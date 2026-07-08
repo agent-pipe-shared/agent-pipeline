@@ -1,0 +1,75 @@
+{
+  "$comment": "pipeline-core hook wiring (Register E11/E23, docs/adr/0013-git-guard-union.md, spec 2026-07-05-elephant-kontext-diaet R-M10, spec 2026-07-06-painkiller AC-G4-1; gate hooks added in the AP1 W-WIRE wave, plan 2026-07-07-ap1-pipeline-tuning + ADR-0027/0029 — this file is TP-4-protected, edited only under explicit PO approval). EIGHT hooks: (1) PreToolUse deny-guard on Bash AND PowerShell tool calls, mirroring all three legacy project settings.json (<PROJECT_A>/<PROJECT_B>/<PROJECT_C>). (2) PreToolUse push-gate guard-push.mjs, SECOND command in the same Bash|PowerShell matcher, deliberately AFTER guard-git (destructive-op denial first, gate policy second): blocks `git push` when verify/security evidence is missing, stale (commit != HEAD) or red, or human approval is absent — evidence-freshness checks only, never computes (10s budget); fail-open without manifest/state. (3) PreToolUse test-path guard on Edit AND Write tool calls (guard-testpath.mjs) — deterministic enforcement of QG-04/GF-04; config-driven, no config -> no-op. (4) PreToolUse dev-plan gate guard-devplan.mjs, SECOND command in the same Edit|Write matcher after guard-testpath: blocks implementation edits while the active feature's plan is not approved in .claude/pipeline-state.json (exempt prefixes docs/ specs/ .claude/ backlog/ + planPath + manifest exemptPaths); fail-open without manifest/state. (5) SessionStart staleness-check — compares the installed pipeline-core plugin SHA against the marketplace remote HEAD and surfaces a bootstrap context line (fresh) or an upgrade systemMessage (stale); matcher covers startup/resume/clear deliberately (clear must re-bootstrap; compact stays deliberately excluded HERE — no re-BOOTSTRAP after compaction; post-compact re-GROUNDING is hook 7's job). (6) Stop stop-suggest — reads manifest+state and suggests the next phase/gate as a systemMessage, plus staged context-budget warnings from the statusline usage file (warn >=100k / overdue >=150k / emergency block >=170k with nag-cap <=2 consecutive blocks then downgrade, dedup marker against repeat chatter — plan 2026-07-07-retro-speed); the block tier is the ONLY decision-block this hook can emit and is persistence-guarded fail-open (write-then-emit). (7) SessionStart post-compact-reground, matcher compact ONLY — emits a German re-ground systemMessage after every /compact (chat language German per ADR-0011/E17, active role/profile, feature+phase from pipeline-state.json read-only); fail-open, NEVER blocks (plan 2026-07-07-retro-speed). (8) SessionStart setup-check, SECOND command in the SAME startup|resume|clear matcher as hook 5 (staleness-check) -- detects whether the Shareable Edition's personalization step (`node setup.mjs`) has run at all (pipeline.user.yaml missing, or present but still carrying its committed default identity markers owner_name=\"Your Name\"/repo_owner=\"your-org\") and reminds the collegue with a systemMessage if not; answers a DIFFERENT question than staleness-check (plugin staleness vs. own-repo personalization), reads pipeline.user.yaml only, fail-open, NEVER blocks (AP2 P3a). Multi-command-per-matcher semantics: Claude Code runs every command in a matcher's hooks array and any exit 2 blocks — pipe-tested per hook; in-session live proof follows the documented cache-refresh path (new hooks enforce only after plugin update + session reload, see the cache-enforcement-latency note in docs/state.md). All invoked via node (required on PATH, v24+ on both machines — docs/state.md toolchain table); ${CLAUDE_PLUGIN_ROOT} is substituted by Claude Code with this plugin's cache directory, so the wiring is path-independent across machines (Windows-safe; the path is quoted against spaces). Exit semantics of all PreToolUse guards: 0 allow, 2 block (stderr to the agent), 1 allow + config warning (stderr to the user). Timeouts in seconds; all hooks are synchronous and typically finish in well under their budget. Fail-open by design — see the why-headers in each hook script.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash|PowerShell",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
+            "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-devplan.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-suggest.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/staleness-check.mjs\"",
+            "timeout": 15
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\"",
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}

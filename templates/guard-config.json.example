@@ -1,0 +1,30 @@
+{
+  "$comment": "Per-project configuration for the pipeline-core guard family (the git-guard and guard-testpath PreToolUse hooks). Copy to <project>/.claude/guard-config.json, adapt, and COMMIT it. NO CONFIG -> NO-OP: if this file is absent, git-guard applies its built-in union rules only and guard-testpath protects nothing at all - both fail safe and silent, which is the normal case. Keys starting with '$' are documentation and are ignored by the guards; documentation lives ONLY in these sibling keys, never as array members (an array entry without a usable 'pattern' is skipped with a warning). Every value below is example data for the fictional project 'acme-notes' - replace it.",
+
+  "protectedTestPaths": [
+    {
+      "id": "TP-1",
+      "pattern": "scripts/verify\\.mjs$",
+      "reason": "verify.mjs is the single verify-gate script - an implementing agent must not weaken it to make its own change pass."
+    },
+    {
+      "id": "TP-2",
+      "pattern": "tests/security/.*\\.test\\.ts$",
+      "reason": "The security test suite gates the auth surface - no ad-hoc edits outside an explicitly briefed test-change task."
+    }
+  ],
+  "$protectedTestPaths": "guard-testpath field: file paths that the Edit and Write tools must not touch. Each entry has 'pattern' (a JS regex body, matched case-insensitively against the file path with backslashes normalized to forward slashes - anchor it with '$' so it fires regardless of the absolute prefix, since two machines have different roots), plus an optional 'reason' (shown to the agent when the write is blocked) and an optional 'id' (defaults to TP-<n> by list position). Escape hatch for a genuine, intended test change: the PO removes the entry here (a git-tracked edit) or edits the file outside the session - the guard binds agents, not humans.",
+
+  "extraDenyPatterns": [
+    {
+      "id": "PX-1",
+      "pattern": "\\brm\\s+-[a-z]*rf?[a-z]*\\b[^|&;]*acme-notes",
+      "reason": "rm -rf on the acme-notes repo folder is blocked - machine-path rules are re-added per project because the central guard stays path-independent."
+    },
+    {
+      "pattern": "\\bnpm\\s+run\\s+db:reset\\b",
+      "reason": "db:reset wipes the local dev database - run it by hand, deliberately."
+    }
+  ],
+  "$extraDenyPatterns": "git-guard field: project-specific Bash/PowerShell deny rules added ON TOP of the built-in union (config, never a fork of the hook). Each entry has 'pattern' (a JS regex body, matched case-insensitively against the quote-stripped command), a 'reason' (shown to the agent when the command is blocked), and an optional 'id' (defaults to PX-<n> by list position). A blocked command can still be run through the double-confirmation override procedure, or by the PO in their own terminal."
+}

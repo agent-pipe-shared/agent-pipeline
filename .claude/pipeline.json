@@ -1,0 +1,23 @@
+{
+  "$comment": "Project calibration of the agent-pipeline repo ITSELF (self-application E13/ADR-0015, A12 mechanism). Schema: close-block SKILL.md step-0 field table / operating-model SS8 (JSON decided 2026-07-03). Keys starting with '$' are documentation. Denies do NOT live here (E8/E11): this repo relies on the git-guard union shipped by its own plugin.",
+  "project": "agent-pipeline",
+  "verify": "node harness/scripts/verify.mjs",
+  "$verify": "THE one gate command (E5) of this docs+guardrails repo: the verify wrapper (harness/scripts/verify.mjs, AC-G4-2) runs the full guard-family test set (guard-git.test.mjs: 1 block + 1 allow case per deny rule, quote-stripping, segment scoping, guard-config, override, global-option-normalization cases; guard-testpath.test.mjs: test-path PreToolUse guard cases) and writes a machine-generated JSON evidence artifact (evidence/verify-latest.json, schema pipeline.verify-evidence.v0, git-ignored — QG-03).",
+  "handover": "docs/state.md",
+  "autonomy": "interactive",
+  "branchModel": "direct-main",
+  "verification": "docs+tests",
+  "wipLimit": 1,
+  "worktree": "optional",
+  "claudeMdMaxLines": 200,
+  "stakes": "hoch (Guardrail-Quelle aller Projekte)",
+  "constraints": [
+    "CLAUDE.md hard rules"
+  ],
+  "ritualExtensions": {
+    "$comment": "Real A12 extension (not fictional): close.pre runs the CLAUDE.md length gate before every close of this repo.",
+    "close.pre": [
+      "node harness/scripts/check-claude-md-lines.mjs"
+    ]
+  }
+}

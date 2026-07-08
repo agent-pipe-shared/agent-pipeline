@@ -1,0 +1,5 @@
+{
+  "$comment": "Generic example license allowlist (enforcing policy) -- fixture content, not a real company's actual list. A dependency's declared license must appear under 'allow' to pass the automated security-scan gate; any license under 'deny' fails it outright. Licenses absent from both lists are treated as 'unknown' by the consuming scanner and typically require the same explicit exception path as a denied license (project-defined, not decided by this fixture).",
+  "allow": ["MIT", "Apache-2.0", "BSD-2-Clause", "BSD-3-Clause", "ISC"],
+  "deny": ["GPL-3.0-only", "AGPL-3.0-only"]
+}

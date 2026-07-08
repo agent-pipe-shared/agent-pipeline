@@ -1,0 +1,1204 @@
+#!/usr/bin/env node
+/**
+ * stop-suggest.test.mjs — test suite for the Stop-hook next-step suggester
+ * (stop-suggest.mjs, task AP1-P5 "OIN").
+ *
+ * Coverage contract (briefing DoD case classes):
+ *   - no manifest (loadManifestSafe -> null, absent file) -> silent
+ *   - manifest invalid (loadManifestSafe -> null, schema/semantic violation) -> silent
+ *   - no state file -> silent
+ *   - no activeFeature -> silent
+ *   - malformed state JSON -> silent
+ *   - mid-phase -> correct next suggestion (exact German message asserted)
+ *   - disabled phase skipped (never appears as "next")
+ *   - condition-false phase (has_ui:false) skipped
+ *   - has_ui:true includes ui-design
+ *   - last phase -> completion message
+ *   - planApproved:false entering implementation -> mentions missing approval
+ *   - unknown mode string -> no crash
+ *   - subprocess smoke (real script spawn, fixture cwd, exit 0 + JSON shape)
+ *
+ * Test strategy (mirrors staleness-check.test.mjs): the pure resolver functions
+ * (`loadStateSafe`, `resolveSuggestion`, `decideOutput`) are imported directly and exercised
+ * with plain constructed manifest/state objects (or, for the file-reading paths, tiny
+ * fixture files) - no real repo state is read except in the two "real manifest.mjs
+ * integration" cases (absent/invalid manifest via the real `loadManifestSafe`) and the final
+ * subprocess smoke. `run()` / the full CLI is additionally verified by spawning the real
+ * script as a subprocess with `CLAUDE_PROJECT_DIR` pointed at a fixture repo root (existing
+ * repo convention, see guard-git.test.mjs / staleness-check.test.mjs).
+ *
+ * Run:   node plugins/pipeline-core/hooks/stop-suggest.test.mjs
+ * Exit:  0 = all cases pass · 1 = at least one case failed (failure list on stdout).
+ */
+import { spawnSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+import { loadManifestSafe } from "../lib/manifest.mjs";
+import {
+  PHASE_GATE_MAP,
+  loadStateSafe,
+  resolveSuggestion,
+  decideOutput,
+  resolveSessionIdFromInput,
+  resolveStopHookActiveFromInput,
+  usageFilePath,
+  loadUsageSafe,
+  resolveTotalTokensFromUsage,
+  resolveUsedPctFromUsage,
+  contextTier,
+  buildContextMessage,
+  resolveUpdatedAtMs,
+  isUsageStale,
+  buildStaleMessage,
+  USAGE_STALE_THRESHOLD_MS,
+  markerPath,
+  loadMarkerSafe,
+  writeMarkerSafe,
+  decideCombinedOutput,
+  applyPersistenceGuard,
+} from "./stop-suggest.mjs";
+
+const SCRIPT = fileURLToPath(new URL("./stop-suggest.mjs", import.meta.url));
+
+let pass = 0;
+const failures = [];
+function ok(id, condition, detail) {
+  if (condition) {
+    pass++;
+    console.log(`PASS  ${id}`);
+  } else {
+    failures.push(`${id}${detail !== undefined ? `: ${detail}` : ""}`);
+    console.log(`FAIL  ${id}${detail !== undefined ? ` — ${detail}` : ""}`);
+  }
+}
+
+const WORKDIR = mkdtempSync(join(tmpdir(), "stop-suggest-test-"));
+function fixtureDir(name) {
+  const dir = join(WORKDIR, name);
+  mkdirSync(dir, { recursive: true });
+  return dir;
+}
+function writeJson(path, obj) {
+  writeFileSync(path, JSON.stringify(obj, null, 2));
+}
+function writeRaw(path, text) {
+  writeFileSync(path, text);
+}
+
+// ---- fixture manifest builder (plain JS objects, bypasses the YAML/schema layer on
+// purpose - manifest.mjs's own suite already covers that layer; here we only need
+// activePhases()/gateConfig()-shaped input) --------------------------------------------------
+function manifestFixture({ uiEnabled = true, hasUi = false, secScanEnabled = true, secMode = "blocking", devPlanMode = "blocking", pushMode = "blocking", profile = "full-sdlc" } = {}) {
+  return {
+    schema: "pipeline.manifest.v0",
+    phases: [
+      { name: "design", enabled: true },
+      { name: "implementation", enabled: true },
+      { name: "security-scan", enabled: secScanEnabled },
+      { name: "ui-design", enabled: uiEnabled, condition: "has_ui" },
+    ],
+    gates: {
+      "dev-plan": { mode: devPlanMode, type: "human" },
+      push: { mode: pushMode, type: "human" },
+      security: { mode: secMode, type: "automated" },
+    },
+    profiles: {
+      active: profile,
+      [profile]: { phases: ["design", "implementation", "security-scan", "ui-design"] },
+    },
+    flags: { has_ui: hasUi },
+  };
+}
+
+function stateFixture(phase, extra = {}) {
+  return { schema: "pipeline.state.v0", activeFeature: { id: "F1", phase, ...extra } };
+}
+
+// ======================================================================================
+// PHASE_GATE_MAP sanity
+// ======================================================================================
+ok("PHASE_GATE_MAP maps implementation -> dev-plan gate, no command", PHASE_GATE_MAP.implementation.gate === "dev-plan" && PHASE_GATE_MAP.implementation.command === null);
+ok(
+  "PHASE_GATE_MAP maps security-scan -> security gate + scan command",
+  PHASE_GATE_MAP["security-scan"].gate === "security" && PHASE_GATE_MAP["security-scan"].command === "node harness/scripts/security-scan.mjs",
+);
+
+// ======================================================================================
+// no manifest / manifest invalid -> silent (real manifest.mjs integration)
+// ======================================================================================
+{
+  const rootDir = fixtureDir("manifest-absent");
+  mkdirSync(join(rootDir, ".claude"), { recursive: true });
+  // .claude/pipeline.yaml intentionally NOT written.
+  const manifest = loadManifestSafe(rootDir);
+  ok("loadManifestSafe returns null when the manifest file is absent", manifest === null);
+  const { stdout } = decideOutput(manifest, stateFixture("implementation"));
+  ok("decideOutput: no manifest -> silent (empty stdout)", stdout === "", stdout);
+}
+
+{
+  const rootDir = fixtureDir("manifest-invalid");
+  mkdirSync(join(rootDir, ".claude"), { recursive: true });
+  writeRaw(join(rootDir, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\nphases:\n  - name: design\n    enabled: not-a-boolean\n");
+  const manifest = loadManifestSafe(rootDir);
+  ok("loadManifestSafe returns null for a schema-invalid manifest", manifest === null);
+  const { stdout } = decideOutput(manifest, stateFixture("implementation"));
+  ok("decideOutput: invalid manifest -> silent (empty stdout)", stdout === "", stdout);
+}
+
+// ======================================================================================
+// no state file / malformed state JSON -> silent
+// ======================================================================================
+{
+  const state = loadStateSafe(join(WORKDIR, "does-not-exist", "pipeline-state.json"));
+  ok("loadStateSafe returns null when the state file is missing", state === null);
+  const { stdout } = decideOutput(manifestFixture(), state);
+  ok("decideOutput: no state file -> silent (empty stdout)", stdout === "", stdout);
+}
+
+{
+  const dir = fixtureDir("state-malformed");
+  const statePath = join(dir, "pipeline-state.json");
+  writeRaw(statePath, "{ this is not valid JSON ][");
+  const state = loadStateSafe(statePath);
+  ok("loadStateSafe returns null on malformed JSON", state === null);
+  const { stdout } = decideOutput(manifestFixture(), state);
+  ok("decideOutput: malformed state -> silent (empty stdout)", stdout === "", stdout);
+}
+
+// ======================================================================================
+// no activeFeature -> silent
+// ======================================================================================
+{
+  const state = { schema: "pipeline.state.v0" };
+  const message = resolveSuggestion(manifestFixture(), state);
+  ok("resolveSuggestion: no activeFeature -> null (silent)", message === null, message);
+}
+
+{
+  const message = resolveSuggestion(manifestFixture(), { schema: "pipeline.state.v0", activeFeature: { id: "F1" } });
+  ok("resolveSuggestion: activeFeature without phase -> null (silent)", message === null, message);
+}
+
+// ======================================================================================
+// unknown / inactive phase -> silent
+// ======================================================================================
+{
+  const message = resolveSuggestion(manifestFixture(), stateFixture("does-not-exist"));
+  ok("resolveSuggestion: phase not in active-phase list -> null (silent)", message === null, message);
+}
+
+// ======================================================================================
+// mid-phase -> correct next suggestion (exact German message)
+// ======================================================================================
+{
+  const manifest = manifestFixture({ secMode: "blocking" });
+  const message = resolveSuggestion(manifest, stateFixture("implementation"));
+  const expected = 'Pipeline: Phase "implementation" aktiv → nächster Schritt: "security-scan" (Gate: security, mode: blocking). Prüfung: node harness/scripts/security-scan.mjs';
+  ok("resolveSuggestion: implementation -> security-scan exact German message", message === expected, message);
+}
+
+// ======================================================================================
+// disabled phase skipped (security-scan disabled -> never the "next" phase)
+// ======================================================================================
+{
+  const manifest = manifestFixture({ secScanEnabled: false, hasUi: false });
+  const message = resolveSuggestion(manifest, stateFixture("implementation"));
+  ok("resolveSuggestion: disabled security-scan is skipped -> no mention of it", message !== null && !message.includes("security-scan"), message);
+  ok("resolveSuggestion: disabled security-scan skipped -> implementation becomes the last active phase (completion message)", message !== null && message.includes("Push-Gate"), message);
+}
+
+// ======================================================================================
+// condition-false phase (has_ui:false) skipped
+// ======================================================================================
+{
+  const manifest = manifestFixture({ hasUi: false });
+  const message = resolveSuggestion(manifest, stateFixture("security-scan"));
+  ok("resolveSuggestion: has_ui false -> ui-design skipped, security-scan is the last active phase", message !== null && message.includes("Push-Gate") && !message.includes("ui-design"), message);
+}
+
+// ======================================================================================
+// has_ui:true includes ui-design
+// ======================================================================================
+{
+  const manifest = manifestFixture({ hasUi: true });
+  const message = resolveSuggestion(manifest, stateFixture("security-scan"));
+  ok("resolveSuggestion: has_ui true -> next phase after security-scan is ui-design", message === 'Pipeline: Phase "security-scan" aktiv → nächster Schritt: "ui-design".', message);
+}
+
+// ======================================================================================
+// last phase -> completion message
+// ======================================================================================
+{
+  const manifest = manifestFixture({ hasUi: false, secScanEnabled: true, pushMode: "blocking" });
+  const message = resolveSuggestion(manifest, stateFixture("security-scan"));
+  const expected = 'Pipeline: alle Phasen von Profil "full-sdlc" durchlaufen — Push-Gate (mode: blocking) ist der letzte Schritt.';
+  ok("resolveSuggestion: last active phase -> exact completion message", message === expected, message);
+}
+
+// ======================================================================================
+// planApproved:false entering implementation -> mentions missing approval
+// ======================================================================================
+{
+  const manifest = manifestFixture({ devPlanMode: "blocking" });
+  const message = resolveSuggestion(manifest, stateFixture("design", { planApproved: false }));
+  ok("resolveSuggestion: planApproved false -> message mentions the missing approval", message !== null && message.includes("planApproved") && message.includes("fehlt"), message);
+  ok("resolveSuggestion: planApproved false -> gate clause names dev-plan", message.includes("Gate: dev-plan"), message);
+}
+
+{
+  const manifest = manifestFixture({ devPlanMode: "blocking" });
+  const message = resolveSuggestion(manifest, stateFixture("design", { planApproved: true }));
+  ok("resolveSuggestion: planApproved true -> no missing-approval hint", message !== null && !message.includes("fehlt"), message);
+}
+
+{
+  // planApproved entirely absent (not just false) must be treated the same as false.
+  const manifest = manifestFixture({ devPlanMode: "blocking" });
+  const message = resolveSuggestion(manifest, stateFixture("design"));
+  ok("resolveSuggestion: planApproved absent -> treated as not approved (mentions missing approval)", message.includes("fehlt"), message);
+}
+
+// ======================================================================================
+// unknown mode string -> no crash
+// ======================================================================================
+{
+  const manifest = manifestFixture({ secMode: "supervised" }); // not in the blocking|warn|off enum
+  let message = null;
+  let threw = false;
+  try {
+    message = resolveSuggestion(manifest, stateFixture("implementation"));
+  } catch {
+    threw = true;
+  }
+  ok("resolveSuggestion: unrecognized gate mode string does not throw", threw === false);
+  ok("resolveSuggestion: unrecognized gate mode string is echoed verbatim", message !== null && message.includes("mode: supervised"), message);
+}
+
+{
+  // Gate referenced by PHASE_GATE_MAP but entirely absent from manifest.gates.
+  const manifest = manifestFixture();
+  delete manifest.gates.security;
+  let threw = false;
+  let message = null;
+  try {
+    message = resolveSuggestion(manifest, stateFixture("implementation"));
+  } catch {
+    threw = true;
+  }
+  ok("resolveSuggestion: gate missing from manifest.gates does not throw", threw === false);
+  ok("resolveSuggestion: gate missing from manifest.gates falls back to 'unbekannt' mode", message !== null && message.includes("mode: unbekannt"), message);
+}
+
+// ======================================================================================
+// subprocess smoke (real script spawn, fixture repo root, exit 0 + JSON shape)
+// ======================================================================================
+function runCli(fakeProjectDir) {
+  const res = spawnSync(process.execPath, [SCRIPT], {
+    encoding: "utf8",
+    env: { ...process.env, CLAUDE_PROJECT_DIR: fakeProjectDir },
+  });
+  return { status: res.status, stdout: res.stdout ?? "", stderr: res.stderr ?? "" };
+}
+
+{
+  const rootDir = fixtureDir("smoke-suggestion");
+  mkdirSync(join(rootDir, ".claude"), { recursive: true });
+  writeRaw(
+    join(rootDir, ".claude", "pipeline.yaml"),
+    [
+      "schema: pipeline.manifest.v0",
+      "phases:",
+      "  - name: design",
+      "    enabled: true",
+      "  - name: implementation",
+      "    enabled: true",
+      "  - name: security-scan",
+      "    enabled: true",
+      "gates:",
+      "  dev-plan:",
+      "    mode: blocking",
+      "    type: human",
+      "  push:",
+      "    mode: blocking",
+      "    type: human",
+      "  security:",
+      "    mode: blocking",
+      "    type: automated",
+      "profiles:",
+      "  active: full-sdlc",
+      "  full-sdlc:",
+      "    phases:",
+      "      - design",
+      "      - implementation",
+      "      - security-scan",
+      "",
+    ].join("\n"),
+  );
+  writeJson(join(rootDir, ".claude", "pipeline-state.json"), stateFixture("implementation"));
+
+  const { status, stdout, stderr } = runCli(rootDir);
+  ok("CLI smoke (suggestion case): exit 0", status === 0, `status=${status} stderr=${stderr}`);
+  let parsed = null;
+  try {
+    parsed = JSON.parse(stdout);
+  } catch {
+    /* leave null, asserted below */
+  }
+  ok("CLI smoke (suggestion case): stdout is valid JSON", parsed !== null, stdout);
+  ok("CLI smoke (suggestion case): systemMessage present", typeof parsed?.systemMessage === "string" && parsed.systemMessage.length > 0, stdout);
+  ok("CLI smoke (suggestion case): systemMessage names security-scan", parsed?.systemMessage?.includes("security-scan") === true, stdout);
+  ok("CLI smoke (suggestion case): hookSpecificOutput.hookEventName is Stop", parsed?.hookSpecificOutput?.hookEventName === "Stop");
+  ok(
+    "CLI smoke (suggestion case): additionalContext mirrors systemMessage",
+    parsed?.hookSpecificOutput?.additionalContext === parsed?.systemMessage,
+  );
+}
+
+{
+  // No manifest at all in this fixture root -> silent CLI, still exit 0.
+  const rootDir = fixtureDir("smoke-silent");
+  mkdirSync(join(rootDir, ".claude"), { recursive: true });
+  const { status, stdout, stderr } = runCli(rootDir);
+  ok("CLI smoke (no manifest): exit 0", status === 0, `status=${status} stderr=${stderr}`);
+  ok("CLI smoke (no manifest): empty stdout (silent)", stdout === "", stdout);
+}
+
+// ==========================================================================================
+// G-B EXTENSION (`.claude/plans/2026-07-07-retro-speed.md` package G-B): context-budget
+// staged mechanics + suggestion dedup + block-tier nag-cap. Everything above this marker is
+// the ORIGINAL pre-G-B suite (unmodified) -- the 35 cases must all still pass, proving the
+// phase-suggestion contract stayed byte-compatible.
+// ==========================================================================================
+
+// ---- resolveSessionIdFromInput (pure) ---------------------------------------------------
+ok("resolveSessionIdFromInput: valid {session_id} -> the string", resolveSessionIdFromInput({ session_id: "sess-1" }) === "sess-1");
+ok("resolveSessionIdFromInput: null input -> null", resolveSessionIdFromInput(null) === null);
+ok("resolveSessionIdFromInput: object without session_id -> null", resolveSessionIdFromInput({}) === null);
+ok("resolveSessionIdFromInput: empty-string session_id -> null", resolveSessionIdFromInput({ session_id: "" }) === null);
+ok("resolveSessionIdFromInput: non-string session_id -> null", resolveSessionIdFromInput({ session_id: 123 }) === null);
+
+// ---- contextTier boundaries (pure) -------------------------------------------------------
+// P2 fix (Design-Entscheid 2026-07-08): contextTier now tiers on usedPct (0-100), not on
+// absolute totalTokens -- the boundaries below are chosen so a 200k window behaves BYTE-
+// IDENTICALLY to the old absolute thresholds (50% = 100k, 75% = 150k, 85% = 170k).
+ok('contextTier: null -> "none"', contextTier(null) === "none");
+ok('contextTier: non-finite (NaN) -> "none"', contextTier(NaN) === "none");
+ok('contextTier: 49 -> "none"', contextTier(49) === "none");
+ok('contextTier: 50 -> "warn" (boundary; 200k-equivalent: 100k)', contextTier(50) === "warn");
+ok('contextTier: 74 -> "warn"', contextTier(74) === "warn");
+ok('contextTier: 75 -> "overdue" (boundary; 200k-equivalent: 150k)', contextTier(75) === "overdue");
+ok('contextTier: 84 -> "overdue"', contextTier(84) === "overdue");
+ok('contextTier: 85 -> "block" (boundary; 200k-equivalent: 170k, NEVER below this)', contextTier(85) === "block");
+ok('contextTier: 100 -> "block"', contextTier(100) === "block");
+// 1M-window correctness: 34% used on a 1M window is 340k real tokens -- old absolute logic
+// would have hit "block" (>=170k) immediately; percentage-based tiering correctly stays "none".
+ok('contextTier: 1M-window at 34% used -> "none" (NO spurious block; 340k real tokens)', contextTier(34) === "none");
+
+// ---- buildContextMessage wording (pure) --------------------------------------------------
+ok('buildContextMessage: tier "none" -> null', buildContextMessage("none", 50000) === null);
+{
+  const msg = buildContextMessage("warn", 120000);
+  ok('buildContextMessage: tier "warn" mentions Übergabefenster + token count', msg.includes("Übergabefenster") && msg.includes("120k"), msg);
+}
+{
+  const msg = buildContextMessage("overdue", 155000);
+  ok('buildContextMessage: tier "overdue" mentions ÜBERFÄLLIG + token count', msg.includes("ÜBERFÄLLIG") && msg.includes("155k"), msg);
+}
+{
+  const msg = buildContextMessage("block", 175000);
+  ok('buildContextMessage: tier "block" mentions NOTBREMSE + token count', msg.includes("NOTBREMSE") && msg.includes("175k"), msg);
+}
+
+// ---- usageFilePath / loadUsageSafe / resolveTotalTokensFromUsage ------------------------
+{
+  const rootDir = fixtureDir("gb-usage-path");
+  ok(
+    "usageFilePath: builds .claude/.usage-<session_id>.json under rootDir",
+    usageFilePath(rootDir, "sess-1") === join(rootDir, ".claude", ".usage-sess-1.json"),
+  );
+}
+{
+  const usage = loadUsageSafe(join(WORKDIR, "gb-usage-absent", ".claude", ".usage-none.json"));
+  ok("loadUsageSafe: missing file -> null", usage === null);
+}
+{
+  const dir = fixtureDir("gb-usage-malformed");
+  const p = join(dir, "usage.json");
+  writeRaw(p, "{ not json ][");
+  ok("loadUsageSafe: malformed JSON -> null", loadUsageSafe(p) === null);
+}
+{
+  const dir = fixtureDir("gb-usage-valid");
+  const p = join(dir, "usage.json");
+  writeJson(p, { usedPct: 62, totalTokens: 124000, updatedAt: "2026-07-07T00:00:00.000Z" });
+  const usage = loadUsageSafe(p);
+  ok("loadUsageSafe: valid JSON -> parsed object", usage !== null && usage.totalTokens === 124000, JSON.stringify(usage));
+}
+ok("resolveTotalTokensFromUsage: valid numeric totalTokens -> the number", resolveTotalTokensFromUsage({ totalTokens: 42000 }) === 42000);
+ok("resolveTotalTokensFromUsage: missing totalTokens -> null", resolveTotalTokensFromUsage({}) === null);
+ok("resolveTotalTokensFromUsage: non-numeric totalTokens -> null", resolveTotalTokensFromUsage({ totalTokens: "lots" }) === null);
+ok("resolveTotalTokensFromUsage: null usage -> null", resolveTotalTokensFromUsage(null) === null);
+
+// ---- resolveUsedPctFromUsage (pure, P2 fix) ----------------------------------------------
+ok("resolveUsedPctFromUsage: valid numeric usedPct -> the number", resolveUsedPctFromUsage({ usedPct: 42 }) === 42);
+ok("resolveUsedPctFromUsage: missing usedPct -> null", resolveUsedPctFromUsage({}) === null);
+ok("resolveUsedPctFromUsage: non-numeric usedPct -> null", resolveUsedPctFromUsage({ usedPct: "lots" }) === null);
+ok("resolveUsedPctFromUsage: null usage -> null", resolveUsedPctFromUsage(null) === null);
+ok("resolveUsedPctFromUsage: out-of-range usedPct (150) -> null", resolveUsedPctFromUsage({ usedPct: 150 }) === null);
+ok("resolveUsedPctFromUsage: negative usedPct -> null", resolveUsedPctFromUsage({ usedPct: -5 }) === null);
+ok("resolveUsedPctFromUsage: boundary 0 -> 0", resolveUsedPctFromUsage({ usedPct: 0 }) === 0);
+ok("resolveUsedPctFromUsage: boundary 100 -> 100", resolveUsedPctFromUsage({ usedPct: 100 }) === 100);
+
+// ---- markerPath / loadMarkerSafe / writeMarkerSafe --------------------------------------
+{
+  const rootDir = fixtureDir("gb-marker-path");
+  ok(
+    "markerPath: builds .claude/.stop-suggest-<session_id>.json under rootDir",
+    markerPath(rootDir, "sess-1") === join(rootDir, ".claude", ".stop-suggest-sess-1.json"),
+  );
+}
+{
+  const marker = loadMarkerSafe(join(WORKDIR, "gb-marker-absent", ".claude", ".stop-suggest-none.json"));
+  ok("loadMarkerSafe: missing file -> null", marker === null);
+}
+{
+  const dir = fixtureDir("gb-marker-roundtrip");
+  const p = join(dir, ".claude", ".stop-suggest-sess-1.json");
+  const wrote = writeMarkerSafe(p, { lastFingerprint: "foo::warn", consecutiveBlocks: 1 });
+  ok("writeMarkerSafe: reports success", wrote === true);
+  const readBack = loadMarkerSafe(p);
+  ok(
+    "writeMarkerSafe + loadMarkerSafe: round-trips the marker shape",
+    readBack !== null && readBack.lastFingerprint === "foo::warn" && readBack.consecutiveBlocks === 1,
+    JSON.stringify(readBack),
+  );
+}
+{
+  // ".claude" exists as a FILE (not a directory) -> writeFileSync must fail (ENOTDIR) ->
+  // writeMarkerSafe fails closed (returns false), never throws.
+  const dir = fixtureDir("gb-marker-unwritable");
+  writeRaw(join(dir, ".claude"), "not a directory");
+  const p = join(dir, ".claude", ".stop-suggest-sess-1.json");
+  let threw = false;
+  let wrote = null;
+  try {
+    wrote = writeMarkerSafe(p, { lastFingerprint: "x", consecutiveBlocks: 0 });
+  } catch {
+    threw = true;
+  }
+  ok("writeMarkerSafe: unwritable target never throws", threw === false);
+  ok("writeMarkerSafe: unwritable target reports failure", wrote === false);
+}
+
+// ---- decideCombinedOutput (pure) -- the dedup + nag-cap decision core -------------------
+{
+  const { stdout, marker } = decideCombinedOutput({ phaseMessage: null, tier: "none", contextMessage: null, priorMarker: null });
+  ok('decideCombinedOutput: nothing to say, no prior marker -> silent, marker null', stdout === "" && marker === null);
+}
+{
+  const { stdout, marker } = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "none",
+    contextMessage: null,
+    priorMarker: { lastFingerprint: "stale::warn", consecutiveBlocks: 2 },
+  });
+  ok(
+    "decideCombinedOutput: nothing to say but a stale marker exists -> silent, nag counter reset to 0",
+    stdout === "" && marker !== null && marker.consecutiveBlocks === 0,
+    JSON.stringify(marker),
+  );
+}
+{
+  // First turn ever (no prior marker): a phase suggestion with tier "none" always emits.
+  const { stdout, marker } = decideCombinedOutput({
+    phaseMessage: "Pipeline: Phase X",
+    tier: "none",
+    contextMessage: null,
+    priorMarker: null,
+  });
+  ok("decideCombinedOutput: first turn, phase message only -> emits", stdout !== "" && stdout.includes("Pipeline: Phase X"), stdout);
+  ok(
+    'decideCombinedOutput: first turn -> marker fingerprint is "<phase>::none"',
+    marker.lastFingerprint === "Pipeline: Phase X::none" && marker.consecutiveBlocks === 0,
+    JSON.stringify(marker),
+  );
+}
+{
+  // Second turn, IDENTICAL phase message + tier as the prior marker -> dedup silences it.
+  const priorMarker = { lastFingerprint: "Pipeline: Phase X::none", consecutiveBlocks: 0 };
+  const { stdout, marker } = decideCombinedOutput({ phaseMessage: "Pipeline: Phase X", tier: "none", contextMessage: null, priorMarker });
+  ok("decideCombinedOutput: identical phase+tier as last turn -> silent (dedup)", stdout === "", stdout);
+  ok("decideCombinedOutput: dedup case still refreshes the marker (same fingerprint)", marker.lastFingerprint === priorMarker.lastFingerprint);
+}
+{
+  // Phase message CHANGES (pipeline-state changed) -> re-emits despite an existing marker.
+  const priorMarker = { lastFingerprint: "Pipeline: Phase X::none", consecutiveBlocks: 0 };
+  const { stdout } = decideCombinedOutput({ phaseMessage: "Pipeline: Phase Y", tier: "none", contextMessage: null, priorMarker });
+  ok("decideCombinedOutput: phase message change -> re-emits", stdout !== "" && stdout.includes("Pipeline: Phase Y"), stdout);
+}
+{
+  // Tier CHANGES (none -> warn), same phase message -> re-emits.
+  const priorMarker = { lastFingerprint: "Pipeline: Phase X::none", consecutiveBlocks: 0 };
+  const { stdout } = decideCombinedOutput({
+    phaseMessage: "Pipeline: Phase X",
+    tier: "warn",
+    contextMessage: buildContextMessage("warn", 120000),
+    priorMarker,
+  });
+  ok("decideCombinedOutput: tier change (none -> warn) -> re-emits", stdout !== "" && stdout.includes("Übergabefenster"), stdout);
+}
+{
+  // First consecutive block turn (priorMarker null) -> decision:"block" present.
+  const { stdout, marker } = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "block",
+    contextMessage: buildContextMessage("block", 175000),
+    priorMarker: null,
+  });
+  const parsed = JSON.parse(stdout);
+  ok('decideCombinedOutput: 1st consecutive block turn -> decision "block"', parsed.decision === "block", stdout);
+  ok("decideCombinedOutput: 1st consecutive block turn -> reason present", typeof parsed.reason === "string" && parsed.reason.includes("NOTBREMSE"));
+  ok("decideCombinedOutput: 1st consecutive block turn -> marker.consecutiveBlocks 1", marker.consecutiveBlocks === 1, JSON.stringify(marker));
+}
+{
+  // Second consecutive block turn -> STILL decision:"block" (nag-cap allows 2).
+  const priorMarker = { lastFingerprint: "∅::block", consecutiveBlocks: 1 };
+  const { stdout, marker } = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "block",
+    contextMessage: buildContextMessage("block", 176000),
+    priorMarker,
+  });
+  const parsed = JSON.parse(stdout);
+  ok('decideCombinedOutput: 2nd consecutive block turn -> STILL decision "block"', parsed.decision === "block", stdout);
+  ok("decideCombinedOutput: 2nd consecutive block turn -> marker.consecutiveBlocks 2", marker.consecutiveBlocks === 2, JSON.stringify(marker));
+}
+{
+  // Second consecutive block turn bypasses dedup EVEN THOUGH the fingerprint would match
+  // (same phaseMessage=null, same tier "block") -- the emergency brake must be felt every
+  // one of its allotted consecutive turns, never silently deduped away.
+  const priorMarker = { lastFingerprint: "∅::block", consecutiveBlocks: 1 };
+  const { stdout } = decideCombinedOutput({ phaseMessage: null, tier: "block", contextMessage: buildContextMessage("block", 175500), priorMarker });
+  ok("decideCombinedOutput: active block turn is NEVER deduped, even with a matching fingerprint", stdout !== "", stdout);
+}
+{
+  // Third consecutive block turn -> CAPPED: downgraded, no `decision` field, downgrade note present.
+  const priorMarker = { lastFingerprint: "∅::block", consecutiveBlocks: 2 };
+  const { stdout, marker } = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "block",
+    contextMessage: buildContextMessage("block", 177000),
+    priorMarker,
+  });
+  const parsed = JSON.parse(stdout);
+  ok("decideCombinedOutput: 3rd consecutive block turn -> NO decision field (downgraded)", parsed.decision === undefined, stdout);
+  ok(
+    "decideCombinedOutput: 3rd consecutive block turn -> downgrade note present",
+    parsed.systemMessage.includes("heruntergestuft"),
+    parsed.systemMessage,
+  );
+  ok("decideCombinedOutput: 3rd consecutive block turn -> marker.consecutiveBlocks 3", marker.consecutiveBlocks === 3, JSON.stringify(marker));
+}
+{
+  // The downgraded (capped) block turn IS subject to normal dedup: a FOURTH consecutive
+  // turn with the identical phase message + tier, whose prior marker already carries the
+  // "block-downgraded" fingerprint from the 3rd turn, goes silent.
+  const priorMarker = { lastFingerprint: "∅::block-downgraded", consecutiveBlocks: 3 };
+  const { stdout, marker } = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "block",
+    contextMessage: buildContextMessage("block", 178000),
+    priorMarker,
+  });
+  ok("decideCombinedOutput: downgraded block turn IS deduped once its fingerprint repeats", stdout === "", stdout);
+  ok("decideCombinedOutput: downgraded+deduped turn still counts toward consecutiveBlocks", marker.consecutiveBlocks === 4, JSON.stringify(marker));
+}
+{
+  // Tier drops out of "block" (context got cut) -> consecutiveBlocks resets to 0.
+  const priorMarker = { lastFingerprint: "∅::block-downgraded", consecutiveBlocks: 4 };
+  const { marker } = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "overdue",
+    contextMessage: buildContextMessage("overdue", 155000),
+    priorMarker,
+  });
+  ok("decideCombinedOutput: tier drops below block -> consecutiveBlocks resets to 0", marker.consecutiveBlocks === 0, JSON.stringify(marker));
+}
+{
+  // NEVER block below 170k: tier "overdue", regardless of any prior consecutiveBlocks value,
+  // must never carry a `decision` field.
+  const priorMarker = { lastFingerprint: "∅::block", consecutiveBlocks: 9 };
+  const { stdout } = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "overdue",
+    contextMessage: buildContextMessage("overdue", 155000),
+    priorMarker,
+  });
+  const parsed = JSON.parse(stdout);
+  ok("decideCombinedOutput: tier overdue NEVER carries decision:block", parsed.decision === undefined, stdout);
+}
+
+// ---- G-B CLI end-to-end (real subprocess, real usage/marker files on disk) -------------
+function runCliWithStdin(fakeProjectDir, inputObj) {
+  const res = spawnSync(process.execPath, [SCRIPT], {
+    input: JSON.stringify(inputObj),
+    encoding: "utf8",
+    env: { ...process.env, CLAUDE_PROJECT_DIR: fakeProjectDir },
+  });
+  return { status: res.status, stdout: res.stdout ?? "", stderr: res.stderr ?? "" };
+}
+
+function writeGbFixture(rootDir, { phase = "implementation" } = {}) {
+  mkdirSync(join(rootDir, ".claude"), { recursive: true });
+  writeRaw(
+    join(rootDir, ".claude", "pipeline.yaml"),
+    [
+      "schema: pipeline.manifest.v0",
+      "phases:",
+      "  - name: design",
+      "    enabled: true",
+      "  - name: implementation",
+      "    enabled: true",
+      "  - name: security-scan",
+      "    enabled: true",
+      "gates:",
+      "  dev-plan:",
+      "    mode: blocking",
+      "    type: human",
+      "  push:",
+      "    mode: blocking",
+      "    type: human",
+      "  security:",
+      "    mode: blocking",
+      "    type: automated",
+      "profiles:",
+      "  active: full-sdlc",
+      "  full-sdlc:",
+      "    phases:",
+      "      - design",
+      "      - implementation",
+      "      - security-scan",
+      "",
+    ].join("\n"),
+  );
+  writeJson(join(rootDir, ".claude", "pipeline-state.json"), stateFixture(phase));
+}
+
+// P2 fix (Design-Entscheid 2026-07-08): usedPct now drives the tier -- callers must pass the
+// pct explicitly (no longer hardcoded to 50, which silently drove every old caller's tier
+// through totalTokens instead). totalTokens stays real/independent -- it only feeds the
+// DISPLAY text (Kontext {k}k), never the tier decision.
+// STALE-DETECTION fixture fix (context-counter hardening, PO-directive 2026-07-08): `updatedAt`
+// now defaults to the REAL current time (`new Date().toISOString()`), not a hardcoded past
+// literal -- every pre-existing caller of this helper writes a snapshot meant to simulate a
+// FRESH usage file (that was always the implicit intent; `updatedAt` was previously present
+// only as boilerplate schema shape, never asserted on). A fixed past literal would grow stale
+// relative to the real `Date.now()` `run()` reads with every day that passes after it was
+// written, silently colliding with the new staleness feature this suite now also covers.
+// Callers that WANT a stale fixture pass an explicit old `updatedAt` (see the dedicated
+// stale-detection section below), which is exactly why this stays an optional 5th parameter
+// rather than removing the field.
+function writeGbUsage(rootDir, sessionId, totalTokens, usedPct, updatedAt = new Date().toISOString()) {
+  writeJson(join(rootDir, ".claude", `.usage-${sessionId}.json`), { usedPct, totalTokens, updatedAt });
+}
+
+{
+  const rootDir = fixtureDir("gb-cli-full-flow");
+  writeGbFixture(rootDir);
+  writeGbUsage(rootDir, "sess-1", 50000, 25); // 25% used -> tier "none" -> no context clause
+
+  const r1 = runCliWithStdin(rootDir, { session_id: "sess-1" });
+  ok("G-B CLI: 1st turn (tier none) exits 0", r1.status === 0, `stderr=${r1.stderr}`);
+  ok("G-B CLI: 1st turn (tier none) emits the phase suggestion", r1.stdout.includes("security-scan"), r1.stdout);
+  ok("G-B CLI: 1st turn (tier none) has no decision field", !r1.stdout.includes('"decision"'), r1.stdout);
+
+  const r2 = runCliWithStdin(rootDir, { session_id: "sess-1" });
+  ok("G-B CLI: 2nd turn, unchanged state+tier -> deduped to silence", r2.status === 0 && r2.stdout === "", `status=${r2.status} stdout=${r2.stdout}`);
+
+  writeGbUsage(rootDir, "sess-1", 120000, 60); // 60% used -> tier "warn"
+  const r3 = runCliWithStdin(rootDir, { session_id: "sess-1" });
+  ok(
+    "G-B CLI: 3rd turn, context tier changed to warn -> re-emits with Übergabefenster",
+    r3.stdout.includes("Übergabefenster") && r3.stdout.includes("security-scan"),
+    r3.stdout,
+  );
+}
+
+{
+  // P2 fix proof (Design-Entscheid 2026-07-08, EL-04): a 1M-context session at 34% used is
+  // 340k REAL tokens -- the OLD absolute-token contextTier (>=170k -> block) would have fired
+  // a spurious emergency brake here. Percentage-based tiering correctly stays "none".
+  const rootDir = fixtureDir("gb-cli-1m-window-no-spurious-block");
+  writeGbFixture(rootDir);
+  writeGbUsage(rootDir, "sess-1m", 340000, 34); // 1M window, 34% used, 340k real tokens
+
+  const r1 = runCliWithStdin(rootDir, { session_id: "sess-1m" });
+  ok("G-B CLI: 1M-window at 34% used -> exit 0", r1.status === 0, `stderr=${r1.stderr}`);
+  ok("G-B CLI: 1M-window at 34% used -> NO decision:block (no spurious emergency brake)", !r1.stdout.includes('"decision"'), r1.stdout);
+  ok("G-B CLI: 1M-window at 34% used -> no context clause at all (tier none)", !r1.stdout.includes("Kontext"), r1.stdout);
+
+  writeGbUsage(rootDir, "sess-1m", 850000, 85); // same 1M window, now 85% used -> tier "block"
+  const r2 = runCliWithStdin(rootDir, { session_id: "sess-1m" });
+  const p2 = JSON.parse(r2.stdout);
+  ok("G-B CLI: 1M-window at 85% used -> decision:block correctly fires", p2.decision === "block", r2.stdout);
+  ok("G-B CLI: 1M-window at 85% used -> DISPLAY shows real tokens (850k)", r2.stdout.includes("850k"), r2.stdout);
+}
+
+{
+  const rootDir = fixtureDir("gb-cli-block-nag-cap");
+  writeGbFixture(rootDir);
+  writeGbUsage(rootDir, "sess-block", 175000, 90); // 90% used -> tier "block" from turn 1
+
+  const r1 = runCliWithStdin(rootDir, { session_id: "sess-block" });
+  const p1 = JSON.parse(r1.stdout);
+  ok("G-B CLI block-nag-cap: turn 1 -> decision block", p1.decision === "block", r1.stdout);
+
+  const r2 = runCliWithStdin(rootDir, { session_id: "sess-block" });
+  const p2 = JSON.parse(r2.stdout);
+  ok("G-B CLI block-nag-cap: turn 2 -> STILL decision block", p2.decision === "block", r2.stdout);
+
+  const r3 = runCliWithStdin(rootDir, { session_id: "sess-block" });
+  let p3 = null;
+  let p3Parsed = true;
+  try {
+    p3 = JSON.parse(r3.stdout);
+  } catch {
+    p3Parsed = false;
+  }
+  ok("G-B CLI block-nag-cap: turn 3 -> stdout still valid JSON (downgraded, not silent)", p3Parsed, r3.stdout);
+  ok("G-B CLI block-nag-cap: turn 3 -> NO decision field (nag-cap downgrade)", p3Parsed && p3.decision === undefined, r3.stdout);
+  ok(
+    "G-B CLI block-nag-cap: turn 3 -> downgrade note present in systemMessage",
+    p3Parsed && p3.systemMessage.includes("heruntergestuft"),
+    r3.stdout,
+  );
+
+  const r4 = runCliWithStdin(rootDir, { session_id: "sess-block" });
+  ok(
+    "G-B CLI block-nag-cap: turn 4 -> silent (dedup on the downgraded fingerprint, primary-path regression)",
+    r4.status === 0 && r4.stdout === "",
+    `status=${r4.status} stdout=${r4.stdout}`,
+  );
+}
+
+{
+  // Usage file absent entirely -> tier stays "none", context part silently skipped; the
+  // phase suggestion (if any) still fires normally.
+  const rootDir = fixtureDir("gb-cli-usage-absent");
+  writeGbFixture(rootDir);
+  const r = runCliWithStdin(rootDir, { session_id: "sess-no-usage" });
+  ok("G-B CLI: usage file absent -> exit 0", r.status === 0);
+  ok("G-B CLI: usage file absent -> phase suggestion still present, no context clause", r.stdout.includes("security-scan") && !r.stdout.includes("Kontext"), r.stdout);
+}
+
+{
+  // Usage file present but malformed JSON -> fail-open, same as absent.
+  const rootDir = fixtureDir("gb-cli-usage-malformed");
+  writeGbFixture(rootDir);
+  mkdirSync(join(rootDir, ".claude"), { recursive: true });
+  writeRaw(join(rootDir, ".claude", ".usage-sess-malformed.json"), "{ not json ][");
+  const r = runCliWithStdin(rootDir, { session_id: "sess-malformed" }); // deliberately a DIFFERENT session id than the malformed file's -- proves a mismatched/absent usage file for THIS session is equally silently skipped
+  ok("G-B CLI: malformed usage file (different session) -> fail-open, no context clause", r.status === 0 && !r.stdout.includes("Kontext"), r.stdout);
+
+  const rSame = runCliWithStdin(rootDir, { session_id: "sess-malformed-samefile" });
+  writeRaw(join(rootDir, ".claude", ".usage-sess-malformed-samefile.json"), "{ not json ][");
+  const rSame2 = runCliWithStdin(rootDir, { session_id: "sess-malformed-samefile" });
+  ok("G-B CLI: malformed usage file for THIS session -> fail-open, no context clause", rSame2.status === 0 && !rSame2.stdout.includes("Kontext"), rSame2.stdout);
+}
+
+{
+  // No session_id resolvable (stdin has no session_id field) -> dedup/nag-cap structurally
+  // impossible -> the hook ALWAYS emits (matches every pre-G-B smoke test's behavior).
+  const rootDir = fixtureDir("gb-cli-no-session-id");
+  writeGbFixture(rootDir);
+  const r1 = runCliWithStdin(rootDir, {});
+  const r2 = runCliWithStdin(rootDir, {});
+  ok("G-B CLI: no session_id -> turn 1 emits", r1.stdout.includes("security-scan"), r1.stdout);
+  ok("G-B CLI: no session_id -> turn 2 (identical state) ALSO emits (no dedup possible)", r2.stdout.includes("security-scan"), r2.stdout);
+  ok("G-B CLI: no session_id -> both turns byte-identical (no marker to diverge on)", r1.stdout === r2.stdout, `r1=${r1.stdout} r2=${r2.stdout}`);
+}
+
+{
+  // Malformed stdin entirely (not valid JSON) -> never crashes, degrades to "no session_id".
+  const rootDir = fixtureDir("gb-cli-malformed-stdin");
+  writeGbFixture(rootDir);
+  const res = spawnSync(process.execPath, [SCRIPT], { input: "{ not json at all ][", encoding: "utf8", env: { ...process.env, CLAUDE_PROJECT_DIR: rootDir } });
+  ok("G-B CLI: malformed stdin -> exit 0 (never crashes)", res.status === 0, `stderr=${res.stderr}`);
+  ok("G-B CLI: malformed stdin -> phase suggestion still emitted (fail-open)", (res.stdout ?? "").includes("security-scan"), res.stdout);
+}
+
+// ==========================================================================================
+// MAJOR-1 FIX (T1 critic, 2026-07-08): nag-cap fail-closed defect -- write-then-emit guard +
+// belt-and-suspenders stop_hook_active check. Also NIT-1 (k-rendering rounding). Everything
+// above this marker is the pre-fix G-B suite (unmodified except the additive `isActiveBlock`
+// field and the turn-4 dedup extension on the block-nag-cap CLI test above).
+// ==========================================================================================
+
+// ---- NIT-1: k-rendering must never round UP into the block threshold (Math.floor) -------
+{
+  const msg = buildContextMessage("overdue", 169999);
+  ok(
+    'buildContextMessage: NIT-1 -- 169999 tokens (tier "overdue") renders "169k", NEVER "170k" (Math.floor, not Math.round)',
+    msg.includes("169k") && !msg.includes("170k"),
+    msg,
+  );
+}
+
+// ---- resolveStopHookActiveFromInput (pure) -----------------------------------------------
+ok("resolveStopHookActiveFromInput: {stop_hook_active:true} -> true", resolveStopHookActiveFromInput({ stop_hook_active: true }) === true);
+ok("resolveStopHookActiveFromInput: {stop_hook_active:false} -> false", resolveStopHookActiveFromInput({ stop_hook_active: false }) === false);
+ok("resolveStopHookActiveFromInput: field absent -> false", resolveStopHookActiveFromInput({}) === false);
+ok("resolveStopHookActiveFromInput: null input -> false", resolveStopHookActiveFromInput(null) === false);
+ok("resolveStopHookActiveFromInput: non-boolean value -> false", resolveStopHookActiveFromInput({ stop_hook_active: "true" }) === false);
+
+// ---- decideCombinedOutput: forceCapped (belt-and-suspenders) -----------------------------
+{
+  // 1st-ever block turn (no prior marker) but forceCapped -> downgraded, NOT decision:block.
+  const { stdout, marker } = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "block",
+    contextMessage: buildContextMessage("block", 175000),
+    priorMarker: null,
+    forceCapped: true,
+  });
+  const parsed = JSON.parse(stdout);
+  ok("decideCombinedOutput: forceCapped on 1st block turn -> NO decision field", parsed.decision === undefined, stdout);
+  ok(
+    "decideCombinedOutput: forceCapped on 1st block turn -> downgrade note present",
+    parsed.systemMessage.includes("heruntergestuft"),
+    parsed.systemMessage,
+  );
+  ok("decideCombinedOutput: forceCapped on 1st block turn -> marker.consecutiveBlocks 1", marker.consecutiveBlocks === 1, JSON.stringify(marker));
+}
+{
+  // forceCapped absent/false (default) preserves pre-fix behaviour: 1st block turn blocks.
+  const { stdout } = decideCombinedOutput({ phaseMessage: null, tier: "block", contextMessage: buildContextMessage("block", 175000), priorMarker: null });
+  const parsed = JSON.parse(stdout);
+  ok("decideCombinedOutput: forceCapped defaults to false -> 1st block turn still blocks", parsed.decision === "block", stdout);
+}
+{
+  // isActiveBlock field: exposed correctly for both the active and capped case.
+  const active = decideCombinedOutput({ phaseMessage: null, tier: "block", contextMessage: buildContextMessage("block", 175000), priorMarker: null });
+  const cappedCase = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "block",
+    contextMessage: buildContextMessage("block", 175000),
+    priorMarker: { lastFingerprint: "∅::block", consecutiveBlocks: 2 },
+  });
+  ok("decideCombinedOutput: isActiveBlock true on an un-capped block turn", active.isActiveBlock === true);
+  ok("decideCombinedOutput: isActiveBlock false on a capped/downgraded block turn", cappedCase.isActiveBlock === false);
+}
+
+// ---- applyPersistenceGuard (pure) --------------------------------------------------------
+{
+  const decided = decideCombinedOutput({ phaseMessage: null, tier: "block", contextMessage: buildContextMessage("block", 175000), priorMarker: null });
+  const guarded = applyPersistenceGuard({ decided, writeSucceeded: true, phaseMessage: null, tier: "block", totalTokens: 175000 });
+  ok("applyPersistenceGuard: write succeeded -> stdout unchanged (still decision:block)", guarded === decided.stdout, guarded);
+}
+{
+  // MAJOR-1: write FAILED on an active block turn -> block stripped, downgraded to overdue wording.
+  const decided = decideCombinedOutput({ phaseMessage: null, tier: "block", contextMessage: buildContextMessage("block", 175000), priorMarker: null });
+  const guarded = applyPersistenceGuard({ decided, writeSucceeded: false, phaseMessage: null, tier: "block", totalTokens: 175000 });
+  const parsed = JSON.parse(guarded);
+  ok("applyPersistenceGuard: write failed on active block -> NO decision field", parsed.decision === undefined, guarded);
+  ok("applyPersistenceGuard: write failed on active block -> reason field also absent", parsed.reason === undefined, guarded);
+  ok(
+    "applyPersistenceGuard: write failed on active block -> downgrades to overdue wording (ÜBERFÄLLIG), not NOTBREMSE",
+    parsed.systemMessage.includes("ÜBERFÄLLIG") && !parsed.systemMessage.includes("NOTBREMSE"),
+    parsed.systemMessage,
+  );
+}
+{
+  // write failed but this was never an active block (e.g. already capped) -> no-op, unchanged.
+  const decided = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "block",
+    contextMessage: buildContextMessage("block", 175000),
+    priorMarker: { lastFingerprint: "∅::block", consecutiveBlocks: 2 },
+  });
+  const guarded = applyPersistenceGuard({ decided, writeSucceeded: false, phaseMessage: null, tier: "block", totalTokens: 175000 });
+  ok("applyPersistenceGuard: write failed on an already-downgraded turn -> no-op (unchanged stdout)", guarded === decided.stdout, guarded);
+}
+
+// ---- CLI end-to-end: unwritable marker path (directory collision) + usage >=170k over ----
+// >=4 simulated turns -> NEVER decision:"block" (T1 critic repro case (a); realistic fixture:
+// absolute mkdtemp-rooted paths, real subprocess pipes, real directory-collision I/O error).
+{
+  const rootDir = fixtureDir("gb-cli-marker-unwritable-block");
+  writeGbFixture(rootDir);
+  writeGbUsage(rootDir, "sess-unwritable", 175000, 90); // 90% used -> tier "block" throughout
+
+  // Directory collision: create a REAL DIRECTORY at the exact marker file path -> writeFileSync
+  // (EISDIR) and readFileSync (EISDIR) both fail on every turn -- the marker can neither be
+  // written NOR read back, exactly the "unwritable marker path" repro class (the manifest/
+  // state/usage files stay normal files under the same `.claude/`, so only the marker itself
+  // is broken -- unlike the pre-existing "gb-marker-unwritable" pure-function fixture, which
+  // makes the whole `.claude` a file and would also blind the usage-file read).
+  const markerCollisionPath = join(rootDir, ".claude", ".stop-suggest-sess-unwritable.json");
+  mkdirSync(markerCollisionPath, { recursive: true });
+
+  const turns = [];
+  for (let i = 0; i < 4; i++) {
+    turns.push(runCliWithStdin(rootDir, { session_id: "sess-unwritable" }));
+  }
+  for (let i = 0; i < turns.length; i++) {
+    ok(`gb-cli marker-unwritable: turn ${i + 1} exits 0`, turns[i].status === 0, `stderr=${turns[i].stderr}`);
+    ok(`gb-cli marker-unwritable: turn ${i + 1} NEVER carries decision:"block"`, !turns[i].stdout.includes('"decision"'), turns[i].stdout);
+  }
+  ok(
+    "gb-cli marker-unwritable: at least one turn still surfaces the overdue wording (fail-open, not silently swallowed)",
+    turns.some((t) => t.stdout.includes("ÜBERFÄLLIG")),
+    JSON.stringify(turns.map((t) => t.stdout)),
+  );
+}
+
+// ---- CLI end-to-end: stop_hook_active=true + missing marker + >=170k -> no block ---------
+// (T1 critic repro case (b): belt-and-suspenders guard, first-ever turn, no marker file yet).
+{
+  const rootDir = fixtureDir("gb-cli-stop-hook-active-no-marker");
+  writeGbFixture(rootDir);
+  writeGbUsage(rootDir, "sess-stopactive", 175000, 90); // 90% used -> tier "block"
+
+  const r = runCliWithStdin(rootDir, { session_id: "sess-stopactive", stop_hook_active: true });
+  ok("gb-cli stop_hook_active+missing-marker: exits 0", r.status === 0, `stderr=${r.stderr}`);
+  ok('gb-cli stop_hook_active+missing-marker: NO decision:"block" (belt-and-suspenders)', !r.stdout.includes('"decision"'), r.stdout);
+  // N1 non-silence pin (re-critic follow-up, 2026-07-08): the downgrade must be FELT, not
+  // swallowed -- absence of a `decision` field alone doesn't prove the warning still surfaced.
+  // Asserts both the tier-block wording (NOTBREMSE, carried through from the un-downgraded
+  // contextMessage) and the downgrade note itself (`heruntergestuft`, NAG_DOWNGRADE_NOTE) are
+  // present on stdout, mirroring the pure-function assertion style at the 3rd-consecutive-turn
+  // case above.
+  ok(
+    "gb-cli stop_hook_active+missing-marker: downgrade output is NOT silent (NOTBREMSE + downgrade-note wording present)",
+    r.stdout.includes("NOTBREMSE") && r.stdout.includes("heruntergestuft"),
+    r.stdout,
+  );
+}
+
+// ---- CLI end-to-end: stop_hook_active=true + READABLE fresh marker + >=170k -> STILL blocks --
+// (M1 mutation pin, re-critic follow-up, 2026-07-08: pins the `&& priorMarker === null` half of
+// `run()`'s `forceCapped: stopHookActive && priorMarker === null` composition. With an intact,
+// readable marker present -- consecutiveBlocks 0, i.e. this is only the 1st consecutive block
+// turn, well under NAG_CAP_TURNS (2) -- the counter logic must win over the belt-and-suspenders
+// override: decision:"block" MUST still fire. The belt is only supposed to force the cap when
+// the prior marker is missing/unreadable (the case the test above covers); a one-token
+// regression that drops the `&& priorMarker === null` clause (i.e. `forceCapped: stopHookActive`
+// alone) would silently downgrade this turn too -- this test fails the suite if that happens.)
+{
+  const rootDir = fixtureDir("gb-cli-stop-hook-active-fresh-marker");
+  writeGbFixture(rootDir);
+  writeGbUsage(rootDir, "sess-stopactive-freshmarker", 175000, 90); // 90% used -> tier "block"
+  // Pre-seed an intact, readable marker file directly (real fs write, same shape
+  // `writeMarkerSafe` produces) -- fresh dedup state, as if this were genuinely the session's
+  // first tracked turn, distinct from the "missing/unreadable marker" repro class above.
+  writeJson(markerPath(rootDir, "sess-stopactive-freshmarker"), { lastFingerprint: "seed::none", consecutiveBlocks: 0 });
+
+  const r = runCliWithStdin(rootDir, { session_id: "sess-stopactive-freshmarker", stop_hook_active: true });
+  ok("gb-cli stop_hook_active+fresh-marker: exits 0", r.status === 0, `stderr=${r.stderr}`);
+  ok(
+    'gb-cli stop_hook_active+fresh-marker: decision:"block" STILL fires (counter logic wins over the belt)',
+    r.stdout.includes('"decision":"block"'),
+    r.stdout,
+  );
+}
+
+// ==========================================================================================
+// STALE-DETECTION (context-counter hardening, PO-directive 2026-07-08): the usage snapshot
+// only refreshes when the statusLine renders -- a snapshot untouched for more than
+// USAGE_STALE_THRESHOLD_MS now gets an explicit German warning instead of being silently
+// trusted. Everything below is additive; nothing above this marker changes meaning (proven by
+// the fixed fixture default above: `writeGbUsage` now defaults `updatedAt` to the real "now").
+// ==========================================================================================
+
+// ---- resolveUpdatedAtMs (pure) ----------------------------------------------------------
+{
+  const iso = "2026-07-08T12:00:00.000Z";
+  ok("resolveUpdatedAtMs: valid ISO updatedAt -> matching ms timestamp", resolveUpdatedAtMs({ updatedAt: iso }) === Date.parse(iso));
+}
+ok("resolveUpdatedAtMs: missing updatedAt -> null", resolveUpdatedAtMs({}) === null);
+ok("resolveUpdatedAtMs: null usage -> null", resolveUpdatedAtMs(null) === null);
+ok("resolveUpdatedAtMs: empty-string updatedAt -> null", resolveUpdatedAtMs({ updatedAt: "" }) === null);
+ok("resolveUpdatedAtMs: non-string updatedAt -> null", resolveUpdatedAtMs({ updatedAt: 12345 }) === null);
+ok("resolveUpdatedAtMs: unparsable updatedAt string -> null", resolveUpdatedAtMs({ updatedAt: "not a date at all" }) === null);
+
+// ---- isUsageStale (pure) ------------------------------------------------------------------
+{
+  const nowMs = Date.parse("2026-07-08T12:20:00.000Z");
+  const fresh = { updatedAt: "2026-07-08T12:10:00.000Z" }; // 10 min old
+  const staleUsage = { updatedAt: "2026-07-08T12:00:00.000Z" }; // 20 min old
+  ok("isUsageStale: 10 min old vs 15 min threshold -> fresh (false)", isUsageStale(fresh, nowMs, USAGE_STALE_THRESHOLD_MS) === false);
+  ok("isUsageStale: 20 min old vs 15 min threshold -> stale (true)", isUsageStale(staleUsage, nowMs, USAGE_STALE_THRESHOLD_MS) === true);
+}
+{
+  // Boundary: age === thresholdMs exactly -> NOT stale (strictly-greater-than only).
+  const updatedAt = "2026-07-08T12:00:00.000Z";
+  const boundaryNowMs = Date.parse(updatedAt) + USAGE_STALE_THRESHOLD_MS;
+  ok("isUsageStale: age exactly == threshold -> false (boundary, strict >)", isUsageStale({ updatedAt }, boundaryNowMs, USAGE_STALE_THRESHOLD_MS) === false);
+  ok("isUsageStale: age one ms over threshold -> true", isUsageStale({ updatedAt }, boundaryNowMs + 1, USAGE_STALE_THRESHOLD_MS) === true);
+}
+ok("isUsageStale: no updatedAt at all -> false (no stale-claim without evidence)", isUsageStale({}, Date.now(), USAGE_STALE_THRESHOLD_MS) === false);
+ok("isUsageStale: null usage -> false", isUsageStale(null, Date.now(), USAGE_STALE_THRESHOLD_MS) === false);
+ok("isUsageStale: malformed updatedAt -> false", isUsageStale({ updatedAt: "garbage" }, Date.now(), USAGE_STALE_THRESHOLD_MS) === false);
+ok("isUsageStale: non-finite nowMs -> false", isUsageStale({ updatedAt: "2026-07-08T12:00:00.000Z" }, NaN, USAGE_STALE_THRESHOLD_MS) === false);
+ok("isUsageStale: non-finite thresholdMs -> false", isUsageStale({ updatedAt: "2026-07-08T12:00:00.000Z" }, Date.now(), NaN) === false);
+
+// ---- buildStaleMessage (pure, format) -----------------------------------------------------
+{
+  const updatedAt = "2026-07-08T09:05:00.000Z";
+  const updatedAtMs = Date.parse(updatedAt);
+  const nowMsFixed = updatedAtMs + 23 * 60000; // exactly 23 minutes later, deterministic
+  const msg = buildStaleMessage({ updatedAt }, nowMsFixed);
+  const d = new Date(updatedAtMs);
+  const expectedHHMM = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  ok("buildStaleMessage: mentions 'veraltet'", msg !== null && msg.includes("veraltet"), msg);
+  ok("buildStaleMessage: mentions the derived HH:MM Stand", msg.includes(expectedHHMM), msg);
+  ok("buildStaleMessage: mentions age in minutes ('vor 23m')", msg.includes("vor 23m"), msg);
+  ok("buildStaleMessage: mentions /context and /compact", msg.includes("/context") && msg.includes("/compact"), msg);
+}
+ok("buildStaleMessage: missing updatedAt -> null", buildStaleMessage({}, Date.now()) === null);
+ok("buildStaleMessage: null usage -> null", buildStaleMessage(null, Date.now()) === null);
+ok("buildStaleMessage: non-finite nowMs -> null", buildStaleMessage({ updatedAt: "2026-07-08T09:05:00.000Z" }, NaN) === null);
+
+// ---- decideCombinedOutput: staleMessage integration (pure) -------------------------------
+{
+  // staleMessage present, everything else null (tier "none", no phase message) -> still
+  // emits standalone -- the "nothing to say" fast path now also checks staleMessage.
+  const { stdout, marker } = decideCombinedOutput({ phaseMessage: null, tier: "none", contextMessage: null, priorMarker: null, staleMessage: "STALE-TEXT" });
+  ok("decideCombinedOutput: staleMessage alone (tier none, no phase) -> emits standalone", stdout !== "" && stdout.includes("STALE-TEXT"), stdout);
+  ok("decideCombinedOutput: staleMessage alone -> fingerprint carries ::stale suffix", marker.lastFingerprint === "∅::none::stale", JSON.stringify(marker));
+}
+{
+  // Backward-compat: staleMessage omitted (defaults to null) -> fingerprint format UNCHANGED,
+  // no "::stale" suffix -- byte-identical to every pre-existing fingerprint assertion above.
+  const { marker } = decideCombinedOutput({ phaseMessage: "Pipeline: Phase X", tier: "none", contextMessage: null, priorMarker: null });
+  ok("decideCombinedOutput: staleMessage omitted -> fingerprint has no ::stale suffix", marker.lastFingerprint === "Pipeline: Phase X::none", JSON.stringify(marker));
+}
+{
+  // Same stale episode two turns in a row -> dedup silences the second (episode-dedup, not
+  // per-turn spam -- the requirement is "once per stale episode").
+  const priorMarker = { lastFingerprint: "∅::none::stale", consecutiveBlocks: 0 };
+  const { stdout } = decideCombinedOutput({ phaseMessage: null, tier: "none", contextMessage: null, priorMarker, staleMessage: "STALE-TEXT" });
+  ok("decideCombinedOutput: identical stale episode as last turn -> silent (dedup)", stdout === "", stdout);
+}
+{
+  // Transition fresh -> stale (same phase/tier) re-emits despite an existing marker.
+  const priorMarker = { lastFingerprint: "∅::none", consecutiveBlocks: 0 };
+  const { stdout } = decideCombinedOutput({ phaseMessage: null, tier: "none", contextMessage: null, priorMarker, staleMessage: "STALE-TEXT" });
+  ok("decideCombinedOutput: fresh -> stale transition re-emits", stdout !== "" && stdout.includes("STALE-TEXT"), stdout);
+}
+{
+  // contextMessage AND staleMessage both present at once (tier "warn") -> both survive into
+  // the combined message.
+  const { stdout } = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "warn",
+    contextMessage: buildContextMessage("warn", 120000),
+    priorMarker: null,
+    staleMessage: "STALE-TEXT",
+  });
+  ok("decideCombinedOutput: contextMessage + staleMessage both present -> both appear", stdout.includes("Übergabefenster") && stdout.includes("STALE-TEXT"), stdout);
+}
+
+// ---- applyPersistenceGuard: staleMessage survives a nag-cap write-failure downgrade ------
+{
+  const decided = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "block",
+    contextMessage: buildContextMessage("block", 175000),
+    priorMarker: null,
+    staleMessage: "STALE-TEXT",
+  });
+  const guarded = applyPersistenceGuard({ decided, writeSucceeded: false, phaseMessage: null, tier: "block", totalTokens: 175000, staleMessage: "STALE-TEXT" });
+  const parsed = JSON.parse(guarded);
+  ok(
+    "applyPersistenceGuard: write failed on active block WITH staleMessage -> stale text survives the downgrade",
+    parsed.systemMessage.includes("STALE-TEXT") && parsed.systemMessage.includes("ÜBERFÄLLIG"),
+    guarded,
+  );
+}
+
+// ---- CLI end-to-end: stale usage snapshot (real subprocess, real files, real Date.now()) -
+{
+  // Standalone emission: no active phase (state file removed after writeGbFixture) + a usage
+  // file whose updatedAt is far in the past -> the stale warning STILL fires, proving the
+  // "eigenständig emittieren, wenn tier sonst none" requirement.
+  const rootDir = fixtureDir("gb-cli-stale-standalone");
+  writeGbFixture(rootDir);
+  rmSync(join(rootDir, ".claude", "pipeline-state.json"));
+  const staleUpdatedAt = new Date(Date.now() - 20 * 60 * 1000).toISOString(); // 20 min ago
+  writeGbUsage(rootDir, "sess-stale-standalone", 50000, 25, staleUpdatedAt); // tier "none"
+  const r = runCliWithStdin(rootDir, { session_id: "sess-stale-standalone" });
+  ok("gb-cli stale standalone: exit 0", r.status === 0, `stderr=${r.stderr}`);
+  ok("gb-cli stale standalone: no phase suggestion (state file removed)", !r.stdout.includes("security-scan"), r.stdout);
+  ok("gb-cli stale standalone: stale warning fires standalone (tier none, no phase message)", r.stdout.includes("veraltet"), r.stdout);
+}
+{
+  // Fresh usage file (default `writeGbUsage` updatedAt = real now) -> no stale warning at all.
+  const rootDir = fixtureDir("gb-cli-stale-fresh-no-warning");
+  writeGbFixture(rootDir);
+  writeGbUsage(rootDir, "sess-fresh", 50000, 25); // tier "none", fresh
+  const r = runCliWithStdin(rootDir, { session_id: "sess-fresh" });
+  ok("gb-cli fresh usage: exit 0", r.status === 0, `stderr=${r.stderr}`);
+  ok("gb-cli fresh usage: no stale warning", !r.stdout.includes("veraltet"), r.stdout);
+}
+{
+  // Episode-dedup at the CLI level: turn 1 (stale) emits, turn 2 (same still-stale file,
+  // unchanged phase) goes silent -- proves "once per episode", not once per turn.
+  const rootDir = fixtureDir("gb-cli-stale-dedup-episode");
+  writeGbFixture(rootDir); // phase "implementation" -> a phase message is present too
+  const staleUpdatedAt = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  writeGbUsage(rootDir, "sess-stale-dedup", 50000, 25, staleUpdatedAt); // tier "none", stale
+  const r1 = runCliWithStdin(rootDir, { session_id: "sess-stale-dedup" });
+  ok("gb-cli stale dedup: turn 1 exit 0", r1.status === 0, `stderr=${r1.stderr}`);
+  ok("gb-cli stale dedup: turn 1 emits the stale warning", r1.stdout.includes("veraltet"), r1.stdout);
+  const r2 = runCliWithStdin(rootDir, { session_id: "sess-stale-dedup" });
+  ok("gb-cli stale dedup: turn 2 (same stale episode, unchanged phase) -> silent", r2.status === 0 && r2.stdout === "", `status=${r2.status} stdout=${r2.stdout}`);
+}
+{
+  // Transition stale -> fresh mid-session (usage file refreshed between turns) -> re-emits
+  // (fingerprint changed) and the stale wording is gone.
+  const rootDir = fixtureDir("gb-cli-stale-to-fresh-transition");
+  writeGbFixture(rootDir);
+  const staleUpdatedAt = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  writeGbUsage(rootDir, "sess-stale-transition", 50000, 25, staleUpdatedAt);
+  const r1 = runCliWithStdin(rootDir, { session_id: "sess-stale-transition" });
+  ok("gb-cli stale->fresh: turn 1 stale warning present", r1.stdout.includes("veraltet"), r1.stdout);
+
+  writeGbUsage(rootDir, "sess-stale-transition", 50000, 25); // refresh -> now fresh
+  const r2 = runCliWithStdin(rootDir, { session_id: "sess-stale-transition" });
+  ok(
+    "gb-cli stale->fresh: turn 2 re-emits (fingerprint changed), no stale warning anymore",
+    r2.stdout.includes("security-scan") && !r2.stdout.includes("veraltet"),
+    r2.stdout,
+  );
+}
+{
+  // Malformed updatedAt inside an otherwise-valid usage file -> fail-open, NO stale claim
+  // (no evidence to prove staleness), matching the pure-function contract at the CLI level.
+  const rootDir = fixtureDir("gb-cli-stale-malformed-updatedat");
+  writeGbFixture(rootDir);
+  mkdirSync(join(rootDir, ".claude"), { recursive: true });
+  writeJson(join(rootDir, ".claude", ".usage-sess-badupdated.json"), { usedPct: 25, totalTokens: 50000, updatedAt: "not-a-date" });
+  const r = runCliWithStdin(rootDir, { session_id: "sess-badupdated" });
+  ok("gb-cli malformed updatedAt: exit 0", r.status === 0, `stderr=${r.stderr}`);
+  ok("gb-cli malformed updatedAt: no stale claim (fail-open, no evidence)", !r.stdout.includes("veraltet"), r.stdout);
+}
+
+// ---- cleanup + summary -----------------------------------------------------------------
+try {
+  rmSync(WORKDIR, { recursive: true, force: true });
+} catch {
+  // best-effort cleanup; leftover temp dirs never fail the suite
+}
+
+console.log(`\n${pass} passed, ${failures.length} failed`);
+if (failures.length > 0) {
+  console.log("Failures:");
+  for (const f of failures) console.log(`  - ${f}`);
+  process.exit(1);
+}
+process.exit(0);

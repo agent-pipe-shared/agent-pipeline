@@ -1,0 +1,7 @@
+{
+  "name": "pipeline-core",
+  "description": "Agent-Pipeline operating model as an installable unit: session bootstrap (pipeline-start), independent review dispatch (critic-review), session close ritual (close-block), Goldfish/Critic subagents, git-guard union hooks. Deliberately WITHOUT a version field: this plugin is in its SHA phase, where every commit counts as a new version and propagates on refresh; SemVer + tags start once the stability phase begins.",
+  "author": {
+    "name": "agent-pipeline"
+  }
+}

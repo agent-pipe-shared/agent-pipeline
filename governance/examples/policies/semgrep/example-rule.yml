@@ -1,0 +1,31 @@
+# Generic example semgrep custom rule (enforcing policy, machine-checkable).
+#
+# Wiring: `.claude/pipeline.yaml` -> security.scanners.semgrep.rules_dir points at THIS
+# directory (governance/examples/policies/semgrep); the security-scan phase's semgrep
+# scanner loads every rule file found here in addition to its own default ruleset. This
+# file is parsed by semgrep itself at scan time (full YAML incl. flow syntax such as the
+# `languages: [javascript, typescript]` list below), NOT by this repo's yaml-lite parser
+# (that lite parser only ever reads `.claude/pipeline.yaml`/manifest files, never
+# semgrep rule files) -- validate edits by running semgrep locally
+# (`semgrep --validate --config governance/examples/policies/semgrep/example-rule.yml`)
+# or, absent semgrep, by hand-checking standard YAML validity (this file was hand-
+# checked: block mapping + one flow sequence, no tabs, consistent 2-space indent).
+#
+# This is a generic template rule -- fixture content, not a real company's actual
+# ruleset. A project adopting the pipeline replaces/extends this with its own rules.
+
+rules:
+  - id: no-eval-usage
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >
+      Avoid `eval()` -- it executes arbitrary strings as code (CWE-95) and is a
+      common injection vector when any part of the evaluated string is
+      attacker-influenced. Use a safer alternative: `JSON.parse` for data, or an
+      explicit allow-listed dispatch table for logic selection.
+    pattern: eval(...)
+    metadata:
+      category: security
+      cwe: CWE-95
+      references:
+        - https://owasp.org/www-community/attacks/Code_Injection

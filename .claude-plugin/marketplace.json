@@ -1,0 +1,14 @@
+{
+  "name": "agent-pipeline",
+  "description": "The Agent-Pipeline plugin marketplace: one versioned source of truth for the agentic operating model (Elephant / Goldfish / Critic) across all projects. Single plugin source: ./plugins/pipeline-core.",
+  "owner": {
+    "name": "agent-pipeline"
+  },
+  "plugins": [
+    {
+      "name": "pipeline-core",
+      "source": "./plugins/pipeline-core",
+      "description": "The Agent-Pipeline core plugin: roles, two-stage review gates, git guardrails, and session bootstrap for Claude Code. Projects bind it via committed extraKnownMarketplaces + enabledPlugins (pipeline-core@agent-pipeline). Ships without a version pin: every commit propagates on refresh."
+    }
+  ]
+}

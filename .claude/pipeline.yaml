@@ -1,0 +1,81 @@
+# pipeline.yaml -- declarative pipeline manifest for THIS repo.
+# ADDITIVE to .claude/pipeline.json (project calibration) -- disjoint field sets, see
+# plugins/pipeline-core/lib/manifest.mjs file header for the dedup confirmation.
+# Schema: pipeline.manifest.v0 (plugins/pipeline-core/scripts/pipeline-manifest.schema.json).
+# Validate with: node harness/scripts/validate-manifest.mjs
+
+schema: pipeline.manifest.v0
+
+# This repo is docs+guardrails only (no live UI) -- ui-design stays declared but its
+# condition keeps it inactive until flags.has_ui below flips true for a project that has one.
+phases:
+  - name: design
+    enabled: true
+  - name: implementation
+    enabled: true
+  - name: security-scan
+    enabled: true
+  - name: ui-design
+    enabled: true
+    condition: has_ui
+
+# Exactly 2 blocking human gates (dev-plan, push) plus 1 blocking automated gate
+# (security) -- the PO's tuning directive. push carries a standing
+# approval (ADR-0017 precedent: the PO is PO/CEO, not a developer -- pushing main at
+# work-package boundaries is pre-approved, never a per-push live human touch).
+gates:
+  dev-plan:
+    mode: blocking
+    type: human
+  push:
+    mode: blocking
+    type: human
+    approval: standing-approved # ADR-0017
+  security:
+    mode: blocking
+    type: automated
+
+security:
+  scanners:
+    gitleaks:
+      enabled: true
+    osv-scanner:
+      enabled: true
+    semgrep:
+      enabled: true
+      rules_dir: governance/examples/policies/semgrep
+
+# Machine-readable projection of policies/model-policy.md (MP-01/02/05/07) -- that file
+# stays canonical; this is only the pipeline's own reflection of it, per role. The models
+# below are the shipped defaults; override them per role in pipeline.user.yaml (models.*).
+modelRouting:
+  elephant:
+    model: profilgebunden
+    effort: profilgebunden
+    note: "MP-01 — Design-Tier: Standard-Profil (Advisor, Cost/Quality)"
+  goldfish:
+    model: sonnet-5
+    effort: xhigh
+  critic:
+    model: sonnet-5
+    effort: max
+    note: "MP-07 — Review-Tier eskaliert bei Architektur/Guardrails/Security auf ein höherkapazitives Modell"
+
+profiles:
+  active: full-sdlc
+  quick:
+    phases:
+      - implementation
+  full-sdlc:
+    phases:
+      - design
+      - implementation
+      - security-scan
+      - ui-design
+
+governance:
+  guidelines_path: governance/examples/guidelines
+  policies_path: governance/examples/policies
+
+flags:
+  has_ui: false

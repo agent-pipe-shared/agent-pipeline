@@ -1,0 +1,120 @@
+#!/usr/bin/env node
+/**
+ * verify.mjs — THE one verify entry point of this repo (E5/QG-02, self-application E13).
+ *
+ * Wired as .claude/pipeline.json field `verify` (AC-G4-2, spec 2026-07-06-painkiller).
+ * Runs the FULL test set of this repo (guard family, hook suites, plugin libs,
+ * manifest/state/security-scan suites — suite list extended in the AP1 W-WIRE wave
+ * and the retro-speed W-WIRE-2 wave (plan 2026-07-07-retro-speed),
+ * plan 2026-07-07-ap1-pipeline-tuning Amendment 1, under explicit PO approval since
+ * this file is TP-3-protected) and writes a machine-generated JSON evidence artifact
+ * per guardrails/quality-gates.md
+ * QG-03, schema `pipeline.verify-evidence.v0` (reduced scope, AC-G4-2/B-6: no
+ * registry, no expiry fields — those are backlog #2, CUT).
+ *
+ * Manifest-gated phase steps (AP1 W-WIRE): when the project opts into the manifest
+ * layer (`.claude/pipeline.yaml` present), two extra steps run after the suites:
+ * validate-manifest (exit 2 on an invalid manifest, fail-closed once a manifest
+ * EXISTS) and security-scan (adapter statuses PASS|FINDINGS|SKIPPED|ERROR; SKIPPED
+ * never blocks, so machines without the scanner binaries stay green — QG-05 honesty
+ * lives in the evidence artifact, not in a false red). No manifest -> step list stays
+ * suites-only, so manifest-less projects keep the pre-AP1 verify shape (regression guard).
+ *
+ * Full chain note (QG-01/QG-02): this repo's calibration (`.claude/pipeline.json`,
+ * field `verification: "docs+tests"`) has no separate format/lint/typecheck/build
+ * stage — the test suites plus the manifest-gated phase steps ARE the full chain
+ * for a docs+guardrails repo. `steps[]` below therefore lists one entry per step run,
+ * not the generic format/lint/typecheck/tests/build shape from the QG-03 sketch (gate
+ * honesty, QG-05: this gate does NOT check prose/doc content, only the executable
+ * harness — hooks, libs, phase runners).
+ *
+ * Evidence artifact: written to `evidence/verify-latest.json` (git-ignored — see
+ * root .gitignore; a fresh, regenerated-every-run status snapshot is not a durable
+ * audit trail like the override ledger, and committing it would create stale-diff
+ * noise on every run). ONE canonical path, overwritten each run — no registry (#2 CUT).
+ *
+ * Exit code: 0 iff every step exited 0; the first non-zero step's code otherwise
+ * (mirrors `npm run`-style aggregation). stdout of both suites is passed through
+ * unchanged so a human sees the same PASS/FAIL lines the suites themselves print.
+ */
+import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+const repoRoot = join(scriptDir, "..", "..");
+const hooksDir = join(repoRoot, "plugins", "pipeline-core", "hooks");
+
+const libDir = join(repoRoot, "plugins", "pipeline-core", "lib");
+const pluginScriptsDir = join(repoRoot, "plugins", "pipeline-core", "scripts");
+
+const TEST_SUITES = [
+  { name: "guard-git-tests", file: join(hooksDir, "guard-git.test.mjs") },
+  { name: "guard-testpath-tests", file: join(hooksDir, "guard-testpath.test.mjs") },
+  { name: "staleness-check-tests", file: join(hooksDir, "staleness-check.test.mjs") },
+  { name: "guard-devplan-tests", file: join(hooksDir, "guard-devplan.test.mjs") },
+  { name: "guard-push-tests", file: join(hooksDir, "guard-push.test.mjs") },
+  { name: "stop-suggest-tests", file: join(hooksDir, "stop-suggest.test.mjs") },
+  { name: "post-compact-reground-tests", file: join(hooksDir, "post-compact-reground.test.mjs") },
+  { name: "statusline-context-tests", file: join(pluginScriptsDir, "statusline-context.test.mjs") },
+  { name: "yaml-lite-tests", file: join(libDir, "yaml-lite.test.mjs") },
+  { name: "schema-lite-tests", file: join(libDir, "schema-lite.test.mjs") },
+  { name: "git-cmd-tests", file: join(libDir, "git-cmd.test.mjs") },
+  { name: "validate-manifest-tests", file: join(scriptDir, "validate-manifest.test.mjs") },
+  { name: "pipeline-state-tests", file: join(scriptDir, "pipeline-state.test.mjs") },
+  { name: "security-scan-tests", file: join(scriptDir, "security-scan.test.mjs") },
+];
+
+// Manifest-gated phase steps: see header — only projects with `.claude/pipeline.yaml`
+// get these two entries; everyone else keeps the suites-only step list.
+const manifestPath = join(repoRoot, ".claude", "pipeline.yaml");
+const PHASE_STEPS = existsSync(manifestPath)
+  ? [
+      { name: "validate-manifest", file: join(scriptDir, "validate-manifest.mjs") },
+      { name: "security-scan", file: join(scriptDir, "security-scan.mjs") },
+    ]
+  : [];
+
+const steps = [];
+for (const suite of [...TEST_SUITES, ...PHASE_STEPS]) {
+  console.log(`\n=== ${suite.name} (${suite.file}) ===`);
+  const res = spawnSync(process.execPath, [suite.file], { encoding: "utf8", cwd: repoRoot });
+  if (res.stdout) process.stdout.write(res.stdout);
+  if (res.stderr) process.stderr.write(res.stderr);
+  const exitCode = res.status ?? 1;
+  steps.push({ name: suite.name, exitCode });
+}
+
+const overallExitCode = steps.find((s) => s.exitCode !== 0)?.exitCode ?? 0;
+
+// ---- HEAD sha (best-effort; "unknown" if git is unavailable) ------------------------
+let commit = "unknown";
+try {
+  const gitRes = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", cwd: repoRoot });
+  if (gitRes.status === 0) commit = gitRes.stdout.trim();
+} catch {
+  // git missing from PATH: evidence still gets written, commit stays "unknown"
+  // (CLAUDE.md environment note: treat as a stale shell, not a missing install).
+}
+
+const command = "node harness/scripts/verify.mjs";
+const evidence = {
+  schema: "pipeline.verify-evidence.v0",
+  project: "agent-pipeline",
+  command,
+  commit,
+  finishedAt: new Date().toISOString(),
+  steps,
+  exitCode: overallExitCode,
+};
+
+const evidenceDir = join(repoRoot, "evidence");
+mkdirSync(evidenceDir, { recursive: true });
+const evidencePath = join(evidenceDir, "verify-latest.json");
+writeFileSync(evidencePath, JSON.stringify(evidence, null, 2) + "\n");
+
+console.log(`\nEvidence written: ${evidencePath}`);
+console.log(`Overall: ${steps.map((s) => `${s.name}=${s.exitCode}`).join(", ")} -> exit ${overallExitCode}`);
+
+process.exit(overallExitCode);

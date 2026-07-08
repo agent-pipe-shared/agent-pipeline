@@ -1,0 +1,21 @@
+{
+  "$comment": "Generic example of a declared-licenses report (e.g. produced by an SCA/license scanner) checked against license-allowlist.json in this same directory. Fixture content only -- package names/versions are illustrative placeholders, not real dependencies of this repo.",
+  "dependencies": [
+    {
+      "name": "example-http-client",
+      "version": "3.2.1",
+      "license": "MIT"
+    },
+    {
+      "name": "example-json-schema",
+      "version": "1.4.0",
+      "license": "Apache-2.0"
+    },
+    {
+      "name": "example-copyleft-widget",
+      "version": "0.9.0",
+      "license": "GPL-3.0-only",
+      "$comment": "INTENTIONAL DEMO FIXTURE: this entry deliberately violates license-allowlist.json's deny list, to give the semgrep/allowlist wiring a real failure case to detect in examples/tests. Not a real dependency; never remove this comment when editing the fixture."
+    }
+  ]
+}

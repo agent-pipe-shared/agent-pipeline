@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.internal/schemas/critic-verdict.schema.json",
+  "title": "Critic verdict (bare/headless isolation level)",
+  "description": "Machine-checkable version of the verdict JSON contract carried as a comment block in templates/prompts/critic-review.md (lines ~154-162) and described in prose in harness/review-protocol.md §2.4 (findings format) / §2.3 (--bare isolation level). Field-identical to that contract by construction. Consumed by plugins/pipeline-core/scripts/critic-bare.mjs, which validates a critic run's final verdict text against this file with a hand-rolled validator (no JSON-Schema library dependency) that understands exactly the keywords used below: type, required, properties, items, enum, additionalProperties. Do not add $ref/oneOf/allOf/pattern/format/etc. to this file without extending that validator in lockstep -- it will silently ignore keywords it does not implement.",
+  "type": "object",
+  "required": [
+    "findings",
+    "deliberately_not_flagged",
+    "trajectory_verdict",
+    "trajectory_evidence",
+    "briefing_violations",
+    "pass"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "findings": {
+      "type": "array",
+      "description": "Ordered by severity (review-protocol §2.4). An empty array is a valid and desired result -- 'no findings' is welcome, not suspicious (anti-overreporting, §2.5).",
+      "items": {
+        "type": "object",
+        "required": ["gap", "risk", "severity", "evidence", "spec_ref"],
+        "additionalProperties": false,
+        "properties": {
+          "gap": {
+            "type": "string",
+            "description": "What is missing or deviates vs. spec/guardrail (1-2 sentences)."
+          },
+          "risk": {
+            "type": "string",
+            "description": "Consequence of the gap. Severity itself is the separate 'severity' field."
+          },
+          "severity": {
+            "type": "string",
+            "enum": ["blocker", "major", "minor"]
+          },
+          "evidence": {
+            "type": "string",
+            "description": "file:line, diff hunk, or artifact quote. Claims without a citation are inadmissible (review-protocol §2.5)."
+          },
+          "spec_ref": {
+            "type": "string",
+            "description": "EARS criterion id or guardrail rule id."
+          }
+        }
+      }
+    },
+    "deliberately_not_flagged": {
+      "type": "array",
+      "description": "Canonical rubric (review-protocol §2.4, DoD condition A10): aspects explicitly examined and found ok -- distinguishes 'checked, ok' from 'not looked at'.",
+      "items": { "type": "string" }
+    },
+    "trajectory_verdict": {
+      "type": "string",
+      "description": "Were the claimed checks actually executed, per the evidence artifact? Mandatory verdict (review-protocol §2.4).",
+      "enum": ["konsistent", "inkonsistent", "nicht prüfbar"]
+    },
+    "trajectory_evidence": {
+      "type": "string",
+      "description": "What was checked / what is missing, backing the trajectory_verdict."
+    },
+    "briefing_violations": {
+      "type": "array",
+      "description": "Contaminating input the critic was handed despite the input-construction rule (review-protocol §2.2), or an empty array for none.",
+      "items": { "type": "string" }
+    },
+    "pass": {
+      "type": "boolean",
+      "description": "Binary pass/fail. Only requested because the --bare/headless JSON schema always requests one (review-protocol §2.4: 'No overall score' otherwise)."
+    }
+  }
+}

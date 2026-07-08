@@ -1,0 +1,123 @@
+# pipeline.yaml.example -- canonical, fully-commented example of the OPTIONAL declarative
+# pipeline manifest (schema id: pipeline.manifest.v0, AP1-P2 "GLOIN"). Copy this file to
+# <project-repo>/.claude/pipeline.yaml and edit; every top-level section is optional -- an
+# absent manifest is a fully supported "not opted in yet" state, byte-identical to today's
+# non-manifest behavior (plugins/pipeline-core/lib/manifest.mjs: loadManifest() returns
+# status "absent", harness/scripts/validate-manifest.mjs exits 0 printing
+# "Manifest nicht aktiv (optional)").
+#
+# GRAMMAR NOTE: this file must parse with the yaml-lite strict subset
+# (plugins/pipeline-core/lib/yaml-lite.mjs) -- only the constructs used below are
+# supported: block maps/lists with 2-space indent per nesting level, quoted or bare
+# scalars, bool/int coercion, `#` comments, and the empty flow literals `[]`/`{}`. NO
+# anchors/aliases/tags, NO literal/folded block scalars (`|`/`>`), NO non-empty flow
+# collections (`[1, 2]`, `{a: 1}`). Validate any edit against this repo's copy of the
+# rules with:
+#   node harness/scripts/validate-manifest.mjs <path-to-your-pipeline.yaml>
+
+schema: pipeline.manifest.v0
+
+# Phases this pipeline can run, in declaration order. `enabled: false` removes a phase
+# from every profile without deleting its declaration (keep the entry, flip the flag).
+# `condition` is optional; grammar: always | never | <flag> | !<flag>, where <flag> must
+# name a key declared under `flags:` near the bottom of this file.
+phases:
+  - name: design
+    enabled: true
+  - name: implementation
+    enabled: true
+  - name: security-scan
+    enabled: true
+  - name: ui-design
+    enabled: true
+    condition: has_ui
+
+# Gates: one entry per named checkpoint (gate names are free-form, not tied to a phase
+# name above -- a gate is a control point AROUND phases, not a phase itself).
+#   mode:     blocking | warn | off (QG-06-revision rationale -- a manifest mode is
+#             documented project calibration, never silent decay):
+#               blocking -- violations exit 2 (hard-fail, gate stops the pipeline)
+#               warn     -- violations exit 1, reported but never block
+#               off      -- gate disabled/no-op (must carry a reasoned comment --
+#                           "off" is a deliberate, visible choice)
+#   type:     human | automated
+#   approval: required | standing-approved (optional; only meaningful on a human gate
+#             that is pre-approved to proceed WITHOUT a live human touch every time --
+#             see ADR-0017 for the standing-approval precedent this
+#             mirrors).
+#   exemptPaths: optional list of path-prefix strings, additive-only exemptions on top
+#             of a gate's built-in defaults (e.g. dev-plan's docs/specs/.claude/backlog
+#             prefixes) -- never more restrictive, only ever widens what a gate allows.
+gates:
+  dev-plan:
+    mode: blocking
+    type: human
+    # exemptPaths:
+    #   - scratch/
+  push:
+    mode: blocking
+    type: human
+    approval: standing-approved
+  security:
+    mode: blocking
+    type: automated
+
+# Configuration for the security-scan phase.
+security:
+  thresholds:
+    block_on:
+      - critical
+      - high
+  scanners:
+    gitleaks:
+      enabled: true
+    osv-scanner:
+      enabled: true
+    semgrep:
+      enabled: true
+      rules_dir: governance/examples/policies/semgrep
+
+# Machine-readable projection of policies/model-policy.md (MP-01/02/05/07). That file
+# stays the canonical source -- this section only reflects it for tooling that wants a
+# structured read instead of parsing prose. Keys are free-form role names.
+modelRouting:
+  elephant:
+    model: profile-bound
+    effort: profile-bound
+    note: "MP-01 -- resolved by the active Elephant profile (advisor / design-first), not fixed here"
+  goldfish:
+    model: sonnet-5
+    effort: high
+  critic:
+    model: sonnet-5
+    effort: max
+    note: "a higher-capability review model is mandatory for A-G-S findings (MP-07)"
+
+# Profiles bundle a phase subset by name. `active` selects which profile currently
+# applies; every other key here is a profile name whose `phases` list must only name
+# phases declared under `phases:` above (checked by manifest.mjs, not by the schema).
+profiles:
+  active: full-sdlc
+  quick:
+    phases:
+      - implementation
+  full-sdlc:
+    phases:
+      - design
+      - implementation
+      - security-scan
+      - ui-design
+
+# Governance layer: where the advisory guidelines and the enforcing policies live, and
+# whether each side is currently advisory-only or actually enforcing.
+governance:
+  guidelines_path: governance/examples/guidelines
+  policies_path: governance/examples/policies
+  mode:
+    guidelines: advisory
+    policies: enforcing
+
+# Feature flags referenced by phases[].condition above. Keys are free-form flag names;
+# every value must be a boolean.
+flags:
+  has_ui: false

@@ -1,0 +1,38 @@
+# OS
+Thumbs.db
+.DS_Store
+
+# Editors
+.vscode/
+.idea/
+
+# Machine-local Claude Code settings (never commit)
+.claude/settings.local.json
+
+# Temp / scratch
+*.log
+*.tmp
+scratch/
+
+# Machine-generated verify evidence (QG-03, AC-G4-2): regenerated every
+# `node harness/scripts/verify.mjs` run — a status snapshot, not a durable
+# audit trail (unlike .claude/guard-override.log.jsonl), so it stays out of history.
+evidence/
+
+# Per-session context-budget snapshot (statusline-context.mjs) and Stop-hook suggestion
+# dedup/nag-cap marker (stop-suggest.mjs) — machine-regenerated per session_id, never a
+# durable audit trail, plan `.claude/plans/2026-07-07-retro-speed.md` package G-B.
+.claude/.usage-*.json
+.claude/.stop-suggest-*.json
+*.usage-*.json
+*.stop-suggest-*.json
+
+# Local environment overrides (never commit secrets)
+.env
+
+# Session-scoped pipeline state, regenerated per run
+.claude/pipeline-state.json
+pipeline-state.json
+
+# Append-only audit logs (guard overrides, etc.) — machine-generated, not source
+*.jsonl

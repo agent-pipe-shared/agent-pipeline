@@ -1,0 +1,24 @@
+# Normalize line endings (cross-OS clone: Windows-authored, macOS/Linux consumed).
+* text=auto eol=lf
+*.mjs text eol=lf
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.sh text eol=lf
+
+# Windows batch/PowerShell files (none currently in the repo, but if added
+# they carry native CRLF semantics).
+*.cmd text eol=crlf
+*.ps1 text eol=crlf
+
+# Binary files: no text conversion.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary

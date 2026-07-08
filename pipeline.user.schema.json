@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.user.v0",
+  "title": "Personal Pipeline profile (pipeline.user.yaml, AP2 P3a)",
+  "description": "Structure-only validation for pipeline.user.yaml -- the ONE source-of-intent config personalizing a cloned Agent-Pipeline copy (PRD AP2 SS5/SS5a). Consumed by setup.mjs with the SAME hand-rolled validator used for critic-verdict.schema.json / pipeline-manifest.schema.json (plugins/pipeline-core/lib/schema-lite.mjs) -- understands exactly: type, required, properties, items, enum, additionalProperties. setup.mjs itself still owns the compile step (user.yaml -> .claude/settings.json + pipeline.json + pipeline.yaml); this schema only guards user.yaml's own shape.",
+  "type": "object",
+  "required": ["identity", "language", "platform", "agent_runtime", "models", "autonomy", "gates"],
+  "additionalProperties": false,
+  "properties": {
+    "identity": {
+      "type": "object",
+      "required": ["owner_name", "repo_owner", "repo_name", "commit_trailer"],
+      "additionalProperties": false,
+      "properties": {
+        "owner_name": { "type": "string" },
+        "repo_owner": { "type": "string" },
+        "repo_name": { "type": "string" },
+        "commit_trailer": { "type": "boolean" }
+      }
+    },
+    "language": {
+      "type": "object",
+      "required": ["human_facing", "agent_facing"],
+      "additionalProperties": false,
+      "properties": {
+        "human_facing": { "type": "string", "enum": ["de", "en"] },
+        "agent_facing": { "type": "string", "enum": ["de", "en"] }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "required": ["git_host", "cli"],
+      "additionalProperties": false,
+      "properties": {
+        "git_host": { "type": "string", "enum": ["github", "gitlab"] },
+        "cli": { "type": "string", "enum": ["gh", "glab"] }
+      }
+    },
+    "agent_runtime": { "type": "string", "enum": ["claude-code", "other"] },
+    "models": {
+      "type": "object",
+      "required": ["design", "implement", "mechanic", "review", "advisor"],
+      "additionalProperties": false,
+      "description": "design/implement/mechanic/review each validated against the same shape ({model, effort} strings) -- inlined 4x below rather than via $ref/$defs, because schema-lite.mjs (plugins/pipeline-core/lib/schema-lite.mjs) understands only type/required/properties/items/enum/additionalProperties and does NOT resolve $ref -- see that file's header.",
+      "properties": {
+        "design": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
+        "implement": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
+        "mechanic": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
+        "review": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
+        "advisor": {
+          "type": "object",
+          "required": ["enabled"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" }
+          }
+        }
+      }
+    },
+    "autonomy": {
+      "type": "object",
+      "required": ["push_policy", "branch_model", "wip_limit"],
+      "additionalProperties": false,
+      "properties": {
+        "push_policy": { "type": "string", "enum": ["gated", "standing-approved"] },
+        "branch_model": { "type": "string", "enum": ["feature-branch", "direct-main"] },
+        "wip_limit": { "type": "number" }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "required": ["dev_plan", "push", "security", "claude_md_max_lines"],
+      "additionalProperties": false,
+      "properties": {
+        "dev_plan": { "type": "string", "enum": ["blocking", "warn", "off"] },
+        "push": { "type": "string", "enum": ["blocking", "warn", "off"] },
+        "security": { "type": "string", "enum": ["blocking", "warn", "off"] },
+        "claude_md_max_lines": { "type": "number" }
+      }
+    }
+  }
+}
