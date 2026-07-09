@@ -4,6 +4,9 @@ A versioned operating model for agentic software development — clone it, run o
 setup script, and adopt a battle-tested set of roles, review gates, and guardrails
 for your own projects.
 
+*Where this stands: v0.1.0 — roughly a week of build time, a solo project, one
+dogfooding round so far. Feedback welcome.*
+
 ## The problem
 
 Teams building with coding agents tend to reinvent the same conventions per repo —
@@ -41,6 +44,11 @@ Around those roles:
 - **Evidence discipline** — "done" means a machine-written log or output, the exact
   command, and its exit code — never a model-formulated claim that something
   "should work."
+- **Two human gates, not a stream of approvals** — the plan sign-off up front and
+  the completion sign-off at the end are the only two required stops for you.
+  Deliberately few and deliberately placed: your attention is the scarce
+  resource, and a long queue of small approvals trains reflexive clicking, not
+  actual review.
 
 ## How it works
 
@@ -103,6 +111,9 @@ Ein versioniertes Operating Model für agentische Softwareentwicklung — klonen
 ein Setup-Skript ausführen und ein erprobtes Set aus Rollen, Review-Gates und
 Guardrails für die eigenen Projekte übernehmen.
 
+*Wo das gerade steht: v0.1.0 — rund eine Woche Bauzeit, ein Soloprojekt, bisher
+eine Dogfooding-Runde. Feedback willkommen.*
+
 ## Das Problem
 
 Teams, die mit Coding-Agents arbeiten, erfinden dieselben Konventionen in jedem
@@ -147,6 +158,11 @@ Ergänzend dazu:
 - **Nachweispflicht** — „fertig" heißt: ein maschinell geschriebenes Log oder
   Ergebnis, dazu der exakte Befehl und dessen Exit-Code — nie eine vom Modell
   formulierte Behauptung, etwas „sollte funktionieren".
+- **Zwei menschliche Gates statt eines Freigabe-Dauerstroms** — die Plan-Freigabe
+  vorn und die Abnahme am Ende sind die einzigen zwei Pflichthalte für dich.
+  Bewusst wenige, bewusst platziert: Deine Aufmerksamkeit ist die knappe
+  Ressource, und eine lange Schlange kleiner Freigaben trainiert reflexartiges
+  Wegklicken, kein echtes Prüfen.
 
 ## Wie es funktioniert
 

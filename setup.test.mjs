@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * setup.test.mjs — pure-function test suite for setup.mjs (AP2 P3a completion wave).
+ * setup.test.mjs — pure-function test suite for setup.mjs.
  *
  * Coverage contract (briefing DoD field 3, item 2): classifyOs, parseFirstRemoteUrl,
  * classifyGitHost, cliForHost, detectGitHost (injected fake spawn), applyAboPreset,
@@ -8,7 +8,8 @@
  * committed pipeline.user.yaml for buildDefaultAnswers()), answersFromParsed, shortHash,
  * generatedMarker/extractRecordedHash round-trip, decideCompileAction (all six branches),
  * compileSettingsJson (github shape + gitlab "source: url" fix), compilePipelineJson,
- * renderPipelineYaml.
+ * renderPipelineYaml, parseArgv (--defaults/--force/--yes/--help flag parsing),
+ * resolveWarnDisposition (the --force/--yes hand-edit-drift override, all three branches).
  *
  * Every function under test here is a PURE builder/classifier (setup.mjs's own header:
  * "I/O happens in the caller") — none of them touch the filesystem, so no OS tmpdir is
@@ -41,6 +42,8 @@ import {
   compileSettingsJson,
   compilePipelineJson,
   renderPipelineYaml,
+  parseArgv,
+  resolveWarnDisposition,
 } from "./setup.mjs";
 
 const USER_YAML_PATH = fileURLToPath(new URL("./pipeline.user.yaml", import.meta.url));
@@ -330,6 +333,41 @@ ok("extractRecordedHash: non-string input -> null", extractRecordedHash(null) ==
   });
   ok("decideCompileAction: recorded hash == current hash but bytes differ -> warn/drift", d.action === "warn" && d.reason === "drift", JSON.stringify(d));
 }
+
+// ======================================================================================
+// resolveWarnDisposition — the --force/--yes override for decideCompileAction's "warn" branch
+// ======================================================================================
+ok(
+  "resolveWarnDisposition: force + interactive -> write-forced (skips the confirm prompt)",
+  resolveWarnDisposition({ force: true, interactive: true }) === "write-forced",
+);
+ok(
+  "resolveWarnDisposition: force + non-interactive -> write-forced (allows the otherwise-refused clobber)",
+  resolveWarnDisposition({ force: true, interactive: false }) === "write-forced",
+);
+ok(
+  "resolveWarnDisposition: no force + interactive -> prompt (unchanged existing behaviour)",
+  resolveWarnDisposition({ force: false, interactive: true }) === "prompt",
+);
+ok(
+  "resolveWarnDisposition: no force + non-interactive -> refuse (still never silently clobbers a hand-edit)",
+  resolveWarnDisposition({ force: false, interactive: false }) === "refuse",
+);
+
+// ======================================================================================
+// parseArgv — flag parsing, including the new --force/--yes flags
+// ======================================================================================
+{
+  const opts = parseArgv([]);
+  ok("parseArgv: no flags -> defaults=false, force=false, help=false", !opts.defaults && !opts.force && !opts.help, JSON.stringify(opts));
+}
+ok("parseArgv: --force -> force=true", parseArgv(["--force"]).force === true);
+ok("parseArgv: --yes -> force=true (alias)", parseArgv(["--yes"]).force === true);
+ok("parseArgv: --defaults --force -> both true", (() => {
+  const o = parseArgv(["--defaults", "--force"]);
+  return o.defaults === true && o.force === true;
+})());
+ok("parseArgv: --defaults alone -> force stays false", parseArgv(["--defaults"]).force === false);
 
 // ======================================================================================
 // compileSettingsJson — github branch shape AND gitlab branch (source: url fix)

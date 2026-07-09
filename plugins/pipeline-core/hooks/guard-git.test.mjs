@@ -530,6 +530,82 @@ check(
   { stderrEmpty: true },
 );
 
+// ---- Rule 17: --no-verify, any subcommand (hook-bypass enforcement,
+// 2026-07-09) --- no subcommand adjacency required, immune to unrecognized-global-option
+// breaks. ---------------------------------------------------------------------------------------
+check("R17 block  commit --no-verify", "git commit --no-verify", BLOCK, { stderrIncludes: ["GG-17"] });
+check("R17 block  push --no-verify", "git push --no-verify", BLOCK, { stderrIncludes: ["GG-17"] });
+check("R17 block  merge --no-verify", "git merge --no-verify", BLOCK, { stderrIncludes: ["GG-17"] });
+check(
+  "R17 allow  merge --no-verify-signatures (real flag, NOT a hook-skip)",
+  "git merge --no-verify-signatures",
+  ALLOW,
+);
+check(
+  "R17 allow  commit message quotes --no-verify (prose, no actual flag)",
+  'git commit -m "avoid --no-verify"',
+  ALLOW,
+);
+
+// ---- Rule 18: `git commit -n` short flag (hook-bypass enforcement, 2026-07-09) --- scoped to
+// `git commit` so `push -n` (=--dry-run) and `merge -n` (=--no-stat) are NOT hook-skips and stay
+// allowed. -------------------------------------------------------------------------------------
+check("R18 block  commit -n", "git commit -n", BLOCK, { stderrIncludes: ["GG-18"] });
+check("R18 block  commit -nm (bundled)", 'git commit -nm "x"', BLOCK, { stderrIncludes: ["GG-18"] });
+check("R18 block  commit -an (bundled, n at end)", "git commit -an", BLOCK, { stderrIncludes: ["GG-18"] });
+check("R18 allow  push -n origin main (=--dry-run, not a hook-skip)", "git push -n origin main", ALLOW);
+check("R18 allow  push --dry-run", "git push --dry-run", ALLOW);
+check("R18 allow  merge -n (=--no-stat, not a hook-skip)", "git merge -n", ALLOW);
+check("R18 allow  commit --no-edit (long flag, double-dash excluded)", "git commit --no-edit", ALLOW);
+check("R18 allow  commit -m normal message", 'git commit -m "normal message"', ALLOW);
+
+// ---- Rule 19: -c / --config-env core.hooksPath transient rebind (hook-bypass enforcement,
+// 2026-07-09) --- the ONLY rule matched against the pre-normalization bucket `c` (PRENORM_BLOCKERS);
+// see that array's header comment in guard-git.mjs for why UNION_BLOCKERS/RAW_BLOCKERS are both
+// wrong here. ------------------------------------------------------------------------------------
+check(
+  "R19 block  -c core.hooksPath=/dev/null commit",
+  "git -c core.hooksPath=/dev/null commit",
+  BLOCK,
+  { stderrIncludes: ["GG-19"] },
+);
+check("R19 block  -c core.hooksPath commit (no value, boolean true)", "git -c core.hooksPath commit", BLOCK, {
+  stderrIncludes: ["GG-19"],
+});
+check(
+  "R19 block  --config-env=core.hooksPath=X commit",
+  "git --config-env=core.hooksPath=X commit",
+  BLOCK,
+  { stderrIncludes: ["GG-19"] },
+);
+check(
+  "R19 allow  commit message quotes core.hooksPath (prose, no actual -c)",
+  'git commit -m "set core.hooksPath here"',
+  ALLOW,
+);
+// Documented NOT-BLOCKED trade-off (guard header): quote-stripping empties the -c VALUE
+// before GG-19 ever sees it, same as the general quote-stripping trade-off everywhere else
+// in this guard --- not a gap unique to this rule.
+check(
+  "R19 allow  -c with quoted value (documented quote-stripping trade-off, NOT a regression)",
+  'git -c "core.hooksPath=/dev/null" commit',
+  ALLOW,
+);
+
+// ---- Rule 20: `git config [set] core.hooksPath` persistent rebind (hook-bypass enforcement,
+// 2026-07-09). ------------------------------------------------------------------------------------
+check("R20 block  config core.hooksPath /tmp/x", "git config core.hooksPath /tmp/x", BLOCK, {
+  stderrIncludes: ["GG-20"],
+});
+check("R20 block  config set core.hooksPath /tmp/x (git >= 2.46 form)", "git config set core.hooksPath /tmp/x", BLOCK, {
+  stderrIncludes: ["GG-20"],
+});
+check(
+  "R20 allow  commit message quotes git config core.hooksPath (prose, no actual git config)",
+  'git commit -m "run git config core.hooksPath"',
+  ALLOW,
+);
+
 // ---- Summary -------------------------------------------------------------------------------------
 for (const dir of [EMPTY_DIR, CFG_DIR, BROKEN_DIR, OV_DIR, OV_NOLEDGER_DIR, CFG_GITOPT_DIR]) {
   try {

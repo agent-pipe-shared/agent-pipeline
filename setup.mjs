@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /**
- * setup.mjs — the Shareable Edition's personalization compiler (AP2 P3a).
+ * setup.mjs — the Shareable Edition's personalization compiler.
  *
  * Turns the ONE source-of-intent config (`pipeline.user.yaml`) into the three
  * runtime-canonical configs this repo already ships and reads at every session
  * (`.claude/settings.json`, `.claude/pipeline.json`, `.claude/pipeline.yaml`) — see
- * PRD `AP2-PRD.md` §5/§5a/§6/§7 (Config-Schichtenmodell: user.yaml = source of intent,
+ * the PRD §5/§5a/§6/§7 (Config-Schichtenmodell: user.yaml = source of intent,
  * this script = compiler, the three existing files stay runtime-canonical; no hook/skill
  * ever reads pipeline.user.yaml directly — zero code change to the guard/gate mechanics).
  *
@@ -48,9 +48,12 @@
  * file's bytes differ from what would be regenerated -> someone hand-edited the COMPILED
  * file without touching pipeline.user.yaml -> WARN, overwrite only after an explicit y/
  * yes/j/ja confirmation (interactive mode) or never (non-interactive `--defaults`, fail-
- * safe: a script with no human to ask must never silently clobber a hand-edit).
+ * safe: a script with no human to ask must never silently clobber a hand-edit) -- UNLESS
+ * `--force`/`--yes` was passed: interactive mode then skips the confirmation prompt and
+ * non-interactive mode is allowed to overwrite too (still with a loud WARN either way --
+ * `--force` changes who decides, never whether the clobber is announced).
  *
- * GITLAB MARKETPLACE BINDING (bug fix, AP2 P3a completion wave): Claude Code has NO `git`
+ * GITLAB MARKETPLACE BINDING (bug fix): Claude Code has NO `git`
  * marketplace source type -- the authoritative shape (verified against the official Claude
  * Code docs) is `{ source: "url", url: "<full .git URL>" }`, which works for ANY git host,
  * including self-hosted GitLab (the earlier, WRONG shape compileSettingsJson used to emit --
@@ -89,6 +92,11 @@
  *                                existing pipeline.user.yaml -- re-run-safe)
  *   node setup.mjs --defaults   non-interactive: writes the conservative default
  *                                pipeline.user.yaml + compiles, no prompts (test/CI path)
+ *   node setup.mjs --force      (or --yes) skips the hand-edit-drift confirmation instead of
+ *                                asking (interactive) or refusing (non-interactive) -- see
+ *                                "DRIFT DETECTION" above. Always prints a loud warning before
+ *                                clobbering a hand-edited compiled file; combine with
+ *                                --defaults for a fully unattended "just overwrite" run.
  *   node setup.mjs --help       usage text, exit 0
  *
  * VERIFY: node setup.test.mjs (pure-function coverage: detection/preset/render/drift
@@ -391,6 +399,21 @@ export function decideCompileAction({ existsOnDisk, parsedOk, existingRaw, wante
   return { action: "warn", reason: "drift" };
 }
 
+/**
+ * Pure resolution of what happens when `decideCompileAction()` returns "warn" (hand-edit
+ * drift, or an existing file that failed to parse), given `--force`/`--yes` and whether the
+ * run is interactive. Does no I/O and no prompting itself -- `applyCompileDecision()` uses
+ * the returned disposition to decide whether to write immediately, prompt the user, or
+ * refuse. `force` always wins over `interactive`: a forced run never blocks on a prompt.
+ * @param {{force: boolean, interactive: boolean}} args
+ * @returns {"write-forced"|"prompt"|"refuse"}
+ */
+export function resolveWarnDisposition({ force, interactive }) {
+  if (force) return "write-forced";
+  if (interactive) return "prompt";
+  return "refuse";
+}
+
 // ---- compile targets (pure builders; I/O happens in the caller) ---------------------------------
 /** @param {object|null} existing - previously-parsed settings.json, or null if absent/corrupt */
 export function compileSettingsJson(existing, answers, sourceHash) {
@@ -531,7 +554,7 @@ function readJsonSafe(path) {
   }
 }
 
-async function applyCompileDecision({ label, path, existingState, wantedText, sourceHash, interactive, rl }) {
+async function applyCompileDecision({ label, path, existingState, wantedText, sourceHash, interactive, rl, force = false }) {
   const recordedHash = extractRecordedHash(existingState.raw);
   const decision = decideCompileAction({
     existsOnDisk: existingState.existsOnDisk,
@@ -558,7 +581,15 @@ async function applyCompileDecision({ label, path, existingState, wantedText, so
       ? "die bestehende Datei ist kein gueltiges JSON/YAML -- bitte von Hand pruefen"
       : "Hand-Edit-Drift erkannt (Datei weicht vom letzten Kompilat ab, obwohl pipeline.user.yaml seither unveraendert ist)";
   console.warn(`  WARNUNG ${label}: ${reasonText}.`);
-  if (interactive && rl) {
+
+  const disposition = resolveWarnDisposition({ force, interactive: interactive && !!rl });
+  if (disposition === "write-forced") {
+    console.warn(`  WARNUNG ${label}: --force/--yes gesetzt -- ueberschreibe die hand-editierte Datei OHNE Rueckfrage.`);
+    writeFileSync(path, wantedText);
+    console.log(`  ${label}: ueberschrieben (--force).`);
+    return { wrote: true, decision };
+  }
+  if (disposition === "prompt") {
     const answer = (await rl.question(`  ${label} trotzdem ueberschreiben? [y/N] `)).trim().toLowerCase();
     if (["y", "yes", "j", "ja"].includes(answer)) {
       writeFileSync(path, wantedText);
@@ -639,15 +670,19 @@ Details: SETUP.md (Haupteinstieg), docs/usage.md (Alltag).
 `);
 }
 
-function parseArgv(argv) {
-  return { defaults: argv.includes("--defaults"), help: argv.includes("--help") || argv.includes("-h") };
+export function parseArgv(argv) {
+  return {
+    defaults: argv.includes("--defaults"),
+    help: argv.includes("--help") || argv.includes("-h"),
+    force: argv.includes("--force") || argv.includes("--yes"),
+  };
 }
 
 export async function run(argv = process.argv.slice(2)) {
   const opts = parseArgv(argv);
   if (opts.help) {
     console.log(
-      "Usage: node setup.mjs [--defaults|--help]\n  (no flags)   interactive setup\n  --defaults   non-interactive: conservative defaults, no prompts (test/CI)\n  --help       this text",
+      "Usage: node setup.mjs [--defaults] [--force|--yes] [--help]\n  (no flags)     interactive setup\n  --defaults     non-interactive: conservative defaults, no prompts (test/CI)\n  --force/--yes  skip the hand-edit-drift confirmation (interactive) or allow the\n                 otherwise-refused overwrite (non-interactive) -- always warns loudly first\n  --help         this text",
     );
     return 0;
   }
@@ -714,6 +749,7 @@ export async function run(argv = process.argv.slice(2)) {
     sourceHash,
     interactive,
     rl,
+    force: opts.force,
   });
 
   const pipelineJsonState = readJsonSafe(PIPELINE_JSON_PATH);
@@ -726,6 +762,7 @@ export async function run(argv = process.argv.slice(2)) {
     sourceHash,
     interactive,
     rl,
+    force: opts.force,
   });
 
   const pipelineYamlExists = existsSync(PIPELINE_YAML_PATH);
@@ -739,6 +776,7 @@ export async function run(argv = process.argv.slice(2)) {
     sourceHash,
     interactive,
     rl,
+    force: opts.force,
   });
 
   if (rl) rl.close();

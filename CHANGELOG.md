@@ -9,3 +9,5 @@ Format nach [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versionier
 ## [0.1.0] — Initial public snapshot
 
 Erster weitergabefähiger Snapshot des Operating Models: Rollenmodell (PO/Elephant/Goldfish/Critic), zweistufiges Review-System (deterministische Gates + Critic-Trigger-Matrix), Session-Lifecycle, Handover-Kanonisierung, Projekt-Kalibrierungsschicht, Guardrails (`guardrails/`), Modell-/Tooling-Policies (`policies/`) und das `pipeline-core`-Plugin (git-guard-Union-Hook, Skills, Agents). Details: [`docs/operating-model.md`](docs/operating-model.md).
+
+Ehrlicher Reifegrad-Hinweis: v0.1.0, rund eine Woche Bauzeit, ein Soloprojekt, bisher eine Dogfooding-Runde — Feedback willkommen.

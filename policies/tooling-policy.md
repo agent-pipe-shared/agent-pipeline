@@ -34,6 +34,14 @@
 - **Warum:** Alle drei dokumentierten Headless-Defekte (`--bare`-Credential-Bug, Workspace-Deadlock ohne `--add-dir`, stdin-Pipe-Hänger im Background) hätte ein 30-Sekunden-Test durch den vollen Pfad vorab gefunden — stattdessen kosteten sie zwei stille Hänger in einer Arbeitssession.
 - **Prüfweise:** Die Erstnutzung eines Transportwegs zeigt in der Trajektorie den Trivialaufruf VOR dem Erstlauf; die Telemetrie-Spalte „Besonderheiten" vermerkt den Smoke-Test bei neuen Pfaden.
 
+### G5 — Spec-Format: prose in Markdown, structured data stays flat (NEU)
+
+*(English in the source — agent-facing authoring guideline, same convention as MP-22/23/24 in `policies/model-policy.md`.)*
+
+- **Gebot (advisory — no enforcing hook, see G1 Prüfweise):** Prose belongs in Markdown; structured data (frontmatter, config, checklists, enums, tables) stays FLAT — avoid deep nesting and format overhead. This is guidance on choosing the right flatness WITHIN the existing spec format, not a mandate to switch formats — no move to Gherkin/BDD is intended or in scope (no evidence surfaced that the existing format itself is the wrong choice).
+- **Warum:** Deep nesting and format overhead cost tokens and readability without adding information; flat structured data reads and diffs cleaner for both agent and human reviewer.
+- **Prüfweise:** Spec/template authoring review flags deeply-nested structured blocks that could be flattened; advisory only (no hook) — marked as such per the G1 advisory requirement, not silently assumed enforced.
+
 ---
 
 ## 2. Werkzeug-Matrix
@@ -200,6 +208,22 @@ Erweiterung der Liste nur per Backlog-Item, nicht ad hoc.
 - **Gebot:** Features, die die **Grundlage einer bestehenden ADR ändern** — z. B. Permission-Semantik, Subagent-Frontmatter-Felder, Hook-Events, Plugin-/Marketplace-Mechanik, Modellpreise/-verfügbarkeit — triggern eine **ADR-Wiedervorlage**: Das Backlog-Item wird entsprechend markiert, die betroffene ADR erhält den Status „Wiedervorlage", und der Entscheid (bestätigen/revidieren) fällt durch Elephant + the PO-Gate — nie still im Radar-Lauf selbst.
 - **Typischer Auslöser:** eine **Preis-Review**, sobald der Einführungspreis eines konfigurierten Modells ausläuft (Instrument und Daten → `policies/model-policy.md`). Ein solches Item wird mit Fälligkeitsdatum in der Kategorie `tooling-radar` angelegt, sobald `backlog/` existiert (Phase 3).
 
+### Radar-Kandidaten (vorgemerkt, KEIN Bau)
+
+*(English in the source — agent-facing radar-candidate entries, formatted per the R4 output contract above: Was ist neu / Betrifft welche Pipeline-Regel/ADR / Empfehlung. These are CANDIDATES ONLY — building either is explicitly out of scope for now (radar pre-flagging only, no build).)*
+
+**Candidate 1 — Scheduled Audit:**
+1. Was ist neu: a periodic self-check of the pipeline's own state/guards (drift detection run on a schedule, not only reactively).
+2. Betrifft welche Pipeline-Regel/ADR: this radar (§4) and the `/close` radar anchor (R2) — a scheduled audit would sit alongside, not replace, the existing monthly radar cadence.
+3. Empfehlung: `prüfen` — trigger: drift accumulates between radar runs, or manual audits keep finding the same class of gap repeatedly (a signal that periodic self-checking, not just the monthly radar, is needed).
+
+**Candidate 2 — Semantic Pre-Execution-Gating:**
+1. Was ist neu: a cheap pre-intent check run before a risky single action (e.g. a Bash command against real devices), verifying the action matches the stated intent before it executes.
+2. Betrifft welche Pipeline-Regel/ADR: `guardrails/` (git-guard-Union, W3) — this would sit ABOVE the deterministic regex/pattern guard layer, not replace it (G1 stays the enforcement floor).
+3. Empfehlung: `prüfen` — trigger: a class-high project (e.g. <PROJECT_B>, real devices) needs intent verification that a regex/pattern guard structurally cannot give (it can block a command SHAPE, not verify the command's semantic intent).
+
+Both candidates share the same discipline: **the lowest level that catches the important thing** — neither is authorized to build here, radar-only for now.
+
 ### Prüfweise (gesamter Radar)
 
 `backlog/`-Kategorie `tooling-radar` enthält je Kalendermonat mindestens ein Item (ggf. Null-Item) — maschinell prüfbar; der Konsistenz-Pass bzw. Critic kann Lücken mechanisch finden. Wiedervorlage-Items referenzieren eine existierende ADR-Nummer.
@@ -213,3 +237,4 @@ Erweiterung der Liste nur per Backlog-Item, nicht ad hoc.
 | Datum | Änderung |
 |---|---|
 | 2026-07-03 | Erstfassung (Sprint 0 Phase 2). |
+| 2026-07-09 | G5 (Spec-Format: Prosa in Markdown, Strukturdaten flach) + zwei Radar-Kandidaten (Scheduled Audit, Semantic Pre-Execution-Gating) ergänzt. |

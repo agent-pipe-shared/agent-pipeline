@@ -30,6 +30,8 @@ Normative source: `harness/session-bootstrap.md` in the **agent-pipeline repo** 
 
 Goldfish/Critic normally receive their compact variant embedded in the dispatch briefing (goldfish-task / critic-review templates in the agent-pipeline repo). If this skill runs with role `goldfish` or `critic`, execute only the steps marked above.
 
+**Context economy — role-path-only load:** execute and read only the row/section that applies to YOUR actual role (Elephant full path, or Goldfish/Critic compact rows above; Elephant profile variants live under "Same-day light bootstrap" / "Speed bootstrap" below) — do not read the other two roles' full step text as part of running this skill. No step is dropped by this; it only stops front-loading unrelated role material into the session. **Measurable target: context after bootstrap ≤ ~75k tokens (down from >150k today), measured via the statusline.**
+
 ## Step 1 — Ruleset presence + loaded state
 
 1. **Presence:** if you are executing this skill, the plugin `pipeline-core` is loaded — this very execution is the presence proof (session-bootstrap §3 step 1). If instead the invocation failed with "unknown skill", that is case **F1** (see failure table; the CLAUDE.md fallback line detects exactly this).
@@ -41,11 +43,11 @@ Goldfish/Critic normally receive their compact variant embedded in the dispatch 
 
 ## Step 1b — Model/effort (Elephant only)
 
-- **Profile question — hard gate, ask BEFORE setting model/effort:** present this AskUserQuestion (2 options + free-text = PO exception):
+- **Profile question (THIRD OPTION `speed` NEW) — hard gate, ask BEFORE setting model/effort:** present this AskUserQuestion (3 options + free-text = PO exception):
 
-  > Profilwahl (hart, AskUserQuestion, 2 Optionen + Freitext = PO-Ausnahme): „Session-Profil für dieses Thema — Advisor (Cost/Quality) [advisor] (das Design-Tier-Modell + das Advisor-Modell ab Sessionbeginn — Standard, solange das Advisor-Modell nicht abo-gedeckt ist) oder Design-first (Cost+/Quality+) [design-first] (phasenbewusst: Design für dieses Thema BEREITS freigegeben? → direkt Ausführungsphase, das Design-Tier-Modell bei Effort max ab Sessionbeginn, das Advisor-Modell nur für T1-Critics/Readiness-Subagenten; sonst das Design-Tier-Modell bei Effort xhigh, Wechsel auf Effort max exakt am PRD-Freigabe-Gate — höhere Tiers kosten mehr pro Token, daher Effort als primären Kostenhebel behandeln)?"
+  > Profilwahl (hart, AskUserQuestion, 3 Optionen + Freitext = PO-Ausnahme): „Session-Profil für dieses Thema — Advisor (Cost/Quality) [advisor] (das Design-Tier-Modell + das Advisor-Modell ab Sessionbeginn — Standard, solange das Advisor-Modell nicht abo-gedeckt ist) oder Design-first (Cost+/Quality+) [design-first] (phasenbewusst: Design für dieses Thema BEREITS freigegeben? → direkt Ausführungsphase, das Design-Tier-Modell bei Effort max ab Sessionbeginn, das Advisor-Modell nur für T1-Critics/Readiness-Subagenten; sonst das Design-Tier-Modell bei Effort xhigh, Wechsel auf Effort max exakt am PRD-Freigabe-Gate — höhere Tiers kosten mehr pro Token, daher Effort als primären Kostenhebel behandeln) oder Speed (Mini-Feature/Hotfix) [speed] (das Implement-Tier-Modell + ein ab Sessionbeginn aktiver Design-Tier-Advisor — exakte Modell-/Effort-/Advisor-Kommandos gemäß `policies/model-policy.md` MP-28; leichter Bootstrap: nur Regelwerk-SHA + Kalibrierungs-Existenz + verify-Verfügbarkeit + operativer Handover-Kopf, EINE Bestätigungszeile statt drei, keine Profil-Zeremonie; Geltungsbereich ~≤5 Dateien, KEINE Guardrail-/Kanon-Dateien, keine neuen Abhängigkeiten — Grenze gerissen ⇒ Pflicht-Eskalation ins Vollprofil; Guard-Hooks bleiben immer aktiv; Details → "Speed bootstrap" below)?"
 
-  The PO decides per the topic of the first prompt. A free-text answer is the PO-exception path (e.g. a special session running the advisor model as the main model — stays PO-designatable, not a third button). Present the verbatim commands for the chosen profile (the model/effort/advisor names below are the shipped default preset — override them in `pipeline.user.yaml`):
+  The PO decides per the topic of the first prompt. A free-text answer is the PO-exception path (e.g. a special session running the advisor model as the main model — stays PO-designatable, not a fourth button). Present the verbatim commands for the chosen profile (the model/effort/advisor names below are the shipped default preset — override them in `pipeline.user.yaml`):
 
   > Profil advisor (ab Sessionbeginn):
   > /model opus
@@ -62,9 +64,12 @@ Goldfish/Critic normally receive their compact variant embedded in the dispatch 
   >
   > Advisor-Hygiene (design-first, falls Advisor konfiguriert):
   > /advisor off
+  >
+  > Profil speed (ab Sessionbeginn, Details → "Speed bootstrap" below):
+  > Modell/Effort/Advisor gemäß `policies/model-policy.md` (MP-28) — fixe Zuordnung, keine weitere Profil-Zeremonie.
 
   **Advisor hygiene:** if profile `design-first` is chosen and an advisor is already configured (leftover `advisorModel` user setting from a prior `advisor`-profile session, persists per machine), check in this order: (1) ask about parallel advisor sessions of other projects on this machine; (2) prefer the project-local off-switch `"advisorModel": ""` in `.claude/settings.local.json` (the live settings validator rejects `null` although the docs name it; `$comment` keys are invalid in `settings.local.json`); (3) `/advisor off` ONLY when no parallel session is affected; (4) **divergence = mandatory question (PO condition „man entscheidet immer"):** whenever the ACTUAL advisor state diverges from the chosen profile's intended state (e.g. a machine-inherited advisor in a design-first session), put the resolution to the PO as an AskUserQuestion (keep attached / project-local off / `/advisor off`) — silent inheritance is a bootstrap defect, informing without asking does NOT satisfy the duty.
-- Verify the session runs the model/effort of the **chosen profile** (Step 1b profile question): profile `design-first` → **phase-aware:** if the design for this session's topic is ALREADY approved (the standard case for a follow-up execution session after an EL-25 cut), start DIRECTLY in the execution phase — **the design-tier model at effort `max`** from session start, the advisor model only for T1 critics/readiness subagents; otherwise **the design-tier model at effort `xhigh`** until the PRD-gate switch (MP-01 standard), then EXACTLY ONE switch to effort **`max`** (EL-24, sanctioned exception MP-17/MP-18); profile `advisor` → **the design-tier model at effort `max` + the advisor model** already from session start (MP-26 — standard recommendation while the advisor model is not subscription-covered). Effort is **session-only**: if unset or wrong, ask the PO to run the profile's verbatim commands NOW, before any work. **Advisory duty:** `xhigh` is the design-phase standard; `max` otherwise only for design-tier fallback operation, for implement-tier dispatches, for PO-designated special tasks (e.g. initial sessions of entirely new topics; for tasks that call for maximal reasoning the ultracode task opt-in, MP-08, remains the alternative), or for **planned execution-phase design-tier operation** — no generic `max` recommendation beyond these. Advisory duty now = point out the OPTION when the PO himself has designated such a task, not proactive lobbying.
+- Verify the session runs the model/effort of the **chosen profile** (Step 1b profile question): profile `design-first` → **phase-aware:** if the design for this session's topic is ALREADY approved (the standard case for a follow-up execution session after an EL-25 cut), start DIRECTLY in the execution phase — **the design-tier model at effort `max`** from session start, the advisor model only for T1 critics/readiness subagents; otherwise **the design-tier model at effort `xhigh`** until the PRD-gate switch (MP-01 standard), then EXACTLY ONE switch to effort **`max`** (EL-24, sanctioned exception MP-17/MP-18); profile `advisor` → **the design-tier model at effort `max` + the advisor model** already from session start (MP-26 — standard recommendation while the advisor model is not subscription-covered); profile `speed` (NEW) → model/effort/advisor per `policies/model-policy.md` (MP-28) already from session start — fixed pairing, no phase switch, no advisor-hygiene sub-flow. Effort is **session-only**: if unset or wrong, ask the PO to run the profile's verbatim commands NOW, before any work. **Advisory duty:** `xhigh` is the design-phase standard; `max` otherwise only for design-tier fallback operation, for implement-tier dispatches, for PO-designated special tasks (e.g. initial sessions of entirely new topics; for tasks that call for maximal reasoning the ultracode task opt-in, MP-08, remains the alternative), or for **planned execution-phase design-tier operation** — no generic `max` recommendation beyond these. Advisory duty now = point out the OPTION when the PO himself has designated such a task, not proactive lobbying.
 - **Model-identity hardening:** assert the active model from OBSERVED evidence — `/model` output or explicit PO confirmation — never assumed, especially in the turns right after a credit-limit/reset event (silent model-fallback risk).
 - Confirm the env var `CLAUDE_CODE_SUBAGENT_MODEL` is **NOT set** (MP-04 — it would silently override every subagent's frontmatter model and void the model matrix).
 - Deviations from the role default are justification-bound against `policies/model-policy.md` (agent-pipeline repo).
@@ -139,6 +144,7 @@ Allowed suffixes (only these, each appended with „·"):
 - Case F3: `· Staleness ungeprüft (offline, Cache-Stand)`
 - Accepted case F2: `· HINWEIS: Regelwerk stale ({{N}} Commits hinter Remote)`
 - Same-day light bootstrap (see "Same-day light bootstrap" below): `· Staleness same-day gecacht (voller Check {{HH:MM}})`
+- Speed bootstrap (see "Speed bootstrap" below): `· Profil speed — Leicht-Bootstrap (Details → "Speed bootstrap")`; the model/effort extra line and the role-prohibitions extra line (both step 6.1 below) are OMITTED in this case — they still apply unchanged in substance, they are just not printed as separate lines (ONE confirmation line instead of three).
 - Case F4 (calibration and/or handover missing — the EXPECTED initial state in not-yet-migrated projects): the affected field carries `FEHLT (F4)` instead of a placeholder value — i.e. `Kalibrierung FEHLT (F4)` resp. `Stand FEHLT (F4)` — PLUS the mandatory suffix `· F4: nur Read-only-Analyse bis Kalibrierung/Handover angelegt`.
 
 Role variants of the „Stand" field:
@@ -176,6 +182,36 @@ Light form (deviates from Steps 1–6 above ONLY as follows; every step not list
 - **Step 6:** confirmation line as usual + the suffix above.
 
 Why: a full bootstrap already completed the same calendar day on the same machine makes the expensive checks (remote staleness, full handover read) redundant — PROVIDED ruleset state and handover state are demonstrably unchanged since; the three preconditions are the evidence duty for that, not a shortcut by feel.
+
+## Speed bootstrap (light, mini-feature/hotfix, Elephant only)
+
+**Origin:** third profile option alongside `advisor`/`design-first` in Step 1b — for genuinely small, tightly-bounded diffs (mini-feature/hotfix), not for architecture/guardrail work.
+
+**Precondition:** the PO picks `speed` at the Step 1b profile question. Unlike the same-day light bootstrap above, `speed` is NOT bound to "same machine/same calendar day" — it is a task-shape decision (mini-feature/hotfix), not a cache-freshness one.
+
+**Scope (hard limits — a breach forces mandatory escalation):**
+
+- Mini-feature/hotfix scope only: **~≤5 files touched.**
+- **NO guardrail/canon files** in scope (`guardrails/*`, `docs/operating-model.md`, `roles/*`, `policies/*`, any hook under `plugins/pipeline-core/hooks/*`, `.claude/settings.json`, guard config).
+- **No new dependencies.**
+- If any of these limits become visible as breached mid-session (scope grew beyond the mini-feature/hotfix shape): **mandatory escalation to the full profile** — switch to the full bootstrap/full process immediately, do not keep working the speed path (escalation logic mirrors `harness/checklists/small-session.md`, "Escalation rule" section).
+- **Guard hooks stay fully active in EVERY profile, including `speed`** (deterministic, free) — speed saves ceremony, not safety.
+
+**Light bootstrap form** (deviates from the full path in Steps 1–6 ONLY as follows; every step not listed here runs unchanged or is dropped exactly as specified below):
+
+- **Step 1:** local ruleset SHA only (no `ls-remote`).
+- **Step 1b:** the profile question itself runs normally (that IS the speed choice); after it, the advisor-hygiene check and the advisor readiness probe are SKIPPED (both are `advisor`-profile-specific) — model/effort/advisor pairing is fixed in the speed profile (`policies/model-policy.md`, MP-28), set once, no follow-up questions.
+- **Step 1c:** skipped (no spend/usage check as a separate act).
+- **Step 1d:** skipped as a separate confirmation line — the role prohibitions (EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19) still apply unchanged in substance, they are just not repeated as their own line in the speed path.
+- **Step 2:** skipped entirely (no remote staleness check).
+- **Step 3:** existence check of the calibration file only (no full read).
+- **Step 4:** the operative head of the handover file only — no full session-history read.
+- **Step 5:** existence/invocability check of verify only.
+- **Step 6:** **ONE confirmation line instead of three** (format → Step 6 above, suffix `· Profil speed — Leicht-Bootstrap`).
+
+**Light process** (not just the bootstrap — applies to the whole task): no PRD document; direct dispatch, or a mini-edit for the smallest fixes (stage-0 fast path per `docs/operating-model.md` §3.3); a light review tier instead of a full Design-Tier review — the existing Critic-trigger matrix decides as usual, this is not a new Critic rule (→ `harness/checklists/small-session.md` step 3); short close via the **close-light variant** of the `close-block` skill (`plugins/pipeline-core/skills/close-block/SKILL.md`) — its own hard eligibility gate applies unchanged, speed does not override it.
+
+**Why:** a mini-feature or a hotfix used to run under the same heavy ceremony as an architecture rebuild — the exceeded proportionality guardrail. Speed cuts the ceremony without touching a single deterministic guardrail.
 
 ## Failure cases F1–F4 (binding behavior)
 

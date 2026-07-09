@@ -109,6 +109,7 @@ Stop and report (do not keep iterating) when ANY of these occurs:
 - The task requires a secret/credential value → STOP, report back (SEC-03) —
   never ask around, never read secret stores on your own initiative.
 - Genuine ambiguity the briefing does not resolve.
+- Tool budget reached or clearly about to be exceeded (field 6, hard cap) — stop cleanly and report what is done + what remains; do not keep working past it.
 - Running out of turns/time mid a state-changing test: restore the touched
   state before you stop (restore-before-yield, see field 4) — a stop report
   with a live fault injection still in place is itself the failure to avoid,
@@ -124,6 +125,7 @@ Stop and report (do not keep iterating) when ANY of these occurs:
   {{MODEL_JUSTIFICATION e.g. ">15 files across two subsystems → the design-tier model per MP-05 criterion 1" or "n/a — role default"}}
 - Worktree: {{WORKTREE e.g. "yes — per calibration `worktree: on-write`" or "no — read-only task"}}
 - Profil: {{standard | light}} — `light` ONLY for stage-0 / uniform-mechanical tasks (operating-model §3.3): condensed 3-field report (see below), effort `xhigh` (`high` only if trivial-uniform), skip the pre-edit baseline verify. Never `light` for class-high / guardrail work.
+- **Tool budget (hard cap, first-class field):** {{TOOL_BUDGET default: "≤45 tool uses"}}. This is a mandatory field in EVERY goldfish briefing, not just workflow-agent dispatches. Approaching or reaching the cap is a stop condition (field 5): stop cleanly and report what is done + what remains — never "push through" past it. **Honesty note:** this is a briefing/behavior rule, not a hook-enforced count — no automated per-subagent tool-call counter exists (yet); documented as such rather than overclaimed as "will be blocked" (the G1 lesson, `policies/tooling-policy.md` AP-T2).
 - **Dispatch record (standard evidence):** write `dispatch-record.json` next to your evidence artifact with fields `taskId`, `model`, `rulesetSha`, `dispatcher`, `outcome` — this template is the authoritative definition of that file's shape. Together with the `Dispatch: {{TASK_ID}} (goldfish)` commit-trailer line (see Final report below), it is the deterministic authorship/evidence pair for close step 6b and the Critic — standard harness trailers (`Co-Authored-By:`, `Claude-Session:`) alone are not authorship evidence.
 - **Report-early duty (truncated-final mitigation):** for packages expected to
   need >~25 tool uses, maintain a RUNNING report skeleton/evidence log inside
@@ -131,6 +133,21 @@ Stop and report (do not keep iterating) when ANY of these occurs:
   commit/milestone — never held only in working context. Your final report
   then condenses this persisted log rather than being composed from scratch,
   which survives a mid-run truncation a chat-only draft would not.
+
+---
+
+## Optional module: BUGFIX briefing (drop-in)
+
+Use this module when dispatching a bugfix (not for new features or mini-edits). It is NOT a seventh field — copy its lines into the matching fields above when composing a bugfix briefing.
+
+- **Field 1 (Goal) addition:** the observable end-state includes "a failing test/repro command exists and is confirmed RED, reproducing the reported bug, before any fix is written."
+- **Field 3 (DoD checks) additions:**
+  - Reproduce-first: a failing test/repro command demonstrating the bug is written and run RED before the fix is written; the red run is evidence (log/output), never a prose claim.
+  - Root-cause-only: the fix addresses the root cause the repro exposed — nothing else. No incidental cleanup, no drive-by refactors riding along on the bugfix diff.
+  - Renames separate: any rename/refactor the fix seems to invite goes into a SEPARATE follow-up item — never bundled into the bugfix commit (one concern per commit).
+  - Repro stays in the suite: the test/check that proved the bug MUST remain afterward as permanent regression coverage — it is not a scratch script to delete once green.
+- **Field 4 (Forbidden) addition:** do not delete or weaken the repro test/check after the fix goes green; do not fold unrelated renames/cleanup into this diff.
+- **Why:** reproduce-first/root-cause-only discipline previously had no dedicated rule governing bugfix dispatches — this closes that gap.
 
 ---
 

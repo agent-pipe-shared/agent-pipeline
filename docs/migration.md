@@ -99,7 +99,9 @@ you want them first:
   first onboarding task. Nothing is "done" while `verify` is red.
 - **The git-guard union** — ships with the plugin and needs no configuration. It
   blocks force-pushes, history rewrites, deletion of protected branches and tags,
-  blanket discards of uncommitted work, and any attempt to skip hooks — for every
+  blanket discards of uncommitted work, and the standard hook-skip forms
+  (`--no-verify`, `git commit -n`, `core.hooksPath` rebinds; other bypass vectors are
+  documented in `guardrails/git.md` GIT-07, not claimed impossible) — for every
   agent, in every session, from the first commit.
 
 **2. The dev-plan and push gates.** Once verify and the guard are in place, add the
@@ -270,8 +272,10 @@ sollten zuerst stehen:
   „fertig", solange `verify` rot ist.
 - **Die git-Guard-Union** — kommt mit dem Plugin und braucht keine Konfiguration.
   Sie blockiert Force-Pushes, History-Rewrites, das Löschen geschützter Branches
-  und Tags, pauschales Verwerfen uncommitteter Arbeit und jeden Versuch, Hooks zu
-  überspringen — für jeden Agenten, in jeder Session, ab dem ersten Commit.
+  und Tags, pauschales Verwerfen uncommitteter Arbeit und die gängigen
+  Hook-Skip-Formen (`--no-verify`, `git commit -n`, `core.hooksPath`-Umbiegung; weitere
+  Vektoren dokumentiert in `guardrails/git.md` GIT-07, nicht als unmöglich behauptet) —
+  für jeden Agenten, in jeder Session, ab dem ersten Commit.
 
 **2. Das Dev-Plan- und das Push-Gate.** Sobald Verify und Guard stehen, ergänze die
 beiden menschlichen Gates. Sie werden im additiven Manifest `.claude/pipeline.yaml`

@@ -32,10 +32,10 @@ Rule IDs: `SEC-xx`.
 
 ## SEC-04 — Slopsquatting: verify every new dependency
 
-- Before adding ANY new dependency (package, action, container image, plugin), **MUST** verify: (a) it exists in the official registry under exactly that name (hallucinated names differ subtly), (b) it is the intended, maintained project (repo link, release history, download signals) — evidence: registry URL + version pinned.
+- Before adding ANY new dependency (package, action, container image, plugin), **MUST** verify: (a) it exists in the official registry under exactly that name (hallucinated names differ subtly), (b) it is the intended, maintained project (repo link, release history, download signals), (c) **the proposed VERSION is current in the registry right now — not a stale, training-cutoff version.** A model's training data freezes at a point in time; the version it "remembers" as latest may be several majors behind, deprecated, or yanked since — check the registry's actual current/recommended listing at verification time, do not pin from memory. Evidence: registry URL + version pinned.
 - **MUST** list every new dependency in the completion report under a "new dependencies" item with that evidence; **MUST NOT** slip dependencies in silently.
 - New dependencies are at least risk class MEDIUM → Critic trigger per matrix (`docs/operating-model.md` §4.2); CI actions are SHA-pinned (tooling-policy W7).
-- **Why:** Slopsquatting is an active attack vector: adversaries register the package names AI models frequently hallucinate. A typo-level name difference is a supply-chain compromise.
+- **Why:** Slopsquatting is an active attack vector: adversaries register the package names AI models frequently hallucinate. A typo-level name difference is a supply-chain compromise — and a stale training-cutoff version pinned with full confidence is the same failure mode one layer down: correct name, wrong evidence.
 - **Verification:** Completion report rubric "new dependencies" filled with registry evidence; lockfile diff is part of the reviewed diff; Critic rubric contains the dependency reality check "do all new imports/packages exist under exactly that name, with registry evidence?" — landed in `plugins/pipeline-core/agents/critic.md`, `plugins/pipeline-core/skills/critic-review/SKILL.md`, and `harness/checklists/critic-review.md`.
 
 ## SEC-06 — Security-scan phase is mandatory when declared; SKIPPED is never PASS
@@ -47,3 +47,10 @@ Rule IDs: `SEC-xx`.
 - **MUST NOT** run the security-scan phase itself inside the gate hook (10s hook budget) — the gate hook only reads evidence freshness (`evidence/security-latest.json`: `exitCode 0` + `commit == HEAD`), never recomputes (`docs/adr/0029-file-handoffs-status.md`).
 - **Why:** Slopsquatting (SEC-04) and secret leaks (SEC-01) are exactly the failure modes a scanner catches mechanically and cheaply — but only if a skipped tool is never mistaken for a clean result, and a project without the manifest is never silently unprotected without saying so.
 - **Verification:** `evidence/security-latest.json` (schema `pipeline.security-evidence.v0`) carries every adapter's status + the applied thresholds; absent manifest/gate → phase does not run at all (opt-in, no silent partial enforcement); `harness/scripts/security-scan.mjs` is the reference runner.
+
+## SEC-07 — Sandboxing is defense-in-depth, not a replacement for the guards
+
+- Running work inside a sandbox (isolated worktree, container, restricted execution environment) **complements** the guard union (git-guard, testpath-guard, security-scan) — it does **NOT** replace any rule in this file or in `guardrails/quality-gates.md` / `guardrails/token-budget.md`.
+- A sandboxed session still needs every SEC-xx rule in this file enforced inside it: secrets stay out of artifacts, staging denies still apply, dependency verification still happens, security-scan still runs where declared. A sandbox narrows the blast radius of a mistake; it does not make the mistake acceptable, and it does not make any guard rule optional.
+- **Why:** Defense-in-depth means layers that each hold independently. Treating a sandbox as "the guards are handled elsewhere" reintroduces exactly the single point of failure the layered approach exists to avoid.
+- **Verification:** No standalone check — this is a framing/discipline note. If a future sandbox mechanism is adopted for this pipeline, its calibration entry MUST name which guards remain active inside it; "none, the sandbox is enough" is not a valid answer.

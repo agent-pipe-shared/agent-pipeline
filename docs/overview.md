@@ -169,6 +169,16 @@ three durable artifacts, and records a short telemetry line. The discipline
 behind it is simple: a session is a cache over persisted files, so what is not
 written down does not exist.
 
+## What this is, and isn't
+
+This is a **Tier 2** review system: a structured, two-stage self- and
+Critic-review layer built into the day-to-day workflow (deterministic gates,
+then an independent LLM reviewer with a fresh context). It is not a certified
+or enterprise-grade assurance system, and it does not claim to be one. See
+[`docs/operating-model.md`](operating-model.md), the "Enterprise-Ausbaupfade"
+section, for the documented, optional upgrade paths (a scheduled audit pass, a
+semantic pre-execution gate) beyond what this repo ships by default.
+
 ## Where things live
 
 - [`docs/operating-model.md`](operating-model.md) — the full normative model:
@@ -378,6 +388,18 @@ das Retro (verfasst von der Sitzung selbst, nicht als Frage an dich), archiviert
 die drei dauerhaften Artefakte und hält eine kurze Telemetrie-Zeile fest. Die
 Disziplin dahinter ist einfach: Eine Sitzung ist nur ein Zwischenspeicher auf
 persistierten Dateien — was nicht festgehalten ist, existiert nicht.
+
+## Was das ist – und was nicht
+
+Das hier ist ein **Tier-2**-Review-System: eine strukturierte, zweistufige
+Self- und Critic-Review-Schicht, fest im Alltagsworkflow verankert
+(deterministische Gates, dann ein unabhängiger LLM-Prüfer mit frischem
+Kontext). Es ist kein zertifiziertes oder Enterprise-taugliches
+Assurance-System und erhebt diesen Anspruch auch nicht. Siehe
+[`docs/operating-model.md`](operating-model.md), Abschnitt
+„Enterprise-Ausbaupfade", für die dokumentierten, optionalen Ausbaustufen (ein
+planmäßiger Audit-Durchlauf, ein semantisches Pre-Execution-Gate) über das
+hinaus, was dieses Repo standardmäßig mitbringt.
 
 ## Wo was liegt
 

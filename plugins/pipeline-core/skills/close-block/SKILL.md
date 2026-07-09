@@ -62,6 +62,12 @@ Rules: extension points not defined by this skill (e.g. a future `newBlockReview
    - Answer the mandatory question (German, verbatim): „Von wem stammen die Produktions-Diffs dieser Session?" — every diff MUST map to a Goldfish/Critic dispatch (`dispatch-record.json` + `Dispatch: <TASK_ID> (goldfish)` trailer line) or to the OM §3.3 stage-0 fast path. Cross-reference source: the session block's dispatch enumeration and the telemetry line.
    - Any Elephant-authored production diff outside stage-0 ⇒ **INCIDENT**, never a retro "discussion point": flag explicitly to the PO in the close output, write an incident note into the handover file and the telemetry line.
 
+6c. **Handover rotation (head-size discipline — keeps the handover file slim, not just once but ON EVERY CLOSE)** — mandatory check, same non-renumbering contract as 6b:
+   - **Register discipline (every close, no threshold, no exception, where the project's handover maintains a decision register/log):** a new register entry's 1-line title stays in the handover file's decision-register/index (step 5's "append at table end" rule, applied to the index row, if the project uses one); the entry's full prose paragraph is appended in the SAME close to the project's own archive (an append-only `docs/state-archive/`-style location) — never written into the head as full prose, not even transiently. This is what keeps the head from re-accumulating register bulk between rotations; where a project's handover uses a register at all, this is how new entries are written from now on.
+   - **Session-block rotation (threshold-triggered, where the handover accumulates per-session/per-block prose in its head):** after step 5 updates this close's state in the head, check the handover file's size. Target: the operative head (re-entry pointer, environment, open items, next steps, plus any recently-kept session/block entries) stays **≤ ~25k tokens — readable in one pass** (the measurable goal this step protects). Over target, OR more than the last **2 full session/block entries** are sitting in the head → move the OLDEST entries verbatim (byte-for-byte, no paraphrasing) into the project's own archive file(s) (append-only; start a new dated file rather than growing one file without bound, e.g. per month) — keep only the operative sections plus the last 1–2 entries in the head.
+   - No archive convention yet on this project (first rotation) → create one (purpose, append-only contract, file list) BEFORE moving content; report the new archive location in the close report (bundled at the gate, not a separate mid-task confirmation — approval-fatigue, §4.2).
+   - Name the rotation explicitly in the close report (what moved, to which path) if anything moved this close — a silent rotation is a lost trail exactly like any other silently-skipped step in this ritual.
+
 7. **Learn + measure:**
    - **Self-retro:** the **session elephant writes the close retro itself** — concrete improvement item(s), or an explicit "nothing" — filed as a `workflow-improvement` backlog item (agent-pipeline repo's `backlog/items/`, or a transfer note in the handover per the mechanic below if that repo is absent on this machine), addressed to the pipeline elephant (continuous-improvement process). MANDATORY part of EVERY close, never silently skipped — silence is not an option (operating-model §7). The PO submits his own observations separately, on his own channel; there is no ritual prompt to the PO anymore.
    - **Tooling radar due? (tooling-policy R2 anchor):** compare the date of the newest `tooling-radar` backlog item in the agent-pipeline repo's `backlog/items/` with the current calendar month. If the newest radar item is older than the current calendar month (or none exists), the monthly radar run is OVERDUE: say so LOUDLY in the ritual output and recommend a radar dispatch (per `policies/tooling-policy.md` §4 R2–R4) — never pass over it silently. This check is the deterministic anchor of the R2 catch-up rule.
@@ -134,7 +140,12 @@ this — close-light makes it the default, not the exception); the session-cut/`
 (a <1h session is not near a cut boundary by construction). The error-register update (step 7b) is
 **still done IF a new/recurring class was actually observed** — close-light compresses ceremony, never
 observation; if nothing register-worthy happened, it is skipped silently like any other block with
-nothing to report.
+nothing to report. The handover-rotation step (6c) keeps its **register-discipline half in full**
+(index row + archive-append for any new register entry, where the project's handover uses one — costs
+nothing extra and is exactly what keeps the next session's bootstrap slim); only the
+**session/block-rotation half is skipped by default** (a <1h close-light session's one-paragraph append
+rarely crosses the ~25k-token threshold by itself) — do the cheap size check anyway and rotate if the
+head is already over target.
 
 **Anything outside the gate = full ritual. No partial/hybrid close.**
 

@@ -4,7 +4,11 @@
 > `docs/operating-model.md` §3.3 (rigor/light-dispatch profile) and §4.2 (Critic trigger matrix).
 > Companion: `plugins/pipeline-core/skills/close-block/SKILL.md` close-light variant (the closing half
 > of this playbook). This file names the PLAYBOOK for the whole small block, close-light names the
-> CLOSE mechanics only — read both, they cross-reference rather than duplicate.
+> CLOSE mechanics only — read both, they cross-reference rather than duplicate. Second companion: the
+> `speed` session-start profile (`harness/session-bootstrap.md` §6.5) is the bootstrapping analog for a
+> session that already knows at START it is a mini-feature/hotfix — this playbook covers the
+> same-day/mid-session case instead; the two overlap in spirit (light process, hard scope limits,
+> close-light at the end) but are entered from different points in the session lifecycle.
 
 ## When this playbook applies
 

@@ -8,6 +8,7 @@
 - [ ] DoD status assigned per task: done / 🟡 not-human-verified / blocked (`harness/definition-of-done.md` §3)
 - [ ] Open 🟡 and blocked items listed in the handover — nothing silently dropped
 - [ ] Every blocker/major Critic finding dispositioned; mandatory-trigger tasks have a findings report before merge
+- [ ] **Deployment-asymmetry check (NEW):** if this block touched a hook/statusline/plugin-cache file, deployment is VERIFIED on this machine (plugin re-installed/updated + `/reload-plugins`), not just committed — statusline (working tree, live on save) and hooks (plugin cache, install-gated) deploy at different speeds, so a commit alone does not make a hook/statusline change live
 
 ## Single-source sync
 
