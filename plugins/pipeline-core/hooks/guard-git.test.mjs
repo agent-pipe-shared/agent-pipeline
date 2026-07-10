@@ -591,7 +591,13 @@ check(
   'git -c "core.hooksPath=/dev/null" commit',
   ALLOW,
 );
-
+check(
+  "R19 block  --config-env core.hooksPath=X commit (space form, critic L1)",
+  "git --config-env core.hooksPath=X commit",
+  BLOCK,
+  { stderrIncludes: ["GG-19"] },
+);
+check("R19 allow  grep -c core.hooksPath (non-git command, git-anchored, critic L1)", "grep -c core.hooksPath README.md", ALLOW);
 // ---- Rule 20: `git config [set] core.hooksPath` persistent rebind (hook-bypass enforcement,
 // 2026-07-09). ------------------------------------------------------------------------------------
 check("R20 block  config core.hooksPath /tmp/x", "git config core.hooksPath /tmp/x", BLOCK, {
