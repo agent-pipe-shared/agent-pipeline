@@ -35,7 +35,7 @@
  *   DEVIATION NOTE (declared during the F1 fix, commit 1c0a181 -- see the `set-feature`/
  *   `set-phase` entries below for that fix itself, which moved `phase` INSIDE
  *   `activeFeature`): `planApproved` lives TOP-LEVEL, deliberately -- ADR-0027
- *   (`docs/adr/0027-gate-philosophie.md`, line ~15, translated: "...as long as an active
+ *   (`docs/adr/0027-gate-philosophy.md`, line ~15, translated: "...as long as an active
  *   feature (`activeFeature`) does not yet carry `planApproved: true`") reads as though
  *   `planApproved` sat INSIDE `activeFeature`; the plan sketch itself
  *   (`.claude/plans/2026-07-07-ap1-pipeline-tuning.md`) never says that -- it only

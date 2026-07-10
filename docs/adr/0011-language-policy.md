@@ -16,7 +16,7 @@ The kickoff brief required the language default to be captured as an ADR; condit
 
 **Why:** model performance and reusability (English runtime artifacts are portable and shareable across projects) at the point of effect — full readability for the PO at every decision point.
 
-**Verification:** the language assignment of new artifacts is a check point in the Critic review of Pipeline deliverables ([ADR-0014](0014-critic-kontrakt.md), [ADR-0015](0015-selbstanwendung.md)).
+**Verification:** the language assignment of new artifacts is a check point in the Critic review of Pipeline deliverables ([ADR-0014](0014-critic-contract.md), [ADR-0015](0015-self-application.md)).
 
 ## Consequences
 
@@ -73,7 +73,7 @@ Die Kickoff-Vorgabe verlangt, den Sprachen-Default als ADR festzuhalten; Auflage
 
 **Warum:** Modell-Performanz und Wiederverwendbarkeit (englische Laufzeit-Artefakte sind über Projekte portabel und teilbar) an der Wirkstelle — volle Lesbarkeit für den PO an jeder Entscheidungsstelle.
 
-**Prüfweise:** Die Sprachzuordnung neuer Artefakte ist Prüfpunkt im Critic-Review von Pipeline-Deliverables ([ADR-0014](0014-critic-kontrakt.md), [ADR-0015](0015-selbstanwendung.md)).
+**Prüfweise:** Die Sprachzuordnung neuer Artefakte ist Prüfpunkt im Critic-Review von Pipeline-Deliverables ([ADR-0014](0014-critic-contract.md), [ADR-0015](0015-self-application.md)).
 
 ## Konsequenzen
 

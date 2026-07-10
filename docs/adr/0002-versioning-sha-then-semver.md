@@ -25,7 +25,7 @@ Clarification: in the SHA phase, the latest commit on `main` is the distributed 
 
 **Negative / risks:**
 
-- Faulty commits also propagate immediately to both machines; no rollback pin during the SHA phase. Mitigation: self-application — Critic review before merge into the pipeline repo ([ADR-0015](0015-selbstanwendung.md)); the bootstrap displays the consumed SHA ([ADR-0010](0010-session-bootstrap.md)).
+- Faulty commits also propagate immediately to both machines; no rollback pin during the SHA phase. Mitigation: self-application — Critic review before merge into the pipeline repo ([ADR-0015](0015-self-application.md)); the bootstrap displays the consumed SHA ([ADR-0010](0010-session-bootstrap.md)).
 - Migration dossiers (Phase 4) reference concrete states — first tags may need to be set there as reference points.
 
 ## Rejected alternatives
@@ -64,7 +64,7 @@ Präzisierung: In der SHA-Phase ist der jüngste Commit auf `main` der verteilte
 
 **Negativ / Risiken:**
 
-- Auch fehlerhafte Commits propagieren sofort auf beide Rechner; kein Rollback-Pin in der SHA-Phase. Mitigation: Selbstanwendung — Critic-Review vor Merge ins Pipeline-Repo ([ADR-0015](0015-selbstanwendung.md)); der Bootstrap zeigt den konsumierten SHA an ([ADR-0010](0010-session-bootstrap.md)).
+- Auch fehlerhafte Commits propagieren sofort auf beide Rechner; kein Rollback-Pin in der SHA-Phase. Mitigation: Selbstanwendung — Critic-Review vor Merge ins Pipeline-Repo ([ADR-0015](0015-self-application.md)); der Bootstrap zeigt den konsumierten SHA an ([ADR-0010](0010-session-bootstrap.md)).
 - Migrationsdossiers (Phase 4) referenzieren konkrete Stände — dort ggf. erste Tags als Bezugspunkte setzen.
 
 ## Verworfene Alternativen

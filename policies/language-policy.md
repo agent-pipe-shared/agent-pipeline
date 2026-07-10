@@ -2,7 +2,7 @@
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 · 2026-07-03 · Language: English (agent-facing pointer; the normative decision document is German, per its own rule).
 
-**Normative source: [ADR-0011 — Language Policy](../docs/adr/0011-sprachen-policy.md).** This file only satisfies the kickoff structure requirement (`policies/language-policy.md`, DoD item 4) and points there — it defines nothing of its own.
+**Normative source: [ADR-0011 — Language Policy](../docs/adr/0011-language-policy.md).** This file only satisfies the kickoff structure requirement (`policies/language-policy.md`, DoD item 4) and points there — it defines nothing of its own.
 
 ## The rule in short (informative — ADR-0011 wins on any divergence)
 

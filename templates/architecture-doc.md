@@ -2,7 +2,7 @@
 ═══════════════════════════════════════════════════════════════════════════
 TEMPLATE: living Architecture Doc (`docs/ARCHITECTURE.md`) — Agent-Pipeline
 v0.1.0-draft · retro-speed session · 2026-07-07
-Source of truth: ADR-0032 (docs/adr/0032-projekt-doku-struktur.md).
+Source of truth: ADR-0032 (docs/adr/0032-project-doc-structure.md).
 Language note (ADR-0011 primary-reader rule): this template's INSTRUCTIONS
 are English (agent-facing); the FILLED doc is in the project's human-facing
 language, default English — the PO is the primary reader.

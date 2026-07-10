@@ -15,7 +15,7 @@ The pipeline is increasingly oriented toward being handed off to third parties (
 **Two governance categories**, strictly separated (`governance/examples/README.md`):
 
 1. **Guidelines (advisory)** — `governance/…/guidelines/`: numbered principles (layering, naming, error handling, etc.). Deviations are ALLOWED but must be named and justified in the plan artifact — a guideline never blocks a gate by itself. Automatically loaded into the Elephant/Critic context (`pipeline-start`/`critic-review` skills consume the manifest path `governance.guidelines_path`).
-2. **Policies (enforcing)** — `governance/…/policies/`: machine-checkable (semgrep rules via `rules_dir`, license allowlist `license-allowlist.json` against `third-party-licenses.json`) AND human-reviewed, but binding (`checklist.md`). A policy violation blocks: for machine-checkable policies the automated security-scan gate fails ([ADR-0027](0027-gate-philosophie.md)); for the non-machine-checkable checklist, the Critic checks off EVERY item BEFORE the push gate is reached — any item marked "NOT MET" is a blocking finding.
+2. **Policies (enforcing)** — `governance/…/policies/`: machine-checkable (semgrep rules via `rules_dir`, license allowlist `license-allowlist.json` against `third-party-licenses.json`) AND human-reviewed, but binding (`checklist.md`). A policy violation blocks: for machine-checkable policies the automated security-scan gate fails ([ADR-0027](0027-gate-philosophy.md)); for the non-machine-checkable checklist, the Critic checks off EVERY item BEFORE the push gate is reached — any item marked "NOT MET" is a blocking finding.
 
 **Hierarchy** (mirrors Claude Code's own settings precedence):
 
@@ -62,7 +62,7 @@ Die Pipeline richtet sich zunehmend auf Weitergabe an Dritte aus (AP1-Kontext). 
 **Zwei Governance-Kategorien**, strikt getrennt (`governance/examples/README.md`):
 
 1. **Guidelines (advisory)** — `governance/…/guidelines/`: nummerierte Prinzipien (Layering, Naming, Error-Handling etc.). Abweichungen sind ERLAUBT, müssen aber im Plan-Artefakt benannt und begründet werden — eine Guideline blockt nie selbst ein Gate. Wird automatisch in den Elephant-/Critic-Kontext geladen (`pipeline-start`/`critic-review`-Skills konsumieren den Manifest-Pfad `governance.guidelines_path`).
-2. **Policies (enforcing)** — `governance/…/policies/`: maschinell prüfbar (semgrep-Regeln via `rules_dir`, Lizenz-Allowlist `license-allowlist.json` gegen `third-party-licenses.json`) UND menschlich geprüft, aber verbindlich (`checklist.md`). Ein Policy-Verstoß blockt: für maschinell prüfbare Policies schlägt das automatisierte Security-Scan-Gate fehl ([ADR-0027](0027-gate-philosophie.md)); für die nicht-maschinell prüfbare Checkliste hakt der Critic JEDEN Punkt ab, BEVOR das Push-Gate erreicht wird — jeder Punkt „NICHT ERFÜLLT" ist ein blockierender Befund.
+2. **Policies (enforcing)** — `governance/…/policies/`: maschinell prüfbar (semgrep-Regeln via `rules_dir`, Lizenz-Allowlist `license-allowlist.json` gegen `third-party-licenses.json`) UND menschlich geprüft, aber verbindlich (`checklist.md`). Ein Policy-Verstoß blockt: für maschinell prüfbare Policies schlägt das automatisierte Security-Scan-Gate fehl ([ADR-0027](0027-gate-philosophy.md)); für die nicht-maschinell prüfbare Checkliste hakt der Critic JEDEN Punkt ab, BEVOR das Push-Gate erreicht wird — jeder Punkt „NICHT ERFÜLLT" ist ein blockierender Befund.
 
 **Hierarchie** (spiegelt Claude Codes eigene Settings-Präzedenz):
 

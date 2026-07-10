@@ -6,7 +6,7 @@
 
 ## Context
 
-Three consecutive canonical Critic runs (readiness + first-pass) all closed at zero findings; real blockers so far only occurred on risky live-code changes (S39 2× blocker, S40 fail-open-major). On this data basis, Wave 2 revises the Critic staffing rules from [ADR-0014](0014-critic-kontrakt.md) (E12) and [ADR-0006](0006-modell-effort-policy.md) (E6).
+Three consecutive canonical Critic runs (readiness + first-pass) all closed at zero findings; real blockers so far only occurred on risky live-code changes (S39 2× blocker, S40 fail-open-major). On this data basis, Wave 2 revises the Critic staffing rules from [ADR-0014](0014-critic-contract.md) (E12) and [ADR-0006](0006-model-effort-policy.md) (E6).
 
 ## Decision (E24, verbatim)
 
@@ -39,7 +39,7 @@ Accepted (Wave 2, M11). No fixed re-review date; the data basis keeps expanding 
 
 ## Kontext
 
-Drei aufeinanderfolgende Kanon-Critics mit Readiness+First-Pass endeten bei 0 Befunden; echte Blocker traten bislang nur auf riskantem Live-Code auf (S39 2× Blocker, S40 fail-open-Major). Welle 2 revidiert auf dieser Datenbasis die Critic-Staffing-Regeln aus [ADR-0014](0014-critic-kontrakt.md) (E12) und [ADR-0006](0006-modell-effort-policy.md) (E6).
+Drei aufeinanderfolgende Kanon-Critics mit Readiness+First-Pass endeten bei 0 Befunden; echte Blocker traten bislang nur auf riskantem Live-Code auf (S39 2× Blocker, S40 fail-open-Major). Welle 2 revidiert auf dieser Datenbasis die Critic-Staffing-Regeln aus [ADR-0014](0014-critic-contract.md) (E12) und [ADR-0006](0006-model-effort-policy.md) (E6).
 
 ## Entscheidung (E24, wortgetreu)
 

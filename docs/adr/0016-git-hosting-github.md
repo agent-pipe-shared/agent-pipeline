@@ -26,7 +26,7 @@ Checkpoint 2 raised the fundamental question of which git-hosting provider to us
 
 ## Re-review
 
-**2026-08-31** — bundled with the general pricing review ([ADR-0006](0006-modell-effort-policy.md)); ongoing observation duty for tipping-point triggers GH-T1–GH-T7 in the tooling radar until then.
+**2026-08-31** — bundled with the general pricing review ([ADR-0006](0006-model-effort-policy.md)); ongoing observation duty for tipping-point triggers GH-T1–GH-T7 in the tooling radar until then.
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
@@ -58,4 +58,4 @@ Checkpoint 2 stellte die Grundsatzfrage nach dem Git-Hosting-Anbieter für alle 
 
 ## Wiedervorlage
 
-**31.08.2026** — gebündelt mit dem generellen Preis-Review ([ADR-0006](0006-modell-effort-policy.md)); laufende Beobachtungspflicht der Kipp-Trigger GH-T1–GH-T7 im Tooling-Radar bis dahin.
+**31.08.2026** — gebündelt mit dem generellen Preis-Review ([ADR-0006](0006-model-effort-policy.md)); laufende Beobachtungspflicht der Kipp-Trigger GH-T1–GH-T7 im Tooling-Radar bis dahin.

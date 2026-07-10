@@ -70,11 +70,11 @@ Frischer Reviewer-Kontext ist offiziell dreifach begründet (Selbstbestätigung,
 
 Präzisierung:
 
-- **Input strikt:** Spec + Diff + Guardrails (+ Evidenz-Artefakte). Nie Chat-Verlauf, nie Implementor-Begründungen. Isolationsstufen → [ADR-0003](0003-rollen-implementierung-subagents.md).
+- **Input strikt:** Spec + Diff + Guardrails (+ Evidenz-Artefakte). Nie Chat-Verlauf, nie Implementor-Begründungen. Isolationsstufen → [ADR-0003](0003-role-implementation-subagents.md).
 - **Output:** strukturierte Befundliste (Gap/Risiko + Evidenz mit `file:line` + Spec-Bezug); kein Score; Pass/Fail nur, wo ein Gesamturteil nötig ist.
 - **Rubrik (Auflage A10):** Der read-only-Critic führt „**Bewusst nicht beanstandet**" (er ändert nichts); „Bewusst NICHT geändert" bleibt die Rubrik schreibender Rollen (Goldfish-Bericht).
 - **Anti-Overreporting-Klausel** + Skip-Regel: nichts flaggen, was CI/deterministische Gates bereits erzwingen.
-- **Pflicht-Trigger nach Risikostufe** („Risikostufe" heißt im operating-model.md §4.2 „Risikoklasse"; die Klassen hoch/mittel/niedrig sind dort definiert). Kanonischer Trigger-Wortlaut (wortgleich mit operating-model.md §4.2/§3.3 und [ADR-0003](0003-rollen-implementierung-subagents.md)): „Jeder Architektur-/Guardrail-/Security-Diff läuft mit Critic Fable 5 / `max` UND zusätzlich in `--bare`-Isolation. Rigor-Stufe 2 macht den Critic zur Pflicht (Standard: Sonnet 5 / `max`); Fable 5 / `max` gilt dort nur, wenn zusätzlich die Risikoklasse hoch ist ODER ein Architektur-/Guardrail-/Security-Diff vorliegt." — Isolationsstufe → ADR-0003, Modelle → [ADR-0006](0006-modell-effort-policy.md).
+- **Pflicht-Trigger nach Risikostufe** („Risikostufe" heißt im operating-model.md §4.2 „Risikoklasse"; die Klassen hoch/mittel/niedrig sind dort definiert). Kanonischer Trigger-Wortlaut (wortgleich mit operating-model.md §4.2/§3.3 und [ADR-0003](0003-role-implementation-subagents.md)): „Jeder Architektur-/Guardrail-/Security-Diff läuft mit Critic Fable 5 / `max` UND zusätzlich in `--bare`-Isolation. Rigor-Stufe 2 macht den Critic zur Pflicht (Standard: Sonnet 5 / `max`); Fable 5 / `max` gilt dort nur, wenn zusätzlich die Risikoklasse hoch ist ODER ein Architektur-/Guardrail-/Security-Diff vorliegt." — Isolationsstufe → ADR-0003, Modelle → [ADR-0006](0006-model-effort-policy.md).
 - **Evidenz-Nachtrag (<PROJECT_B> S39, 2026-07-05):** Ein Critic der Standard-Isolationsstufe (Modell dort: Fable 5 per riskZone-Trigger; ob Sonnet dieselben Befunde gefunden hätte, ist die offene A/B-Frage, s. Retro-Item) fing auf einem riskZone-Diff (<PROJECT_B>, Projekt-Constraint `packages/**`) 2 BLOCKER der Klasse „Interaktion NEU↔BESTAND" — eine neue Funktion machte eine geplant nicht-abbrechbare Aktion sprach-/Google-abbrechbar, und eine unangetastete Bestandsautomation umging deterministisch ein neues Wach-Gate —, die der Implementor-Blick allein plausibel nicht sah. Belegt empirisch die Pflicht-Trigger-Zeilen oben.
 
 ## Konsequenzen
@@ -102,7 +102,7 @@ the PO akzeptiert die Elephant-Empfehlung (2026-07-04, AP-Sprint): **Autoload bl
 
 Beide Auflagen gelten für den Critic-Kontrakt und das Dispatch-Template (`templates/prompts/critic-review.md`) gleichermaßen. Diese Revision ersetzt keinen Bestandteil des ADR-Bodys oben (Never-Rewrite-Konvention, `docs/adr/README.md`), sie ergänzt ihn.
 
-**Querverweis (E24, Welle 2):** Critic-Stufung (Mechanik-Auto-Pass, Sonnet-Kaskade bei Klasse mittel, EIN gebündelter Critic je Welle) revidiert das E12-Pflicht-Trigger-Staffing — eigenes ADR, keine Wiederholung hier: [ADR-0024](0024-critic-stufung-datenbasiert.md), Register E24.
+**Querverweis (E24, Welle 2):** Critic-Stufung (Mechanik-Auto-Pass, Sonnet-Kaskade bei Klasse mittel, EIN gebündelter Critic je Welle) revidiert das E12-Pflicht-Trigger-Staffing — eigenes ADR, keine Wiederholung hier: [ADR-0024](0024-critic-staffing-data-based.md), Register E24.
 
 ## Wiedervorlage
 

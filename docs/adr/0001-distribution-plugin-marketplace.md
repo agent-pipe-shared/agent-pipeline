@@ -34,7 +34,7 @@ Detail: this repo (planned `{{REPO_OWNER}}/agent-pipeline`, private) is the mark
 
 ## Status
 
-Accepted (2026-07-03, Checkpoint 1) · Basis: Register E1. No standalone follow-up. Versioning phases: [ADR-0002](0002-versionierung-sha-dann-semver.md); staleness operation: [ADR-0010](0010-session-bootstrap.md).
+Accepted (2026-07-03, Checkpoint 1) · Basis: Register E1. No standalone follow-up. Versioning phases: [ADR-0002](0002-versioning-sha-then-semver.md); staleness operation: [ADR-0010](0010-session-bootstrap.md).
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
@@ -76,4 +76,4 @@ Präzisierung: Dieses Repo (geplant `{{REPO_OWNER}}/agent-pipeline`, privat) ist
 
 ## Wiedervorlage
 
-Keine eigene. Versionierungsphasen: [ADR-0002](0002-versionierung-sha-dann-semver.md); Staleness-Betrieb: [ADR-0010](0010-session-bootstrap.md).
+Keine eigene. Versionierungsphasen: [ADR-0002](0002-versioning-sha-then-semver.md); Staleness-Betrieb: [ADR-0010](0010-session-bootstrap.md).

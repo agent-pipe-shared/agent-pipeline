@@ -4,7 +4,7 @@
 
 ## Context
 
-The two new gates ([ADR-0027](0027-gate-philosophie.md)) need deterministic, git-committed state — "has plan approval already been recorded?", "has this push already been approved?" — that can be neither chat memory nor a hand-edited file (exactly the kind of silent, unauditable state change the gates exist to prevent). At the same time, plan artifacts themselves lacked a uniform home.
+The two new gates ([ADR-0027](0027-gate-philosophy.md)) need deterministic, git-committed state — "has plan approval already been recorded?", "has this push already been approved?" — that can be neither chat memory nor a hand-edited file (exactly the kind of silent, unauditable state change the gates exist to prevent). At the same time, plan artifacts themselves lacked a uniform home.
 
 ## Decision
 
@@ -31,7 +31,7 @@ The two new gates ([ADR-0027](0027-gate-philosophie.md)) need deterministic, git
 
 ## Status
 
-Accepted 2026-07-07 (PO plan approval "AP1 TUNING"). Basis: `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` guiding decision 3, [ADR-0012](0012-handover-kanonisierung.md), `guardrails/quality-gates.md` QG-03. Open follow-up: a recommended project-specific `guard-config` addition against direct edits of `pipeline-state.json` remains OPEN (no plugin mandate) — see risks section of the AP1 plan.
+Accepted 2026-07-07 (PO plan approval "AP1 TUNING"). Basis: `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` guiding decision 3, [ADR-0012](0012-handover-canonicalization.md), `guardrails/quality-gates.md` QG-03. Open follow-up: a recommended project-specific `guard-config` addition against direct edits of `pipeline-state.json` remains OPEN (no plugin mandate) — see risks section of the AP1 plan.
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
@@ -39,11 +39,11 @@ Accepted 2026-07-07 (PO plan approval "AP1 TUNING"). Basis: `.claude/plans/2026-
 
 > Agent-Pipeline v0.1.0-draft · AP1-Tuning-Session · Stand 2026-07-07
 
-**Status:** akzeptiert (2026-07-07, the PO-Plan-Freigabe „AP1 TUNING") · **Grundlage:** `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` Leitentscheidung 3, [ADR-0012](0012-handover-kanonisierung.md), `guardrails/quality-gates.md` QG-03
+**Status:** akzeptiert (2026-07-07, the PO-Plan-Freigabe „AP1 TUNING") · **Grundlage:** `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` Leitentscheidung 3, [ADR-0012](0012-handover-canonicalization.md), `guardrails/quality-gates.md` QG-03
 
 ## Kontext
 
-Die beiden neuen Gates ([ADR-0027](0027-gate-philosophie.md)) brauchen einen deterministischen, git-committeten Zustand — „ist die Plan-Freigabe schon verbucht?", „wurde dieser Push schon genehmigt?" — der weder Chat-Gedächtnis noch eine freihändig editierte Datei sein darf (genau die Art von stiller, unauditierbarer Zustandsänderung, die die Gates verhindern sollen). Zugleich fehlte ein einheitlicher Ablageort für Plan-Artefakte selbst.
+Die beiden neuen Gates ([ADR-0027](0027-gate-philosophy.md)) brauchen einen deterministischen, git-committeten Zustand — „ist die Plan-Freigabe schon verbucht?", „wurde dieser Push schon genehmigt?" — der weder Chat-Gedächtnis noch eine freihändig editierte Datei sein darf (genau die Art von stiller, unauditierbarer Zustandsänderung, die die Gates verhindern sollen). Zugleich fehlte ein einheitlicher Ablageort für Plan-Artefakte selbst.
 
 ## Entscheidung
 

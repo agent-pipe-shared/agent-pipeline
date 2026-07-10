@@ -16,9 +16,9 @@ The Pipeline requires independent review, evidence, and versioned handovers from
 
 Clarifications:
 
-- The Critic contract ([ADR-0014](0014-critic-kontrakt.md)) applies to this repo's checkpoint deliverables; as architecture-/guardrail-critical, these reviews run on Fable 5/max ([ADR-0006](0006-modell-effort-policy.md)).
-- Session hygiene/lifecycle ([ADR-0009](0009-session-hygiene-lifecycle.md)) and the languages policy ([ADR-0011](0011-sprachen-policy.md)) apply here exactly as in any project.
-- Handover canonicity ([ADR-0012](0012-handover-kanonisierung.md)) concretely means: `state.md` is THE handover file of this repo; the drift check also applies to Pipeline artifacts (Critic finding L3-05).
+- The Critic contract ([ADR-0014](0014-critic-contract.md)) applies to this repo's checkpoint deliverables; as architecture-/guardrail-critical, these reviews run on Fable 5/max ([ADR-0006](0006-model-effort-policy.md)).
+- Session hygiene/lifecycle ([ADR-0009](0009-session-hygiene-lifecycle.md)) and the languages policy ([ADR-0011](0011-language-policy.md)) apply here exactly as in any project.
+- Handover canonicity ([ADR-0012](0012-handover-canonicalization.md)) concretely means: `state.md` is THE handover file of this repo; the drift check also applies to Pipeline artifacts (Critic finding L3-05).
 
 ## Consequences
 
@@ -26,7 +26,7 @@ Clarifications:
 
 **Negative:** Overhead within the Pipeline repo itself (reviews, condition management) — accepted deliberately.
 
-**Risk:** Self-review theater if the Critic sits too close to the Elephant session. Mitigation: fresh context is mandatory, never chat history as input ([ADR-0014](0014-critic-kontrakt.md)); read-only; structured findings list with documented disposition per finding.
+**Risk:** Self-review theater if the Critic sits too close to the Elephant session. Mitigation: fresh context is mandatory, never chat history as input ([ADR-0014](0014-critic-contract.md)); read-only; structured findings list with documented disposition per finding.
 
 ## Rejected alternatives
 
@@ -54,9 +54,9 @@ Die Pipeline verlangt von den Projekten unabhängige Prüfung, Evidenz und versi
 
 Präzisierung:
 
-- Der Critic-Kontrakt ([ADR-0014](0014-critic-kontrakt.md)) gilt für die Checkpoint-Deliverables dieses Repos; als Architektur-/Guardrail-kritisch laufen diese Reviews auf Fable 5/max ([ADR-0006](0006-modell-effort-policy.md)).
-- Session-Hygiene/Lifecycle ([ADR-0009](0009-session-hygiene-lifecycle.md)) und Sprachen-Policy ([ADR-0011](0011-sprachen-policy.md)) gelten hier wie in jedem Projekt.
-- Handover-Kanonik ([ADR-0012](0012-handover-kanonisierung.md)) hier konkret: `state.md` ist DIE Handover-Datei dieses Repos; der Drift-Check gilt auch für Pipeline-Artefakte (Critic-Befund L3-05).
+- Der Critic-Kontrakt ([ADR-0014](0014-critic-contract.md)) gilt für die Checkpoint-Deliverables dieses Repos; als Architektur-/Guardrail-kritisch laufen diese Reviews auf Fable 5/max ([ADR-0006](0006-model-effort-policy.md)).
+- Session-Hygiene/Lifecycle ([ADR-0009](0009-session-hygiene-lifecycle.md)) und Sprachen-Policy ([ADR-0011](0011-language-policy.md)) gelten hier wie in jedem Projekt.
+- Handover-Kanonik ([ADR-0012](0012-handover-canonicalization.md)) hier konkret: `state.md` ist DIE Handover-Datei dieses Repos; der Drift-Check gilt auch für Pipeline-Artefakte (Critic-Befund L3-05).
 
 ## Konsequenzen
 
@@ -64,7 +64,7 @@ Präzisierung:
 
 **Negativ:** Overhead im Pipeline-Repo selbst (Reviews, Auflagen-Verwaltung) — bewusst in Kauf genommen.
 
-**Risiko:** Selbst-Review-Theater, wenn der Critic der Elephant-Session zu nahe kommt. Mitigation: frischer Kontext ist Pflicht, nie Chat-Verlauf als Input ([ADR-0014](0014-critic-kontrakt.md)); read-only; strukturierte Befundliste mit dokumentierter Disposition je Befund.
+**Risiko:** Selbst-Review-Theater, wenn der Critic der Elephant-Session zu nahe kommt. Mitigation: frischer Kontext ist Pflicht, nie Chat-Verlauf als Input ([ADR-0014](0014-critic-contract.md)); read-only; strukturierte Befundliste mit dokumentierter Disposition je Befund.
 
 ## Verworfene Alternativen
 

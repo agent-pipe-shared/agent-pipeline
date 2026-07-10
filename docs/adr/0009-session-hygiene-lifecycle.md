@@ -13,7 +13,7 @@ Cache economics are measurable: model/effort switches and `/compact` invalidate 
 **Additionally canonicalized — session lifecycle policy (PO follow-up):**
 
 - **Planned cut instead of emergency compaction:** Elephant sessions end at task boundaries via a deliberate cut (update handover → end), not via forced `/compact` once context is already full.
-- **Handover-based re-bootstrapping:** the successor session bootstraps from the versioned handover file ([ADR-0012](0012-handover-kanonisierung.md)) via the bootstrap protocol ([ADR-0010](0010-session-bootstrap.md)) — never from chat history.
+- **Handover-based re-bootstrapping:** the successor session bootstraps from the versioned handover file ([ADR-0012](0012-handover-canonicalization.md)) via the bootstrap protocol ([ADR-0010](0010-session-bootstrap.md)) — never from chat history.
 - **Goldfish cadence:** token-intensive execution work runs in fresh Goldfish sub-sessions per task; Elephant context stays reserved for orchestration and decisions.
 
 Full articulation of the lifecycle policy: [operating-model.md §5](../operating-model.md).
@@ -56,7 +56,7 @@ Cache-Ökonomie ist messbar: Modell-/Effort-Wechsel und `/compact` invalidieren 
 **Ergänzend kanonisiert — Session-Lifecycle-Politik (Rückfrage des PO):**
 
 - **Geplanter Schnitt statt Not-Kompaktierung:** Elephant-Sessions enden an Aufgabengrenzen durch bewussten Schnitt (Handover aktualisieren → beenden), nicht durch erzwungenes `/compact` bei vollem Kontext.
-- **Handover-basiertes Re-Bootstrapping:** Die Nachfolge-Session bootstrappt aus der versionierten Handover-Datei ([ADR-0012](0012-handover-kanonisierung.md)) über das Bootstrap-Protokoll ([ADR-0010](0010-session-bootstrap.md)) — nie aus dem Chat-Verlauf.
+- **Handover-basiertes Re-Bootstrapping:** Die Nachfolge-Session bootstrappt aus der versionierten Handover-Datei ([ADR-0012](0012-handover-canonicalization.md)) über das Bootstrap-Protokoll ([ADR-0010](0010-session-bootstrap.md)) — nie aus dem Chat-Verlauf.
 - **Goldfish-Kadenz:** Token-intensive Ausführungsarbeit läuft in frischen Goldfischen pro Task; der Elephant-Kontext bleibt für Orchestrierung und Entscheidungen reserviert.
 
 Ausformulierung der Lifecycle-Politik: [operating-model.md §5](../operating-model.md).

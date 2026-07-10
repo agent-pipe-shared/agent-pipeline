@@ -8,7 +8,7 @@
 
 ## Context
 
-The pipeline's general Haiku ban ([ADR-0006](0006-modell-effort-policy.md), E6/MP-03: "NO Haiku in the pipeline") arose from concern over judgment quality. Wave 2 measured a clear efficiency gap for pure read-only web search/extraction with no artifacts/judgment: a research-fetch run (R1) completed in 77s/38k usable tokens on Haiku, versus roughly 12min/~200k tokens for Sonnet-class models on the same task class.
+The pipeline's general Haiku ban ([ADR-0006](0006-model-effort-policy.md), E6/MP-03: "NO Haiku in the pipeline") arose from concern over judgment quality. Wave 2 measured a clear efficiency gap for pure read-only web search/extraction with no artifacts/judgment: a research-fetch run (R1) completed in 77s/38k usable tokens on Haiku, versus roughly 12min/~200k tokens for Sonnet-class models on the same task class.
 
 ## Decision (E25, verbatim)
 
@@ -40,7 +40,7 @@ Accepted (Wave 2, milestone M12). No fixed follow-up date; the measurement basis
 
 ## Kontext
 
-Das generelle Haiku-Verbot ([ADR-0006](0006-modell-effort-policy.md), E6/MP-03: „KEIN Haiku in der Pipeline") entstand aus der Sorge um Urteilsqualität. Welle 2 belegt an einem Recherche-Fetch-Lauf (R1: 77 s/38k Token verwertbar) eine deutliche Effizienzlücke gegenüber Sonnet-Klasse (~12 min/~200k Token) für rein lesende Websuche/Extraktion ohne Artefakte/Judgment.
+Das generelle Haiku-Verbot ([ADR-0006](0006-model-effort-policy.md), E6/MP-03: „KEIN Haiku in der Pipeline") entstand aus der Sorge um Urteilsqualität. Welle 2 belegt an einem Recherche-Fetch-Lauf (R1: 77 s/38k Token verwertbar) eine deutliche Effizienzlücke gegenüber Sonnet-Klasse (~12 min/~200k Token) für rein lesende Websuche/Extraktion ohne Artefakte/Judgment.
 
 ## Entscheidung (E25, wortgetreu)
 

@@ -36,7 +36,7 @@ Refinement (condition A9):
 
 ## Follow-up
 
-None. Handover template + generation/reference mechanics: Phase 3; project migration: Phase 4. For this repo, `state.md` is the handover file ([ADR-0015](0015-selbstanwendung.md)).
+None. Handover template + generation/reference mechanics: Phase 3; project migration: Phase 4. For this repo, `state.md` is the handover file ([ADR-0015](0015-self-application.md)).
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
@@ -76,4 +76,4 @@ Präzisierung (Auflage A9):
 
 ## Wiedervorlage
 
-Keine. Handover-Template + Generierungs-/Referenzmechanik: Phase 3; Projekt-Migration: Phase 4. Für dieses Repo ist `state.md` die Handover-Datei ([ADR-0015](0015-selbstanwendung.md)).
+Keine. Handover-Template + Generierungs-/Referenzmechanik: Phase 3; Projekt-Migration: Phase 4. Für dieses Repo ist `state.md` die Handover-Datei ([ADR-0015](0015-self-application.md)).

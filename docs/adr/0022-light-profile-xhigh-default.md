@@ -6,7 +6,7 @@
 
 ## Context
 
-The speed-tuning pass identified several levers; two of them concern the Goldfish (implementor) role directly — a lightweight dispatch profile for tier-0/mechanical tasks, and a general effort default brought to parity with the Elephant's own calibration (Register E16, [ADR-0006](0006-modell-effort-policy.md)).
+The speed-tuning pass identified several levers; two of them concern the Goldfish (implementor) role directly — a lightweight dispatch profile for tier-0/mechanical tasks, and a general effort default brought to parity with the Elephant's own calibration (Register E16, [ADR-0006](0006-model-effort-policy.md)).
 
 ## Decision (E22)
 
@@ -44,7 +44,7 @@ None scheduled; speed levers #3/#4 remain deferred (out of scope for this decisi
 
 ## Kontext
 
-Speed-Tuning identifizierte mehrere Hebel; zwei davon betreffen den Goldfish direkt — ein leichtgewichtiges Dispatch-Profil für Stufe-0-/Mechanik-Aufgaben und ein genereller Effort-Default in Parität zur Elephant-Kalibrierung (Register E16, [ADR-0006](0006-modell-effort-policy.md)).
+Speed-Tuning identifizierte mehrere Hebel; zwei davon betreffen den Goldfish direkt — ein leichtgewichtiges Dispatch-Profil für Stufe-0-/Mechanik-Aufgaben und ein genereller Effort-Default in Parität zur Elephant-Kalibrierung (Register E16, [ADR-0006](0006-model-effort-policy.md)).
 
 ## Entscheidung (E22, wortgetreu)
 

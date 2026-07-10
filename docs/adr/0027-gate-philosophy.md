@@ -2,7 +2,7 @@
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**Context:** The pipeline already had two human-gate precursors: the PRD-PO gate ([ADR-0021](0021-prd-po-gate.md), step 3b) and push approval ([ADR-0017](0017-push-policy-standing-approval.md), standing-approved in this repo). Both ran purely procedurally (prose/review discipline), never technically enforced. At the same time, the new manifest (`.claude/pipeline.yaml`, [ADR-0028](0028-manifest-ansatz.md)) introduces a per-gate `mode` (`blocking|warn|off`) — which at first glance conflicts with `guardrails/quality-gates.md` QG-06 ("gates are binary; warn-only needs an expiry date"). This conflict is deliberately named in the AP1 plan (guiding decision 5) and resolved here.
+**Context:** The pipeline already had two human-gate precursors: the PRD-PO gate ([ADR-0021](0021-prd-po-gate.md), step 3b) and push approval ([ADR-0017](0017-push-policy-standing-approval.md), standing-approved in this repo). Both ran purely procedurally (prose/review discipline), never technically enforced. At the same time, the new manifest (`.claude/pipeline.yaml`, [ADR-0028](0028-manifest-approach.md)) introduces a per-gate `mode` (`blocking|warn|off`) — which at first glance conflicts with `guardrails/quality-gates.md` QG-06 ("gates are binary; warn-only needs an expiry date"). This conflict is deliberately named in the AP1 plan (guiding decision 5) and resolved here.
 
 **Decision:** **Exactly two blocking human gates** in the pipeline, enforced deterministically by hooks instead of prose instruction:
 
@@ -15,7 +15,7 @@
 
 **Consequences:**
 - *Positive:* Two procedural declarations of intent become two technically enforced gates — an edit before plan approval, or a push with stale/red evidence, is now a hook block (exit 2), not just a briefing prohibition a Goldfish could miss. The QG-06 conflict is cleanly resolved rather than silently ignored.
-- *Negative:* Extra hook complexity (two new PreToolUse guards); an invalid or misconfigured manifest can fail into WARN instead of BLOCK (deliberately fail-open, [ADR-0028](0028-manifest-ansatz.md)).
+- *Negative:* Extra hook complexity (two new PreToolUse guards); an invalid or misconfigured manifest can fail into WARN instead of BLOCK (deliberately fail-open, [ADR-0028](0028-manifest-approach.md)).
 - *Risk:* `mode: warn` could be abused as a convenient permanent state if the justification requirement isn't enforced. Mitigation: flanked by the Critic checklist (`governance` policies, [ADR-0030](0030-governance-layer.md)); QG-06 remains the canonical rule in `guardrails/quality-gates.md`, this ADR is only its application at the manifest layer.
 
 **Rejected alternatives:**
@@ -34,7 +34,7 @@
 
 ## Kontext
 
-Die Pipeline kennt bereits zwei Human-Gate-Vorläufer: das PRD-PO-Gate ([ADR-0021](0021-prd-po-gate.md), Schritt 3b) und die Push-Freigabe ([ADR-0017](0017-push-policy-standing-approval.md), in diesem Repo standing-approved). Beide liefen bisher rein prozessual (Prosa/Prüfweise), nie technisch durchgesetzt. Zugleich führt das neue Manifest (`.claude/pipeline.yaml`, [ADR-0028](0028-manifest-ansatz.md)) je Gate einen `mode` (`blocking|warn|off`) ein — das kollidiert auf den ersten Blick mit `guardrails/quality-gates.md` QG-06 („Gates sind binär; warn-only braucht ein Ablaufdatum"). Dieser Konflikt ist im AP1-Plan bewusst benannt (Leitentscheidung 5) und wird hier aufgelöst.
+Die Pipeline kennt bereits zwei Human-Gate-Vorläufer: das PRD-PO-Gate ([ADR-0021](0021-prd-po-gate.md), Schritt 3b) und die Push-Freigabe ([ADR-0017](0017-push-policy-standing-approval.md), in diesem Repo standing-approved). Beide liefen bisher rein prozessual (Prosa/Prüfweise), nie technisch durchgesetzt. Zugleich führt das neue Manifest (`.claude/pipeline.yaml`, [ADR-0028](0028-manifest-approach.md)) je Gate einen `mode` (`blocking|warn|off`) ein — das kollidiert auf den ersten Blick mit `guardrails/quality-gates.md` QG-06 („Gates sind binär; warn-only braucht ein Ablaufdatum"). Dieser Konflikt ist im AP1-Plan bewusst benannt (Leitentscheidung 5) und wird hier aufgelöst.
 
 ## Entscheidung
 
@@ -51,7 +51,7 @@ Die Pipeline kennt bereits zwei Human-Gate-Vorläufer: das PRD-PO-Gate ([ADR-002
 
 **Positiv:** Aus zwei prozessualen Absichtserklärungen werden zwei technisch erzwungene Gates — ein Edit vor Plan-Freigabe oder ein Push mit veralteter/roter Evidenz ist jetzt ein Hook-Block (exit 2), nicht mehr nur ein Briefing-Verbot, das ein Goldfish übersehen könnte. Der QG-06-Konflikt ist sauber aufgelöst statt stillschweigend ignoriert.
 
-**Negativ:** Zusätzliche Hook-Komplexität (zwei neue PreToolUse-Guards); ein invalides oder fehlkonfiguriertes Manifest kann im Fehlerfall zu WARN statt BLOCK führen (bewusst fail-open, [ADR-0028](0028-manifest-ansatz.md)).
+**Negativ:** Zusätzliche Hook-Komplexität (zwei neue PreToolUse-Guards); ein invalides oder fehlkonfiguriertes Manifest kann im Fehlerfall zu WARN statt BLOCK führen (bewusst fail-open, [ADR-0028](0028-manifest-approach.md)).
 
 **Risiko:** `mode: warn` könnte als bequemer Dauerzustand missbraucht werden, wenn die Begründungspflicht nicht durchgesetzt wird. Mitigation: Critic-Checkliste flankiert (`governance`-Policies, [ADR-0030](0030-governance-layer.md)); QG-06 bleibt in `guardrails/quality-gates.md` die kanonische Regel, dieses ADR ist nur ihre Anwendung auf die Manifest-Ebene.
 

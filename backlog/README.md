@@ -49,7 +49,7 @@ Per [`docs/operating-model.md` §7](../docs/operating-model.md#7-feedback-loop):
 
 ## Release cycle (SHA phase)
 
-As long as the pipeline is versioned in the SHA phase ([ADR-0002](../docs/adr/0002-versionierung-sha-dann-semver.md)), **every commit to `main` propagates immediately** to the bound projects — there is no bundled release step in between. This makes **triage itself the actual release gate**: an accepted item that gets implemented and merged takes effect immediately on every machine/project that next refreshes. From the SemVer phase onward, bundled releases with a CHANGELOG entry are added (the switchover criterion is documented as its own backlog item).
+As long as the pipeline is versioned in the SHA phase ([ADR-0002](../docs/adr/0002-versioning-sha-then-semver.md)), **every commit to `main` propagates immediately** to the bound projects — there is no bundled release step in between. This makes **triage itself the actual release gate**: an accepted item that gets implemented and merged takes effect immediately on every machine/project that next refreshes. From the SemVer phase onward, bundled releases with a CHANGELOG entry are added (the switchover criterion is documented as its own backlog item).
 
 ## Close-retro
 
@@ -69,7 +69,7 @@ The tooling radar has its own, already fully specified contract in [`policies/to
 - [`docs/operating-model.md` §7](../docs/operating-model.md) — feedback loop (source of the triage and retro rules)
 - [`policies/tooling-policy.md` §4](../policies/tooling-policy.md) — tooling-radar contract R1–R5
 - [`policies/model-policy.md` MP-20/MP-21](../policies/model-policy.md) — cost telemetry, price-review follow-up
-- [`docs/adr/0002-versionierung-sha-dann-semver.md`](../docs/adr/0002-versionierung-sha-dann-semver.md) — SHA phase, SemVer follow-up
+- [`docs/adr/0002-versioning-sha-then-semver.md`](../docs/adr/0002-versioning-sha-then-semver.md) — SHA phase, SemVer follow-up
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
@@ -122,7 +122,7 @@ Nach [`docs/operating-model.md` §7](../docs/operating-model.md#7-feedback-loop)
 
 ## Release-Zyklus (SHA-Phase)
 
-Solange die Pipeline in der SHA-Phase versioniert wird ([ADR-0002](../docs/adr/0002-versionierung-sha-dann-semver.md)), propagiert **jeder Commit auf `main` sofort** an die gebundenen Projekte — es gibt keinen gebündelten Release-Schritt dazwischen. Das macht die **Triage selbst zum eigentlichen Release-Gate**: Ein angenommenes Item, das umgesetzt und gemerged wird, wirkt sofort auf allen Maschinen/Projekten, die zum nächsten Zeitpunkt refreshen. Ab der SemVer-Phase kommen gebündelte Releases mit CHANGELOG-Eintrag dazu (das Umstiegskriterium wird als eigenes Backlog-Item dokumentiert).
+Solange die Pipeline in der SHA-Phase versioniert wird ([ADR-0002](../docs/adr/0002-versioning-sha-then-semver.md)), propagiert **jeder Commit auf `main` sofort** an die gebundenen Projekte — es gibt keinen gebündelten Release-Schritt dazwischen. Das macht die **Triage selbst zum eigentlichen Release-Gate**: Ein angenommenes Item, das umgesetzt und gemerged wird, wirkt sofort auf allen Maschinen/Projekten, die zum nächsten Zeitpunkt refreshen. Ab der SemVer-Phase kommen gebündelte Releases mit CHANGELOG-Eintrag dazu (das Umstiegskriterium wird als eigenes Backlog-Item dokumentiert).
 
 ## Close-Retro
 
@@ -142,4 +142,4 @@ Der Tooling-Radar hat einen eigenen, bereits vollständig spezifizierten Kontrak
 - [`docs/operating-model.md` §7](../docs/operating-model.md) — Feedback-Loop (Quelle der Triage- und Retro-Regeln)
 - [`policies/tooling-policy.md` §4](../policies/tooling-policy.md) — Tooling-Radar-Kontrakt R1–R5
 - [`policies/model-policy.md` MP-20/MP-21](../policies/model-policy.md) — Kosten-Telemetrie, Preis-Review-Wiedervorlage
-- [`docs/adr/0002-versionierung-sha-dann-semver.md`](../docs/adr/0002-versionierung-sha-dann-semver.md) — SHA-Phase, SemVer-Wiedervorlage
+- [`docs/adr/0002-versioning-sha-then-semver.md`](../docs/adr/0002-versioning-sha-then-semver.md) — SHA-Phase, SemVer-Wiedervorlage

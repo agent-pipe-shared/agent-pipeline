@@ -2,7 +2,7 @@
 ═══════════════════════════════════════════════════════════════════════════
 TEMPLATE: Release Manifest (`docs/releases/<version>.md`) — Agent-Pipeline
 v0.1.0-draft
-Source of truth: ADR-0032 (docs/adr/0032-projekt-doku-struktur.md).
+Source of truth: ADR-0032 (docs/adr/0032-project-doc-structure.md).
 Motivation: the PO pain point "what got built in which version?".
 Language note (ADR-0011 primary-reader rule): this template's INSTRUCTIONS
 are English (agent-facing); the FILLED manifest is written in the project's

@@ -19,7 +19,7 @@ Refinement:
 
 ## Consequences
 
-**Positive:** every project immediately gets the sibling projects' protection rules; future rules propagate centrally ([ADR-0001](0001-verteilung-plugin-marketplace.md)); the hook layer carries workflow preconditions ([ADR-0007](0007-workflows-ultracode-opt-in.md)).
+**Positive:** every project immediately gets the sibling projects' protection rules; future rules propagate centrally ([ADR-0001](0001-distribution-plugin-marketplace.md)); the hook layer carries workflow preconditions ([ADR-0007](0007-workflows-ultracode-opt-in.md)).
 
 **Negative:** the union can produce false positives in individual projects (patterns foreign to that project) — the fail-open nature and the escape hatch bound the damage.
 
@@ -58,7 +58,7 @@ Präzisierung:
 
 ## Konsequenzen
 
-**Positiv:** jedes Projekt erhält sofort die Schutzregeln der Geschwister; künftige Regeln propagieren zentral ([ADR-0001](0001-verteilung-plugin-marketplace.md)); die Hook-Ebene trägt die Workflow-Vorbedingungen ([ADR-0007](0007-workflows-ultracode-opt-in.md)).
+**Positiv:** jedes Projekt erhält sofort die Schutzregeln der Geschwister; künftige Regeln propagieren zentral ([ADR-0001](0001-distribution-plugin-marketplace.md)); die Hook-Ebene trägt die Workflow-Vorbedingungen ([ADR-0007](0007-workflows-ultracode-opt-in.md)).
 
 **Negativ:** die Union kann in Einzelprojekten False-Positives erzeugen (projektfremde Muster) — der fail-open-Charakter und der Not-Ausgang begrenzen den Schaden.
 

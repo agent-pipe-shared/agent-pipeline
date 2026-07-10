@@ -23,7 +23,7 @@ Refinement (condition A2):
 
 **Positive:** low threshold where workflows are demonstrably strong; the protection sits at the one layer `acceptEdits` cannot bypass (hooks).
 
-**Negative:** token cost "substantially higher" than normal sessions — visible via cost telemetry ([ADR-0006](0006-modell-effort-policy.md)).
+**Negative:** token cost "substantially higher" than normal sessions — visible via cost telemetry ([ADR-0006](0006-model-effort-policy.md)).
 
 **Risk:** misclassifying read-only vs. write-capable bypasses the preconditions. OPEN (Phase 4): deterministic enforcement of the precondition check (e.g. in the workflow-start building block).
 
@@ -64,7 +64,7 @@ Präzisierung (Auflage A2):
 
 **Positiv:** niedrige Schwelle dort, wo Workflows belegt stark sind; der Schutz liegt auf der einzigen Ebene, die `acceptEdits` nicht aushebeln kann (Hooks).
 
-**Negativ:** Token-Kosten „substanziell höher" als normale Sessions — sichtbar über die Kosten-Telemetrie ([ADR-0006](0006-modell-effort-policy.md)).
+**Negativ:** Token-Kosten „substanziell höher" als normale Sessions — sichtbar über die Kosten-Telemetrie ([ADR-0006](0006-model-effort-policy.md)).
 
 **Risiko:** Fehlklassifikation read-only vs. schreibend umgeht die Vorbedingungen. OFFEN (Phase 4): deterministische Absicherung des Vorbedingungs-Checks (z. B. im Workflow-Start-Baustein).
 

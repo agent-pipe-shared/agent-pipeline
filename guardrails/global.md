@@ -1,7 +1,7 @@
 # Global Guardrails — Cross-Cutting Rules
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 3
-> Audience: every agent role (Elephant, Goldfish, Critic) in every pipeline-bound project (<PROJECT_A>, <PROJECT_B>, <PROJECT_C>, future) and in this repo itself (self-application). Language: English per ADR-0011 (`docs/adr/0011-sprachen-policy.md`).
+> Audience: every agent role (Elephant, Goldfish, Critic) in every pipeline-bound project (<PROJECT_A>, <PROJECT_B>, <PROJECT_C>, future) and in this repo itself (self-application). Language: English per ADR-0011 (`docs/adr/0011-language-policy.md`).
 
 **Precedence.** On contradiction, the project decision record (`docs/state.md`) wins, then the ADRs (`docs/adr/`), then `docs/operating-model.md` and the policies (`policies/`), then this file. Report contradictions; never silently pick a side.
 
