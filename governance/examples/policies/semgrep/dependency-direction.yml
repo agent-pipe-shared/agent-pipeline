@@ -1,0 +1,49 @@
+# Generic example semgrep custom rule (enforcing policy, machine-checkable) -- FIXTURE.
+#
+# Demonstrates the "dependency direction" guideline (architecture-guidelines.md item 2)
+# promoted from advisory to enforcing. Fictional module names: `core/` (stable/abstract)
+# must never import from `features/` (concrete/volatile). See
+# governance/examples/worked-example.md for the full advisory-to-enforcing walkthrough.
+#
+# Wiring: `.claude/pipeline.yaml` -> security.scanners.semgrep.rules_dir points at THIS
+# directory (governance/examples/policies/semgrep); the security-scan phase's semgrep
+# scanner loads every rule file found here in addition to its own default ruleset. This
+# file is parsed by semgrep itself at scan time, NOT by this repo's yaml-lite parser
+# (that lite parser only ever reads `.claude/pipeline.yaml`/manifest files, never semgrep
+# rule files) -- validate edits by running semgrep locally (`semgrep --validate --config
+# governance/examples/policies/semgrep/dependency-direction.yml`) or, absent semgrep, by
+# checking structural consistency with `example-rule.yml` (this file was hand-checked:
+# block mapping + one flow sequence, no tabs, consistent 2-space indent).
+#
+# Gate-honesty: this rule matches code FORM, not architecture. It catches the literal
+# import patterns enumerated below inside files scoped by `paths.include` -- it does not
+# prove the dependency-direction principle holds (a re-export, a dynamically built import
+# path, or a file outside the scoped paths will not be caught).
+#
+# This is a generic template rule -- fixture content, not a real company's actual
+# ruleset. A project adopting the pipeline replaces/extends this with its own rules,
+# scoped via `paths.include`/`paths.exclude` to its actual module layout.
+
+rules:
+  - id: core-must-not-import-features
+    languages: [javascript, typescript]
+    severity: ERROR
+    message: >
+      A module under `core/` imports from `features/` -- this violates the
+      dependency-direction guideline (architecture-guidelines.md item 2): stable/abstract
+      modules must never depend on concrete/volatile ones. Invert the dependency (move
+      the shared piece into `core/`, or introduce an interface/port that `features/`
+      implements) instead of importing the feature module directly.
+    patterns:
+      - pattern-either:
+          - pattern: import $X from "features/$PATH"
+          - pattern: import "features/$PATH"
+          - pattern: require("features/$PATH")
+    paths:
+      include:
+        - "core/**"
+    metadata:
+      category: best-practice
+      references:
+        - governance/examples/guidelines/architecture-guidelines.md
+        - governance/examples/worked-example.md

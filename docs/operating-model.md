@@ -509,13 +509,28 @@ Zentral ist die Invariante, kalibriert ist die Ausprägung (bewusste Vielfalt is
 - **Mechanik:** Der zentrale Skill definiert **benannte Erweiterungspunkte** (z. B. `newBlockReview.post`, `close.pre`); die Kalibrierungsdatei hängt dort projektspezifische Schritte (Skill-/Kommando-Referenzen) ein. Fehlt die Datei, läuft der Skill mit sicheren Defaults und meldet sich explizit als „unkalibriert" (fail-safe, kein stilles Raten).
 - **Abgrenzung Denies:** Projekt-**Denies** leben NICHT in der Kalibrierungsdatei, sondern in der committeten `.claude/settings.json` bzw. der Guard-Config des git-guard — der Bootstrap-Check prüft sie dort (→ [../harness/session-bootstrap.md](../harness/session-bootstrap.md), Schritt 3).
 - **DoD-Kriterium (hart):** Ein projektspezifischer Ritualschritt ist ergänzbar, **OHNE den zentralen Skill zu forken** — sonst beginnt die Copy-Paste-Vererbung von vorn (Anti-Pattern AP1). **Nachweis in Phase 3** an einem realen Beispiel (z. B. <PROJECT_A>-DB-Hygiene-Schritt).
-- **Manifest-Ergänzung (optional, additiv, AP1):** Seit AP1 existiert zusätzlich `.claude/pipeline.yaml` (Schema `pipeline.manifest.v0`) als rein additive Schicht NEBEN `pipeline.json` — deckt Phasen/Gates/Security-Schwellen/Modell-Routing/Profile/Governance-Pfade/Flags ab, ohne ein einziges Feld der Kalibrierungsdatei zu berühren (Null-Feld-Überlappung bestätigt, `plugins/pipeline-core/lib/manifest.mjs`). Kein Manifest → Verhalten byte-identisch zu heute. Schema: `plugins/pipeline-core/scripts/pipeline-manifest.schema.json`; Validator: `node harness/scripts/validate-manifest.mjs`; Details/Begründung: [ADR-0028](adr/0028-manifest-ansatz.md).
+- **Manifest-Ergänzung (optional, additiv, AP1):** Seit AP1 existiert zusätzlich `.claude/pipeline.yaml` (Schema `pipeline.manifest.v0`) als rein additive Schicht NEBEN `pipeline.json` — deckt Phasen/Gates/Security-Schwellen/Modell-Routing/Profile/Governance-Pfade (§10)/Flags ab, ohne ein einziges Feld der Kalibrierungsdatei zu berühren (Null-Feld-Überlappung bestätigt, `plugins/pipeline-core/lib/manifest.mjs`). Kein Manifest → Verhalten byte-identisch zu heute. Schema: `plugins/pipeline-core/scripts/pipeline-manifest.schema.json`; Validator: `node harness/scripts/validate-manifest.mjs`; Details/Begründung: [ADR-0028](adr/0028-manifest-ansatz.md).
 
 ## 9. Traceability
 
 Die Konzept-Traceability-Matrix (entsteht parallel in Phase 2; Pflicht-Deliverable der Kanonisch-Direktive) weist nach, dass jedes Kernkonzept aus Rensin (EGM) und Google (New SDLC) explizit verbaut oder mit Begründung angepasst/verworfen ist: `Konzept → Quelle → Pipeline-Artefakt/Regel → Status`. Eingangs-Checkliste ist eine verbindliche Auflage; die Anker in diesem Dokument: Alternatives-Sektion (§3.2/2), Mean Review (§2.4), Anti-Sycophancy (§2.2/§2.4), Look-away-Metrik (§7), 3–5-Parallel-Limit (§5.3), Drei-Artefakte-Archiv (§7).
 
-## 10. Enterprise-Ausbaupfade
+## 10. Governance-Schicht (projekteigene Regeln)
+
+Ein gehostetes Projekt bringt eigene Architektur- und Style-Vorgaben mit — getrennt von der pipeline-eigenen Infrastruktur (`guardrails/*`, `harness/checklists/*`, die ausschließlich regeln, WIE die Pipeline selbst arbeitet). Diese projekteigene Schicht lebt unter `governance/…` (kanonisches Fixture-Beispiel: [`governance/examples/README.md`](../governance/examples/README.md)) und gliedert sich in zwei Kategorien mit unterschiedlicher Durchsetzung ([ADR-0030](adr/0030-governance-layer.md)):
+
+- **Guidelines (advisory)** — nummerierte Prinzipien (Layering, Naming, Fehlerbehandlung, …). Abweichungen sind erlaubt, müssen aber im Plan-Artefakt benannt und begründet werden. Eine Guideline blockt nie selbst ein Gate; sie fließt in jeden Plan ein und ist Prüf-Maßstab des Critic (§4.2) — eine BENANNTE Abweichung ist erwartete Eingabe, eine UNBENANNTE Abweichung ist der Befund.
+- **Policies (enforcing)** — maschinell prüfbare Regeln (semgrep-Regeln über `rules_dir`, Lizenz-Allowlist) UND die menschlich geprüfte, aber verbindliche `checklist.md`. Ein Verstoß blockt: Für maschinell prüfbare Policies schlägt das automatisierte Security-Scan-Gate fehl (§4.1); für die Checkliste hakt der Critic jeden Punkt ab, bevor das Push-Gate erreicht wird — jeder Punkt „NICHT ERFÜLLT" ist ein blockierender Befund.
+
+Architektur-Grundsätze zählen dabei automatisch als Risikoklasse **hoch** und erzwingen damit den Pflicht-Critic (§4.2) — unabhängig davon, wie klein der Diff ist.
+
+**Hierarchie** (spiegelt Claude Codes eigene Settings-Präzedenz): Die Repo-Ebene (projekteigene `governance/…`-Verzeichnisse) überschreibt die User-Ebene (`~/.claude/`, persönliche Präferenzen); beide stehen UNTER einer optionalen Managed-Settings-Ebene (Enterprise), die von keiner der beiden überschreibbar ist — dieses Repo liefert selbst keine Managed-Settings-Schicht, das ist Sache der adoptierenden Organisation.
+
+**Pfade pro Projekt:** Wohin die Governance-Verzeichnisse eines Projekts zeigen, ist Kalibrierungssache (§8) — der `governance`-Block in `.claude/pipeline.yaml` (`guidelines_path`, `policies_path`) macht das konkret; nur der Mechanismus ist zentral, nicht der Inhalt.
+
+Ein komplett durchgespieltes Beispiel — von der Hausregel bis zur erzwungenen Regel — steht in [`governance/examples/worked-example.md`](../governance/examples/worked-example.md).
+
+## 11. Enterprise-Ausbaupfade
 
 Zwei Erweiterungs-Kandidaten für den Einsatz in größeren/Enterprise-Kontexten sind bewusst nur vorgemerkt und NICHT gebaut — sie liegen unterhalb der Bau-Schwelle für den aktuellen (Solo-)Betrieb, sind aber dokumentiert, damit ein späterer Nutzer weiß, dass und wo sich nachrüsten lässt.
 

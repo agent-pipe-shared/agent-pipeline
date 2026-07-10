@@ -90,6 +90,13 @@ calibrate it:
   strongest reviewer regardless of how small it is. Size buys you a lighter spec;
   it never buys you out of review.
 
+A hosted project's own architecture guidelines feed the same dial: a diff
+touching an architecture principle under
+[`governance/examples/`](../governance/examples/README.md) counts as risk
+class high and forces the mandatory Critic, independent of how small the diff
+is — see the [worked example](../governance/examples/worked-example.md) for
+how a guideline becomes an enforced policy end to end.
+
 ## The four roles, a little deeper
 
 - **Product Owner (you).** You own intent, priority, and the two human gates —
@@ -301,6 +308,14 @@ abwürgen. Zwei Stellschrauben kalibrieren ihn:
   Größe. Eine dreizeilige Änderung an einem Guardrail-Hook ist trotzdem eine
   Guardrail-Änderung und bekommt den stärksten Prüfer, egal wie klein sie ist.
   Größe erkauft dir eine leichtere Spec; aus dem Review kauft sie dich nie frei.
+
+Die eigenen Architekturvorgaben eines betreuten Projekts bedienen dieselbe
+Stellschraube: Ein Diff, der einen Architektur-Grundsatz unter
+[`governance/examples/`](../governance/examples/README.md) berührt, zählt als
+Risikoklasse hoch und erzwingt den Pflicht-Critic — unabhängig davon, wie klein
+der Diff ist. Wie aus einer Guideline eine erzwungene Policy wird, zeigt das
+[Worked Example](../governance/examples/worked-example.md) komplett
+durchgespielt.
 
 ## Die vier Rollen, etwas genauer
 

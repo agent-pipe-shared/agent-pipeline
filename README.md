@@ -73,6 +73,59 @@ flowchart LR
     Elephant -->|"decision"| PO
 ```
 
+## How a run flows end to end
+
+```mermaid
+flowchart TD
+    P["Profile / model decision"] --> PL["Plan artifact +<br/>human plan gate"]
+    PL --> R["Readiness check"]
+    R --> D["Dispatch<br/>(fresh context, briefing)"]
+    D --> G["Deterministic gates<br/>(verify, security scan)"]
+    G --> C["Risk-class-dependent Critic"]
+    C --> H["Human completion gate"]
+    H --> M["Merge + doc sync"]
+```
+
+Order matters: the deterministic gates always run *before* any LLM judgment — a
+Critic never reviews a diff that hasn't already cleared the machine chain.
+
+## Bring your own architecture rules & guardrails
+
+A project can bring its own house rules, split into two classes: **guidelines**
+are recommended principles you may deliberately deviate from, as long as the
+deviation is named; **policies** are binding rules that block a gate the moment
+they're violated. Both live under
+[`governance/examples/`](governance/examples/README.md) and are wired in through
+the `governance` block in `.claude/pipeline.yaml`.
+
+Each class is enforced differently: guidelines feed into every plan and are the
+Critic's review benchmark — an unnamed deviation is the finding, not the
+deviation itself. Machine-checkable policies automatically fail the
+security-scan gate; the non-machine-checkable checklist gets ticked off by the
+Critic before every push. A pattern played all the way through — from house
+rule to enforced rule — lives in the
+[worked example](governance/examples/worked-example.md).
+
+## Three dials, not one size fits all
+
+Same method, calibrated strictness — from a weekend hack to an enterprise
+codebase. Three independent dials set that:
+
+- **Rigor per task** — issue-only / delta-spec / spec-anchored
+- **Governance mode per rule set** — advisory / enforcing / off
+- **Session profile per session** — design / advisor / speed
+
+## Why this holds up at enterprise scale
+
+What comes together here is more than an agent setup: a repeatable
+architecture through the governance layer, machine-checkable gates instead of
+promises, mandatory documentation artifacts instead of word-of-mouth
+knowledge, an independent review kept separate from the executing context, and
+a model/cost policy that scales effort to risk. The reasoning behind it:
+attention is the scarcest resource — so strictness gets invested where
+mistakes are expensive, and consciously spared elsewhere. The final judgment
+still always stays with the human.
+
 ## Quick start
 
 See [`SETUP.md`](SETUP.md) for the full walkthrough: clone, run `node setup.mjs`,
@@ -187,6 +240,60 @@ flowchart LR
     Critic -->|"Befunde"| Elephant
     Elephant -->|"Entscheidung"| PO
 ```
+
+## Wie ein Durchlauf abläuft
+
+```mermaid
+flowchart TD
+    P["Profil-/Modell-Entscheid"] --> PL["Plan-Artefakt +<br/>menschliches Plan-Gate"]
+    PL --> R["Readiness-Check"]
+    R --> D["Dispatch<br/>(frischer Kontext, Briefing)"]
+    D --> G["Deterministische Gates<br/>(verify, Security-Scan)"]
+    G --> C["Risikoklassen-abhängiger Critic"]
+    C --> H["Menschliches Abschluss-Gate"]
+    H --> M["Merge + Doku-Sync"]
+```
+
+Entscheidend ist die Reihenfolge: Die maschinellen Gates laufen immer VOR jedem
+Urteil eines LLM — ein Critic bewertet nie einen Diff, der die deterministische
+Kette noch nicht durchlaufen hat.
+
+## Eigene Architekturvorgaben & Guardrails
+
+Ein Projekt kann eigene Hausregeln mitbringen — getrennt in zwei Klassen:
+**Guidelines** sind empfohlene Prinzipien, von denen bewusst und benannt
+abgewichen werden darf; **Policies** sind verbindliche Regeln, die ein Gate
+blockieren, sobald sie verletzt werden. Beide leben unter
+[`governance/examples/`](governance/examples/README.md) und werden über den
+`governance`-Block in `.claude/pipeline.yaml` eingebunden.
+
+Durchgesetzt wird jede Klasse unterschiedlich: Guidelines fließen in jeden Plan
+ein und sind der Prüf-Maßstab des Critic — eine unbenannte Abweichung ist der
+Befund, nicht die Abweichung selbst. Maschinell prüfbare Policies blockieren
+automatisch das Security-Scan-Gate; die nicht-maschinelle Checkliste hakt der
+Critic vor jedem Push ab. Ein Muster komplett durchgespielt — von der
+Hausregel bis zur erzwungenen Regel — steht im
+[Worked Example](governance/examples/worked-example.md).
+
+## Drei Drehregler statt einer Einheitsgröße
+
+Gleiche Methode, kalibrierte Strenge — vom Wochenend-Hack bis zur
+Enterprise-Codebasis. Drei unabhängige Regler stellen das ein:
+
+- **Rigor pro Aufgabe** — Issue-only / Delta-Spec / Spec-verankert
+- **Governance-Modus pro Regelwerk** — advisory / enforcing / off
+- **Session-Profil pro Sitzung** — Design / Advisor / Speed
+
+## Warum das auch im Unternehmenskontext trägt
+
+Was hier zusammenkommt, ist mehr als ein Agent-Setup: eine wiederholbare
+Architektur durch die Governance-Schicht, maschinell prüfbare Gates statt
+Versprechen, Pflicht-Dokumentationsartefakte statt Zuruf-Wissen, ein
+unabhängiges Review getrennt vom ausführenden Kontext und eine
+Modell-/Kosten-Policy, die Aufwand nach Risiko staffelt. Der Grund dahinter:
+Aufmerksamkeit ist die knappste Ressource — Strenge wird also dort
+investiert, wo Fehler teuer sind, und woanders bewusst gespart. Das letzte
+Urteil bleibt trotzdem immer beim Menschen.
 
 ## Schnellstart
 

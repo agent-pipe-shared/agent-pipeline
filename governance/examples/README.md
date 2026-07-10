@@ -22,6 +22,14 @@ The pipeline distinguishes exactly two kinds of governance artifact — do not b
    Critic ticks every item before the push gate and any NOT MET item is a blocking
    finding.
 
+## Worked example
+
+[`worked-example.md`](worked-example.md) walks ONE pattern — dependency direction
+(guideline item 2 above) — through both modes end to end: advisory (named in the plan,
+Critic benchmark) and enforcing (promoted to the `dependency-direction.yml` semgrep
+fixture, security-scan gate blocks). Start there for a concrete "guideline → enforced
+rule" trace.
+
 ## Wiring (`.claude/pipeline.yaml`)
 
 A project points at its own governance directories via the manifest's `governance`

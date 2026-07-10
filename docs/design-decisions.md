@@ -85,7 +85,9 @@ Rules for a hosted project fall deliberately into two classes. **Advisory
 guidelines** are recommendations: they give orientation but block nothing.
 **Enforcing policies** are machine-checked and blocking: violate one and you do
 not get through. Each hosted project decides per rule which class it falls into —
-so strictness can be dialed without rewriting the method.
+so strictness can be dialed without rewriting the method. A pattern played all
+the way through both classes lives in the
+[worked example](../governance/examples/worked-example.md).
 
 ---
 
@@ -181,7 +183,8 @@ Leitlinien** sind Empfehlungen: Sie geben Orientierung, blockieren aber nichts.
 **Erzwingende Policies** sind maschinell geprüft und blockierend: Wer sie
 verletzt, kommt nicht weiter. Jedes betreute Projekt entscheidet pro Regel, in
 welche Klasse sie fällt — so lässt sich Strenge dosieren, ohne die Methodik
-umzuschreiben.
+umzuschreiben. Ein komplett durchgespieltes Beispiel über beide Klassen steht
+im [Worked Example](../governance/examples/worked-example.md).
 
 ---
 
