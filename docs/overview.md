@@ -13,119 +13,118 @@ enough to decide whether it fits how you build.
 Every change moves through the same shape. Most steps scale with how much is at
 stake (see "How much ceremony" below), but the shape is constant.
 
-1. **Intent.** You bring a need — a feature, a fix, a refactor — to the
-   Elephant, the long-lived orchestrator session.
+1. **Intent.** You bring a need — feature, fix, refactor — to the Elephant, the
+   long-lived orchestrator session.
 
-2. **Triage.** The Elephant classifies the work: a *rigor level* (0, 1, 2) that
-   sets how much specification the task earns, and a *risk class* (low / medium
-   / high) that sets how hard it gets reviewed. A one-line typo fix and a change
-   to an authentication path do not deserve the same process; triage is where
-   that is decided, up front and written down.
+2. **Triage.** The Elephant classifies the work: a *rigor level* (0, 1, 2)
+   setting how much specification it earns, and a *risk class* (low / medium /
+   high) setting how hard it gets reviewed — decided up front and written down.
 
 3. **Interview → spec.** For anything above a trivial fix, the Elephant
-   interviews you into a spec: what the change is, why, what is explicitly out
-   of scope, and a set of **acceptance criteria** — the concrete, checkable
-   conditions that define "done" (written as checkable acceptance criteria from
-   rigor level 1 up). No implementation happens yet; the AI proposes the first
-   design, which is how you find out whether the system was actually understood.
+   interviews you into a spec: what, why, explicit non-goals, and
+   **acceptance criteria** — the checkable conditions that define "done"
+   (mandatory as checkable criteria from rigor level 1 up). No implementation
+   yet; the AI's first design proposal is how you find out whether the system
+   was actually understood.
 
 4. **Readiness check.** Before a line is written, a fresh, read-only Goldfish
-   reads only the spec and the files it references — no chat history — and tries
-   to explain the change back and find the gaps. If a fresh context cannot
-   implement from the spec alone, the spec is not ready. Gaps go back into the
-   doc; then a *new* fresh context checks again.
+   reads only the spec and its referenced files — no chat history — and tries to
+   explain the change back and find the gaps. A spec a fresh context can't
+   implement from alone is not ready; gaps go back into the doc and a *new*
+   fresh context checks again.
 
 5. **PO gate.** For work that matters, you sign off on the plan — a short
-   product rationale (what, why, scope, non-goals, risks, alternatives) — before
-   any implementation is dispatched. This is the front-end human gate: it catches
-   a wrong direction while it is still cheap.
+   product rationale (what, why, scope, non-goals, risks, alternatives) —
+   before any implementation is dispatched. This front-end human gate catches a
+   wrong direction while it's still cheap.
 
 6. **Dispatch.** The Elephant hands the task to a Goldfish through a fixed
-   briefing: the goal, the exact context files, the Definition-of-Done checks,
-   the prohibitions, the stop conditions, and the model/effort for the run. The
-   briefing is the only channel — a Goldfish knows nothing else.
+   briefing — goal, exact context files, Definition-of-Done checks,
+   prohibitions, stop conditions, model/effort for the run. The briefing is the
+   only channel; a Goldfish knows nothing else.
 
 7. **Deterministic gates.** The Goldfish implements, then runs the project's one
-   `verify` command: a fixed chain of format → lint → typecheck → tests → build,
-   plus an optional security scan. The result is a **machine-written evidence
-   artifact** — the actual command, its output, its exit code. A claim of "done"
-   without that artifact does not count.
+   `verify` command: format → lint → typecheck → tests → build, plus an
+   optional security scan. The result is a **machine-written evidence
+   artifact** — command, output, exit code. "Done" without that artifact
+   doesn't count.
 
-8. **Critic.** What passes the gates — and only what passes — can reach the
-   Critic: an independent, read-only reviewer in a fresh context that never sees
-   the chat, the reasoning, or the implementer's own report. It gets the spec,
-   the diff, the guardrails, and the evidence, builds its own view, and reports
-   findings. Whether a Critic runs, and on which model, is set by the risk class;
-   purely mechanical diffs skip it entirely.
+8. **Critic.** Only what passes the gates can reach the Critic: an independent,
+   read-only reviewer in a fresh context that never sees the chat, the
+   reasoning, or the implementer's own report. It gets spec, diff, guardrails,
+   and evidence, builds its own view, and reports findings. Whether a Critic
+   runs, and on which model, is set by risk class; purely mechanical diffs skip
+   it entirely.
 
-9. **Gate decision.** The Elephant disposes of every finding — fix it, reject it
-   with a written reason, or escalate it. This decision is the Elephant's alone;
-   Critic findings are input, never a verdict it rubber-stamps.
+9. **Gate decision.** The Elephant disposes of every finding — fix, reject with
+   a written reason, or escalate. This decision is the Elephant's alone; Critic
+   findings are input, never a verdict it rubber-stamps.
 
 10. **Merge and human gate.** The change merges, docs sync, and — where the
     stakes call for it (live systems, irreversible or costly actions,
-    architecture or guardrail changes) — you give the final sign-off on the
-    completed work. "Delivered" (gates green, Critic passed) and "accepted" (you
-    signed off) are deliberately different words.
+    architecture or guardrail changes) — you give the final sign-off. "Delivered"
+    (gates green, Critic passed) and "accepted" (you signed off) are
+    deliberately different words.
 
 11. **Close.** The block ends with a ritual, not a fade-out: the handover file
     is brought current, a short retro is written (one concrete improvement or an
     explicit "nothing" — silence is not allowed), and the durable artifacts
-    (spec, acceptance criteria, result) are archived. The next session bootstraps
-    from the handover in seconds.
+    (spec, acceptance criteria, result) are archived. The next session
+    bootstraps from the handover in seconds.
 
 ## How much ceremony: rigor and risk
 
-The process is not one-size-fits-all — that is what kills adoption. Two dials
+The process isn't one-size-fits-all — that's what kills adoption. Two dials
 calibrate it:
 
-- **Rigor level** decides how much specification a task earns. Level 0 is a fast
-  path for genuine small fixes (a couple of files, trivially revertible, no touch
-  to architecture, schema, public APIs, tests, guardrails, dependencies, or the
-  security surface) — a short brief instead of a full spec. Level 1 gets a
-  delta-spec; level 2 gets a full, maintained spec. The two invariants that never
-  scale away: the `verify` gate and the machine evidence are mandatory at *every*
-  level.
+- **Rigor level** decides how much specification a task earns. Level 0 is a
+  fast path for genuine small fixes (a couple of files, trivially revertible,
+  no touch to architecture, schema, public APIs, tests, guardrails,
+  dependencies, or the security surface) — a short brief instead of a full
+  spec. Level 1 gets a delta-spec; level 2 gets a full, maintained spec. Two
+  invariants never scale away: the `verify` gate and the machine evidence are
+  mandatory at *every* level.
 
 - **Risk class** decides how hard the review is, independent of size. A
-  three-line change to a guardrail hook is still a guardrail change, and gets the
-  strongest reviewer regardless of how small it is. Size buys you a lighter spec;
-  it never buys you out of review.
+  three-line change to a guardrail hook is still a guardrail change and gets
+  the strongest reviewer regardless of how small it is. Size buys a lighter
+  spec; it never buys you out of review.
 
 A hosted project's own architecture guidelines feed the same dial: a diff
 touching an architecture principle under
 [`governance/examples/`](../governance/examples/README.md) counts as risk
-class high and forces the mandatory Critic, independent of how small the diff
-is — see the [worked example](../governance/examples/worked-example.md) for
-how a guideline becomes an enforced policy end to end.
+class high and forces the mandatory Critic, independent of diff size — see the
+[worked example](../governance/examples/worked-example.md) for how a guideline
+becomes an enforced policy end to end.
 
 ## The four roles, a little deeper
 
 - **Product Owner (you).** You own intent, priority, and the two human gates —
-  the plan sign-off up front and the completion sign-off at the end. You never
-  hand your judgment down: architecture trade-offs, ambiguity, and anything
-  irreversible or costly stay with you. The pipeline's job is to make each of
-  those decisions cheap and well-prepared, not to make them for you.
+  plan sign-off up front, completion sign-off at the end. You never delegate
+  judgment down: architecture trade-offs, ambiguity, and anything irreversible
+  or costly stay with you. The pipeline's job is to make each of those
+  decisions cheap and well-prepared, not to make them for you.
 
-- **Elephant — the orchestrator.** One long-lived session that turns intent into
-  specs, decomposes work into independent Goldfish-sized tasks, dispatches them,
-  decides the gate, and keeps the handover current. It writes no production code
-  — that keeps it lean and unbiased for the call it has to make. Crucially, "the
-  Elephant is the document, not the session": everything that matters lives in
-  files, so a fresh session can pick up where a dead one left off.
+- **Elephant — the orchestrator.** One long-lived session that turns intent
+  into specs, decomposes work into independent Goldfish-sized tasks, dispatches
+  them, decides the gate, and keeps the handover current. It writes no
+  production code — that keeps it lean and unbiased for the call it has to
+  make. "The Elephant is the document, not the session": everything that
+  matters lives in files, so a fresh session can pick up where a dead one left
+  off.
 
 - **Goldfish — the implementer.** A fresh context doing exactly one
-  clearly-bounded task. It follows the plan, it does not redesign it. It delivers
-  with machine evidence or it stops and reports honestly — there is nothing in
-  between, and a clean stop is a first-class result. It never touches the tests
-  that gate its own work, and it has no memory across tasks by design: the
-  pipeline learns through its versioned rules, not through agent memory.
+  clearly-bounded task. It follows the plan, doesn't redesign it. It delivers
+  with machine evidence or stops and reports honestly — nothing in between, and
+  a clean stop is a first-class result. It never touches the tests that gate
+  its own work, and has no memory across tasks by design: the pipeline learns
+  through its versioned rules, not through agent memory.
 
 - **Critic — the independent reviewer.** A read-only, fresh context whose whole
-  reason to exist is to neutralize the bias of whoever wrote the code. It
+  reason to exist is neutralizing the bias of whoever wrote the code. It
   receives references only — spec, diff, guardrails, evidence — and constructs
-  its own view; framing it ("this should be fine, just check X") is treated as a
-  defect in the dispatch. It searches hard on the working assumption that the
+  its own view; framing it ("this should be fine, just check X") counts as a
+  defect in the dispatch. It searches hard on the working assumption the
   artifact is flawed, then reports only findings that carry evidence, an anchor
   in the spec or a guardrail, and a concrete consequence. "No findings" is a
   valid, welcome result.
@@ -138,55 +137,56 @@ before probabilistic.**
 - **Stage 1 — the gates.** One `verify` script per project runs the same fixed
   chain everywhere — the Goldfish runs it, the stop hook runs it, CI runs it. It
   is binary and blocking: green or not green, no "warn-only" that quietly rots.
-  Every gate also documents what it does *not* check, so green never overclaims.
-  The output is a machine-written artifact, never model prose.
+  Every gate also documents what it does *not* check, so green never
+  overclaims. The output is a machine-written artifact, never model prose.
 
 - **Stage 2 — the Critic.** Only what survives the gates reaches LLM judgment.
-  That is the whole point: an expensive reviewer should never spend its attention
-  on something a test could have caught, and the Critic is explicitly forbidden
-  from flagging anything the gates already enforce. Machines handle what machines
-  can decide; the Critic adds only the judgment they cannot.
+  An expensive reviewer should never spend attention on something a test could
+  have caught; the Critic is explicitly forbidden from flagging anything the
+  gates already enforce. Machines handle what machines can decide; the Critic
+  adds only the judgment they cannot.
 
 ## The escalation ladder
 
-Failure has a fixed path upward, with hard stop criteria at each rung so nothing
-grinds indefinitely:
+Failure has a fixed path upward, with hard stop criteria at each rung so
+nothing grinds indefinitely:
 
-1. **Goldfish.** A red `verify` gets at most two attempts at the same cause. The
-   second failure ends the series — no third variation. The Goldfish stops and
-   reports the failure state honestly.
+1. **Goldfish.** A red `verify` gets at most two attempts at the same cause.
+   The second failure ends the series — no third variation. The Goldfish stops
+   and reports the failure state honestly.
 
 2. **Critic.** Findings only. No dialogue with the implementer, no fixes of its
-   own. It reports once, to the Elephant.
+   own. Reports once, to the Elephant.
 
-3. **Elephant.** Before re-dispatching or reaching for a bigger model, it debugs
-   the *harness* first — was the briefing complete, the context clean, the tools
-   right-sized, the hooks wired? Most agent failures are configuration failures.
-   Rework is a *new* dispatch with a fresh context and a sharpened brief, never
-   continued work in the failed one — capped at two cycles per task.
+3. **Elephant.** Before re-dispatching or reaching for a bigger model, it
+   debugs the *harness* first — was the briefing complete, the context clean,
+   the tools right-sized, the hooks wired? Most agent failures are
+   configuration failures. Rework is a *new* dispatch with a fresh context and
+   a sharpened brief, never continued work in the failed one — capped at two
+   cycles per task.
 
 4. **Product Owner.** Blockers, more than two rework cycles, spec-versus-reality
    conflicts, and anything irreversible, externally visible, or costly escalate
-   to you. These are exactly the judgments that are not delegable.
+   to you. These are exactly the judgments that aren't delegable.
 
 ## The close ritual
 
-A block does not end when the code merges; it ends when the record is
+A block doesn't end when the code merges; it ends when the record is
 trustworthy again. Close brings the single handover file current, writes the
 retro (the session's own author, not a question thrown at you), archives the
 three durable artifacts, and records a short telemetry line. The discipline
-behind it is simple: a session is a cache over persisted files, so what is not
-written down does not exist.
+behind it: a session is a cache over persisted files, so what isn't written
+down doesn't exist.
 
 ## What this is, and isn't
 
 This is a **Tier 2** review system: a structured, two-stage self- and
 Critic-review layer built into the day-to-day workflow (deterministic gates,
 then an independent LLM reviewer with a fresh context). It is not a certified
-or enterprise-grade assurance system, and it does not claim to be one. See
-[`docs/operating-model.md`](operating-model.md), the "Enterprise expansion paths"
-section, for the documented, optional upgrade paths (a scheduled audit pass, a
-semantic pre-execution gate) beyond what this repo ships by default.
+or enterprise-grade assurance system, and doesn't claim to be one. See
+[`docs/operating-model.md`](operating-model.md), "Enterprise expansion paths",
+for the documented, optional upgrade paths (a scheduled audit pass, a semantic
+pre-execution gate) beyond what this repo ships by default.
 
 ## Where things live
 
@@ -208,6 +208,8 @@ semantic pre-execution gate) beyond what this repo ships by default.
   [`docs/runtime-boundary.md`](runtime-boundary.md).
 
 ---
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
 # Das Modell in einem Durchgang
 

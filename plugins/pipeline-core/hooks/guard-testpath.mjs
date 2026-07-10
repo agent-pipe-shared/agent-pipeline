@@ -30,7 +30,7 @@
  *     always-active block per configured path — no task-type distinction (e.g. "is
  *     this Goldfish briefed to update tests right now?") and no override mechanism.
  *     The backlog item explicitly flagged that distinction as an open design
- *     question ("Briefing-Marker, Env-Var oder Kalibrierungsfeld?"); resolving it
+ *     question ("Briefing marker, environment variable, or calibration field?"); resolving it
  *     is out of scope here (scope burst) — see NOT COVERED below for the accepted
  *     escape hatch instead.
  *

@@ -1,8 +1,53 @@
-# ADR-0023: Elephant-Kontext-Diät & Latenz-Maßnahmenbündel
+# ADR-0023: Elephant Context Diet & Latency Measure Bundle
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR adopts a bundle of ten concrete measures to cut the "Elephant" (main agent) context share and session latency, after sessions repeatedly showed 78–89% Elephant context usage — deemed unsustainable. Measures include capped subagent reports, single-turn/parallel-first task scheduling, phase-cut cost triggers, selective (non-full-text) reading by default, commit-first-then-report ordering, a dispatch ledger, leaner chat communication, and scoped readiness checks. It was reviewed bundled rather than piecemeal (an independent critic review failed on first pass with 6 findings, then passed after fixes) and carries an explicit, dated measurement target for the next feature session (Elephant share ≤50%, cost <$30, wall-clock time −30%, unchanged first-pass quality), with a rollback trigger if that target is missed.
+> Agent-Pipeline v0.1.0-draft · Sprint 1 · as of 2026-07-06
+
+**Status:** accepted (2026-07-05 evening, Wave 2, PO-PRD approvals) · **Basis:** Register E23
+
+## Context
+
+Multiple sessions showed a high Elephant (main agent) context share (78–89%). Wave 2 bundled a comprehensive set of context- and latency-reduction measures; a Fable critic reviewed it (first pass FAIL with 6 findings → dispositioned, second pass PASS).
+
+## Decision (E23)
+
+Elephant Context Diet & Latency (Wave 2, PO-PRD approvals 2026-07-05 evening; commits `886db4f`/`166e60a`/`fc725c6`/`c2e45b3`/`9d4734d`) adopts ten concrete measures:
+
+- Report cap ≤1,000 tokens / 40 lines (GF-09)
+- Single-turn recon + parallel-first scheduling (EL-05/EL-22: independent work in the SAME turn, sequential only with a named dependency)
+- Phase-cut cost trigger ~10 dispatches / ~2h / ≥50% in addition to fill-level (operating-model §5.2)
+- Selective reading EL-20 (full text only on anomaly)
+- commit-first-then-report as default ordering
+- Dispatch ledger EL-21
+- Communication economy EL-23 (chat only: finding/gate/incident/result)
+- Readiness scoping (mandatory only for canon/guardrail/core-contract/class-high/rigor-2)
+- goldfish-implementor `effort: xhigh`
+- SessionStart staleness hook (detect+prompt, fail-open; `autoUpdate` key removed again after Critic finding F1 → verification item)
+- PRD template enforcement (E21 addendum)
+
+Measurement target for the next feature session: Elephant share ≤50% (baseline S39/S40/tuning/S42: 78–89%), feature session <$30, wall-clock time −30%, unchanged first-pass quality; a regression triggers a dated rollback revision. Critic: first pass FAIL (6 findings) → dispositioned, second pass PASS. ADR formalization: Phase 2.
+
+## Consequences
+
+**Positive:** Bundles ten concrete levers against the documented dominant cost factor (Elephant context share); the measurement target is explicit and time-boxed (next feature session).
+
+**Negative:** High rule density in a single decision (ten individual measures) — maintenance effort is spread across many canon locations.
+
+**Risk:** A first-pass quality regression from overly aggressive cuts (report cap, selective reading) could initially go unnoticed. Mitigation: explicit measurement mandate with a rollback trigger on attributable regression.
+
+## Rejected alternatives
+
+- **Status quo (high Elephant context share unchanged)** — rejected as untenable given the S39/S40/tuning/S42 data (78–89%).
+- **Introducing individual measures in isolation rather than bundled** — the critic review ran bundled (first pass FAIL → dispositioned, second pass PASS); the bundle was kept rather than split.
+
+## Follow-up
+
+Measurement-target check at the next feature session (Elephant share ≤50%, feature session <$30, wall-clock time −30%, unchanged first-pass quality); attributable regression → dated rollback revision.
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0023: Elephant-Kontext-Diät & Latenz-Maßnahmenbündel
 
 > Agent-Pipeline v0.1.0-draft · Sprint 1 · Stand 2026-07-06
 

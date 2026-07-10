@@ -1,8 +1,60 @@
-# ADR-0014: Critic-Kontrakt
+# ADR-0014: Critic Contract
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR institutes a formal contract for the "Critic" review role: mandatory triggers by risk level, strict input limited to spec + diff + guardrails (never chat history or the implementor's own reasoning, to avoid contamination and self-confirmation bias), a structured, evidence-based findings list (no numeric score) that must include a "deliberately not flagged" rubric plus a trajectory check (were the claimed checks actually run?), and an anti-overreporting clause so CI-enforced checks aren't re-flagged. A later revision (2026-07-04) addresses an infrastructure discovery — subagents auto-load the full project CLAUDE.md and a stale git-status snapshot at spawn — by keeping that autoload as-is but adding a disclosure duty and banning use of the injected snapshot as a freshness reference.
+**Status:** accepted (2026-07-03, Checkpoint 1) · **revised with a CLAUDE.md-autoload disclosure duty + snapshot ban (the PO, 2026-07-04 — see "Revision" section)** · **Basis:** Register E12 + Condition A10
+
+## Context
+
+Fresh reviewer context is officially justified on three grounds (self-confirmation, contamination, anchoring); **overreporting** is the documented failure mode: "A reviewer prompted to find gaps will usually report some, even when the work is sound." The Google essence adds a trajectory check — were the claimed checks actually run? The existing setup had Critic substance without institution. Critic finding L2-04 → Condition A10 (rubric naming).
+
+## Decision (E12, verbatim)
+
+> Critic contract: mandatory triggers by risk level; never chat history as input; findings list with evidence + "deliberately not flagged" rubric + trajectory check; anti-overreporting
+
+Refinements:
+
+- **Input strict:** spec + diff + guardrails (+ evidence artifacts). Never chat history, never the implementor's own reasoning. Isolation levels → ADR-0003.
+- **Output:** structured findings list (gap/risk + evidence with `file:line` + spec reference); no score; pass/fail only where an overall verdict is required.
+- **Rubric (Condition A10):** the read-only Critic uses "**deliberately not flagged**" (it changes nothing); "deliberately NOT changed" stays the rubric for writing roles (Goldfish report).
+- **Anti-overreporting clause** + skip rule: never flag what CI/deterministic gates already enforce.
+- **Mandatory triggers by risk level** (called "Risikoklasse" in operating-model.md §4.2, where the high/medium/low classes are defined). Canonical trigger wording (verbatim with operating-model.md §4.2/§3.3 and ADR-0003): every architecture/guardrail/security diff runs with Critic Fable 5 / `max` AND additionally in `--bare` isolation. Rigor level 2 makes the Critic mandatory (default: Sonnet 5 / `max`); Fable 5 / `max` applies there only if the risk class is additionally high OR an architecture/guardrail/security diff is present. — Isolation level → ADR-0003, models → ADR-0006.
+- **Evidence addendum (project S39, 2026-07-05):** a Critic at the standard isolation level (model there: Fable 5 via riskZone trigger; whether Sonnet would have found the same findings is the open A/B question, see retro item) caught, on a riskZone diff (project, `packages/**` constraint), 2 BLOCKERs of class "interaction NEW↔EXISTING" — a new feature made a deliberately non-abortable action voice-/Google-abortable, and an untouched existing automation deterministically bypassed a new guard gate — that the implementor's view alone plausibly did not see. This empirically substantiates the mandatory-trigger lines above.
+
+## Consequences
+
+**Positive:** independence becomes an institution rather than a raw form; findings are evidence-based and verifiable; the trajectory check closes the gap of "gates claimed instead of executed."
+
+**Negative:** cost per review (models per ADR-0006); upkeep of the trigger table per risk level.
+
+**Risk:** anti-overreporting can tip into under-reporting — the "deliberately not flagged" rubric makes omissions explicit and thus checkable.
+
+## Rejected alternatives
+
+- **Score-based judging** — documented bias catalog (position, verbosity, self-preference); Anthropic's own practice: a single call against a fixed rubric was more consistent than multiple judges.
+- **Critic with chat history** — contamination; exactly the bias fresh context is officially meant to avoid.
+- **CI only, no Critic** — CI checks what's machine-checkable; spec fidelity, scope, and edge cases need judgment.
+
+## Revision (the PO, 2026-07-04): CLAUDE.md autoload — documented acceptance + disclosure duty + snapshot ban
+
+Monitoring of the project migration (2026-07-04) revealed that every subagent (Goldfish/Critic) automatically gets the project's full CLAUDE.md plus a git-status snapshot injected at spawn — officially confirmed and with no opt-out parameter (`code.claude.com/docs/en/sub-agents.md`: "Explore and Plan are the only subagents that omit CLAUDE.md and git status. There is no frontmatter field or per-agent setting to change which agents skip them."). A factual measurement (AP-P4-PROBE-1) additionally showed that the injected git status is a **snapshot from the start of the Elephant parent session**, not the state at the subagent's spawn.
+
+The PO accepts the Elephant recommendation (2026-07-04, AP sprint): **autoload stays as is** — CLAUDE.md is the yardstick the Critic reviews against; the E12-critical contamination (Elephant framing/reasoning) is prevented by subagent isolation regardless. With two conditions:
+
+1. **Disclosure duty:** the Critic explicitly names the context injected at spawn (CLAUDE.md, user memory, git-status snapshot, etc.) in the report.
+2. **Ban on using the snapshot as a freshness reference:** the injected git status (parent-session-start state) may NEVER serve as a freshness reference — the diff range/commit list comes exclusively from the briefing; the Critic establishes the actual repo state itself via `git` commands.
+
+Both conditions apply equally to the Critic contract and the dispatch template (`templates/prompts/critic-review.md`). This revision replaces no part of the ADR body above (never-rewrite convention, `docs/adr/README.md`); it supplements it.
+
+**Cross-reference (E24, Wave 2):** Critic tiering (mechanics auto-pass, Sonnet cascade for medium class, ONE bundled Critic per wave) revises the E12 mandatory-trigger staffing — own ADR, not repeated here: ADR-0024, Register E24.
+
+## Follow-up
+
+None. Critic as a callable building block (prompt + schema): Phase 3.
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0014: Critic-Kontrakt
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 

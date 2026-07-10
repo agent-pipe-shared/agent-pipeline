@@ -1,8 +1,37 @@
-# ADR-0024: Critic-Stufung — datenbasierte Revision des E12/E6-Staffings
+# ADR-0024: Critic Staffing — Data-Based Revision of the E12/E6 Staffing Rules
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR revises the critic (code-review) staffing rules from ADR-0014/ADR-0006 based on observed outcomes: the last three canonical critic passes returned zero findings, while real blockers only showed up on risky live-code changes. It introduces a mechanical auto-pass for deterministic diffs (lockfiles, generated files, pure formatting — no critic needed, evidenced by the generating command plus verify), a Sonnet-based cascade for medium-risk diffs that escalates to the stronger model only on a major-or-above finding, an approvals/governance/security touch, or a contested result, and allows non-blocking parallel review for low-risk diffs. High-risk/approvals-governance-security-touching changes remain unchanged: mandatory, blocking review by the stronger model. Status: accepted (Wave 2, milestone M11).
+**Status:** accepted (Wave 2, M11) · **Basis:** Register E24
+
+## Context
+
+Three consecutive canonical Critic runs (readiness + first-pass) all closed at zero findings; real blockers so far only occurred on risky live-code changes (S39 2× blocker, S40 fail-open-major). On this data basis, Wave 2 revises the Critic staffing rules from [ADR-0014](0014-critic-kontrakt.md) (E12) and [ADR-0006](0006-modell-effort-policy.md) (E6).
+
+## Decision (E24, verbatim)
+
+> Critic staffing (Wave 2 M11, revises E12/E6 staffing; data-based + meta-RADAR evidence): NEW mechanical auto-pass (deterministic diffs: lockfiles/generated files/pure formatting → no Critic, evidence = generating command + verify) · class medium = Sonnet CASCADE (escalation to Fable ONLY on a finding ≥major / approvals-governance-security touch / contested) · class low = non-blocking parallel permitted (disposition required before wave close) · ONE bundled Critic per wave = default · class high/A-G-S unchanged, Fable + blocking (T1 untouched). Data basis: last 3 canonical Critics after readiness+first-pass = PASS, 0 findings; real blockers only on risky live code (S39 2×BLOCKER, S40 fail-open-MAJOR). ADR formalization Phase 2
+
+## Consequences
+
+**Positive:** Saves Fable cost on mechanical/medium diffs without an observed loss of defect-finding on canonical material; the T1 obligation (class high/A-G-S) remains fully untouched.
+
+**Negative:** The new staffing logic (mechanical auto-pass, Sonnet cascade, non-blocking-parallel for class low) increases case-distinction complexity in the Critic contract.
+
+**Risk:** The Sonnet cascade could miss a major finding that would have triggered a Fable escalation. Mitigation: the escalation criterion is explicitly defined (finding ≥major / A-G-S touch / contested), not left to discretion.
+
+## Rejected alternatives
+
+- **Keep Fable-Critic across the board for class medium** — rejected as uneconomical given the 0-finding data from the last three canonical Critics.
+- **No Critic at all for class low** — rejected in favor of non-blocking parallel; disposition remains mandatory before wave close.
+
+## Status
+
+Accepted (Wave 2, M11). No fixed re-review date; the data basis keeps expanding through further Critic runs (implicit observation duty).
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0024: Critic-Stufung — datenbasierte Revision des E12/E6-Staffings
 
 > Agent-Pipeline v0.1.0-draft · Sprint 1 · Stand 2026-07-06
 

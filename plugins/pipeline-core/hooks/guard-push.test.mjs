@@ -114,7 +114,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   const { dir } = freshRepo("missing-evidence");
   writeManifest(dir, manifestPush({ approval: "standing-approved" }));
   check("PG04 block  blocking + missing verify evidence", PUSH_CMD, dir, BLOCK, {
-    stderrIncludes: ["evidence/verify-latest.json fehlt"],
+    stderrIncludes: ["evidence/verify-latest.json missing"],
   });
 }
 
@@ -124,7 +124,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   writeManifest(dir, manifestPush({ approval: "standing-approved" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: "0000000000000000000000000000000000000000" });
   check("PG05 block  blocking + stale commit in verify evidence", PUSH_CMD, dir, BLOCK, {
-    stderrIncludes: ["veraltet"],
+    stderrIncludes: ["is stale"],
   });
   void head;
 }
@@ -144,7 +144,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   const { dir } = freshRepo("warn-missing");
   writeManifest(dir, manifestPush({ mode: "warn", approval: "standing-approved" }));
   check("PG07 warn  warn mode + missing verify evidence -> exit 1", PUSH_CMD, dir, WARN, {
-    stderrIncludes: ["evidence/verify-latest.json fehlt"],
+    stderrIncludes: ["evidence/verify-latest.json missing"],
   });
 }
 
@@ -155,7 +155,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   // security-latest.json intentionally absent -> must be reported as a failure.
   check("PG08 block  security evidence enforced when gates.security mode=blocking", PUSH_CMD, dir, BLOCK, {
-    stderrIncludes: ["evidence/security-latest.json fehlt"],
+    stderrIncludes: ["evidence/security-latest.json missing"],
   });
 }
 
@@ -182,7 +182,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   writeManifest(dir, manifestPush({ approval: "required" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   check("PG11a block  required approval, no state file at all", PUSH_CMD, dir, BLOCK, {
-    stderrIncludes: ["Push-Freigabe fehlt"],
+    stderrIncludes: ["Push approval missing"],
   });
 }
 
@@ -196,7 +196,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
     pushApproval: { lastApproved: { approvedBy: "po-test", approvedAt: "2020-01-01T00:00:00.000Z", forCommit: "deadbeef" } },
   });
   check("PG11b block  required approval, state present but stale forCommit", PUSH_CMD, dir, BLOCK, {
-    stderrIncludes: ["Push-Freigabe fehlt oder ist veraltet"],
+    stderrIncludes: ["Push approval missing or stale"],
   });
 }
 
@@ -235,7 +235,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   const { dir } = freshRepo("second-segment");
   writeManifest(dir, manifestPush({ approval: "standing-approved" }));
   check("PG15 block  push detected inside second segment (git add . && git push)", "git add . && git push", dir, BLOCK, {
-    stderrIncludes: ["evidence/verify-latest.json fehlt"],
+    stderrIncludes: ["evidence/verify-latest.json missing"],
   });
 }
 

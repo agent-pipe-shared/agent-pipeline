@@ -5,9 +5,9 @@ v0.1.0-draft · Sprint 0 Phase 3 · 2026-07-03
 Source of truth: harness/session-bootstrap.md (the human-readable spec — on any
 divergence THAT document is authoritative), ADR-0010, model-policy MP-01/MP-04/
 MP-16/MP-17.
-Language: English (agent-facing prompt, ADR-0011); the confirmation line stays
-verbatim GERMAN — it is the canonical audit string the PO and hooks check
-literally („Zeile beginnt wörtlich mit ‚Bootstrap-Check bestanden:'").
+Language: English (agent-facing prompt, ADR-0011); the confirmation line is
+the canonical audit string the PO and hooks check literally ("the line begins
+literally with 'Bootstrap check passed:'").
 
 STATUS: TRANSITIONAL. This prompt exists for projects where the plugin skill
 (`/pipeline-core:pipeline-start`) is not yet installed. Once the skill works in
@@ -45,27 +45,27 @@ steps — a confirmation without performed checks is exactly the failure mode
 2. **Model/effort (Elephant only).** **Profile question first — hard gate, ask
    BEFORE setting model/effort:**
 
-   > Profilwahl (hart, AskUserQuestion, 2 Optionen + Freitext = PO-Ausnahme): „Session-Profil für dieses Thema — Advisor (Cost/Quality) [advisor] (Design-Tier-Modell + Advisor-Modell ab Sessionbeginn — empfohlener Standard, solange ein Advisor konfiguriert ist) oder Design-First (Cost+/Quality+) [design-first] (phasenbewusst, d2a: Design für dieses Thema BEREITS freigegeben? → direkt Ausführungsphase, Design-Tier-Modell ab Sessionbeginn, Advisor nur für T1-Critics/Readiness-Subagenten; sonst Design-Tier-Modell mit vollem Reasoning-Budget bis zum PRD-Freigabe-Gate, dann genau EIN Wechsel zum Ausführungs-Preset — höhere Tiers kosten mehr pro Token; Effort ist der primäre Kostenhebel, nicht $/MTok)?"
+   > Profile choice (hard, AskUserQuestion, 2 options + free text = PO exception): "Session profile for this topic — Advisor (Cost/Quality) [advisor] (design-tier model + advisor model from session start — recommended default, as long as an advisor is configured) or Design-First (Cost+/Quality+) [design-first] (phase-aware, d2a: design for this topic ALREADY approved? → straight to the execution phase, design-tier model from session start, advisor only for T1 critics/readiness subagents; otherwise design-tier model with full reasoning budget until the PRD approval gate, then EXACTLY ONE switch to the execution preset — higher tiers cost more per token; effort is the primary cost lever, not $/MTok)?"
 
    the PO decides per topic; a free-text answer is the PO-exception path (e.g.
    a pure-advisor special session). Verbatim commands per chosen profile — the
    concrete model names here are the **shipped default preset** (override in
    `pipeline.user.yaml` and substitute your configured model):
 
-   > Profil advisor (ab Sessionbeginn):
+   > Profile advisor (from session start):
    > /model opus
    > /effort max
    > /advisor fable
    >
-   > Profil design-first, Design bereits freigegeben (phasenbewusst, d2a) — ab Sessionbeginn:
+   > Profile design-first, design already approved (phase-aware, d2a) — from session start:
    > /model opus
    > /effort max
    >
-   > Profil design-first, Design noch nicht freigegeben (Wechsel am PRD-Freigabe-Gate):
+   > Profile design-first, design not yet approved (switch at the PRD approval gate):
    > /model opus
    > /effort max
    >
-   > Advisor-Hygiene (design-first, falls Advisor konfiguriert):
+   > Advisor hygiene (design-first, if an advisor is configured):
    > /advisor off
 
    **Advisor hygiene (d2c):** if profile
@@ -77,8 +77,8 @@ steps — a confirmation without performed checks is exactly the failure mode
    `.claude/settings.local.json` (the live settings validator rejects `null`
    although the docs name it; `$comment` keys are invalid in
    `settings.local.json`); (3) `/advisor off` ONLY when no parallel session
-   is affected; (4) **divergence = mandatory question (PO condition „man
-   entscheidet immer"):** whenever the ACTUAL advisor
+   is affected; (4) **divergence = mandatory question (PO condition "one always
+   decides"):** whenever the ACTUAL advisor
    state diverges from the chosen profile's intended state, put the
    resolution to the PO as an AskUserQuestion (keep attached / project-local
    off / `/advisor off`) — silent inheritance is a bootstrap defect,
@@ -146,7 +146,7 @@ steps — a confirmation without performed checks is exactly the failure mode
   `/reload-plugins`. Work may
   continue EXCEPT when the delta touches guardrails (paths `hooks/`, `agents/`,
   permission settings) — then refresh FIRST. If you cannot inspect the delta:
-  default-safe = refresh. Confirmation line carries the HINWEIS suffix.
+  default-safe = refresh. Confirmation line carries the NOTE suffix.
 - **F3 — offline / remote unreachable:** Warn, continue on cache state, redo
   the staleness check at next connectivity. Confirmation line carries the
   offline suffix.
@@ -155,24 +155,24 @@ steps — a confirmation without performed checks is exactly the failure mode
   Newly created files must be named to the PO for confirmation (a new
   calibration is a project-policy decision, never an agent's solo act).
 
-## Confirmation (verbatim German format — mandatory, final step)
+## Confirmation (mandatory format — final step)
 
-> Bootstrap-Check bestanden: Regelwerk {{version/SHA}} geladen · Projekt {{name}} · Kalibrierung {{datei}} · Stand {{handover-datum}} · Rolle {{Elephant|Goldfish|Critic}}
+> Bootstrap check passed: ruleset {{version/SHA}} loaded · Project {{name}} · Calibration {{file}} · State {{handover-date}} · Role {{Elephant|Goldfish|Critic}}
 
-Allowed suffixes (only these, appended with „·"):
-- F3: „· Staleness ungeprüft (offline, Cache-Stand)"
-- accepted F2: „· HINWEIS: Regelwerk stale ({{n}} Commits hinter Remote)"
+Allowed suffixes (only these, appended with "·"):
+- F3: "· Staleness unchecked (offline, cache state)"
+- accepted F2: "· NOTE: ruleset stale ({{n}} commits behind remote)"
 
-Role variants of the „Stand" field: Goldfish = „Stand Briefing
-{{task-id/datum}}"; Critic = „Stand n/a (Critic sieht keinen Verlauf)".
+Role variants of the "State" field: Goldfish = "State briefing
+{{task-id/date}}"; Critic = "State n/a (Critic sees no history)".
 
 Elephant adds a second line directly below (MP-17):
 
-> Modell/Effort: {{MODEL}} / {{EFFORT}} (gemäß policies/model-policy.md) · Profil {{advisor|design-first|PO-Ausnahme}} · Advisor {{advisor-model|aus}}
+> Model/Effort: {{MODEL}} / {{EFFORT}} (per policies/model-policy.md) · Profile {{advisor|design-first|PO exception}} · Advisor {{model|off}}
 
 Elephant adds a third line directly below that:
 
-> Rollen-Verbote geladen: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — Implementierung nur per Goldfish-Dispatch (Stufe-0 per OM §3.3; weitere Ausnahmen nur durch the PO); PRD-Gate: lesbar vorlegen + auf ‚freigegeben' warten
+> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per OM §3.3; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'
 
-All five fields must carry concrete values — no placeholders, no „unbekannt"
+All five fields must carry concrete values — no placeholders, no "unknown"
 outside the defined suffix cases.

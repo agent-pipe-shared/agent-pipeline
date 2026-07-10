@@ -50,16 +50,16 @@ security:
 # below are the shipped defaults; override them per role in pipeline.user.yaml (models.*).
 modelRouting:
   elephant:
-    model: profilgebunden
-    effort: profilgebunden
-    note: "MP-01 — Design-Tier: Standard-Profil (Advisor, Cost/Quality)"
+    model: profile-bound
+    effort: profile-bound
+    note: "MP-01 -- design tier: default profile (advisor, cost/quality)"
   goldfish:
     model: sonnet-5
     effort: xhigh
   critic:
     model: sonnet-5
     effort: max
-    note: "MP-07 — Review-Tier eskaliert bei Architektur/Guardrails/Security auf ein höherkapazitives Modell"
+    note: "MP-07 -- review tier escalates to a higher-capability model on architecture/guardrails/security findings"
 
 profiles:
   active: full-sdlc

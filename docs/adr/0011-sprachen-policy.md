@@ -1,8 +1,61 @@
-# ADR-0011: Sprachen-Policy — Deutsch für Menschen, Englisch für Agenten
+# ADR-0011: Language Policy — German for Humans, English for Agents
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR sets the project's language split: German for human-facing documentation (operating model, ADRs, policies, reviews, handover files — anything the product owner reads and approves), and English for agent-facing artifacts (templates, skills, prompts, agent/skill frontmatter, CLAUDE.md templates, and originally commit messages). A later revision (E17, 2026-07-04) reclassified commit messages as PO-facing rather than agent-facing, since the product owner is the primary reader of `git log` in these projects — this is the one correction layered on top of the original decision, not a rewrite of it. The underlying "primary reader" tiebreaker rule for edge cases is unchanged and governs both the original decision and the E17 correction.
+**Status:** accepted (2026-07-03, Checkpoint 1) · **revised in commit classification (E17, by the PO, 2026-07-04 — see "Revision E17" section)** · **Basis:** Kickoff working rule 8 + condition A6
+
+## Context
+
+The kickoff brief required the language default to be captured as an ADR; condition A6 confirms the ADR as a DoD requirement. The practice already existed and had proven itself: German documentation, English commits and agent artifacts across this repo and the existing projects.
+
+## Decision (kickoff default, carried over unchanged and refined)
+
+- **German — human-facing documentation:** everything the PO reads, reviews, and approves: operating model, ADRs, policies, reviews, target-state docs, migration dossiers, management summaries. English technical terms are explicitly fine.
+- **English — agent-facing artifacts:** everything an agent loads at runtime or generates in standardized form: templates, skills (description + body), prompts, agent/skill frontmatter, CLAUDE.md (templates), commit messages (Conventional Commits).
+- **Primary-reader rule for edge cases:** an artifact follows the language of its primary reader. Template structures and field names are English; filled-in content follows the primary reader (e.g. handover/HISTORY content is German because the PO reads it; frontmatter is English).
+
+**Why:** model performance and reusability (English runtime artifacts are portable and shareable across projects) at the point of effect — full readability for the PO at every decision point.
+
+**Verification:** the language assignment of new artifacts is a check point in the Critic review of Pipeline deliverables ([ADR-0014](0014-critic-kontrakt.md), [ADR-0015](0015-selbstanwendung.md)).
+
+## Consequences
+
+**Positive:** best model performance at the point of effect, full reading speed at the point of decision; artifacts portable without translation.
+
+**Negative:** a language boundary within the same repo; duplicate terminology possible (glossary need for core terms like Staffelstab/handover).
+
+**Risk:** gradual language drift in mixed artifacts. Implemented (Phase 3): the language assignment per template is anchored in the template headers (Language-Note in `templates/CLAUDE.project.md`, `templates/prompts/*`, `backlog/items/TEMPLATE.md`; telemetry: preamble of `telemetry/costs.md`) — for future new mixed artifacts, the primary-reader rule is the default; the check point is Hunt category 10 of the Critic review.
+
+## Rejected alternatives
+
+- **All German** — costs model performance and any reusability of runtime artifacts outside the German-speaking context.
+- **All English** — misses the purpose of human-facing documentation: fast, precise reviewability and decidability for the PO.
+
+## Revision E17 (by the PO, 2026-07-04): commit messages are PO-facing, not agent-facing
+
+Sprint-1 `<PROJECT_A>` migration, Fable-Critic finding F1 (2026-07-04): the migration commits ran in German even though GIT-01 (`guardrails/git.md`) had until then required "English MUST" for commit messages — citing exactly the classification above ("commit messages (Conventional Commits)" under "English — agent-facing artifacts"). The PO decided the classification the other way (register **E17**): commit messages are **PO-facing**, not agent-facing — the PO is the primary reader of every `git log` in his projects. **The primary-reader rule itself is unchanged and was already correct beforehand** (it already correctly classified handover/HISTORY content as German, see above) — this revision corrects exclusively this ONE individual assignment; the ADR body above is not rewritten (convention `docs/adr/README.md`), but surgically overridden by this section.
+
+**Refined assignment as of E17:**
+
+| PO-facing (primary reader: PO) → German | Agent↔agent (primary reader: agent) → English |
+|---|---|
+| Commit messages (NEW — previously misclassified on the right) | Goldfish briefings |
+| Handover instances (`docs/state.md` per project) | Critic reports (report format — CP2 decision 1, unchanged) |
+| Chat responses | Specs (content — CP2 decision 2, unchanged) |
+| PR descriptions | Agent-facing canon (guardrails, harness, skills, agent frontmatter) |
+| Questions/comments to the PO | Templates (structure/field names; filled-in content still follows the primary reader) |
+
+**E17 also confirms** CP2 decisions 1/2 unchanged (Goldfish/Critic report language English, spec content English) — nothing changes there.
+
+**Implementation:** `guardrails/git.md` GIT-01 (commit language); sweep across `guardrails/`, `templates/`, `harness/`, `plugins/pipeline-core/{skills,agents}/`, `docs/adr/`.
+
+## Follow-up
+
+None.
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0011: Sprachen-Policy — Deutsch für Menschen, Englisch für Agenten
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 

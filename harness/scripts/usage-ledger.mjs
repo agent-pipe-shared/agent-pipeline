@@ -30,9 +30,8 @@
  *   - `--row [label]`: ONE MP-20-compatible fragment (token counts + an ESTIMATED
  *     $ figure per model, from `--prices`) instead of the full table — meant to be
  *     pasted into the close-block ritual's `telemetry/costs.md` row (token half
- *     "erhoben", $ half always marked "geschätzt" — real session-$ is not
- *     machine-readable). Path-free and German-language (its landing document,
- *     `telemetry/costs.md`, is German — primary-reader rule, ADR-0011).
+ *     "collected", $ half always marked "estimated" — real session-$ is not
+ *     machine-readable). Path-free and English-language.
  *
  * Session scoping: `--session <uuid>` restricts aggregation to one session (incl.
  * its subagent transcripts, via the shared `sessionId` field — see schema notes
@@ -70,7 +69,7 @@
  *     records/harness versions, so it is read defensively: when present it drives
  *     the per-TTL price split, when absent the whole `cache_creation_input_tokens`
  *     amount is treated as 5m-rate (a DECLARED assumption, surfaced in the `--row`
- *     output's Besonderheiten note — never silently guessed).
+ *     output's peculiarities note — never silently guessed).
  *   - `message.model === "<synthetic>"` marks harness-internal synthetic messages
  *     (e.g. an auth-failure stub) with zero real usage — excluded from the ledger.
  *   - The top-level `sessionId` field is present on BOTH main-session records and
@@ -457,8 +456,7 @@ function renderTable() {
   process.exit(0);
 }
 
-// --- 4b. `--row` output: ONE MP-20-compatible, path-free, German-language fragment
-//         (its landing document, telemetry/costs.md, is German — primary-reader rule). ---
+// --- 4b. `--row` output: ONE MP-20-compatible, path-free, English-language fragment. ---
 function familyOf(model) {
   const m = model.toLowerCase();
   if (m.includes("fable")) return "fable";
@@ -540,7 +538,7 @@ function renderRow() {
   if (rowLabel) fragment.push(`Session/Block: ${rowLabel}`);
 
   if (byModel.size === 0) {
-    fragment.push("Tokens laut `/usage` (erhoben, Skript): keine Datensätze gefunden für die gewählte Session/Filterung.");
+    fragment.push("Tokens per `/usage` (collected, script): no records found for the selected session/filter.");
     console.log(fragment.join("\n"));
     process.exit(0);
     return;
@@ -564,27 +562,27 @@ function renderRow() {
       // calculation either — excluded from undeterminedTotal (the footnote must
       // only count tokens that actually fed a computed estimate).
       anyUnknown = true;
-      dollarLabel = "n/a (Preis unbekannt)";
+      dollarLabel = "n/a (price unknown)";
     } else {
       anyKnown = true;
       totalUsd += usd;
       undeterminedTotal += agg.cacheCreateUndetermined;
-      dollarLabel = `$${fmtUsd(usd)} (geschätzt)`;
+      dollarLabel = `$${fmtUsd(usd)} (estimated)`;
     }
     return `- ${model}: ${fmtDe(agg.input)} in / ${fmtDe(agg.output)} out / ${fmtDe(agg.cacheCreate)} cache-write / ${fmtDe(agg.cacheRead)} cache-read -> ${dollarLabel}`;
   });
 
-  fragment.push("Tokens laut `/usage` (erhoben, Skript):");
+  fragment.push("Tokens per `/usage` (collected, script):");
   fragment.push(...perModelLines);
   if (anyKnown) {
-    const suffix = anyUnknown ? " — schließt Modelle mit unbekanntem Preis aus (s. o.)" : "";
-    fragment.push(`TOTAL ≈ $${fmtUsd(totalUsd)} (geschätzt)${suffix}`);
+    const suffix = anyUnknown ? " — excludes models with unknown price (see above)" : "";
+    fragment.push(`TOTAL ≈ $${fmtUsd(totalUsd)} (estimated)${suffix}`);
   } else {
-    fragment.push("TOTAL: n/a (kein Modell mit bekanntem Preis)");
+    fragment.push("TOTAL: n/a (no model with known price)");
   }
   fragment.push("");
   fragment.push(
-    `Besonderheiten: $-Werte geschätzt, Preistabelle asOf ${prices.asOf ?? "n/a"} (${path.basename(pricesPath)}); Cache-TTL je Modell aus dem Transkript übernommen (ephemeral_5m/1h) wo vorhanden, sonst 5m-Satz angenommen (deklarierte Annahme${undeterminedTotal > 0 ? `, ${fmtDe(undeterminedTotal)} Cache-Write-Tokens ohne TTL-Angabe` : ""}).`,
+    `Notes: $ values estimated, price table asOf ${prices.asOf ?? "n/a"} (${path.basename(pricesPath)}); cache TTL per model taken from the transcript (ephemeral_5m/1h) where present, otherwise 5m rate assumed (declared assumption${undeterminedTotal > 0 ? `, ${fmtDe(undeterminedTotal)} cache-write tokens without TTL data` : ""}).`,
   );
 
   console.log(fragment.join("\n"));

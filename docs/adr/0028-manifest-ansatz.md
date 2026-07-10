@@ -1,8 +1,42 @@
-# ADR-0028: Manifest-Ansatz — `.claude/pipeline.yaml` additiv, in-house YAML-Parser, Agents bleiben im Plugin
+# ADR-0028: Manifest Approach — `.claude/pipeline.yaml` additive, in-house YAML parser, agents stay in the plugin
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR adds an optional, additive `.claude/pipeline.yaml` manifest for declarative pipeline configuration (phases, gates, security thresholds, model routing, profiles, governance) alongside the existing `.claude/pipeline.json` calibration file, which stays byte-identical and untouched — the two files have zero field overlap, and no manifest present means no behavior change. To parse the YAML without adding an npm dependency (preserving the project's zero-dependency invariant), the decision introduces a small in-house, strict block-subset YAML parser that loudly rejects unsupported syntax (anchors, flow syntax, block strings) rather than silently misinterpreting it; validation is fail-open when no manifest exists but fail-closed when a manifest is present and invalid. Agents continue to be distributed via the plugin (`plugins/pipeline-core/agents/`) rather than duplicated into `.claude/agents/`, to avoid re-introducing copy-paste divergence of centrally versioned artifacts. Status: accepted (2026-07-07).
+**Status:** accepted (2026-07-07, PO plan approval "AP1 TUNING") · **Basis:** `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` guiding decisions 1/2/4/7, `docs/operating-model.md` §8, `guardrails/security.md` SEC-04
+
+## Context
+
+The Pipeline has so far configured projects exclusively via `.claude/pipeline.json` (calibration layer, `docs/operating-model.md` §8: project, verify command, autonomy, WIP limit, worktree mode, etc.). The AP1 mandate calls for additional, declarative control over phases, gates, security thresholds, model routing, profiles, and governance paths — without touching any of the three already-live project calibrations (`pipeline.json`) and without introducing an npm dependency for YAML parsing (zero-dependency invariant, [SEC-04](../../guardrails/security.md)).
+
+## Decision
+
+1. **`.claude/pipeline.yaml` ADDITIVE** alongside `.claude/pipeline.json`: calibration (`pipeline.json`) stays byte-identical and untouched — a confirmed field comparison (`plugins/pipeline-core/lib/manifest.mjs` header comment) shows zero overlap between `pipeline.json` fields (project/verify/handover/autonomy/branchModel/verification/wipLimit/worktree/claudeMdMaxLines/stakes/constraints/ritualExtensions — calibration concerns) and manifest fields (schema/phases/gates/security/modelRouting/profiles/governance/flags — declarative pipeline-shape concerns). No manifest present → behavior byte-identical to today (pure opt-in).
+2. **In-house YAML parser** `yaml-lite.mjs`: a strict block-subset parser (maps/lists/scalars/comments; anchors, `|` block strings, and flow syntax are loudly rejected rather than silently misinterpreted) — preserves the zero-npm-dependency invariant ([SEC-04](../../guardrails/security.md), auditability) for a small, actually-needed grammar. Three-stage validation pipeline: (a) YAML parse (`yaml-lite.mjs`), (b) structural validation against `pipeline-manifest.schema.json` (`schema-lite.mjs`, schema ID `pipeline.manifest.v0`), (c) semantic checks that a plain JSON schema can't express (e.g. `profiles.active` must name a declared profile, `phases[].name` must be unique).
+3. **Fail-open as anti-brick default** (mirrors `guard-testpath.mjs`): no manifest present → no-op, behavior stays as today. Fail-closed ONLY when a manifest IS present but invalid (validation step returns `exit 2`, German error message "Field X: expected …, got …"), and in gate checks running in `blocking` mode (see [ADR-0027](0027-gate-philosophie.md)).
+4. **Tiny condition grammar** for conditional phases: `always|never|<flag>|!<flag>` — deliberately not a full expression parser; covers the one case actually needed (conditional UI-design phase via `flags.has_ui`).
+5. **Agents stay in the plugin** (`plugins/pipeline-core/agents/`), NOT under `.claude/agents/` — a deliberate, openly documented deviation from the original PO mandate wording. Rationale (E1): the plugin IS the central, versioned distribution channel; projects get new/updated agents automatically via the existing plugin binding instead of via an additional, project-locally maintained copy under `.claude/agents/`. A `.claude/agents/` copy would repeat exactly the anti-pattern AP1 is meant to dissolve (copy-paste divergence of central artifacts, `docs/operating-model.md` §1).
+
+## Consequences
+
+**Positive:** a new, declarative control layer with no risk to the three live project calibrations; no new supply-chain dependency (slopsquatting surface stays at zero, [SEC-04](../../guardrails/security.md)); plugin distribution of agents stays consistent with the already-established distribution principle (E1, [ADR-0001](0001-verteilung-plugin-marketplace.md)).
+
+**Negative:** an additional, self-maintained YAML parser instead of a standard library — maintenance burden stays with the repo; the deliberately small grammar produces loud errors for any YAML feature outside the block subset (anchors, flow syntax, block strings), constraining manifest authors.
+
+**Risk:** the "agents in the plugin instead of `.claude/agents/`" deviation could be misread as non-fulfillment of the original mandate wording if left undocumented — hence it is named explicitly here rather than implemented silently.
+
+## Rejected alternatives
+
+- **YAML standard library as an npm dependency** — rejected; breaks the zero-dependency invariant ([SEC-04](../../guardrails/security.md)) and opens a new slopsquatting/supply-chain surface for an actually small grammar need.
+- **Fold manifest fields into `pipeline.json` instead of additive** — rejected; would have invasively touched the three live project calibrations and blurred the established schema (calibration ≠ declarative pipeline shape).
+- **`.claude/agents/` copy as originally mandated** — rejected; repeats anti-pattern AP1 (copy-paste divergence), see rationale above.
+
+## Follow-up
+
+None. Grammar scope is extended on demand (new YAML use case arises), not preemptively.
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0028: Manifest-Ansatz — `.claude/pipeline.yaml` additiv, in-house YAML-Parser, Agents bleiben im Plugin
 
 > Agent-Pipeline v0.1.0-draft · AP1-Tuning-Session · Stand 2026-07-07
 

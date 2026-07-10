@@ -3,8 +3,8 @@
 PROMPT TEMPLATE: Goldfish task briefing (6 mandatory fields) — Agent-Pipeline
 v0.1.0-draft · Sprint 0 Phase 3 · 2026-07-03
 Source of truth: docs/operating-model.md §2.3 — the canonical briefing field
-list (German). The six fields below carry the original German field names in
-parentheses; on any divergence the German §2.3 text is authoritative.
+list. The six fields below are: Goal, Context files, DoD checks, Forbidden,
+Stop conditions, and Dispatch metadata (per operating-model.md §2.3).
 Also: harness/session-bootstrap.md §6.2 (Goldfish bootstrap), model-policy
 MP-02/MP-05 (model/effort, escalation justification), the no-memory rule and the
 two-failed-attempts rule.
@@ -18,7 +18,7 @@ USAGE (Elephant)
 3. Dispatch as subagent (default: the implement-tier model, effort high–max per MP-02).
    Deviation from the role default REQUIRES the model justification in field 6.
 4. Writing tasks: worktree per project calibration (`.claude/pipeline.json`).
-5. Light profile (stage-0 / uniform-mechanic ONLY): set field 6 `Profil: light` for a
+5. Light profile (stage-0 / uniform-mechanic ONLY): set field 6 `Profile: light` for a
    condensed 3-field report, effort `xhigh`, reference-inlining, no baseline verify. Use
    the standard profile (6-field report, full references) for class-high / guardrail work.
 6. Briefing language is English (ADR-0011) — confirm before dispatch; this is a
@@ -37,10 +37,10 @@ state files or session history — the briefing replaces them (bootstrap §6.2).
 If anything is unclear or contradictory: trigger a stop condition (field 5) and
 report — never guess.
 
-First output line (compact bootstrap confirmation, verbatim German format,
+First output line (compact bootstrap confirmation, verbatim canonical format,
 with the ruleset SHA from field 6):
 
-> Bootstrap-Check bestanden: Regelwerk {{RULESET_SHA}} geladen · Projekt {{PROJECT_NAME}} · Kalibrierung {{CALIBRATION_FILE default: .claude/pipeline.json}} · Stand Briefing {{TASK_ID}}/{{DATE}} · Rolle Goldfish
+> Bootstrap check passed: ruleset {{RULESET_SHA}} loaded · Project {{PROJECT_NAME}} · Calibration {{CALIBRATION_FILE default: .claude/pipeline.json}} · State briefing {{TASK_ID}}/{{DATE}} · Role Goldfish
 
 If this briefing lacks the ruleset SHA, that is a briefing defect: stop and
 report back to the Elephant — do not research it yourself.
@@ -49,13 +49,13 @@ report back to the Elephant — do not research it yourself.
 
 ## Briefing {{TASK_ID}}: {{SHORT_TITLE}}
 
-### 1. Goal (Ziel)
+### 1. Goal
 
 {{OUTCOME, not a step list — one observable end-state criterion. Example: "The
 export endpoint streams CSV for datasets > 100k rows without OOM; AC-1..AC-3 of
 the spec pass."}}
 
-### 2. Context files (Kontext-Dateien)
+### 2. Context files
 
 Explicit, exhaustive list — spec/delta-spec FIRST. Read these; nothing else is
 assumed known. Chat history is never inherited. If prior commits are part of
@@ -69,7 +69,7 @@ can silently include an extra commit that slipped in between.
 
 For a `light`-profile dispatch (field 6): inline the 3–5 governing rule snippets VERBATIM here instead of pointing at large canon files (reference-inlining, speed) — the goldfish should not need to re-read canon for context.
 
-### 3. DoD checks (DoD-Checks)
+### 3. DoD checks
 
 Fixed BEFORE this run — they are the contract, not negotiable during the run.
 
@@ -84,7 +84,7 @@ Fixed BEFORE this run — they are the contract, not negotiable during the run.
   relative form is the fixture-blindness failure class.
 - {{ADDITIONAL_CHECKS or delete this line}}
 
-### 4. Forbidden (Verbote)
+### 4. Forbidden
 
 - Scope: touch ONLY the files enumerated in the spec's Detailed Implementation
   ({{FILE_LIST_REF}}); any other file is out of scope.
@@ -98,7 +98,7 @@ Fixed BEFORE this run — they are the contract, not negotiable during the run.
 - {{ACCOUNTING_ATTRIBUTION: if this briefing touches booking/accounting/financial data, require an explicit attribution/source line for every evidence entry the goldfish produces — the source of each figure/label, never a goldfish-invented label (e.g. an ad hoc session name not present in the source data); keep booking facts and delivery evidence in visibly separate fields, never merged into one prose line — else delete this line (an inline accounting briefing has let a goldfish invent an ad-hoc session label inside an evidence line).}}
 - {{TASK_SPECIFIC_PROHIBITIONS or delete}}
 
-### 5. Stop conditions (Stop-Bedingungen)
+### 5. Stop conditions
 
 Stop and report (do not keep iterating) when ANY of these occurs:
 
@@ -116,7 +116,7 @@ Stop and report (do not keep iterating) when ANY of these occurs:
   not an acceptable stop.
 - {{TASK_SPECIFIC_STOPS or delete}}
 
-### 6. Dispatch metadata (Dispatch-Metadaten)
+### 6. Dispatch metadata
 
 - Ruleset SHA/version (always, from the Elephant's bootstrap): `{{RULESET_SHA}}`
   — echo it in your confirmation line.
@@ -124,7 +124,7 @@ Stop and report (do not keep iterating) when ANY of these occurs:
 - Model justification (ONLY if deviating from the Goldfish default, MP-05):
   {{MODEL_JUSTIFICATION e.g. ">15 files across two subsystems → the design-tier model per MP-05 criterion 1" or "n/a — role default"}}
 - Worktree: {{WORKTREE e.g. "yes — per calibration `worktree: on-write`" or "no — read-only task"}}
-- Profil: {{standard | light}} — `light` ONLY for stage-0 / uniform-mechanical tasks (operating-model §3.3): condensed 3-field report (see below), effort `xhigh` (`high` only if trivial-uniform), skip the pre-edit baseline verify. Never `light` for class-high / guardrail work.
+- Profile: {{standard | light}} — `light` ONLY for stage-0 / uniform-mechanical tasks (operating-model §3.3): condensed 3-field report (see below), effort `xhigh` (`high` only if trivial-uniform), skip the pre-edit baseline verify. Never `light` for class-high / guardrail work.
 - **Tool budget (hard cap, first-class field):** {{TOOL_BUDGET default: "≤45 tool uses"}}. This is a mandatory field in EVERY goldfish briefing, not just workflow-agent dispatches. Approaching or reaching the cap is a stop condition (field 5): stop cleanly and report what is done + what remains — never "push through" past it. **Honesty note:** this is a briefing/behavior rule, not a hook-enforced count — no automated per-subagent tool-call counter exists (yet); documented as such rather than overclaimed as "will be blocked" (the G1 lesson, `policies/tooling-policy.md` AP-T2).
 - **Dispatch record (standard evidence):** write `dispatch-record.json` next to your evidence artifact with fields `taskId`, `model`, `rulesetSha`, `dispatcher`, `outcome` — this template is the authoritative definition of that file's shape. Together with the `Dispatch: {{TASK_ID}} (goldfish)` commit-trailer line (see Final report below), it is the deterministic authorship/evidence pair for close step 6b and the Critic — standard harness trailers (`Co-Authored-By:`, `Claude-Session:`) alone are not authorship evidence.
 - **Report-early duty (truncated-final mitigation):** for packages expected to
@@ -155,7 +155,7 @@ Use this module when dispatching a bugfix (not for new features or mini-edits). 
 
 **For write tasks: commit BEFORE writing this report** — reference your commit SHA in the sections below; this ordering is what keeps finals from truncating mid-report (evidence: 0 truncated finals since the pattern is in use, vs. 4 incidents at 2–5 min resume cost before). Every goldfish commit message CONTAINS the trailer line `Dispatch: <agent-tier> <task> @ <ruleset-sha>` (e.g. `Dispatch: goldfish-deep DISP @ a1b2c3d`) in its trailer block — alongside, not replacing, the harness-standard closing lines such as `Co-Authored-By:`/`Claude-Session:`, which keep the final position; this trailer is the deterministic authorship evidence for close step 6b and the Critic. Note: `Co-Authored-By:` model lines are session-level harness artifacts, NOT model/authorship attestations. **Staging+commit is ONE bundled act:** `git add -- <exact paths> && git commit -- <same paths>` in a single shell call; NEVER `git add -A` or `git add .` — in a shared working tree, staging and committing as separate acts (or a wildcard add) lets another parallel goldfish's files or message ride along on your commit (shared-index race). **The trailer block is the LAST paragraph of the commit message** — separated from the body by exactly ONE blank line (that blank line is git's REQUIRED separator; do not omit it), with NO blank line between the trailer lines themselves: `Dispatch:`, `Co-Authored-By:`, `Claude-Session:` sit as consecutive lines. A blank line INSIDE the trailer block (between trailer lines) is what makes git's trailer parser see nothing, silently breaking machine-parseable authorship.
 
-*Light-profile dispatch (`Profil: light`, field 6)? Use the condensed 3-field variant instead: (1) DoD + evidence, (2) changed files, (3) deviations & open items — target ≤ 600 tokens (`roles/goldfish.md` §6). The evidence duty (GF-08) and stop-condition honesty (GF-07) are never trimmed.*
+*Light-profile dispatch (`Profile: light`, field 6)? Use the condensed 3-field variant instead: (1) DoD + evidence, (2) changed files, (3) deviations & open items — target ≤ 600 tokens (`roles/goldfish.md` §6). The evidence duty (GF-08) and stop-condition honesty (GF-07) are never trimmed.*
 
 Evidence throughout is POINTERS ONLY — exact command + exit code + artifact path / commit SHA — never inline logs or full file dumps; full detail lives in the committed artifacts and is provided only on explicit Elephant request.
 

@@ -17,16 +17,16 @@
 - [ ] Merge-completion gate: post-merge handover update done (deterministic check)
 - [ ] CLAUDE.md length gate green: ≤ {{CLAUDE_MD_MAX_LINES}} — growing means consolidating, moving to skills/hooks, or deleting
 - [ ] Memory is mirror only — contradictions corrected in favor of the repo
-- [ ] Authorship check (sub-step 6b — before Learn + measure): session's production diffs enumerated (`git log`/diff stat over the session range); mandatory question answered — „Von wem stammen die Produktions-Diffs dieser Session?" — every diff maps to a Goldfish/Critic dispatch or the OM §3.3 stage-0 fast path; Elephant-authored diff outside stage-0 → INCIDENT (flag to the PO, note in handover + telemetry), never a retro discussion point
+- [ ] Authorship check (sub-step 6b — before Learn + measure): session's production diffs enumerated (`git log`/diff stat over the session range); mandatory question answered — "Whose are this session's production diffs?" — every diff maps to a Goldfish/Critic dispatch or the OM §3.3 stage-0 fast path; Elephant-authored diff outside stage-0 → INCIDENT (flag to the PO, note in handover + telemetry), never a retro discussion point
 
 ## Learn + measure
 
-- [ ] Self-retro filed (supersedes the former the PO retro question + deferred-retro placeholder): session elephant writes the close retro itself — concrete improvement item(s) or explicit "nothing" — as a `workflow-improvement` backlog item / transfer note to the pipeline elephant (KVP); never silently skipped. the PO's observations go via his own channel, no ritual prompt.
+- [ ] Self-retro filed (supersedes the former the PO retro question + deferred-retro placeholder): session elephant writes the close retro itself — concrete improvement item(s) or explicit "nothing" — as a `workflow-improvement` backlog item / transfer note to the pipeline elephant (continuous-improvement process); never silently skipped. the PO's observations go via his own channel, no ritual prompt.
 - [ ] Tooling radar due? Newest `tooling-radar` backlog item vs. current calendar month — overdue → report loudly + recommend a radar dispatch (tooling-policy R2; anchored in close-block step 7)
 - [ ] `workflow-improvement` items filed in the pipeline repo's `backlog/`
 - [ ] Agent failure traced to a missing/vague rule → rule added/sharpened in the right artifact (growth rule, OM §7)
 - [ ] Three-artifacts archive for rigor ≥ 1: spec · acceptance criteria · result report (never full chat logs)
-- [ ] `/usage`: ONE optional paste request before session end (mandatory manual paste rejected by the PO; declined/absent → „nicht erhoben" is a valid outcome; automated capture is tracked as a backlog item); telemetry line appended to `telemetry/costs.md` incl. first-pass + interventions per goldfish + limit standings when available (MP-20)
+- [ ] `/usage`: ONE optional paste request before session end (mandatory manual paste rejected by the PO; declined/absent → "not collected" is a valid outcome; automated capture is tracked as a backlog item); telemetry line appended to `telemetry/costs.md` incl. first-pass + interventions per goldfish + limit standings when available (MP-20)
 - [ ] Rigor-0 lessons may be bundled into one collective entry (OM §3.3)
 
 ## Hygiene + handover to the next session

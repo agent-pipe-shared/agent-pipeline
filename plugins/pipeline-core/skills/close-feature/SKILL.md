@@ -39,7 +39,7 @@ node harness/scripts/pipeline-state.mjs close-feature --by "<name>"
 
 This is the ONLY sanctioned writer for this transition (see the header doc in
 `harness/scripts/pipeline-state.mjs` for the full contract). No `activeFeature` present -> the CLI
-refuses (German error, exit 2, nothing written) -- report that back rather than working around it.
+refuses (error, exit 2, nothing written) -- report that back rather than working around it.
 A `git rev-parse HEAD` failure during this step is NOT fatal (deliberate deviation from
 `approve-push`, documented in that file's header): the close still completes with `forCommit: null`.
 

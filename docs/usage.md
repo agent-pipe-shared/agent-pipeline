@@ -3,10 +3,9 @@
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
 You've run `node setup.mjs`, bound the plugin, and opened a session (if not, start
-with [`SETUP.md`](../SETUP.md)). This is what an ordinary working session looks like
-from the inside: one intent in, reviewed and committed work out. Most of the
-machinery runs without you — the few moments that need a human are called out
-explicitly.
+with [`SETUP.md`](../SETUP.md)). This is what an ordinary working session looks like:
+one intent in, reviewed and committed work out. Most of the machinery runs without
+you — the few moments that need a human are called out explicitly.
 
 ## The shape of a session
 
@@ -24,95 +23,89 @@ The rest of this page walks each step with the exact commands you touch.
 
 ## 1. Start a session
 
-Open Claude Code in your project. At session start a `SessionStart` hook surfaces a
-reminder line — *run `/pipeline-core:pipeline-start` before any work* (plus an upgrade
-notice if your installed plugin is behind the marketplace remote). The reminder itself
-checks nothing; you run `/pipeline-core:pipeline-start`, and that skill performs the
-bootstrap (re-run it by hand after a `/clear` or a plugin refresh). It verifies that
-the ruleset is loaded and matches the marketplace remote, that your
-`.claude/pipeline.json` calibration is present, that the handover file is current, and
-that the verify gate is runnable. It then asks you **one** question — which
-cost/quality profile this session should run in — and shows you the exact `/model` and
-`/effort` commands to paste for that profile.
+Open Claude Code in your project. A `SessionStart` hook reminds you to run
+`/pipeline-core:pipeline-start` before any work (plus an upgrade notice if your
+plugin is behind the marketplace remote). The reminder itself checks nothing — the
+skill does the actual bootstrap (re-run it by hand after `/clear` or a plugin
+refresh). It verifies: the ruleset is loaded and matches the marketplace remote,
+`.claude/pipeline.json` calibration is present, the handover file is current, and the
+verify gate is runnable. It then asks **one** question — which cost/quality profile
+this session runs in — and gives you the exact `/model`/`/effort` commands to paste.
 
-Nothing starts until the check prints its confirmation line. That line is the
-auditable proof the session was bootstrapped; a session without it counts as not
-bootstrapped. If the ruleset is stale or the calibration is missing, the check says
-so and names the fix instead of quietly proceeding.
+Nothing starts until the check prints its confirmation line — the auditable proof the
+session was bootstrapped; a session without it counts as not bootstrapped. A stale
+ruleset or missing calibration is reported with the fix, not silently passed over.
 
 ## 2. Say what you want
 
 Give the Elephant your intent in plain language — "add rate limiting to the public
-API", not a task breakdown. The Elephant is the long-lived orchestrator: where the
-intent is ambiguous it interviews you (and it's built to push back, not just agree),
-then turns the result into a **spec with checkable acceptance criteria**. Nothing is
-"done" on a feeling — every task gets a Definition of Done that a script or a person
-can actually verify.
+API", not a task breakdown. The Elephant (the long-lived orchestrator) interviews you
+where the intent is ambiguous — and is built to push back, not just agree — then
+turns the result into a **spec with checkable acceptance criteria**: every task gets
+a Definition of Done a script or person can actually verify, never a feeling of done.
 
-This is the **no-code phase**: no implementation happens until the spec exists. For
-anything beyond a trivial fix, the spec first goes through a **readiness check** — a
-fresh, read-only subagent reads only the spec and asks, "could someone implement
-this correctly from the document alone?" Gaps go back into the document before a
-line of code is written.
+This is the **no-code phase** — no implementation before the spec exists. Beyond a
+trivial fix, the spec first goes through a **readiness check**: a fresh, read-only
+subagent reads only the spec and asks "could someone implement this correctly from
+the document alone?" Gaps go back into the document before any code is written.
 
 ## 3. Approve the plan — your gate
 
-Before the first implementation task, the Elephant brings you the plan: a short,
-readable product rationale (what, why, scope, non-goals, risks) — delivered to you,
-not left as a file path to go find. It then waits for your explicit approval and
-dispatches nothing until it arrives.
+Before the first implementation task, the Elephant brings you the plan — a short,
+readable product rationale (what, why, scope, non-goals, risks), delivered to you,
+not left as a file path to find — and waits for your explicit approval; nothing
+dispatches until it arrives.
 
-This is the human gate that matters most. It's a hold on the *designed plan*, before
-any expensive (mis-)implementation — the cheapest place to catch a wrong direction.
-Approve it, ask for a change, or reject it; the Elephant acts only on a clear
-go-ahead.
+This is the human gate that matters most: a hold on the *designed plan*, before any
+expensive (mis-)implementation, the cheapest place to catch a wrong direction.
+Approve, request a change, or reject — the Elephant acts only on a clear go-ahead.
 
 ## 4. Watch it run
 
-Once you've approved, the Elephant decomposes the work into small, independent tasks
-and dispatches a **Goldfish** for each — a fresh-context subagent that gets exactly
-one task through a self-contained briefing (goal, context files, done-checks,
-prohibitions, stop conditions). A Goldfish never inherits chat history and is never
-micromanaged step by step; independent tasks run in parallel (typically a handful at
-once, on disjoint files or isolated worktrees).
+Once approved, the Elephant decomposes the work into small, independent tasks and
+dispatches a **Goldfish** per task — a fresh-context subagent that gets exactly one
+task via a self-contained briefing (goal, context files, done-checks, prohibitions,
+stop conditions). A Goldfish never inherits chat history and is never micromanaged
+step by step; independent tasks run in parallel (typically a handful at once, on
+disjoint files or isolated worktrees).
 
 Each result runs the **two-stage review**:
 
 - **Deterministic gates first** — format, lint, typecheck, tests, build (and an
-  optional security scan) run *before* any model judgment. A Goldfish's "done" means
-  a machine-written log, the exact command, and its exit code — never a claim that
+  optional security scan) run *before* any model judgment. "Done" for a Goldfish
+  means a machine-written log, the exact command, and its exit code — never a claim
   something "should work." Red gates bounce back to a fresh attempt.
 - **Then a Critic** — an independent, read-only reviewer with a fresh context. It
   sees the spec, the diff, the guardrails, and the evidence — never the chat history
-  or the implementor's reasoning. It hunts hard, then reports only findings it can
-  anchor to evidence and a spec rule. "No findings" is a valid, common result.
+  or the implementor's reasoning. It hunts hard, then reports only findings anchored
+  to evidence and a spec rule. "No findings" is a valid, common result.
 
-The Elephant takes the Critic's findings and makes the call: merge, or rework.
-Rework is a *new* dispatch with a sharper briefing, never continued work in the
-context that already went wrong — capped at two cycles before it comes to you.
+The Elephant takes the Critic's findings and decides: merge, or rework. Rework is a
+*new* dispatch with a sharper briefing, never continued work in the context that
+already went wrong — capped at **two cycles** before it comes to you.
 
 Throughout, the git guardrails hold regardless of what any agent asks for: no
 force-push, no history rewrite, no deleted protected branches, no skipped hooks.
 Commits are conventional and atomic; `/pipeline-core:conventional-commit` proposes a
-message from your staged diff, but never commits for you.
+message from your staged diff but never commits for you.
 
 ## 5. Decide the exceptions
 
-You are not in the loop for every task — by design. The Elephant pulls you back in
-only for the judgment classes that can't be delegated: a blocker, more than two
-rework cycles on one task, anything irreversible or externally visible or costly, or
-a spec-versus-reality conflict. High-stakes work (live systems, architecture or
-guardrail changes) also gets a **human sign-off** on the finished result — the work
-can merge and sit at a "🟡 awaiting your verification" status without blocking the
-rest, but it isn't "done" until you accept it.
+You're not in the loop for every task — by design. The Elephant pulls you back in
+only for judgment that can't be delegated: a blocker, more than **two rework cycles**
+on one task, anything irreversible/externally visible/costly, or a
+spec-versus-reality conflict. High-stakes work (live systems, architecture or
+guardrail changes) also gets a **human sign-off** on the finished result — it can
+merge and sit at "🟡 awaiting your verification" without blocking the rest, but isn't
+"done" until you accept it.
 
 Communication is outcome-first: findings, gates, incidents, results — not a
 play-by-play of every dispatch.
 
 ## 6. Close the session
 
-When the block is done, you run **`/pipeline-core:close-block`**. The close ritual is
-where the session's truth gets persisted. It:
+When the block is done, run **`/pipeline-core:close-block`**. The close ritual
+persists the session's truth. It:
 
 - runs the verify gate one last time and records the machine evidence;
 - runs the drift checks — handover freshness, CLAUDE.md length, stale worktrees;
@@ -157,6 +150,8 @@ the pipeline's job, not yours.
   way.
 
 ---
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
 # Nutzung — ein Tag in der Pipeline
 

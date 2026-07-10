@@ -1,8 +1,53 @@
-# ADR-0030: Governance-Layer — advisory Guidelines vs. enforcing Policies, Hierarchie Repo > User > Managed
+# ADR-0030: Governance Layer — advisory Guidelines vs. enforcing Policies, hierarchy Repo > User > Managed
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR establishes a governance layer for projects that adopt this pipeline, splitting it into two strictly separated categories: advisory "guidelines" (numbered principles like layering or naming, from which deviations are allowed if justified in the plan artifact) and enforcing "policies" (machine-checkable via security-scan rules and license allowlists, plus a human-reviewed checklist, both of which block the relevant gate on violation). It also fixes a precedence hierarchy mirroring Claude Code's own settings model — repo governance overrides user-level preferences, and both sit below an org's managed settings, which this repo itself does not ship. Only generic, fictional example fixtures live in `governance/examples/**` here; real organizational policies are explicitly out of scope for this repo and deferred to a later adoption phase (AP2).
+> Agent-Pipeline v0.1.0-draft · AP1 tuning session · as of 2026-07-07
+
+**Status:** accepted (2026-07-07, PO plan approval "AP1 TUNING") · **Basis:** `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` package P6, `governance/examples/README.md`
+
+## Context
+
+The pipeline is increasingly oriented toward being handed off to third parties (AP1 context). An adopting project/organization needs a place for its own conventions (style guides, naming conventions) AND for binding, partly machine-checkable rules (license allowlists, security policies) — both clearly separated from the pipeline's own infrastructure (`guardrails/*`, `harness/checklists/*`), which continues to govern exclusively HOW the pipeline itself works, not what a hosted project must fulfill.
+
+## Decision
+
+**Two governance categories**, strictly separated (`governance/examples/README.md`):
+
+1. **Guidelines (advisory)** — `governance/…/guidelines/`: numbered principles (layering, naming, error handling, etc.). Deviations are ALLOWED but must be named and justified in the plan artifact — a guideline never blocks a gate by itself. Automatically loaded into the Elephant/Critic context (`pipeline-start`/`critic-review` skills consume the manifest path `governance.guidelines_path`).
+2. **Policies (enforcing)** — `governance/…/policies/`: machine-checkable (semgrep rules via `rules_dir`, license allowlist `license-allowlist.json` against `third-party-licenses.json`) AND human-reviewed, but binding (`checklist.md`). A policy violation blocks: for machine-checkable policies the automated security-scan gate fails ([ADR-0027](0027-gate-philosophie.md)); for the non-machine-checkable checklist, the Critic checks off EVERY item BEFORE the push gate is reached — any item marked "NOT MET" is a blocking finding.
+
+**Hierarchy** (mirrors Claude Code's own settings precedence):
+
+1. **Repo** — the project's own `governance/…` directories (or wherever `.claude/pipeline.yaml` points) are the project-specific layer; they override the user level.
+2. **User** (`~/.claude/`) — personal preferences apply only where the repo level is silent.
+3. **Managed Settings** (Enterprise) — a centrally administered layer that sits ABOVE both Repo and User and cannot be overridden by either — the organization's non-negotiable floor (data protection, license law, security baseline). This repo itself ships NO managed-settings layer — that is a deployment-time concern of the adopting organization.
+
+**Only generic examples in this repo:** exclusively `governance/examples/**` (fictional fixtures: example guidelines, `license-allowlist.json`, `third-party-licenses.example.json`, `semgrep/example-rule.yml`, `checklist.md`) are shipped — real organizational policies of an actually adopting organization stay OUTSIDE this repo (AP2 subject, not part of this session).
+
+**Boundary (dedup-confirmed, `governance/examples/README.md`):** `harness/checklists/*` and `guardrails/*` remain the pipeline's OWN infrastructure (how the pipeline itself works); `governance/examples/**` is the THIRD, independent layer — project-owned governance that a hosted project defines and the pipeline consumes. No mixing of the three layers.
+
+## Consequences
+
+**Positive:** An adopting project gets a clear, generic starting point (copy the directory, delete the example fixtures, enter its own guidelines/policies) without touching the pipeline's own infrastructure; the advisory/enforcing split prevents style questions from accidentally becoming blockers, or conversely binding rules being misread as mere recommendations.
+
+**Negative:** One more consumption path in `pipeline-start`/`critic-review` (governance paths as a required input); the non-machine-checkable checklist still relies on Critic diligence — no technical enforcement that every item is actually checked.
+
+**Risk:** A real organization could accidentally enter real policy content into `governance/examples/` instead of into its own project-specific copy. Mitigation: the naming convention (`examples/`) and the README warning make the fixture character explicit; real content is an AP2 subject.
+
+## Rejected alternatives
+
+- **A single governance category without an advisory/enforcing split** — rejected; blurs exactly the distinction between "should" and "must" that QG-06 (binary gates) already requires at the technical level.
+- **Placing governance content directly in `guardrails/*`** — rejected; mixes the pipeline's own infrastructure with project-specific third-party content (dedup principle, see above).
+- **Onboarding real organizational policies already in this session** — rejected (out of scope); AP2 is the explicitly designated place for that.
+
+## Status / follow-up
+
+AP2 — integration of real, project-specific governance content for an actually adopting organization.
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0030: Governance-Layer — advisory Guidelines vs. enforcing Policies, Hierarchie Repo > User > Managed
 
 > Agent-Pipeline v0.1.0-draft · AP1-Tuning-Session · Stand 2026-07-07
 

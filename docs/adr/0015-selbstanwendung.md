@@ -1,8 +1,44 @@
-# ADR-0015: Selbstanwendung der Pipeline auf das Pipeline-Repo
+# ADR-0015: Self-Application of the Pipeline to the Pipeline Repo
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR decides that the Pipeline's own operating model applies to the Pipeline repository itself — there is no separate, lighter ruleset for building the Pipeline versus the projects it governs. Checkpoint deliverables in this repo must pass independent Critic review (fresh context, structured findings) before the PO gate, exactly as required of hosted projects. Rationale: self-application ("dogfooding") is the only risk-free proving ground for the Pipeline's mechanisms before rollout — Checkpoint 1 already found 5 major issues via three independent Critic reviews, fixed before the PO gate. Status: accepted (2026-07-03).
+> Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · as of 2026-07-03
+
+**Status:** accepted (2026-07-03, Checkpoint 1) · **Basis:** Register E13, PO decision
+
+## Context
+
+The Pipeline requires independent review, evidence, and versioned handovers from the projects it governs — that is only credible and tested if the Pipeline repo itself works the same way. Already practiced at Checkpoint 1: three independent Critics (fresh context, Fable 5/max) found 5 major findings and 0 blockers; immediate fixes and conditions A1–A13 were produced BEFORE the PO gate.
+
+## Decision (E13, verbatim)
+
+> Self-application: the Pipeline's own working method applies to this repo; checkpoint deliverables go through Critic review before the PO gate
+
+Clarifications:
+
+- The Critic contract ([ADR-0014](0014-critic-kontrakt.md)) applies to this repo's checkpoint deliverables; as architecture-/guardrail-critical, these reviews run on Fable 5/max ([ADR-0006](0006-modell-effort-policy.md)).
+- Session hygiene/lifecycle ([ADR-0009](0009-session-hygiene-lifecycle.md)) and the languages policy ([ADR-0011](0011-sprachen-policy.md)) apply here exactly as in any project.
+- Handover canonicity ([ADR-0012](0012-handover-kanonisierung.md)) concretely means: `state.md` is THE handover file of this repo; the drift check also applies to Pipeline artifacts (Critic finding L3-05).
+
+## Consequences
+
+**Positive:** Dogfooding is the only risk-free proving ground before rollout — Checkpoint 1 demonstrates the effect (major findings fixed before they calcify into ADRs); PO gates receive pre-filtered, evidence-based submissions.
+
+**Negative:** Overhead within the Pipeline repo itself (reviews, condition management) — accepted deliberately.
+
+**Risk:** Self-review theater if the Critic sits too close to the Elephant session. Mitigation: fresh context is mandatory, never chat history as input ([ADR-0014](0014-critic-kontrakt.md)); read-only; structured findings list with documented disposition per finding.
+
+## Rejected alternatives
+
+- **Pipeline repo as an exception ("the cobbler's children go barefoot")** — undermines the credibility of every rule and forfeits the only risk-free test run of the Pipeline's own mechanisms before deployment in the projects.
+
+## Status / follow-up
+
+None pending. DoD check of self-application: Phase 5 (Retro).
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0015: Selbstanwendung der Pipeline auf das Pipeline-Repo
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 

@@ -1,8 +1,61 @@
-# ADR-0031: Modell-Routing im Manifest — maschinenlesbare Projektion, `model-policy.md` bleibt kanonisch
+# ADR-0031: Model Routing in the Manifest — Machine-Readable Projection, `model-policy.md` Stays Canonical
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR decides that the `modelRouting` block introduced in `.claude/pipeline.yaml` is a machine-readable *projection* of the existing model/effort policy, not a second, competing source of truth — `policies/model-policy.md` (and ADR-0006) remains canonical whenever the two conflict. Rationale: without this clarification, the new manifest block risked violating the "single source of truth" principle (Anti-Pattern AP1) by letting tooling read model/effort assignments straight from the manifest instead of the policy file. Status: accepted 2026-07-07; the tradeoff accepted is a manual sync burden between the manifest and the policy file, flagged for review alongside the next model-policy pricing review (2026-08-31).
+> Agent-Pipeline v0.1.0-draft · AP1 tuning session · as of 2026-07-07
+
+**Status:** accepted (2026-07-07, PO plan approval "AP1 TUNING") · **Basis:** `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` packages P2/P7, [ADR-0006](0006-modell-effort-policy.md), `policies/model-policy.md`
+
+## Context
+
+`.claude/pipeline.yaml` ([ADR-0028](0028-manifest-ansatz.md)) introduces a `modelRouting` block (role → model/effort) that, at first glance, could look like a second source for model/effort decisions alongside `policies/model-policy.md` and [ADR-0006](0006-modell-effort-policy.md) (register E6, revised E16). That would contradict the "ONE source of truth" principle (`docs/operating-model.md`, anti-pattern AP1) — this ADR clarifies that it is not a second source.
+
+## Decision
+
+The manifest block `modelRouting` (`.claude/pipeline.yaml`) is a **machine-readable PROJECTION** of the existing model policy — not an independent, competing decision point. `policies/model-policy.md` remains canonical on any conflict. Example content from this repo:
+
+```yaml
+modelRouting:
+  elephant:
+    model: profile-bound
+    effort: profile-bound
+    note: "MP-01/E26 — Profile Fable Advisor (Cost/Quality) default"
+  goldfish:
+    model: sonnet-5
+    effort: xhigh
+  critic:
+    model: sonnet-5
+    effort: max
+    note: "Fable 5 required for A-G-S (MP-07)"
+```
+
+- **Elephant:** model/effort is profile-bound (`profile-bound`) — the manifest deliberately does NOT encode a fixed value, because the real value depends on the active profile (`advisor`/`design-first`, E26) and possibly on the model-switch point (step 3c, `docs/operating-model.md` §3.2); a fixed manifest value would create drift the moment the profile changes.
+- **Goldfish:** default **Sonnet 5 / `xhigh`** (E22 standard default, [ADR-0022](0022-light-profil-xhigh-default.md); minimum Sonnet 5, no Haiku, E6/[ADR-0006](0006-modell-effort-policy.md)).
+- **Critic:** default **Sonnet 5 / `max`**; Fable 5 escalation for architecture/guardrail/security diffs (A-G-S) per [ADR-0024](0024-critic-stufung-datenbasiert.md)/E24 (data-based revision of the original E12 trigger staffing).
+
+**Relation to [ADR-0006](0006-modell-effort-policy.md):** revision/reference, not a replacement — this ADR does not introduce a new model decision, it only describes how the already register-fixed model policy (E6, revised E16, extended E24/E25) is made visible/machine-readable in the manifest.
+
+## Consequences
+
+**Positive:** tools/hooks that read the manifest can inspect the current model-routing state programmatically (e.g. for future dispatch automation) without having to parse `policies/model-policy.md`; the projection surfaces drift between manifest and policy instead of silently allowing it.
+
+**Negative:** two artifacts (manifest block + `model-policy.md`) must be kept in sync on every model-policy change — a manual maintenance risk, knowingly accepted for the benefit of the machine-readable projection.
+
+**Risk:** a stale `modelRouting` entry in the manifest could be mistakenly read as current policy if `model-policy.md` was revised in the meantime (e.g. at the 2026-08-31 price review, [ADR-0006](0006-modell-effort-policy.md) follow-up). Mitigation: this ADR explicitly names `model-policy.md` as canonical on conflict; a sync check at future model-policy revisions is recommended practice, not an automated enforcement of this delivery.
+
+## Rejected alternatives
+
+- **`modelRouting` as an independent, manifest-authoritative model decision** — rejected; would devalue `policies/model-policy.md` and [ADR-0006](0006-modell-effort-policy.md) as the canonical source and create a second truth (anti-pattern AP1).
+- **No `modelRouting` block in the manifest** — rejected; the AP1 plan (package P2) explicitly requires it as machine-readable visibility, among other things for future automation.
+- **Fixed model/effort values for the Elephant in the manifest** — rejected in favor of `profile-bound`, because a fixed value would contradict the profile logic (E26) as soon as the active profile changes.
+
+## Follow-up
+
+Bundled with the model-policy follow-up (**2026-08-31**, price review, [ADR-0006](0006-modell-effort-policy.md)): sync check between `modelRouting` and `model-policy.md` at that occasion.
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0031: Modell-Routing im Manifest — maschinenlesbare Projektion, `model-policy.md` bleibt kanonisch
 
 > Agent-Pipeline v0.1.0-draft · AP1-Tuning-Session · Stand 2026-07-07
 

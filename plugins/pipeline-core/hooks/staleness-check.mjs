@@ -4,7 +4,7 @@
  * against the marketplace remote HEAD and surfaces a reminder/upgrade notice.
  *
  * Plugin: pipeline-core (Agent-Pipeline). Canon:
- * `harness/session-bootstrap.md` §3 (Verankerung) + §7 (SessionStart-hook OFFEN item).
+ * `harness/session-bootstrap.md` §3 (anchoring) + §7 (SessionStart-hook OPEN item).
  *
  * WHY THIS FILE EXISTS
  *   The bootstrap protocol (`harness/session-bootstrap.md`) needs to know whether the

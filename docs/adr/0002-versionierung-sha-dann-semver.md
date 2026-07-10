@@ -1,8 +1,45 @@
-# ADR-0002: Versionierungsstrategie — SHA-Phase, dann SemVer
+# ADR-0002: Versioning strategy — SHA phase, then SemVer
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR decides that the plugin starts in a SHA-based versioning phase — no `version` field, every commit on `main` propagates immediately to consuming projects — instead of adopting SemVer and Git tags from day one. Rationale: in Sprint 0/1 the pipeline is the least stable artifact in the portfolio, and release ceremony would slow iteration; the SemVer/tag channel pattern (stable/latest) is documented and ready to adopt once stability matters more than iteration speed. Status: accepted (2026-07-03); the switchover trigger is still open (candidates: the v0.1.0 release, or once all consuming projects are on the pipeline in production).
+> Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · as of 2026-07-03
+
+**Status:** accepted (2026-07-03, Checkpoint 1) · **Basis:** Register E2
+
+## Context
+
+Without a `version` field, plugin version resolution falls back to the commit SHA — which is exactly the official recommendation for internal plugins under active development (every commit propagates). SemVer arrives later via Git tags (`claude plugin tag`); two marketplace refs on the same repo give prepared stable/latest channels. In Sprint 0/1 the pipeline is the least stable artifact in the portfolio — release ceremony would slow iteration down.
+
+## Decision (E2, verbatim)
+
+> Versioning: SHA-based initially (every commit propagates), SemVer + tags from the stability phase onward.
+
+Clarification: in the SHA phase, the latest commit on `main` is the distributed state — there is no pin illusion. The switch to SemVer (+ tags, optionally stable/latest channels) happens once stability matters more than iteration speed.
+
+## Consequences
+
+**Positive:**
+
+- Maximum iteration speed; fixes reach all projects without a release step.
+- The switchover is prepared (channel pattern documented), no rework needed.
+
+**Negative / risks:**
+
+- Faulty commits also propagate immediately to both machines; no rollback pin during the SHA phase. Mitigation: self-application — Critic review before merge into the pipeline repo ([ADR-0015](0015-selbstanwendung.md)); the bootstrap displays the consumed SHA ([ADR-0010](0010-session-bootstrap.md)).
+- Migration dossiers (Phase 4) reference concrete states — first tags may need to be set there as reference points.
+
+## Rejected alternatives
+
+- **SemVer from day one** — release overhead in the least stable phase; encourages batched commits instead of small atomic ones.
+- **Permanently SHA without a SemVer perspective** — without tags, no stable reference points for pinning, rollback, and changelog communication.
+
+## Follow-up
+
+Switch to SemVer once stable. OPEN (Phase 5): the concrete switchover criterion — candidates: with the v0.1.0 release after Checkpoint 3, or once all three projects consume in production (Sprint 1 migration complete).
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0002: Versionierungsstrategie — SHA-Phase, dann SemVer
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 

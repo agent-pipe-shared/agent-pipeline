@@ -1,8 +1,45 @@
-# ADR-0009: Session-Hygiene und Session-Lifecycle
+# ADR-0009: Session Hygiene and Session Lifecycle
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR (accepted 2026-07-03) codifies session hygiene for long-running agent ("Elephant") sessions: `/clear` + rename on topic changes, `/compact` only at task boundaries (never as an emergency fix once context is already full), a two-failed-attempts rule to abandon a stuck approach in favor of fresh context, and fixing model/effort choice at session start since both invalidate the cache. It also mandates planned session cuts at task boundaries — updating the handover file and ending the session deliberately, rather than force-compacting — with the successor session re-bootstrapping from that versioned handover file, never from chat history. A 2026-07-06 addendum adds a concrete checkpoint-window rule: at ~100k tokens of context, presenting a `/compact` block becomes mandatory rather than optional, with 100–150k as the target window and >150k flagged as an overdue cut.
+## Context
+
+Cache economics are measurable: model/effort switches and `/compact` invalidate the entire cache — the official rule of thumb is "pick your model and effort level at the top of a session." Abort criteria are mandatory — after more than two failed attempts at the same problem, fresh context is cheaper than further iteration. Marathon sessions mixing topics are a documented anti-pattern from prior experience. A PO follow-up question (2026-07-03) makes session-lifecycle policy a mandatory part of the operating model: every Elephant session must be able to explain how it handles a full context window.
+
+## Decision (E9, verbatim)
+
+> Session hygiene: /clear+/rename on topic change; /compact only at task boundaries; two-failed-attempts rule; fix model+effort at session start
+
+**Additionally canonicalized — session lifecycle policy (PO follow-up):**
+
+- **Planned cut instead of emergency compaction:** Elephant sessions end at task boundaries via a deliberate cut (update handover → end), not via forced `/compact` once context is already full.
+- **Handover-based re-bootstrapping:** the successor session bootstraps from the versioned handover file ([ADR-0012](0012-handover-kanonisierung.md)) via the bootstrap protocol ([ADR-0010](0010-session-bootstrap.md)) — never from chat history.
+- **Goldfish cadence:** token-intensive execution work runs in fresh Goldfish sub-sessions per task; Elephant context stays reserved for orchestration and decisions.
+
+Full articulation of the lifecycle policy: [operating-model.md §5](../operating-model.md).
+
+## Consequences
+
+**Positive:** predictable, cheap context cuts instead of expensive emergency compaction; the Elephant stays long-lived and cache-stable; knowledge is file-persisted and survives every cut.
+
+**Negative:** discipline cost — handover upkeep before every cut, foresight in timing `/compact`.
+
+**Risk:** these rules are partly advisory-only (prose). Mitigation: a SessionStart hook (matcher `compact`) re-injects pipeline state; deterministic parts move into hooks/building blocks in Phase 3; the ability to account for this policy is part of the bootstrap self-confirmation ([ADR-0010](0010-session-bootstrap.md)).
+
+## Rejected alternatives
+
+- **Free practice without codified rules** — documented anti-pattern (marathon sessions, context drift, triple-maintained state).
+- **Emergency compaction as the default mechanism** — `/compact` invalidates the cache by design and loses context uncontrollably; acceptable as an emergency measure, not as policy.
+
+## Addendum 2026-07-06 (PO directive — E9 addendum)
+
+`/compact` gains a **checkpoint-window rule** (append-only; the wording decided above stays unchanged): at every task boundary — package/wave boundary with Critic PASS + commit/push, PRD gate passed, or before the first dispatch of a new package — the Elephant checks context fill level. At ≥ ~100k tokens, presenting a compact block (literal `/compact` + one focus line) is MANDATORY, no longer just an emergency valve. Target window: 100–150k; > 150k counts as an overdue cut, to be named honestly. Trigger: project evidence that "/compact helped a lot" when applied deliberately at a boundary; counter-evidence of 69% usage > 150k from another project. The existing principle "`/compact` only at task boundaries" (E9, above) stays unchanged — the addendum turns it into an active duty at the window boundary rather than a mere permission. Full articulation: `docs/operating-model.md` §5.2, `roles/elephant.md` EL-25, `policies/model-policy.md` MP-19, `guardrails/token-budget.md` TB-02/TB-07.
+
+**Status:** accepted (2026-07-03, Checkpoint 1; addendum 2026-07-06) · **Basis:** Register E9 + session lifecycle directive
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0009: Session-Hygiene und Session-Lifecycle
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 

@@ -697,7 +697,7 @@ security:
   const { PIPELINE_GITLEAKS_PATH, PIPELINE_OSV_SCANNER_PATH, PIPELINE_SEMGREP_PATH, ...baseEnv } = process.env;
   const res = spawnSync(process.execPath, [SCRIPT, "--root", rootDir, "--timeout-ms", "5000"], { encoding: "utf8", env: baseEnv });
   assertEqual("CLI: bare rootDir -> exit 0", res.status, 0);
-  assertIncludes("CLI: stdout contains German verdict line", res.stdout, "Verdict: SAUBER");
+  assertIncludes("CLI: stdout contains verdict line", res.stdout, "Verdict: CLEAN");
   assertIncludes("CLI: stdout reports evidence path", res.stdout, "Evidence written:");
   assertTrue("CLI: evidence file actually created", existsSync(join(rootDir, "evidence", "security-latest.json")), "no evidence file");
 }

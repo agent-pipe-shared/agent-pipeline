@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * statusline-context — statusLine command: prints a compact German context-budget status
+ * statusline-context — statusLine command: prints a compact context-budget status
  * line and side-writes a per-session usage snapshot for `stop-suggest.mjs`'s staged
  * /compact enforcement mechanics to consume.
  *
@@ -39,14 +39,14 @@
  *   never affects the printed status line and never throws upward.
  *
  * OUTPUT CONTRACT (statusLine command contract: plain text on stdout, one line, no JSON):
- *   `{model} · Kontext {pct}% ({tokens}k)` -- German field separator "·" (matches every
- *   other German-facing hook message's style in this plugin), `pct` rounded to the
+ *   `{model} · Context {pct}% ({tokens}k)` -- middle-dot field separator "·" (matches every
+ *   other hook message's style in this plugin), `pct` rounded to the
  *   nearest integer, `tokens` rounded to the nearest thousand (e.g. 124000 tokens -> "124k").
  *
  * SIDE-WRITE: `.claude/.usage-<session_id>.json` (gitignored, see root `.gitignore`) --
  *   `{ usedPct: <int>, totalTokens: <int>, updatedAt: "<ISO-8601>", contextWindowSize?: <int> }`,
  *   pretty-printed + trailing newline (same shape convention as `pipeline-state.mjs`'s own
- *   writes). `contextWindowSize` (Design-Entscheid 2026-07-08) is additive and only present
+ *   writes). `contextWindowSize` (design decision 2026-07-08) is additive and only present
  *   when resolvable -- a future consumer field, not read by `stop-suggest.mjs` today. This is
  *   a machine-regenerated snapshot (overwritten every statusLine tick), never meant to be
  *   git-committed or read by a human directly -- consumed exclusively by
@@ -102,7 +102,7 @@ export function resolveTotalTokens(input) {
   if (!input || typeof input !== "object") return null;
   const cw = input.context_window;
   if (cw && typeof cw === "object") {
-    // PRIMARY (real statusLine schema, Design-Entscheid 2026-07-08): context_window carries
+    // PRIMARY (real statusLine schema, design decision 2026-07-08): context_window carries
     // `total_input_tokens` (+ `total_output_tokens` of the most recent response, additive when
     // both are present -- output tokens are context consumption too, not a subset of the input
     // count). This is the field the real stdin actually sends; everything else in this function
@@ -122,7 +122,7 @@ export function resolveTotalTokens(input) {
     const v = toFiniteNumber(cost.total_tokens) ?? toFiniteNumber(cost.total_input_tokens);
     if (v !== null) return v;
   }
-  // Display-robustness fallback (Design-Entscheid 2026-07-08): no token field resolved above,
+  // Display-robustness fallback (design decision 2026-07-08): no token field resolved above,
   // but `used_percentage` + `context_window_size` are both present -- derive an approximate
   // total from the percentage so the status line still shows a plausible token count instead
   // of a hard "0k". Intentionally approximate (rounding), only reached when the real token-
@@ -189,7 +189,7 @@ export function buildStatus(input) {
   const totalTokens = resolveTotalTokens(input) ?? 0;
   const pctRounded = Math.round(pct);
   const tokensK = Math.round(totalTokens / 1000);
-  const line = `${modelName} · Kontext ${pctRounded}% (${tokensK}k)`;
+  const line = `${modelName} · Context ${pctRounded}% (${tokensK}k)`;
   return { line, usedPct: pctRounded, totalTokens, contextWindowSize: resolveContextWindowSize(input), sessionId: resolveSessionId(input) };
 }
 
@@ -207,7 +207,7 @@ export function usageFilePath(rootDir, sessionId) {
  * @param {number} usedPct
  * @param {number} totalTokens
  * @param {string} nowIso
- * @param {number|null} [contextWindowSize] - additive field (Design-Entscheid 2026-07-08) for
+ * @param {number|null} [contextWindowSize] - additive field (design decision 2026-07-08) for
  *   future consumers; written only when it resolves to a finite number, keeping the pre-
  *   existing `{usedPct, totalTokens, updatedAt}` shape intact when it does not.
  * @returns {boolean}

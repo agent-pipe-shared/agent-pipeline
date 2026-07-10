@@ -1,4 +1,4 @@
-# Checklist — Small Session ("Nachtest/Korrektur ≤45 min" playbook)
+# Checklist — Small Session ("retest/correction ≤45 min" playbook)
 
 > Agent-Pipeline v0.1.0-draft · Compact operative reference for the Elephant; why + verification live in
 > `docs/operating-model.md` §3.3 (rigor/light-dispatch profile) and §4.2 (Critic trigger matrix).
@@ -13,7 +13,7 @@
 ## When this playbook applies
 
 A same-day, narrowly-scoped correction or follow-up test — the class this playbook targets is exactly
-the "small Nachtest session that took 2h and should not have" pattern.
+the "small retest session that took 2h and should not have" pattern.
 **Wall-clock target: ≤45 minutes**, bootstrap to close. This is a target to steer toward, not a hard
 stop-the-clock rule — but a session drifting well past it is itself the escalation signal (see below).
 
@@ -31,11 +31,11 @@ out to need real interview/decomposition work — that is a normal session from 
    (`harness/session-bootstrap.md` §6.4 short-bootstrap exclusions) — never skip on that basis.
 2. **ONE bundled dispatch.** Either:
    - a single **light-profile** Goldfish dispatch (`docs/operating-model.md` §3.3) — briefed
-     Stufe-0/mechanic-shaped correction, compact 3-field report, referenced rule sets inlined, no
+     stage-0/mechanic-shaped correction, compact 3-field report, referenced rule sets inlined, no
      baseline verify, effort per the MP-27 3-tier matrix (`goldfish-mechanic` `low` for
      mechanical/uniform tasks, `goldfish-implementor` `medium` for clearly-briefed
      implementation) — or
-   - the **stage-0 fast path** (`docs/operating-model.md` §3.3 Stufe-0-Kleinfix-Definition) when the
+   - the **stage-0 fast path** (`docs/operating-model.md` §3.3 stage-0-smallfix-definition) when the
      fix qualifies outright (≤2 files, ≤~25 diff lines, no architecture/schema/API/test/guardrail
      touch, trivially `git revert`-able, no risk flag).
    Do NOT fan out multiple small dispatches for a task this size — one bundled dispatch is the whole

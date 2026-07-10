@@ -4,18 +4,19 @@ TEMPLATE: Project roadmap — Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 3 ·
 Source of truth: templates/CLAUDE.project.md block 6/7 (roadmap prose is FORBIDDEN
 in CLAUDE.md — this file is its dedicated home), operating-model §6 (handover owns
 state).
-Language note (ADR-0011): template structure/instructions English; FILLED content
-GERMAN (primary reader: the PO — planning/priorities are PO judgment).
+Language note (ADR-0011): template structure/instructions English; filled content
+in the project's human-facing language, default English (primary reader: the PO —
+planning/priorities are PO judgment).
 
 USAGE
 1. Copy to `{{ROADMAP_FILE default: docs/roadmap.md}}` in the project repo.
-2. Fill in German. Delete this comment block.
+2. Fill in. Delete this comment block.
 
 HARD RULES (checkable)
-- This file holds INTENT (was/warum als Nächstes), never status or history.
+- This file holds INTENT (what/why next), never status or history.
   Why: three hand-maintained state copies demonstrably drifted (AP3); state has
   exactly one home (handover file), the past exactly one home (HISTORY.md).
-  Check: close-ritual drift check — no „done/erledigt" prose here; finished items
+  Check: close-ritual drift check — no "done" prose here; finished items
   are DELETED (their record is the HISTORY entry), not marked done.
 - Item granularity: one line per item + optional 1–2 detail lines. Operational
   detail prose (configs, test plans) belongs in specs/backlog items — the
@@ -28,29 +29,29 @@ HARD RULES (checkable)
 
 # Roadmap — {{PROJECT_NAME}}
 
-> Zweck: Absicht und Reihenfolge („was als Nächstes und warum"). KEIN Status
-> (→ `{{HANDOVER_FILE}}`), KEINE Historie (→ `HISTORY.md`).
-> Zuletzt priorisiert: {{YYYY-MM-DD}} durch the PO.
+> Purpose: intent and order ("what's next and why"). NO status
+> (→ `{{HANDOVER_FILE}}`), NO history (→ `HISTORY.md`).
+> Last prioritized: {{YYYY-MM-DD}} by the PO.
 
-## Jetzt (nächster Block / nächste Blöcke)
+## Now (next block / next blocks)
 
-| # | Vorhaben | Warum jetzt | Vor-Triage (Rigor/Risiko) |
+| # | Item | Why now | Pre-triage (rigor/risk) |
 |---|---|---|---|
-| 1 | {{VORHABEN_1}} | {{NUTZEN_ODER_DRUCK}} | {{z. B. "Stufe 1 / mittel"}} |
-| 2 | {{VORHABEN_2}} | {{...}} | {{...}} |
+| 1 | {{ITEM_1}} | {{BENEFIT_OR_PRESSURE}} | {{e.g. "tier 1 / medium"}} |
+| 2 | {{ITEM_2}} | {{...}} | {{...}} |
 
-## Als Nächstes (sichtbar, noch nicht geschnitten)
+## Up next (visible, not yet cut)
 
-- {{VORHABEN_3 — 1 Zeile}}
-- {{VORHABEN_4 — 1 Zeile}}
+- {{ITEM_3 — 1 line}}
+- {{ITEM_4 — 1 line}}
 
-## Später / Ideen (unverbindlich)
+## Later / ideas (non-binding)
 
-- {{IDEE_1 — 1 Zeile; Detail gehört in ein Backlog-Item, nicht hierher}}
+- {{IDEA_1 — 1 line; detail belongs in a backlog item, not here}}
 
-## Bewusst NICHT geplant
+## Deliberately NOT planned
 
-{{Verworfene oder zurückgestellte Vorhaben mit 1-Satz-Begründung — verhindert
-Wiederholungsdebatten (Alternatives-Prinzip).}}
+{{Discarded or deferred items with a 1-sentence rationale — prevents
+repeat debates (alternatives principle).}}
 
-- {{NICHT_VORHABEN_1}} — {{Begründung}}
+- {{NOT_PLANNED_1}} — {{rationale}}

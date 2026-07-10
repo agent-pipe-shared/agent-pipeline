@@ -1,8 +1,54 @@
-# ADR-0010: Session-Bootstrap-Mechanismus
+# ADR-0010: Session Bootstrap Mechanism
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR (accepted 2026-07-03) mandates a defined, checkable bootstrap protocol at the start of every Agent-Pipeline session, covering the three pillars of the distribution architecture: the plugin (skills/agents/hooks), committed project settings, and a versioned handover file. It requires the protocol to display the consumed plugin SHA and reconcile it against the remote (a staleness check), define offline behavior and a refresh ritual, and end with a mandatory self-confirmation (ruleset SHA/version, project, calibration, handover state, role) before any work begins. It was driven by Critic finding L3-03: without this, plugin distribution can silently drift stale across two machines, and reliance on unversioned user-scope memory breaks on a fresh clone.
+> Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · as of 2026-07-03
+
+**Status:** accepted (2026-07-03, Checkpoint 1) · **Basis:** conditions A5/A6
+
+## Context
+
+Critic finding L3-03 (major): the two-machine staleness of plugin distribution was unresolved — the SHA phase only propagates on manual refresh, cache drift risks replacing the old copy-paste drift, and offline first-binding fails. The stock-take also showed: dependence on unversioned user-scope memory breaks on a fresh clone. Condition A5 requires a bootstrap protocol with plugin-SHA display, remote reconciliation, offline behavior, and a refresh ritual; condition A6 makes this ADR a DoD requirement.
+
+## Decision (derived from conditions A5/A6)
+
+Every Pipeline session begins with a defined, checkable bootstrap covering the three pillars of the distribution architecture:
+
+1. **Plugin** — behavior: skills/agents/hooks ([ADR-0001](0001-verteilung-plugin-marketplace.md)),
+2. **committed project settings** — binding + permissions ([ADR-0008](0008-permissions-worktree-policy.md)),
+3. **versioned handover file** — state ([ADR-0012](0012-handover-kanonisierung.md)).
+
+The protocol (normatively spelled out in [session-bootstrap.md](../../harness/session-bootstrap.md)):
+
+- displays the consumed **plugin SHA** and reconciles it against the remote state (**staleness check**);
+- defines **offline behavior** (working on a cached state is allowed, but never silently — the consumed state is declared) and the **refresh ritual**;
+- ends with a **self-confirmation** of the session in the binding format from [session-bootstrap.md](../../harness/session-bootstrap.md) step 6: ruleset SHA/version, project, calibration, handover state, role; model/effort appears as an **additional line in the Elephant variant** (§6.1, not for Goldfish/Critic) — only then does work begin;
+- defines **failure behavior**: if a mandatory check fails, work does not silently continue on an unknown state (escalation path defined in the protocol).
+
+## Consequences
+
+**Positive:** staleness becomes visible instead of silent; the fresh clone on the second machine is a defined path instead of chance; the self-confirmation makes session state auditable (ties into cost telemetry, [ADR-0006](0006-modell-effort-policy.md)).
+
+**Negative:** bootstrap overhead at every session start; remote reconciliation needs network (offline path defined, but degraded).
+
+**Risk:** a prose protocol remains advisory. Mitigation: Phase 3 implements the bootstrap check as an invocable building block (kickoff requirement).
+
+## Rejected alternatives
+
+- **Marketplace `autoUpdate`** — effect outside managed settings is ⚠ UNVERIFIED and off by default; deliberately not a load-bearing mechanism.
+- **Bootstrap via user-scope memory** — documented anti-pattern: breaks on a fresh clone.
+- **No formalized bootstrap** — cache drift replaces copy-paste drift (L3-03); exactly the problem the Pipeline is meant to solve.
+- **`@` imports alone** — distribute only instruction text, no hooks/agents; hard guardrails would remain unenforced, since CLAUDE.md is officially "context, not enforced configuration."
+- **SessionStart hook alone** — can inject context, but the hook itself must first reach the project; hooks only distribute via user settings or plugins — a chicken-and-egg problem without the plugin layer.
+- The distribution-path alternatives **global `~/.claude`** and **checked-in `.claude/` copies per project** are weighed in [ADR-0001](0001-verteilung-plugin-marketplace.md).
+
+## Follow-up
+
+Phase 3 (bootstrap check as an invocable building block), Phase 4 (two-machine validation laptop/main PC).
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0010: Session-Bootstrap-Mechanismus
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 

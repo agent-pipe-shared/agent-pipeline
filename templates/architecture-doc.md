@@ -1,11 +1,11 @@
 <!--
 ═══════════════════════════════════════════════════════════════════════════
 TEMPLATE: living Architecture Doc (`docs/ARCHITECTURE.md`) — Agent-Pipeline
-v0.1.0-draft · retro-speed-Session · 2026-07-07
+v0.1.0-draft · retro-speed session · 2026-07-07
 Source of truth: ADR-0032 (docs/adr/0032-projekt-doku-struktur.md).
 Language note (ADR-0011 primary-reader rule): this template's INSTRUCTIONS
-are English (agent-facing); the FILLED doc is GERMAN — human-facing,
-the PO is the primary reader.
+are English (agent-facing); the FILLED doc is in the project's human-facing
+language, default English — the PO is the primary reader.
 
 USAGE
 1. GREENFIELD ONLY (ADR-0032): create at project birth (see
@@ -24,33 +24,33 @@ USAGE
 ═══════════════════════════════════════════════════════════════════════════
 -->
 
-# {{PROJEKT_NAME}} — Architektur
+# {{PROJECT_NAME}} — Architecture
 
-> Versions-Header: {{ARCHITEKTUR_DOC_VERSION, z. B. "v1, Stand 2026-07-07"}} · Aktueller Ist-Stand — kein Änderungsjournal in diesem Dokument, Änderungen je Release siehe `docs/releases/<version>.md`.
+> Version header: {{ARCHITECTURE_DOC_VERSION, e.g. "v1, as of 2026-07-07"}} · Current state — no change log in this document, changes per release see `docs/releases/<version>.md`.
 
-## Überblick
+## Overview
 
-{{2–4 Sätze: was das System ist, Kernzweck, primäre Nutzer:innen.}}
+{{2–4 sentences: what the system is, core purpose, primary users.}}
 
-## Komponenten
+## Components
 
-- {{Komponente 1}} — {{1 Satz Zweck}}
-- {{Komponente 2}} — {{1 Satz Zweck}}
+- {{Component 1}} — {{1-sentence purpose}}
+- {{Component 2}} — {{1-sentence purpose}}
 
-## Datenfluss / Schnittstellen
+## Data Flow / Interfaces
 
-{{Kurzbeschreibung des Datenflusses zwischen den Komponenten, oder Verweis auf ein Diagramm/eine Diagramm-Datei.}}
+{{Short description of the data flow between components, or a reference to a diagram/diagram file.}}
 
-## Tech-Stack
+## Tech Stack
 
-- {{Sprache(n)/Framework(s)/Paketmanager/Testrunner}}
+- {{Language(s)/Framework(s)/Package manager/Test runner}}
 
-## Entscheidungs-Verweise
+## Decision References
 
-- {{Verweis auf projekteigene ADRs, die die aktuelle Architektur prägen (z. B. "docs/adr/000X-....md")}}
+- {{Reference to project-specific ADRs that shape the current architecture (e.g. "docs/adr/000X-....md")}}
 
-## Änderungen je Release
+## Changes per Release
 
-> Diese Sektion verlinkt NUR — Details (Features, PRDs/Specs, Evidenz, SBOM-Delta) stehen im jeweiligen Release-Manifest, nie hier dupliziert.
+> This section links ONLY — details (features, PRDs/specs, evidence, SBOM delta) live in the respective release manifest, never duplicated here.
 
-- {{VERSION}}: siehe `docs/releases/{{VERSION}}.md`
+- {{VERSION}}: see `docs/releases/{{VERSION}}.md`

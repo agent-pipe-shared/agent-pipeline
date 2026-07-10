@@ -6,10 +6,13 @@ central per-project handover template referenced by `.claude/pipeline.json`
 → `handover` (default `docs/state.md`).
 Language: this TEMPLATE is English (agent-facing, ADR-0011 — templates/ is
 listed as agent-facing). Every INSTANCE (a project's actual `docs/state.md`)
-is written in German, per project convention and ADR-0011's primary-reader
-rule (the PO is the primary human reader of a project's handover; treat the
-section structure below as inspiration, not a schema to copy verbatim). Keep the German section headers below verbatim in
-instances — do not translate them back to English.
+is written in the project's human-facing language — English by default
+for this share — per ADR-0011's primary-reader rule (the PO is the primary
+human reader of a project's handover; treat the section structure below as
+inspiration, not a schema to copy verbatim). If a project's primary human
+reader works in a different language, translate the section headers below
+consistently and keep them stable across the project's handover history —
+do not swap languages mid-project.
 
 USAGE
 1. Copy this file to `docs/state.md` in the target project repo (path fixed
@@ -64,45 +67,45 @@ HARD RULES (checkable)
 ═══════════════════════════════════════════════════════════════════════════
 -->
 
-# {{PROJECT_NAME}} — Stand
+# {{PROJECT_NAME}} — Status
 
-> Zweck: Persistenter Handover-Stand des Projekts — einzige maßgebliche Stand-Quelle (ADR-0012). Wird nach jedem Block/jeder Session aktualisiert. HISTORY.md bleibt Log, kein zweiter Stand-Ort; Memory ist nur Spiegel.
+> Purpose: persistent handover state for the project — the single authoritative state source (ADR-0012). Updated after every block/session. HISTORY.md stays a log, not a second state location; memory is a mirror only.
 
-**Letzte Aktualisierung:** {{YYYY-MM-DD, ggf. + Tageszeit-Kürzel bei mehreren Updates/Tag}} · **Aktueller Block/Session:** {{Block-/Sitzungsname oder -ID}} · **Modell-Setup:** {{aktives Modell + Effort dieser Session, z. B. "Implement-Tier-Modell / high"; Abweichungen von der projektüblichen Kalibrierung kurz begründen}}
+**Last updated:** {{YYYY-MM-DD, plus a time-of-day tag if multiple updates/day}} · **Current block/session:** {{block/session name or ID}} · **Model setup:** {{active model + effort for this session, e.g. "implement-tier model / high"; briefly justify any deviation from the project's usual calibration}}
 
-{{1–3 Sätze Klartext: was gerade läuft oder gerade fertig wurde. Kein Ersatz für die Tabelle unten — nur Orientierung auf den ersten Blick.}}
+{{1–3 plain-language sentences: what's running right now or just finished. Not a substitute for the table below — just orientation at a glance.}}
 
 ## Status
 
-> Jede Zeile = ein laufendes oder kürzlich abgeschlossenes Arbeitspaket. Marker: ✅ fertig · 🟡 Human-Verifikation ausstehend (blockt laut "🟡-Merge v2" NICHT den Merge, zählt aber weiter gegen das WIP-Limit) · 🔄 läuft. **Rollback-Anker ist Pflichtfeld bei 🟡** — Form je `branchModel` siehe Kopf-Kommentar.
+> Each row = one work package in progress or recently completed. Markers: ✅ done · 🟡 human verification pending (does NOT block the merge under "🟡-Merge v2", but keeps counting against the WIP limit) · 🔄 in progress. **Rollback anchor is mandatory for 🟡** — form depends on `branchModel`, see the header comment.
 
-| # | Arbeitspaket | Status | Rollback-Anker | Bemerkung |
+| # | Work package | Status | Rollback anchor | Note |
 |---|---|---|---|---|
-| 1 | {{Kurzbezeichnung}} | {{✅ / 🟡 / 🔄}} | {{Tag `rollback/<date>-<block>` \| "Rollback-Anker: <sha>" \| "Pre-Merge-SHA: <merge-sha>^1" \| "–" wenn kein 🟡}} | {{kurz}} |
+| 1 | {{short label}} | {{✅ / 🟡 / 🔄}} | {{tag `rollback/<date>-<block>` \| "Rollback-Anker: <sha>" \| "Pre-Merge-SHA: <merge-sha>^1" \| "–" if no 🟡}} | {{brief}} |
 
-## Nächste Schritte
+## Next steps
 
-{{Nummerierte, konkrete nächste Schritte — kein Backlog-Reprint, nur was unmittelbar ansteht.}}
+{{Numbered, concrete next steps — not a backlog reprint, only what's immediately ahead.}}
 
-1. {{Schritt}}
+1. {{step}}
 
-## Entscheidungen seit letztem Gate
+## Decisions since the last gate
 
-{{Was wurde seit dem letzten the PO-Gate/Checkpoint entschieden — Datum, Entscheidung, kurze Begründung (1–2 Sätze). Nur was noch nicht in ADRs/Entscheidungsregister formalisiert ist; sonst verlinken statt duplizieren.}}
+{{What was decided since the last PO gate/checkpoint — date, decision, brief rationale (1–2 sentences). Only what isn't yet formalized in ADRs/decision register; otherwise link instead of duplicating.}}
 
-- {{YYYY-MM-DD}}: {{Entscheidung + Begründung}}
+- {{YYYY-MM-DD}}: {{decision + rationale}}
 
-## Umgebung & Toolchain
+## Environment & toolchain
 
-> Achtung: Pfade und Toolchain-Details sind maschinenspezifisch (dieses Projekt läuft ggf. auf mehreren Rechnern mit unterschiedlichen Pfaden). Nie einen einzelnen Maschinen-Pfad zentral (CLAUDE.md, guardrails, Prompts) hardcoden — hier je Maschine führen, bei Maschinenwechsel neu verifizieren statt annehmen.
+> Note: paths and toolchain details are machine-specific (this project may run on multiple machines with different paths). Never hardcode a single machine's path centrally (CLAUDE.md, guardrails, prompts) — track it per machine here, and re-verify rather than assume on a machine switch.
 
-| Tool/Pfad | {{Maschine 1, z. B. Laptop}} | {{Maschine 2, z. B. Haupt-PC}} | Status |
+| Tool/path | {{Machine 1, e.g. laptop}} | {{Machine 2, e.g. main PC}} | Status |
 |---|---|---|---|
-| Repo-Pfad | {{Pfad}} | {{Pfad}} | {{✓ / ⚠}} |
-| {{weitere Einträge nach Bedarf: git/gh/lfs-Version, `verify`-Kommando-Abhängigkeiten, Credential-Store}} | | | |
+| Repo path | {{path}} | {{path}} | {{✓ / ⚠}} |
+| {{further entries as needed: git/gh/lfs version, `verify`-command dependencies, credential store}} | | | |
 
-## Offene Fragen an the PO
+## Open questions for the PO
 
-{{Nummerierte Liste offener Entscheidungsfragen, die nur the PO klären kann. "– keine –" wenn nichts offen ist — nicht künstlich auffüllen.}}
+{{Numbered list of open decision questions only the PO can resolve. "– none –" if nothing is open — don't pad it artificially.}}
 
-1. {{Frage}}
+1. {{question}}

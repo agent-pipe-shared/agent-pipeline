@@ -1,8 +1,42 @@
-# ADR-0026: Rollenschnitt Elephant/Goldfish/Critic — Formalisierung + plan-verifier
+# ADR-0026: Role split Elephant/Goldfish/Critic — formalization + plan-verifier
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR formalizes the three-role split (Elephant orchestrates and never writes production code; Goldfish executes exactly one briefed task in a fresh context; Critic is an independent, read-only reviewer) that had previously existed only as prose in the operating model, giving it its own decision record. It also introduces a new `plan-verifier` subagent — read-only, fresh context — that checks a diff against the approved plan item-by-item (verdicts `VERIFIED | GAP | UNPLANNED`), as a narrower, cheaper pre-check before the more expensive Critic review, without replacing the Critic contract or adding a fourth pipeline role. Status: accepted 2026-07-07.
+**Status:** accepted (2026-07-07, PO plan approval "AP1 TUNING") · **Basis:** `docs/operating-model.md` §2 (previously prose only), `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` package P6/P7
+
+## Context
+
+The Elephant/Goldfish/Critic role split has been described at length as prose in `docs/operating-model.md` §2 since Sprint 0 (Elephant orchestrates and never writes production code, EL-01/EL-16/E20 "delegate-first"; Goldfish is the executor in a fresh context for EXACTLY ONE briefed task; Critic is an independent, read-only reviewer, ADR-0014) — but it had no ADR of its own formalizing it as a foundational decision. The AP1 tuning plan (package P6) additionally introduces a new verification subagent: `plan-verifier` (`plugins/pipeline-core/agents/plan-verifier.md`), which checks an implementation diff against the approved plan — read-only, fresh context, BEFORE a task counts as DONE.
+
+## Decision
+
+The three-way role split described in `docs/operating-model.md` §2 is formalized as its own foundational decision:
+
+- **Elephant** — long-lived orchestrator session. Writes no production code (EL-01); execution work ALWAYS goes to a briefed Goldfish dispatch (EL-16/E20 enforcement, [ADR-0020](0020-el01-enforcement-goldfish-pflicht.md)). Owns triage, spec/plan, decomposition, gate decisions, handover maintenance.
+- **Goldfish** — fresh context, EXACTLY ONE 6-field briefing (goal · context files · DoD checks · prohibitions · stop conditions · dispatch metadata, `docs/operating-model.md` §2.3). No `memory` (E3); handoff only with a machine-checkable evidence artifact.
+- **Critic** — independent, read-only reviewer (spec + diff + guardrails + evidence as the sole input, never chat history, [ADR-0014](0014-critic-kontrakt.md)); trigger matrix by risk class (`docs/operating-model.md` §4.2).
+- **NEW (AP1, package P6): `plan-verifier` agent** as an additional verification subagent — read-only, fresh context, Sonnet 5/`high` default (`plugins/pipeline-core/agents/plan-verifier.md`). It does NOT check spec fidelity/guardrails/edge cases (that stays a Critic task, [ADR-0014](0014-critic-kontrakt.md)); it exclusively checks the plan↔diff mapping: every plan item gets a verdict `VERIFIED | GAP | UNPLANNED` with evidence (file:line/commit SHA/plan section). It is an additional, narrower check BEFORE the Critic resp. before "DONE" — not a replacement for the Critic contract, and not a fourth pipeline role in the sense of §2 (the implementing agent never verifies its own work, mirroring the E12 principle).
+
+## Consequences
+
+**Positive:** The role split, previously only living prose in §2, is now traceable via the decision register (anti-pattern "silently made foundational decision", `docs/operating-model.md` §2.2, prohibition line); `plan-verifier` closes a previously open gap — until now there was no mechanical evidence that a diff really covers EVERY plan item, only the Critic's general view on spec fidelity.
+
+**Negative:** One more subagent dispatch per feature close-out (cost, turnaround) — accepted deliberately as a narrow, cheap Sonnet/`high` check ahead of the more expensive Critic.
+
+**Risk:** Role sprawl if future sessions confuse `plan-verifier` with the Critic, or treat its findings as a substitute for a Critic review. Mitigation: clear boundary in the agent contract itself (`plan-verifier.md`: "mirrors E12/critic.md", but exclusively plan↔diff mapping, no spec/guardrail verdict) and in this ADR.
+
+## Rejected alternatives
+
+- **No dedicated ADR, role split stays pure OM prose** — rejected because foundational decisions without a register/ADR are not reconstructable (`docs/operating-model.md` §2.2 prohibition line, Critic finding L1-04 from Checkpoint 1).
+- **`plan-verifier` as an extension of the Critic contract instead of its own agent** — rejected: the Critic deliberately checks more broadly (spec fidelity, edge cases, trajectory) and is more expensive (Sonnet/`max`, possibly Fable/`max`); a narrow, cheap plan↔diff comparison BEFORE the Critic dispatch filters out gross gaps more cheaply upstream.
+
+## Follow-up
+
+None. First real `plan-verifier` dispatch: package P8 (E2E demo) of the AP1 plan.
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0026: Rollenschnitt Elephant/Goldfish/Critic — Formalisierung + plan-verifier
 
 > Agent-Pipeline v0.1.0-draft · AP1-Tuning-Session · Stand 2026-07-07
 

@@ -1,8 +1,45 @@
-# ADR-0004: Spec-Rigor in drei Stufen + EARS-Akzeptanzkriterien
+# ADR-0004: Three-Tier Spec Rigor + EARS Acceptance Criteria
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR establishes a three-tier spec-rigor model — Tier 0 (issue-only, for bugfixes with repro/config/docs), Tier 1 (spec-first delta specs for medium features, archived after merge, following an OpenSpec-style pattern), and Tier 2 (spec-anchored, for a small number of long-lived core contracts such as `<PROJECT_A>` API or `<PROJECT_B>` schema/invariants, where the spec lives in the repo and evolves with it) — with EARS-style acceptance criteria ("WHEN … THE SYSTEM SHALL …") required from Tier 1 upward to give a direct spec-to-test bridge. The decision favors home-grown templates over adopting an external spec-driven-development CLI (e.g. Spec Kit, Kiro, OpenSpec), to avoid tool lock-in and match process overhead to task size. Status: accepted (2026-07-03, Checkpoint 1).
+**Status:** accepted (2026-07-03, Checkpoint 1) · **Basis:** Register E4
+
+## Context
+
+All SDD frameworks converge on the same Markdown artifacts (Constitution/Spec/Plan/Tasks); Agent OS v3 dropped its own orchestration phases; in the one head-to-head comparison found, the lightest tool won and Spec Kit scored worst. The SDD critique is well documented: overhead ∝ 1/task-size, spec drift, the waterfall trap. EARS ("WHEN … THE SYSTEM SHALL …") turns every acceptance criterion 1:1 into a test case — the spec → tests → Critic bridge.
+
+## Decision (E4, verbatim)
+
+> Spec-Rigor: 3 tiers (0 issue-only / 1 delta-spec / 2 spec-anchored for core contracts); EARS from Tier 1 up; home-grown templates, no external CLI
+
+Detail:
+
+- **Tier 0 (issue-only):** bugfix with repro, config, docs — the fast path in the SDLC; verify + evidence stay mandatory.
+- **Tier 1 (spec-first, delta):** medium features — delta spec following the OpenSpec pattern, archived after merge.
+- **Tier 2 (spec-anchored):** a small number of long-lived core contracts (`<PROJECT_A>` API, `<PROJECT_B>` schema/invariants, `<PROJECT_C>` core systems) — the spec lives in the repo and evolves with it.
+- The Elephant decides the tier triage per the Constitution rule. Templates are modeled in content on Spec Kit (Constitution), OpenSpec (delta spec), Kiro (EARS) — versioned in this repo.
+
+## Consequences
+
+**Positive:** Critic-checkability is bought exactly where it pays off; process cost scales with task size (Auflage/mandate A3 → [operating-model.md](../operating-model.md)); no tool lock-in, no external-CLI upgrade risk.
+
+**Negative:** Tier-0 changes deliberately run without a spec contract — an accepted residual risk; Tier 2 carries an ongoing "maintenance tax."
+
+**Risk:** mis-triage. Mitigation: a spec-readiness check before implementation (mandate A1; mandatory for Tier 2 + architecture/guardrails, recommended for Tier 1 — → [operating-model.md](../operating-model.md)).
+
+## Rejected alternatives
+
+- **External CLI (Spec Kit / Kiro / OpenSpec) as a dependency** — lock-in and documented upgrade risk; the framework convergence is in the artifacts, not the tooling.
+- **One workflow for all task sizes** — fails on differing problem sizes (Böckeler's core critique) and was the most likely discipline tipping point (Critic finding L3-01).
+- **spec-as-source** — experimental, not production-ready.
+
+## Follow-up
+
+None. Templates + triage rule: Phase 3; project mapping of the Tier-2 contracts: Phase 4.
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0004: Spec-Rigor in drei Stufen + EARS-Akzeptanzkriterien
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 

@@ -6,7 +6,7 @@
  * WHY THIS FILE EXISTS
  *   The Dev-Plan-Gate (guard-devplan.mjs) and the Push-Gate (guard-push.mjs) need a
  *   deterministic, git-committed record of "has the PO's plan approval already been
- *   verbucht" and "was the push approved for THIS commit" -- not a chat memory, not a
+ *   recorded" and "was the push approved for THIS commit" -- not a chat memory, not a
  *   free-hand edit of the state file (which would be exactly the kind of silent,
  *   unauditable state change the whole gate exists to prevent). This CLI is the single
  *   choke point: every state transition is one subcommand, one audit-friendly JSON
@@ -35,8 +35,8 @@
  *   DEVIATION NOTE (declared during the F1 fix, commit 1c0a181 -- see the `set-feature`/
  *   `set-phase` entries below for that fix itself, which moved `phase` INSIDE
  *   `activeFeature`): `planApproved` lives TOP-LEVEL, deliberately -- ADR-0027
- *   (`docs/adr/0027-gate-philosophie.md`, line ~15: "...solange eine aktive Feature
- *   (`activeFeature`) noch keine `planApproved: true` trägt") reads as though
+ *   (`docs/adr/0027-gate-philosophie.md`, line ~15, translated: "...as long as an active
+ *   feature (`activeFeature`) does not yet carry `planApproved: true`") reads as though
  *   `planApproved` sat INSIDE `activeFeature`; the plan sketch itself
  *   (`.claude/plans/2026-07-07-ap1-pipeline-tuning.md`) never says that -- it only
  *   names `planApproved`, without specifying placement. Unlike `phase`, `planApproved`
@@ -76,19 +76,19 @@
  *                                                 sets planApproved=false, clears
  *                                                 planApproval/planRevocation.
  *                                                 pushApproval is left untouched. No
- *                                                 activeFeature present -> refused (German
+ *                                                 activeFeature present -> refused (English
  *                                                 error, exit 2, nothing written). See the
  *                                                 forCommit DEVIATION note in RULES below --
  *                                                 unlike approve-push, a git failure here is
  *                                                 NOT fatal.
  *
  * RULES (all five `--by`-taking subcommands: approve-plan/revoke-plan/approve-push/close-feature)
- *   - `--by` MUST be present and non-blank -- REFUSED otherwise (German error, exit 2,
+ *   - `--by` MUST be present and non-blank -- REFUSED otherwise (English error, exit 2,
  *     nothing written). An unattributed approval/revocation would be exactly the kind
  *     of unauditable state change this CLI exists to prevent.
  *   - A pre-existing state file that is NOT valid JSON, NOT a JSON object, or carries
  *     a `schema` field other than "pipeline.state.v0" is treated as MALFORMED: the CLI
- *     refuses to write ANYTHING (clear German error, exit 2) -- NEVER a silent
+ *     refuses to write ANYTHING (clear English error, exit 2) -- NEVER a silent
  *     overwrite of data that might still matter. Fix or deliberately delete the file
  *     first (same "the guard binds agents, not humans" escape hatch as the git-guard
  *     family: the PO can always edit/delete the file directly, outside this CLI).
@@ -97,7 +97,7 @@
  *     newline) and is meant to be git-committed by design -- it IS the audit trail
  *     (mirrors `.claude/guard-override.log.jsonl`'s philosophy: state changes belong
  *     in history, not just on disk).
- *   - All CLI user-facing output (stdout confirmations, stderr errors) is German.
+ *   - All CLI user-facing output (stdout confirmations, stderr errors) is English.
  *   - DEVIATION (close-feature only, declared deliberately): unlike approve-push, a failed
  *     `git rev-parse HEAD` is NOT fatal for close-feature -- forCommit is set to `null`, a
  *     warning goes to stderr, and the close still writes and exits 0. Rationale: for
@@ -143,7 +143,7 @@ export function statePath(dir = projectDir()) {
  * Returns one of:
  *   { status: "absent" }
  *   { status: "ok", state }
- *   { status: "malformed", error: "<German reason>" }
+ *   { status: "malformed", error: "<English reason>" }
  */
 export function readState(dir = projectDir()) {
   const p = statePath(dir);
@@ -157,13 +157,13 @@ export function readState(dir = projectDir()) {
   try {
     parsed = JSON.parse(raw);
   } catch (e) {
-    return { status: "malformed", error: `ungültiges JSON (${e.message})` };
+    return { status: "malformed", error: `invalid JSON (${e.message})` };
   }
   if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-    return { status: "malformed", error: "Inhalt ist kein JSON-Objekt auf oberster Ebene" };
+    return { status: "malformed", error: "content is not a top-level JSON object" };
   }
   if (parsed.schema !== undefined && parsed.schema !== SCHEMA_ID) {
-    return { status: "malformed", error: `unbekanntes Schema "${parsed.schema}" (erwartet "${SCHEMA_ID}")` };
+    return { status: "malformed", error: `unknown schema "${parsed.schema}" (expected "${SCHEMA_ID}")` };
   }
   return { status: "ok", state: parsed };
 }
@@ -216,9 +216,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
   const existing = readState(dir);
   if (existing.status === "malformed") {
-    console.error(`Fehler: bestehende Statusdatei ist ungültig (${existing.error}) -- Abbruch OHNE Änderung.`);
-    console.error(`Datei: ${statePath(dir)}`);
-    console.error(`Behebe die Datei manuell (oder lösche sie bewusst), bevor pipeline-state.mjs erneut schreibt.`);
+    console.error(`Error: existing state file is invalid (${existing.error}) -- aborting WITHOUT changes.`);
+    console.error(`File: ${statePath(dir)}`);
+    console.error(`Fix the file manually (or deliberately delete it) before pipeline-state.mjs writes again.`);
     return 2;
   }
   const base = existing.status === "ok" ? existing.state : { schema: SCHEMA_ID };
@@ -228,7 +228,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const id = flags.id;
       const planPath = flags["plan-path"];
       if (isBlank(id) || isBlank(planPath)) {
-        console.error('Fehler: set-feature benötigt --id <id> und --plan-path <pfad> (beide nicht leer).');
+        console.error('Error: set-feature requires --id <id> and --plan-path <path> (both non-empty).');
         return 2;
       }
       const timestamp = now();
@@ -244,14 +244,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       delete next.phase; // F1 fix: strip any legacy top-level `phase` left over from a
       // pre-fix file -- phase now lives exclusively at activeFeature.phase.
       writeState(dir, next);
-      console.log(`Feature "${id}" gesetzt. Plan-Pfad: ${planPath}. planApproved=false, phase="design".`);
+      console.log(`Feature "${id}" set. Plan path: ${planPath}. planApproved=false, phase="design".`);
       return 0;
     }
 
     case "set-phase": {
       const phase = flags.phase;
       if (isBlank(phase)) {
-        console.error('Fehler: set-phase benötigt --phase <name> (nicht leer).');
+        console.error('Error: set-phase requires --phase <name> (non-empty).');
         return 2;
       }
       const baseActiveFeature = base.activeFeature && typeof base.activeFeature === "object" ? base.activeFeature : {};
@@ -264,14 +264,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       delete next.phase; // F1 fix: strip any legacy top-level `phase` left over from a
       // pre-fix file -- phase now lives exclusively at activeFeature.phase.
       writeState(dir, next);
-      console.log(`Phase gesetzt: "${phase}".`);
+      console.log(`Phase set: "${phase}".`);
       return 0;
     }
 
     case "approve-plan": {
       const by = flags.by;
       if (isBlank(by)) {
-        console.error('Fehler: approve-plan benötigt --by <name> (nicht leer) -- eine unbenannte Freigabe wird verweigert.');
+        console.error('Error: approve-plan requires --by <name> (non-empty) -- an unattributed approval is refused.');
         return 2;
       }
       const approvedAt = now();
@@ -284,14 +284,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       };
       delete next.planRevocation;
       writeState(dir, next);
-      console.log(`Plan freigegeben durch "${by}" am ${approvedAt}.`);
+      console.log(`Plan approved by "${by}" on ${approvedAt}.`);
       return 0;
     }
 
     case "revoke-plan": {
       const by = flags.by;
       if (isBlank(by)) {
-        console.error('Fehler: revoke-plan benötigt --by <name> (nicht leer) -- ein unbenannter Widerruf wird verweigert.');
+        console.error('Error: revoke-plan requires --by <name> (non-empty) -- an unattributed revocation is refused.');
         return 2;
       }
       const revokedAt = now();
@@ -303,20 +303,20 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         updatedAt: revokedAt,
       };
       writeState(dir, next);
-      console.log(`Plan-Freigabe widerrufen durch "${by}" am ${revokedAt}.`);
+      console.log(`Plan approval revoked by "${by}" on ${revokedAt}.`);
       return 0;
     }
 
     case "approve-push": {
       const by = flags.by;
       if (isBlank(by)) {
-        console.error('Fehler: approve-push benötigt --by <name> (nicht leer) -- eine unbenannte Freigabe wird verweigert.');
+        console.error('Error: approve-push requires --by <name> (non-empty) -- an unattributed approval is refused.');
         return 2;
       }
       const head = gitHead(dir);
       if (!head.ok) {
-        console.error(`Fehler: aktueller Commit (git rev-parse HEAD) konnte nicht ermittelt werden: ${head.error}`);
-        console.error("Push-Freigabe NICHT verbucht -- ohne bekannten Commit ist forCommit sinnlos.");
+        console.error(`Error: current commit (git rev-parse HEAD) could not be determined: ${head.error}`);
+        console.error("Push approval NOT recorded -- forCommit is meaningless without a known commit.");
         return 2;
       }
       const approvedAt = now();
@@ -327,19 +327,19 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         updatedAt: approvedAt,
       };
       writeState(dir, next);
-      console.log(`Push freigegeben durch "${by}" für Commit ${head.commit} (${approvedAt}).`);
+      console.log(`Push approved by "${by}" for commit ${head.commit} (${approvedAt}).`);
       return 0;
     }
 
     case "close-feature": {
       const by = flags.by;
       if (isBlank(by)) {
-        console.error('Fehler: close-feature benötigt --by <name> (nicht leer) -- ein unbenannter Abschluss wird verweigert.');
+        console.error('Error: close-feature requires --by <name> (non-empty) -- an unattributed close is refused.');
         return 2;
       }
       const activeFeature = base.activeFeature;
       if (!activeFeature || typeof activeFeature !== "object") {
-        console.error('Fehler: kein aktives Feature vorhanden -- nichts zu schließen.');
+        console.error('Error: no active feature present -- nothing to close.');
         return 2;
       }
       // DEVIATION vs. approve-push (declared in the header): a git failure here is NOT fatal --
@@ -349,8 +349,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       if (head.ok) {
         forCommit = head.commit;
       } else {
-        console.error(`Warnung: aktueller Commit (git rev-parse HEAD) konnte nicht ermittelt werden: ${head.error}.`);
-        console.error("close-feature läuft trotzdem weiter -- forCommit wird als null vermerkt.");
+        console.error(`Warning: current commit (git rev-parse HEAD) could not be determined: ${head.error}.`);
+        console.error("close-feature proceeds anyway -- forCommit is recorded as null.");
       }
       const closedAt = now();
       const priorClosed = Array.isArray(base.closedFeatures) ? base.closedFeatures : [];
@@ -374,14 +374,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       delete next.planRevocation;
       writeState(dir, next);
       console.log(
-        `Feature "${activeFeature.id}" geschlossen durch "${by}" (Commit ${forCommit ?? "—"}, ${closedAt}). activeFeature entfernt, planApproved=false.`,
+        `Feature "${activeFeature.id}" closed by "${by}" (commit ${forCommit ?? "—"}, ${closedAt}). activeFeature removed, planApproved=false.`,
       );
       return 0;
     }
 
     default: {
       console.error(
-        `Fehler: unbekanntes Kommando "${sub ?? ""}". Erlaubt: set-feature, set-phase, approve-plan, revoke-plan, approve-push, close-feature.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, set-phase, approve-plan, revoke-plan, approve-push, close-feature.`,
       );
       return 2;
     }

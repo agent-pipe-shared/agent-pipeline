@@ -43,7 +43,7 @@
  * ERROR SHAPE: `{ path, expected, got, line? }`. `line` is present only for a YAML syntax
  * error (path/expected/got are `null` in that case; the human-readable reason lives in
  * the extra `reason` field) -- see validate-manifest.mjs for how the two shapes render
- * into the two required German message templates.
+ * into the two required English message templates.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -117,18 +117,18 @@ function joinPath(basePath, leaf) {
 function translateSchemaError(raw) {
   let m;
   if ((m = RE_TYPE_MISMATCH.exec(raw))) {
-    return { path: normalizePath(m[1]), expected: `Typ "${m[2]}"`, got: `Typ "${m[3]}"` };
+    return { path: normalizePath(m[1]), expected: `type "${m[2]}"`, got: `type "${m[3]}"` };
   }
   if ((m = RE_ENUM_VIOLATION.exec(raw))) {
-    return { path: normalizePath(m[1]), expected: `einer der Werte [${m[3]}]`, got: m[2] };
+    return { path: normalizePath(m[1]), expected: `one of the values [${m[3]}]`, got: m[2] };
   }
   if ((m = RE_MISSING_REQUIRED.exec(raw))) {
-    return { path: joinPath(normalizePath(m[1]), m[2]), expected: "vorhanden (Pflichtfeld)", got: "fehlt" };
+    return { path: joinPath(normalizePath(m[1]), m[2]), expected: "present (required field)", got: "missing" };
   }
   if ((m = RE_ADDITIONAL_PROPERTY.exec(raw))) {
-    return { path: joinPath(normalizePath(m[1]), m[2]), expected: "ein bekanntes Manifest-Feld", got: "unbekanntes Feld" };
+    return { path: joinPath(normalizePath(m[1]), m[2]), expected: "a known manifest field", got: "unknown field" };
   }
-  return { path: "", expected: raw, got: "(nicht uebersetzbare schema-lite-Meldung)" };
+  return { path: "", expected: raw, got: "(untranslatable schema-lite message)" };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -150,8 +150,8 @@ function checkProfiles(manifest, errors) {
   if (typeof profiles.active === "string" && !profileNames.includes(profiles.active)) {
     errors.push({
       path: "profiles.active",
-      expected: profileNames.length > 0 ? `ein deklariertes Profil (${profileNames.join(", ")})` : "ein unter profiles deklariertes Profil",
-      got: `"${profiles.active}" (unbekannt)`,
+      expected: profileNames.length > 0 ? `a declared profile (${profileNames.join(", ")})` : "a profile declared under profiles",
+      got: `"${profiles.active}" (unknown)`,
     });
   }
 
@@ -162,8 +162,8 @@ function checkProfiles(manifest, errors) {
       if (typeof phaseName === "string" && !phaseNames.has(phaseName)) {
         errors.push({
           path: `profiles.${profileName}.phases[${i}]`,
-          expected: "einen unter phases[] deklarierten Phasennamen",
-          got: `"${phaseName}" (unbekannt)`,
+          expected: "a phase name declared under phases[]",
+          got: `"${phaseName}" (unknown)`,
         });
       }
     });
@@ -182,8 +182,8 @@ function checkPhases(manifest, errors) {
       if (seenNames.has(phase.name)) {
         errors.push({
           path: `phases[${i}].name`,
-          expected: "einen im Manifest eindeutigen Phasennamen",
-          got: `"${phase.name}" (Duplikat von phases[${seenNames.get(phase.name)}])`,
+          expected: "a phase name unique within the manifest",
+          got: `"${phase.name}" (duplicate of phases[${seenNames.get(phase.name)}])`,
         });
       } else {
         seenNames.set(phase.name, i);
@@ -195,7 +195,7 @@ function checkPhases(manifest, errors) {
       if (!parsed) {
         errors.push({
           path: `phases[${i}].condition`,
-          expected: '"always", "never", "<flag>" oder "!<flag>"',
+          expected: '"always", "never", "<flag>" or "!<flag>"',
           got: `"${phase.condition}"`,
         });
       } else if (parsed.kind === "flag" && !Object.prototype.hasOwnProperty.call(flags, parsed.flag)) {
@@ -203,9 +203,9 @@ function checkPhases(manifest, errors) {
           path: `phases[${i}].condition`,
           expected:
             Object.keys(flags).length > 0
-              ? `ein unter flags deklariertes Flag (${Object.keys(flags).join(", ")})`
-              : "ein unter flags deklariertes Flag",
-          got: `"${parsed.flag}" (unbekannt)`,
+              ? `a flag declared under flags (${Object.keys(flags).join(", ")})`
+              : "a flag declared under flags",
+          got: `"${parsed.flag}" (unknown)`,
         });
       }
     }

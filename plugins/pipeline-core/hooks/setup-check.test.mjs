@@ -81,20 +81,20 @@ ok("isStillDefault: parsed is undefined -> false", isStillDefault(undefined) ===
 {
   const msg = buildSetupIncompleteMessage("missing");
   ok("buildSetupIncompleteMessage missing: names the setup.mjs command", msg.includes("setup.mjs"), msg);
-  ok("buildSetupIncompleteMessage missing: mentions the file is absent (fresh clone)", msg.includes("fehlt"), msg);
+  ok("buildSetupIncompleteMessage missing: mentions the file is absent (fresh clone)", msg.includes("is still missing"), msg);
   ok(
     "buildSetupIncompleteMessage missing: does NOT use the default-markers wording",
-    !msg.includes("Default-Marker"),
+    !msg.includes("default markers"),
     msg,
   );
 }
 {
   const msg = buildSetupIncompleteMessage("default-markers");
   ok("buildSetupIncompleteMessage default-markers: names the setup.mjs command", msg.includes("setup.mjs"), msg);
-  ok("buildSetupIncompleteMessage default-markers: mentions the default-marker wording", msg.includes("Default-Marker"), msg);
+  ok("buildSetupIncompleteMessage default-markers: mentions the default-marker wording", msg.includes("default markers"), msg);
   ok(
-    "buildSetupIncompleteMessage default-markers: does NOT use the 'fehlt noch' missing-file wording",
-    !msg.includes("fehlt noch"),
+    "buildSetupIncompleteMessage default-markers: does NOT use the 'is still missing' missing-file wording",
+    !msg.includes("is still missing"),
     msg,
   );
 }
@@ -183,7 +183,7 @@ function runCli(rootDir) {
   const { status, stdout } = runCli(rootDir);
   ok("CLI: default markers -> exit 0", status === 0);
   const parsed = JSON.parse(stdout);
-  ok("CLI: default markers -> active JSON, default-markers wording", parsed.systemMessage.includes("Default-Marker"), stdout);
+  ok("CLI: default markers -> active JSON, default-markers wording", parsed.systemMessage.includes("default markers"), stdout);
 }
 
 {

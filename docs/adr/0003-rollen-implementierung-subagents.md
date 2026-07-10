@@ -1,8 +1,50 @@
-# ADR-0003: Rollen-Implementierung — Goldfish als Subagent, Critic read-only mit `--bare`-Stufe
+# ADR-0003: Role implementation — Goldfish as subagent, Critic read-only with a `--bare` tier
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR maps the pipeline's roles onto native Claude Code primitives: the implementor role ("Goldfish") runs as a custom subagent with a narrow tool set and no persistent memory, while the reviewer role ("Critic") runs read-only by default (Read/Grep/Glob plus limited `git diff`/`git log` access) with an optional harder isolation tier — a separate `claude -p --bare` run with `--json-schema` output that skips all auto-discovery, including CLAUDE.md. Rationale: subagents alone cannot fully suppress CLAUDE.md/git-status autoloading, so the standard Critic tier accepts a documented contamination trade-off for everyday convenience, while the `--bare` tier is reserved for architecture/guardrail/security diffs where full input isolation matters. Status: accepted (2026-07-03); as of a later revision the `--bare` tier is temporarily suspended pending a wrapper fix, with a follow-up A/B test planned to decide whether it stays mandatory, becomes optional, or is dropped.
+Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · as of 2026-07-03
+
+**Status:** accepted (2026-07-03, Checkpoint 1) · **Basis:** Register E3
+
+## Context
+
+Roles map onto native Claude Code primitives: subagents get their own context window and system prompt — only the delegation prompt goes in, only the summary comes back. Fresh reviewer context is officially motivated (no bias from code just written). Mechanical limit: custom subagents auto-load CLAUDE.md + git status, non-disableable; the strict reading "sees ONLY spec + diff + guardrails" is only delivered by a separate `claude -p --bare` run. `memory` auto-enables Read/Write/Edit.
+
+## Decision (E3, verbatim)
+
+> Goldfish = custom subagent (no `memory`); Critic = read-only subagent, `--bare` tier for critical diffs
+
+Detail:
+
+- **Goldfish:** custom subagent (plugin `agents/`), narrow `tools` set, `maxTurns`, worktree per [ADR-0008](0008-permissions-worktree-policy.md), NO `memory`.
+- **Critic, standard tier:** read-only subagent (`tools: Read, Grep, Glob` + tightly scoped Bash for `git diff`/`git log`), NO `memory`.
+- **Critic, harder tier:** separate `claude -p --bare` run with `--json-schema` — skips all auto-discovery (incl. CLAUDE.md), reproducible, machine-readable verdict. Trigger (canonical wording, verbatim-matched to operating-model.md §4.2/§3.3 and [ADR-0014](0014-critic-kontrakt.md)): "Every architecture/guardrail/security diff runs with Critic Fable 5 / `max` AND additionally in `--bare` isolation. Rigor level 2 makes the Critic mandatory (default: Sonnet 5 / `max`); Fable 5 / `max` applies there only when the risk class is additionally high OR an architecture/guardrail/security diff is present."
+
+**Deliberately accepted trade-off (CLAUDE.md autoload):** the standard Critic sees CLAUDE.md + git status — full input isolation only holds at the `--bare` tier. Day to day, in-session pragmatism wins (findings directly usable, low friction); on critical diffs, the isolation guarantee wins.
+
+## Consequences
+
+**Positive:** no bespoke build — all roles on officially documented primitives; two-tier: everyday cheap and convenient, critical diffs maximally isolated with a machine-readable verdict.
+
+**Negative:** the `--bare` tier needs its own auth setup (`ANTHROPIC_API_KEY`/`apiKeyHelper`) and explicit context hand-off (`--append-system-prompt`, `--settings`) — extra effort per critical review.
+
+**Risk:** contamination of the standard Critic by CLAUDE.md content is real — accepted, documented, and bounded by the harder tier.
+
+## Rejected alternatives
+
+- **Skill with `context: fork` (built-in Explore/Plan)** — fully isolated, but not configurable (neither tools nor model nor system prompt).
+- **`memory: project` for recurring task types** — breaks the Goldfish definition (fresh context as a feature) and any read-only guarantee; learning runs through the versioned operating model instead.
+- **Always `--bare` for every Critic run** — loses in-session convenience; friction disproportionate to the isolation gain on non-critical diffs.
+
+## Follow-up
+
+**Agreed 2026-07-04 (U3 disposition, second-Elephant finding 9).** Status: the `--bare` tier has been **suspended** since 2026-07-04 pending wrapper delivery (three empirical headless defects; fallback path: neutral cwd + standard subagent Critic with a documented isolation deviation). **Follow-up content:** after wrapper delivery, an A/B test of subagent-Critic vs. `--bare`/neutral-cwd on an **identical prompt** (the two P4-T1 reviews as validation run) — the comparison planned in Sprint 0 never happened, so the isolation value-add of the harder tier remains **unproven**. The result decides whether the tier stays mandatory, becomes optional, or is dropped (decision: Elephant + PO gate, not silently in the radar).
+
+**History:** Original conception: "No follow-up. Implement both Critic tiers as callable building blocks: Phase 3." Phase 3 delivered (Critic agent + skill); the `--bare` tier failed in Phase 4 on the transport mechanism, not on the concept.
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0003: Rollen-Implementierung — Goldfish als Subagent, Critic read-only mit `--bare`-Stufe
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 

@@ -73,7 +73,7 @@ const FIXED_GIT_HEAD = () => ({ ok: true, commit: "abc123deadbeef" });
   ok("PS04 approve-push without --by refused (exit 2)", code === 2, `got ${code}`);
 }
 
-// ---- PS05: malformed pre-existing state file -> German error, exit 2, no overwrite -----
+// ---- PS05: malformed pre-existing state file -> English error, exit 2, no overwrite -----
 {
   const dir = freshDir("malformed-existing");
   mkdirSync(join(dir, ".claude"), { recursive: true });

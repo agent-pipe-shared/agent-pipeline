@@ -13,10 +13,10 @@ answer-language footer — INSIDE the paste region by design (it must be part
 of the first pasted message), not a prompt-injection payload.
 
 USAGE (the PO)
-1. Before pasting: pick a session profile — **`Profil: advisor`**
-   („Advisor (Cost/Quality)") — the design-tier model plus the advisor model
+1. Before pasting: pick a session profile — **`Profile: advisor`**
+   ("Advisor (Cost/Quality)") — the design-tier model plus the advisor model
    from session start (a continuous second opinion; MP-26) — or
-   **`Profil: design-first`** („Design-first (Cost+/Quality+)"): the design
+   **`Profile: design-first`** ("Design-first (Cost+/Quality+)"): the design
    phase runs on a cost-optimized model at high effort, switching to the full
    design-tier model at the PRD gate (MP-01). **Phase-aware `design-first`:**
    if this session's design is ALREADY approved (the standard case for a later
@@ -68,9 +68,9 @@ allowed) → the offered create-from-template actions ARE Steps 2 and 4. (F4's
 general trigger is calibration OR handover missing — in the greenfield
 instant both happen to be, but either alone fires it in later sessions.)
 
-It ends with three verbatim German lines: the confirmation line
-(„Bootstrap-Check bestanden: …"), the model/effort line (now also carrying
-`· Profil … · Advisor …`), and the role-prohibitions line (§1d/§6.1) — confirm
+It ends with three verbatim confirmation lines: the confirmation line
+("Bootstrap check passed: ruleset <SHA> loaded · Project <name> · Calibration <file> · State <...> · Role <Elephant|Goldfish|Critic>"), the model/effort line (now also carrying
+`· Profile … · Advisor …`), and the role-prohibitions line (§1d/§6.1) — confirm
 model/effort match your chosen profile (`advisor`: design-tier model + advisor
 model from start; `design-first`: cost-optimized model pre-gate, or the
 design-tier model from session start if the design-already-approved phase-aware
@@ -139,8 +139,7 @@ every `{{PLACEHOLDER}}`, keep every numbered block, add nothing from its
 confirm it survived the fill. **Correct-from-birth role language:**
 under "Pipeline binding", state that the Elephant orchestrates and EVERY
 implementation runs as a briefed Goldfish dispatch (stage-0, §3.3, the
-only exception, further ones only from the PO) — the „Claude Code = umsetzende
-IT"/„Claude Code = gesamte IT" phrase class must never be written
+only exception, further ones only from the PO) — the "Claude Code = implementing IT"/"Claude Code = all IT" phrase class must never be written
 into this file in the first place. Length gate: Step 2's `claudeMdMaxLines`.
 
 ### Step 4 — Handover file
@@ -192,7 +191,7 @@ all call this SAME command.
 ### Step 7 — First close ritual
 
 Run `/pipeline-core:close-block`. It runs the telemetry line (MP-20 —
-`/usage` paste is optional, "nicht erhoben" is a valid outcome) and the
+`/usage` paste is optional, "not collected" is a valid outcome) and the
 mandatory **6b authorship check**: enumerate this session's production diffs
 and confirm each maps to a Goldfish dispatch or an explicitly invoked
 stage-0 fast path (§3.3) — any Elephant-authored diff outside stage-0 is an
@@ -230,4 +229,4 @@ session specifically:
    the PO's explicit agreement); WIP limit 1 — at most one open the PO-gate at
    a time (Step 2's walkthrough, Step 6's ruleset gate).
 
-===> Achtung WICHTIG: Antworte bitte auf deutsch - die Anweisungen sind nur für dich nativ geschrieben, damit du diese besser und günstiger verarbeiten kannst!
+===> IMPORTANT: Answer in this project's human-facing language (default English, per §0's project header / ADR-0011) — not necessarily the language these instructions are written in.

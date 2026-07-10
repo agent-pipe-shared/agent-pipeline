@@ -5,17 +5,16 @@
 The Agent-Pipeline is two layers stacked on top of each other:
 
 - a **methodology** — roles, an SDLC, a review contract, and a handful of
-  disciplines (spec, evidence, model/token) that describe *how* work moves from
+  disciplines (spec, evidence, model/token) describing *how* work moves from
   intent to a shipped change; and
-- an **enforcement layer** — a set of hooks and a plugin that make some of those
-  disciplines hard to skip by accident.
+- an **enforcement layer** — hooks and a plugin that make those disciplines
+  hard to skip by accident.
 
-The methodology is portable. It is prose and practice; it runs wherever you and
-an agent can read and follow it. The enforcement layer is not portable: it is
-wired into Claude Code's hook and plugin system, and nothing outside Claude Code
-runs it. This page draws that line precisely — so you know exactly what you keep,
-and what you take over yourself, if you run the pipeline on a different agent
-runtime.
+The methodology is portable: prose and practice, running wherever you and an
+agent can read and follow it. The enforcement layer is not: it is wired into
+Claude Code's hook and plugin system, and nothing outside Claude Code runs it.
+This page draws that line precisely, so you know what you keep and what you
+take over yourself on a different agent runtime.
 
 ## The one setting that names your side of the line
 
@@ -27,19 +26,19 @@ agent_runtime: claude-code   # claude-code (full enforcement) | other (methodolo
 
 - **`claude-code`** — the default. The plugin's hooks are live and the gates
   below actually block.
-- **`other`** — you run the methodology by hand. `setup.mjs` records the choice
-  and prints a one-line reminder pointing here.
+- **`other`** — you run the methodology by hand. `setup.mjs` records the
+  choice and prints a one-line reminder pointing here.
 
-One point worth stating plainly: choosing `other` does not strip anything out of
-the compiled config. The hooks run through Claude Code's hook system; on any
-other runtime there is simply no hook system to invoke them, so they are
-inherently absent. The setting is a declaration of intent — it names which half
-of the pipeline you are relying on. It is not a switch that rewrites the guards.
+Worth stating plainly: choosing `other` does not strip anything out of the
+compiled config. The hooks run through Claude Code's hook system; on any
+other runtime there simply is no hook system to invoke them, so they are
+inherently absent. The setting is a declaration of intent, naming which half
+of the pipeline you rely on — not a switch that rewrites the guards.
 
 ## What requires Claude Code — the enforcement layer
 
-Everything in this section is a hook or a plugin component. It exists because
-Claude Code exposes `PreToolUse`, `SessionStart`, and `Stop` hook points and a
+Everything below is a hook or a plugin component, existing because Claude
+Code exposes `PreToolUse`, `SessionStart`, and `Stop` hook points plus a
 plugin/skill system. Take that away and none of it fires.
 
 ### Guard hooks (`PreToolUse`)
@@ -51,8 +50,8 @@ plugin/skill system. Take that away and none of it fires.
 | **`guard-testpath`** | `Edit` / `Write` | Edits to the test files that gate an implementation, so an implementor cannot quietly weaken or delete its own checks. Config-driven; with no configured paths it does nothing. |
 | **`guard-devplan`** | `Edit` / `Write` (after `guard-testpath`) | Implementation edits while the active feature's plan is not yet approved. Docs, specs, `.claude/`, and backlog paths are exempt. |
 
-All four fail *open*: without a manifest or state file they allow the action
-rather than block on missing config.
+All four fail *open*: without a manifest or state file, they allow the
+action rather than block on missing config.
 
 ### Lifecycle hooks (`SessionStart`, `Stop`)
 
@@ -68,53 +67,52 @@ rather than block on missing config.
 The whole thing ships as the `pipeline-core` Claude Code plugin. Beyond the
 hooks, that includes:
 
-- **Skills** you invoke by name — `pipeline-start` (the session bootstrap
-  protocol), `close-block` (the block-close ritual), `critic-review` (an
-  independent read-only Critic pass), `conventional-commit` (proposes a commit
-  message from the staged diff), and `advisor-consult` (the read-only
-  second-opinion workaround).
+- **Skills** invoked by name — `pipeline-start` (session bootstrap protocol),
+  `close-block` (block-close ritual), `critic-review` (independent read-only
+  Critic pass), `conventional-commit` (proposes a commit message from the
+  staged diff), and `advisor-consult` (read-only second-opinion workaround).
 - **Bound subagents** — a fresh-context Critic and the Goldfish
   implementor/mechanic tiers, dispatched as Claude Code subagents.
 - **A statusline** configured in `.claude/settings.json`.
 
-None of these have an equivalent outside Claude Code. On another runtime they
-become things you do by hand, if you do them at all.
+None of these have an equivalent outside Claude Code. On another runtime
+they become things you do by hand, if at all.
 
 ## What is portable — the methodology
 
-This is the part with no dependency on any runtime. It is documents and habits;
-it travels with the repo and works under any agent that can read a spec and run
-a command.
+No dependency on any runtime: documents and habits that travel with the repo
+and work under any agent that can read a spec and run a command.
 
-- **The four roles.** Product Owner (the human gate), Elephant (the long-lived
-  orchestrator), Goldfish (a fresh-context implementor that reports evidence,
-  not claims), and Critic (an independent read-only reviewer that sees only the
-  result). You can seat these roles under any runtime; they are a division of
-  responsibility, not a feature.
-- **The SDLC.** Intent to spec to small tasks to implement to review to
-  decision. The flow lives in [`operating-model.md`](operating-model.md) and
-  depends on nothing Claude-Code-specific.
-- **The two-stage review contract.** Deterministic checks (tests, security scan,
-  lint) run first; only what survives reaches a reviewer. On Claude Code the
-  first stage is partly hook-enforced; as a *practice* it is just "run the checks
-  before you ask anyone to judge the work," which you can do anywhere.
-- **Spec discipline.** Every task carries acceptance criteria that something or
-  someone can actually check. That is a way of writing specs, not a tool.
+- **The four roles.** Product Owner (the human gate), Elephant (long-lived
+  orchestrator), Goldfish (fresh-context implementor reporting evidence, not
+  claims), and Critic (independent read-only reviewer seeing only the
+  result). Seatable under any runtime — a division of responsibility, not a
+  feature.
+- **The SDLC.** Intent → spec → small tasks → implement → review → decision.
+  Lives in [`operating-model.md`](operating-model.md); depends on nothing
+  Claude-Code-specific.
+- **The two-stage review contract.** Deterministic checks (tests, security
+  scan, lint) run first; only what survives reaches a reviewer. On Claude
+  Code the first stage is partly hook-enforced; as a *practice* it's just
+  "run the checks before asking anyone to judge the work" — doable anywhere.
+- **Spec discipline.** Every task carries acceptance criteria something or
+  someone can actually check. A way of writing specs, not a tool.
 - **Evidence discipline.** "Done" means a machine-written log or output, the
-  exact command, and its exit code — never a model's assurance that something
-  "should work." Portable by definition.
+  exact command, and its exit code — never a model's assurance that
+  something "should work." Portable by definition.
 - **The model/token policy as a practice.** Route design, implementation,
-  mechanical, and review work to models that match their complexity, and keep an
+  mechanical, and review work to models matching their complexity; keep an
   eye on cost. On another runtime you lose the routing *hooks* but keep the
   *rule*.
-- **Handover discipline.** One canonical handover file that wins on conflict,
-  updated as state changes rather than reconstructed from chat history.
+- **Handover discipline.** One canonical handover file that wins on
+  conflict, updated as state changes rather than reconstructed from chat
+  history.
 
 ## Running on `other`: you become the enforcement layer
 
-Pick `agent_runtime: other` and the methodology is intact, but nothing is
-stopping you from cutting a corner. In practice that means turning each
-blocked-by-hook gate into a manual step you own:
+Pick `agent_runtime: other` and the methodology stays intact, but nothing
+stops you from cutting a corner. In practice, each hook-blocked gate becomes
+a manual step you own:
 
 | On Claude Code, enforced by… | On another runtime, you do this by hand |
 |---|---|
@@ -125,10 +123,10 @@ blocked-by-hook gate into a manual step you own:
 | two-stage review | Run the deterministic checks yourself, then have a separate, fresh-context reviewer look only at the result. |
 | `stop-suggest` / bootstrap | Keep the handover file current and re-read it at the start of each session. |
 
-The trade is straightforward: on `other` you get the same discipline with none
-of the safety net. That is a fine place to evaluate the methodology, or to run it
-under an agent you already trust — just go in knowing the guards are advisory,
-not active.
+The trade is straightforward: on `other` you get the same discipline with
+none of the safety net. Fine for evaluating the methodology, or for running
+it under an agent you already trust — just go in knowing the guards are
+advisory, not active.
 
 ## See also
 
@@ -143,6 +141,8 @@ not active.
 - [`design-decisions.md`](design-decisions.md) — the "why" behind the model.
 
 ---
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
 # Laufzeitgrenze — Claude Code vs. übertragbare Methodik
 

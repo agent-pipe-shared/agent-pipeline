@@ -83,12 +83,12 @@ export function isStillDefault(parsed) {
 export function buildSetupIncompleteMessage(reason) {
   const detail =
     reason === "missing"
-      ? "pipeline.user.yaml fehlt noch (frischer Clone)."
-      : "pipeline.user.yaml trägt noch die Default-Marker (owner_name/repo_owner unverändert).";
+      ? "pipeline.user.yaml is still missing (fresh clone)."
+      : "pipeline.user.yaml still carries the default markers (owner_name/repo_owner unchanged).";
   return [
-    "Setup nicht abgeschlossen — `node setup.mjs` ausführen (siehe SETUP.md).",
+    "Setup not complete — run `node setup.mjs` (see SETUP.md).",
     `- ${detail}`,
-    "- setup.mjs schreibt pipeline.user.yaml und kompiliert danach automatisch die Laufzeit-Configs (.claude/settings.json, pipeline.json, pipeline.yaml).",
+    "- setup.mjs writes pipeline.user.yaml and then automatically compiles the runtime configs (.claude/settings.json, pipeline.json, pipeline.yaml).",
   ].join("\n");
 }
 

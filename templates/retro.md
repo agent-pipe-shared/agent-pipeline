@@ -4,23 +4,24 @@ TEMPLATE: Block/session retro — Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 
 Source of truth: docs/operating-model.md §7 (feedback loop: mandatory question,
 maturity metrics, growth rule, three-artifact archive), §3.2 step 11,
 policies/model-policy.md MP-20 (telemetry line), tooling-policy G1 (rule → artifact).
-Language note (ADR-0011): template structure/instructions English; FILLED content
-GERMAN (primary readers: the PO + future human review of lessons).
+Language note (ADR-0011): template structure/instructions in English; FILLED
+content in the project's human-facing language (default English).
 
 USAGE
 1. Produced at block/session close as part of the /close ritual (until the skill
    ships: filled manually). Destination: the block's HISTORY.md entry (sections
    1–4 map into the entry) — no separate retro file archive needed; the retro IS
    part of the journal.
-2. Fill in German. Delete this comment block.
+2. Fill in the project's human-facing language (default English). Delete this
+   comment block.
 
 HARD RULES (checkable)
 - The mandatory question (section 1) MUST be answered: a concrete item OR a
-  deliberate „nichts". Silence is not an option.
+  deliberate "nothing". Silence is not an option.
   Why: the lessons loop is the only cross-session learning mechanism; without
   the forced answer it silts up (operating-model §7).
   Check: close report contains the answered question; empty section = ritual failed.
-- Every Lehre MUST carry an escalation decision (section 3, column „Eskalation").
+- Every lesson MUST carry an escalation decision (section 3, column "Escalation").
   Why: a lesson without a landing artifact evaporates — the growth rule requires
   each rule-shaped lesson to change CLAUDE.md/hook/skill/ADR (G1 assignment).
   Check: the named artifact was actually changed in the same or next commit,
@@ -31,49 +32,49 @@ HARD RULES (checkable)
 ═══════════════════════════════════════════════════════════════════════════
 -->
 
-# Retro — {{PROJECT_NAME}} · {{SESSION_ODER_BLOCK_ID}} · {{YYYY-MM-DD}}
+# Retro — {{PROJECT_NAME}} · {{SESSION_OR_BLOCK_ID}} · {{YYYY-MM-DD}}
 
-## 1. Elephant-Retro (vom Session-Elephant selbst verfasst, operating-model §7)
+## 1. Elephant Retro (written by the session Elephant itself, operating-model §7)
 
-Leitfrage (wörtlich): **„Was soll die Pipeline nächstes Mal besser machen?"**
+Guiding question (verbatim): **"What should the Pipeline do better next time?"**
 
-> Antwort des Session-Elephant: {{KONKRETES_ITEM oder bewusst „nichts" — Schweigen ist keine Option.}}
+> Session Elephant's answer: {{CONCRETE_ITEM or deliberate "nothing" — silence is not an option.}}
 
-the PO wird dazu NICHT abgefragt — eigene the PO-Beobachtungen kommen nebenbei über seinen eigenen Kanal.
+the PO is NOT surveyed for this — his own observations reach the Pipeline separately, through his own channel.
 
-Falls Item: als `workflow-improvement` ins Pipeline-Backlog übernommen bzw. als Transfer-Item an den Pipeline-Elephant?
-{{ja → BACKLOG_ITEM_REF / nein → Begründung}}
+If there is an item: adopted into the Pipeline backlog as a `workflow-improvement`, or transferred to the Pipeline Elephant?
+{{yes → BACKLOG_ITEM_REF / no → rationale}}
 
-## 2. Reifemetriken (aus telemetry/costs.md dieses Blocks, MP-20)
+## 2. Maturity Metrics (from this block's telemetry/costs.md, MP-20)
 
-| Metrik | Wert | Trend/Notiz |
+| Metric | Value | Trend/Note |
 |---|---|---|
-| First-Pass-Quote (Goldfish-Abgaben ohne Nacharbeitszyklus) | {{n von m}} | {{sinkt sie: zuerst Harness debuggen, P1}} |
-| Look-away (Eingriffe nötig? je Dispatch) | {{n von m ohne Eingriff}} | {{steigt sie: Briefings werden besser}} |
-| Nacharbeitszyklen gesamt | {{ZAHL}} | {{>2 je Task = Eskalationsfall gewesen?}} |
-| Besonderheiten (Eskalationen MP-05/MP-07, Cache, Fallbacks) | {{KURZNOTIZ oder —}} | |
+| First-pass rate (Goldfish submissions without a rework cycle) | {{n of m}} | {{if falling: debug the harness first, P1}} |
+| Look-away (interventions needed per dispatch) | {{n of m without intervention}} | {{if rising: briefings are improving}} |
+| Total rework cycles | {{NUMBER}} | {{>2 per task = was this an escalation case?}} |
+| Notable events (MP-05/MP-07 escalations, cache, fallbacks) | {{SHORT_NOTE or —}} | |
 
-## 3. Lehren → Eskalationspfad
+## 3. Lessons → Escalation Path
 
-Pfad je Lehre (tooling-policy G1): **Fakt/Konvention** → CLAUDE.md (Constraint
-nummeriert, mit Manifestations-Datum) · **Deterministisch erzwingbar** → Hook/
-Permission · **Prozedur** → Skill · **Grundsatzentscheidung** → ADR (+ Register
-bei Pipeline-Ebene) · **Pipeline-Arbeitsweise** → `workflow-improvement`-Item.
+Path per lesson (tooling-policy G1): **Fact/convention** → CLAUDE.md (numbered
+constraint, with manifestation date) · **Deterministically enforceable** → Hook/
+Permission · **Procedure** → Skill · **Policy decision** → ADR (+ register
+at Pipeline level) · **Pipeline way of working** → `workflow-improvement` item.
 
-| Lehre (1–2 Sätze, konkret) | Auslöser (Task/Fund) | Eskalation (Artefakt + Ref) |
+| Lesson (1–2 sentences, concrete) | Trigger (task/finding) | Escalation (artifact + ref) |
 |---|---|---|
-| {{LEHRE_1}} | {{AUSLOESER}} | {{z. B. "CLAUDE.md Constraint 14 (manifestiert {{DATUM}})" / "ADR-NNNN" / "backlog/NNN"}} |
-| {{LEHRE_2}} | {{...}} | {{...}} |
+| {{LESSON_1}} | {{TRIGGER}} | {{e.g. "CLAUDE.md constraint 14 (manifested {{DATE}})" / "ADR-NNNN" / "backlog/NNN"}} |
+| {{LESSON_2}} | {{...}} | {{...}} |
 
-## 4. Abschluss-Checks (Close-Ritual-Anteil)
+## 4. Closing Checks (part of the Close ritual)
 
-- [ ] Drei-Artefakte-Ablage ab Rigor-Stufe 1 erfolgt: Spec/Problembeschreibung ·
-      Akzeptanzkriterien · Ergebnis/Abschlussbericht (KEINE Chatlogs — §7).
-- [ ] Handover-Datei aktualisiert (Merge-Abschluss-Gate, §6).
-- [ ] CLAUDE.md-Längen-Gate grün ({{LIMIT}} Zeilen).
-- [ ] Telemetrie-Zeile(n) geschrieben (MP-20).
-- [ ] Memory-Spiegel widerspruchsfrei zum Repo (Widerspruch → Repo gewinnt).
-- [ ] Habe ich die Diffs wirklich gelesen oder nur Critic-Verdikte abgenickt?
-      (Lesefähigkeit erhalten; „nur abgenickt" → als Lehre in Abschnitt 3)
-- [ ] Auto-Compaction in diesem Block? {{nein / ja → Prozessfehler: „warum wurde
-      der Schnitt verpasst?" als Lehre in Abschnitt 3}}
+- [ ] Three-artifact archive done from rigor level 1 up: spec/problem statement ·
+      acceptance criteria · result/close report (NO chat logs — §7).
+- [ ] Handover file updated (merge-close gate, §6).
+- [ ] CLAUDE.md length gate green ({{LIMIT}} lines).
+- [ ] Telemetry line(s) written (MP-20).
+- [ ] Memory mirror consistent with the repo (conflict → repo wins).
+- [ ] Did I actually read the diffs, or just rubber-stamp the Critic verdicts?
+      (preserve reading ability; "just rubber-stamped" → log as a lesson in section 3)
+- [ ] Auto-compaction during this block? {{no / yes → process failure: "why was
+      the cut missed?" as a lesson in section 3}}

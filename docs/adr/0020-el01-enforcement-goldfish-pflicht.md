@@ -1,8 +1,44 @@
-# ADR-0020: EL-01-Enforcement — jede Implementierung läuft als gebriefter Goldfish-Dispatch
+# ADR-0020: EL-01 Enforcement — Every Implementation Runs as a Briefed Goldfish Dispatch
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR mandates that every implementation task run as a briefed "Goldfish" sub-agent dispatch — never done directly by the lead ("Elephant") agent — with no exception for small or tightly-coupled work (such work is bundled into one combined briefed dispatch instead). It was adopted after an incident where self-implementation by the lead agent caused significant extra cost. Enforcement is three-layered (a mandatory bootstrap check, a close-time authorship check, a critic-review checkpoint) plus a migration sweep to update onboarding docs against pre-migration language; exceptions may only be granted by the product owner.
+**Status:** accepted (2026-07-05, PO ruling following the &lt;PROJECT_B&gt;-S39 incident) · **Basis:** Register E20
+
+## Context
+
+A &lt;PROJECT_B&gt;-S39 incident showed the lead agent ("Elephant") self-implementing instead of delegating to a briefed Goldfish sub-agent — with significant extra cost. The PO subsequently ordered a three-layer enforcement plus a migration sweep.
+
+## Decision (E20)
+
+EL-01 Enforcement (PO ruling following the &lt;PROJECT_B&gt;-S39 incident, 2026-07-05): EVERY implementation runs as a briefed Sonnet-Goldfish dispatch; "small/tightly-coupled" is NOT an exception — tightly-coupled small bundles are dispatched as ONE combined briefing (context economy comes from bundling, never from self-implementation); exceptions may be granted only by the PO (the Stage-0 fast path per Operating Model §3.3 is unchanged). Enforcement is three-layered plus a migration sweep:
+
+- (a) bootstrap loads the role prohibitions as mandatory step 1d, with a third confirmation line;
+- (b) close runs an authorship check ("who produced this session's production diffs?"; self-authorship outside Stage 0 is an incident, never a discussion point);
+- (c) the critic trajectory check carries the authorship question as a standard checkpoint;
+- (d) migration kickoffs get a CLAUDE.md onboarding sweep against pre-migration language.
+
+Economic rationale: the S39 cost analysis — $57.80 Fable share (89%, 26.6M cache reads) — is the direct consequence of the violation.
+
+## Consequences
+
+**Positive:** closes the most expensive observed violation class (Elephant self-implementation at Fable's cost) procedurally, on three layers (bootstrap, close, critic).
+
+**Negative:** additional ritual overhead (third confirmation line, authorship check) in every session.
+
+**Risk:** bundling could be abused as a workaround ("one mega-briefing" instead of real delegation). Mitigation: bundling is explicitly permitted for tightly-coupled small pieces, but always remains ONE briefed dispatch, never self-implementation.
+
+## Rejected alternatives
+
+- **Keep allowing exceptions for "small/tightly-coupled"** — this is exactly what enabled the S39 violation; explicitly rejected.
+- **Enforcement on only one layer** (e.g. bootstrap hint only) — the register explicitly requires three layers plus a migration sweep.
+
+## Follow-up
+
+None scheduled in the register; spec-bound.
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0020: EL-01-Enforcement — jede Implementierung läuft als gebriefter Goldfish-Dispatch
 
 > Agent-Pipeline v0.1.0-draft · Sprint 1 · Stand 2026-07-06
 

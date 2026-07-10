@@ -1,42 +1,42 @@
-# pipeline.user.yaml — dein persönliches Pipeline-Profil.
-# Die EINE Datei, die die Pipeline "deine" macht. Der Methodik-Kern bleibt generisch.
+# pipeline.user.yaml — your personal Pipeline profile.
+# The ONE file that makes the Pipeline "yours". The methodology core stays generic.
 #
-# Ändern → `node setup.mjs` erneut ausführen (kompiliert die Laufzeit-Configs neu:
-# .claude/settings.json, .claude/pipeline.json, .claude/pipeline.yaml). Diese Datei ist
-# die QUELLE der Absicht — die drei kompilierten Dateien sind laufzeit-kanonisch und
-# tragen je einen "GENERATED from pipeline.user.yaml"-Header; Hand-Edits DORT werden bei
-# der nächsten `setup.mjs`-Ausführung als Drift erkannt und nur nach Bestätigung
-# überschrieben (Schichtenmodell).
+# Change it → re-run `node setup.mjs` (recompiles the runtime configs:
+# .claude/settings.json, .claude/pipeline.json, .claude/pipeline.yaml). This file is
+# the SOURCE of intent — the three compiled files are runtime-canonical and each
+# carries a "GENERATED from pipeline.user.yaml" header; hand-edits THERE are detected
+# as drift on the next `setup.mjs` run and overwritten only after confirmation
+# (layer model).
 #
-# Dies ist der committete TEMPLATE-Zustand mit konservativen, aber lauffähigen Defaults
-# (der Neu-Kollege startet sicher UND sofort funktionsfähig). Der SessionStart-Hook
-# `setup-check.mjs` erkennt diesen Default-Zustand (owner_name/repo_owner unverändert)
-# und erinnert an `node setup.mjs`, solange kein echtes Setup gelaufen ist.
+# This is the committed TEMPLATE state with conservative but working defaults
+# (a new colleague starts safe AND immediately functional). The SessionStart hook
+# `setup-check.mjs` recognizes this default state (owner_name/repo_owner unchanged)
+# and reminds you to run `node setup.mjs` as long as no real setup has run yet.
 
 identity:
-  owner_name: "Your Name"           # erscheint nirgends im Methodik-Kern, nur in DEINEN Artefakten (Commit-Trailer etc.)
-  repo_owner: "your-org"            # GitHub-Org/-User bzw. GitLab-Gruppe deines EIGENEN Repos
-  repo_name: "agent-pipeline"       # Name deines EIGENEN Repos (setup.mjs bindet das Plugin darauf)
-  commit_trailer: true              # Co-Authored-By-Trailer an Commits
+  owner_name: "Your Name"           # appears nowhere in the methodology core, only in YOUR artifacts (commit trailer etc.)
+  repo_owner: "your-org"            # GitHub org/user or GitLab group of YOUR OWN repo
+  repo_name: "agent-pipeline"       # name of YOUR OWN repo (setup.mjs binds the plugin to it)
+  commit_trailer: true              # Co-Authored-By trailer on commits
 
 language:
-  human_facing: de                  # was die Pipeline PRODUZIERT: Commits, Reviews, neue Docs (de|en)
-  agent_facing: en                  # Rollen/Guardrails/Skills (Empfehlung: en)
-  # Hinweis: die MITGELIEFERTE Doku ist de (human) / en (agent).
+  human_facing: en                  # what the Pipeline PRODUCES: commits, reviews, new docs (de|en)
+  agent_facing: en                  # roles/guardrails/skills (recommended: en)
+  # Note: the SHIPPED documentation is de (human) / en (agent).
 
 platform:
-  git_host: github                  # github | gitlab   (setup.mjs erkennt es aus `git remote -v`)
-  cli: gh                           # gh | glab         (setup.mjs setzt das passend zum Host)
-  # Hinweis Self-Hosted GitLab: setup.mjs bindet das Marketplace-Binding standardmaessig an
-  # gitlab.com; bei einem eigenen GitLab-Host die generierte Marketplace-URL in
-  # .claude/settings.json (extraKnownMarketplaces) danach von Hand anpassen.
+  git_host: github                  # github | gitlab   (setup.mjs detects it from `git remote -v`)
+  cli: gh                           # gh | glab         (setup.mjs sets this to match the host)
+  # Note on self-hosted GitLab: setup.mjs binds the marketplace binding to gitlab.com by
+  # default; for your own GitLab host, adjust the generated marketplace URL in
+  # .claude/settings.json (extraKnownMarketplaces) by hand afterwards.
 
-agent_runtime: claude-code          # claude-code (volles Enforcement) | other (nur Methodik → docs/runtime-boundary.md)
+agent_runtime: claude-code          # claude-code (full enforcement) | other (methodology only → docs/runtime-boundary.md)
 
-# setup.mjs fragt deine Abo-Stufe und schreibt ein Preset:
-#   Pro:  alles sonnet, effort-gestaffelt (Methodik voll nutzbar)
-#   Max:  opus-Orchestrator + sonnet-3-Tier (empfohlen, Default unten)
-#   API/eigene: Namen frei eintragen (setup.mjs befüllt mit dem Max-Preset als Startpunkt)
+# setup.mjs asks your subscription tier and writes a preset:
+#   Pro:  all sonnet, effort-tiered (methodology fully usable)
+#   Max:  opus orchestrator + sonnet 3-tier (recommended, default below)
+#   API/custom: enter names freely (setup.mjs pre-fills with the Max preset as a starting point)
 models:
   design:
     model: opus
@@ -51,8 +51,8 @@ models:
     model: sonnet
     effort: high
   advisor:
-    enabled: false                  # optionales 2nd-Opinion-Muster; DEFAULT AUS
-    # Fallback ohne Advisor-Zugang: advisor-consult-Subagent (dokumentiert)
+    enabled: false                  # optional 2nd-opinion pattern; DEFAULT OFF
+    # Fallback without advisor access: advisor-consult subagent (documented)
 
 autonomy:
   push_policy: gated                # gated | standing-approved
@@ -66,8 +66,8 @@ gates:
   claude_md_max_lines: 200
 
 # -----------------------------------------------------------------------------------------
-# Advanced/Autonom-Beispiel (NICHT aktiv — nur zur Orientierung; setup.mjs schreibt diese
-# Werte automatisch, wenn du beim Autonomie-Preset "Autonom" wählst):
+# Advanced/autonomous example (NOT active — for orientation only; setup.mjs writes these
+# values automatically when you choose "Autonomous" for the autonomy preset):
 #
 # autonomy:
 #   push_policy:  standing-approved

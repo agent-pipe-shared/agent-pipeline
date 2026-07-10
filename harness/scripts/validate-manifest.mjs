@@ -2,7 +2,7 @@
 /**
  * validate-manifest.mjs -- thin CLI over plugins/pipeline-core/lib/manifest.mjs.
  * All the actual reading/parsing/validating logic lives in the
- * (distribution-ready) library; this script is just argv handling + German rendering
+ * (distribution-ready) library; this script is just argv handling + English rendering
  * of the {path, expected, got, line?} error shape loadManifest() returns.
  *
  * NOT WIRED into harness/scripts/verify.mjs by this delivery (TP-3 -- verify.mjs is
@@ -15,7 +15,7 @@
  *
  * EXIT CODES:
  *   0 -- manifest absent (opt-in feature, nothing to validate) OR present and valid.
- *   2 -- present but invalid: one German error line per finding, then exit 2.
+ *   2 -- present but invalid: one English error line per finding, then exit 2.
  */
 import { basename, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,12 +25,12 @@ import { loadManifest, DEFAULT_MANIFEST_RELPATH } from "../../plugins/pipeline-c
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = join(SCRIPT_DIR, "..", "..");
 
-/** Renders one structured error entry into the required German message template. */
+/** Renders one structured error entry into the required English message template. */
 export function formatError(err) {
   if (err.line !== undefined && err.line !== null) {
-    return `YAML-Fehler Zeile ${err.line}: ${err.reason}`;
+    return `YAML error line ${err.line}: ${err.reason}`;
   }
-  return `Feld "${err.path}": erwartet ${err.expected}, erhalten ${err.got}`;
+  return `Field "${err.path}": expected ${err.expected}, got ${err.got}`;
 }
 
 /** One-line human summary of a valid manifest -- printed on the exit-0 "present+valid" path. */
@@ -40,8 +40,8 @@ export function formatSummary(manifest) {
   const activeProfile =
     manifest.profiles && typeof manifest.profiles === "object" && typeof manifest.profiles.active === "string"
       ? manifest.profiles.active
-      : "(kein Profil)";
-  return `Manifest gültig (${manifest.schema}): ${phaseCount} Phase(n), ${gateCount} Gate(s), aktives Profil "${activeProfile}".`;
+      : "(no profile)";
+  return `Manifest valid (${manifest.schema}): ${phaseCount} phase(s), ${gateCount} gate(s), active profile "${activeProfile}".`;
 }
 
 /**
@@ -60,7 +60,7 @@ export function run(argv = process.argv.slice(2)) {
   const result = loadManifest(rootDir, { manifestRelPath });
 
   if (result.status === "absent") {
-    console.log("Manifest nicht aktiv (optional)");
+    console.log("Manifest not active (optional)");
     return 0;
   }
   if (result.status === "ok") {

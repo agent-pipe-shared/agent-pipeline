@@ -2,9 +2,9 @@
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-This folder is the pipeline's documentation set. For the one-minute picture start
-with the top-level [README](../README.md); to stand up your own copy read
-[`SETUP.md`](../SETUP.md). Then come here and read in this order.
+This folder is the pipeline's documentation set. For the one-minute picture, start
+with the top-level [README](../README.md); to stand up your own copy, read
+[`SETUP.md`](../SETUP.md). Then read in this order.
 
 ## Reading order
 
@@ -27,6 +27,8 @@ Then, as you need them:
 (Formalized decisions live in [`adr/`](adr/) — one record per decision.)
 
 ---
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
 # Die Dokumente und die Reihenfolge zum Lesen
 

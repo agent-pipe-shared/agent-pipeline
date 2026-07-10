@@ -9,7 +9,7 @@
  *   - no state file -> silent
  *   - no activeFeature -> silent
  *   - malformed state JSON -> silent
- *   - mid-phase -> correct next suggestion (exact German message asserted)
+ *   - mid-phase -> correct next suggestion (exact English message asserted)
  *   - disabled phase skipped (never appears as "next")
  *   - condition-false phase (has_ui:false) skipped
  *   - has_ui:true includes ui-design
@@ -192,13 +192,13 @@ ok(
 }
 
 // ======================================================================================
-// mid-phase -> correct next suggestion (exact German message)
+// mid-phase -> correct next suggestion (exact English message)
 // ======================================================================================
 {
   const manifest = manifestFixture({ secMode: "blocking" });
   const message = resolveSuggestion(manifest, stateFixture("implementation"));
-  const expected = 'Pipeline: Phase "implementation" aktiv → nächster Schritt: "security-scan" (Gate: security, mode: blocking). Prüfung: node harness/scripts/security-scan.mjs';
-  ok("resolveSuggestion: implementation -> security-scan exact German message", message === expected, message);
+  const expected = 'Pipeline: phase "implementation" active → next step: "security-scan" (Gate: security, mode: blocking). Check: node harness/scripts/security-scan.mjs';
+  ok("resolveSuggestion: implementation -> security-scan exact English message", message === expected, message);
 }
 
 // ======================================================================================
@@ -208,7 +208,7 @@ ok(
   const manifest = manifestFixture({ secScanEnabled: false, hasUi: false });
   const message = resolveSuggestion(manifest, stateFixture("implementation"));
   ok("resolveSuggestion: disabled security-scan is skipped -> no mention of it", message !== null && !message.includes("security-scan"), message);
-  ok("resolveSuggestion: disabled security-scan skipped -> implementation becomes the last active phase (completion message)", message !== null && message.includes("Push-Gate"), message);
+  ok("resolveSuggestion: disabled security-scan skipped -> implementation becomes the last active phase (completion message)", message !== null && message.includes("push gate"), message);
 }
 
 // ======================================================================================
@@ -217,7 +217,7 @@ ok(
 {
   const manifest = manifestFixture({ hasUi: false });
   const message = resolveSuggestion(manifest, stateFixture("security-scan"));
-  ok("resolveSuggestion: has_ui false -> ui-design skipped, security-scan is the last active phase", message !== null && message.includes("Push-Gate") && !message.includes("ui-design"), message);
+  ok("resolveSuggestion: has_ui false -> ui-design skipped, security-scan is the last active phase", message !== null && message.includes("push gate") && !message.includes("ui-design"), message);
 }
 
 // ======================================================================================
@@ -226,7 +226,7 @@ ok(
 {
   const manifest = manifestFixture({ hasUi: true });
   const message = resolveSuggestion(manifest, stateFixture("security-scan"));
-  ok("resolveSuggestion: has_ui true -> next phase after security-scan is ui-design", message === 'Pipeline: Phase "security-scan" aktiv → nächster Schritt: "ui-design".', message);
+  ok("resolveSuggestion: has_ui true -> next phase after security-scan is ui-design", message === 'Pipeline: phase "security-scan" active → next step: "ui-design".', message);
 }
 
 // ======================================================================================
@@ -235,7 +235,7 @@ ok(
 {
   const manifest = manifestFixture({ hasUi: false, secScanEnabled: true, pushMode: "blocking" });
   const message = resolveSuggestion(manifest, stateFixture("security-scan"));
-  const expected = 'Pipeline: alle Phasen von Profil "full-sdlc" durchlaufen — Push-Gate (mode: blocking) ist der letzte Schritt.';
+  const expected = 'Pipeline: all phases of profile "full-sdlc" complete — push gate (mode: blocking) is the last step.';
   ok("resolveSuggestion: last active phase -> exact completion message", message === expected, message);
 }
 
@@ -245,21 +245,21 @@ ok(
 {
   const manifest = manifestFixture({ devPlanMode: "blocking" });
   const message = resolveSuggestion(manifest, stateFixture("design", { planApproved: false }));
-  ok("resolveSuggestion: planApproved false -> message mentions the missing approval", message !== null && message.includes("planApproved") && message.includes("fehlt"), message);
+  ok("resolveSuggestion: planApproved false -> message mentions the missing approval", message !== null && message.includes("planApproved") && message.includes("missing"), message);
   ok("resolveSuggestion: planApproved false -> gate clause names dev-plan", message.includes("Gate: dev-plan"), message);
 }
 
 {
   const manifest = manifestFixture({ devPlanMode: "blocking" });
   const message = resolveSuggestion(manifest, stateFixture("design", { planApproved: true }));
-  ok("resolveSuggestion: planApproved true -> no missing-approval hint", message !== null && !message.includes("fehlt"), message);
+  ok("resolveSuggestion: planApproved true -> no missing-approval hint", message !== null && !message.includes("missing"), message);
 }
 
 {
   // planApproved entirely absent (not just false) must be treated the same as false.
   const manifest = manifestFixture({ devPlanMode: "blocking" });
   const message = resolveSuggestion(manifest, stateFixture("design"));
-  ok("resolveSuggestion: planApproved absent -> treated as not approved (mentions missing approval)", message.includes("fehlt"), message);
+  ok("resolveSuggestion: planApproved absent -> treated as not approved (mentions missing approval)", message.includes("missing"), message);
 }
 
 // ======================================================================================
@@ -290,7 +290,7 @@ ok(
     threw = true;
   }
   ok("resolveSuggestion: gate missing from manifest.gates does not throw", threw === false);
-  ok("resolveSuggestion: gate missing from manifest.gates falls back to 'unbekannt' mode", message !== null && message.includes("mode: unbekannt"), message);
+  ok("resolveSuggestion: gate missing from manifest.gates falls back to 'unknown' mode", message !== null && message.includes("mode: unknown"), message);
 }
 
 // ======================================================================================
@@ -382,7 +382,7 @@ ok("resolveSessionIdFromInput: empty-string session_id -> null", resolveSessionI
 ok("resolveSessionIdFromInput: non-string session_id -> null", resolveSessionIdFromInput({ session_id: 123 }) === null);
 
 // ---- contextTier boundaries (pure) -------------------------------------------------------
-// P2 fix (Design-Entscheid 2026-07-08): contextTier now tiers on usedPct (0-100), not on
+// P2 fix (design decision 2026-07-08): contextTier now tiers on usedPct (0-100), not on
 // absolute totalTokens -- the boundaries below are chosen so a 200k window behaves BYTE-
 // IDENTICALLY to the old absolute thresholds (50% = 100k, 75% = 150k, 85% = 170k).
 ok('contextTier: null -> "none"', contextTier(null) === "none");
@@ -402,15 +402,15 @@ ok('contextTier: 1M-window at 34% used -> "none" (NO spurious block; 340k real t
 ok('buildContextMessage: tier "none" -> null', buildContextMessage("none", 50000) === null);
 {
   const msg = buildContextMessage("warn", 120000);
-  ok('buildContextMessage: tier "warn" mentions Übergabefenster + token count', msg.includes("Übergabefenster") && msg.includes("120k"), msg);
+  ok('buildContextMessage: tier "warn" mentions handover window + token count', msg.includes("handover window") && msg.includes("120k"), msg);
 }
 {
   const msg = buildContextMessage("overdue", 155000);
-  ok('buildContextMessage: tier "overdue" mentions ÜBERFÄLLIG + token count', msg.includes("ÜBERFÄLLIG") && msg.includes("155k"), msg);
+  ok('buildContextMessage: tier "overdue" mentions OVERDUE + token count', msg.includes("OVERDUE") && msg.includes("155k"), msg);
 }
 {
   const msg = buildContextMessage("block", 175000);
-  ok('buildContextMessage: tier "block" mentions NOTBREMSE + token count', msg.includes("NOTBREMSE") && msg.includes("175k"), msg);
+  ok('buildContextMessage: tier "block" mentions EMERGENCY BRAKE + token count', msg.includes("EMERGENCY BRAKE") && msg.includes("175k"), msg);
 }
 
 // ---- usageFilePath / loadUsageSafe / resolveTotalTokensFromUsage ------------------------
@@ -549,7 +549,7 @@ ok("resolveUsedPctFromUsage: boundary 100 -> 100", resolveUsedPctFromUsage({ use
     contextMessage: buildContextMessage("warn", 120000),
     priorMarker,
   });
-  ok("decideCombinedOutput: tier change (none -> warn) -> re-emits", stdout !== "" && stdout.includes("Übergabefenster"), stdout);
+  ok("decideCombinedOutput: tier change (none -> warn) -> re-emits", stdout !== "" && stdout.includes("handover window"), stdout);
 }
 {
   // First consecutive block turn (priorMarker null) -> decision:"block" present.
@@ -561,7 +561,7 @@ ok("resolveUsedPctFromUsage: boundary 100 -> 100", resolveUsedPctFromUsage({ use
   });
   const parsed = JSON.parse(stdout);
   ok('decideCombinedOutput: 1st consecutive block turn -> decision "block"', parsed.decision === "block", stdout);
-  ok("decideCombinedOutput: 1st consecutive block turn -> reason present", typeof parsed.reason === "string" && parsed.reason.includes("NOTBREMSE"));
+  ok("decideCombinedOutput: 1st consecutive block turn -> reason present", typeof parsed.reason === "string" && parsed.reason.includes("EMERGENCY BRAKE"));
   ok("decideCombinedOutput: 1st consecutive block turn -> marker.consecutiveBlocks 1", marker.consecutiveBlocks === 1, JSON.stringify(marker));
 }
 {
@@ -598,7 +598,7 @@ ok("resolveUsedPctFromUsage: boundary 100 -> 100", resolveUsedPctFromUsage({ use
   ok("decideCombinedOutput: 3rd consecutive block turn -> NO decision field (downgraded)", parsed.decision === undefined, stdout);
   ok(
     "decideCombinedOutput: 3rd consecutive block turn -> downgrade note present",
-    parsed.systemMessage.includes("heruntergestuft"),
+    parsed.systemMessage.includes("Downgraded"),
     parsed.systemMessage,
   );
   ok("decideCombinedOutput: 3rd consecutive block turn -> marker.consecutiveBlocks 3", marker.consecutiveBlocks === 3, JSON.stringify(marker));
@@ -688,10 +688,10 @@ function writeGbFixture(rootDir, { phase = "implementation" } = {}) {
   writeJson(join(rootDir, ".claude", "pipeline-state.json"), stateFixture(phase));
 }
 
-// P2 fix (Design-Entscheid 2026-07-08): usedPct now drives the tier -- callers must pass the
+// P2 fix (design decision 2026-07-08): usedPct now drives the tier -- callers must pass the
 // pct explicitly (no longer hardcoded to 50, which silently drove every old caller's tier
 // through totalTokens instead). totalTokens stays real/independent -- it only feeds the
-// DISPLAY text (Kontext {k}k), never the tier decision.
+// DISPLAY text (Context {k}k), never the tier decision.
 // STALE-DETECTION fixture fix (context-counter hardening, PO-directive 2026-07-08): `updatedAt`
 // now defaults to the REAL current time (`new Date().toISOString()`), not a hardcoded past
 // literal -- every pre-existing caller of this helper writes a snapshot meant to simulate a
@@ -722,14 +722,14 @@ function writeGbUsage(rootDir, sessionId, totalTokens, usedPct, updatedAt = new 
   writeGbUsage(rootDir, "sess-1", 120000, 60); // 60% used -> tier "warn"
   const r3 = runCliWithStdin(rootDir, { session_id: "sess-1" });
   ok(
-    "G-B CLI: 3rd turn, context tier changed to warn -> re-emits with Übergabefenster",
-    r3.stdout.includes("Übergabefenster") && r3.stdout.includes("security-scan"),
+    "G-B CLI: 3rd turn, context tier changed to warn -> re-emits with handover window",
+    r3.stdout.includes("handover window") && r3.stdout.includes("security-scan"),
     r3.stdout,
   );
 }
 
 {
-  // P2 fix proof (Design-Entscheid 2026-07-08, EL-04): a 1M-context session at 34% used is
+  // P2 fix proof (design decision 2026-07-08, EL-04): a 1M-context session at 34% used is
   // 340k REAL tokens -- the OLD absolute-token contextTier (>=170k -> block) would have fired
   // a spurious emergency brake here. Percentage-based tiering correctly stays "none".
   const rootDir = fixtureDir("gb-cli-1m-window-no-spurious-block");
@@ -739,7 +739,7 @@ function writeGbUsage(rootDir, sessionId, totalTokens, usedPct, updatedAt = new 
   const r1 = runCliWithStdin(rootDir, { session_id: "sess-1m" });
   ok("G-B CLI: 1M-window at 34% used -> exit 0", r1.status === 0, `stderr=${r1.stderr}`);
   ok("G-B CLI: 1M-window at 34% used -> NO decision:block (no spurious emergency brake)", !r1.stdout.includes('"decision"'), r1.stdout);
-  ok("G-B CLI: 1M-window at 34% used -> no context clause at all (tier none)", !r1.stdout.includes("Kontext"), r1.stdout);
+  ok("G-B CLI: 1M-window at 34% used -> no context clause at all (tier none)", !r1.stdout.includes("Context "), r1.stdout);
 
   writeGbUsage(rootDir, "sess-1m", 850000, 85); // same 1M window, now 85% used -> tier "block"
   const r2 = runCliWithStdin(rootDir, { session_id: "sess-1m" });
@@ -773,7 +773,7 @@ function writeGbUsage(rootDir, sessionId, totalTokens, usedPct, updatedAt = new 
   ok("G-B CLI block-nag-cap: turn 3 -> NO decision field (nag-cap downgrade)", p3Parsed && p3.decision === undefined, r3.stdout);
   ok(
     "G-B CLI block-nag-cap: turn 3 -> downgrade note present in systemMessage",
-    p3Parsed && p3.systemMessage.includes("heruntergestuft"),
+    p3Parsed && p3.systemMessage.includes("Downgraded"),
     r3.stdout,
   );
 
@@ -792,7 +792,7 @@ function writeGbUsage(rootDir, sessionId, totalTokens, usedPct, updatedAt = new 
   writeGbFixture(rootDir);
   const r = runCliWithStdin(rootDir, { session_id: "sess-no-usage" });
   ok("G-B CLI: usage file absent -> exit 0", r.status === 0);
-  ok("G-B CLI: usage file absent -> phase suggestion still present, no context clause", r.stdout.includes("security-scan") && !r.stdout.includes("Kontext"), r.stdout);
+  ok("G-B CLI: usage file absent -> phase suggestion still present, no context clause", r.stdout.includes("security-scan") && !r.stdout.includes("Context "), r.stdout);
 }
 
 {
@@ -802,12 +802,12 @@ function writeGbUsage(rootDir, sessionId, totalTokens, usedPct, updatedAt = new 
   mkdirSync(join(rootDir, ".claude"), { recursive: true });
   writeRaw(join(rootDir, ".claude", ".usage-sess-malformed.json"), "{ not json ][");
   const r = runCliWithStdin(rootDir, { session_id: "sess-malformed" }); // deliberately a DIFFERENT session id than the malformed file's -- proves a mismatched/absent usage file for THIS session is equally silently skipped
-  ok("G-B CLI: malformed usage file (different session) -> fail-open, no context clause", r.status === 0 && !r.stdout.includes("Kontext"), r.stdout);
+  ok("G-B CLI: malformed usage file (different session) -> fail-open, no context clause", r.status === 0 && !r.stdout.includes("Context "), r.stdout);
 
   const rSame = runCliWithStdin(rootDir, { session_id: "sess-malformed-samefile" });
   writeRaw(join(rootDir, ".claude", ".usage-sess-malformed-samefile.json"), "{ not json ][");
   const rSame2 = runCliWithStdin(rootDir, { session_id: "sess-malformed-samefile" });
-  ok("G-B CLI: malformed usage file for THIS session -> fail-open, no context clause", rSame2.status === 0 && !rSame2.stdout.includes("Kontext"), rSame2.stdout);
+  ok("G-B CLI: malformed usage file for THIS session -> fail-open, no context clause", rSame2.status === 0 && !rSame2.stdout.includes("Context "), rSame2.stdout);
 }
 
 {
@@ -869,7 +869,7 @@ ok("resolveStopHookActiveFromInput: non-boolean value -> false", resolveStopHook
   ok("decideCombinedOutput: forceCapped on 1st block turn -> NO decision field", parsed.decision === undefined, stdout);
   ok(
     "decideCombinedOutput: forceCapped on 1st block turn -> downgrade note present",
-    parsed.systemMessage.includes("heruntergestuft"),
+    parsed.systemMessage.includes("Downgraded"),
     parsed.systemMessage,
   );
   ok("decideCombinedOutput: forceCapped on 1st block turn -> marker.consecutiveBlocks 1", marker.consecutiveBlocks === 1, JSON.stringify(marker));
@@ -907,8 +907,8 @@ ok("resolveStopHookActiveFromInput: non-boolean value -> false", resolveStopHook
   ok("applyPersistenceGuard: write failed on active block -> NO decision field", parsed.decision === undefined, guarded);
   ok("applyPersistenceGuard: write failed on active block -> reason field also absent", parsed.reason === undefined, guarded);
   ok(
-    "applyPersistenceGuard: write failed on active block -> downgrades to overdue wording (ÜBERFÄLLIG), not NOTBREMSE",
-    parsed.systemMessage.includes("ÜBERFÄLLIG") && !parsed.systemMessage.includes("NOTBREMSE"),
+    "applyPersistenceGuard: write failed on active block -> downgrades to overdue wording (OVERDUE), not EMERGENCY BRAKE",
+    parsed.systemMessage.includes("OVERDUE") && !parsed.systemMessage.includes("EMERGENCY BRAKE"),
     parsed.systemMessage,
   );
 }
@@ -951,7 +951,7 @@ ok("resolveStopHookActiveFromInput: non-boolean value -> false", resolveStopHook
   }
   ok(
     "gb-cli marker-unwritable: at least one turn still surfaces the overdue wording (fail-open, not silently swallowed)",
-    turns.some((t) => t.stdout.includes("ÜBERFÄLLIG")),
+    turns.some((t) => t.stdout.includes("OVERDUE")),
     JSON.stringify(turns.map((t) => t.stdout)),
   );
 }
@@ -968,13 +968,13 @@ ok("resolveStopHookActiveFromInput: non-boolean value -> false", resolveStopHook
   ok('gb-cli stop_hook_active+missing-marker: NO decision:"block" (belt-and-suspenders)', !r.stdout.includes('"decision"'), r.stdout);
   // N1 non-silence pin (re-critic follow-up, 2026-07-08): the downgrade must be FELT, not
   // swallowed -- absence of a `decision` field alone doesn't prove the warning still surfaced.
-  // Asserts both the tier-block wording (NOTBREMSE, carried through from the un-downgraded
-  // contextMessage) and the downgrade note itself (`heruntergestuft`, NAG_DOWNGRADE_NOTE) are
+  // Asserts both the tier-block wording (EMERGENCY BRAKE, carried through from the un-downgraded
+  // contextMessage) and the downgrade note itself (`Downgraded`, NAG_DOWNGRADE_NOTE) are
   // present on stdout, mirroring the pure-function assertion style at the 3rd-consecutive-turn
   // case above.
   ok(
-    "gb-cli stop_hook_active+missing-marker: downgrade output is NOT silent (NOTBREMSE + downgrade-note wording present)",
-    r.stdout.includes("NOTBREMSE") && r.stdout.includes("heruntergestuft"),
+    "gb-cli stop_hook_active+missing-marker: downgrade output is NOT silent (EMERGENCY BRAKE + downgrade-note wording present)",
+    r.stdout.includes("EMERGENCY BRAKE") && r.stdout.includes("Downgraded"),
     r.stdout,
   );
 }
@@ -1009,7 +1009,7 @@ ok("resolveStopHookActiveFromInput: non-boolean value -> false", resolveStopHook
 // ==========================================================================================
 // STALE-DETECTION (context-counter hardening, PO-directive 2026-07-08): the usage snapshot
 // only refreshes when the statusLine renders -- a snapshot untouched for more than
-// USAGE_STALE_THRESHOLD_MS now gets an explicit German warning instead of being silently
+// USAGE_STALE_THRESHOLD_MS now gets an explicit warning instead of being silently
 // trusted. Everything below is additive; nothing above this marker changes meaning (proven by
 // the fixed fixture default above: `writeGbUsage` now defaults `updatedAt` to the real "now").
 // ==========================================================================================
@@ -1054,9 +1054,9 @@ ok("isUsageStale: non-finite thresholdMs -> false", isUsageStale({ updatedAt: "2
   const msg = buildStaleMessage({ updatedAt }, nowMsFixed);
   const d = new Date(updatedAtMs);
   const expectedHHMM = `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-  ok("buildStaleMessage: mentions 'veraltet'", msg !== null && msg.includes("veraltet"), msg);
-  ok("buildStaleMessage: mentions the derived HH:MM Stand", msg.includes(expectedHHMM), msg);
-  ok("buildStaleMessage: mentions age in minutes ('vor 23m')", msg.includes("vor 23m"), msg);
+  ok("buildStaleMessage: mentions 'stale'", msg !== null && msg.includes("stale"), msg);
+  ok("buildStaleMessage: mentions the derived HH:MM timestamp", msg.includes(expectedHHMM), msg);
+  ok("buildStaleMessage: mentions age in minutes ('23m ago')", msg.includes("23m ago"), msg);
   ok("buildStaleMessage: mentions /context and /compact", msg.includes("/context") && msg.includes("/compact"), msg);
 }
 ok("buildStaleMessage: missing updatedAt -> null", buildStaleMessage({}, Date.now()) === null);
@@ -1100,7 +1100,7 @@ ok("buildStaleMessage: non-finite nowMs -> null", buildStaleMessage({ updatedAt:
     priorMarker: null,
     staleMessage: "STALE-TEXT",
   });
-  ok("decideCombinedOutput: contextMessage + staleMessage both present -> both appear", stdout.includes("Übergabefenster") && stdout.includes("STALE-TEXT"), stdout);
+  ok("decideCombinedOutput: contextMessage + staleMessage both present -> both appear", stdout.includes("handover window") && stdout.includes("STALE-TEXT"), stdout);
 }
 
 // ---- applyPersistenceGuard: staleMessage survives a nag-cap write-failure downgrade ------
@@ -1116,7 +1116,7 @@ ok("buildStaleMessage: non-finite nowMs -> null", buildStaleMessage({ updatedAt:
   const parsed = JSON.parse(guarded);
   ok(
     "applyPersistenceGuard: write failed on active block WITH staleMessage -> stale text survives the downgrade",
-    parsed.systemMessage.includes("STALE-TEXT") && parsed.systemMessage.includes("ÜBERFÄLLIG"),
+    parsed.systemMessage.includes("STALE-TEXT") && parsed.systemMessage.includes("OVERDUE"),
     guarded,
   );
 }
@@ -1125,7 +1125,7 @@ ok("buildStaleMessage: non-finite nowMs -> null", buildStaleMessage({ updatedAt:
 {
   // Standalone emission: no active phase (state file removed after writeGbFixture) + a usage
   // file whose updatedAt is far in the past -> the stale warning STILL fires, proving the
-  // "eigenständig emittieren, wenn tier sonst none" requirement.
+  // "emits standalone when tier would otherwise be none" requirement.
   const rootDir = fixtureDir("gb-cli-stale-standalone");
   writeGbFixture(rootDir);
   rmSync(join(rootDir, ".claude", "pipeline-state.json"));
@@ -1134,7 +1134,7 @@ ok("buildStaleMessage: non-finite nowMs -> null", buildStaleMessage({ updatedAt:
   const r = runCliWithStdin(rootDir, { session_id: "sess-stale-standalone" });
   ok("gb-cli stale standalone: exit 0", r.status === 0, `stderr=${r.stderr}`);
   ok("gb-cli stale standalone: no phase suggestion (state file removed)", !r.stdout.includes("security-scan"), r.stdout);
-  ok("gb-cli stale standalone: stale warning fires standalone (tier none, no phase message)", r.stdout.includes("veraltet"), r.stdout);
+  ok("gb-cli stale standalone: stale warning fires standalone (tier none, no phase message)", r.stdout.includes("stale"), r.stdout);
 }
 {
   // Fresh usage file (default `writeGbUsage` updatedAt = real now) -> no stale warning at all.
@@ -1143,7 +1143,7 @@ ok("buildStaleMessage: non-finite nowMs -> null", buildStaleMessage({ updatedAt:
   writeGbUsage(rootDir, "sess-fresh", 50000, 25); // tier "none", fresh
   const r = runCliWithStdin(rootDir, { session_id: "sess-fresh" });
   ok("gb-cli fresh usage: exit 0", r.status === 0, `stderr=${r.stderr}`);
-  ok("gb-cli fresh usage: no stale warning", !r.stdout.includes("veraltet"), r.stdout);
+  ok("gb-cli fresh usage: no stale warning", !r.stdout.includes("stale"), r.stdout);
 }
 {
   // Episode-dedup at the CLI level: turn 1 (stale) emits, turn 2 (same still-stale file,
@@ -1154,7 +1154,7 @@ ok("buildStaleMessage: non-finite nowMs -> null", buildStaleMessage({ updatedAt:
   writeGbUsage(rootDir, "sess-stale-dedup", 50000, 25, staleUpdatedAt); // tier "none", stale
   const r1 = runCliWithStdin(rootDir, { session_id: "sess-stale-dedup" });
   ok("gb-cli stale dedup: turn 1 exit 0", r1.status === 0, `stderr=${r1.stderr}`);
-  ok("gb-cli stale dedup: turn 1 emits the stale warning", r1.stdout.includes("veraltet"), r1.stdout);
+  ok("gb-cli stale dedup: turn 1 emits the stale warning", r1.stdout.includes("stale"), r1.stdout);
   const r2 = runCliWithStdin(rootDir, { session_id: "sess-stale-dedup" });
   ok("gb-cli stale dedup: turn 2 (same stale episode, unchanged phase) -> silent", r2.status === 0 && r2.stdout === "", `status=${r2.status} stdout=${r2.stdout}`);
 }
@@ -1166,13 +1166,13 @@ ok("buildStaleMessage: non-finite nowMs -> null", buildStaleMessage({ updatedAt:
   const staleUpdatedAt = new Date(Date.now() - 30 * 60 * 1000).toISOString();
   writeGbUsage(rootDir, "sess-stale-transition", 50000, 25, staleUpdatedAt);
   const r1 = runCliWithStdin(rootDir, { session_id: "sess-stale-transition" });
-  ok("gb-cli stale->fresh: turn 1 stale warning present", r1.stdout.includes("veraltet"), r1.stdout);
+  ok("gb-cli stale->fresh: turn 1 stale warning present", r1.stdout.includes("stale"), r1.stdout);
 
   writeGbUsage(rootDir, "sess-stale-transition", 50000, 25); // refresh -> now fresh
   const r2 = runCliWithStdin(rootDir, { session_id: "sess-stale-transition" });
   ok(
     "gb-cli stale->fresh: turn 2 re-emits (fingerprint changed), no stale warning anymore",
-    r2.stdout.includes("security-scan") && !r2.stdout.includes("veraltet"),
+    r2.stdout.includes("security-scan") && !r2.stdout.includes("stale"),
     r2.stdout,
   );
 }
@@ -1185,7 +1185,7 @@ ok("buildStaleMessage: non-finite nowMs -> null", buildStaleMessage({ updatedAt:
   writeJson(join(rootDir, ".claude", ".usage-sess-badupdated.json"), { usedPct: 25, totalTokens: 50000, updatedAt: "not-a-date" });
   const r = runCliWithStdin(rootDir, { session_id: "sess-badupdated" });
   ok("gb-cli malformed updatedAt: exit 0", r.status === 0, `stderr=${r.stderr}`);
-  ok("gb-cli malformed updatedAt: no stale claim (fail-open, no evidence)", !r.stdout.includes("veraltet"), r.stdout);
+  ok("gb-cli malformed updatedAt: no stale claim (fail-open, no evidence)", !r.stdout.includes("stale"), r.stdout);
 }
 
 // ---- cleanup + summary -----------------------------------------------------------------

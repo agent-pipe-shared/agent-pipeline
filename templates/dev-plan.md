@@ -1,57 +1,57 @@
 <!--
-PROMPT/DOC TEMPLATE: Dev-Plan — Implementierungs-Vertrag für the PO's Plan-Mode-Freigabe
+PROMPT/DOC TEMPLATE: Dev-Plan — implementation contract for the PO's Plan-Mode approval
 (Dev-Plan-Gate) — Agent-Pipeline, AP1-P3 "DURIN".
-Language: GERMAN (the PO ist primärer Leser, ADR-0011 Primärleser-Regel).
-Source of truth: docs/operating-model.md §3.2 Schritt 3b (Verbuchungssatz).
-Zweck: Plan-Mode-Ersatz für Spec/PRD-Zeremonie in Sessions, die the PO's Session-Regel 1
-("Plan Mode + explizite Plan-Freigabe") statt vollem Spec-Prozess nutzen — DIESES
-Artefakt ist dann der Implementierungs-Vertrag, gegen den das Dev-Plan-Gate
-(plugins/pipeline-core/hooks/guard-devplan.mjs) prüft, ob the PO's Freigabe schon
-deterministisch verbucht ist.
-Ablage: `.claude/plans/<datum>-<feature>.md` (der Pfad wird als `planPath` beim Setzen
-des Features verbucht: `node harness/scripts/pipeline-state.mjs set-feature --id <id>
---plan-path .claude/plans/<datum>-<feature>.md`).
+Language: ENGLISH (share default; the PO is the primary reader in the hosted project).
+Source of truth: docs/operating-model.md §3.2 Step 3b (booking statement).
+Purpose: Plan-Mode substitute for Spec/PRD ceremony in sessions that use the PO's Session
+Rule 1 ("Plan Mode + explicit plan approval") instead of the full Spec process — this
+artifact is then the implementation contract against which the Dev-Plan-Gate
+(plugins/pipeline-core/hooks/guard-devplan.mjs) checks whether the PO's approval has
+already been recorded deterministically.
+Location: `.claude/plans/<date>-<feature>.md` (the path is recorded as `planPath` when
+the feature is set: `node harness/scripts/pipeline-state.mjs set-feature --id <id>
+--plan-path .claude/plans/<date>-<feature>.md`).
 -->
 
-# <Feature/Thema> — Umsetzungsplan (VERTRAG)
+# <Feature/Topic> — Implementation Plan (CONTRACT)
 
-> **Status: ENTWURF** (Platzhalter — nach the PO's „freigegeben" hier auf **FREIGEGEBEN**
-> ändern, mit Datum/Zeit) — dieses Artefakt ist der Implementierungs-Vertrag der Session.
+> **Status: DRAFT** (placeholder — after the PO's "approved" change this to **APPROVED**
+> here, with date/time) — this artifact is the session's implementation contract.
 >
-> **Freigabe-Verbuchung:** Nach the PO's wörtlichem „freigegeben" wird die Freigabe
-> zusätzlich deterministisch verbucht (docs/operating-model.md §3.2 Schritt 3b):
+> **Approval booking:** After the PO's literal "approved", the approval is additionally
+> recorded deterministically (docs/operating-model.md §3.2 Step 3b):
 > ```
-> node harness/scripts/pipeline-state.mjs set-feature --id <feature-id> --plan-path .claude/plans/<datum>-<feature>.md
+> node harness/scripts/pipeline-state.mjs set-feature --id <feature-id> --plan-path .claude/plans/<date>-<feature>.md
 > node harness/scripts/pipeline-state.mjs approve-plan --by po-test
 > ```
-> Erst danach lässt das Dev-Plan-Gate (guard-devplan.mjs) Implementierungs-Edits
-> außerhalb der Standard-Ausnahmen (`docs/`, `specs/`, `.claude/`, `backlog/`, dieser
-> Plan-Pfad selbst) zu. Ein Widerruf läuft über `revoke-plan --by <name>`.
+> Only after that does the Dev-Plan-Gate (guard-devplan.mjs) allow implementation edits
+> outside the standard exceptions (`docs/`, `specs/`, `.claude/`, `backlog/`, this plan
+> path itself). A revocation runs via `revoke-plan --by <name>`.
 
-## Kontext
-<Arbeitsauftrag, Anlass, Abgrenzung zu Parallel-Sessions/-Themen; ein Absatz.>
+## Context
+<Task/assignment, occasion, boundary against parallel sessions/topics; one paragraph.>
 
-## Leitentscheidungen (mit Begründung)
-<Nummerierte Liste: jede wesentliche Design-/Scope-Entscheidung mit Ein-Satz-Warum —
-mirrors PRD "Betrachtete Alternativen" (Solo-Gedächtnis-Element).>
+## Key decisions (with rationale)
+<Numbered list: every material design/scope decision with a one-sentence why —
+mirrors PRD "Alternatives considered" (solo-memory element).>
 
 1. …
 2. …
 
-## Pakete (Implementierung = implement-tier Goldfish, disjunkte Dateien je Paket)
-<Je Paket: Kurzname, betroffene Dateien (disjunkt zu anderen Paketen), 1-Satz-Scope.>
+## Packages (implementation = implement-tier Goldfish, disjoint files per package)
+<Per package: short name, affected files (disjoint from other packages), one-sentence scope.>
 
 - **P0 — …:** …
 - **P1 — …:** …
 
-## Verifikation (DoD-Mapping)
-<Woran die Erledigung je Paket/insgesamt erkennbar ist; Verweis auf `verify`-Kommando
-und ggf. zusätzliche Suiten/Evidenz-Artefakte.>
+## Verification (DoD mapping)
+<How completion is recognizable per package/overall; reference to the `verify`
+command and any additional suites/evidence artifacts.>
 
-## Risiken / bewusst offen
-<Bekannte Risiken, akzeptierte Lücken, explizit NICHT in dieser Session behandelte
-Themen (Scope-Abgrenzung, verhindert stillen Scope-Creep).>
+## Risks / knowingly open
+<Known risks, accepted gaps, topics explicitly NOT addressed in this session
+(scope boundary, prevents silent scope creep).>
 
-## Amendments (nach Freigabe, PO-sanktioniert)
-<Nur befüllen, wenn nach der Freigabe ein PO-sanktionierter Nachtrag nötig wird — jeder
-Amendment-Eintrag nummeriert, mit Datum und Kurzbegründung.>
+## Amendments (after approval, PO-sanctioned)
+<Only fill in if a PO-sanctioned addendum is needed after approval — every amendment
+entry numbered, with date and short rationale.>

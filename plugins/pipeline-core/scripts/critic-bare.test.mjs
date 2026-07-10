@@ -215,7 +215,7 @@ const VALID_VERDICT = {
     },
   ],
   deliberately_not_flagged: ["spec fidelity", "scope", "security surface"],
-  trajectory_verdict: "konsistent",
+  trajectory_verdict: "consistent",
   trajectory_evidence: "evidence log matches the claimed command and exit code",
   briefing_violations: [],
   pass: true,

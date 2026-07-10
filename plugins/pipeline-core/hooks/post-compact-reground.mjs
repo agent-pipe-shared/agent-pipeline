@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * post-compact-reground — SessionStart hook: fires ONLY right after a `/compact`
- * compaction event and prints a German re-grounding reminder so a freshly-summarized
- * context does not silently drift into English, forget the active role, or lose track of
+ * compaction event and prints an English re-grounding reminder so a freshly-summarized
+ * context does not silently drift out of English, forget the active role, or lose track of
  * which feature/phase is currently active.
  *
  * Package G-B ("context-hooks"). Live finding this addresses: "/compact language drift".
@@ -30,7 +30,7 @@
  *   so never assume it is). `.claude/pipeline-state.json` absent, unreadable, malformed
  *   JSON, or without a usable `activeFeature` -> the re-ground message STILL fires (the
  *   language/role reminder is unconditional) but the feature/phase line degrades to a
- *   generic "kein aktives Feature vermerkt" note instead of throwing or going silent --
+ *   generic "no active feature recorded" note instead of throwing or going silent --
  *   losing track of the STATE file must never suppress the more important reminder that
  *   compaction just happened at all.
  *
@@ -95,18 +95,18 @@ export function buildRegroundMessage(state) {
   const activeFeature = state && typeof state === "object" ? state.activeFeature : undefined;
   let featureLine;
   if (activeFeature && typeof activeFeature === "object" && typeof activeFeature.id === "string" && activeFeature.id !== "") {
-    const phase = typeof activeFeature.phase === "string" && activeFeature.phase !== "" ? activeFeature.phase : "(unbekannt)";
-    featureLine = `- Aktives Feature: "${activeFeature.id}" (Phase: ${phase}).`;
+    const phase = typeof activeFeature.phase === "string" && activeFeature.phase !== "" ? activeFeature.phase : "unknown";
+    featureLine = `- Active feature: "${activeFeature.id}" (phase: ${phase}).`;
   } else {
-    featureLine = "- Kein aktives Feature im State vermerkt (.claude/pipeline-state.json).";
+    featureLine = "- No active feature recorded in state (.claude/pipeline-state.json).";
   }
 
   return [
-    "Re-Grounding nach /compact:",
-    "- Chat-Sprache bleibt DEUTSCH (ADR-0011/E17) — Kompaktierung darf keinen Sprachdrift ins Englische auslösen.",
-    "- Aktive Rolle unverändert (Elephant/Goldfish/Critic je nach laufendem Dispatch) — Regelwerk aus roles/ + CLAUDE.md gilt unverändert weiter.",
+    "Re-grounding after /compact:",
+    "- Chat/output language stays ENGLISH (the project's human-facing language) — compaction must not drift it.",
+    "- Active role unchanged (Elephant/Goldfish/Critic per the running dispatch) — the rules in roles/ + CLAUDE.md still apply.",
     featureLine,
-    "- Volle Historie/Register/nächste Schritte: docs/state.md.",
+    "- Full history/register/next steps: docs/state.md.",
   ].join("\n");
 }
 

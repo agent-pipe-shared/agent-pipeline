@@ -3,32 +3,33 @@
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
 [`SETUP.md`](../SETUP.md) covers standing up your own copy of the pipeline repo.
-This guide covers the other half: taking one of your **existing** code repos and
-onboarding it, so its sessions run under the same roles, gates, and guardrails.
+This guide covers the other half: onboarding one of your **existing** code repos
+so its sessions run under the same roles, gates, and guardrails.
 
-Onboarding is deliberately gradual. You point the pipeline at the repo, let it
-observe, add a thin committed calibration layer, and turn gates on one at a time
-— starting with the cheapest, most valuable ones. Nothing here is all-or-nothing.
+Onboarding is deliberately gradual: point the pipeline at the repo, let it
+observe, add a thin committed calibration layer, and turn gates on one at a
+time — starting with the cheapest, most valuable ones. Nothing here is
+all-or-nothing.
 
 ## Start read-only
 
-Bind the pipeline to your project before you hand it any write autonomy. Bind the
-plugin, open a session, and let the bootstrap check and the roles read the repo —
-producing specs, plans, and reviews — while writes stay gated. You calibrate and
-prove the setup against a real codebase first; broad write autonomy comes after,
-once you trust what the gates are enforcing.
+Bind the pipeline to your project before granting it any write autonomy. Bind
+the plugin, open a session, and let the bootstrap check and the roles read the
+repo — producing specs, plans, and reviews — while writes stay gated. Calibrate
+and prove the setup against a real codebase first; broad write autonomy comes
+after, once you trust what the gates enforce.
 
-This costs you little in safety while you get there. The git-guard union (below)
-ships with the plugin and blocks destructive git operations from the very first
-commit, regardless of what any agent asks for — so "read-mostly" is the floor, not
-a fragile promise. Begin with a conservative `autonomy` value in your calibration
-(see below) and widen it as your confidence grows.
+This costs little in safety while you get there: the git-guard union (below)
+ships with the plugin and blocks destructive git operations from the very
+first commit, regardless of what any agent asks for — so "read-mostly" is the
+floor, not a fragile promise. Start with a conservative `autonomy` value in
+your calibration (see below) and widen it as confidence grows.
 
 ## Bind the plugin
 
 The mechanics are identical to [`SETUP.md`](../SETUP.md) step 3 — run them from
-your **project** repo, pointing the marketplace at your own copy of the pipeline
-repo:
+your **project** repo, pointing the marketplace at your own copy of the
+pipeline repo:
 
 ```
 # GitHub
@@ -37,26 +38,28 @@ claude plugin install pipeline-core@agent-pipeline --scope project
 ```
 
 `--scope project` matters — the binding belongs to the repo, not your user
-profile. Commit the resulting `.claude/settings.json` (the `extraKnownMarketplaces`
-and `enabledPlugins` entries) so every clone and CI run resolves the same plugin.
-Verify with `claude plugin list --json`.
+profile. Commit the resulting `.claude/settings.json` (`extraKnownMarketplaces`
+and `enabledPlugins` entries) so every clone and CI run resolves the same
+plugin. Verify with `claude plugin list --json`.
 
-Unlike the pipeline repo, a project repo has no `setup.mjs` — that script lives in
-your pipeline copy and personalizes *that* repo. In a project repo you author the
-thin calibration layer by hand, copying from the templates described next.
+Unlike the pipeline repo, a project repo has no `setup.mjs` — that script lives
+in your pipeline copy and personalizes *that* repo. In a project repo you
+author the thin calibration layer by hand, copying from the templates
+described next.
 
 ## Create the project calibration
 
-The calibration is a small, committed file — `.claude/pipeline.json` — that tells
-the central ritual skills how *this* project differs. Everything universal (the
-roles, the review contract, the rituals, the git-guard union) stays in the plugin;
-only the project-specific dials live here. Copy the canonical example and adapt it:
+The calibration is a small, committed file — `.claude/pipeline.json` — that
+tells the central ritual skills how *this* project differs. Everything
+universal (roles, review contract, rituals, git-guard union) stays in the
+plugin; only project-specific dials live here. Copy the canonical example and
+adapt it:
 
 ```
 cp <pipeline-repo>/templates/pipeline.json.example .claude/pipeline.json
 ```
 
-Fill in these fields at minimum:
+Fill in at least these fields:
 
 | Field | What it is | Example values |
 |---|---|---|
@@ -69,88 +72,95 @@ Fill in these fields at minimum:
 | `constraints` | the project's "do not revert" rules | `["No breaking API change without an ADR"]` |
 | `handover` | *(optional)* the project's single state file | `"docs/state.md"` (the default when omitted) |
 
-Keys beginning with `$` in the example are documentation and are ignored by the
-skills — read them, then delete or keep them as you like. If the file is missing,
-the skills fall back to safe defaults and announce themselves as *uncalibrated*
-rather than guessing silently.
+Keys beginning with `$` in the example are documentation and are ignored by
+the skills — read them, then delete or keep as you like. If the file is
+missing, the skills fall back to safe defaults and announce themselves as
+*uncalibrated* rather than guessing silently.
 
-While you're here, copy [`templates/CLAUDE.project.md`](../templates/CLAUDE.project.md)
-to your repo root as `CLAUDE.md` and replace its placeholders — it is the lean,
-length-capped agent context that points every session at this calibration and your
-handover file.
+While you're here, copy
+[`templates/CLAUDE.project.md`](../templates/CLAUDE.project.md) to your repo
+root as `CLAUDE.md` and replace its placeholders — the lean, length-capped
+agent context that points every session at this calibration and your handover
+file.
 
 One boundary worth stating up front: **project denies do not live in
-`pipeline.json`.** Paths and files an agent must never touch (secrets, generated
-output, content packs) belong in the committed `.claude/settings.json` and the
-git-guard config — the calibration file carries dials, not prohibitions. See
-[`docs/operating-model.md`](operating-model.md) §8 for the full central-vs-calibrated
-split.
+`pipeline.json`.** Paths and files an agent must never touch (secrets,
+generated output, content packs) belong in the committed `.claude/settings.json`
+and the git-guard config — the calibration file carries dials, not
+prohibitions. See [`docs/operating-model.md`](operating-model.md) §8 for the
+full central-vs-calibrated split.
 
 ## Adopt gates incrementally
 
-Turn gates on in order of value-per-effort. You do not need the full set on day
-one.
+Turn gates on in order of value-per-effort. You do not need the full set on
+day one.
 
-**1. The one verify command + the git-guard union.** These are the foundation and
-you want them first:
+**1. The one verify command + the git-guard union.** The foundation, wanted
+first:
 
-- **`verify`** — a single command that runs your full deterministic chain
-  (format → lint → typecheck → tests → build, whichever apply). It is named once in
-  `pipeline.json` and called identically by every consumer, so "green" never means
-  two different things. If your repo has no such command yet, writing one *is* the
-  first onboarding task. Nothing is "done" while `verify` is red.
-- **The git-guard union** — ships with the plugin and needs no configuration. It
-  blocks force-pushes, history rewrites, deletion of protected branches and tags,
-  blanket discards of uncommitted work, and the standard hook-skip forms
-  (`--no-verify`, `git commit -n`, `core.hooksPath` rebinds; other bypass vectors are
-  documented in `guardrails/git.md` GIT-07, not claimed impossible) — for every
-  agent, in every session, from the first commit.
+- **`verify`** — a single command running your full deterministic chain
+  (format → lint → typecheck → tests → build, whichever apply). Named once in
+  `pipeline.json` and called identically by every consumer, so "green" never
+  means two different things. If your repo has no such command yet, writing
+  one *is* the first onboarding task. Nothing is "done" while `verify` is red.
+- **The git-guard union** — ships with the plugin, needs no configuration.
+  Blocks force-pushes, history rewrites, deletion of protected branches and
+  tags, blanket discards of uncommitted work, and the standard hook-skip forms
+  (`--no-verify`, `git commit -n`, `core.hooksPath` rebinds; other bypass
+  vectors documented in `guardrails/git.md` GIT-07, not claimed impossible) —
+  for every agent, in every session, from the first commit.
 
-**2. The dev-plan and push gates.** Once verify and the guard are in place, add the
-two human gates. These are declared in the additive manifest `.claude/pipeline.yaml`
-under `gates`, and each carries a `mode` of `blocking`, `warn`, or `off`:
+**2. The dev-plan and push gates.** Once verify and the guard are in place,
+add the two human gates. Declared in the additive manifest
+`.claude/pipeline.yaml` under `gates`, each carrying a `mode` of `blocking`,
+`warn`, or `off`:
 
-- **`dev-plan`** — blocks implementation edits on a feature until that feature's
-  plan is approved, turning "did we agree on a plan first?" from a habit into an
-  enforced step. Drafting the plan itself, and touching docs or config, are exempt.
-- **`push`** — governs pushes to your remote. It can carry a *standing approval*, so
-  routine pushes at work-package boundaries proceed without a per-push human touch,
-  while the git-guard union still blocks the destructive operations underneath it.
+- **`dev-plan`** — blocks implementation edits on a feature until that
+  feature's plan is approved, turning "did we agree on a plan first?" from a
+  habit into an enforced step. Drafting the plan itself, and touching docs or
+  config, are exempt.
+- **`push`** — governs pushes to your remote. Can carry a *standing approval*
+  so routine pushes at work-package boundaries proceed without a per-push
+  human touch, while the git-guard union still blocks the destructive
+  operations underneath it.
 
 Start either gate in `warn` mode to see where it *would* fire without blocking
-anyone, then promote it to `blocking` once the signal is clean. A gate is meant to
-be binary at any moment — `blocking` or `off`; `warn` is a documented, temporary
-step on the way to `blocking`, not a resting state. Both gates are opt-in: with no
-manifest, or with a gate set to `off`, they fail open and change nothing.
+anyone, then promote to `blocking` once the signal is clean. A gate is meant
+to be binary at any moment — `blocking` or `off`; `warn` is a documented,
+temporary step on the way to `blocking`, not a resting state. Both gates are
+opt-in: with no manifest, or with a gate set to `off`, they fail open and
+change nothing.
 
 ## Per-project calibration
 
-Beyond the gate wiring, a handful of fields let you tune how strict and how
-targeted the pipeline is for this specific repo:
+Beyond gate wiring, a handful of fields tune how strict and targeted the
+pipeline is for this specific repo:
 
 - **`stakes`** (`low` / `medium` / `high`, in `pipeline.json`) — the project's
   position on the vibe-to-engineering spectrum. Higher stakes pull the whole
   process toward more rigor: more reviews, tighter gates, less autonomy.
-- **`constraints`** (in `pipeline.json`) — the numbered "do not revert" rules earned
-  from real decisions and failures. Goldfish briefings quote them so an implementor
-  can't undo them by accident; the Critic uses them as a measuring stick.
-- **`riskZones`** (glob paths in `pipeline.json`, e.g. `["app/api/**", "prisma/**"]`)
-  — diffs touching these paths raise the risk class during triage, pulling in a
-  Critic review where a change to a leaf component wouldn't. Point them at your
-  genuinely sensitive surfaces.
-- **`protectedTestPaths`** (in `.claude/guard-config.json`, *not* `pipeline.json`) —
-  the tests and gate scripts that define "green." A PreToolUse guard blocks Edit and
-  Write against these paths so an implementor can never weaken its own examiner; a
-  real test change becomes a separate, deliberately briefed task. This config has its
-  own copy step — `cp <pipeline-repo>/templates/guard-config.json.example
-  .claude/guard-config.json` — then fill in your paths; see
-  [`templates/guard-config.json.example`](../templates/guard-config.json.example) for
-  the field format.
+- **`constraints`** (in `pipeline.json`) — numbered "do not revert" rules
+  earned from real decisions and failures. Goldfish briefings quote them so
+  an implementor can't undo them by accident; the Critic uses them as a
+  measuring stick.
+- **`riskZones`** (glob paths in `pipeline.json`, e.g. `["app/api/**",
+  "prisma/**"]`) — diffs touching these paths raise the risk class during
+  triage, pulling in a Critic review where a change to a leaf component
+  wouldn't. Point them at your genuinely sensitive surfaces.
+- **`protectedTestPaths`** (in `.claude/guard-config.json`, *not*
+  `pipeline.json`) — the tests and gate scripts that define "green." A
+  PreToolUse guard blocks Edit and Write against these paths so an
+  implementor can never weaken its own examiner; a real test change becomes a
+  separate, deliberately briefed task. Own copy step — `cp <pipeline-repo>/
+  templates/guard-config.json.example .claude/guard-config.json` — then fill
+  in your paths; see
+  [`templates/guard-config.json.example`](../templates/guard-config.json.example)
+  for the field format.
 
-Set these to match the repo in front of you, not a generic ideal. A small internal
-tool and a payment service should not carry the same `stakes`, the same `riskZones`,
-or the same autonomy — that calibrated variety is the point, and it is what keeps
-the shared core honest across very different projects.
+Set these to match the repo in front of you, not a generic ideal. A small
+internal tool and a payment service should not carry the same `stakes`,
+`riskZones`, or autonomy — that calibrated variety is the point, and it's
+what keeps the shared core honest across very different projects.
 
 ## Where to go next
 
@@ -164,6 +174,8 @@ the shared core honest across very different projects.
   end.
 
 ---
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
 # Ein bestehendes Projekt unter die Pipeline holen
 

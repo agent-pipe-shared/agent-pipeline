@@ -3,8 +3,8 @@
  * guard-devplan — PreToolUse guard enforcing the Dev-Plan-Gate for Edit|Write.
  *
  * Plugin: pipeline-core (Agent-Pipeline). AP1-P3 "DURIN". Canon: docs/operating-
- * model.md §3.2 Schritt 3b (PO-Gate: PRD-Freigabe — this hook is the deterministic
- * enforcement of that gate's "verbucht" step).
+ * model.md §3.2 Step 3b (PO gate: PRD approval — this hook is the deterministic
+ * enforcement of that gate's "recorded" step).
  *
  * WHY THIS FILE EXISTS
  *   Until now, "did the PO approve the plan before implementation edits start" was an
@@ -163,10 +163,10 @@ if (manifestResult.status === "absent") process.exit(0);
 if (manifestResult.status === "invalid" && manifestResult.manifest === undefined) {
   // Genuine YAML syntax failure -- the manifest could not even be parsed into a
   // structure, so there is nothing to read a gate config off. See file header WARN.
-  const reason = manifestResult.errors?.[0]?.reason ?? "YAML-Fehler";
+  const reason = manifestResult.errors?.[0]?.reason ?? "YAML error";
   emit(1, [
-    `[guard-devplan] WARN: .claude/pipeline.yaml ist nicht lesbar (${reason}).`,
-    `Dev-Plan-Gate wird übersprungen (fail-open) -- bitte die Manifest-Datei reparieren.`,
+    `[guard-devplan] WARN: .claude/pipeline.yaml is not readable (${reason}).`,
+    `Dev-Plan gate is being skipped (fail-open) -- please repair the manifest file.`,
   ]);
 }
 // status "ok", OR "invalid" with a structurally parsed manifest (schema/semantic
@@ -189,9 +189,9 @@ try {
   state = JSON.parse(stateRaw);
 } catch (e) {
   emit(1, [
-    `[guard-devplan] WARN: ${statePath} enthält ungültiges JSON (${e.message}).`,
-    `Dev-Plan-Gate wird übersprungen (fail-open) -- bitte die Statusdatei reparieren (nur via ` +
-      `harness/scripts/pipeline-state.mjs neu schreiben, nie von Hand).`,
+    `[guard-devplan] WARN: ${statePath} contains invalid JSON (${e.message}).`,
+    `Dev-Plan gate is being skipped (fail-open) -- please repair the state file (rewrite only via ` +
+      `harness/scripts/pipeline-state.mjs, never by hand).`,
   ]);
 }
 
@@ -216,11 +216,11 @@ if (isExempt) process.exit(0);
 
 // ---- verdict --------------------------------------------------------------------------
 const message = [
-  `BLOCKED (guard-devplan, plugin pipeline-core): Feature "${activeFeature.id}" hat noch keine freigegebene Planung.`,
-  `Plan: ${typeof activeFeature.planPath === "string" ? activeFeature.planPath : "(kein planPath im State hinterlegt)"}`,
-  `Datei: ${filePath}`,
-  `Warum: Dev-Plan-Gate (.claude/pipeline.yaml, Gate "dev-plan") verlangt eine verbuchte Freigabe VOR ` +
-    `Implementierungs-Edits (docs/operating-model.md §3.2 Schritt 3b). Freigabe verbuchen: ` +
+  `BLOCKED (guard-devplan, plugin pipeline-core): Feature "${activeFeature.id}" has no approved plan yet.`,
+  `Plan: ${typeof activeFeature.planPath === "string" ? activeFeature.planPath : "(no planPath recorded in state)"}`,
+  `File: ${filePath}`,
+  `Why: The Dev-Plan gate (.claude/pipeline.yaml, gate "dev-plan") requires a recorded approval BEFORE ` +
+    `implementation edits (docs/operating-model.md §3.2 step 3b). Record approval: ` +
     `node harness/scripts/pipeline-state.mjs approve-plan --by <name>.`,
 ];
 

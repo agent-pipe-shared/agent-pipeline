@@ -1,8 +1,43 @@
-# ADR-0013: git-guard als zentrale Union + Projekt-Deny-Config
+# ADR-0013: git-guard as central union + project deny-config
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR decides that the `git-guard` PreToolUse hook — previously maintained as three diverged per-project copies, none a superset of the others — is consolidated into a single central union living in the shared plugin, merging all deny rules (force-push, `reset --hard`, `clean -f`, main-branch deletion, secret staging, etc.) from the three source projects (`<PROJECT_A>`/`<PROJECT_B>`/`<PROJECT_C>`). Project-specific denies are then layered on top as per-project deny-config rather than as forked guard code. The design keeps broad allows plus a targeted deny-guard, exit-code 2 with a plain-text reason, fail-open behavior, and a documented manual escape hatch; status is accepted (2026-07-03).
+**Status:** accepted (2026-07-03, Checkpoint 1) · **Basis:** Register E11
+
+## Context
+
+All three source projects ran a PreToolUse git-guard as diverged copies: no single incarnation was a superset of the others — each copy carried protection rules the siblings lacked. This was the clearest measurable copy-paste damage in the existing estate. Shared core: a deny-guard against force-push, `reset --hard`, `clean -f`, main-branch deletion, secret staging; the pattern of "broad allows + targeted deny-guard"; exit code 2 with a plain-text reason; fail-open behavior; a human manual escape hatch. Hook denies also apply under `acceptEdits`/`bypassPermissions`.
+
+## Decision (E11, verbatim)
+
+> git-guard: central union of all three project incarnations + project deny-config
+
+Refinement:
+
+- The central version (in the plugin, PreToolUse hook) forms the **union of all deny rules** from the three source projects; project-specific denies (content packs, `secrets.yaml`, `.storage`, prod branch, etc.) are added as **deny-config in the project repo** — configuration, not a fork.
+- Design invariants are preserved: broad allows + targeted deny-guard, exit 2 with a plain-text reason to the agent, **fail-open** ("the guard is a safety net, not a prison"), a documented manual escape hatch (the PO executes manually), a why-header per guard.
+
+## Consequences
+
+**Positive:** every project immediately gets the sibling projects' protection rules; future rules propagate centrally ([ADR-0001](0001-verteilung-plugin-marketplace.md)); the hook layer carries workflow preconditions ([ADR-0007](0007-workflows-ultracode-opt-in.md)).
+
+**Negative:** the union can produce false positives in individual projects (patterns foreign to that project) — the fail-open nature and the escape hatch bound the damage.
+
+**Risk:** local patches could let the divergence return. Check: the guard lives exclusively in the plugin; project repos contain only deny-config, never guard copies.
+
+## Rejected alternatives
+
+- **Declare one incarnation the master** — none is a superset; any choice would lose proven protection rules from the other two.
+- **Rewrite from scratch** — discards three-times-matured, field-tested rules and their operational semantics (quote-stripping, fail-open behavior).
+- **Permission-rules instead of a hook** — Bash argument patterns are officially fragile; the guard needs real parsing, and only hook-denies also apply under `acceptEdits`.
+
+## Follow-up
+
+None. Building the union + reconciling against all three incarnations: Phase 3; verification per project: Phase 4.
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0013: git-guard als zentrale Union + Projekt-Deny-Config
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 

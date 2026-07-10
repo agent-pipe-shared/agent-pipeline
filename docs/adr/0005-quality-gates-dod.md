@@ -1,8 +1,42 @@
-# ADR-0005: Quality-Gate-Kette und zweigeteilte DoD
+# ADR-0005: Quality-Gate Chain and Two-Part Definition of Done
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR establishes a fixed quality-gate chain — Format → Lint → Typecheck → Tests → Build (all blocking) followed by Critic judgment — enforced by a single verify script per project that runs identically in the stop-hook, the agent's completion report, and CI. "Done" may only be claimed with machine-generated evidence (script output, a passing feature list, command plus return code), never a model-asserted claim; the Definition of Done is split into a machine-checkable part and a judgment part (spec fidelity, scope, edge cases) the Critic still has to assess. Status: accepted 2026-07-03 (Checkpoint 1), grounded in decision register entry E5.
+## Context
+
+The documented main failure mode of agentic development is "reported done but not tested"; the countermeasure is evidence instead of claim. Verification is an escalation staircase: deterministic before probabilistic — stop-hooks block the end of the turn until the check is green; LLM review comes after and flags nothing that CI already enforces.
+
+## Decision (E5, verbatim)
+
+> Gates/DoD: Format→Lint→Typecheck→Tests→Build (blocking) → Critic (judgment); ONE verify script per project; evidence obligation (machine-generated artifacts)
+
+Clarification:
+
+- The verify script is the single source of truth and runs identically in three places: stop-hook (Goldfish gate), Goldfish completion report, CI (the last, unbypassable instance).
+- Evidence obligation: work may only be submitted with a machine-generated artifact (script output/JSON, a passing feature list, command plus return code) — never a model-formulated success claim.
+- DoD is two-part: a machine-checkable part (hook/CI) plus a judgment part (Critic: spec fidelity, scope, edge cases). Project commands (pnpm / config-check / UE build) are defined by project calibration (→ [operating-model.md](../operating-model.md)).
+
+## Consequences
+
+**Positive:** "done" becomes enforceable instead of asserted; identical checks locally and in CI mean no gate drift; the Critic is systematically relieved and only checks what machines cannot.
+
+**Negative:** every project needs a maintained verify script; `<PROJECT_C>` (UE build latency) and `<PROJECT_B>` (config-check instead of classic tests) need their own calibration.
+
+**Risk:** AI-generated tests can be hollow — coverage lies ("perpetually green tests"). Mitigation: mutation testing as a nightly meta-gate on `<PROJECT_A>` core logic; E2E/config equivalents for `<PROJECT_B>`/`<PROJECT_C>`. Additionally, test-role separation: the implementation Goldfish never modifies the tests of its own implementation.
+
+## Rejected alternatives
+
+- **LLM review as the primary gate** — probabilistic, overreporting is documented; machine checks are cheaper, faster, more reliable.
+- **Coverage thresholds as a quality measure** — high coverage masks hollow assertions.
+- **Project-individual check chains** — exactly today's divergence; chain semantics are central, only the commands are project-specific.
+
+## Status
+
+Accepted 2026-07-03 (Checkpoint 1), grounded in decision register entry E5. Follow-up: none. Per-project verify scripts: Phase 4 (migration dossiers).
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0005: Quality-Gate-Kette und zweigeteilte DoD
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 

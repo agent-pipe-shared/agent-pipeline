@@ -243,16 +243,16 @@ export async function runSecurityScan({ rootDir, timeoutMs = DEFAULT_TIMEOUT_MS,
   return { evidence, exitCode };
 }
 
-function germanStatusLabel(status) {
+function statusLabel(status) {
   switch (status) {
     case "PASS":
       return "OK";
     case "FINDINGS":
-      return "FUNDE";
+      return "FINDINGS";
     case "SKIPPED":
-      return "UEBERSPRUNGEN";
+      return "SKIPPED";
     case "ERROR":
-      return "FEHLER";
+      return "ERROR";
     default:
       return status;
   }
@@ -261,10 +261,10 @@ function germanStatusLabel(status) {
 function printSummary(evidence) {
   for (const s of evidence.scanners) {
     const reasonSuffix = s.reason ? ` -- ${s.reason}` : "";
-    console.log(`${s.tool}: ${germanStatusLabel(s.status)} (${s.findingCount} Funde)${reasonSuffix}`);
+    console.log(`${s.tool}: ${statusLabel(s.status)} (${s.findingCount} findings)${reasonSuffix}`);
   }
-  const verdict = evidence.exitCode === 0 ? "SAUBER" : evidence.exitCode === 1 ? "WARNUNG" : "BLOCKIEREND";
-  console.log(`\nVerdict: ${verdict} (Schwellenwerte: ${evidence.thresholds.block_on.join(", ")}) -> exit ${evidence.exitCode}`);
+  const verdict = evidence.exitCode === 0 ? "CLEAN" : evidence.exitCode === 1 ? "WARNING" : "BLOCKING";
+  console.log(`\nVerdict: ${verdict} (thresholds: ${evidence.thresholds.block_on.join(", ")}) -> exit ${evidence.exitCode}`);
 }
 
 // ---------------------------------------------------------------------------------------------

@@ -4,7 +4,7 @@
 # absent manifest is a fully supported "not opted in yet" state, byte-identical to today's
 # non-manifest behavior (plugins/pipeline-core/lib/manifest.mjs: loadManifest() returns
 # status "absent", harness/scripts/validate-manifest.mjs exits 0 printing
-# "Manifest nicht aktiv (optional)").
+# "Manifest not active (optional)").
 #
 # GRAMMAR NOTE: this file must parse with the yaml-lite strict subset
 # (plugins/pipeline-core/lib/yaml-lite.mjs) -- only the constructs used below are

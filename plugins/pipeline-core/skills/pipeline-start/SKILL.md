@@ -1,6 +1,6 @@
 ---
 name: pipeline-start
-description: "Mandatory session bootstrap for Agent-Pipeline projects (ADR-0010). Run FIRST in every new session before any other work, and re-run after /clear or a plugin refresh. Verifies ruleset presence + loaded SHA, model/effort (Elephant), staleness against the marketplace remote, project calibration (.claude/pipeline.json), handover state and the verify gate - then prints the auditable German confirmation line. Optional argument = role (elephant default | goldfish | critic)."
+description: "Mandatory session bootstrap for Agent-Pipeline projects (ADR-0010). Run FIRST in every new session before any other work, and re-run after /clear or a plugin refresh. Verifies ruleset presence + loaded SHA, model/effort (Elephant), staleness against the marketplace remote, project calibration (.claude/pipeline.json), handover state and the verify gate - then prints the auditable confirmation line. Optional argument = role (elephant default | goldfish | critic)."
 argument-hint: "[elephant|goldfish|critic]"
 ---
 
@@ -45,30 +45,30 @@ Goldfish/Critic normally receive their compact variant embedded in the dispatch 
 
 - **Profile question (THIRD OPTION `speed` NEW) — hard gate, ask BEFORE setting model/effort:** present this AskUserQuestion (3 options + free-text = PO exception):
 
-  > Profilwahl (hart, AskUserQuestion, 3 Optionen + Freitext = PO-Ausnahme): „Session-Profil für dieses Thema — Advisor (Cost/Quality) [advisor] (das Design-Tier-Modell + das Advisor-Modell ab Sessionbeginn — Standard, solange das Advisor-Modell nicht abo-gedeckt ist) oder Design-first (Cost+/Quality+) [design-first] (phasenbewusst: Design für dieses Thema BEREITS freigegeben? → direkt Ausführungsphase, das Design-Tier-Modell bei Effort max ab Sessionbeginn, das Advisor-Modell nur für T1-Critics/Readiness-Subagenten; sonst das Design-Tier-Modell bei Effort xhigh, Wechsel auf Effort max exakt am PRD-Freigabe-Gate — höhere Tiers kosten mehr pro Token, daher Effort als primären Kostenhebel behandeln) oder Speed (Mini-Feature/Hotfix) [speed] (das Implement-Tier-Modell + ein ab Sessionbeginn aktiver Design-Tier-Advisor — exakte Modell-/Effort-/Advisor-Kommandos gemäß `policies/model-policy.md` MP-28; leichter Bootstrap: nur Regelwerk-SHA + Kalibrierungs-Existenz + verify-Verfügbarkeit + operativer Handover-Kopf, EINE Bestätigungszeile statt drei, keine Profil-Zeremonie; Geltungsbereich ~≤5 Dateien, KEINE Guardrail-/Kanon-Dateien, keine neuen Abhängigkeiten — Grenze gerissen ⇒ Pflicht-Eskalation ins Vollprofil; Guard-Hooks bleiben immer aktiv; Details → "Speed bootstrap" below)?"
+  > Profile choice (hard, AskUserQuestion, 3 options + free text = PO exception): "Session profile for this topic — Advisor (Cost/Quality) [advisor] (design-tier model throughout from session start + an attached advisor model — default, as long as the advisor model is billed outside your own plan quota) or Design-First (Cost+/Quality+) [design-first] (phase-aware: is the design for this topic ALREADY approved? → go straight to the execution phase, design-tier model at effort `max` from session start, otherwise the design-tier model only for T1 critics/readiness subagents; otherwise design-tier model at effort `xhigh` until the PRD approval gate, then EXACTLY ONE switch to effort `max` — cost consequence: a model outside your own plan quota can cost a noticeable share of an execution session as overage; check your own billing model beforehand, don't assume) or Speed (mini-feature/hotfix) [speed] (implement-tier model + a design-tier advisor active from session start — exact model/effort/advisor commands per `policies/model-policy.md` MP-28; light bootstrap: only ruleset SHA + calibration existence + verify availability + operational handover head, ONE confirmation line instead of three, no profile ceremony; scope ~≤5 files, NO guardrail/canon files, no new dependencies — breaching the boundary ⇒ mandatory escalation to the full profile; guard hooks always stay active; details → "Speed bootstrap" below)?"
 
   The PO decides per the topic of the first prompt. A free-text answer is the PO-exception path (e.g. a special session running the advisor model as the main model — stays PO-designatable, not a fourth button). Present the verbatim commands for the chosen profile (the model/effort/advisor names below are the shipped default preset — override them in `pipeline.user.yaml`):
 
-  > Profil advisor (ab Sessionbeginn):
+  > Profile advisor (from session start):
   > /model opus
   > /effort max
   > /advisor fable
   >
-  > Profil design-first, Design bereits freigegeben (phasenbewusst) — ab Sessionbeginn:
+  > Profile design-first, design already approved (phase-aware) — from session start:
   > /model opus
   > /effort max
   >
-  > Profil design-first, Design noch nicht freigegeben (Wechsel am PRD-Freigabe-Gate):
+  > Profile design-first, design not yet approved (switch at the PRD approval gate):
   > /model opus
   > /effort max
   >
-  > Advisor-Hygiene (design-first, falls Advisor konfiguriert):
+  > Advisor hygiene (design-first, if advisor is configured):
   > /advisor off
   >
-  > Profil speed (ab Sessionbeginn, Details → "Speed bootstrap" below):
-  > Modell/Effort/Advisor gemäß `policies/model-policy.md` (MP-28) — fixe Zuordnung, keine weitere Profil-Zeremonie.
+  > Profile speed (from session start, details → "Speed bootstrap" below):
+  > Model/effort/advisor per `policies/model-policy.md` (MP-28) — fixed mapping, no further profile ceremony.
 
-  **Advisor hygiene:** if profile `design-first` is chosen and an advisor is already configured (leftover `advisorModel` user setting from a prior `advisor`-profile session, persists per machine), check in this order: (1) ask about parallel advisor sessions of other projects on this machine; (2) prefer the project-local off-switch `"advisorModel": ""` in `.claude/settings.local.json` (the live settings validator rejects `null` although the docs name it; `$comment` keys are invalid in `settings.local.json`); (3) `/advisor off` ONLY when no parallel session is affected; (4) **divergence = mandatory question (PO condition „man entscheidet immer"):** whenever the ACTUAL advisor state diverges from the chosen profile's intended state (e.g. a machine-inherited advisor in a design-first session), put the resolution to the PO as an AskUserQuestion (keep attached / project-local off / `/advisor off`) — silent inheritance is a bootstrap defect, informing without asking does NOT satisfy the duty.
+  **Advisor hygiene:** if profile `design-first` is chosen and an advisor is already configured (leftover `advisorModel` user setting from a prior `advisor`-profile session, persists per machine), check in this order: (1) ask about parallel advisor sessions of other projects on this machine; (2) prefer the project-local off-switch `"advisorModel": ""` in `.claude/settings.local.json` (the live settings validator rejects `null` although the docs name it; `$comment` keys are invalid in `settings.local.json`); (3) `/advisor off` ONLY when no parallel session is affected; (4) **divergence = mandatory question (PO condition "one always decides"):** whenever the ACTUAL advisor state diverges from the chosen profile's intended state (e.g. a machine-inherited advisor in a design-first session), put the resolution to the PO as an AskUserQuestion (keep attached / project-local off / `/advisor off`) — silent inheritance is a bootstrap defect, informing without asking does NOT satisfy the duty.
 - Verify the session runs the model/effort of the **chosen profile** (Step 1b profile question): profile `design-first` → **phase-aware:** if the design for this session's topic is ALREADY approved (the standard case for a follow-up execution session after an EL-25 cut), start DIRECTLY in the execution phase — **the design-tier model at effort `max`** from session start, the advisor model only for T1 critics/readiness subagents; otherwise **the design-tier model at effort `xhigh`** until the PRD-gate switch (MP-01 standard), then EXACTLY ONE switch to effort **`max`** (EL-24, sanctioned exception MP-17/MP-18); profile `advisor` → **the design-tier model at effort `max` + the advisor model** already from session start (MP-26 — standard recommendation while the advisor model is not subscription-covered); profile `speed` (NEW) → model/effort/advisor per `policies/model-policy.md` (MP-28) already from session start — fixed pairing, no phase switch, no advisor-hygiene sub-flow. Effort is **session-only**: if unset or wrong, ask the PO to run the profile's verbatim commands NOW, before any work. **Advisory duty:** `xhigh` is the design-phase standard; `max` otherwise only for design-tier fallback operation, for implement-tier dispatches, for PO-designated special tasks (e.g. initial sessions of entirely new topics; for tasks that call for maximal reasoning the ultracode task opt-in, MP-08, remains the alternative), or for **planned execution-phase design-tier operation** — no generic `max` recommendation beyond these. Advisory duty now = point out the OPTION when the PO himself has designated such a task, not proactive lobbying.
 - **Model-identity hardening:** assert the active model from OBSERVED evidence — `/model` output or explicit PO confirmation — never assumed, especially in the turns right after a credit-limit/reset event (silent model-fallback risk).
 - Confirm the env var `CLAUDE_CODE_SUBAGENT_MODEL` is **NOT set** (MP-04 — it would silently override every subagent's frontmatter model and void the model matrix).
@@ -80,7 +80,7 @@ Goldfish/Critic normally receive their compact variant embedded in the dispatch 
 
 ## Step 1c — Spend/usage check (Elephant only; recommended)
 
-- Check the budget situation at session start: configured `/usage-credits`/workspace limits, known weekly-limit pressure (MP-16). Note a configured or near limit **once** in the confirmation output; under acute budget pressure, name the consequence (delegation-first: execution on the implement-tier model, judgment reserved for the higher-capability tier — MP-22). **Model-fallback duty:** whenever a model fallback is on the table at session start, the limit claim MUST be verified against current `/usage` values — limit percentage AND reset timestamp named concretely to the PO; a fallback decision based on unverified/stale limit information is a violation. For the "/usage is a user command → ask once" mechanics see the bullet below (already there, do not duplicate it; same in `harness/session-bootstrap.md` Schritt 1c). The switch/cut decision itself is the PO's — NO automatic reset-cut (MP-17: mid-session model changes invalidate the warm cache).
+- Check the budget situation at session start: configured `/usage-credits`/workspace limits, known weekly-limit pressure (MP-16). Note a configured or near limit **once** in the confirmation output; under acute budget pressure, name the consequence (delegation-first: execution on the implement-tier model, judgment reserved for the higher-capability tier — MP-22). **Model-fallback duty:** whenever a model fallback is on the table at session start, the limit claim MUST be verified against current `/usage` values — limit percentage AND reset timestamp named concretely to the PO; a fallback decision based on unverified/stale limit information is a violation. For the "/usage is a user command → ask once" mechanics see the bullet below (already there, do not duplicate it; same in `harness/session-bootstrap.md` Step 1c). The switch/cut decision itself is the PO's — NO automatic reset-cut (MP-17: mid-session model changes invalidate the warm cache).
 - `/usage` is a user command: if the session cannot see the value itself, ask the PO once instead of guessing (three-valued honesty). **In a model-fallback session the confirmation output must name BOTH values** (limit % + reset time); a fallback note without both counts as step not executed.
 - Why: a spend-limit abort mid-run and weekly-limit pressure under sustained use are both documented failure modes. Budget surprises mid-work cost runs and quality; the check belongs at session start.
 
@@ -94,15 +94,15 @@ Confirm the Elephant's role prohibitions before work starts, as a compact list e
 - **EL-04** — no silent foundational decisions (register + ADR or it does not exist).
 - **EL-16** — delegate-first in the execution phase: EVERY implementation = briefed implement-tier Goldfish dispatch; "small/interlinked" is NOT an exception — bundle interlinked small features into ONE briefing; design-phase thinking stays Elephant work.
 - **EL-18** — one repo, one elephant; cross-repo needs go through the transfer path.
-- **EL-19** — PO gate: after the readiness check, PROACTIVELY deliver the PRD as a readable document (not just a repo path; remote sessions: send it to the device/render) and explicitly wait for the word „freigegeben" — no implementation dispatch before it arrives.
+- **EL-19** — PO gate: after the readiness check, PROACTIVELY deliver the PRD as a readable document (not just a repo path; remote sessions: send it to the device/render) and explicitly wait for the word "approved" — no implementation dispatch before it arrives.
 
 Why: exactly these prohibitions were once violated in a real session — neither bootstrap, close, nor Critic caught it, because the bootstrap never loaded the role prohibitions. The embedded list makes them impossible to miss at session start instead of relying on memory.
 
 Roles: MANDATORY for the Elephant. Goldfish/Critic receive their prohibitions via the dispatch briefing (field 4 "Prohibitions", or their role contract) — this step does not apply to them as a separate bootstrap act.
 
-This step ends in a **third mandatory confirmation line** (German, verbatim, printed directly below the Modell/Effort line; literal-checked like line 1 — format → Step 6):
+This step ends in a **third mandatory confirmation line** (verbatim, printed directly below the Model/Effort line; literal-checked like line 1 — format → Step 6):
 
-> Rollen-Verbote geladen: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — Implementierung nur per Goldfish-Dispatch (Stufe-0 per OM §3.3; weitere Ausnahmen nur durch den PO); PRD-Gate: lesbar vorlegen + auf ‚freigegeben' warten
+> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per OM §3.3; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'
 
 ## Step 2 — Staleness check against the marketplace remote (Elephant only)
 
@@ -133,36 +133,36 @@ This step ends in a **third mandatory confirmation line** (German, verbatim, pri
 - Missing → treat as **F4** (STOP for writing work, offer creation).
 - Why: without a runnable verify, the evidence duty is unfulfillable — that must surface at session start, not at task end.
 
-## Step 6 — Confirmation line (verbatim German format, mandatory, final step)
+## Step 6 — Confirmation line (verbatim format, mandatory, final step)
 
-Print exactly this line (all five fields with concrete values; the check is literal — the line must begin with „Bootstrap-Check bestanden:"):
+Print exactly this line (all five fields with concrete values; the check is literal — the line must begin with "Bootstrap check passed:"):
 
-> Bootstrap-Check bestanden: Regelwerk {{VERSION_OR_SHA}} geladen · Projekt {{PROJECT_NAME}} · Kalibrierung {{CALIBRATION_FILE}} · Stand {{HANDOVER_DATE}} · Rolle {{Elephant|Goldfish|Critic}}
+> Bootstrap check passed: ruleset {{VERSION_OR_SHA}} loaded · Project {{PROJECT_NAME}} · Calibration {{CALIBRATION_FILE}} · State {{HANDOVER_DATE}} · Role {{Elephant|Goldfish|Critic}}
 
-Allowed suffixes (only these, each appended with „·"):
+Allowed suffixes (only these, each appended with "·"):
 
-- Case F3: `· Staleness ungeprüft (offline, Cache-Stand)`
-- Accepted case F2: `· HINWEIS: Regelwerk stale ({{N}} Commits hinter Remote)`
-- Same-day light bootstrap (see "Same-day light bootstrap" below): `· Staleness same-day gecacht (voller Check {{HH:MM}})`
-- Speed bootstrap (see "Speed bootstrap" below): `· Profil speed — Leicht-Bootstrap (Details → "Speed bootstrap")`; the model/effort extra line and the role-prohibitions extra line (both step 6.1 below) are OMITTED in this case — they still apply unchanged in substance, they are just not printed as separate lines (ONE confirmation line instead of three).
-- Case F4 (calibration and/or handover missing — the EXPECTED initial state in not-yet-migrated projects): the affected field carries `FEHLT (F4)` instead of a placeholder value — i.e. `Kalibrierung FEHLT (F4)` resp. `Stand FEHLT (F4)` — PLUS the mandatory suffix `· F4: nur Read-only-Analyse bis Kalibrierung/Handover angelegt`.
+- Case F3: `· Staleness unchecked (offline, cache state)`
+- Accepted case F2: `· NOTE: ruleset stale ({{N}} commits behind remote)`
+- Same-day light bootstrap (see "Same-day light bootstrap" below): `· Staleness same-day cached (full check {{HH:MM}})`
+- Speed bootstrap (see "Speed bootstrap" below): `· Profile speed — light bootstrap (details → "Speed bootstrap")`; the model/effort extra line and the role-prohibitions extra line (both step 6.1 below) are OMITTED in this case — they still apply unchanged in substance, they are just not printed as separate lines (ONE confirmation line instead of three).
+- Case F4 (calibration and/or handover missing — the EXPECTED initial state in not-yet-migrated projects): the affected field carries `MISSING (F4)` instead of a placeholder value — i.e. `Calibration MISSING (F4)` resp. `State MISSING (F4)` — PLUS the mandatory suffix `· F4: read-only analysis only until calibration/handover is created`.
 
-Role variants of the „Stand" field:
+Role variants of the "State" field:
 
-- Goldfish: `Stand Briefing {{TASK_ID_OR_DATE}}` (SHA comes from the briefing; a briefing without SHA is a briefing defect → return to the Elephant, do not research it yourself)
-- Critic: `Stand n/a (Critic sieht keinen Verlauf)` (additionally confirm: no write tools available — if you CAN write, the wrong agent definition is loaded → bootstrap failed, stop)
+- Goldfish: `State briefing {{TASK_ID_OR_DATE}}` (SHA comes from the briefing; a briefing without SHA is a briefing defect → return to the Elephant, do not research it yourself)
+- Critic: `State n/a (Critic sees no history)` (additionally confirm: no write tools available — if you CAN write, the wrong agent definition is loaded → bootstrap failed, stop)
 
 Elephant adds a second line directly below (MP-17):
 
-> Modell/Effort: {{MODEL}} / {{EFFORT}} (gemäß policies/model-policy.md) · Profil {{advisor|design-first|PO-Ausnahme}} · Advisor {{advisor-model|aus}}
+> Model/Effort: {{MODEL}} / {{EFFORT}} (per policies/model-policy.md) · Profile {{advisor|design-first|PO exception}} · Advisor {{ADVISOR|off}}
 
 Elephant adds a THIRD line directly below that (Step 1d):
 
-> Rollen-Verbote geladen: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — Implementierung nur per Goldfish-Dispatch (Stufe-0 per OM §3.3; weitere Ausnahmen nur durch den PO); PRD-Gate: lesbar vorlegen + auf ‚freigegeben' warten
+> Role prohibitions loaded: EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19 — implementation only via Goldfish dispatch (Tier-0 per OM §3.3; further exceptions only by the PO); PRD gate: present readably + wait for 'approved'
 
-No placeholders, no „unbekannt" outside the defined suffix cases. **Prohibition:** printing this line without having performed steps 1–5 (see Contract).
+No placeholders, no "unknown" outside the defined suffix cases. **Prohibition:** printing this line without having performed steps 1–5 (see Contract).
 
-## Same-day light bootstrap ("Kurz-Bootstrap", Elephant only)
+## Same-day light bootstrap ("short bootstrap", Elephant only)
 
 Preconditions (ALL must hold, else full bootstrap):
 
@@ -175,7 +175,7 @@ Light form (deviates from Steps 1–6 above ONLY as follows; every step not list
 - **Step 1:** local SHA only (no `ls-remote`).
 - **Step 1b:** unchanged (MANDATORY) — **the profile question repeats at EVERY bootstrap**, light path included: it is a cheap single UI question, and a mid-day profile change is a new session anyway.
 - **Step 1d:** unchanged (embedded, cheap).
-- **Step 2:** SKIPPED, with mandatory suffix `· Staleness same-day gecacht (voller Check {{HH:MM}})` (see Step 6 allowed-suffix list).
+- **Step 2:** SKIPPED, with mandatory suffix `· Staleness same-day cached (full check {{HH:MM}})` (see Step 6 allowed-suffix list).
 - **Step 3:** existence check only.
 - **Step 4:** read the handover HEAD block + topmost session block only — UNLESS the handover changed since the full bootstrap (newer commits/date) → full read.
 - **Step 5:** existence check only.
@@ -207,7 +207,7 @@ Why: a full bootstrap already completed the same calendar day on the same machin
 - **Step 3:** existence check of the calibration file only (no full read).
 - **Step 4:** the operative head of the handover file only — no full session-history read.
 - **Step 5:** existence/invocability check of verify only.
-- **Step 6:** **ONE confirmation line instead of three** (format → Step 6 above, suffix `· Profil speed — Leicht-Bootstrap`).
+- **Step 6:** **ONE confirmation line instead of three** (format → Step 6 above, suffix `· Profile speed — light bootstrap`).
 
 **Light process** (not just the bootstrap — applies to the whole task): no PRD document; direct dispatch, or a mini-edit for the smallest fixes (stage-0 fast path per `docs/operating-model.md` §3.3); a light review tier instead of a full Design-Tier review — the existing Critic-trigger matrix decides as usual, this is not a new Critic rule (→ `harness/checklists/small-session.md` step 3); short close via the **close-light variant** of the `close-block` skill (`plugins/pipeline-core/skills/close-block/SKILL.md`) — its own hard eligibility gate applies unchanged, speed does not override it.
 
@@ -218,9 +218,9 @@ Why: a full bootstrap already completed the same calendar day on the same machin
 | Case | Finding | Binding behavior |
 |---|---|---|
 | **F1** | Ruleset missing entirely (plugin not installed, skills not found) | **STOP.** Inform the PO. Only **minimal-safe mode**: reading (Read/Glob/Grep), read-only git (`status`/`log`/`diff`), plugin diagnosis (`/plugin` menu, settings inspection). NO edits/writes/commits/pushes, no settings changes. **NO confirmation line** — the session counts as not bootstrapped. |
-| **F2** | Plugin stale (installed SHA ≠ remote HEAD) | Warn + offer the refresh verbatim: `/plugin marketplace update agent-pipeline`, then `claude plugin update pipeline-core` (project-scoped installations: `claude plugin update pipeline-core@agent-pipeline --scope project` — the unscoped command fails with "not found" there, default scope is user), then `/reload-plugins`. Work MAY continue — EXCEPT when the delta touches guardrails (paths `hooks/`, `agents/`, permission settings): then refresh FIRST, work after. Delta check: in a local checkout of the agent-pipeline repo run `git fetch` + `git log --name-only {{INSTALLED_SHA}}..origin/main`; without a checkout the default-safe rule applies: **when in doubt, refresh** (the refresh is cheap, stale guardrails are not). Confirmation line carries the HINWEIS suffix. After every refresh, repeat steps 1–2 (new SHA in the confirmation line) — otherwise the refresh is not evidenced. **Expectation note:** `/reload-plugins` may report "0 skills" (or an apparently empty skill count) even though skills remain invocable afterwards — verify by invoking a skill, not by the message. |
+| **F2** | Plugin stale (installed SHA ≠ remote HEAD) | Warn + offer the refresh verbatim: `/plugin marketplace update agent-pipeline`, then `claude plugin update pipeline-core` (project-scoped installations: `claude plugin update pipeline-core@agent-pipeline --scope project` — the unscoped command fails with "not found" there, default scope is user), then `/reload-plugins`. Work MAY continue — EXCEPT when the delta touches guardrails (paths `hooks/`, `agents/`, permission settings): then refresh FIRST, work after. Delta check: in a local checkout of the agent-pipeline repo run `git fetch` + `git log --name-only {{INSTALLED_SHA}}..origin/main`; without a checkout the default-safe rule applies: **when in doubt, refresh** (the refresh is cheap, stale guardrails are not). Confirmation line carries the NOTE suffix. After every refresh, repeat steps 1–2 (new SHA in the confirmation line) — otherwise the refresh is not evidenced. **Expectation note:** `/reload-plugins` may report "0 skills" (or an apparently empty skill count) even though skills remain invocable afterwards — verify by invoking a skill, not by the message. |
 | **F3** | Offline / remote unreachable | Warn + continue on cache state (the cache is a complete copy; day-to-day operation is offline-capable). Redo the staleness check at next connectivity, at latest at the next bootstrap. Confirmation line carries the offline suffix. |
-| **F4** | Calibration or handover file missing (or verify command missing) | **STOP for writing work.** Read-only analysis stays allowed. Offer creation: draft the missing calibration from the required-field list in step 3 (canonical example: `templates/pipeline.json.example` in the agent-pipeline repo — an installed plugin cannot read repo templates, so generate the draft from the field list). Newly created files MUST be named to the PO for confirmation — a new calibration is a project-policy decision, never an agent's solo act. **The confirmation line still prints** (F4 is the expected initial state in not-yet-migrated projects, not a bootstrap failure): the affected field reads `FEHLT (F4)` (step 6) plus the mandatory suffix `· F4: nur Read-only-Analyse bis Kalibrierung/Handover angelegt`. |
+| **F4** | Calibration or handover file missing (or verify command missing) | **STOP for writing work.** Read-only analysis stays allowed. Offer creation: draft the missing calibration from the required-field list in step 3 (canonical example: `templates/pipeline.json.example` in the agent-pipeline repo — an installed plugin cannot read repo templates, so generate the draft from the field list). Newly created files MUST be named to the PO for confirmation — a new calibration is a project-policy decision, never an agent's solo act. **The confirmation line still prints** (F4 is the expected initial state in not-yet-migrated projects, not a bootstrap failure): the affected field reads `MISSING (F4)` (step 6) plus the mandatory suffix `· F4: read-only analysis only until calibration/handover is created`. |
 
 Why F2 has the guardrail exception: a stale ruleset with old hooks means the session works under WEAKER protection than decided — exactly the state the pipeline exists to abolish. Feature/doc deltas may wait; protection deltas may not.
 

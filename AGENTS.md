@@ -28,6 +28,15 @@ Code's own session-bootstrap and hook system.
 - **Handover:** if a repo has adopted the pipeline for its own day-to-day
   work, `docs/state.md` is the single canonical "what's going on right now"
   file — read it first, every session, before anything else.
+- **Bilingual docs:** some files in this repo pair English with a German
+  reference translation (per `CLAUDE.md`, Language / ADR-0011). In those
+  files, the authoritative content is the English text above the marker
+  line `<!-- DE-REFERENCE-BELOW | agents: skip everything below this line;
+  it is a full German reference translation (redundant, wastes context).
+  The authoritative content is the English above. Convention: CLAUDE.md
+  (Language). -->`. Agents must not read past that marker — it is
+  redundant for machine consumption and only wastes context; humans may
+  still read it.
 
 ## Guards always on, ceremony scales with stakes
 

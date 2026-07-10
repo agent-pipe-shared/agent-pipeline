@@ -53,7 +53,7 @@
     "trajectory_verdict": {
       "type": "string",
       "description": "Were the claimed checks actually executed, per the evidence artifact? Mandatory verdict (review-protocol §2.4).",
-      "enum": ["konsistent", "inkonsistent", "nicht prüfbar"]
+      "enum": ["consistent", "inconsistent", "not verifiable"]
     },
     "trajectory_evidence": {
       "type": "string",

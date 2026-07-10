@@ -7,15 +7,23 @@ for your own projects.
 *Where this stands: v0.1.0 — roughly a week of build time, a solo project, one
 dogfooding round so far. Feedback welcome.*
 
+> **A note on language.** This operating model was first built in German and then
+> made English-first for release. The docs are English-primary — bilingual files
+> keep a full German reference below a skip marker — but because of that origin,
+> stray German may still surface here and there (a comment, an example, an internal
+> label, or the odd directive). It's harmless, corrections/PRs are welcome, and you
+> pick the language the pipeline works in for you (commits, reviews, PRDs) via the
+> `language.human_facing` setting.
+
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
 ## The problem
 
 Teams building with coding agents tend to reinvent the same conventions per repo —
-review rituals, git guardrails, handover files — and copy them by hand from project
-to project. Copies drift. There is no independent reviewer separate from whoever
-wrote the code, and no shared discipline over which model does which kind of work
-at what cost. This repo is that missing shared layer: one versioned source, adopted
+review rituals, git guardrails, handover files — copied by hand and drifting
+project to project. There's no independent reviewer separate from whoever wrote
+the code, and no shared discipline over which model does which kind of work at
+what cost. This repo is that missing shared layer: one versioned source, adopted
 by reference instead of copy-pasted.
 
 ## What you get
@@ -35,19 +43,19 @@ Around those roles:
 
 - **Two-stage review** — deterministic gates (tests, security scan, lint) run
   *before* any LLM judgment; only what survives the gates reaches a Critic.
-- **Specs with checkable acceptance criteria** — no task is "done" on a feeling;
-  every task has a Definition of Done something or someone can actually check.
+- **Specs with checkable acceptance criteria** — every task has a Definition of
+  Done something or someone can actually check, not a "done"-on-a-feeling.
 - **Git guardrails** — a hook layer that blocks force-pushes, history rewrites,
   deleted protected branches, and skipped hooks, regardless of what any agent asks
   for.
 - **A model/token policy** — role-tiered model routing (design / implement /
-  mechanic / review / optional advisor) you configure to your own subscription, so
+  mechanic / review / optional advisor) configured to your own subscription, so
   cost tracks task complexity instead of one model doing everything.
 - **Evidence discipline** — "done" means a machine-written log or output, the exact
   command, and its exit code — never a model-formulated claim that something
   "should work."
-- **Two human gates, not a stream of approvals** — the plan sign-off up front and
-  the completion sign-off at the end are the only two required stops for you.
+- **Two human gates, not a stream of approvals** — plan sign-off up front and
+  completion sign-off at the end are the only two required stops for you.
   Deliberately few and deliberately placed: your attention is the scarce
   resource, and a long queue of small approvals trains reflexive clicking, not
   actual review.
@@ -55,14 +63,13 @@ Around those roles:
 ## How it works
 
 Everything ships as a Claude Code plugin plus a small set of `.claude/` runtime
-configs. You don't hand-edit those configs: you fill in **one** file,
-`pipeline.user.yaml` (your name, your repo, your language, your subscription tier,
-your autonomy preset), and `node setup.mjs` compiles it into the three
-runtime-canonical files Claude Code actually reads
-(`.claude/settings.json`, `.claude/pipeline.json`, `.claude/pipeline.yaml`). Re-run
-it any time you change your mind — it's drift-safe: files it hasn't touched since
-get recompiled freely, but a file you hand-edited yourself triggers a confirmation
-before it's overwritten.
+configs, which you never hand-edit. You fill in **one** file, `pipeline.user.yaml`
+(your name, your repo, your language, your subscription tier, your autonomy
+preset), and `node setup.mjs` compiles it into the three runtime-canonical files
+Claude Code actually reads (`.claude/settings.json`, `.claude/pipeline.json`,
+`.claude/pipeline.yaml`). Re-run it any time you change your mind — it's
+drift-safe: untouched files recompile freely, but a file you hand-edited yourself
+triggers a confirmation before it's overwritten.
 
 ```mermaid
 flowchart LR
@@ -88,7 +95,7 @@ flowchart TD
     H --> M["Merge + doc sync"]
 ```
 
-Order matters: the deterministic gates always run *before* any LLM judgment — a
+Order matters: deterministic gates always run *before* any LLM judgment — a
 Critic never reviews a diff that hasn't already cleared the machine chain.
 
 ## Bring your own architecture rules & guardrails
@@ -97,10 +104,10 @@ A project can bring its own house rules, split into two classes: **guidelines**
 are recommended principles you may deliberately deviate from, as long as the
 deviation is named; **policies** are binding rules that block a gate the moment
 they're violated. Both live under
-[`governance/examples/`](governance/examples/README.md) and are wired in through
-the `governance` block in `.claude/pipeline.yaml`.
+[`governance/examples/`](governance/examples/README.md), wired in through the
+`governance` block in `.claude/pipeline.yaml`.
 
-Each class is enforced differently: guidelines feed into every plan and are the
+Enforcement differs by class: guidelines feed into every plan and are the
 Critic's review benchmark — an unnamed deviation is the finding, not the
 deviation itself. Machine-checkable policies automatically fail the
 security-scan gate; the non-machine-checkable checklist gets ticked off by the
@@ -119,14 +126,14 @@ codebase. Three independent dials set that:
 
 ## Why this holds up at enterprise scale
 
-What comes together here is more than an agent setup: a repeatable
-architecture through the governance layer, machine-checkable gates instead of
-promises, mandatory documentation artifacts instead of word-of-mouth
-knowledge, an independent review kept separate from the executing context, and
-a model/cost policy that scales effort to risk. The reasoning behind it:
-attention is the scarcest resource — so strictness gets invested where
-mistakes are expensive, and consciously spared elsewhere. The final judgment
-still always stays with the human.
+What comes together here is more than an agent setup: a repeatable architecture
+through the governance layer, machine-checkable gates instead of promises,
+mandatory documentation artifacts instead of word-of-mouth knowledge, an
+independent review kept separate from the executing context, and a model/cost
+policy that scales effort to risk. The reasoning behind it: attention is the
+scarcest resource — so strictness gets invested where mistakes are expensive,
+and consciously spared elsewhere. The final judgment still always stays with the
+human.
 
 ## Quick start
 
@@ -160,6 +167,8 @@ what's always portable and what's Claude-Code-specific.
 
 ---
 
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
 # Agent-Pipeline (Deutsch)
 
 Ein versioniertes Operating Model für agentische Softwareentwicklung — klonen,
@@ -168,6 +177,15 @@ Guardrails für die eigenen Projekte übernehmen.
 
 *Wo das gerade steht: v0.1.0 — rund eine Woche Bauzeit, ein Soloprojekt, bisher
 eine Dogfooding-Runde. Feedback willkommen.*
+
+> **Zur Sprache.** Dieses Operating Model entstand zuerst auf Deutsch und wurde für
+> die Veröffentlichung auf Englisch-first umgestellt. Die Doku ist englisch-primär —
+> zweisprachige Dateien führen unterhalb eines Skip-Markers eine vollständige
+> deutsche Referenz —, aber durch diese Herkunft können vereinzelt noch deutsche
+> Reste auftauchen (ein Kommentar, ein Beispiel, ein internes Label oder mal eine
+> Direktive). Das ist unkritisch, Korrekturen/PRs sind willkommen, und welche
+> Sprache die Pipeline für dich verwendet (Commits, Reviews, PRDs), wählst du über
+> die Einstellung `language.human_facing`.
 
 ## Das Problem
 

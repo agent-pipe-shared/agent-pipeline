@@ -43,7 +43,7 @@ Rule IDs: `TB-xx`.
 ## TB-04 — Calibration run before novel large runs (MP-09/14, recommended)
 
 - **SHOULD** run a small-slice calibration before any NOVEL large run (workflow or long autonomous single run): one directory instead of the repo, one narrow question instead of a broad one; watch spend via `/workflows`.
-- Not a mandatory hurdle — but for novel workflows expected to exceed ~30 min, the telemetry row **MUST** record whether a calibration ran ("Besonderheiten" column).
+- Not a mandatory hurdle — but for novel workflows expected to exceed ~30 min, the telemetry row **MUST** record whether a calibration ran ("peculiarities" column).
 - **Why:** Large-run consumption is barely estimable up front ("a single run can use meaningfully more tokens than the same task in conversation"); the small slice buys the projection before the budget is gone.
 - **Verification:** Telemetry row of the large run references its calibration run.
 
@@ -53,12 +53,12 @@ Rule IDs: `TB-xx`.
 - Autonomous `/goal` runs **MUST** contain an explicit stop clause (e.g. "... or stop after {{N}} turns") (MP-15).
 - **MUST NOT** base budget control on undocumented mechanisms (prompt directives like "+500k", unverified flags) — only documented instruments count: `/usage`, `/usage-credits`, workspace spend limits, `/workflows` live view.
 - **Why:** Without a defined threshold and stop, a misdirected run has no structural upper bound; undocumented knobs are hope, not control.
-- **Verification:** Escalation is documented in the session/telemetry ("Besonderheiten"); briefings for autonomous runs contain the stop clause (stop conditions are mandatory briefing field 5).
+- **Verification:** Escalation is documented in the session/telemetry ("peculiarities"); briefings for autonomous runs contain the stop clause (stop conditions are mandatory briefing field 5).
 
 ## TB-06 — Telemetry duty (MP-20)
 
-- Every session/block close **MUST** append one row to the project's `telemetry/costs.md` — canonical column set and conventions are defined in `policies/model-policy.md` MP-20 (date, session/block, role, model/effort, task, tokens per `/usage`, first-pass y/n, interventions y/n, notes). Do not fork the format here.
-- Goldfish rows **MUST** fill the reifemetric columns (first-pass, interventions); `--bare`/headless runs add `total_cost_usd` from `--output-format json`.
+- Every session/block close **MUST** append one row to the project's `telemetry/costs.md` — canonical column set and conventions are defined in `policies/model-policy.md` MP-20 (date, session/block, role, model/effort, task, tokens per `/usage`, first-pass y/n, interventions y/n, peculiarities). Do not fork the format here.
+- Goldfish rows **MUST** fill the maturity-metric columns (first-pass, interventions); `--bare`/headless runs add `total_cost_usd` from `--output-format json`.
 - The `close-block` skill (shipped, `plugins/pipeline-core`) writes the row as ritual step 8; wherever the skill is not installed/run, the row is a MANUAL mandatory step — in this repo from now on (`telemetry/costs.md`), in project repos from their migration (Phase 4).
 - The first Elephant session of a month runs the monthly sighting (3–5 findings lines, first-pass quota, cache health) per MP-20.
 - **Why:** "Cost telemetry from day 1" stayed a soft TODO without an instrument; the periodic price review needs task-level data, not $/MTok guesses (tokenizer trap, MP-13).

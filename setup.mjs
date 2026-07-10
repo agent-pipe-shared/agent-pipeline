@@ -12,7 +12,7 @@
  * DEPENDENCY-FREE (pure Node >=24, no npm packages): imports only Node builtins plus the
  * two EXISTING plugin libs this repo already ships for exactly this purpose
  * (plugins/pipeline-core/lib/yaml-lite.mjs, .../schema-lite.mjs) — briefing instruction
- * "nutzen -- KEINE neue Dependency".
+ * "use -- NO new dependency".
  *
  * WHY BLOCK-STYLE YAML, NOT THE PRD's FLOW-STYLE EXAMPLE (deviation, documented once here
  * -- see also pipeline.user.yaml's own header): the PRD §5 schema sketch writes
@@ -80,7 +80,7 @@
  * default values) — so a first `--defaults` run against a pristine clone is already a
  * no-op diff, and a second `--defaults` run changes nothing (all three compile targets hit
  * the "up-to-date" branch of decideCompileAction, since pipeline.user.yaml itself did not
- * change between the two runs). See DoD "zweiter Lauf idempotent".
+ * change between the two runs). See DoD "second run idempotent".
  *
  * DETECTION vs. QUESTIONS (PRD §6): OS + git-host + CLI are DETECTED (never asked) on
  * every run, in both interactive and `--defaults` mode; the five questions (runtime,
@@ -101,7 +101,7 @@
  *
  * VERIFY: node setup.test.mjs (pure-function coverage: detection/preset/render/drift
  * logic). NOT wired into harness/scripts/verify.mjs's TEST_SUITES list here -- that file
- * is TP-3-protected and wiring it is outside this briefing's Lieferumfang (out of scope,
+ * is TP-3-protected and wiring it is outside this briefing's delivery scope (out of scope,
  * flagged in the delivering briefing's report as an open item for a later wave).
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
@@ -118,7 +118,7 @@ import { validateAgainstSchema } from "./plugins/pipeline-core/lib/schema-lite.m
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const ROOT_DIR = SCRIPT_DIR; // setup.mjs lives at the export root -- resolve relative
 // to the SCRIPT's own location, not `process.cwd()`, so it stays correct no matter where the
-// collegue invokes `node setup.mjs` from (PRD §6/§7: "läuft überall").
+// collegue invokes `node setup.mjs` from (PRD §6/§7: "runs anywhere").
 
 const USER_YAML_PATH = join(ROOT_DIR, "pipeline.user.yaml");
 const USER_SCHEMA_PATH = join(ROOT_DIR, "pipeline.user.schema.json");
@@ -132,7 +132,7 @@ export const GENERATED_MARKER_PREFIX = "GENERATED from pipeline.user.yaml — ed
 export function buildDefaultAnswers() {
   return {
     identity: { owner_name: "Your Name", repo_owner: "your-org", repo_name: "agent-pipeline", commit_trailer: true },
-    language: { human_facing: "de", agent_facing: "en" },
+    language: { human_facing: "en", agent_facing: "en" },
     platform: { git_host: "github", cli: "gh" },
     agent_runtime: "claude-code",
     models: {
@@ -180,8 +180,8 @@ export function cliForHost(host) {
 
 /**
  * Detects the git host: `git remote -v` first (real signal), then CLI availability
- * (`gh`/`glab` on PATH) as a fallback heuristic (briefing: "aus git remote -v bzw.
- * Verfügbarkeit von gh/glab"), then "github" as the conservative, deterministic default
+ * (`gh`/`glab` on PATH) as a fallback heuristic (briefing: "from git remote -v or
+ * availability of gh/glab"), then "github" as the conservative, deterministic default
  * (matches buildDefaultAnswers().platform.git_host — fresh clones without a remote yet,
  * like this export before P5's `git init`, always resolve here).
  * @param {string} rootDir
@@ -210,7 +210,7 @@ function safeSpawn(spawn, command, args, opts = {}) {
 }
 
 // ---- subscription-tier / autonomy presets (pure) -----------------------------------------------
-/** @param {string} tier - "pro" | "max" | anything else ("api"/eigene: Max-Preset als Startpunkt) */
+/** @param {string} tier - "pro" | "max" | anything else ("api"/custom: uses the Max preset as a starting point) */
 export function applyAboPreset(tier) {
   if (tier === "pro") {
     return {
@@ -221,7 +221,7 @@ export function applyAboPreset(tier) {
       advisor: { enabled: false },
     };
   }
-  // "max" (recommended) and "api"/eigene (freely editable starting point) share the preset.
+  // "max" (recommended) and "api"/custom (freely editable starting point) share the preset.
   return {
     design: { model: "opus", effort: "high" },
     implement: { model: "sonnet", effort: "medium" },
@@ -231,7 +231,7 @@ export function applyAboPreset(tier) {
   };
 }
 
-/** @param {string} preset - "autonom"/"autonomous" or anything else ("konservativ") */
+/** @param {string} preset - "autonom"/"autonomous" or anything else ("conservative") */
 export function applyAutonomyPreset(preset) {
   const p = String(preset ?? "").toLowerCase();
   if (p.startsWith("autonom")) return { push_policy: "standing-approved", branch_model: "direct-main", wip_limit: 1 };
@@ -247,45 +247,45 @@ export function normalizeLang(value) {
  * same answers -> byte-identical text (idempotency, see file header). */
 export function renderUserYaml(answers) {
   const a = answers;
-  return `# pipeline.user.yaml — dein persönliches Pipeline-Profil.
-# Die EINE Datei, die die Pipeline "deine" macht. Der Methodik-Kern bleibt generisch.
+  return `# pipeline.user.yaml — your personal Pipeline profile.
+# The ONE file that makes the Pipeline "yours". The methodology core stays generic.
 #
-# Ändern → \`node setup.mjs\` erneut ausführen (kompiliert die Laufzeit-Configs neu:
-# .claude/settings.json, .claude/pipeline.json, .claude/pipeline.yaml). Diese Datei ist
-# die QUELLE der Absicht — die drei kompilierten Dateien sind laufzeit-kanonisch und
-# tragen je einen "GENERATED from pipeline.user.yaml"-Header; Hand-Edits DORT werden bei
-# der nächsten \`setup.mjs\`-Ausführung als Drift erkannt und nur nach Bestätigung
-# überschrieben (Schichtenmodell).
+# Change it → re-run \`node setup.mjs\` (recompiles the runtime configs:
+# .claude/settings.json, .claude/pipeline.json, .claude/pipeline.yaml). This file is
+# the SOURCE of intent — the three compiled files are runtime-canonical and each
+# carries a "GENERATED from pipeline.user.yaml" header; hand-edits THERE are detected
+# as drift on the next \`setup.mjs\` run and overwritten only after confirmation
+# (layer model).
 #
-# Dies ist der committete TEMPLATE-Zustand mit konservativen, aber lauffähigen Defaults
-# (der Neu-Kollege startet sicher UND sofort funktionsfähig). Der SessionStart-Hook
-# \`setup-check.mjs\` erkennt diesen Default-Zustand (owner_name/repo_owner unverändert)
-# und erinnert an \`node setup.mjs\`, solange kein echtes Setup gelaufen ist.
+# This is the committed TEMPLATE state with conservative but working defaults
+# (a new colleague starts safe AND immediately functional). The SessionStart hook
+# \`setup-check.mjs\` recognizes this default state (owner_name/repo_owner unchanged)
+# and reminds you to run \`node setup.mjs\` as long as no real setup has run yet.
 
 identity:
-  owner_name: "${a.identity.owner_name}"           # erscheint nirgends im Methodik-Kern, nur in DEINEN Artefakten (Commit-Trailer etc.)
-  repo_owner: "${a.identity.repo_owner}"            # GitHub-Org/-User bzw. GitLab-Gruppe deines EIGENEN Repos
-  repo_name: "${a.identity.repo_name}"       # Name deines EIGENEN Repos (setup.mjs bindet das Plugin darauf)
-  commit_trailer: ${a.identity.commit_trailer}              # Co-Authored-By-Trailer an Commits
+  owner_name: "${a.identity.owner_name}"           # appears nowhere in the methodology core, only in YOUR artifacts (commit trailer etc.)
+  repo_owner: "${a.identity.repo_owner}"            # GitHub org/user or GitLab group of YOUR OWN repo
+  repo_name: "${a.identity.repo_name}"       # name of YOUR OWN repo (setup.mjs binds the plugin to it)
+  commit_trailer: ${a.identity.commit_trailer}              # Co-Authored-By trailer on commits
 
 language:
-  human_facing: ${a.language.human_facing}                  # was die Pipeline PRODUZIERT: Commits, Reviews, neue Docs (de|en)
-  agent_facing: ${a.language.agent_facing}                  # Rollen/Guardrails/Skills (Empfehlung: en)
-  # Hinweis: die MITGELIEFERTE Doku ist de (human) / en (agent).
+  human_facing: ${a.language.human_facing}                  # what the Pipeline PRODUCES: commits, reviews, new docs (de|en)
+  agent_facing: ${a.language.agent_facing}                  # roles/guardrails/skills (recommended: en)
+  # Note: the SHIPPED documentation is de (human) / en (agent).
 
 platform:
-  git_host: ${a.platform.git_host}                  # github | gitlab   (setup.mjs erkennt es aus \`git remote -v\`)
-  cli: ${a.platform.cli}                           # gh | glab         (setup.mjs setzt das passend zum Host)
-  # Hinweis Self-Hosted GitLab: setup.mjs bindet das Marketplace-Binding standardmaessig an
-  # gitlab.com; bei einem eigenen GitLab-Host die generierte Marketplace-URL in
-  # .claude/settings.json (extraKnownMarketplaces) danach von Hand anpassen.
+  git_host: ${a.platform.git_host}                  # github | gitlab   (setup.mjs detects it from \`git remote -v\`)
+  cli: ${a.platform.cli}                           # gh | glab         (setup.mjs sets this to match the host)
+  # Note on self-hosted GitLab: setup.mjs binds the marketplace binding to gitlab.com by
+  # default; for your own GitLab host, adjust the generated marketplace URL in
+  # .claude/settings.json (extraKnownMarketplaces) by hand afterwards.
 
-agent_runtime: ${a.agent_runtime}          # claude-code (volles Enforcement) | other (nur Methodik → docs/runtime-boundary.md)
+agent_runtime: ${a.agent_runtime}          # claude-code (full enforcement) | other (methodology only → docs/runtime-boundary.md)
 
-# setup.mjs fragt deine Abo-Stufe und schreibt ein Preset:
-#   Pro:  alles sonnet, effort-gestaffelt (Methodik voll nutzbar)
-#   Max:  opus-Orchestrator + sonnet-3-Tier (empfohlen, Default unten)
-#   API/eigene: Namen frei eintragen (setup.mjs befüllt mit dem Max-Preset als Startpunkt)
+# setup.mjs asks your subscription tier and writes a preset:
+#   Pro:  all sonnet, effort-tiered (methodology fully usable)
+#   Max:  opus orchestrator + sonnet 3-tier (recommended, default below)
+#   API/custom: enter names freely (setup.mjs pre-fills with the Max preset as a starting point)
 models:
   design:
     model: ${a.models.design.model}
@@ -300,8 +300,8 @@ models:
     model: ${a.models.review.model}
     effort: ${a.models.review.effort}
   advisor:
-    enabled: ${a.models.advisor.enabled}                  # optionales 2nd-Opinion-Muster; DEFAULT AUS
-    # Fallback ohne Advisor-Zugang: advisor-consult-Subagent (dokumentiert)
+    enabled: ${a.models.advisor.enabled}                  # optional 2nd-opinion pattern; DEFAULT OFF
+    # Fallback without advisor access: advisor-consult subagent (documented)
 
 autonomy:
   push_policy: ${a.autonomy.push_policy}                # gated | standing-approved
@@ -315,8 +315,8 @@ gates:
   claude_md_max_lines: ${a.gates.claude_md_max_lines}
 
 # -----------------------------------------------------------------------------------------
-# Advanced/Autonom-Beispiel (NICHT aktiv — nur zur Orientierung; setup.mjs schreibt diese
-# Werte automatisch, wenn du beim Autonomie-Preset "Autonom" wählst):
+# Advanced/autonomous example (NOT active — for orientation only; setup.mjs writes these
+# values automatically when you choose "Autonomous" for the autonomy preset):
 #
 # autonomy:
 #   push_policy:  standing-approved
@@ -566,38 +566,38 @@ async function applyCompileDecision({ label, path, existingState, wantedText, so
   });
 
   if (decision.action === "skip") {
-    console.log(`  ${label}: bereits aktuell (unveraendert).`);
+    console.log(`  ${label}: already up to date (unchanged).`);
     return { wrote: false, decision };
   }
   if (decision.action === "write") {
     writeFileSync(path, wantedText);
-    console.log(`  ${label}: kompiliert (${decision.reason}).`);
+    console.log(`  ${label}: compiled (${decision.reason}).`);
     return { wrote: true, decision };
   }
 
   // decision.action === "warn"
   const reasonText =
     decision.reason === "unparseable"
-      ? "die bestehende Datei ist kein gueltiges JSON/YAML -- bitte von Hand pruefen"
-      : "Hand-Edit-Drift erkannt (Datei weicht vom letzten Kompilat ab, obwohl pipeline.user.yaml seither unveraendert ist)";
-  console.warn(`  WARNUNG ${label}: ${reasonText}.`);
+      ? "the existing file is not valid JSON/YAML -- please check it by hand"
+      : "hand-edit drift detected (file diverges from the last compile, although pipeline.user.yaml has not changed since)";
+  console.warn(`  WARNING ${label}: ${reasonText}.`);
 
   const disposition = resolveWarnDisposition({ force, interactive: interactive && !!rl });
   if (disposition === "write-forced") {
-    console.warn(`  WARNUNG ${label}: --force/--yes gesetzt -- ueberschreibe die hand-editierte Datei OHNE Rueckfrage.`);
+    console.warn(`  WARNING ${label}: --force/--yes set -- overwriting the hand-edited file WITHOUT confirmation.`);
     writeFileSync(path, wantedText);
-    console.log(`  ${label}: ueberschrieben (--force).`);
+    console.log(`  ${label}: overwritten (--force).`);
     return { wrote: true, decision };
   }
   if (disposition === "prompt") {
-    const answer = (await rl.question(`  ${label} trotzdem ueberschreiben? [y/N] `)).trim().toLowerCase();
+    const answer = (await rl.question(`  Overwrite ${label} anyway? [y/N] `)).trim().toLowerCase();
     if (["y", "yes", "j", "ja"].includes(answer)) {
       writeFileSync(path, wantedText);
-      console.log(`  ${label}: ueberschrieben (Bestaetigung erhalten).`);
+      console.log(`  ${label}: overwritten (confirmation received).`);
       return { wrote: true, decision };
     }
   }
-  console.warn(`  ${label}: NICHT ueberschrieben -- bitte manuell abgleichen.`);
+  console.warn(`  ${label}: NOT overwritten -- please reconcile manually.`);
   return { wrote: false, decision };
 }
 
@@ -608,33 +608,33 @@ async function promptAnswers(rl, previous) {
   const agent_runtime = runtimeIn === "other" ? "other" : runtimeIn === "" ? previous.agent_runtime : "claude-code";
   if (agent_runtime === "other") {
     console.log(
-      "  Hinweis: 'other' bedeutet portable Methodik ohne volles Hook-/Gate-Enforcement -- siehe docs/runtime-boundary.md.",
+      "  Note: 'other' means portable methodology without full hook/gate enforcement -- see docs/runtime-boundary.md.",
     );
   }
 
-  const owner_name = (await rl.question(`Dein Name (${previous.identity.owner_name}): `)).trim() || previous.identity.owner_name;
+  const owner_name = (await rl.question(`Your name (${previous.identity.owner_name}): `)).trim() || previous.identity.owner_name;
   const repo_owner =
-    (await rl.question(`GitHub/GitLab-Owner deines Repos (${previous.identity.repo_owner}): `)).trim() || previous.identity.repo_owner;
-  const repo_name = (await rl.question(`Repo-Name (${previous.identity.repo_name}): `)).trim() || previous.identity.repo_name;
+    (await rl.question(`GitHub/GitLab owner of your repo (${previous.identity.repo_owner}): `)).trim() || previous.identity.repo_owner;
+  const repo_name = (await rl.question(`Repo name (${previous.identity.repo_name}): `)).trim() || previous.identity.repo_name;
 
-  const humanIn = (await rl.question(`Sprache -- human-facing (Commits/Reviews/neue Docs) [de/en] (${previous.language.human_facing}): `)).trim();
-  const agentIn = (await rl.question(`Sprache -- agent-facing (Rollen/Guardrails/Skills) [de/en] (${previous.language.agent_facing}): `)).trim();
+  const humanIn = (await rl.question(`Language -- human-facing (commits/reviews/new docs) [de/en] (${previous.language.human_facing}): `)).trim();
+  const agentIn = (await rl.question(`Language -- agent-facing (roles/guardrails/skills) [de/en] (${previous.language.agent_facing}): `)).trim();
 
-  const aboIn = (await rl.question(`Abo-Stufe? [pro/max/api] (max) `)).trim().toLowerCase() || "max";
+  const aboIn = (await rl.question(`Subscription tier? [pro/max/api] (max) `)).trim().toLowerCase() || "max";
   const models = applyAboPreset(aboIn);
   if (aboIn !== "pro" && aboIn !== "max") {
     console.log(
-      "  API/eigene gewaehlt: Modelle mit dem Max-Preset vorbefuellt -- trage deine eigenen Modellnamen/Effort-Werte direkt in pipeline.user.yaml ein und fuehre `node setup.mjs` danach erneut aus.",
+      "  API/custom chosen: models pre-filled with the Max preset -- enter your own model names/effort values directly in pipeline.user.yaml and re-run `node setup.mjs` afterwards.",
     );
   }
 
-  const autonomyIn = (await rl.question(`Autonomie-Preset? [konservativ/autonom] (konservativ) `)).trim().toLowerCase() || "konservativ";
+  const autonomyIn = (await rl.question(`Autonomy preset? [conservative/autonomous] (conservative) `)).trim().toLowerCase() || "conservative";
   const autonomy = applyAutonomyPreset(autonomyIn);
   if (autonomyIn.startsWith("autonom")) models.advisor = { enabled: true };
 
   const git_host = detectGitHost(ROOT_DIR);
   const cli = cliForHost(git_host);
-  console.log(`  Erkannt: Betriebssystem=${classifyOs(process.platform)}, Git-Host=${git_host}, CLI=${cli}.`);
+  console.log(`  Detected: OS=${classifyOs(process.platform)}, git host=${git_host}, CLI=${cli}.`);
 
   return {
     identity: { owner_name, repo_owner, repo_name, commit_trailer: previous.identity.commit_trailer },
@@ -655,18 +655,18 @@ function printNextSteps(answers) {
       ? `claude plugin marketplace add https://gitlab.com/${answers.identity.repo_owner}/${answers.identity.repo_name}.git --scope project`
       : `claude plugin marketplace add ${answers.identity.repo_owner}/${answers.identity.repo_name} --scope project`;
   console.log(`
-Setup abgeschlossen.
+Setup complete.
 
-Naechste Schritte:
-  1. Plugin im eigenen Repo binden (falls noch nicht geschehen):
+Next steps:
+  1. Bind the plugin to your own repo (if not already done):
        ${addCmd}
        claude plugin install pipeline-core@agent-pipeline --scope project
-  2. Neue Claude-Code-Session starten -- der Bootstrap-Check laeuft automatisch
+  2. Start a new Claude Code session -- the bootstrap check runs automatically
      (/pipeline-core:pipeline-start).
-  3. Ersten Lauf im Profil "quick" ausprobieren (Details: SETUP.md).
-  4. pipeline.user.yaml jederzeit anpassbar -- danach \`node setup.mjs\` erneut ausfuehren.
+  3. Try a first run in the "quick" profile (details: SETUP.md).
+  4. pipeline.user.yaml is adjustable any time -- re-run \`node setup.mjs\` afterwards.
 
-Details: SETUP.md (Haupteinstieg), docs/usage.md (Alltag).
+Details: SETUP.md (main entry point), docs/usage.md (day to day).
 `);
 }
 
@@ -729,15 +729,15 @@ export async function run(argv = process.argv.slice(2)) {
 
   if (existingUserYamlRaw !== userYamlText) {
     writeFileSync(USER_YAML_PATH, userYamlText);
-    console.log("pipeline.user.yaml geschrieben.");
+    console.log("pipeline.user.yaml written.");
   } else {
-    console.log("pipeline.user.yaml bereits aktuell (unveraendert).");
+    console.log("pipeline.user.yaml already up to date (unchanged).");
   }
 
   const sourceHash = shortHash(userYamlText);
   const interactive = !opts.defaults;
 
-  console.log("\nKompiliere Laufzeit-Configs:");
+  console.log("\nCompiling runtime configs:");
 
   const settingsState = readJsonSafe(SETTINGS_JSON_PATH);
   const settingsWanted = JSON.stringify(compileSettingsJson(settingsState.parsed, answers, sourceHash), null, 2) + "\n";

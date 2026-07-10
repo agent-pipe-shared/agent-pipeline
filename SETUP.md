@@ -7,22 +7,16 @@ personalize it, bind the plugin, start a session.
 
 ## Prerequisites
 
-- **Node.js >= 24** — `setup.mjs` is dependency-free (Node builtins only, no `npm
-  install` step).
+- **Node.js >= 24** — `setup.mjs` is dependency-free (Node builtins only, no `npm install` step).
 - **git**
 - **Claude Code**
-- Optional: **`gh`** (GitHub CLI) or **`glab`** (GitLab CLI). Setup detects your
-  git host from `git remote -v`, falling back to whichever of the two is on your
-  `PATH` if there's no remote yet; the detected choice is recorded in
-  `pipeline.user.yaml` (`platform.cli`) for your own PR/MR workflows later.
+- Optional: **`gh`** (GitHub CLI) or **`glab`** (GitLab CLI). Setup detects your git host from `git remote -v`, falling back to whichever CLI is on your `PATH` if there's no remote yet; the choice is recorded in `pipeline.user.yaml` (`platform.cli`) for your later PR/MR workflows.
 
 ## Steps
 
 ### 1. Clone your own copy
 
-Fork, mirror, or otherwise create your own copy of this repo under your own
-GitHub org/user or GitLab group. That copy becomes the one canonical source your
-projects bind to as a plugin.
+Fork, mirror, or otherwise create your own copy of this repo under your own GitHub org/user or GitLab group. That copy becomes the one canonical source your projects bind to as a plugin.
 
 ### 2. Run `node setup.mjs`
 
@@ -32,8 +26,7 @@ From the repo root:
 node setup.mjs
 ```
 
-Interactive mode asks five questions — everything else (your OS, your git host)
-is *detected*, never asked:
+Interactive mode asks five questions — everything else (OS, git host) is *detected*, never asked:
 
 | Question | Values | Feeds |
 |---|---|---|
@@ -43,29 +36,17 @@ is *detected*, never asked:
 | Subscription tier | `pro`, `max`, or `api`/own — picks a model preset per role | `models` |
 | Autonomy preset | `conservative` (gated push, feature branches) or `autonomous` (standing-approved push, direct-to-main, advisor on) | `autonomy` |
 
-`max` is the recommended default preset: an Opus design/orchestrator tier plus a
-Sonnet three-tier (implement / mechanic / review) for everything else. `api`/own
-starts you from the same Max preset — edit the model names directly in
-`pipeline.user.yaml` afterwards and re-run setup.
+`max` is the recommended default preset: an Opus design/orchestrator tier plus a Sonnet three-tier (implement / mechanic / review) for everything else. `api`/own starts from the same Max preset — edit the model names directly in `pipeline.user.yaml` afterwards and re-run setup.
 
-Setup writes `pipeline.user.yaml`, then immediately compiles it into the three
-runtime configs (see "What setup wrote" below).
+Setup writes `pipeline.user.yaml`, then immediately compiles it into the three runtime configs (see "What setup wrote" below).
 
-**Non-interactive path:** `node setup.mjs --defaults` writes the conservative
-defaults with no prompts — useful for a first dry run or a CI check.
+**Non-interactive path:** `node setup.mjs --defaults` writes the conservative defaults with no prompts — useful for a first dry run or a CI check.
 
-**Changed your mind later?** Edit `pipeline.user.yaml` by hand and run
-`node setup.mjs` again — it's drift-safe: files it can recompile cleanly are
-overwritten freely, but a compiled file you hand-edited yourself (without
-touching `pipeline.user.yaml`) triggers a confirmation before it's overwritten
-(non-interactive mode never overwrites it at all).
+**Changed your mind later?** Edit `pipeline.user.yaml` by hand and run `node setup.mjs` again — it's drift-safe: cleanly-recompilable files are overwritten freely, but a compiled file you hand-edited yourself (without touching `pipeline.user.yaml`) triggers a confirmation before being overwritten (non-interactive mode never overwrites it at all).
 
 ### 3. Bind the plugin
 
-The compiled `.claude/settings.json` already declares the marketplace and the
-plugin, so opening/trusting the repo folder in Claude Code should prompt you to
-install it automatically. For a deterministic, scriptable path — or if that
-prompt doesn't appear — run:
+The compiled `.claude/settings.json` already declares the marketplace and the plugin, so opening/trusting the repo folder in Claude Code should prompt you to install it automatically. For a deterministic, scriptable path — or if that prompt doesn't appear — run:
 
 ```
 # GitHub
@@ -78,17 +59,11 @@ claude plugin marketplace add https://<host>/<owner>/<repo>.git --scope project
 claude plugin install pipeline-core@agent-pipeline --scope project
 ```
 
-`--scope project` matters: these subcommands default to `--scope user`, but the
-binding belongs at project scope. Verify with `claude plugin list --json` — it
-should show `pipeline-core@agent-pipeline` installed and enabled.
+`--scope project` matters: these subcommands default to `--scope user`, but the binding belongs at project scope. Verify with `claude plugin list --json` — it should show `pipeline-core@agent-pipeline` installed and enabled.
 
 ### 4. Start a session
 
-Open a Claude Code session in the repo. A `SessionStart` hook surfaces a reminder —
-*run `/pipeline-core:pipeline-start` before any work* — but the reminder itself checks
-nothing. You then run `/pipeline-core:pipeline-start`, and that skill performs the
-bootstrap: it confirms the ruleset state, your project calibration, and the handover
-file before work begins.
+Open a Claude Code session in the repo. A `SessionStart` hook surfaces a reminder — *run `/pipeline-core:pipeline-start` before any work* — but the reminder itself checks nothing. Running `/pipeline-core:pipeline-start` performs the actual bootstrap: it confirms ruleset state, project calibration, and the handover file before work begins.
 
 ## What setup wrote
 
@@ -98,25 +73,19 @@ file before work begins.
 | `.claude/pipeline.json` | `autonomy`, `gates` | project calibration — the bootstrap check and the `pipeline-start`/`close-block` skills |
 | `.claude/pipeline.yaml` | `models`, `gates`, `autonomy` | the declarative manifest layer — the PreToolUse guard hooks (`guard-devplan`, `guard-push`), the `stop-suggest` Stop-event hook (next-phase suggestion + context-budget warnings), and model routing; validated by `harness/scripts/validate-manifest.mjs` |
 
-Every compiled file carries a `GENERATED from pipeline.user.yaml` marker so
-re-runs can tell a stale compile from a real hand-edit.
+Every compiled file carries a `GENERATED from pipeline.user.yaml` marker so re-runs can tell a stale compile from a real hand-edit.
 
 ## Troubleshooting
 
-**"Setup nicht abgeschlossen" reminder at session start.** If you open a session
-before finishing setup, you'll see something like:
+**"Setup not complete" reminder at session start.** If you open a session before finishing setup, you'll see something like:
 
 ```
-Setup nicht abgeschlossen — `node setup.mjs` ausführen (siehe SETUP.md).
+Setup not complete — run `node setup.mjs` (see SETUP.md).
 ```
 
-This fires in exactly two cases: `pipeline.user.yaml` doesn't exist yet (a fresh
-clone), or it exists but still carries a committed default marker
-(`identity.owner_name: "Your Name"` or `identity.repo_owner: "your-org"`). Note
-this specific reminder is currently emitted in German regardless of your chosen
-`language` setting — the fix is the same either way: run `node setup.mjs` and
-answer at least the identity question. The check never blocks your session; it's
-a reminder, not a gate.
+This fires in exactly two cases: `pipeline.user.yaml` doesn't exist yet (a fresh clone), or it exists but still carries a committed default marker (`identity.owner_name: "Your Name"` or `identity.repo_owner: "your-org"`). This specific reminder is currently emitted in German regardless of your chosen `language` setting — the fix is the same either way: run `node setup.mjs` and answer at least the identity question. The check never blocks your session; it's a reminder, not a gate.
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
 ---
 

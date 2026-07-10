@@ -1,8 +1,46 @@
-# ADR-0012: Staffelstab — Kanonisierung der Handover-Quelle
+# ADR-0012: Baton Handoff — Canonicalizing the Handover Source
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR canonicalizes handover state into a single versioned file per project, replacing a three-way manual duplication (HISTORY log, CLAUDE.md status section, memory) that had provably drifted out of sync across projects. Memory becomes a mirror only — never a source of truth — and any session must be fully workable from a fresh clone without it. Two deterministic gates enforce this at close time: a merge-completion check (handover/doc sync must happen before work counts as done) and a CLAUDE.md length check. Status: accepted (2026-07-03); for this repo, `docs/state.md` is the canonical handover file per ADR-0015.
+> Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · as of 2026-07-03
+
+**Status:** accepted (2026-07-03, Checkpoint 1) · **Basis:** Register E10 + condition A9
+
+## Context
+
+The codebase maintained the handover baton three times by hand (HISTORY log, CLAUDE.md status section, memory) — and it provably lied: one project's CLAUDE.md contradicted HEAD, another project's status existed threefold, a third referenced memory files that didn't exist; the chain broke on a fresh clone. Critic finding L2-03: the relationship between the handover file and the HISTORY "open items" block was undefined — the baton risked existing twice again → condition A9.
+
+## Decision (E10, verbatim)
+
+> Baton: ONE versioned handover file per project; memory is mirror-only; merge completion + CLAUDE.md length as deterministic gates
+
+Refinement (condition A9):
+
+- The **handover file is canonical**. The HISTORY "open items" block is **generated from, or references,** the handover file — it is never hand-maintained.
+- **Memory is a mirror only** of what's versioned; every session must be fully workable on a fresh clone without memory.
+- Two **deterministic gates** in the close ritual: merge completion (handover/doc sync happens before work counts as done) and a CLAUDE.md length check (context economy; one project's hard limit as the model).
+
+## Consequences
+
+**Positive:** one canonical source ends the documented triple drift; a fresh clone works on both machines; gates are deterministic instead of relying on discipline.
+
+**Negative:** generating/referencing the HISTORY block needs tooling (Phase 3); per-project migration of existing state (Phase 4).
+
+**Risk:** secondary sources creep back in. Mitigation: the drift check in the close ritual checks handover ↔ HISTORY ↔ CLAUDE.md status; any deviation is a finding ("docs are a snapshot, code is truth").
+
+## Rejected alternatives
+
+- **Status quo (three hand-maintained places)** — a provably lying baton; the most expensive anti-pattern in the codebase.
+- **Memory as canon** — unversioned and machine-local; provably breaks on a fresh clone.
+- **HISTORY as canon** — an append-only log doesn't work as current state; its own "open items" block was exactly what risked diverging (L2-03).
+
+## Follow-up
+
+None. Handover template + generation/reference mechanics: Phase 3; project migration: Phase 4. For this repo, `state.md` is the handover file ([ADR-0015](0015-selbstanwendung.md)).
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0012: Staffelstab — Kanonisierung der Handover-Quelle
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 

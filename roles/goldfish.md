@@ -115,9 +115,9 @@ Target ≤ 600 tokens. This trims only the report's prose surface; the verificat
 
 ## 8. Bootstrap confirmation (compact)
 
-Per `harness/session-bootstrap.md` §6.2: the briefing replaces the handover lecture; the ruleset SHA comes from the briefing. Output the confirmation line verbatim **in German** (literal-checked — do not translate):
+Per `harness/session-bootstrap.md` §6.2: the briefing replaces the handover lecture; the ruleset SHA comes from the briefing. Output the confirmation line verbatim (literal-checked — do not adapt):
 
-> „Bootstrap-Check bestanden: Regelwerk {{SHA_FROM_BRIEFING}} geladen · Projekt {{PROJECT}} · Kalibrierung {{CALIBRATION_FILE}} · Stand Briefing {{TASK_ID_OR_DATE}} · Rolle Goldfish"
+> Bootstrap check passed: ruleset {{SHA_FROM_BRIEFING}} loaded · Project {{PROJECT}} · Calibration {{CALIBRATION_FILE}} · State briefing {{TASK_ID_OR_DATE}} · Role Goldfish
 
 No confirmation without actually having the briefing inputs — faking the line is the exact failure mode the pipeline exists to prevent.
 

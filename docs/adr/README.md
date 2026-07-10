@@ -2,9 +2,66 @@
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This directory holds the project's Architecture Decision Records, which formalize the canonical decision register (E1–E25) plus the DoD-mandated decisions from the Checkpoint-1 conditions — the register wins on conflict. Each ADR is a German-language decision record (context, decision, consequences, discarded alternatives, follow-up) carrying a short English summary at its top; entries are numbered sequentially (`NNNN-<slug>.md`) and listed in the table below, and an ADR is never rewritten but superseded by a new one.
+**In brief (English):** This directory holds the project's Architecture Decision Records, which formalize the canonical decision register (E1–E25) plus the DoD-mandated decisions from the Checkpoint-1 conditions — the register wins on conflict. Each ADR is an English-primary decision record (context, decision, consequences, discarded alternatives, follow-up) with a full German reference translation below a skip marker; entries are numbered sequentially (`NNNN-<slug>.md`) and listed in the table below, and an ADR is never rewritten but superseded by a new one.
 
-> Agent-Pipeline v0.1.0-draft · Sprint 1 (PAINKILLER) · Stand 2026-07-06
+> Agent-Pipeline v0.1.0-draft · Sprint 1 (PAINKILLER) · as of 2026-07-06
+
+The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required by condition A6 are 0010/0011. **E16/E17 have NO ADRs of their own** — they are revision sections in [0006](0006-modell-effort-policy.md) and [0011](0011-sprachen-policy.md) respectively (never-rewrite convention: a revision instead of a new ADR, because they surgically amend existing E6/A6 decisions without opening any new subject matter).
+
+> **Model names in ADRs are historical.** Concrete model mentions in the ADRs reflect the standard defaults of the original author team (2026) at the respective decision point — they are part of the historical record and are not retroactively genericized. Configure your own models in `pipeline.user.yaml`.
+
+| No. | Title | Status | Date |
+|---|---|---|---|
+| [0001](0001-verteilung-plugin-marketplace.md) | Distribution of the operating model as plugin/marketplace (E1) | accepted | 2026-07-03 |
+| [0002](0002-versionierung-sha-dann-semver.md) | Versioning strategy — SHA phase, then SemVer (E2) | accepted | 2026-07-03 |
+| [0003](0003-rollen-implementierung-subagents.md) | Role implementation — Goldfish subagent, Critic read-only + `--bare` tier (E3) | accepted | 2026-07-03 |
+| [0004](0004-spec-rigor-stufen-ears.md) | Spec rigor in three tiers + EARS acceptance criteria (E4) | accepted | 2026-07-03 |
+| [0005](0005-quality-gates-dod.md) | Quality-gate chain and two-part DoD (E5) | accepted | 2026-07-03 |
+| [0006](0006-modell-effort-policy.md) | Model and effort policy per role (E6) | accepted | 2026-07-03 |
+| [0007](0007-workflows-ultracode-opt-in.md) | Dynamic workflows/Ultracode as task opt-in (E7, A2) | accepted | 2026-07-03 |
+| [0008](0008-permissions-worktree-policy.md) | Permission and worktree policy per project (E8, A4) | accepted | 2026-07-03 |
+| [0009](0009-session-hygiene-lifecycle.md) | Session hygiene and session lifecycle (E9) | accepted | 2026-07-03 |
+| [0010](0010-session-bootstrap.md) | Session bootstrap mechanism (A5/A6) | accepted | 2026-07-03 |
+| [0011](0011-sprachen-policy.md) | Language policy — German for humans, English for agents (A6) | accepted | 2026-07-03 |
+| [0012](0012-handover-kanonisierung.md) | Handover baton — canonicalization of the handover source (E10, A9) | accepted | 2026-07-03 |
+| [0013](0013-git-guard-union.md) | git-guard as central union + project deny-config (E11) | accepted | 2026-07-03 |
+| [0014](0014-critic-kontrakt.md) | Critic contract (E12, A10) | accepted | 2026-07-03 |
+| [0015](0015-selbstanwendung.md) | Self-application of the pipeline to the pipeline repo (E13) | accepted | 2026-07-03 |
+| [0016](0016-git-hosting-github.md) | Git hosting — staying with GitHub (E14) | accepted | 2026-07-06 |
+| [0017](0017-push-policy-standing-approval.md) | Push policy — standing approval for `main` push (E15) | accepted | 2026-07-06 |
+| [0018](0018-retro-prozess-elephant-selbstverfasst.md) | Retro-process revision — Elephant authors the close retro itself (E18) | accepted | 2026-07-06 |
+| [0019](0019-projekt-abgrenzung-ein-repo-ein-elephant.md) | Project boundary — one repo, one Elephant at a time (E19) | accepted | 2026-07-06 |
+| [0020](0020-el01-enforcement-goldfish-pflicht.md) | EL-01 enforcement — implementation only as a briefed Goldfish dispatch (E20) | accepted | 2026-07-06 |
+| [0021](0021-prd-po-gate.md) | PRD/PO gate before the first implementation dispatch (E21) | provisional | 2026-07-06 |
+| [0022](0022-light-profil-xhigh-default.md) | Light dispatch profile + Goldfish `xhigh` default (E22) | accepted | 2026-07-06 |
+| [0023](0023-elephant-kontext-diaet.md) | Elephant context diet & latency measure bundle (E23) | accepted | 2026-07-06 |
+| [0024](0024-critic-stufung-datenbasiert.md) | Critic tiering — data-based revision of the E12/E6 staffing (E24) | accepted | 2026-07-06 |
+| [0025](0025-haiku-research-fetcher.md) | Haiku research fetcher — rescope of MP-03 (E25) | accepted | 2026-07-06 |
+| [0026](0026-rollenschnitt-elephant-goldfish-critic.md) | Role cut Elephant/Goldfish/Critic — formalization + `plan-verifier` | accepted | 2026-07-07 |
+| [0027](0027-gate-philosophie.md) | Gate philosophy — exactly 2 blocking human gates, QG-06 revision | accepted | 2026-07-07 |
+| [0028](0028-manifest-ansatz.md) | Manifest approach — `.claude/pipeline.yaml` additive, in-house YAML parser | accepted | 2026-07-07 |
+| [0029](0029-file-handoffs-status.md) | File handoffs & status — `pipeline-state.json`, evidence freshness instead of self-calculation | accepted | 2026-07-07 |
+| [0030](0030-governance-layer.md) | Governance layer — advisory guidelines vs. enforcing policies | accepted | 2026-07-07 |
+| [0031](0031-modell-routing-manifest.md) | Model routing in the manifest — machine-readable projection (reference ADR-0006) | accepted | 2026-07-07 |
+| [0032](0032-projekt-doku-struktur.md) | Project documentation structure — release traceability, SBOM convention, living architecture document (GREENFIELD) | accepted | 2026-07-07 |
+
+### Resubmissions
+
+| ADR | Date / trigger |
+|---|---|
+| [0002](0002-versionierung-sha-dann-semver.md) | Switch to SemVer once stable (criterion OPEN, phase 5) |
+| [0006](0006-modell-effort-policy.md) | **2026-08-31** — price review (Sonnet-5 introductory pricing ends) |
+| [0007](0007-workflows-ultracode-opt-in.md) | `<PROJECT_B>` special rule lapses once the guard migration is complete |
+| [0008](0008-permissions-worktree-policy.md) | **DONE** (phase 4, 2026-07-04) — worktree verdict `worktree: off` per project in the migration dossiers, confirmed by the PO with the phase-4 acceptance (see ADR body "Resubmission") |
+| [0010](0010-session-bootstrap.md) | Bootstrap building block (phase 3), two-machine validation (phase 4) |
+| [0016](0016-git-hosting-github.md) | **2026-08-31** — bundled with the price review (0006); tipping triggers GH-T1–GH-T7 tracked ongoing in the tooling radar |
+| [0023](0023-elephant-kontext-diaet.md) | Measurement-goal check at the next feature session (Elephant share ≤50%, feature session <$30, wall time −30%, first-pass unchanged) |
+
+### Conventions
+
+Format per ADR: context → decision (verbatim to the register) → consequences → discarded alternatives → resubmission. New ADRs receive the next sequential number (`NNNN-<slug>.md`) and an entry in the table above. An ADR is never rewritten, only superseded by a new one (status "superseded by NNNN").
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
 Architecture Decision Records der Agent-Pipeline. Die ADRs formalisieren das kanonische Entscheidungsregister **E1–E25** sowie die DoD-Pflicht-Entscheidungen aus den Checkpoint-1-Auflagen. **Bei Widerspruch gewinnt das Register.** Die Kandidaten ADR-1…9 entsprechen 0001…0009; die von Auflage A6 geforderten „ADR-10/ADR-11" sind 0010/0011. **E16/E17 haben KEINE eigenen ADRs** — sie sind Revisionsabschnitte in [0006](0006-modell-effort-policy.md) bzw. [0011](0011-sprachen-policy.md) (never-rewrite-Konvention: Revision statt neuem ADR, weil sie bestehende E6-/A6-Entscheidungen chirurgisch ändern, keine neuen Sachverhalte eröffnen).
 

@@ -39,7 +39,7 @@ tool**:
 - Task-tool **`model` invocation parameter:** set it to the model ENUM VALUE the Task tool accepts
   for your configured advisor tier (`pipeline.user.yaml -> models.advisor`). Keep this ENUM VALUE
   distinct from the dispatch-ledger/telemetry LABEL you log the consult under (EL-21). Some setups
-  use a human-readable label in the ledger (the one the close-ritual "Besonderheiten" line uses for
+  use a human-readable label in the ledger (the one the close-ritual "peculiarities" line uses for
   the advisor-model cost share) that is NOT a valid Task-tool `model` value — state BOTH explicitly
   and keep them apart, so a session running this pattern under advisor-outage pressure does not pass
   the label string where the enum value is expected. This mirrors the same per-dispatch
@@ -83,12 +83,12 @@ Rules (hard, mirror MP-26g verbatim):
   verdict to apply mechanically.
 - Log the consult in the session's dispatch ledger (EL-21, `roles/elephant.md`) like any other
   subagent dispatch: `role=consult-advisor`, the advisor-outage trigger, and the question asked —
-  this is what lets the close ritual's telemetry line (MP-20, „Besonderheiten") show the
+  this is what lets the close ritual's telemetry line (MP-20, "peculiarities") show the
   advisor-model cost share correctly and lets a later session/Critic audit the trail.
 
 ## Relationship to the full MP-26(g) sequence
 
-1. SOFORT-Meldung an den PO beim ERSTEN Fehlschlag (this skill does not replace that alert).
+1. Immediate notification to the PO on the FIRST failure (this skill does not replace that alert).
 2. **This skill** — the standing, mandatory-primary workaround.
 3. Offer `/advisor <higher-tier-model>` to the PO as an ADDITIONAL option, never as a silent
    unilateral switch of the session's main model.

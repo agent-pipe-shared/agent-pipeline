@@ -1,8 +1,37 @@
-# ADR-0017: Push-Policy — Standing-Approval für `main`-Push an Arbeitspaket-Grenzen
+# ADR-0017: Push Policy — Standing Approval for `main` Pushes at Work-Package Boundaries
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR records a standing (pre-approved) authorization for the agent to push `main` to origin at work-package boundaries in this repository, replacing the earlier per-push approval requirement, so automated-mode work is not slowed by manual sign-off on every push. The change was made explicitly by the product owner on 2026-07-04 for this repo only; destructive git operations (force-push, history rewrite, branch/tag deletion, hook skipping) remain deterministically blocked by the guard-union regardless of this approval, and other project repos keep their own separate calibration.
+**Status:** accepted (2026-07-04, PO revision) · **Basis:** Register E15
+
+## Context
+
+The original push approval (Decision 3, 2026-07-02) had pulled forward remote+push for cross-machine handover, but approved it per work state individually. The PO explicitly revised this on 2026-07-04 for automated-mode operation of this repo.
+
+## Decision (E15, verbatim)
+
+> Push policy (PO revision, 2026-07-04): `main` push at work-package boundaries is standing-approved in THIS repo ("especially in automode I just need to be able to push"); destructive forms (force-push, history rewrite, branch/tag deletion, hook skip) remain deterministically blocked by the guard union. Implemented in the CLAUDE.md hard rule, GIT-05, `permissions.allow`. Project repos keep their own calibration (GIT-05).
+
+## Consequences
+
+**Positive:** No approval overhead per push in this repo; faster automode throughput at work-package boundaries.
+
+**Negative:** Higher error potential from the absence of manual intermediate review before each push — mitigated by the guard union ([ADR-0013](0013-git-guard-union.md)).
+
+**Risk:** Standing approval could unintentionally "bleed" into other project repos; explicitly excluded — project repos keep their own calibration (GIT-05).
+
+## Rejected alternatives
+
+- **Keeping per-push individual approval** — incompatible with this repo's desired automode pace (PO rationale quoted verbatim in the register).
+- **Standing approval also for destructive git forms** — explicitly rejected; force-push, history rewrite, branch/tag deletion, and hook skip remain deterministically blocked.
+
+## Follow-up
+
+None named in the register.
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0017: Push-Policy — Standing-Approval für `main`-Push an Arbeitspaket-Grenzen
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 4 · Stand 2026-07-06
 

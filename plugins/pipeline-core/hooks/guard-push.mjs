@@ -4,8 +4,8 @@
  *
  * Plugin: pipeline-core (Agent-Pipeline). AP1-P3 "DURIN". Canon: `.claude/pipeline.yaml`
  * gate "push" (this repo: blocking/human/standing-approved, E15/ADR-0017), `.claude/
- * plans/2026-07-07-ap1-pipeline-tuning.md` Leitentscheidung 3 ("Gates prüfen EVIDENZ-
- * Frische, nie selbst rechnen").
+ * plans/2026-07-07-ap1-pipeline-tuning.md` Governing Decision 3 ("Gates check EVIDENCE
+ * freshness, never compute it themselves").
  *
  * WHY THIS FILE EXISTS
  *   `verify` and (later) the security scan produce evidence artifacts, but nothing
@@ -41,7 +41,7 @@
  *      genuinely unparseable YAML -> WARN exit 1 (malformed, never silent).
  *   4. Gate "push" absent, or `mode === "off"` -> exit 0.
  *   5. Otherwise (mode "blocking" or "warn"): evaluate ALL of the checks below,
- *      collect ALL failures, and report them TOGETHER in one German stderr message —
+ *      collect ALL failures, and report them TOGETHER in one English stderr message —
  *      never fail on the first mismatch alone, so a single push attempt surfaces
  *      every reason at once instead of a frustrating fix-one-fail-next loop.
  *        (a) `evidence/verify-latest.json` exists, `exitCode === 0`, and `commit`
@@ -99,10 +99,10 @@ const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
 const manifestResult = loadManifest(projectDir);
 if (manifestResult.status === "absent") process.exit(0); // opt-in feature, nothing configured
 if (manifestResult.status === "invalid") {
-  const reason = manifestResult.errors?.[0]?.reason ?? manifestResult.errors?.[0]?.path ?? "ungültiges Manifest";
+  const reason = manifestResult.errors?.[0]?.reason ?? manifestResult.errors?.[0]?.path ?? "invalid manifest";
   emit(1, [
-    `[guard-push] WARN: .claude/pipeline.yaml ist ungültig (${reason}).`,
-    `Push-Gate wird übersprungen (fail-open, niemals still blockend/durchlassend markiert) -- bitte reparieren.`,
+    `[guard-push] WARN: .claude/pipeline.yaml is invalid (${reason}).`,
+    `Push-Gate is being skipped (fail-open, never silently marked blocking/passing) -- please fix.`,
   ]);
 }
 const manifest = manifestResult.manifest;
@@ -124,13 +124,13 @@ function readEvidence(relPath) {
   try {
     raw = readFileSync(p, "utf8");
   } catch {
-    return { ok: false, reason: `${relPath} fehlt` };
+    return { ok: false, reason: `${relPath} missing` };
   }
   let data;
   try {
     data = JSON.parse(raw);
   } catch (e) {
-    return { ok: false, reason: `${relPath} ist beschädigt (ungültiges JSON: ${e.message})` };
+    return { ok: false, reason: `${relPath} is corrupted (invalid JSON: ${e.message})` };
   }
   return { ok: true, data, relPath };
 }
@@ -145,10 +145,10 @@ function checkEvidenceFreshness(relPath) {
   }
   const { data } = read;
   if (data?.exitCode !== 0) {
-    failures.push(`${relPath}: exitCode=${JSON.stringify(data?.exitCode)} (erwartet 0)`);
+    failures.push(`${relPath}: exitCode=${JSON.stringify(data?.exitCode)} (expected 0)`);
   }
   if (head !== null && data?.commit !== head) {
-    failures.push(`${relPath}: commit=${JSON.stringify(data?.commit)} ist veraltet (aktueller HEAD: ${head})`);
+    failures.push(`${relPath}: commit=${JSON.stringify(data?.commit)} is stale (current HEAD: ${head})`);
   }
   return failures;
 }
@@ -180,24 +180,24 @@ if (pushGate.approval === "standing-approved") {
     stateExists = false;
   }
   if (!stateExists) {
-    failures.push(`Push-Freigabe fehlt: ${statePath} existiert nicht (noch nie via approve-push verbucht).`);
+    failures.push(`Push approval missing: ${statePath} does not exist (never recorded via approve-push).`);
   } else {
     let state;
     try {
       state = JSON.parse(stateRaw);
     } catch (e) {
       emit(1, [
-        `[guard-push] WARN: ${statePath} enthält ungültiges JSON (${e.message}).`,
-        `Push-Gate wird übersprungen (fail-open, niemals still blockend/durchlassend markiert) -- bitte reparieren ` +
-          `(nur via harness/scripts/pipeline-state.mjs neu schreiben, nie von Hand).`,
+        `[guard-push] WARN: ${statePath} contains invalid JSON (${e.message}).`,
+        `Push-Gate is being skipped (fail-open, never silently marked blocking/passing) -- please fix ` +
+          `(rewrite only via harness/scripts/pipeline-state.mjs, never by hand).`,
       ]);
     }
     const forCommit = state?.pushApproval?.lastApproved?.forCommit;
     if (!forCommit || forCommit !== head) {
       failures.push(
-        `Push-Freigabe fehlt oder ist veraltet: state.pushApproval.lastApproved.forCommit=${JSON.stringify(
+        `Push approval missing or stale: state.pushApproval.lastApproved.forCommit=${JSON.stringify(
           forCommit ?? null,
-        )}, erwartet HEAD=${JSON.stringify(head)}. Verbuchen: node harness/scripts/pipeline-state.mjs approve-push --by <name>.`,
+        )}, expected HEAD=${JSON.stringify(head)}. Record: node harness/scripts/pipeline-state.mjs approve-push --by <name>.`,
       );
     }
   }
@@ -206,9 +206,9 @@ if (pushGate.approval === "standing-approved") {
 if (failures.length === 0) process.exit(0); // all-green -- allow
 
 const message = [
-  `BLOCKED (guard-push, plugin pipeline-core): Push-Gate-Prüfung fehlgeschlagen (${failures.length} Befund/e):`,
+  `BLOCKED (guard-push, plugin pipeline-core): Push-Gate check failed (${failures.length} finding(s)):`,
   ...failures.map((f, i) => `  ${i + 1}. ${f}`),
-  `Kommando: ${cmd}`,
+  `Command: ${cmd}`,
 ];
 
 if (pushGate.mode === "warn") emit(1, message);

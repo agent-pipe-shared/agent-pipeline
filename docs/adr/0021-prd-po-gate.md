@@ -1,8 +1,39 @@
-# ADR-0021: PRD-PO-Gate vor dem ersten Implementierungs-Dispatch
+# ADR-0021: PRD-PO Gate Before the First Implementation Dispatch
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR records a provisional Product Owner gate inserted after solution design and readiness, but before the first implementation dispatch: for work at rigor level ≥1 or high classification, the PO must approve a German `prd_<topic>.md` (product rationale — what/why/scope/non-goals/risks/alternatives) before implementation may start; acceptance criteria stay in the English, agent-facing spec rather than being duplicated into the PRD. A true stage-0 fast path (small, product-irrelevant hotfixes) is exempt. The gate is a literal-confirmation checkpoint, not a UI dialog, and a later addendum tightens it further: the PRD must be proactively surfaced as a readable document (not just referenced by repo path), with explicit waiting for the literal approval word — because early practice showed the gate being nominally held without being genuinely read. Status is provisional pending experience from the feature phase; full ADR formalization is deferred to a later phase.
+**Status:** provisional ("let's test it this way for now", PO directive 2026-07-05, tuning session) · **Basis:** Register E21
+
+## Context
+
+Before Register E21 there was no binding product sign-off point between solution design and the first implementation dispatch. The PO introduced a PRD gate at the tuning session, explicitly as a trial.
+
+## Decision (E21, verbatim in intent)
+
+After solution design and passed readiness, and BEFORE the first implementation dispatch, the PO approves a German `prd_<topic>.md` — product rationale (what/why/scope/non-goals/risks/alternatives), NOT acceptance criteria (those stay agent-facing English in the spec; PRD and spec reference each other, no duplication). **Mandatory when rigor ≥1 OR classification high; a true stage-0 fast path no longer applies** (only small hotfixes without product relevance are exempt). Approval via EL-17a; "approved" is a gate, not a UI dialog. Filed at `specs/<task>/prd_<topic>.md`. `sdp_<topic>.md` is an optional companion artifact WITHOUT a gate (enterprise reservation). Implemented in: operating-model §3.2 (step 3b)/§3.1/§3.3, `roles/elephant.md` EL-19, `templates/prd.md`, kickoffs (commit `6b8b1c3`). Provisional ("let's test it this way for now"); full ADR formalization deferred to Phase 2.
+
+**Addendum (PO finding 2026-07-05 evening, R-M14):** gate held ≠ gate fulfilled — the draft must henceforth be surfaced PROACTIVELY as a READABLE document on the device (a repo path alone is not a valid presentation), with explicit waiting for the literal word "approved"; a failure to present it counts as a process incident. EL-19 anchored in the bootstrap 1d list plus a third confirmation line (commit `fc725c6`).
+
+## Consequences
+
+**Positive:** binding product check before implementation cost is incurred; PRD and spec stay separate (product rationale vs. acceptance criteria) instead of duplicated maintenance.
+
+**Negative:** an extra gate step before every rigor-≥1/classification-high effort; no true stage-0 fast path left for hotfixes with product relevance.
+
+**Risk:** the gate gets held formally but isn't actually read ("gate held ≠ gate fulfilled"). The addendum responds directly to this: proactive readable presentation plus explicit waiting for the literal word "approved".
+
+## Rejected alternatives
+
+- **Moving acceptance criteria into the PRD instead of the spec** — rejected to avoid duplicated maintenance; PRD and spec reference each other.
+- **A pure UI dialog as approval** — rejected; "approved" is a gate, not a UI mechanism.
+
+## Status / follow-up
+
+Formalization status provisional — confirmation/revision after practical experience from the feature phase; no fixed date named in the register.
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0021: PRD-PO-Gate vor dem ersten Implementierungs-Dispatch
 
 > Agent-Pipeline v0.1.0-draft · Sprint 1 · Stand 2026-07-06
 

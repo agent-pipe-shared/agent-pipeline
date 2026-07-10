@@ -4,7 +4,7 @@
 > before the push gate — fixture content, not a real company's actual checklist. Unlike
 > the machine-checkable policies (`license-allowlist.json`, `semgrep/*.yml`), none of the
 > items below can be verified by a script; the **Critic ticks each item by hand, one by
-> one, before the push gate**. Any item marked **NOT MET** (NICHT ERFÜLLT) is a BLOCKING
+> one, before the push gate**. Any item marked **NOT MET** is a BLOCKING
 > finding — the push gate does not open until it is resolved or explicitly waived by the
 > project's designated approver (never by the Critic itself).
 

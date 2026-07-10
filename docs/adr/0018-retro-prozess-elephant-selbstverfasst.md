@@ -1,8 +1,38 @@
-# ADR-0018: Retro-Prozess-Revision — Elephant verfasst das Close-Retro selbst
+# ADR-0018: Retro Process Revision — Elephant Writes the Close-Retro Itself
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR retires the ritual close-of-session retro question ("what should the pipeline do better next time?") that used to be posed to the PO. Instead, the session Elephant now writes the close-retro itself — either concrete improvement items or an explicit "nothing" — as a backlog item/handoff to the pipeline Elephant's continuous-improvement process, and it must never be silently skipped. The PO may still contribute observations separately, through their own channel, without a ritual prompt. Status: accepted 2026-07-04.
+> Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 4 · as of 2026-07-06
+
+**Status:** accepted (2026-07-04, PO close-session) · **Basis:** Register E18
+
+## Context
+
+The previous practice ritually posed the mandatory retro question ("What should the pipeline do better next time?") to the PO. The PO directed, at the relevant session close, that the session Elephant henceforth writes the close-retro itself instead of asking for it.
+
+## Decision (E18, verbatim)
+
+> Retro process revision (PO directive, 2026-07-04, session close): The mandatory retro question ("What should the pipeline do better next time?") is NO LONGER posed to the PO — the session Elephant writes the close-retro ITSELF (concrete items, or an explicit "nothing") as a backlog item/handoff to the pipeline Elephant's continuous-improvement process; it must never be silently skipped. The PO may still submit their own observations separately (own channel, no ritual prompt). Implementation: close-block step 7 + operating-model §7 + kickoff/bootstrap references (AP sprint package 3, 2026-07-04).
+
+## Consequences
+
+**Positive:** Relieves the PO of a recurring ritual question; the continuous-improvement process still runs reliably because "never silently skipped" holds.
+
+**Negative:** Self-reflection by the same instance that ran the session — risk of blind spots.
+
+**Risk:** The Elephant could tick off the retro pro forma instead of substantively. Mitigation: an explicit "nothing" is permitted, but must be stated — no silent omission.
+
+## Rejected alternatives
+
+- **Keeping the ritual question to the PO** — exactly what this revision abolishes, since it generated recurring effort without demonstrated value.
+
+## Follow-up
+
+None noted in the register.
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0018: Retro-Prozess-Revision — Elephant verfasst das Close-Retro selbst
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 4 · Stand 2026-07-06
 

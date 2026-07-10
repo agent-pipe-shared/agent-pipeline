@@ -67,20 +67,20 @@ function checkCli(id, path, expectExit, { stdoutIncludes, stderrIncludes } = {})
 
 // ---- ABSENT -----------------------------------------------------------------------------------
 checkCli("ABSENT  a nonexistent manifest path exits 0 with the opt-in message", join(SCRATCH, "does-not-exist.yaml"), 0, {
-  stdoutIncludes: "Manifest nicht aktiv (optional)",
+  stdoutIncludes: "Manifest not active (optional)",
 });
 
 // ---- MINIMAL VALID ------------------------------------------------------------------------------
 checkCli("MINIMAL VALID  just `schema:` is a complete, valid manifest", fixture("minimal.yaml", "schema: pipeline.manifest.v0\n"), 0, {
-  stdoutIncludes: "Manifest gültig",
+  stdoutIncludes: "Manifest valid",
 });
 
 // ---- FULL VALID (the shipped example + this repo's own committed manifest) --------------------
 checkCli("FULL VALID  templates/pipeline.yaml.example parses and validates clean", join(REPO_ROOT, "templates", "pipeline.yaml.example"), 0, {
-  stdoutIncludes: "Manifest gültig",
+  stdoutIncludes: "Manifest valid",
 });
 checkCli("FULL VALID  this repo's own committed .claude/pipeline.yaml parses and validates clean", join(REPO_ROOT, ".claude", "pipeline.yaml"), 0, {
-  stdoutIncludes: "Manifest gültig",
+  stdoutIncludes: "Manifest valid",
 });
 
 // ---- MISSING REQUIRED FIELD ---------------------------------------------------------------------
@@ -88,7 +88,7 @@ checkCli(
   "MISSING REQUIRED  a manifest without the top-level `schema` key is rejected",
   fixture("missing-required.yaml", "phases:\n  - name: design\n    enabled: true\n"),
   2,
-  { stderrIncludes: 'Feld "schema": erwartet vorhanden (Pflichtfeld), erhalten fehlt' },
+  { stderrIncludes: 'Field "schema": expected present (required field), got missing' },
 );
 
 // ---- WRONG TYPE -----------------------------------------------------------------------------------
@@ -96,7 +96,7 @@ checkCli(
   "WRONG TYPE  phases[].enabled must be boolean, a non-bool string is rejected and both types named",
   fixture("wrong-type.yaml", "schema: pipeline.manifest.v0\nphases:\n  - name: design\n    enabled: yes-please\n"),
   2,
-  { stderrIncludes: 'Feld "phases[0].enabled": erwartet Typ "boolean", erhalten Typ "string"' },
+  { stderrIncludes: 'Field "phases[0].enabled": expected type "boolean", got type "string"' },
 );
 
 // ---- ENUM VIOLATION (gate mode: blocking|warn|off) ---------------------------------------------------
@@ -104,7 +104,7 @@ checkCli(
   "ENUM gate mode  an out-of-enum gates.<name>.mode value is rejected and the allowed set is named",
   fixture("enum-mode.yaml", "schema: pipeline.manifest.v0\ngates:\n  dev-plan:\n    mode: onlyloosely\n    type: human\n"),
   2,
-  { stderrIncludes: 'Feld "gates.dev-plan.mode": erwartet einer der Werte [blocking, warn, off], erhalten "onlyloosely"' },
+  { stderrIncludes: 'Field "gates.dev-plan.mode": expected one of the values [blocking, warn, off], got "onlyloosely"' },
 );
 
 // ---- ENUM ACCEPT (gate mode: warn, off) --------------------------------------------------------------
@@ -112,13 +112,13 @@ checkCli(
   "ENUM gate mode ACCEPT warn  mode: warn is a valid gate mode",
   fixture("mode-warn.yaml", "schema: pipeline.manifest.v0\ngates:\n  dev-plan:\n    mode: warn\n    type: human\n"),
   0,
-  { stdoutIncludes: "Manifest gültig" },
+  { stdoutIncludes: "Manifest valid" },
 );
 checkCli(
   "ENUM gate mode ACCEPT off  mode: off is a valid gate mode",
   fixture("mode-off.yaml", "schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: off\n    type: automated\n"),
   0,
-  { stdoutIncludes: "Manifest gültig" },
+  { stdoutIncludes: "Manifest valid" },
 );
 
 // ---- ENUM VIOLATION (gate type: human|automated) ----------------------------------------------------
@@ -126,7 +126,7 @@ checkCli(
   "ENUM gate type  an out-of-enum gates.<name>.type value is rejected (human|automated)",
   fixture("enum-type.yaml", "schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: blocking\n    type: robot\n"),
   2,
-  { stderrIncludes: 'Feld "gates.security.type": erwartet einer der Werte [human, automated], erhalten "robot"' },
+  { stderrIncludes: 'Field "gates.security.type": expected one of the values [human, automated], got "robot"' },
 );
 
 // ---- GATE exemptPaths ACCEPT (array of strings) --------------------------------------------------
@@ -137,7 +137,7 @@ checkCli(
     "schema: pipeline.manifest.v0\ngates:\n  dev-plan:\n    mode: blocking\n    type: human\n    exemptPaths:\n      - scratch/\n      - tmp/\n",
   ),
   0,
-  { stdoutIncludes: "Manifest gültig" },
+  { stdoutIncludes: "Manifest valid" },
 );
 
 // ---- GATE exemptPaths REJECT (plain string instead of array) ------------------------------------
@@ -148,7 +148,7 @@ checkCli(
     "schema: pipeline.manifest.v0\ngates:\n  dev-plan:\n    mode: blocking\n    type: human\n    exemptPaths: scratch/\n",
   ),
   2,
-  { stderrIncludes: 'Feld "gates.dev-plan.exemptPaths": erwartet Typ "array", erhalten Typ "string"' },
+  { stderrIncludes: 'Field "gates.dev-plan.exemptPaths": expected type "array", got type "string"' },
 );
 
 // ---- GATE exemptPaths REJECT (array of numbers instead of strings) ------------------------------
@@ -159,7 +159,7 @@ checkCli(
     "schema: pipeline.manifest.v0\ngates:\n  dev-plan:\n    mode: blocking\n    type: human\n    exemptPaths:\n      - 1\n      - 2\n",
   ),
   2,
-  { stderrIncludes: 'Feld "gates.dev-plan.exemptPaths[0]": erwartet Typ "string", erhalten Typ "number"' },
+  { stderrIncludes: 'Field "gates.dev-plan.exemptPaths[0]": expected type "string", got type "number"' },
 );
 
 // ---- UNKNOWN TOP-LEVEL KEY -----------------------------------------------------------------------
@@ -167,7 +167,7 @@ checkCli(
   "UNKNOWN TOP-LEVEL KEY  a stray unrecognized top-level key is rejected",
   fixture("unknown-key.yaml", "schema: pipeline.manifest.v0\nbogus: true\n"),
   2,
-  { stderrIncludes: 'Feld "bogus": erwartet ein bekanntes Manifest-Feld, erhalten unbekanntes Feld' },
+  { stderrIncludes: 'Field "bogus": expected a known manifest field, got unknown field' },
 );
 
 // ---- DANGLING profiles.active ------------------------------------------------------------------
@@ -175,7 +175,7 @@ checkCli(
   "DANGLING active  profiles.active naming an undeclared profile is rejected",
   fixture("dangling-active.yaml", "schema: pipeline.manifest.v0\nprofiles:\n  active: ghost\n  quick:\n    phases: []\n"),
   2,
-  { stderrIncludes: 'Feld "profiles.active": erwartet ein deklariertes Profil (quick), erhalten "ghost" (unbekannt)' },
+  { stderrIncludes: 'Field "profiles.active": expected a declared profile (quick), got "ghost" (unknown)' },
 );
 
 // ---- PROFILE REFERENCING UNKNOWN PHASE ------------------------------------------------------------
@@ -188,7 +188,7 @@ checkCli(
   2,
   {
     stderrIncludes:
-      'Feld "profiles.quick.phases[0]": erwartet einen unter phases[] deklarierten Phasennamen, erhalten "nonexistent-phase" (unbekannt)',
+      'Field "profiles.quick.phases[0]": expected a phase name declared under phases[], got "nonexistent-phase" (unknown)',
   },
 );
 
@@ -206,7 +206,7 @@ checkCli(
   2,
   {
     stderrIncludes:
-      'Feld "phases[0].condition": erwartet "always", "never", "<flag>" oder "!<flag>", erhalten "not-a-valid-flag"',
+      'Field "phases[0].condition": expected "always", "never", "<flag>" or "!<flag>", got "not-a-valid-flag"',
   },
 );
 
@@ -219,16 +219,16 @@ checkCli(
   ),
   2,
   {
-    stderrIncludes: 'Feld "phases[0].condition": erwartet ein unter flags deklariertes Flag, erhalten "has_ui" (unbekannt)',
+    stderrIncludes: 'Field "phases[0].condition": expected a flag declared under flags, got "has_ui" (unknown)',
   },
 );
 
-// ---- YAML SYNTAX ERROR (German wrapper, line number, yaml-lite reason passed through) ------------------
+// ---- YAML SYNTAX ERROR (English wrapper, line number, yaml-lite reason passed through) ------------------
 checkCli(
-  "YAML syntax error  a yaml-lite rejection (anchor) surfaces as a German 'YAML-Fehler Zeile N' line",
+  "YAML syntax error  a yaml-lite rejection (anchor) surfaces as an English 'YAML error line N' line",
   fixture("yaml-syntax-error.yaml", "schema: &anchor pipeline.manifest.v0\n"),
   2,
-  { stderrIncludes: ["YAML-Fehler Zeile 1:", "anchor"] },
+  { stderrIncludes: ["YAML error line 1:", "anchor"] },
 );
 
 // ---- DUPLICATE PHASE NAME -----------------------------------------------------------------------
@@ -240,7 +240,7 @@ checkCli(
   ),
   2,
   {
-    stderrIncludes: 'Feld "phases[1].name": erwartet einen im Manifest eindeutigen Phasennamen, erhalten "design" (Duplikat von phases[0])',
+    stderrIncludes: 'Field "phases[1].name": expected a phase name unique within the manifest, got "design" (duplicate of phases[0])',
   },
 );
 

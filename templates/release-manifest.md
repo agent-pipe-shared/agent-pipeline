@@ -1,12 +1,13 @@
 <!--
 ═══════════════════════════════════════════════════════════════════════════
-TEMPLATE: Release-Manifest (`docs/releases/<version>.md`) — Agent-Pipeline
+TEMPLATE: Release Manifest (`docs/releases/<version>.md`) — Agent-Pipeline
 v0.1.0-draft
 Source of truth: ADR-0032 (docs/adr/0032-projekt-doku-struktur.md).
-Motivation: the PO pain point "was wurde in welcher Version gebaut?".
+Motivation: the PO pain point "what got built in which version?".
 Language note (ADR-0011 primary-reader rule): this template's INSTRUCTIONS
-are English (agent-facing); the FILLED manifest is GERMAN — release
-manifests are explicitly human-facing (the PO is the primary reader).
+are English (agent-facing); the FILLED manifest is written in the project's
+human-facing language (default English) — release manifests are explicitly
+human-facing (the PO is the primary reader).
 
 USAGE
 1. GREENFIELD ONLY (ADR-0032): adopt this structure from the point a project
@@ -21,48 +22,48 @@ USAGE
 4. Link, never duplicate: reference specs/PRDs, ADRs, and evidence snapshots
    by repo-relative path — do not inline their content here (dedup
    discipline, same principle as `docs/state.md`/ADR bodies).
-5. "Bekannte Lücken" is a MANDATORY section even when empty — write "keine"
+5. "Known Gaps" is a MANDATORY section even when empty — write "none"
    rather than omitting it (QG-05 honesty: an empty section reads as
-   "forgotten", an explicit "keine" reads as "checked").
+   "forgotten", an explicit "none" reads as "checked").
 6. Evidence snapshot paths point at COMMITTED snapshots (pattern:
-   `specs/<datum>-<thema>/evidence/...`) — never at the git-ignored
+   `specs/<date>-<topic>/evidence/...`) — never at the git-ignored
    `evidence/verify-latest.json`/`evidence/security-latest.json` runtime
    files, which do not survive past the next run.
 ═══════════════════════════════════════════════════════════════════════════
 -->
 
-# Release-Manifest {{VERSION}} ({{YYYY-MM-DD}})
+# Release Manifest {{VERSION}} ({{YYYY-MM-DD}})
 
-> Was wurde in dieser Version gebaut? {{PROJEKT_NAME}} · Release {{VERSION}}
+> What got built in this version? {{PROJECT_NAME}} · Release {{VERSION}}
 
 ## Features
 
-- {{Feature/Änderung 1 — 1 Satz, was für wen}}
+- {{Feature/change 1 — 1 sentence, what for whom}}
 
 ## PRDs / Specs
 
-- {{Link auf specs/<datum>-<thema>/ bzw. die konkrete PRD-/Spec-Datei, gegen die dieses Release gebaut und getestet wurde}}
+- {{Link to specs/<date>-<topic>/ or the specific PRD/spec file this release was built and tested against}}
 
-## Entscheidungen / ADR-Deltas
+## Decisions / ADR Deltas
 
-- {{Neue oder geänderte ADRs seit dem letzten Release, mit Link — "keine" wenn es keine gab}}
+- {{New or changed ADRs since the last release, with link — "none" if there were none}}
 
-## Architektur-Stand
+## Architecture Status
 
-- Architektur-Dokument-Version zum Release-Zeitpunkt: {{Verweis auf docs/ARCHITECTURE.md — Versions-Header-Wert oder Commit-SHA zum Release-Zeitpunkt}}
+- Architecture document version at release time: {{Reference to docs/ARCHITECTURE.md — version header value or commit SHA at release time}}
 
-## Test-/Verify-Evidenz
+## Test/Verify Evidence
 
-- Snapshot-Pfad(e): {{z. B. specs/<datum>-<thema>/evidence/verify-<version>.json — committeter Snapshot, nicht die Laufzeit-Datei}}
+- Snapshot path(s): {{e.g. specs/<date>-<topic>/evidence/verify-<version>.json — committed snapshot, not the runtime file}}
 
-## Security-Evidenz
+## Security Evidence
 
-- Snapshot-Pfad(e): {{z. B. specs/<datum>-<thema>/evidence/security-<version>.json — committeter Snapshot, nicht die Laufzeit-Datei}}
+- Snapshot path(s): {{e.g. specs/<date>-<topic>/evidence/security-<version>.json — committed snapshot, not the runtime file}}
 
-## SBOM-Stand / SBOM-Delta
+## SBOM Status / SBOM Delta
 
-- {{Verweis auf den third-party-licenses.json-Stand + osv-scanner-Evidenz dieses Release (Baseline-SBOM, ADR-0032); falls das Projekt zusätzlich eine volle CycloneDX-SBOM führt (ADR-0032-Option): Pfad zur SBOM-Datei dieses Release}}
+- {{Reference to the third-party-licenses.json state + osv-scanner evidence for this release (baseline SBOM, ADR-0032); if the project additionally maintains a full CycloneDX SBOM (ADR-0032 option): path to this release's SBOM file}}
 
-## Bekannte Lücken
+## Known Gaps
 
-- {{Bekannte Lücken zu diesem Release-Zeitpunkt, oder "keine" — Pflichtangabe, nicht weglassen}}
+- {{Known gaps as of this release, or "none" — mandatory field, do not omit}}

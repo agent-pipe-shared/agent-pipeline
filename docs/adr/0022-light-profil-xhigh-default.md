@@ -1,8 +1,42 @@
-# ADR-0022: Light-Dispatch-Profil + Goldfish-`xhigh`-Standard-Default
+# ADR-0022: Light Dispatch Profile + Goldfish `xhigh` Default Effort
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-**In brief (English):** This ADR (accepted 2026-07-05) introduces two speed-tuning changes to the Goldfish (implementor) role: (a) an opt-in "light" dispatch profile for low-risk, mechanical Tier-0 tasks — a compact 3-field report, inlined references, and no pre-edit baseline verification, run at `xhigh` effort — while leaving evidence and stop-condition safeguards untouched and explicitly excluding this profile from high-risk or guardrail work; and (b) making `xhigh` the general default effort level for Goldfish dispatches (matching the Elephant's own calibration), reserving `max` for large/complex/guardrail work and `high` for trivial, uniform work.
+**Status:** accepted (2026-07-05, tuning session) · **Basis:** Register E22
+
+## Context
+
+The speed-tuning pass identified several levers; two of them concern the Goldfish (implementor) role directly — a lightweight dispatch profile for tier-0/mechanical tasks, and a general effort default brought to parity with the Elephant's own calibration (Register E16, [ADR-0006](0006-modell-effort-policy.md)).
+
+## Decision (E22)
+
+Two changes, decided by the PO 2026-07-05 (tuning session):
+
+- **(a) Opt-in `Profile: light`** for tier-0/mechanical dispatches — a compact 3-field report, inlined references, no pre-edit baseline verification, run at effort `xhigh`. GF-08 evidence requirements and GF-07 stop conditions stay untouched; this profile is **never** used for high-risk/guardrail work.
+- **(b) `xhigh` becomes the general Goldfish default effort** (parity with the E16 Elephant calibration): `max` is reserved for large/complex/guardrail work, `high` for trivial/uniform work only.
+
+Implemented in: `operating-model.md` §3.3, `roles/goldfish.md` §6, `roles/elephant.md` EL-05, `goldfish-task.md`, MP-02/MP-06/role matrix (commit `6b8b1c3`). Covers speed levers #1/#2/#5 from `2026-07-04-pipeline-durchsatz-speed.md`; levers #3/#4 deferred. A follow-up item — bringing the Goldfish-implementor frontmatter (`effort: max`) in line with `xhigh` — was completed 2026-07-05 (wave 2, M6, commit `886db4f`). ADR formalization is phase 2.
+
+## Consequences
+
+**Positive:** Faster, cheaper runs for mechanical/tier-0 tasks; effort parity between Elephant and Goldfish reduces overthinking overhead on standard dispatches.
+
+**Negative:** Two effort regimes (light profile vs. standard) widen the calibration surface in briefings.
+
+**Risk:** The light profile could be mis-selected for high-risk/guardrail work — explicitly excluded ("never for high-risk/guardrails"); GF-08/GF-07 remain in place as safeguards regardless.
+
+## Rejected alternatives
+
+- **Keep `max` as the general Goldfish default** — rejected in favor of `xhigh` (parity with E16, speed lever).
+- **Open the light profile to high-risk/guardrail work too** — explicitly excluded.
+
+## Follow-up
+
+None scheduled; speed levers #3/#4 remain deferred (out of scope for this decision).
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0022: Light-Dispatch-Profil + Goldfish-`xhigh`-Standard-Default
 
 > Agent-Pipeline v0.1.0-draft · Sprint 1 · Stand 2026-07-06
 

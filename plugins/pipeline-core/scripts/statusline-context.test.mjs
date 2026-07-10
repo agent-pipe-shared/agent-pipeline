@@ -141,7 +141,7 @@ ok("resolveSessionId: null input -> null", resolveSessionId(null) === null);
   const status = buildStatus(input);
   ok(
     "buildStatus: full valid input (real schema) -> exact line format",
-    status !== null && status.line === "Claude Sonnet 5 · Kontext 43% (84k)",
+    status !== null && status.line === "Claude Sonnet 5 · Context 43% (84k)",
     JSON.stringify(status),
   );
   ok("buildStatus: usedPct rounded", status.usedPct === 43);
@@ -159,14 +159,14 @@ ok("resolveSessionId: null input -> null", resolveSessionId(null) === null);
   const status = buildStatus(input);
   ok(
     "buildStatus: 1M-window fixture -> DISPLAY shows real tokens (850k), not a 200k assumption",
-    status !== null && status.line === "Claude Sonnet 5 · Kontext 85% (850k)",
+    status !== null && status.line === "Claude Sonnet 5 · Context 85% (850k)",
     JSON.stringify(status),
   );
   ok("buildStatus: 1M-window fixture -> contextWindowSize 1000000", status.contextWindowSize === 1000000);
 }
 {
   const status = buildStatus({ context_window: { used_percentage: 10 }, model: { display_name: "X" } });
-  ok("buildStatus: missing token field defaults to 0k", status.line === "X · Kontext 10% (0k)", status.line);
+  ok("buildStatus: missing token field defaults to 0k", status.line === "X · Context 10% (0k)", status.line);
   ok("buildStatus: missing context_window_size -> contextWindowSize null", status.contextWindowSize === null);
 }
 ok("buildStatus: missing pct -> null (fail-open)", buildStatus({ model: { display_name: "X" }, total_input_tokens: 1000 }) === null);
@@ -248,7 +248,7 @@ function runCli(rootDir, stdinText) {
   });
   const { status, stdout, stderr } = runCli(rootDir, stdin);
   ok("CLI: valid input -> exit 0", status === 0, `stderr=${stderr}`);
-  ok("CLI: valid input -> exact status line on stdout", stdout === "Claude Sonnet 5 · Kontext 61% (122k)\n", JSON.stringify(stdout));
+  ok("CLI: valid input -> exact status line on stdout", stdout === "Claude Sonnet 5 · Context 61% (122k)\n", JSON.stringify(stdout));
   const usagePath = join(rootDir, ".claude", ".usage-sess-cli-1.json");
   ok("CLI: valid input -> side-write exists", existsSync(usagePath));
   const usage = JSON.parse(readFileSync(usagePath, "utf8"));
@@ -268,7 +268,7 @@ function runCli(rootDir, stdinText) {
   });
   const { status, stdout, stderr } = runCli(rootDir, stdin);
   ok("CLI: 1M-window input -> exit 0", status === 0, `stderr=${stderr}`);
-  ok("CLI: 1M-window input -> DISPLAY shows real tokens (850k)", stdout === "Claude Sonnet 5 · Kontext 85% (850k)\n", JSON.stringify(stdout));
+  ok("CLI: 1M-window input -> DISPLAY shows real tokens (850k)", stdout === "Claude Sonnet 5 · Context 85% (850k)\n", JSON.stringify(stdout));
   const usage = JSON.parse(readFileSync(join(rootDir, ".claude", ".usage-sess-cli-1m.json"), "utf8"));
   ok(
     "CLI: 1M-window input -> side-write has real totalTokens + contextWindowSize",
@@ -305,7 +305,7 @@ function runCli(rootDir, stdinText) {
   const rootDir = fixtureDir("cli-no-session-id");
   const { status, stdout } = runCli(rootDir, JSON.stringify({ context_window: { used_percentage: 5 }, model: { display_name: "X" } }));
   ok("CLI: no session_id -> exit 0", status === 0);
-  ok("CLI: no session_id -> status line still printed", stdout === "X · Kontext 5% (0k)\n", JSON.stringify(stdout));
+  ok("CLI: no session_id -> status line still printed", stdout === "X · Context 5% (0k)\n", JSON.stringify(stdout));
   ok("CLI: no session_id -> .claude/ never created (no side-write target)", !existsSync(join(rootDir, ".claude")));
 }
 

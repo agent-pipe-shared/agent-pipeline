@@ -35,7 +35,7 @@
  *
  * GATE `mode` IS PRINTED VERBATIM, NEVER SWITCHED ON
  *   The manifest's gate `mode` enum (`blocking|warn|off`) is being corrected in a parallel
- *   follow-up; this hook only ever echoes whatever string is present (or "unbekannt" if the
+ *   follow-up; this hook only ever echoes whatever string is present (or "unknown" if the
  *   field is missing/non-string) into the suggestion text -- it never branches behavior on
  *   the value, so an unexpected/future mode string can never crash or mis-suggest here.
  *
@@ -52,16 +52,16 @@
  *       read stdin at all, see header note below). Absent/malformed usage file, or no
  *       resolvable `session_id`, silently skips the context part entirely (fail-open) --
  *       the phase suggestion (if any) still fires exactly as before.
- *       Staged German thresholds (`contextTier`/`buildContextMessage`, PO decision
+ *       Staged context thresholds (`contextTier`/`buildContextMessage`, PO decision
  *       2026-07-07, floor ~170k on a 200k window (direction-safe, never later -- see the
- *       write-side rounding note below); PERCENTAGE-based since Design-Entscheid 2026-07-08
+ *       write-side rounding note below); PERCENTAGE-based since design decision 2026-07-08
  *       (P2 fix, EL-04) -- window-size-agnostic, matching the 200k thresholds to within the
  *       write side's whole-percent rounding (NOT byte-identical -- MINOR-2, DISP 2026-07-08):
- *         >= 50% used -> "warn"    ("/compact-Übergabefenster (...)")  [200k-equiv: ~100k]
- *         >= 75% used -> "overdue" ("ÜBERFÄLLIG")                          [200k-equiv: ~150k]
+ *         >= 50% used -> "warn"    ("/compact handover window (...)")  [200k-equiv: ~100k]
+ *         >= 75% used -> "overdue" ("OVERDUE")                              [200k-equiv: ~150k]
  *         >= 85% used -> "block"   (`decision: "block"`, hard emergency brake) [200k-equiv: ~170k]
  *       `totalTokens` (the REAL token count, from `resolveTotalTokensFromUsage`) is still used
- *       for the DISPLAY text ("Kontext {k}k") -- only the tiering decision moved to `usedPct`.
+ *       for the DISPLAY text ("Context {k}k") -- only the tiering decision moved to `usedPct`.
  *
  *   (2) NAG-CAP (block tier only): a Stop hook returning `decision:"block"` on every single
  *       turn risks Claude Code's own block-cap session-abort safety (plan G-B: "Stop-hook
@@ -81,7 +81,7 @@
  *       fail-open). The fix: `run()` now persists the incremented marker BEFORE it is allowed
  *       to emit `decision:"block"` (`writeMarkerSafe`'s own boolean return feeds
  *       `applyPersistenceGuard` below). If that write fails, the block is unconditionally
- *       stripped and the output downgrades to the "overdue" wording (ÜBERFÄLLIG, no
+ *       stripped and the output downgrades to the "overdue" wording (OVERDUE, no
  *       `decision`/`reason` field) instead -- the fail-open promise now explicitly covers the
  *       block tier too, not just the tiers below it. Belt-and-suspenders: if the hook's own
  *       stdin carries `stop_hook_active: true` (Claude Code re-invoked this Stop hook because
@@ -142,7 +142,7 @@
  * real usage keeps climbing, and this hook would silently keep tiering on the stale, too-low
  * number. `resolveUpdatedAtMs`/`isUsageStale`/`buildStaleMessage` (pure, `nowMs` an explicit
  * parameter -- `run()` is the only caller of the real `Date.now()`, exactly like every other
- * pure helper in this file) detect this and produce a German warning line. The warning is
+ * pure helper in this file) detect this and produce a warning line. The warning is
  * folded into `decideCombinedOutput`'s EXISTING dedup/fingerprint machinery (a `"::stale"`
  * fingerprint suffix, present only while stale is actually true, so the pre-existing exact
  * fingerprint strings the test suite asserts stay byte-identical when nothing is stale) --
@@ -215,18 +215,18 @@ function buildTransitionMessage(currentPhase, nextPhase, manifest, activeFeature
 
   if (mapping && mapping.gate) {
     const gate = gateConfig(manifest, mapping.gate);
-    const mode = gate && typeof gate.mode === "string" && gate.mode !== "" ? gate.mode : "unbekannt";
+    const mode = gate && typeof gate.mode === "string" && gate.mode !== "" ? gate.mode : "unknown";
     gateClause = ` (Gate: ${mapping.gate}, mode: ${mode})`;
 
     if (mapping.command) {
-      commandClause = ` Prüfung: ${mapping.command}`;
+      commandClause = ` Check: ${mapping.command}`;
     }
     if (mapping.gate === "dev-plan" && activeFeature.planApproved !== true) {
-      noteClause = " Hinweis: Freigabe (planApproved) fehlt noch.";
+      noteClause = " Note: approval (planApproved) still missing.";
     }
   }
 
-  return `Pipeline: Phase "${currentPhase}" aktiv → nächster Schritt: "${nextPhase}"${gateClause}.${commandClause}${noteClause}`;
+  return `Pipeline: phase "${currentPhase}" active → next step: "${nextPhase}"${gateClause}.${commandClause}${noteClause}`;
 }
 
 /**
@@ -238,10 +238,10 @@ function buildCompletionMessage(manifest) {
   const activeProfileName =
     manifest.profiles && typeof manifest.profiles === "object" && typeof manifest.profiles.active === "string"
       ? manifest.profiles.active
-      : "(ohne Profil)";
+      : "(no profile)";
   const pushGate = gateConfig(manifest, "push");
-  const mode = pushGate && typeof pushGate.mode === "string" && pushGate.mode !== "" ? pushGate.mode : "unbekannt";
-  return `Pipeline: alle Phasen von Profil "${activeProfileName}" durchlaufen — Push-Gate (mode: ${mode}) ist der letzte Schritt.`;
+  const mode = pushGate && typeof pushGate.mode === "string" && pushGate.mode !== "" ? pushGate.mode : "unknown";
+  return `Pipeline: all phases of profile "${activeProfileName}" complete — push gate (mode: ${mode}) is the last step.`;
 }
 
 // ---- core resolver (pure) ------------------------------------------------------------------
@@ -345,7 +345,7 @@ export function resolveTotalTokensFromUsage(usage) {
 }
 
 /**
- * (Design-Entscheid 2026-07-08, P2 fix) Mirrors `resolveTotalTokensFromUsage` for the
+ * (design decision 2026-07-08, P2 fix) Mirrors `resolveTotalTokensFromUsage` for the
  * percentage field the usage snapshot carries (`statusline-context.mjs`'s `resolveUsedPct`
  * already resolves this correctly -- P1 only ever affected `totalTokens`). This is the field
  * `contextTier` now tiers on, so it is validated to the same 0-100 range `resolveUsedPct`
@@ -401,7 +401,7 @@ export function isUsageStale(usage, nowMs, thresholdMs) {
 }
 
 /**
- * Builds the German stale-warning line. Callers are expected to have already confirmed
+ * Builds the stale-warning line. Callers are expected to have already confirmed
  * staleness (e.g. via `isUsageStale`) -- this function independently re-derives `updatedAt`
  * and returns `null` (never throws) whenever it cannot honestly report a timestamp, so it
  * stays safe to call unconditionally.
@@ -416,12 +416,12 @@ export function buildStaleMessage(usage, nowMs) {
   const d = new Date(updatedAtMs);
   const hh = String(d.getHours()).padStart(2, "0");
   const mm = String(d.getMinutes()).padStart(2, "0");
-  return `⚠ Kontext-Zähler veraltet (Stand ${hh}:${mm}, vor ${ageMinutes}m) — /context prüfen, an Paketgrenze vorsorglich /compact.`;
+  return `⚠ Context counter stale (as of ${hh}:${mm}, ${ageMinutes}m ago) — check /context, run /compact proactively at the package boundary.`;
 }
 
 // ============================================================================================
 // G-B: staged context-budget tiering (PO decision 2026-07-07 -- floor ~170k on a 200k window,
-// direction-safe; Design-Entscheid 2026-07-08, P2 fix, EL-04: PERCENTAGE-based, not absolute-
+// direction-safe; design decision 2026-07-08, P2 fix, EL-04: PERCENTAGE-based, not absolute-
 // token-based -- the original absolute thresholds were calibrated for a 200k context window only.
 // A 1M-context session (context_window_size: 1000000) at, say, 34% used (340k tokens) would
 // have hit the OLD 170k absolute threshold immediately -- a spurious emergency brake. Tiering
@@ -458,18 +458,18 @@ export function buildContextMessage(tier, totalTokens) {
   // have rounded to for all boundary/whole-thousand inputs the existing suite exercises).
   const k = Math.floor((totalTokens ?? 0) / 1000);
   if (tier === "warn") {
-    return `Kontext ${k}k — /compact-Übergabefenster (100–150k, an Aufgabengrenze schneiden).`;
+    return `Context ${k}k — /compact handover window (100–150k, cut at a task boundary).`;
   }
   if (tier === "overdue") {
-    return `Kontext ${k}k — /compact ÜBERFÄLLIG (100–150k längst überschritten, jetzt an Aufgabengrenze schneiden).`;
+    return `Context ${k}k — /compact OVERDUE (100–150k long exceeded, cut at a task boundary now).`;
   }
   // "block"
-  return `Kontext ${k}k — NOTBREMSE: /compact ist jetzt zwingend (Grenze 170k).`;
+  return `Context ${k}k — EMERGENCY BRAKE: /compact is now mandatory (limit 170k).`;
 }
 
 const NAG_CAP_TURNS = 2;
 const NAG_DOWNGRADE_NOTE =
-  " (Nach 2 Blockierungen in Folge auf Warnung heruntergestuft — Stop-Hook-Block-Cap-Schutz, auto-mode.)";
+  " (Downgraded to a warning after 2 consecutive blocks — Stop-hook block-cap protection, auto-mode.)";
 
 // ============================================================================================
 // G-B: session-keyed dedup/nag-cap marker (`.claude/.stop-suggest-<session_id>.json`).
@@ -619,7 +619,7 @@ export function applyPersistenceGuard({ decided, writeSucceeded, phaseMessage, t
   if (!decided.isActiveBlock || writeSucceeded) return decided.stdout;
 
   // Persist failed on what would have been an active block turn -- fail-open: downgrade to
-  // the overdue-tier wording (ÜBERFÄLLIG), never the block/NOTBREMSE wording, and never a
+  // the overdue-tier wording (OVERDUE), never the block/EMERGENCY BRAKE wording, and never a
   // `decision`/`reason` field: an unpersisted counter means we can no longer prove this is
   // only the 1st/2nd consecutive turn, so the conservative choice is to not claim the
   // emergency-brake tier at all. The stale warning (if any) survives the downgrade unchanged --
@@ -669,9 +669,9 @@ export function run() {
   // skipped, matching the DoD's "file absent -> silently skip" contract).
   const usage = sessionId ? loadUsageSafe(usageFilePath(rootDir, sessionId)) : null;
   const totalTokens = resolveTotalTokensFromUsage(usage);
-  // P2 fix (Design-Entscheid 2026-07-08): tier on usedPct (window-size-agnostic), not on the
+  // P2 fix (design decision 2026-07-08): tier on usedPct (window-size-agnostic), not on the
   // real totalTokens -- but keep passing the real totalTokens into buildContextMessage so the
-  // DISPLAY text still shows real tokens ("Kontext {k}k"), not a percentage.
+  // DISPLAY text still shows real tokens ("Context {k}k"), not a percentage.
   const usedPct = resolveUsedPctFromUsage(usage);
   const tier = contextTier(usedPct);
   const contextMessage = buildContextMessage(tier, totalTokens);

@@ -46,13 +46,13 @@ Evaluate all rows; the **strictest matching row wins** — a diff that superfici
 | **T5** | Rigor 0 + risk class low + no risk flag | none — verify + evidence suffice (fast path) | — | — |
 | **T6** | Review-tier findings contested or contradictory | Elephant's option | a higher-capability-model second opinion | NEW fresh context — never a debate in the same context |
 
-**Non-blocking option (risk class niedrig only):** where T3 or T4 is triggered by rigor level rather than by risk class mittel/hoch, and the diff's risk class is niedrig (non-A/G/S), the critic run MAY proceed non-blocking — parallel to the next package's implementation dispatch — instead of gating it; ALL findings from that run are still dispositioned before the wave closes or before push. Risk class mittel or hoch stays blocking; hoch + A/G/S additionally keeps T1's higher-capability-model-mandatory + `--bare` requirement unchanged (T1 row untouched, including the documented `--bare`-suspension status quo).
+**Non-blocking option (risk class low only):** where T3 or T4 is triggered by rigor level rather than by risk class medium/high, and the diff's risk class is low (non-A/G/S), the critic run MAY proceed non-blocking — parallel to the next package's implementation dispatch — instead of gating it; ALL findings from that run are still dispositioned before the wave closes or before push. Risk class medium or high stays blocking; high + A/G/S additionally keeps T1's higher-capability-model-mandatory + `--bare` requirement unchanged (T1 row untouched, including the documented `--bare`-suspension status quo).
 
 **Bundling default:** one bundled critic per delivery wave is the default; per-package critics run only when risk classes inside the wave differ from each other.
 
-Canonical trigger wording (German; word-identical in `docs/operating-model.md` §3.3/§4.2, ADR-0003, and ADR-0014 — on any divergence the canonical wording wins over the table above):
+Canonical trigger wording (word-identical in `docs/operating-model.md` §3.3/§4.2, ADR-0003, and ADR-0014 — on any divergence the canonical wording wins over the table above):
 
-> „Jeder Architektur-/Guardrail-/Security-Diff läuft mit dem eskalierten Review-Tier-Modell (höhere Kapazitätsstufe) UND zusätzlich in `--bare`-Isolation. Rigor-Stufe 2 macht den Critic zur Pflicht (Standard: das Review-Tier-Modell); die Eskalation auf die höhere Kapazitätsstufe gilt dort nur, wenn zusätzlich die Risikoklasse hoch ist ODER ein Architektur-/Guardrail-/Security-Diff vorliegt."
+> "Every architecture/guardrail/security diff runs with the escalated review-tier model (higher capability level) AND additionally in `--bare` isolation. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher capability level applies there only when, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
 
 **Why staggered:** The Critic is expensive and must not decay into ceremony — a documented discipline-erosion risk; A/G/S zones are exactly where a weaker checker has correlated blind spots. Evidence for the cascade/non-blocking relaxation: the last 3 canon critics after a passed readiness check + first-pass delivery returned PASS with 0 findings; real blockers occurred only on risky live-code changes in a governed project (two blockers, one fail-open major finding). Community evidence: Meta's risk-tiered gating held quality at relaxed gates (incident rate 1/50 baseline).
 **Check:** The gate decision documents the applied row; merge requires a findings report for every mandatory trigger (OM §4.2).
@@ -65,7 +65,7 @@ Canonical trigger wording (German; word-identical in `docs/operating-model.md` �
 2. Diff reference (`base..head`, worktree path, or PR ref) — the Critic runs `git diff` itself,
 3. Guardrail paths to check against (`guardrails/` files, relevant calibration constraints),
 4. Evidence artifact path(s),
-5. Metadata: task id, rigor level, risk class, applied trigger row + "criticality → model" (MP-07), regelwerk SHA.
+5. Metadata: task id, rigor level, risk class, applied trigger row + "criticality → model" (MP-07), ruleset SHA.
 
 **Never in the dispatch:** chat history, Elephant reasoning or summaries of the work, goldfish completion-report rationale, prior Critic verdicts (a fresh run must not anchor).
 **Why:** Two residual contamination channels are structurally closed: (a) CLAUDE.md/git-status autoload → `--bare` duty for A/G/S diffs; (b) Elephant framing → the Critic builds its input itself; the Elephant passes paths, never justifications.

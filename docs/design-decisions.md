@@ -2,67 +2,66 @@
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-This method rests on a few long-lived foundational decisions. This document sums
-them up in plain language: it explains the *why*. The binding *how* lives in the
-rulesets (`policies/`, `guardrails/`, `roles/`).
+This method rests on a few long-lived foundational decisions. This document
+explains the *why* in plain language. The binding *how* lives in the rulesets
+(`policies/`, `guardrails/`, `roles/`).
 
 ## Separated roles
 
 The model is carried by a **Product Owner** — you, the human gate — plus three
 deliberately separated agent roles:
 
-- **Elephant — the orchestrator.** The long-lived session. Out of the
-  conversation with the Product Owner it shapes a specification, breaks it into
-  small tasks, dispatches them, and makes the final go/no-go call.
+- **Elephant — the orchestrator.** The long-lived session. From the conversation
+  with the Product Owner it shapes a specification, breaks it into small tasks,
+  dispatches them, and makes the final go/no-go call.
 - **Goldfish — the implementor.** A fresh, tightly-scoped context that carries
   out exactly one task and hands back only with evidence.
 - **Critic — the independent reviewer.** A read-only instance with a fresh
-  context that knows neither the chat history nor the reasoning behind the
-  implementation.
+  context, knowing neither the chat history nor the implementation's rationale.
 
-The Product Owner keeps the two human gates — sign-off on the plan up front and
-sign-off on the result at the end — and never hands that judgment down.
+The Product Owner keeps the two human gates — sign-off on the plan up front,
+sign-off on the result at the end — and never delegates that judgment.
 
 The separation is deliberate: whoever implements does not review their own work.
-A reviewer who has already heard the rationale inherits its blind spots. A fresh
-context on the Goldfish and the Critic keeps a wrong assumption from threading
-unnoticed through the whole chain.
+A reviewer who already heard the rationale inherits its blind spots. Fresh
+context on Goldfish and Critic keeps a wrong assumption from threading unnoticed
+through the whole chain.
 
 ## Delegate first
 
-The Elephant does not carry out implementation work itself; it hands it to fresh
-Goldfish contexts. That keeps its scarce, long-lived context free for overview,
-decision, and quality — instead of filling up with implementation detail and
-losing its judgment along the way.
+The Elephant does not implement itself; it hands work to fresh Goldfish
+contexts. That keeps its scarce, long-lived context free for overview, decision,
+and quality — instead of filling up with implementation detail and losing
+judgment along the way.
 
 ## One canonical verify gate and mandatory evidence
 
-There is exactly one authoritative check gate ("verify") that measures a change
-against live behavior — not just tests or a typecheck, but demonstrated proof
-that the change actually does what it is meant to. No task counts as done without
-that proof; the bare claim that "it runs," with no evidence, does not count.
+Exactly one authoritative check gate ("verify") measures a change against live
+behavior — not just tests or a typecheck, but demonstrated proof the change
+does what it's meant to. No task counts as done without that proof; the bare
+claim "it runs," with no evidence, does not count.
 
 ## Push gate
 
 Before any push to the shared remote there is a deliberate checkpoint. Whether
 routine pushes need explicit approval or are standing-approved is a
-project-specific setting. Either way, certain actions stay forbidden always:
-force-push, rewriting history, deleting protected branches or tags, and bypassing
+project-specific setting. Either way, some actions stay forbidden always:
+force-push, rewriting history, deleting protected branches or tags, bypassing
 hooks.
 
 ## Small, atomic Conventional Commits
 
 Every commit carries exactly one concern and follows the Conventional Commits
 format. Small, self-contained steps are easier to review, to roll back
-deliberately, and to read in the history than large catch-all commits.
+deliberately, and to read in history than large catch-all commits.
 
 ## Planned context checkpoints
 
 A long-lived orchestrator session accumulates context over time and loses its
-edge. So state, decisions, and insights are recorded continuously in files — not
-in the chat history. A session is therefore only a cache over the persisted
-artifact, never the actual source of truth. At planned points it can be reloaded
-cleanly, without losing knowledge.
+edge. So state, decisions, and insights are recorded continuously in files, not
+in chat history — a session is only a cache over the persisted artifact, never
+the source of truth itself. At planned points it can be reloaded cleanly,
+without losing knowledge.
 
 ## Model-tier routing (`pipeline.user.yaml`)
 
@@ -71,27 +70,29 @@ set centrally in `pipeline.user.yaml`: a more capable design tier for the
 orchestrator, an implement tier for execution, a leaner mechanic tier for simple
 work, a review tier for checking, and optionally an advisor tier for an
 independent second opinion. The method ships sensible defaults; each team
-overrides them in this one file to match its subscription and budget. The primary
-cost lever here is the configured thinking depth (effort), measured by the
-effective cost per task — not the raw price per token.
+overrides them in this one file to match its subscription and budget. The
+primary cost lever is configured thinking depth (effort), measured by effective
+cost per task — not raw price per token.
 
 ## Security-scan gate
 
-Before a change is closed out there is a dedicated security gate. It checks
+Before a change is closed out there is a dedicated security gate, checking
 specifically for secrets, tokens, and typical weaknesses before code leaves the
-repo. Security is thus a fixed step in the flow, not an afterthought.
+repo. Security is a fixed step in the flow, not an afterthought.
 
 ## Governance layer: advisory guidelines vs. enforcing policies
 
 Rules for a hosted project fall deliberately into two classes. **Advisory
 guidelines** are recommendations: they give orientation but block nothing.
 **Enforcing policies** are machine-checked and blocking: violate one and you do
-not get through. Each hosted project decides per rule which class it falls into —
-so strictness can be dialed without rewriting the method. A pattern played all
-the way through both classes lives in the
+not get through. Each hosted project decides per rule which class it falls into,
+so strictness can be dialed without rewriting the method. A pattern played
+through both classes lives in the
 [worked example](../governance/examples/worked-example.md).
 
 ---
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
 # Design-Entscheidungen — das „Warum" der Methodik
 

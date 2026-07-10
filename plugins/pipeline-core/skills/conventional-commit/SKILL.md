@@ -1,13 +1,13 @@
 ---
 name: conventional-commit
-description: "Proposes a German Conventional Commit message (type(scope): subject + body bullets) from the currently staged diff. Reads git diff --cached, git log and git status to infer type/scope/subject and to include the repo's trailer conventions (Dispatch:-trailer when run in a goldfish dispatch context). It only PROPOSES the message text; committing remains the caller's own act."
+description: "Proposes a Conventional Commit message (type(scope): subject + body bullets) from the currently staged diff. Reads git diff --cached, git log and git status to infer type/scope/subject and to include the repo's trailer conventions (Dispatch:-trailer when run in a goldfish dispatch context). It only PROPOSES the message text; committing remains the caller's own act."
 argument-hint: "[optional: scope override]"
 allowed-tools: Bash(git diff:*), Bash(git log:*), Bash(git status:*)
 ---
 
 # conventional-commit — propose a commit message from the staged diff
 
-Builds a **German** Conventional Commit message (human-facing prose per ADR-0011 —
+Builds a Conventional Commit message (human-facing prose per ADR-0011 —
 commit messages are human-facing) from whatever is CURRENTLY staged. This skill never commits by
 itself; it hands the caller a ready-to-use message to review and commit with, exactly as they
 would any other proposed text.
@@ -30,12 +30,12 @@ would any other proposed text.
 - **Scope**: the dominant touched area in parentheses, e.g. `(pipeline)`, `(docs)`, `(governance)`,
   `(close)` — mirror the granularity already visible in `git log --oneline` output. An explicit
   scope override may be passed as `$ARGUMENTS`; if given, use it instead of inferring one.
-- **Subject**: one German sentence, imperative/nominal style matching existing commits (e.g.
-  "Korrigiert…", "Ergänzt…", "Fügt … hinzu"), ≤ 72 characters where practical.
+- **Subject**: one sentence, imperative/nominal style matching existing commits (e.g.
+  "Fix…", "Add…", "Update…"), ≤ 72 characters where practical.
 
 ## 3. Body bullets (when the diff is non-trivial)
 
-For anything beyond a one-line change, add a short body: 2–5 bullets in German naming WHAT changed
+For anything beyond a one-line change, add a short body: 2–5 bullets naming WHAT changed
 and, where it is not obvious from the diff alone, WHY — never restate the whole diff, never invent
 rationale the diff does not support.
 

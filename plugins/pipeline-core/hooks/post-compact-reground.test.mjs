@@ -95,22 +95,22 @@ ok('shouldActivate: source is a non-string "compact"-like value -> false', shoul
 {
   const msg = buildRegroundMessage({ activeFeature: { id: "retro-speed", phase: "implementation" } });
   ok('buildRegroundMessage: mentions the active feature id + phase', msg.includes('"retro-speed"') && msg.includes("implementation"), msg);
-  ok("buildRegroundMessage: mentions DEUTSCH (chat-language reminder, ADR-0011/E17)", msg.includes("DEUTSCH") && msg.includes("ADR-0011"), msg);
-  ok("buildRegroundMessage: mentions the active-role reminder", msg.toLowerCase().includes("rolle"), msg);
+  ok("buildRegroundMessage: mentions ENGLISH (chat-language reminder)", msg.includes("ENGLISH"), msg);
+  ok("buildRegroundMessage: mentions the active-role reminder", msg.toLowerCase().includes("role"), msg);
   ok("buildRegroundMessage: points to docs/state.md", msg.includes("docs/state.md"), msg);
 }
 {
   const msg = buildRegroundMessage({ activeFeature: { id: "no-phase-feature" } });
-  ok('buildRegroundMessage: missing phase -> "(unbekannt)" fallback, not a crash', msg.includes("(unbekannt)"), msg);
+  ok('buildRegroundMessage: missing phase -> "unknown" fallback, not a crash', msg.includes("unknown"), msg);
 }
 {
   const msg = buildRegroundMessage({ schema: "pipeline.state.v0" }); // no activeFeature at all
-  ok("buildRegroundMessage: no activeFeature -> generic fallback line", msg.includes("Kein aktives Feature"), msg);
+  ok("buildRegroundMessage: no activeFeature -> generic fallback line", msg.includes("No active feature"), msg);
 }
 {
   const msg = buildRegroundMessage(null); // state entirely absent/malformed
-  ok("buildRegroundMessage: null state -> generic fallback line, never throws", msg.includes("Kein aktives Feature"), msg);
-  ok("buildRegroundMessage: null state -> still mentions DEUTSCH reminder", msg.includes("DEUTSCH"), msg);
+  ok("buildRegroundMessage: null state -> generic fallback line, never throws", msg.includes("No active feature"), msg);
+  ok("buildRegroundMessage: null state -> still mentions ENGLISH reminder", msg.includes("ENGLISH"), msg);
 }
 
 // ==========================================================================================
@@ -161,7 +161,7 @@ function runCli(rootDir, stdinText) {
   const { status, stdout, stderr } = runCli(rootDir, JSON.stringify({ source: "compact", session_id: "sess-1" }));
   ok("CLI: source=compact + real state -> exit 0", status === 0, `stderr=${stderr}`);
   ok("CLI: source=compact + real state -> mentions the active feature", stdout.includes("retro-speed"), stdout);
-  ok("CLI: source=compact + real state -> mentions DEUTSCH reminder", stdout.includes("DEUTSCH"), stdout);
+  ok("CLI: source=compact + real state -> mentions ENGLISH reminder", stdout.includes("ENGLISH"), stdout);
 }
 
 {
@@ -195,7 +195,7 @@ function runCli(rootDir, stdinText) {
   const { status, stdout } = runCli(rootDir, JSON.stringify({ source: "compact" }));
   ok("CLI: source=compact + missing state file -> exit 0", status === 0);
   ok("CLI: source=compact + missing state file -> still fires (fail-open)", stdout !== "", stdout);
-  ok("CLI: source=compact + missing state file -> generic fallback feature line", stdout.includes("Kein aktives Feature"), stdout);
+  ok("CLI: source=compact + missing state file -> generic fallback feature line", stdout.includes("No active feature"), stdout);
 }
 
 {
@@ -206,7 +206,7 @@ function runCli(rootDir, stdinText) {
   const { status, stdout } = runCli(rootDir, JSON.stringify({ source: "compact" }));
   ok("CLI: source=compact + malformed state -> exit 0", status === 0);
   ok("CLI: source=compact + malformed state -> still fires (fail-open)", stdout !== "", stdout);
-  ok("CLI: source=compact + malformed state -> generic fallback feature line", stdout.includes("Kein aktives Feature"), stdout);
+  ok("CLI: source=compact + malformed state -> generic fallback feature line", stdout.includes("No active feature"), stdout);
 }
 
 // ---- cleanup + summary -------------------------------------------------------------------
