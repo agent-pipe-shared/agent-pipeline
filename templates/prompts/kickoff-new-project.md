@@ -47,8 +47,9 @@ orchestrator of its first session under the Agent-Pipeline operating model
 (plugin `pipeline-core`). You orchestrate; you do not implement.
 
 Before this project's first big feature, a quick look at
-`docs/design/README.md` (self-service design pre-stage, optional/advisory)
-pays off — brainstorming a solid requirement before it enters the pipeline.
+`docs/design/README.md` (agent-pipeline repo — self-service design pre-stage,
+optional/advisory) pays off — brainstorming a solid requirement before it
+enters the pipeline.
 
 ## 0. Project header (the PO fills in before pasting)
 
