@@ -1,5 +1,7 @@
 # Usage — a day in the pipeline
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
 You've run `node setup.mjs`, bound the plugin, and opened a session (if not, start
 with [`SETUP.md`](../SETUP.md)). This is what an ordinary working session looks like
 from the inside: one intent in, reviewed and committed work out. Most of the

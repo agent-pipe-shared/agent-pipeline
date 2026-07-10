@@ -1,5 +1,9 @@
 # ADR-0031: Modell-Routing im Manifest — maschinenlesbare Projektion, `model-policy.md` bleibt kanonisch
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR decides that the `modelRouting` block introduced in `.claude/pipeline.yaml` is a machine-readable *projection* of the existing model/effort policy, not a second, competing source of truth — `policies/model-policy.md` (and ADR-0006) remains canonical whenever the two conflict. Rationale: without this clarification, the new manifest block risked violating the "single source of truth" principle (Anti-Pattern AP1) by letting tooling read model/effort assignments straight from the manifest instead of the policy file. Status: accepted 2026-07-07; the tradeoff accepted is a manual sync burden between the manifest and the policy file, flagged for review alongside the next model-policy pricing review (2026-08-31).
+
 > Agent-Pipeline v0.1.0-draft · AP1-Tuning-Session · Stand 2026-07-07
 
 **Status:** akzeptiert (2026-07-07, the PO-Plan-Freigabe „AP1 TUNING") · **Grundlage:** `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` Paket P2/P7, [ADR-0006](0006-modell-effort-policy.md), `policies/model-policy.md`

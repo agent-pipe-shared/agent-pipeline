@@ -1,5 +1,9 @@
 # ADR-0010: Session-Bootstrap-Mechanismus
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR (accepted 2026-07-03) mandates a defined, checkable bootstrap protocol at the start of every Agent-Pipeline session, covering the three pillars of the distribution architecture: the plugin (skills/agents/hooks), committed project settings, and a versioned handover file. It requires the protocol to display the consumed plugin SHA and reconcile it against the remote (a staleness check), define offline behavior and a refresh ritual, and end with a mandatory self-confirmation (ruleset SHA/version, project, calibration, handover state, role) before any work begins. It was driven by Critic finding L3-03: without this, plugin distribution can silently drift stale across two machines, and reliance on unversioned user-scope memory breaks on a fresh clone.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 
 **Status:** akzeptiert (2026-07-03, Checkpoint 1) · **Grundlage:** Auflagen A5/A6

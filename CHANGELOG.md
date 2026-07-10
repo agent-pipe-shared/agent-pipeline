@@ -1,13 +1,13 @@
 # Changelog
 
-Alle nennenswerten Änderungen an der Agent-Pipeline werden hier festgehalten.
+All notable changes to the Agent Pipeline are documented here.
 
-Format nach [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versionierung gemäß [ADR-0002](docs/adr/0002-versionierung-sha-dann-semver.md): SHA-basiert in der frühen Phase — der jeweils aktuelle Commit auf `main` ist der gültige, verteilte Stand; SemVer + Tags kommen ab der Stabilitätsphase.
+Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning per [ADR-0002](docs/adr/0002-versionierung-sha-dann-semver.md): SHA-based in the early phase — the current commit on `main` is the valid, distributed state; SemVer + tags arrive once the stability phase begins.
 
 ## [Unreleased]
 
 ## [0.1.0] — Initial public snapshot
 
-Erster weitergabefähiger Snapshot des Operating Models: Rollenmodell (PO/Elephant/Goldfish/Critic), zweistufiges Review-System (deterministische Gates + Critic-Trigger-Matrix), Session-Lifecycle, Handover-Kanonisierung, Projekt-Kalibrierungsschicht, Guardrails (`guardrails/`), Modell-/Tooling-Policies (`policies/`) und das `pipeline-core`-Plugin (git-guard-Union-Hook, Skills, Agents). Details: [`docs/operating-model.md`](docs/operating-model.md).
+First shareable snapshot of the Operating Model: role model (PO/Elephant/Goldfish/Critic), two-tier review system (deterministic gates + Critic trigger matrix), session lifecycle, handover canonicalization, project calibration layer, guardrails (`guardrails/`), model/tooling policies (`policies/`), and the `pipeline-core` plugin (git-guard union hook, skills, agents). Details: [`docs/operating-model.md`](docs/operating-model.md).
 
-Ehrlicher Reifegrad-Hinweis: v0.1.0, rund eine Woche Bauzeit, ein Soloprojekt, bisher eine Dogfooding-Runde — Feedback willkommen.
+Honest maturity note: v0.1.0, about a week of build time, a solo project, one dogfooding round so far — feedback welcome.

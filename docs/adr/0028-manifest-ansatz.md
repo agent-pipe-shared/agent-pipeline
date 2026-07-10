@@ -1,5 +1,9 @@
 # ADR-0028: Manifest-Ansatz — `.claude/pipeline.yaml` additiv, in-house YAML-Parser, Agents bleiben im Plugin
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR adds an optional, additive `.claude/pipeline.yaml` manifest for declarative pipeline configuration (phases, gates, security thresholds, model routing, profiles, governance) alongside the existing `.claude/pipeline.json` calibration file, which stays byte-identical and untouched — the two files have zero field overlap, and no manifest present means no behavior change. To parse the YAML without adding an npm dependency (preserving the project's zero-dependency invariant), the decision introduces a small in-house, strict block-subset YAML parser that loudly rejects unsupported syntax (anchors, flow syntax, block strings) rather than silently misinterpreting it; validation is fail-open when no manifest exists but fail-closed when a manifest is present and invalid. Agents continue to be distributed via the plugin (`plugins/pipeline-core/agents/`) rather than duplicated into `.claude/agents/`, to avoid re-introducing copy-paste divergence of centrally versioned artifacts. Status: accepted (2026-07-07).
+
 > Agent-Pipeline v0.1.0-draft · AP1-Tuning-Session · Stand 2026-07-07
 
 **Status:** akzeptiert (2026-07-07, the PO-Plan-Freigabe „AP1 TUNING") · **Grundlage:** `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` Leitentscheidungen 1/2/4/7, `docs/operating-model.md` §8, `guardrails/security.md` SEC-04

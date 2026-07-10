@@ -1,5 +1,9 @@
 # ADR-0008: Permission- und Worktree-Policy je Projekt
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR sets a per-repo permissions and worktree policy: `.claude/settings.json` (allow/ask/deny, `defaultMode`) is committed per repository, with personal loosening only in `settings.local.json`; denies are cut narrowly since a deny cannot be overridden by any other level; network control uses a WebFetch domain allowlist rather than fragile Bash argument patterns. Worktree isolation for write access is the default, but the binding tier and its fallback are left to per-project calibration rather than a blanket mandate, because Checkpoint-1 review found the blanket worktree requirement broke on <PROJECT_C>'s fail-open editor-bound compile gate and <PROJECT_A>'s per-worktree `node_modules` cost, with Windows practice itself unverified. Status: accepted (2026-07-03); the Phase-4 follow-up (Auflage A4) later resolved to `worktree: off` across all three project dossiers, confirmed at the Phase-4 acceptance gate, with real-world practice validation deferred to Sprint-1 sessions per project.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 
 **Status:** akzeptiert (2026-07-03, Checkpoint 1) · **Grundlage:** Register E8 + Auflage A4

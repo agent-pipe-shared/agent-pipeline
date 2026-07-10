@@ -1,5 +1,9 @@
 # ADR-0004: Spec-Rigor in drei Stufen + EARS-Akzeptanzkriterien
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR establishes a three-tier spec-rigor model — Tier 0 (issue-only, for bugfixes with repro/config/docs), Tier 1 (spec-first delta specs for medium features, archived after merge, following an OpenSpec-style pattern), and Tier 2 (spec-anchored, for a small number of long-lived core contracts such as `<PROJECT_A>` API or `<PROJECT_B>` schema/invariants, where the spec lives in the repo and evolves with it) — with EARS-style acceptance criteria ("WHEN … THE SYSTEM SHALL …") required from Tier 1 upward to give a direct spec-to-test bridge. The decision favors home-grown templates over adopting an external spec-driven-development CLI (e.g. Spec Kit, Kiro, OpenSpec), to avoid tool lock-in and match process overhead to task size. Status: accepted (2026-07-03, Checkpoint 1).
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 
 **Status:** akzeptiert (2026-07-03, Checkpoint 1) · **Grundlage:** Register E4

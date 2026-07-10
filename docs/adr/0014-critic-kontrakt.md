@@ -1,5 +1,9 @@
 # ADR-0014: Critic-Kontrakt
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR institutes a formal contract for the "Critic" review role: mandatory triggers by risk level, strict input limited to spec + diff + guardrails (never chat history or the implementor's own reasoning, to avoid contamination and self-confirmation bias), a structured, evidence-based findings list (no numeric score) that must include a "deliberately not flagged" rubric plus a trajectory check (were the claimed checks actually run?), and an anti-overreporting clause so CI-enforced checks aren't re-flagged. A later revision (2026-07-04) addresses an infrastructure discovery — subagents auto-load the full project CLAUDE.md and a stale git-status snapshot at spawn — by keeping that autoload as-is but adding a disclosure duty and banning use of the injected snapshot as a freshness reference.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 
 **Status:** akzeptiert (2026-07-03, Checkpoint 1) · **revidiert um CLAUDE.md-Autoload-Disclosure-Pflicht + Snapshot-Verbot (the PO, 2026-07-04 — s. Abschnitt „Revision")** · **Grundlage:** Register E12 + Auflage A10

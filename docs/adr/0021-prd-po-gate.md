@@ -1,5 +1,9 @@
 # ADR-0021: PRD-PO-Gate vor dem ersten Implementierungs-Dispatch
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR records a provisional Product Owner gate inserted after solution design and readiness, but before the first implementation dispatch: for work at rigor level ≥1 or high classification, the PO must approve a German `prd_<topic>.md` (product rationale — what/why/scope/non-goals/risks/alternatives) before implementation may start; acceptance criteria stay in the English, agent-facing spec rather than being duplicated into the PRD. A true stage-0 fast path (small, product-irrelevant hotfixes) is exempt. The gate is a literal-confirmation checkpoint, not a UI dialog, and a later addendum tightens it further: the PRD must be proactively surfaced as a readable document (not just referenced by repo path), with explicit waiting for the literal approval word — because early practice showed the gate being nominally held without being genuinely read. Status is provisional pending experience from the feature phase; full ADR formalization is deferred to a later phase.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 1 · Stand 2026-07-06
 
 **Status:** provisorisch („testen wir erst mal so", the PO-Direktive 2026-07-05, Tuning-Session) · **Grundlage:** Register E21

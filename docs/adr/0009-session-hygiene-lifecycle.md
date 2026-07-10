@@ -1,5 +1,9 @@
 # ADR-0009: Session-Hygiene und Session-Lifecycle
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR (accepted 2026-07-03) codifies session hygiene for long-running agent ("Elephant") sessions: `/clear` + rename on topic changes, `/compact` only at task boundaries (never as an emergency fix once context is already full), a two-failed-attempts rule to abandon a stuck approach in favor of fresh context, and fixing model/effort choice at session start since both invalidate the cache. It also mandates planned session cuts at task boundaries — updating the handover file and ending the session deliberately, rather than force-compacting — with the successor session re-bootstrapping from that versioned handover file, never from chat history. A 2026-07-06 addendum adds a concrete checkpoint-window rule: at ~100k tokens of context, presenting a `/compact` block becomes mandatory rather than optional, with 100–150k as the target window and >150k flagged as an overdue cut.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 
 **Status:** akzeptiert (2026-07-03, Checkpoint 1) · **Grundlage:** Register E9 + Session-Lifecycle-Direktive

@@ -1,5 +1,9 @@
 # ADR-0016: Git-Hosting — bei GitHub bleiben
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR records the decision to keep GitHub as the git-hosting provider for all projects rather than migrating (e.g. to a self-hosted option or GitLab), following a Checkpoint 2 review (CP2 Q8, 2026-07-03). The rationale is that staying avoids migration cost and keeps the existing toolchain valid (`gh` CLI, three project remotes, plugin-marketplace distribution via GitHub), while the risks that prompted the review are bounded — not eliminated — by mitigations M1–M8 and tracked via tipping-point triggers GH-T1–GH-T7 in the tooling radar. Status: accepted; scheduled for re-review on 2026-08-31 alongside the general pricing review.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 4 · Stand 2026-07-06
 
 **Status:** akzeptiert (2026-07-03, Checkpoint 2, Q8) · **Grundlage:** Register E14

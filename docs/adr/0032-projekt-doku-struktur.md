@@ -1,5 +1,9 @@
 # ADR-0032: Projekt-Doku-Struktur — Release-Traceability, SBOM-Konvention, lebendes Architektur-Dokument (GREENFIELD)
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR is accepted (2026-07-07) and defines a greenfield project-documentation structure for new projects: a per-release manifest (`docs/releases/<version>.md`) that freezes PRD/spec references, ADR deltas, the architecture-doc version, and verify/security evidence paths for that release; a living `docs/ARCHITECTURE.md` reflecting current state rather than a change log; and a two-tier SBOM convention — a mandatory baseline (`third-party-licenses.json` + osv-scanner evidence) with full CycloneDX as an optional, non-mandatory addition for projects that need it. The structure applies only to projects adopting it from now on — no retroactive migration of existing projects is planned or forced; existing projects may adopt it later, individually, at the project owner's initiative.
+
 > Agent-Pipeline v0.1.0-draft · retro-speed-Session (Folge zu AP1-TUNING) · Stand 2026-07-07
 
 **Status:** akzeptiert (2026-07-07, PO-Direktive AP1-TUNING-Session + Plan-Freigabe „retro-speed") · **Grundlage:** PO-Direktive (wörtlich), `.claude/plans/2026-07-07-retro-speed.md` Paket G-E

@@ -1,5 +1,9 @@
 # ADR-0024: Critic-Stufung — datenbasierte Revision des E12/E6-Staffings
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR revises the critic (code-review) staffing rules from ADR-0014/ADR-0006 based on observed outcomes: the last three canonical critic passes returned zero findings, while real blockers only showed up on risky live-code changes. It introduces a mechanical auto-pass for deterministic diffs (lockfiles, generated files, pure formatting — no critic needed, evidenced by the generating command plus verify), a Sonnet-based cascade for medium-risk diffs that escalates to the stronger model only on a major-or-above finding, an approvals/governance/security touch, or a contested result, and allows non-blocking parallel review for low-risk diffs. High-risk/approvals-governance-security-touching changes remain unchanged: mandatory, blocking review by the stronger model. Status: accepted (Wave 2, milestone M11).
+
 > Agent-Pipeline v0.1.0-draft · Sprint 1 · Stand 2026-07-06
 
 **Status:** akzeptiert (Welle 2, M11) · **Grundlage:** Register E24

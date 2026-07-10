@@ -1,5 +1,7 @@
 # Setup
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
 How to adopt this repo as the Agent-Pipeline for your own projects: clone it,
 personalize it, bind the plugin, start a session.
 

@@ -1,5 +1,9 @@
 # ADR-0005: Quality-Gate-Kette und zweigeteilte DoD
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR establishes a fixed quality-gate chain — Format → Lint → Typecheck → Tests → Build (all blocking) followed by Critic judgment — enforced by a single verify script per project that runs identically in the stop-hook, the agent's completion report, and CI. "Done" may only be claimed with machine-generated evidence (script output, a passing feature list, command plus return code), never a model-asserted claim; the Definition of Done is split into a machine-checkable part and a judgment part (spec fidelity, scope, edge cases) the Critic still has to assess. Status: accepted 2026-07-03 (Checkpoint 1), grounded in decision register entry E5.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 
 **Status:** akzeptiert (2026-07-03, Checkpoint 1) · **Grundlage:** Register E5

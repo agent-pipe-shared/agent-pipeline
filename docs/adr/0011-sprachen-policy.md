@@ -1,5 +1,9 @@
 # ADR-0011: Sprachen-Policy — Deutsch für Menschen, Englisch für Agenten
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR sets the project's language split: German for human-facing documentation (operating model, ADRs, policies, reviews, handover files — anything the product owner reads and approves), and English for agent-facing artifacts (templates, skills, prompts, agent/skill frontmatter, CLAUDE.md templates, and originally commit messages). A later revision (E17, 2026-07-04) reclassified commit messages as PO-facing rather than agent-facing, since the product owner is the primary reader of `git log` in these projects — this is the one correction layered on top of the original decision, not a rewrite of it. The underlying "primary reader" tiebreaker rule for edge cases is unchanged and governs both the original decision and the E17 correction.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 
 **Status:** akzeptiert (2026-07-03, Checkpoint 1) · **revidiert in der Commit-Klassifikation (E17, der PO, 2026-07-04 — s. Abschnitt „Revision E17")** · **Grundlage:** Kickoff-Arbeitsregel 8 + Auflage A6

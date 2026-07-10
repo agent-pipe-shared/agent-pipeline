@@ -1,5 +1,9 @@
 # ADR-0013: git-guard als zentrale Union + Projekt-Deny-Config
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR decides that the `git-guard` PreToolUse hook — previously maintained as three diverged per-project copies, none a superset of the others — is consolidated into a single central union living in the shared plugin, merging all deny rules (force-push, `reset --hard`, `clean -f`, main-branch deletion, secret staging, etc.) from the three source projects (`<PROJECT_A>`/`<PROJECT_B>`/`<PROJECT_C>`). Project-specific denies are then layered on top as per-project deny-config rather than as forked guard code. The design keeps broad allows plus a targeted deny-guard, exit-code 2 with a plain-text reason, fail-open behavior, and a documented manual escape hatch; status is accepted (2026-07-03).
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 
 **Status:** akzeptiert (2026-07-03, Checkpoint 1) · **Grundlage:** Register E11

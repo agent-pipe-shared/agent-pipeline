@@ -1,5 +1,9 @@
 # ADR-Index — Agent-Pipeline
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This directory holds the project's Architecture Decision Records, which formalize the canonical decision register (E1–E25) plus the DoD-mandated decisions from the Checkpoint-1 conditions — the register wins on conflict. Each ADR is a German-language decision record (context, decision, consequences, discarded alternatives, follow-up) carrying a short English summary at its top; entries are numbered sequentially (`NNNN-<slug>.md`) and listed in the table below, and an ADR is never rewritten but superseded by a new one.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 1 (PAINKILLER) · Stand 2026-07-06
 
 Architecture Decision Records der Agent-Pipeline. Die ADRs formalisieren das kanonische Entscheidungsregister **E1–E25** sowie die DoD-Pflicht-Entscheidungen aus den Checkpoint-1-Auflagen. **Bei Widerspruch gewinnt das Register.** Die Kandidaten ADR-1…9 entsprechen 0001…0009; die von Auflage A6 geforderten „ADR-10/ADR-11" sind 0010/0011. **E16/E17 haben KEINE eigenen ADRs** — sie sind Revisionsabschnitte in [0006](0006-modell-effort-policy.md) bzw. [0011](0011-sprachen-policy.md) (never-rewrite-Konvention: Revision statt neuem ADR, weil sie bestehende E6-/A6-Entscheidungen chirurgisch ändern, keine neuen Sachverhalte eröffnen).

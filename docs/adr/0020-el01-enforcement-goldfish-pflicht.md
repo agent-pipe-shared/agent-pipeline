@@ -1,5 +1,9 @@
 # ADR-0020: EL-01-Enforcement — jede Implementierung läuft als gebriefter Goldfish-Dispatch
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR mandates that every implementation task run as a briefed "Goldfish" sub-agent dispatch — never done directly by the lead ("Elephant") agent — with no exception for small or tightly-coupled work (such work is bundled into one combined briefed dispatch instead). It was adopted after an incident where self-implementation by the lead agent caused significant extra cost. Enforcement is three-layered (a mandatory bootstrap check, a close-time authorship check, a critic-review checkpoint) plus a migration sweep to update onboarding docs against pre-migration language; exceptions may only be granted by the product owner.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 1 · Stand 2026-07-06
 
 **Status:** akzeptiert (2026-07-05, the PO-Ruling nach <PROJECT_B>-S39-Inzident) · **Grundlage:** Register E20

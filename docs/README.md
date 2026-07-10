@@ -1,5 +1,7 @@
 # The docs, and the order to read them
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
 This folder is the pipeline's documentation set. For the one-minute picture start
 with the top-level [README](../README.md); to stand up your own copy read
 [`SETUP.md`](../SETUP.md). Then come here and read in this order.

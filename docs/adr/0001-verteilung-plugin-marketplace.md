@@ -1,5 +1,9 @@
 # ADR-0001: Verteilung des Operating Model als Plugin/Marketplace
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR decides to distribute the Operating Model as a Claude Code plugin/marketplace, hosted from this repo, rather than copying it into each project or using git submodules, symlinks, or an npm package. Each project repo commits the binding (`extraKnownMarketplaces` + `enabledPlugins`) in its own `.claude/settings.json`, so a fresh clone on any machine is self-describing and correctly bound without manual setup. The plugin path was chosen because it is the only option that gives versioning, pinning, AND hook distribution across projects, while remaining path-independent via the local plugin cache — the alternatives (submodules, symlinks, copy-sync, npm) each failed on reliability, platform support, or lack of an update channel. Status: accepted (2026-07-03).
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 
 **Status:** akzeptiert (2026-07-03, Checkpoint 1) · **Grundlage:** Register E1

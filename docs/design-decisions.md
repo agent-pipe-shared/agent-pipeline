@@ -1,5 +1,7 @@
 # Design decisions — the "why" behind the method
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
 This method rests on a few long-lived foundational decisions. This document sums
 them up in plain language: it explains the *why*. The binding *how* lives in the
 rulesets (`policies/`, `guardrails/`, `roles/`).

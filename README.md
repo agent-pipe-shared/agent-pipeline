@@ -7,6 +7,8 @@ for your own projects.
 *Where this stands: v0.1.0 — roughly a week of build time, a solo project, one
 dogfooding round so far. Feedback welcome.*
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
 ## The problem
 
 Teams building with coding agents tend to reinvent the same conventions per repo —

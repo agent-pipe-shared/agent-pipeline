@@ -1,5 +1,9 @@
 # ADR-0017: Push-Policy — Standing-Approval für `main`-Push an Arbeitspaket-Grenzen
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR records a standing (pre-approved) authorization for the agent to push `main` to origin at work-package boundaries in this repository, replacing the earlier per-push approval requirement, so automated-mode work is not slowed by manual sign-off on every push. The change was made explicitly by the product owner on 2026-07-04 for this repo only; destructive git operations (force-push, history rewrite, branch/tag deletion, hook skipping) remain deterministically blocked by the guard-union regardless of this approval, and other project repos keep their own separate calibration.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 4 · Stand 2026-07-06
 
 **Status:** akzeptiert (2026-07-04, the PO-Revision) · **Grundlage:** Register E15

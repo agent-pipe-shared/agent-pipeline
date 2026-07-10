@@ -1,5 +1,9 @@
 # ADR-0007: Dynamic Workflows / Ultracode als Task-Opt-in mit harten Schreib-Vorbedingungen
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR makes "ultracode" (Dynamic Workflows / multi-agent orchestration, up to 16 parallel agents) a per-task opt-in — not a session-wide setting — restricted to an indication list (initial research, process/architecture exploration, audits, migrations). Because workflow subagents always run under `acceptEdits`, where permission modes like `plan`/`ask` don't apply, any *write*-capable workflow is hard-gated on three preconditions: the git-guard hook union (ADR-0013), a tight Bash allowlist, and a worktree — since hooks are the only enforcement layer `acceptEdits` cannot bypass. Status: accepted 2026-07-03, recorded as Register E7 with Auflage (condition) A2, after review flagged that an earlier, more permissive revision had dropped this safety precondition.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 
 **Status:** akzeptiert (2026-07-03, Checkpoint 1) · **Grundlage:** Register E7 + Auflage A2

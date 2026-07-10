@@ -1,5 +1,9 @@
 # ADR-0015: Selbstanwendung der Pipeline auf das Pipeline-Repo
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR decides that the Pipeline's own operating model applies to the Pipeline repository itself — there is no separate, lighter ruleset for building the Pipeline versus the projects it governs. Checkpoint deliverables in this repo must pass independent Critic review (fresh context, structured findings) before the PO gate, exactly as required of hosted projects. Rationale: self-application ("dogfooding") is the only risk-free proving ground for the Pipeline's mechanisms before rollout — Checkpoint 1 already found 5 major issues via three independent Critic reviews, fixed before the PO gate. Status: accepted (2026-07-03).
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 
 **Status:** akzeptiert (2026-07-03, Checkpoint 1) · **Grundlage:** Register E13, PO-Entscheid the PO

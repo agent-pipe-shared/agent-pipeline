@@ -1,5 +1,7 @@
 # Runtime boundary — Claude Code vs. portable methodology
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
 The Agent-Pipeline is two layers stacked on top of each other:
 
 - a **methodology** — roles, an SDLC, a review contract, and a handful of

@@ -1,5 +1,9 @@
 # ADR-0003: Rollen-Implementierung — Goldfish als Subagent, Critic read-only mit `--bare`-Stufe
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR maps the pipeline's roles onto native Claude Code primitives: the implementor role ("Goldfish") runs as a custom subagent with a narrow tool set and no persistent memory, while the reviewer role ("Critic") runs read-only by default (Read/Grep/Glob plus limited `git diff`/`git log` access) with an optional harder isolation tier — a separate `claude -p --bare` run with `--json-schema` output that skips all auto-discovery, including CLAUDE.md. Rationale: subagents alone cannot fully suppress CLAUDE.md/git-status autoloading, so the standard Critic tier accepts a documented contamination trade-off for everyday convenience, while the `--bare` tier is reserved for architecture/guardrail/security diffs where full input isolation matters. Status: accepted (2026-07-03); as of a later revision the `--bare` tier is temporarily suspended pending a wrapper fix, with a follow-up A/B test planned to decide whether it stays mandatory, becomes optional, or is dropped.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 
 **Status:** akzeptiert (2026-07-03, Checkpoint 1) · **Grundlage:** Register E3

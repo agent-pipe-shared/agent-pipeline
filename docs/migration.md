@@ -1,5 +1,7 @@
 # Bringing an existing project under the pipeline
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
 [`SETUP.md`](../SETUP.md) covers standing up your own copy of the pipeline repo.
 This guide covers the other half: taking one of your **existing** code repos and
 onboarding it, so its sessions run under the same roles, gates, and guardrails.

@@ -1,5 +1,9 @@
 # ADR-0012: Staffelstab — Kanonisierung der Handover-Quelle
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR canonicalizes handover state into a single versioned file per project, replacing a three-way manual duplication (HISTORY log, CLAUDE.md status section, memory) that had provably drifted out of sync across projects. Memory becomes a mirror only — never a source of truth — and any session must be fully workable from a fresh clone without it. Two deterministic gates enforce this at close time: a merge-completion check (handover/doc sync must happen before work counts as done) and a CLAUDE.md length check. Status: accepted (2026-07-03); for this repo, `docs/state.md` is the canonical handover file per ADR-0015.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 
 **Status:** akzeptiert (2026-07-03, Checkpoint 1) · **Grundlage:** Register E10 + Auflage A9

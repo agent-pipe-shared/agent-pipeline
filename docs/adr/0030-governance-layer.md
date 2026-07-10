@@ -1,5 +1,9 @@
 # ADR-0030: Governance-Layer — advisory Guidelines vs. enforcing Policies, Hierarchie Repo > User > Managed
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR establishes a governance layer for projects that adopt this pipeline, splitting it into two strictly separated categories: advisory "guidelines" (numbered principles like layering or naming, from which deviations are allowed if justified in the plan artifact) and enforcing "policies" (machine-checkable via security-scan rules and license allowlists, plus a human-reviewed checklist, both of which block the relevant gate on violation). It also fixes a precedence hierarchy mirroring Claude Code's own settings model — repo governance overrides user-level preferences, and both sit below an org's managed settings, which this repo itself does not ship. Only generic, fictional example fixtures live in `governance/examples/**` here; real organizational policies are explicitly out of scope for this repo and deferred to a later adoption phase (AP2).
+
 > Agent-Pipeline v0.1.0-draft · AP1-Tuning-Session · Stand 2026-07-07
 
 **Status:** akzeptiert (2026-07-07, the PO-Plan-Freigabe „AP1 TUNING") · **Grundlage:** `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` Paket P6, `governance/examples/README.md`

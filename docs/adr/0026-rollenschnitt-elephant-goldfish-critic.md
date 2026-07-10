@@ -1,5 +1,9 @@
 # ADR-0026: Rollenschnitt Elephant/Goldfish/Critic — Formalisierung + plan-verifier
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR formalizes the three-role split (Elephant orchestrates and never writes production code; Goldfish executes exactly one briefed task in a fresh context; Critic is an independent, read-only reviewer) that had previously existed only as prose in the operating model, giving it its own decision record. It also introduces a new `plan-verifier` subagent — read-only, fresh context — that checks a diff against the approved plan item-by-item (verdicts `VERIFIED | GAP | UNPLANNED`), as a narrower, cheaper pre-check before the more expensive Critic review, without replacing the Critic contract or adding a fourth pipeline role. Status: accepted 2026-07-07.
+
 > Agent-Pipeline v0.1.0-draft · AP1-Tuning-Session · Stand 2026-07-07
 
 **Status:** akzeptiert (2026-07-07, the PO-Plan-Freigabe „AP1 TUNING") · **Grundlage:** `docs/operating-model.md` §2 (bislang nur Prosa), `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` Paket P6/P7

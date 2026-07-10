@@ -1,5 +1,9 @@
 # ADR-0027: Gate-Philosophie — genau 2 blockierende Human-Gates, hook-durchgesetzt, Manifest-Modi als Kalibrierung
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR fixes the pipeline at exactly two blocking human gates — a Dev-Plan Gate (blocks edits until a plan is explicitly approved) and a Push Gate (blocks pushes unless verification evidence is fresh and the push approval condition is met) — both enforced deterministically by hooks instead of by prose instruction. It also resolves an apparent conflict with the "gates must be binary" quality rule (QG-06): the manifest's per-project `blocking|warn|off` gate modes are calibration of these two gates, not a loosening of the binary principle, and any `warn` mode requires a documented justification in the manifest. Status: accepted 2026-07-07.
+
 > Agent-Pipeline v0.1.0-draft · AP1-Tuning-Session · Stand 2026-07-07
 
 **Status:** akzeptiert (2026-07-07, the PO-Plan-Freigabe „AP1 TUNING") · **Grundlage:** `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` Leitentscheidung 5, [ADR-0017](0017-push-policy-standing-approval.md), [ADR-0021](0021-prd-po-gate.md), `guardrails/quality-gates.md` QG-06

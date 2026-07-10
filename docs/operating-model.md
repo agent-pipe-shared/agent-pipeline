@@ -1,5 +1,559 @@
 # Operating Model v1.0 — Agent-Pipeline
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+> Agent-Pipeline v0.1.0-draft
+
+> **Canon:** Where this document and the project's own decision register ([state.md](state.md)) or the ADRs ([adr/](adr/)) disagree, the register/ADR wins. Conceptual roots of this model: Rensin's "Elephants & Goldfish" role model (EGM) and Google's "New SDLC" (vibe-coding playbook) — both feed into the relevant places below (§1–2), with rationale.
+
+## 1. Purpose & Scope
+
+**Purpose.** This document is the central, versioned Operating Model for agentic development across all of the PO's projects (<PROJECT_A>, <PROJECT_B>, <PROJECT_C>, and future ones). It defines roles, SDLC, review system, session lifecycle, handover, feedback loop, and the project calibration layer. It is **consolidation, not a rebuild**: all three projects already live the same model, three-times copied and diverged; the pipeline centralizes, hardens, and extends it.
+
+**Scope.**
+
+- Applies to every Claude Code work in the bound project repos **and to this repo itself** (self-application).
+- Distributed as a plugin/marketplace with a committed binding per project; versioning is SHA-based initially, SemVer from the stability phase on. Details: ADRs in [adr/](adr/).
+- Language rule: human-facing docs German, agent-facing artifacts (templates, skills, prompts, frontmatter) English (ADR-11).
+- Deliberate project differences run exclusively through the calibration layer (§8) — never through copies of central artifacts (a known drift anti-pattern).
+
+**Guiding principles** (from the approved target-picture sketch, refined):
+
+| # | Principle | Meaning | Source |
+|---|---|---|---|
+| P1 | **Agent = Model + Harness** | When an agent fails, debug the harness first (missing tool? vague rule? context noise?) — don't switch the model or flip the prompt around. | Google (New SDLC) |
+| P2 | **The Elephant is the document, not the session** | The session is a volatile cache; the persisted artifact (spec, handover file) carries the knowledge. "Feed the Elephant; test it against the Goldfish." | Rensin (EGM) |
+| P3 | **What's deterministic belongs in hooks/permissions, not in prose** | CLAUDE.md is officially "advisory"; only hooks/permission rules guarantee. Guardrails are enforced technically; prose only carries facts and conventions. | own research |
+| P4 | **Evidence over claim** | The documented main failure mode is "reported done but not tested." A submission counts only with machine-generated evidence. | own research |
+| P5 | **Context economy is architecture** | CLAUDE.md stays under a hard limit, procedures live in skills (loaded on demand), handovers run through artifacts rather than history, verbose work goes to subagents. | own research |
+| P6 | **Stakes determine the discipline** | Calibrate position on the vibe↔engineering spectrum per project and per task (<PROJECT_B> high, <PROJECT_A> medium, <PROJECT_C> prototyping looser). | Google (New SDLC) |
+| P7 | **Judgment stays with the PO** | Models only simulate judgment. Architecture trade-offs, ambiguity resolution, and final gates are not delegable; the PO is accountable for everything. | Rensin (EGM) |
+
+## 2. Roles
+
+The four roles map onto native Claude Code primitives: Elephant = long-lived main session, Goldfish = custom subagent or fresh session, Critic = read-only subagent with `--bare` hardening level, the PO = human.
+
+**Derived from Rensin (EGM):** The role model is a variant of Rensin's original, adapted to a different role cut — no claim of improvement, just a different split: **Rensin's Goldfish is a checker** (fresh context tests the doc), **our Goldfish is an executor** (fresh context implements from the doc; Rensin's Step 8, "follow the plan exactly"). Rensin's checking Goldfish lives on in the spec readiness check (§3.4); **our Critic formalizes Rensin's Steps 5–7+9** as a standalone role.
+
+**Working mode outside the pipeline — Conductor:** Alongside the pipeline roles, **Conductor mode** stays legitimate: the PO works directly and interactively with Claude — for tricky debugging, exploration on unfamiliar terrain, and learning (keeping one's own skills warm). Not every task is forced through the pipeline; the process equivalent inside the pipeline is the rigor-level-0 fast path (§3.3). Once a task can be specified in dispatchable form, the role model applies.
+
+### 2.1 The PO — Product Owner & Quality Arbiter
+
+**Mandate:** Intent, prioritization, architecture judgment, final gates, human verification (PIE acceptance <PROJECT_C>, live devices <PROJECT_B>, spot checks <PROJECT_A>).
+
+| Rule | Why | Verification method |
+|---|---|---|
+| **Must:** Consent is mandatory for anything externally visible, irreversible, or costly; consent **never carries across contexts** (every session/task obtains it anew). | The PO is accountable for every agent action; blanket approvals erode the gate. | Human-gate step in the SDLC (§3); escalation ladder rung 4 (§4.3). |
+| **Must:** Keep the ability to read code and to spot-check reviews; never rubber-stamp Critic verdicts. | "Design is the new code" holds for intent — but <PROJECT_B> runs in a real house, and <PROJECT_C> bugs can only be diagnosed in code. Otherwise one's own skills atrophy. | Retro question, "did I actually read code this week?"; maturity metrics §7. |
+| **Must not:** The PO does not do clickwork an agent can do; delegating to the human requires a stated reason. | Human time is the pipeline's scarcest resource. | The handover/report rubric "remaining manual work" is an exhaustive list. |
+
+### 2.2 Elephant — Orchestrator (long-lived session)
+
+**Mandate:** Interview → spec, triage (rigor level + risk class), decomposition into Goldfish tasks, dispatch, gate decision over Critic findings, docs/handover sync, lessons aggregation.
+
+**Capability profile** — the four core orchestrator capabilities (after Google's "Orchestrator" role picture, New SDLC):
+
+1. **Specification** — define tasks unambiguously, self-contained, and checkable (EARS from level 1 up).
+2. **Decomposition** — break work into agent-sized, independent chunks (wave pattern).
+3. **Evaluation** — judge Goldfish output fast and evidence-based (gate decision, not re-implementing).
+4. **System Design** — design constraints, checks, and feedback loops before code exists.
+
+| Rule | Why | Verification method |
+|---|---|---|
+| **Must not:** The Elephant writes no production code. | Role split: execution needs a fresh context; the Elephant stays lean and unbiased for the gate decision (confirmation bias). | Production diffs come from Goldfish sessions (commit/session trailer documents authorship). |
+| **Must:** No-code phase until the spec is done; the AI proposes the first design, not the PO. | Only this way shows whether the system was actually understood; blind spots otherwise stay undetected. | The spec exists and has passed the readiness check BEFORE an implementation Goldfish starts (§3.4). |
+| **Must:** Every briefing = outcome + guardrails + stop conditions — never a step-by-step dictation in chat. | "We are all managers now": micromanagement destroys parallelism and look-away time. | Briefing format check: all 6 mandatory fields (§2.3) present. |
+| **Must:** Context hygiene — ALWAYS delegate read-/research-/write-intensive work to Goldfish; the Elephant holds only decisions, plan, state. | The Elephant's context is the pipeline's most expensive resource; filling it up forces lossy compaction. (§5) | `/context` check at task boundaries; session-cut protocol §5b. |
+| **Must:** Actively deploy anti-sycophancy: have assumptions challenged, "Why do you think that?", force critic mode on an agreement spiral. | A solo setup has no colleague to challenge assumptions; sycophancy is the structural blind spot. | Interview/design prompts contain the snippets; the Critic system prompt does too (§2.4). |
+| **Must:** File-pointing rule: never argue hallucinations away in chat — instead point at the correcting file (spec, code, docs) and hand it in as context. | Discussion only entrenches the hallucination deeper; the file is the authority, not the counter-argument. | Correction turns reference a concrete file instead of argument chains; snippets live in the prompt library. |
+| **Must not:** No silently made policy decisions. | Decisions without a register/ADR entry cannot be reconstructed. | New policy decision ⇒ register entry + ADR; drift check in the close ritual. |
+| **Must not:** Never two Elephants at once in the same repo; a project Elephant writes ONLY in its own project repo, monitoring/collection sessions stay strictly read-only toward project repos. Cross-repo needs go as a NEW transfer item into the target repo's `backlog/items/` (append-only, never edits to foreign existing files) or to the PO — never as a direct edit. | Two writers in one repo = "a china shop"; in-place foreign edits bypass the target repo's gates and calibration. A deliberate process rule rather than a path guard. | Session diffs stay in their own repo; foreign-repo write access is limited to new backlog items; Critic trajectory review flags violations (roles/elephant.md EL-18). |
+
+**Model/effort:** The design tier model runs at effort `xhigh` in the design phase; for the execution phase, depending on the profile, either continuation on the design tier model (profile `advisor`, advisor second opinion from session start) or a one-time switch to a cheaper execution configuration at the PRD gate (profile `design-first`, MP-01) applies — running continuously on the most expensive available model with no de-escalation at all is permitted only as a named PO exception. Ultracode is not session-persistent but a low-threshold, task-level opt-in with an indication list. Authoritative in detail: [../policies/model-policy.md](../policies/model-policy.md).
+
+### 2.3 Goldfish — Executor (fresh context)
+
+**Mandate:** EXACTLY ONE clearly-bounded task (implementation, research, bulk edit, review preparation), "follow the plan exactly," delivery only with evidence. No `memory` — learning runs through the versioned Operating Model, not through agent memory.
+
+| Rule | Why | Verification method |
+|---|---|---|
+| **Must:** Only the briefing and the files listed in it are input; unclarity ⇒ trigger a stop condition instead of guessing. | The dispatch prompt is the only handover channel; guessing produces conceptual errors that "look right." | The completion report explicitly names deviations/stops; the Critic checks spec fidelity. |
+| **Must not:** An implementation Goldfish never changes the tests/checks of its own implementation. | Self-validation is the core failure mode; tests are the contract, not negotiable ground. | PreToolUse protection on test paths (OPEN — planned; see backlog); until then the prohibitions field in the briefing + the Critic checks test diffs for weakening. |
+| **Must:** Writing tasks run in a worktree per project calibration (§8). | Isolation protects the main state; a blanket requirement failed against <PROJECT_C>/<PROJECT_A> reality. | Calibration file field `worktree`; stale-worktree check in the close ritual. |
+| **Must:** After 2 failed attempts at the same problem: STOP and escalate (§4.3) — do not keep iterating. | From there the hit rate drops; a fresh context with a better briefing beats muddling on. | The two-failed-attempts rule appears in the briefing as a stop condition; `maxTurns` in the frontmatter as a hard leash. |
+
+**Model/effort:** At minimum the mechanic tier model (**no model class below this in the pipeline**); effort is 3-staged per subagent (MP-27): `goldfish-mechanic` `low` (purely mechanical), `goldfish-implementor` `medium` (standard for clearly-briefed implementation), `goldfish-deep` `xhigh` (test/verify authorship, guardrail/hook/canon code, design latitude, risk class high); very large scope optionally the design tier model. → [../policies/model-policy.md](../policies/model-policy.md).
+
+**Handover format 1 — Goldfish briefing (6 mandatory fields; this is the canonical briefing field list that session-bootstrap and model-policy reference):**
+
+1. **Goal** — outcome, not a step list; an observable end-state criterion.
+2. **Context files** — explicit list (spec/delta-spec first); never inherit chat history.
+3. **DoD checks** — EARS acceptance criteria (from level 1 up) + `verify` command; checks are fixed BEFORE the run (contract).
+4. **Prohibitions** — scope boundaries, no-go paths, "don't change tests," relevant project denies.
+5. **Stop conditions** — "stop and report if …": >2 failed attempts, contradiction in the spec, scope burst, missing access, unclarity.
+6. **Dispatch metadata** — **always:** ruleset SHA/version from the bootstrap (the Goldfish carries it into its confirmation, → [../harness/session-bootstrap.md](../harness/session-bootstrap.md) §6.2), **model + effort for this dispatch (explicit — every dispatch names model and effort)** **and a tool budget (≤45 tool calls, stated explicitly as a number — a briefing/behavior rule, not a technical barrier, → [../guardrails/token-budget.md](../guardrails/token-budget.md) TB-08/TB-09)**; **conditional:** model RATIONALE on deviation from the role default (MP-05), or "criticality → model" for Critic briefings (MP-07) — → [../policies/model-policy.md](../policies/model-policy.md).
+
+**Handover format 2 — Goldfish completion report (condensed, target ≤ 1,000 tokens / hard max 40 lines, evidence as a pointer, not full text):**
+
+1. Result per DoD check (passed / failed / not verifiable — three-valued).
+2. **Evidence artifact (mandatory):** machine-generated `verify` output (file/log written by the script, never formulated by the model) + the command run + exit code.
+3. Changed files with a one-line rationale.
+4. **"Deliberately NOT changed"** — adjacent oddities intentionally left untouched (rubric for writing roles).
+5. Deviations from the spec — reported, never silently built in (anti-drift).
+6. Open items / triggered stop conditions / remaining manual work for the PO.
+
+### 2.4 Critic — independent reviewer (read-only)
+
+**Mandate:** Checks spec fidelity, scope, edge cases AND trajectory. **Never** sees chat history or the implementer's own reasoning — input is exclusively spec + diff + guardrails + evidence artifact. Standard: a read-only subagent; for critical diffs, the harder isolation level `claude -p --bare` with a JSON-schema verdict.
+
+| Rule | Why | Verification method |
+|---|---|---|
+| **Must not:** No `memory`, no write tools. | `memory` automatically activates Write/Edit and breaks every read-only guarantee. | Agent frontmatter: a tight `tools` set; no `memory` field. |
+| **Must:** Trajectory review — did the claimed checks actually run, per the evidence? | Smooth output with skipped verification is more dangerous than a visible error (output AND trajectory evaluation). | Mandatory section in the findings report; cross-check evidence artifact vs. claim. |
+| **Must:** Search harshly, report honestly ("mean review"): maximum scrutiny in the mandate, but only evidenced findings in the result. | Rensin's Mean Review finds real errors (~30% of findings are valuable); without an anti-overreporting clause, though, a "find gaps" prompt produces phantom findings. | Anti-overreporting clause in the system prompt; findings carry evidence (see below). |
+| **Must not:** Flag nothing that CI/`verify` already enforces; no style critique without a spec/guardrail anchor; no score theater. | The Critic checks only what machines cannot — otherwise noise and duplicated work. | Skip rule in the system prompt; the Elephant rejects out-of-mandate findings. |
+
+**Model/effort:** The review tier model / effort `max` as standard; **escalation to the design tier model is MANDATORY** for architecture, guardrail, and security reviews (MP-07). → [../policies/model-policy.md](../policies/model-policy.md).
+
+**Handover format 3 — Critic findings report:**
+
+- **Per finding:** `Gap` (what's missing/deviates vs. the spec) · `Risk` (consequence + severity blocker/major/minor) · `Evidence` (file:line or a concrete diff/artifact reference — claims without a citation are not allowed) · `Spec reference` (EARS criterion or guardrail rule).
+- **Mandatory rubric "deliberately not flagged":** aspects explicitly checked and found fine (makes review depth visible and distinguishes "checked, OK" from "not looked at").
+- **Mandatory trajectory-review section:** verdict on whether checks/evidence are consistent.
+- **Anti-overreporting clause:** "no findings" is a valid and welcome result; every finding must clear the evidence bar.
+- No overall score; binary pass/fail only where the Elephant requests an overall verdict.
+
+## 3. SDLC v1.0
+
+### 3.1 Flow
+
+Adopted from the approved target-picture sketch (incl. spec readiness check and rigor-level-0 fast path):
+
+```mermaid
+flowchart TD
+    A[Idea / need] --> T{"Triage (Elephant):
+    rigor level 0/1/2 + risk class"}
+    T -->|"Level 0: fast path —
+    short brief instead of ceremony
+    (verify + evidence stay mandatory)"| W
+    T -->|Level 1/2| I["Interview → spec with EARS criteria
+    → plan → tasks.md (no-code phase)"]
+    I --> R{"Spec readiness check (Goldfish test):
+    fresh context checks the doc —
+    understandable? implementable? gaps?
+    Mandatory: level 2 + architecture/guardrails
+    Recommended: level 1"}
+    R -->|"Gaps → extend doc"| I
+    R -->|passed| PO{"PO gate: PRD sign-off?
+    (rigor ≥1 / class high;
+    genuine level-0 fast path drops out)"}
+    PO -->|"Change → adjust doc/plan"| I
+    PO -->|approved| G["Goldfish dispatch — briefing:
+    goal · context files · DoD checks ·
+    prohibitions · stop conditions ·
+    dispatch metadata"]
+    G --> W["Goldfish implements
+    (fresh context; worktree per
+    project calibration)"]
+    W --> V{"verify script (deterministic):
+    format → lint → typecheck → tests → build"}
+    V -->|"red (≤ 2 attempts)"| W
+    V -->|"red (> 2 attempts)"| E2["Escalation to Elephant:
+    /clear + better briefing"]
+    E2 --> G
+    V -->|green + evidence artifact| CT{"Critic trigger?
+    (by risk class, §4.2)"}
+    CT -->|"yes"| C["Critic (fresh context):
+    spec + diff + guardrails"]
+    CT -->|"no (level 0, no risk flag)"| M
+    C --> E3{"Elephant:
+    gate decision on findings"}
+    E3 -->|Rework| G
+    E3 -->|passed| M["Merge + docs sync
+    (rollback anchor + procedure mandatory
+    with an open human gate; external effect/
+    live deploy stays consent-gated)"]
+    M --> H{"Human gate needed?
+    (PIE / live devices / high stakes /
+    architecture or guardrail change) —
+    human gate = acceptance of the done report,
+    does NOT block the merge (🟡 merge v2)"}
+    H -->|"yes, pending"| Y["Status 🟡 in the handover
+    until the PO verifies (counts against WIP limit)"]
+    H -->|"yes, granted / no"| D["Status: delivered +
+    lessons (level 0: bundled)"]
+    Y -.->|the PO verifies| D
+    D --> F["Feedback loop:
+    lessons → constraints/ADRs ·
+    workflow improvements → pipeline backlog"]
+    F -.-> A
+```
+
+### 3.2 Steps in detail
+
+| # | Step | Input | Output | Responsible | Gate criterion |
+|---|---|---|---|---|---|
+| 1 | Triage | Idea / need / backlog item | Rigor level (0/1/2) + risk class (§4.2) + task cut | Elephant | Level and class are noted explicitly in the task/spec header; when in doubt, the higher class. |
+| 2 | Interview → spec | Triage result | Spec with EARS criteria + plan + `tasks.md`; **from level 1 up with a mandatory Alternatives section** (considered-but-rejected; level 1: short form allowed — 1–3 bullets "considered and rejected"; rationale: solo memory) | PO + Elephant | EARS criteria present (from level 1 up); no-code rule observed. |
+| 3 | Spec readiness check | Spec doc + referenced files | "Passed" or a gap list | Readiness Goldfish (fresh, read-only) | Pass criterion §3.4; mandatory for level 2, architecture/guardrail/core-contract packages, OR risk class high; otherwise optional at Elephant judgment (recommended for multi-part waves). |
+| 3b | PO gate: PRD sign-off | Reviewed spec/plan + `prd_<topic>.md` (German) | The PO's "approved" or a change order | PO | **Mandatory at rigor ≥1 OR class high; a genuine level-0 fast path drops out.** The PRD carries product rationale (what/why/scope/non-goals/risks/alternatives); the Elephant presents it PROACTIVELY in readable form (not just a file path) and explicitly waits for the word "approved" (EL-19); sign-off mechanics EL-17a. Detail in the note below the table / EL-19. |
+| 3c | Model-switch point (profile `design-first` only) | The PO's "approved" (step 3b) | The Elephant presents the switch command (model + effort of the configured execution configuration, e.g. `/model <model>` + `/effort <level>`) as ONE copy-paste block; waits; verifies the new model identity from observed evidence | Elephant (EL-24) | Verification BEFORE the first implementation dispatch; omitting it = a process incident. Profile `advisor` skips this step (design tier model + advisor is already running since session start). |
+| 4 | Goldfish dispatch | Reviewed spec / `tasks.md` | Briefing (6 mandatory fields, §2.3) | Elephant | Briefing format check complete; task self-contained. |
+| 5 | Implementation | Briefing | Diff + completion report + evidence artifact | Goldfish | `verify` green; stop conditions respected. |
+| 6 | verify (stage-1 review) | Working state | Machine-generated evidence artifact | Harness (deterministic) | The entire gate chain green (§4.1); the artifact written by the script. |
+| 6b | Security scan phase (manifest-driven) | Working state after `verify` | Machine-generated security evidence artifact (`evidence/security-latest.json`) | Harness (deterministic, adapters gitleaks/osv-scanner/semgrep/license-check) | Four-valued status per scanner `PASS \| FINDINGS \| SKIPPED \| ERROR` — SKIPPED ≠ PASS (QG-05 honesty), ERROR is fail-closed; thresholds from manifest `security.thresholds.block_on` (default `[critical, high]`); active only if the manifest declares the phase (no manifest → no-op). Detail below the table. |
+| 6c | UI design phase (conditional) | Working state after implementation; for a UI redesign of a major feature, additionally the confirmed sketch-gate wireframe (see below) BEFORE implementation starts | UI review result (a calibration matter) | Elephant/Goldfish per project calibration | Runs ONLY if the manifest declares `flags.has_ui: true` (condition grammar `always\|never\|<flag>\|!<flag>`, [ADR-0028](adr/0028-manifest-ansatz.md)); without a manifest or with `has_ui: false` the step drops entirely — no gate, no requirement. With `has_ui: true` active, the sketch-gate requirement (detail below) additionally applies to every UI redesign of a major feature. Detail below the table. |
+| 7 | Critic review (stage 2) | Spec + diff + guardrails + evidence | Findings report (§2.4) | Critic | Trigger matrix §4.2 followed; findings format complete. |
+| 8 | Gate decision | Findings report + completion report | "Passed" or a rework dispatch | Elephant | Every blocker/major finding is disposed of (fix / reject with reason / escalate to the PO). |
+| 9 | Human gate | Elephant recommendation + evidence | Acceptance of the done report / decision / rework | PO | Mandatory for: PIE acceptance, live devices, high stakes, architecture/guardrail change, irreversible/costly. **Since 🟡 merge v2, no longer blocks the merge (step 10) — only the done report.** |
+| 10 | Merge + docs sync | Elephant gate decision "passed" (step 8); **human-gate acceptance (step 9) is NOT a precondition** as long as, with an open human gate: (a) a rollback anchor exists (pre-merge tag/commit reference in the handover), (b) a rollback procedure is documented per project in the calibration (§8), (c) 🟡 stays in the handover until the PO verifies (still counts against the WIP limit), (d) external effect/live deploy stays consent-gated | Merge/completion + updated handover file + HISTORY entry + lessons (status possibly 🟡 instead of delivered until human-gate acceptance) | Elephant (execution possibly Goldfish) | Merge-completion gate: handover updated (deterministic check, §6); CLAUDE.md length gate green; with an open human gate, additionally a rollback anchor + procedure proven. |
+| 11 | Retro / feedback | Closed block | Lessons, `workflow-improvement` items, telemetry entry | Elephant | The session Elephant wrote the close retro itself (§7): concrete items or an explicit "nothing"; the three-artifact archive happens. |
+
+**Step 3b (PO gate: PRD sign-off) — detail:** After the readiness check passes and BEFORE the first implementation dispatch, the Elephant presents a German `prd_<topic>.md` — product rationale (what/why/scope/non-goals/risks/alternatives considered), NOT the acceptance criteria (those live agent-facing in English in the spec; the PRD and the spec reference each other, no duplication). Location: `specs/<task>/prd_<topic>.md` (a three-artifact package with spec + readiness + review). **Mandatory at rigor ≥1 OR class high; a genuine level-0 fast path (§3.3) drops out** — small hotfixes need no product review. Sign-off via EL-17a (numbered inline summary + file reference); the PO's "approved" is the gate, not a UI dialog. **Optional companion artifact WITHOUT a gate:** `sdp_<topic>.md` (Software Development Plan) per topic — documented but not a mandatory confirmation point (enterprise reservation, resurfaced when needed). After the PO's "approved," the sign-off is additionally booked deterministically via `node harness/scripts/pipeline-state.mjs approve-plan --by po` (the basis for the dev-plan gate hook).
+
+**PRD language rule (PO addendum, 2026-07-09):** Binding for every future PRD — the intended reader is the PO, not the agent — German, plain language, short sentences; the PRD is a decision document, not a work order. Every block answers three questions: which problem? What are we changing? What's in it for you? Rule IDs, file paths, and jargon do NOT belong in the main text — compact technical lines or an appendix carry them, as do the downstream Goldfish briefings anyway. For feedback-/review-driven PRDs, a coverage matrix belongs in it ("your input → where in the PRD") so the PO can verify completeness instead of trusting it. At the end come numbered decision points — what needs an explicit decision, separated from mere acknowledgment. Template: [../templates/prd.md](../templates/prd.md); Elephant requirement: `roles/elephant.md` EL-19.
+
+**Step 3c (model-switch point, profile `design-first`) — detail:** Directly after the PO's "approved" (step 3b), the Elephant, in profile `design-first`, presents the switch commands EXACTLY ONCE (model + effort of the configured execution configuration, e.g. `/model <model>` then `/effort <level>`) as ONE copy-paste block and waits. It then verifies the new model identity from OBSERVED evidence (`/model` output or explicit PO confirmation) — BEFORE the first implementation dispatch starts (EL-24, `roles/elephant.md`). Profile `advisor` doesn't have this step: there the session already runs on the design tier model with an active advisor since session start.
+
+**Step 6b (security scan phase) — detail:** Runs manifest-driven as its own step after `verify`: four adapters (gitleaks, osv-scanner, semgrep, license-check) each deliver a four-valued status `PASS | FINDINGS | SKIPPED | ERROR` — `SKIPPED` (tool not installed) NEVER counts as `PASS` (QG-05 honesty); `ERROR` is fail-closed. A finding only blocks if its severity is in `security.thresholds.block_on` (manifest default `[critical, high]`). Evidence: `evidence/security-latest.json` (schema `pipeline.security-evidence.v0`); the push-gate hook only checks its freshness (exitCode 0, `commit == HEAD`), never computes anything itself ([ADR-0029](adr/0029-file-handoffs-status.md)). Without a manifest or without a declared `security` gate: the step drops out (opt-in, [ADR-0028](adr/0028-manifest-ansatz.md)).
+
+**Step 6c (UI design phase, conditional) — detail:** An optional phase for projects with a UI portion, active ONLY if the manifest sets `flags.has_ui: true` (a tiny condition grammar `always|never|<flag>|!<flag>`, [ADR-0028](adr/0028-manifest-ansatz.md)). This repo itself is docs+guardrails-only (no live UI) and therefore declares the phase but keeps `has_ui: false` — the phase stays inactive until a project with a real UI arms it through its own manifest. The stop hook (`stop-suggest.mjs`) deliberately emits no gate clause for phases without their own gate entry (like `design`/`ui-design` today).
+
+**Sketch gate:** A UI REDESIGN of a MAJOR feature (not: a minor fix/copy/color tweak) needs a confirmed ASCII/wireframe sketch BEFORE implementation starts — the PO (or, as a stand-in, the Elephant, if the PO delegated the judgment in advance) confirms the sketch before the first UI Goldfish is dispatched; no implementation "on spec" in parallel with the sketch discussion. Applies exclusively in projects with `flags.has_ui: true` (see above); does not apply in this repo (`has_ui: false`).
+
+### 3.3 Process Overhead by Rigor Level
+
+Invariant at ALL levels: **`verify` + the evidence artifact are mandatory** — there is no way around the deterministic gates. Everything else scales with the level, so process overhead stays proportional to task size (core critique: process overhead ∝ 1/task size):
+
+| Element | Level 0 (issue-only) | Level 1 (delta-spec, spec-first) | Level 2 (spec-anchored) |
+|---|---|---|---|
+| Typical tasks | Bugfix, small config, docs | Medium features | Core contracts: <PROJECT_A> API, <PROJECT_B> schema/invariants, <PROJECT_C> core systems |
+| Spec | Short brief in the issue/prompt (still: goal, prohibitions, stop conditions) | Delta-spec (just the change) + EARS | Full spec + EARS; evolves with the code (the "maintenance tax" is deliberately paid) |
+| Spec readiness check | Not applicable | Recommended; **mandatory for architecture/guardrail/core-contract packages OR risk class high** | **Mandatory** |
+| PO gate: PRD sign-off (§3.2 step 3b) | Not applicable | **Mandatory** | **Mandatory** |
+| `verify` + evidence | **Mandatory** | **Mandatory** | **Mandatory** |
+| Critic | Only with a risk flag (then per §4.2) | Per risk class (§4.2) | Mandatory (standard: review tier model); escalation to the design tier model per the trigger wording below |
+| Worktree | Per write scope, per project calibration (§8) | Per project calibration | Per project calibration (default case: yes) |
+| Human gate | Only with a risk flag | Per criteria (§3.2 step 9) | Default case: yes |
+| Lessons/docs sync | Bundled (a collective entry for several level-0 tasks) | Per block | Per block |
+| Spec upkeep after merge | — | Spec may go stale (spec-first) | Report deviation + update spec BEFORE merge (anti-drift) |
+
+**Level-0 small-fix definition (canonical):** A task qualifies for the level-0 fast path only if ALL of the following criteria hold:
+
+- ≤ 2 files and ≤ ~25 lines of diff.
+- No change to: architecture, data model/schema, public APIs, tests, guardrails/hooks/CI, dependencies, security surface.
+- Trivially revertible via `git revert`.
+- `verify` green + evidence stays mandatory (invariant, see above).
+
+**Risk flag (= NO fast path)** for live/deploy effect (<PROJECT_B>), game mechanics (<PROJECT_C>), auth/payment paths (<PROJECT_A>) — even if all size criteria are met.
+
+**Examples ✅ (fast-path-eligible):** <PROJECT_A>: typo/label text, CSS spacing · <PROJECT_B>: icon/color of a Lovelace card (no automation/device logic) · <PROJECT_C>: tooltip/string fix.
+**Counter-examples ❌ (no fast path):** a new <PROJECT_B> automation · a dependency bump · any line touching hooks/guards.
+
+**Self-execution clause:** If a task fully meets the level-0 definition above, the interactive Elephant session may execute the fix itself — a tightly-bounded exception to EL-01 (`roles/elephant.md`, "the Elephant writes no production code"). `verify` + the evidence artifact stay mandatory; a Critic run is required only with a risk flag set. This OM definition is exclusively authoritative — no case-by-case interpretation when in doubt.
+
+The Elephant sets the risk flag in triage as soon as a level-0 task touches a risk zone (§4.2) — size does not protect against review: even a 3-line hook diff is a guardrail change.
+
+**Critic trigger wording (canonical, substantively identical in §4.2, ADR-0003, and ADR-0014):** "Every architecture/guardrail/security diff runs with the Critic on the design tier model AND additionally in `--bare` isolation. Rigor level 2 makes the Critic mandatory (standard: review tier model); the design tier model applies there only if, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
+
+**Light dispatch profile (a speed lever for level-0/mechanic dispatches; NOT for class high/guardrails):** For briefed level-0 or uniform mechanical tasks, the Elephant may set `Profile: light` in the briefing. The profile trims only the *ceremony surface*, never the substance:
+
+- **A compact 3-field report** instead of the 6 sections (`roles/goldfish.md` §6): (1) DoD result + evidence artifact, (2) changed files, (3) deviations/open items. Target ≤ 600 tokens.
+- **Reference inlining:** the briefing inlines the 3–5 rule sets that are actually needed verbatim, instead of pointing at large canon files — otherwise every Goldfish re-reads the same canon.
+- **No pre-edit baseline verify** — `verify` runs only against the final state.
+- **Effort `xhigh`** as the default (MP-06); `high` only for truly trivial/uniform tasks. **Revised (MP-27):** Exactly the mechanical/uniform level-0 dispatches meant here now run regularly through the dedicated subagent `goldfish-mechanic` (effort `low`) instead of a separately configured `xhigh` — details/rollback path: `../policies/model-policy.md` MP-27.
+
+**Invariant untouched:** `verify` + the machine evidence artifact (GF-08) and stop-condition honesty (GF-07) stay mandatory — the light profile shortens the report prose, never the check. At class high, architecture/guardrails/security, the standard profile always applies.
+
+**One-turn recon:** Read-only recon with questions known in advance runs as ONE Elephant turn — a bundled dispatch or a parallel fan-out in one message; N sequential individual dispatches for questions known in advance are a context-economy violation (`roles/elephant.md` EL-05).
+
+**Parallel-first:** Independent work runs in the SAME turn (parallel/bundled), sequential only with a named dependency (data, file overlap, gate) — one-turn recon lowers the report count, parallel-first lowers wall-clock time; together, fewer turns × a smaller context, never "more small dispatches, just to be parallel" (`roles/elephant.md` EL-22).
+
+### 3.4 Spec readiness check in detail
+
+Anchors Rensin's Goldfish protocol (Steps 5–7: Comprehension / Critic / Readiness) BEFORE implementation.
+
+**Procedure:**
+
+1. The Elephant dispatches a **fresh, read-only Goldfish**. Input: ONLY the spec doc + the files it references. Forbidden as input: chat history, Elephant reasoning, earlier readiness runs.
+2. Three check steps in this order:
+   - **Comprehension:** "Explain the system and the planned change using only the doc." — checks understandability.
+   - **Critic pass:** "Find gaps, wrong assumptions, contradictions, missing edge cases." — expected value: ~30% of the findings are valuable; that's enough ROI.
+   - **Readiness:** "Is the doc enough for an error-free first-pass implementation? What questions would you have to ask beforehand?" — every question is a gap in the doc.
+3. The result goes to the Elephant as a structured gap list. The Elephant evaluates the checking Goldfish's explanation and gap list against the spec doc; on unclarity, the PO decides.
+
+**Pass criterion (all three):** (a) the explanation is factually correct with no follow-up questions; (b) no open major finding from the critic pass; (c) readiness answer "yes" with no material questions.
+
+**Repeat rule:** Gaps → the Elephant extends the doc → a **new** fresh Goldfish (never the same context again — it already knows the doc). Iterate until only nitpicks come back (Rensin's stop criterion). From the 3rd round on, the cut itself counts as the problem: back to triage/decomposition rather than continuing to grind on the doc.
+
+**Why:** A doc that only "works" thanks to accumulated Elephant context is worthless — exactly the context illusion the Goldfish test exposes. **Verification method:** The readiness result is referenced at dispatch; the Critic (stage 2) flags implementations without a passed mandatory check.
+
+## 4. Review system (two-stage)
+
+Principle: **deterministic before probabilistic**. Stage 1 is machine and blocking; stage 2 is LLM judgment and delivers findings for the Elephant's gate decision.
+
+**Tests ≠ evals:** Tests catch deterministic regressions; evals catch behavioral drift in LLM features. The axis is named here before a project needs it — nothing is built here, that stays a project matter once a project has real LLM features. As a documented example (opt-in, NO infrastructure present), this could be modeled in the manifest as its own conditional phase:
+
+```yaml
+# .claude/pipeline.yaml (example — illustrative only, not built)
+phases:
+  eval:
+    condition: has_llm   # active ONLY if the project declares flags.has_llm: true
+    runs: "pnpm eval"    # the project's own eval command, analogous to "verify"
+```
+
+### 4.1 Stage 1 — deterministic gate chain
+
+**Must:** A fixed chain `format → lint → typecheck → tests → build`, encapsulated in **ONE `verify` script per project** (single source of truth). The stop hook, the Goldfish submission, and CI run the same script. **Why:** Three diverging check paths = three truths (a known drift anti-pattern); one script is the only way to make "green" unambiguous. **Verification method:** The evidence artifact names the script + commit state + exit code; CI is shown to call the identical command.
+
+- The concrete checkers are a project matter (<PROJECT_A>: the pnpm chain; <PROJECT_B>: yamllint + `check_config`; <PROJECT_C>: build/compile gate) — calibrated via §8.
+- **Gate honesty:** Every gate documents what it does NOT check. Gates are binary — sharp or deleted; warn-only only with an expiry date (a known anti-pattern).
+- **Evidence requirement:** A submission without a machine-generated artifact counts as unverified — regardless of what the report claims (P4).
+
+### 4.2 Stage 2 — Critic with trigger matrix by risk class
+
+**Risk classes** (= "risk level" in the wording of ADR-0014; the Elephant classifies in triage; when in doubt, higher; project risk zones are refined by the calibration §8):
+
+| Class | Criteria |
+|---|---|
+| **high** | Architecture principles; guardrails (hooks, permissions, policies — including in this repo); security/secrets; live-effective <PROJECT_B> changes (real devices); irreversible/externally-visible/costly actions; level-2 contract areas (specifically including the dispatch contract templates `templates/prompts/critic-review.md` and `templates/prompts/goldfish-task.md`). |
+| **medium** | Prod-adjacent changes (e.g. <PROJECT_A> `main` = prod deploy); data model/migrations; refactors across module boundaries; new dependencies. |
+| **low** | Locally-bounded, revertible changes that touch none of the zones above. |
+
+**Trigger matrix:**
+
+| Situation | Critic requirement |
+|---|---|
+| **Mechanical/deterministic diff** (lockfiles, generated artifacts, pure formatting with no semantic delta) | **No Critic — auto-pass.** Evidence = the generating command + the `verify` gate; a stricter row below (e.g. A/G/S) still overrides this row if it additionally applies. |
+| Rigor 0 + class low, no risk flag | **No Critic** — `verify` + evidence suffice (fast path). |
+| Rigor 0 with risk flag; rigor 1 standard; class medium; **rigor 2 standard (the Critic is mandatory there)** | **The review tier model** as a read-only subagent FIRST. At class medium (cascade): escalation to the design tier model ONLY on (a) a finding ≥ major, (b) an architecture/guardrail/security connection discovered during review, or (c) a contested verdict (row below) — the higher tier is NEVER the first run at class medium without A/G/S. **Class-medium Critics MAY run non-blocking in parallel with the next wave** (wave pipelining, row below; the disposition requirement before wave close/push is unchanged). Class high/A-G-S stays blocking without exception. |
+| Class low OR medium (non-A/G/S), Critic otherwise triggered by one of the rows above (**wave pipelining: non-blocking applies to class low AND medium**) | The Critic run **may run non-blocking** in parallel with the next package — ALL findings are still disposed of before wave close/push (disposition requirement unchanged). Class high stays blocking (A-G-S untouched). |
+| Class high (even at rigor 2) | **Escalation to the design tier model mandatory**. |
+| EVERY architecture/guardrail/security diff (independent of diff size and rigor level) | **Escalation to the design tier model mandatory** AND ADDITIONALLY always the `--bare` isolation level with a JSON-schema verdict. |
+| Review-tier findings contested or contradictory | Elephant's option: a second opinion on the design tier model (fresh context) instead of discussion in the same context. |
+
+**Bundling (default):** One bundled Critic per delivery wave is the standard case; Critics per individual package run only if risk classes differ within the wave.
+
+**Trigger wording (canonical, substantively identical in §3.3, ADR-0003, and ADR-0014):** "Every architecture/guardrail/security diff runs with the Critic on the design tier model AND additionally in `--bare` isolation. Rigor level 2 makes the Critic mandatory (standard: review tier model); the design tier model applies there only if, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
+
+**Wave pipelining:** The non-blocking Critic run applies to class LOW AND MEDIUM — a completed Critic run (review-tier cascade) may run in parallel with the next wave instead of blocking wave progress. The disposition requirement before wave close/push remains mandatory unchanged (every finding gets disposed of, §4.3). Class HIGH/A-G-S stays blocking without exception (escalation to the design tier model untouched) — this row loosens NOTHING in the trigger-wording row above.
+
+**Why staggered:** The Critic is expensive and must not degrade into ceremony; at the same time, architecture/guardrails/security are exactly the zones where a weaker reviewer has correlated blind spots. Evidence for the cascade/non-blocking relaxation: the last 3 canon Critics after a passed readiness + first pass returned PASS with 0 findings; real blockers occurred in practice only with risky live code (observed: 2 blockers, 1 fail-open major finding across several live sessions). Community evidence: Meta's risk-tiered gating held quality with relaxed gates (1/50 baseline incident rate). **Verification method:** The gate decision (step 8) documents the applied trigger row; the merge step requires a findings report on file when the trigger is mandatory.
+
+**Exactly two human gates against approval fatigue:** The pipeline deliberately provides only two points where the PO must give consent — the PO gate: PRD sign-off (§3.2 step 3b) and the human gate: acceptance of the done report (§3.2 step 9). Many micro-approvals lead to reflex clicks instead of real review, with burnout risk as a consequence (Google, "Day 5" whitepaper). Hence: **approvals are bundled at the defined gates; no in-between questions.**
+
+**Time-delayed self-review for irreversible decisions:** Before irreversible, externally-visible, or costly decisions, deliberate time distance is placed between the draft and the final sign-off (a fresh look: a different day, or at least a clearly later session segment) — the PO or the Elephant reads the decision again against the spec and the register BEFORE the human gate gives final sign-off. **Why:** A solo substitute for team review — time distance replaces the second human. **Verification method:** For irreversible gates, the gate decision documents the time-delayed second look.
+
+### 4.3 Escalation ladder with abort criteria
+
+```mermaid
+flowchart TD
+    G["Goldfish: submission"] --> V{"Stage 1: verify
+    (format→lint→typecheck→tests→build)"}
+    V -->|"red, attempt ≤ 2"| GF["Goldfish fixes it itself"]
+    GF --> V
+    V -->|"red, attempt > 2
+    OR maxTurns/stop-hook cap 8 reached"| EL["Escalation to Elephant:
+    fresh context + better briefing
+    OR change the task cut"]
+    EL -.->|"Re-dispatch"| G
+    V -->|"green + evidence"| T{"Critic trigger? (§4.2)"}
+    T -->|"no"| GE
+    T -->|"review tier"| C1["Critic review tier model"]
+    T -->|"design tier mandatory"| C2["Critic design tier model
+    (critical diffs: --bare)"]
+    C1 --> B["Findings report"]
+    C2 --> B
+    B --> GE{"Elephant: gate decision
+    (every finding disposed of)"}
+    GE -->|"Rework (max. 2 cycles)"| G
+    GE -->|"> 2 cycles OR blocker
+    OR irreversible/externally-visible/costly"| A["The PO: decision"]
+    GE -->|"passed"| M["Merge + docs sync
+    (rollback anchor + procedure with an
+    open human gate; external effect/
+    live deploy stays consent-gated)"]
+    A --> M
+    M --> H{"Human gate? (§3.2/9) =
+    acceptance of the done report,
+    does NOT block the merge"}
+    H -->|"yes, pending"| Y["Status 🟡 until
+    the PO verifies"]
+    H -->|"yes, granted / no"| D["Status: delivered"]
+    Y -.->|the PO verifies| D
+```
+
+| Rung | Responsible | Abort/escalation criterion (hard) |
+|---|---|---|
+| 1 | Goldfish itself | `verify` red: max. **2 failed attempts at the same problem**, then stop + report with the failure state. Hard leashes of the harness: `maxTurns` in the agent frontmatter; stop-hook cap of 8 consecutive blocks. |
+| 2 | Critic | Delivers only findings; **no Critic↔Goldfish dialogue**, no fixes of its own (read-only). |
+| 3 | Elephant | Disposes of every finding (have it fixed / reject with reason / escalate to the PO). **Before re-dispatch or model escalation: run through the harness checklist per guiding principle P1 / tooling-policy G2 (briefing precise? context sufficient? tools/permissions present? a hook in the way?).** Rework = **a new dispatch with a fresh context and a sharpened briefing**, never continued work in the failed context. Max. **2 rework cycles per task**, then the PO. |
+| 4 | the PO | Mandatory escalation on: blockers, >2 rework cycles, irreversible/externally-visible/costly actions, a spec↔reality conflict, budget overrun (→ ../policies/model-policy.md). |
+
+## 5. Session lifecycle & context policy
+
+Mandatory knowledge for every Elephant session — every session must command the following rules well enough to explain them on request (from the PO).
+
+### 5.1 Principle: the Elephant is NOT the session
+
+The Elephant consists of two parts: the **persisted artifact** (handover/state file, specs, register) and the **running session as a volatile cache** on top of it. If the session dies (crash, context full, machine change), the pipeline loses nothing that was persisted per the rules — re-bootstrapping from the artifact is a **30-second operation**. As a converse requirement: **what exists only in chat history does not exist.** Findings, decisions, and state changes are persisted to files immediately. **Verification method:** the handover file is updated after every phase/block (close ritual); spot check "could a fresh session take over here?".
+
+### 5.2 Elephant preservation: context hygiene & planned session cuts
+
+| Rule | Why | Verification method |
+|---|---|---|
+| **Must:** ALWAYS delegate read-, research-, and write-intensive work to Goldfish. The Elephant holds only decisions, plan, state. | Every file listing/log loaded into the Elephant crowds out orchestration knowledge; subagents have their own contexts and their own cache. | Elephant turns contain dispatches and decisions, not bulk reads; self-check in the FAQ (§5.4). |
+| **Must:** Consume reports selectively — read Goldfish/Critic completion reports in the capped format, full text only on anomaly (no first pass, a stop condition, a Critic finding ≥ major). | The report cap (`roles/goldfish.md` GF-09) only pays off if the Elephant also consumes it in capped form — otherwise ingestion eats the same context as before. | `roles/elephant.md` EL-20; the anomaly trigger is documented in the gate decision. |
+| **Must:** Communication economy — limit chat with the PO to four event classes (finding · decision needed/gate · incident/stop · block result), result first, compact; no mechanical progress narration. | Chat prose gets re-read every turn — the same mechanism as report ingestion (context × turns). | `roles/elephant.md` EL-23; visibility via the harness task display + dispatch ledger (EL-21) instead of chat prose. |
+| **Must: turn economy for the Elephant** — targeted grep instead of a full read where a search answer suffices; no repeat checks while waiting (no re-asking/re-checking while a dispatch is still running without a new event); keep in-between text minimal. | Every unnecessary turn re-reads the warm, large context — cache-read volume = context × turns; a tight turn cut is itself a cost lever, independent of fill level (evidence: 79M cache reads in one session). | Elephant turns show targeted search operations instead of full-text reads where a grep answer suffices; no status turns during a running dispatch without a qualifying event (cf. EL-23 liveness line at >15 min). |
+| **Must:** Fill-level telemetry — check `/context` at task boundaries. | Context level is measurable; without measurement, chance decides the cut point. | `/context` check is a step in the close/block-change ritual. |
+| **Must: planned session cut instead of emergency compaction:** at ~70–80% fill level, OR at a natural phase/block boundary, OR once a session reaches ~10 dispatches OR ~2h wall-clock time OR ≥ 50% fill level → update the handover file → commit → a fresh session bootstraps from it ([../harness/session-bootstrap.md](../harness/session-bootstrap.md)). The implementation phase may continue as a FRESH session, started from spec + PRD + handover via short bootstrap ([../harness/session-bootstrap.md](../harness/session-bootstrap.md) §6.4). **Compact checkpoint:** in addition to the session cut, the Elephant checks the context fill level at EVERY task boundary (package/wave boundary with Critic PASS + commit/push, PRD gate passed, before the first dispatch of a new package); at ≥ ~100k tokens it MUST present the PO with a compact block (a literal `/compact` plus one focus line for the next phase). Target window: 100–150k; >150k counts as an overdue cut, to be named honestly (EL-25). | The planned cut is lossless (the artifact is complete); the harness's auto-compaction is lossy and uncontrolled. Every turn re-reads the full context (cache-read volume = context × turns, measured Elephant cost share 78–89%) — the cost-based trigger catches this before the fill-level trigger alone kicks in. The compact checkpoint additionally catches the case where a long wave crosses the 150k mark unplanned (<PROJECT_C> evidence: 69% usage > 150k). | A session-end commit with an updated handover file exists; the new session starts with the bootstrap check. At task boundaries with a fill level ≥ 100k, a compact block is visible (presented or executed). |
+| **Must not:** Plan on auto-compaction/auto-summary as a strategy. It is ONLY a safety net for the accident case. | Uncontrolled information loss exactly where the Elephant needs its memory; what compaction discards is not decided by the PO. | Sessions that run into auto-compaction count as a process error → retro question, "why was the cut missed?". |
+| **Must:** `/compact <focus>` only at task boundaries and with an explicit focus — AND MANDATORY at every task boundary when the context fill level is ≥ ~100k tokens (target window 100–150k; >150k = an overdue cut, to be named honestly; EL-25); `/clear` + `/rename` on topic change. | Compacting mid-task loses working state; a topic change in a full context mixes scopes (anti-pattern AP6); the proactive window requirement closes the gap where the Elephant feels "still running" while the fill level is long overdue. | Session history: `/compact` only between blocks; ONE topic per session; a compact block visibly presented at task boundaries with a fill level ≥ 100k. |
+| **Rule of thumb:** >80 messages → check for a fresh fork/cut (<PROJECT_A> experience rule). | An empirically proven heuristic as a second indicator alongside `/context`. | Self-check at block boundaries. |
+| **Must:** Fix model + effort at session start; no model switch mid-session — EXCEPT for the ONE sanctioned exception: the switch to the design tier model at the PRD sign-off gate in profile `design-first` (MP-17/MP-18, EL-24, step 3c). Switching back away from the design tier model stays forbidden mid-session, without exception. | Every switch invalidates the entire prompt cache; delegation to Goldfish replaces the model switch. | The session-start protocol (bootstrap) notes model/effort (+ profile/advisor); the sanctioned switch appears as a documented ledger event, not as an anomaly (MP-18). |
+| **Must:** In long execution phases, additionally set explicit compact points at WAVE boundaries (`/compact <focus>`), in the target window of 100–150k context fill level (>150k counts as an overdue cut) — this supplements, does NOT replace, the existing triggers (~10 dispatches / ~2h / ≥ 50% fill level, see above). | Long waves without an interim compact let the cache-read share grow unnecessarily, even though a natural focus change is due at the wave boundary anyway. | Wave-end turns show a `/compact <focus>` recommendation or execution when context is in the 100–150k window (or named as overdue when > 150k). |
+
+**Automated staging mechanics:** The judgment-driven fill-level trigger from the table above is additionally technically SUPPORTED by a hook chain (not a replacement, only a backstop): `plugins/pipeline-core/scripts/statusline-context.mjs` reads the statusline input (`context_window.used_percentage`, tokens, model, session ID) and writes a gitignored usage file `.claude/.usage-<session_id>.json`; `plugins/pipeline-core/hooks/stop-suggest.mjs` reads this file and emits STAGED German-language warnings: from ~100k tokens, "Context {tokens}k — /compact handover window" (100–150k, cut at a task boundary); from ~150k, "OVERDUE" wording; from ~170k, a hard `decision:block` (emergency brake) WITH a nag cap (blocks max. 2 consecutive turns, then downgrades to a warning — protection against the stop-hook block-cap-8 session abort, auto-mode safety). Below 170k it NEVER blocks; every read/parsing error is fail-open (an empty line, no block). The TASK BOUNDARY stays the PRIMARY trigger for this rule (compact checkpoint, row above) — the fill-level thresholds are the secondary, hook-backed backstop trigger for the case where a wave crosses the boundary unplanned.
+
+**Post-compact re-ground:** Directly after every `/compact`, a SessionStart hook (`plugins/pipeline-core/hooks/post-compact-reground.mjs`, matcher `compact`) fires a German-language re-ground notice: chat language GERMAN (ADR-0011 — closes the observation "`/compact` pulled the chat language toward English"), the active role/profile, a pointer to `state.md` + the current phase/feature from `pipeline-state.json` (read-only). Fail-open.
+
+**`/compact` invocation discipline (tightened, 2026-07-07):** A bare `/compact` WITHOUT instruction is explicitly UNWANTED — every invocation explicitly names what to KEEP and what to DROP (e.g. "Keep: decisions + open items; drop: full tool-output text"), not just a topic word. The task boundary remains, unchanged, the primary trigger (see above).
+
+**Small-session playbook & close-light (pointer):** For short retest/correction sessions (target ≤45 min wall-clock time), its own playbook applies: [../harness/checklists/small-session.md](../harness/checklists/small-session.md) (same-day light bootstrap → ONE bundled light-profile dispatch or level-0 fast path → mechanical auto-pass/model cascade decides the Critic need → verify → push → close-light). The corresponding shortened close ritual is `close-light` (eligibility as a checklist, not a judgment call) in the [close-block skill](../plugins/pipeline-core/skills/close-block/SKILL.md).
+
+### 5.3 Goldfish cadence: when does a Goldfish start?
+
+- **Default case:** Every delimitable execution task runs as a Goldfish — implementation, research, bulk edits, review preparation. The Elephant itself works only on: interview/spec, triage/decomposition, gate decisions, handover/core-docs upkeep.
+- **Trigger criterion, "80% gate":** As soon as a task can be specified self-contained (a briefing with the 6 mandatory fields can be formulated), it's Goldfish-ready. If the Elephant CANNOT specify it unambiguously, it's not dispatch-ready — then interview/decomposition work is missing, not a better prompt (a Goldfish only gets tasks where the 80% is enough; the 20% ambiguity belongs to the PO/Elephant).
+- **Parallel limit: 3–5 concurrent Goldfish** ("ramp slowly" — increase gradually). Why: the PO's attention is the bottleneck; more parallelism creates a review backlog instead of throughput. Verification method: dispatch count; an increase only after the briefing/Critic loop demonstrably works (maturity metrics §7).
+- **WIP rule per project:** max. **1 open human-gate item** per project; new dispatches in that project only after acceptance. Why: parallel Goldfish vs. serial PO gates otherwise create a stale queue (worktree corpses, stale diffs). Verification method: the WIP field in the calibration (§8); the stale-worktree check in the ritual.
+- **Ultracode/workflows** are a task-level opt-in for the indication list (initial research, process-model/architecture exploration, audits, migrations), NOT a standard dispatch path. Writing workflows require hook guardrails + a tight bash allowlist + a worktree (workflow subagents technically always run in `acceptEdits`; <PROJECT_B> special rule until the guard migration: only with PO sign-off) — details: the workflow ADR ([adr/](adr/)) and [../policies/model-policy.md](../policies/model-policy.md).
+
+### 5.4 Quick FAQ, "how do I run myself" (for Elephant sessions)
+
+1. **How do I notice my context is running low?** Check `/context` at every task boundary; alarm zone ~70–80% fill level or >80 messages. Don't rely on the feeling of "still running."
+2. **What do I do then?** A planned session cut: update the handover file → commit → end the session → a fresh session bootstraps from the file. No drama: a 30-second operation if §5.1 was actually lived.
+3. **Why not just wait for auto-compaction?** It's lossy and uncontrolled — it decides for itself what gets forgotten. A safety net, yes; a strategy, never.
+4. **Am I allowed to use `/compact`?** Yes, but only at task boundaries and with a focus argument (`/compact <focus>`) — AND MANDATORY at every task boundary when the context fill level is ≥ ~100k tokens (target window 100–150k; >150k = an overdue cut, to be named honestly; EL-25). Mid-task: no. On a topic change, use `/clear` + `/rename` instead.
+5. **When do I dispatch a Goldfish instead of working myself?** As soon as the task can be specified self-contained (the 80% gate) — and, in general, for anything read-/write-/research-intensive. If I can't specify it, interview/decomposition is due, not doing it myself.
+6. **How many Goldfish at once?** 3–5 maximum; only 1 open human-gate item per project (the WIP rule).
+7. **What belongs in my context, and what doesn't?** In: decisions, plan, state, gate results. Out (delegate): file contents, logs, raw research material, verbose tool output.
+8. **What do I do after a crash/machine change?** Like question 2, run backward: new session, bootstrap protocol ([../harness/session-bootstrap.md](../harness/session-bootstrap.md)), read the handover file, keep working. If anything is missing there, §5.1 was violated → record a lesson.
+
+## 6. Baton Pass & Handover
+
+| Rule | Why | Verification method |
+|---|---|---|
+| **Must:** Per project, **ONE versioned handover file** exists as the single source of state-truth (convention: `docs/state.md`; this repo demonstrates it. Final template name: phase 3). Content: current state, decisions, open items, next block, re-entry protocol. | The three-times hand-maintained baton (HISTORY "open" + CLAUDE state + memory) demonstrably lies (anti-pattern AP3: <PROJECT_C> drift documented). | Exactly one file carries "open/next"; every other location references it. |
+| **Must:** At session end, the "open / next block" section of a HISTORY entry **is generated from the handover file or merely references it** — never hand-maintained as a duplicate. | Two hand-maintained copies inevitably drift; generation makes drift technically impossible. | The `/close` skill generates the block mechanically (phase 3); the drift check no longer compares two hand-maintained states. |
+| **Role split:** HISTORY = append-only past (a journal with lessons); the handover file = present and future. | A clear responsibility per time direction prevents the double truth. | No "current state" prose block in HISTORY except the generated/referenced one. |
+| **Must:** Memory (user/project scope) is a **mirror only** and must not contradict the repo; on contradiction, the repo wins, and memory is corrected. | Unversioned memory breaks on a fresh clone/second machine (anti-pattern AP4); the <PROJECT_C> rule "memory = mirror," generalized. | The bootstrap check verifies the existence of all mandatory artifacts in the repo; a memory reconciliation happens in the close ritual. |
+| **Deterministic gates:** (a) **merge-completion gate** — after a merge, a check blocks until the handover file carries the new state; (b) **CLAUDE.md length gate** — a hard limit per project (calibration; reference: <PROJECT_A> holds at 220 lines). | Exactly at the post-merge step is where the documented drift arose (<PROJECT_C>); CLAUDE.md sprawl eats up every session start (anti-pattern AP2). | Hook/skill check in phase 3; until then, a mandatory step in the close ritual. |
+| **Must (status vocabulary):** Completion statuses are register-fixed and two-staged: **DELIVERED** (artifact created, deterministic gates green, Critic PASS where applicable) ≠ **ACCEPTED** (the PO gate passed). Chat messages, the handover, and the register use exactly these terms; "done"/"closed"/"finished" without a register status is an overclaim. | Incident 2026-07-04: "phase 4 is closed" in chat, even though it was only DELIVERED, not ACCEPTED (a PO catch). The PO decides based on status reports — chat vocabulary must mirror the register state. | Handover/register entries carry one of the two terms; the Critic/drift check flags completion messages without a register-status term. |
+
+## 7. Feedback loop
+
+- **Retro requirement:** The earlier mandatory retro question to the PO ("what should the pipeline do better next time?") is dropped without replacement — instead, the **session Elephant** writes its **own retro** at the end of every project session (part of the `/close` ritual): a concrete improvement item or a deliberate "nothing," as a backlog item/transfer to the pipeline Elephant (the continuous-improvement process) — silence is not an option, this step is a mandatory part of every close and is never silently skipped. The PO submits their own observations on the side through their own channel, without a ritual prompt; the old deferred-retro placeholder mechanism (waiting for the PO's answer) is thus obsolete. **Why:** The only cross-session learning mechanism is lessons distillation; the responsibility for it lies with the Elephant itself rather than a ritual question to the PO (verbatim, the PO, 2026-07-04: "asking me that in the close ritual makes no sense, I can note it better just in passing"). **Verification method:** the close report contains the written retro (item or an explicit "nothing") + the backlog-item/transfer path.
+- **Backlog process:** Improvements flow as items of type **`workflow-improvement`** into this repo's `backlog/` (description, triggering situation, affected artifact, proposal). **Triage** by the Elephant of the next pipeline session: accept (assign to a phase/release) / reject (with a reason in the item) / defer; merge duplicates. **Release cycle:** in the SHA phase, every commit propagates immediately into the projects — triage is thus the real release gate; from the SemVer phase on, bundled releases with a CHANGELOG. OPEN (operational): the criterion for the SemVer switch ("stability matters more than iteration speed").
+- **Maturity metrics**, captured lightweight per block in the close ritual, filed in the model-policy's telemetry instrument (→ [../policies/model-policy.md](../policies/model-policy.md)):
+  - **Look-away time** — how long a Goldfish ran unattended and delivered something usable. If it rises, briefings are getting better.
+  - **First-pass/rework rate** — the share of Goldfish submissions that clear the gate with no rework cycle. If it drops, debug the harness first (P1).
+- **CLAUDE.md growth rule** ("add one rule every time"): every agent failure traced back to a missing or vague rule becomes a new or sharpened rule in the fitting artifact (a CLAUDE.md fact, a hook, a skill — assignment per tooling-policy G1). The **counterweight** is the CLAUDE.md length gate (§6): adding also means consolidating — as the file grows toward the limit, rules get merged, moved into skills/hooks, or struck. **Verification method:** the lessons entry names the changed/new rule; the length gate stays green.
+- **Three-artifact archive rule:** for every larger task, three things are permanently versioned and archived: (1) the problem description/spec, (2) the acceptance criteria, (3) the result/completion report. **Full chat logs are NOT archived** ("mostly token noise"); the bridge to the session is the `Claude-Session:` commit trailer. **Why:** a searchable archive of one's own judgment compounds; chat logs don't. **Verification method:** the close ritual checks that the three artifacts are filed, from rigor level 1 up.
+- **Error register (a community pattern, NOT a count ranking):** `backlog/error-register.md` maintains a capped, curated triage board (max. ~30 lines, kept small through semantic consolidation of similar error classes — the AutoManual pattern). The register is STRICTLY TRIAGE-ONLY: it is NEVER injected into briefings (the community anti-pattern "rule blindness"), and carries NO numeric ranking and NO count as a priority signal — the initially considered top-100/top-30 counting idea was REJECTED BY THE PO. A second occurrence of the same error class triggers MANDATORY TRIAGE (disposition in the hierarchy mechanism > template > curated lesson). The `close-block` skill carries its own close step for this, "error-register update" (capture new error classes, mark repeats, every REPEATED line gets a disposition or an explicit deferral note) — details/seed lines: [../plugins/pipeline-core/skills/close-block/SKILL.md](../plugins/pipeline-core/skills/close-block/SKILL.md), `backlog/error-register.md`. **Why:** the counting approach was deliberately rejected — a ranking suggests priority where semantics count (community evidence of "rule blindness" from injected rule lists). **Verification method:** the register header explicitly documents the triage-only contract; the close-ritual step cannot be skipped; REPEATED lines without a disposition surface at the next close.
+
+## 8. Project calibration layer
+
+The invariant is central, the expression is calibrated (deliberate diversity is justified, not drift):
+
+| Central (plugin + docs, one version) | Project calibration (a thin, committed layer in the project repo) |
+|---|---|
+| Role definitions + prompts (Elephant/Goldfish/Critic) incl. handover formats (§2) | — (roles apply identically everywhere) |
+| Session-start/-end ritual skills (parametrized) | Gate commands (`verify`: the pnpm chain / yamllint+`check_config` / the UE build), runtime checks, hygiene inserts |
+| git-guard as the **union** of all three incarnations | Project denies (content packs, `secrets.yaml`, `.env`, `.storage`) |
+| Stop-hook gate framework | The concrete checker (lint / compile / config-check) |
+| Spec/ADR/retro/briefing/handover templates, DoD scaffold, EARS requirement | Content, domain constraints, the "core mental model," risk zones |
+| Model/effort/token policy, escalation ladder, trigger matrix | Stakes classification, autonomy level (<PROJECT_C> auto-mode ↔ <PROJECT_B> consent rules), human-gate form (PIE / live verification / spot check) |
+| The invariant "merge gate + Critic trigger by risk class" | Gate form (PR flow ↔ direct push + staging), branch model |
+| Context-economy policy (hard limit, map) | The limit number, map content |
+| Session-lifecycle rules (§5), the base WIP rule | The WIP-limit number, worktree mode (validate per project in phase 4 — the <PROJECT_C> editor gate is fail-open in a worktree!) |
+
+**Invariant across all autonomy levels:** scope sign-off ≠ design sign-off ≠ go-live sign-off (EL-03) — even in auto-mode/AFK; only the execution of an accepted plan runs autonomously.
+
+**Mechanism sketch:** The central ritual skills (plugin `pipeline-core`) read a **versioned project calibration file** in the project repo on start (uniformly: `.claude/pipeline.json` — schema format **decided 2026-07-03 with the plugin delivery: JSON**; the skills `pipeline-start`/`close-block` consume this format, canonical example: `../templates/pipeline.json.example`). Sketch of the fields:
+
+```jsonc
+// .claude/pipeline.json (schema format JSON, decided 2026-07-03)
+{
+  "project": "project-a",
+  "verify": "pnpm verify",              // ONE gate command
+  "autonomy": "night-branch-only",      // autonomy level (M16 vocabulary)
+  "branchModel": "direct-push+staging", // vs. "pr-flow"
+  "verification": "tests+browser",      // vs. "live-devices", "pie-human"
+  "wipLimit": 1,                        // open human-gate items
+  "rollback": "git revert <merge-commit>", // rollback procedure per project (🟡 merge v2, refined later, condition b; anchor = pre-merge tag/commit ref in the handover, condition a)
+  "worktree": "on-write",               // vs. "off", "always"
+  "stakes": "medium",                   // the project's stakes classification (P6)
+  "constraints": [                      // project constraints (domain rules, "do NOT roll back")
+    "no breaking API change without an ADR"
+  ],
+  "claudeMdMaxLines": 220,              // length gate (§6)
+  "riskZones": ["app/api/**", "prisma/**"],
+  "handover": "docs/state.md",          // optional: the project's handover file (default docs/state.md)
+  "ritualExtensions": {                 // named extension points
+    "newBlockReview.post": ["check-db-hygiene"],
+    "close.pre": ["sync-changelog"]
+  }
+}
+```
+
+- **Mechanics:** The central skill defines **named extension points** (e.g. `newBlockReview.post`, `close.pre`); the calibration file hooks project-specific steps (skill/command references) into them there. If the file is missing, the skill runs with safe defaults and explicitly reports itself as "uncalibrated" (fail-safe, no silent guessing).
+- **Denies boundary:** project **denies** do NOT live in the calibration file, but in the committed `.claude/settings.json` or the git-guard's guard config — the bootstrap check verifies them there (→ [../harness/session-bootstrap.md](../harness/session-bootstrap.md), step 3).
+- **DoD criterion (hard):** a project-specific ritual step can be added **WITHOUT forking the central skill** — otherwise the copy-paste inheritance starts all over again (anti-pattern AP1). **Proof in phase 3** on a real example (e.g. the <PROJECT_A> DB hygiene step).
+- **Manifest addition (optional, additive, AP1):** since AP1, `.claude/pipeline.yaml` (schema `pipeline.manifest.v0`) additionally exists as a purely additive layer ALONGSIDE `pipeline.json` — covers phases/gates/security thresholds/model routing/profiles/governance paths (§10)/flags, without touching a single field of the calibration file (zero-field overlap confirmed, `plugins/pipeline-core/lib/manifest.mjs`). No manifest → behavior byte-identical to today. Schema: `plugins/pipeline-core/scripts/pipeline-manifest.schema.json`; validator: `node harness/scripts/validate-manifest.mjs`; details/rationale: [ADR-0028](adr/0028-manifest-ansatz.md).
+
+## 9. Traceability
+
+The concept traceability matrix (produced in parallel in phase 2; a mandatory deliverable of the canonicity directive) proves that every core concept from Rensin (EGM) and Google (New SDLC) is either explicitly built in or adapted/rejected with a stated reason: `concept → source → pipeline artifact/rule → status`. The entry checklist is a binding requirement; the anchors in this document: the Alternatives section (§3.2/2), Mean Review (§2.4), anti-sycophancy (§2.2/§2.4), the look-away metric (§7), the 3–5 parallel limit (§5.3), the three-artifact archive (§7).
+
+## 10. Governance layer (project-owned rules)
+
+A hosted project brings its own architecture and style rules — separate from the pipeline's own infrastructure (`guardrails/*`, `harness/checklists/*`, which regulate exclusively HOW the pipeline itself works). This project-owned layer lives under `governance/…` (canonical fixture example: [`governance/examples/README.md`](../governance/examples/README.md)) and splits into two categories with different enforcement ([ADR-0030](adr/0030-governance-layer.md)):
+
+- **Guidelines (advisory)** — numbered principles (layering, naming, error handling, …). Deviations are allowed but must be named and justified in the plan artifact. A guideline never blocks a gate by itself; it feeds into every plan and is a review standard for the Critic (§4.2) — a NAMED deviation is expected input, an UNNAMED deviation is the finding.
+- **Policies (enforcing)** — machine-checkable rules (semgrep rules via `rules_dir`, a license allowlist) AND the humanly-reviewed but binding `checklist.md`. A violation blocks: for machine-checkable policies, the automated security-scan gate fails (§4.1); for the checklist, the Critic ticks off every item before the push gate is reached — every "NOT MET" item is a blocking finding.
+
+Architecture principles automatically count as risk class **high** and thus force the mandatory Critic (§4.2) — regardless of how small the diff is.
+
+**Hierarchy** (mirrors Claude Code's own settings precedence): the repo level (a project's own `governance/…` directories) overrides the user level (`~/.claude/`, personal preferences); both sit BELOW an optional managed-settings level (enterprise), which neither of the two can override — this repo itself ships no managed-settings layer; that's the adopting organization's matter.
+
+**Paths per project:** where a project's governance directories point is a calibration matter (§8) — the `governance` block in `.claude/pipeline.yaml` (`guidelines_path`, `policies_path`) makes that concrete; only the mechanism is central, not the content.
+
+A fully worked-through example — from house rule to enforced rule — is in [`governance/examples/worked-example.md`](../governance/examples/worked-example.md).
+
+## 11. Enterprise expansion paths
+
+Two expansion candidates for use in larger/enterprise contexts are deliberately only noted and NOT built — they sit below the build threshold for the current (solo) operation, but are documented so a later user knows that, and where, they can be retrofitted.
+
+**Scheduled Audit** — a periodic self-check of pipeline state and the guards (scheduled drift detection instead of purely reactive), in addition to the existing monthly tooling radar (`policies/tooling-policy.md` §4), not as its replacement. Trigger to build it: drift accumulates between radar runs, or repeated audits find the same error class — a signal that periodic self-checking is needed in addition to the monthly radar.
+
+**Semantic Pre-Execution Gating** — a cheap upfront intent check immediately before a risky single action (e.g. a bash command against real devices/systems) that checks whether the action actually matches the stated intent BEFORE it executes. Would sit ABOVE the deterministic guard layer (the git-guard union, `guardrails/`), not in its place — the deterministic layer stays the enforcement foundation (P3). Trigger to build it: a project with class high/live effect (real devices) needs intent verification that a regex/pattern guard cannot structurally deliver — it blocks a command FORM, never the semantic intent behind it.
+
+Both candidates follow the same discipline: **the lowest level that catches what matters** — neither is approved to build here, both remain pure radar notes. Details/trigger criteria: [../policies/tooling-policy.md](../policies/tooling-policy.md) §4 (tooling radar).
+
+---
+
+*Operating Model v1.0 — Sprint 0 Phase 2 (2026-07-03). Authoritative on conflict: the project's own decision register in [state.md](state.md) or the ADRs in [adr/](adr/); process status lives exclusively in [state.md](state.md).*
+
+> _This English text is a translation. The authoritative original is the German version below._
+
+---
+
+# Operating Model v1.0 — Agent-Pipeline
+
+> _Dies ist die maßgebliche Originalfassung; die englische Fassung oben ist eine Übersetzung davon._
+
 > Agent-Pipeline v0.1.0-draft
 
 > **Kanonik:** Bei Widerspruch zwischen diesem Dokument und dem eigenen Entscheidungsregister ([state.md](state.md)) bzw. den ADRs ([adr/](adr/)) gilt das Register/der ADR. Konzeptionelle Wurzeln dieses Modells: Rensins „Elephants & Goldfish"-Rollenmodell (EGM) und Googles „New SDLC" (vibe-coding-Playbook) — beide fließen unten (§1–2) an den relevanten Stellen mit Begründung ein.

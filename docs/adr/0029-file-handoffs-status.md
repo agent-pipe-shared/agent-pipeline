@@ -1,5 +1,9 @@
 # ADR-0029: File-Handoffs & Status — `pipeline-state.json`, Plan-Artefakte, Evidenz-Frische statt Selbstberechnung
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR establishes `.claude/pipeline-state.json` as the single source of truth for plan-approval and push-approval status, written exclusively through a dedicated CLI (`pipeline-state.mjs`) rather than hand-edited, so every state change is an attributed, git-tracked commit — never silent, chat-only, or freehand. Plan artifacts get a uniform home under `.claude/plans/<feature>.md`, and quality gates check only the *freshness* of existing evidence files (verify/security run results matching the current HEAD) instead of re-running checks themselves, keeping hooks inside a strict time budget. The safeguard is explicitly procedural rather than technically bulletproof: a rogue direct edit to the state file is still possible, but would be forensically visible in the git diff. Status: accepted 2026-07-07.
+
 > Agent-Pipeline v0.1.0-draft · AP1-Tuning-Session · Stand 2026-07-07
 
 **Status:** akzeptiert (2026-07-07, the PO-Plan-Freigabe „AP1 TUNING") · **Grundlage:** `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` Leitentscheidung 3, [ADR-0012](0012-handover-kanonisierung.md), `guardrails/quality-gates.md` QG-03

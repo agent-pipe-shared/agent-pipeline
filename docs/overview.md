@@ -1,5 +1,7 @@
 # The model in one read
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
 This is the middle layer. The [README](../README.md) tells you what the
 Agent-Pipeline is in a minute; [`docs/operating-model.md`](operating-model.md)
 is the full normative rulebook. This page sits between them: enough to
@@ -182,7 +184,7 @@ This is a **Tier 2** review system: a structured, two-stage self- and
 Critic-review layer built into the day-to-day workflow (deterministic gates,
 then an independent LLM reviewer with a fresh context). It is not a certified
 or enterprise-grade assurance system, and it does not claim to be one. See
-[`docs/operating-model.md`](operating-model.md), the "Enterprise-Ausbaupfade"
+[`docs/operating-model.md`](operating-model.md), the "Enterprise expansion paths"
 section, for the documented, optional upgrade paths (a scheduled audit pass, a
 semantic pre-execution gate) beyond what this repo ships by default.
 

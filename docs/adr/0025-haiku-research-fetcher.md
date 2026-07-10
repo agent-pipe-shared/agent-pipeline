@@ -1,5 +1,9 @@
 # ADR-0025: Haiku-Research-Fetcher — Rescope von MP-03 für read-only Recherche
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR narrows the pipeline's general Haiku ban (ADR-0006/MP-03) to still prohibit Haiku for implementation, judgment, and review work, but now explicitly permits it (new rule MP-25) for read-only web search/fetch/extraction tasks that produce no artifacts and require no judgment — provided the dispatch metadata explicitly declares `role=research-fetcher, model=haiku`. The decision is grounded in a measured efficiency gap: a research-fetch run completed in 77s/38k usable tokens on Haiku versus roughly 12min/200k tokens for Sonnet-class models on the same class of task. Synthesis and evaluation work must still use Sonnet or better. Status: accepted (Wave 2, milestone M12).
+
 > Agent-Pipeline v0.1.0-draft · Sprint 1 · Stand 2026-07-06
 
 **Status:** akzeptiert (Welle 2, M12) · **Grundlage:** Register E25

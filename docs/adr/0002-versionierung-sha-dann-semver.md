@@ -1,5 +1,9 @@
 # ADR-0002: Versionierungsstrategie — SHA-Phase, dann SemVer
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR decides that the plugin starts in a SHA-based versioning phase — no `version` field, every commit on `main` propagates immediately to consuming projects — instead of adopting SemVer and Git tags from day one. Rationale: in Sprint 0/1 the pipeline is the least stable artifact in the portfolio, and release ceremony would slow iteration; the SemVer/tag channel pattern (stable/latest) is documented and ready to adopt once stability matters more than iteration speed. Status: accepted (2026-07-03); the switchover trigger is still open (candidates: the v0.1.0 release, or once all consuming projects are on the pipeline in production).
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 
 **Status:** akzeptiert (2026-07-03, Checkpoint 1) · **Grundlage:** Register E2

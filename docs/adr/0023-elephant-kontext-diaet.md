@@ -1,5 +1,9 @@
 # ADR-0023: Elephant-Kontext-Diät & Latenz-Maßnahmenbündel
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR adopts a bundle of ten concrete measures to cut the "Elephant" (main agent) context share and session latency, after sessions repeatedly showed 78–89% Elephant context usage — deemed unsustainable. Measures include capped subagent reports, single-turn/parallel-first task scheduling, phase-cut cost triggers, selective (non-full-text) reading by default, commit-first-then-report ordering, a dispatch ledger, leaner chat communication, and scoped readiness checks. It was reviewed bundled rather than piecemeal (an independent critic review failed on first pass with 6 findings, then passed after fixes) and carries an explicit, dated measurement target for the next feature session (Elephant share ≤50%, cost <$30, wall-clock time −30%, unchanged first-pass quality), with a rollback trigger if that target is missed.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 1 · Stand 2026-07-06
 
 **Status:** akzeptiert (2026-07-05 abends, Welle 2, the PO-PRD-Freigaben) · **Grundlage:** Register E23

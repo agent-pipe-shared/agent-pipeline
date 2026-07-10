@@ -1,5 +1,9 @@
 # ADR-0006: Modell- und Effort-Policy je Rolle
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR sets the model and effort level per pipeline role: Elephant (orchestrator) runs Fable 5 at `xhigh` effort (fixed, revised down from `max`; `max` remains an explicit named exception for guardrail/architecture/refactoring work), Goldfish (implementer) runs Sonnet 5 at minimum `high`–`max` effort (no Haiku), and Critic runs Sonnet 5/`max`, escalating to Fable 5/`max` for architecture, guardrails, or security reviews. The decision overrides an earlier research recommendation (Opus for Elephant, Haiku tier for Critic) based on the PO's practical experience that effective cost-per-task matters more than raw $/MTok pricing, and it commits to cost telemetry from day one with a pricing review scheduled for 2026-08-31.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 
 **Status:** akzeptiert (2026-07-03, Checkpoint 1) · **revidiert im Effort-Teil (E16, der PO, 2026-07-04 — s. Abschnitt „Revision E16")** · **Grundlage:** Register E6 + E16, PO-Entscheid

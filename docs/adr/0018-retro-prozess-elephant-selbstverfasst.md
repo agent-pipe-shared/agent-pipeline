@@ -1,5 +1,9 @@
 # ADR-0018: Retro-Prozess-Revision — Elephant verfasst das Close-Retro selbst
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR retires the ritual close-of-session retro question ("what should the pipeline do better next time?") that used to be posed to the PO. Instead, the session Elephant now writes the close-retro itself — either concrete improvement items or an explicit "nothing" — as a backlog item/handoff to the pipeline Elephant's continuous-improvement process, and it must never be silently skipped. The PO may still contribute observations separately, through their own channel, without a ritual prompt. Status: accepted 2026-07-04.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 4 · Stand 2026-07-06
 
 **Status:** akzeptiert (2026-07-04, <PROJECT_B>-S38-Close) · **Grundlage:** Register E18

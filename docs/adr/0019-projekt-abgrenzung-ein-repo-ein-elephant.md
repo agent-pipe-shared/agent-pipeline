@@ -1,5 +1,9 @@
 # ADR-0019: Projekt-Abgrenzung — Ein Repo, ein Elephant zur Zeit
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR establishes a workspace contract for cross-project agent work: one repo, one active "Elephant" (lead agent) session at a time, so parallel sessions cannot overwrite each other's changes. A project Elephant may only write within its own project repo; monitoring/collection sessions across repos must stay strictly read-only. Cross-repo needs are routed through a fixed transfer path — a new, append-only item in the target repo's `backlog/items/`, or a handback to the product owner — rather than ad-hoc edits to foreign repos. The decision is deliberately a process rule only (no enforcing hook or `writeRoots` field), accepted 2026-07-04 with the stricter technical options left open as a documented, unassigned backlog possibility.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 4 · Stand 2026-07-06
 
 **Status:** akzeptiert (2026-07-04, AP-Sprint) · **Grundlage:** Register E19

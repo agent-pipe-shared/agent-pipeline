@@ -1,5 +1,9 @@
 # ADR-0022: Light-Dispatch-Profil + Goldfish-`xhigh`-Standard-Default
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
+**In brief (English):** This ADR (accepted 2026-07-05) introduces two speed-tuning changes to the Goldfish (implementor) role: (a) an opt-in "light" dispatch profile for low-risk, mechanical Tier-0 tasks — a compact 3-field report, inlined references, and no pre-edit baseline verification, run at `xhigh` effort — while leaving evidence and stop-condition safeguards untouched and explicitly excluding this profile from high-risk or guardrail work; and (b) making `xhigh` the general default effort level for Goldfish dispatches (matching the Elephant's own calibration), reserving `max` for large/complex/guardrail work and `high` for trivial, uniform work.
+
 > Agent-Pipeline v0.1.0-draft · Sprint 1 · Stand 2026-07-06
 
 **Status:** akzeptiert (2026-07-05, Tuning-Session) · **Grundlage:** Register E22
