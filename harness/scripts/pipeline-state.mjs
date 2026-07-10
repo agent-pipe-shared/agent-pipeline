@@ -77,10 +77,14 @@
  *                                                 planApproval/planRevocation.
  *                                                 pushApproval is left untouched. No
  *                                                 activeFeature present -> refused (English
- *                                                 error, exit 2, nothing written). See the
- *                                                 forCommit DEVIATION note in RULES below --
- *                                                 unlike approve-push, a git failure here is
- *                                                 NOT fatal.
+ *                                                 error, exit 2, nothing written). Likewise
+ *                                                 refused (F2 hardening): a blank
+ *                                                 activeFeature.id/planPath, or an existing
+ *                                                 closedFeatures that is present but NOT an
+ *                                                 array (malformed -- never silently replaced
+ *                                                 with []). See the forCommit DEVIATION note
+ *                                                 in RULES below -- unlike approve-push, a git
+ *                                                 failure here is NOT fatal.
  *
  * RULES (all five `--by`-taking subcommands: approve-plan/revoke-plan/approve-push/close-feature)
  *   - `--by` MUST be present and non-blank -- REFUSED otherwise (English error, exit 2,
@@ -111,8 +115,9 @@
  *   case for a human/Goldfish running this CLI directly from the repo root).
  *
  * EXIT CODES: 0 = written / success. 2 = refused (bad usage, malformed pre-existing
- * file, `git rev-parse HEAD` failed for `approve-push`, or no `activeFeature` for
- * `close-feature`) -- nothing written. Note: a `git rev-parse HEAD` failure during
+ * file, `git rev-parse HEAD` failed for `approve-push`, no `activeFeature` for
+ * `close-feature`, a blank `activeFeature.id`/`planPath`, or a non-array pre-existing
+ * `closedFeatures`) -- nothing written. Note: a `git rev-parse HEAD` failure during
  * close-feature does NOT produce exit 2 -- see the DEVIATION note in RULES above.
  *
  * VERIFY: node harness/scripts/pipeline-state.test.mjs (this file's own behavior
@@ -340,6 +345,14 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       const activeFeature = base.activeFeature;
       if (!activeFeature || typeof activeFeature !== "object") {
         console.error('Error: no active feature present -- nothing to close.');
+        return 2;
+      }
+      if (isBlank(activeFeature.id) || isBlank(activeFeature.planPath)) {
+        console.error('Error: activeFeature.id and activeFeature.planPath must both be non-empty -- close-feature refused (no unattributed audit entry).');
+        return 2;
+      }
+      if (base.closedFeatures !== undefined && !Array.isArray(base.closedFeatures)) {
+        console.error('Error: existing closedFeatures is not an array -- aborting WITHOUT changes (no silent overwrite).');
         return 2;
       }
       // DEVIATION vs. approve-push (declared in the header): a git failure here is NOT fatal --

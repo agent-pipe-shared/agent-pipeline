@@ -425,6 +425,72 @@ const FIXED_GIT_HEAD = () => ({ ok: true, commit: "abc123deadbeef" });
   ok("PS21c AFTER close-feature the nudge is silent (null)", suggestionAfter === null, JSON.stringify(suggestionAfter));
 }
 
+// ---- PS22: close-feature refuses when activeFeature.id is blank (F2 hardening) ---------
+{
+  const dir = freshDir("close-feature-blank-id");
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(
+    join(dir, ".claude", "pipeline-state.json"),
+    JSON.stringify({ schema: SCHEMA_ID, activeFeature: { id: "", planPath: "p.md", phase: "design" } }, null, 2) + "\n",
+  );
+  const before = readFileSync(statePath(dir), "utf8");
+  const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  ok("PS22a close-feature with blank activeFeature.id refused (exit 2)", code === 2, `got ${code}`);
+  const after = readFileSync(statePath(dir), "utf8");
+  ok("PS22b file left byte-identical (no silent write)", after === before);
+}
+
+// ---- PS23: close-feature refuses when activeFeature.planPath is blank (F2 hardening) ---
+{
+  const dir = freshDir("close-feature-blank-planpath");
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(
+    join(dir, ".claude", "pipeline-state.json"),
+    JSON.stringify({ schema: SCHEMA_ID, activeFeature: { id: "f-blank-plan", planPath: "  ", phase: "design" } }, null, 2) + "\n",
+  );
+  const before = readFileSync(statePath(dir), "utf8");
+  const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  ok("PS23a close-feature with blank activeFeature.planPath refused (exit 2)", code === 2, `got ${code}`);
+  const after = readFileSync(statePath(dir), "utf8");
+  ok("PS23b file left byte-identical (no silent write)", after === before);
+}
+
+// ---- PS24: close-feature refuses when existing closedFeatures is not an array (F2) -----
+{
+  const dir = freshDir("close-feature-nonarray-closed");
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(
+    join(dir, ".claude", "pipeline-state.json"),
+    JSON.stringify(
+      { schema: SCHEMA_ID, activeFeature: { id: "f-ok", planPath: "p.md", phase: "design" }, closedFeatures: "not-an-array" },
+      null,
+      2,
+    ) + "\n",
+  );
+  const before = readFileSync(statePath(dir), "utf8");
+  const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  ok("PS24a close-feature with non-array closedFeatures refused (exit 2)", code === 2, `got ${code}`);
+  const after = readFileSync(statePath(dir), "utf8");
+  ok("PS24b file left byte-identical (no silent overwrite with [])", after === before);
+}
+
+// ---- PS25: close-feature happy path still succeeds and appends the audit entry ---------
+// (regression guard: the new F2 validations must not break the normal case already
+// covered by PS18/PS20 -- kept as an explicit, minimal case named for the F2 fix.)
+{
+  const dir = freshDir("close-feature-f2-happy-path");
+  run(["set-feature", "--id", "f2-happy", "--plan-path", "p2-happy.md"], { dir, now: FIXED_NOW });
+  const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  ok("PS25a close-feature happy path exit 0", code === 0, `got ${code}`);
+  const state = readState(dir).state;
+  ok(
+    "PS25b closedFeatures[0] appended with correct id/planPath",
+    state.closedFeatures?.length === 1 && state.closedFeatures[0].id === "f2-happy" && state.closedFeatures[0].planPath === "p2-happy.md",
+    JSON.stringify(state.closedFeatures),
+  );
+  ok("PS25c activeFeature removed", state.activeFeature === undefined);
+}
+
 // ---- Cleanup ------------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {
