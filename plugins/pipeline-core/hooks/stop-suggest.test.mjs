@@ -1385,6 +1385,85 @@ ok("buildStaleMessage: non-finite nowMs -> null", buildStaleMessage({ updatedAt:
   );
 }
 
+// ==========================================================================================
+// ORDERING FIX (this task, 2026-07-10): the copyable /compact command must ALWAYS be the true
+// LAST LINE of the emitted text -- a stale-usage note or a nag-downgrade note appended AFTER
+// contextMessage used to land on the SAME LINE as "/compact ...", so copying "the last line"
+// fed the trailing warning text into /compact's own argument. Everything below proves the fix
+// at both combine-sites (decideCombinedOutput, applyPersistenceGuard).
+// ==========================================================================================
+function lastLineOf(text) {
+  const lines = text.split("\n");
+  return lines[lines.length - 1];
+}
+
+{
+  // Repro (a): tier "overdue" contextMessage + a stale-usage warning together.
+  const { stdout } = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "overdue",
+    contextMessage: buildContextMessage("overdue", 155000),
+    priorMarker: null,
+    staleMessage: "STALE-TEXT",
+  });
+  const parsed = JSON.parse(stdout);
+  ok(
+    "ORDERING FIX: overdue tier + stale snapshot -> the /compact command is the LAST line",
+    lastLineOf(parsed.systemMessage).startsWith("/compact "),
+    parsed.systemMessage,
+  );
+  ok(
+    "ORDERING FIX: overdue tier + stale snapshot -> the stale note appears BEFORE the compact block, not after",
+    parsed.systemMessage.includes("STALE-TEXT") &&
+      parsed.systemMessage.indexOf("STALE-TEXT") < parsed.systemMessage.indexOf("Copy and run this command"),
+    parsed.systemMessage,
+  );
+}
+{
+  // Repro (b): nag-capped (3rd+ consecutive) block turn -- the downgrade note + a stale note
+  // both used to trail the compact line; both must now precede it.
+  const priorMarker = { lastFingerprint: "∅::block", consecutiveBlocks: 2 };
+  const { stdout } = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "block",
+    contextMessage: buildContextMessage("block", 177000),
+    priorMarker,
+    staleMessage: "STALE-TEXT",
+  });
+  const parsed = JSON.parse(stdout);
+  ok(
+    "ORDERING FIX: nag-capped block turn + stale snapshot -> the /compact command is the LAST line",
+    lastLineOf(parsed.systemMessage).startsWith("/compact "),
+    parsed.systemMessage,
+  );
+  ok(
+    "ORDERING FIX: nag-capped block turn -> downgrade note + stale note both appear BEFORE the compact block",
+    parsed.systemMessage.includes("Downgraded to a warning") &&
+      parsed.systemMessage.includes("STALE-TEXT") &&
+      parsed.systemMessage.indexOf("Downgraded to a warning") < parsed.systemMessage.indexOf("Copy and run this command") &&
+      parsed.systemMessage.indexOf("STALE-TEXT") < parsed.systemMessage.indexOf("Copy and run this command"),
+    parsed.systemMessage,
+  );
+}
+{
+  // Repro (c): applyPersistenceGuard's own write-failure downgrade path rebuilds contextMessage
+  // itself (tier "overdue") -- same reordering fix applies there too.
+  const decided = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "block",
+    contextMessage: buildContextMessage("block", 175000),
+    priorMarker: null,
+    staleMessage: "STALE-TEXT",
+  });
+  const guarded = applyPersistenceGuard({ decided, writeSucceeded: false, phaseMessage: null, tier: "block", totalTokens: 175000, staleMessage: "STALE-TEXT" });
+  const parsed = JSON.parse(guarded);
+  ok(
+    "ORDERING FIX: applyPersistenceGuard downgrade + stale snapshot -> the /compact command is the LAST line",
+    lastLineOf(parsed.systemMessage).startsWith("/compact "),
+    parsed.systemMessage,
+  );
+}
+
 // ---- CLI end-to-end: stale usage snapshot (real subprocess, real files, real Date.now()) -
 {
   // Standalone emission: no active phase (state file removed after writeGbFixture) + a usage
@@ -1450,6 +1529,29 @@ ok("buildStaleMessage: non-finite nowMs -> null", buildStaleMessage({ updatedAt:
   const r = runCliWithStdin(rootDir, { session_id: "sess-badupdated" });
   ok("gb-cli malformed updatedAt: exit 0", r.status === 0, `stderr=${r.stderr}`);
   ok("gb-cli malformed updatedAt: no stale claim (fail-open, no evidence)", !r.stdout.includes("stale"), r.stdout);
+}
+
+{
+  // ORDERING FIX (this task, 2026-07-10), CLI end-to-end: overdue tier + stale usage snapshot
+  // together -- proves the fix holds through the real subprocess path, not just the pure
+  // decideCombinedOutput unit.
+  const rootDir = fixtureDir("gb-cli-overdue-plus-stale-compact-line-fix");
+  writeGbFixture(rootDir, { phase: "does-not-exist" }); // isolate: no phase suggestion
+  const staleUpdatedAt = new Date(Date.now() - 30 * 60 * 1000).toISOString();
+  writeGbUsage(rootDir, "sess-overdue-stale", 155000, 77, staleUpdatedAt); // 77% -> tier overdue, AND stale
+  const r = runCliWithStdin(rootDir, { session_id: "sess-overdue-stale" });
+  ok("gb-cli overdue+stale compact-line fix: exit 0", r.status === 0, `stderr=${r.stderr}`);
+  const parsed = JSON.parse(r.stdout);
+  ok(
+    "gb-cli overdue+stale compact-line fix: both OVERDUE and stale present",
+    parsed.systemMessage.includes("OVERDUE") && parsed.systemMessage.includes("stale"),
+    parsed.systemMessage,
+  );
+  ok(
+    "gb-cli overdue+stale compact-line fix: /compact command is the LAST line",
+    lastLineOf(parsed.systemMessage).startsWith("/compact "),
+    parsed.systemMessage,
+  );
 }
 
 // ---- cleanup + summary -----------------------------------------------------------------

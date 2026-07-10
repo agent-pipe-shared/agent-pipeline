@@ -539,6 +539,43 @@ export function effectiveContextTier(usedPct, totalTokens) {
   return moreSevere(contextTier(usedPct), absoluteContextTier(totalTokens));
 }
 
+// ORDERING FIX (this task, 2026-07-10): the copyable `/compact` command previously lived
+// INSIDE `buildContextMessage`'s return value as its trailing lines. That was safe as long as
+// `buildContextMessage`'s result was the LAST thing appended to the combined output -- but
+// `decideCombinedOutput` (nag-downgrade note) and `applyPersistenceGuard` (stale-usage note)
+// both append MORE text after `contextMessage` via `parts.join(" ")`, which put that trailing
+// text on the SAME LINE as the copyable `/compact ...` command. A user copying "the last line"
+// would then feed the warning text into `/compact`'s own argument. Fix: the compact block is
+// now a separate, constant building block (`buildCompactCommandBlock`) that combine-sites
+// re-attach as the TRUE final line of the whole emitted text, AFTER every other note
+// (nag-downgrade, stale-usage) has been folded in -- see `decideCombinedOutput` and
+// `applyPersistenceGuard` below.
+/**
+ * The copyable `/compact` command block (Elephant decision 2026-07-10). Factored out of
+ * `buildContextMessage` so combine-sites can reposition it independently of the tier-specific
+ * body text. The text is a FIXED constant (independent of tier/totalTokens), which is what lets
+ * `extractContextMessageBody` below strip it back off via a plain suffix check.
+ * @returns {string}
+ */
+function buildCompactCommandBlock() {
+  return "Copy and run this command:\n/compact Summarize the handover: active phase & feature, open items, next steps, active file paths/dispatches, and any not-yet-persisted decisions.";
+}
+
+/**
+ * Strips the trailing compact-command block back off a `buildContextMessage()` result, leaving
+ * only the tier-specific body line (e.g. "Context 120k — ..."). Every caller in this file only
+ * ever passes `null` or a genuine `buildContextMessage()` result, so the fixed suffix always
+ * matches; falls back to returning the input unchanged if it somehow doesn't (defensive, never
+ * throws).
+ * @param {string|null} contextMessage
+ * @returns {string|null}
+ */
+function extractContextMessageBody(contextMessage) {
+  if (typeof contextMessage !== "string") return contextMessage;
+  const suffix = `\n${buildCompactCommandBlock()}`;
+  return contextMessage.endsWith(suffix) ? contextMessage.slice(0, -suffix.length) : contextMessage;
+}
+
 /**
  * @param {"none"|"warn"|"overdue"|"block"} tier
  * @param {number|null} totalTokens
@@ -564,8 +601,9 @@ export function buildContextMessage(tier, totalTokens) {
   // Copyable /compact command (Elephant decision 2026-07-10): appended ONCE here so every
   // reuse site (decideCombinedOutput's normal + capped paths, applyPersistenceGuard's downgrade
   // path) carries it automatically -- naming the problem without the exact copy-pasteable fix
-  // is half as actionable.
-  return `${base}\nCopy and run this command:\n/compact Summarize the handover: active phase & feature, open items, next steps, active file paths/dispatches, and any not-yet-persisted decisions.`;
+  // is half as actionable. Combine-sites strip it back off via `extractContextMessageBody` when
+  // they need to insert further notes BEFORE it (see ORDERING FIX above).
+  return `${base}\n${buildCompactCommandBlock()}`;
 }
 
 const NAG_CAP_TURNS = 2;
@@ -707,11 +745,16 @@ export function decideCombinedOutput({ phaseMessage, tier, contextMessage, prior
     };
   }
 
+  // ORDERING FIX (this task, 2026-07-10): keep the copyable /compact command as the TRUE last
+  // line of the whole emitted text -- strip it off `contextMessage` here, fold the nag-downgrade
+  // note into the remaining body (not after the compact block), join every part with the stale
+  // note included, and re-attach the compact block ONLY at the very end.
+  const contextBody = contextMessage ? extractContextMessageBody(contextMessage) : null;
   const parts = [];
   if (phaseMessage) parts.push(phaseMessage);
-  if (contextMessage) parts.push(capped ? `${contextMessage}${NAG_DOWNGRADE_NOTE}` : contextMessage);
+  if (contextBody) parts.push(capped ? `${contextBody}${NAG_DOWNGRADE_NOTE}` : contextBody);
   if (staleMessage) parts.push(staleMessage);
-  const combinedMessage = parts.join(" ");
+  const combinedMessage = contextMessage ? `${parts.join(" ")}\n${buildCompactCommandBlock()}` : parts.join(" ");
 
   const payload = {
     systemMessage: combinedMessage,
@@ -767,12 +810,17 @@ export function applyPersistenceGuard({ decided, writeSucceeded, phaseMessage, t
   // it is an orthogonal, independently-derived fact about the usage file, not part of the
   // nag-cap counter this guard protects.
   const downgradedContextMessage = tier === "block" ? buildContextMessage("overdue", totalTokens) : null;
+  // ORDERING FIX (this task, 2026-07-10): same reordering as `decideCombinedOutput` above -- the
+  // copyable /compact command stays the TRUE last line, with the stale note (if any) placed
+  // before it, never after.
+  const downgradedContextBody = downgradedContextMessage ? extractContextMessageBody(downgradedContextMessage) : null;
   const parts = [];
   if (phaseMessage) parts.push(phaseMessage);
-  if (downgradedContextMessage) parts.push(downgradedContextMessage);
+  if (downgradedContextBody) parts.push(downgradedContextBody);
   if (staleMessage) parts.push(staleMessage);
-  const combinedMessage = parts.join(" ");
-  if (!combinedMessage) return "";
+  const joinedParts = parts.join(" ");
+  if (!joinedParts) return "";
+  const combinedMessage = downgradedContextMessage ? `${joinedParts}\n${buildCompactCommandBlock()}` : joinedParts;
 
   const payload = {
     systemMessage: combinedMessage,
