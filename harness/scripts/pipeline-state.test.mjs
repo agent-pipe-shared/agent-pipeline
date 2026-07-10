@@ -288,6 +288,143 @@ const FIXED_GIT_HEAD = () => ({ ok: true, commit: "abc123deadbeef" });
   );
 }
 
+// ---- PS15: close-feature without --by is refused, nothing written ---------------------
+{
+  const dir = freshDir("close-feature-no-by");
+  const code = run(["close-feature"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  ok("PS15a close-feature without --by refused (exit 2)", code === 2, `got ${code}`);
+  ok("PS15b nothing written (state file absent)", readState(dir).status === "absent");
+}
+
+// ---- PS16: close-feature with empty --by is refused ------------------------------------
+{
+  const dir = freshDir("close-feature-empty-by");
+  const code = run(["close-feature", "--by", ""], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  ok("PS16 close-feature with empty --by refused (exit 2)", code === 2, `got ${code}`);
+}
+
+// ---- PS17: close-feature without an activeFeature is refused, nothing written ----------
+{
+  const dir = freshDir("close-feature-no-active");
+  const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  ok("PS17a close-feature without activeFeature refused (exit 2)", code === 2, `got ${code}`);
+  ok("PS17b nothing written (state file absent)", readState(dir).status === "absent");
+}
+
+// ---- PS18: close-feature with an activeFeature -- full shape assertion -----------------
+{
+  const dir = freshDir("close-feature-shape");
+  run(["set-feature", "--id", "f-close", "--plan-path", "p-close.md"], { dir, now: FIXED_NOW });
+  run(["approve-plan", "--by", "po-test"], { dir, now: FIXED_NOW });
+  run(["approve-push", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  ok("PS18a close-feature exit 0", code === 0, `got ${code}`);
+  const state = readState(dir).state;
+  ok("PS18b activeFeature removed", state.activeFeature === undefined);
+  ok("PS18c planApproved false", state.planApproved === false);
+  ok("PS18d planApproval cleared", state.planApproval === undefined);
+  ok("PS18e planRevocation cleared", state.planRevocation === undefined);
+  ok(
+    "PS18f closedFeatures[0] shape correct",
+    state.closedFeatures?.length === 1 &&
+      state.closedFeatures[0].id === "f-close" &&
+      state.closedFeatures[0].planPath === "p-close.md" &&
+      state.closedFeatures[0].phaseAtClose === "design" &&
+      state.closedFeatures[0].closedAt === FIXED_NOW() &&
+      state.closedFeatures[0].closedBy === "po-test" &&
+      state.closedFeatures[0].forCommit === "abc123deadbeef",
+    JSON.stringify(state.closedFeatures),
+  );
+  ok("PS18g pushApproval preserved", state.pushApproval?.lastApproved?.forCommit === "abc123deadbeef");
+}
+
+// ---- PS19: close-feature best-effort on a git failure (DEVIATION vs. approve-push) -----
+{
+  const dir = freshDir("close-feature-git-error");
+  run(["set-feature", "--id", "f-git-err", "--plan-path", "p.md"], { dir, now: FIXED_NOW });
+  const code = run(["close-feature", "--by", "po-test"], {
+    dir,
+    now: FIXED_NOW,
+    gitHead: () => ({ ok: false, error: "not a git repository" }),
+  });
+  ok("PS19a close-feature with unresolvable git HEAD still exits 0", code === 0, `got ${code}`);
+  const state = readState(dir).state;
+  ok("PS19b forCommit null on git failure", state.closedFeatures?.[0]?.forCommit === null);
+  ok("PS19c activeFeature still removed despite git failure", state.activeFeature === undefined);
+}
+
+// ---- PS20: close-feature appends -- prior closedFeatures entries are preserved ---------
+{
+  const dir = freshDir("close-feature-append");
+  run(["set-feature", "--id", "f-first", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
+  run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  run(["set-feature", "--id", "f-second", "--plan-path", "p2.md"], { dir, now: FIXED_NOW });
+  const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  ok("PS20a second close-feature exit 0", code === 0, `got ${code}`);
+  const state = readState(dir).state;
+  ok("PS20b closedFeatures length 2", state.closedFeatures?.length === 2, JSON.stringify(state.closedFeatures));
+  ok("PS20c first closedFeatures entry unchanged", state.closedFeatures?.[0]?.id === "f-first");
+  ok("PS20d second closedFeatures entry appended", state.closedFeatures?.[1]?.id === "f-second");
+}
+
+// ---- PS21: close-feature silences the stop-suggest nudge (no activeFeature -> null) ----
+{
+  const dir = freshDir("close-feature-nudge-silence");
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(
+    join(dir, ".claude", "pipeline.yaml"),
+    [
+      "schema: pipeline.manifest.v0",
+      "phases:",
+      "  - name: design",
+      "    enabled: true",
+      "  - name: implementation",
+      "    enabled: true",
+      "  - name: security-scan",
+      "    enabled: true",
+      "gates:",
+      "  dev-plan:",
+      "    mode: blocking",
+      "    type: human",
+      "  push:",
+      "    mode: blocking",
+      "    type: human",
+      "  security:",
+      "    mode: blocking",
+      "    type: automated",
+      "profiles:",
+      "  active: full-sdlc",
+      "  full-sdlc:",
+      "    phases:",
+      "      - design",
+      "      - implementation",
+      "      - security-scan",
+      "flags:",
+      "  has_ui: false",
+      "",
+    ].join("\n"),
+  );
+  run(["set-feature", "--id", "nudge-test", "--plan-path", ".claude/plans/nudge.md"], { dir, now: FIXED_NOW });
+  run(["set-phase", "--phase", "implementation"], { dir, now: FIXED_NOW });
+
+  const manifestBefore = loadManifestSafe(dir);
+  const stateBefore = loadStateSafe(statePath(dir));
+  const suggestionBefore = resolveSuggestion(manifestBefore, stateBefore);
+  ok(
+    "PS21a sanity: BEFORE close-feature the nudge is non-empty",
+    typeof suggestionBefore === "string" && suggestionBefore.length > 0,
+    suggestionBefore,
+  );
+
+  const code = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  ok("PS21b close-feature exit 0", code === 0, `got ${code}`);
+
+  const manifestAfter = loadManifestSafe(dir);
+  const stateAfter = loadStateSafe(statePath(dir));
+  const suggestionAfter = resolveSuggestion(manifestAfter, stateAfter);
+  ok("PS21c AFTER close-feature the nudge is silent (null)", suggestionAfter === null, JSON.stringify(suggestionAfter));
+}
+
 // ---- Cleanup ------------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {

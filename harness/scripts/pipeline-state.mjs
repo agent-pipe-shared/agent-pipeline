@@ -23,6 +23,10 @@
  *     "pushApproval": {
  *       "lastApproved": { "approvedBy": "<string>", "approvedAt": "<ISO-8601>", "forCommit": "<sha>" }
  *     } | absent,
+ *     "closedFeatures": [
+ *       { "id": "<string>", "planPath": "<string>", "phaseAtClose": "<string>|null",
+ *         "closedAt": "<ISO-8601>", "closedBy": "<string>", "forCommit": "<sha>|null" }
+ *     ] | absent,
  *     "updatedAt": "<ISO-8601>"
  *   }
  *   Every field beyond `schema` is optional -- consumers (the two gate hooks) treat an
@@ -64,8 +68,21 @@
  *                                                 where forCommit is the CURRENT HEAD
  *                                                 (`git rev-parse HEAD`, spawned in the
  *                                                 target project dir).
+ *   close-feature --by <name>                     Closes the current activeFeature:
+ *                                                 appends {id, planPath, phaseAtClose,
+ *                                                 closedAt, closedBy, forCommit} to
+ *                                                 closedFeatures (existing entries kept,
+ *                                                 append-only), deletes activeFeature,
+ *                                                 sets planApproved=false, clears
+ *                                                 planApproval/planRevocation.
+ *                                                 pushApproval is left untouched. No
+ *                                                 activeFeature present -> refused (German
+ *                                                 error, exit 2, nothing written). See the
+ *                                                 forCommit DEVIATION note in RULES below --
+ *                                                 unlike approve-push, a git failure here is
+ *                                                 NOT fatal.
  *
- * RULES (all four `--by`-taking subcommands: approve-plan/revoke-plan/approve-push)
+ * RULES (all five `--by`-taking subcommands: approve-plan/revoke-plan/approve-push/close-feature)
  *   - `--by` MUST be present and non-blank -- REFUSED otherwise (German error, exit 2,
  *     nothing written). An unattributed approval/revocation would be exactly the kind
  *     of unauditable state change this CLI exists to prevent.
@@ -81,6 +98,12 @@
  *     (mirrors `.claude/guard-override.log.jsonl`'s philosophy: state changes belong
  *     in history, not just on disk).
  *   - All CLI user-facing output (stdout confirmations, stderr errors) is German.
+ *   - DEVIATION (close-feature only, declared deliberately): unlike approve-push, a failed
+ *     `git rev-parse HEAD` is NOT fatal for close-feature -- forCommit is set to `null`, a
+ *     warning goes to stderr, and the close still writes and exits 0. Rationale: for
+ *     approve-push, forCommit IS the gate payload (the entire point of that command); for
+ *     close-feature it is audit metadata on a cleanup action -- a transient git failure must
+ *     not block a feature from closing.
  *
  * PATH LOOKUP (same convention as the guard family -- guard-git.mjs/guard-testpath.mjs):
  *   `$CLAUDE_PROJECT_DIR/.claude/pipeline-state.json`, falling back to
@@ -88,7 +111,9 @@
  *   case for a human/Goldfish running this CLI directly from the repo root).
  *
  * EXIT CODES: 0 = written / success. 2 = refused (bad usage, malformed pre-existing
- * file, or `git rev-parse HEAD` failed for `approve-push`) -- nothing written.
+ * file, `git rev-parse HEAD` failed for `approve-push`, or no `activeFeature` for
+ * `close-feature`) -- nothing written. Note: a `git rev-parse HEAD` failure during
+ * close-feature does NOT produce exit 2 -- see the DEVIATION note in RULES above.
  *
  * VERIFY: node harness/scripts/pipeline-state.test.mjs (this file's own behavior
  * suite, standalone-runnable; exit 0 = all cases pass). Running this CLI directly
@@ -306,9 +331,57 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       return 0;
     }
 
+    case "close-feature": {
+      const by = flags.by;
+      if (isBlank(by)) {
+        console.error('Fehler: close-feature benötigt --by <name> (nicht leer) -- ein unbenannter Abschluss wird verweigert.');
+        return 2;
+      }
+      const activeFeature = base.activeFeature;
+      if (!activeFeature || typeof activeFeature !== "object") {
+        console.error('Fehler: kein aktives Feature vorhanden -- nichts zu schließen.');
+        return 2;
+      }
+      // DEVIATION vs. approve-push (declared in the header): a git failure here is NOT fatal --
+      // forCommit becomes null, a warning goes to stderr, and the close proceeds (exit 0).
+      const head = gitHead(dir);
+      let forCommit = null;
+      if (head.ok) {
+        forCommit = head.commit;
+      } else {
+        console.error(`Warnung: aktueller Commit (git rev-parse HEAD) konnte nicht ermittelt werden: ${head.error}.`);
+        console.error("close-feature läuft trotzdem weiter -- forCommit wird als null vermerkt.");
+      }
+      const closedAt = now();
+      const priorClosed = Array.isArray(base.closedFeatures) ? base.closedFeatures : [];
+      const closedEntry = {
+        id: activeFeature.id,
+        planPath: activeFeature.planPath,
+        phaseAtClose: activeFeature.phase ?? null,
+        closedAt,
+        closedBy: by,
+        forCommit,
+      };
+      const next = {
+        ...base,
+        schema: SCHEMA_ID,
+        closedFeatures: [...priorClosed, closedEntry],
+        planApproved: false,
+        updatedAt: closedAt,
+      };
+      delete next.activeFeature;
+      delete next.planApproval;
+      delete next.planRevocation;
+      writeState(dir, next);
+      console.log(
+        `Feature "${activeFeature.id}" geschlossen durch "${by}" (Commit ${forCommit ?? "—"}, ${closedAt}). activeFeature entfernt, planApproved=false.`,
+      );
+      return 0;
+    }
+
     default: {
       console.error(
-        `Fehler: unbekanntes Kommando "${sub ?? ""}". Erlaubt: set-feature, set-phase, approve-plan, revoke-plan, approve-push.`,
+        `Fehler: unbekanntes Kommando "${sub ?? ""}". Erlaubt: set-feature, set-phase, approve-plan, revoke-plan, approve-push, close-feature.`,
       );
       return 2;
     }
