@@ -1,6 +1,6 @@
 ---
 name: critic-review
-description: "Independent Critic review (standard stage) of one finished piece of work. Pass PATHS/REFS ONLY - the Critic constructs its own input (git diff, spec, guardrails, evidence) and never accepts prose context. Runs as a fresh-context read-only subagent; two-phase protocol - adversarial hunt with negative-thesis priming, then evidence-gated honest report per operating-model SS2.4. NOT sufficient for architecture/guardrail/security diffs (trigger T1 requires the review tier escalated to a higher-capability model + --bare isolation)."
+description: "Independent Critic review (standard stage) of one finished piece of work. Pass PATHS/REFS ONLY - the Critic constructs its own input (git diff, spec, guardrails, evidence) and never accepts prose context. Runs as a fresh-context read-only subagent; two-phase protocol - adversarial hunt with negative-thesis priming, then evidence-gated honest report per operating-model §2.4. NOT sufficient for architecture/guardrail/security diffs (trigger T1 requires the review tier escalated to a higher-capability model + --bare isolation)."
 disable-model-invocation: true
 argument-hint: "<spec-path> <diff-range> [guardrail-path ...] [evidence:<path> ...] [sha:<ruleset-sha>] [project:<name>] [verdict:yes|no]"
 context: fork

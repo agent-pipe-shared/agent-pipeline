@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "pipeline.user.v0",
   "title": "Personal Pipeline profile (pipeline.user.yaml, AP2 P3a)",
-  "description": "Structure-only validation for pipeline.user.yaml -- the ONE source-of-intent config personalizing a cloned Agent-Pipeline copy (PRD AP2 SS5/SS5a). Consumed by setup.mjs with the SAME hand-rolled validator used for critic-verdict.schema.json / pipeline-manifest.schema.json (plugins/pipeline-core/lib/schema-lite.mjs) -- understands exactly: type, required, properties, items, enum, additionalProperties. setup.mjs itself still owns the compile step (user.yaml -> .claude/settings.json + pipeline.json + pipeline.yaml); this schema only guards user.yaml's own shape.",
+  "description": "Structure-only validation for pipeline.user.yaml -- the ONE source-of-intent config personalizing a cloned Agent-Pipeline copy (PRD AP2 §5/§5a). Consumed by setup.mjs with the SAME hand-rolled validator used for critic-verdict.schema.json / pipeline-manifest.schema.json (plugins/pipeline-core/lib/schema-lite.mjs) -- understands exactly: type, required, properties, items, enum, additionalProperties. setup.mjs itself still owns the compile step (user.yaml -> .claude/settings.json + pipeline.json + pipeline.yaml); this schema only guards user.yaml's own shape.",
   "type": "object",
   "required": ["identity", "language", "platform", "agent_runtime", "worktypes", "models", "autonomy", "gates"],
   "additionalProperties": false,

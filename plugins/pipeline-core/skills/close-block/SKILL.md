@@ -1,6 +1,6 @@
 ---
 name: close-block
-description: "Session/block close ritual, parametrized by the project's .claude/pipeline.json (operating-model SS8): run close.pre extensions, verify + machine evidence, drift checks (handover freshness, CLAUDE.md length gate, memory mirror, stale worktrees), handover + HISTORY sync (single source), telemetry line (MP-20), mandatory self-retro, close.post extensions, final commit. Invoke at a block/task boundary or before a planned session cut."
+description: "Session/block close ritual, parametrized by the project's .claude/pipeline.json (operating-model §8): run close.pre extensions, verify + machine evidence, drift checks (handover freshness, CLAUDE.md length gate, memory mirror, stale worktrees), handover + HISTORY sync (single source), telemetry line (MP-20), mandatory self-retro, close.post extensions, final commit. Invoke at a block/task boundary or before a planned session cut."
 disable-model-invocation: true
 argument-hint: "[block-id or short session label]"
 allowed-tools: Bash(git add:*), Bash(git commit:*), Bash(git log:*), Bash(git diff:*)

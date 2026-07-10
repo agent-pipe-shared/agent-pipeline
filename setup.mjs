@@ -412,7 +412,7 @@ worktypes:
   feature:                          # profile advisor -- the everyday method
     design_phase:
       model: ${a.worktypes.feature.design_phase.model}
-      effort: ${a.worktypes.feature.design_phase.effort}  # no separate design phase: same values
+      effort: ${a.worktypes.feature.design_phase.effort}  # Opus designs; Sonnet executes below (phases differ)
     execution_phase:
       model: ${a.worktypes.feature.execution_phase.model}
       effort: ${a.worktypes.feature.execution_phase.effort}
