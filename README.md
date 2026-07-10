@@ -71,6 +71,10 @@ Claude Code actually reads (`.claude/settings.json`, `.claude/pipeline.json`,
 drift-safe: untouched files recompile freely, but a file you hand-edited yourself
 triggers a confirmation before it's overwritten.
 
+Model routing per work method lives in its own block, `pipeline.user.yaml` →
+`worktypes` — one entry per session profile (design-first / advisor / speed),
+each with its own model, effort, and advisor setting.
+
 ```mermaid
 flowchart LR
     PO["Product Owner<br/>(you)"] -->|"intent / brief"| Elephant["Elephant<br/>(orchestrator)"]
@@ -122,7 +126,8 @@ codebase. Three independent dials set that:
 
 - **Rigor per task** — issue-only / delta-spec / spec-anchored
 - **Governance mode per rule set** — advisory / enforcing / off
-- **Session profile per session** — design / advisor / speed
+- **Session profile per session** — design / advisor / speed (model, effort,
+  and advisor per profile: `pipeline.user.yaml` → `worktypes`)
 
 ## Why this holds up at enterprise scale
 
@@ -250,6 +255,11 @@ Antworten ändern — es ist driftsicher: unveränderte Dateien werden frei neu
 kompiliert, aber eine von Hand bearbeitete kompilierte Datei löst vor dem
 Überschreiben eine Rückfrage aus.
 
+Modell-Routing je Arbeitsmethode lebt in einem eigenen Block,
+`pipeline.user.yaml` → `worktypes` — ein Eintrag je Session-Profil
+(Design-first / Advisor / Speed), jeweils mit eigenem Modell, Effort und
+Advisor-Einstellung.
+
 ```mermaid
 flowchart LR
     PO["Product Owner<br/>(du)"] -->|"Absicht / Auftrag"| Elephant["Elephant<br/>(Orchestrator)"]
@@ -302,7 +312,8 @@ Enterprise-Codebasis. Drei unabhängige Regler stellen das ein:
 
 - **Rigor pro Aufgabe** — Issue-only / Delta-Spec / Spec-verankert
 - **Governance-Modus pro Regelwerk** — advisory / enforcing / off
-- **Session-Profil pro Sitzung** — Design / Advisor / Speed
+- **Session-Profil pro Sitzung** — Design / Advisor / Speed (Modell, Effort
+  und Advisor je Profil: `pipeline.user.yaml` → `worktypes`)
 
 ## Warum das auch im Unternehmenskontext trägt
 

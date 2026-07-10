@@ -1,6 +1,6 @@
 ---
 name: advisor-consult
-description: "Ready dispatch pattern for the bound read-only `consult-advisor` subagent (Task-tool subagent_type: consult-advisor) - the MANDATORY primary workaround (MP-26g) when the advisor tool reports unavailable/error in an `advisor`-profile session, or when the session-start advisor readiness probe (session-bootstrap.md Step 1b) fails. Dispatch metadata: log the consult under the advisor-tier ledger label (MP-26g telemetry), and set the Task-tool `model` invocation parameter to your configured advisor model's enum value (`pipeline.user.yaml -> models.advisor`) - the enum, not the ledger label; EXACTLY one question per consult; hard read-only (tools: Read, Grep, Glob only - no Edit/Write/Bash, no repo mutation). The answer feeds the Elephant's own judgment, never auto-applied. Use PROACTIVELY the moment an advisor call returns unavailable/error - do not silently drop advisory and do not unilaterally switch the main model up to a higher-capability tier instead of running this pattern (MP-26g)."
+description: "Ready dispatch pattern for the bound read-only `consult-advisor` subagent (Task-tool subagent_type: consult-advisor) - the MANDATORY primary workaround (MP-26g) when the advisor tool reports unavailable/error in an `advisor`-profile session, or when the session-start advisor readiness probe (session-bootstrap.md Step 1b) fails. Dispatch metadata: log the consult under the advisor-tier ledger label (MP-26g telemetry), and set the Task-tool `model` invocation parameter to your configured advisor model's enum value (`pipeline.user.yaml -> worktypes.<profile>.advisor`) - the enum, not the ledger label; EXACTLY one question per consult; hard read-only (tools: Read, Grep, Glob only - no Edit/Write/Bash, no repo mutation). The answer feeds the Elephant's own judgment, never auto-applied. Use PROACTIVELY the moment an advisor call returns unavailable/error - do not silently drop advisory and do not unilaterally switch the main model up to a higher-capability tier instead of running this pattern (MP-26g)."
 argument-hint: "<one question for the advisor-replacement consult>"
 ---
 
@@ -37,7 +37,7 @@ tool**:
 - `subagent_type: consult-advisor` — the bound agent above, **never `general-purpose`** for this
   pattern anymore (the read-only contract used to be prompt-level-only; it is now a hard allowlist).
 - Task-tool **`model` invocation parameter:** set it to the model ENUM VALUE the Task tool accepts
-  for your configured advisor tier (`pipeline.user.yaml -> models.advisor`). Keep this ENUM VALUE
+  for your configured advisor tier (`pipeline.user.yaml -> worktypes.<profile>.advisor`). Keep this ENUM VALUE
   distinct from the dispatch-ledger/telemetry LABEL you log the consult under (EL-21). Some setups
   use a human-readable label in the ledger (the one the close-ritual "peculiarities" line uses for
   the advisor-model cost share) that is NOT a valid Task-tool `model` value — state BOTH explicitly
@@ -50,7 +50,7 @@ tool**:
 Dispatch prompt template (fill in exactly ONE question, nothing else):
 
 ```
-role=consult-advisor, ledger label = advisor tier (Task-tool invocation parameter is model=<your configured models.advisor enum>, which may differ from the ledger label)
+role=consult-advisor, ledger label = advisor tier (Task-tool invocation parameter is model=<your configured worktypes.<profile>.advisor enum>, which may differ from the ledger label)
 
 You are a read-only consult subagent standing in for an unavailable advisor
 (MP-26g workaround). You have Read/Grep/Glob ONLY - a hard

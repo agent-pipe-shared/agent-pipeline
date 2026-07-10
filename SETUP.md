@@ -33,10 +33,12 @@ Interactive mode asks five questions — everything else (OS, git host) is *dete
 | Runtime | `claude-code` (full hook/gate enforcement) or `other` (methodology only) | `agent_runtime` |
 | Identity | your name, your repo's owner (org/user or GitLab group), your repo's name | `identity` |
 | Language | human-facing (commits, reviews, new docs) and agent-facing (roles, guardrails, skills), each `de`/`en` | `language` |
-| Subscription tier | `pro`, `max`, or `api`/own — picks a model preset per role | `models` |
+| Subscription tier | `pro`, `max`, or `api`/own — picks a model preset per work method and dispatch tier | `worktypes`, `models` |
 | Autonomy preset | `conservative` (gated push, feature branches) or `autonomous` (standing-approved push, direct-to-main, advisor on) | `autonomy` |
 
-`max` is the recommended default preset: an Opus design/orchestrator tier plus a Sonnet three-tier (implement / mechanic / review) for everything else. `api`/own starts from the same Max preset — edit the model names directly in `pipeline.user.yaml` afterwards and re-run setup.
+`max` is the recommended default preset: an Opus orchestrator (routed per work method — see below) plus a Sonnet three-tier dispatch palette (implement / mechanic / deep) and Sonnet review. `api`/own starts from the same Max preset — edit the model names directly in `pipeline.user.yaml` afterwards and re-run setup.
+
+**Route models per work method?** → `pipeline.user.yaml` → `worktypes`. That block is THE single place to set which model/effort/advisor runs for each of the three session profiles (design-first, advisor, speed) — see the comments in the file itself.
 
 Setup writes `pipeline.user.yaml`, then immediately compiles it into the three runtime configs (see "What setup wrote" below).
 
@@ -71,7 +73,7 @@ Open a Claude Code session in the repo. A `SessionStart` hook surfaces a reminde
 |---|---|---|
 | `.claude/settings.json` | `identity`, `platform` | Claude Code itself — plugin/marketplace binding, permissions, status line |
 | `.claude/pipeline.json` | `autonomy`, `gates` | project calibration — the bootstrap check and the `pipeline-start`/`close-block` skills |
-| `.claude/pipeline.yaml` | `models`, `gates`, `autonomy` | the declarative manifest layer — the PreToolUse guard hooks (`guard-devplan`, `guard-push`), the `stop-suggest` Stop-event hook (next-phase suggestion + context-budget warnings), and model routing; validated by `harness/scripts/validate-manifest.mjs` |
+| `.claude/pipeline.yaml` | `worktypes`, `models`, `gates`, `autonomy` | the declarative manifest layer — the PreToolUse guard hooks (`guard-devplan`, `guard-push`), the `stop-suggest` Stop-event hook (next-phase suggestion + context-budget warnings), and model routing; validated by `harness/scripts/validate-manifest.mjs` |
 
 Every compiled file carries a `GENERATED from pipeline.user.yaml` marker so re-runs can tell a stale compile from a real hand-edit.
 
@@ -131,13 +133,19 @@ Git-Host) wird *erkannt*, nie gefragt:
 | Runtime | `claude-code` (volles Hook-/Gate-Enforcement) oder `other` (nur Methodik) | `agent_runtime` |
 | Identität | dein Name, Owner deines Repos (Org/User bzw. GitLab-Gruppe), Repo-Name | `identity` |
 | Sprache | human-facing (Commits, Reviews, neue Docs) und agent-facing (Rollen, Guardrails, Skills), je `de`/`en` | `language` |
-| Abo-Stufe | `pro`, `max` oder `api`/eigene — legt ein Modell-Preset je Rolle fest | `models` |
+| Abo-Stufe | `pro`, `max` oder `api`/eigene — legt ein Modell-Preset je Arbeitsmethode und Dispatch-Stufe fest | `worktypes`, `models` |
 | Autonomie-Preset | `konservativ` (gated Push, Feature-Branches) oder `autonom` (standing-approved Push, direkt auf main, Advisor an) | `autonomy` |
 
-`max` ist das empfohlene Default-Preset: eine Opus-Design-/Orchestrator-Stufe
-plus ein Sonnet-Dreistufer (Implementierung / Mechanik / Review) für alles
-andere. `api`/eigene startet vom selben Max-Preset — trage die Modellnamen
-danach direkt in `pipeline.user.yaml` ein und führe Setup erneut aus.
+`max` ist das empfohlene Default-Preset: ein Opus-Orchestrator (geroutet je
+Arbeitsmethode — siehe unten) plus eine Sonnet-Dreistufer-Dispatch-Palette
+(Implementierung / Mechanik / Deep) sowie Sonnet-Review. `api`/eigene startet
+vom selben Max-Preset — trage die Modellnamen danach direkt in
+`pipeline.user.yaml` ein und führe Setup erneut aus.
+
+**Modelle je Arbeitsmethode routen?** → `pipeline.user.yaml` → `worktypes`.
+Dieser Block ist DIE eine Stelle, an der du Modell/Effort/Advisor für jedes
+der drei Session-Profile (Design-first, Advisor, Speed) festlegst — siehe die
+Kommentare direkt in der Datei.
 
 Setup schreibt `pipeline.user.yaml` und kompiliert daraus sofort die drei
 Laufzeit-Configs (siehe „Was Setup geschrieben hat" unten).
@@ -190,7 +198,7 @@ beginnt.
 |---|---|---|
 | `.claude/settings.json` | `identity`, `platform` | Claude Code selbst — Plugin-/Marketplace-Bindung, Permissions, Status-Zeile |
 | `.claude/pipeline.json` | `autonomy`, `gates` | Projekt-Kalibrierung — der Bootstrap-Check sowie die Skills `pipeline-start`/`close-block` |
-| `.claude/pipeline.yaml` | `models`, `gates`, `autonomy` | die deklarative Manifest-Schicht — die PreToolUse-Guard-Hooks (`guard-devplan`, `guard-push`), der `stop-suggest`-Stop-Hook (Vorschlag der nächsten Phase + Kontext-Budget-Warnungen) sowie Modell-Routing; validiert über `harness/scripts/validate-manifest.mjs` |
+| `.claude/pipeline.yaml` | `worktypes`, `models`, `gates`, `autonomy` | die deklarative Manifest-Schicht — die PreToolUse-Guard-Hooks (`guard-devplan`, `guard-push`), der `stop-suggest`-Stop-Hook (Vorschlag der nächsten Phase + Kontext-Budget-Warnungen) sowie Modell-Routing; validiert über `harness/scripts/validate-manifest.mjs` |
 
 Jede kompilierte Datei trägt einen `GENERATED from pipeline.user.yaml`-Marker,
 damit ein erneuter Lauf einen veralteten Kompilat-Stand von einem echten

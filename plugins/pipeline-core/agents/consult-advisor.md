@@ -1,6 +1,6 @@
 ---
 name: consult-advisor
-description: "Agent-Pipeline read-only advisor-outage consult subagent (MP-26g) - the bound, hard-read-only replacement for the advisor model when a session's advisor call or the session-start readiness probe (session-bootstrap.md Step 1b) reports unavailable/error. Dispatch via the Task tool: subagent_type: consult-advisor, with the model invocation parameter set to your configured advisor model (pipeline.user.yaml -> models.advisor). EXACTLY one question per consult; hard read-only (Read/Grep/Glob only - no Write/Edit/Bash, no repo mutation, no exceptions). The prose answer feeds the Elephant's own judgment, it is never auto-applied. Ready dispatch pattern: plugins/pipeline-core/skills/advisor-consult/SKILL.md."
+description: "Agent-Pipeline read-only advisor-outage consult subagent (MP-26g) - the bound, hard-read-only replacement for the advisor model when a session's advisor call or the session-start readiness probe (session-bootstrap.md Step 1b) reports unavailable/error. Dispatch via the Task tool: subagent_type: consult-advisor, with the model invocation parameter set to your configured advisor model (pipeline.user.yaml -> worktypes.<profile>.advisor). EXACTLY one question per consult; hard read-only (Read/Grep/Glob only - no Write/Edit/Bash, no repo mutation, no exceptions). The prose answer feeds the Elephant's own judgment, it is never auto-applied. Ready dispatch pattern: plugins/pipeline-core/skills/advisor-consult/SKILL.md."
 effort: high
 maxTurns: 10
 tools: Read, Grep, Glob
