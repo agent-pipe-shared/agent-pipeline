@@ -831,6 +831,8 @@ Next steps:
      (/pipeline-core:pipeline-start).
   3. Try a first run in the "quick" profile (details: SETUP.md).
   4. pipeline.user.yaml is adjustable any time -- re-run \`node setup.mjs\` afterwards.
+  5. Before your first big feature: a quick look at docs/design/README.md pays
+     off (optional design pre-stage, self-service brainstorming guide).
 
 Details: SETUP.md (main entry point), docs/usage.md (day to day).
 `);

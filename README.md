@@ -90,6 +90,9 @@ flowchart LR
 
 ```mermaid
 flowchart TD
+    ID["Idea"] --> P
+    ID -.->|"optional, advisory"| DS["Design pre-stage<br/>(self-service,<br/>docs/design/)"]
+    DS -.-> P
     P["Profile / model decision"] --> PL["Plan artifact +<br/>human plan gate"]
     PL --> R["Readiness check"]
     R --> D["Dispatch<br/>(fresh context, briefing)"]
@@ -101,6 +104,24 @@ flowchart TD
 
 Order matters: deterministic gates always run *before* any LLM judgment — a
 Critic never reviews a diff that hasn't already cleared the machine chain.
+
+## The front door: optional design pre-stage
+
+Before the pipeline itself there's deliberately no mandatory step, just a
+front door (the dotted branch in the diagram above): idea → optional design
+brainstorming with any chat AI (guide + standard prompt + lean export
+template under [`docs/design/README.md`](docs/design/README.md)) →
+requirements export → feeds the pipeline. If a requirement looks large at
+triage (multiple modules/projects affected, new architecture, several
+plausible options, a larger security/data surface), the Elephant flags it
+**non-blocking** and links the guide — you can always skip the design
+pre-stage and go straight to work. An external design export never gets a
+free pass: the Elephant challenges it and re-derives it through the normal
+path (interview → spec → readiness) instead of adopting it as an
+already-approved design. For large topics, the Elephant also proposes a cut
+into several self-contained backlog items and waits for confirmation or
+correction — the existing per-item PRD review stays the only check point,
+nothing new is added. Details: [`docs/operating-model.md`](docs/operating-model.md) §3.2.
 
 ## Bring your own architecture rules & guardrails
 
@@ -144,6 +165,11 @@ human.
 
 See [`SETUP.md`](SETUP.md) for the full walkthrough: clone, run `node setup.mjs`,
 bind the plugin, start your first session.
+
+Before your first big feature, a quick look at
+[`docs/design/README.md`](docs/design/README.md) pays off — a self-service
+guide for brainstorming a solid requirement before it enters the pipeline
+(optional, recommended).
 
 ## Runtime
 
@@ -275,6 +301,9 @@ flowchart LR
 
 ```mermaid
 flowchart TD
+    ID["Idee"] --> P
+    ID -.->|"optional, advisory"| DS["Design-Vorstufe<br/>(Selbstbedienung,<br/>docs/design/)"]
+    DS -.-> P
     P["Profil-/Modell-Entscheid"] --> PL["Plan-Artefakt +<br/>menschliches Plan-Gate"]
     PL --> R["Readiness-Check"]
     R --> D["Dispatch<br/>(frischer Kontext, Briefing)"]
@@ -287,6 +316,25 @@ flowchart TD
 Entscheidend ist die Reihenfolge: Die maschinellen Gates laufen immer VOR jedem
 Urteil eines LLM — ein Critic bewertet nie einen Diff, der die deterministische
 Kette noch nicht durchlaufen hat.
+
+## Die Vordertür: optionale Design-Vorstufe
+
+Vor der eigentlichen Pipeline steht bewusst kein Pflichtschritt, sondern eine
+Vordertür (im Diagramm oben der gestrichelte Zweig): Idee → optionales
+Design-Brainstorming mit einer beliebigen Chat-KI (Guide + Standard-Prompt +
+schlankes Export-Template unter [`docs/design/README.md`](docs/design/README.md))
+→ Requirements-Export → speist die Pipeline. Wirkt eine Anforderung bei der
+Triage umfangreich (mehrere Module/Projekte betroffen, neue Architektur,
+mehrere plausible Optionen, größere Security-/Datenfläche), weist der
+Elephant **nicht-blockierend** darauf hin und verlinkt den Guide — wer sofort
+ohne Design weiterarbeiten will, kann das jederzeit tun. Ein externer
+Design-Export bekommt dabei nie einen Vertrauensvorschuss: Der Elephant
+challenged ihn und leitet ihn über den normalen Weg (Interview → Spec →
+Readiness) neu her, statt ihn als fertig genehmigtes Design zu übernehmen.
+Bei großen Themen schlägt der Elephant zusätzlich einen Schnitt in mehrere
+eigenständige Backlog-Items vor und wartet auf Bestätigung oder Korrektur —
+das bestehende PRD-Review pro Item bleibt der einzige Prüfpunkt, es kommt
+nichts Neues hinzu. Details: [`docs/operating-model.md`](docs/operating-model.md) §3.2.
 
 ## Eigene Architekturvorgaben & Guardrails
 
@@ -330,6 +378,11 @@ Urteil bleibt trotzdem immer beim Menschen.
 
 Der vollständige Ablauf steht in [`SETUP.md`](SETUP.md): klonen, `node setup.mjs`
 ausführen, Plugin binden, erste Session starten.
+
+Vor dem ersten großen Feature lohnt ein kurzer Blick in
+[`docs/design/README.md`](docs/design/README.md) — der Selbstbedienungs-Guide
+zum Brainstorming einer soliden Anforderung, bevor sie in die Pipeline geht
+(optional, empfohlen).
 
 ## Laufzeitumgebung
 

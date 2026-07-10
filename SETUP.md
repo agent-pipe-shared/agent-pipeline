@@ -67,6 +67,8 @@ claude plugin install pipeline-core@agent-pipeline --scope project
 
 Open a Claude Code session in the repo. A `SessionStart` hook surfaces a reminder — *run `/pipeline-core:pipeline-start` before any work* — but the reminder itself checks nothing. Running `/pipeline-core:pipeline-start` performs the actual bootstrap: it confirms ruleset state, project calibration, and the handover file before work begins.
 
+Before your first big feature, a quick look at [`docs/design/README.md`](docs/design/README.md) pays off — a self-service guide for brainstorming a solid requirement before it enters the pipeline (optional, advisory).
+
 ## What setup wrote
 
 | File | Compiled from (`pipeline.user.yaml`) | Read by |
@@ -191,6 +193,11 @@ Arbeit ausführen* —, die Erinnerung selbst prüft aber nichts. Erst wenn du
 `/pipeline-core:pipeline-start` ausführst, läuft der eigentliche Bootstrap: Der Skill
 bestätigt Regelwerk-Stand, Projekt-Kalibrierung und Handover-Datei, bevor die Arbeit
 beginnt.
+
+Vor dem ersten großen Feature lohnt ein kurzer Blick in
+[`docs/design/README.md`](docs/design/README.md) — der Selbstbedienungs-Guide
+zum Brainstorming einer soliden Anforderung, bevor sie in die Pipeline geht
+(optional, empfohlen).
 
 ## Was Setup geschrieben hat
 
