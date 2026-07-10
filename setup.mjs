@@ -135,12 +135,31 @@ export function buildDefaultAnswers() {
     language: { human_facing: "en", agent_facing: "en" },
     platform: { git_host: "github", cli: "gh" },
     agent_runtime: "claude-code",
+    // worktypes = THE place to route models per work method (the three session profiles:
+    // design-first/advisor/speed) -- the orchestrator's own routing. models below stays the
+    // dispatch-tier palette only (mechanic/implement/deep, plus critic's review).
+    worktypes: {
+      design: {
+        design_phase: { model: "opus", effort: "high" },
+        execution_phase: { model: "opus", effort: "max" },
+        advisor: "off",
+      },
+      feature: {
+        design_phase: { model: "opus", effort: "max" },
+        execution_phase: { model: "opus", effort: "max" },
+        advisor: "off",
+      },
+      mini: {
+        design_phase: { model: "sonnet", effort: "max" },
+        execution_phase: { model: "sonnet", effort: "max" },
+        advisor: "opus",
+      },
+    },
     models: {
-      design: { model: "opus", effort: "high" },
       implement: { model: "sonnet", effort: "medium" },
       mechanic: { model: "sonnet", effort: "low" },
+      deep: { model: "sonnet", effort: "xhigh" },
       review: { model: "sonnet", effort: "high" },
-      advisor: { enabled: false },
     },
     autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
     gates: { dev_plan: "blocking", push: "blocking", security: "blocking", claude_md_max_lines: 200 },
@@ -210,24 +229,66 @@ function safeSpawn(spawn, command, args, opts = {}) {
 }
 
 // ---- subscription-tier / autonomy presets (pure) -----------------------------------------------
-/** @param {string} tier - "pro" | "max" | anything else ("api"/custom: uses the Max preset as a starting point) */
+/**
+ * @param {string} tier - "pro" | "max" | anything else ("api"/custom: uses the Max preset as a
+ *   starting point)
+ * @returns {{worktypes: object, models: object}} both preset-filled blocks -- worktypes carries
+ *   the orchestrator/session-profile routing, models the dispatch-tier palette (see
+ *   buildDefaultAnswers() for the shape).
+ */
 export function applyAboPreset(tier) {
   if (tier === "pro") {
     return {
-      design: { model: "sonnet", effort: "high" },
-      implement: { model: "sonnet", effort: "medium" },
-      mechanic: { model: "sonnet", effort: "low" },
-      review: { model: "sonnet", effort: "high" },
-      advisor: { enabled: false },
+      worktypes: {
+        design: {
+          design_phase: { model: "sonnet", effort: "high" },
+          execution_phase: { model: "sonnet", effort: "max" },
+          advisor: "off",
+        },
+        feature: {
+          design_phase: { model: "sonnet", effort: "max" },
+          execution_phase: { model: "sonnet", effort: "max" },
+          advisor: "off",
+        },
+        mini: {
+          design_phase: { model: "sonnet", effort: "max" },
+          execution_phase: { model: "sonnet", effort: "max" },
+          advisor: "sonnet",
+        },
+      },
+      models: {
+        implement: { model: "sonnet", effort: "medium" },
+        mechanic: { model: "sonnet", effort: "low" },
+        deep: { model: "sonnet", effort: "xhigh" },
+        review: { model: "sonnet", effort: "high" },
+      },
     };
   }
   // "max" (recommended) and "api"/custom (freely editable starting point) share the preset.
   return {
-    design: { model: "opus", effort: "high" },
-    implement: { model: "sonnet", effort: "medium" },
-    mechanic: { model: "sonnet", effort: "low" },
-    review: { model: "sonnet", effort: "high" },
-    advisor: { enabled: false },
+    worktypes: {
+      design: {
+        design_phase: { model: "opus", effort: "high" },
+        execution_phase: { model: "opus", effort: "max" },
+        advisor: "off",
+      },
+      feature: {
+        design_phase: { model: "opus", effort: "max" },
+        execution_phase: { model: "opus", effort: "max" },
+        advisor: "off",
+      },
+      mini: {
+        design_phase: { model: "sonnet", effort: "max" },
+        execution_phase: { model: "sonnet", effort: "max" },
+        advisor: "opus",
+      },
+    },
+    models: {
+      implement: { model: "sonnet", effort: "medium" },
+      mechanic: { model: "sonnet", effort: "low" },
+      deep: { model: "sonnet", effort: "xhigh" },
+      review: { model: "sonnet", effort: "high" },
+    },
   };
 }
 
@@ -240,6 +301,13 @@ export function applyAutonomyPreset(preset) {
 
 export function normalizeLang(value) {
   return value === "en" ? "en" : "de";
+}
+
+/** Renders an advisor field: "off" gets quoted (a deliberate string sentinel, not a YAML
+ * literal off-state -- yaml-lite has no bool coercion for it, but the quoting stays for human
+ * readability/parity with the PRD's authoritative example); a model name renders bare. */
+function renderAdvisor(value) {
+  return value === "off" ? `"off"` : value;
 }
 
 // ---- pipeline.user.yaml: render + parse + validate ---------------------------------------------
@@ -282,26 +350,54 @@ platform:
 
 agent_runtime: ${a.agent_runtime}          # claude-code (full enforcement) | other (methodology only → docs/runtime-boundary.md)
 
-# setup.mjs asks your subscription tier and writes a preset:
+# setup.mjs asks your subscription tier and writes matching presets for both blocks
+# below (worktypes = orchestrator/session-profile routing, models = dispatch-tier routing):
 #   Pro:  all sonnet, effort-tiered (methodology fully usable)
-#   Max:  opus orchestrator + sonnet 3-tier (recommended, default below)
+#   Max:  opus orchestrator + sonnet dispatch tiers (recommended, default below)
 #   API/custom: enter names freely (setup.mjs pre-fills with the Max preset as a starting point)
-models:
-  design:
-    model: ${a.models.design.model}
-    effort: ${a.models.design.effort}
+#
+# THE place to route models per work method (= the three session profiles: design-first,
+# advisor, speed). Bugfix rule: a mini-scoped bugfix runs as \`mini\`; anything larger runs
+# as \`feature\` (QG-07 repro-first applies either way).
+worktypes:
+  design:                           # profile design-first -- features with a real design phase
+    design_phase:
+      model: ${a.worktypes.design.design_phase.model}
+      effort: ${a.worktypes.design.design_phase.effort}   # orchestrator until plan approval
+    execution_phase:
+      model: ${a.worktypes.design.execution_phase.model}
+      effort: ${a.worktypes.design.execution_phase.effort} # orchestrator after approval
+    advisor: ${renderAdvisor(a.worktypes.design.advisor)}
+  feature:                          # profile advisor -- the everyday method
+    design_phase:
+      model: ${a.worktypes.feature.design_phase.model}
+      effort: ${a.worktypes.feature.design_phase.effort}  # no separate design phase: same values
+    execution_phase:
+      model: ${a.worktypes.feature.execution_phase.model}
+      effort: ${a.worktypes.feature.execution_phase.effort}
+    advisor: ${renderAdvisor(a.worktypes.feature.advisor)} # "off" | a model name (autonomous preset sets a model here)
+  mini:                             # profile speed -- mini-feature / hotfix
+    design_phase:
+      model: ${a.worktypes.mini.design_phase.model}
+      effort: ${a.worktypes.mini.design_phase.effort}
+    execution_phase:
+      model: ${a.worktypes.mini.execution_phase.model}
+      effort: ${a.worktypes.mini.execution_phase.effort}
+    advisor: ${renderAdvisor(a.worktypes.mini.advisor)}    # fixed pairing (small model orchestrates, bigger advisor watches)
+
+models:                             # dispatch tiers only (MP-27: mechanic/implement/deep, plus critic's review)
   implement:
     model: ${a.models.implement.model}
     effort: ${a.models.implement.effort}
   mechanic:
     model: ${a.models.mechanic.model}
     effort: ${a.models.mechanic.effort}
+  deep:
+    model: ${a.models.deep.model}
+    effort: ${a.models.deep.effort}
   review:
     model: ${a.models.review.model}
     effort: ${a.models.review.effort}
-  advisor:
-    enabled: ${a.models.advisor.enabled}                  # optional 2nd-opinion pattern; DEFAULT OFF
-    # Fallback without advisor access: advisor-consult subagent (documented)
 
 autonomy:
   push_policy: ${a.autonomy.push_policy}                # gated | standing-approved
@@ -323,9 +419,9 @@ gates:
 #   branch_model: direct-main
 #   wip_limit: 1
 #
-# models:
-#   advisor:
-#     enabled: true
+# worktypes:
+#   feature:
+#     advisor: opus
 # -----------------------------------------------------------------------------------------
 `;
 }
@@ -352,17 +448,26 @@ export function answersFromParsed(parsed, defaults = buildDefaultAnswers()) {
   if (!parsed || typeof parsed !== "object") return defaults;
   const d = defaults;
   const g = (obj, key, fallback) => (obj && typeof obj === "object" && obj[key] !== undefined ? obj[key] : fallback);
+  const mergeWorktype = (def, val) => ({
+    design_phase: { ...def.design_phase, ...(val?.design_phase ?? {}) },
+    execution_phase: { ...def.execution_phase, ...(val?.execution_phase ?? {}) },
+    advisor: g(val, "advisor", def.advisor),
+  });
   return {
     identity: { ...d.identity, ...(parsed.identity && typeof parsed.identity === "object" ? parsed.identity : {}) },
     language: { ...d.language, ...(parsed.language && typeof parsed.language === "object" ? parsed.language : {}) },
     platform: { ...d.platform, ...(parsed.platform && typeof parsed.platform === "object" ? parsed.platform : {}) },
     agent_runtime: g(parsed, "agent_runtime", d.agent_runtime),
+    worktypes: {
+      design: mergeWorktype(d.worktypes.design, parsed.worktypes?.design),
+      feature: mergeWorktype(d.worktypes.feature, parsed.worktypes?.feature),
+      mini: mergeWorktype(d.worktypes.mini, parsed.worktypes?.mini),
+    },
     models: {
-      design: { ...d.models.design, ...(parsed.models?.design ?? {}) },
       implement: { ...d.models.implement, ...(parsed.models?.implement ?? {}) },
       mechanic: { ...d.models.mechanic, ...(parsed.models?.mechanic ?? {}) },
+      deep: { ...d.models.deep, ...(parsed.models?.deep ?? {}) },
       review: { ...d.models.review, ...(parsed.models?.review ?? {}) },
-      advisor: { ...d.models.advisor, ...(parsed.models?.advisor ?? {}) },
     },
     autonomy: { ...d.autonomy, ...(parsed.autonomy ?? {}) },
     gates: { ...d.gates, ...(parsed.gates ?? {}) },
@@ -507,12 +612,25 @@ security:
       rules_dir: governance/examples/policies/semgrep
 
 modelRouting:
+  # elephant: pipeline-manifest.schema.json's modelRouting shape is a flat {model, effort, note}
+  # per role (schema-lite has no $ref/oneOf to express worktypes' nested per-phase routing
+  # without invasive manifest-schema surgery -- out of this delivery's scope, flagged in the
+  # delivering briefing's report). This is a REPRESENTATIVE value (feature worktype, execution
+  # phase) -- the full per-worktype/phase orchestrator routing is authoritative in
+  # pipeline.user.yaml -> worktypes.
   elephant:
-    model: ${answers.models.design.model}
-    effort: ${answers.models.design.effort}
+    model: ${answers.worktypes.feature.execution_phase.model}
+    effort: ${answers.worktypes.feature.execution_phase.effort}
+    note: "representative value (worktypes.feature.execution_phase) -- full per-worktype/phase routing lives in pipeline.user.yaml -> worktypes"
   goldfish:
     model: ${answers.models.implement.model}
     effort: ${answers.models.implement.effort}
+  goldfish_mechanic:
+    model: ${answers.models.mechanic.model}
+    effort: ${answers.models.mechanic.effort}
+  goldfish_deep:
+    model: ${answers.models.deep.model}
+    effort: ${answers.models.deep.effort}
   critic:
     model: ${answers.models.review.model}
     effort: ${answers.models.review.effort}
@@ -621,7 +739,7 @@ async function promptAnswers(rl, previous) {
   const agentIn = (await rl.question(`Language -- agent-facing (roles/guardrails/skills) [de/en] (${previous.language.agent_facing}): `)).trim();
 
   const aboIn = (await rl.question(`Subscription tier? [pro/max/api] (max) `)).trim().toLowerCase() || "max";
-  const models = applyAboPreset(aboIn);
+  const { worktypes, models } = applyAboPreset(aboIn);
   if (aboIn !== "pro" && aboIn !== "max") {
     console.log(
       "  API/custom chosen: models pre-filled with the Max preset -- enter your own model names/effort values directly in pipeline.user.yaml and re-run `node setup.mjs` afterwards.",
@@ -630,7 +748,7 @@ async function promptAnswers(rl, previous) {
 
   const autonomyIn = (await rl.question(`Autonomy preset? [conservative/autonomous] (conservative) `)).trim().toLowerCase() || "conservative";
   const autonomy = applyAutonomyPreset(autonomyIn);
-  if (autonomyIn.startsWith("autonom")) models.advisor = { enabled: true };
+  if (autonomyIn.startsWith("autonom")) worktypes.feature.advisor = "opus";
 
   const git_host = detectGitHost(ROOT_DIR);
   const cli = cliForHost(git_host);
@@ -641,6 +759,7 @@ async function promptAnswers(rl, previous) {
     language: { human_facing: humanIn ? normalizeLang(humanIn) : previous.language.human_facing, agent_facing: agentIn ? normalizeLang(agentIn) : previous.language.agent_facing },
     platform: { git_host, cli },
     agent_runtime,
+    worktypes,
     models,
     autonomy,
     gates: previous.gates,

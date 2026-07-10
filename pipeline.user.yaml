@@ -33,26 +33,54 @@ platform:
 
 agent_runtime: claude-code          # claude-code (full enforcement) | other (methodology only → docs/runtime-boundary.md)
 
-# setup.mjs asks your subscription tier and writes a preset:
+# setup.mjs asks your subscription tier and writes matching presets for both blocks
+# below (worktypes = orchestrator/session-profile routing, models = dispatch-tier routing):
 #   Pro:  all sonnet, effort-tiered (methodology fully usable)
-#   Max:  opus orchestrator + sonnet 3-tier (recommended, default below)
+#   Max:  opus orchestrator + sonnet dispatch tiers (recommended, default below)
 #   API/custom: enter names freely (setup.mjs pre-fills with the Max preset as a starting point)
-models:
-  design:
-    model: opus
-    effort: high
+#
+# THE place to route models per work method (= the three session profiles: design-first,
+# advisor, speed). Bugfix rule: a mini-scoped bugfix runs as `mini`; anything larger runs
+# as `feature` (QG-07 repro-first applies either way).
+worktypes:
+  design:                           # profile design-first -- features with a real design phase
+    design_phase:
+      model: opus
+      effort: high   # orchestrator until plan approval
+    execution_phase:
+      model: opus
+      effort: max # orchestrator after approval
+    advisor: "off"
+  feature:                          # profile advisor -- the everyday method
+    design_phase:
+      model: opus
+      effort: max  # no separate design phase: same values
+    execution_phase:
+      model: opus
+      effort: max
+    advisor: "off" # "off" | a model name (autonomous preset sets a model here)
+  mini:                             # profile speed -- mini-feature / hotfix
+    design_phase:
+      model: sonnet
+      effort: max
+    execution_phase:
+      model: sonnet
+      effort: max
+    advisor: opus    # fixed pairing (small model orchestrates, bigger advisor watches)
+
+models:                             # dispatch tiers only (MP-27: mechanic/implement/deep, plus critic's review)
   implement:
     model: sonnet
     effort: medium
   mechanic:
     model: sonnet
     effort: low
+  deep:
+    model: sonnet
+    effort: xhigh
   review:
     model: sonnet
     effort: high
-  advisor:
-    enabled: false                  # optional 2nd-opinion pattern; DEFAULT OFF
-    # Fallback without advisor access: advisor-consult subagent (documented)
 
 autonomy:
   push_policy: gated                # gated | standing-approved
@@ -74,7 +102,7 @@ gates:
 #   branch_model: direct-main
 #   wip_limit: 1
 #
-# models:
-#   advisor:
-#     enabled: true
+# worktypes:
+#   feature:
+#     advisor: opus
 # -----------------------------------------------------------------------------------------

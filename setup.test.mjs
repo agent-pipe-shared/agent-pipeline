@@ -144,23 +144,53 @@ function fakeSpawn(byCommand) {
 // applyAboPreset
 // ======================================================================================
 {
-  const m = applyAboPreset("pro");
-  ok("applyAboPreset pro: design is sonnet/high (no opus)", m.design.model === "sonnet" && m.design.effort === "high", JSON.stringify(m.design));
-  ok("applyAboPreset pro: implement sonnet/medium", m.implement.model === "sonnet" && m.implement.effort === "medium");
-  ok("applyAboPreset pro: advisor disabled by default", m.advisor.enabled === false);
+  const p = applyAboPreset("pro");
+  ok(
+    "applyAboPreset pro: worktypes.design is sonnet (no opus)",
+    p.worktypes.design.design_phase.model === "sonnet" && p.worktypes.design.execution_phase.model === "sonnet",
+    JSON.stringify(p.worktypes.design),
+  );
+  ok(
+    "applyAboPreset pro: worktypes.feature.advisor stays off",
+    p.worktypes.feature.advisor === "off",
+  );
+  ok(
+    "applyAboPreset pro: worktypes.mini.advisor is sonnet (no bigger model available)",
+    p.worktypes.mini.advisor === "sonnet",
+  );
+  ok("applyAboPreset pro: models.implement sonnet/medium", p.models.implement.model === "sonnet" && p.models.implement.effort === "medium");
+  ok("applyAboPreset pro: models.deep sonnet/xhigh", p.models.deep.model === "sonnet" && p.models.deep.effort === "xhigh");
 }
 {
-  const m = applyAboPreset("max");
-  ok("applyAboPreset max: design is opus/high", m.design.model === "opus" && m.design.effort === "high", JSON.stringify(m.design));
-  ok("applyAboPreset max: matches buildDefaultAnswers().models", JSON.stringify(m) === JSON.stringify(buildDefaultAnswers().models));
+  const p = applyAboPreset("max");
+  ok(
+    "applyAboPreset max: worktypes.design is opus/high (design_phase) + opus/max (execution_phase)",
+    p.worktypes.design.design_phase.model === "opus" &&
+      p.worktypes.design.design_phase.effort === "high" &&
+      p.worktypes.design.execution_phase.model === "opus" &&
+      p.worktypes.design.execution_phase.effort === "max",
+    JSON.stringify(p.worktypes.design),
+  );
+  ok("applyAboPreset max: worktypes.mini.advisor is opus", p.worktypes.mini.advisor === "opus");
+  ok("applyAboPreset max: models.deep is sonnet/xhigh (MP-27 3-tier completeness)", p.models.deep.model === "sonnet" && p.models.deep.effort === "xhigh");
+  ok(
+    "applyAboPreset max: matches buildDefaultAnswers() worktypes + models",
+    JSON.stringify(p.worktypes) === JSON.stringify(buildDefaultAnswers().worktypes) && JSON.stringify(p.models) === JSON.stringify(buildDefaultAnswers().models),
+  );
 }
 {
-  const m = applyAboPreset("api");
-  ok("applyAboPreset api/eigene fallback: shares the max preset (opus/high design)", m.design.model === "opus" && m.design.effort === "high");
+  const p = applyAboPreset("api");
+  ok(
+    "applyAboPreset api/eigene fallback: shares the max preset (opus/high design)",
+    p.worktypes.design.design_phase.model === "opus" && p.worktypes.design.design_phase.effort === "high",
+  );
 }
 {
-  const m = applyAboPreset("something-unrecognized");
-  ok("applyAboPreset unrecognized tier: falls back to the max preset", m.design.model === "opus" && m.design.effort === "high");
+  const p = applyAboPreset("something-unrecognized");
+  ok(
+    "applyAboPreset unrecognized tier: falls back to the max preset",
+    p.worktypes.design.design_phase.model === "opus" && p.worktypes.design.design_phase.effort === "high",
+  );
 }
 
 // ======================================================================================
@@ -225,6 +255,19 @@ ok("normalizeLang: undefined -> de", normalizeLang(undefined) === "de");
   ok("renderUserYaml: reflects customized identity fields", text.includes('owner_name: "Jane Doe"') && text.includes('repo_owner: "janedoe"'));
   ok("renderUserYaml: reflects customized platform fields", text.includes("git_host: gitlab") && text.includes("cli: glab"));
 }
+{
+  // worktypes rendering: "off" quotes as a string sentinel, a model name renders bare.
+  const withAdvisorSet = {
+    ...buildDefaultAnswers(),
+    worktypes: { ...buildDefaultAnswers().worktypes, feature: { ...buildDefaultAnswers().worktypes.feature, advisor: "opus" } },
+  };
+  const text = renderUserYaml(withAdvisorSet);
+  ok("renderUserYaml: worktypes block present, above models", text.indexOf("worktypes:") > -1 && text.indexOf("worktypes:") < text.indexOf("models:"));
+  ok("renderUserYaml: worktypes.design.advisor renders as quoted \"off\"", text.includes('advisor: "off"'));
+  ok("renderUserYaml: worktypes.feature.advisor reflects an assigned model name (bare, unquoted)", text.includes("advisor: opus") && !text.includes('advisor: "opus"'));
+  ok("renderUserYaml: models block carries the new deep tier", text.includes("deep:") && text.includes("effort: xhigh"));
+  ok("renderUserYaml: models block no longer carries design/advisor", !/^\s{2}design:/m.test(text.slice(text.indexOf("\nmodels:"))));
+}
 
 // ======================================================================================
 // answersFromParsed
@@ -246,6 +289,23 @@ ok("normalizeLang: undefined -> de", normalizeLang(undefined) === "de");
   ok("answersFromParsed: partial merge overrides autonomy.push_policy", merged.autonomy.push_policy === "standing-approved");
   ok("answersFromParsed: partial merge keeps autonomy.branch_model from defaults", merged.autonomy.branch_model === defaults.autonomy.branch_model);
   ok("answersFromParsed: untouched top-level blocks (language) stay at defaults", JSON.stringify(merged.language) === JSON.stringify(defaults.language));
+}
+{
+  const defaults = buildDefaultAnswers();
+  const partial = {
+    worktypes: { feature: { advisor: "opus" } },
+    models: { deep: { effort: "max" } },
+  };
+  const merged = answersFromParsed(partial, defaults);
+  ok("answersFromParsed: partial worktypes.feature.advisor override applied", merged.worktypes.feature.advisor === "opus");
+  ok(
+    "answersFromParsed: worktypes.feature.design_phase/execution_phase kept from defaults (partial worktype object)",
+    JSON.stringify(merged.worktypes.feature.design_phase) === JSON.stringify(defaults.worktypes.feature.design_phase),
+  );
+  ok("answersFromParsed: untouched worktypes (design, mini) stay at defaults", JSON.stringify(merged.worktypes.design) === JSON.stringify(defaults.worktypes.design) && JSON.stringify(merged.worktypes.mini) === JSON.stringify(defaults.worktypes.mini));
+  ok("answersFromParsed: partial models.deep.effort override applied", merged.models.deep.effort === "max");
+  ok("answersFromParsed: models.deep.model kept from defaults (partial tier object)", merged.models.deep.model === defaults.models.deep.model);
+  ok("answersFromParsed: untouched models tiers (implement, mechanic, review) stay at defaults", JSON.stringify(merged.models.implement) === JSON.stringify(defaults.models.implement));
 }
 
 // ======================================================================================
@@ -439,19 +499,46 @@ ok("parseArgv: --defaults alone -> force stays false", parseArgv(["--defaults"])
 {
   const answers = {
     ...buildDefaultAnswers(),
+    worktypes: {
+      ...buildDefaultAnswers().worktypes,
+      feature: { design_phase: { model: "opus", effort: "max" }, execution_phase: { model: "opus", effort: "high" }, advisor: "off" },
+    },
     models: {
-      ...buildDefaultAnswers().models,
-      design: { model: "opus", effort: "high" },
       implement: { model: "sonnet", effort: "medium" },
-      review: { model: "sonnet", effort: "high" },
+      mechanic: { model: "sonnet", effort: "low" },
+      deep: { model: "sonnet", effort: "xhigh" },
+      review: { model: "haiku", effort: "high" },
     },
     gates: { dev_plan: "warn", push: "blocking", security: "off", claude_md_max_lines: 200 },
     autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
   };
   const yaml = renderPipelineYaml(answers, "hashGHI");
-  ok("renderPipelineYaml: elephant model-routing mirrors models.design", yaml.includes("elephant:") && yaml.includes("model: opus") && yaml.includes("effort: high"));
-  ok("renderPipelineYaml: goldfish model-routing mirrors models.implement", yaml.includes("goldfish:") && yaml.includes("model: sonnet") && yaml.includes("effort: medium"));
-  ok("renderPipelineYaml: critic model-routing mirrors models.review", yaml.includes("critic:"));
+  ok(
+    "renderPipelineYaml: elephant model-routing mirrors worktypes.feature.execution_phase (representative value)",
+    /elephant:\s*\n(?:.*\n)*?\s*model: opus\s*\n\s*effort: high/.test(yaml),
+    yaml,
+  );
+  ok("renderPipelineYaml: elephant carries a note pointing to pipeline.user.yaml -> worktypes", /elephant:[\s\S]*?note:.*worktypes/.test(yaml));
+  ok(
+    "renderPipelineYaml: goldfish model-routing mirrors models.implement",
+    /goldfish:\s*\n\s*model: sonnet\s*\n\s*effort: medium/.test(yaml),
+    yaml,
+  );
+  ok(
+    "renderPipelineYaml: goldfish_mechanic mirrors models.mechanic",
+    /goldfish_mechanic:\s*\n\s*model: sonnet\s*\n\s*effort: low/.test(yaml),
+    yaml,
+  );
+  ok(
+    "renderPipelineYaml: goldfish_deep mirrors models.deep (MP-27 3-tier completeness)",
+    /goldfish_deep:\s*\n\s*model: sonnet\s*\n\s*effort: xhigh/.test(yaml),
+    yaml,
+  );
+  ok(
+    "renderPipelineYaml: critic model-routing mirrors models.review",
+    /critic:\s*\n\s*model: haiku\s*\n\s*effort: high/.test(yaml),
+    yaml,
+  );
   ok("renderPipelineYaml: dev-plan gate mode mirrors gates.dev_plan", yaml.includes("mode: warn"));
   ok("renderPipelineYaml: security gate mode mirrors gates.security", /security:\s*\n\s*mode: off/.test(yaml), yaml);
   ok("renderPipelineYaml: push approval is 'required' when push_policy is gated", yaml.includes("approval: required"));

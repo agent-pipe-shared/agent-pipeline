@@ -4,7 +4,7 @@
   "title": "Personal Pipeline profile (pipeline.user.yaml, AP2 P3a)",
   "description": "Structure-only validation for pipeline.user.yaml -- the ONE source-of-intent config personalizing a cloned Agent-Pipeline copy (PRD AP2 SS5/SS5a). Consumed by setup.mjs with the SAME hand-rolled validator used for critic-verdict.schema.json / pipeline-manifest.schema.json (plugins/pipeline-core/lib/schema-lite.mjs) -- understands exactly: type, required, properties, items, enum, additionalProperties. setup.mjs itself still owns the compile step (user.yaml -> .claude/settings.json + pipeline.json + pipeline.yaml); this schema only guards user.yaml's own shape.",
   "type": "object",
-  "required": ["identity", "language", "platform", "agent_runtime", "models", "autonomy", "gates"],
+  "required": ["identity", "language", "platform", "agent_runtime", "worktypes", "models", "autonomy", "gates"],
   "additionalProperties": false,
   "properties": {
     "identity": {
@@ -37,24 +37,54 @@
       }
     },
     "agent_runtime": { "type": "string", "enum": ["claude-code", "other"] },
-    "models": {
+    "worktypes": {
       "type": "object",
-      "required": ["design", "implement", "mechanic", "review", "advisor"],
+      "required": ["design", "feature", "mini"],
       "additionalProperties": false,
-      "description": "design/implement/mechanic/review each validated against the same shape ({model, effort} strings) -- inlined 4x below rather than via $ref/$defs, because schema-lite.mjs (plugins/pipeline-core/lib/schema-lite.mjs) understands only type/required/properties/items/enum/additionalProperties and does NOT resolve $ref -- see that file's header.",
+      "description": "THE place to route models per work method (= the three session profiles: design-first/advisor/speed). design/feature/mini each validated against the same shape (design_phase + execution_phase, each {model, effort} strings, plus advisor: a string -- \"off\" or a model name) -- inlined 3x below (design_phase/execution_phase inlined 2x within each) rather than via $ref/$defs, same schema-lite constraint as models below (no $ref support).",
       "properties": {
-        "design": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
-        "implement": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
-        "mechanic": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
-        "review": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
-        "advisor": {
+        "design": {
           "type": "object",
-          "required": ["enabled"],
+          "required": ["design_phase", "execution_phase", "advisor"],
           "additionalProperties": false,
           "properties": {
-            "enabled": { "type": "boolean" }
+            "design_phase": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
+            "execution_phase": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
+            "advisor": { "type": "string" }
+          }
+        },
+        "feature": {
+          "type": "object",
+          "required": ["design_phase", "execution_phase", "advisor"],
+          "additionalProperties": false,
+          "properties": {
+            "design_phase": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
+            "execution_phase": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
+            "advisor": { "type": "string" }
+          }
+        },
+        "mini": {
+          "type": "object",
+          "required": ["design_phase", "execution_phase", "advisor"],
+          "additionalProperties": false,
+          "properties": {
+            "design_phase": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
+            "execution_phase": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
+            "advisor": { "type": "string" }
           }
         }
+      }
+    },
+    "models": {
+      "type": "object",
+      "required": ["implement", "mechanic", "deep", "review"],
+      "additionalProperties": false,
+      "description": "Dispatch tiers ONLY (MP-27 3-tier: mechanic/implement/deep, plus critic's review) -- the orchestrator's own routing per work method lives in worktypes above, not here. implement/mechanic/deep/review each validated against the same shape ({model, effort} strings) -- inlined 4x below rather than via $ref/$defs, because schema-lite.mjs (plugins/pipeline-core/lib/schema-lite.mjs) understands only type/required/properties/items/enum/additionalProperties and does NOT resolve $ref -- see that file's header.",
+      "properties": {
+        "implement": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
+        "mechanic": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
+        "deep": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } },
+        "review": { "type": "object", "required": ["model", "effort"], "additionalProperties": false, "properties": { "model": { "type": "string" }, "effort": { "type": "string" } } }
       }
     },
     "autonomy": {
