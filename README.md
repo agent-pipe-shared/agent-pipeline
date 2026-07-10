@@ -196,6 +196,25 @@ what's always portable and what's Claude-Code-specific.
   calibration.
 - [`LICENSE`](LICENSE) (code, Apache-2.0) · [`LICENSE-DOCS`](LICENSE-DOCS) (docs & prose, CC-BY-4.0).
 
+## Acknowledgments
+
+This operating model is a synthesis, not an invention. It adapts and builds on
+the ideas in three published works, and we thank their authors for the thinking
+that shaped it:
+
+- the **"Elephants & Goldfish" role model (EGM)** — source of the Elephant and
+  Goldfish roles and the principle that the document, not the session, carries
+  the knowledge;
+- Google's **"New SDLC" (vibe-coding playbook)** — source of *Agent = Model +
+  Harness*, the orchestrator capability model, and stakes-driven discipline;
+- Google's **"Day 5" whitepaper** — source of the approval-fatigue analysis
+  behind the deliberately minimal set of human gates.
+
+Where this repository departs from these sources — for example, recasting the
+Goldfish as an executor rather than a checker — it says so, and why, in
+[`docs/operating-model.md`](docs/operating-model.md) and
+[`docs/design-decisions.md`](docs/design-decisions.md).
+
 ---
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
@@ -410,6 +429,26 @@ Claude-Code-spezifisch ist.
   normative Dokument: Rollen, SDLC, Review-System, Session-Lifecycle, Handover,
   Projekt-Kalibrierung.
 - [`LICENSE`](LICENSE) (Code, Apache-2.0) · [`LICENSE-DOCS`](LICENSE-DOCS) (Doku & Prosa, CC-BY-4.0).
+
+## Danksagung
+
+Dieses Operating Model ist eine Synthese, keine Erfindung. Es adaptiert die
+Ideen aus drei veröffentlichten Arbeiten und baut auf ihnen auf; wir danken
+ihren Autorinnen und Autoren für die Denkarbeit, die es geprägt hat:
+
+- das **„Elephants & Goldfish"-Rollenmodell (EGM)** — Quelle der Elephant- und
+  Goldfish-Rollen und des Prinzips, dass das Dokument, nicht die Session, das
+  Wissen trägt;
+- Googles **„New SDLC" (Vibe-Coding-Playbook)** — Quelle von *Agent = Model +
+  Harness*, des Orchestrator-Capability-Modells und der stakes-getriebenen
+  Disziplin;
+- Googles **„Day 5"-Whitepaper** — Quelle der Approval-Fatigue-Analyse hinter
+  dem bewusst minimalen Satz an Human-Gates.
+
+Wo dieses Repository von diesen Quellen abweicht — etwa indem der Goldfish als
+Ausführender statt als Prüfer neu geschnitten wird —, sagt es das und warum, in
+[`docs/operating-model.md`](docs/operating-model.md) und
+[`docs/design-decisions.md`](docs/design-decisions.md).
 
 ---
 
