@@ -153,6 +153,55 @@
  * case, never a false alarm.
  * ============================================================================================
  *
+ * ============================================================================================
+ * ABSOLUTE SOFT-NUDGE LAYER (Elephant decision, 2026-07-10 -- resolves a goldfish-deep stop on
+ * genuine design latitude): a prior dispatch correctly identified an ambiguity between "EL-04
+ * says window-size-agnostic" and "a window-independent absolute checkpoint nudge is also
+ * wanted" and stopped rather than guess. Resolution: these are TWO ORTHOGONAL SIGNALS, kept
+ * distinct rather than merged into one ladder:
+ *
+ *   (1) The HARD emergency tier (`decision:"block"`) STAYS PERCENT-BASED, unchanged --
+ *       EL-04's core assertion ("no spurious hard brake on a large, lightly-used window", see
+ *       above) is fully PRESERVED. `contextTier` itself is untouched byte-for-byte.
+ *
+ *   (2) The SOFT proactive nudge (`warn`/`overdue`) additionally gains a window-INDEPENDENT
+ *       ABSOLUTE ladder (`absoluteContextTier`, new pure function beside `contextTier`):
+ *         >= 180k real tokens -> "warn"    ("look for the next good cut")
+ *         >= 200k real tokens -> "overdue" ("clearly time to checkpoint")
+ *         >= 250k real tokens -> "overdue" (same tier, strongest-soft framing -- see the
+ *                                            function's own comment for why this collapses to
+ *                                            the same machine-checkable state as 200k)
+ *       This ladder NEVER returns "block" -- structurally incapable of it, not just by
+ *       convention (see the function itself). `effectiveContextTier(usedPct, totalTokens)`
+ *       combines the two ladders via "more severe wins" (`none < warn < overdue < block`).
+ *       Because the absolute ladder tops out at "overdue", `effectiveContextTier` can only
+ *       ever be "block" when the PERCENT ladder already says "block" -- the hard brake stays
+ *       automatically percent-gated, with no special-casing needed anywhere else in the file.
+ *       `run()` now tiers on `effectiveContextTier(usedPct, totalTokens)` instead of bare
+ *       `contextTier(usedPct)`; every OTHER G-B/MAJOR-1/stale-detection mechanic above (nag-cap,
+ *       write-then-emit, dedup, forceCapped) is untouched -- they all operate on "whatever the
+ *       final tier is", agnostic to which ladder produced it.
+ *
+ *   (3) RECURRING RE-ARM (additive third dimension, independent of both ladders and of the
+ *       nag-cap): the marker (`.claude/.stop-suggest-<session_id>.json`) grows a new field,
+ *       `lastEmittedTotalTokens`, set ONLY when the hook actually emits something (never on a
+ *       deduped/silent turn -- exactly like `lastFingerprint`/`consecutiveBlocks`'s own
+ *       persistence discipline). `decideCombinedOutput` bypasses its ordinary fingerprint dedup
+ *       -- forcing a fresh emission even though the phase+tier fingerprint is UNCHANGED --
+ *       whenever the effective tier is not "none" AND real usage has grown by
+ *       >= `CONTEXT_REARM_STEP_TOKENS` (50k) tokens since that last emission. Without this, a
+ *       session sitting at "overdue" for another 200k tokens because nothing else about the
+ *       situation changed would go silent after the first nudge -- exactly the chatter-fix this
+ *       hook exists for, but pointed at the wrong target (staying silent when the SITUATION
+ *       WORSENED is not the "nothing changed" case dedup is meant to catch).
+ *
+ *   (4) COPYABLE /compact COMMAND: `buildContextMessage` now appends a copy-pasteable
+ *       `/compact <summary prompt>` line to every non-"none"-tier message, ONCE, inside the
+ *       function itself -- every reuse site (the normal `decideCombinedOutput` emission path,
+ *       its capped/downgraded path, `applyPersistenceGuard`'s fail-open downgrade path) carries
+ *       it automatically, with no per-call-site duplication.
+ * ============================================================================================
+ *
  * VERIFY: node plugins/pipeline-core/hooks/stop-suggest.test.mjs
  * Manual smoke (from the repo root; always exits 0, stdout empty unless an active feature
  * with a resolvable next phase, or a staged context-budget warning, applies):
@@ -444,6 +493,52 @@ export function contextTier(usedPct) {
   return "none";
 }
 
+// ============================================================================================
+// ABSOLUTE SOFT-NUDGE LADDER (Elephant decision, 2026-07-10) -- see header. Window-INDEPENDENT
+// (unlike `contextTier` above, which is percent/window-relative on purpose, EL-04). Kept as a
+// SEPARATE pure function rather than folded into `contextTier` so the percent function stays
+// byte-for-byte untouched (its own direct unit tests below stay green unmodified).
+// ============================================================================================
+/**
+ * @param {number|null} totalTokens - the REAL token count, or `null`/non-finite (fail-open -> "none").
+ * @returns {"none"|"warn"|"overdue"} NEVER "block" -- structurally incapable of it (no branch
+ *   here ever produces that string), which is what keeps the hard emergency brake automatically
+ *   percent-gated once combined via `effectiveContextTier` below.
+ */
+export function absoluteContextTier(totalTokens) {
+  if (typeof totalTokens !== "number" || !Number.isFinite(totalTokens)) return "none";
+  // 250k is documented (Elephant decision 2026-07-10) as the "strongest soft" floor -- but it
+  // maps to the SAME "overdue" tier as the 200k floor. There is no 4th soft tier between
+  // "overdue" and the percent-gated "block"; the 250k number is an urgency-framing distinction
+  // in the decision record, not a separate machine-checkable state.
+  if (totalTokens >= 200000) return "overdue"; // also covers the 250k "strongest soft" floor
+  if (totalTokens >= 180000) return "warn";
+  return "none";
+}
+
+const TIER_RANK = { none: 0, warn: 1, overdue: 2, block: 3 };
+
+/** @param {"none"|"warn"|"overdue"|"block"} a @param {"none"|"warn"|"overdue"|"block"} b
+ * @returns {"none"|"warn"|"overdue"|"block"} whichever ranks higher (ties keep `a`). */
+function moreSevere(a, b) {
+  return TIER_RANK[b] > TIER_RANK[a] ? b : a;
+}
+
+/**
+ * Combines the PERCENT tier (`contextTier`, EL-04, hard-block-eligible) with the ABSOLUTE tier
+ * (`absoluteContextTier`, 2026-07-10, soft-nudge-only) via "more severe wins". Because
+ * `absoluteContextTier` never returns "block", the ONLY way this function's result can be
+ * "block" is when `contextTier(usedPct)` itself already says "block" -- the hard emergency
+ * brake therefore stays exactly as percent-gated as EL-04 requires, automatically, with no
+ * special-casing needed here or anywhere downstream.
+ * @param {number|null} usedPct
+ * @param {number|null} totalTokens
+ * @returns {"none"|"warn"|"overdue"|"block"}
+ */
+export function effectiveContextTier(usedPct, totalTokens) {
+  return moreSevere(contextTier(usedPct), absoluteContextTier(totalTokens));
+}
+
 /**
  * @param {"none"|"warn"|"overdue"|"block"} tier
  * @param {number|null} totalTokens
@@ -457,19 +552,28 @@ export function buildContextMessage(tier, totalTokens) {
   // every tier including "block" itself (170000+ still floors to the same k-value it would
   // have rounded to for all boundary/whole-thousand inputs the existing suite exercises).
   const k = Math.floor((totalTokens ?? 0) / 1000);
+  let base;
   if (tier === "warn") {
-    return `Context ${k}k — /compact handover window (100–150k, cut at a task boundary).`;
+    base = `Context ${k}k — /compact handover window (100–150k, cut at a task boundary).`;
+  } else if (tier === "overdue") {
+    base = `Context ${k}k — /compact OVERDUE (100–150k long exceeded, cut at a task boundary now).`;
+  } else {
+    // "block"
+    base = `Context ${k}k — EMERGENCY BRAKE: /compact is now mandatory (limit 170k).`;
   }
-  if (tier === "overdue") {
-    return `Context ${k}k — /compact OVERDUE (100–150k long exceeded, cut at a task boundary now).`;
-  }
-  // "block"
-  return `Context ${k}k — EMERGENCY BRAKE: /compact is now mandatory (limit 170k).`;
+  // Copyable /compact command (Elephant decision 2026-07-10): appended ONCE here so every
+  // reuse site (decideCombinedOutput's normal + capped paths, applyPersistenceGuard's downgrade
+  // path) carries it automatically -- naming the problem without the exact copy-pasteable fix
+  // is half as actionable.
+  return `${base}\nCopy and run this command:\n/compact Summarize the handover: active phase & feature, open items, next steps, active file paths/dispatches, and any not-yet-persisted decisions.`;
 }
 
 const NAG_CAP_TURNS = 2;
 const NAG_DOWNGRADE_NOTE =
   " (Downgraded to a warning after 2 consecutive blocks — Stop-hook block-cap protection, auto-mode.)";
+
+/** Re-arm step (Elephant decision, 2026-07-10) -- see header point (3). */
+export const CONTEXT_REARM_STEP_TOKENS = 50000;
 
 // ============================================================================================
 // G-B: session-keyed dedup/nag-cap marker (`.claude/.stop-suggest-<session_id>.json`).
@@ -514,7 +618,8 @@ export function writeMarkerSafe(path, marker) {
  *
  * @param {object} args
  * @param {string|null} args.phaseMessage - result of `resolveSuggestion()`
- * @param {"none"|"warn"|"overdue"|"block"} args.tier - result of `contextTier()`
+ * @param {"none"|"warn"|"overdue"|"block"} args.tier - the EFFECTIVE tier, i.e. `run()` passes
+ *   `effectiveContextTier()`'s result (Elephant decision 2026-07-10) here, not bare `contextTier()`
  * @param {string|null} args.contextMessage - result of `buildContextMessage()`
  * @param {{lastFingerprint?: string, consecutiveBlocks?: number}|null} args.priorMarker
  * @param {boolean} [args.forceCapped] - belt-and-suspenders override (T1 critic MAJOR-1 fix,
@@ -529,12 +634,36 @@ export function writeMarkerSafe(path, marker) {
  *   there is nothing to check). Defaults to `null`, i.e. every pre-existing caller keeps its
  *   pre-fix behaviour byte-identical (fingerprints included -- the `"::stale"` suffix below is
  *   only ever appended when `staleMessage` is non-null).
- * @returns {{stdout: string, marker: {lastFingerprint: string, consecutiveBlocks: number}|null, isActiveBlock: boolean}}
+ * @param {number|null} [args.totalTokens] - the REAL token count (Elephant decision 2026-07-10,
+ *   see header point (3)), used ONLY for the re-arm bypass below -- NOT for tiering (that
+ *   happens upstream, in `effectiveContextTier`). Defaults to `null`, i.e. every pre-existing
+ *   caller (which never passed this) gets `rearmDue` structurally `false` -- byte-identical
+ *   pre-fix behaviour.
+ * @returns {{stdout: string, marker: {lastFingerprint: string, consecutiveBlocks: number, lastEmittedTotalTokens: number|null}|null, isActiveBlock: boolean}}
  */
-export function decideCombinedOutput({ phaseMessage, tier, contextMessage, priorMarker, forceCapped = false, staleMessage = null }) {
+export function decideCombinedOutput({ phaseMessage, tier, contextMessage, priorMarker, forceCapped = false, staleMessage = null, totalTokens = null }) {
   const priorConsecutiveBlocks = typeof priorMarker?.consecutiveBlocks === "number" ? priorMarker.consecutiveBlocks : 0;
   const nextConsecutiveBlocks = tier === "block" ? priorConsecutiveBlocks + 1 : 0;
   const capped = tier === "block" && (nextConsecutiveBlocks > NAG_CAP_TURNS || forceCapped); // 3rd+ consecutive turn, or forced
+
+  // RE-ARM (Elephant decision 2026-07-10, additive third dimension -- see header point (3)):
+  // `lastEmittedTotalTokens` is only ever set on an actual emission (below), never on a
+  // deduped/silent turn. Whenever the effective tier is still active (not "none") AND real
+  // usage has grown by >= CONTEXT_REARM_STEP_TOKENS since that last emission, the fingerprint
+  // dedup is bypassed even though phase+tier are otherwise unchanged -- staying silent while
+  // the SITUATION WORSENS is not the "nothing changed" case dedup exists to catch. Untouched
+  // when `totalTokens`/`priorMarker.lastEmittedTotalTokens` are unavailable (pre-fix callers,
+  // or the very first emission ever) -- `rearmDue` is structurally `false` there.
+  const priorLastEmittedTotalTokens =
+    typeof priorMarker?.lastEmittedTotalTokens === "number" && Number.isFinite(priorMarker.lastEmittedTotalTokens)
+      ? priorMarker.lastEmittedTotalTokens
+      : null;
+  const rearmDue =
+    tier !== "none" &&
+    typeof totalTokens === "number" &&
+    Number.isFinite(totalTokens) &&
+    priorLastEmittedTotalTokens !== null &&
+    totalTokens - priorLastEmittedTotalTokens >= CONTEXT_REARM_STEP_TOKENS;
 
   if (phaseMessage === null && contextMessage === null && staleMessage === null) {
     // Nothing to say at all (tier "none", no phase suggestion, no stale warning) -- identical
@@ -543,10 +672,13 @@ export function decideCombinedOutput({ phaseMessage, tier, contextMessage, prior
     // window; skips writing anything when there was never a marker to begin with (no needless
     // marker-file churn on an ordinary quiet turn). tier can never be "block" here (a null
     // contextMessage implies tier "none", see buildContextMessage) so isActiveBlock is always
-    // false in this branch.
+    // false in this branch. `lastEmittedTotalTokens` carries over unchanged -- this is NOT an
+    // emission.
     return {
       stdout: "",
-      marker: priorMarker ? { lastFingerprint: priorMarker.lastFingerprint ?? "", consecutiveBlocks: 0 } : null,
+      marker: priorMarker
+        ? { lastFingerprint: priorMarker.lastFingerprint ?? "", consecutiveBlocks: 0, lastEmittedTotalTokens: priorLastEmittedTotalTokens }
+        : null,
       isActiveBlock: false,
     };
   }
@@ -563,11 +695,16 @@ export function decideCombinedOutput({ phaseMessage, tier, contextMessage, prior
   const fingerprint = `${phaseMessage ?? "∅"}::${effectiveTierLabel}${staleSuffix}`;
   const isActiveBlock = tier === "block" && !capped; // NEVER true below 170k (tier is only "block" there)
 
-  if (!isActiveBlock && priorMarker && priorMarker.lastFingerprint === fingerprint) {
+  if (!isActiveBlock && !rearmDue && priorMarker && priorMarker.lastFingerprint === fingerprint) {
     // Dedup: identical situation as last turn (same phase suggestion AND same tier AND same
-    // stale/fresh state) -- stay silent (the live "chatter" finding this feature fixes). The
-    // marker is still refreshed (nag counter especially) so state stays consistent across turns.
-    return { stdout: "", marker: { lastFingerprint: fingerprint, consecutiveBlocks: nextConsecutiveBlocks }, isActiveBlock: false };
+    // stale/fresh state) AND no re-arm due -- stay silent (the live "chatter" finding this
+    // feature fixes). The marker is still refreshed (nag counter especially) so state stays
+    // consistent across turns; `lastEmittedTotalTokens` carries over unchanged (NOT an emission).
+    return {
+      stdout: "",
+      marker: { lastFingerprint: fingerprint, consecutiveBlocks: nextConsecutiveBlocks, lastEmittedTotalTokens: priorLastEmittedTotalTokens },
+      isActiveBlock: false,
+    };
   }
 
   const parts = [];
@@ -585,9 +722,13 @@ export function decideCombinedOutput({ phaseMessage, tier, contextMessage, prior
     payload.reason = combinedMessage;
   }
 
+  // Actual emission -> stamp lastEmittedTotalTokens with the current real token count (or
+  // `null` when it isn't resolvable this turn), enabling future re-arm checks against THIS turn.
+  const emittedTotalTokens = typeof totalTokens === "number" && Number.isFinite(totalTokens) ? totalTokens : null;
+
   return {
     stdout: JSON.stringify(payload) + "\n",
-    marker: { lastFingerprint: fingerprint, consecutiveBlocks: nextConsecutiveBlocks },
+    marker: { lastFingerprint: fingerprint, consecutiveBlocks: nextConsecutiveBlocks, lastEmittedTotalTokens: emittedTotalTokens },
     isActiveBlock,
   };
 }
@@ -673,7 +814,11 @@ export function run() {
   // real totalTokens -- but keep passing the real totalTokens into buildContextMessage so the
   // DISPLAY text still shows real tokens ("Context {k}k"), not a percentage.
   const usedPct = resolveUsedPctFromUsage(usage);
-  const tier = contextTier(usedPct);
+  // Elephant decision 2026-07-10 (see header ABSOLUTE SOFT-NUDGE LAYER): tier on the COMBINED
+  // effective tier (percent ladder, EL-04, hard-block-eligible; ∨ absolute ladder, soft-only)
+  // instead of the bare percent tier -- `effectiveContextTier` guarantees this can only ever be
+  // "block" when the percent ladder alone already says "block", so EL-04 stays intact.
+  const tier = effectiveContextTier(usedPct, totalTokens);
   const contextMessage = buildContextMessage(tier, totalTokens);
 
   // STALE-DETECTION (context-counter hardening, PO-directive 2026-07-08): real Date.now() is
@@ -700,6 +845,7 @@ export function run() {
     // readable counter conservatively forces the downgraded path (see header).
     forceCapped: stopHookActive && priorMarker === null,
     staleMessage,
+    totalTokens,
   });
 
   // WRITE-THEN-EMIT (T1 critic MAJOR-1 fix, 2026-07-08): persist BEFORE emitting -- whether

@@ -49,6 +49,8 @@ import {
   resolveTotalTokensFromUsage,
   resolveUsedPctFromUsage,
   contextTier,
+  absoluteContextTier,
+  effectiveContextTier,
   buildContextMessage,
   resolveUpdatedAtMs,
   isUsageStale,
@@ -59,6 +61,7 @@ import {
   writeMarkerSafe,
   decideCombinedOutput,
   applyPersistenceGuard,
+  CONTEXT_REARM_STEP_TOKENS,
 } from "./stop-suggest.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./stop-suggest.mjs", import.meta.url));
@@ -398,19 +401,95 @@ ok('contextTier: 100 -> "block"', contextTier(100) === "block");
 // would have hit "block" (>=170k) immediately; percentage-based tiering correctly stays "none".
 ok('contextTier: 1M-window at 34% used -> "none" (NO spurious block; 340k real tokens)', contextTier(34) === "none");
 
+// ---- absoluteContextTier boundaries (pure, Elephant decision 2026-07-10) ----------------
+// Window-INDEPENDENT soft-nudge ladder, layered beside (NOT replacing) the percent-based
+// contextTier above -- EL-04's own boundary tests above stay untouched/unmodified.
+ok('absoluteContextTier: null -> "none"', absoluteContextTier(null) === "none");
+ok('absoluteContextTier: non-finite (NaN) -> "none"', absoluteContextTier(NaN) === "none");
+ok('absoluteContextTier: 0 -> "none"', absoluteContextTier(0) === "none");
+ok('absoluteContextTier: 179999 -> "none"', absoluteContextTier(179999) === "none");
+ok('absoluteContextTier: 180000 -> "warn" (boundary)', absoluteContextTier(180000) === "warn");
+ok('absoluteContextTier: 199999 -> "warn"', absoluteContextTier(199999) === "warn");
+ok('absoluteContextTier: 200000 -> "overdue" (boundary)', absoluteContextTier(200000) === "overdue");
+ok('absoluteContextTier: 249999 -> "overdue"', absoluteContextTier(249999) === "overdue");
+ok('absoluteContextTier: 250000 -> "overdue" ("strongest soft" floor, same tier)', absoluteContextTier(250000) === "overdue");
+ok('absoluteContextTier: 10,000,000 -> STILL "overdue", NEVER "block"', absoluteContextTier(10_000_000) === "overdue");
+
+// ---- effectiveContextTier: more-severe combination (pure, Elephant decision 2026-07-10) -
+{
+  // Percent says "block" (usedPct 85), absolute says "none" (totalTokens 50000, small window)
+  // -> effective stays "block" (percent wins, EL-04's hard brake untouched).
+  ok(
+    "effectiveContextTier: percent block + absolute none -> block (percent wins)",
+    effectiveContextTier(85, 50000) === "block",
+  );
+}
+{
+  // Percent says "none" (usedPct 10, huge window), absolute says "overdue" (totalTokens 340000)
+  // -> effective becomes "overdue" (absolute adds urgency percent alone would miss) but NEVER
+  // "block" -- this is the EL-04-preserving case the resolved design exists for.
+  ok(
+    "effectiveContextTier: percent none (10% of 1M) + absolute overdue (340k) -> overdue, NOT block",
+    effectiveContextTier(10, 340000) === "overdue",
+  );
+}
+{
+  // Percent says "warn" (usedPct 60), absolute says "overdue" (totalTokens 340000) -> more
+  // severe of the two ("overdue" outranks "warn") wins.
+  ok(
+    "effectiveContextTier: percent warn + absolute overdue -> overdue (more severe wins)",
+    effectiveContextTier(60, 340000) === "overdue",
+  );
+}
+{
+  // Percent unresolvable (null usedPct, e.g. no usage snapshot) + absolute warn (190000) ->
+  // absolute alone still surfaces a nudge.
+  ok(
+    "effectiveContextTier: percent null (contextTier -> none) + absolute warn (190k) -> warn",
+    effectiveContextTier(null, 190000) === "warn",
+  );
+}
+{
+  // Both null/absent -> none.
+  ok("effectiveContextTier: both null -> none", effectiveContextTier(null, null) === "none");
+}
+{
+  // Absolute alone can NEVER push the combination into "block", however large totalTokens is,
+  // as long as percent stays below its own 85% floor.
+  ok(
+    "effectiveContextTier: percent overdue (usedPct 80) + absolute at 10M tokens -> STILL overdue, never block",
+    effectiveContextTier(80, 10_000_000) === "overdue",
+  );
+}
+
 // ---- buildContextMessage wording (pure) --------------------------------------------------
 ok('buildContextMessage: tier "none" -> null', buildContextMessage("none", 50000) === null);
 {
   const msg = buildContextMessage("warn", 120000);
   ok('buildContextMessage: tier "warn" mentions handover window + token count', msg.includes("handover window") && msg.includes("120k"), msg);
+  ok(
+    "buildContextMessage: tier \"warn\" carries the copyable /compact command (Elephant decision 2026-07-10)",
+    msg.includes("/compact "),
+    msg,
+  );
 }
 {
   const msg = buildContextMessage("overdue", 155000);
   ok('buildContextMessage: tier "overdue" mentions OVERDUE + token count', msg.includes("OVERDUE") && msg.includes("155k"), msg);
+  ok(
+    "buildContextMessage: tier \"overdue\" carries the copyable /compact command (Elephant decision 2026-07-10)",
+    msg.includes("/compact "),
+    msg,
+  );
 }
 {
   const msg = buildContextMessage("block", 175000);
   ok('buildContextMessage: tier "block" mentions EMERGENCY BRAKE + token count', msg.includes("EMERGENCY BRAKE") && msg.includes("175k"), msg);
+  ok(
+    "buildContextMessage: tier \"block\" ALSO carries the copyable /compact command (appended unconditionally for every non-none tier)",
+    msg.includes("/compact "),
+    msg,
+  );
 }
 
 // ---- usageFilePath / loadUsageSafe / resolveTotalTokensFromUsage ------------------------
@@ -642,6 +721,93 @@ ok("resolveUsedPctFromUsage: boundary 100 -> 100", resolveUsedPctFromUsage({ use
   ok("decideCombinedOutput: tier overdue NEVER carries decision:block", parsed.decision === undefined, stdout);
 }
 
+// ---- decideCombinedOutput: re-arm bypass (pure, Elephant decision 2026-07-10) -----------
+{
+  // Fingerprint UNCHANGED, but usage grew by exactly >= CONTEXT_REARM_STEP_TOKENS since the
+  // last EMISSION -> dedup bypassed, re-emits, and the marker's lastEmittedTotalTokens is
+  // stamped with the NEW totalTokens (this turn IS an emission).
+  const priorMarker = { lastFingerprint: "∅::overdue", consecutiveBlocks: 0, lastEmittedTotalTokens: 340000 };
+  const { stdout, marker } = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "overdue",
+    contextMessage: buildContextMessage("overdue", 395000),
+    priorMarker,
+    totalTokens: 395000, // +55k since lastEmittedTotalTokens (340000) -- above the 50k step
+  });
+  ok("decideCombinedOutput re-arm: +55k since last emission -> bypasses dedup, re-emits", stdout !== "" && stdout.includes("395k"), stdout);
+  ok("decideCombinedOutput re-arm: emission stamps lastEmittedTotalTokens with the NEW total", marker.lastEmittedTotalTokens === 395000, JSON.stringify(marker));
+}
+{
+  // Same fingerprint, usage grew by LESS than the re-arm step -> dedup still applies (anti-spam
+  // cap holds within one arming); lastEmittedTotalTokens carries over UNCHANGED (not an emission).
+  const priorMarker = { lastFingerprint: "∅::overdue", consecutiveBlocks: 0, lastEmittedTotalTokens: 340000 };
+  const { stdout, marker } = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "overdue",
+    contextMessage: buildContextMessage("overdue", 360000),
+    priorMarker,
+    totalTokens: 360000, // +20k since lastEmittedTotalTokens -- below the 50k step
+  });
+  ok("decideCombinedOutput re-arm: +20k since last emission (< 50k) -> STILL deduped", stdout === "", stdout);
+  ok("decideCombinedOutput re-arm: deduped turn leaves lastEmittedTotalTokens UNCHANGED", marker.lastEmittedTotalTokens === 340000, JSON.stringify(marker));
+}
+{
+  // Boundary: delta exactly === CONTEXT_REARM_STEP_TOKENS -> re-arm DUE (>=, not strictly >).
+  const priorMarker = { lastFingerprint: "∅::overdue", consecutiveBlocks: 0, lastEmittedTotalTokens: 300000 };
+  const { stdout } = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "overdue",
+    contextMessage: buildContextMessage("overdue", 300000 + CONTEXT_REARM_STEP_TOKENS),
+    priorMarker,
+    totalTokens: 300000 + CONTEXT_REARM_STEP_TOKENS,
+  });
+  ok("decideCombinedOutput re-arm: delta exactly == CONTEXT_REARM_STEP_TOKENS -> re-arm due (boundary, >=)", stdout !== "", stdout);
+}
+{
+  // Boundary: delta one token under the step -> NOT due.
+  const priorMarker = { lastFingerprint: "∅::overdue", consecutiveBlocks: 0, lastEmittedTotalTokens: 300000 };
+  const { stdout } = decideCombinedOutput({
+    phaseMessage: null,
+    tier: "overdue",
+    contextMessage: buildContextMessage("overdue", 300000 + CONTEXT_REARM_STEP_TOKENS - 1),
+    priorMarker,
+    totalTokens: 300000 + CONTEXT_REARM_STEP_TOKENS - 1,
+  });
+  ok("decideCombinedOutput re-arm: delta one token under the step -> NOT due (still deduped)", stdout === "", stdout);
+}
+{
+  // Re-arm never fires while the effective tier is "none", however far totalTokens grew --
+  // guarded explicitly by `tier !== "none"` in the implementation.
+  const priorMarker = { lastFingerprint: "Pipeline: Phase X::none", consecutiveBlocks: 0, lastEmittedTotalTokens: 100000 };
+  const { stdout } = decideCombinedOutput({
+    phaseMessage: "Pipeline: Phase X",
+    tier: "none",
+    contextMessage: null,
+    priorMarker,
+    totalTokens: 999999, // huge delta, but tier "none" -> must not matter
+  });
+  ok('decideCombinedOutput re-arm: tier "none" never re-arms, regardless of totalTokens delta', stdout === "", stdout);
+}
+{
+  // Pre-fix callers (no totalTokens passed at all) -> rearmDue structurally false, byte-
+  // identical pre-fix dedup behaviour preserved.
+  const priorMarker = { lastFingerprint: "∅::overdue", consecutiveBlocks: 0, lastEmittedTotalTokens: 100000 };
+  const { stdout } = decideCombinedOutput({ phaseMessage: null, tier: "overdue", contextMessage: buildContextMessage("overdue", 155000), priorMarker });
+  ok("decideCombinedOutput re-arm: totalTokens omitted (pre-fix caller) -> normal dedup applies, no re-arm", stdout === "", stdout);
+}
+{
+  // A brand-new emission (no prior marker at all) stamps lastEmittedTotalTokens with the
+  // current totalTokens -- establishing the baseline for future re-arm checks.
+  const { marker } = decideCombinedOutput({ phaseMessage: null, tier: "warn", contextMessage: buildContextMessage("warn", 190000), priorMarker: null, totalTokens: 190000 });
+  ok("decideCombinedOutput re-arm: first-ever emission stamps lastEmittedTotalTokens with the current total", marker.lastEmittedTotalTokens === 190000, JSON.stringify(marker));
+}
+{
+  // Emission where totalTokens itself is unresolvable this turn -> lastEmittedTotalTokens is
+  // stamped `null` (never throws, never fabricates a number).
+  const { marker } = decideCombinedOutput({ phaseMessage: "Pipeline: Phase X", tier: "none", contextMessage: null, priorMarker: null });
+  ok("decideCombinedOutput re-arm: emission with unresolvable totalTokens -> lastEmittedTotalTokens null", marker.lastEmittedTotalTokens === null, JSON.stringify(marker));
+}
+
 // ---- G-B CLI end-to-end (real subprocess, real usage/marker files on disk) -------------
 function runCliWithStdin(fakeProjectDir, inputObj) {
   const res = spawnSync(process.execPath, [SCRIPT], {
@@ -729,23 +895,121 @@ function writeGbUsage(rootDir, sessionId, totalTokens, usedPct, updatedAt = new 
 }
 
 {
-  // P2 fix proof (design decision 2026-07-08, EL-04): a 1M-context session at 34% used is
-  // 340k REAL tokens -- the OLD absolute-token contextTier (>=170k -> block) would have fired
-  // a spurious emergency brake here. Percentage-based tiering correctly stays "none".
+  // P2 fix proof (design decision 2026-07-08, EL-04), LAYERED (Elephant decision, 2026-07-10,
+  // absolute soft-nudge layer -- see stop-suggest.mjs header "ABSOLUTE SOFT-NUDGE LAYER"): a
+  // 1M-context session at 34% used is 340k REAL tokens. EL-04's core assertion (a) STILL holds
+  // unmodified below: the OLD absolute-token contextTier (>=170k -> block) would have fired a
+  // spurious emergency brake here; percentage-based tiering correctly keeps the HARD "block"
+  // tier out of it. What CHANGES (b) is the soft layer: 340k real tokens is >= the new
+  // window-independent 250k absolute-overdue floor (`absoluteContextTier`), so
+  // `effectiveContextTier` now surfaces a SOFT "overdue" nudge (with the copyable /compact
+  // command) even though the percent ladder alone would have said "none" -- this is the
+  // resolved design's whole point (compact-checkpoint-pacing intent: a session carrying 340k
+  // real tokens of live context is worth a proactive nudge, however large its window is), NOT
+  // a regression of EL-04, which only ever governed the HARD brake.
   const rootDir = fixtureDir("gb-cli-1m-window-no-spurious-block");
   writeGbFixture(rootDir);
   writeGbUsage(rootDir, "sess-1m", 340000, 34); // 1M window, 34% used, 340k real tokens
 
   const r1 = runCliWithStdin(rootDir, { session_id: "sess-1m" });
   ok("G-B CLI: 1M-window at 34% used -> exit 0", r1.status === 0, `stderr=${r1.stderr}`);
-  ok("G-B CLI: 1M-window at 34% used -> NO decision:block (no spurious emergency brake)", !r1.stdout.includes('"decision"'), r1.stdout);
-  ok("G-B CLI: 1M-window at 34% used -> no context clause at all (tier none)", !r1.stdout.includes("Context "), r1.stdout);
+  // (a) EL-04's core assertion, UNCHANGED: never a spurious hard emergency brake.
+  ok("G-B CLI: 1M-window at 34% used -> NO decision:block (no spurious emergency brake, EL-04 preserved)", !r1.stdout.includes('"decision"'), r1.stdout);
+  // (b) CHANGED (2026-07-10 absolute soft-nudge layer): a soft "overdue" nudge now fires,
+  // carrying the real token count and the copyable /compact command.
+  ok("G-B CLI: 1M-window at 34% used -> soft OVERDUE nudge fires (absolute layer, 340k >= 250k floor)", r1.stdout.includes("OVERDUE") && r1.stdout.includes("340k"), r1.stdout);
+  ok("G-B CLI: 1M-window at 34% used -> nudge carries the copyable /compact command", r1.stdout.includes("/compact "), r1.stdout);
 
   writeGbUsage(rootDir, "sess-1m", 850000, 85); // same 1M window, now 85% used -> tier "block"
   const r2 = runCliWithStdin(rootDir, { session_id: "sess-1m" });
   const p2 = JSON.parse(r2.stdout);
   ok("G-B CLI: 1M-window at 85% used -> decision:block correctly fires", p2.decision === "block", r2.stdout);
   ok("G-B CLI: 1M-window at 85% used -> DISPLAY shows real tokens (850k)", r2.stdout.includes("850k"), r2.stdout);
+}
+
+{
+  // NEW regression (this task, 2026-07-10): preserves EL-04's spirit at a token count BELOW
+  // the new absolute soft-nudge floor (180k) -- a session genuinely lightly used on a huge
+  // window (100k real tokens = 10% of a 1M window) must stay completely quiet: no soft nudge,
+  // no hard block. Without this guard, an overly aggressive absolute floor could reintroduce
+  // exactly the kind of spurious noise EL-04 was written to eliminate, just one layer up (soft
+  // instead of hard).
+  const rootDir = fixtureDir("gb-cli-1m-window-genuinely-light-usage");
+  writeGbFixture(rootDir);
+  writeGbUsage(rootDir, "sess-1m-light", 100000, 10); // 1M window, 10% used, 100k real tokens
+
+  const r = runCliWithStdin(rootDir, { session_id: "sess-1m-light" });
+  ok("G-B CLI: 1M-window at 10% used (100k tokens, below the 180k absolute floor) -> exit 0", r.status === 0, `stderr=${r.stderr}`);
+  ok("G-B CLI: 1M-window at 10% used -> NO decision:block", !r.stdout.includes('"decision"'), r.stdout);
+  ok("G-B CLI: 1M-window at 10% used -> NO context clause at all (tier none, no spurious soft nudge either)", !r.stdout.includes("Context "), r.stdout);
+}
+
+{
+  // Interaction regression (this task, 2026-07-10): a 200k-window-sized session that already
+  // hard-blocks via PERCENT (85% used) ALSO happens to sit above the absolute overdue floor
+  // (210000 >= 200000) -- proves the hard block still fires exactly as before (percent wins,
+  // "block" outranks "overdue") and that the absolute layer never downgrades or interferes
+  // with an already-active percent-driven emergency brake.
+  const rootDir = fixtureDir("gb-cli-200k-window-hard-block-plus-absolute-overdue");
+  writeGbFixture(rootDir);
+  writeGbUsage(rootDir, "sess-200k-block", 210000, 85); // 85% used AND >=200k absolute overdue floor
+
+  const r = runCliWithStdin(rootDir, { session_id: "sess-200k-block" });
+  const parsed = JSON.parse(r.stdout);
+  ok(
+    "G-B CLI: 200k-ish window at 85% used (also >=200k absolute) -> decision:block STILL fires (percent wins over absolute)",
+    parsed.decision === "block",
+    r.stdout,
+  );
+  ok("G-B CLI: 200k-ish window hard block -> wording is EMERGENCY BRAKE, not the absolute-only OVERDUE wording", r.stdout.includes("EMERGENCY BRAKE"), r.stdout);
+}
+
+{
+  // Absolute ladder soft-nudge boundaries on a 1M window (this task, 2026-07-10 DoD): 180k ->
+  // warn, 200k -> overdue, 250k -> overdue, all with NO decision:block.
+  const cases = [
+    { totalTokens: 180000, usedPct: 18, label: "180k/1M (warn floor)", expectSubstr: "handover window" },
+    { totalTokens: 200000, usedPct: 20, label: "200k/1M (overdue floor)", expectSubstr: "OVERDUE" },
+    { totalTokens: 250000, usedPct: 25, label: "250k/1M (strongest-soft overdue floor)", expectSubstr: "OVERDUE" },
+  ];
+  for (const [i, c] of cases.entries()) {
+    const rootDir = fixtureDir(`gb-cli-1m-window-absolute-ladder-${i}`);
+    writeGbFixture(rootDir);
+    writeGbUsage(rootDir, `sess-ladder-${i}`, c.totalTokens, c.usedPct);
+    const r = runCliWithStdin(rootDir, { session_id: `sess-ladder-${i}` });
+    ok(`G-B CLI absolute ladder ${c.label}: exit 0`, r.status === 0, `stderr=${r.stderr}`);
+    ok(`G-B CLI absolute ladder ${c.label}: NO decision:block`, !r.stdout.includes('"decision"'), r.stdout);
+    ok(`G-B CLI absolute ladder ${c.label}: expected wording (${c.expectSubstr}) present`, r.stdout.includes(c.expectSubstr), r.stdout);
+    ok(`G-B CLI absolute ladder ${c.label}: copyable /compact command present`, r.stdout.includes("/compact "), r.stdout);
+  }
+}
+
+{
+  // Recurring RE-ARM (this task, 2026-07-10, DoD): a soft nudge sitting at the same effective
+  // tier for another >=50k real tokens re-emits despite an unchanged phase+tier fingerprint;
+  // less than 50k growth stays deduped (anti-spam cap still limits repeats within one arming).
+  const rootDir = fixtureDir("gb-cli-context-rearm");
+  writeGbFixture(rootDir, { phase: "does-not-exist" }); // no phase suggestion -> isolates the context-nudge fingerprint
+  writeGbUsage(rootDir, "sess-rearm", 340000, 34); // 1M window, absolute "overdue" (>=250k)
+
+  const r1 = runCliWithStdin(rootDir, { session_id: "sess-rearm" });
+  ok("G-B CLI re-arm: turn 1 (340k) emits the soft nudge", r1.stdout.includes("OVERDUE"), r1.stdout);
+
+  writeGbUsage(rootDir, "sess-rearm", 360000, 36); // +20k, same tier, well under the 50k re-arm step
+  const r2 = runCliWithStdin(rootDir, { session_id: "sess-rearm" });
+  ok(
+    `G-B CLI re-arm: turn 2 (+20k, < ${CONTEXT_REARM_STEP_TOKENS}) -> STILL deduped to silence (anti-spam cap holds within one arming)`,
+    r2.status === 0 && r2.stdout === "",
+    `status=${r2.status} stdout=${r2.stdout}`,
+  );
+
+  writeGbUsage(rootDir, "sess-rearm", 395000, 39); // +55k since the LAST EMISSION (340k) -> re-arm due
+  const r3 = runCliWithStdin(rootDir, { session_id: "sess-rearm" });
+  ok(
+    `G-B CLI re-arm: turn 3 (+55k since last emission, >= ${CONTEXT_REARM_STEP_TOKENS}) -> re-emits despite unchanged fingerprint`,
+    r3.stdout.includes("OVERDUE") && r3.stdout.includes("395k"),
+    r3.stdout,
+  );
 }
 
 {
