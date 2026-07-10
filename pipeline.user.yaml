@@ -54,7 +54,7 @@ worktypes:
   feature:                          # profile advisor -- the everyday method
     design_phase:
       model: opus
-      effort: high  # no separate design phase: same values
+      effort: high  # Opus designs; Sonnet executes below (phases differ)
     execution_phase:
       model: sonnet
       effort: high
