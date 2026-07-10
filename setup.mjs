@@ -141,17 +141,17 @@ export function buildDefaultAnswers() {
     worktypes: {
       design: {
         design_phase: { model: "opus", effort: "high" },
-        execution_phase: { model: "opus", effort: "max" },
+        execution_phase: { model: "opus", effort: "high" },
         advisor: "off",
       },
       feature: {
-        design_phase: { model: "opus", effort: "max" },
-        execution_phase: { model: "opus", effort: "max" },
-        advisor: "off",
+        design_phase: { model: "opus", effort: "high" },
+        execution_phase: { model: "sonnet", effort: "high" },
+        advisor: "opus",
       },
       mini: {
-        design_phase: { model: "sonnet", effort: "max" },
-        execution_phase: { model: "sonnet", effort: "max" },
+        design_phase: { model: "sonnet", effort: "high" },
+        execution_phase: { model: "sonnet", effort: "high" },
         advisor: "opus",
       },
     },
@@ -242,17 +242,17 @@ export function applyAboPreset(tier) {
       worktypes: {
         design: {
           design_phase: { model: "sonnet", effort: "high" },
-          execution_phase: { model: "sonnet", effort: "max" },
+          execution_phase: { model: "sonnet", effort: "high" },
           advisor: "off",
         },
         feature: {
           design_phase: { model: "sonnet", effort: "max" },
-          execution_phase: { model: "sonnet", effort: "max" },
+          execution_phase: { model: "sonnet", effort: "high" },
           advisor: "off",
         },
         mini: {
           design_phase: { model: "sonnet", effort: "max" },
-          execution_phase: { model: "sonnet", effort: "max" },
+          execution_phase: { model: "sonnet", effort: "high" },
           advisor: "sonnet",
         },
       },
@@ -269,17 +269,17 @@ export function applyAboPreset(tier) {
     worktypes: {
       design: {
         design_phase: { model: "opus", effort: "high" },
-        execution_phase: { model: "opus", effort: "max" },
+        execution_phase: { model: "opus", effort: "high" },
         advisor: "off",
       },
       feature: {
-        design_phase: { model: "opus", effort: "max" },
-        execution_phase: { model: "opus", effort: "max" },
-        advisor: "off",
+        design_phase: { model: "opus", effort: "high" },
+        execution_phase: { model: "sonnet", effort: "high" },
+        advisor: "opus",
       },
       mini: {
-        design_phase: { model: "sonnet", effort: "max" },
-        execution_phase: { model: "sonnet", effort: "max" },
+        design_phase: { model: "sonnet", effort: "high" },
+        execution_phase: { model: "sonnet", effort: "high" },
         advisor: "opus",
       },
     },
@@ -297,6 +297,47 @@ export function applyAutonomyPreset(preset) {
   const p = String(preset ?? "").toLowerCase();
   if (p.startsWith("autonom")) return { push_policy: "standing-approved", branch_model: "direct-main", wip_limit: 1 };
   return { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 };
+}
+
+/**
+ * Resolves worktypes/models/autonomy for a (re-)run, given the raw subscription-tier and
+ * autonomy-preset CLI answers plus the previously-parsed pipeline.user.yaml (or
+ * buildDefaultAnswers() on a fresh install). RE-RUN SAFETY (Critic finding #2, 2026-07-10):
+ * pressing Enter (empty answer, "") on EITHER question KEEPS the corresponding previous.*
+ * values untouched -- a fresh preset is applied ONLY when the operator types an explicit
+ * tier/preset, the deliberate override. Before this fix, promptAnswers() derived worktypes/
+ * models/autonomy ONLY from applyAboPreset()/applyAutonomyPreset() and never consulted
+ * `previous`, so pressing Enter through a re-run silently replaced a personalized routing
+ * with the generic preset. On a fresh install `previous` already equals buildDefaultAnswers(),
+ * which in turn equals applyAboPreset("max") (see the "matches buildDefaultAnswers()" test) --
+ * so this is a no-op behaviour change for first-time setup.
+ * @param {string} aboIn - raw (trimmed, lowercased) subscription-tier answer, "" = keep
+ * @param {string} autonomyIn - raw (trimmed, lowercased) autonomy-preset answer, "" = keep
+ * @param {object} previous - answersFromParsed(...) result (existing personalization or defaults)
+ */
+export function resolveRoutingAnswers(aboIn, autonomyIn, previous) {
+  let worktypes;
+  let models;
+  if (aboIn === "") {
+    worktypes = {
+      design: { ...previous.worktypes.design },
+      feature: { ...previous.worktypes.feature },
+      mini: { ...previous.worktypes.mini },
+    };
+    models = { ...previous.models };
+  } else {
+    ({ worktypes, models } = applyAboPreset(aboIn));
+  }
+
+  let autonomy;
+  if (autonomyIn === "") {
+    autonomy = previous.autonomy;
+  } else {
+    autonomy = applyAutonomyPreset(autonomyIn);
+    if (autonomyIn.startsWith("autonom")) worktypes.feature.advisor = "opus";
+  }
+
+  return { worktypes, models, autonomy };
 }
 
 export function normalizeLang(value) {
@@ -738,17 +779,23 @@ async function promptAnswers(rl, previous) {
   const humanIn = (await rl.question(`Language -- human-facing (commits/reviews/new docs) [de/en] (${previous.language.human_facing}): `)).trim();
   const agentIn = (await rl.question(`Language -- agent-facing (roles/guardrails/skills) [de/en] (${previous.language.agent_facing}): `)).trim();
 
-  const aboIn = (await rl.question(`Subscription tier? [pro/max/api] (max) `)).trim().toLowerCase() || "max";
-  const { worktypes, models } = applyAboPreset(aboIn);
-  if (aboIn !== "pro" && aboIn !== "max") {
+  const aboIn = (
+    await rl.question(
+      `Subscription tier -- press Enter to KEEP your current worktypes/models routing, or type pro/max/api to re-pick a preset (overwrites routing): `,
+    )
+  ).trim().toLowerCase();
+  if (aboIn !== "" && aboIn !== "pro" && aboIn !== "max") {
     console.log(
       "  API/custom chosen: models pre-filled with the Max preset -- enter your own model names/effort values directly in pipeline.user.yaml and re-run `node setup.mjs` afterwards.",
     );
   }
 
-  const autonomyIn = (await rl.question(`Autonomy preset? [conservative/autonomous] (conservative) `)).trim().toLowerCase() || "conservative";
-  const autonomy = applyAutonomyPreset(autonomyIn);
-  if (autonomyIn.startsWith("autonom")) worktypes.feature.advisor = "opus";
+  const autonomyIn = (
+    await rl.question(
+      `Autonomy preset -- press Enter to KEEP your current autonomy setting, or type conservative/autonomous to re-pick a preset (overwrites it): `,
+    )
+  ).trim().toLowerCase();
+  const { worktypes, models, autonomy } = resolveRoutingAnswers(aboIn, autonomyIn, previous);
 
   const git_host = detectGitHost(ROOT_DIR);
   const cli = cliForHost(git_host);

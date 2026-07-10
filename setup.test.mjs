@@ -31,6 +31,7 @@ import {
   detectGitHost,
   applyAboPreset,
   applyAutonomyPreset,
+  resolveRoutingAnswers,
   normalizeLang,
   buildDefaultAnswers,
   renderUserYaml,
@@ -164,18 +165,38 @@ function fakeSpawn(byCommand) {
 {
   const p = applyAboPreset("max");
   ok(
-    "applyAboPreset max: worktypes.design is opus/high (design_phase) + opus/max (execution_phase)",
+    "applyAboPreset max: worktypes.design is opus/high (design_phase) + opus/high (execution_phase, 2026-07-10 routing revision: no more effort:max in execution_phase)",
     p.worktypes.design.design_phase.model === "opus" &&
       p.worktypes.design.design_phase.effort === "high" &&
       p.worktypes.design.execution_phase.model === "opus" &&
-      p.worktypes.design.execution_phase.effort === "max",
+      p.worktypes.design.execution_phase.effort === "high",
     JSON.stringify(p.worktypes.design),
   );
+  ok(
+    "applyAboPreset max: worktypes.feature.execution_phase is sonnet/high (2026-07-10 routing revision)",
+    p.worktypes.feature.execution_phase.model === "sonnet" && p.worktypes.feature.execution_phase.effort === "high",
+    JSON.stringify(p.worktypes.feature.execution_phase),
+  );
+  ok("applyAboPreset max: worktypes.feature.advisor is opus (2026-07-10 routing revision)", p.worktypes.feature.advisor === "opus");
   ok("applyAboPreset max: worktypes.mini.advisor is opus", p.worktypes.mini.advisor === "opus");
-  ok("applyAboPreset max: models.deep is sonnet/xhigh (MP-27 3-tier completeness)", p.models.deep.model === "sonnet" && p.models.deep.effort === "xhigh");
+  ok(
+    "applyAboPreset max: worktypes.mini execution_phase/design_phase are both high (no leftover max)",
+    p.worktypes.mini.design_phase.effort === "high" && p.worktypes.mini.execution_phase.effort === "high",
+  );
+  ok("applyAboPreset max: models.deep is sonnet/xhigh (MP-27 3-tier completeness, models UNCHANGED)", p.models.deep.model === "sonnet" && p.models.deep.effort === "xhigh");
   ok(
     "applyAboPreset max: matches buildDefaultAnswers() worktypes + models",
     JSON.stringify(p.worktypes) === JSON.stringify(buildDefaultAnswers().worktypes) && JSON.stringify(p.models) === JSON.stringify(buildDefaultAnswers().models),
+  );
+}
+{
+  const p = applyAboPreset("pro");
+  ok(
+    "applyAboPreset pro: execution_phase effort is high everywhere (2026-07-10 routing revision, no more max)",
+    p.worktypes.design.execution_phase.effort === "high" &&
+      p.worktypes.feature.execution_phase.effort === "high" &&
+      p.worktypes.mini.execution_phase.effort === "high",
+    JSON.stringify({ design: p.worktypes.design.execution_phase, feature: p.worktypes.feature.execution_phase, mini: p.worktypes.mini.execution_phase }),
   );
 }
 {
@@ -219,6 +240,82 @@ function fakeSpawn(byCommand) {
 {
   const a = applyAutonomyPreset(undefined);
   ok("applyAutonomyPreset undefined -> conservative default", a.push_policy === "gated");
+}
+
+// ======================================================================================
+// resolveRoutingAnswers -- re-run safety (Critic finding #2): pressing Enter on a re-run
+// must NEVER clobber an existing personalized worktypes/models/autonomy with the generic
+// preset. See setup.mjs's own JSDoc above resolveRoutingAnswers for the full rationale.
+// ======================================================================================
+{
+  const previous = {
+    worktypes: {
+      design: { design_phase: { model: "opus", effort: "high" }, execution_phase: { model: "opus", effort: "high" }, advisor: "off" },
+      feature: { design_phase: { model: "sonnet", effort: "high" }, execution_phase: { model: "sonnet", effort: "high" }, advisor: "sonnet" },
+      mini: { design_phase: { model: "sonnet", effort: "high" }, execution_phase: { model: "sonnet", effort: "high" }, advisor: "sonnet" },
+    },
+    models: {
+      implement: { model: "haiku", effort: "medium" },
+      mechanic: { model: "haiku", effort: "low" },
+      deep: { model: "sonnet", effort: "xhigh" },
+      review: { model: "sonnet", effort: "high" },
+    },
+    autonomy: { push_policy: "standing-approved", branch_model: "direct-main", wip_limit: 1 },
+  };
+  const resolved = resolveRoutingAnswers("", "", previous);
+  ok(
+    "resolveRoutingAnswers: empty tier answer KEEPS the existing personalized worktypes (no clobber by the generic preset -- Critic finding #2)",
+    JSON.stringify(resolved.worktypes) === JSON.stringify(previous.worktypes),
+    JSON.stringify(resolved.worktypes),
+  );
+  ok(
+    "resolveRoutingAnswers: empty tier answer KEEPS the existing personalized models",
+    JSON.stringify(resolved.models) === JSON.stringify(previous.models),
+  );
+  ok(
+    "resolveRoutingAnswers: empty autonomy answer KEEPS the existing personalized autonomy",
+    JSON.stringify(resolved.autonomy) === JSON.stringify(previous.autonomy),
+  );
+}
+{
+  const previous = buildDefaultAnswers();
+  const resolved = resolveRoutingAnswers("pro", "autonomous", previous);
+  ok(
+    "resolveRoutingAnswers: explicit tier answer ('pro') applies the fresh preset, overriding previous (deliberate override)",
+    JSON.stringify(resolved.worktypes.design) === JSON.stringify(applyAboPreset("pro").worktypes.design),
+  );
+  ok(
+    "resolveRoutingAnswers: explicit autonomy answer ('autonomous') applies standing-approved/direct-main",
+    resolved.autonomy.push_policy === "standing-approved" && resolved.autonomy.branch_model === "direct-main",
+  );
+  ok(
+    "resolveRoutingAnswers: explicit autonomous preset nudges feature.advisor to opus",
+    resolved.worktypes.feature.advisor === "opus",
+  );
+}
+{
+  // Mutation safety: the autonomous feature.advisor nudge must not mutate the caller's
+  // `previous` object (relevant when worktypes came from the "keep" branch).
+  const previous = buildDefaultAnswers();
+  const before = JSON.stringify(previous.worktypes);
+  const resolved = resolveRoutingAnswers("", "autonomous", previous);
+  ok(
+    "resolveRoutingAnswers: does not mutate the caller's `previous.worktypes` object",
+    JSON.stringify(previous.worktypes) === before,
+  );
+  ok("resolveRoutingAnswers: returned worktypes DOES carry the nudge", resolved.worktypes.feature.advisor === "opus");
+}
+{
+  // A fresh install (no existing pipeline.user.yaml) -> previous === buildDefaultAnswers(),
+  // which equals applyAboPreset("max") (see the "matches buildDefaultAnswers()" test above)
+  // -- so keeping on empty answers is a behaviour no-op for first-time setup.
+  const previous = buildDefaultAnswers();
+  const resolved = resolveRoutingAnswers("", "", previous);
+  ok(
+    "resolveRoutingAnswers: fresh install (defaults as previous) + empty answers == applyAboPreset('max') (no-op vs. old behaviour)",
+    JSON.stringify(resolved.worktypes) === JSON.stringify(applyAboPreset("max").worktypes) &&
+      JSON.stringify(resolved.models) === JSON.stringify(applyAboPreset("max").models),
+  );
 }
 
 // ======================================================================================

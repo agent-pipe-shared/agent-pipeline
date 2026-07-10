@@ -49,23 +49,23 @@ worktypes:
       effort: high   # orchestrator until plan approval
     execution_phase:
       model: opus
-      effort: max # orchestrator after approval
+      effort: high # orchestrator after approval
     advisor: "off"
   feature:                          # profile advisor -- the everyday method
     design_phase:
       model: opus
-      effort: max  # no separate design phase: same values
+      effort: high  # no separate design phase: same values
     execution_phase:
-      model: opus
-      effort: max
-    advisor: "off" # "off" | a model name (autonomous preset sets a model here)
+      model: sonnet
+      effort: high
+    advisor: opus # "off" | a model name (autonomous preset sets a model here)
   mini:                             # profile speed -- mini-feature / hotfix
     design_phase:
       model: sonnet
-      effort: max
+      effort: high
     execution_phase:
       model: sonnet
-      effort: max
+      effort: high
     advisor: opus    # fixed pairing (small model orchestrates, bigger advisor watches)
 
 models:                             # dispatch tiers only (MP-27: mechanic/implement/deep, plus critic's review)
