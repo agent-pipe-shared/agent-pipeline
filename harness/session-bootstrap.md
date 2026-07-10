@@ -298,7 +298,7 @@ The Elephant must additionally be able to speak to the session-lifecycle policy 
 **Scope (hard limits — breach triggers mandatory escalation):**
 
 - Mini-feature/hotfix scope only: **~≤5 affected files.**
-- **NO guardrail/canon files** in scope (`guardrails/*`, `docs/operating-model.md`, `roles/*`, `policies/*`, any hook under `plugins/pipeline-core/hooks/*`, `.claude/settings.json`, guard config).
+- **NO guardrail/canon files** in scope — canonical list of forbidden file-classes for the `speed` profile: `policies/model-policy.md` (MP-28); not re-enumerated here to avoid divergence.
 - **No new dependencies.**
 - If any of these limits becomes visible during the session (scope grows beyond the sizing): **mandatory escalation to the full profile** — switch immediately to the full bootstrap/full process, don't keep working on the speed path (escalation logic analogous to `harness/checklists/small-session.md`, section "Escalation rule").
 - **The guard hooks stay fully active in EVERY profile, including `speed`** (deterministic, free) — speed saves ceremony, not safety.
@@ -630,7 +630,7 @@ Der Elephant muss außerdem zur Session-Lifecycle-Politik auskunftsfähig sein (
 **Geltungsbereich (harte Grenzen — Bruch löst Pflicht-Eskalation aus):**
 
 - Nur für Mini-Feature-/Hotfix-Umfang: **~≤5 betroffene Dateien.**
-- **KEINE Guardrail-/Kanon-Dateien** im Scope (`guardrails/*`, `docs/operating-model.md`, `roles/*`, `policies/*`, jeder Hook unter `plugins/pipeline-core/hooks/*`, `.claude/settings.json`, Guard-Config).
+- **KEINE Guardrail-/Kanon-Dateien** im Scope — kanonische Liste der verbotenen Datei-Klassen für das `speed`-Profil: `policies/model-policy.md` (MP-28); hier nicht separat aufgeführt, um Divergenz zu vermeiden.
 - **Keine neuen Abhängigkeiten.**
 - Wird eine dieser Grenzen während der Session sichtbar (Scope wächst über den Zuschnitt hinaus): **Pflicht-Eskalation ins Vollprofil** — sofort auf den vollen Bootstrap/vollen Prozess wechseln, nicht im Speed-Pfad weiterarbeiten (Eskalationslogik analog `harness/checklists/small-session.md`, Abschnitt „Escalation rule").
 - **Die Guard-Hooks bleiben in JEDEM Profil, auch `speed`, uneingeschränkt aktiv** (deterministisch, kostenlos) — Speed spart Zeremonie, nicht Sicherheit.

@@ -192,7 +192,7 @@ Why: a full bootstrap already completed the same calendar day on the same machin
 **Scope (hard limits — a breach forces mandatory escalation):**
 
 - Mini-feature/hotfix scope only: **~≤5 files touched.**
-- **NO guardrail/canon files** in scope (`guardrails/*`, `docs/operating-model.md`, `roles/*`, `policies/*`, any hook under `plugins/pipeline-core/hooks/*`, `.claude/settings.json`, guard config).
+- **NO guardrail/canon files** in scope — canonical list of forbidden file-classes for the `speed` profile: `policies/model-policy.md` (MP-28); not re-enumerated here to avoid divergence.
 - **No new dependencies.**
 - If any of these limits become visible as breached mid-session (scope grew beyond the mini-feature/hotfix shape): **mandatory escalation to the full profile** — switch to the full bootstrap/full process immediately, do not keep working the speed path (escalation logic mirrors `harness/checklists/small-session.md`, "Escalation rule" section).
 - **Guard hooks stay fully active in EVERY profile, including `speed`** (deterministic, free) — speed saves ceremony, not safety.

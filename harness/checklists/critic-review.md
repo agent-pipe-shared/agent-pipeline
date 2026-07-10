@@ -22,6 +22,8 @@
 - [ ] Documented-instead-of-fixed risks hunted: known gaps with TODO/comment but no owner + expiry date are findings, not mitigations (AP7/QG-06)
 - [ ] Dependency reality check: every NEW import/package/action/image exists in the official registry under exactly that name, registry evidence (URL + pinned version) present (SEC-04 slopsquatting)
 - [ ] Pipeline-deliverable reviews: language assignment of new artifacts per ADR-0011 checked (agent-facing English / human-facing German / primary-reader rule)
+- [ ] Full translations of normative docs: rule/line-level parity checked per section (table rows, list items, Must/Must-not clauses counted both sides), not just heading parity
+- [ ] After a "pure-prepend" bulk edit: `git diff --numstat` run, any file with deletions>0 flagged (not assumed to be a pure prepend)
 - [ ] "Deliberately not flagged" rubric filled — "checked, ok" distinguishable from "not looked at"
 - [ ] Skip rule: nothing CI/verify enforces; no style critique without spec/guardrail ref; no score
 - [ ] "No findings" is a valid, welcome result — never invent findings to justify the run

@@ -7,6 +7,7 @@
 - [ ] 80%-gate: task self-contained and specifiable — if not, do interview/decomposition, not a better prompt
 - [ ] Rigor level + risk class set at triage and recorded (in doubt: higher; risk flag when risk zones are touched)
 - [ ] Spec-readiness check passed where mandatory (canon/guardrail/core-contract packages: risk class high OR architecture/guardrail/security surface OR rigor 2; otherwise optional at Elephant judgment, recommended for multi-file waves)
+- [ ] Readiness §-references verified, not just resolved: a §-reference that cites a *specific rule/claim* is checked against the target section's actual content — not merely that the section exists
 - [ ] Package-size budget (EL-25a): expected >~50 tool uses OR >~8–9 files OR >1 complex topic → split BEFORE dispatch, never discovered mid-run
 - [ ] Parallel limit 3–5 (up to 5 when file ownership is strictly disjoint, EL-22) goldfish respected; worktree isolation when overlap is unavoidable; never parallelize dependent/same-file work; WIP rule: max 1 open human-gate item per project (condition A11); worktree isolation MANDATORY from 3+ parallel goldfish committing to the same tree — disjoint file ownership does not protect the shared git index (EL-22)
 - [ ] Writing task → worktree per project calibration; workflow runs → MP-10 preconditions (hooks + allowlist + worktree)

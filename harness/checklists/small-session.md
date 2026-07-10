@@ -49,7 +49,8 @@ out to need real interview/decomposition work — that is a normal session from 
    heaviest Critic option by habit on a small task.
 4. **Verify → push → close light.** Run the calibration's `verify` command against the final state
    (evidence bar unchanged — machine-written output + command + exit code). Push per the project's
-   push policy. Close via the close-block skill's **close-light variant**
+   push policy — canonical sequence: **Commit → regenerate evidence (verify + security-scan) → Push**
+   (the guard-push staleness check remains the hard backstop, not a substitute for the sequence). Close via the close-block skill's **close-light variant**
    (`plugins/pipeline-core/skills/close-block/SKILL.md`) — check its own hard eligibility gate
    explicitly; this playbook does not override that gate, it is the expected common case that satisfies
    it (≤1 package, no guardrail/canon diff, <~1h, no open major Critic finding).

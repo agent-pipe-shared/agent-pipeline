@@ -95,15 +95,15 @@ function writeRaw(path, text) {
     version: 2,
     plugins: {
       [PLUGIN_ID]: [
-        { scope: "project", projectPath: "D:\\Dev\\agent-pipeline", gitCommitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+        { scope: "project", projectPath: "D:\\Dev\\example-project", gitCommitSha: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
         { scope: "project", projectPath: "D:\\Dev\\other-project", gitCommitSha: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" },
       ],
     },
   });
-  const sha = resolveInstalledSha({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\agent-pipeline" });
+  const sha = resolveInstalledSha({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\example-project" });
   ok("resolveInstalledSha matches by projectPath", sha === "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", sha);
 
-  const shaNorm = resolveInstalledSha({ installedPluginsPath: installedPath, projectDir: "d:/dev/agent-pipeline" });
+  const shaNorm = resolveInstalledSha({ installedPluginsPath: installedPath, projectDir: "d:/dev/example-project" });
   ok("resolveInstalledSha matches case/slash-insensitively", shaNorm === "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", shaNorm);
 }
 
@@ -114,7 +114,7 @@ function writeRaw(path, text) {
     version: 2,
     plugins: { [PLUGIN_ID]: [{ scope: "project", projectPath: "D:\\Dev\\other-project", gitCommitSha: "cccccccccccccccccccccccccccccccccccccccc" }] },
   });
-  const sha = resolveInstalledSha({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\agent-pipeline" });
+  const sha = resolveInstalledSha({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\example-project" });
   ok("resolveInstalledSha falls back to sole entry when no projectPath matches", sha === "cccccccccccccccccccccccccccccccccccccccc", sha);
 }
 
@@ -130,7 +130,7 @@ function writeRaw(path, text) {
       ],
     },
   });
-  const sha = resolveInstalledSha({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\agent-pipeline" });
+  const sha = resolveInstalledSha({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\example-project" });
   ok("resolveInstalledSha returns null when ambiguous (no match, multiple entries)", sha === null, sha);
 }
 
@@ -138,13 +138,13 @@ function writeRaw(path, text) {
   const dir = fixtureDir("installed-malformed");
   const installedPath = join(dir, "installed_plugins.json");
   writeRaw(installedPath, "{ this is not valid JSON ][");
-  const sha = resolveInstalledSha({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\agent-pipeline" });
+  const sha = resolveInstalledSha({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\example-project" });
   ok("resolveInstalledSha returns null on malformed JSON", sha === null, sha);
 }
 
 {
   const installedPath = join(WORKDIR, "does-not-exist.json");
-  const sha = resolveInstalledSha({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\agent-pipeline" });
+  const sha = resolveInstalledSha({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\example-project" });
   ok("resolveInstalledSha returns null when file is missing", sha === null, sha);
 }
 
@@ -155,7 +155,7 @@ function writeRaw(path, text) {
     version: 2,
     plugins: { "other-plugin@other-marketplace": [{ projectPath: "x", gitCommitSha: "3333333333333333333333333333333333333333" }] },
   });
-  const sha = resolveInstalledSha({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\agent-pipeline" });
+  const sha = resolveInstalledSha({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\example-project" });
   ok("resolveInstalledSha returns null when PLUGIN_ID entry is absent", sha === null, sha);
 }
 
@@ -166,7 +166,7 @@ function writeRaw(path, text) {
   // Reuses the "installed-match" fixture written above (both entries carry scope "project").
   const dir = fixtureDir("installed-match");
   const installedPath = join(dir, "installed_plugins.json");
-  const scope = resolveInstalledScope({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\agent-pipeline" });
+  const scope = resolveInstalledScope({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\example-project" });
   ok("resolveInstalledScope resolves \"project\" by projectPath match (same entry as the SHA match)", scope === "project", scope);
 }
 
@@ -179,9 +179,9 @@ function writeRaw(path, text) {
     version: 2,
     plugins: { [PLUGIN_ID]: [{ scope: "user", installPath: "C:\\fake\\cache\\path", gitCommitSha: "4444444444444444444444444444444444444444" }] },
   });
-  const scope = resolveInstalledScope({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\agent-pipeline" });
+  const scope = resolveInstalledScope({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\example-project" });
   ok("resolveInstalledScope resolves \"user\" from a projectPath-less, single-entry user-scope install", scope === "user", scope);
-  const sha = resolveInstalledSha({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\agent-pipeline" });
+  const sha = resolveInstalledSha({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\example-project" });
   ok("resolveInstalledSha still resolves the SHA of that same user-scope entry", sha === "4444444444444444444444444444444444444444", sha);
 }
 
@@ -189,12 +189,12 @@ function writeRaw(path, text) {
   // Reuses the "installed-ambiguous" fixture (no projectPath match, multiple entries -> null).
   const dir = fixtureDir("installed-ambiguous");
   const installedPath = join(dir, "installed_plugins.json");
-  const scope = resolveInstalledScope({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\agent-pipeline" });
+  const scope = resolveInstalledScope({ installedPluginsPath: installedPath, projectDir: "D:\\Dev\\example-project" });
   ok("resolveInstalledScope returns null when ambiguous (no match, multiple entries)", scope === null, scope);
 }
 
 {
-  const scope = resolveInstalledScope({ installedPluginsPath: join(WORKDIR, "does-not-exist.json"), projectDir: "D:\\Dev\\agent-pipeline" });
+  const scope = resolveInstalledScope({ installedPluginsPath: join(WORKDIR, "does-not-exist.json"), projectDir: "D:\\Dev\\example-project" });
   ok("resolveInstalledScope returns null when file is missing", scope === null, scope);
 }
 
