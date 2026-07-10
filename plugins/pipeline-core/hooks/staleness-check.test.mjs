@@ -305,7 +305,7 @@ ok(
   const url = resolveMarketplaceUrl({ settingsPath: REAL_REPO_SETTINGS });
   ok(
     "resolveMarketplaceUrl matches this repo's real .claude/settings.json",
-    url === "https://github.com/agent-pipeline/agent-pipeline.git",
+    url === "https://github.com/agent-pipe-shared/agent-pipeline.git",
     url,
   );
 }
