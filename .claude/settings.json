@@ -3,12 +3,6 @@
     "type": "command",
     "command": "node plugins/pipeline-core/scripts/statusline-context.mjs"
   },
-  "permissions": {
-    "allow": [
-      "Bash(git push*)",
-      "PowerShell(git push*)"
-    ]
-  },
   "extraKnownMarketplaces": {
     "agent-pipeline": {
       "source": {
