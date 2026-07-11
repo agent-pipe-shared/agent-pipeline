@@ -536,8 +536,31 @@ ok("parseArgv: --defaults alone -> force stays false", parseArgv(["--defaults"])
   ok("compileSettingsJson github: source.source is 'github'", source.source === "github", JSON.stringify(source));
   ok("compileSettingsJson github: repo is owner/name", source.repo === "acme/widgets", JSON.stringify(source));
   ok("compileSettingsJson github: no leftover 'url' key", source.url === undefined);
-  ok("compileSettingsJson: no existing state -> synthesizes statusLine/permissions/enabledPlugins", settings.statusLine && settings.permissions && settings.enabledPlugins);
+  ok("compileSettingsJson: no existing state -> synthesizes statusLine/enabledPlugins", settings.statusLine && settings.enabledPlugins);
+  ok(
+    "compileSettingsJson: gated (default) push_policy -> NO permissions key (ADR-0017 no bleed-over)",
+    settings.permissions === undefined,
+    JSON.stringify(settings.permissions),
+  );
   ok("compileSettingsJson: $generated marker embeds the sourceHash", settings.$generated.includes("hash123"), settings.$generated);
+}
+{
+  // standing-approved push_policy -> synthesized settings.json DOES grant prompt-less git
+  // push*, mirroring the same condition renderPipelineYaml() uses (briefing fix, 2026-07-11).
+  const answers = {
+    ...buildDefaultAnswers(),
+    identity: { ...buildDefaultAnswers().identity, repo_owner: "acme", repo_name: "widgets" },
+    autonomy: { ...buildDefaultAnswers().autonomy, push_policy: "standing-approved" },
+  };
+  const settings = compileSettingsJson(null, answers, "hash123-standing");
+  ok(
+    "compileSettingsJson: standing-approved push_policy -> permissions.allow contains both git push* entries",
+    Array.isArray(settings.permissions?.allow) &&
+      settings.permissions.allow.includes("Bash(git push*)") &&
+      settings.permissions.allow.includes("PowerShell(git push*)"),
+    JSON.stringify(settings.permissions),
+  );
+  ok("compileSettingsJson: standing-approved -> statusLine/enabledPlugins still present", settings.statusLine && settings.enabledPlugins);
 }
 {
   const answers = {

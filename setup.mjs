@@ -568,7 +568,11 @@ export function compileSettingsJson(existing, answers, sourceHash) {
       ? { ...existing }
       : {
           statusLine: { type: "command", command: "node plugins/pipeline-core/scripts/statusline-context.mjs" },
-          permissions: { allow: ["Bash(git push*)", "PowerShell(git push*)"] },
+          // Standing push-approval is opt-in only (ADR-0017: no bleed-over into projects that
+          // keep push gated) -- mirrors the same condition renderPipelineYaml() uses below.
+          ...(answers.autonomy.push_policy === "standing-approved"
+            ? { permissions: { allow: ["Bash(git push*)", "PowerShell(git push*)"] } }
+            : {}),
           enabledPlugins: { "pipeline-core@agent-pipeline": true },
         };
   const marketplaceName = "agent-pipeline"; // local alias key stays stable (D2: same alias, own repo underneath)
