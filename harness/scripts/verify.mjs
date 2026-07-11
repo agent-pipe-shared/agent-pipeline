@@ -64,6 +64,7 @@ const TEST_SUITES = [
   { name: "validate-manifest-tests", file: join(scriptDir, "validate-manifest.test.mjs") },
   { name: "pipeline-state-tests", file: join(scriptDir, "pipeline-state.test.mjs") },
   { name: "security-scan-tests", file: join(scriptDir, "security-scan.test.mjs") },
+  { name: "no-autoupdate-key-tests", file: join(scriptDir, "no-autoupdate-key.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects with `.claude/pipeline.yaml`
