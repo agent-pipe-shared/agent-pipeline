@@ -27,13 +27,13 @@ The original push approval (Decision 3, 2026-07-02) had pulled forward remote+pu
 
 ## Follow-up
 
-None named in the register.
+**Share / public edition (2026-07-11, git-public-readiness):** for the public template repo, the committed `.claude/settings.json` no longer ships `permissions.allow` — a public template must not pre-authorize any push (the `git push*` glob also matches force-push; least-privilege default). The standing approval this ADR records still holds for THIS repo's automode maintenance — the committed `.claude/pipeline.yaml` still declares it as the guard-push approval — but the Claude Code permission-prompt bypass for it now lives only in the operator-local, gitignored `.claude/settings.local.json` (per machine; a fresh clone or a second machine re-adds it), no longer in a committed permissions block (so on a fresh clone, pushes still prompt at the permission layer until that file is added). The destructive-form block (guard union) is unchanged and remains the real force-push defense. Correspondingly, the `setup.mjs` generator emits `permissions.allow` only for adopters who choose `standing-approved` autonomy — honoring the no-bleed Risk clause above (a gated adopter gets no prompt-less push).
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
 # ADR-0017: Push-Policy — Standing-Approval für `main`-Push an Arbeitspaket-Grenzen
 
-> Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 4 · Stand 2026-07-06
+> Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 4 · Stand 2026-07-11
 
 **Status:** akzeptiert (2026-07-04, the PO-Revision) · **Grundlage:** Register E15
 
@@ -60,4 +60,4 @@ Die ursprüngliche Push-Freigabe (Entscheidung 3, 2026-07-02) hatte Remote+Push 
 
 ## Wiedervorlage
 
-Keine im Register genannt.
+**Share-/Public-Edition (2026-07-11, git-public-readiness):** Für das öffentliche Template-Repo shippt die committete `.claude/settings.json` kein `permissions.allow` mehr — ein öffentliches Template darf keinen Push vorautorisieren (der `git push*`-Glob matcht auch Force-Push; Least-Privilege-Default). Die hier festgehaltene Standing-Approval gilt für die Automode-Pflege DIESES Repos weiter — die committete `.claude/pipeline.yaml` deklariert sie weiterhin als guard-push-Approval —, aber der Claude-Code-Permission-Prompt-Bypass dafür lebt nun nur noch im operator-lokalen, gitignorten `.claude/settings.local.json` (pro Maschine; ein frischer Clone oder eine zweite Maschine legt es erneut an), nicht mehr in einem committeten permissions-Block (auf einem frischen Clone fragt der Push also weiterhin auf der Permission-Ebene nach, bis diese Datei angelegt ist). Der Destruktiv-Block (Guard-Union) ist unverändert und bleibt die eigentliche Force-Push-Abwehr. Entsprechend emittiert der `setup.mjs`-Generator das `permissions.allow` nur noch für Adopter, die `standing-approved`-Autonomie wählen — im Einklang mit der No-Bleed-Risikoklausel oben (ein gated-Adopter erhält kein prompt-loses Push).

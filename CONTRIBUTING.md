@@ -5,6 +5,21 @@ model (documentation, guardrails, and Node tooling) for agentic software
 development. Contributions of any size — typo fixes, documentation
 improvements, new guardrails, tooling changes — are welcome.
 
+## About this repository (release & provenance model)
+
+This public repository is a curated export of a private working repository,
+where the operating model is developed under the pipeline's own process. A few
+consequences are worth knowing up front:
+
+- **Commit history.** Maintainer commits carry a neutral project identity and
+  English messages by release convention. They intentionally omit the private
+  repo's internal decision-trailers and working-language artifacts; the full
+  decision lineage (specs, the decision register, dispatch records) lives in the
+  private repo. The [ADRs](docs/adr/) capture the durable *why* that is relevant
+  to users of the public edition.
+- **The DCO below applies to contributor pull requests**, not retroactively to
+  the maintainer export history.
+
 ## Before you start
 
 - Check open issues and pull requests to avoid duplicate work.
