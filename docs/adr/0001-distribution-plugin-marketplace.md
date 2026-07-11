@@ -32,9 +32,19 @@ Detail: this repo (planned `{{REPO_OWNER}}/agent-pipeline`, private) is the mark
 - **npm package** — fits only `<PROJECT_A>`; the plugin system's tag-based SemVer resolution does not apply to npm sources.
 - **Global `~/.claude` as carrier** — not project-versioned, not self-describing; dependency on unversioned user scope breaks on a fresh clone, as documented.
 
+## Addendum (2026-07-11): install-scope canonicalization + auto-update posture
+
+Running this operating model across two machines surfaced a double registration: the plugin binding existed both as the committed project-scope entry (E1, per project) AND, once, as an additional user-scope-global install on one machine. Two independent registrations mean two caches and two update paths — an unscoped `claude plugin update` (default `--scope user`) left the project-scope install stale (per fact-check against the shipped CLI behavior).
+
+**D1 — Project-scope is the only canonical install path.** The committed `.claude/settings.json` already forces the project binding unavoidably (E1); an extra user-scope-global install is only a redundant second path and is discouraged in the setup output (see `setup.mjs`). Project-scope is self-describing for adopters and pinnable per project. Operational ritual: `claude plugin marketplace update agent-pipeline` → `claude plugin update pipeline-core@agent-pipeline --scope project` → `/reload-plugins`.
+
+**D2 — No committed `autoUpdate` flag; the canon stays detect-and-prompt.** `autoUpdate` is documented only for managed settings; a committed project-level key is undocumented/unproven and is not carried in this repo's shipped configs. Background auto-update, where a user enables it locally, runs without the git credential helper and needs `GITHUB_TOKEN`/`GH_TOKEN` in the environment for a **private** marketplace repo — otherwise it fails silently at startup; `/reload-plugins` stays a manual step in every case (no hook can reload a running session). Consequence for an adopter: against the **public** upstream marketplace repo the native `/plugin → Marketplaces` auto-update toggle needs no token; bind the pipeline into your own **private** fork or repo instead, and the token caveat applies there. The distribution/update canon therefore stays the existing detect-and-prompt mechanism (the staleness-check hook plus the reload reminder in the bootstrap protocol, `harness/session-bootstrap.md` step 5b) — the native toggle is documented only as an optional, per-machine, non-committable convenience with these caveats named honestly.
+
+**Consequence for E1:** E1 (committed project binding) stays valid unchanged; this addendum clarifies that project-scope is also the only *update* target scope, and that no auto-update automation is committed.
+
 ## Status
 
-Accepted (2026-07-03, Checkpoint 1) · Basis: Register E1. No standalone follow-up. Versioning phases: [ADR-0002](0002-versioning-sha-then-semver.md); staleness operation: [ADR-0010](0010-session-bootstrap.md).
+Accepted (2026-07-03, Checkpoint 1) · **Addendum** 2026-07-11 (install-scope canonicalization, see above) · Basis: Register E1. No standalone follow-up. Versioning phases: [ADR-0002](0002-versioning-sha-then-semver.md); staleness operation: [ADR-0010](0010-session-bootstrap.md).
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
@@ -42,7 +52,7 @@ Accepted (2026-07-03, Checkpoint 1) · Basis: Register E1. No standalone follow-
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
 
-**Status:** akzeptiert (2026-07-03, Checkpoint 1) · **Grundlage:** Register E1
+**Status:** akzeptiert (2026-07-03, Checkpoint 1) · **Nachtrag** 2026-07-11 (Install-Scope-Kanonisierung, s. u.) · **Grundlage:** Register E1
 
 ## Kontext
 
@@ -73,6 +83,16 @@ Präzisierung: Dieses Repo (geplant `{{REPO_OWNER}}/agent-pipeline`, privat) ist
 - **Copy-Sync / Template-Repo** — exakt das heutige Anti-Pattern: kein Update-Kanal, belegte Divergenz.
 - **npm-Paket** — passt nur zu <PROJECT_A>; die Tag-basierte SemVer-Auflösung des Plugin-Systems greift bei npm-Quellen nicht.
 - **Globales `~/.claude` als Träger** — nicht projektversioniert, nicht self-describing; Abhängigkeit von unversioniertem User-Scope bricht belegt auf frischem Klon.
+
+## Nachtrag (2026-07-11): Install-Scope-Kanonisierung + Auto-Update-Haltung
+
+Der Betrieb dieses Operating Model über zwei Maschinen hinweg deckte eine Doppelregistrierung auf: Die Plugin-Bindung existierte sowohl als committeter Project-Scope-Eintrag (E1, je Projekt) ALS AUCH, einmalig, als zusätzlicher User-Scope-Global-Install auf einer Maschine. Zwei unabhängige Registrierungen bedeuten zwei Caches und zwei Update-Pfade — ein unscoped `claude plugin update` (Default `--scope user`) ließ die Project-Scope-Installation stale (Faktencheck gegen das ausgelieferte CLI-Verhalten).
+
+**D1 — Project-Scope ist der einzige kanonische Install-Weg.** Die committete `.claude/settings.json` erzwingt die Project-Bindung ohnehin unvermeidbar (E1); ein zusätzlicher User-Scope-Global ist nur der redundante zweite Pfad und wird in der Setup-Ausgabe abgeraten (siehe `setup.mjs`). Project-Scope ist self-describing für Adopter und je Projekt pinbar. Betriebs-Ritual: `claude plugin marketplace update agent-pipeline` → `claude plugin update pipeline-core@agent-pipeline --scope project` → `/reload-plugins`.
+
+**D2 — Kein committeter `autoUpdate`-Flag; Kanon bleibt Detect-and-Prompt.** `autoUpdate` ist nur für managed settings dokumentiert; ein committeter Projekt-Key ist undokumentiert/unbelegt und wird in den mitgelieferten Configs dieses Repos nicht geführt. Aktiviert ein Adopter lokal Hintergrund-Auto-Update, läuft es ohne Git-Credential-Helper und braucht `GITHUB_TOKEN`/`GH_TOKEN` in der Umgebung für ein **privates** Marketplace-Repo — sonst scheitert es still beim Start; `/reload-plugins` bleibt in jedem Fall ein manueller Schritt (kein Hook kann eine laufende Session neu laden). Konsequenz für einen Adopter: Gegen das **öffentliche** Upstream-Marketplace-Repo braucht der native `/plugin → Marketplaces`-Auto-Update-Toggle keinen Token; bindet ein Adopter die Pipeline stattdessen an einen eigenen **privaten** Fork bzw. ein privates Repo, greift dort der Token-Vorbehalt. Der Verteilungs-/Update-Kanon bleibt deshalb der bestehende Detect-and-Prompt-Mechanismus (der Staleness-Check-Hook plus der Reload-Reminder im Bootstrap-Protokoll, `harness/session-bootstrap.md` Schritt 5b) — der native Toggle wird nur als optionaler, per-Maschine nicht committbarer Komfort mit ehrlich benannten Vorbehalten dokumentiert.
+
+**Konsequenz für E1:** E1 (committete Project-Bindung) bleibt unverändert gültig; dieser Nachtrag präzisiert, dass Project-Scope auch der einzige *Update*-Zielscope ist und dass keine Auto-Update-Automatik committet wird.
 
 ## Wiedervorlage
 

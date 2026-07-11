@@ -63,6 +63,18 @@ claude plugin install pipeline-core@agent-pipeline --scope project
 
 `--scope project` matters: these subcommands default to `--scope user`, but the binding belongs at project scope. Verify with `claude plugin list --json` — it should show `pipeline-core@agent-pipeline` installed and enabled.
 
+**Keeping the plugin current.** Project scope is the only canonical install *and* update scope — an extra user-scope install is never a shortcut, just a second, staler copy with its own update path. Refresh with this three-step ritual, always in this order:
+
+```
+claude plugin marketplace update agent-pipeline
+claude plugin update pipeline-core@agent-pipeline --scope project
+/reload-plugins
+```
+
+`/reload-plugins` is the step that actually reloads an already-running session — the two update commands alone don't.
+
+**Native auto-update toggle (`/plugin → Marketplaces`) — optional, per machine, not committable.** It's a convenience switch, not a replacement for the ritual above, with one caveat: background updates need `GITHUB_TOKEN`/`GH_TOKEN` in the environment for a **private** marketplace repo, or they fail silently at startup — no error, just a stale state left behind. Against the **public** upstream marketplace repo the toggle needs no token. If you bind the pipeline to your own **private** fork or repo instead, the token caveat applies there. `/reload-plugins` stays a manual step either way.
+
 ### 4. Start a session
 
 Open a Claude Code session in the repo. A `SessionStart` hook surfaces a reminder — *run `/pipeline-core:pipeline-start` before any work* — but the reminder itself checks nothing. Running `/pipeline-core:pipeline-start` performs the actual bootstrap: it confirms ruleset state, project calibration, and the handover file before work begins.
@@ -184,6 +196,30 @@ claude plugin install pipeline-core@agent-pipeline --scope project
 `--scope user`, die Bindung gehört aber in den Projekt-Scope. Prüfen mit
 `claude plugin list --json` — es sollte `pipeline-core@agent-pipeline` als
 installiert und aktiviert zeigen.
+
+**Plugin aktuell halten.** Project-Scope ist der einzige kanonische Install-
+*und* Update-Scope — ein zusätzlicher User-Scope-Install ist nie eine
+Abkürzung, sondern nur eine zweite, veraltende Kopie mit eigenem Update-Pfad.
+Refresh über dieses Drei-Schritte-Ritual, immer in dieser Reihenfolge:
+
+```
+claude plugin marketplace update agent-pipeline
+claude plugin update pipeline-core@agent-pipeline --scope project
+/reload-plugins
+```
+
+`/reload-plugins` ist der Schritt, der eine bereits laufende Session
+tatsächlich neu lädt — die beiden Update-Kommandos allein tun das nicht.
+
+**Nativer Auto-Update-Toggle (`/plugin → Marketplaces`) — optional, pro
+Maschine, nicht committbar.** Er ist ein Komfort-Schalter, kein Ersatz für
+das Ritual oben, mit einem Vorbehalt: Hintergrund-Updates brauchen
+`GITHUB_TOKEN`/`GH_TOKEN` in der Umgebung für ein **privates**
+Marketplace-Repo, sonst scheitern sie still beim Start — kein Fehlerhinweis,
+einfach ein veralteter Stand. Gegen das **öffentliche** Upstream-Marketplace-Repo
+braucht der Toggle keinen Token. Bindest du die Pipeline stattdessen an deinen
+eigenen **privaten** Fork bzw. ein privates Repo, greift der Token-Vorbehalt
+dort. `/reload-plugins` bleibt so oder so ein manueller Schritt.
 
 ### 4. Session starten
 

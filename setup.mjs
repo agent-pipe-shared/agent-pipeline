@@ -837,6 +837,13 @@ Next steps:
   4. pipeline.user.yaml is adjustable any time -- re-run \`node setup.mjs\` afterwards.
   5. Before your first big feature: a quick look at docs/design/README.md pays
      off (optional design pre-stage, self-service brainstorming guide).
+  6. Keep the plugin current -- project scope is the only supported
+     install/update scope (an extra user-scope install becomes a stale
+     second copy, never a shortcut); refresh with, always in this order:
+       claude plugin marketplace update agent-pipeline
+       claude plugin update pipeline-core@agent-pipeline --scope project
+       /reload-plugins
+     (details: docs/adr/0001-distribution-plugin-marketplace.md, addendum)
 
 Details: SETUP.md (main entry point), docs/usage.md (day to day).
 `);
