@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * pipeline-state.mjs -- the ONLY sanctioned writer for `.claude/pipeline-state.json`
- * (schema `pipeline.state.v0`, AP1-P3 "DURIN").
+ * (schema `pipeline.state.v0`).
  *
  * WHY THIS FILE EXISTS
  *   The Dev-Plan-Gate (guard-devplan.mjs) and the Push-Gate (guard-push.mjs) need a
@@ -27,10 +27,24 @@
  *       { "id": "<string>", "planPath": "<string>", "phaseAtClose": "<string>|null",
  *         "closedAt": "<ISO-8601>", "closedBy": "<string>", "forCommit": "<sha>|null" }
  *     ] | absent,
+ *     "deployApprovals": [
+ *       { "forArtifact": "<tag-or-sha>", "forEnvironment": "<env>", "approvedBy": "<string>",
+ *         "approvedAt": "<ISO-8601>", "usedAt": "<ISO-8601>"? }
+ *     ] | absent,
  *     "updatedAt": "<ISO-8601>"
  *   }
  *   Every field beyond `schema` is optional -- consumers (the two gate hooks) treat an
  *   absent field the same as "not yet set" (fail-open per their own contracts).
+ *
+ *   `deployApprovals` (Release/Promotion phase): a LIST, NOT a single overwritable slot
+ *   like `pushApproval` -- a slot would silently clobber an unconsumed approval for a
+ *   different environment/artifact. Keyed by {forArtifact, forEnvironment}; consumed on
+ *   use (`usedAt` set). The consuming READER is `guard-push.mjs`'s deploy branch, which
+ *   is READ-ONLY against this field by family convention -- it never sets `usedAt`
+ *   itself; marking consumption is this CLI's `consume-deploy` subcommand, run by the
+ *   agent immediately after the triggering push succeeds. Additive within
+ *   `pipeline.state.v0` -- no schema-id bump, same additive-optional discipline as
+ *   every other field here.
  *
  *   DEVIATION NOTE (declared during the F1 fix, commit 1c0a181 -- see the `set-feature`/
  *   `set-phase` entries below for that fix itself, which moved `phase` INSIDE
@@ -85,8 +99,37 @@
  *                                                 with []). See the forCommit DEVIATION note
  *                                                 in RULES below -- unlike approve-push, a git
  *                                                 failure here is NOT fatal.
+ *   approve-deploy --env <environment> --artifact <tag-or-sha> --by <name>
+ *                                                 Appends a record {forArtifact,
+ *                                                 forEnvironment, approvedBy, approvedAt}
+ *                                                 to deployApprovals. Artifact is ALWAYS
+ *                                                 explicit -- never auto-detected from
+ *                                                 HEAD (build-once-promote rejects HEAD
+ *                                                 binding). Refuses blank
+ *                                                 --env/--artifact/--by, and a
+ *                                                 pre-existing deployApprovals that is
+ *                                                 present but NOT an array (malformed --
+ *                                                 never silently replaced).
+ *   consume-deploy --env <env> --artifact <ref> --by <name>
+ *                                                 Sets `usedAt` on the matching
+ *                                                 UNCONSUMED deployApprovals record
+ *                                                 ({forArtifact, forEnvironment} match).
+ *                                                 Fails LOUDLY (exit 2, nothing written)
+ *                                                 if no matching record exists, or the
+ *                                                 only match is already consumed -- never
+ *                                                 a silent no-op (a silent success would
+ *                                                 mask a broken runbook). Refuses blanks.
+ *   clear-deploy   --env <env> [--artifact <ref>] --by <name>
+ *                                                 Removes PENDING (unconsumed)
+ *                                                 deployApprovals for the env (optionally
+ *                                                 narrowed to one artifact) -- housekeeping
+ *                                                 for approvals granted in error or
+ *                                                 abandoned artifacts. Fails loudly if it
+ *                                                 matches nothing. Refuses blank
+ *                                                 --env/--by (--artifact stays optional).
  *
- * RULES (all five `--by`-taking subcommands: approve-plan/revoke-plan/approve-push/close-feature)
+ * RULES (all seven `--by`-taking subcommands: approve-plan/revoke-plan/approve-push/
+ * close-feature/approve-deploy/consume-deploy/clear-deploy)
  *   - `--by` MUST be present and non-blank -- REFUSED otherwise (English error, exit 2,
  *     nothing written). An unattributed approval/revocation would be exactly the kind
  *     of unauditable state change this CLI exists to prevent.
@@ -116,9 +159,11 @@
  *
  * EXIT CODES: 0 = written / success. 2 = refused (bad usage, malformed pre-existing
  * file, `git rev-parse HEAD` failed for `approve-push`, no `activeFeature` for
- * `close-feature`, a blank `activeFeature.id`/`planPath`, or a non-array pre-existing
- * `closedFeatures`) -- nothing written. Note: a `git rev-parse HEAD` failure during
- * close-feature does NOT produce exit 2 -- see the DEVIATION note in RULES above.
+ * `close-feature`, a blank `activeFeature.id`/`planPath`, a non-array pre-existing
+ * `closedFeatures`, a non-array pre-existing `deployApprovals`, or -- `consume-deploy`/
+ * `clear-deploy` only -- no matching {env, artifact} record to act on) -- nothing
+ * written. Note: a `git rev-parse HEAD` failure during close-feature does NOT produce
+ * exit 2 -- see the DEVIATION note in RULES above.
  *
  * VERIFY: node harness/scripts/pipeline-state.test.mjs (this file's own behavior
  * suite, standalone-runnable; exit 0 = all cases pass). Running this CLI directly
@@ -392,9 +437,109 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       return 0;
     }
 
+    case "approve-deploy": {
+      const env = flags.env;
+      const artifact = flags.artifact;
+      const by = flags.by;
+      if (isBlank(env) || isBlank(artifact) || isBlank(by)) {
+        console.error(
+          'Error: approve-deploy requires --env <environment>, --artifact <tag-or-sha> and --by <name> (all three non-empty).',
+        );
+        return 2;
+      }
+      if (base.deployApprovals !== undefined && !Array.isArray(base.deployApprovals)) {
+        console.error('Error: existing deployApprovals is not an array -- aborting WITHOUT changes (no silent overwrite).');
+        return 2;
+      }
+      const approvedAt = now();
+      const priorApprovals = Array.isArray(base.deployApprovals) ? base.deployApprovals : [];
+      const entry = { forArtifact: artifact, forEnvironment: env, approvedBy: by, approvedAt };
+      const next = {
+        ...base,
+        schema: SCHEMA_ID,
+        deployApprovals: [...priorApprovals, entry],
+        updatedAt: approvedAt,
+      };
+      writeState(dir, next);
+      console.log(`Deploy approval granted by "${by}" for artifact "${artifact}" / environment "${env}" (${approvedAt}).`);
+      return 0;
+    }
+
+    case "consume-deploy": {
+      const env = flags.env;
+      const artifact = flags.artifact;
+      const by = flags.by;
+      if (isBlank(env) || isBlank(artifact) || isBlank(by)) {
+        console.error('Error: consume-deploy requires --env <env>, --artifact <ref> and --by <name> (all three non-empty).');
+        return 2;
+      }
+      if (base.deployApprovals !== undefined && !Array.isArray(base.deployApprovals)) {
+        console.error('Error: existing deployApprovals is not an array -- aborting WITHOUT changes (no silent overwrite).');
+        return 2;
+      }
+      const approvals = Array.isArray(base.deployApprovals) ? base.deployApprovals : [];
+      const idx = approvals.findIndex(
+        (a) => a && a.forArtifact === artifact && a.forEnvironment === env && a.usedAt === undefined,
+      );
+      if (idx === -1) {
+        console.error(
+          `Error: no open deploy approval found for artifact "${artifact}" / environment "${env}" (absent or already consumed) -- consume-deploy refused (no silent no-op).`,
+        );
+        return 2;
+      }
+      const usedAt = now();
+      const nextApprovals = approvals.map((a, i) => (i === idx ? { ...a, usedAt } : a));
+      const next = {
+        ...base,
+        schema: SCHEMA_ID,
+        deployApprovals: nextApprovals,
+        updatedAt: usedAt,
+      };
+      writeState(dir, next);
+      console.log(`Deploy approval consumed by "${by}" for artifact "${artifact}" / environment "${env}" (${usedAt}).`);
+      return 0;
+    }
+
+    case "clear-deploy": {
+      const env = flags.env;
+      const artifact = flags.artifact; // optional
+      const by = flags.by;
+      if (isBlank(env) || isBlank(by)) {
+        console.error('Error: clear-deploy requires --env <env> and --by <name> (both non-empty); --artifact is optional.');
+        return 2;
+      }
+      if (base.deployApprovals !== undefined && !Array.isArray(base.deployApprovals)) {
+        console.error('Error: existing deployApprovals is not an array -- aborting WITHOUT changes (no silent overwrite).');
+        return 2;
+      }
+      const approvals = Array.isArray(base.deployApprovals) ? base.deployApprovals : [];
+      const matchesTarget = (a) =>
+        a && a.forEnvironment === env && a.usedAt === undefined && (isBlank(artifact) || a.forArtifact === artifact);
+      const toRemove = approvals.filter(matchesTarget);
+      if (toRemove.length === 0) {
+        console.error(
+          `Error: no open deploy approval found for environment "${env}"${isBlank(artifact) ? "" : ` / artifact "${artifact}"`} -- clear-deploy refused (nothing to remove).`,
+        );
+        return 2;
+      }
+      const remaining = approvals.filter((a) => !matchesTarget(a));
+      const clearedAt = now();
+      const next = {
+        ...base,
+        schema: SCHEMA_ID,
+        deployApprovals: remaining,
+        updatedAt: clearedAt,
+      };
+      writeState(dir, next);
+      console.log(
+        `${toRemove.length} open deploy approval(s) for environment "${env}"${isBlank(artifact) ? "" : ` / artifact "${artifact}"`} removed by "${by}" (${clearedAt}).`,
+      );
+      return 0;
+    }
+
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, set-phase, approve-plan, revoke-plan, approve-push, close-feature.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, set-phase, approve-plan, revoke-plan, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy.`,
       );
       return 2;
     }
