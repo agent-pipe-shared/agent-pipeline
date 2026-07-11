@@ -56,10 +56,12 @@
  * absolute `file_path` is resolved against the project root (`CLAUDE_PROJECT_DIR`, same
  * env var/cwd-fallback already used to locate the state file below — the hook's own
  * runtime contract guarantees this is set for real hook invocations) via
- * `path.relative()`, using the platform-native `node:path` (this project's machines are
- * Windows; `path.isAbsolute`/`path.relative` there natively understand drive letters,
- * backslashes, forward slashes and UNC paths — no separate parsing needed). Relative
- * inputs are matched exactly as before (unchanged behavior).
+ * `path.relative()`, using the platform-native `node:path` (`path.isAbsolute`/
+ * `path.relative` natively understand whichever absolute-path convention the HOST OS
+ * uses — drive letters/backslashes/UNC on Windows dev machines, `/`-rooted paths on POSIX
+ * CI runners — each correct for its own platform; this absolute-vs-relative + root
+ * resolution step stays platform-native and unchanged). Relative inputs are matched
+ * exactly as before (unchanged behavior).
  *   - **Absolute path OUTSIDE the project root** (the relative form still starts with
  *     `..` — an ancestor/sibling on the same drive — or is itself still absolute — a
  *     different drive letter, or a UNC path Windows cannot express relatively): this is
@@ -100,13 +102,21 @@
  * RELATIVE `file_path` carrying a `..`/`.` traversal segment (e.g. `docs/../src/foo.ts`)
  * starts with the exempt prefix `docs/` as a raw string even though it resolves OUTSIDE
  * `docs/` once collapsed — matching the raw string against `DEFAULT_EXEMPT_PREFIXES`
- * would wrongly exempt it. `path.normalize()` collapses every relative candidate path
- * (both the as-received relative form and the already-`path.relative()`-resolved
- * absolute-input form, where it is a defensive no-op since `relative()` normalizes
- * internally) BEFORE the case-insensitive slash normalization / prefix match below —
- * so `docs/../src/foo.ts` is correctly treated as `src/foo.ts` (non-exempt, blocked),
- * while a traversal that still resolves back under an exempt prefix (e.g.
- * `docs/../docs/state.md` -> `docs/state.md`) is correctly still exempt.
+ * would wrongly exempt it. The candidate path is therefore slashified (`\` -> `/`) and then
+ * collapsed with `posix.normalize()` — deliberately POSIX semantics regardless of host OS,
+ * NOT the platform-native `path.normalize()` — for every relative candidate path (both the
+ * as-received relative form and the already-`path.relative()`-resolved absolute-input
+ * form, where it is a defensive no-op since `relative()` normalizes internally) BEFORE the
+ * case-insensitive slash normalization / prefix match below. Using platform-native
+ * `normalize()` here was a real cross-platform bug: on win32 it treats `\` as a separator
+ * and collapses a backslash-form traversal correctly, but on POSIX (e.g. Linux CI) `\` is
+ * just an ordinary filename character to it, so `docs\..\src\foo.ts` passed through
+ * un-collapsed and then wrongly matched the `docs/` prefix once slash-normalized — a
+ * traversal-exemption bypass on POSIX hosts. Slashifying BEFORE a forced-POSIX collapse
+ * fixes this identically on every host OS: `docs/../src/foo.ts` (and its backslash form)
+ * are correctly treated as `src/foo.ts` (non-exempt, blocked), while a traversal that still
+ * resolves back under an exempt prefix (e.g. `docs/../docs/state.md` -> `docs/state.md`)
+ * is correctly still exempt.
  *
  * MECHANICS: stdin = `{ tool_input: { file_path } }` (PreToolUse contract). Wired via
  * plugins/pipeline-core/hooks/hooks.json in a LATER bundled wave (W-WIRE, TP-4) — this
@@ -115,7 +125,7 @@
  * VERIFY: node plugins/pipeline-core/hooks/guard-devplan.test.mjs
  */
 import { readFileSync } from "node:fs";
-import { join, relative, isAbsolute, normalize as pathNormalize } from "node:path";
+import { join, relative, isAbsolute, posix } from "node:path";
 
 import { loadManifest, gateConfig } from "../lib/manifest.mjs";
 
@@ -153,8 +163,15 @@ if (isAbsolute(filePath)) {
   relPath = rel;
 }
 // Collapse ".."/"." traversal segments BEFORE the prefix match (see header "TRAVERSAL
-// HARDENING"). No-op for a path already free of traversal segments.
-relPath = pathNormalize(relPath);
+// HARDENING"). No-op for a path already free of traversal segments. Slashify backslashes
+// FIRST, then collapse with POSIX semantics explicitly -- platform-native `path.normalize`
+// only treats "\" as a separator on win32; on POSIX hosts (e.g. Linux CI) a literal "\"
+// in the input is just an ordinary filename character to it, so a backslash-form traversal
+// like "docs\\..\\src\\foo.ts" would pass through UNCOLLAPSED and then wrongly match the
+// "docs/" exempt prefix once the later case-insensitive slash normalization runs. Using
+// `posix.normalize()` on an already-slashified string collapses "docs/../src/foo.ts" the
+// same way on every host OS.
+relPath = posix.normalize(relPath.replace(/\\/g, "/"));
 const normalizedPath = normalize(relPath);
 
 // ---- manifest: gate config (fail-open on absent, WARN on genuine YAML failure) -----
