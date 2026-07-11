@@ -54,3 +54,107 @@ const GIT_GLOBAL_OPT_PREFIX_RE = new RegExp(`\\bgit\\b(?:\\s+(?:${GIT_GLOBAL_OPT
 export function normalizeGlobalGitOptions(str) {
   return str.replace(GIT_GLOBAL_OPT_PREFIX_RE, "git");
 }
+
+// ---- quote-aware argv tokenizer + ref-glob matcher ------------------------------------
+
+/**
+ * tokenizeArgv(cmd) -- quote-aware argv tokenizer for push refspec EXTRACTION.
+ *
+ * Distinct from `stripQuotedSegments` (above): that helper DESTROYS quoted content
+ * (`"v1.2.3"` -> `""`) which is correct for DETECTION (a commit message merely
+ * mentioning a destructive command must not trip a rule) but unusable for EXTRACTION
+ * (it would turn `git push origin "v1.2.3"` into an empty ref). This helper is the
+ * extraction-safe counterpart: it splits `cmd` into argv tokens on UNQUOTED
+ * whitespace, and for each token unwraps quote pairs (single or double) while
+ * PRESERVING the inner content verbatim -- `"v1.2.3"` -> `v1.2.3`, `'refs/tags/v*'`
+ * -> `refs/tags/v*`, a bare `v1.2.3` -> `v1.2.3` unchanged. A quote appearing anywhere
+ * INSIDE a token (not just at its edges) also collapses to its content (`a"b"c` ->
+ * `abc`) -- mirrors standard POSIX-ish quote unwrapping; the guard only needs
+ * ref-shaped tokens to survive intact, not full shell-quoting fidelity.
+ *
+ * Tokenizes ONE command segment -- it does NOT split on `&&`/`;`/`|`; the caller
+ * (guard-push.mjs's deploy branch) isolates the push segment first. NO new regex is
+ * layered on top of this by the guard for extraction purposes -- see that file's own
+ * header for how segment isolation and refspec/option identification build on the
+ * plain token list this function returns.
+ */
+export function tokenizeArgv(cmd) {
+  const tokens = [];
+  let current = "";
+  let inSingle = false;
+  let inDouble = false;
+  let sawAnyChar = false; // distinguishes an empty quoted token (`''`) from no token at all
+
+  for (let i = 0; i < cmd.length; i++) {
+    const ch = cmd[i];
+    if (inSingle) {
+      if (ch === "'") inSingle = false;
+      else current += ch;
+      continue;
+    }
+    if (inDouble) {
+      if (ch === '"') inDouble = false;
+      else current += ch;
+      continue;
+    }
+    if (ch === "'") {
+      inSingle = true;
+      sawAnyChar = true;
+      continue;
+    }
+    if (ch === '"') {
+      inDouble = true;
+      sawAnyChar = true;
+      continue;
+    }
+    if (/\s/.test(ch)) {
+      if (sawAnyChar) {
+        tokens.push(current);
+        current = "";
+        sawAnyChar = false;
+      }
+      continue;
+    }
+    current += ch;
+    sawAnyChar = true;
+  }
+  if (sawAnyChar) tokens.push(current);
+  return tokens;
+}
+
+const REGEX_SPECIAL_CHAR_RE = /[.*+?^${}()|[\]\\]/;
+
+/** Escapes ONE character for literal inclusion in a RegExp source string. */
+function escapeRegexChar(ch) {
+  return REGEX_SPECIAL_CHAR_RE.test(ch) ? `\\${ch}` : ch;
+}
+
+/**
+ * refMatchesPattern(ref, pattern) -- pure glob matcher deciding whether a
+ * fully-qualified git ref matches ONE manifest release-adapter trigger pattern (e.g.
+ * `refs/tags/v*`). Fixed, security-appropriate semantics -- err toward MORE matches
+ * (fail-toward-the-gate, same posture as the rest of this guard family): `*` matches
+ * any run of characters INCLUDING `/` (greedy); no other wildcard syntax (`?`, `[...]`
+ * are literal characters, not glob metacharacters); case-sensitive (git refs are); the
+ * pattern must match the FULL ref string (anchored both ends). Implementation:
+ * translate the pattern into an anchored RegExp with every non-`*` character
+ * regex-escaped and each `*` -> `.*`.
+ *
+ * This lives here (pure string logic, this module's remit) rather than inline in the
+ * deploy branch -- the guard calls this, never re-implementing ref-glob matching.
+ */
+export function refMatchesPattern(ref, pattern) {
+  if (typeof ref !== "string" || typeof pattern !== "string") return false;
+  let source = "^";
+  for (const ch of pattern) {
+    source += ch === "*" ? ".*" : escapeRegexChar(ch);
+  }
+  source += "$";
+  let re;
+  try {
+    re = new RegExp(source);
+  } catch {
+    return false;
+  }
+  return re.test(ref);
+}

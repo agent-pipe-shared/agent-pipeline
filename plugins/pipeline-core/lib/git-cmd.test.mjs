@@ -9,7 +9,7 @@
  * Run:   node plugins/pipeline-core/lib/git-cmd.test.mjs
  * Exit:  0 = all cases pass · 1 = at least one case failed (failure list on stdout).
  */
-import { stripQuotedSegments, normalizeGlobalGitOptions } from "./git-cmd.mjs";
+import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern } from "./git-cmd.mjs";
 
 let pass = 0;
 const failures = [];
@@ -120,6 +120,96 @@ function record(id, ok, detail) {
     "COMBINED pipeline  strip -> lowercase -> normalize matches guard-git.mjs's own composition order",
     normalized === 'git add "" && echo ""',
     `stripped=${JSON.stringify(stripped)} normalized=${JSON.stringify(normalized)}`,
+  );
+}
+
+// ---- tokenizeArgv ---------------------------------------------------------------------
+{
+  const out = tokenizeArgv('git push origin "v1.2.3"');
+  record(
+    "TOKENIZE double-quote  a double-quoted ref is preserved verbatim, not destroyed",
+    JSON.stringify(out) === JSON.stringify(["git", "push", "origin", "v1.2.3"]),
+    `out=${JSON.stringify(out)}`,
+  );
+}
+{
+  const out = tokenizeArgv("git push origin 'refs/tags/v*'");
+  record(
+    "TOKENIZE single-quote  a single-quoted ref is preserved verbatim, not destroyed",
+    JSON.stringify(out) === JSON.stringify(["git", "push", "origin", "refs/tags/v*"]),
+    `out=${JSON.stringify(out)}`,
+  );
+}
+{
+  const out = tokenizeArgv("git push origin v1.2.3");
+  record(
+    "TOKENIZE bare-ref  an unquoted ref is unchanged",
+    JSON.stringify(out) === JSON.stringify(["git", "push", "origin", "v1.2.3"]),
+    `out=${JSON.stringify(out)}`,
+  );
+}
+{
+  const out = tokenizeArgv("git -C sub push --force origin v1.2.3");
+  record(
+    "TOKENIZE option-tokens  option tokens (-C, sub, --force) are present in the returned list unchanged",
+    JSON.stringify(out) === JSON.stringify(["git", "-C", "sub", "push", "--force", "origin", "v1.2.3"]),
+    `out=${JSON.stringify(out)}`,
+  );
+}
+{
+  const out = tokenizeArgv("git   push\torigin   v1.2.3");
+  record(
+    "TOKENIZE mixed-whitespace  multiple spaces/tabs between tokens collapse to one split each",
+    JSON.stringify(out) === JSON.stringify(["git", "push", "origin", "v1.2.3"]),
+    `out=${JSON.stringify(out)}`,
+  );
+}
+{
+  const out = tokenizeArgv('git push origin a"b"c');
+  record(
+    "TOKENIZE interior-quote  a quote pair inside one token collapses to its content (a\"b\"c -> abc)",
+    JSON.stringify(out) === JSON.stringify(["git", "push", "origin", "abc"]),
+    `out=${JSON.stringify(out)}`,
+  );
+}
+
+// ---- refMatchesPattern -----------------------------------------------------------------
+{
+  record(
+    "GLOB star-crosses-slash  refs/tags/v* matches refs/tags/v1.0.0",
+    refMatchesPattern("refs/tags/v1.0.0", "refs/tags/v*") === true,
+  );
+}
+{
+  record(
+    "GLOB star-crosses-slash-2  refs/tags/v* matches refs/tags/v1/beta (* crosses /)",
+    refMatchesPattern("refs/tags/v1/beta", "refs/tags/v*") === true,
+  );
+}
+{
+  record(
+    "GLOB no-cross-type  refs/tags/v* does NOT match refs/heads/v1",
+    refMatchesPattern("refs/heads/v1", "refs/tags/v*") === false,
+  );
+}
+{
+  record(
+    "GLOB case-sensitive  refs/tags/V* does NOT match refs/tags/v1.0.0 (git refs are case-sensitive)",
+    refMatchesPattern("refs/tags/v1.0.0", "refs/tags/V*") === false,
+  );
+}
+{
+  record(
+    "GLOB literal-question-mark  a `?` in a pattern is a literal character, not a wildcard",
+    refMatchesPattern("refs/tags/v1", "refs/tags/v?") === false &&
+      refMatchesPattern("refs/tags/v?", "refs/tags/v?") === true,
+  );
+}
+{
+  record(
+    "GLOB exact-match-only  a wildcard-free pattern matches only itself",
+    refMatchesPattern("refs/tags/v1.0.0", "refs/tags/v1.0.0") === true &&
+      refMatchesPattern("refs/tags/v1.0.01", "refs/tags/v1.0.0") === false,
   );
 }
 
