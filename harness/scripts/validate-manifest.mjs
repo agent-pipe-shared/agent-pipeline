@@ -27,10 +27,26 @@ const REPO_ROOT = join(SCRIPT_DIR, "..", "..");
 
 /** Renders one structured error entry into the required English message template. */
 export function formatError(err) {
+  // A deploy-precedence violation object `{rule, subject, message}` carries a complete,
+  // self-describing message -- printed VERBATIM, no Field/expected/got wrapping. This branch
+  // must come FIRST: the existing {line,...} and {path,expected,got} shapes below never carry
+  // a `.message`, so they are unreachable here and stay byte-identical.
+  if (typeof err.message === "string") return err.message;
   if (err.line !== undefined && err.line !== null) {
     return `YAML error line ${err.line}: ${err.reason}`;
   }
   return `Field "${err.path}": expected ${err.expected}, got ${err.got}`;
+}
+
+/**
+ * Renders one warning entry. A plain string (the D1 malformed-central-policy warning, or the
+ * checkReleaseIntegrity WIP ci-adapter warning) renders as `Warning: <string>`; an
+ * advisory-mode deploy-precedence violation object `{rule,subject,message}` renders as
+ * `Warning: <message>` -- the single `typeof w === "string"` branch covers both.
+ */
+export function formatWarning(w) {
+  if (typeof w === "string") return `Warning: ${w}`;
+  return `Warning: ${w.message}`;
 }
 
 /** One-line human summary of a valid manifest -- printed on the exit-0 "present+valid" path. */
@@ -48,10 +64,25 @@ export function formatSummary(manifest) {
  * Resolves the CLI arg (or the default) into { rootDir, manifestRelPath } for
  * loadManifest(). `arg` may be absolute or relative to cwd; absent defaults to
  * `<repo-root>/.claude/pipeline.yaml`.
+ *
+ * `rootDir` MUST be the PROJECT ROOT, uniform with every hook call site (which invoke
+ * `loadManifest(projectRoot)`/`loadManifestSafe(projectRoot)` directly). For the CANONICAL
+ * `<root>/.claude/pipeline.yaml` layout, naively taking `dirname(manifestPath)` yields
+ * `<root>/.claude` -- one directory too deep -- which makes `governance.policies_path`/
+ * `docs/risks.md` (both project-root-relative) resolve at `<root>/.claude/governance/...` and
+ * never be found: a central deploy-policy silently goes `absent` through the CLI while the
+ * hook callers, given the true project root, keep enforcing it (round-2 Critic finding -- a
+ * split-brain between CLI and hook enforcement). FIX: detect the `.claude`-nested layout by
+ * its parent directory's basename and hoist `rootDir` one level up in that case; every other
+ * (flat) layout keeps the original `rootDir = dirname(manifestPath)` behavior unchanged.
  */
 export function resolveTarget(arg, { repoRoot = REPO_ROOT, cwd = process.cwd() } = {}) {
   const targetPath = arg ? (isAbsolute(arg) ? arg : resolve(cwd, arg)) : join(repoRoot, DEFAULT_MANIFEST_RELPATH);
-  return { rootDir: dirname(targetPath), manifestRelPath: basename(targetPath) };
+  const parentDir = dirname(targetPath);
+  if (basename(parentDir) === ".claude") {
+    return { rootDir: dirname(parentDir), manifestRelPath: join(".claude", basename(targetPath)) };
+  }
+  return { rootDir: parentDir, manifestRelPath: basename(targetPath) };
 }
 
 /** Runs the CLI logic against an argv array; returns the process exit code (never calls process.exit itself -- testable). */
@@ -65,10 +96,16 @@ export function run(argv = process.argv.slice(2)) {
   }
   if (result.status === "ok") {
     console.log(formatSummary(result.manifest));
+    for (const warning of result.warnings ?? []) {
+      console.error(formatWarning(warning));
+    }
     return 0;
   }
   for (const err of result.errors) {
     console.error(formatError(err));
+  }
+  for (const warning of result.warnings ?? []) {
+    console.error(formatWarning(warning));
   }
   return 2;
 }
