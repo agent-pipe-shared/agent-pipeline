@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.deploy-policy.v0",
+  "title": "Central deploy policy (pipeline.deploy-policy.v0, ADR-0034)",
+  "description": "Structure-only validation for the OPTIONAL central deploy-policy.yaml, discovered by plugins/pipeline-core/lib/manifest.mjs's loadDeployPolicy() via the project manifest's governance.policies_path (fixed filename `deploy-policy.yaml`). Validated with the same hand-rolled schema-lite validator as pipeline-manifest.schema.json (plugins/pipeline-core/lib/schema-lite.mjs) -- understands exactly: type, required, properties, items, enum, additionalProperties. The ORDINAL meaning of type_floor/mode_floor and the advisory/mandate/strict strictness semantics are enforced as CODE in manifest.mjs's checkDeployPrecedence, not here (schema-lite has no ordinal/pattern keyword).",
+  "type": "object",
+  "required": ["schema", "mode"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": {
+      "type": "string",
+      "enum": ["pipeline.deploy-policy.v0"]
+    },
+    "mode": {
+      "type": "string",
+      "enum": ["advisory", "mandate", "strict"],
+      "description": "advisory: guideline only, undocumented deviations are a Critic finding (ADR-0030). mandate: hard floor, a violation blocks UNLESS covered by a valid non-expired docs/risks.md deviation record. strict: hard floor, deviation records are ignored entirely."
+    },
+    "adapters": {
+      "type": "array",
+      "description": "OPTIONAL allowlist of adapter names a project may configure (omit = no restriction).",
+      "items": { "type": "string" }
+    },
+    "targets": {
+      "type": "array",
+      "description": "OPTIONAL allowlist of deploy-destination ids (omit = no restriction). When present, every project env MUST declare a `target` from this list (checkDeployPrecedence D2 -- absence-is-not-compliance).",
+      "items": { "type": "string" }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "promote_prod": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type_floor": {
+              "type": "string",
+              "enum": ["automated", "human"],
+              "description": "OPTIONAL ordinal floor (automated < human) -- checkDeployPrecedence D3."
+            },
+            "mode_floor": {
+              "type": "string",
+              "enum": ["off", "warn", "blocking"],
+              "description": "OPTIONAL ordinal floor (off < warn < blocking); v1-vacuous-but-reserved -- a human-gated promote is already `blocking` by canon and the release schema exposes no per-env promote MODE knob (checkDeployPrecedence D3)."
+            }
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required": {
+          "type": "boolean",
+          "description": "FORWARD-DECLARED, consumed by the deploy-log evidence check at deploy time -- NOT enforced by this precedence engine (checkDeployPrecedence reads policy.evidence not at all)."
+        }
+      }
+    }
+  }
+}

@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "pipeline.manifest.v0",
-  "title": "Pipeline manifest (declarative pipeline.yaml, AP1-P2 GLOIN)",
+  "title": "Pipeline manifest (declarative pipeline.yaml)",
   "description": "Structure-only validation for the OPTIONAL declarative pipeline manifest (.claude/pipeline.yaml). Consumed by plugins/pipeline-core/lib/manifest.mjs with the SAME hand-rolled validator used for critic-verdict.schema.json (plugins/pipeline-core/lib/schema-lite.mjs) -- understands exactly: type, required, properties, items, enum, additionalProperties (incl. the additionalProperties-as-schema extension, used throughout below for maps whose KEYS are arbitrary names -- gate names, scanner names, model-routing roles, profile names, flag names). Semantic checks schema-lite cannot express (profiles.active must name a declared profile, profiles.*.phases[] entries must name a declared phase, phases[].condition grammar + flag existence, phases[].name uniqueness) live as CODE in manifest.mjs, not here -- do not try to shoehorn them into this file.",
   "type": "object",
   "required": ["schema"],
@@ -123,6 +123,82 @@
       "type": "object",
       "description": "Keys are arbitrary flag names (has_ui, ...) referenced by phases[].condition; every value must be boolean.",
       "additionalProperties": { "type": "boolean" }
+    },
+    "release": {
+      "type": "object",
+      "description": "OPTIONAL SDLC Release/Promotion phase config (ADR-0033/0034). Absent = zero behavior change (anti-bloat). Semantic integrity (adapter references, executor/trigger/command coherence) and the central deploy-policy precedence diff live as CODE in manifest.mjs (checkReleaseIntegrity / checkDeployPrecedence), not here.",
+      "additionalProperties": false,
+      "properties": {
+        "environments": {
+          "type": "object",
+          "description": "Keys are arbitrary environment names (test, prod, ...); every value validated against the environment schema below. The canonical test/prod pair is convention, not schema law.",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["adapter", "healthcheck", "rollback"],
+            "additionalProperties": false,
+            "properties": {
+              "adapter": {
+                "type": "string",
+                "description": "Must reference a declared release.adapters key (semantic integrity check, manifest.mjs checkReleaseIntegrity)."
+              },
+              "target": {
+                "type": "string",
+                "description": "OPTIONAL deploy-destination id (e.g. \"production-eu\"). Schema-optional; SEMANTICALLY required whenever a central targets allowlist exists (precedence engine D2)."
+              },
+              "healthcheck": {
+                "type": "string",
+                "description": "Command or workflow ref (opaque string in v0)."
+              },
+              "rollback": {
+                "type": "string",
+                "description": "Procedure ref, or the literal \"none-irreversible\" -- mandatory per environment (umbrella rollback rule)."
+              },
+              "promotion": {
+                "type": "string",
+                "enum": ["human-gate"],
+                "description": "OPTIONAL; presence = this env carries the promote human-gate. Absent = automated env (e.g. test)."
+              }
+            }
+          }
+        },
+        "adapters": {
+          "type": "object",
+          "description": "Keys are arbitrary adapter names (vercel-preview, vercel-prod, ...); every value validated against the adapter schema below.",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["executor", "credentials"],
+            "additionalProperties": false,
+            "properties": {
+              "executor": {
+                "type": "string",
+                "enum": ["ci", "local"],
+                "description": "The swappable deploy driver (PO decision)."
+              },
+              "trigger": {
+                "type": "object",
+                "description": "OPTIONAL; ci executor's release-triggering ref patterns (the push guard reads these). local executor: omit refs.",
+                "additionalProperties": false,
+                "properties": {
+                  "refs": { "type": "array", "items": { "type": "string" } }
+                }
+              },
+              "command": {
+                "type": "string",
+                "description": "OPTIONAL; local executor's deploy command ref (mutually-informative with executor:local)."
+              },
+              "deploy": {
+                "type": "string",
+                "description": "OPTIONAL workflow/command reference."
+              },
+              "credentials": {
+                "type": "string",
+                "enum": ["oidc", "ci-secret", "external"],
+                "description": "Never inline values (SEC-08) -- the enum makes an inline secret value structurally unrepresentable."
+              }
+            }
+          }
+        }
+      }
     }
   }
 }

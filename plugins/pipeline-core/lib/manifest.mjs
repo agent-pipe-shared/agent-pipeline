@@ -44,6 +44,13 @@
  * error (path/expected/got are `null` in that case; the human-readable reason lives in
  * the extra `reason` field) -- see validate-manifest.mjs for how the two shapes render
  * into the two required English message templates.
+ *
+ * RELEASE/PROMOTION PHASE (ADR-0033/0034, additive): `checkSemantics` now also returns a
+ * `warnings` array alongside `errors`, and gains `rootDir`/`now` parameters so its new
+ * `checkReleaseIntegrity`/`checkDeployPrecedence` checks can load a central
+ * `deploy-policy.yaml` (`loadDeployPolicy`) and a `docs/risks.md` deviation record
+ * (`readDeviations`) deterministically. The whole deploy-precedence path runs ONLY when the
+ * manifest declares a `release` section (anti-bloat) -- see each function's own doc comment.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -58,8 +65,17 @@ const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 /** Co-located schema file (plugins/pipeline-core/scripts/pipeline-manifest.schema.json). */
 export const DEFAULT_SCHEMA_PATH = join(SCRIPT_DIR, "..", "scripts", "pipeline-manifest.schema.json");
 
+/** Co-located central deploy-policy schema (plugins/pipeline-core/scripts/deploy-policy.schema.json). */
+export const DEFAULT_DEPLOY_POLICY_SCHEMA_PATH = join(SCRIPT_DIR, "..", "scripts", "deploy-policy.schema.json");
+
 /** Where a project's manifest lives, relative to its repo root. */
 export const DEFAULT_MANIFEST_RELPATH = join(".claude", "pipeline.yaml");
+
+/** Fixed filename the central deploy policy is discovered under (no new manifest field for the filename itself). */
+const DEPLOY_POLICY_FILENAME = "deploy-policy.yaml";
+
+/** Where the deviation-record document lives, relative to a project's repo root. */
+const RISKS_MD_RELPATH = join("docs", "risks.md");
 
 // ---------------------------------------------------------------------------------------------
 // Condition grammar: always | never | <flag> | !<flag>. <flag> is a bare identifier
@@ -212,13 +228,321 @@ function checkPhases(manifest, errors) {
   });
 }
 
-/** Runs all semantic checks against an already schema-shaped manifest object. Defensive against a manifest that failed schema validation (missing/mistyped fields) -- never throws, silently skips a check whose preconditions are not met (the schema-lite error already covers the shape defect). */
-function checkSemantics(manifest) {
+// ---------------------------------------------------------------------------------------------
+// Release/Promotion phase (ADR-0033/0034): release-section integrity checks, the central
+// deploy-policy loader, the docs/risks.md deviation reader, and the pure precedence engine.
+// All four are new in this slice; NONE of them add a schema-lite keyword or a new
+// error-translation regex (the two schemas reuse only type/required/properties/items/
+// enum/additionalProperties, already understood by schema-lite -- see the file-header note).
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * Semantic integrity checks over an already schema-shaped `release` section: adapter
+ * references must resolve, `executor: local` adapters must be trigger-free and command-ful,
+ * and a WIP `executor: ci` adapter feeding a human-gated env (no `trigger.refs` yet) is a
+ * WARNING, never an error (pushed to the third `warnings` sink, never to `errors`). Skipped
+ * entirely when there is no `release` section (defensive, same idiom as
+ * checkProfiles/checkPhases): a manifest that failed schema validation on `release`'s shape
+ * is already covered by that schema-lite error, this check silently no-ops on anything it
+ * cannot safely read.
+ */
+function checkReleaseIntegrity(manifest, errors, warnings) {
+  const release = manifest.release;
+  if (!release || typeof release !== "object" || Array.isArray(release)) return;
+
+  const environments =
+    release.environments && typeof release.environments === "object" && !Array.isArray(release.environments)
+      ? release.environments
+      : {};
+  const adapters =
+    release.adapters && typeof release.adapters === "object" && !Array.isArray(release.adapters) ? release.adapters : {};
+
+  const humanGatedAdapterNames = new Set();
+
+  for (const [envName, env] of Object.entries(environments)) {
+    if (!env || typeof env !== "object") continue;
+    const adapterName = env.adapter;
+    if (typeof adapterName !== "string") continue;
+    if (!Object.prototype.hasOwnProperty.call(adapters, adapterName)) {
+      errors.push({
+        path: `release.environments.${envName}.adapter`,
+        expected: "a declared adapter",
+        got: `'${adapterName}' (not declared)`,
+      });
+    } else if (env.promotion === "human-gate") {
+      humanGatedAdapterNames.add(adapterName);
+    }
+  }
+
+  for (const [adapterName, adapter] of Object.entries(adapters)) {
+    if (!adapter || typeof adapter !== "object") continue;
+
+    if (adapter.executor === "local") {
+      if (adapter.trigger !== undefined) {
+        errors.push({
+          path: `release.adapters.${adapterName}.trigger`,
+          expected: "no trigger (executor: local)",
+          got: "present",
+        });
+      }
+      if (typeof adapter.command !== "string" || adapter.command === "") {
+        errors.push({
+          path: `release.adapters.${adapterName}.command`,
+          expected: "present (executor: local)",
+          got: "missing",
+        });
+      }
+    }
+
+    if (adapter.executor === "ci" && humanGatedAdapterNames.has(adapterName)) {
+      const refs = adapter.trigger && typeof adapter.trigger === "object" ? adapter.trigger.refs : undefined;
+      if (!Array.isArray(refs) || refs.length === 0) {
+        warnings.push(
+          `Adapter '${adapterName}' (executor: ci) for a human-gated environment has no trigger.refs -- not deploy-triggerable`,
+        );
+      }
+    }
+  }
+}
+
+/**
+ * Discovers and loads the central deploy policy via `manifest.governance?.policies_path`
+ * (absent section/field ⇒ `{status:"absent"}`), looking for the FIXED filename
+ * `deploy-policy.yaml` there. The ENTIRE body runs inside ONE try/catch: a not-found file ⇒
+ * `{status:"absent"}`; ANY other outcome (permission error, a directory at that path, YAML
+ * syntax error, schema violation) ⇒ `{status:"malformed", detail}`; a clean valid parse ⇒
+ * `{status:"ok", policy}`. NEVER throws -- this totality is what lets the "malformed ⇒
+ * warning, never blocks verify" guarantee (D1) hold inside `loadManifest`, which must itself
+ * stay total.
+ */
+export function loadDeployPolicy(rootDir, manifest) {
+  try {
+    const policiesPath = manifest && typeof manifest === "object" ? manifest.governance?.policies_path : undefined;
+    if (typeof policiesPath !== "string" || policiesPath === "") return { status: "absent" };
+
+    const policyPath = join(rootDir, policiesPath, DEPLOY_POLICY_FILENAME);
+    if (!existsSync(policyPath)) return { status: "absent" };
+
+    const text = readFileSync(policyPath, "utf8");
+    const policy = parseYaml(text);
+    const schema = loadSchema(DEFAULT_DEPLOY_POLICY_SCHEMA_PATH);
+    const { valid, errors: schemaErrors } = validateAgainstSchema(policy, schema);
+    if (!valid) return { status: "malformed", detail: schemaErrors.join("; ") };
+
+    return { status: "ok", policy };
+  } catch (err) {
+    return { status: "malformed", detail: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+const DEVIATION_REQUIRED_FIELDS = ["id", "policy-rule", "deviation", "justification", "owner", "expires", "approved-by"];
+
+/**
+ * Reads `docs/risks.md` inside a try/catch (absent OR unreadable ⇒ `[]`, never throws). Scans
+ * for fenced ` ```yaml ` blocks and parses each with yaml-lite; prose between fences is never
+ * parsed, and a malformed fenced block (yaml-lite throws on it) is skipped, not fatal. A record
+ * needs ALL of `id, policy-rule, deviation, justification, owner, expires, approved-by`; missing
+ * any field OR an `expires` before the injected `now` ⇒ the record is treated as ABSENT --
+ * simply left out of the returned list.
+ */
+export function readDeviations(rootDir, now) {
+  try {
+    const risksPath = join(rootDir, RISKS_MD_RELPATH);
+    if (!existsSync(risksPath)) return [];
+
+    const text = readFileSync(risksPath, "utf8");
+    const deviations = [];
+    const fenceRe = /```yaml[^\n]*\n([\s\S]*?)```/g;
+    let m;
+    while ((m = fenceRe.exec(text)) !== null) {
+      let record;
+      try {
+        record = parseYaml(m[1]);
+      } catch {
+        continue; // malformed fenced block -- skipped, not fatal.
+      }
+      if (!record || typeof record !== "object" || Array.isArray(record)) continue;
+
+      const hasAllFields = DEVIATION_REQUIRED_FIELDS.every(
+        (f) => Object.prototype.hasOwnProperty.call(record, f) && record[f] !== null && record[f] !== undefined,
+      );
+      if (!hasAllFields) continue;
+
+      const expiresAt = new Date(record.expires);
+      if (Number.isNaN(expiresAt.getTime()) || expiresAt < now) continue;
+
+      deviations.push(record);
+    }
+    return deviations;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * The machine-deterministic precedence diff (umbrella strictness partial order). PURE function
+ * over already-parsed inputs -- never reads state, git, or the filesystem, and NEVER throws.
+ * Returns `{errors:[], warnings:[]}`.
+ *
+ * No-release guard (anti-bloat): returns the empty result immediately when `projectRelease` is
+ * falsy or has no `environments` (key absent OR a zero-key object both count) -- a direct unit
+ * call on an empty release is a clean no-op regardless of how hard a central policy is.
+ */
+export function checkDeployPrecedence(projectRelease, policyResult, deviations, now) {
   const errors = [];
-  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) return errors;
+  const warnings = [];
+
+  const environments =
+    projectRelease &&
+    typeof projectRelease === "object" &&
+    !Array.isArray(projectRelease) &&
+    projectRelease.environments &&
+    typeof projectRelease.environments === "object" &&
+    !Array.isArray(projectRelease.environments)
+      ? projectRelease.environments
+      : null;
+
+  if (!environments || Object.keys(environments).length === 0) {
+    return { errors, warnings };
+  }
+
+  if (!policyResult || policyResult.status === "absent") {
+    return { errors, warnings }; // no central policy ⇒ the project decides.
+  }
+
+  if (policyResult.status === "malformed") {
+    // D1: a declared-but-unreadable/invalid central policy is a WARNING, never blocks verify --
+    // the push guard carries the fail-closed for deploy-triggering pushes.
+    warnings.push(
+      `central deploy-policy present but unreadable/invalid: ${policyResult.detail}; deploy-triggering pushes are fail-closed by the guard until fixed`,
+    );
+    return { errors, warnings };
+  }
+
+  const policy = policyResult.policy && typeof policyResult.policy === "object" ? policyResult.policy : {};
+  const adapters =
+    projectRelease.adapters && typeof projectRelease.adapters === "object" && !Array.isArray(projectRelease.adapters)
+      ? projectRelease.adapters
+      : {};
+  const safeDeviations = Array.isArray(deviations) ? deviations : [];
+  const violations = [];
+
+  // D2 -- targets is a HARD allowlist over EVERY declared env (absence-is-not-compliance).
+  if (Array.isArray(policy.targets)) {
+    for (const [envName, env] of Object.entries(environments)) {
+      if (!env || typeof env !== "object") continue;
+      const target = env.target;
+      if (typeof target !== "string" || target === "") {
+        violations.push({
+          rule: "targets",
+          subject: envName,
+          message: `Environment '${envName}' declares no target under a central targets allowlist`,
+        });
+      } else if (!policy.targets.includes(target)) {
+        violations.push({
+          rule: "targets",
+          subject: envName,
+          message: `Environment '${envName}' target '${target}' not in central targets allowlist`,
+        });
+      }
+    }
+  }
+
+  // D3 -- gate-type floor, field-based "prod-intent" definition (no env-name heuristic).
+  if (policy.gates && typeof policy.gates === "object" && policy.gates.promote_prod?.type_floor === "human") {
+    if (Array.isArray(policy.targets)) {
+      // Primary: prod-intent env = an env whose target ∈ policy.targets.
+      for (const [envName, env] of Object.entries(environments)) {
+        if (!env || typeof env !== "object") continue;
+        const target = env.target;
+        if (typeof target === "string" && policy.targets.includes(target) && env.promotion !== "human-gate") {
+          violations.push({
+            rule: "gate-type-floor",
+            subject: envName,
+            message: `Environment '${envName}' (deploys to central target '${target}') under central gate-type floor 'human'`,
+          });
+        }
+      }
+    } else {
+      // Fallback: no central targets ⇒ the release config must contain ≥1 human-gated env.
+      const hasHumanGate = Object.values(environments).some(
+        (env) => env && typeof env === "object" && env.promotion === "human-gate",
+      );
+      if (!hasHumanGate) {
+        violations.push({
+          rule: "gate-type-floor",
+          subject: "config",
+          message: "release config declares no human-gated promote environment, central floor requires gate type 'human'",
+        });
+      }
+    }
+  }
+
+  // adapters ⊆ -- every declared project adapter must be in the central allowlist, if any.
+  if (Array.isArray(policy.adapters)) {
+    for (const name of Object.keys(adapters)) {
+      if (!policy.adapters.includes(name)) {
+        violations.push({
+          rule: "adapters",
+          subject: name,
+          message: `Adapter '${name}' not in central adapters allowlist`,
+        });
+      }
+    }
+  }
+
+  // Mode application: advisory -> warnings; strict -> errors, deviations ignored; mandate ->
+  // errors unless a valid, non-expired deviation covers the rule category or the exact instance.
+  if (policy.mode === "advisory") {
+    warnings.push(...violations);
+  } else if (policy.mode === "strict") {
+    errors.push(...violations);
+  } else if (policy.mode === "mandate") {
+    for (const v of violations) {
+      const covered = safeDeviations.some((d) => {
+        const rule = d && d["policy-rule"];
+        return rule === v.rule || rule === `${v.rule}:${v.subject}`;
+      });
+      if (!covered) errors.push(v);
+    }
+  } else {
+    // Defensive (round-2 Critic finding): a hand-built/future-schema policy carrying an
+    // unrecognized `mode` (neither advisory/mandate/strict) must NEVER silently drop
+    // violations -- that would be fail-AWAY-from-the-gate, the opposite of every other
+    // fail-toward-the-gate posture this engine takes (D1/D2 absence-is-not-compliance).
+    // Treat an unknown mode as the STRICTEST: every violation becomes an error, deviations
+    // ignored, same as `strict`.
+    errors.push(...violations);
+  }
+
+  return { errors, warnings };
+}
+
+/**
+ * Runs all semantic checks against an already schema-shaped manifest object. Defensive against
+ * a manifest that failed schema validation (missing/mistyped fields) -- never throws, silently
+ * skips a check whose preconditions are not met (the schema-lite error already covers the shape
+ * defect). `rootDir`/`now` let the deploy-precedence path load the central policy and the
+ * deviation record deterministically; that whole path runs ONLY when `manifest.release` exists
+ * (anti-bloat).
+ */
+function checkSemantics(manifest, rootDir, now) {
+  const errors = [];
+  const warnings = [];
+  if (!manifest || typeof manifest !== "object" || Array.isArray(manifest)) return { errors, warnings };
   checkProfiles(manifest, errors);
   checkPhases(manifest, errors);
-  return errors;
+  checkReleaseIntegrity(manifest, errors, warnings);
+
+  if (manifest.release) {
+    const policyResult = loadDeployPolicy(rootDir, manifest);
+    const deviations = readDeviations(rootDir, now);
+    const dp = checkDeployPrecedence(manifest.release, policyResult, deviations, now);
+    errors.push(...dp.errors);
+    warnings.push(...dp.warnings);
+  }
+
+  return { errors, warnings };
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -227,13 +551,18 @@ function checkSemantics(manifest) {
 
 /**
  * Loads and validates the manifest at `<rootDir>/<manifestRelPath>` (default
- * `.claude/pipeline.yaml`). Returns `{ status: "absent"|"ok"|"invalid", manifest?, errors }`.
- * Never throws -- every failure mode becomes `status: "invalid"` plus structured `errors`.
+ * `.claude/pipeline.yaml`). Returns `{ status: "absent"|"ok"|"invalid", manifest?, errors,
+ * warnings }` -- `warnings` is present on EVERY status, including "absent" (the channel must
+ * not be shaped differently just because there was nothing to load). Never throws -- every
+ * failure mode becomes `status: "invalid"` plus structured `errors`.
  */
-export function loadManifest(rootDir, { manifestRelPath = DEFAULT_MANIFEST_RELPATH, schemaPath = DEFAULT_SCHEMA_PATH } = {}) {
+export function loadManifest(
+  rootDir,
+  { manifestRelPath = DEFAULT_MANIFEST_RELPATH, schemaPath = DEFAULT_SCHEMA_PATH, now = new Date() } = {},
+) {
   const manifestPath = join(rootDir, manifestRelPath);
   if (!existsSync(manifestPath)) {
-    return { status: "absent", errors: [] };
+    return { status: "absent", errors: [], warnings: [] };
   }
 
   const text = readFileSync(manifestPath, "utf8");
@@ -245,6 +574,7 @@ export function loadManifest(rootDir, { manifestRelPath = DEFAULT_MANIFEST_RELPA
       return {
         status: "invalid",
         errors: [{ path: null, expected: null, got: null, line: err.line, reason: err.message.replace(/^line \d+: /, "") }],
+        warnings: [],
       };
     }
     throw err;
@@ -253,10 +583,11 @@ export function loadManifest(rootDir, { manifestRelPath = DEFAULT_MANIFEST_RELPA
   const schema = loadSchema(schemaPath);
   const { valid, errors: rawSchemaErrors } = validateAgainstSchema(manifest, schema);
   const errors = rawSchemaErrors.map(translateSchemaError);
-  errors.push(...checkSemantics(manifest));
+  const { errors: semanticErrors, warnings } = checkSemantics(manifest, rootDir, now);
+  errors.push(...semanticErrors);
 
-  if (errors.length > 0) return { status: "invalid", manifest, errors };
-  return { status: "ok", manifest, errors: [] };
+  if (errors.length > 0) return { status: "invalid", manifest, errors, warnings };
+  return { status: "ok", manifest, errors: [], warnings };
 }
 
 /**
