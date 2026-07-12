@@ -107,6 +107,51 @@
         "security": { "type": "string", "enum": ["blocking", "warn", "off"] },
         "claude_md_max_lines": { "type": "number" }
       }
+    },
+    "release": {
+      "type": "object",
+      "description": "OPTIONAL SDLC Release/Promotion phase config (ADR-0033/0034), mirrored structure-only from plugins/pipeline-core/scripts/pipeline-manifest.schema.json's `release` property block (same schema-lite validator, plugins/pipeline-core/lib/schema-lite.mjs). Absent = zero behavior change (anti-bloat) -- deliberately NOT in this file's root `required` list.",
+      "additionalProperties": false,
+      "properties": {
+        "environments": {
+          "type": "object",
+          "description": "Keys are arbitrary environment names (test, prod, ...); every value validated against the environment shape below.",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["adapter", "healthcheck", "rollback"],
+            "additionalProperties": false,
+            "properties": {
+              "adapter": { "type": "string", "description": "Must reference a declared release.adapters key (semantic integrity check, manifest.mjs checkReleaseIntegrity)." },
+              "target": { "type": "string", "description": "OPTIONAL deploy-destination id." },
+              "healthcheck": { "type": "string" },
+              "rollback": { "type": "string", "description": "Procedure ref, or the literal \"none-irreversible\" -- mandatory per environment." },
+              "promotion": { "type": "string", "enum": ["human-gate"], "description": "OPTIONAL; presence = this env carries the promote human-gate." }
+            }
+          }
+        },
+        "adapters": {
+          "type": "object",
+          "description": "Keys are arbitrary adapter names (vercel-preview, vercel-prod, ...); every value validated against the adapter shape below.",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["executor", "credentials"],
+            "additionalProperties": false,
+            "properties": {
+              "executor": { "type": "string", "enum": ["ci", "local"] },
+              "trigger": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "refs": { "type": "array", "items": { "type": "string" } }
+                }
+              },
+              "command": { "type": "string" },
+              "deploy": { "type": "string" },
+              "credentials": { "type": "string", "enum": ["oidc", "ci-secret", "external"] }
+            }
+          }
+        }
+      }
     }
   }
 }

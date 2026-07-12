@@ -93,6 +93,36 @@ gates:
   security: blocking
   claude_md_max_lines: 200
 
+# OPTIONAL — omit entirely for zero added behavior (anti-bloat guarantee, ADR-0033/0034).
+# Release/Promotion phase (optional SDLC tail phase): uncomment and adapt only for a project
+# that actually deploys; see docs/deploy/README.md for the full guide. Two-environment
+# vercel-preview/vercel-prod starter shape (fields ground-truthed in
+# plugins/pipeline-core/scripts/pipeline-manifest.schema.json's `release` property):
+#
+# release:
+#   environments:
+#     test:
+#       adapter: vercel-preview       # must reference a declared adapter (integrity check)
+#       healthcheck: <command-or-workflow-ref>
+#       rollback: <procedure-ref>     # MANDATORY per environment
+#     prod:
+#       adapter: vercel-prod
+#       healthcheck: <command-or-workflow-ref>
+#       rollback: <procedure-ref>
+#       promotion: human-gate         # fixed value in v1
+#   adapters:
+#     vercel-preview:
+#       executor: ci                  # ci | local -- the swappable driver
+#       deploy: <workflow-ref>        # test-env deploy (merge-triggered), no release refs
+#       credentials: oidc             # oidc | ci-secret | external -- never inline values
+#     vercel-prod:
+#       executor: ci
+#       trigger:
+#         refs:
+#           - refs/tags/v*            # ci executor: release-triggering ref patterns
+#       deploy: <workflow-ref>        # local executor: a command reference instead
+#       credentials: oidc
+
 # -----------------------------------------------------------------------------------------
 # Advanced/autonomous example (NOT active — for orientation only; setup.mjs writes these
 # values automatically when you choose "Autonomous" for the autonomy preset):
