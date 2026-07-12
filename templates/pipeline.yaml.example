@@ -121,3 +121,37 @@ governance:
 # every value must be a boolean.
 flags:
   has_ui: false
+
+# Release/Promotion phase (OPTIONAL SDLC tail phase, ADR-0033/0034). Declaring a
+# `release` section here opts a project into the test->prod promotion phase (adapter-based
+# deploy, mandatory per-env health check + rollback procedure, an optional promote:prod human
+# gate, and -- where a central deploy-policy.yaml exists at governance.policies_path above --
+# precedence checking against it, see plugins/pipeline-core/lib/manifest.mjs
+# checkReleaseIntegrity/checkDeployPrecedence). Absent (the default, as in this template) =
+# zero new behavior (anti-bloat). Left commented out here on purpose -- uncomment and adapt
+# only for a project that actually deploys. Two-environment vercel-preview/vercel-prod worked
+# shape:
+#
+# release:
+#   environments:
+#     test:
+#       adapter: vercel-preview       # must reference a declared adapter (integrity check)
+#       healthcheck: <command-or-workflow-ref>
+#       rollback: <procedure-ref>     # MANDATORY per environment
+#     prod:
+#       adapter: vercel-prod
+#       healthcheck: <command-or-workflow-ref>
+#       rollback: <procedure-ref>
+#       promotion: human-gate         # fixed value in v1
+#   adapters:
+#     vercel-preview:
+#       executor: ci
+#       deploy: <workflow-ref>        # test-env deploy (merge-triggered), no release refs
+#       credentials: oidc
+#     vercel-prod:
+#       executor: ci                  # ci | local -- the swappable driver
+#       trigger:
+#         refs:
+#           - refs/tags/v*            # ci executor: release-triggering ref patterns
+#       deploy: <workflow-ref>        # local executor: a command reference instead
+#       credentials: oidc             # oidc | ci-secret | external -- never inline values
