@@ -98,3 +98,11 @@ Rule IDs: `GIT-xx`.
 - The GIT-04 double-confirmation override mechanism applies to `GG-17`…`GG-20` exactly like every other rule id — no separate procedure.
 - **Why:** A ruleset that claims more than the guard technically enforces is worse than no rule at all — a false sense of protection invites exactly the bypass it claims to prevent (operating-model §4.1, gate honesty).
 - **Verification:** `plugins/pipeline-core/hooks/guard-git.test.mjs` carries a BLOCK case and an ALLOW counter-case per rule id (`GG-17`…`GG-20`); `node harness/scripts/verify.mjs` runs the full suite.
+
+## GIT-08 — Standing push approval does NOT cover a deploy-triggering ref
+
+- **MUST NOT** treat the standing push approval (GIT-05) as covering a push to a deploy-triggering ref (a release tag/branch pattern declared under a manifest `release` section, e.g. `refs/tags/v*`). `standing-approved` covers ORDINARY commits to `main`; it is explicitly carved out for deploy triggers.
+- **MUST** obtain a fresh `deployApproval` bound to `{artifact, environment}` (`harness/scripts/pipeline-state.mjs approve-deploy --env <env> --artifact <tag-or-sha> --by <name>`) before a push that fires a `promote:prod`-class deployment to a `human-gate` environment — even when the repo's push gate is otherwise `standing-approved`.
+- Enforced by the `guard-push` deploy branch: the deploy branch's approval check runs INDEPENDENT of `gates.push.approval`, so it is never satisfied by the standing approval — see `guardrails/deploy.md` DP-01 for the full rule and `docs/adr/0017-push-policy-standing-approval.md`'s follow-up note for the ADR-side carve-out.
+- **Why:** Without this carve-out, `git push origin v1.0.0` would auto-pass under the standing approval and silently fire a prod deploy in CI — a composition bypass. A blanket "pushing to main is fine" approval was never meant to also mean "promoting to prod is fine".
+- **Verification:** `plugins/pipeline-core/hooks/guard-push.test.mjs` carries a case where a deploy-triggering push is BLOCKED despite `gates.push.approval === "standing-approved"`; `node harness/scripts/verify.mjs` runs the full suite.
