@@ -491,6 +491,208 @@ const FIXED_GIT_HEAD = () => ({ ok: true, commit: "abc123deadbeef" });
   ok("PS25c activeFeature removed", state.activeFeature === undefined);
 }
 
+// ---- PS26: approve-deploy binds {forArtifact, forEnvironment, approvedBy, approvedAt} -----
+{
+  const dir = freshDir("approve-deploy-shape");
+  const code = run(["approve-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS26a approve-deploy exit 0", code === 0, `got ${code}`);
+  const state = readState(dir).state;
+  ok(
+    "PS26b deployApprovals[0] shape correct",
+    state.deployApprovals?.length === 1 &&
+      state.deployApprovals[0].forArtifact === "v1.0.0" &&
+      state.deployApprovals[0].forEnvironment === "prod" &&
+      state.deployApprovals[0].approvedBy === "po-test" &&
+      state.deployApprovals[0].approvedAt === FIXED_NOW() &&
+      state.deployApprovals[0].usedAt === undefined,
+    JSON.stringify(state.deployApprovals),
+  );
+}
+
+// ---- PS27: approve-deploy refuses blank --env/--artifact/--by, nothing written ------------
+{
+  const dir = freshDir("approve-deploy-blank-env");
+  const code = run(["approve-deploy", "--env", "", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS27a approve-deploy blank --env refused (exit 2)", code === 2, `got ${code}`);
+  ok("PS27b nothing written", readState(dir).status === "absent");
+}
+{
+  const dir = freshDir("approve-deploy-blank-artifact");
+  const code = run(["approve-deploy", "--env", "prod", "--artifact", "", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS27c approve-deploy blank --artifact refused (exit 2)", code === 2, `got ${code}`);
+  ok("PS27d nothing written", readState(dir).status === "absent");
+}
+{
+  const dir = freshDir("approve-deploy-blank-by");
+  const code = run(["approve-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", ""], { dir, now: FIXED_NOW });
+  ok("PS27e approve-deploy blank --by refused (exit 2)", code === 2, `got ${code}`);
+  ok("PS27f nothing written", readState(dir).status === "absent");
+}
+{
+  const dir = freshDir("approve-deploy-missing-env");
+  const code = run(["approve-deploy", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS27g approve-deploy missing --env refused (exit 2)", code === 2, `got ${code}`);
+}
+
+// ---- PS28: a `test` approval does NOT satisfy a `prod` check ------------------------------
+{
+  const dir = freshDir("deploy-env-does-not-cross");
+  run(["approve-deploy", "--env", "test", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  const codeWrongEnv = run(["consume-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS28a consume-deploy for prod fails when only a test approval exists (exit 2)", codeWrongEnv === 2, `got ${codeWrongEnv}`);
+  const stateAfterFail = readState(dir).state;
+  ok(
+    "PS28b test approval left untouched (still unconsumed) after the failed prod check",
+    stateAfterFail.deployApprovals?.[0]?.usedAt === undefined,
+  );
+  const codeRightEnv = run(["consume-deploy", "--env", "test", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS28c consume-deploy for the matching test env succeeds (exit 0)", codeRightEnv === 0, `got ${codeRightEnv}`);
+}
+
+// ---- PS29: consumed-on-use -- a consumed record fails a second consume-deploy check ------
+{
+  const dir = freshDir("deploy-consumed-on-use");
+  run(["approve-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  const code1 = run(["consume-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS29a first consume-deploy exit 0", code1 === 0, `got ${code1}`);
+  const state1 = readState(dir).state;
+  ok("PS29b usedAt set after first consume", state1.deployApprovals?.[0]?.usedAt === FIXED_NOW());
+  const code2 = run(["consume-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS29c second consume-deploy on the same record fails (exit 2, never a silent no-op)", code2 === 2, `got ${code2}`);
+}
+
+// ---- PS30: consume-deploy refuses blank --env/--artifact/--by ----------------------------
+{
+  const dir = freshDir("consume-deploy-blank-env");
+  run(["approve-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  const code = run(["consume-deploy", "--env", "", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS30a consume-deploy blank --env refused (exit 2)", code === 2, `got ${code}`);
+}
+{
+  const dir = freshDir("consume-deploy-blank-artifact");
+  run(["approve-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  const code = run(["consume-deploy", "--env", "prod", "--artifact", "", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS30b consume-deploy blank --artifact refused (exit 2)", code === 2, `got ${code}`);
+}
+{
+  const dir = freshDir("consume-deploy-blank-by");
+  run(["approve-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  const code = run(["consume-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", ""], { dir, now: FIXED_NOW });
+  ok("PS30c consume-deploy blank --by refused (exit 2)", code === 2, `got ${code}`);
+}
+
+// ---- PS31: consume-deploy fails loudly (exit 2, nothing written) on a non-existent record -
+{
+  const dir = freshDir("consume-deploy-no-record");
+  const code = run(["consume-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS31a consume-deploy with no prior approval refused (exit 2)", code === 2, `got ${code}`);
+  ok("PS31b nothing written (state file absent)", readState(dir).status === "absent");
+}
+
+// ---- PS32: clear-deploy removes pending approvals for the env (unconsumed only) ----------
+{
+  const dir = freshDir("clear-deploy-pending-only");
+  run(["approve-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  run(["approve-deploy", "--env", "prod", "--artifact", "v2.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  run(["consume-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  const code = run(["clear-deploy", "--env", "prod", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS32a clear-deploy exit 0", code === 0, `got ${code}`);
+  const state = readState(dir).state;
+  ok(
+    "PS32b only the pending (unconsumed) v2.0.0 record was removed -- the consumed v1.0.0 record stays",
+    state.deployApprovals?.length === 1 && state.deployApprovals[0].forArtifact === "v1.0.0" && state.deployApprovals[0].usedAt === FIXED_NOW(),
+    JSON.stringify(state.deployApprovals),
+  );
+}
+
+// ---- PS33: clear-deploy narrowed by --artifact only clears the named artifact -------------
+{
+  const dir = freshDir("clear-deploy-narrowed");
+  run(["approve-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  run(["approve-deploy", "--env", "prod", "--artifact", "v2.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  const code = run(["clear-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS33a clear-deploy narrowed by --artifact exit 0", code === 0, `got ${code}`);
+  const state = readState(dir).state;
+  ok(
+    "PS33b only v1.0.0 removed, v2.0.0 stays pending",
+    state.deployApprovals?.length === 1 && state.deployApprovals[0].forArtifact === "v2.0.0",
+    JSON.stringify(state.deployApprovals),
+  );
+}
+
+// ---- PS34: clear-deploy refuses blank --env/--by; --artifact stays optional ---------------
+{
+  const dir = freshDir("clear-deploy-blank-env");
+  run(["approve-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  const code = run(["clear-deploy", "--env", "", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS34a clear-deploy blank --env refused (exit 2)", code === 2, `got ${code}`);
+}
+{
+  const dir = freshDir("clear-deploy-blank-by");
+  run(["approve-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  const code = run(["clear-deploy", "--env", "prod", "--by", ""], { dir, now: FIXED_NOW });
+  ok("PS34b clear-deploy blank --by refused (exit 2)", code === 2, `got ${code}`);
+}
+{
+  const dir = freshDir("clear-deploy-no-artifact-ok");
+  run(["approve-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  const code = run(["clear-deploy", "--env", "prod", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS34c clear-deploy without --artifact (optional) still succeeds (exit 0)", code === 0, `got ${code}`);
+}
+
+// ---- PS35: clear-deploy fails loudly (exit 2, nothing written) when nothing matches -------
+{
+  const dir = freshDir("clear-deploy-no-match");
+  const code = run(["clear-deploy", "--env", "prod", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS35a clear-deploy with no matching pending approval refused (exit 2)", code === 2, `got ${code}`);
+  ok("PS35b nothing written (state file absent)", readState(dir).status === "absent");
+}
+{
+  const dir = freshDir("clear-deploy-already-consumed-no-match");
+  run(["approve-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  run(["consume-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  const before = readFileSync(statePath(dir), "utf8");
+  const code = run(["clear-deploy", "--env", "prod", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS35c clear-deploy with only an already-consumed record refused (exit 2)", code === 2, `got ${code}`);
+  const after = readFileSync(statePath(dir), "utf8");
+  ok("PS35d file left byte-identical (no silent write)", after === before);
+}
+
+// ---- PS36: existing malformed-file refusal still holds with the new subcommands ----------
+{
+  const dir = freshDir("malformed-existing-deploy");
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(join(dir, ".claude", "pipeline-state.json"), "{ this is not json");
+  const before = readFileSync(statePath(dir), "utf8");
+
+  const codeApprove = run(["approve-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS36a approve-deploy on malformed existing file -> exit 2", codeApprove === 2, `got ${codeApprove}`);
+  ok("PS36b file left byte-identical after approve-deploy attempt", readFileSync(statePath(dir), "utf8") === before);
+
+  const codeConsume = run(["consume-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS36c consume-deploy on malformed existing file -> exit 2", codeConsume === 2, `got ${codeConsume}`);
+  ok("PS36d file left byte-identical after consume-deploy attempt", readFileSync(statePath(dir), "utf8") === before);
+
+  const codeClear = run(["clear-deploy", "--env", "prod", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS36e clear-deploy on malformed existing file -> exit 2", codeClear === 2, `got ${codeClear}`);
+  ok("PS36f file left byte-identical after clear-deploy attempt", readFileSync(statePath(dir), "utf8") === before);
+}
+
+// ---- PS37: approve-deploy refuses a non-array pre-existing deployApprovals field ---------
+{
+  const dir = freshDir("approve-deploy-nonarray");
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(
+    join(dir, ".claude", "pipeline-state.json"),
+    JSON.stringify({ schema: SCHEMA_ID, deployApprovals: "not-an-array" }, null, 2) + "\n",
+  );
+  const before = readFileSync(statePath(dir), "utf8");
+  const code = run(["approve-deploy", "--env", "prod", "--artifact", "v1.0.0", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS37a approve-deploy with non-array deployApprovals refused (exit 2)", code === 2, `got ${code}`);
+  const after = readFileSync(statePath(dir), "utf8");
+  ok("PS37b file left byte-identical (no silent overwrite)", after === before);
+}
+
 // ---- Cleanup ------------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {

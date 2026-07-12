@@ -252,6 +252,300 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   );
 }
 
+// =============================================================================================
+// DEPLOY BRANCH -- new fixtures/cases, additive. Base manifest: two envs
+// (`test` = automated/non-gated, `prod` = human-gate) + two adapters (`vercel-preview`
+// no trigger, `vercel-prod` tag-triggered); `triggerRefs` customizes vercel-prod's own
+// trigger.refs (varies per ref-extraction-form case); `testEnvAdapterRef: "ghost-adapter"`
+// deliberately breaks release integrity (an undeclared-adapter semantic error) WITHOUT
+// touching vercel-prod's own trigger patterns -- used for the A/B fail-matrix cases so
+// the manifest is semantic-`status:"invalid"` while trigger classification stays clean.
+// =============================================================================================
+function releaseManifest({ triggerRefs = ["refs/tags/v*"], extraTop = "", testEnvAdapterRef = "vercel-preview", includeCanary = false } = {}) {
+  const lines = ["schema: pipeline.manifest.v0"];
+  if (extraTop) lines.push(...extraTop.split("\n").filter((l) => l.length > 0));
+  lines.push(
+    "release:",
+    "  environments:",
+    "    test:",
+    `      adapter: ${testEnvAdapterRef}`,
+    "      healthcheck: check.sh",
+    "      rollback: rollback-test.sh",
+    "    prod:",
+    "      adapter: vercel-prod",
+    "      healthcheck: check.sh",
+    "      rollback: rollback-prod.sh",
+    "      promotion: human-gate",
+  );
+  if (includeCanary) {
+    lines.push("    canary:", "      adapter: vercel-canary", "      healthcheck: check.sh", "      rollback: rollback-canary.sh");
+  }
+  lines.push("  adapters:", "    vercel-preview:", "      executor: ci", "      credentials: oidc", "    vercel-prod:", "      executor: ci");
+  if (triggerRefs.length > 0) {
+    lines.push("      trigger:", "        refs:");
+    for (const r of triggerRefs) lines.push(`          - ${r}`);
+  }
+  lines.push("      credentials: oidc");
+  if (includeCanary) {
+    lines.push(
+      "    vercel-canary:",
+      "      executor: ci",
+      "      trigger:",
+      "        refs:",
+      "          - refs/tags/canary-*",
+      "      credentials: oidc",
+    );
+  }
+  return lines.join("\n") + "\n";
+}
+function writeGovernancePolicy(dir, relDir, content) {
+  mkdirSync(join(dir, relDir), { recursive: true });
+  writeFileSync(join(dir, relDir, "deploy-policy.yaml"), content);
+}
+function deployApprovalState(forArtifact, forEnvironment) {
+  return {
+    schema: "pipeline.state.v0",
+    deployApprovals: [{ forArtifact, forEnvironment, approvedBy: "po-test", approvedAt: "2026-07-07T20:00:00.000Z" }],
+  };
+}
+
+// ---- PGD01/02 bare-name candidate: block (no approval) / allow (matching approval) --------
+{
+  const { dir } = freshRepo("deploy-bare-block");
+  writeManifest(dir, releaseManifest());
+  check("PGD01 block  bare-name deploy-trigger to human-gate env without a deployApproval", "git push origin v1.0.0", dir, BLOCK, {
+    stderrIncludes: ["no unused deployApproval", "v1.0.0"],
+  });
+}
+{
+  const { dir } = freshRepo("deploy-bare-allow");
+  writeManifest(dir, releaseManifest());
+  writeState(dir, deployApprovalState("v1.0.0", "prod"));
+  check("PGD02 allow  bare-name deploy-trigger with a matching unconsumed deployApproval", "git push origin v1.0.0", dir, ALLOW, {
+    stderrEmpty: true,
+  });
+}
+
+// ---- PGD03/04 src:dst candidate (destination-keyed): block / allow ------------------------
+{
+  const { dir } = freshRepo("deploy-srcdst-block");
+  writeManifest(dir, releaseManifest());
+  check(
+    "PGD03 block  src:dst deploy-trigger (destination-keyed) without a deployApproval",
+    "git push origin HEAD:refs/tags/v2.0.0",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["no unused deployApproval", "v2.0.0"] },
+  );
+}
+{
+  const { dir } = freshRepo("deploy-srcdst-allow");
+  writeManifest(dir, releaseManifest());
+  writeState(dir, deployApprovalState("v2.0.0", "prod"));
+  check(
+    "PGD04 allow  src:dst deploy-trigger with a matching unconsumed deployApproval (bare dest artifact identity)",
+    "git push origin HEAD:refs/tags/v2.0.0",
+    dir,
+    ALLOW,
+    { stderrEmpty: true },
+  );
+}
+
+// ---- PGD05/06 --tags: block (a tag-pattern trigger is declared) / allow (none declared) ---
+{
+  const { dir } = freshRepo("deploy-tags-block");
+  writeManifest(dir, releaseManifest());
+  check("PGD05 block  --tags counts as release-triggering whenever ANY tag-pattern trigger is declared", "git push origin --tags", dir, BLOCK, {
+    stderrIncludes: ["no unused deployApproval"],
+  });
+}
+{
+  const { dir } = freshRepo("deploy-tags-allow");
+  writeManifest(dir, releaseManifest({ triggerRefs: ["refs/heads/release-*"] })); // branch-pattern only, no tag pattern
+  check("PGD06 allow  --tags does NOT trigger when no tag-pattern trigger is declared", "git push origin --tags", dir, ALLOW, {
+    stderrEmpty: true,
+  });
+}
+
+// ---- PGD07 --delete: NOT a deploy trigger, even for an otherwise-matching name -------------
+{
+  const { dir } = freshRepo("deploy-delete-allow");
+  writeManifest(dir, releaseManifest());
+  check("PGD07 allow  --delete forms are excluded from deploy-trigger matching (protected-ref deletion stays guard-git territory)", "git push origin --delete v1.0.0", dir, ALLOW, {
+    stderrEmpty: true,
+  });
+}
+
+// ---- PGD08/09 unparseable -> conservative block --------------------------------------------
+{
+  const { dir } = freshRepo("deploy-unparseable-chain");
+  writeManifest(dir, releaseManifest());
+  check(
+    "PGD08 block  a multi-push chain in one command is unparseable in a release-declaring repo -- conservative block",
+    "git push origin v1.0.0 && git push origin v2.0.0",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["exactly ONE git-push segment"] },
+  );
+}
+{
+  const { dir } = freshRepo("deploy-unparseable-refspec");
+  writeManifest(dir, releaseManifest());
+  check(
+    "PGD09 block  an unparseable refspec form (empty destination after the colon) -- conservative block",
+    "git push origin v1.0.0:",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["cannot be evaluated deterministically"] },
+  );
+}
+
+// ---- PGD10/11 bare push: tag-only trigger ALLOWED, branch-pattern trigger BLOCKED ----------
+{
+  const { dir } = freshRepo("deploy-barepush-tagonly-allow");
+  writeManifest(dir, releaseManifest()); // default trigger is a tag pattern only
+  check("PGD10 allow  a bare `git push` (no remote/refspec) never pushes tags -- allowed when triggers are tag-only", "git push", dir, ALLOW, {
+    stderrEmpty: true,
+  });
+}
+{
+  const { dir } = freshRepo("deploy-barepush-branchpattern-block");
+  writeManifest(dir, releaseManifest({ triggerRefs: ["refs/heads/release-*"] }));
+  check(
+    "PGD11 block  a bare `git push` in a repo declaring a branch-pattern trigger -- conservative block",
+    "git push",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["without an explicit remote/ref"] },
+  );
+}
+
+// ---- PGD12: a deploy-trigger resolving to a NON-human-gated env never demands approval -----
+{
+  const { dir } = freshRepo("deploy-nongated-allow");
+  writeManifest(dir, releaseManifest({ includeCanary: true }));
+  check("PGD12 allow  deploy-trigger to a non-human-gated env (automated) never demands a deployApproval", "git push origin canary-1", dir, ALLOW, {
+    stderrEmpty: true,
+  });
+}
+
+// ---- PGD13 standing-approval carve-out: the deploy branch is evaluated EVEN under standing-approved --
+{
+  const { dir } = freshRepo("deploy-standing-approval-carveout");
+  writeManifest(dir, releaseManifest({ extraTop: "gates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n" }));
+  check(
+    "PGD13 block  standing push approval does NOT satisfy a deployApproval -- the composition bypass closed",
+    "git push origin v1.0.0",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["no unused deployApproval"] },
+  );
+}
+
+// ---- PGD14/15/16/17 the fail-matrix: A block / B fall-through-block / C warn / D warn ------
+{
+  // Case A: semantic-invalid manifest (undeclared adapter ref on the `test` env), release present,
+  // push IS deploy-triggering (matches vercel-prod's own -- untouched, still valid -- trigger.refs).
+  const { dir } = freshRepo("deploy-caseA-block");
+  writeManifest(dir, releaseManifest({ testEnvAdapterRef: "ghost-adapter" }));
+  check(
+    "PGD14 block  case A: semantic-invalid manifest + release present + deploy-triggering push -- unconditional block",
+    "git push origin v1.0.0",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["is semantically invalid", "deploy-triggering", "unconditional block, no mode exception"] },
+  );
+}
+{
+  // Case B: same semantic-invalid manifest, push NOT deploy-triggering (main matches neither
+  // refs/tags/v* nor refs/heads/v* trigger form) -- falls through to the normal push-gate
+  // checks (WARN prepended); a configured blocking push gate + no verify evidence -> exit 2.
+  const { dir } = freshRepo("deploy-caseB-fallthrough-block");
+  writeManifest(
+    dir,
+    releaseManifest({
+      testEnvAdapterRef: "ghost-adapter",
+      extraTop: "gates:\n  push:\n    mode: blocking\n    type: human\n    approval: standing-approved\n",
+    }),
+  );
+  check(
+    "PGD15 block  case B: semantic-invalid manifest + release present + NON-deploy-triggering push -- falls through, blocked by the normal evidence-freshness gate (WARN prepended, not fail-open)",
+    "git push origin main",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["release section present, the push-gate check still runs normally", "evidence/verify-latest.json missing"] },
+  );
+}
+{
+  // Case C: semantic-invalid manifest, NO release section at all -- unchanged WARN behavior.
+  const { dir } = freshRepo("deploy-caseC-warn");
+  writeManifest(dir, "schema: pipeline.manifest.v0\nprofiles:\n  active: bogus-profile\n");
+  check("PGD16 warn  case C: semantic-invalid manifest, no release section -- unchanged WARN", "git push origin main", dir, WARN, {
+    stderrIncludes: ["WARN"],
+  });
+}
+{
+  // Case D: parse-level invalid (malformed YAML), no release section reachable at all --
+  // unchanged WARN behavior (same fixture class as PG14 above).
+  const { dir } = freshRepo("deploy-caseD-warn");
+  writeManifest(dir, "schema: pipeline.manifest.v0\ngates:\n  push: &anchor\n    mode: blocking\n");
+  check("PGD17 warn  case D: parse-level invalid manifest (malformed YAML) -- unchanged WARN", "git push origin main", dir, WARN, {
+    stderrIncludes: ["WARN"],
+  });
+}
+
+// ---- PGD18: a declared-but-malformed central deploy policy fail-closes a deploy-triggering push --
+{
+  const { dir } = freshRepo("deploy-malformed-central-policy");
+  writeManifest(dir, releaseManifest({ extraTop: "governance:\n  policies_path: governance-policies\n" }));
+  writeGovernancePolicy(dir, "governance-policies", "schema: &anchor pipeline.deploy-policy.v0\nmode: strict\n");
+  check(
+    "PGD18 block  a declared-but-malformed central deploy-policy fail-closes a deploy-triggering push, unconditional",
+    "git push origin v1.0.0",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["central deploy policy is declared but unreadable/invalid", "fail-closed blocked, unconditional"] },
+  );
+}
+
+// ---- PGD19/20: a leading `+` (force-push refspec syntax) is stripped before trigger-
+// classification AND artifact-matching, so a force-tag-push blocks exactly like its
+// non-force form -------------------------------------------------------------------------
+{
+  const { dir } = freshRepo("deploy-plus-bare-block");
+  writeManifest(dir, releaseManifest());
+  check("PGD19 block  `+`-force bare-name deploy-trigger to human-gate env without a deployApproval -- `+` stripped for trigger-classification AND artifact identity", "git push origin +v1.0.0", dir, BLOCK, {
+    stderrIncludes: ["no unused deployApproval", "v1.0.0"],
+  });
+}
+{
+  const { dir } = freshRepo("deploy-plus-fq-block");
+  writeManifest(dir, releaseManifest());
+  check(
+    "PGD20 block  `+`-force fully-qualified deploy-trigger (refs/tags/v1.0.0) to human-gate env without a deployApproval -- resolves identically to the non-force form",
+    "git push origin +refs/tags/v1.0.0",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["no unused deployApproval", "v1.0.0"] },
+  );
+}
+
+// ---- PGD21 fall-matrix case B, NO active push gate: the semantic-invalidity WARN is still
+// surfaced instead of exiting silently -------------------------------------------------------
+{
+  // Same semantic-invalid manifest as PGD15 (case B), but no `gates.push` section at all
+  // (absent, not "off") -- exercises the `!pushGate || pushGate.mode === "off"` branch.
+  const { dir } = freshRepo("deploy-caseB-nogate-warn");
+  writeManifest(dir, releaseManifest({ testEnvAdapterRef: "ghost-adapter" }));
+  check(
+    "PGD21 warn  case B: semantic-invalid manifest + release present + NON-deploy-triggering push + NO active push gate -- invalidity WARN still surfaces, does not silently exit 0",
+    "git push origin main",
+    dir,
+    WARN,
+    { stderrIncludes: ["is semantically invalid", "release section present"] },
+  );
+}
+
 // ---- Cleanup ----------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {
