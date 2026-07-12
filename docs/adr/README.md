@@ -44,6 +44,8 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0030](0030-governance-layer.md) | Governance layer — advisory guidelines vs. enforcing policies | accepted | 2026-07-07 |
 | [0031](0031-model-routing-manifest.md) | Model routing in the manifest — machine-readable projection (reference ADR-0006) | accepted | 2026-07-07 |
 | [0032](0032-project-doc-structure.md) | Project documentation structure — release traceability, SBOM convention, living architecture document (GREENFIELD) | accepted | 2026-07-07 |
+| [0033](0033-release-promotion-phase.md) | Release/Promotion phase — optional, adapter-based SDLC tail phase | accepted | 2026-07-11 |
+| [0034](0034-deploy-precedence-central-vs-project.md) | Precedence — central deploy policy vs. project manifest, a new axis | accepted | 2026-07-11 |
 
 ### Resubmissions
 
@@ -60,6 +62,8 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 ### Conventions
 
 Format per ADR: context → decision (verbatim to the register) → consequences → discarded alternatives → resubmission. New ADRs receive the next sequential number (`NNNN-<slug>.md`) and an entry in the table above. An ADR is never rewritten, only superseded by a new one (status "superseded by NNNN").
+
+**Numbering is per-repo, not 1:1 with any other copy of this project:** ADR numbers here are assigned independently of numbering in any other copy or fork of this codebase that may exist elsewhere — the same number is not guaranteed to denote the same topic across copies, and vice versa. This is an accepted, documented instance of that general fact, not a defect.
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
@@ -101,6 +105,8 @@ Architecture Decision Records der Agent-Pipeline. Die ADRs formalisieren das kan
 | [0030](0030-governance-layer.md) | Governance-Layer — advisory Guidelines vs. enforcing Policies | akzeptiert | 2026-07-07 |
 | [0031](0031-model-routing-manifest.md) | Modell-Routing im Manifest — maschinenlesbare Projektion (Verweis ADR-0006) | akzeptiert | 2026-07-07 |
 | [0032](0032-project-doc-structure.md) | Projekt-Doku-Struktur — Release-Traceability, SBOM-Konvention, lebendes Architektur-Dokument (GREENFIELD) | akzeptiert | 2026-07-07 |
+| [0033](0033-release-promotion-phase.md) | Release/Promotion-Phase — optionale, adapter-basierte SDLC-Tail-Phase | akzeptiert | 2026-07-11 |
+| [0034](0034-deploy-precedence-central-vs-project.md) | Präzedenz — zentrale Deploy-Policy vs. Projekt-Manifest, eine neue Achse | akzeptiert | 2026-07-11 |
 
 ## Wiedervorlagen
 
@@ -117,3 +123,5 @@ Architecture Decision Records der Agent-Pipeline. Die ADRs formalisieren das kan
 ## Konventionen
 
 Format je ADR: Kontext → Entscheidung (wortgetreu zum Register) → Konsequenzen → Verworfene Alternativen → Wiedervorlage. Neue ADRs erhalten die nächste fortlaufende Nummer (`NNNN-<slug>.md`) und einen Eintrag in der Tabelle oben. Ein ADR wird nie umgeschrieben, sondern durch ein neues ADR ersetzt (Status „ersetzt durch NNNN").
+
+**Nummerierung ist repo-eigen, nicht 1:1 mit anderen Kopien dieses Projekts:** ADR-Nummern werden hier unabhängig von der Nummerierung in etwaigen anderen Kopien oder Forks dieses Codebase vergeben — dieselbe Nummer bezeichnet nicht garantiert dasselbe Thema über Kopien hinweg, und umgekehrt. Das ist eine akzeptierte, dokumentierte Instanz dieser generellen Tatsache, kein Defekt.
