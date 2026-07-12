@@ -23,6 +23,9 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
+import { parseYaml } from "./plugins/pipeline-core/lib/yaml-lite.mjs";
+import { validateAgainstSchema } from "./plugins/pipeline-core/lib/schema-lite.mjs";
+
 import {
   classifyOs,
   parseFirstRemoteUrl,
@@ -365,6 +368,15 @@ ok("normalizeLang: undefined -> de", normalizeLang(undefined) === "de");
   ok("renderUserYaml: models block carries the new deep tier", text.includes("deep:") && text.includes("effort: xhigh"));
   ok("renderUserYaml: models block no longer carries design/advisor", !/^\s{2}design:/m.test(text.slice(text.indexOf("\nmodels:"))));
 }
+{
+  // release: static commented starter example (ADR-0033/0034) -- always present, entirely
+  // commented out (matches the existing "Advanced/autonomous example" convention in this same
+  // function), so it never changes parsed behavior regardless of `answers`.
+  const text = renderUserYaml(buildDefaultAnswers());
+  ok("renderUserYaml: carries the commented release: starter example", text.includes("# release:"));
+  ok("renderUserYaml: release starter is placed after gates:, before the Advanced/autonomous example", text.indexOf("gates:") < text.indexOf("# release:") && text.indexOf("# release:") < text.indexOf("Advanced/autonomous example"));
+  ok("renderUserYaml: no LIVE (uncommented) release: key -- stays inert by default", !/^release:/m.test(text));
+}
 
 // ======================================================================================
 // answersFromParsed
@@ -403,6 +415,17 @@ ok("normalizeLang: undefined -> de", normalizeLang(undefined) === "de");
   ok("answersFromParsed: partial models.deep.effort override applied", merged.models.deep.effort === "max");
   ok("answersFromParsed: models.deep.model kept from defaults (partial tier object)", merged.models.deep.model === defaults.models.deep.model);
   ok("answersFromParsed: untouched models tiers (implement, mechanic, review) stay at defaults", JSON.stringify(merged.models.implement) === JSON.stringify(defaults.models.implement));
+}
+{
+  // release: OPTIONAL passthrough only (ADR-0033/0034 anti-bloat guarantee) -- no default shape
+  // exists to merge over, so absence must stay absence, never a synthesized empty object.
+  const defaults = buildDefaultAnswers();
+  ok("answersFromParsed: no release key in parsed -> no release key in result", !("release" in answersFromParsed({}, defaults)));
+  ok("answersFromParsed: buildDefaultAnswers() itself carries no release key", !("release" in defaults));
+  const withRelease = { release: { environments: { test: { adapter: "a", healthcheck: "h", rollback: "r" } } } };
+  const merged = answersFromParsed(withRelease, defaults);
+  ok("answersFromParsed: a present release section is threaded through unchanged", JSON.stringify(merged.release) === JSON.stringify(withRelease.release));
+  ok("answersFromParsed: a non-object release is dropped, not passed through", !("release" in answersFromParsed({ release: "not an object" }, defaults)));
 }
 
 // ======================================================================================
@@ -668,6 +691,42 @@ ok("parseArgv: --defaults alone -> force stays false", parseArgv(["--defaults"])
   const answers = { ...buildDefaultAnswers(), autonomy: { push_policy: "standing-approved", branch_model: "direct-main", wip_limit: 1 } };
   const yaml = renderPipelineYaml(answers, "hashJKL");
   ok("renderPipelineYaml: push approval is 'standing-approved' when push_policy is standing-approved", yaml.includes("approval: standing-approved"));
+}
+
+// ======================================================================================
+// renderPipelineYaml — release: section is CONDITIONAL on answers.release (ADR-0033/0034
+// anti-bloat guarantee: absent release = zero new behavior in the compiled manifest)
+// ======================================================================================
+{
+  const yaml = renderPipelineYaml(buildDefaultAnswers(), "hashNoRelease");
+  ok("renderPipelineYaml: no answers.release -> compiled manifest carries NO release: section at all", !yaml.includes("release:"));
+}
+{
+  const answers = {
+    ...buildDefaultAnswers(),
+    release: {
+      environments: {
+        test: { adapter: "vercel-preview", healthcheck: "cmd-test", rollback: "proc-test" },
+        prod: { adapter: "vercel-prod", healthcheck: "cmd-prod", rollback: "proc-prod", promotion: "human-gate" },
+      },
+      adapters: {
+        "vercel-preview": { executor: "ci", deploy: "wf-preview", credentials: "oidc" },
+        "vercel-prod": { executor: "ci", trigger: { refs: ["refs/tags/v*"] }, deploy: "wf-prod", credentials: "oidc" },
+      },
+    },
+  };
+  const yaml = renderPipelineYaml(answers, "hashWithRelease");
+  ok("renderPipelineYaml: a present answers.release DOES render a release: section", yaml.includes("\nrelease:"));
+  ok("renderPipelineYaml: release.environments.test.adapter present", /environments:\s*\n\s*test:\s*\n\s*adapter: vercel-preview/.test(yaml), yaml);
+  ok("renderPipelineYaml: release.environments.prod.promotion present (human-gate)", /prod:[\s\S]*?promotion: human-gate/.test(yaml), yaml);
+  ok("renderPipelineYaml: release.adapters.vercel-prod.trigger.refs rendered as a YAML list item", /refs:\s*\n\s*- refs\/tags\/v\*/.test(yaml), yaml);
+  ok("renderPipelineYaml: release.adapters credentials rendered (never inline secret values, SEC-08)", /credentials: oidc/.test(yaml));
+
+  const reparsed = parseYaml(yaml);
+  ok("renderPipelineYaml: compiled release: section re-parses via yaml-lite back to the same shape", JSON.stringify(reparsed.release) === JSON.stringify(answers.release));
+  const manifestSchema = JSON.parse(readFileSync(new URL("./plugins/pipeline-core/scripts/pipeline-manifest.schema.json", import.meta.url), "utf8"));
+  const { valid, errors } = validateAgainstSchema(reparsed.release, manifestSchema.properties.release);
+  ok("renderPipelineYaml: compiled release: section validates against pipeline-manifest.schema.json's release shape", valid, errors.join("; "));
 }
 
 // ---- summary ----------------------------------------------------------------------------

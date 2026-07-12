@@ -451,6 +451,36 @@ gates:
   security: ${a.gates.security}
   claude_md_max_lines: ${a.gates.claude_md_max_lines}
 
+# OPTIONAL — omit entirely for zero added behavior (anti-bloat guarantee, ADR-0033/0034).
+# Release/Promotion phase (optional SDLC tail phase): uncomment and adapt only for a project
+# that actually deploys; see docs/deploy/README.md for the full guide. Two-environment
+# vercel-preview/vercel-prod starter shape (fields ground-truthed in
+# plugins/pipeline-core/scripts/pipeline-manifest.schema.json's \`release\` property):
+#
+# release:
+#   environments:
+#     test:
+#       adapter: vercel-preview       # must reference a declared adapter (integrity check)
+#       healthcheck: <command-or-workflow-ref>
+#       rollback: <procedure-ref>     # MANDATORY per environment
+#     prod:
+#       adapter: vercel-prod
+#       healthcheck: <command-or-workflow-ref>
+#       rollback: <procedure-ref>
+#       promotion: human-gate         # fixed value in v1
+#   adapters:
+#     vercel-preview:
+#       executor: ci                  # ci | local -- the swappable driver
+#       deploy: <workflow-ref>        # test-env deploy (merge-triggered), no release refs
+#       credentials: oidc             # oidc | ci-secret | external -- never inline values
+#     vercel-prod:
+#       executor: ci
+#       trigger:
+#         refs:
+#           - refs/tags/v*            # ci executor: release-triggering ref patterns
+#       deploy: <workflow-ref>        # local executor: a command reference instead
+#       credentials: oidc
+
 # -----------------------------------------------------------------------------------------
 # Advanced/autonomous example (NOT active — for orientation only; setup.mjs writes these
 # values automatically when you choose "Autonomous" for the autonomy preset):
@@ -512,6 +542,12 @@ export function answersFromParsed(parsed, defaults = buildDefaultAnswers()) {
     },
     autonomy: { ...d.autonomy, ...(parsed.autonomy ?? {}) },
     gates: { ...d.gates, ...(parsed.gates ?? {}) },
+    // release: OPTIONAL passthrough only (ADR-0033/0034) -- no default, no merge-over-defaults
+    // (there IS no default shape to merge over). Present in `parsed` only when a project
+    // hand-edited pipeline.user.yaml to uncomment/fill in its own `release:` section; absent
+    // otherwise, which is what keeps renderPipelineYaml()'s compiled output release-free
+    // (anti-bloat guarantee) on every repo that never touches this.
+    ...(parsed.release && typeof parsed.release === "object" ? { release: parsed.release } : {}),
   };
 }
 
@@ -614,9 +650,50 @@ export function compilePipelineJson(existing, answers, sourceHash) {
 }
 
 /** Fully regenerated from a fixed template on every compile (see file header "COMPILE MODEL"). */
+/** Renders the compiled `release:` section for .claude/pipeline.yaml -- ONLY called with a
+ * present object by renderPipelineYaml() below (ADR-0033/0034 anti-bloat guarantee: an absent
+ * `release` in pipeline.user.yaml means the compiled manifest carries no release: section at
+ * all, zero behavior change). Targeted serializer for the known release shape
+ * (pipeline-manifest.schema.json's `release` property / pipeline.user.schema.json's mirror) --
+ * not a generic YAML stringifier (this repo has no YAML serializer dependency, only the
+ * yaml-lite PARSER, see file header imports). Returns "" on anything not a present object. */
+function renderReleaseSection(release) {
+  if (!release || typeof release !== "object") return "";
+  const lines = ["", "release:"];
+  const environments = release.environments && typeof release.environments === "object" ? release.environments : {};
+  const envKeys = Object.keys(environments);
+  if (envKeys.length > 0) lines.push("  environments:");
+  for (const key of envKeys) {
+    const env = environments[key] ?? {};
+    lines.push(`    ${key}:`);
+    if (env.adapter !== undefined) lines.push(`      adapter: ${env.adapter}`);
+    if (env.target !== undefined) lines.push(`      target: ${env.target}`);
+    if (env.healthcheck !== undefined) lines.push(`      healthcheck: ${env.healthcheck}`);
+    if (env.rollback !== undefined) lines.push(`      rollback: ${env.rollback}`);
+    if (env.promotion !== undefined) lines.push(`      promotion: ${env.promotion}`);
+  }
+  const adapters = release.adapters && typeof release.adapters === "object" ? release.adapters : {};
+  const adapterKeys = Object.keys(adapters);
+  if (adapterKeys.length > 0) lines.push("  adapters:");
+  for (const key of adapterKeys) {
+    const ad = adapters[key] ?? {};
+    lines.push(`    ${key}:`);
+    if (ad.executor !== undefined) lines.push(`      executor: ${ad.executor}`);
+    if (ad.trigger && Array.isArray(ad.trigger.refs)) {
+      lines.push("      trigger:");
+      lines.push("        refs:");
+      for (const ref of ad.trigger.refs) lines.push(`          - ${ref}`);
+    }
+    if (ad.command !== undefined) lines.push(`      command: ${ad.command}`);
+    if (ad.deploy !== undefined) lines.push(`      deploy: ${ad.deploy}`);
+    if (ad.credentials !== undefined) lines.push(`      credentials: ${ad.credentials}`);
+  }
+  return lines.join("\n") + "\n";
+}
+
 export function renderPipelineYaml(answers, sourceHash) {
   const pushApproval = answers.autonomy.push_policy === "standing-approved" ? "standing-approved" : "required";
-  return `# pipeline.yaml -- declarative pipeline manifest (.claude/pipeline.yaml, schema pipeline.manifest.v0).
+  const base = `# pipeline.yaml -- declarative pipeline manifest (.claude/pipeline.yaml, schema pipeline.manifest.v0).
 # ${generatedMarker(sourceHash)}
 # ADDITIVE to .claude/pipeline.json (project calibration) -- disjoint field sets.
 # Validate with: node harness/scripts/validate-manifest.mjs
@@ -699,6 +776,7 @@ governance:
 flags:
   has_ui: false
 `;
+  return base + renderReleaseSection(answers.release);
 }
 
 // ---- CLI I/O layer: real filesystem, real prompts, real exit -----------------------------------
@@ -814,6 +892,10 @@ async function promptAnswers(rl, previous) {
     models,
     autonomy,
     gates: previous.gates,
+    // release: carried over unchanged (no prompt asks about it -- ADR-0033/0034 is opt-in via a
+    // hand-edited pipeline.user.yaml, never via this interactive flow); only present at all when
+    // `previous` (answersFromParsed of the existing file) already had one.
+    ...(previous.release !== undefined ? { release: previous.release } : {}),
   };
 }
 
@@ -876,7 +958,13 @@ export async function run(argv = process.argv.slice(2)) {
     // Detection still runs (never a "question") -- only the five interactive questions are
     // replaced by the deterministic defaults (see file header "DETECTION vs. QUESTIONS").
     const git_host = detectGitHost(ROOT_DIR);
-    answers = { ...defaults, platform: { git_host, cli: cliForHost(git_host) } };
+    answers = {
+      ...defaults,
+      platform: { git_host, cli: cliForHost(git_host) },
+      // release: carried over from the existing pipeline.user.yaml, if any -- `--defaults`
+      // resets the five interactive answers, never a hand-edited release: section (ADR-0033/0034).
+      ...(previous.release !== undefined ? { release: previous.release } : {}),
+    };
   } else {
     rl = createInterface({ input: process.stdin, output: process.stdout });
     try {
