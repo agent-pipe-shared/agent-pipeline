@@ -113,7 +113,10 @@ persists the session's truth. It:
 - appends a telemetry line (cost and first-pass metrics);
 - writes a **mandatory self-retro** — at least one concrete improvement, or an
   explicit "nothing"; silence is not an option;
-- makes the final commit (and pushes, if your autonomy preset stands that approval).
+- makes the final commit (and pushes, if your autonomy preset stands that approval);
+- if the project has a configured `release` section, can be followed by the
+  Release/Promotion phase — an adapter-bounded deploy behind a human
+  promote-gate, with mandatory deploy evidence; see [`docs/deploy/README.md`](deploy/README.md).
 
 ## Between sessions
 
@@ -290,7 +293,11 @@ wird der Stand der Session festgehalten. Es:
 - schreibt ein **verpflichtendes Selbst-Retro** — mindestens ein konkretes
   Verbesserungs-Item oder ein ausdrückliches „nichts"; Schweigen ist keine Option;
 - erstellt den finalen Commit (und pusht, sofern dein Autonomie-Preset den Push
-  dauerhaft deckt).
+  dauerhaft deckt);
+- hat ein Projekt eine konfigurierte `release`-Sektion, kann darauf die
+  Release/Promotion-Phase folgen — ein adapter-gebundener Deploy hinter einem
+  menschlichen Promote-Gate, mit verpflichtender Deploy-Evidenz; siehe
+  [`docs/deploy/README.md`](deploy/README.md).
 
 ## Zwischen den Sessions
 

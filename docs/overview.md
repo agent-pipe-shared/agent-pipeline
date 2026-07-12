@@ -72,6 +72,13 @@ stake (see "How much ceremony" below), but the shape is constant.
     (spec, acceptance criteria, result) are archived. The next session
     bootstraps from the handover in seconds.
 
+12. **Release/Promotion (conditional, optional).** For a project that has
+    declared a `release` section, closing a block can be followed by an
+    adapter-bounded deploy — test, then prod — gated by a human promote-gate
+    and completed only once a machine-written deploy log entry exists. For a
+    project without that section, the step simply doesn't exist: no new
+    gates, no new prompts, zero cost. See [`docs/deploy/README.md`](deploy/README.md).
+
 ## How much ceremony: rigor and risk
 
 The process isn't one-size-fits-all — that's what kills adoption. Two dials
@@ -298,6 +305,14 @@ gleich.
     nicht erlaubt), und die dauerhaften Artefakte (Spec, Akzeptanzkriterien,
     Ergebnis) werden archiviert. Die nächste Sitzung startet in Sekunden aus dem
     Handover.
+
+12. **Release/Promotion (konditional, optional).** Hat ein Projekt eine
+    `release`-Sektion erklärt, kann auf den Abschluss eines Blocks die
+    Release/Promotion-Phase folgen — ein adapter-gebundener Deploy, test dann
+    prod, hinter einem menschlichen Promote-Gate, und erst mit einem
+    maschinell geschriebenen Deploy-Log-Eintrag abgeschlossen. Ohne diese
+    Sektion existiert der Schritt schlicht nicht: keine neuen Gates, keine
+    neuen Prompts, Zero-Cost. Siehe [`docs/deploy/README.md`](deploy/README.md).
 
 ## Wie viel Formalität: Rigor und Risiko
 
