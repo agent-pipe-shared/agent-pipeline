@@ -4,8 +4,9 @@ A versioned operating model for agentic software development — clone it, run o
 setup script, and adopt a battle-tested set of roles, review gates, and guardrails
 for your own projects.
 
-*Where this stands: v0.1.0 — roughly a week of build time, a solo project, one
-dogfooding round so far. Feedback welcome.*
+*Where this stands: v0.2.0 — a week and a half of build time, a solo project,
+multiple dogfooding rounds so far (this release itself was shipped under its
+own Release/Promotion phase). Feedback welcome.*
 
 > **A note on language.** This operating model was first built in German and then
 > made English-first for release. The docs are English-primary — bilingual files
@@ -230,8 +231,9 @@ Ein versioniertes Operating Model für agentische Softwareentwicklung — klonen
 ein Setup-Skript ausführen und ein erprobtes Set aus Rollen, Review-Gates und
 Guardrails für die eigenen Projekte übernehmen.
 
-*Wo das gerade steht: v0.1.0 — rund eine Woche Bauzeit, ein Soloprojekt, bisher
-eine Dogfooding-Runde. Feedback willkommen.*
+*Wo das gerade steht: v0.2.0 — anderthalb Wochen Bauzeit, ein Soloprojekt,
+mittlerweile mehrere Dogfooding-Runden (dieses Release selbst wurde unter der
+eigenen Release/Promotion-Phase ausgeliefert). Feedback willkommen.*
 
 > **Zur Sprache.** Dieses Operating Model entstand zuerst auf Deutsch und wurde für
 > die Veröffentlichung auf Englisch-first umgestellt. Die Doku ist englisch-primär —
