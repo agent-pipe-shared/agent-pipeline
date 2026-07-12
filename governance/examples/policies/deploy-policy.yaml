@@ -1,0 +1,67 @@
+# Example central deploy policy (pipeline.deploy-policy.v0, ADR-0034).
+#
+# Discovered by plugins/pipeline-core/lib/manifest.mjs's loadDeployPolicy() at the
+# FIXED filename `deploy-policy.yaml` directly under the project manifest's
+# `governance.policies_path` (see governance/examples/README.md "Wiring"). Absence of
+# this file (or of `governance.policies_path` itself) means: no central policy, the
+# project decides its own deploy configuration unconstrained (ADR-0034).
+#
+# ADR-0034 defines the precedence axis this file sits on: central-beats-project is a
+# NEW precedence relationship between two repo-level artifacts (this file vs. a
+# project's own `.claude/pipeline.yaml` `release` section) -- it is not covered by
+# ADR-0030's existing Repo>User<Managed hierarchy. Read ADR-0034 before editing this
+# example: it also documents the honest limitation that a repo can opt OUT of this
+# file's reach by omitting/repointing `governance.policies_path` -- the BINDING
+# channel for an org is deployment-time (managed settings pinning the policy) plus
+# the server-side prod controls in guardrails/deploy.md, not this file alone.
+#
+# A `mandate`-mode violation is overridable ONLY via a valid, non-expired deviation
+# record in the project's `docs/risks.md` (template: templates/risks.md; a filled
+# pairing example for THIS policy: governance/examples/policies/deploy-risks.example.md).
+# `strict` mode admits no deviation record at all -- see the commented alternative
+# below.
+#
+# Schema-conformance note: this file validates against
+# plugins/pipeline-core/scripts/deploy-policy.schema.json (`additionalProperties: false`,
+# required keys `schema` + `mode`). It stays inside the yaml-lite strict block subset
+# (plugins/pipeline-core/lib/yaml-lite.mjs): no flow lists `[...]`, no anchors -- one
+# `- ` item per line only.
+
+schema: pipeline.deploy-policy.v0
+
+# mode: advisory | mandate | strict -- see ADR-0034 for the full semantics table.
+# `mandate` is shown as the primary example here (the meaningful default once a
+# central policy exists at all): violations block UNLESS covered by a valid
+# deviation record.
+mode: mandate
+
+# mode: advisory   # guideline only -- undocumented deviations are a Critic finding
+#                  # (ADR-0030 pattern), nothing blocks automatically.
+# mode: strict     # hard floor, no exceptions at all -- deviation records are
+#                  # ignored even if present; for larger/enterprise setups.
+
+# OPTIONAL allowlist of adapter names a project may configure. Omit entirely for no
+# restriction. Project adapters must be a SUBSET of this list (checkDeployPrecedence).
+adapters:
+  - vercel-prod
+  - gcp-cloud-run
+
+# OPTIONAL allowlist of deploy-destination ids. When present, every project
+# environment MUST declare a `target` drawn from this list (absence-is-not-compliance,
+# checkDeployPrecedence D2).
+targets:
+  - production-eu
+
+# Gate floors for the promote:prod human gate. Both floors are ordinal: a project may
+# only move UP from the floor named here, never below it.
+gates:
+  promote_prod:
+    type_floor: human      # ordinal floor: automated < human
+    mode_floor: blocking   # ordinal floor: off < warn < blocking
+
+# Evidence duty: a documented process requirement, not enforced by the precedence
+# engine itself -- `required: true` at central level is binding: no deploy under this
+# policy counts done without the evidence artifact + docs/deployments.md entry
+# (guardrails/deploy.md DP-03).
+evidence:
+  required: true

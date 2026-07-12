@@ -30,6 +30,20 @@ Critic benchmark) and enforcing (promoted to the `dependency-direction.yml` semg
 fixture, security-scan gate blocks). Start there for a concrete "guideline → enforced
 rule" trace.
 
+## Deploy policy (the release-phase enforcing side)
+
+[`policies/deploy-policy.yaml`](policies/deploy-policy.yaml) is a THIRD kind of policy
+content alongside the machine-checkable and checklist policies above: the enforcing
+side of the optional Release/Promotion SDLC phase (ADR-0033). It governs a project's
+deploy CONFIGURATION (adapters, promote-gate floors, evidence duty) across three hardness
+modes (`advisory` / `mandate` / `strict`) rather than code content — see ADR-0034 for
+the full precedence model (central policy vs. project manifest) and
+`guardrails/deploy.md` for the provable rules it backs. It ships paired with a FILLED
+deviation-record example, [`policies/deploy-risks.example.md`](policies/deploy-risks.example.md),
+showing how a legitimate `mandate`-mode exception is carried via `templates/risks.md`'s
+format — the same guideline→enforced-rule pairing convention as
+[`worked-example.md`](worked-example.md) above, applied to the deploy phase.
+
 ## Wiring (`.claude/pipeline.yaml`)
 
 A project points at its own governance directories via the manifest's `governance`
