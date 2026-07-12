@@ -100,10 +100,15 @@ flowchart TD
     G --> C["Risk-class-dependent Critic"]
     C --> H["Human completion gate"]
     H --> M["Merge + doc sync"]
+    M -.->|"optional, if manifest declares release"| REL["Release/Promotion<br/>(optional, §3.5)"]
 ```
 
 Order matters: deterministic gates always run *before* any LLM judgment — a
 Critic never reviews a diff that hasn't already cleared the machine chain.
+
+An optional Release/Promotion tail can hook in after the merge (`REL` above) once
+a project's manifest declares a `release` section — detail in
+[`docs/deploy/README.md`](docs/deploy/README.md).
 
 ## The front door: optional design pre-stage
 
@@ -330,11 +335,16 @@ flowchart TD
     G --> C["Risikoklassen-abhängiger Critic"]
     C --> H["Menschliches Abschluss-Gate"]
     H --> M["Merge + Doku-Sync"]
+    M -.->|"optional, falls Manifest Release erklärt"| REL["Release/Promotion<br/>(optional, §3.5)"]
 ```
 
 Entscheidend ist die Reihenfolge: Die maschinellen Gates laufen immer VOR jedem
 Urteil eines LLM — ein Critic bewertet nie einen Diff, der die deterministische
 Kette noch nicht durchlaufen hat.
+
+Ein optionaler Release/Promotion-Ausklang kann nach dem Merge andocken (`REL`
+oben), sobald das Manifest eines Projekts einen `release`-Abschnitt erklärt —
+Details in [`docs/deploy/README.md`](docs/deploy/README.md).
 
 ## Die Vordertür: optionale Design-Vorstufe
 

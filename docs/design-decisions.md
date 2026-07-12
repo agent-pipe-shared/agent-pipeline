@@ -90,6 +90,23 @@ so strictness can be dialed without rewriting the method. A pattern played
 through both classes lives in the
 [worked example](../governance/examples/worked-example.md).
 
+## Release/Promotion: build-once-promote and server-side enforcement first
+
+The optional Release/Promotion phase ([ADR-0033](adr/0033-release-promotion-phase.md))
+carries two decisions that only make sense together. First, **build-once-promote**:
+the artifact that passes the test gate is the exact artifact promoted to prod —
+never rebuilt, never a moving HEAD — so a sign-off and its evidence bind to a
+fixed, named thing, not to whatever the branch happens to contain by the time the
+deploy runs. Second, **server-side enforcement as the primary layer**
+([ADR-0034](adr/0034-deploy-precedence-central-vs-project.md)): a repo-file policy
+or guard hook is editable by the very agent it constrains, so it can never be the
+load-bearing wall on its own; GitHub Environments with required reviewers,
+branch/tag protection, and OIDC trust conditions carry that role, with the
+repo-side guard-push extension as a secondary, defense-in-depth check, not a
+replacement for it. Together they keep the phase honest even at enterprise
+scale: no promotion can quietly become "rebuild and hope," and no policy claims a
+strength the repo layer alone can't actually deliver.
+
 ---
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
@@ -188,6 +205,26 @@ verletzt, kommt nicht weiter. Jedes betreute Projekt entscheidet pro Regel, in
 welche Klasse sie fällt — so lässt sich Strenge dosieren, ohne die Methodik
 umzuschreiben. Ein komplett durchgespieltes Beispiel über beide Klassen steht
 im [Worked Example](../governance/examples/worked-example.md).
+
+## Release/Promotion: Build-once-promote und serverseitige Durchsetzung zuerst
+
+Die optionale Release/Promotion-Phase ([ADR-0033](adr/0033-release-promotion-phase.md))
+trägt zwei Entscheidungen, die nur zusammen Sinn ergeben. Erstens
+**Build-once-promote**: Das Artefakt, das das Test-Gate besteht, ist genau das
+Artefakt, das nach Prod befördert wird — nie neu gebaut, nie ein bewegliches
+HEAD —, sodass eine Freigabe und ihr Nachweis an ein festes, benanntes Ding
+gebunden sind, nicht an das, was der Branch zufällig zum Zeitpunkt des Deploys
+enthält. Zweitens **serverseitige Durchsetzung als primäre Schicht**
+([ADR-0034](adr/0034-deploy-precedence-central-vs-project.md)): Eine
+Repo-Datei-Policy oder ein Guard-Hook ist von genau dem Agenten editierbar, den
+sie einschränken soll, kann also nie allein die tragende Wand sein; GitHub
+Environments mit Pflicht-Reviewern, Branch-/Tag-Protection und
+OIDC-Trust-Bedingungen übernehmen diese Rolle, die repo-seitige
+guard-push-Erweiterung ist die sekundäre Defense-in-Depth-Prüfung, kein Ersatz
+dafür. Zusammen halten beide die Phase auch im Unternehmenskontext ehrlich:
+Keine Beförderung kann sich stillschweigend in „neu bauen und hoffen"
+verwandeln, und keine Policy behauptet eine Stärke, die die Repo-Schicht allein
+gar nicht liefern kann.
 
 ---
 

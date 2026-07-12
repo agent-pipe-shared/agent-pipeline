@@ -202,6 +202,10 @@ pre-execution gate) beyond what this repo ships by default.
   gates, token budget, and the global baseline.
 - [`README.md`](../README.md) and [`SETUP.md`](../SETUP.md) — what the pipeline
   is, and how to adopt it.
+- [`docs/deploy/README.md`](deploy/README.md) — the optional Release/Promotion
+  phase: an adapter-based tail phase (test → prod, with mandatory evidence and
+  a deploy log) that a project opts into by declaring a `release` section in
+  its manifest; zero added behavior if you never touch it.
 - Day-to-day operation is covered in [`docs/usage.md`](usage.md); bringing an
   existing project under the pipeline in [`docs/migration.md`](migration.md); and
   the boundary between what is portable and what is Claude-Code-specific in
@@ -434,6 +438,11 @@ hinaus, was dieses Repo standardmäßig mitbringt.
   Quality-Gates, Token-Budget und die globale Grundlinie.
 - [`README.md`](../README.md) und [`SETUP.md`](../SETUP.md) — was die Pipeline
   ist und wie du sie übernimmst.
+- [`docs/deploy/README.md`](deploy/README.md) — die optionale
+  Release/Promotion-Phase: eine adapter-basierte Tail-Phase (Test → Prod, mit
+  Pflicht-Nachweis und Deploy-Log), in die ein Projekt einsteigt, indem es
+  einen `release`-Abschnitt im Manifest erklärt; ohne diesen Abschnitt keine
+  zusätzliche Wirkung.
 - Der Alltagsbetrieb steht in [`docs/usage.md`](usage.md); wie du ein bestehendes
   Projekt unter die Pipeline bringst, in [`docs/migration.md`](migration.md); und
   die Grenze zwischen dem, was übertragbar ist, und dem, was

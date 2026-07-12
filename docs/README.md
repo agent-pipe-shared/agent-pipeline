@@ -16,6 +16,9 @@ with the top-level [README](../README.md); to stand up your own copy, read
    pipeline, step by step.
 4. [`runtime-boundary.md`](runtime-boundary.md) — what is portable methodology
    versus what is specific to Claude Code.
+5. [`deploy/README.md`](deploy/README.md) — the optional Release/Promotion phase:
+   the adapter-based deploy guide, relevant only once your project's manifest
+   declares a `release` section.
 
 Then, as you need them:
 
@@ -47,6 +50,9 @@ liest in dieser Reihenfolge.
    unter die Pipeline bringen.
 4. [`runtime-boundary.md`](runtime-boundary.md) — was übertragbare Methodik ist
    und was spezifisch für Claude Code.
+5. [`deploy/README.md`](deploy/README.md) — die optionale Release/Promotion-Phase:
+   der adapter-basierte Deploy-Guide, relevant erst, sobald das Manifest deines
+   Projekts einen `release`-Abschnitt erklärt.
 
 Danach, je nach Bedarf:
 

@@ -148,6 +148,8 @@ the pipeline's job, not yours.
   every step above.
 - [`docs/design-decisions.md`](design-decisions.md) — why the model is shaped this
   way.
+- [`docs/deploy/README.md`](deploy/README.md) — if your project deploys, the
+  Release/Promotion phase guide (optional, opt-in via manifest).
 
 ---
 
@@ -324,6 +326,8 @@ ist Sache der Pipeline, nicht deine.
   hinter jedem Schritt oben.
 - [`docs/design-decisions.md`](design-decisions.md) — warum das Modell so geformt
   ist.
+- [`docs/deploy/README.md`](deploy/README.md) — falls dein Projekt deployt: der
+  Guide zur Release/Promotion-Phase (optional, opt-in über das Manifest).
 
 ---
 
