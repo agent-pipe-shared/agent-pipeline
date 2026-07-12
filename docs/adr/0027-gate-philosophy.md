@@ -22,6 +22,8 @@
 - *More than two blocking human gates* (e.g. one gate per package) — rejected: the PO directive explicitly calls for "exactly two"; additional gates would throttle automode throughput against the principle established in [ADR-0017](0017-push-policy-standing-approval.md).
 - *Loosen QG-06 because of the manifest modes (warn/off as equally valid permanent states)* — explicitly rejected; the modes remain calibration with a justification requirement, not a license for silent lapse.
 
+**Release/Promotion clarification (2026-07-12, sdlc-release-deploy):** The optional Release/Promotion phase (§3.5, [ADR-0033](0033-release-promotion-phase.md)) does NOT add a third blocking hook-gate — the hook-gate count stays exactly TWO (Dev-Plan Gate + Push Gate, unchanged). `promote:prod` is a CHECK inside the existing Push-Gate concept (the guard-push carve-out requiring a recorded `deployApproval` for a deploy-triggering push, [ADR-0017](0017-push-policy-standing-approval.md) follow-up) — a human-gate consent event, not a new hook mechanism.
+
 **Status:** accepted (2026-07-07, PO plan approval "AP1 TUNING"); basis: `.claude/plans/2026-07-07-ap1-pipeline-tuning.md` guiding decision 5, [ADR-0017](0017-push-policy-standing-approval.md), [ADR-0021](0021-prd-po-gate.md), `guardrails/quality-gates.md` QG-06. No follow-up scheduled; first live probe of the two gate hooks: W-WIRE wave of the AP1 plan (`hooks.json` wiring).
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
@@ -59,6 +61,8 @@ Die Pipeline kennt bereits zwei Human-Gate-Vorläufer: das PRD-PO-Gate ([ADR-002
 
 - **Mehr als zwei blockierende Human-Gates** (z. B. je Paket ein eigenes Gate) — verworfen: the PO-Direktive verlangt ausdrücklich „genau zwei", zusätzliche Gates würden den Automode-Durchsatz gegen den in [ADR-0017](0017-push-policy-standing-approval.md) etablierten Grundsatz ausbremsen.
 - **QG-06 wegen der Manifest-Modi aufweichen (warn/off als gleichwertige Dauerzustände)** — ausdrücklich verworfen; die Modi bleiben Kalibrierung mit Begründungspflicht, kein Freibrief für stillen Verfall.
+
+**Release/Promotion-Klarstellung (2026-07-12, sdlc-release-deploy):** Die optionale Release/Promotion-Phase (§3.5, [ADR-0033](0033-release-promotion-phase.md)) fügt KEIN drittes blockierendes Hook-Gate hinzu — die Hook-Gate-Zahl bleibt exakt ZWEI (Dev-Plan-Gate + Push-Gate, unverändert). `promote:prod` ist eine PRÜFUNG innerhalb des bestehenden Push-Gate-Konzepts (der Guard-Push-Carve-out, der für einen Deploy-auslösenden Push eine verbuchte `deployApproval` verlangt, [ADR-0017](0017-push-policy-standing-approval.md)-Folgevermerk) — ein Human-Gate-Konsens-Ereignis, kein neuer Hook-Mechanismus.
 
 ## Wiedervorlage
 
