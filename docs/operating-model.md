@@ -127,7 +127,7 @@ The four roles map onto native Claude Code primitives: Elephant = long-lived mai
 
 ### 3.1 Flow
 
-Adopted from the approved target-picture sketch (incl. spec readiness check and rigor-level-0 fast path):
+Adopted from the approved target-picture sketch (incl. spec readiness check and rigor-level-0 fast path; extended with the optional Release/Promotion phase, §3.5):
 
 ```mermaid
 flowchart TD
@@ -180,14 +180,40 @@ flowchart TD
     does NOT block the merge (🟡 merge v2)"}
     H -->|"yes, pending"| Y["Status 🟡 in the handover
     until the PO verifies (counts against WIP limit)"]
-    H -->|"yes, granted / no"| D["Status: delivered +
+    H -->|"yes, granted / no"| REL{"Manifest declares a release section?
+    (optional phase, §3.5)"}
+    Y -.->|the PO verifies| REL
+    REL -->|no| D["Status: delivered +
     lessons (level 0: bundled)"]
-    Y -.->|the PO verifies| D
+    REL -->|yes| DT["deploy:test via adapter
+    (executor: ci/local)"]
+    DT --> TG{"test gate:
+    health/smoke evidence (machine-checked)"}
+    TG -->|red| RB1["rollback:test +
+    back to Elephant"]
+    TG -->|green| PP{"promote:prod = HUMAN GATE
+    (an optional third gate, §4.2;
+    the sign-off binds artifact + environment)"}
+    PP -->|"not approved"| STAY["stays on test"]
+    STAY --> D
+    PP -->|approved| DP["deploy:prod via adapter
+    (build-once-promote: same artifact)"]
+    DP --> OG{"operate check:
+    prod health/smoke evidence"}
+    OG -->|green| LOG["Deploy record: evidence artifact +
+    a standardized deployments-log entry"]
+    OG -->|red| RB2["rollback:prod
+    (pre-authorized with the promote sign-off) +
+    back to Elephant"]
+    RB2 --> LOG
+    LOG --> D
     D --> F["Feedback loop:
     lessons → constraints/ADRs ·
     workflow improvements → pipeline backlog"]
     F -.-> A
 ```
+
+**Release/Promotion phase (optional — detail §3.5):** From `REL` on, an optional tail phase hooks into the flow — active only if a project declares a `release` section in its own manifest (otherwise the `no` branch: zero added cost, unchanged behavior from today — the anti-bloat guarantee is visible in the diagram itself). The phase is adapter-based (the project delivers the HOW, the pipeline only the WHAT) and counts as complete only once BOTH artifacts exist: a machine-generated evidence artifact AND a standardized `docs/deployments.md` entry. Detail: §3.5, [ADR-0033](adr/0033-release-promotion-phase.md).
 
 ### 3.2 Steps in detail
 
@@ -207,6 +233,7 @@ flowchart TD
 | 8 | Gate decision | Findings report + completion report | "Passed" or a rework dispatch | Elephant | Every blocker/major finding is disposed of (fix / reject with reason / escalate to the PO). |
 | 9 | Human gate | Elephant recommendation + evidence | Acceptance of the done report / decision / rework | PO | Mandatory for: PIE acceptance, live devices, high stakes, architecture/guardrail change, irreversible/costly. **Since 🟡 merge v2, no longer blocks the merge (step 10) — only the done report.** |
 | 10 | Merge + docs sync | Elephant gate decision "passed" (step 8); **human-gate acceptance (step 9) is NOT a precondition** as long as, with an open human gate: (a) a rollback anchor exists (pre-merge tag/commit reference in the handover), (b) a rollback procedure is documented per project in the calibration (§8), (c) 🟡 stays in the handover until the PO verifies (still counts against the WIP limit), (d) external effect/live deploy stays consent-gated | Merge/completion + updated handover file + HISTORY entry + lessons (status possibly 🟡 instead of delivered until human-gate acceptance) | Elephant (execution possibly Goldfish) | Merge-completion gate: handover updated (deterministic check, §6); CLAUDE.md length gate green; with an open human gate, additionally a rollback anchor + procedure proven. |
+| 10b | Release/Promotion phase (conditional, optional) | Merge + docs sync (step 10) complete; manifest declares a `release` section | Deploy evidence artifact + a `docs/deployments.md` entry | Elephant (orchestrates: obtain sign-off, trigger via git/command, verify evidence — never a prod deploy itself, EL-27) | `promote:prod` = human gate (§4.2); without a manifest `release` section the step drops entirely (opt-in, zero-cost). |
 | 11 | Retro / feedback | Closed block | Lessons, `workflow-improvement` items, telemetry entry | Elephant | The session Elephant wrote the close retro itself (§7): concrete items or an explicit "nothing"; the three-artifact archive happens. |
 
 **Step 1 (triage) — design pre-stage (advisory, optional) — detail:** Before the pipeline itself, there's deliberately no mandatory step, just a front door: a self-service asset under `docs/design/README.md` (a brainstorming guide with concrete AI techniques + anti-patterns, a standard "design facilitator" prompt, a lean export template with a Mermaid self-check) — deliberately OUTSIDE the pipeline, so raw-idea-kneading happens in a cheap chat session instead of the expensive Elephant session. At triage (row 1 above), the Elephant roughly sizes the request using the SAME indicators named in the table row — multiple modules/projects affected, new architecture, several plausible options, a larger security/data surface — no second, competing size heuristic exists. If a requirement looks large, the Elephant issues a **non-blocking** hint along the lines of: "That sounds like a big one. I'd recommend a design pre-stage before we plan — it's how you get a solid design → `docs/design/README.md`." The human can always continue without the design pre-stage — the hint is orientation, not a gate.
@@ -228,6 +255,8 @@ flowchart TD
 **Step 6c (UI design phase, conditional) — detail:** Optional phase for projects with a UI portion, active ONLY if the manifest sets `flags.has_ui: true` (condition grammar `always|never|<flag>|!<flag>`, [ADR-0028](adr/0028-manifest-approach.md)). This repo is docs+guardrails-only (no live UI) — it declares the phase but keeps `has_ui: false`; inactive until a project with a real UI arms it via its own manifest. The stop hook (`stop-suggest.mjs`) deliberately emits no gate clause for phases without their own gate entry (like `design`/`ui-design` today).
 
 **Sketch gate:** A UI REDESIGN of a MAJOR feature (not a minor fix/copy/color tweak) needs a confirmed ASCII/wireframe sketch BEFORE implementation starts — the PO (or, standing in, the Elephant if the PO delegated the judgment in advance) confirms the sketch before the first UI Goldfish is dispatched; no implementation "on spec" parallel to the sketch discussion. Applies only in projects with `flags.has_ui: true`; does not apply in this repo (`has_ui: false`).
+
+**Step 10b (Release/Promotion phase, conditional, optional) — detail:** Runs only if the manifest declares a `release` section (otherwise the step drops entirely — no gate, no requirement, opt-in like steps 6b/6c). The Elephant orchestrates: it obtains the `promote:prod` sign-off (human gate, §4.2), triggers the deploy via sanctioned git state or the local adapter's command, and verifies the resulting evidence — it NEVER executes a prod deploy itself and never handles deploy-target credentials (EL-27, `roles/elephant.md`). This row is DESCRIPTIVE; the binding mechanics (guard extension, evidence schema) ship in follow-up slices of the release/deploy extension. Phase narrative: §3.5; founding decision: [ADR-0033](adr/0033-release-promotion-phase.md).
 
 ### 3.3 Process Overhead by Rigor Level
 
@@ -296,6 +325,14 @@ Anchors Rensin's Goldfish protocol (Steps 5–7: Comprehension / Critic / Readin
 
 **Why:** A doc that only "works" thanks to accumulated Elephant context is worthless — the context illusion the Goldfish test exposes. **Verification method:** The readiness result is referenced at dispatch; the Critic (stage 2) flags implementations without a passed mandatory check.
 
+### 3.5 Release/Promotion phase
+
+Optional tail phase after merge + docs sync (§3.1): a project activates it via a `release` section in its own manifest (`.claude/pipeline.yaml`); without that section the SDLC runs unchanged as today (zero-cost anti-bloat). The pipeline defines WHAT a deploy step guarantees — evidence before every prod deploy, a human gate before prod (`promote:prod`, §4.2), a named rollback anchor per environment, a standardized deploy-log entry — the project delivers HOW that happens technically, via an adapter ([ADR-0033](adr/0033-release-promotion-phase.md)).
+
+Three shapes are equally provided for: (a) full test→prod with health/smoke evidence at both stages; (b) release/publish without a server deploy (the OSS shape: tag/publish behind the same promote gate); (c) no deploy — the default without a `release` section, free of cost. **Build-once-promote:** sign-offs and evidence bind to the artifact (tag/immutable reference), never to a moving HEAD — prod never rebuilds.
+
+The adapter contract, evidence schema, and the precedence engine (central vs. project-owned deploy policy) are NOT spelled out here — canon altitude stops at the guarantee, not the mechanism. Detail: [ADR-0033](adr/0033-release-promotion-phase.md) (phase concept, adapter, degrade shapes), [ADR-0034](adr/0034-deploy-precedence-central-vs-project.md) (precedence axis central↔project).
+
 ## 4. Review system (two-stage)
 
 Principle: **deterministic before probabilistic**. Stage 1 is machine and blocking; stage 2 is LLM judgment and delivers findings for the Elephant's gate decision.
@@ -324,7 +361,7 @@ phases:
 
 | Class | Criteria |
 |---|---|
-| **high** | Architecture principles; guardrails (hooks, permissions, policies — including in this repo); security/secrets; live-effective <PROJECT_B> changes (real devices); irreversible/externally-visible/costly actions; level-2 contract areas (specifically including the dispatch contract templates `templates/prompts/critic-review.md` and `templates/prompts/goldfish-task.md`). |
+| **high** | Architecture principles; guardrails (hooks, permissions, policies — including in this repo); security/secrets; live-effective <PROJECT_B> changes (real devices); irreversible/externally-visible/costly actions; level-2 contract areas (specifically including the dispatch contract templates `templates/prompts/critic-review.md` and `templates/prompts/goldfish-task.md`). Prod deploy targets, adapters, and release-trigger refs, as well as a central deploy policy (Release/Promotion phase, [ADR-0033](adr/0033-release-promotion-phase.md)/[ADR-0034](adr/0034-deploy-precedence-central-vs-project.md)). |
 | **medium** | Prod-adjacent changes (e.g. <PROJECT_A> `main` = prod deploy); data model/migrations; refactors across module boundaries; new dependencies. |
 | **low** | Locally-bounded, revertible changes that touch none of the zones above. |
 
@@ -348,7 +385,7 @@ phases:
 
 **Why staggered:** The Critic is expensive and must not degrade into ceremony; at the same time, architecture/guardrails/security are exactly the zones where a weaker reviewer has correlated blind spots. Evidence for the cascade/non-blocking relaxation: the last 3 canon Critics after a passed readiness + first pass returned PASS with 0 findings; real blockers occurred in practice only with risky live code (observed: 2 blockers, 1 fail-open major finding across several live sessions). Community evidence: Meta's risk-tiered gating held quality with relaxed gates (1/50 baseline incident rate). **Verification method:** The gate decision (step 8) documents the applied trigger row; the merge step requires a findings report on file when the trigger is mandatory.
 
-**Exactly two human gates against approval fatigue:** The pipeline deliberately provides only two points where the PO must give consent — the PO gate: PRD sign-off (§3.2 step 3b) and the human gate: acceptance of the done report (§3.2 step 9). Many micro-approvals lead to reflex clicks instead of real review, with burnout risk as a consequence (Google, "Day 5" whitepaper). Hence: **approvals are bundled at the defined gates; no in-between questions.**
+**Exactly two human gates — plus an optional third only with an active release phase — against approval fatigue:** The pipeline deliberately provides only two points where the PO must give consent as a rule — the PO gate: PRD sign-off (§3.2 step 3b) and the human gate: acceptance of the done report (§3.2 step 9). **Only in projects that configure the optional release phase (§3.1) does a third join them: the `promote:prod` gate — opt-in per project, fires once per promotion (not per task), and is therefore itself approval-fatigue-compliant.** Many micro-approvals lead to reflex clicks instead of real review, with burnout risk as a consequence (Google, "Day 5" whitepaper). Hence: **approvals are bundled at the defined gates; no in-between questions.**
 
 **Time-delayed self-review for irreversible decisions:** Before irreversible, externally-visible, or costly decisions, deliberate time distance sits between draft and final sign-off (a fresh look: a different day, or at least a clearly later session segment) — the PO or Elephant re-reads the decision against the spec and register BEFORE the human gate gives final sign-off. **Why:** A solo substitute for team review — time distance replaces the second human. **Verification method:** For irreversible gates, the gate decision documents the time-delayed second look.
 
@@ -520,6 +557,7 @@ The invariant is central, the expression is calibrated (deliberate diversity is 
 - **Denies boundary:** project **denies** do NOT live in the calibration file, but in the committed `.claude/settings.json` or the git-guard's guard config — the bootstrap check verifies them there (→ [../harness/session-bootstrap.md](../harness/session-bootstrap.md), step 3).
 - **DoD criterion (hard):** a project-specific ritual step can be added **WITHOUT forking the central skill** — otherwise the copy-paste inheritance starts all over again (anti-pattern AP1). **Proof in phase 3** on a real example (e.g. the <PROJECT_A> DB hygiene step).
 - **Manifest addition (optional, additive, AP1):** `.claude/pipeline.yaml` (schema `pipeline.manifest.v0`) exists as a purely additive layer ALONGSIDE `pipeline.json` — covers phases/gates/security thresholds/model routing/profiles/governance paths (§10)/flags, without touching a single field of the calibration file (zero-field overlap confirmed, `plugins/pipeline-core/lib/manifest.mjs`). No manifest → behavior byte-identical to today. Schema: `plugins/pipeline-core/scripts/pipeline-manifest.schema.json`; validator: `node harness/scripts/validate-manifest.mjs`; details/rationale: [ADR-0028](adr/0028-manifest-approach.md).
+- **Release phase (optional, additive):** A project can additionally declare a `release` section in `.claude/pipeline.yaml` — environments, adapter and rollback references per environment (§3.5). No new mandatory field and no new calibration file: a pure signpost to where deploy configuration lives; schema details ship with the manifest extension of the release/deploy extension ([ADR-0033](adr/0033-release-promotion-phase.md)/[ADR-0034](adr/0034-deploy-precedence-central-vs-project.md)).
 
 ## 9. Traceability
 
@@ -689,7 +727,7 @@ Die vier Rollen mappen auf native Claude-Code-Primitives: Elephant = langlebige 
 
 ### 3.1 Fluss
 
-Übernommen aus der freigegebenen Zielbild-Skizze (inkl. Spec-Readiness-Check und Stufe-0-Fast-Path):
+Übernommen aus der freigegebenen Zielbild-Skizze (inkl. Spec-Readiness-Check und Stufe-0-Fast-Path; erweitert um die optionale Release/Promotion-Phase, §3.5):
 
 ```mermaid
 flowchart TD
@@ -742,14 +780,40 @@ flowchart TD
     blockiert NICHT den Merge (🟡-Merge v2)"}
     H -->|"ja, ausstehend"| Y["Status 🟡 im Handover
     bis der PO verifiziert (zählt gg. WIP-Limit)"]
-    H -->|"ja, erteilt / nein"| D["Status: Erledigt +
+    H -->|"ja, erteilt / nein"| REL{"Manifest erklärt Release-Abschnitt?
+    (optionale Phase, §3.5)"}
+    Y -.->|der PO verifiziert| REL
+    REL -->|nein| D["Status: Erledigt +
     Lehren (Stufe 0: gebündelt)"]
-    Y -.->|der PO verifiziert| D
+    REL -->|ja| DT["deploy:test via Adapter
+    (Executor: ci/local)"]
+    DT --> TG{"Test-Gate:
+    Health-/Smoke-Evidenz (maschinell)"}
+    TG -->|rot| RB1["rollback:test +
+    zurück an Elephant"]
+    TG -->|grün| PP{"promote:prod = HUMAN GATE
+    (optionales drittes Gate, §4.2;
+    Freigabe bindet Artefakt + Umgebung)"}
+    PP -->|"nicht genehmigt"| STAY["bleibt auf test"]
+    STAY --> D
+    PP -->|genehmigt| DP["deploy:prod via Adapter
+    (build-once-promote: gleiches Artefakt)"]
+    DP --> OG{"Operate-Check:
+    Prod-Health-/Smoke-Evidenz"}
+    OG -->|grün| LOG["Deploy-Record: Evidenz-Artefakt +
+    standardisierter Deployments-Log-Eintrag"]
+    OG -->|rot| RB2["rollback:prod
+    (vorab autorisiert mit der Promote-Freigabe) +
+    zurück an Elephant"]
+    RB2 --> LOG
+    LOG --> D
     D --> F["Feedback-Loop:
     Lehren → Constraints/ADRs ·
     Workflow-Verbesserungen → Pipeline-Backlog"]
     F -.-> A
 ```
+
+**Release/Promotion-Phase (optional — Detail §3.5):** Ab `REL` hängt eine optionale Tail-Phase in den Fluss — aktiv nur, wenn ein Projekt eine `release`-Sektion im eigenen Manifest deklariert (sonst der `nein`-Zweig: null Zusatzkosten, unverändertes Verhalten von heute — die Anti-Bloat-Garantie ist damit im Diagramm selbst sichtbar). Die Phase ist Adapter-basiert (das Projekt liefert das WIE, die Pipeline nur das WAS) und zählt erst als abgeschlossen, wenn BEIDE Artefakte vorliegen: ein maschinell erzeugtes Evidenz-Artefakt UND ein standardisierter `docs/deployments.md`-Eintrag. Detail: §3.5, [ADR-0033](adr/0033-release-promotion-phase.md).
 
 ### 3.2 Schritte im Detail
 
@@ -769,6 +833,7 @@ flowchart TD
 | 8 | Gate-Entscheid | Befundbericht + Abschlussbericht | „bestanden" oder Nacharbeits-Dispatch | Elephant | Jeder Blocker-/Major-Befund ist disponiert (fixen / begründet ablehnen / an den PO). |
 | 9 | Human-Gate | Elephant-Empfehlung + Evidenz | Abnahme der Erledigt-Meldung / Entscheid / Nacharbeit | PO | Pflicht bei: PIE-Abnahme, Live-Geräten, hohen Stakes, Architektur-/Guardrail-Änderung, Irreversiblem/Kostenpflichtigem. **Blockiert seit 🟡-Merge v2 nicht mehr den Merge (Schritt 10) — nur die Erledigt-Meldung.** |
 | 10 | Merge + Doku-Sync | Elephant-Gate-Entscheid „bestanden" (Schritt 8); **Human-Gate-Abnahme (Schritt 9) ist KEINE Voraussetzung**, wenn bei offenem Human-Gate gilt: (a) Rollback-Anker existiert (Pre-Merge-Tag/Commit-Referenz im Handover), (b) Rollback-Prozedur je Projekt in der Kalibrierung dokumentiert (§8), (c) 🟡 bleibt im Handover bis der PO verifiziert (zählt weiter gegen WIP-Limit), (d) Außenwirkung/Live-Deploy bleibt zustimmungspflichtig | Merge/Abschluss + aktualisierte Handover-Datei + HISTORY-Eintrag + Lehren (Status ggf. 🟡 statt Erledigt bis zur Human-Gate-Abnahme) | Elephant (Ausführung ggf. Goldfish) | Merge-Abschluss-Gate: Handover aktualisiert (deterministischer Check, §6); CLAUDE.md-Längen-Gate grün; bei offenem Human-Gate zusätzlich Rollback-Anker + -Prozedur nachgewiesen. |
+| 10b | Release/Promotion-Phase (konditional, optional) | Merge + Doku-Sync (Schritt 10) abgeschlossen; Manifest erklärt `release`-Sektion | Deploy-Evidenz-Artefakt + `docs/deployments.md`-Eintrag | Elephant (orchestriert: Freigabe einholen, Trigger per Git/Kommando, Evidenz verifizieren — nie selbst Prod-Deploy, EL-27) | `promote:prod` = Human-Gate (§4.2); ohne Manifest-`release`-Sektion entfällt der Schritt vollständig (Opt-in, Zero-Cost). |
 | 11 | Retro / Feedback | abgeschlossener Block | Lehren, `workflow-improvement`-Items, Telemetrie-Eintrag | Elephant | Session-Elephant hat das Close-Retro selbst verfasst (§7): konkrete Items oder explizites „nichts"; Drei-Artefakte-Ablage erfolgt. |
 
 **Schritt 1 (Triage) — Design-Vorstufe (advisory, optional) — Detail:** Vor der eigentlichen Pipeline steht bewusst KEIN Pflichtschritt, sondern eine Vordertür: ein Selbstbedienungs-Asset unter `docs/design/README.md` (Brainstorming-Guide mit konkreten KI-Techniken + Anti-Patterns, Standard-Prompt „Design-Facilitator", schlankes Export-Template mit Mermaid-Selbstcheck) — bewusst AUSSERHALB der Pipeline, damit das Rohideen-Kneten in einer billigen Chat-Session stattfindet statt in der teuren Elephant-Session. Bei der Triage (Zeile 1 oben) schätzt der Elephant anhand DERSELBEN Anhaltspunkte aus der Tabellenzeile — mehrere Module/Projekte betroffen, neue Architektur, mehrere plausible Optionen, größere Security-/Datenfläche — grob den Umfang ein; es entsteht KEINE zweite, konkurrierende Größenheuristik. Wirkt eine Anforderung groß, gibt der Elephant einen **nicht-blockierenden** Hinweis aus, sinngemäß: „Das klingt umfangreich. Ich empfehle eine vorgelagerte Designphase, bevor wir planen. So erstellst du ein gutes Design → `docs/design/README.md`." Der Mensch kann jederzeit ohne die Design-Vorstufe weitermachen — der Hinweis ist Orientierung, kein Gate.
@@ -790,6 +855,8 @@ flowchart TD
 **Schritt 6c (UI-Design-Phase, konditional) — Detail:** Eine optionale Phase für Projekte mit UI-Anteil, aktiv NUR wenn das Manifest `flags.has_ui: true` setzt (winzige Condition-Grammatik `always|never|<flag>|!<flag>`, [ADR-0028](adr/0028-manifest-approach.md)). Dieses Repo selbst ist docs+guardrails-only (kein Live-UI) und deklariert die Phase deshalb zwar, hält `has_ui: false` — die Phase bleibt inaktiv, bis ein Projekt mit echter UI sie über sein eigenes Manifest scharf schaltet. Der Stop-Hook (`stop-suggest.mjs`) gibt für Phasen ohne eigenen Gate-Eintrag (wie `design`/`ui-design` heute) bewusst keine Gate-Klausel aus.
 
 **Sketch-Gate:** Ein UI-REDESIGN eines HAUPTfeatures (nicht: Kleinkorrektur/Copy-/Farbfix) braucht VOR Implementierungsbeginn eine bestätigte ASCII-/Wireframe-Skizze — der PO (oder stellvertretend der Elephant, wenn der PO das Judgment vorab delegiert hat) bestätigt die Skizze, bevor der erste UI-Goldfish dispatcht wird; keine Implementierung „auf Verdacht" parallel zur Skizzen-Diskussion. Gilt ausschließlich in Projekten mit `flags.has_ui: true` (s. o.); entfällt in diesem Repo (`has_ui: false`).
+
+**Schritt 10b (Release/Promotion-Phase, konditional, optional) — Detail:** Läuft ausschließlich, wenn das Manifest eine `release`-Sektion deklariert (sonst entfällt der Schritt vollständig — kein Gate, keine Pflicht, Opt-in wie Schritt 6b/6c). Der Elephant orchestriert: er holt die `promote:prod`-Freigabe ein (Human-Gate, §4.2), triggert den Deploy über sanktionierten Git-Zustand bzw. das lokale Adapter-Kommando und verifiziert die entstehende Evidenz — er deployt NIE selbst nach Prod und handhabt keine Deploy-Ziel-Credentials (EL-27, `roles/elephant.md`). Diese Zeile ist BESCHREIBEND; die bindende Mechanik (Guard-Erweiterung, Evidenz-Schema) liefern Folge-Slices der Release/Deploy-Erweiterung. Phasen-Narrativ: §3.5; Grundsatzentscheidung: [ADR-0033](adr/0033-release-promotion-phase.md).
 
 ### 3.3 Prozess-Toll je Rigor-Stufe
 
@@ -858,6 +925,14 @@ Verankert Rensins Goldfish-Protokoll (Steps 5–7: Comprehension / Critic / Read
 
 **Warum:** Ein Doc, das nur dank aufgebautem Elephant-Kontext „funktioniert", ist wertlos — genau die Kontext-Illusion, die der Goldfish-Test aufdeckt. **Prüfweise:** Readiness-Ergebnis wird beim Dispatch referenziert; der Critic (Stufe 2) flaggt Implementierungen ohne bestandenen Pflicht-Check.
 
+### 3.5 Release/Promotion-Phase
+
+Optionale Tail-Phase nach Merge + Doku-Sync (§3.1): Ein Projekt aktiviert sie über eine `release`-Sektion im eigenen Manifest (`.claude/pipeline.yaml`); ohne diese Sektion läuft der SDLC unverändert wie heute (Zero-Cost-Anti-Bloat). Die Pipeline definiert, WAS ein Deploy-Schritt garantiert — Evidenz vor jedem Prod-Deploy, ein Human-Gate vor Prod (`promote:prod`, §4.2), ein benannter Rollback-Anker je Umgebung, ein standardisierter Deploy-Log-Eintrag —, das Projekt liefert über einen Adapter, WIE das technisch geschieht ([ADR-0033](adr/0033-release-promotion-phase.md)).
+
+Drei Ausprägungen sind gleichrangig vorgesehen: (a) volles test→prod mit Health-/Smoke-Evidenz auf beiden Stufen; (b) Release/Publish ohne Server-Deploy (die OSS-Ausprägung: Tag/Publish hinter demselben Promote-Gate); (c) kein Deploy — Standard ohne `release`-Sektion, kostenlos. **Build-once-promote:** Freigaben und Evidenz binden sich an das Artefakt (Tag/unveränderliche Referenz), niemals an einen wandernden HEAD — Prod baut nie neu.
+
+Adapter-Vertrag, Evidenz-Schema und die Präzedenz-Engine (zentrale vs. projekteigene Deploy-Policy) sind NICHT hier ausformuliert — Kanon-Höhe endet an der Garantie, nicht am Mechanismus. Detail: [ADR-0033](adr/0033-release-promotion-phase.md) (Phasenkonzept, Adapter, Degrade-Shapes), [ADR-0034](adr/0034-deploy-precedence-central-vs-project.md) (Präzedenz-Achse zentral↔Projekt).
+
 ## 4. Review-System (zweistufig)
 
 Grundsatz: **deterministisch vor probabilistisch**. Stufe 1 ist Maschine und blockierend; Stufe 2 ist LLM-Judgment und liefert Befunde für den Gate-Entscheid des Elephant.
@@ -886,7 +961,7 @@ phases:
 
 | Klasse | Kriterien |
 |---|---|
-| **hoch** | Architektur-Grundsätze; Guardrails (Hooks, Permissions, Policies — auch in diesem Repo); Security/Secrets; live-wirksame <PROJECT_B>-Änderungen (reale Geräte); Irreversibles/Außenwirksames/Kostenpflichtiges; Stufe-2-Vertragsbereiche (namentlich einschließlich der Dispatch-Kontrakt-Templates `templates/prompts/critic-review.md` und `templates/prompts/goldfish-task.md`). |
+| **hoch** | Architektur-Grundsätze; Guardrails (Hooks, Permissions, Policies — auch in diesem Repo); Security/Secrets; live-wirksame <PROJECT_B>-Änderungen (reale Geräte); Irreversibles/Außenwirksames/Kostenpflichtiges; Stufe-2-Vertragsbereiche (namentlich einschließlich der Dispatch-Kontrakt-Templates `templates/prompts/critic-review.md` und `templates/prompts/goldfish-task.md`). Prod-Deploy-Ziele, -Adapter und Release-Trigger-Refs sowie eine zentrale Deploy-Policy (Release/Promotion-Phase, [ADR-0033](adr/0033-release-promotion-phase.md)/[ADR-0034](adr/0034-deploy-precedence-central-vs-project.md)). |
 | **mittel** | Prod-nahe Änderungen (z. B. <PROJECT_A> `main` = Prod-Deploy); Datenmodell/Migrationen; Refactors über Modulgrenzen; neue Abhängigkeiten. |
 | **niedrig** | Lokal begrenzte, revertierbare Änderungen ohne Berührung der obigen Zonen. |
 
@@ -910,7 +985,7 @@ phases:
 
 **Warum gestaffelt:** Der Critic ist teuer und darf nicht zur Zeremonie verkommen; zugleich sind Architektur/Guardrails/Security genau die Zonen, in denen ein schwächerer Prüfer korrelierte blinde Flecken hat. Beleg für die Kaskaden-/Nicht-blockierend-Lockerung: Die letzten 3 Kanon-Critics nach bestandener Readiness + First-Pass ergaben PASS mit 0 Befunden; echte Blocker traten in der Praxis nur bei riskantem Live-Code auf (beobachtet: 2 Blocker, 1 fail-open Major-Fund über mehrere Live-Sessions). Community-Beleg: Metas risikogestuftes Gating hielt die Qualität bei gelockerten Gates (Incident-Rate 1/50 Baseline). **Prüfweise:** Gate-Entscheid (Schritt 8) dokumentiert die angewandte Trigger-Zeile; der Merge-Schritt verlangt bei Pflicht-Trigger einen vorliegenden Befundbericht.
 
-**Genau zwei Human-Gates gegen Approval Fatigue:** Die Pipeline sieht bewusst nur zwei Punkte vor, an denen der PO zustimmen muss — das PO-Gate: PRD-Freigabe (§3.2 Schritt 3b) und das Human-Gate: Abnahme der Erledigt-Meldung (§3.2 Schritt 9). Viele Mikro-Freigaben führen zu Reflex-Klicks statt echter Prüfung, mit Burnout-Risiko als Folge (Google, Whitepaper „Day 5"). Deshalb gilt: **Freigaben werden an den definierten Gates gebündelt; keine Zwischenfragen.**
+**Genau zwei Human-Gates — plus ein optionales drittes nur bei aktiver Release-Phase — gegen Approval Fatigue:** Die Pipeline sieht bewusst nur zwei Punkte vor, an denen der PO im Regelfall zustimmen muss — das PO-Gate: PRD-Freigabe (§3.2 Schritt 3b) und das Human-Gate: Abnahme der Erledigt-Meldung (§3.2 Schritt 9). **Ausschließlich in Projekten, die die optionale Release-Phase konfigurieren (§3.1), kommt ein drittes hinzu: das promote:prod-Gate — opt-in je Projekt, feuert einmal pro Promotion (nicht pro Task), und ist damit selbst Approval-Fatigue-konform.** Viele Mikro-Freigaben führen zu Reflex-Klicks statt echter Prüfung, mit Burnout-Risiko als Folge (Google, Whitepaper „Day 5"). Deshalb gilt: **Freigaben werden an den definierten Gates gebündelt; keine Zwischenfragen.**
 
 **Zeitversetztes Selbst-Review bei Irreversiblem:** Vor irreversiblen, außenwirksamen oder kostenpflichtigen Entscheidungen wird zwischen Entwurf und finaler Freigabe bewusst Zeitdistanz gelegt (frischer Blick: anderer Tag oder mindestens deutlich späterer Session-Abschnitt) — der PO bzw. der Elephant liest die Entscheidung erneut gegen Spec und Register, BEVOR das Human-Gate final freigibt. **Warum:** Solo-Ersatz für das Team-Review — Zeitdistanz ersetzt den zweiten Menschen. **Prüfweise:** Bei irreversiblen Gates dokumentiert der Gate-Entscheid den zeitversetzten Zweitblick.
 
@@ -1082,6 +1157,7 @@ Zentral ist die Invariante, kalibriert ist die Ausprägung (bewusste Vielfalt is
 - **Abgrenzung Denies:** Projekt-**Denies** leben NICHT in der Kalibrierungsdatei, sondern in der committeten `.claude/settings.json` bzw. der Guard-Config des git-guard — der Bootstrap-Check prüft sie dort (→ [../harness/session-bootstrap.md](../harness/session-bootstrap.md), Schritt 3).
 - **DoD-Kriterium (hart):** Ein projektspezifischer Ritualschritt ist ergänzbar, **OHNE den zentralen Skill zu forken** — sonst beginnt die Copy-Paste-Vererbung von vorn (Anti-Pattern AP1). **Nachweis in Phase 3** an einem realen Beispiel (z. B. <PROJECT_A>-DB-Hygiene-Schritt).
 - **Manifest-Ergänzung (optional, additiv, AP1):** Seit AP1 existiert zusätzlich `.claude/pipeline.yaml` (Schema `pipeline.manifest.v0`) als rein additive Schicht NEBEN `pipeline.json` — deckt Phasen/Gates/Security-Schwellen/Modell-Routing/Profile/Governance-Pfade (§10)/Flags ab, ohne ein einziges Feld der Kalibrierungsdatei zu berühren (Null-Feld-Überlappung bestätigt, `plugins/pipeline-core/lib/manifest.mjs`). Kein Manifest → Verhalten byte-identisch zu heute. Schema: `plugins/pipeline-core/scripts/pipeline-manifest.schema.json`; Validator: `node harness/scripts/validate-manifest.mjs`; Details/Begründung: [ADR-0028](adr/0028-manifest-approach.md).
+- **Release-Phase (optional, additiv):** Ein Projekt kann zusätzlich eine `release`-Sektion in `.claude/pipeline.yaml` deklarieren — Umgebungen, Adapter- und Rollback-Referenzen je Environment (§3.5). Kein neues Pflichtfeld und keine neue Kalibrierungsdatei: reiner Signpost, wo Deploy-Konfiguration lebt; Schema-Details folgen mit der Manifest-Erweiterung der Release/Deploy-Erweiterung ([ADR-0033](adr/0033-release-promotion-phase.md)/[ADR-0034](adr/0034-deploy-precedence-central-vs-project.md)).
 
 ## 9. Traceability
 
