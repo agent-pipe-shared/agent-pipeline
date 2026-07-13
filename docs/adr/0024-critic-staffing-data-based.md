@@ -1,63 +1,41 @@
-# ADR-0024: Critic Staffing — Data-Based Revision of the E12/E6 Staffing Rules
-
-> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
-
-**Status:** accepted (Wave 2, M11) · **Basis:** Register E24
-
-## Context
-
-Three consecutive canonical Critic runs (readiness + first-pass) all closed at zero findings; real blockers so far only occurred on risky live-code changes (S39 2× blocker, S40 fail-open-major). On this data basis, Wave 2 revises the Critic staffing rules from [ADR-0014](0014-critic-contract.md) (E12) and [ADR-0006](0006-model-effort-policy.md) (E6).
-
-## Decision (E24, verbatim)
-
-> Critic staffing (Wave 2 M11, revises E12/E6 staffing; data-based + meta-RADAR evidence): NEW mechanical auto-pass (deterministic diffs: lockfiles/generated files/pure formatting → no Critic, evidence = generating command + verify) · class medium = Sonnet CASCADE (escalation to Fable ONLY on a finding ≥major / approvals-governance-security touch / contested) · class low = non-blocking parallel permitted (disposition required before wave close) · ONE bundled Critic per wave = default · class high/A-G-S unchanged, Fable + blocking (T1 untouched). Data basis: last 3 canonical Critics after readiness+first-pass = PASS, 0 findings; real blockers only on risky live code (S39 2×BLOCKER, S40 fail-open-MAJOR). ADR formalization Phase 2
-
-## Consequences
-
-**Positive:** Saves Fable cost on mechanical/medium diffs without an observed loss of defect-finding on canonical material; the T1 obligation (class high/A-G-S) remains fully untouched.
-
-**Negative:** The new staffing logic (mechanical auto-pass, Sonnet cascade, non-blocking-parallel for class low) increases case-distinction complexity in the Critic contract.
-
-**Risk:** The Sonnet cascade could miss a major finding that would have triggered a Fable escalation. Mitigation: the escalation criterion is explicitly defined (finding ≥major / A-G-S touch / contested), not left to discretion.
-
-## Rejected alternatives
-
-- **Keep Fable-Critic across the board for class medium** — rejected as uneconomical given the 0-finding data from the last three canonical Critics.
-- **No Critic at all for class low** — rejected in favor of non-blocking parallel; disposition remains mandatory before wave close.
+# ADR-0024: Risk-Based Critic Staffing
 
 ## Status
 
-Accepted (Wave 2, M11). No fixed re-review date; the data basis keeps expanding through further Critic runs (implicit observation duty).
+Accepted during the 2026-07-05 measure wave. Revised for provider-neutral Phase 2 architecture on 2026-07-13.
 
-<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+## Context
 
-# ADR-0024: Critic-Stufung — datenbasierte Revision des E12/E6-Staffings
+Critic staffing should follow risk and evidence rather than use the most expensive review path for every change. Historical observations supported a cascade for routine work, but they did not weaken blocking review for high-risk architecture, guardrail, or security changes.
 
-> Agent-Pipeline v0.1.0-draft · Sprint 1 · Stand 2026-07-06
+## Historical Decision
 
-**Status:** akzeptiert (Welle 2, M11) · **Grundlage:** Register E24
+The original decision introduced a mechanical auto-pass, a medium-risk cascade, non-blocking low-risk review, one bundled Critic per wave by default, and unchanged blocking review for high-risk and architecture/guardrail/security work.
 
-## Kontext
+## Phase 2 Revision (2026-07-13)
 
-Drei aufeinanderfolgende Kanon-Critics mit Readiness+First-Pass endeten bei 0 Befunden; echte Blocker traten bislang nur auf riskantem Live-Code auf (S39 2× Blocker, S40 fail-open-Major). Welle 2 revidiert auf dieser Datenbasis die Critic-Staffing-Regeln aus [ADR-0014](0014-critic-contract.md) (E12) und [ADR-0006](0006-model-effort-policy.md) (E6).
+The kernel uses capability and independence classes rather than provider names:
 
-## Entscheidung (E24, wortgetreu)
+- **Mechanical:** a Critic may be bypassed only when the entire diff is deterministically generated or purely format-normalized and evidence includes both the exact generating command and successful verification bound to the resulting content. A descriptive claim that work was mechanical is insufficient.
+- **Low risk:** an independent review may run non-blocking and in parallel. Every finding and the explicit pass result still require disposition before the wave closes.
+- **Medium risk:** start with the configured standard independent review capability. Escalate to the strongest configured independent review when there is a finding of at least major severity, an architecture/guardrail/security touch, or a contested disposition.
+- **High risk and architecture/guardrail/security:** the strongest configured independent review is mandatory, blocking, and may not be replaced by a mechanical classification or lower-tier pass.
+- **Wave staffing:** one bundled Critic is the default only when the reviewed items share a coherent risk boundary. It cannot merge unrelated high-risk decisions into an unreviewable batch.
 
-> Critic-Stufung (Welle 2 M11, revidiert E12/E6-Staffing; datenbasiert + Meta-RADAR-Beleg): NEU Mechanik-Auto-Pass (deterministische Diffs: Lockfiles/Generiertes/reine Formatierung → kein Critic, Evidenz = erzeugendes Kommando + verify) · Klasse mittel = Sonnet-KASKADE (Eskalation zu Fable NUR bei Befund ≥major / A-G-S-Berührung / Contested) · Klasse niedrig = non-blocking parallel zulässig (Disposition vor Wave-Close) · EIN gebündelter Critic je Welle = Standard · Klasse hoch/A-G-S unverändert Fable + blockierend (T1 unangetastet). Datenbasis: letzte 3 Kanon-Critics nach Readiness+First-Pass = PASS 0 Befunde; echte Blocker nur auf riskantem Live-Code (S39 2×BLOCKER, S40 fail-open-MAJOR). ADR-Formalisierung Phase 2
+Existing Claude assignments remain unchanged in the Claude projection. In the Codex projection, every Fable duty resolves to `gpt-5.6-sol` at the same assigned effort tier. Neither mapping changes the provider-neutral risk semantics.
 
-## Konsequenzen
+## Consequences
 
-**Positiv:** Spart Fable-Kosten bei mechanischen/mittleren Diffs, ohne beobachteten Verlust an Fehlerfindung auf Kanon-Material; die T1-Pflicht (Klasse hoch/A-G-S) bleibt vollständig unangetastet.
+Deterministic work avoids redundant judgment calls while medium and low risk can use proportionate review. High-risk work retains the strongest independent blocking path.
 
-**Negativ:** Die neue Staffing-Logik (Mechanik-Auto-Pass, Sonnet-Kaskade, non-blocking-parallel bei Klasse niedrig) erhöht die Fallunterscheidungs-Komplexität im Critic-Kontrakt.
+The cascade adds classification complexity. Misclassification is controlled by evidence requirements and by treating any architecture, guardrail, or security touch as a mandatory high-risk path.
 
-**Risiko:** Die Sonnet-Kaskade könnte einen major-Befund unentdeckt lassen, der eine Fable-Eskalation ausgelöst hätte. Mitigation: Das Eskalationskriterium ist explizit definiert (Befund ≥major / A-G-S-Berührung / Contested), nicht dem Ermessen überlassen.
+## Rejected Alternatives
 
-## Verworfene Alternativen
+- Strongest-tier review for every mechanical diff: deterministic evidence can establish those bytes more reliably.
+- No review or disposition for low risk: non-blocking does not mean ignorable.
+- Non-blocking high-risk review: it allows work to proceed before the highest-impact findings are resolved.
 
-- **Fable-Critic pauschal für Klasse mittel beibehalten** — durch die 0-Befund-Datenlage der letzten drei Kanon-Critics als unwirtschaftlich verworfen.
-- **Kein Critic bei Klasse niedrig** — verworfen zugunsten non-blocking parallel; die Disposition bleibt vor Wave-Close Pflicht.
+## Follow-up
 
-## Wiedervorlage
-
-Keine fest terminiert; die Datenbasis wird durch weitere Critic-Läufe laufend erweitert (implizite Beobachtungspflicht).
+Continue collecting dated review outcomes. Any change to the cascade requires evidence that distinguishes mechanical, low-, medium-, and high-risk work.
