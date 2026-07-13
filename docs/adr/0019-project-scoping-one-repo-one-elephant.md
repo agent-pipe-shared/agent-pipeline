@@ -1,63 +1,43 @@
-# ADR-0019: Project Boundaries — One Repo, One Elephant at a Time
+# ADR-0019: One Active Write Target per Orchestrator
 
-> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+## Status
 
-**Status:** accepted (2026-07-04, AP-Sprint) · **Basis:** Register E19
+Accepted on 2026-07-04.
 
 ## Context
 
-Cross-project work needs a clear workspace contract so parallel sessions don't overwrite each other. The PO decided at the AP-Sprint on the principle "one repo, one Elephant at a time," with a fixed transfer path for cross-repo needs.
+An orchestrator that writes across multiple repositories at once can blur ownership, stage unrelated changes, and collide with parallel sessions. Some legitimate workflows bind a public core to a private overlay, so the boundary must support deliberate transfer without implying simultaneous write authority.
 
-## Decision (E19)
+## Decision
 
-"One repo, one Elephant at a time": a project Elephant writes ONLY within its own project repo; monitoring/collection sessions stay strictly read-only toward project repos. Cross-repo needs go through a fixed transfer path (the &lt;PROJECT_B&gt;-S38 pattern): a NEW item in the target repo's `backlog/items/` (append-only, no edits to foreign existing files), or a handback to the PO — "in a way that it will definitely be found." Deliberately a process rule ONLY (option b) — a path-guard hook (a) and a `writeRoots` field (c) are documented possibilities, not commissioned. Implementation: `roles/elephant.md`, operating-model §2.2, kickoff templates.
+An orchestrator has exactly one active repository write target at a time.
+
+- It may write only inside the repository and path scope granted for the current phase.
+- Monitoring, inventory, and collection work is read-only toward every other repository.
+- Cross-repository work is split into separately scoped, sequential phases. Before changing targets, the orchestrator completes or safely parks the current write phase, records the handoff evidence, and establishes the next repository as the sole write target.
+- A transfer to another repository uses a new, discoverable, append-only handoff artifact or an explicit handback to the operator/coordinator. It does not edit an existing foreign file merely to make the request visible.
+- Binding a public core and private overlay for comparison does not authorize concurrent or unbounded writes to both.
+
+This is a process control, not a technical sandbox claim. Without an enforced path guard or runner-level `writeRoots`, repository permissions may still allow a violation. Reports and conformance statements must disclose that limitation.
+
+Deferred hardening risk:
+
+- **Owner:** pipeline maintainer.
+- **Expiry gate:** before any automated cross-repository writer is enabled or described as safe.
+- **Required resolution:** enforce repository/path write roots, or keep automated cross-repository writing disabled and retain the explicit process-only limitation.
 
 ## Consequences
 
-**Positive:** Prevents collisions between parallel sessions across project boundaries; a fixed, discoverable transfer path instead of ad-hoc edits in foreign repos.
+Write ownership and staging scope stay auditable. Public/private reconciliation remains possible through sequential delivery and receipt phases.
 
-**Negative:** A pure process rule — no technical safeguard (hook/field) enforces it; relies on discipline.
+Transfers take an extra handoff step. Until technical enforcement exists, safety depends on disciplined scoping and review.
 
-**Risk:** An Elephant could violate the rule anyway, since nothing technically blocks it. Mitigation: deliberately documented but not commissioned — options a/c remain open as a later hardening in the backlog item.
+## Rejected Alternatives
 
-## Rejected alternatives
-
-- **Path-guard hook (option a)** — documented possibility, deliberately not commissioned.
-- **`writeRoots` field per project (option c)** — documented possibility, deliberately not commissioned.
+- Simultaneous writes to every bound repository: ownership and failure recovery become ambiguous.
+- Treating read access as write authority: comparison scope is not mutation scope.
+- Claiming the process rule is technically enforced: current controls do not justify that claim.
 
 ## Follow-up
 
-None scheduled; the deferred technical options (a/c) live in the referenced backlog item.
-
-<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
-
-# ADR-0019: Projekt-Abgrenzung — Ein Repo, ein Elephant zur Zeit
-
-> Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 4 · Stand 2026-07-06
-
-**Status:** akzeptiert (2026-07-04, AP-Sprint) · **Grundlage:** Register E19
-
-## Kontext
-
-Cross-Projekt-Arbeit braucht einen klaren Arbeitsraum-Kontrakt, damit parallele Sessions sich nicht überschreiben. the PO entschied am AP-Sprint den Grundsatz „ein Repo, ein Elephant zur Zeit" mit einem festen Transferpfad für Cross-Repo-Bedarf.
-
-## Entscheidung (E19, wortgetreu)
-
-> Projekt-Abgrenzung / Arbeitsraum-Kontrakt (the PO, 2026-07-04, AP-Sprint): „Ein Repo, ein Elephant zur Zeit"; ein Projekt-Elephant schreibt NUR im eigenen Projekt-Repo; Monitoring-/Sammel-Sessions strikt read-only gegenüber Projekt-Repos. Cross-Repo-Bedarf läuft über den festen Transfer-Pfad (<PROJECT_B>-S38-Muster): NEUES Item in `backlog/items/` des Zielrepos (append-only, keine Edits an Fremd-Bestandsdateien) oder Übergabe an the PO — „so, dass es definitiv gefunden wird". Bewusst NUR Prozessregel (Option b) — Pfad-Guard-Hook (a) und `writeRoots`-Feld (c) nicht beauftragt, dokumentierte Möglichkeit. Umsetzung: roles/elephant.md, operating-model §2.2, Kickoff-Templates
-
-## Konsequenzen
-
-**Positiv:** Verhindert Kollisionen zwischen parallelen Sessions über Projektgrenzen hinweg; ein fester, auffindbarer Transferpfad statt Ad-hoc-Edits in Fremd-Repos.
-
-**Negativ:** Reine Prozessregel — kein technischer Schutz (Hook/Feld) erzwingt sie; verlässt sich auf Disziplin.
-
-**Risiko:** Ein Elephant könnte die Regel trotzdem verletzen, weil nichts sie technisch blockiert. Mitigation: bewusst dokumentiert, aber nicht beauftragt — die Optionen a/c bleiben als spätere Verschärfung im Backlog-Item offen.
-
-## Verworfene Alternativen
-
-- **Pfad-Guard-Hook (Option a)** — dokumentierte Möglichkeit, bewusst nicht beauftragt.
-- **`writeRoots`-Feld je Projekt (Option c)** — dokumentierte Möglichkeit, bewusst nicht beauftragt.
-
-## Wiedervorlage
-
-Keine terminiert; die zurückgestellten technischen Optionen (a/c) liegen im genannten Backlog-Item.
+The maintainer must resolve the deferred hardening risk at its expiry gate. No release or conformance claim is implied by this ADR.
