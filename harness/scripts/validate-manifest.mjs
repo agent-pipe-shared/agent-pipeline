@@ -5,9 +5,8 @@
  * (distribution-ready) library; this script is just argv handling + English rendering
  * of the {path, expected, got, line?} error shape loadManifest() returns.
  *
- * NOT WIRED into harness/scripts/verify.mjs by this delivery (TP-3 -- verify.mjs is
- * TP-protected; a later bundled wiring wave adds the step). Standalone-invocable
- * only for now.
+ * Wired into harness/scripts/verify.mjs whenever a project manifest is present; it also
+ * remains standalone-invocable for setup and diagnostics.
  *
  * USAGE:
  *   node harness/scripts/validate-manifest.mjs [path]

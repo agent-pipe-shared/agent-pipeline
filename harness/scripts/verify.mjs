@@ -38,7 +38,7 @@
  * unchanged so a human sees the same PASS/FAIL lines the suites themselves print.
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -70,12 +70,22 @@ const TEST_SUITES = [
 // Manifest-gated phase steps: see header — only projects with `.claude/pipeline.yaml`
 // get these two entries; everyone else keeps the suites-only step list.
 const manifestPath = join(repoRoot, ".claude", "pipeline.yaml");
-const PHASE_STEPS = existsSync(manifestPath)
-  ? [
-      { name: "validate-manifest", file: join(scriptDir, "validate-manifest.mjs") },
-      { name: "security-scan", file: join(scriptDir, "security-scan.mjs") },
-    ]
-  : [];
+// Distinguish confirmed absence from unreadable presence. Confirmed ENOENT preserves the
+// suites-only evidence shape; any other read failure still runs validation and therefore
+// fails closed instead of being misclassified as opt-out. Security remains present-only.
+let manifestPresence = "present";
+try {
+  readFileSync(manifestPath, "utf8");
+} catch (error) {
+  manifestPresence = error && typeof error === "object" && error.code === "ENOENT" ? "absent" : "unreadable";
+}
+const PHASE_STEPS =
+  manifestPresence === "absent"
+    ? []
+    : [
+        { name: "validate-manifest", file: join(scriptDir, "validate-manifest.mjs") },
+        ...(manifestPresence === "present" ? [{ name: "security-scan", file: join(scriptDir, "security-scan.mjs") }] : []),
+      ];
 
 const steps = [];
 for (const suite of [...TEST_SUITES, ...PHASE_STEPS]) {

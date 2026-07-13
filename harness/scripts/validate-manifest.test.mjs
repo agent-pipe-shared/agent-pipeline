@@ -120,6 +120,14 @@ checkCli("ABSENT  a nonexistent manifest path exits 0 with the opt-in message", 
   stdoutIncludes: "Manifest not active (optional)",
 });
 
+{
+  const unreadablePath = join(SCRATCH, "manifest-is-a-directory.yaml");
+  mkdirSync(unreadablePath);
+  checkCli("UNREADABLE  a non-readable manifest shape exits 2 instead of throwing", unreadablePath, 2, {
+    stderrIncludes: "readable manifest and validation schema",
+  });
+}
+
 // ---- MINIMAL VALID ------------------------------------------------------------------------------
 checkCli("MINIMAL VALID  just `schema:` is a complete, valid manifest", fixture("minimal.yaml", "schema: pipeline.manifest.v0\n"), 0, {
   stdoutIncludes: "Manifest valid",
@@ -1237,6 +1245,46 @@ writeFileSync(
     `got ${JSON.stringify(result)}`,
   );
   rmSync(absentRoot, { recursive: true, force: true });
+}
+
+{
+  const root = mkdtempSync(join(tmpdir(), "manifest-total-read-error-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  mkdirSync(join(root, ".claude", "pipeline.yaml"));
+  let result;
+  let threw = false;
+  try {
+    result = loadManifest(root);
+  } catch {
+    threw = true;
+  }
+  record(
+    "loadManifest TOTAL  manifest read failures become structured invalid results",
+    !threw && result?.status === "invalid" && result.errors?.[0]?.path === "manifest",
+    `threw=${threw} result=${JSON.stringify(result)}`,
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+
+{
+  const root = mkdtempSync(join(tmpdir(), "manifest-total-schema-error-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  const schemaPath = join(root, "schema-is-a-directory");
+  mkdirSync(schemaPath);
+  let result;
+  let threw = false;
+  try {
+    result = loadManifest(root, { schemaPath });
+  } catch {
+    threw = true;
+  }
+  record(
+    "loadManifest TOTAL  schema read failures become structured invalid results",
+    !threw && result?.status === "invalid" && result.errors?.[0]?.path === "manifest",
+    `threw=${threw} result=${JSON.stringify(result)}`,
+  );
+  rmSync(root, { recursive: true, force: true });
 }
 
 // ---- gateConfig ---------------------------------------------------------------------------------

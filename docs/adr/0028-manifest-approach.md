@@ -34,6 +34,22 @@ The Pipeline has so far configured projects exclusively via `.claude/pipeline.js
 
 None. Grammar scope is extended on demand (new YAML use case arises), not preemptively.
 
+## Phase-2 authority and failure-mode amendment (2026-07-13)
+
+The original "untouched" and "zero overlap" statements describe the runtime file shapes,
+not independent authorship. In a compiler-managed installation, `pipeline.user.yaml` is the
+authored intent and `setup.mjs` produces the disjoint `.claude/pipeline.json` and
+`.claude/pipeline.yaml` runtime projections. A project that does not use the compiler may
+instead author `.claude/pipeline.yaml` directly; it must not mix both ownership modes.
+
+All manifest consumers share one validation authority: parse, schema and semantic checks.
+Absence remains an opt-in no-op. A present invalid or unreadable manifest produces a
+structured invalid result; the standalone validator and full verify exit 2. Advisory helpers
+may deliberately collapse absent/invalid to no active manifest, while enforcement consumers
+must use the structured result and their documented fail matrix. `setup.mjs` validates the
+complete generated manifest through this same authority before writing any source or runtime
+file, preventing partial compiles from an invalid projection.
+
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
 # ADR-0028: Manifest-Ansatz — `.claude/pipeline.yaml` additiv, in-house YAML-Parser, Agents bleiben im Plugin

@@ -1,6 +1,8 @@
 # pipeline.yaml.example -- canonical, fully-commented example of the OPTIONAL declarative
-# pipeline manifest (schema id: pipeline.manifest.v0, AP1-P2 "GLOIN"). Copy this file to
-# <project-repo>/.claude/pipeline.yaml and edit; every top-level section is optional -- an
+# pipeline manifest (schema id: pipeline.manifest.v0). Use this as a reference for a
+# DIRECTLY AUTHORED manifest only. Compiler-managed installs author pipeline.user.yaml and
+# let setup.mjs regenerate .claude/pipeline.yaml; do not mix the two ownership modes. Every
+# top-level section is optional -- an
 # absent manifest is a fully supported "not opted in yet" state, byte-identical to today's
 # non-manifest behavior (plugins/pipeline-core/lib/manifest.mjs: loadManifest() returns
 # status "absent", harness/scripts/validate-manifest.mjs exits 0 printing
