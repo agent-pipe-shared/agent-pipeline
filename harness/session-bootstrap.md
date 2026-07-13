@@ -128,6 +128,8 @@ This step ends in a **third mandatory confirmation line** (printed directly unde
 - **Note (mechanism, only on a STALE warning from the SessionStart hook):** if the plugin's SessionStart hook reports a STALE warning IN THIS SESSION naming the installed SHA and remote SHA by name, Step 2 may adopt that result as equivalent evidence instead of re-running `ls-remote` itself. The real hook output otherwise only has a constant fresh-path bootstrap line without SHAs — it looks identical whether the SHAs match or the hook fired fail-open for lack of resolvability, and is therefore NOT usable as substitution proof. If only that constant line is present, or no hook output exists at all, Step 2 still requires its own `ls-remote`.
 - **Why:** third-party marketplaces don't auto-update; without this check, two-machine cache drift replaces the old copy-paste drift.
 - **Verification:** SHA match = current. Mismatch = stale → case **F2**. Remote unreachable → case **F3**. The check needs network + credentials for the private repo (see §5).
+- **Working repository (every writable governed project, including self-application):** run `node "${CLAUDE_PLUGIN_ROOT}/scripts/repository-freshness.mjs"` (from this repo's source checkout: `node plugins/pipeline-core/scripts/repository-freshness.mjs`). This is separate from marketplace/plugin freshness. The helper fetches into a disposable bare repository, never into the working checkout. `equal` and `ahead` permit writing; `behind`, `diverged`, `detached`, `no-upstream`, and `unknown` stop writes/dispatch while read-only diagnosis remains allowed. `unknown` (including fetch failure, timeout, unavailable upstream, or insufficient shallow history) is never reported as fresh. Other unmerged remote branches are bounded informational output only and never change the selected branch.
+- **Honesty boundary:** this is a point-in-time protocol gate, not an atomic lock; a remote can advance immediately afterwards. The helper never runs pull, merge, rebase, checkout, or config/ref writes in the source checkout. SessionStart context alone is not an unbypassable OS-level write barrier.
 
 ### Step 3 — Read the project calibration file (existence check first!)
 
@@ -288,7 +290,7 @@ The Elephant must additionally be able to speak to the session-lifecycle policy 
 - **Step 1:** local SHA only (no `ls-remote`).
 - **Step 1b:** unchanged (mandatory) — **the profile question repeats at EVERY bootstrap**, even on the short path: it's cheap (one UI question) and a profile switch mid-day is a new session anyway.
 - **Step 1d:** unchanged (embedded, cheap).
-- **Step 2:** SKIPPED, with mandatory suffix `· Staleness same-day cached (full check <HH:MM>)` (see Step 6, list of permitted additions).
+- **Step 2:** marketplace/plugin staleness is SKIPPED, with mandatory suffix `· Staleness same-day cached (full check <HH:MM>)`; the current writable checkout's freshness helper still runs every time.
 - **Step 3:** existence check only.
 - **Step 4:** only the handover HEAD block + topmost session block — UNLESS the handover file has changed since the full bootstrap (newer commits/date) → then full reading.
 - **Step 5:** existence check only.
@@ -316,7 +318,7 @@ The Elephant must additionally be able to speak to the session-lifecycle policy 
 - **Step 1b:** the profile question itself runs normally (that IS already the speed choice); afterward the advisor-hygiene check and the readiness probe are DROPPED (both are `advisor`-profile-specific) — the model/effort/advisor pairing is fixed in the speed profile (`policies/model-policy.md`, MP-28), set once, no extra questions.
 - **Step 1c:** dropped (no spend/usage check as a separate act).
 - **Step 1d:** dropped as a separate confirmation line — the role prohibitions (EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19) still apply unchanged in substance, they're just not repeated as their own line on the speed path.
-- **Step 2:** dropped entirely (no remote staleness check).
+- **Step 2:** marketplace/plugin staleness is dropped; the current writable checkout's freshness helper still runs and must permit writing.
 - **Step 3:** existence check of the calibration file only (no full reading).
 - **Step 4:** only the operational head of the handover file (no full reading of the session history).
 - **Step 5:** existence/callability check of verify only.
@@ -467,6 +469,8 @@ Dieser Schritt endet in einer **dritten verbindlichen Bestätigungszeile** (Deut
 - **Hinweis (Mechanismus, nur bei STALE-Warnung des SessionStart-Hooks):** Meldet der SessionStart-Hook des Plugins in DIESER Session eine STALE-Warnung, die installierten SHA und Remote-SHA namentlich nennt, darf Schritt 2 dieses Ergebnis als gleichwertige Evidenz übernehmen statt `ls-remote` selbst erneut auszuführen. Die reale Hook-Ausgabe kennt sonst nur eine konstante Fresh-Pfad-Bootstrap-Zeile ohne SHAs — sie fällt identisch aus, ob die SHAs übereinstimmen oder der Hook mangels Auflösbarkeit fail-open ausgelöst hat, und taugt deshalb NICHT als Substitutionsnachweis. Liegt nur diese konstante Zeile vor oder fehlt jede Hook-Ausgabe, gilt Schritt 2 unverändert per eigenem `ls-remote`.
 - **Warum:** Drittanbieter-Marketplaces auto-updaten nicht; ohne diesen Check ersetzt Zwei-Rechner-Cache-Drift die alte Copy-Paste-Drift.
 - **Prüfweise:** SHA-Gleichheit = aktuell. Abweichung = stale → Fall **F2**. Remote nicht erreichbar → Fall **F3**. Der Check braucht Netz + Credentials fürs private Repo (siehe §5).
+- **Arbeits-Repository (jedes beschreibbare governte Projekt, einschließlich Self-Application):** Führe `node "${CLAUDE_PLUGIN_ROOT}/scripts/repository-freshness.mjs"` aus (aus dem Quell-Checkout dieses Repos: `node plugins/pipeline-core/scripts/repository-freshness.mjs`). Das ist vom Marketplace-/Plugin-Freshness-Check getrennt. Der Helper fetcht nur in ein wegwerfbares Bare-Repository, nie in den Arbeits-Checkout. `equal` und `ahead` erlauben Schreiben; `behind`, `diverged`, `detached`, `no-upstream` und `unknown` stoppen Schreibarbeit/Dispatch, Read-only-Diagnose bleibt erlaubt. `unknown` (einschließlich Fetch-Fehler, Timeout, nicht auflösbarem Upstream oder unzureichender Shallow-Historie) wird niemals als frisch ausgegeben. Andere ungemergte Remote-Branches sind begrenzte Information und ändern nie den gewählten Branch.
+- **Ehrlichkeitsgrenze:** Das ist ein Zeitpunkt-Protokollgate, kein atomarer Lock; der Remote kann direkt danach fortschreiten. Der Helper führt im Quell-Checkout weder Pull, Merge, Rebase, Checkout noch Config-/Ref-Schreibzugriffe aus. SessionStart-Kontext allein ist keine technisch unumgehbare Betriebssystem-Schreibsperre.
 
 ### Schritt 3 — Projekt-Kalibrierungsdatei lesen (Existenz-Check zuerst!)
 
@@ -627,7 +631,7 @@ Der Elephant muss außerdem zur Session-Lifecycle-Politik auskunftsfähig sein (
 - **Schritt 1:** nur lokaler SHA (kein `ls-remote`).
 - **Schritt 1b:** unverändert (Pflicht) — **die Profil-Frage wird bei JEDEM Bootstrap wiederholt**, auch im Kurz-Pfad: sie ist billig (eine UI-Frage) und ein Profilwechsel mitten am Tag ist ohnehin eine neue Session.
 - **Schritt 1d:** unverändert (eingebettet, billig).
-- **Schritt 2:** ÜBERSPRUNGEN, mit Pflicht-Suffix `· Staleness same-day gecacht (voller Check <HH:MM>)` (siehe Schritt 6, Liste der erlaubten Zusätze).
+- **Schritt 2:** Marketplace-/Plugin-Staleness wird ÜBERSPRUNGEN, mit Pflicht-Suffix `· Staleness same-day gecacht (voller Check <HH:MM>)`; der Freshness-Helper des aktuellen beschreibbaren Checkouts läuft weiterhin jedes Mal.
 - **Schritt 3:** nur Existenz-Check.
 - **Schritt 4:** nur Handover-HEAD-Block + oberster Session-Block — AUSSER die Handover-Datei hat sich seit dem vollen Bootstrap geändert (neuere Commits/Datum) → dann vollständige Lektüre.
 - **Schritt 5:** nur Existenz-Check.
@@ -655,7 +659,7 @@ Der Elephant muss außerdem zur Session-Lifecycle-Politik auskunftsfähig sein (
 - **Schritt 1b:** die Profilfrage selbst läuft normal (das IST bereits die Speed-Wahl); danach ENTFÄLLT die Advisor-Hygiene-Prüfung und die Bereitschaftsprobe (beide sind `advisor`-Profil-spezifisch) — Modell/Effort/Advisor-Pairing ist im Speed-Profil fix (`policies/model-policy.md`, MP-28), einmal gesetzt, keine Zusatzfragen.
 - **Schritt 1c:** entfällt (kein Spend-/Usage-Check als eigener Akt).
 - **Schritt 1d:** entfällt als eigene Bestätigungszeile — die Rollen-Verbote (EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19) gelten inhaltlich unverändert, werden im Speed-Pfad nur nicht als eigene Zeile wiederholt.
-- **Schritt 2:** entfällt vollständig (kein Remote-Staleness-Check).
+- **Schritt 2:** Marketplace-/Plugin-Staleness entfällt; der Freshness-Helper des aktuellen beschreibbaren Checkouts läuft weiterhin und muss Schreiben erlauben.
 - **Schritt 3:** nur Existenz-Check der Kalibrierungsdatei (kein Vollständig-Lesen).
 - **Schritt 4:** nur der operative Kopf der Handover-Datei (kein vollständiges Lesen der Session-Historie).
 - **Schritt 5:** nur Existenz-/Aufrufbarkeits-Check von verify.

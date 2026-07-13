@@ -25,7 +25,7 @@ function freshRepo(prefix) {
   const dir = mkdtempSync(join(tmpdir(), `guard-push-${prefix}-`));
   ALL_DIRS.push(dir);
   const git = (...args) => spawnSync("git", args, { cwd: dir, encoding: "utf8" });
-  git("init", "-q");
+  git("init", "-q", "-b", "main");
   git("config", "user.email", "goldfish@example.invalid");
   git("config", "user.name", "Goldfish");
   writeFileSync(join(dir, "README.md"), "fixture\n");
@@ -33,6 +33,10 @@ function freshRepo(prefix) {
   git("commit", "-q", "-m", "init");
   const head = git("rev-parse", "HEAD").stdout.trim();
   return { dir, head };
+}
+
+function gitAt(dir, ...args) {
+  return spawnSync("git", args, { cwd: dir, encoding: "utf8" });
 }
 
 function writeManifest(dir, yamlText) {
@@ -49,24 +53,28 @@ function writeEvidence(dir, relPath, obj) {
   writeFileSync(full, typeof obj === "string" ? obj : JSON.stringify(obj));
 }
 
-function runGuard(command, dir) {
+function runGuard(command, dir, { cwd = dir, projectDir = dir, env = {} } = {}) {
   const res = spawnSync(process.execPath, [GUARD], {
     input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
     encoding: "utf8",
-    cwd: dir,
-    env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
+    cwd,
+    env: { ...process.env, ...env, CLAUDE_PROJECT_DIR: projectDir },
+    timeout: 10000,
   });
   return { code: res.status, stderr: res.stderr ?? "" };
 }
 
 let pass = 0;
 const failures = [];
-function check(id, command, dir, expectExit, { stderrIncludes, stderrEmpty } = {}) {
-  const { code, stderr } = runGuard(command, dir);
+function check(id, command, dir, expectExit, { stderrIncludes, stderrNotIncludes, stderrEmpty, cwd, projectDir, env } = {}) {
+  const { code, stderr } = runGuard(command, dir, { cwd: cwd ?? dir, projectDir: projectDir ?? dir, env });
   const problems = [];
   if (code !== expectExit) problems.push(`exit ${code} (expected ${expectExit}) -- stderr: ${stderr.trim().slice(0, 300)}`);
   for (const needle of [].concat(stderrIncludes ?? [])) {
     if (!stderr.includes(needle)) problems.push(`stderr missing "${needle}" -- got: ${stderr.trim().slice(0, 300)}`);
+  }
+  for (const needle of [].concat(stderrNotIncludes ?? [])) {
+    if (stderr.includes(needle)) problems.push(`stderr unexpectedly contains "${needle}"`);
   }
   if (stderrEmpty && stderr.trim() !== "") problems.push(`stderr not empty: ${stderr.trim().slice(0, 200)}`);
   if (problems.length === 0) {
@@ -107,6 +115,16 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   const { dir } = freshRepo("mode-off");
   writeManifest(dir, manifestPush({ mode: "off" }));
   check("PG03 allow  push gate mode off", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
+}
+{
+  const { dir } = freshRepo("opt-in-ambiguous");
+  check("PG03b allow  structural policy remains opt-in without a manifest", "git add README.md && git push", dir, ALLOW, {
+    stderrEmpty: true,
+  });
+  writeManifest(dir, manifestPush({ mode: "off" }));
+  check("PG03c allow  structural policy remains off when push gate is off", "git add README.md && git push", dir, ALLOW, {
+    stderrEmpty: true,
+  });
 }
 
 // ---- PG04 blocking + missing verify evidence -> exit 2 ---------------------------------
@@ -235,8 +253,156 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   const { dir } = freshRepo("second-segment");
   writeManifest(dir, manifestPush({ approval: "standing-approved" }));
   check("PG15 block  push detected inside second segment (git add . && git push)", "git add . && git push", dir, BLOCK, {
+    stderrIncludes: ["standalone command"],
+  });
+}
+
+// ---- PG17 actual repository and explicit source OID bind every artifact ----------------
+{
+  const decoy = freshRepo("binding-decoy");
+  const target = freshRepo("binding-target");
+  writeManifest(decoy.dir, manifestPush({ approval: "standing-approved" }));
+  writeManifest(target.dir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(decoy.dir, "evidence/verify-latest.json", { exitCode: 0, commit: decoy.head });
+  check("PG17a block  git -C target never borrows green evidence from session repo", `git -C ${target.dir} push origin main`, decoy.dir, BLOCK, {
+    cwd: decoy.dir,
+    projectDir: decoy.dir,
+    stderrIncludes: ["evidence/verify-latest.json missing"],
+    stderrNotIncludes: [target.dir, decoy.dir],
+  });
+  writeEvidence(target.dir, "evidence/verify-latest.json", { exitCode: 0, commit: target.head });
+  writeEvidence(decoy.dir, "evidence/verify-latest.json", { exitCode: 1, commit: decoy.head });
+  check("PG17b allow  git -C target uses target evidence despite red session repo", `git -C ${target.dir} push origin main`, decoy.dir, ALLOW, {
+    cwd: decoy.dir,
+    projectDir: decoy.dir,
+    stderrEmpty: true,
+  });
+}
+{
+  const { dir, head: verifiedOid } = freshRepo("source-oid");
+  gitAt(dir, "branch", "verified", verifiedOid);
+  writeFileSync(join(dir, "later.txt"), "later\n");
+  gitAt(dir, "add", "later.txt");
+  gitAt(dir, "commit", "-q", "-m", "later");
+  const laterOid = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: verifiedOid });
+  check("PG17c allow  evidence binds explicit older source, not checkout HEAD", "git push origin verified", dir, ALLOW, { stderrEmpty: true });
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: laterOid });
+  check("PG17d block  checkout-HEAD evidence cannot authorize another source", "git push origin verified", dir, BLOCK, {
+    stderrIncludes: [verifiedOid, "pushed source commit"],
+  });
+  check("PG17e block  unresolvable source fails closed", "git push origin does-not-exist:refs/heads/x", dir, BLOCK, {
+    stderrIncludes: ["does not resolve"],
+  });
+}
+{
+  const { dir } = freshRepo("detection-privacy");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  check("PG17f block  quoted git executable is gated", '"git" push origin main', dir, BLOCK, {
     stderrIncludes: ["evidence/verify-latest.json missing"],
   });
+  check("PG17g block  git.exe cannot bypass detection", "git.exe push origin main", dir, BLOCK, {
+    stderrIncludes: ["not unambiguous"],
+  });
+  check("PG17h block  shell wrapper cannot bypass detection", 'bash -c "git push origin main"', dir, BLOCK, {
+    stderrIncludes: ["not unambiguous"],
+  });
+  check("PG17h2 block  cmd wrapper cannot bypass detection", 'cmd.exe /c "git push origin main"', dir, BLOCK, {
+    stderrIncludes: ["not unambiguous"],
+  });
+  check("PG17h3 block  ssh wrapper cannot bypass detection", 'ssh host "git push origin main"', dir, BLOCK, {
+    stderrIncludes: ["not unambiguous"],
+  });
+  check("PG17i diagnostics redact raw credential-shaped remote and absolute path", "git push https://token@example.invalid/repo main", dir, BLOCK, {
+    stderrNotIncludes: ["token@example.invalid", dir],
+  });
+  check("PG17i2 unsupported option diagnostics redact credential-shaped values", "git push --repo=https://secret@example.invalid/x origin main", dir, BLOCK, {
+    stderrNotIncludes: ["secret@example.invalid", dir],
+  });
+}
+{
+  const { dir } = freshRepo("strict-shapes");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  const blockedShapes = [
+    ["PG17j multiple refspecs", "git push origin main other"],
+    ["PG17k bulk all", "git push --all origin main"],
+    ["PG17l pipe", "git push origin main | tee result"],
+    ["PG17m redirect", "git push origin main >result"],
+    ["PG17n substitution", "git push origin $(git branch --show-current)"],
+    ["PG17o option operand", "git push --repo other origin main"],
+    ["PG17o2 git-dir override", "git --git-dir=/tmp/other.git push origin main"],
+    ["PG17o3 multiple git-C overrides", "git -C one -C two push origin main"],
+    ["PG17p incomplete quoting", "git push origin 'main"],
+    ["PG17r variable source expansion", "git push origin $BRANCH"],
+    ["PG17s double-quoted source expansion", 'git push origin "$BRANCH"'],
+  ];
+  for (const [id, command] of blockedShapes) {
+    check(`${id} is structurally blocked`, command, dir, BLOCK, { stderrIncludes: ["not unambiguous"] });
+  }
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: gitAt(dir, "rev-parse", "HEAD").stdout.trim() });
+  check("PG17q allow  safe set-upstream flag preserves one-source binding", "git push -u origin main", dir, ALLOW, {
+    stderrEmpty: true,
+  });
+}
+{
+  const decoy = freshRepo("ambiguous-cross-decoy");
+  const target = freshRepo("ambiguous-cross-target");
+  writeManifest(target.dir, manifestPush({ approval: "standing-approved" }));
+  check(
+    "PG17t block  bundled git -C push loads the target gate, not an ungated session repo",
+    `git -C ${target.dir} push origin main && echo done`,
+    decoy.dir,
+    BLOCK,
+    { cwd: decoy.dir, projectDir: decoy.dir, stderrIncludes: ["standalone command"], stderrNotIncludes: [target.dir, decoy.dir] },
+  );
+  check(
+    "PG17u block  unresolved variable git -C target fails closed",
+    'git -C "$TARGET_DIR" push origin main',
+    decoy.dir,
+    BLOCK,
+    { cwd: decoy.dir, projectDir: decoy.dir, stderrIncludes: ["dynamic cross-repository"], stderrNotIncludes: [decoy.dir] },
+  );
+  const literalDynamicDir = join(decoy.dir, "$TARGET_DIR");
+  mkdirSync(literalDynamicDir);
+  gitAt(literalDynamicDir, "init", "-q", "-b", "main");
+  check(
+    "PG17v block  literal dynamic-path decoy cannot hide the expanded gated target",
+    'git -C "$TARGET_DIR" push origin main',
+    decoy.dir,
+    BLOCK,
+    {
+      cwd: decoy.dir,
+      projectDir: decoy.dir,
+      env: { TARGET_DIR: target.dir },
+      stderrIncludes: ["dynamic cross-repository"],
+      stderrNotIncludes: [target.dir, decoy.dir],
+    },
+  );
+  check(
+    "PG17w block  inline environment assignment cannot hide dynamic cross-repo expansion",
+    `TARGET_DIR=${target.dir} git -C "$TARGET_DIR" push origin main`,
+    decoy.dir,
+    BLOCK,
+    {
+      cwd: decoy.dir,
+      projectDir: decoy.dir,
+      stderrIncludes: ["dynamic cross-repository"],
+      stderrNotIncludes: [target.dir, decoy.dir],
+    },
+  );
+  check(
+    "PG17x block  env wrapper options cannot hide dynamic cross-repo expansion",
+    `env -i TARGET_DIR=${target.dir} git -C "$TARGET_DIR" push origin main`,
+    decoy.dir,
+    BLOCK,
+    {
+      cwd: decoy.dir,
+      projectDir: decoy.dir,
+      stderrIncludes: ["dynamic cross-repository"],
+      stderrNotIncludes: [target.dir, decoy.dir],
+    },
+  );
 }
 
 // ---- PG16 quoted prose mentioning push -> NOT detected ---------------------------------
@@ -250,6 +416,9 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
     ALLOW,
     { stderrEmpty: true },
   );
+  check("PG16b allow  an unquoted commit-message token named push is not a push subcommand", "git commit -m push", dir, ALLOW, {
+    stderrEmpty: true,
+  });
 }
 
 // =============================================================================================
@@ -319,6 +488,7 @@ function deployApprovalState(forArtifact, forEnvironment) {
 }
 {
   const { dir } = freshRepo("deploy-bare-allow");
+  gitAt(dir, "tag", "v1.0.0");
   writeManifest(dir, releaseManifest());
   writeState(dir, deployApprovalState("v1.0.0", "prod"));
   check("PGD02 allow  bare-name deploy-trigger with a matching unconsumed deployApproval", "git push origin v1.0.0", dir, ALLOW, {
@@ -351,28 +521,28 @@ function deployApprovalState(forArtifact, forEnvironment) {
   );
 }
 
-// ---- PGD05/06 --tags: block (a tag-pattern trigger is declared) / allow (none declared) ---
+// ---- PGD05/06 bulk tag pushes are structurally ambiguous regardless trigger shape --------
 {
   const { dir } = freshRepo("deploy-tags-block");
   writeManifest(dir, releaseManifest());
-  check("PGD05 block  --tags counts as release-triggering whenever ANY tag-pattern trigger is declared", "git push origin --tags", dir, BLOCK, {
-    stderrIncludes: ["no unused deployApproval"],
+  check("PGD05 block  --tags cannot bind evidence to one source commit", "git push origin --tags", dir, BLOCK, {
+    stderrIncludes: ["cannot be bound to exactly one source commit"],
   });
 }
 {
   const { dir } = freshRepo("deploy-tags-allow");
   writeManifest(dir, releaseManifest({ triggerRefs: ["refs/heads/release-*"] })); // branch-pattern only, no tag pattern
-  check("PGD06 allow  --tags does NOT trigger when no tag-pattern trigger is declared", "git push origin --tags", dir, ALLOW, {
-    stderrEmpty: true,
+  check("PGD06 block  --tags remains ambiguous without a tag trigger", "git push origin --tags", dir, BLOCK, {
+    stderrIncludes: ["cannot be bound to exactly one source commit"],
   });
 }
 
-// ---- PGD07 --delete: NOT a deploy trigger, even for an otherwise-matching name -------------
+// ---- PGD07 deletion has no source commit and is therefore structurally blocked ------------
 {
   const { dir } = freshRepo("deploy-delete-allow");
   writeManifest(dir, releaseManifest());
-  check("PGD07 allow  --delete forms are excluded from deploy-trigger matching (protected-ref deletion stays guard-git territory)", "git push origin --delete v1.0.0", dir, ALLOW, {
-    stderrEmpty: true,
+  check("PGD07 block  --delete cannot bind evidence to a source commit", "git push origin --delete v1.0.0", dir, BLOCK, {
+    stderrIncludes: ["cannot be bound to exactly one source commit"],
   });
 }
 
@@ -385,7 +555,7 @@ function deployApprovalState(forArtifact, forEnvironment) {
     "git push origin v1.0.0 && git push origin v2.0.0",
     dir,
     BLOCK,
-    { stderrIncludes: ["exactly ONE git-push segment"] },
+    { stderrIncludes: ["standalone command"] },
   );
 }
 {
@@ -396,33 +566,34 @@ function deployApprovalState(forArtifact, forEnvironment) {
     "git push origin v1.0.0:",
     dir,
     BLOCK,
-    { stderrIncludes: ["cannot be evaluated deterministically"] },
+    { stderrIncludes: ["source-ambiguous"] },
   );
 }
 
-// ---- PGD10/11 bare push: tag-only trigger ALLOWED, branch-pattern trigger BLOCKED ----------
+// ---- PGD10/11 implicit bare pushes are structurally ambiguous -------------------------------
 {
   const { dir } = freshRepo("deploy-barepush-tagonly-allow");
   writeManifest(dir, releaseManifest()); // default trigger is a tag pattern only
-  check("PGD10 allow  a bare `git push` (no remote/refspec) never pushes tags -- allowed when triggers are tag-only", "git push", dir, ALLOW, {
-    stderrEmpty: true,
+  check("PGD10 block  bare git push cannot identify one source", "git push", dir, BLOCK, {
+    stderrIncludes: ["exactly one remote and one explicit source"],
   });
 }
 {
   const { dir } = freshRepo("deploy-barepush-branchpattern-block");
   writeManifest(dir, releaseManifest({ triggerRefs: ["refs/heads/release-*"] }));
   check(
-    "PGD11 block  a bare `git push` in a repo declaring a branch-pattern trigger -- conservative block",
+    "PGD11 block  bare git push remains ambiguous with a branch trigger",
     "git push",
     dir,
     BLOCK,
-    { stderrIncludes: ["without an explicit remote/ref"] },
+    { stderrIncludes: ["exactly one remote and one explicit source"] },
   );
 }
 
 // ---- PGD12: a deploy-trigger resolving to a NON-human-gated env never demands approval -----
 {
   const { dir } = freshRepo("deploy-nongated-allow");
+  gitAt(dir, "branch", "canary-1");
   writeManifest(dir, releaseManifest({ includeCanary: true }));
   check("PGD12 allow  deploy-trigger to a non-human-gated env (automated) never demands a deployApproval", "git push origin canary-1", dir, ALLOW, {
     stderrEmpty: true,
@@ -508,25 +679,23 @@ function deployApprovalState(forArtifact, forEnvironment) {
   );
 }
 
-// ---- PGD19/20: a leading `+` (force-push refspec syntax) is stripped before trigger-
-// classification AND artifact-matching, so a force-tag-push blocks exactly like its
-// non-force form -------------------------------------------------------------------------
+// ---- PGD19/20 force refspecs are rejected before evidence binding ----------------------
 {
   const { dir } = freshRepo("deploy-plus-bare-block");
   writeManifest(dir, releaseManifest());
-  check("PGD19 block  `+`-force bare-name deploy-trigger to human-gate env without a deployApproval -- `+` stripped for trigger-classification AND artifact identity", "git push origin +v1.0.0", dir, BLOCK, {
-    stderrIncludes: ["no unused deployApproval", "v1.0.0"],
+  check("PGD19 block  leading-plus force refspec is source-ambiguous", "git push origin +v1.0.0", dir, BLOCK, {
+    stderrIncludes: ["source-ambiguous"],
   });
 }
 {
   const { dir } = freshRepo("deploy-plus-fq-block");
   writeManifest(dir, releaseManifest());
   check(
-    "PGD20 block  `+`-force fully-qualified deploy-trigger (refs/tags/v1.0.0) to human-gate env without a deployApproval -- resolves identically to the non-force form",
+    "PGD20 block  fully-qualified leading-plus force refspec is source-ambiguous",
     "git push origin +refs/tags/v1.0.0",
     dir,
     BLOCK,
-    { stderrIncludes: ["no unused deployApproval", "v1.0.0"] },
+    { stderrIncludes: ["source-ambiguous"] },
   );
 }
 

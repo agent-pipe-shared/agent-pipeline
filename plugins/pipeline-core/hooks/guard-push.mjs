@@ -44,15 +44,16 @@
  *      collect ALL failures, and report them TOGETHER in one English stderr message —
  *      never fail on the first mismatch alone, so a single push attempt surfaces
  *      every reason at once instead of a frustrating fix-one-fail-next loop.
- *        (a) `evidence/verify-latest.json` exists, `exitCode === 0`, and `commit`
- *            equals the current `git rev-parse HEAD`.
+ *        (a) the push is one standalone, explicit repo/source operation;
+ *            `evidence/verify-latest.json` exists, `exitCode === 0`, and `commit`
+ *            equals the resolved commit OID of that exact source ref.
  *        (b) `evidence/security-latest.json` — SAME freshness checks as (a) — but
  *            ONLY evaluated when `gates.security` exists in the manifest AND its
  *            `mode !== "off"` (skipped entirely otherwise).
  *        (c) approval: `gates.push.approval === "standing-approved"` auto-passes
  *            (no state needed at all); `"required"` (or the field simply absent —
  *            treated as the safer default) requires
- *            `state.pushApproval.lastApproved.forCommit === HEAD` — a malformed
+ *            `state.pushApproval.lastApproved.forCommit === source OID` — a malformed
  *            `.claude/pipeline-state.json` at THIS point (only reached when the
  *            state file is actually needed) is its own WARN exit 1, same as (3).
  *   6. All checks pass -> exit 0 (allow).
@@ -82,7 +83,7 @@
  * VERIFY: node plugins/pipeline-core/hooks/guard-push.test.mjs
  */
 import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { isAbsolute, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { loadManifest, gateConfig, loadDeployPolicy } from "../lib/manifest.mjs";
@@ -106,10 +107,229 @@ if (!cmd) process.exit(0);
 // ---- push detection (shared normalization with guard-git.mjs) ----------------------
 const stripped = stripQuotedSegments(cmd);
 const normalized = normalizeGlobalGitOptions(stripped.toLowerCase());
-const isPush = /\bgit\s+push\b/.test(normalized);
+const detectionTokens = tokenizeArgv(cmd);
+const directExecutable = /^(?:git|git\.exe)$/i.test(detectionTokens[0] ?? "");
+const directPush =
+  directExecutable &&
+  (detectionTokens[1]?.toLowerCase() === "push" ||
+    (detectionTokens[1] === "-C" && detectionTokens[2] && detectionTokens[3]?.toLowerCase() === "push"));
+const shellWrapperPush = /^(?:(?:ba|z|da)?sh|pwsh|powershell|cmd|ssh)(?:\.exe)?$/i.test(detectionTokens[0] ?? "") &&
+  detectionTokens.some((token) => /\bgit(?:\.exe)?(?:\s+-C\s+\S+)?\s+push\b/i.test(token));
+const isPush = /\bgit\s+push\b/.test(normalized) || directPush || shellWrapperPush;
 if (!isPush) process.exit(0); // fast path: not a push at all
 
-const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+/**
+ * Bind one push invocation to one repository and one source commit.  This is
+ * intentionally a small accepted grammar: a guard cannot prove evidence freshness
+ * for a shell bundle, an implicit/default refspec, a bulk push, or repository
+ * overrides with different git-dir/work-tree semantics.
+ */
+function parsePushBinding(rawCmd) {
+  let singleQuoted = false;
+  let doubleQuoted = false;
+  let escaped = false;
+  for (const ch of rawCmd) {
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\" && !singleQuoted) {
+      escaped = true;
+      continue;
+    }
+    if (!singleQuoted && (ch === "$" || ch === "`" || "*?[]{}~".includes(ch))) {
+      return { ok: false, reason: "push command contains shell expansion or glob syntax" };
+    }
+    if (ch === "'" && !doubleQuoted) singleQuoted = !singleQuoted;
+    else if (ch === '"' && !singleQuoted) doubleQuoted = !doubleQuoted;
+  }
+  if (singleQuoted || doubleQuoted || escaped) return { ok: false, reason: "push command quoting is incomplete or ambiguous" };
+
+  const shellShape = stripQuotedSegments(rawCmd);
+  if (/&&|\|\||[;|\n\r`<>]|\$\(/.test(shellShape)) {
+    return { ok: false, reason: "push must be a standalone command (no shell bundle, pipe, redirection, or substitution)" };
+  }
+
+  const tokens = tokenizeArgv(rawCmd);
+  if (tokens[0]?.toLowerCase() !== "git") return { ok: false, reason: "push command prefix is ambiguous" };
+
+  let i = 1;
+  let gitC = null;
+  if (tokens[i] === "-C") {
+    gitC = tokens[i + 1];
+    if (!gitC) return { ok: false, reason: "git -C requires one repository path" };
+    i += 2;
+  }
+  if (tokens[i]?.toLowerCase() !== "push") {
+    return { ok: false, reason: "only git [-C <path>] push is accepted; other global repository overrides are ambiguous" };
+  }
+  i += 1;
+
+  const safeFlags = new Set(["--dry-run", "--porcelain", "--verbose", "-v", "--quiet", "-q", "--atomic", "--no-atomic", "--set-upstream", "-u"]);
+  const positionals = [];
+  for (; i < tokens.length; i++) {
+    const token = tokens[i];
+    if (safeFlags.has(token)) continue;
+    if (token.startsWith("-")) {
+      return { ok: false, reason: "push option cannot be bound to exactly one source commit" };
+    }
+    positionals.push(token);
+  }
+  if (positionals.length !== 2) {
+    return { ok: false, reason: "push must name exactly one remote and one explicit source refspec" };
+  }
+
+  const [remote, refspec] = positionals;
+  const colon = refspec.indexOf(":");
+  const source = colon === -1 ? refspec : refspec.slice(0, colon);
+  const destination = colon === -1 ? null : refspec.slice(colon + 1);
+  if (!remote || !source || (colon !== -1 && !destination) || source.startsWith("+")) {
+    return { ok: false, reason: "push refspec is deleting, forced, or otherwise source-ambiguous" };
+  }
+
+  const shellCwd = process.cwd();
+  const candidateDir = gitC ? (isAbsolute(gitC) ? gitC : resolve(shellCwd, gitC)) : shellCwd;
+  const rootResult = spawnSync("git", ["-C", candidateDir, "rev-parse", "--show-toplevel"], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  if (rootResult.status !== 0 || !rootResult.stdout?.trim()) {
+    return { ok: false, reason: "push repository cannot be resolved to a non-bare worktree" };
+  }
+  return { ok: true, projectDir: rootResult.stdout.trim(), source, remote, refspec };
+}
+
+function splitShellSegments(rawCmd) {
+  const segments = [];
+  let start = 0;
+  let single = false;
+  let double = false;
+  let escaped = false;
+  for (let i = 0; i < rawCmd.length; i++) {
+    const ch = rawCmd[i];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (ch === "\\" && !single) {
+      escaped = true;
+      continue;
+    }
+    if (ch === "'" && !double) {
+      single = !single;
+      continue;
+    }
+    if (ch === '"' && !single) {
+      double = !double;
+      continue;
+    }
+    if (single || double) continue;
+    const two = rawCmd.slice(i, i + 2);
+    if (two === "&&" || two === "||") {
+      segments.push(rawCmd.slice(start, i));
+      i += 1;
+      start = i + 1;
+    } else if (ch === ";" || ch === "|" || ch === "\n" || ch === "\r") {
+      segments.push(rawCmd.slice(start, i));
+      start = i + 1;
+    }
+  }
+  segments.push(rawCmd.slice(start));
+  return segments;
+}
+
+function gitInvocationIndex(tokens) {
+  return tokens.findIndex((token) => /^(?:git|git\.exe)$/i.test(token));
+}
+
+function resolveDeclaredPushProject(rawCmd, allowWrapper = true) {
+  for (const segment of splitShellSegments(rawCmd)) {
+    const tokens = tokenizeArgv(segment.trim());
+    const gitIndex = gitInvocationIndex(tokens);
+    if (gitIndex !== -1) {
+      let candidate = process.cwd();
+      let pushIndex = gitIndex + 1;
+      if (tokens[gitIndex + 1] === "-C" && tokens[gitIndex + 2]) {
+        candidate = isAbsolute(tokens[gitIndex + 2]) ? tokens[gitIndex + 2] : resolve(process.cwd(), tokens[gitIndex + 2]);
+        pushIndex = gitIndex + 3;
+      }
+      if (tokens[pushIndex]?.toLowerCase() === "push") {
+        const result = spawnSync("git", ["-C", candidate, "rev-parse", "--show-toplevel"], {
+          encoding: "utf8",
+          timeout: 5000,
+        });
+        if (result.status === 0 && result.stdout?.trim()) return result.stdout.trim();
+      }
+    }
+  }
+  if (allowWrapper && /^(?:(?:ba|z|da)?sh|pwsh|powershell|cmd)(?:\.exe)?$/i.test(detectionTokens[0] ?? "")) {
+    for (const token of detectionTokens.slice(1)) {
+      if (/\bgit(?:\.exe)?(?:\s+-C\s+\S+)?\s+push\b/i.test(token)) {
+        const nested = resolveDeclaredPushProject(token, false);
+        if (nested) return nested;
+      }
+    }
+  }
+  return null;
+}
+
+function declaresCrossRepositoryPush(rawCmd) {
+  for (const segment of splitShellSegments(rawCmd)) {
+    const tokens = tokenizeArgv(segment.trim());
+    const gitIndex = gitInvocationIndex(tokens);
+    if (gitIndex !== -1) {
+      const pushIndex = tokens.findIndex((token, index) => index > gitIndex && token.toLowerCase() === "push");
+      const globals = pushIndex === -1 ? [] : tokens.slice(gitIndex + 1, pushIndex);
+      if (
+        globals.some(
+          (token) =>
+            token === "-C" ||
+            token === "--bare" ||
+            token === "--git-dir" ||
+            token.startsWith("--git-dir=") ||
+            token === "--work-tree" ||
+            token.startsWith("--work-tree=") ||
+            token === "--namespace" ||
+            token.startsWith("--namespace="),
+        )
+      ) return true;
+    }
+  }
+  return detectionTokens.some(
+    (token) => /\bgit(?:\.exe)?\b.*(?:\s-C\s|--git-dir|--work-tree|--namespace|--bare).*\bpush\b/i.test(token),
+  );
+}
+
+function resolveSourceCommit(binding) {
+  const result = spawnSync("git", ["-C", binding.projectDir, "rev-parse", "--verify", "--end-of-options", `${binding.source}^{commit}`], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  if (result.status !== 0 || !/^[0-9a-f]{40,64}$/i.test(result.stdout?.trim() ?? "")) return null;
+  return result.stdout.trim();
+}
+
+const pushBinding = parsePushBinding(cmd);
+function fallbackProjectDir() {
+  const candidate = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  const result = spawnSync("git", ["-C", candidate, "rev-parse", "--show-toplevel"], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  return result.status === 0 && result.stdout?.trim() ? result.stdout.trim() : candidate;
+}
+const ambiguousDynamicCrossRepo =
+  !pushBinding.ok &&
+  pushBinding.reason === "push command contains shell expansion or glob syntax" &&
+  declaresCrossRepositoryPush(cmd);
+if (ambiguousDynamicCrossRepo) {
+  emit(2, ["BLOCKED (guard-push, plugin pipeline-core): push target is not unambiguous; dynamic cross-repository target cannot be bound safely."]);
+}
+const declaredProjectDir = pushBinding.ok ? pushBinding.projectDir : resolveDeclaredPushProject(cmd);
+if (!pushBinding.ok && !declaredProjectDir && declaresCrossRepositoryPush(cmd)) {
+  emit(2, ["BLOCKED (guard-push, plugin pipeline-core): push target is not unambiguous; cross-repository target cannot be resolved safely."]);
+}
+const projectDir = declaredProjectDir ?? fallbackProjectDir();
 
 // =====================================================================================
 // DEPLOY BRANCH helpers. Pure/defensive helpers first, `runDeployBranch` (the entry
@@ -324,7 +544,6 @@ function runDeployBranch(release, manifestResult, cmd) {
         `into exactly ONE git-push segment in a release-declaring repo (release section present) (zero or more ` +
         `than one occurrence) -- conservatively blocked (fail-toward-the-gate).`,
       `Please use exactly one \`git push\` per command invocation (no second push chained via &&/;/|).`,
-      `Command: ${cmd}`,
     ]);
   }
 
@@ -335,7 +554,6 @@ function runDeployBranch(release, manifestResult, cmd) {
       `BLOCKED (guard-push deploy branch, plugin pipeline-core): the refspec in the push command cannot be ` +
         `evaluated deterministically in a release-declaring repo -- conservatively blocked (fail-toward-the-gate). ` +
         `Please name the source/destination ref explicitly and unambiguously.`,
-      `Command: ${cmd}`,
     ]);
   }
 
@@ -351,7 +569,6 @@ function runDeployBranch(release, manifestResult, cmd) {
         `BLOCKED (guard-push deploy branch, plugin pipeline-core): \`git push\` without an explicit remote/ref in ` +
           `a repo with a branch-shaped deploy trigger -- conservatively blocked.`,
         `Please name the remote and ref explicitly (e.g. \`git push origin <ref>\`).`,
-        `Command: ${cmd}`,
       ]);
     }
     // else: tag-only trigger patterns (or none at all) -- a bare push never pushes tags, ALLOWED, not a trigger.
@@ -405,7 +622,6 @@ function runDeployBranch(release, manifestResult, cmd) {
           (e, i) => `  ${i + 1}. ${e.path ?? "(YAML)"}: expected ${e.expected}, got ${e.got}${e.reason ? ` (${e.reason})` : ""}`,
         ),
         `Fix: correct the manifest, or (in mandate mode) record a valid docs/risks.md deviation.`,
-        `Command: ${cmd}`,
       ]);
     }
     // Case B: NOT deploy-triggering -- fall through to the normal push-gate checks; the
@@ -430,7 +646,6 @@ function runDeployBranch(release, manifestResult, cmd) {
           `unreadable/invalid (${policyResult.detail}) -- deploy-triggering push fail-closed blocked, ` +
           `unconditional (no mode carve-out).`,
         `Fix: repair deploy-policy.yaml (path: governance.policies_path from the manifest).`,
-        `Command: ${cmd}`,
       ]);
     }
     // The deployApproval check -- evaluated EVEN under gates.push.approval ===
@@ -443,7 +658,6 @@ function runDeployBranch(release, manifestResult, cmd) {
           `BLOCKED (guard-push deploy branch, plugin pipeline-core): the push touches a deploy-triggering ref to ` +
             `a human-gated environment without a matching unused deployApproval (${failures.length} finding(s)):`,
           ...failures.map((f, i) => `  ${i + 1}. ${f}`),
-          `Command: ${cmd}`,
         ]);
       }
     }
@@ -459,23 +673,37 @@ if (manifestResult.status === "absent") process.exit(0); // opt-in feature, noth
 const releaseSection = manifestResult.manifest?.release;
 const hasRelease = Boolean(releaseSection) && typeof releaseSection === "object" && !Array.isArray(releaseSection);
 
-let invalidityNote = null;
-if (hasRelease) {
-  const outcome = runDeployBranch(releaseSection, manifestResult, cmd);
-  invalidityNote = outcome.invalidityNote;
-}
-
 if (manifestResult.status === "invalid" && !hasRelease) {
-  // Cases C/D: release absent, or manifest unparseable entirely -- byte-identical to the
-  // pre-deploy-branch behavior (zero behavior change for release-less/unparseable repos).
   const reason = manifestResult.errors?.[0]?.reason ?? manifestResult.errors?.[0]?.path ?? "invalid manifest";
   emit(1, [
     `[guard-push] WARN: .claude/pipeline.yaml is invalid (${reason}).`,
     `Push-Gate is being skipped (fail-open, never silently marked blocking/passing) -- please fix.`,
   ]);
 }
+
 const manifest = manifestResult.manifest;
 const pushGate = gateConfig(manifest, "push");
+const guardActive = hasRelease || (pushGate && pushGate.mode !== "off");
+if (!guardActive) process.exit(0);
+
+if (!pushBinding.ok) {
+  emit(2, [
+    "BLOCKED (guard-push, plugin pipeline-core): push target is not unambiguous.",
+    `Reason: ${pushBinding.reason}.`,
+  ]);
+}
+
+let invalidityNote = null;
+if (hasRelease) {
+  const outcome = runDeployBranch(releaseSection, manifestResult, cmd);
+  invalidityNote = outcome.invalidityNote;
+}
+
+const sourceCommit = resolveSourceCommit(pushBinding);
+if (!sourceCommit) {
+  emit(2, ["BLOCKED (guard-push, plugin pipeline-core): the explicit push source does not resolve to one commit."]);
+}
+
 if (!pushGate || pushGate.mode === "off") {
   // Fall-matrix case B with NO active push gate: still surface the semantic-invalidity
   // WARN instead of exiting silently (pre-existing behavior emitted WARN for any push on
@@ -484,14 +712,6 @@ if (!pushGate || pushGate.mode === "off") {
   if (invalidityNote) emit(1, [invalidityNote]);
   process.exit(0);
 }
-
-// ---- current HEAD (needed for both evidence-freshness and approval checks) --------
-function currentHead() {
-  const res = spawnSync("git", ["rev-parse", "HEAD"], { cwd: projectDir, encoding: "utf8" });
-  if (res.status !== 0 || !res.stdout) return null;
-  return res.stdout.trim();
-}
-const head = currentHead();
 
 /** Reads + JSON-parses an evidence file; returns {ok:true, data} | {ok:false, reason}. */
 function readEvidence(relPath) {
@@ -511,7 +731,7 @@ function readEvidence(relPath) {
   return { ok: true, data, relPath };
 }
 
-/** Runs the shared exitCode===0 + commit===HEAD freshness check; returns failure reasons (empty = pass). */
+/** Runs the shared exitCode===0 + commit===pushed-source check; returns failure reasons (empty = pass). */
 function checkEvidenceFreshness(relPath) {
   const failures = [];
   const read = readEvidence(relPath);
@@ -523,8 +743,8 @@ function checkEvidenceFreshness(relPath) {
   if (data?.exitCode !== 0) {
     failures.push(`${relPath}: exitCode=${JSON.stringify(data?.exitCode)} (expected 0)`);
   }
-  if (head !== null && data?.commit !== head) {
-    failures.push(`${relPath}: commit=${JSON.stringify(data?.commit)} is stale (current HEAD: ${head})`);
+  if (data?.commit !== sourceCommit) {
+    failures.push(`${relPath}: commit=${JSON.stringify(data?.commit)} is stale (pushed source commit: ${sourceCommit})`);
   }
   return failures;
 }
@@ -556,24 +776,24 @@ if (pushGate.approval === "standing-approved") {
     stateExists = false;
   }
   if (!stateExists) {
-    failures.push(`Push approval missing: ${statePath} does not exist (never recorded via approve-push).`);
+    failures.push(`Push approval missing: .claude/pipeline-state.json does not exist (never recorded via approve-push).`);
   } else {
     let state;
     try {
       state = JSON.parse(stateRaw);
     } catch (e) {
       emit(1, [
-        `[guard-push] WARN: ${statePath} contains invalid JSON (${e.message}).`,
+        `[guard-push] WARN: .claude/pipeline-state.json contains invalid JSON (${e.message}).`,
         `Push-Gate is being skipped (fail-open, never silently marked blocking/passing) -- please fix ` +
           `(rewrite only via harness/scripts/pipeline-state.mjs, never by hand).`,
       ]);
     }
     const forCommit = state?.pushApproval?.lastApproved?.forCommit;
-    if (!forCommit || forCommit !== head) {
+    if (!forCommit || forCommit !== sourceCommit) {
       failures.push(
         `Push approval missing or stale: state.pushApproval.lastApproved.forCommit=${JSON.stringify(
           forCommit ?? null,
-        )}, expected HEAD=${JSON.stringify(head)}. Record: node harness/scripts/pipeline-state.mjs approve-push --by <name>.`,
+        )}, expected pushed source commit=${JSON.stringify(sourceCommit)}. Record: node harness/scripts/pipeline-state.mjs approve-push --by <name>.`,
       );
     }
   }
@@ -587,7 +807,6 @@ const message = [
   // `.filter(Boolean)` drops it cleanly on every other path (`invalidityNote` stays null).
   `BLOCKED (guard-push, plugin pipeline-core): Push-Gate check failed (${failures.length} finding(s)):`,
   ...failures.map((f, i) => `  ${i + 1}. ${f}`),
-  `Command: ${cmd}`,
 ];
 
 if (pushGate.mode === "warn") emit(1, message);

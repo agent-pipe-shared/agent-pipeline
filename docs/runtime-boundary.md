@@ -46,12 +46,13 @@ plugin/skill system. Take that away and none of it fires.
 | Guard | Fires on | What it blocks |
 |---|---|---|
 | **`guard-git`** | `Bash` / `PowerShell` | Force-pushes, history rewrites, deletion of protected branches or tags, and skipped hooks — regardless of what any agent asks for. |
-| **`guard-push`** | `Bash` / `PowerShell` (after `guard-git`) | A `git push` when the verify/security evidence is missing, stale (recorded against a commit that is not `HEAD`), or red — or when the required human approval is absent. |
+| **`guard-push`** | `Bash` / `PowerShell` (after `guard-git`) | An active-gate `git push` unless it is one standalone, unambiguous repo/source operation whose verify/security evidence and approval bind the exact pushed source commit. |
 | **`guard-testpath`** | `Edit` / `Write` | Edits to the test files that gate an implementation, so an implementor cannot quietly weaken or delete its own checks. Config-driven; with no configured paths it does nothing. |
 | **`guard-devplan`** | `Edit` / `Write` (after `guard-testpath`) | Implementation edits while the active feature's plan is not yet approved. Docs, specs, `.claude/`, and backlog paths are exempt. |
 
-All four fail *open*: without a manifest or state file, they allow the
-action rather than block on missing config.
+The guards remain opt-in through project configuration. Once a push/release
+gate is active, repository/ref ambiguity fails closed; an absent state file is
+not allowed to masquerade as approval.
 
 ### Lifecycle hooks (`SessionStart`, `Stop`)
 
@@ -107,6 +108,11 @@ and work under any agent that can read a spec and run a command.
 - **Handover discipline.** One canonical handover file that wins on
   conflict, updated as state changes rather than reconstructed from chat
   history.
+- **Repository freshness helper.** `repository-freshness.mjs` is a portable,
+  read-only point-in-time check. It fetches remote refs into a disposable bare
+  repository, never the source checkout. Only `equal`/`ahead` permit protocol
+  writes; every uncertain or stale topology stops them. It is not an atomic
+  lock and does not cover user-terminal or non-Git-CLI mutations.
 
 ## Running on `other`: you become the enforcement layer
 
@@ -192,12 +198,13 @@ ein Plugin-/Skill-System bereitstellt. Nimmt man das weg, feuert nichts davon.
 | Guard | Feuert bei | Was er blockiert |
 |---|---|---|
 | **`guard-git`** | `Bash` / `PowerShell` | Force-Pushes, History-Rewrites, das Löschen geschützter Branches oder Tags und übersprungene Hooks — egal, worum ein Agent bittet. |
-| **`guard-push`** | `Bash` / `PowerShell` (nach `guard-git`) | Einen `git push`, wenn der Verify-/Security-Nachweis fehlt, veraltet ist (für einen Commit erfasst, der nicht `HEAD` ist) oder rot ist — oder wenn die nötige menschliche Freigabe fehlt. |
+| **`guard-push`** | `Bash` / `PowerShell` (nach `guard-git`) | Einen Push bei aktivem Gate, sofern er nicht genau eine eigenständige, eindeutige Repo-/Source-Operation ist, deren Verify-/Security-Nachweis und Freigabe exakt an den gepushten Source-Commit gebunden sind. |
 | **`guard-testpath`** | `Edit` / `Write` | Änderungen an den Testdateien, die eine Implementierung absichern, damit ein Implementierer seine eigenen Prüfungen nicht klammheimlich aufweicht oder löscht. Konfigurationsgesteuert; ohne konfigurierte Pfade tut er nichts. |
 | **`guard-devplan`** | `Edit` / `Write` (nach `guard-testpath`) | Implementierungs-Edits, solange der Plan des aktiven Features noch nicht freigegeben ist. Docs, Specs, `.claude/` und Backlog-Pfade sind ausgenommen. |
 
-Alle vier lassen im Zweifel durch (fail-open): Ohne Manifest oder State-Datei
-erlauben sie die Aktion, statt bei fehlender Config zu blockieren.
+Die Guards bleiben über die Projektkonfiguration opt-in. Sobald ein Push-/Release-
+Gate aktiv ist, blockieren Repo-/Ref-Mehrdeutigkeit und eine fehlende Freigabe;
+fehlender State darf nicht als Freigabe erscheinen.
 
 ### Lifecycle-Hooks (`SessionStart`, `Stop`)
 
@@ -260,6 +267,12 @@ Agenten, der eine Spec lesen und einen Befehl ausführen kann.
 - **Handover-Disziplin.** Eine kanonische Handover-Datei, die im Konfliktfall
   gewinnt und bei Zustandsänderungen fortgeschrieben wird, statt aus dem
   Chat-Verlauf rekonstruiert zu werden.
+- **Repository-Freshness-Helper.** `repository-freshness.mjs` ist ein
+  portabler, read-only Zeitpunkt-Check. Remote-Refs landen in einem
+  wegwerfbaren Bare-Repository, nie im Quell-Checkout. Nur `equal`/`ahead`
+  erlauben protokollgebundenes Schreiben; unklare oder stale Topologien stoppen
+  es. Das ist kein atomarer Lock und deckt weder User-Terminal- noch andere
+  Nicht-Git-CLI-Mutationen ab.
 
 ## Betrieb auf `other`: Du wirst selbst zur Durchsetzungsschicht
 
