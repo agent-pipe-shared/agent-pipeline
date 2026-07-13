@@ -25,7 +25,7 @@ Every item carries exactly one type in the frontmatter field `type`:
 
 - One item = one file under `backlog/items/`, naming scheme `YYYY-MM-DD-short-german-slug.md` (date = `created`, not a due date).
 - Structure and mandatory frontmatter: [`backlog/items/TEMPLATE.md`](items/TEMPLATE.md) — required fields `type` / `status` / `created` / `source`; optional fields (e.g. `due` for scheduled follow-ups) are marked as such in the template.
-- Items are **never deleted**, only progressed in status (append-only, like HISTORY files, cf. [`docs/operating-model.md` §6](../docs/operating-model.md#6-staffelstab--handover-e10-auflage-a9)) — rejected or completed items stay in place with their rationale.
+- Items are **never deleted**, only progressed in status (append-only, like HISTORY files, cf. [`docs/operating-model.md` §6](../docs/operating-model.md#6-baton-pass--handover)) — rejected or completed items stay in place with their rationale.
 
 ### Status lifecycle
 
@@ -98,7 +98,7 @@ Jedes Item trägt genau einen Typ im Frontmatter-Feld `type`:
 
 - Ein Item = eine Datei unter `backlog/items/`, Namensschema `YYYY-MM-DD-kurzer-deutscher-slug.md` (Datum = `created`, nicht Fälligkeitsdatum).
 - Struktur und Pflicht-Frontmatter: [`backlog/items/TEMPLATE.md`](items/TEMPLATE.md) — Pflichtfelder `type` / `status` / `created` / `source`; optionale Felder (z. B. `due` für terminierte Wiedervorlagen) sind im Template als solche markiert.
-- Items werden **nie gelöscht**, nur im Status fortgeschrieben (Append-Charakter wie bei HISTORY-Dateien, vgl. [`docs/operating-model.md` §6](../docs/operating-model.md#6-staffelstab--handover-e10-auflage-a9)) — abgelehnte oder erledigte Items bleiben mit Begründung liegen.
+- Items werden **nie gelöscht**, nur im Status fortgeschrieben (Append-Charakter wie bei HISTORY-Dateien, vgl. [`docs/operating-model.md` §6](../docs/operating-model.md#6-staffelstab--handover)) — abgelehnte oder erledigte Items bleiben mit Begründung liegen.
 
 ### Status-Lebenszyklus
 

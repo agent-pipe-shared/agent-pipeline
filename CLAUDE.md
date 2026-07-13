@@ -37,7 +37,7 @@ Central, versioned Operating Model for agentic development across the PO's proje
 
 ## Environment note
 
-If `git` is unexpectedly missing from a session's PATH, treat it as a stale shell environment, not a missing install — the verified install location and version live in `docs/state.md` (machine-specific; do not hardcode a path here).
+If `git` is unexpectedly missing from a session's `PATH`, treat it as a stale shell environment, not a missing install. Probe availability and version locally with `command -v git` and `git --version`; never persist machine-specific installation paths or versions in this repository.
 
 ---
 *Kept intentionally short (context economy, operating-model §5.2/P5): nothing explained elsewhere is repeated here — follow the pointers instead.*
