@@ -1,79 +1,47 @@
-# ADR-0023: Elephant Context Diet & Latency Measure Bundle
+# ADR-0023: Orchestrator Context Diet and Latency Measure Bundle
 
-> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+## Status
 
-> Agent-Pipeline v0.1.0-draft · Sprint 1 · as of 2026-07-06
-
-**Status:** accepted (2026-07-05 evening, Wave 2, PO-PRD approvals) · **Basis:** Register E23
+Accepted on 2026-07-05. Revised for provider-neutral Phase 2 architecture on 2026-07-13.
 
 ## Context
 
-Multiple sessions showed a high Elephant (main agent) context share (78–89%). Wave 2 bundled a comprehensive set of context- and latency-reduction measures; a Fable critic reviewed it (first pass FAIL with 6 findings → dispositioned, second pass PASS).
+Measured work showed that orchestrator context and coordination latency could dominate a feature even when implementation was delegated. The response was a coordinated measure bundle, not a claim that any one token or cost figure is universally valid.
 
-## Decision (E23)
+## Historical Decision
 
-Elephant Context Diet & Latency (Wave 2, PO-PRD approvals 2026-07-05 evening; commits `886db4f`/`166e60a`/`fc725c6`/`c2e45b3`/`9d4734d`) adopts ten concrete measures:
+The 2026-07-05 decision adopted the bundle below and required first-pass quality to remain stable. Its original provider, run, and pricing evidence remains dated programme evidence rather than product policy.
 
-- Report cap ≤1,000 tokens / 40 lines (GF-09)
-- Single-turn recon + parallel-first scheduling (EL-05/EL-22: independent work in the SAME turn, sequential only with a named dependency)
-- Phase-cut cost trigger ~10 dispatches / ~2h / ≥50% in addition to fill-level (operating-model §5.2)
-- Selective reading EL-20 (full text only on anomaly)
-- commit-first-then-report as default ordering
-- Dispatch ledger EL-21
-- Communication economy EL-23 (chat only: finding/gate/incident/result)
-- Readiness scoping (mandatory only for canon/guardrail/core-contract/class-high/rigor-2)
-- goldfish-implementor `effort: xhigh`
-- SessionStart staleness hook (detect+prompt, fail-open; `autoUpdate` key removed again after Critic finding F1 → verification item)
-- PRD template enforcement (E21 addendum)
+## Phase 2 Revision (2026-07-13)
 
-Measurement target for the next feature session: Elephant share ≤50% (baseline S39/S40/tuning/S42: 78–89%), feature session <$30, wall-clock time −30%, unchanged first-pass quality; a regression triggers a dated rollback revision. Critic: first pass FAIL (6 findings) → dispositioned, second pass PASS. ADR formalization: Phase 2.
+The operative bundle is:
+
+- **Bounded reports:** a Goldfish report is capped at 1,000 tokens or 40 lines unless a named anomaly requires more evidence.
+- **Parallel first:** independent reconnaissance and analysis run in the same turn where the host permits it. Sequential work requires a named dependency.
+- **Phase cuts:** approximately ten dispatches, two hours, or 50% additional context growth triggers a deliberate phase-cut check alongside the normal fill-level check.
+- **Selective reads:** use indexes and focused excerpts for normal work; read full source text when the task requires it or an anomaly makes the narrower view insufficient.
+- **Evidence order:** persist or commit the intended content durably first; then verify that exact persisted content and bind the evidence to its content hash or commit; only then report. No report may precede durable persistence.
+- **Dispatch ledger:** record each dispatch, its bounded purpose, state, evidence, and disposition.
+- **Communication economy:** chat carries findings, gates or decisions needing attention, incidents or stops, and block results. Dispatch announcements and intermediate ceremony are omitted.
+- **Readiness scope:** mandatory readiness review is reserved for canon, guardrails, core contracts, high-risk work, and the configured highest-rigor class.
+- **Configured implementor effort:** the executor effort comes from the active runner projection, not from kernel prose.
+- **Staleness notice:** startup may detect and prompt on stale runtime material. Detection is advisory and fail-open unless a separate gate explicitly makes freshness blocking.
+- **Template enforcement:** planning templates encode the required scope, evidence, and dispatch fields instead of relying on memory.
+
+Concrete model and effort labels are runner concerns. Existing Claude assignments remain unchanged in the Claude projection. Codex resolves every Fable assignment to `gpt-5.6-sol` at the same assigned effort tier and must not invent or silently substitute a tier.
 
 ## Consequences
 
-**Positive:** Bundles ten concrete levers against the documented dominant cost factor (Elephant context share); the measurement target is explicit and time-boxed (next feature session).
+The bundle reduces repeated context loading, serialized waiting, premature narration, and evidence loss. It also spreads maintenance across several contracts and therefore needs template and ledger checks.
 
-**Negative:** High rule density in a single decision (ten individual measures) — maintenance effort is spread across many canon locations.
+Aggressive report or reading reductions can harm first-pass quality. Context, latency, first-pass completion, and attributable rework must be measured against a dated local baseline.
 
-**Risk:** A first-pass quality regression from overly aggressive cuts (report cap, selective reading) could initially go unnoticed. Mitigation: explicit measurement mandate with a rollback trigger on attributable regression.
+## Rejected Alternatives
 
-## Rejected alternatives
-
-- **Status quo (high Elephant context share unchanged)** — rejected as untenable given the S39/S40/tuning/S42 data (78–89%).
-- **Introducing individual measures in isolation rather than bundled** — the critic review ran bundled (first pass FAIL → dispositioned, second pass PASS); the bundle was kept rather than split.
+- Treat one historical cost or context percentage as universal: runner and workload economics change.
+- Apply only one measure: the bottleneck spans scheduling, reading, reporting, and evidence handling.
+- Optimize output volume without a quality gate: lower token use is not success when rework rises.
 
 ## Follow-up
 
-Measurement-target check at the next feature session (Elephant share ≤50%, feature session <$30, wall-clock time −30%, unchanged first-pass quality); attributable regression → dated rollback revision.
-
-<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
-
-# ADR-0023: Elephant-Kontext-Diät & Latenz-Maßnahmenbündel
-
-> Agent-Pipeline v0.1.0-draft · Sprint 1 · Stand 2026-07-06
-
-**Status:** akzeptiert (2026-07-05 abends, Welle 2, the PO-PRD-Freigaben) · **Grundlage:** Register E23
-
-## Kontext
-
-Mehrere Sessions zeigten einen hohen Elephant-Kontextanteil (78–89 %). Welle 2 bündelte ein umfassendes Maßnahmenpaket zur Kontext- und Latenzreduktion; ein Fable-Critic prüfte es (Erstlauf FAIL mit 6 Befunden → disponiert, Zweitlauf PASS).
-
-## Entscheidung (E23, wortgetreu)
-
-> Elephant-Kontext-Diät & Latenz (Welle 2, the PO-PRD-Freigaben 2026-07-05 abends; Commits `886db4f`/`166e60a`/`fc725c6`/`c2e45b3`/`9d4734d`): Report-Cap ≤1.000 Tok/40 Zeilen (GF-09) · Ein-Turn-Recon + Parallel-first-Scheduling (EL-05/EL-22: Unabhängiges im SELBEN Turn, sequenziell nur mit benannter Abhängigkeit) · Phasen-Schnitt-Kostentrigger ~10 Dispatches/~2 h/≥50 % zusätzlich zum Füllstand (OM §5.2) · Selektiv-Lesen EL-20 (Volltext nur bei Anomalie) · commit-first-then-report Standard · Dispatch-Ledger EL-21 · Kommunikations-Ökonomie EL-23 (Chat nur: Befund/Gate/Inzident/Ergebnis) · Readiness-Scoping (Pflicht nur Kanon/Guardrail/Kernvertrag/Klasse hoch/Rigor 2) · goldfish-implementor `effort: xhigh` · SessionStart-Staleness-Hook (detect+prompt, fail-open; `autoUpdate`-Key nach Critic-F1 wieder entfernt → Verifikations-Item) · PRD-Vorlage-Enforcement (E21-Nachtrag). Messziel nächste Feature-Session: Elephant-Anteil ≤50 % (S39/S40/Tuning/S42: 78–89 %), Feature-Session <$30, Wall −30 %, First-Pass unverändert; Verschlechterung → datierte Rück-Revision. Critic: Erstlauf FAIL (6 Befunde) → disponiert, Zweitlauf PASS. ADR-Formalisierung Phase 2
-
-## Konsequenzen
-
-**Positiv:** Bündelt zehn konkrete Hebel gegen den dokumentiert dominierenden Kostenfaktor (Elephant-Kontextanteil); das Messziel ist explizit und terminiert (nächste Feature-Session).
-
-**Negativ:** Hohe Regel-Dichte in einer einzigen Entscheidung (zehn Einzelmaßnahmen) — Pflegeaufwand verteilt sich über viele Kanon-Stellen.
-
-**Risiko:** Verschlechterung des First-Pass durch zu aggressive Kürzung (Report-Cap, Selektiv-Lesen) bliebe zunächst unbemerkt. Mitigation: expliziter Messauftrag mit Rück-Revisions-Trigger bei zurechenbarer Verschlechterung.
-
-## Verworfene Alternativen
-
-- **Status quo (hoher Elephant-Kontextanteil unverändert)** — durch die S39/S40/Tuning/S42-Datenlage (78–89 %) als nicht tragbar verworfen.
-- **Einzelmaßnahmen isoliert statt gebündelt einführen** — der Critic-Review lief gebündelt (Erstlauf FAIL → disponiert, Zweitlauf PASS); das Bündel wurde beibehalten statt aufgeteilt.
-
-## Wiedervorlage
-
-Messziel-Prüfung an der nächsten Feature-Session (Elephant-Anteil ≤50 %, Feature-Session <$30, Wall −30 %, First-Pass unverändert); zurechenbare Verschlechterung → datierte Rück-Revision.
+An attributable first-pass regression or increase in rework triggers a dated reversal decision at the PO gate. The regressing default must not be retained silently.
