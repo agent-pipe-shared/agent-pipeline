@@ -1,109 +1,48 @@
 # ADR-0014: Critic Contract
 
-> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+## Status
 
-**Status:** accepted (2026-07-03, Checkpoint 1) · **revised with a CLAUDE.md-autoload disclosure duty + snapshot ban (the PO, 2026-07-04 — see "Revision" section)** · **Basis:** Register E12 + Condition A10
+Accepted on 2026-07-03; revised on 2026-07-04 to require injected-context disclosure and independent freshness checks.
 
 ## Context
 
-Fresh reviewer context is officially justified on three grounds (self-confirmation, contamination, anchoring); **overreporting** is the documented failure mode: "A reviewer prompted to find gaps will usually report some, even when the work is sound." The Google essence adds a trajectory check — were the claimed checks actually run? The existing setup had Critic substance without institution. Critic finding L2-04 → Condition A10 (rubric naming).
+Independent review reduces self-confirmation and anchoring, but asking a reviewer to find gaps can also cause overreporting. Some runner surfaces inject project instructions, memory, or a repository-status snapshot into a new agent. A standard-tier critic on such a surface is useful but is not honestly a pristine context.
 
-## Decision (E12, verbatim)
+## Decision
 
-> Critic contract: mandatory triggers by risk level; never chat history as input; findings list with evidence + "deliberately not flagged" rubric + trajectory check; anti-overreporting
+The Critic is an independent, read-only role. It must not edit the reviewed work.
 
-Refinements:
+Its bounded input is the specification, the exact diff or commit range, applicable guardrails, and the evidence artifacts. The dispatch must not include chat history, implementor reasoning, or arguments intended to persuade the review.
 
-- **Input strict:** spec + diff + guardrails (+ evidence artifacts). Never chat history, never the implementor's own reasoning. Isolation levels → ADR-0003.
-- **Output:** structured findings list (gap/risk + evidence with `file:line` + spec reference); no score; pass/fail only where an overall verdict is required.
-- **Rubric (Condition A10):** the read-only Critic uses "**deliberately not flagged**" (it changes nothing); "deliberately NOT changed" stays the rubric for writing roles (Goldfish report).
-- **Anti-overreporting clause** + skip rule: never flag what CI/deterministic gates already enforce.
-- **Mandatory triggers by risk level** (called "Risikoklasse" in operating-model.md §4.2, where the high/medium/low classes are defined). Canonical trigger wording (verbatim with operating-model.md §4.2/§3.3 and ADR-0003): every architecture/guardrail/security diff runs with Critic Fable 5 / `max` AND additionally in `--bare` isolation. Rigor level 2 makes the Critic mandatory (default: Sonnet 5 / `max`); Fable 5 / `max` applies there only if the risk class is additionally high OR an architecture/guardrail/security diff is present. — Isolation level → ADR-0003, models → ADR-0006.
-- **Evidence addendum (project S39, 2026-07-05):** a Critic at the standard isolation level (model there: Fable 5 via riskZone trigger; whether Sonnet would have found the same findings is the open A/B question, see retro item) caught, on a riskZone diff (project, `packages/**` constraint), 2 BLOCKERs of class "interaction NEW↔EXISTING" — a new feature made a deliberately non-abortable action voice-/Google-abortable, and an untouched existing automation deterministically bypassed a new guard gate — that the implementor's view alone plausibly did not see. This empirically substantiates the mandatory-trigger lines above.
+The Critic must:
+
+1. disclose all context known to have been injected by the runner, including project instructions, user memory, repository snapshots, and inherited framing;
+2. state the isolation level actually achieved and never describe a standard-tier review as fresh or bare when inherited context remains;
+3. derive the review range from the dispatch and inspect the live repository state independently with current commands;
+4. never use an injected or inherited status snapshot as freshness evidence;
+5. verify that claimed checks were actually run and that their evidence binds to the reviewed content;
+6. report each finding with severity, `file:line` evidence, and its specification or guardrail basis;
+7. provide an overall pass/fail only when the caller requests one, and never substitute a numerical score for findings.
+
+The report includes a **Deliberately not flagged** section for plausible concerns rejected due to insufficient evidence, irrelevance, or deterministic enforcement elsewhere. The Critic does not repeat findings already enforced by a deterministic gate unless the gate itself is missing, stale, or not bound to the reviewed content.
+
+Risk policy selects staffing and isolation. High-risk architecture, guardrail, and security changes require the configured highest review capability and the strongest available isolation. When a runner cannot provide that isolation, the report records the contamination limit and the coordinator either adds an independent review path or stops at the applicable gate.
+
+Model names and spawn mechanics belong to runner mappings. The kernel contract is provider-neutral; any runner-specific mapping must preserve the required capability and independence.
 
 ## Consequences
 
-**Positive:** independence becomes an institution rather than a raw form; findings are evidence-based and verifiable; the trajectory check closes the gap of "gates claimed instead of executed."
+Findings are reproducible and tied to the actual diff. Disclosure makes unavoidable context contamination visible instead of pretending it does not exist. The trajectory check prevents claimed-but-unexecuted verification from passing as evidence.
 
-**Negative:** cost per review (models per ADR-0006); upkeep of the trigger table per risk level.
+Read-only review adds cost and cannot eliminate all anchoring on standard runner surfaces. Stronger isolation or a second independent path remains necessary where the risk policy requires it.
 
-**Risk:** anti-overreporting can tip into under-reporting — the "deliberately not flagged" rubric makes omissions explicit and thus checkable.
+## Rejected Alternatives
 
-## Rejected alternatives
-
-- **Score-based judging** — documented bias catalog (position, verbosity, self-preference); Anthropic's own practice: a single call against a fixed rubric was more consistent than multiple judges.
-- **Critic with chat history** — contamination; exactly the bias fresh context is officially meant to avoid.
-- **CI only, no Critic** — CI checks what's machine-checkable; spec fidelity, scope, and edge cases need judgment.
-
-## Revision (the PO, 2026-07-04): CLAUDE.md autoload — documented acceptance + disclosure duty + snapshot ban
-
-Monitoring of the project migration (2026-07-04) revealed that every subagent (Goldfish/Critic) automatically gets the project's full CLAUDE.md plus a git-status snapshot injected at spawn — officially confirmed and with no opt-out parameter (`code.claude.com/docs/en/sub-agents.md`: "Explore and Plan are the only subagents that omit CLAUDE.md and git status. There is no frontmatter field or per-agent setting to change which agents skip them."). A factual measurement (AP-P4-PROBE-1) additionally showed that the injected git status is a **snapshot from the start of the Elephant parent session**, not the state at the subagent's spawn.
-
-The PO accepts the Elephant recommendation (2026-07-04, AP sprint): **autoload stays as is** — CLAUDE.md is the yardstick the Critic reviews against; the E12-critical contamination (Elephant framing/reasoning) is prevented by subagent isolation regardless. With two conditions:
-
-1. **Disclosure duty:** the Critic explicitly names the context injected at spawn (CLAUDE.md, user memory, git-status snapshot, etc.) in the report.
-2. **Ban on using the snapshot as a freshness reference:** the injected git status (parent-session-start state) may NEVER serve as a freshness reference — the diff range/commit list comes exclusively from the briefing; the Critic establishes the actual repo state itself via `git` commands.
-
-Both conditions apply equally to the Critic contract and the dispatch template (`templates/prompts/critic-review.md`). This revision replaces no part of the ADR body above (never-rewrite convention, `docs/adr/README.md`); it supplements it.
-
-**Cross-reference (E24, Wave 2):** Critic tiering (mechanics auto-pass, Sonnet cascade for medium class, ONE bundled Critic per wave) revises the E12 mandatory-trigger staffing — own ADR, not repeated here: ADR-0024, Register E24.
+- Critic with the implementation conversation: it imports framing and self-justification.
+- Injected status snapshot as repository truth: it may predate the review.
+- CI alone: deterministic checks cannot judge specification fidelity or subtle interactions.
+- Score-only judging: it hides evidence and encourages false precision.
 
 ## Follow-up
 
-None. Critic as a callable building block (prompt + schema): Phase 3.
-
-<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
-
-# ADR-0014: Critic-Kontrakt
-
-> Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
-
-**Status:** akzeptiert (2026-07-03, Checkpoint 1) · **revidiert um CLAUDE.md-Autoload-Disclosure-Pflicht + Snapshot-Verbot (the PO, 2026-07-04 — s. Abschnitt „Revision")** · **Grundlage:** Register E12 + Auflage A10
-
-## Kontext
-
-Frischer Reviewer-Kontext ist offiziell dreifach begründet (Selbstbestätigung, Kontamination, Anchoring); **Overreporting** ist der dokumentierte Failure-Mode: „A reviewer prompted to find gaps will usually report some, even when the work is sound". Die Google-Essenz ergänzt die Trajektorien-Prüfung — wurden die behaupteten Checks wirklich ausgeführt? Der Bestand hat Critic-Substanz ohne Institution. Critic-Befund L2-04 → Auflage A10 (Rubrik-Benennung).
-
-## Entscheidung (E12, wortgetreu)
-
-> Critic-Kontrakt: Pflicht-Trigger nach Risikostufe; nie Chat-Verlauf als Input; Befundliste mit Evidenz + „Bewusst nicht beanstandet"-Rubrik + Trajektorien-Prüfung; Anti-Overreporting
-
-Präzisierung:
-
-- **Input strikt:** Spec + Diff + Guardrails (+ Evidenz-Artefakte). Nie Chat-Verlauf, nie Implementor-Begründungen. Isolationsstufen → [ADR-0003](0003-role-implementation-subagents.md).
-- **Output:** strukturierte Befundliste (Gap/Risiko + Evidenz mit `file:line` + Spec-Bezug); kein Score; Pass/Fail nur, wo ein Gesamturteil nötig ist.
-- **Rubrik (Auflage A10):** Der read-only-Critic führt „**Bewusst nicht beanstandet**" (er ändert nichts); „Bewusst NICHT geändert" bleibt die Rubrik schreibender Rollen (Goldfish-Bericht).
-- **Anti-Overreporting-Klausel** + Skip-Regel: nichts flaggen, was CI/deterministische Gates bereits erzwingen.
-- **Pflicht-Trigger nach Risikostufe** („Risikostufe" heißt im operating-model.md §4.2 „Risikoklasse"; die Klassen hoch/mittel/niedrig sind dort definiert). Kanonischer Trigger-Wortlaut (wortgleich mit operating-model.md §4.2/§3.3 und [ADR-0003](0003-role-implementation-subagents.md)): „Jeder Architektur-/Guardrail-/Security-Diff läuft mit Critic Fable 5 / `max` UND zusätzlich in `--bare`-Isolation. Rigor-Stufe 2 macht den Critic zur Pflicht (Standard: Sonnet 5 / `max`); Fable 5 / `max` gilt dort nur, wenn zusätzlich die Risikoklasse hoch ist ODER ein Architektur-/Guardrail-/Security-Diff vorliegt." — Isolationsstufe → ADR-0003, Modelle → [ADR-0006](0006-model-effort-policy.md).
-- **Evidenz-Nachtrag (<PROJECT_B> S39, 2026-07-05):** Ein Critic der Standard-Isolationsstufe (Modell dort: Fable 5 per riskZone-Trigger; ob Sonnet dieselben Befunde gefunden hätte, ist die offene A/B-Frage, s. Retro-Item) fing auf einem riskZone-Diff (<PROJECT_B>, Projekt-Constraint `packages/**`) 2 BLOCKER der Klasse „Interaktion NEU↔BESTAND" — eine neue Funktion machte eine geplant nicht-abbrechbare Aktion sprach-/Google-abbrechbar, und eine unangetastete Bestandsautomation umging deterministisch ein neues Wach-Gate —, die der Implementor-Blick allein plausibel nicht sah. Belegt empirisch die Pflicht-Trigger-Zeilen oben.
-
-## Konsequenzen
-
-**Positiv:** Unabhängigkeit wird Institution statt Rohform; Befunde sind evidenzbasiert nachprüfbar; die Trajektorien-Prüfung schließt die Lücke „Gates behauptet statt ausgeführt".
-
-**Negativ:** Kosten pro Review (Modelle gemäß ADR-0006); Pflege der Trigger-Tabelle je Risikostufe.
-
-**Risiko:** Anti-Overreporting kann in Under-Reporting kippen — die Rubrik „Bewusst nicht beanstandet" macht Auslassungen explizit und damit prüfbar.
-
-## Verworfene Alternativen
-
-- **Score-basiertes Judging** — belegter Bias-Katalog (Position, Verbosity, Self-Preference); Anthropics eigene Praxis: ein Call gegen eine feste Rubrik war konsistenter als mehrere Judges.
-- **Critic mit Chat-Verlauf** — Kontamination; exakt der Bias, den frischer Kontext offiziell vermeiden soll.
-- **Nur CI statt Critic** — CI prüft Maschinencheckbares; Spec-Treue, Scope und Edge Cases brauchen Judgment.
-
-## Revision (the PO, 2026-07-04): CLAUDE.md-Autoload — dokumentierte Akzeptanz + Disclosure-Pflicht + Snapshot-Verbot
-
-Monitoring der <PROJECT_B>-Migration (2026-07-04) deckte auf, dass jeder Subagent (Goldfish/Critic) beim Spawn automatisch die volle CLAUDE.md des Projekts sowie einen Git-Status-Snapshot injiziert bekommt — offiziell bestätigt und ohne Abschalt-Parameter ([`code.claude.com/docs/en/sub-agents.md`](https://code.claude.com/docs/en/sub-agents.md): „Explore and Plan are the only subagents that omit CLAUDE.md and git status. There is no frontmatter field or per-agent setting to change which agents skip them."). Eine Ist-Vermessung (AP-P4-PROBE-1) belegte zusätzlich, dass der injizierte Git-Status ein **Snapshot vom Start der Elephant-Parent-Session** ist, nicht der Stand beim Spawn des Subagents.
-
-the PO akzeptiert die Elephant-Empfehlung (2026-07-04, AP-Sprint): **Autoload bleibt, wie er ist** — CLAUDE.md ist der Prüfmaßstab, gegen den der Critic prüft; die E12-kritische Kontamination (Elephant-Framing/Begründungen) verhindert die Subagent-Isolation ohnehin. Mit zwei Auflagen:
-
-1. **Disclosure-Pflicht:** Der Critic benennt den bei Spawn injizierten Kontext (CLAUDE.md, User-Memory, Git-Status-Snapshot u. Ä.) explizit im Report.
-2. **Verbot der Snapshot-Nutzung als Frische-Referenz:** Der injizierte Git-Status (Parent-Session-Start-Stand) darf NIE als Frische-Referenz dienen — Diff-Range/Commit-Liste kommt ausschließlich aus dem Briefing; den tatsächlichen Repo-Zustand erhebt der Critic selbst per `git`-Kommando.
-
-Beide Auflagen gelten für den Critic-Kontrakt und das Dispatch-Template (`templates/prompts/critic-review.md`) gleichermaßen. Diese Revision ersetzt keinen Bestandteil des ADR-Bodys oben (Never-Rewrite-Konvention, `docs/adr/README.md`), sie ergänzt ihn.
-
-**Querverweis (E24, Welle 2):** Critic-Stufung (Mechanik-Auto-Pass, Sonnet-Kaskade bei Klasse mittel, EIN gebündelter Critic je Welle) revidiert das E12-Pflicht-Trigger-Staffing — eigenes ADR, keine Wiederholung hier: [ADR-0024](0024-critic-staffing-data-based.md), Register E24.
-
-## Wiedervorlage
-
-Keine. Critic als aufrufbarer Baustein (Prompt + Schema): Phase 3.
+Runner projections must document their actual context injection, isolation capability, and critic model mapping.

@@ -1,93 +1,49 @@
 # ADR-0006: Model and Effort Policy per Role
 
-> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+## Status
+
+Accepted on 2026-07-03; effort defaults revised on 2026-07-04.
 
 ## Context
 
-Research recommended: Elephant = Opus 4.8/high, Goldfish = Sonnet 5/medium, Critic tiered Haiku→Sonnet→Opus. The PO revised this at Checkpoint 1, from practical experience: Opus actually burns more tokens because it's less effective at finding solutions; Fable is faster and more effective. The cp1 Critic review confirmed the decision as legitimate and cleanly logged; it does not collide with cache economics, since token-intensive work is delegated to Goldfish subagents rather than switching the Elephant's own model.
+Model names, prices, and runner controls change faster than the pipeline's safety requirements. The durable policy therefore describes capabilities and effort tiers in the provider-neutral kernel. Each runner owns the concrete model mapping.
 
-## Decision (E6, verbatim)
+Historical measurements showed that price per token alone did not predict effective cost per completed task. They also showed that changing the orchestrator's model during a session invalidated useful prompt-cache state. Those observations motivate stable routing, delegation, and measured follow-up rather than a universal vendor ranking.
 
-> **Model policy (PO-revised):** Elephant = Fable 5 / max (FIXED); Goldfish = Sonnet 5 minimum (NO Haiku), effort high–max, optionally Opus 4.8 for large-scope work; Critic = Sonnet 5/max, Fable 5/max for architecture/guardrails/security; cost telemetry from day 1; pricing review 2026-08-31
+## Decision
 
-## Deviation from the research recommendation (transparent)
+The kernel defines these capability requirements:
 
-| Point | Research | Decision | PO rationale / framing |
-|---|---|---|---|
-| Elephant | Opus 4.8 / high | **Fable 5 / max (FIXED)** | Effective cost per task matters, not $/MTok — consistent with the pricing analysis's own measurement rule |
-| Goldfish effort | Sonnet 5 / medium | **Sonnet 5 minimum / high–max** | max pays off given Sonnet's low token cost ($2/$10 until 2026-08-31); optionally Opus 4.8 for very large scope |
-| Critic baseline | Haiku 4.5 for formal checks | **Sonnet 5 (no Haiku in the pipeline)** | Haiku has no effort parameter and a 200k context — excluded from the pipeline |
+- The orchestrator uses the strongest configured reasoning tier for coordination and judgment.
+- Implementors use the least expensive tier demonstrated capable of the work, but never a low-capability or research-only tier for implementation, judgment, or review.
+- Critics use an independent review-capable tier. Architecture, guardrail, security, and other high-risk reviews use the configured highest review tier.
+- Read-only retrieval may use a lower tier when it performs no implementation, judgment, or review.
+
+The kernel requires a declared normal reasoning-effort class appropriate to orchestration; it does not prescribe a runner-specific effort label. For guardrail work, broad architecture, major refactoring, migrations, audits, or mass changes, the pipeline must actively offer the runner's configured `max` mode or approved highest task-scoped equivalent. The operator decides. A runner must never silently continue in a lower or otherwise wrong mode: it must obtain the decision or stop with an explicit capability mismatch.
+
+Routing stays stable for the lifetime of a session. Work that needs a different model or capability is delegated as a bounded task instead of switching the orchestrator in place. This preserves cache reuse and makes cost attribution meaningful.
+
+Concrete mappings are runner projections, not kernel truth:
+
+- Existing Claude runner assignments to Fable, including the Claude orchestrator's `xhigh` default, remain unchanged by this ADR and by the Codex mapping; their concrete resolution stays a Claude runner detail.
+- In the Codex runner, every duty mapped to Fable resolves to `gpt-5.6-sol` at the assigned effort tier. Codex must not invent another provider identity or silently substitute a different tier.
+- Other runners must publish an explicit mapping and fail closed when a required tier is unavailable.
+
+Telemetry records the selected capability tier, requested effort, effective runner mapping, usage, first-pass outcome, and attributable rework. Telemetry must avoid secrets and private prompt content.
 
 ## Consequences
 
-**Positive:** strongest judgment applied at the costliest failure points (orchestration, critical reviews); the Elephant's cache stays intact (no in-session model switch, delegation via subagent); implementation work runs on the cheapest capable model.
+Stable routing improves cache reuse and comparability. Capability floors protect implementation and review quality while allowing economical read-only retrieval. Runner mappings can evolve without rewriting the kernel decision.
 
-**Negative:** Fable 5 ($10/$50) is the most expensive standing choice per MTok; thinking cannot be disabled there.
+The active-mode prompt introduces a deliberate operator gate for exceptional work. Missing or incompatible runner mappings stop work instead of degrading silently.
 
-**Risk:** unnoticed cost blowup. Mitigation is part of the decision: cost telemetry from day 1 — instrument and storage defined in [model-policy.md](../../policies/model-policy.md) (requirement A8). Adjustment explicitly reserved if it proves too expensive.
+## Rejected Alternatives
 
-## Rejected alternatives
-
-- **Research matrix (Opus-Elephant / medium-Goldfish / Haiku baseline)** — revised by PO decision; kept documented as a dated research snapshot with a supersession note.
-- **`opusplan` alias (Opus plans, Sonnet executes)** — every plan↔exec toggle is a model switch and invalidates the entire prompt cache.
-
-## Revision E16 (PO, 2026-07-04): Elephant effort xhigh instead of max
-
-The Elephant effort default is revised from `max` to **`xhigh`**; the model (Fable 5) stays FIXED/unchanged. `max` remains a **named session exception** with an active prompting duty: for guardrail work, large-scope architecture, or major refactoring, the pipeline ACTIVELY recommends the switch to `max` to the PO — for E7-flagged tasks (migrations, audits, mass changes), alternatively the Ultracode task opt-in (MP-08); the PO decides, never silent continuation. **Rationale:** official guidance (xhigh = sweet spot for agentic work and the Claude Code default; max = diminishing returns/overthinking, "use sparingly"; lower Fable tiers often match the max quality of earlier top models — verified against the API reference 2026-07-04) plus budget reality (Fable weekly limit at 94%). **Measurement mandate:** Sprint-1 telemetry tracks first-pass rate/rework under xhigh; an attributable regression triggers a dated reversal (PO gate). Implementation: `policies/model-policy.md` MP-01, `roles/elephant.md` §9, Bootstrap 1b (spec + skill), kickoff templates.
-
-**Cross-reference (E25, wave 2):** the general Haiku ban (MP-03) was rescoped for read-only research fetchers (ban now applies only to implementation/judgment/review) — separate ADR, not repeated here: [ADR-0025](0025-haiku-research-fetcher.md), Register E25.
+- One concrete provider matrix as universal policy: it couples the kernel to transient products and prices.
+- Price per token as the only routing metric: it ignores first-pass success and rework.
+- In-session model switching: it damages cache stability and obscures attribution.
+- Silent fallback: it hides a material change in review or implementation capability.
 
 ## Follow-up
 
-**2026-08-31** — Sonnet 5 introductory pricing ends; pricing review based on telemetry data. The pricing review also examines the E16 measurement data (first-pass rate under xhigh).
-
-## Status
-
-Accepted (2026-07-03, Checkpoint 1) · revised in the effort part (E16, PO, 2026-07-04 — see "Revision E16") · basis: Register E6 + E16, PO decision.
-
-<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
-
-# ADR-0006: Modell- und Effort-Policy je Rolle
-
-> Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · Stand 2026-07-03
-
-**Status:** akzeptiert (2026-07-03, Checkpoint 1) · **revidiert im Effort-Teil (E16, der PO, 2026-07-04 — s. Abschnitt „Revision E16")** · **Grundlage:** Register E6 + E16, PO-Entscheid
-
-## Kontext
-
-Die Recherche empfahl: Elephant = Opus 4.8/high, Goldfish = Sonnet 5/medium, Critic gestaffelt Haiku→Sonnet→Opus. Der PO hat an Checkpoint 1 revidiert — PO-Entscheid aus Praxiserfahrung: Opus verbraucht real mehr Tokens, weil es bei der Lösungsfindung weniger effektiv ist; Fable ist schneller und effektiver. Das cp1-Critic-Review bestätigt den Entscheid als legitim und sauber protokolliert; er kollidiert nicht mit der Cache-Ökonomie, weil token-intensive Arbeit an Goldfische delegiert wird, statt das Elephant-Modell zu wechseln.
-
-## Entscheidung (E6, wortgetreu)
-
-> **Modell-Policy (PO revidiert):** Elephant = Fable 5 / max (GESETZT); Goldfish = Sonnet 5 Minimum (KEIN Haiku), Effort high–max, Umfangreiches optional Opus 4.8; Critic = Sonnet 5/max, Fable 5/max bei Architektur/Guardrails/Security; Kosten-Telemetrie ab Tag 1; Preis-Review 31.08.2026
-
-## Abweichung von der Recherche-Empfehlung (transparent)
-
-| Punkt | Recherche | Entscheid | Begründung PO / Einordnung |
-|---|---|---|---|
-| Elephant | Opus 4.8 / high | **Fable 5 / max (GESETZT)** | Effektive Kosten pro Aufgabe zählen, nicht $/MTok — deckt sich mit der Messregel der Preisanalyse |
-| Goldfish-Effort | Sonnet 5 / medium | **Sonnet 5 Minimum / high–max** | max lohnt sich bei Sonnets niedrigen Tokenkosten ($2/$10 bis 31.08.2026); sehr Umfangreiches optional Opus 4.8 |
-| Critic-Sockel | Haiku 4.5 für formale Checks | **Sonnet 5 (KEIN Haiku in der Pipeline)** | Haiku: kein Effort-Parameter, 200k Kontext — für die Pipeline ausgeschlossen |
-
-## Konsequenzen
-
-**Positiv:** stärkstes Urteilsvermögen an den teuersten Fehlerquellen (Orchestrierung, kritische Reviews); der Elephant-Cache bleibt intakt (kein Modellwechsel in-session, Delegation per Subagent); Umsetzungsarbeit läuft auf dem günstigsten tauglichen Modell.
-
-**Negativ:** Fable 5 ($10/$50) ist pro MTok die teuerste Dauerwahl; Thinking dort nicht abschaltbar.
-
-**Risiko:** unbemerkte Kostenexplosion. Mitigation ist Teil der Entscheidung: Kosten-Telemetrie ab Tag 1 — Instrument und Ablage definiert [model-policy.md](../../policies/model-policy.md) (Auflage A8). Anpassung ausdrücklich vorbehalten, falls zu teuer.
-
-## Verworfene Alternativen
-
-- **Recherche-Matrix (Opus-Elephant / medium-Goldfish / Haiku-Sockel)** — durch PO-Entscheid revidiert; bleibt als datierter Recherche-Stand mit Supersession-Vermerk dokumentiert.
-- **`opusplan`-Alias (Opus plant, Sonnet exekutiert)** — jeder Plan↔Exec-Toggle ist ein Modellwechsel und invalidiert den kompletten Prompt-Cache.
-
-## Revision E16 (der PO, 2026-07-04): Elephant-Effort xhigh statt max
-
-Der Elephant-Effort-Standard wird von `max` auf **`xhigh`** revidiert; das Modell (Fable 5) bleibt unverändert GESETZT. `max` bleibt als **benannte Session-Ausnahme** mit aktiver Hinweispflicht: Bei Arbeit an Guardrails, umfassender Architektur oder größerem Refactoring empfiehlt die Pipeline dem PO AKTIV den Wechsel auf `max` — bei E7-indizierten Aufgaben (Migrationen, Audits, Massenänderungen) alternativ den Ultracode-Task-Opt-in (MP-08); der PO entscheidet, nie stiller Weiterlauf. **Begründung:** offizielle Guidance (xhigh = Sweet Spot für agentische Arbeit und Claude-Code-Default; max = diminishing returns/Overthinking, „sparingly"; niedrigere Fable-Stufen erreichen oft die max-Qualität früherer Topmodelle — verifiziert gegen die API-Referenz 2026-07-04) plus Budget-Realität (Fable-Wochenlimit 94 %). **Messauftrag:** Sprint-1-Telemetrie beobachtet First-Pass/Nacharbeit unter xhigh; zurechenbare Verschlechterung → datierte Rück-Revision (PO-Gate). Umsetzung: `policies/model-policy.md` MP-01, `roles/elephant.md` §9, Bootstrap 1b (Spec + Skill), Kickoff-Templates.
-
-**Querverweis (E25, Welle 2):** Das generelle Haiku-Verbot (MP-03) wurde für read-only Research-Fetcher rescoped (Verbot nur noch Implementierung/Judgment/Review) — eigenes ADR, keine Wiederholung hier: [ADR-0025](0025-haiku-research-fetcher.md), Register E25.
-
-## Wiedervorlage
-
-**31.08.2026** — Sonnet-5-Einführungspreis endet; Preis-Review auf Basis der Telemetrie-Daten. Der Preis-Review sichtet zugleich die E16-Messdaten (First-Pass unter xhigh).
+The pricing review scheduled for 2026-08-31 remains a dated evidence check, not a universal pricing claim. It reviews runner presets using accumulated telemetry and compares first-pass rate and rework under each revised or exceptional effort default. An attributable regression in first-pass completion or rework must trigger a dated reversal decision at the PO gate; the runner may not silently retain the regressing default. Any resulting change must be recorded as a dated runner-policy revision and does not alter the capability-tier principle by itself.
