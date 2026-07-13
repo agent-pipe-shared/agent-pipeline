@@ -112,7 +112,8 @@ This step ends in a **third mandatory confirmation line** (verbatim, printed dir
   - Equal → current.
   - Differs → case **F2**.
   - Remote unreachable / offline → case **F3**.
-- Self-application case (working in the agent-pipeline repo itself): compare `git rev-parse HEAD` with `git ls-remote origin HEAD`. Being AHEAD of origin is fine there (you are authoring the ruleset); only BEHIND origin/main counts as stale.
+- Working repository (EVERY writable governed project, including self-application): run `node "${CLAUDE_PLUGIN_ROOT}/scripts/repository-freshness.mjs"` (from this source checkout: `node plugins/pipeline-core/scripts/repository-freshness.mjs`). This is separate from marketplace/plugin freshness. It compares through a disposable bare repository and never fetches into the source checkout. `equal|ahead` permit writes. `behind|diverged|detached|no-upstream|unknown` STOP writes and dispatch while read-only diagnosis remains allowed. `unknown` covers fetch failure/timeout, unavailable upstream, and insufficient shallow history; never call it fresh. Other unmerged remote branches are bounded information only, never a branch-selection gate.
+- This is a point-in-time protocol check, not an atomic lock or global enforcement claim: the remote may advance immediately afterwards, and SessionStart context is not an OS-level write barrier. The helper never pulls, merges, rebases, checks out, or writes source refs/config.
 - Why: third-party marketplaces do not auto-update; only an explicit refresh propagates — without this check, two-machine cache drift silently replaces the old copy-paste drift.
 
 ## Step 3 — Project calibration + denies (existence check FIRST)
@@ -182,7 +183,7 @@ Light form (deviates from Steps 1–6 above ONLY as follows; every step not list
 - **Step 1:** local SHA only (no `ls-remote`).
 - **Step 1b:** unchanged (MANDATORY) — **the profile question repeats at EVERY bootstrap**, light path included: it is a cheap single UI question, and a mid-day profile change is a new session anyway.
 - **Step 1d:** unchanged (embedded, cheap).
-- **Step 2:** SKIPPED, with mandatory suffix `· Staleness same-day cached (full check {{HH:MM}})` (see Step 6 allowed-suffix list).
+- **Step 2:** marketplace/plugin staleness is SKIPPED, with mandatory suffix `· Staleness same-day cached (full check {{HH:MM}})`; the current writable checkout's freshness helper still runs every time.
 - **Step 3:** existence check only.
 - **Step 4:** read the handover HEAD block + topmost session block only — UNLESS the handover changed since the full bootstrap (newer commits/date) → full read.
 - **Step 5:** existence check only.
@@ -210,7 +211,7 @@ Why: a full bootstrap already completed the same calendar day on the same machin
 - **Step 1b:** the profile question itself runs normally (that IS the speed choice); after it, the advisor-hygiene check and the advisor readiness probe are SKIPPED (both are `advisor`-profile-specific) — model/effort/advisor pairing is fixed in the speed profile (`policies/model-policy.md`, MP-28), set once, no follow-up questions.
 - **Step 1c:** skipped (no spend/usage check as a separate act).
 - **Step 1d:** skipped as a separate confirmation line — the role prohibitions (EL-01/EL-02/EL-03/EL-04/EL-16/EL-18/EL-19) still apply unchanged in substance, they are just not repeated as their own line in the speed path.
-- **Step 2:** skipped entirely (no remote staleness check).
+- **Step 2:** marketplace/plugin staleness is skipped; the current writable checkout's freshness helper still runs and requires a write-permitting result.
 - **Step 3:** existence check of the calibration file only (no full read).
 - **Step 4:** the operative head of the handover file only — no full session-history read.
 - **Step 5:** existence/invocability check of verify only.

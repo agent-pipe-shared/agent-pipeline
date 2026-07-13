@@ -7,7 +7,7 @@
 **Decision:** **Exactly two blocking human gates** in the pipeline, enforced deterministically by hooks instead of prose instruction:
 
 1. **Dev-Plan Gate** (`guard-devplan.mjs`) — absorbs/reinforces the E21 PRD gate: PRD and plan are presented together; "approved" is booked deterministically via `node harness/scripts/pipeline-state.mjs approve-plan --by <name>` (the hook's basis, `docs/operating-model.md` §3.2 step 3b). An Edit/Write against a non-exempted path blocks as long as an active feature (`activeFeature`) does not yet carry `planApproved: true`.
-2. **Push Gate** (`guard-push.mjs`) — checks evidence freshness (`evidence/verify-latest.json` + where applicable `evidence/security-latest.json`: `exitCode 0` AND `commit == HEAD`) plus the approval condition. In THIS repo, push human-approval is `standing-approved` ([ADR-0017](0017-push-policy-standing-approval.md)/E15) — the default template for new projects sets `required`.
+2. **Push Gate** (`guard-push.mjs`) — accepts one standalone, explicit repository/source push and checks evidence freshness (`exitCode 0` AND `commit == resolved pushed-source OID`) plus approval against that same OID. Ambiguity fails closed once the gate is active. In THIS repo, push human-approval is `standing-approved` ([ADR-0017](0017-push-policy-standing-approval.md)/E15) — the default template for new projects sets `required`.
 
 **Step-9 human gate** (sign-off on the done-report, `docs/operating-model.md` §3.2) stays **non-blocking** (🟡-merge v2 unchanged) — it is not a third blocking gate type, just the existing sign-off semantics.
 
@@ -43,7 +43,7 @@ Die Pipeline kennt bereits zwei Human-Gate-Vorläufer: das PRD-PO-Gate ([ADR-002
 **Genau zwei blockierende Human-Gates** in der Pipeline, deterministisch durch Hooks durchgesetzt statt durch Prosa-Anweisung:
 
 1. **Dev-Plan-Gate** (`guard-devplan.mjs`) — absorbiert/verstärkt das E21-PRD-Gate: PRD und Plan werden zusammen vorgelegt; „freigegeben" wird deterministisch verbucht via `node harness/scripts/pipeline-state.mjs approve-plan --by <name>` (Grundlage des Hooks, `docs/operating-model.md` §3.2 Schritt 3b). Ein Edit/Write gegen einen nicht-exemptierten Pfad blockt, solange eine aktive Feature (`activeFeature`) noch keine `planApproved: true` trägt.
-2. **Push-Gate** (`guard-push.mjs`) — prüft Evidenz-Frische (`evidence/verify-latest.json` + ggf. `evidence/security-latest.json`: `exitCode 0` UND `commit == HEAD`) sowie die Approval-Bedingung. In DIESEM Repo ist die Push-Human-Approval `standing-approved` ([ADR-0017](0017-push-policy-standing-approval.md)/E15) — das Default-Template für neue Projekte setzt `required`.
+2. **Push-Gate** (`guard-push.mjs`) — akzeptiert genau einen eigenständigen, expliziten Repository-/Source-Push und prüft Evidenz-Frische (`exitCode 0` UND `commit == aufgelöster gepushter Source-OID`) sowie die Approval-Bedingung gegen denselben OID. Mehrdeutigkeit blockiert bei aktivem Gate. In DIESEM Repo ist die Push-Human-Approval `standing-approved` ([ADR-0017](0017-push-policy-standing-approval.md)/E15) — das Default-Template für neue Projekte setzt `required`.
 
 **Schritt-9-Human-Gate** (Abnahme der Erledigt-Meldung, `docs/operating-model.md` §3.2) bleibt **nicht-blockierend** (🟡-Merge v2 unverändert) — es ist kein dritter blockierender Gate-Typ, sondern die bestehende Abnahme-Semantik.
 
