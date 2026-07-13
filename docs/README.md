@@ -2,14 +2,14 @@
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
-This folder is the pipeline's documentation set. For the one-minute picture, start
-with the top-level [README](../README.md); to stand up your own copy, read
-[`SETUP.md`](../SETUP.md). Then read in this order.
+This folder is the pipeline's optional post-setup reference map. For the one-minute
+picture, start with the top-level [README](../README.md); to stand up your own copy,
+read [`SETUP.md`](../SETUP.md). After setup, use this list as needed.
 
 ## Reading order
 
 1. [`overview.md`](overview.md) — the model in one read: how work flows from
-   intent to a closed change. **Start here.**
+   intent to a closed change. **Optional conceptual overview after setup.**
 2. [`usage.md`](usage.md) — a day in the pipeline: the concrete, session-by-session
    workflow once you are set up.
 3. [`migration.md`](migration.md) — bringing an existing project under the
@@ -35,15 +35,16 @@ Then, as you need them:
 
 # Die Dokumente und die Reihenfolge zum Lesen
 
-Dieser Ordner ist die Dokumentation der Pipeline. Für das Bild in einer Minute
-beginnst du mit der obersten [README](../README.md); um eine eigene Kopie
-aufzusetzen, liest du [`SETUP.md`](../SETUP.md). Danach kommst du hierher und
-liest in dieser Reihenfolge.
+Dieser Ordner ist die optionale Nachschlagekarte der Pipeline nach dem Setup. Für
+das Bild in einer Minute beginnst du mit der obersten [README](../README.md); um
+eine eigene Kopie aufzusetzen, liest du [`SETUP.md`](../SETUP.md). Danach nutzt du
+diese Liste nach Bedarf.
 
 ## Lesereihenfolge
 
 1. [`overview.md`](overview.md) — das Modell in einem Durchgang: wie eine
-   Änderung von der ersten Absicht bis zum Abschluss läuft. **Fang hier an.**
+   Änderung von der ersten Absicht bis zum Abschluss läuft. **Optionale
+   konzeptionelle Übersicht nach dem Setup.**
 2. [`usage.md`](usage.md) — ein Tag in der Pipeline: der konkrete Ablauf,
    Sitzung für Sitzung, sobald alles eingerichtet ist.
 3. [`migration.md`](migration.md) — ein bestehendes Projekt Schritt für Schritt

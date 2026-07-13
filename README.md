@@ -18,6 +18,10 @@ own Release/Promotion phase). Feedback welcome.*
 
 > _A German version follows below · Eine deutsche Fassung folgt weiter unten._
 
+> **Newcomer path:** This README is the single entry point. For adoption, the only
+> required next document is `SETUP.md`; deeper and conceptual documentation
+> is optional reference.
+
 ## The problem
 
 Teams building with coding agents tend to reinvent the same conventions per repo —
@@ -243,6 +247,10 @@ eigenen Release/Promotion-Phase ausgeliefert). Feedback willkommen.*
 > Direktive). Das ist unkritisch, Korrekturen/PRs sind willkommen, und welche
 > Sprache die Pipeline für dich verwendet (Commits, Reviews, PRDs), wählst du über
 > die Einstellung `language.human_facing`.
+
+> **Einstieg für Neue:** Diese README ist der einzige Einstieg. Für die Übernahme ist
+> als Nächstes nur `SETUP.md` erforderlich; weiterführende und
+> konzeptionelle Dokumentation ist optionales Nachschlagewerk.
 
 ## Das Problem
 
