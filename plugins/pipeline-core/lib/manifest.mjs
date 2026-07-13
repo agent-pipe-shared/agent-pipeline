@@ -550,6 +550,39 @@ function checkSemantics(manifest, rootDir, now) {
 // ---------------------------------------------------------------------------------------------
 
 /**
+ * Validates an already-parsed manifest through the same schema and semantic authority used by
+ * loadManifest(). Compiler call sites use this before writing a generated runtime projection,
+ * so generated and file-loaded manifests cannot drift onto separate validation paths.
+ */
+export function validateManifest(
+  manifest,
+  { schemaPath = DEFAULT_SCHEMA_PATH, rootDir = process.cwd(), now = new Date() } = {},
+) {
+  try {
+    const schema = loadSchema(schemaPath);
+    const { errors: rawSchemaErrors } = validateAgainstSchema(manifest, schema);
+    const errors = rawSchemaErrors.map(translateSchemaError);
+    const { errors: semanticErrors, warnings } = checkSemantics(manifest, rootDir, now);
+    errors.push(...semanticErrors);
+
+    if (errors.length > 0) return { status: "invalid", manifest, errors, warnings };
+    return { status: "ok", manifest, errors: [], warnings };
+  } catch (err) {
+    return {
+      status: "invalid",
+      manifest,
+      errors: [{
+        path: "manifest",
+        expected: "readable manifest and validation schema",
+        got: err instanceof Error ? err.message : String(err),
+        reason: err instanceof Error ? err.message : String(err),
+      }],
+      warnings: [],
+    };
+  }
+}
+
+/**
  * Loads and validates the manifest at `<rootDir>/<manifestRelPath>` (default
  * `.claude/pipeline.yaml`). Returns `{ status: "absent"|"ok"|"invalid", manifest?, errors,
  * warnings }` -- `warnings` is present on EVERY status, including "absent" (the channel must
@@ -560,34 +593,44 @@ export function loadManifest(
   rootDir,
   { manifestRelPath = DEFAULT_MANIFEST_RELPATH, schemaPath = DEFAULT_SCHEMA_PATH, now = new Date() } = {},
 ) {
-  const manifestPath = join(rootDir, manifestRelPath);
-  if (!existsSync(manifestPath)) {
-    return { status: "absent", errors: [], warnings: [] };
-  }
-
-  const text = readFileSync(manifestPath, "utf8");
-  let manifest;
   try {
-    manifest = parseYaml(text);
-  } catch (err) {
-    if (err instanceof YamlLiteError) {
-      return {
-        status: "invalid",
-        errors: [{ path: null, expected: null, got: null, line: err.line, reason: err.message.replace(/^line \d+: /, "") }],
-        warnings: [],
-      };
+    const manifestPath = join(rootDir, manifestRelPath);
+    let text;
+    try {
+      text = readFileSync(manifestPath, "utf8");
+    } catch (err) {
+      if (err && typeof err === "object" && err.code === "ENOENT") {
+        return { status: "absent", errors: [], warnings: [] };
+      }
+      throw err;
     }
-    throw err;
+    let manifest;
+    try {
+      manifest = parseYaml(text);
+    } catch (err) {
+      if (err instanceof YamlLiteError) {
+        return {
+          status: "invalid",
+          errors: [{ path: null, expected: null, got: null, line: err.line, reason: err.message.replace(/^line \d+: /, "") }],
+          warnings: [],
+        };
+      }
+      throw err;
+    }
+
+    return validateManifest(manifest, { schemaPath, rootDir, now });
+  } catch (err) {
+    return {
+      status: "invalid",
+      errors: [{
+        path: "manifest",
+        expected: "readable manifest and validation schema",
+        got: err instanceof Error ? err.message : String(err),
+        reason: err instanceof Error ? err.message : String(err),
+      }],
+      warnings: [],
+    };
   }
-
-  const schema = loadSchema(schemaPath);
-  const { valid, errors: rawSchemaErrors } = validateAgainstSchema(manifest, schema);
-  const errors = rawSchemaErrors.map(translateSchemaError);
-  const { errors: semanticErrors, warnings } = checkSemantics(manifest, rootDir, now);
-  errors.push(...semanticErrors);
-
-  if (errors.length > 0) return { status: "invalid", manifest, errors, warnings };
-  return { status: "ok", manifest, errors: [], warnings };
 }
 
 /**

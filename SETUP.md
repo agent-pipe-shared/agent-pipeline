@@ -90,6 +90,9 @@ Before your first big feature, a quick look at [`docs/design/README.md`](docs/de
 | `.claude/pipeline.yaml` | `worktypes`, `models`, `gates`, `autonomy` | the declarative manifest layer — the PreToolUse guard hooks (`guard-devplan`, `guard-push`), the `stop-suggest` Stop-event hook (next-phase suggestion + context-budget warnings), and model routing; validated by `harness/scripts/validate-manifest.mjs` |
 
 Every compiled file carries a `GENERATED from pipeline.user.yaml` marker so re-runs can tell a stale compile from a real hand-edit.
+Before setup writes any of these files, the complete generated manifest passes the same
+parse, schema, and semantic validation used by the runtime validator. A failed preflight
+leaves both `pipeline.user.yaml` and all runtime projections unchanged.
 
 ## Troubleshooting
 

@@ -20,7 +20,9 @@
  * Run:   node setup.test.mjs
  * Exit:  0 = all cases pass · 1 = at least one case failed (failure list on stdout).
  */
-import { readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseYaml } from "./plugins/pipeline-core/lib/yaml-lite.mjs";
@@ -46,8 +48,10 @@ import {
   compileSettingsJson,
   compilePipelineJson,
   renderPipelineYaml,
+  validateCompiledPipelineYaml,
   parseArgv,
   resolveWarnDisposition,
+  run,
 } from "./setup.mjs";
 
 const USER_YAML_PATH = fileURLToPath(new URL("./pipeline.user.yaml", import.meta.url));
@@ -62,6 +66,47 @@ function ok(id, condition, detail) {
     failures.push(`${id}${detail !== undefined ? `: ${detail}` : ""}`);
     console.log(`FAIL  ${id}${detail !== undefined ? ` — ${detail}` : ""}`);
   }
+}
+
+// ======================================================================================
+// generated runtime manifest preflight — canonical schema + semantic authority
+// ======================================================================================
+{
+  const result = validateCompiledPipelineYaml(renderPipelineYaml(buildDefaultAnswers(), "preflight-ok"));
+  ok("validateCompiledPipelineYaml: generated default projection passes canonical validation", result.status === "ok", JSON.stringify(result.errors));
+}
+
+{
+  const root = mkdtempSync(join(tmpdir(), "setup-preflight-no-write-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  const sentinels = new Map([
+    [join(root, "pipeline.user.yaml"), "existing-user-source\n"],
+    [join(root, ".claude", "settings.json"), "existing-settings\n"],
+    [join(root, ".claude", "pipeline.json"), "existing-pipeline-json\n"],
+    [join(root, ".claude", "pipeline.yaml"), "existing-pipeline-yaml\n"],
+  ]);
+  for (const [path, content] of sentinels) writeFileSync(path, content);
+  const code = await run(["--defaults"], { rootDir: root, renderPipelineYamlFn: () => "schema: wrong.schema\n" });
+  const unchanged = [...sentinels].every(([path, content]) => existsSync(path) && readFileSync(path, "utf8") === content);
+  ok("run: invalid generated manifest exits 1 and leaves source plus all runtime targets byte-identical", code === 1 && unchanged);
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const answers = {
+    ...buildDefaultAnswers(),
+    release: {
+      environments: {
+        prod: { adapter: "missing-adapter", healthcheck: "check", rollback: "rollback", promotion: "human-gate" },
+      },
+      adapters: {},
+    },
+  };
+  const result = validateCompiledPipelineYaml(renderPipelineYaml(answers, "preflight-invalid"));
+  ok(
+    "validateCompiledPipelineYaml: semantic release error is rejected before compiler writes",
+    result.status === "invalid" && result.errors.some((error) => error.path === "release.environments.prod.adapter"),
+    JSON.stringify(result.errors),
+  );
 }
 
 // ======================================================================================

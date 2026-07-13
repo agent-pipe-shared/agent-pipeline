@@ -114,6 +114,7 @@ import { pathToFileURL } from "node:url";
 
 import { parseYaml, YamlLiteError } from "./plugins/pipeline-core/lib/yaml-lite.mjs";
 import { validateAgainstSchema } from "./plugins/pipeline-core/lib/schema-lite.mjs";
+import { validateManifest } from "./plugins/pipeline-core/lib/manifest.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const ROOT_DIR = SCRIPT_DIR; // setup.mjs lives at the export root -- resolve relative
@@ -779,6 +780,21 @@ flags:
   return base + renderReleaseSection(answers.release);
 }
 
+/**
+ * Parses and validates a generated runtime manifest through the canonical manifest authority.
+ * The CLI runs this before writing pipeline.user.yaml or any compiled target, preventing a
+ * malformed or semantically invalid projection from leaving a partial compile behind.
+ */
+export function validateCompiledPipelineYaml(text, rootDir = ROOT_DIR) {
+  let manifest;
+  try {
+    manifest = parseYaml(text);
+  } catch (error) {
+    return { status: "invalid", errors: [{ reason: error.message }], warnings: [] };
+  }
+  return validateManifest(manifest, { rootDir });
+}
+
 // ---- CLI I/O layer: real filesystem, real prompts, real exit -----------------------------------
 function readJsonSafe(path) {
   if (!existsSync(path)) return { existsOnDisk: false, parsedOk: true, raw: null, parsed: null };
@@ -939,7 +955,13 @@ export function parseArgv(argv) {
   };
 }
 
-export async function run(argv = process.argv.slice(2)) {
+export async function run(argv = process.argv.slice(2), deps = {}) {
+  const rootDir = deps.rootDir ?? ROOT_DIR;
+  const renderPipelineYamlFn = deps.renderPipelineYamlFn ?? renderPipelineYaml;
+  const userYamlPath = join(rootDir, "pipeline.user.yaml");
+  const settingsJsonPath = join(rootDir, ".claude", "settings.json");
+  const pipelineJsonPath = join(rootDir, ".claude", "pipeline.json");
+  const pipelineYamlPath = join(rootDir, ".claude", "pipeline.yaml");
   const opts = parseArgv(argv);
   if (opts.help) {
     console.log(
@@ -949,7 +971,7 @@ export async function run(argv = process.argv.slice(2)) {
   }
 
   const defaults = buildDefaultAnswers();
-  const { raw: existingUserYamlRaw, parsed: existingUserYamlParsed } = loadUserYamlSafe(USER_YAML_PATH);
+  const { raw: existingUserYamlRaw, parsed: existingUserYamlParsed } = loadUserYamlSafe(userYamlPath);
   const previous = answersFromParsed(existingUserYamlParsed, defaults);
 
   let rl = null;
@@ -957,7 +979,7 @@ export async function run(argv = process.argv.slice(2)) {
   if (opts.defaults) {
     // Detection still runs (never a "question") -- only the five interactive questions are
     // replaced by the deterministic defaults (see file header "DETECTION vs. QUESTIONS").
-    const git_host = detectGitHost(ROOT_DIR);
+    const git_host = detectGitHost(rootDir);
     answers = {
       ...defaults,
       platform: { git_host, cli: cliForHost(git_host) },
@@ -994,23 +1016,34 @@ export async function run(argv = process.argv.slice(2)) {
     return 1;
   }
 
+  const sourceHash = shortHash(userYamlText);
+  const pipelineYamlWanted = renderPipelineYamlFn(answers, sourceHash);
+  const manifestPreflight = validateCompiledPipelineYaml(pipelineYamlWanted, rootDir);
+  if (manifestPreflight.status !== "ok") {
+    if (rl) rl.close();
+    console.error("setup.mjs: generated .claude/pipeline.yaml failed canonical validation; no files were written:");
+    for (const error of manifestPreflight.errors) {
+      console.error(`  ${error.reason ?? error.message ?? `${error.path}: expected ${error.expected}, got ${error.got}`}`);
+    }
+    return 1;
+  }
+
   if (existingUserYamlRaw !== userYamlText) {
-    writeFileSync(USER_YAML_PATH, userYamlText);
+    writeFileSync(userYamlPath, userYamlText);
     console.log("pipeline.user.yaml written.");
   } else {
     console.log("pipeline.user.yaml already up to date (unchanged).");
   }
 
-  const sourceHash = shortHash(userYamlText);
   const interactive = !opts.defaults;
 
   console.log("\nCompiling runtime configs:");
 
-  const settingsState = readJsonSafe(SETTINGS_JSON_PATH);
+  const settingsState = readJsonSafe(settingsJsonPath);
   const settingsWanted = JSON.stringify(compileSettingsJson(settingsState.parsed, answers, sourceHash), null, 2) + "\n";
   await applyCompileDecision({
     label: ".claude/settings.json",
-    path: SETTINGS_JSON_PATH,
+    path: settingsJsonPath,
     existingState: settingsState,
     wantedText: settingsWanted,
     sourceHash,
@@ -1019,11 +1052,11 @@ export async function run(argv = process.argv.slice(2)) {
     force: opts.force,
   });
 
-  const pipelineJsonState = readJsonSafe(PIPELINE_JSON_PATH);
+  const pipelineJsonState = readJsonSafe(pipelineJsonPath);
   const pipelineJsonWanted = JSON.stringify(compilePipelineJson(pipelineJsonState.parsed, answers, sourceHash), null, 2) + "\n";
   await applyCompileDecision({
     label: ".claude/pipeline.json",
-    path: PIPELINE_JSON_PATH,
+    path: pipelineJsonPath,
     existingState: pipelineJsonState,
     wantedText: pipelineJsonWanted,
     sourceHash,
@@ -1032,12 +1065,11 @@ export async function run(argv = process.argv.slice(2)) {
     force: opts.force,
   });
 
-  const pipelineYamlExists = existsSync(PIPELINE_YAML_PATH);
-  const pipelineYamlRaw = pipelineYamlExists ? readFileSync(PIPELINE_YAML_PATH, "utf8") : null;
-  const pipelineYamlWanted = renderPipelineYaml(answers, sourceHash);
+  const pipelineYamlExists = existsSync(pipelineYamlPath);
+  const pipelineYamlRaw = pipelineYamlExists ? readFileSync(pipelineYamlPath, "utf8") : null;
   await applyCompileDecision({
     label: ".claude/pipeline.yaml",
-    path: PIPELINE_YAML_PATH,
+    path: pipelineYamlPath,
     existingState: { existsOnDisk: pipelineYamlExists, parsedOk: true, raw: pipelineYamlRaw, parsed: null },
     wantedText: pipelineYamlWanted,
     sourceHash,
