@@ -1,0 +1,24 @@
+{
+  "schema": "pipeline.runner-mappings.v0",
+  "runners": {
+    "claude": {
+      "capabilities": {
+        "design": "opus",
+        "implement": "sonnet",
+        "mechanic": "sonnet",
+        "deep": "sonnet",
+        "review": "sonnet"
+      },
+      "manifestAliases": {
+        "sonnet": "sonnet-5"
+      },
+      "effortMode": "identity"
+    },
+    "codex": {
+      "aliases": {
+        "fable": "gpt-5.6-sol"
+      },
+      "effortMode": "identity"
+    }
+  }
+}

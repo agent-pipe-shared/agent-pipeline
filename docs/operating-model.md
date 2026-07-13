@@ -298,7 +298,7 @@ The Elephant sets the risk flag in triage as soon as a level-0 task touches a ri
 - **A compact 3-field report** instead of the 6 sections (`roles/goldfish.md` §6): (1) DoD result + evidence artifact, (2) changed files, (3) deviations/open items. Target ≤ 600 tokens.
 - **Reference inlining:** the briefing inlines the 3–5 rule sets actually needed verbatim, instead of pointing at large canon files — otherwise every Goldfish re-reads the same canon.
 - **No pre-edit baseline verify** — `verify` runs only against the final state.
-- **Effort `xhigh`** as the default (MP-06); `high` only for truly trivial/uniform tasks. **Revised (MP-27):** the mechanical/uniform level-0 dispatches meant here now run regularly through the dedicated subagent `goldfish-mechanic` (effort `low`) instead of a separately configured `xhigh` — details/rollback path: `../policies/model-policy.md` MP-27.
+- **Effort follows MP-27:** `goldfish-mechanic` at `low` for mechanical/uniform work or `goldfish-implementor` at `medium` for bounded implementation. Deep/`xhigh` work is outside the light-profile boundary. The earlier blanket `xhigh` rule is historical; see ADR-0022.
 
 **Invariant untouched:** `verify` + the machine evidence artifact (GF-08) and stop-condition honesty (GF-07) stay mandatory — the light profile shortens report prose, never the check. At class high, architecture/guardrails/security, the standard profile always applies.
 
@@ -898,7 +898,7 @@ Das Risiko-Flag setzt der Elephant in der Triage, sobald ein Stufe-0-Task eine R
 - **Kompakter 3-Feld-Report** statt der 6 Sektionen (`roles/goldfish.md` §6): (1) DoD-Ergebnis + Evidenz-Artefakt, (2) geänderte Dateien, (3) Abweichungen/offene Punkte. Ziel ≤ 600 Tokens.
 - **Referenz-Inlining:** das Briefing inlinet die 3–5 wirklich nötigen Regelsätze wörtlich, statt auf große Kanon-Dateien zu verweisen — sonst liest jeder Goldfish denselben Kanon neu.
 - **Kein Pre-Edit-Baseline-verify** — `verify` läuft nur gegen den Endstand.
-- **Effort `xhigh`** als Default (MP-06); `high` nur bei wirklich trivialen/gleichförmigen Tasks. **Revidiert (MP-27):** Genau die hier gemeinten mechanischen/gleichförmigen Stufe-0-Dispatches laufen inzwischen regulär über den eigenen Subagenten `goldfish-mechanic` (Effort `low`) statt separat konfiguriertem `xhigh` — Details/Rück-Revisions-Pfad: `../policies/model-policy.md` MP-27.
+- **Effort gemäß MP-27:** `goldfish-mechanic` mit `low` für mechanische/gleichförmige Arbeit oder `goldfish-implementor` mit `medium` für begrenzte Implementierung. Deep-/`xhigh`-Arbeit liegt außerhalb des Light-Profils. Die frühere pauschale `xhigh`-Regel ist historisch; siehe ADR-0022.
 
 **Invariant unangetastet:** `verify` + maschinelles Evidenz-Artefakt (GF-08) und die Stop-Bedingungs-Ehrlichkeit (GF-07) bleiben Pflicht — das Light-Profil kürzt die Report-Prosa, nie die Prüfung. Bei Klasse hoch, Architektur/Guardrails/Security gilt immer das Standard-Profil.
 
@@ -1191,4 +1191,3 @@ Beide Kandidaten folgen derselben Disziplin: **die niedrigste Stufe, die das Wic
 ---
 
 *Operating Model v1.0 — Sprint 0 Phase 2 (2026-07-03). Maßgeblich bei Widerspruch: das eigene Entscheidungsregister in [state.md](state.md) bzw. die ADRs in [adr/](adr/); der Prozessstatus lebt ausschließlich in [state.md](state.md).*
-

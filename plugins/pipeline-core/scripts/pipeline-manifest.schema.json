@@ -77,13 +77,14 @@
     },
     "modelRouting": {
       "type": "object",
-      "description": "Keys are arbitrary role names (elephant, goldfish, critic, ...) -- machine-readable projection of policies/model-policy.md, which stays canonical.",
+      "description": "Keys are arbitrary projected route names. Semantic constraints live in policies/model-policy.md; mutable shipped-default assignments live in routing-authority.json and are resolved by runner-mappings.json.",
       "additionalProperties": {
         "type": "object",
+        "required": ["model", "effort"],
         "additionalProperties": false,
         "properties": {
           "model": { "type": "string" },
-          "effort": { "type": "string" },
+          "effort": { "type": "string", "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] },
           "note": { "type": "string" }
         }
       }

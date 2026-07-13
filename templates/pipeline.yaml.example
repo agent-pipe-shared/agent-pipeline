@@ -79,21 +79,46 @@ security:
       enabled: true
       rules_dir: governance/examples/policies/semgrep
 
-# Machine-readable projection of policies/model-policy.md (MP-01/02/05/07). That file
-# stays the canonical source -- this section only reflects it for tooling that wants a
-# structured read instead of parsing prose. Keys are free-form role names.
+# Example of a full generated Claude routing projection. In a real project, setup.mjs
+# compiles this matrix from routing-authority.json, runner-mappings.json, and
+# pipeline.user.yaml; do not maintain it as an independent policy source.
 modelRouting:
-  elephant:
-    model: profile-bound
-    effort: profile-bound
-    note: "MP-01 -- resolved by the active Elephant profile (advisor / design-first), not fixed here"
-  goldfish:
+  elephant_design_design:
+    model: opus
+    effort: high
+  elephant_design_execution:
+    model: opus
+    effort: high
+  elephant_feature_design:
+    model: opus
+    effort: high
+  elephant_feature_execution:
     model: sonnet-5
     effort: high
+  advisor_feature:
+    model: opus
+    effort: not-applicable
+  elephant_mini_design:
+    model: sonnet-5
+    effort: high
+  elephant_mini_execution:
+    model: sonnet-5
+    effort: high
+  advisor_mini:
+    model: opus
+    effort: not-applicable
+  goldfish:
+    model: sonnet-5
+    effort: medium
+  goldfish_mechanic:
+    model: sonnet-5
+    effort: low
+  goldfish_deep:
+    model: sonnet-5
+    effort: xhigh
   critic:
     model: sonnet-5
     effort: max
-    note: "a higher-capability review model is mandatory for A-G-S findings (MP-07)"
 
 # Profiles bundle a phase subset by name. `active` selects which profile currently
 # applies; every other key here is a profile name whose `phases` list must only name

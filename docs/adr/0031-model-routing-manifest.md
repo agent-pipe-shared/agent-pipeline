@@ -26,7 +26,7 @@ The Claude adapter retains its existing assignments unchanged. The Codex adapter
 
 `.claude/pipeline.yaml` is therefore a managed Claude projection. Equivalent files for other runners are their own generated projections; none is canonical.
 
-This Phase 2 revision is a normative contract only. This ADR change does not claim that the required generator or every runner projection is already implemented, delivered, current, or conformant. A projection must not be treated as current until its required generation and deterministic comparison gates exist and pass.
+The Phase 2 implementation stores the provider-neutral default assignments in `plugins/pipeline-core/config/routing-authority.json`, runner mappings separately in `plugins/pipeline-core/config/runner-mappings.json`, and compiles the Claude manifest through `setup.mjs`. The deterministic projection gate checks the committed user configuration, full manifest routing matrix, fixed agent frontmatter, and source hashes. Its Codex scope is intentionally partial: it proves only Fable → `gpt-5.6-sol` with unchanged effort and fail-closed behavior for unsupported identities; it does not claim a complete Codex runner projection.
 
 ## Consequences
 
@@ -43,4 +43,4 @@ Generation and drift validation become required build responsibilities. Until a 
 
 ## Follow-up
 
-Any routing-policy or adapter-mapping revision regenerates and tests every affected projection before use. Dated provider or pricing evidence may motivate a revision but does not become kernel truth.
+Any routing-policy or adapter-mapping revision regenerates and tests every affected projection before use. Full Verify runs setup tests, projection tests, and the live drift checker. Dated provider or pricing evidence may motivate a revision but does not become kernel truth.

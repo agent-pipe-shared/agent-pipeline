@@ -702,24 +702,27 @@ ok("parseArgv: --defaults alone -> force stays false", parseArgv(["--defaults"])
   };
   const yaml = renderPipelineYaml(answers, "hashGHI");
   ok(
-    "renderPipelineYaml: elephant model-routing mirrors worktypes.feature.execution_phase (representative value)",
-    /elephant:\s*\n(?:.*\n)*?\s*model: opus\s*\n\s*effort: high/.test(yaml),
+    "renderPipelineYaml: full feature execution route mirrors worktypes.feature.execution_phase",
+    /elephant_feature_execution:\s*\n\s*model: opus\s*\n\s*effort: high/.test(yaml),
     yaml,
   );
-  ok("renderPipelineYaml: elephant carries a note pointing to pipeline.user.yaml -> worktypes", /elephant:[\s\S]*?note:.*worktypes/.test(yaml));
+  ok(
+    "renderPipelineYaml: all six profile-phase routes are projected",
+    (yaml.match(/^  elephant_(?:design|feature|mini)_(?:design|execution):$/gm) ?? []).length === 6,
+  );
   ok(
     "renderPipelineYaml: goldfish model-routing mirrors models.implement",
-    /goldfish:\s*\n\s*model: sonnet\s*\n\s*effort: medium/.test(yaml),
+    /goldfish:\s*\n\s*model: sonnet-5\s*\n\s*effort: medium/.test(yaml),
     yaml,
   );
   ok(
     "renderPipelineYaml: goldfish_mechanic mirrors models.mechanic",
-    /goldfish_mechanic:\s*\n\s*model: sonnet\s*\n\s*effort: low/.test(yaml),
+    /goldfish_mechanic:\s*\n\s*model: sonnet-5\s*\n\s*effort: low/.test(yaml),
     yaml,
   );
   ok(
     "renderPipelineYaml: goldfish_deep mirrors models.deep (MP-27 3-tier completeness)",
-    /goldfish_deep:\s*\n\s*model: sonnet\s*\n\s*effort: xhigh/.test(yaml),
+    /goldfish_deep:\s*\n\s*model: sonnet-5\s*\n\s*effort: xhigh/.test(yaml),
     yaml,
   );
   ok(

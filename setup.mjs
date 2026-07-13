@@ -100,9 +100,7 @@
  *   node setup.mjs --help       usage text, exit 0
  *
  * VERIFY: node setup.test.mjs (pure-function coverage: detection/preset/render/drift
- * logic). NOT wired into harness/scripts/verify.mjs's TEST_SUITES list here -- that file
- * is TP-3-protected and wiring it is outside this briefing's delivery scope (out of scope,
- * flagged in the delivering briefing's report as an open item for a later wave).
+ * logic). The suite and the live routing-projection checker are wired into Full Verify.
  */
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -115,6 +113,7 @@ import { pathToFileURL } from "node:url";
 import { parseYaml, YamlLiteError } from "./plugins/pipeline-core/lib/yaml-lite.mjs";
 import { validateAgainstSchema } from "./plugins/pipeline-core/lib/schema-lite.mjs";
 import { validateManifest } from "./plugins/pipeline-core/lib/manifest.mjs";
+import { projectManifestRouting, projectPreset, routingProvenance } from "./plugins/pipeline-core/lib/routing-projection.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const ROOT_DIR = SCRIPT_DIR; // setup.mjs lives at the export root -- resolve relative
@@ -131,6 +130,7 @@ export const GENERATED_MARKER_PREFIX = "GENERATED from pipeline.user.yaml — ed
 
 // ---- default answers (== the committed pipeline.user.yaml template's values) -----------------
 export function buildDefaultAnswers() {
+  const routing = projectPreset("max", "claude");
   return {
     identity: { owner_name: "Your Name", repo_owner: "your-org", repo_name: "agent-pipeline", commit_trailer: true },
     language: { human_facing: "en", agent_facing: "en" },
@@ -139,29 +139,7 @@ export function buildDefaultAnswers() {
     // worktypes = THE place to route models per work method (the three session profiles:
     // design-first/advisor/speed) -- the orchestrator's own routing. models below stays the
     // dispatch-tier palette only (mechanic/implement/deep, plus critic's review).
-    worktypes: {
-      design: {
-        design_phase: { model: "opus", effort: "high" },
-        execution_phase: { model: "opus", effort: "high" },
-        advisor: "off",
-      },
-      feature: {
-        design_phase: { model: "opus", effort: "high" },
-        execution_phase: { model: "sonnet", effort: "high" },
-        advisor: "opus",
-      },
-      mini: {
-        design_phase: { model: "sonnet", effort: "high" },
-        execution_phase: { model: "sonnet", effort: "high" },
-        advisor: "opus",
-      },
-    },
-    models: {
-      implement: { model: "sonnet", effort: "medium" },
-      mechanic: { model: "sonnet", effort: "low" },
-      deep: { model: "sonnet", effort: "xhigh" },
-      review: { model: "sonnet", effort: "high" },
-    },
+    ...routing,
     autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
     gates: { dev_plan: "blocking", push: "blocking", security: "blocking", claude_md_max_lines: 200 },
   };
@@ -238,59 +216,7 @@ function safeSpawn(spawn, command, args, opts = {}) {
  *   buildDefaultAnswers() for the shape).
  */
 export function applyAboPreset(tier) {
-  if (tier === "pro") {
-    return {
-      worktypes: {
-        design: {
-          design_phase: { model: "sonnet", effort: "high" },
-          execution_phase: { model: "sonnet", effort: "high" },
-          advisor: "off",
-        },
-        feature: {
-          design_phase: { model: "sonnet", effort: "max" },
-          execution_phase: { model: "sonnet", effort: "high" },
-          advisor: "off",
-        },
-        mini: {
-          design_phase: { model: "sonnet", effort: "max" },
-          execution_phase: { model: "sonnet", effort: "high" },
-          advisor: "sonnet",
-        },
-      },
-      models: {
-        implement: { model: "sonnet", effort: "medium" },
-        mechanic: { model: "sonnet", effort: "low" },
-        deep: { model: "sonnet", effort: "xhigh" },
-        review: { model: "sonnet", effort: "high" },
-      },
-    };
-  }
-  // "max" (recommended) and "api"/custom (freely editable starting point) share the preset.
-  return {
-    worktypes: {
-      design: {
-        design_phase: { model: "opus", effort: "high" },
-        execution_phase: { model: "opus", effort: "high" },
-        advisor: "off",
-      },
-      feature: {
-        design_phase: { model: "opus", effort: "high" },
-        execution_phase: { model: "sonnet", effort: "high" },
-        advisor: "opus",
-      },
-      mini: {
-        design_phase: { model: "sonnet", effort: "high" },
-        execution_phase: { model: "sonnet", effort: "high" },
-        advisor: "opus",
-      },
-    },
-    models: {
-      implement: { model: "sonnet", effort: "medium" },
-      mechanic: { model: "sonnet", effort: "low" },
-      deep: { model: "sonnet", effort: "xhigh" },
-      review: { model: "sonnet", effort: "high" },
-    },
-  };
+  return projectPreset(tier === "pro" ? "pro" : "max", "claude");
 }
 
 /** @param {string} preset - "autonom"/"autonomous" or anything else ("conservative") */
@@ -692,6 +618,21 @@ function renderReleaseSection(release) {
   return lines.join("\n") + "\n";
 }
 
+export function renderModelRoutingYaml(worktypes, models) {
+  const routing = projectManifestRouting(worktypes, models);
+  const lines = [
+    "modelRouting:",
+    `  # Generated projection: ${routingProvenance("claude")} source=pipeline.user.yaml.`,
+    "  # Do not edit this block as an independent routing authority.",
+  ];
+  for (const [role, assignment] of Object.entries(routing)) {
+    lines.push(`  ${role}:`);
+    lines.push(`    model: ${assignment.model}`);
+    lines.push(`    effort: ${assignment.effort}`);
+  }
+  return lines.join("\n");
+}
+
 export function renderPipelineYaml(answers, sourceHash) {
   const pushApproval = answers.autonomy.push_policy === "standing-approved" ? "standing-approved" : "required";
   const base = `# pipeline.yaml -- declarative pipeline manifest (.claude/pipeline.yaml, schema pipeline.manifest.v0).
@@ -734,29 +675,7 @@ security:
       enabled: true
       rules_dir: governance/examples/policies/semgrep
 
-modelRouting:
-  # elephant: pipeline-manifest.schema.json's modelRouting shape is a flat {model, effort, note}
-  # per role (schema-lite has no $ref/oneOf to express worktypes' nested per-phase routing
-  # without invasive manifest-schema surgery -- out of this delivery's scope, flagged in the
-  # delivering briefing's report). This is a REPRESENTATIVE value (feature worktype, execution
-  # phase) -- the full per-worktype/phase orchestrator routing is authoritative in
-  # pipeline.user.yaml -> worktypes.
-  elephant:
-    model: ${answers.worktypes.feature.execution_phase.model}
-    effort: ${answers.worktypes.feature.execution_phase.effort}
-    note: "representative value (worktypes.feature.execution_phase) -- full per-worktype/phase routing lives in pipeline.user.yaml -> worktypes"
-  goldfish:
-    model: ${answers.models.implement.model}
-    effort: ${answers.models.implement.effort}
-  goldfish_mechanic:
-    model: ${answers.models.mechanic.model}
-    effort: ${answers.models.mechanic.effort}
-  goldfish_deep:
-    model: ${answers.models.deep.model}
-    effort: ${answers.models.deep.effort}
-  critic:
-    model: ${answers.models.review.model}
-    effort: ${answers.models.review.effort}
+${renderModelRoutingYaml(answers.worktypes, answers.models)}
 
 profiles:
   active: full-sdlc
