@@ -1,95 +1,202 @@
-# Token-Budget Guardrails
+# Dispatch and Budget Guardrails
 
-> Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 3 · 2026-07-03
-> Audience: primarily the Elephant (dispatch and session decisions); Goldfish/Critic inherit their part via briefing/frontmatter.
+This file defines the provider-neutral dispatch, context, and bounded-execution
+contract. Concrete model names, runner commands, context windows, and enforced
+limits belong to runner projections. A projection may narrow this contract but
+must not silently weaken it.
 
-**Distillation notice:** This file distills `policies/model-policy.md` (rules MP-01…MP-27) into dispatch-time guardrails. On any disagreement, the model-policy wins — fix this file, do not reinterpret the policy. Precedence and enforcement otherwise as in `guardrails/global.md` (header).
+**Enforcement status:** the kernel requirements are normative, but their
+machine enforcement is projection-owned. Until a projection names and tests an
+enforcement surface, the corresponding requirement is advisory and checked by
+review. The conformance fixtures listed below are pending, not delivered here.
 
-Rule IDs: `TB-xx`.
+Rule IDs use `TB-xx`.
 
----
+## B4E-DISPATCH-BUDGET
 
-## TB-01 — Model discipline at every dispatch (MP-01/02/03/05/07/27)
+### TB-01 — Every dispatch has six explicit fields
 
-- Every subagent dispatch **MUST** name model and effort explicitly in the briefing's dispatch-metadata field — never rely on silent inheritance of the session model.
-- Role defaults: Elephant = the design-tier model (design phase at effort `xhigh`, execution phase at effort `max`) under one of two profiles (`advisor`: the top design tier from session start with the advisor model enabled; `design-first`: a lower-cost design-capable model during design, then one sanctioned switch up to the top design tier at the PRD gate, MP-01) — running the lower-cost design model for the whole session (skipping the switch-up) stays possible only as a named PO exception; Goldfish = the mechanic-tier model as a hard minimum (MP-02/03), effort per the MP-27 3-tier subagent matrix (`goldfish-mechanic` = `low`, `goldfish-implementor` = `medium`, `goldfish-deep` = `xhigh`); Critic = the review-tier model at `max`, escalated to a higher-capability model for architecture/guardrail/security reviews (canonical trigger wording: `docs/operating-model.md` §4.2). Concrete models per tier come from the shipped default preset (design → opus, implement/mechanic → sonnet, review → sonnet) in `pipeline.user.yaml` and are overridable there.
-- A dispatch ABOVE the role default (e.g. a Goldfish running above the implement tier) **MUST** carry the "model justification" entry in the dispatch metadata (MP-05 criteria); Critic briefings carry "criticality → model" (MP-07).
-- **MUST NOT** run any pipeline role below the implement-tier minimum capability — the cheapest "fast/cheap" model class is too weak for pipeline work (MP-03, hard).
-- **MUST NOT** set `CLAUDE_CODE_SUBAGENT_MODEL` — it silently overrides ALL subagent frontmatter and voids the matrix (MP-04).
-- **Why:** Subagents inherit the session model without an override — a Goldfish silently ran on the more expensive design-tier model for exactly this reason. Silent inheritance breaks both the cost model and the audit trail.
-- **Verification:** Briefing format check (dispatch metadata is mandatory field 6, `docs/operating-model.md` §2.3); telemetry row shows model/effort per dispatch (TB-06); bootstrap step 1b confirms the env var is unset (`harness/session-bootstrap.md`).
+Every agent or autonomous-run dispatch MUST state:
 
-## TB-02 — Effort and cache rules (MP-01/06/17/18/27)
+1. **Task and scope:** the single purpose, allowed inputs, allowed paths or
+   outputs, and excluded work.
+2. **Capability route:** role or capability profile, risk class, and why that
+   profile meets the task's ambiguity and risk.
+3. **Runner binding:** runner, model or capability binding, model/version pin
+   where supported, and effort or reasoning tier. Silent inheritance is
+   forbidden.
+4. **Budgets:** token, context, tool-call, and elapsed-time budgets, marking each
+   as requested, technically enforceable, or observational when supported
+   controls differ.
+5. **Verification:** the deterministic result or evidence required for
+   completion.
+6. **Stop and escalation:** when to stop, what partial result to return, and the
+   capability or decision owner to escalate to.
 
-- Elephant: **MUST** set model/effort per the chosen profile at session start and verify (bootstrap step 1b): profile `advisor` → the top design-tier model at effort `max` with the advisor model enabled, from session start; profile `design-first` → a lower-cost design-capable model at effort `xhigh`, then ONE sanctioned switch to the top design-tier model at effort `max` at the PRD gate. Effort is session-only and resets every start.
-- Goldfish: effort follows the MP-27 3-tier subagent matrix, not a single dispatch-time dial — `goldfish-mechanic` runs at effort `low` (mechanical, uniform, fully-specified plan execution, no in-task design decisions), `goldfish-implementor` at effort `medium` (the standard for clearly-briefed implementation), `goldfish-deep` at effort `xhigh` (test-suite/verify authorship, guardrail/hook/canon code, genuine in-task design latitude, class-high risk work). Tier choice IS the escalation/de-escalation lever (MP-06) — pick the subagent matching the task's actual design latitude; never default every dispatch to the top tier "to be safe", and never stretch a low-tier dispatch onto guardrail/test-authorship work. **MUST NOT** compare effort levels across models (the scale is per-model).
-- **MUST NOT** switch model or effort mid-session — both invalidate the entire prompt cache — **except the ONE sanctioned exception:** the single-direction switch up from the lower-cost design model to the top design-tier model at the PRD-gate in profile `design-first` (evidence = ledger entry + identity verification, EL-24/MP-17/MP-18). The reverse switch back down mid-session remains forbidden without exception. Need a different model or heavy token throughput otherwise? Cut a subagent (Goldfish/Critic) instead (MP-18); automatic mid-session model switching is not used in the pipeline.
-- `/compact` only at task boundaries with a focus argument; `/clear` + `/rename` on topic switch; prefer `/rewind` over `/compact` when discarding a dead-end path (MP-19). **Checkpoint window:** at every handover moment (package/wave boundary, PRD gate, before the first dispatch of a new package) once context reaches the checkpoint threshold, `/compact` is a MANDATORY checkpoint — for the exact, window-independent numbers see the one reconciled threshold ladder below (revision 2026-07-10): **≥180k → plan the cut, ≥200k → overdue**. Precondition: handover file/ledger current (persisted state = compact-safe, `docs/operating-model.md` §5.1) — never compact with unpersisted state.
-- **Why:** Cache economy is the second-largest cost lever after model choice: the Elephant context re-reads at 0.1× as cache; every mid-session switch pays full reprocessing of up to 1M tokens.
-- **Verification:** Bootstrap confirmation line names model/effort (+ profile/advisor state, `harness/session-bootstrap.md` step 1b); cache health is measurable (high read-to-write ratio via `/usage`); mid-session model switches appear in telemetry as anomalies UNLESS they are the documented PRD-gate switch event (ledger entry present, MP-18).
+If a runner cannot expose or enforce one of these dimensions, the dispatch MUST
+say so. Omission is not a limit. Completion evidence reports the binding that
+actually ran and any divergence from the dispatch.
 
-## TB-03 — Ultracode/workflow preconditions (MP-08/10/11)
+### TB-02 — Route to the lowest validated capability
 
-- Ultracode/Dynamic Workflows are a PER-TASK opt-in for the indication list only: initial research, approach/architecture exploration, audits, migrations. **MUST NOT** run ultracode as a session-permanent state; most coding tasks are the documented worst fit.
-- A workflow that WRITES files **MUST NOT** start unless all three preconditions hold (hard, blocking):
-  1. git-guard union installed as PreToolUse hook (the only layer that holds in `acceptEdits`),
-  2. tight Bash allowlist for the session (only task-required commands),
-  3. isolated worktree — never the main checkout.
-- <PROJECT_B> additionally requires explicit PO approval for writing workflows until the guard migration completes (see the live-deploy-lock example policy, `governance/examples/policies/live-deploy-lock.md`).
-- Parallel fan-out default: 3–5 agents; more only with explicit justification AND a prior calibration run (MP-11).
-- **Why:** Workflow subagents always run in `acceptEdits` and inherit the session's tool allowlist — permission modes (`plan`/`ask`) do NOT apply there; hooks, allowlist, and isolation are the only effective protection (ADR-0007).
-- **Verification:** The workflow start prompt names the three preconditions explicitly; the bootstrap check verifies hook installation; read-only workflows are exempt. OPEN (Phase 4): deterministic precondition check in the workflow start building block (ADR-0007 risk note). OPEN (Phase 4, from MP-10): whether the existing divergent project guards suffice transitionally until the union ships — until decided: ask the PO.
+Routing MUST use the lowest capability profile validated for the task's risk,
+ambiguity, and verification needs. Risk-class floors are policy; concrete model
+names, environment variables, and effort values are projection configuration.
+Moving above the normal floor requires a reason. Moving below it requires an
+approved, separately defined profile rather than an informal exception.
 
-## TB-04 — Calibration run before novel large runs (MP-09/14, recommended)
+Architecture, security, guardrail, policy, and adversarial review work retains
+its higher capability and independence requirements. A cheap or fast binding is
+not validated merely because it can accept the prompt.
 
-- **SHOULD** run a small-slice calibration before any NOVEL large run (workflow or long autonomous single run): one directory instead of the repo, one narrow question instead of a broad one; watch spend via `/workflows`.
-- Not a mandatory hurdle — but for novel workflows expected to exceed ~30 min, the telemetry row **MUST** record whether a calibration ran ("peculiarities" column).
-- **Why:** Large-run consumption is barely estimable up front ("a single run can use meaningfully more tokens than the same task in conversation"); the small slice buys the projection before the budget is gone.
-- **Verification:** Telemetry row of the large run references its calibration run.
+### TB-03 — Micro-Goldfish is a distinct bounded route
 
-## TB-05 — Budget escalation (MP-16/20)
+The micro-Goldfish capability profile is limited to one small, testable SDLC
+slice with fresh context and no durable memory. Its dispatch MUST include
+explicit path/output scope, tool/context/time budgets, deterministic
+verification, and a stop-and-report condition.
 
-- Budget overrun is defined: the `/usage-credits` monthly limit is reached, OR a calibration-run projection clearly exceeds expectation. Then: **MUST** stop and escalate to the PO (escalation ladder level 4, `docs/operating-model.md` §4.3) — do not "finish quickly first".
-- Autonomous `/goal` runs **MUST** contain an explicit stop clause (e.g. "... or stop after {{N}} turns") (MP-15).
-- **MUST NOT** base budget control on undocumented mechanisms (prompt directives like "+500k", unverified flags) — only documented instruments count: `/usage`, `/usage-credits`, workspace spend limits, `/workflows` live view.
-- **Why:** Without a defined threshold and stop, a misdirected run has no structural upper bound; undocumented knobs are hope, not control.
-- **Verification:** Escalation is documented in the session/telemetry ("peculiarities"); briefings for autonomous runs contain the stop clause (stop conditions are mandatory briefing field 5).
+Suitable work includes bounded mechanical implementation, focused
+verification, and routine documentation or maintenance. The micro-Goldfish MUST
+stop and escalate to a full Goldfish or Elephant when the slice:
 
-## TB-06 — Telemetry duty (MP-20)
+- uncovers architectural ambiguity;
+- crosses its declared scope;
+- needs a security, guardrail, or policy decision;
+- cannot be verified deterministically; or
+- approaches any stated budget.
 
-- Every session/block close **MUST** append one row to the project's `telemetry/costs.md` — canonical column set and conventions are defined in `policies/model-policy.md` MP-20 (date, session/block, role, model/effort, task, tokens per `/usage`, first-pass y/n, interventions y/n, peculiarities). Do not fork the format here.
-- Goldfish rows **MUST** fill the maturity-metric columns (first-pass, interventions); `--bare`/headless runs add `total_cost_usd` from `--output-format json`.
-- The `close-block` skill (shipped, `plugins/pipeline-core`) writes the row as ritual step 8; wherever the skill is not installed/run, the row is a MANUAL mandatory step — in this repo from now on (`telemetry/costs.md`), in project repos from their migration (Phase 4).
-- The first Elephant session of a month runs the monthly sighting (3–5 findings lines, first-pass quota, cache health) per MP-20.
-- **Why:** "Cost telemetry from day 1" stayed a soft TODO without an instrument; the periodic price review needs task-level data, not $/MTok guesses (tokenizer trap, MP-13).
-- **Verification:** File exists and grows (`git log telemetry/costs.md`); the `/close` drift check flags missing rows; monthly sighting section exists per month.
+It is never a substitute for an independent Critic or for a higher capability
+floor already required by the task. A runner projection owns the concrete
+binding, invocation, model/version, context window, supported controls,
+telemetry mapping, and enforceable limits. No micro-Goldfish runner is enabled
+by default until the pending canonical decision in TB-09 is complete.
 
-## TB-07 — Session lifecycle thresholds: planned cut, never emergency compaction (MP-19)
+### TB-04 — Context thresholds are calibrated configuration
 
-- **MUST NOT** plan for auto-compaction: it is a lossy, uncontrolled safety net. A session that runs into auto-compaction is a process failure → retro question "why was the cut missed?".
-- The planned cut is loss-free ONLY if `guardrails/global.md` GL-07 was lived (everything persisted); re-bootstrapping is then a 30-second operation.
-- **Why:** What auto-compaction discards is not the PO's decision; the planned cut at a boundary keeps the artifact complete and the cache economics sane (`docs/operating-model.md` §5.2).
-- **Verification:** `/context` check is a step in the close/block-change ritual; a session-end commit with the updated handover file exists; auto-compaction incidents are flagged in the retro and telemetry.
-- **One reconciled threshold ladder (revision 2026-07-10, resolves a prior three-way contradiction between an old 100–150k window, an old 120k-WARN/150k-MANDATORY pair, and the shipped absolute ladder below — this is now the ONLY normative wording; the retired numbers are superseded, not a second source):**
-  - **Elephant self-check, ABSOLUTE (matches the Stop hook, `stop-suggest.mjs`'s `absoluteContextTier`):** at every package/phase boundary AND after every dispatch WAVE, the Elephant reads `.claude/.usage-<session_id>.json` (`usedPct`/`totalTokens`/`contextWindowSize`/`updatedAt`) and self-assesses on the REAL, window-independent token count — **≥ 180k → soft nudge (WARN):** start planning a checkpoint now (what does the handover file need, is a natural boundary close); **≥ 200k → soft nudge (OVERDUE):** write the checkpoint, then `/compact` or restart, do NOT wait until 250k "because there's still room" — that reasoning is exactly what produced an expensive session observed here (71% of its usage ran past its own overdue threshold); **≥ 250k → OVERDUE, strongest-soft framing** (same machine-checkable tier as 200k, just more urgent in wording). **Heed `updatedAt` freshness:** the snapshot only refreshes when the statusLine renders, so on long/remote/autonomous stretches it can be STALE — when `updatedAt` is old relative to work done since, treat real usage as HIGHER than the snapshot and checkpoint conservatively rather than trusting a stale low number.
-  - **Hard emergency brake, PERCENT-based (EL-04, 2026-07-08, preserved verbatim — a `decision:"block"` on a large, lightly-used window would be spurious):** ≥50% used → warn, ≥75% used → overdue, ≥85% used → block/emergency — this is `contextTier`'s own ladder in `stop-suggest.mjs`, window-relative by design (a 1M-token window's 50% is ~500k tokens, not 100k). The ≥85% floor is the ONLY tier that may ever set `decision:"block"`; the absolute ladder above is structurally incapable of reaching it (`effectiveContextTier` combines both via "more severe wins", so the absolute ladder can only ever ADD a soft nudge, never trigger or strengthen the hard brake).
-  - **Re-arm:** once a soft nudge fires, it re-emits again every time real usage grows by **≥ 50k tokens** since that nudge, even if the phase+tier fingerprint is otherwise unchanged (`lastEmittedTotalTokens` in the session marker) — a session sitting at "overdue" for hundreds of thousands more tokens because nothing else changed must not go silent.
-  - **Every emitted nudge carries a copyable `/compact <summary prompt>` line**, appended once inside `buildContextMessage()` (and always positioned as the true final line of the emitted text, ahead of any stale/nag notes, fix 2026-07-10) so every reuse/downgrade path gets it automatically — the goal is one copy-paste away from the checkpoint, not just a warning that names the problem.
-  - **After every dispatch WAVE** (not only at package/phase boundaries), the Elephant actively checks whether a cut is due, instead of discovering it only once already deep inside a large context. The statusline token-field bug behind the live signal is already fixed (`statusline-context.mjs`) — these thresholds now have a working live signal to fire against, not a silently-zeroed gauge.
-  - **Do NOT rely solely on the Stop-hook context-warning or the PO to raise a checkpoint** — the Elephant self-check above is the same ladder the hook applies, run proactively rather than waited for.
+Each runner projection MUST define a context-threshold ladder that combines:
 
-## TB-08 — Workflow-agent tool-call budget; script-first for bulk edits
+- calibrated absolute token thresholds;
+- calibrated percentages of the available context window; and
+- freshness of the usage observation.
 
-- When dispatching **Workflow** subagents, size each agent's task to complete within **<= 45 tool calls**. There is an observed hard cap of ~50 tool calls per workflow agent: on reaching it the agent is truncated mid-task, returns **NO StructuredOutput** (its result is `null`), and that agent's work is lost -- forcing a re-dispatch that spends the tokens twice.
-- For bulk edits across many files, use **script-first**: one `node`/replacement script in a single Bash call instead of N per-file `Edit` calls. Per-line editing exhausts the budget after ~15-20 files; a script processes hundreds in one call.
-- The cap is per **workflow** agent. **Direct** Agent-tool dispatches (outside a Workflow) do NOT share it (observed 59 tool calls in one dispatch) -- pressure is lower there, but script-first stays the token-efficient default for mass edits.
-- **Why:** In an observed run, five parallel workflow agents each hit exactly 50 tool calls doing per-line edits, were truncated without structured output, and had to be re-dispatched; the re-run as script-first direct agents finished in one pass. Budgeting <=45 + script-first avoids the double spend.
-- **Verification:** Bulk-edit workflow briefings specify a script-first method; a workflow agent returning `null` with `toolCalls~=50` in the progress log is the failure signature to flag in retro.
+A stale or incomplete usage snapshot is treated conservatively. Persist the
+handover/checkpoint before compaction, restart, or handoff. Emergency automatic
+compaction is a safety net, not a session strategy. Sessions and work packages
+stay single-purpose, with planned checks after dispatch waves and at natural
+phase boundaries.
 
-## TB-09 — Tool-call budget is a MANDATORY field in every dispatch, not only Workflow agents
+Cache-invalidating changes and mid-session model switches SHOULD be minimized.
+Any sanctioned switch MUST be declared by the runner projection and recorded in
+the evidence. Runner commands for inspecting, compacting, clearing, rewinding,
+or handing off context are projection vocabulary, not kernel vocabulary.
 
-- The <= 45 tool-call budget (TB-08) is **NOT limited to Workflow agents.** It is a **MANDATORY field in every Goldfish briefing** (and every other subagent dispatch) — stated as an explicit number in the briefing's dispatch-metadata field (canonical field 6, `docs/operating-model.md` §2.3), not left implicit.
-- **MUST** pair the number with a STOP rule: on reaching the stated budget, the agent stops cleanly and reports what is done and what remains — it does **NOT** keep digging past the number to "just finish this one thing." A justified stop on budget is a first-class result, not a failure to route around.
-- **Honest limit, stated plainly:** there is (still) no hard per-subagent technical tool-call counter outside the observed ~50-call Workflow-agent truncation behavior described in TB-08. TB-09 is a briefing/behaviour rule, carried by the agent's own discipline and by the Elephant reading the completion report (`toolUsesApprox`) — **it is NOT a hook and NOT technically enforced.** No dispatch, briefing, doc, or report may claim or imply otherwise; a claimed-but-unimplemented technical block is exactly the credibility failure this rule exists to close.
-- **Why:** TB-08 was scoped to Workflow agents because that is where the ~50-call truncation was observed and measured; the same discipline — bounded task, report-early, no unbounded digging — is equally valuable for every other dispatch, where no equivalent technical truncation exists to catch an overrun for you.
-- **Verification:** Goldfish/subagent briefings carry the tool-budget number as a stated field; completion reports state `toolUsesApprox`; a report that blows far past its stated budget without a clean stop-and-report is the TB-09 failure signature to flag in retro — self-reported here, unlike TB-08's `null`-result truncation signature.
+### TB-05 — Calibrate novel or expensive paths
+
+A novel or expensive execution path SHOULD start with a small representative
+slice. The calibration defines an expected budget and an overrun condition
+before the larger run starts. Crossing that condition stops the run and returns
+completed work, remaining work, and the reason for escalation; it does not
+authorize a final unbudgeted push.
+
+Verbose investigation belongs in a bounded fresh executor. Bulk deterministic
+edits are script-first when that reduces repeated tool calls without weakening
+reviewability or verification.
+
+## B4E-BOUNDED-TOOLS
+
+### TB-06 — Every dispatch has a tool-call budget
+
+The dispatch's tool-call budget is mandatory even when the runner provides no
+technical counter or hard stop. At the stated budget, the executor MUST stop
+cleanly and report what is complete, what remains, and the next safe action.
+Approaching the budget is a reason to simplify, checkpoint, or escalate, not to
+hide additional calls.
+
+A budget is technically enforced only when the named runner surface actually
+blocks or terminates further calls. Otherwise it is an advisory behavioral
+limit, verified from the trajectory or completion report. Policy and reports
+MUST NOT describe an advisory limit as a hook, hard cap, or guarantee.
+
+### TB-07 — Use bounded tasks and deterministic bulk operations
+
+Dispatches MUST be narrow enough to finish within their declared budgets.
+Repeated per-file or per-line edits SHOULD be replaced by a reviewable,
+deterministic script when a script can perform the same transformation in fewer
+calls. The script and its result remain subject to the same scope and
+verification requirements.
+
+If a task reveals unbounded discovery, the executor stops early with findings
+and a proposed re-slice. Partial, well-evidenced completion is preferable to a
+truncated or unverifiable result.
+
+### TB-08 — Budget evidence separates four values
+
+Completion evidence MUST distinguish:
+
+- the requested budget;
+- the technically enforceable limit, if any;
+- actual or approximate observed use; and
+- estimation uncertainty.
+
+It also records interventions, budget-triggered stops, and runner termination
+signatures. Approximate values MUST be labeled approximate. Missing telemetry
+MUST be stated rather than reconstructed as fact.
+
+## Runner projections
+
+### Claude compatibility projection
+
+The following values are compatibility evidence for the Claude runner only;
+they are not cross-provider defaults:
+
+- Existing context handling uses soft absolute checkpoints at approximately
+  180k tokens (plan the cut), 200k (checkpoint is overdue), and 250k (strongest
+  soft warning), together with percentage-based warnings at 50%, 75%, and an
+  emergency brake at 85%. Freshness remains part of the decision. These values
+  may remain only until runner-specific recalibration replaces them.
+- An observed Claude Workflow-agent termination near 50 tool calls motivates a
+  recommended dispatch budget of no more than 45 calls for that execution mode.
+  This is scoped operational evidence, not a universal Claude guarantee and not
+  a limit for direct agents, Codex, Snap, or another runner.
+- Commands such as `/compact`, `/clear`, `/rewind`, `/usage`, `/goal`, and
+  `/workflows` are Claude bindings. Their presence here does not make them
+  portable policy vocabulary.
+
+### Codex and other runner projections
+
+Each projection MUST document its public commands, supported controls, context
+window configuration, telemetry fields, and genuinely enforceable limits. No
+numeric tool-call or context threshold is inferred from the Claude
+compatibility projection. Unsupported controls are declared explicitly.
+
+### Snap micro-Goldfish projection
+
+The approved direction is a Snap-backed projection of the micro-Goldfish
+profile, not a redefinition of Goldfish or Critic and not a kernel model name.
+Its exact model/version, invocation, limits, and telemetry remain pending the
+canonical decision and calibration below. This policy does not claim that the
+projection is enabled, supported, or calibrated today.
+
+## Pending bounded follow-ups
+
+### TB-09 — Phase-3 work not delivered by this policy wave
+
+The following work remains bounded and pending:
+
+1. Before enabling the micro-Goldfish route by default, add a durable decision
+   naming the profile, Snap binding, allowed task classes, escalation triggers,
+   and its narrow precedence over the full-Goldfish floor.
+2. Calibrate rather than guess: run 3–5 representative bounded Snap slices and
+   a comparable full-Goldfish control, recording completion, verification,
+   interventions, elapsed time, tokens/context, and tool use. Until then,
+   require explicit per-dispatch budgets and publish no universal micro default.
+3. Add conformance fixtures that reject silent inheritance, unsupported risk
+   classes, and over-budget continuation, and that verify stale-usage handling,
+   checkpoint-before-cut, and stop-and-report. Keep any `<=45` fixture inside
+   the Claude projection.
+4. Complete the adapter-owned tooling-radar source registry described in the
+   tooling policy before claiming runner/provider support.
+
+These follow-ups do not lower existing full-role floors and are not claimed as
+implemented by this document.
