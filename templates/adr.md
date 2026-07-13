@@ -34,7 +34,7 @@ Status vocabulary: "proposed" | "accepted (YYYY-MM-DD, <Gate>)" |
 
 > {{PROJECT_OR_PIPELINE_ID e.g. "Agent-Pipeline v0.1.0-draft"}} · {{PHASE_OR_SPRINT}} · as of {{YYYY-MM-DD}}
 
-**Status:** {{STATUS}} · **Basis:** {{REGISTER_ENTRY / MANDATE / TRIGGER with reference, e.g. "decision register entry ([state.md](../state.md))"}}
+**Status:** {{STATUS}} · **Basis:** {{REGISTER_ENTRY / MANDATE / TRIGGER with reference, e.g. "decision register entry (`docs/state.md`; link relative to the ADR's final location)"}}
 
 ## Context
 
