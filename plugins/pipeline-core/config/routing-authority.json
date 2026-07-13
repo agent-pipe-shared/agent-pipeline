@@ -1,0 +1,73 @@
+{
+  "schema": "pipeline.routing-authority.v0",
+  "advisorProjectionEffort": "not-applicable",
+  "presets": {
+    "max": {
+      "worktypes": {
+        "design": {
+          "design_phase": { "capability": "design", "effort": "high" },
+          "execution_phase": { "capability": "design", "effort": "high" },
+          "advisor": null
+        },
+        "feature": {
+          "design_phase": { "capability": "design", "effort": "high" },
+          "execution_phase": { "capability": "implement", "effort": "high" },
+          "advisor": { "capability": "design", "effort": "not-applicable" }
+        },
+        "mini": {
+          "design_phase": { "capability": "implement", "effort": "high" },
+          "execution_phase": { "capability": "implement", "effort": "high" },
+          "advisor": { "capability": "design", "effort": "not-applicable" }
+        }
+      },
+      "models": {
+        "implement": { "capability": "implement", "effort": "medium" },
+        "mechanic": { "capability": "mechanic", "effort": "low" },
+        "deep": { "capability": "deep", "effort": "xhigh" },
+        "review": { "capability": "review", "effort": "max" }
+      }
+    },
+    "pro": {
+      "worktypes": {
+        "design": {
+          "design_phase": { "capability": "implement", "effort": "high" },
+          "execution_phase": { "capability": "implement", "effort": "high" },
+          "advisor": null
+        },
+        "feature": {
+          "design_phase": { "capability": "implement", "effort": "max" },
+          "execution_phase": { "capability": "implement", "effort": "high" },
+          "advisor": null
+        },
+        "mini": {
+          "design_phase": { "capability": "implement", "effort": "max" },
+          "execution_phase": { "capability": "implement", "effort": "high" },
+          "advisor": { "capability": "implement", "effort": "not-applicable" }
+        }
+      },
+      "models": {
+        "implement": { "capability": "implement", "effort": "medium" },
+        "mechanic": { "capability": "mechanic", "effort": "low" },
+        "deep": { "capability": "deep", "effort": "xhigh" },
+        "review": { "capability": "review", "effort": "max" }
+      }
+    }
+  },
+  "agentAssignments": {
+    "plugins/pipeline-core/agents/goldfish-mechanic.md": { "capability": "mechanic", "effort": "low" },
+    "plugins/pipeline-core/agents/goldfish-implementor.md": { "capability": "implement", "effort": "medium" },
+    "plugins/pipeline-core/agents/goldfish-deep.md": { "capability": "deep", "effort": "xhigh" },
+    "plugins/pipeline-core/agents/critic.md": { "capability": "review", "effort": "max" },
+    "plugins/pipeline-core/agents/plan-verifier.md": { "capability": "review", "effort": "high" }
+  },
+  "dispatchBoundAgents": {
+    "plugins/pipeline-core/agents/consult-advisor.md": { "model": null, "effort": "high" }
+  },
+  "dispatchProfiles": {
+    "light": {
+      "ceremonyOnly": true,
+      "allowedRoutes": ["mechanic", "implement"],
+      "forbiddenClasses": ["high-risk", "architecture", "guardrail", "security"]
+    }
+  }
+}

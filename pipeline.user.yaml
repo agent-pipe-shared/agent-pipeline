@@ -80,7 +80,7 @@ models:                             # dispatch tiers only (MP-27: mechanic/imple
     effort: xhigh
   review:
     model: sonnet
-    effort: high
+    effort: max
 
 autonomy:
   push_policy: gated                # gated | standing-approved

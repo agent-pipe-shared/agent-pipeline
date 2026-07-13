@@ -50,6 +50,9 @@ const libDir = join(repoRoot, "plugins", "pipeline-core", "lib");
 const pluginScriptsDir = join(repoRoot, "plugins", "pipeline-core", "scripts");
 
 const TEST_SUITES = [
+  { name: "setup-tests", file: join(repoRoot, "setup.test.mjs") },
+  { name: "routing-projection-tests", file: join(pluginScriptsDir, "check-routing-projections.test.mjs") },
+  { name: "routing-projection-check", file: join(pluginScriptsDir, "check-routing-projections.mjs") },
   { name: "guard-git-tests", file: join(hooksDir, "guard-git.test.mjs") },
   { name: "guard-testpath-tests", file: join(hooksDir, "guard-testpath.test.mjs") },
   { name: "staleness-check-tests", file: join(hooksDir, "staleness-check.test.mjs") },

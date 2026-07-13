@@ -140,6 +140,30 @@ checkCli("FULL VALID  templates/pipeline.yaml.example parses and validates clean
 checkCli("FULL VALID  this repo's own committed .claude/pipeline.yaml parses and validates clean", join(REPO_ROOT, ".claude", "pipeline.yaml"), 0, {
   stdoutIncludes: "Manifest valid",
 });
+checkCli(
+  "MODEL ROUTING VALID  a complete projected route carries model and effort",
+  fixture("routing-complete.yaml", "schema: pipeline.manifest.v0\nmodelRouting:\n  goldfish:\n    model: sonnet\n    effort: medium\n"),
+  0,
+  { stdoutIncludes: "Manifest valid" },
+);
+checkCli(
+  "MODEL ROUTING REQUIRED  model cannot be omitted",
+  fixture("routing-missing-model.yaml", "schema: pipeline.manifest.v0\nmodelRouting:\n  goldfish:\n    effort: medium\n"),
+  2,
+  { stderrIncludes: "model" },
+);
+checkCli(
+  "MODEL ROUTING REQUIRED  effort cannot be omitted",
+  fixture("routing-missing-effort.yaml", "schema: pipeline.manifest.v0\nmodelRouting:\n  goldfish:\n    model: sonnet\n"),
+  2,
+  { stderrIncludes: "effort" },
+);
+checkCli(
+  "MODEL ROUTING ENUM  unsupported effort cannot enter a projection",
+  fixture("routing-unsupported-effort.yaml", "schema: pipeline.manifest.v0\nmodelRouting:\n  goldfish:\n    model: sonnet\n    effort: turbo\n"),
+  2,
+  { stderrIncludes: "turbo" },
+);
 
 // ---- MISSING REQUIRED FIELD ---------------------------------------------------------------------
 checkCli(

@@ -45,30 +45,45 @@ security:
       enabled: true
       rules_dir: governance/examples/policies/semgrep
 
-# Machine-readable projection of policies/model-policy.md (MP-01/02/05/07/27/28) -- that file
-# stays canonical; this is only the pipeline's own reflection of it, per role. The models
-# below are the shipped defaults; override them per role in pipeline.user.yaml (worktypes.*/models.*).
 modelRouting:
-  # elephant: pipeline-manifest.schema.json's modelRouting shape is a flat {model, effort, note}
-  # per role (schema-lite has no $ref/oneOf to express nested per-worktype/phase routing without
-  # invasive manifest-schema surgery, flagged as out of scope -- see the shared setup.mjs
-  # renderPipelineYaml() comment). "profile-bound" stays the representative-value placeholder;
-  # the authoritative per-worktype/phase routing lives in pipeline.user.yaml -> worktypes
-  # (design-first/advisor/speed session profiles, MP-01/26/28).
-  elephant:
-    model: profile-bound
-    effort: profile-bound
-    note: "session-profile-bound -- see pipeline.user.yaml -> worktypes for the authoritative per-worktype/phase routing"
-  # goldfish: representative value (the MP-27 3-tier dispatch matrix -- mechanic/implement/deep --
-  # is canonical in policies/model-policy.md; this single entry is not yet split per tier here).
+  # Generated projection: authority=7932e75def2ea6bd mappings=334243f47adab7dd runner=claude source=pipeline.user.yaml.
+  # Do not edit this block as an independent routing authority.
+  elephant_design_design:
+    model: opus
+    effort: high
+  elephant_design_execution:
+    model: opus
+    effort: high
+  elephant_feature_design:
+    model: opus
+    effort: high
+  elephant_feature_execution:
+    model: sonnet-5
+    effort: high
+  advisor_feature:
+    model: opus
+    effort: not-applicable
+  elephant_mini_design:
+    model: sonnet-5
+    effort: high
+  elephant_mini_execution:
+    model: sonnet-5
+    effort: high
+  advisor_mini:
+    model: opus
+    effort: not-applicable
   goldfish:
     model: sonnet-5
+    effort: medium
+  goldfish_mechanic:
+    model: sonnet-5
+    effort: low
+  goldfish_deep:
+    model: sonnet-5
     effort: xhigh
-    note: "representative value -- MP-27 3-tier dispatch matrix (mechanic/implement/deep) is canonical in policies/model-policy.md"
   critic:
     model: sonnet-5
     effort: max
-    note: "MP-07 -- review tier escalates to a higher-capability model on architecture/guardrails/security findings"
 
 profiles:
   active: full-sdlc

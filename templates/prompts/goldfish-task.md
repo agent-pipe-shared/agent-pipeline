@@ -15,11 +15,12 @@ USAGE (Elephant)
    briefing-format check (operating-model §3.2 step 4) fails.
 2. This text plus the files listed in field 2 are the Goldfish's ENTIRE input.
    Never paste chat history, never paste your reasoning about alternatives.
-3. Dispatch as subagent (default: the implement-tier model, effort high–max per MP-02).
+3. Dispatch as subagent (default: `goldfish-implementor`, effort `medium` per MP-27).
    Deviation from the role default REQUIRES the model justification in field 6.
 4. Writing tasks: worktree per project calibration (`.claude/pipeline.json`).
-5. Light profile (stage-0 / uniform-mechanic ONLY): set field 6 `Profile: light` for a
-   condensed 3-field report, effort `xhigh`, reference-inlining, no baseline verify. Use
+5. Light profile (stage-0 / bounded implementation ONLY): set field 6 `Profile: light` for a
+   condensed 3-field report, reference-inlining, no baseline verify. Route mechanical work to
+   `goldfish-mechanic`/`low` and bounded implementation to `goldfish-implementor`/`medium`. Use
    the standard profile (6-field report, full references) for class-high / guardrail work.
 6. Briefing language is English (ADR-0011) — confirm before dispatch; this is a
    checklist item, not an assumed default.
@@ -121,11 +122,11 @@ Stop and report (do not keep iterating) when ANY of these occurs:
 
 - Ruleset SHA/version (always, from the Elephant's bootstrap): `{{RULESET_SHA}}`
   — echo it in your confirmation line.
-- Model/effort for this run: {{MODEL_EFFORT default: "the implement-tier model / max"}}.
+- Model/effort for this run: {{MODEL_EFFORT default: "the implement-tier model / medium"}}.
 - Model justification (ONLY if deviating from the Goldfish default, MP-05):
   {{MODEL_JUSTIFICATION e.g. ">15 files across two subsystems → the design-tier model per MP-05 criterion 1" or "n/a — role default"}}
 - Worktree: {{WORKTREE e.g. "yes — per calibration `worktree: on-write`" or "no — read-only task"}}
-- Profile: {{standard | light}} — `light` ONLY for stage-0 / uniform-mechanical tasks (operating-model §3.3): condensed 3-field report (see below), effort `xhigh` (`high` only if trivial-uniform), skip the pre-edit baseline verify. Never `light` for class-high / guardrail work.
+- Profile: {{standard | light}} — `light` ONLY for stage-0 mechanical or bounded implementation tasks (operating-model §3.3): condensed 3-field report (see below), mechanic `low` or implementor `medium`, skip the pre-edit baseline verify. Never `light` for deep, class-high, architecture, guardrail, or security work.
 - **Tool budget (TB-09, hard cap, first-class field):** {{TOOL_BUDGET default: "≤45 tool uses"}}. This is a mandatory field in EVERY goldfish briefing, not just workflow-agent dispatches. Approaching or reaching the cap is a stop condition (field 5): stop cleanly and report what is done + what remains — never "push through" past it. **Honesty note:** this is a briefing/behavior rule, not a hook-enforced count — no automated per-subagent tool-call counter exists (yet); documented as such rather than overclaimed as "will be blocked" (the G1 lesson, `policies/tooling-policy.md` AP-T2).
 - **Dispatch record (standard evidence):** write `dispatch-record.json` next to your evidence artifact with fields `taskId`, `model`, `rulesetSha`, `dispatcher`, `outcome` — this template is the authoritative definition of that file's shape. Together with the `Dispatch: {{TASK_ID}} (goldfish)` commit-trailer line (see Final report below), it is the deterministic authorship/evidence pair for close step 6b and the Critic — standard harness trailers (`Co-Authored-By:`, `Claude-Session:`) alone are not authorship evidence.
 - **Report-early duty (truncated-final mitigation):** for packages expected to
