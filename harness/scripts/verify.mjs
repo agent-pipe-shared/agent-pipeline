@@ -25,8 +25,9 @@
  * stage — the test suites plus the manifest-gated phase steps ARE the full chain
  * for a docs+guardrails repo. `steps[]` below therefore lists one entry per step run,
  * not the generic format/lint/typecheck/tests/build shape from the QG-03 sketch (gate
- * honesty, QG-05: this gate does NOT check prose/doc content, only the executable
- * harness — hooks, libs, phase runners).
+ * honesty, QG-05: this gate checks executable harness behavior plus internal
+ * Markdown link/anchor and calibrated handover-authority contracts; it does not
+ * judge prose semantics or fetch external URLs).
  *
  * Evidence artifact: written to `evidence/verify-latest.json` (git-ignored — see
  * root .gitignore; a fresh, regenerated-every-run status snapshot is not a durable
@@ -69,6 +70,8 @@ const TEST_SUITES = [
   { name: "git-cmd-tests", file: join(libDir, "git-cmd.test.mjs") },
   { name: "validate-manifest-tests", file: join(scriptDir, "validate-manifest.test.mjs") },
   { name: "pipeline-state-tests", file: join(scriptDir, "pipeline-state.test.mjs") },
+  { name: "doc-contract-tests", file: join(scriptDir, "check-doc-contracts.test.mjs") },
+  { name: "doc-contract-check", file: join(scriptDir, "check-doc-contracts.mjs") },
   { name: "security-scan-tests", file: join(scriptDir, "security-scan.test.mjs") },
   { name: "no-autoupdate-key-tests", file: join(scriptDir, "no-autoupdate-key.test.mjs") },
 ];
