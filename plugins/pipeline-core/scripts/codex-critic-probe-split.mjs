@@ -171,7 +171,10 @@ async function runOne({ fixture, taskId, taskType, schemaPath, leaseMs, spawn = 
   const startedAt = Date.now();
   const heartbeat = setInterval(() => { try { onHeartbeat({ taskType, elapsedMs: Date.now() - startedAt, stdoutBytes: stdout.bytes, stderrBytes: stderr.bytes }); } catch {} }, 5_000);
   await new Promise((resolve) => {
-    const timer = setTimeout(() => { timeout = true; void terminate(child, "lease-timeout"); }, leaseMs);
+    const timer = setTimeout(() => {
+      timeout = true;
+      if (!terminationPromise) terminationPromise = terminate(child, "lease-timeout");
+    }, leaseMs);
     child.once("error", () => { terminal = { code: null, signal: null, error: "child-error" }; clearTimeout(timer); resolve(); });
     child.once("exit", (code, signal) => { terminal = { code, signal, error: null }; clearTimeout(timer); resolve(); });
   });
