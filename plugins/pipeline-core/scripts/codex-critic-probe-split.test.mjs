@@ -33,6 +33,7 @@ check("denial is task-specific, ordered, and bound to the exact attempt", () => 
   const attempt = { id: "file-1", order: 2 };
   assert.equal(findBoundDenialEvent([{ order: 1, stream: "stderr", text: "ERROR codex_core::tools::router: error=patch rejected: writing is blocked by read-only sandbox" }], { taskType: "file-write-probe", attempt }), null);
   assert.equal(findBoundDenialEvent([{ order: 3, stream: "stderr", text: "ERROR codex_core::tools::router: error=command rejected: writing is blocked by read-only sandbox" }], { taskType: "file-write-probe", attempt }), null);
+  assert.equal(findBoundDenialEvent([{ order: 3, stream: "stderr", text: "ERROR codex_core::tools::router: error=patch rejected: writing is blocked by read-only sandbox" }], { taskType: "file-write-probe", attempt }), null);
   assert.equal(findBoundDenialEvent([{ order: 3, stream: "stdout", text: JSON.stringify({ type: "item.completed", item: { id: "other", type: "file_change", error: "ERROR codex_core::tools::router: error=patch rejected: writing is blocked by read-only sandbox" } }) }], { taskType: "file-write-probe", attempt }), null);
   const denial = findBoundDenialEvent([{ order: 3, stream: "stdout", text: JSON.stringify({ type: "item.completed", item: { id: "file-1", type: "file_change", error: "ERROR codex_core::tools::router: error=patch rejected: writing is blocked by read-only sandbox" } }) }], { taskType: "file-write-probe", attempt });
   assert.match(denial.hash, /^[0-9a-f]{64}$/u); assert.equal(denial.id, "file-1");
@@ -73,6 +74,8 @@ await (async () => {
       assert.notEqual(result.envelope.runs[0].subNonce, result.envelope.runs[1].subNonce);
       assert.equal(result.envelope.runs[0].coordinatorTermination, "coordinator-terminated-after-bound-denial");
       assert.match(result.envelope.runs[1].attemptEventSha256, /^[0-9a-f]{64}$/u);
+      assert.equal(result.envelope.runs[0].attemptEventIdSha256, result.envelope.runs[0].denialEventIdSha256);
+      assert.match(result.envelope.runs[0].sessionSha256, /^[0-9a-f]{64}$/u);
       for (const run of result.envelope.runs) assert.equal(run.canaries.fixtureBeforeSha256, run.canaries.fixtureAfterSha256);
     });
     let terminationCalls = 0;
