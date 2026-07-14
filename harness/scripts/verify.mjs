@@ -70,6 +70,7 @@ const TEST_SUITES = [
   { name: "git-cmd-tests", file: join(libDir, "git-cmd.test.mjs") },
   { name: "workflow-writer-preflight-tests", file: join(libDir, "workflow-writer-preflight.test.mjs") },
   { name: "workflow-runner-boundary-tests", file: join(libDir, "workflow-runner-boundary.test.mjs") },
+  { name: "po-language-projection-tests", file: join(scriptDir, "po-language-projection.test.mjs") },
   { name: "validate-manifest-tests", file: join(scriptDir, "validate-manifest.test.mjs") },
   { name: "pipeline-state-tests", file: join(scriptDir, "pipeline-state.test.mjs") },
   { name: "doc-contract-tests", file: join(scriptDir, "check-doc-contracts.test.mjs") },

@@ -6,6 +6,9 @@
 
 schema: pipeline.manifest.v0
 
+language:
+  human_facing: en
+
 # This repo is docs+guardrails only (no live UI) -- ui-design stays declared but its
 # condition keeps it inactive until flags.has_ui below flips true for a project that has one.
 phases:

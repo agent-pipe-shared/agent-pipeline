@@ -11,6 +11,14 @@
       "type": "string",
       "enum": ["pipeline.manifest.v0"]
     },
+    "language": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["human_facing"],
+      "properties": {
+        "human_facing": { "type": "string", "enum": ["de", "en"] }
+      }
+    },
     "phases": {
       "type": "array",
       "items": {

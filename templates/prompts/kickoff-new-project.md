@@ -214,7 +214,7 @@ session specifically:
 - **Workspace boundary (EL-18)** — one repo, one Elephant; cross-project
   findings become a transfer item in the target repo's `backlog/items/`,
   never a direct foreign-repo edit.
-- **PO-Gate (PRD):** for rigor ≥1 / class-high work, the PO releases a German `prd_<topic>.md` (product rationale) BEFORE the first implementation dispatch (EL-19 / operating-model §3.2 step 3b); true stage-0 hotfixes are exempt.
+- **PO-Gate (PRD):** for rigor ≥1 / class-high work, read `language.human_facing` from compiled `.claude/pipeline.yaml` before authoring the PO-facing `prd_<topic>.md`; if unavailable, stop and repair setup. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / operating-model §3.2 step 3b). True stage-0 hotfixes are exempt.
 - **EL-01** — every implementation is a briefed Goldfish
   dispatch; stage-0 (§3.3) is the only exception, further ones only from
   the PO.

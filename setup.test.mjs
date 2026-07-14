@@ -32,6 +32,7 @@ import {
   applyAutonomyPreset,
   resolveRoutingAnswers,
   normalizeLang,
+  validateHumanFacingLanguage,
   buildDefaultAnswers,
   renderUserYaml,
   answersFromParsed,
@@ -92,7 +93,7 @@ function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" }
   mkdirSync(join(root, ".claude"), { recursive: true });
   symlinkSync(PLUGINS_PATH, join(root, "plugins"), "dir");
   const sentinels = new Map([
-    [join(root, "pipeline.user.yaml"), "source-before\n"],
+    [join(root, "pipeline.user.yaml"), renderUserYaml(buildDefaultAnswers())],
     [join(root, ".claude", "settings.json"), "settings-before\n"],
     [join(root, ".claude", "pipeline.json"), "pipeline-before\n"],
     [join(root, ".claude", "pipeline.yaml"), "manifest-before\n"],
@@ -104,6 +105,26 @@ function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" }
   });
   const unchanged = [...sentinels].every(([path, content]) => readFileSync(path, "utf8") === content);
   ok("run: missing private-overlay fails before source or runtime mutation byte-identically", code === 1 && unchanged);
+  rmSync(root, { recursive: true, force: true });
+}
+for (const [name, source] of [
+  ["missing", "setup:\n  intent: consumer\nlanguage: {}\n"],
+  ["empty", "language:\n  human_facing: \"\"\n"],
+  ["unknown", "language:\n  human_facing: fr\n"],
+]) {
+  const root = mkdtempSync(join(tmpdir(), `setup-language-${name}-`));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  symlinkSync(PLUGINS_PATH, join(root, "plugins"), "dir");
+  const sentinels = new Map([
+    [join(root, "pipeline.user.yaml"), source],
+    [join(root, ".claude", "settings.json"), "settings-before\n"],
+    [join(root, ".claude", "pipeline.json"), "pipeline-before\n"],
+    [join(root, ".claude", "pipeline.yaml"), "manifest-before\n"],
+  ]);
+  for (const [path, content] of sentinels) writeFileSync(path, content);
+  const code = await run(["--defaults"], { rootDir: root, spawn: () => ({ status: 0, stdout: `${"a".repeat(40)}\n` }) });
+  const unchanged = [...sentinels].every(([path, content]) => readFileSync(path, "utf8") === content);
+  ok(`run: ${name} human-facing source rejects before every runtime mutation`, code === 1 && unchanged);
   rmSync(root, { recursive: true, force: true });
 }
 {
@@ -128,7 +149,7 @@ function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" }
   writeFileSync(join(root, ".pipeline", "private-overlay.yaml"), `shared:\n  sha: ${sha}\n`);
   writeFileSync(join(root, ".claude", "policy-lock.yaml"), managedPolicyLockYaml({ mode: "strict", status: "source-unverified" }));
   const sentinels = new Map([
-    [join(root, "pipeline.user.yaml"), "source-before\n"],
+    [join(root, "pipeline.user.yaml"), renderUserYaml(buildDefaultAnswers())],
     [join(root, ".claude", "settings.json"), "settings-before\n"],
     [join(root, ".claude", "pipeline.json"), "pipeline-before\n"],
     [join(root, ".claude", "pipeline.yaml"), "manifest-before\n"],
@@ -188,7 +209,7 @@ function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" }
   const root = mkdtempSync(join(tmpdir(), "setup-preflight-no-write-"));
   mkdirSync(join(root, ".claude"), { recursive: true });
   const sentinels = new Map([
-    [join(root, "pipeline.user.yaml"), "existing-user-source\n"],
+    [join(root, "pipeline.user.yaml"), renderUserYaml(buildDefaultAnswers())],
     [join(root, ".claude", "settings.json"), "existing-settings\n"],
     [join(root, ".claude", "pipeline.json"), "existing-pipeline-json\n"],
     [join(root, ".claude", "pipeline.yaml"), "existing-pipeline-yaml\n"],
@@ -399,8 +420,10 @@ function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" }
 // ======================================================================================
 ok("normalizeLang: 'en' -> en", normalizeLang("en") === "en");
 ok("normalizeLang: 'de' -> de", normalizeLang("de") === "de");
-ok("normalizeLang: anything else -> de (conservative default)", normalizeLang("fr") === "de");
-ok("normalizeLang: undefined -> de", normalizeLang(undefined) === "de");
+ok("normalizeLang: unsupported value has no fallback", normalizeLang("fr") === null);
+ok("normalizeLang: missing value has no fallback", normalizeLang(undefined) === null);
+ok("validateHumanFacingLanguage: rejects empty source value fail-closed", validateHumanFacingLanguage("").ok === false);
+ok("validateHumanFacingLanguage: rejects unsupported source value fail-closed", validateHumanFacingLanguage("fr").ok === false);
 
 // ======================================================================================
 // renderUserYaml — idempotency + byte-identity to the committed pipeline.user.yaml
@@ -746,6 +769,14 @@ ok("parseArgv: --defaults alone -> force stays false", parseArgv(["--defaults"])
   ok("renderPipelineYaml: security gate mode mirrors gates.security", /security:\s*\n\s*mode: off/.test(yaml), yaml);
   ok("renderPipelineYaml: push approval is 'required' when push_policy is gated", yaml.includes("approval: required"));
   ok("renderPipelineYaml: sourceHash embedded in the GENERATED header comment", yaml.includes("hashGHI"));
+  ok("renderPipelineYaml: human-facing language projects from the source answers", /language:\s*\n\s*human_facing: en/.test(yaml), yaml);
+}
+{
+  const answers = { ...buildDefaultAnswers(), language: { human_facing: "de", agent_facing: "en" } };
+  const yaml = renderPipelineYaml(answers, "hashGerman");
+  const parsed = parseYaml(yaml);
+  ok("renderPipelineYaml: projects another accepted language deterministically", parsed.language?.human_facing === "de");
+  ok("renderPipelineYaml: generated de projection validates through the canonical runtime schema", validateCompiledPipelineYaml(yaml).status === "ok");
 }
 {
   const answers = { ...buildDefaultAnswers(), autonomy: { push_policy: "standing-approved", branch_model: "direct-main", wip_limit: 1 } };
