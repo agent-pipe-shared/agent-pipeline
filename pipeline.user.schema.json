@@ -4,19 +4,17 @@
   "title": "Personal Pipeline profile (pipeline.user.yaml, AP2 P3a)",
   "description": "Structure-only validation for pipeline.user.yaml -- the ONE source-of-intent config personalizing a cloned Agent-Pipeline copy (PRD AP2 §5/§5a). Consumed by setup.mjs with the SAME hand-rolled validator used for critic-verdict.schema.json / pipeline-manifest.schema.json (plugins/pipeline-core/lib/schema-lite.mjs) -- understands exactly: type, required, properties, items, enum, additionalProperties. setup.mjs itself still owns the compile step (user.yaml -> .claude/settings.json + pipeline.json + pipeline.yaml); this schema only guards user.yaml's own shape.",
   "type": "object",
-  "required": ["identity", "language", "platform", "agent_runtime", "worktypes", "models", "autonomy", "gates"],
+  "required": ["setup", "language", "agent_runtime", "worktypes", "models", "autonomy", "gates"],
   "additionalProperties": false,
   "properties": {
-    "identity": {
+    "setup": {
       "type": "object",
-      "required": ["owner_name", "repo_owner", "repo_name", "commit_trailer"],
+      "required": ["intent"],
       "additionalProperties": false,
       "properties": {
-        "owner_name": { "type": "string" },
-        "repo_owner": { "type": "string" },
-        "repo_name": { "type": "string" },
-        "commit_trailer": { "type": "boolean" }
-      }
+        "intent": { "type": "string", "enum": ["unconfigured", "consumer", "maintainer"] }
+      },
+      "description": "Public setup intent only. Personal coordinates and credentials stay out of this schema and all generated Public-Core projections."
     },
     "language": {
       "type": "object",
@@ -25,15 +23,6 @@
       "properties": {
         "human_facing": { "type": "string", "enum": ["de", "en"] },
         "agent_facing": { "type": "string", "enum": ["de", "en"] }
-      }
-    },
-    "platform": {
-      "type": "object",
-      "required": ["git_host", "cli"],
-      "additionalProperties": false,
-      "properties": {
-        "git_host": { "type": "string", "enum": ["github", "gitlab"] },
-        "cli": { "type": "string", "enum": ["gh", "glab"] }
       }
     },
     "agent_runtime": { "type": "string", "enum": ["claude-code", "other"] },

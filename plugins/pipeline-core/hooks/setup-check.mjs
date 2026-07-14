@@ -19,10 +19,8 @@
  * DETECTION LOGIC (mirrors setup.mjs's own default markers, see that file's
  * `buildDefaultAnswers()`): "not set up" is exactly two cases --
  *   1. `pipeline.user.yaml` does not exist at the project root at all.
- *   2. It exists AND parses AND its `identity.owner_name` is still the literal committed
- *      default `"Your Name"`, OR its `identity.repo_owner` is still the literal committed
- *      default `"your-org"` (either marker alone is enough -- a collegue who only changed
- *      one of the two identity fields has still not really finished personalizing).
+ *   2. It exists AND parses AND its `setup.intent` is still the literal committed
+ *      default `"unconfigured"`.
  * Every OTHER state (file present, parses, neither marker is the default) is "set up" --
  * silent, no message. This is a coarse, cheap signal (this hook does NOT run schema
  * validation -- that is setup.mjs's job at write time) that only ever flags the two
@@ -30,16 +28,16 @@
  *
  * FAIL-OPEN BY DESIGN (mirrors post-compact-reground.mjs / staleness-check.mjs)
  *   `pipeline.user.yaml` present but UNPARSEABLE (malformed YAML outside the yaml-lite
- *   strict subset, or missing/malformed `identity` block) -> treated as "cannot confirm
+ *   strict subset, or missing/malformed `setup` block) -> treated as "cannot confirm
  *   default markers" -> SILENT, never a guess-based nag. Only a definitively MISSING file
  *   or a definitively-matched literal default marker ever produces output. Any read/parse
- *   error anywhere in the chain -> silent, `process.exit(0)` -- this hook NEVER blocks.
+ *   error anywhere in the chain -> silent, exit code 0 -- this hook NEVER blocks.
  *
  * OUTPUT CONTRACT (SessionStart hook JSON shape, mirrors post-compact-reground.mjs's
  * active case): inactive (setup already done, or ambiguous) -> nothing on stdout,
- * `process.exit(0)`. Active (missing file or default markers) -> `{ systemMessage,
+ * exit code 0. Active (missing file or default markers) -> `{ systemMessage,
  * hookSpecificOutput: { hookEventName: "SessionStart", additionalContext } }` JSON on
- * stdout (message duplicated in both fields), `process.exit(0)`.
+ * stdout (message duplicated in both fields), exit code 0.
  *
  * MECHANICS: no stdin contract needed (SessionStart hooks receive session/env info this
  * hook does not gate on -- same as staleness-check.mjs). Reads `pipeline.user.yaml` from
@@ -50,7 +48,7 @@
  *
  * ARCHITECTURE: pure exported resolver functions (`isStillDefault`, `buildSetupIncompleteMessage`,
  * `decideOutput`) take explicit parameters and do no I/O; `run()` is the only function that
- * touches the real filesystem/environment and always calls `process.exit(0)`.
+ * touches the real filesystem/environment and always returns exit code 0.
  *
  * VERIFY: node plugins/pipeline-core/hooks/setup-check.test.mjs
  * Manual smoke (from the repo root; exits 0, stdout empty once pipeline.user.yaml has been
@@ -63,19 +61,18 @@ import { pathToFileURL } from "node:url";
 
 import { parseYaml } from "../lib/yaml-lite.mjs";
 
-export const DEFAULT_OWNER_NAME = "Your Name";
-export const DEFAULT_REPO_OWNER = "your-org";
+export const DEFAULT_SETUP_INTENT = "unconfigured";
 
 // ---- detection (pure) ---------------------------------------------------------------------
 /**
  * @param {object|null} parsed - already-parsed pipeline.user.yaml, or null/non-object
- * @returns {boolean} true only when the identity block is present AND carries at least one
- *   of the two literal committed default marker values -- never a guess on ambiguous input.
+ * @returns {boolean} true only when the setup block is present and carries the literal
+ *   unconfigured intent marker -- never a guess on ambiguous input.
  */
 export function isStillDefault(parsed) {
-  const identity = parsed && typeof parsed === "object" ? parsed.identity : null;
-  if (!identity || typeof identity !== "object") return false;
-  return identity.owner_name === DEFAULT_OWNER_NAME || identity.repo_owner === DEFAULT_REPO_OWNER;
+  const setup = parsed && typeof parsed === "object" ? parsed.setup : null;
+  if (!setup || typeof setup !== "object") return false;
+  return setup.intent === DEFAULT_SETUP_INTENT;
 }
 
 // ---- message builder (pure) ----------------------------------------------------------------
@@ -84,7 +81,7 @@ export function buildSetupIncompleteMessage(reason) {
   const detail =
     reason === "missing"
       ? "pipeline.user.yaml is still missing (fresh clone)."
-      : "pipeline.user.yaml still carries the default markers (owner_name/repo_owner unchanged).";
+      : "pipeline.user.yaml still carries the unconfigured setup intent.";
   return [
     "Setup not complete — run `node setup.mjs` (see SETUP.md).",
     `- ${detail}`,
@@ -112,11 +109,14 @@ export function decideOutput({ fileExists, parsed }) {
   return { stdout: JSON.stringify(payload) + "\n", json: true, payload };
 }
 
-// ---- CLI entrypoint: real environment, always exit 0 ------------------------------------------
-export function run() {
-  const rootDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+/**
+ * Resolve the hook output for one project root. Kept separate from `run()` so
+ * the same filesystem path is testable where process spawning is unavailable.
+ * @param {string} rootDir
+ * @returns {{stdout: string, json: boolean, payload?: object}}
+ */
+export function decideFromProjectDir(rootDir) {
   const userYamlPath = join(rootDir, "pipeline.user.yaml");
-
   const fileExists = existsSync(userYamlPath);
   let parsed = null;
   if (fileExists) {
@@ -128,10 +128,18 @@ export function run() {
       parsed = null; // malformed/outside yaml-lite's strict subset -> ambiguous, fail-open
     }
   }
+  return decideOutput({ fileExists, parsed });
+}
 
-  const { stdout } = decideOutput({ fileExists, parsed });
+// ---- CLI entrypoint: real environment, always exit 0 ------------------------------------------
+export function run() {
+  const rootDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
+  const { stdout } = decideFromProjectDir(rootDir);
   if (stdout) process.stdout.write(stdout);
-  process.exit(0); // NEVER blocks, regardless of outcome
+  // Do not call process.exit(): under a piped hook runner that can truncate the
+  // JSON written immediately above. Let Node drain stdout while retaining the
+  // hook's fail-open exit contract.
+  process.exitCode = 0;
 }
 
 // Only auto-run when executed directly (`node setup-check.mjs`), never on import

@@ -3,14 +3,6 @@
     "type": "command",
     "command": "node plugins/pipeline-core/scripts/statusline-context.mjs"
   },
-  "extraKnownMarketplaces": {
-    "agent-pipeline": {
-      "source": {
-        "source": "github",
-        "repo": "agent-pipe-shared/agent-pipeline"
-      }
-    }
-  },
   "enabledPlugins": {
     "pipeline-core@agent-pipeline": true
   }

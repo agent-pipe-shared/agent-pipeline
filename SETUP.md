@@ -10,7 +10,7 @@ personalize it, bind the plugin, start a session.
 - **Node.js >= 24** — `setup.mjs` is dependency-free (Node builtins only, no `npm install` step).
 - **git**
 - **Claude Code**
-- Optional: **`gh`** (GitHub CLI) or **`glab`** (GitLab CLI). Setup detects your git host from `git remote -v`, falling back to whichever CLI is on your `PATH` if there's no remote yet; the choice is recorded in `pipeline.user.yaml` (`platform.cli`) for your later PR/MR workflows.
+- Optional: **`gh`** or **`glab`**. Marketplace coordinates, credentials, account state and absolute paths are machine-local; do not put them in Public Core.
 
 ## Steps
 
@@ -26,12 +26,12 @@ From the repo root:
 node setup.mjs
 ```
 
-Interactive mode asks five questions — everything else (OS, git host) is *detected*, never asked:
+Interactive mode asks public setup intent, runtime, language, subscription tier and autonomy. Personal coordinates are not collected:
 
 | Question | Values | Feeds |
 |---|---|---|
 | Runtime | `claude-code` (full hook/gate enforcement) or `other` (methodology only) | `agent_runtime` |
-| Identity | your name, your repo's owner (org/user or GitLab group), your repo's name | `identity` |
+| Setup intent | `consumer` or `maintainer` | `setup.intent` |
 | Language | human-facing (commits, reviews, new docs) and agent-facing (roles, guardrails, skills), each `de`/`en` | `language` |
 | Subscription tier | `pro`, `max`, or `api`/own — picks a model preset per work method and dispatch tier | `worktypes`, `models` |
 | Autonomy preset | `conservative` (gated push, feature branches) or `autonomous` (standing-approved push, direct-to-main, advisor on) | `autonomy` |
@@ -40,7 +40,14 @@ Interactive mode asks five questions — everything else (OS, git host) is *dete
 
 **Route models per work method?** → `pipeline.user.yaml` → `worktypes`. That block is THE single place to set which model/effort/advisor runs for each of the three session profiles (design-first, advisor, speed) — see the comments in the file itself.
 
-Setup writes `pipeline.user.yaml`, then immediately compiles it into the three runtime configs (see "What setup wrote" below).
+Before any write, create the ignored Private Overlay `.pipeline/private-overlay.yaml` with only the immutable Public-Core reference:
+
+```
+shared:
+  sha: <exact-40-hex-checked-out-sha>
+```
+
+The lock must exactly match `git rev-parse HEAD`; missing, abbreviated or mismatched locks fail before source or runtime mutation. Keep marketplace/account/path mapping separately in ignored `.pipeline/machine-local.yaml`; setup never reads or projects it. Setup then writes `pipeline.user.yaml` and compiles the runtime configs.
 
 **Non-interactive path:** `node setup.mjs --defaults` writes the conservative defaults with no prompts — useful for a first dry run or a CI check.
 
@@ -48,7 +55,7 @@ Setup writes `pipeline.user.yaml`, then immediately compiles it into the three r
 
 ### 3. Bind the plugin
 
-The compiled `.claude/settings.json` already declares the marketplace and the plugin, so opening/trusting the repo folder in Claude Code should prompt you to install it automatically. For a deterministic, scriptable path — or if that prompt doesn't appear — run:
+The Public-Core `.claude/settings.json` enables the plugin but deliberately contains no marketplace coordinates. Use your ignored machine-local mapping to supply the appropriate local command:
 
 ```
 # GitHub
@@ -85,7 +92,7 @@ Before your first big feature, a quick look at [`docs/design/README.md`](docs/de
 
 | File | Compiled from (`pipeline.user.yaml`) | Read by |
 |---|---|---|
-| `.claude/settings.json` | `identity`, `platform` | Claude Code itself — plugin/marketplace binding, permissions, status line |
+| `.claude/settings.json` | `autonomy` only where applicable | Claude Code itself — plugin enablement, permissions, status line; no marketplace coordinates |
 | `.claude/pipeline.json` | `autonomy`, `gates` | project calibration — the bootstrap check and the `pipeline-start`/`close-block` skills |
 | `.claude/pipeline.yaml` | `worktypes`, `models`, `gates`, `autonomy` | the declarative manifest layer — the PreToolUse guard hooks (`guard-devplan`, `guard-push`), the `stop-suggest` Stop-event hook (next-phase suggestion + context-budget warnings), and model routing; validated by `harness/scripts/validate-manifest.mjs` |
 
@@ -102,7 +109,7 @@ leaves both `pipeline.user.yaml` and all runtime projections unchanged.
 Setup not complete — run `node setup.mjs` (see SETUP.md).
 ```
 
-This fires in exactly two cases: `pipeline.user.yaml` doesn't exist yet (a fresh clone), or it exists but still carries a committed default marker (`identity.owner_name: "Your Name"` or `identity.repo_owner: "your-org"`). This specific reminder is currently emitted in German regardless of your chosen `language` setting — the fix is the same either way: run `node setup.mjs` and answer at least the identity question. The check never blocks your session; it's a reminder, not a gate.
+This fires in exactly two cases: `pipeline.user.yaml` doesn't exist yet (a fresh clone), or it still carries `setup.intent: unconfigured`. The check never blocks; the immutable Private-Overlay SHA preflight is the fail-closed setup gate.
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
 
@@ -119,11 +126,9 @@ klonen, personalisieren, Plugin binden, Session starten.
   kein `npm install`-Schritt).
 - **git**
 - **Claude Code**
-- Optional: **`gh`** (GitHub-CLI) oder **`glab`** (GitLab-CLI). Setup erkennt
-  deinen Git-Host aus `git remote -v` und greift, falls noch kein Remote
-  existiert, auf die CLI zurück, die auf deinem `PATH` liegt; die erkannte
-  Wahl landet in `pipeline.user.yaml` (`platform.cli`) für deine eigenen
-  PR-/MR-Abläufe später.
+- Optional: **`gh`** (GitHub-CLI) oder **`glab`** (GitLab-CLI).
+  Marketplace-Koordinaten, Zugangsdaten, Account-Status und absolute Pfade
+  bleiben maschinenlokal; sie gehören nicht in den Public Core.
 
 ## Schritte
 
@@ -142,13 +147,13 @@ Im Repo-Root:
 node setup.mjs
 ```
 
-Der interaktive Modus stellt fünf Fragen — alles andere (Betriebssystem,
-Git-Host) wird *erkannt*, nie gefragt:
+Der interaktive Modus fragt nach öffentlicher Setup-Absicht, Runtime, Sprache,
+Abo-Stufe und Autonomie. Persönliche Koordinaten werden nicht erhoben:
 
 | Frage | Werte | Fließt in |
 |---|---|---|
 | Runtime | `claude-code` (volles Hook-/Gate-Enforcement) oder `other` (nur Methodik) | `agent_runtime` |
-| Identität | dein Name, Owner deines Repos (Org/User bzw. GitLab-Gruppe), Repo-Name | `identity` |
+| Setup-Absicht | `consumer` oder `maintainer` | `setup.intent` |
 | Sprache | human-facing (Commits, Reviews, neue Docs) und agent-facing (Rollen, Guardrails, Skills), je `de`/`en` | `language` |
 | Abo-Stufe | `pro`, `max` oder `api`/eigene — legt ein Modell-Preset je Arbeitsmethode und Dispatch-Stufe fest | `worktypes`, `models` |
 | Autonomie-Preset | `konservativ` (gated Push, Feature-Branches) oder `autonom` (standing-approved Push, direkt auf main, Advisor an) | `autonomy` |
@@ -164,8 +169,20 @@ Dieser Block ist DIE eine Stelle, an der du Modell/Effort/Advisor für jedes
 der drei Session-Profile (Design-first, Advisor, Speed) festlegst — siehe die
 Kommentare direkt in der Datei.
 
-Setup schreibt `pipeline.user.yaml` und kompiliert daraus sofort die drei
-Laufzeit-Configs (siehe „Was Setup geschrieben hat" unten).
+Vor jedem Write legst du das ignorierte Private Overlay
+`.pipeline/private-overlay.yaml` an. Es enthält nur die unveränderliche
+Public-Core-Referenz:
+
+```
+shared:
+  sha: <exakter-geprüfter-40-hex-SHA>
+```
+
+Der Lock muss exakt `git rev-parse HEAD` entsprechen; fehlende, abgekürzte oder
+abweichende Locks schlagen vor Source- oder Runtime-Mutationen fehl. Marketplace-,
+Account- und Pfad-Mapping bleibt separat in der ignorierten
+`.pipeline/machine-local.yaml`; Setup liest oder projiziert sie nicht. Danach
+schreibt Setup `pipeline.user.yaml` und kompiliert die Laufzeit-Configs.
 
 **Nicht-interaktiver Weg:** `node setup.mjs --defaults` schreibt die
 konservativen Defaults ohne Rückfragen — nützlich für einen ersten Trockenlauf
@@ -179,10 +196,9 @@ Rückfrage aus (der nicht-interaktive Modus überschreibt sie nie).
 
 ### 3. Plugin binden
 
-Die kompilierte `.claude/settings.json` deklariert Marketplace und Plugin
-bereits, sodass das Öffnen des Repo-Ordners und seine Bestätigung als
-vertrauenswürdig in Claude Code automatisch zur Installation auffordern sollte. Für einen deterministischen, skriptbaren Weg
-— oder falls diese Aufforderung ausbleibt:
+Die Public-Core-`.claude/settings.json` aktiviert das Plugin, enthält aber
+absichtlich keine Marketplace-Koordinaten. Nutze dein ignoriertes
+maschinenlokales Mapping für den passenden lokalen Befehl:
 
 ```
 # GitHub
@@ -242,7 +258,7 @@ zum Brainstorming einer soliden Anforderung, bevor sie in die Pipeline geht
 
 | Datei | Kompiliert aus (`pipeline.user.yaml`) | Gelesen von |
 |---|---|---|
-| `.claude/settings.json` | `identity`, `platform` | Claude Code selbst — Plugin-/Marketplace-Bindung, Permissions, Status-Zeile |
+| `.claude/settings.json` | gegebenenfalls nur `autonomy` | Claude Code selbst — Plugin-Aktivierung, Permissions, Status-Zeile; keine Marketplace-Koordinaten |
 | `.claude/pipeline.json` | `autonomy`, `gates` | Projekt-Kalibrierung — der Bootstrap-Check sowie die Skills `pipeline-start`/`close-block` |
 | `.claude/pipeline.yaml` | `worktypes`, `models`, `gates`, `autonomy` | die deklarative Manifest-Schicht — die PreToolUse-Guard-Hooks (`guard-devplan`, `guard-push`), der `stop-suggest`-Stop-Hook (Vorschlag der nächsten Phase + Kontext-Budget-Warnungen) sowie Modell-Routing; validiert über `harness/scripts/validate-manifest.mjs` |
 
@@ -260,13 +276,9 @@ Setup nicht abgeschlossen — `node setup.mjs` ausführen (siehe SETUP.md).
 ```
 
 Das passiert in genau zwei Fällen: `pipeline.user.yaml` existiert noch nicht
-(frischer Klon), oder sie existiert, trägt aber noch einen committeten
-Default-Marker (`identity.owner_name: "Your Name"` oder
-`identity.repo_owner: "your-org"`). Dieser konkrete Hinweis erscheint derzeit
-unabhängig von deiner gewählten `language`-Einstellung auf Deutsch — die
-Lösung ist in jedem Fall dieselbe: `node setup.mjs` ausführen und mindestens
-die Identitätsfrage beantworten. Der Check blockiert die Session nie; er ist
-ein Hinweis, kein Gate.
+(frischer Klon), oder sie trägt noch `setup.intent: unconfigured`. Der Check
+blockiert die Session nie; der unveränderliche Private-Overlay-SHA-Preflight ist
+das fail-closed Setup-Gate.
 
 ---
 
