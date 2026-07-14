@@ -90,6 +90,19 @@ const RISKS_MD_RELPATH = join("docs", "risks.md");
 // manifest itself can declare under `flags:` (plain YAML mapping keys).
 // ---------------------------------------------------------------------------------------------
 const FLAG_NAME_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+const HUMAN_FACING_LANGUAGES = new Set(["de", "en"]);
+
+/**
+ * Return the compiled PO-facing language or a deterministic fail-closed reason.
+ * Consumers deliberately receive no default: a missing runtime projection is a
+ * setup repair, not an invitation to infer a human language from surrounding prose.
+ */
+export function resolveHumanFacingLanguage(manifest) {
+  const value = manifest?.language?.human_facing;
+  return HUMAN_FACING_LANGUAGES.has(value)
+    ? { ok: true, value }
+    : { ok: false, reason: "compiled language.human_facing is missing or unsupported; re-run setup from a valid pipeline.user.yaml" };
+}
 
 /** Parses a condition string into { kind: "always"|"never"|"flag", flag?, negated? }, or null if it doesn't match the grammar at all. */
 function parseCondition(condition) {

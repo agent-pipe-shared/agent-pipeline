@@ -1,7 +1,8 @@
 <!--
 PROMPT/DOC TEMPLATE: PRD — Product Review Document (PO gate) — Agent-Pipeline
-Language: English (default for the share; the PO is the primary reader — see the
-project's own language policy if it differs).
+PO-facing language: read `language.human_facing` from the compiled runtime
+manifest `.claude/pipeline.yaml`. If it is missing, unreadable, or unsupported,
+stop and repair `pipeline.user.yaml` with `node setup.mjs`; never infer a default.
 Source of truth: docs/operating-model.md §3.2 (Step 3b) / §3.3 / roles/elephant.md EL-19.
 Purpose: the PO release gate. Written by the Elephant AFTER the solution is designed
 and the spec passed readiness, BEFORE the first implementation dispatch. Mandatory at
@@ -10,12 +11,14 @@ Keep it to ~1 page. It carries product RATIONALE, not acceptance criteria — th
 agent-facing/English in spec.md, which this PRD references (no duplication).
 Location: specs/<task>/prd_<topic>.md
 Release mechanic: EL-17a — numbered inline chat summary + this file reference + readable
-delivery to the PO's device/render (a repo path alone is NOT delivery) + explicit wait for
-the literal word "approved" (no UI dialog; EL-19).
+delivery to the PO's device/render (a repo path alone is NOT delivery). A readable PRD
+whose Status the PO marks `freigegeben` is the single authority for exactly one first
+implementation dispatch; do not request a second implementation approval. Merge, push,
+and release remain their distinct approval gates.
 
 PO language guidance (binding for every future PRD):
 - The target reader is the PO, not the agent — plain language, short sentences, in the
-  project's human-facing language (default English).
+  configured runtime human-facing language.
 - Every block answers three questions: What problem? What are we changing? What do you
   get out of it?
 - Rule IDs, file paths, jargon stay OUT of the main text — only in compact, italicized
@@ -28,7 +31,8 @@ PO language guidance (binding for every future PRD):
 # PRD — <Feature/Topic>
 
 > Product Review Document (PO gate). Produced after the solution design, before
-> implementation. The PO verifies and gives "approved". Acceptance criteria: see
+> implementation. Status: `entwurf` until the PO marks it `freigegeben`; that marker
+> authorizes the first implementation dispatch exactly once. Acceptance criteria: see
 > `spec.md` (agent-facing). Task: `<task-id>` · Rigor <0/1/2> / Class <low/medium/high>.
 
 ## What

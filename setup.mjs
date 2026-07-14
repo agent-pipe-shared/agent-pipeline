@@ -109,6 +109,7 @@ const PIPELINE_JSON_PATH = join(ROOT_DIR, ".claude", "pipeline.json");
 const PIPELINE_YAML_PATH = join(ROOT_DIR, ".claude", "pipeline.yaml");
 
 export const GENERATED_MARKER_PREFIX = "GENERATED from pipeline.user.yaml — edit there, then re-run setup";
+export const HUMAN_FACING_LANGUAGES = Object.freeze(["de", "en"]);
 
 // ---- default answers (== the committed pipeline.user.yaml template's values) -----------------
 export function buildDefaultAnswers() {
@@ -197,7 +198,18 @@ export function resolveRoutingAnswers(aboIn, autonomyIn, previous) {
 }
 
 export function normalizeLang(value) {
-  return value === "en" ? "en" : "de";
+  return HUMAN_FACING_LANGUAGES.includes(value) ? value : null;
+}
+
+/**
+ * The source profile is the only authority for a runtime PO-facing language.
+ * A missing, empty, or unsupported source value must never be repaired by a
+ * default: that would emit an unreliable compiled authority.
+ */
+export function validateHumanFacingLanguage(value) {
+  return HUMAN_FACING_LANGUAGES.includes(value)
+    ? { ok: true, value }
+    : { ok: false, reason: "language.human_facing must be an explicit supported value (de or en)" };
 }
 
 /** Renders an advisor field: "off" gets quoted (a deliberate string sentinel, not a YAML
@@ -564,6 +576,9 @@ export function renderPipelineYaml(answers, sourceHash) {
 
 schema: pipeline.manifest.v0
 
+language:
+  human_facing: ${answers.language.human_facing}
+
 phases:
   - name: design
     enabled: true
@@ -844,6 +859,13 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
 
   const defaults = buildDefaultAnswers();
   const { raw: existingUserYamlRaw, parsed: existingUserYamlParsed } = loadUserYamlSafe(userYamlPath);
+  if (existingUserYamlRaw !== null) {
+    const sourceLanguage = validateHumanFacingLanguage(existingUserYamlParsed?.language?.human_facing);
+    if (!sourceLanguage.ok) {
+      console.error(`setup.mjs: ${sourceLanguage.reason}; correct pipeline.user.yaml before compiling.`);
+      return 1;
+    }
+  }
   const previous = answersFromParsed(existingUserYamlParsed, defaults);
 
   let rl = null;
@@ -870,6 +892,12 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
   }
 
   const userYamlText = renderUserYaml(answers);
+  const compiledLanguage = validateHumanFacingLanguage(answers.language?.human_facing);
+  if (!compiledLanguage.ok) {
+    if (rl) rl.close();
+    console.error(`setup.mjs: ${compiledLanguage.reason}; no files were written.`);
+    return 1;
+  }
   let parsedForValidation;
   try {
     parsedForValidation = parseYaml(userYamlText);
