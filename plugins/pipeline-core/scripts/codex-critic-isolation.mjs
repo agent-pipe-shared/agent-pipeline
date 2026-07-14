@@ -27,17 +27,22 @@ const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+$/u;
 const SAFE_PROFILE_ID = /^[a-z][a-z0-9-]{0,31}$/u;
 const BROAD_READ_ROOTS = new Set(["/home", "/mnt", "/opt", "/tmp", "/usr", "/var", os.homedir(), path.dirname(os.homedir())].map(normalizedPath));
 const DEBUG_REDACTED_SECRET = "[REDACTED_SECRET]";
+const DEBUG_REDACTED_URL = "[REDACTED_URL]";
 const DEBUG_REDACTED_QUERY = "[REDACTED_URL_QUERY]";
 const DEBUG_REDACTED_FRAGMENT = "[REDACTED_URL_FRAGMENT]";
 const DEBUG_REDACTED_PATH = "[REDACTED_ABSOLUTE_PATH]";
+const DEBUG_REDACTED_IDENTIFIER = "[REDACTED_PRIVATE_IDENTIFIER]";
 const DEBUG_QUOTED_OR_ATOM = String.raw`(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;}\]]+)`;
 const DEBUG_AUTHORIZATION = new RegExp(String.raw`((?<![A-Za-z0-9])authorization\b["']?\s*[:=]\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:bearer|basic)\s+[^\s,;}\]]+|[^\s,;}\]]+)`, "giu");
 const DEBUG_BEARER = new RegExp(String.raw`(\bbearer\s+)${DEBUG_QUOTED_OR_ATOM}`, "giu");
 const DEBUG_COOKIE = new RegExp(String.raw`((?<![A-Za-z0-9])(?:set[-_]?cookie|cookie)\b["']?\s*[:=]\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^}\]]+)`, "giu");
 const DEBUG_NAMED_SECRET = new RegExp(String.raw`((?<![A-Za-z0-9])(?:x[-_]?api[-_]?key|api[-_ ]?key|access[-_]?token|refresh[-_]?token|id[-_]?token|client[-_]?secret|token|secret|password|passwd|pwd)\b["']?\s*[:=]\s*)${DEBUG_QUOTED_OR_ATOM}`, "giu");
-const DEBUG_ABSOLUTE_URL = /\b([a-z][a-z0-9+.-]*:\/\/[^\s?#"'<>]+)(\?[^\s#"'<>]*)?(#[^\s"'<>]*)?/giu;
+const DEBUG_ABSOLUTE_URL = /\b([a-z][a-z0-9+.-]*):\/\/[^\s"'<>]*/giu;
 const DEBUG_RELATIVE_URL_QUERY = /(^|[\s=(])((?:\/{1,2})[^\s?#"'<>]*)(\?[^\s#"'<>]*)(#[^\s"'<>]*)?/gu;
 const DEBUG_RELATIVE_URL_FRAGMENT = /(^|[\s=(])((?:\/{1,2})[^\s?#"'<>]*)(#[^\s"'<>]*)/gu;
+const DEBUG_NAMED_SECRET_SPACE = new RegExp(String.raw`((?<![A-Za-z0-9])(?:authorization|x[-_]?api[-_]?key|api[-_ ]?key|access[-_]?token|refresh[-_]?token|id[-_]?token|client[-_]?secret|token|secret|password|passwd|pwd)\b\s+)${DEBUG_QUOTED_OR_ATOM}`, "giu");
+const DEBUG_BARE_TOKEN = /(?<![A-Za-z0-9_-])(?:sk-[A-Za-z0-9_-]{8,16384}|gh[pousr]_[A-Za-z0-9]{8,16384})(?![A-Za-z0-9_-])/gu;
+const DEBUG_JWT = /(?<![A-Za-z0-9_-])[A-Za-z0-9_-]{4,16384}\.[A-Za-z0-9_-]{4,16384}\.[A-Za-z0-9_-]{4,16384}(?![A-Za-z0-9_-])/gu;
 const DEBUG_UNC_PATH = /(?<![A-Za-z0-9\\])\\\\[^\\/\s"'<>|?*\u0000-\u001f]+\\[^\\/\s"'<>|?*\u0000-\u001f]+(?:\\[^\\/\s"'<>|?*\u0000-\u001f]+)*/gu;
 const DEBUG_WINDOWS_PATH = /(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/])(?:[^\s\\/"'<>|?*\u0000-\u001f]+[\\/])*[^\s\\/"'<>|?*\u0000-\u001f]*/gu;
 const DEBUG_UNIX_PATH = /(?<![A-Za-z0-9.:/\\])\/(?:[^\s/\\:"'<>|?*\u0000-\u001f]+\/)*[^\s/\\:"'<>|?*\u0000-\u001f]*/gu;
@@ -46,20 +51,24 @@ const DEFAULT_DEBUG_PENDING_BYTES = 16 * 1024;
 const DEFAULT_DEBUG_OUTPUT_BYTES = 64 * 1024;
 const DEFAULT_TRACE_BYTES = 4 * 1024 * 1024;
 const DEFAULT_TRACE_EVENTS = 4096;
+const DEBUG_DIAGNOSTIC_RAW_BYTES = 1024;
+const DEBUG_DIAGNOSTIC_BYTES = 4096;
+const DEBUG_PROC_INTERVAL_MS = 5000;
 const TRACE_CATEGORY = /^[a-z][a-z0-9-]{0,63}$/u;
 const TRACE_SHA256 = /^[0-9a-f]{64}$/u;
 const TRACE_MONOTONIC_NS = /^(?:0|[1-9][0-9]*)$/u;
 const TRACE_SIGNALS = new Set(["SIGHUP", "SIGINT", "SIGQUIT", "SIGILL", "SIGTRAP", "SIGABRT", "SIGBUS", "SIGFPE", "SIGKILL", "SIGUSR1", "SIGSEGV", "SIGUSR2", "SIGPIPE", "SIGALRM", "SIGTERM", "SIGCHLD", "SIGCONT", "SIGSTOP", "SIGTSTP", "SIGTTIN", "SIGTTOU", "SIGURG", "SIGXCPU", "SIGXFSZ", "SIGVTALRM", "SIGPROF", "SIGWINCH", "SIGIO", "SIGPWR", "SIGSYS"]);
 const TRACE_PROCESS_STATES = new Set(["R", "S", "D", "Z", "T", "t", "X", "x", "K", "W", "P", "I"]);
 const TRACE_CAUSES = new Set(["coordinator-input", "child-process", "cli-before-turn", "response-stalled", "jsonl-lifecycle", "result-sink", "fixture-or-binding", "cleanup", "unbestimmt"]);
+const SECURE_TRACE_STORES = new WeakSet();
 
 export const CODEX_CRITIC_TRACE_EVENTS = Object.freeze([
   "trace.opened",
   "run.started", "run.completed", "run.failed",
   "step.started", "step.completed", "step.failed",
-  "child.spawn-requested", "child.spawned", "child.spawn-failed", "child.exit", "child.close", "child.signal-requested", "child.signal-result",
+  "child.spawn-requested", "child.spawned", "child.spawn-failed", "child.error", "child.exit", "child.close", "child.signal-requested", "child.signal-result",
   "stdin.write-requested", "stdin.write-accepted", "stdin.end-requested", "stdin.closed", "stdin.error",
-  "stream.chunk", "stream.jsonl-event", "stream.error",
+  "stream.chunk", "stream.jsonl-event", "stream.diagnostic", "stream.error",
   "process.sample",
   "lease.armed", "lease.heartbeat", "lease.expired",
   "result.observed",
@@ -183,21 +192,43 @@ function escapeDebugControl(character) {
   return code <= 0xff ? `\\x${code.toString(16).padStart(2, "0")}` : `\\u${code.toString(16).padStart(4, "0")}`;
 }
 
-function sanitizeDebugLine(line) {
-  const escaped = line.replace(DEBUG_CONTROLS, escapeDebugControl);
-  const secrets = escaped
+function assertDebugPrivateValues(values, label) {
+  if (!Array.isArray(values) || values.length > 32) fail(`${label} must be a bounded array`);
+  for (const value of values) if (typeof value !== "string" || value.length < 2 || Buffer.byteLength(value, "utf8") > 512 || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(value)) fail(`${label} contains an invalid literal`);
+  return Object.freeze([...values].sort((left, right) => right.length - left.length));
+}
+
+function replaceDebugLiterals(value, literals, marker) {
+  let result = value;
+  for (const literal of literals) result = result.replaceAll(literal, marker);
+  return result;
+}
+
+function sanitizeDebugLine(line, { privateIdentifiers = [], privateRoots = [] } = {}) {
+  const markers = [DEBUG_REDACTED_SECRET, DEBUG_REDACTED_URL, DEBUG_REDACTED_QUERY, DEBUG_REDACTED_FRAGMENT, DEBUG_REDACTED_PATH, DEBUG_REDACTED_IDENTIFIER];
+  const protectedMarkers = markers.map((_marker, index) => `__PIPELINE_MARKER_${index}__`);
+  let protectedLine = line;
+  for (const [index, marker] of markers.entries()) protectedLine = protectedLine.replaceAll(marker, protectedMarkers[index]);
+  const escaped = protectedLine.replace(DEBUG_CONTROLS, escapeDebugControl);
+  const privateSafe = replaceDebugLiterals(replaceDebugLiterals(escaped, privateRoots, DEBUG_REDACTED_PATH), privateIdentifiers, DEBUG_REDACTED_IDENTIFIER);
+  const secrets = privateSafe
     .replace(DEBUG_AUTHORIZATION, `$1${DEBUG_REDACTED_SECRET}`)
     .replace(DEBUG_BEARER, `$1${DEBUG_REDACTED_SECRET}`)
     .replace(DEBUG_COOKIE, `$1${DEBUG_REDACTED_SECRET}`)
-    .replace(DEBUG_NAMED_SECRET, `$1${DEBUG_REDACTED_SECRET}`);
+    .replace(DEBUG_NAMED_SECRET, `$1${DEBUG_REDACTED_SECRET}`)
+    .replace(DEBUG_NAMED_SECRET_SPACE, `$1${DEBUG_REDACTED_SECRET}`)
+    .replace(DEBUG_BARE_TOKEN, DEBUG_REDACTED_SECRET)
+    .replace(DEBUG_JWT, DEBUG_REDACTED_SECRET);
   const urls = secrets
-    .replace(DEBUG_ABSOLUTE_URL, (_match, base, query, fragment) => `${base}${query === undefined ? "" : `?${DEBUG_REDACTED_QUERY}`}${fragment === undefined ? "" : `#${DEBUG_REDACTED_FRAGMENT}`}`)
+    .replace(DEBUG_ABSOLUTE_URL, (_match, scheme) => `${scheme}://${DEBUG_REDACTED_URL}`)
     .replace(DEBUG_RELATIVE_URL_QUERY, (_match, prefix, base, _query, fragment) => `${prefix}${base}?${DEBUG_REDACTED_QUERY}${fragment === undefined ? "" : `#${DEBUG_REDACTED_FRAGMENT}`}`)
     .replace(DEBUG_RELATIVE_URL_FRAGMENT, (_match, prefix, base) => `${prefix}${base}#${DEBUG_REDACTED_FRAGMENT}`);
-  return urls
+  let sanitized = urls
     .replace(DEBUG_UNC_PATH, DEBUG_REDACTED_PATH)
     .replace(DEBUG_WINDOWS_PATH, DEBUG_REDACTED_PATH)
     .replace(DEBUG_UNIX_PATH, DEBUG_REDACTED_PATH);
+  for (const [index, marker] of markers.entries()) sanitized = sanitized.replaceAll(protectedMarkers[index], marker);
+  return sanitized;
 }
 
 /**
@@ -206,8 +237,11 @@ function sanitizeDebugLine(line) {
  * flushes a final unterminated line. Returned arrays and the writer are frozen,
  * and no raw complete line is retained after an emission.
  */
-export function createDebugLineRedactor({ maxPendingBytes = DEFAULT_DEBUG_PENDING_BYTES, maxOutputBytes = DEFAULT_DEBUG_OUTPUT_BYTES } = {}) {
+export function createDebugLineRedactor({ maxPendingBytes = DEFAULT_DEBUG_PENDING_BYTES, maxOutputBytes = DEFAULT_DEBUG_OUTPUT_BYTES, privateIdentifiers = [], privateRoots = [] } = {}) {
   if (![maxPendingBytes, maxOutputBytes].every((value) => Number.isSafeInteger(value) && value > 0)) fail("debug line redactor limits must be positive safe integers");
+  if (maxPendingBytes > DEFAULT_DEBUG_PENDING_BYTES || maxOutputBytes > DEFAULT_DEBUG_OUTPUT_BYTES) fail("debug line redactor limits exceed their closed maxima");
+  const identifiers = assertDebugPrivateValues(privateIdentifiers, "debug privateIdentifiers");
+  const roots = assertDebugPrivateValues(privateRoots, "debug privateRoots");
   let decoder = new StringDecoder("utf8");
   let pending = "";
   let pendingBytes = 0;
@@ -238,7 +272,7 @@ export function createDebugLineRedactor({ maxPendingBytes = DEFAULT_DEBUG_PENDIN
     pending = "";
     pendingBytes = 0;
     decoder = new StringDecoder("utf8");
-    const sanitized = sanitizeDebugLine(complete);
+    const sanitized = sanitizeDebugLine(complete, { privateIdentifiers: identifiers, privateRoots: roots });
     const nextBytes = emittedBytes + Buffer.byteLength(sanitized, "utf8") + 1;
     if (outputBytes + nextBytes > maxOutputBytes) overflow();
     lines.push(sanitized);
@@ -326,6 +360,8 @@ function validateTracePayload(event, payload, { terminal = false } = {}) {
     assertTraceSafeInteger(payload.pid, "child pid", { nonnegative: true }); assertTraceSafeInteger(payload.pgid, "child pgid", { nonnegative: true });
   } else if (event === "child.spawn-failed") {
     assertTraceKeys(payload, ["label", "category"]); assertTraceCategory(payload.label, "child label"); assertTraceCategory(payload.category);
+  } else if (event === "child.error") {
+    assertTraceKeys(payload, ["label", "category"]); assertTraceCategory(payload.label, "child label"); assertTraceCategory(payload.category);
   } else if (event === "child.exit" || event === "child.close") {
     assertTraceKeys(payload, ["label", "code", "signal"]); assertTraceCategory(payload.label, "child label");
     if (payload.code !== null) assertTraceSafeInteger(payload.code, "child exit code");
@@ -350,6 +386,10 @@ function validateTracePayload(event, payload, { terminal = false } = {}) {
   } else if (event === "stream.jsonl-event") {
     assertTraceKeys(payload, ["type", "itemType", "status"]);
     if (!TRACE_JSONL_TYPES.has(payload.type) || !TRACE_ITEM_TYPES.has(payload.itemType) || !TRACE_ITEM_STATUSES.has(payload.status)) fail("trace JSONL lifecycle value is outside the closed enum");
+  } else if (event === "stream.diagnostic") {
+    assertTraceKeys(payload, ["stream", "line"]);
+    if (payload.stream !== "stderr") fail("trace diagnostic stream is outside the closed enum");
+    if (typeof payload.line !== "string" || Buffer.byteLength(payload.line, "utf8") > DEBUG_DIAGNOSTIC_BYTES || payload.line !== sanitizeDebugLine(payload.line)) fail("trace diagnostic line is not bounded sanitized text");
   } else if (event === "stream.error") {
     assertTraceKeys(payload, ["stream", "category"]);
     if (payload.stream !== "stdout" && payload.stream !== "stderr") fail("trace stream is outside the closed enum");
@@ -380,6 +420,151 @@ function validateTracePayload(event, payload, { terminal = false } = {}) {
     assertTraceSha256(payload.priorRootSha256, "trace prior root");
     assertTraceSafeInteger(payload.recordCount, "trace record count", { nonnegative: true }); assertTraceSafeInteger(payload.totalBytes, "trace total bytes", { nonnegative: true });
   }
+}
+
+function createTraceReplayState() {
+  return { phase: "initial", terminal: null, currentStep: null, lastStep: -1, children: new Map(), stdin: "initial", leases: new Map() };
+}
+
+function activeTraceChild(state) {
+  return [...state.children.values()].some((child) => child.phase === "spawned" || child.phase === "errored" || child.phase === "exited");
+}
+
+function requireActiveTraceRun(state, event) {
+  if (state.phase !== "running") fail(`${event} is outside the active run`);
+}
+
+function applyTraceTransition(state, event, payload) {
+  if (state.phase === "finalized") fail("trace contains an event after finalization");
+  if (event === "trace.opened") {
+    if (state.phase !== "initial") fail("trace.opened is duplicated or out of order");
+    state.phase = "opened";
+    return;
+  }
+  if (event === "run.started") {
+    if (state.phase !== "opened") fail("run.started must occur exactly once after trace.opened");
+    state.phase = "running";
+    return;
+  }
+  if (event === "run.completed" || event === "run.failed") {
+    requireActiveTraceRun(state, event);
+    if (state.currentStep !== null) fail("run cannot terminate with an active step");
+    if ([...state.children.values()].some((child) => child.phase === "requested" || child.phase === "spawned" || child.phase === "errored" || child.phase === "exited")) fail("run cannot terminate before every child closes or fails");
+    if ([...state.children.values()].some((child) => child.pendingSignal !== null)) fail("run cannot terminate with an unresolved child signal request");
+    if ([...state.leases.values()].some((lease) => lease === "expired" || lease === "signaling")) fail("run cannot terminate before an expired lease signal resolves");
+    if (!["initial", "closed", "error"].includes(state.stdin)) fail("run cannot terminate before stdin closes or fails");
+    state.terminal = { outcome: event === "run.completed" ? "completed" : "failed", cause: payload.cause };
+    state.phase = "terminal";
+    return;
+  }
+  if (event === "trace.finalized") {
+    if (state.phase !== "terminal" || state.terminal === null) fail("trace.finalized requires exactly one run terminal");
+    if (payload.outcome !== state.terminal.outcome || payload.cause !== state.terminal.cause) fail("trace final outcome or cause disagrees with the run terminal");
+    state.phase = "finalized";
+    return;
+  }
+  requireActiveTraceRun(state, event);
+  if (event.startsWith("step.")) {
+    const stepIndex = CODEX_CRITIC_TRACE_STEPS.indexOf(payload.step);
+    if (event === "step.started") {
+      if (state.currentStep !== null || stepIndex <= state.lastStep) fail("trace step start is duplicated, overlapping or out of fixed order");
+      state.currentStep = payload.step;
+    } else {
+      if (state.currentStep !== payload.step) fail("trace step terminal lacks its matching start");
+      state.currentStep = null;
+      state.lastStep = stepIndex;
+    }
+    return;
+  }
+  if (event === "child.spawn-requested") {
+    if (state.children.has(payload.label)) fail("child spawn request is duplicated");
+    state.children.set(payload.label, { phase: "requested", pendingSignal: null });
+    return;
+  }
+  if (event === "child.spawned" || event === "child.spawn-failed") {
+    const child = state.children.get(payload.label);
+    if (child?.phase !== "requested") fail(`${event} lacks its spawn request`);
+    child.phase = event === "child.spawned" ? "spawned" : "failed";
+    return;
+  }
+  if (event === "child.exit") {
+    const child = state.children.get(payload.label);
+    if (!child || !["spawned", "errored"].includes(child.phase)) fail("child.exit lacks one live spawned child");
+    child.phase = "exited";
+    return;
+  }
+  if (event === "child.error") {
+    const child = state.children.get(payload.label);
+    if (!child || !["spawned", "errored", "exited"].includes(child.phase)) fail("child.error lacks one spawned child");
+    child.phase = "errored";
+    return;
+  }
+  if (event === "child.close") {
+    const child = state.children.get(payload.label);
+    if (!child || !["exited", "errored", "failed"].includes(child.phase)) fail("child.close must follow child.exit, child.error or child.spawn-failed");
+    child.phase = "closed";
+    return;
+  }
+  if (event === "child.signal-requested") {
+    const child = state.children.get(payload.label);
+    if (!child || !["spawned", "errored", "exited"].includes(child.phase) || child.pendingSignal !== null) fail("child signal request is out of order");
+    child.pendingSignal = payload.signal;
+    if (state.leases.get(payload.label) === "expired") state.leases.set(payload.label, "signaling");
+    return;
+  }
+  if (event === "child.signal-result") {
+    const child = state.children.get(payload.label);
+    if (!child || child.pendingSignal !== payload.signal) fail("child signal result lacks its matching request");
+    child.pendingSignal = null;
+    if (state.leases.get(payload.label) === "signaling") state.leases.set(payload.label, "handled");
+    return;
+  }
+  if (event === "stdin.write-requested") {
+    if (!activeTraceChild(state) || state.stdin !== "initial") fail("stdin write request is out of order");
+    state.stdin = "requested";
+    return;
+  }
+  if (event === "stdin.write-accepted") {
+    if (state.stdin !== "requested") fail("stdin write acceptance lacks its request");
+    state.stdin = "accepted";
+    return;
+  }
+  if (event === "stdin.end-requested") {
+    if (state.stdin !== "accepted") fail("stdin end request lacks an accepted write");
+    state.stdin = "ending";
+    return;
+  }
+  if (event === "stdin.closed") {
+    if (state.stdin !== "ending" && state.stdin !== "error") fail("stdin close is out of order");
+    state.stdin = "closed";
+    return;
+  }
+  if (event === "stdin.error") {
+    if (!["requested", "accepted", "ending"].includes(state.stdin)) fail("stdin error is out of order");
+    state.stdin = "error";
+    return;
+  }
+  if (event === "stream.chunk" || event === "stream.jsonl-event" || event === "stream.diagnostic" || event === "stream.error" || event === "process.sample") {
+    if (!activeTraceChild(state)) fail(`${event} requires one spawned child that has not closed`);
+    return;
+  }
+  if (event.startsWith("lease.")) {
+    const child = state.children.get(payload.label);
+    if (!child || !["spawned", "errored", "exited"].includes(child.phase)) fail("lease event requires its spawned child");
+    const lease = state.leases.get(payload.label) ?? "initial";
+    if (event === "lease.armed") {
+      if (lease !== "initial") fail("lease arm is duplicated");
+      state.leases.set(payload.label, "armed");
+    } else if (event === "lease.heartbeat") {
+      if (lease !== "armed") fail("lease heartbeat is outside an armed lease");
+    } else {
+      if (lease !== "armed") fail("lease expiry is outside an armed lease");
+      state.leases.set(payload.label, "expired");
+    }
+    return;
+  }
+  if (event === "result.observed") return;
+  fail("trace event has no lifecycle transition");
 }
 
 function traceStatBigInt(value) { return typeof value === "bigint" ? value : BigInt(value); }
@@ -431,15 +616,20 @@ function traceInside(candidate, root) {
   return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
 }
 
-async function validateTraceLocation({ tracePath, repoRoot, fixtureRoot, target, io }) {
+async function validateTraceLocation({ tracePath, repoRoot, fixtureRoot, forbiddenRoots = [], target, io }) {
   assertAbsolute(tracePath, "tracePath");
   if (path.resolve(tracePath) !== tracePath) fail("tracePath must be canonical and normalized");
   const tempRoot = await io.realpath(os.tmpdir());
   if (!traceInside(tracePath, tempRoot) || tracePath === tempRoot) fail("tracePath must be below the canonical OS temp directory");
   await assertTraceParents(tracePath, io);
-  for (const [value, label] of [[repoRoot, "repoRoot"], [fixtureRoot, "fixtureRoot"]]) {
+  if (!Array.isArray(forbiddenRoots) || forbiddenRoots.length > 64) fail("forbiddenRoots must be a bounded array");
+  const exclusions = [[repoRoot, "repoRoot"], [fixtureRoot, "fixtureRoot"], ...forbiddenRoots.map((value, index) => [value, `forbiddenRoots[${index}]`])];
+  const seen = new Set();
+  for (const [value, label] of exclusions) {
     if (value === undefined || value === null) continue;
     const excluded = await canonicalTraceRoot(value, label, io);
+    if (seen.has(excluded)) continue;
+    seen.add(excluded);
     if (traceInside(tracePath, excluded)) fail(`tracePath must be outside ${label}`);
   }
   try {
@@ -524,6 +714,7 @@ function verifyTraceRecords(buffer, maxEvents) {
   let previousHash = null;
   let previousMonotonic = null;
   const records = [];
+  const replay = createTraceReplayState();
   for (const [index, line] of lines.entries()) {
     let record;
     try { record = JSON.parse(line); }
@@ -538,6 +729,7 @@ function verifyTraceRecords(buffer, maxEvents) {
     if (index === 0 && record.event !== "trace.opened") fail("trace.opened must be the first record");
     if (index > 0 && record.event === "trace.opened") fail("trace.opened can only occur once");
     if (index < lines.length - 1 && record.event === "trace.finalized") fail("trace.finalized must be terminal");
+    applyTraceTransition(replay, record.event, record.payload);
     previousHash = record.record_sha256;
     previousMonotonic = monotonic;
     records.push(record);
@@ -551,12 +743,12 @@ function verifyTraceRecords(buffer, maxEvents) {
   return Object.freeze({ records: Object.freeze(records), rootSha256: terminal.record_sha256, priorRootSha256: prior, outcome: terminal.payload.outcome, cause: terminal.payload.cause });
 }
 
-export async function verifySecureTraceStore({ tracePath, binding, repoRoot, fixtureRoot, maxBytes = DEFAULT_TRACE_BYTES, maxEvents = DEFAULT_TRACE_EVENTS, io: ioOverrides = {} } = {}) {
+export async function verifySecureTraceStore({ tracePath, binding, repoRoot, fixtureRoot, forbiddenRoots = [], maxBytes = DEFAULT_TRACE_BYTES, maxEvents = DEFAULT_TRACE_EVENTS, io: ioOverrides = {} } = {}) {
   if (!binding || typeof binding.dev !== "string" || typeof binding.ino !== "string") fail("trace verification requires the original device/inode binding");
   for (const [value, label] of [[maxBytes, "trace byte bound"], [maxEvents, "trace event bound"]]) assertTraceSafeInteger(value, label, { nonnegative: true });
   if (maxBytes < 1 || maxEvents < 2) fail("trace verification bounds are too small");
   const io = traceIo(ioOverrides);
-  await validateTraceLocation({ tracePath, repoRoot, fixtureRoot, target: "present", io });
+  await validateTraceLocation({ tracePath, repoRoot, fixtureRoot, forbiddenRoots, target: "present", io });
   const handle = await io.open(tracePath, constants.O_RDONLY | constants.O_NOFOLLOW);
   try {
     const before = validateTraceStat(await handle.stat({ bigint: true }), binding);
@@ -573,12 +765,12 @@ export async function verifySecureTraceStore({ tracePath, binding, repoRoot, fix
   }
 }
 
-export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot, maxBytes = DEFAULT_TRACE_BYTES, maxEvents = DEFAULT_TRACE_EVENTS, now = () => new Date().toISOString(), monotonicNow = process.hrtime.bigint, io: ioOverrides = {} } = {}) {
+export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot, forbiddenRoots = [], maxBytes = DEFAULT_TRACE_BYTES, maxEvents = DEFAULT_TRACE_EVENTS, now = () => new Date().toISOString(), monotonicNow = process.hrtime.bigint, io: ioOverrides = {} } = {}) {
   for (const [value, label] of [[maxBytes, "trace byte bound"], [maxEvents, "trace event bound"]]) assertTraceSafeInteger(value, label, { nonnegative: true });
   if (maxBytes < 1 || maxEvents < 2) fail("trace store bounds are too small");
   if (typeof now !== "function" || typeof monotonicNow !== "function") fail("trace clocks must be functions");
   const io = traceIo(ioOverrides);
-  await validateTraceLocation({ tracePath, repoRoot, fixtureRoot, target: "absent", io });
+  await validateTraceLocation({ tracePath, repoRoot, fixtureRoot, forbiddenRoots, target: "absent", io });
   let handle;
   try {
     handle = await io.open(tracePath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
@@ -592,6 +784,7 @@ export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot,
     let bytes = 0;
     let previousHash = null;
     let previousMonotonic = null;
+    const replay = createTraceReplayState();
     let failure = null;
     let tail = Promise.resolve();
 
@@ -613,6 +806,7 @@ export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot,
 
     async function emit(event, payload, { terminal = false } = {}) {
       validateTracePayload(event, payload, { terminal });
+      applyTraceTransition(replay, event, payload);
       const nextCount = count + 1;
       if (nextCount > maxEvents) fail("trace event bound exceeded");
       const monotonic = traceMonotonicTime(monotonicNow, previousMonotonic);
@@ -667,21 +861,352 @@ export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot,
         }
         if (bytes + finalLine.length !== predictedBytes) fail("trace final byte prediction did not converge");
         if (predictedBytes > maxBytes) fail("trace byte bound exceeded");
+        applyTraceTransition(replay, "trace.finalized", finalRecord.payload);
         await writeTraceBuffer(handle, finalLine);
         count = finalCount; bytes = predictedBytes; previousHash = finalRecord.record_sha256; previousMonotonic = monotonic;
         if (typeof handle.datasync === "function") await handle.datasync();
         else await handle.sync();
         await handle.close();
         state = "closed";
-        return verifySecureTraceStore({ tracePath, binding: opened.binding, repoRoot, fixtureRoot, maxBytes, maxEvents, io: ioOverrides });
+        return verifySecureTraceStore({ tracePath, binding: opened.binding, repoRoot, fixtureRoot, forbiddenRoots, maxBytes, maxEvents, io: ioOverrides });
       });
     }
 
-    return Object.freeze({ tracePath, binding: opened.binding, append, sync, finalize });
+    const store = Object.freeze({ tracePath, binding: opened.binding, append, sync, finalize });
+    SECURE_TRACE_STORES.add(store);
+    return store;
   } catch (error) {
     if (handle) { try { await handle.close(); } catch { /* Preserve the creation failure. */ } }
     throw error;
   }
+}
+
+function debugErrorCategory(error, fallback) {
+  if (error?.code === "EPIPE") return "broken-pipe";
+  if (error?.code === "ECONNRESET") return "connection-reset";
+  if (error?.code === "ERR_STREAM_DESTROYED") return "stream-destroyed";
+  if (error?.code === "ENOENT" || error?.code === "ESRCH") return "not-found";
+  if (error?.code === "EACCES" || error?.code === "EPERM") return "permission-denied";
+  return fallback;
+}
+
+function debugExitCode(value) { return Number.isSafeInteger(value) ? value : null; }
+function debugSignal(value) { return typeof value === "string" && TRACE_SIGNALS.has(value) ? value : null; }
+
+function debugJsonlMetadata(bytes) {
+  let line;
+  try { line = new TextDecoder("utf-8", { fatal: true }).decode(bytes); }
+  catch { return Object.freeze({ error: "decode-error", metadata: null }); }
+  if (line.endsWith("\r")) line = line.slice(0, -1);
+  if (line.length === 0) return Object.freeze({ error: null, metadata: null });
+  let value;
+  try { value = JSON.parse(line); }
+  catch { return Object.freeze({ error: null, metadata: Object.freeze({ type: "unknown", itemType: "unknown", status: "unknown" }) }); }
+  const type = TRACE_JSONL_TYPES.has(value?.type) ? value.type : "unknown";
+  const itemType = TRACE_ITEM_TYPES.has(value?.item?.type) ? value.item.type : "unknown";
+  let status = TRACE_ITEM_STATUSES.has(value?.status) ? value.status : TRACE_ITEM_STATUSES.has(value?.item?.status) ? value.item.status : "unknown";
+  if (status === "unknown") {
+    if (type.endsWith(".started")) status = "started";
+    else if (type.endsWith(".completed")) status = "completed";
+    else if (type.endsWith(".failed") || type === "error") status = "failed";
+  }
+  return Object.freeze({ error: null, metadata: Object.freeze({ type, itemType, status }) });
+}
+
+function parseDebugProcInteger(value, label) {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number) || number < 0) fail(`debug process ${label} is invalid`);
+  return number;
+}
+
+async function readDebugProcSample(pid, { readFile: readFileFn = readFile, readdir: readdirFn = readdir } = {}) {
+  const proc = `/proc/${pid}`;
+  try {
+    const [statBytes, statusBytes, wchanBytes, fdEntries] = await Promise.all([
+      readFileFn(`${proc}/stat`), readFileFn(`${proc}/status`), readFileFn(`${proc}/wchan`), readdirFn(`${proc}/fd`),
+    ]);
+    const statText = new TextDecoder("utf-8", { fatal: true }).decode(statBytes);
+    const statusText = new TextDecoder("utf-8", { fatal: true }).decode(statusBytes);
+    const statSuffix = statText.lastIndexOf(") ");
+    if (statSuffix < 1) fail("debug process sample is structurally invalid");
+    const suffix = statText.slice(statSuffix + 2).trim().split(/\s+/u);
+    const statusPid = /^Pid:\s+([0-9]+)$/mu.exec(statusText)?.[1];
+    if (suffix.length < 22 || !TRACE_PROCESS_STATES.has(suffix[0]) || statusPid === undefined || Number(statusPid) !== pid || !Array.isArray(fdEntries)) fail("debug process sample is structurally invalid");
+    return Object.freeze({
+      availability: "observed",
+      state: suffix[0],
+      cpuUserTicks: parseDebugProcInteger(suffix[11], "cpuUserTicks"),
+      cpuSystemTicks: parseDebugProcInteger(suffix[12], "cpuSystemTicks"),
+      rssPages: parseDebugProcInteger(suffix[21], "rssPages"),
+      fdCount: parseDebugProcInteger(fdEntries.length, "fdCount"),
+      wchanSha256: sha256(wchanBytes),
+    });
+  } catch (error) {
+    return Object.freeze({ availability: "unavailable", category: debugErrorCategory(error, error?.message === "debug process sample is structurally invalid" || String(error?.message).startsWith("debug process ") ? "invalid-sample" : "io-error") });
+  }
+}
+
+/**
+ * Attaches a fail-closed debug observer to an already spawned ChildProcess.
+ * Every listener is installed synchronously by this constructor; productive
+ * execution paths deliberately do not call this primitive yet.
+ */
+export function createDebugChildObserver({
+  traceStore, child, label = "critic", privateIdentifiers = [], privateRoots = [], procIo = {},
+  clock = () => Number(process.hrtime.bigint() / 1_000_000n),
+  setIntervalFn = setInterval, clearIntervalFn = clearInterval, setTimeoutFn = setTimeout, clearTimeoutFn = clearTimeout,
+} = {}) {
+  if (!SECURE_TRACE_STORES.has(traceStore)) fail("debug child observer requires a verified secure trace store");
+  if (!child || typeof child.on !== "function" || !child.stdin || !child.stdout || !child.stderr) fail("debug child observer requires one spawned ChildProcess with stdio pipes");
+  for (const [stream, name] of [[child.stdin, "stdin"], [child.stdout, "stdout"], [child.stderr, "stderr"]]) if (typeof stream.on !== "function") fail(`debug child observer ${name} is not observable`);
+  assertTraceCategory(label, "child label");
+  if (typeof clock !== "function" || typeof setIntervalFn !== "function" || typeof clearIntervalFn !== "function" || typeof setTimeoutFn !== "function" || typeof clearTimeoutFn !== "function") fail("debug child observer clocks and timers must be functions");
+
+  const stderrRedactor = createDebugLineRedactor({ maxPendingBytes: DEBUG_DIAGNOSTIC_RAW_BYTES, maxOutputBytes: DEFAULT_DEBUG_OUTPUT_BYTES, privateIdentifiers, privateRoots });
+  let tail = Promise.resolve();
+  let queueFailure = null;
+  let observedFailure = null;
+  let accepting = true;
+  let stdoutPending = Buffer.alloc(0);
+  let stdoutBytes = 0;
+  let stderrBytes = 0;
+  let stdoutFinished = false;
+  let stderrFinished = false;
+  let stdinClosed = false;
+  let childClosed = false;
+  let spawnRecorded = false;
+  let spawnPid = null;
+  let spawnPgid = null;
+  let procTimer = null;
+  let leaseTimer = null;
+  let leaseStarted = null;
+  let leaseExpired = false;
+  let finishRequested = false;
+
+  function safeFailure() {
+    if (observedFailure === null) observedFailure = new Error("debug child observer observed a closed failure category");
+  }
+
+  function schedule(action) {
+    if (!accepting) {
+      const rejected = Promise.reject(queueFailure ?? new Error("debug child observer is closed"));
+      rejected.catch(() => {});
+      return rejected;
+    }
+    const operation = tail.then(async () => {
+      if (queueFailure) throw queueFailure;
+      try { return await action(); }
+      catch {
+        queueFailure = new Error("debug child observer trace operation failed");
+        accepting = false;
+        throw queueFailure;
+      }
+    });
+    tail = operation.catch(() => {});
+    operation.catch(() => {});
+    return operation;
+  }
+
+  function append(event, payload) { return schedule(() => traceStore.append(event, payload)); }
+
+  function appendStreamChunk(stream, chunk, cumulativeBytes) {
+    append("stream.chunk", { stream, bytes: chunk.length, cumulativeBytes, sha256: sha256(chunk) });
+  }
+
+  function emitStdoutLine(lineBytes) {
+    const parsed = debugJsonlMetadata(lineBytes);
+    if (parsed.error) {
+      append("stream.error", { stream: "stdout", category: parsed.error });
+      safeFailure();
+    } else if (parsed.metadata) append("stream.jsonl-event", parsed.metadata);
+  }
+
+  function consumeStdout(chunk) {
+    if (stdoutFinished || !Buffer.isBuffer(chunk)) { safeFailure(); return; }
+    stdoutBytes += chunk.length;
+    appendStreamChunk("stdout", chunk, stdoutBytes);
+    stdoutPending = Buffer.concat([stdoutPending, chunk]);
+    for (;;) {
+      const newline = stdoutPending.indexOf(0x0a);
+      if (newline === -1) break;
+      const line = stdoutPending.subarray(0, newline);
+      stdoutPending = stdoutPending.subarray(newline + 1);
+      emitStdoutLine(line);
+    }
+    if (stdoutPending.length > DEFAULT_DEBUG_PENDING_BYTES) {
+      stdoutPending = Buffer.alloc(0);
+      append("stream.error", { stream: "stdout", category: "line-too-long" });
+      safeFailure();
+    }
+  }
+
+  function finishStdout() {
+    if (stdoutFinished) return;
+    stdoutFinished = true;
+    if (stdoutPending.length > 0) emitStdoutLine(stdoutPending);
+    stdoutPending = Buffer.alloc(0);
+  }
+
+  function emitDiagnosticLines(lines) {
+    for (const line of lines) {
+      if (Buffer.byteLength(line, "utf8") > DEBUG_DIAGNOSTIC_BYTES) {
+        append("stream.error", { stream: "stderr", category: "line-too-long" });
+        safeFailure();
+        continue;
+      }
+      append("stream.diagnostic", { stream: "stderr", line });
+    }
+  }
+
+  function consumeStderr(chunk) {
+    if (stderrFinished || !Buffer.isBuffer(chunk)) { safeFailure(); return; }
+    stderrBytes += chunk.length;
+    appendStreamChunk("stderr", chunk, stderrBytes);
+    try { emitDiagnosticLines(stderrRedactor.write(chunk)); }
+    catch { append("stream.error", { stream: "stderr", category: "redaction-error" }); safeFailure(); }
+  }
+
+  function finishStderr() {
+    if (stderrFinished) return;
+    stderrFinished = true;
+    try { emitDiagnosticLines(stderrRedactor.finish()); }
+    catch { append("stream.error", { stream: "stderr", category: "redaction-error" }); safeFailure(); }
+  }
+
+  function stopTimers() {
+    if (procTimer !== null) { clearIntervalFn(procTimer); procTimer = null; }
+    if (leaseTimer !== null) { clearTimeoutFn(leaseTimer); leaseTimer = null; }
+  }
+
+  function finishStreams() { finishStdout(); finishStderr(); }
+
+  function sampleProcess() {
+    if (childClosed || !spawnRecorded) return Promise.resolve();
+    const pid = spawnPid;
+    return schedule(async () => {
+      const sample = Number.isSafeInteger(pid) && pid > 0 ? await readDebugProcSample(pid, procIo) : Object.freeze({ availability: "unavailable", category: "pid-unavailable" });
+      await traceStore.append("process.sample", sample);
+    });
+  }
+
+  function recordSpawn({ pid = child.pid, pgid = child.pid } = {}) {
+    if (spawnRecorded) return Promise.reject(new Error("debug child spawn was already recorded"));
+    if (!Number.isSafeInteger(pid) || pid <= 0 || !Number.isSafeInteger(pgid) || pgid <= 0) return Promise.reject(new Error("debug child observer requires safe pid metadata"));
+    spawnRecorded = true;
+    spawnPid = pid;
+    spawnPgid = pgid;
+    const operation = schedule(async () => {
+      await traceStore.append("child.spawn-requested", { label });
+      await traceStore.append("child.spawned", { label, pid, pgid });
+    });
+    procTimer = setIntervalFn(() => { sampleProcess().catch(() => {}); }, DEBUG_PROC_INTERVAL_MS);
+    procTimer?.unref?.();
+    return operation;
+  }
+
+  function writeAndEndStdin(value) {
+    if (!spawnRecorded || finishRequested) return Promise.reject(new Error("debug child stdin write is out of order"));
+    const bytes = Buffer.isBuffer(value) ? Buffer.from(value) : typeof value === "string" ? Buffer.from(value, "utf8") : null;
+    if (bytes === null) return Promise.reject(new Error("debug child stdin accepts only Buffer or string input"));
+    return schedule(async () => {
+      await traceStore.append("stdin.write-requested", { bytes: bytes.length, sha256: sha256(bytes) });
+      try { child.stdin.write(bytes); }
+      catch { await traceStore.append("stdin.error", { category: "write-error" }); safeFailure(); return; }
+      await traceStore.append("stdin.write-accepted", { bytes: bytes.length });
+      await traceStore.append("stdin.end-requested", {});
+      try { child.stdin.end(); }
+      catch { await traceStore.append("stdin.error", { category: "end-error" }); safeFailure(); }
+    });
+  }
+
+  function readClock() {
+    let value;
+    try { value = clock(); } catch { throw new Error("debug child observer clock is invalid"); }
+    if (!Number.isSafeInteger(value) || value < 0) throw new Error("debug child observer clock is invalid");
+    return value;
+  }
+
+  function leasePayload() {
+    const value = readClock();
+    if (leaseStarted === null || value < leaseStarted || !Number.isSafeInteger(value - leaseStarted)) throw new Error("debug child observer clock is invalid");
+    return { label, elapsedMs: value - leaseStarted, stdoutBytes, stderrBytes };
+  }
+
+  function armLease({ leaseMs, signal = "SIGTERM" } = {}) {
+    if (leaseStarted !== null || !Number.isSafeInteger(leaseMs) || leaseMs <= 0 || !TRACE_SIGNALS.has(signal)) return Promise.reject(new Error("debug child lease configuration is invalid"));
+    try { leaseStarted = readClock(); }
+    catch (error) { return Promise.reject(error); }
+    const operation = append("lease.armed", leasePayload());
+    leaseTimer = setTimeoutFn(() => { expireLease({ signal }).catch(() => {}); }, leaseMs);
+    leaseTimer?.unref?.();
+    return operation;
+  }
+
+  function heartbeatLease() {
+    if (leaseStarted === null || leaseExpired) return Promise.reject(new Error("debug child lease heartbeat is out of order"));
+    return append("lease.heartbeat", leasePayload());
+  }
+
+  function expireLease({ signal = "SIGTERM" } = {}) {
+    if (leaseStarted === null || leaseExpired || !TRACE_SIGNALS.has(signal)) return Promise.reject(new Error("debug child lease expiry is out of order"));
+    leaseExpired = true;
+    if (leaseTimer !== null) { clearTimeoutFn(leaseTimer); leaseTimer = null; }
+    safeFailure();
+    return schedule(async () => {
+      await traceStore.append("lease.expired", leasePayload());
+      const identity = {};
+      if (spawnPid !== null) { identity.pid = spawnPid; identity.pgid = spawnPgid; }
+      await traceStore.append("child.signal-requested", { label, signal, ...identity });
+      let category = "not-sent";
+      try { category = typeof child.kill === "function" && child.kill(signal) ? "sent" : "not-sent"; }
+      catch { category = "signal-error"; }
+      await traceStore.append("child.signal-result", { label, signal, category, ...(identity.pgid === undefined ? {} : { pgid: identity.pgid }) });
+    });
+  }
+
+  function beginFinish() {
+    if (finishRequested) return;
+    finishRequested = true;
+    stopTimers();
+    finishStreams();
+    if (!childClosed) safeFailure();
+  }
+
+  async function drain() {
+    if (!finishRequested) beginFinish();
+    await tail;
+    if (queueFailure) throw queueFailure;
+    await traceStore.sync();
+    if (observedFailure) throw observedFailure;
+    return Object.freeze({ stdoutBytes, stderrBytes, closed: childClosed });
+  }
+
+  async function finish() { beginFinish(); return drain(); }
+  async function finishAndDrain() { return finish(); }
+
+  // Listener installation is intentionally contiguous and precedes every API
+  // method capable of writing stdin.
+  child.on("error", (error) => { append("child.error", { label, category: debugErrorCategory(error, "process-error") }); safeFailure(); });
+  child.stdin.on("error", (error) => { append("stdin.error", { category: debugErrorCategory(error, "stdin-error") }); safeFailure(); });
+  child.stdin.on("finish", () => { if (!stdinClosed) { stdinClosed = true; append("stdin.closed", {}); } });
+  child.stdin.on("close", () => { if (!stdinClosed) { stdinClosed = true; append("stdin.closed", {}); } });
+  child.stdout.on("data", consumeStdout);
+  child.stdout.on("error", (error) => { append("stream.error", { stream: "stdout", category: debugErrorCategory(error, "stream-error") }); safeFailure(); });
+  child.stdout.on("end", finishStdout);
+  child.stdout.on("close", finishStdout);
+  child.stderr.on("data", consumeStderr);
+  child.stderr.on("error", (error) => { append("stream.error", { stream: "stderr", category: debugErrorCategory(error, "stream-error") }); safeFailure(); });
+  child.stderr.on("end", finishStderr);
+  child.stderr.on("close", finishStderr);
+  child.on("exit", (code, signal) => { append("child.exit", { label, code: debugExitCode(code), signal: debugSignal(signal) }); });
+  child.on("close", (code, signal) => {
+    finishStreams();
+    childClosed = true;
+    stopTimers();
+    append("child.close", { label, code: debugExitCode(code), signal: debugSignal(signal) });
+  });
+
+  return Object.freeze({ recordSpawn, writeAndEndStdin, armLease, heartbeatLease, expireLease, sampleProcess, finish, drain, finishAndDrain });
 }
 
 function filesystemInline(entries) {
