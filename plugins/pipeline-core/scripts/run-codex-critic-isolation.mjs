@@ -1,19 +1,11 @@
 #!/usr/bin/env node
-/** Local host entry point for the approved Codex Critic isolation acceptance run. */
-import { rm } from "node:fs/promises";
+/** Local host entry point for the approved profile-bound isolation acceptance. */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { buildExactFixture, runCodexCritic } from "./codex-critic-isolation.mjs";
+import { CODEX_CRITIC_ARTIFACTS, runProfileBoundIsolation } from "./codex-critic-isolation.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
-const DEFAULT_ARTIFACTS = Object.freeze([
-  "plugins/pipeline-core/scripts/codex-critic-isolation.mjs",
-  "plugins/pipeline-core/scripts/codex-critic-isolation.test.mjs",
-  "plugins/pipeline-core/scripts/run-codex-critic-isolation.mjs",
-  "plugins/pipeline-core/scripts/critic-verdict.schema.json",
-  "harness/scripts/verify.mjs",
-]);
 
 function usage(stream = process.stdout) {
   stream.write("Usage: node plugins/pipeline-core/scripts/run-codex-critic-isolation.mjs --commit <40-hex-sha>\n");
@@ -28,23 +20,31 @@ export function parseArgs(argv) {
 }
 
 export async function run({ commit, repoRoot = root } = {}) {
-  const fixture = await buildExactFixture({ repoRoot, candidateCommit: commit, artifactPaths: DEFAULT_ARTIFACTS });
-  try {
-    const result = await runCodexCritic({
-      fixture,
-      onHeartbeat({ elapsedMs, stdoutBytes, stderrBytes }) {
-        process.stderr.write(`codex-critic-isolation: running ${Math.floor(elapsedMs / 1000)}s stdout=${stdoutBytes} stderr=${stderrBytes}\n`);
-      },
-    });
-    if (!result.ok) {
-      const diagnostic = result.diagnostics;
-      process.stderr.write(`codex-critic-isolation: local diagnostics stdout=${diagnostic.stdoutBytes}/${diagnostic.stdoutSha256} stderr=${diagnostic.stderrBytes}/${diagnostic.stderrSha256}\n`);
-      if (diagnostic.stderrTail) process.stderr.write(`codex-critic-isolation: local stderr tail (do not paste into receipt):\n${diagnostic.stderrTail}\n`);
+  const result = await runProfileBoundIsolation({
+    repoRoot,
+    candidateCommit: commit,
+    artifactPaths: CODEX_CRITIC_ARTIFACTS,
+    onHeartbeat({ label, elapsedMs, stdoutBytes, stderrBytes }) {
+      process.stderr.write(`codex-critic-isolation: ${label} ${Math.floor(elapsedMs / 1000)}s stdout=${stdoutBytes} stderr=${stderrBytes}\n`);
+    },
+  });
+  if (!result.ok) {
+    for (const [label, diagnostic] of Object.entries(result.localDiagnostics ?? {})) {
+      if (!diagnostic) continue;
+      if (label === "preflight") {
+        for (const [probe, probeDiagnostic] of Object.entries(diagnostic)) {
+          if (!probeDiagnostic) continue;
+          process.stderr.write(`codex-critic-isolation: local ${label}/${probe} diagnostics stdout=${probeDiagnostic.stdoutBytes}/${probeDiagnostic.stdoutSha256} stderr=${probeDiagnostic.stderrBytes}/${probeDiagnostic.stderrSha256}\n`);
+          if (probeDiagnostic.stderrTail) process.stderr.write(`codex-critic-isolation: local ${label}/${probe} stderr tail (do not paste into receipt):\n${probeDiagnostic.stderrTail}\n`);
+        }
+      } else {
+        process.stderr.write(`codex-critic-isolation: local ${label} diagnostics stdout=${diagnostic.stdoutBytes}/${diagnostic.stdoutSha256} stderr=${diagnostic.stderrBytes}/${diagnostic.stderrSha256}\n`);
+        if (diagnostic.stderrTail) process.stderr.write(`codex-critic-isolation: local ${label} stderr tail (do not paste into receipt):\n${diagnostic.stderrTail}\n`);
+      }
     }
-    return Object.freeze({ ok: result.ok, envelope: result.envelope, reason: result.reason });
-  } finally {
-    await rm(fixture.root, { recursive: true, force: true });
   }
+  const { localDiagnostics, ...publicResult } = result;
+  return Object.freeze(publicResult);
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
