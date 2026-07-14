@@ -167,7 +167,7 @@ export async function runNativeSandboxProbe({ codexBinary, fixtureRoot, leaseMs 
   const before = await hashes(fixtureCanary, externalCanary);
   // Keep the coordinator source in argv rather than a coordinator-only file:
   // :read-only may legitimately hide that temporary directory from the child.
-  const args = ["sandbox", "-P", CONTROL_POLICY.nativeProbeProfile, "--", process.execPath, "-e", program, fixtureCanary, externalCanary];
+  const args = ["sandbox", "-P", CONTROL_POLICY.nativeProbeProfile, "--", process.execPath, "--input-type=module", "-e", program, fixtureCanary, externalCanary];
   const invocationSha256 = invocationHash(codexBinary, args);
   let child;
   try { child = spawn(codexBinary, args, { cwd: fixtureRoot, shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] }); }
