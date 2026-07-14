@@ -471,6 +471,23 @@ function writeGovernancePolicy(dir, relDir, content) {
   mkdirSync(join(dir, relDir), { recursive: true });
   writeFileSync(join(dir, relDir, "deploy-policy.yaml"), content);
 }
+function writePolicyLock(dir, { mode = "mandate", status = "resolved" } = {}) {
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(
+    join(dir, ".claude", "policy-lock.yaml"),
+    [
+      "schema: pipeline.policy-lock.v0",
+      "pack_id: policy-pack-001",
+      "version: 1.0.0",
+      "digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      `mode: ${mode}`,
+      "update: pinned",
+      "verifier:",
+      `  status: ${status}`,
+      "",
+    ].join("\n"),
+  );
+}
 function deployApprovalState(forArtifact, forEnvironment) {
   return {
     schema: "pipeline.state.v0",
@@ -676,6 +693,34 @@ function deployApprovalState(forArtifact, forEnvironment) {
     dir,
     BLOCK,
     { stderrIncludes: ["central deploy policy is declared but unreadable/invalid", "fail-closed blocked, unconditional"] },
+  );
+}
+
+// ---- PGD18a/b: fixed managed policy lock is independent of governance.policies_path ----
+{
+  const { dir } = freshRepo("deploy-policylock-mandate");
+  writeManifest(dir, releaseManifest());
+  writePolicyLock(dir, { mode: "mandate", status: "source-unverified" });
+  check(
+    "PGD18a block  a fixed mandate lock with unverified source blocks a deploy trigger without governance discovery",
+    "git push origin v1.0.0",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["managed policy lock status: source-unverified", "deploy-triggering"] },
+  );
+}
+{
+  const { dir } = freshRepo("deploy-policylock-advisory");
+  gitAt(dir, "tag", "v1.0.0");
+  writeManifest(dir, releaseManifest());
+  writePolicyLock(dir, { mode: "advisory", status: "source-unverified" });
+  writeState(dir, deployApprovalState("v1.0.0", "prod"));
+  check(
+    "PGD18b allow  an advisory unverified lock warns at validation but does not close an otherwise approved deploy trigger",
+    "git push origin v1.0.0",
+    dir,
+    ALLOW,
+    { stderrEmpty: true },
   );
 }
 

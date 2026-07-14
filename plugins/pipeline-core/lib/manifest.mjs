@@ -74,6 +74,13 @@ export const DEFAULT_MANIFEST_RELPATH = join(".claude", "pipeline.yaml");
 /** Fixed filename the central deploy policy is discovered under (no new manifest field for the filename itself). */
 const DEPLOY_POLICY_FILENAME = "deploy-policy.yaml";
 
+/** Fixed, repository-relative managed-policy binding.  Unlike governance.policies_path,
+ * this location is not selectable by the project manifest. */
+export const DEFAULT_POLICY_LOCK_RELPATH = join(".claude", "policy-lock.yaml");
+
+/** Co-located schema for the public, credential-free policy-lock contract. */
+export const DEFAULT_POLICY_LOCK_SCHEMA_PATH = join(SCRIPT_DIR, "..", "scripts", "policy-lock.schema.json");
+
 /** Where the deviation-record document lives, relative to a project's repo root. */
 const RISKS_MD_RELPATH = join("docs", "risks.md");
 
@@ -335,6 +342,65 @@ export function loadDeployPolicy(rootDir, manifest) {
   }
 }
 
+const POLICY_LOCK_STATUSES = new Set(["resolved", "missing", "stale", "digest-mismatch", "policy-invalid", "source-unverified"]);
+const OPAQUE_PACK_ID_RE = /^[a-z][a-z0-9-]{2,63}$/;
+const PRIVATE_PACK_ID_MARKER_RE = /(?:^|-)private(?:-|$)/;
+const SHA256_DIGEST_RE = /^sha256:[a-f0-9]{64}$/;
+const IMMUTABLE_VERSION_RE = /^v?\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/;
+
+/**
+ * Loads the fixed public policy-lock.  This package deliberately does not resolve a
+ * source, fetch a pack, inspect a cache, or use credentials: verifier state is an
+ * externally-produced, public-safe status assertion.  Consequently callers only get
+ * a status code and never a source coordinate, path, account, or pack name.
+ */
+export function loadPolicyLock(rootDir) {
+  try {
+    const lockPath = join(rootDir, DEFAULT_POLICY_LOCK_RELPATH);
+    if (!existsSync(lockPath)) return { status: "unbound" };
+    const lock = parseYaml(readFileSync(lockPath, "utf8"));
+    const schema = loadSchema(DEFAULT_POLICY_LOCK_SCHEMA_PATH);
+    const { valid, errors } = validateAgainstSchema(lock, schema);
+    // Retain only a schema-shaped mode for advisory fail direction; no identity or
+    // policy material is ever emitted from an invalid lock.
+    const modeOnly = lock && typeof lock === "object" && ["advisory", "mandate", "strict"].includes(lock.mode) ? { mode: lock.mode } : undefined;
+    if (!valid) return { status: "policy-invalid", lock: modeOnly };
+    if (
+      !OPAQUE_PACK_ID_RE.test(lock.pack_id) ||
+      PRIVATE_PACK_ID_MARKER_RE.test(lock.pack_id) ||
+      !IMMUTABLE_VERSION_RE.test(lock.version) ||
+      !SHA256_DIGEST_RE.test(lock.digest) ||
+      (lock.verifier.observed_digest !== undefined && !SHA256_DIGEST_RE.test(lock.verifier.observed_digest))
+    ) {
+      return { status: "policy-invalid", lock: modeOnly };
+    }
+    if (!POLICY_LOCK_STATUSES.has(lock.verifier.status)) return { status: "policy-invalid", lock: modeOnly };
+    if (lock.verifier.observed_digest && lock.verifier.observed_digest !== lock.digest) return { status: "digest-mismatch", lock };
+    return { status: lock.verifier.status, lock };
+  } catch {
+    return { status: "policy-invalid" };
+  }
+}
+
+/** Returns only the log-safe public status code, never lock identity or location. */
+export function policyLockStatus(rootDir) {
+  return loadPolicyLock(rootDir).status;
+}
+
+function policyLockFinding(lockResult) {
+  const status = lockResult.status;
+  if (status === "unbound" || status === "resolved") return null;
+  const mode = lockResult.lock?.mode;
+  const message = `managed policy lock status: ${status}`;
+  return mode === "advisory" ? { warning: message } : { error: { rule: "policy-lock", subject: "binding", message } };
+}
+
+function policyResultFromLock(lockResult) {
+  if (lockResult.status !== "resolved" || !lockResult.lock) return null;
+  const lock = lockResult.lock;
+  return { status: "ok", policy: { ...(lock.policy ?? {}), mode: lock.mode } };
+}
+
 const DEVIATION_REQUIRED_FIELDS = ["id", "policy-rule", "deviation", "justification", "owner", "expires", "approved-by"];
 
 /**
@@ -535,11 +601,27 @@ function checkSemantics(manifest, rootDir, now) {
   checkReleaseIntegrity(manifest, errors, warnings);
 
   if (manifest.release) {
-    const policyResult = loadDeployPolicy(rootDir, manifest);
+    const lockResult = loadPolicyLock(rootDir);
+    const lockFinding = policyLockFinding(lockResult);
+    if (lockFinding?.error) errors.push(lockFinding.error);
+    if (lockFinding?.warning) warnings.push(lockFinding.warning);
+
+    // A fixed bound lock is authoritative.  A project-controlled governance path is
+    // consulted only while no lock is bound, so removing/repointing that manifest key
+    // cannot mute a mandate/strict managed floor.
+    const policyResult = policyResultFromLock(lockResult) ?? loadDeployPolicy(rootDir, manifest);
     const deviations = readDeviations(rootDir, now);
     const dp = checkDeployPrecedence(manifest.release, policyResult, deviations, now);
     errors.push(...dp.errors);
     warnings.push(...dp.warnings);
+
+    const updateStatus = lockResult.lock?.verifier?.update_status;
+    if (updateStatus === "available" && lockResult.lock?.update === "notify") {
+      warnings.push("managed policy lock update available");
+    }
+    if (updateStatus === "required" && lockResult.lock?.update === "required") {
+      errors.push({ rule: "policy-lock-update", subject: "binding", message: "managed policy lock requires an immutable update" });
+    }
   }
 
   return { errors, warnings };

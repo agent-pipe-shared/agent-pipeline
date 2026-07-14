@@ -44,6 +44,7 @@ import {
   renderPipelineYaml,
   validateCompiledPipelineYaml,
   validateSharedLock,
+  validatePolicyLockPreflight,
   parseArgv,
   resolveWarnDisposition,
   run,
@@ -63,6 +64,20 @@ function ok(id, condition, detail) {
     failures.push(`${id}${detail !== undefined ? `: ${detail}` : ""}`);
     console.log(`FAIL  ${id}${detail !== undefined ? ` — ${detail}` : ""}`);
   }
+}
+
+function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" } = {}) {
+  return [
+    "schema: pipeline.policy-lock.v0",
+    "pack_id: policy-pack-001",
+    "version: 1.0.0",
+    "digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    `mode: ${mode}`,
+    "update: pinned",
+    "verifier:",
+    `  status: ${status}`,
+    "",
+  ].join("\n");
 }
 
 // ======================================================================================
@@ -89,6 +104,42 @@ function ok(id, condition, detail) {
   });
   const unchanged = [...sentinels].every(([path, content]) => readFileSync(path, "utf8") === content);
   ok("run: missing private-overlay fails before source or runtime mutation byte-identically", code === 1 && unchanged);
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const strict = validatePolicyLockPreflight("/unused", { policyLockResult: { status: "missing", lock: { mode: "strict" } } });
+  const mandate = validatePolicyLockPreflight("/unused", { policyLockResult: { status: "stale", lock: { mode: "mandate" } } });
+  const advisory = validatePolicyLockPreflight("/unused", { policyLockResult: { status: "source-unverified", lock: { mode: "advisory" } } });
+  const unbound = validatePolicyLockPreflight("/unused", { policyLockResult: { status: "unbound" } });
+  ok(
+    "validatePolicyLockPreflight: mandate/strict fail before setup mutation; advisory warns and unbound is inert",
+    !strict.ok && strict.reason === "managed-policy-lock-missing" &&
+      !mandate.ok && mandate.reason === "managed-policy-lock-stale" &&
+      advisory.ok && advisory.warning === "managed policy lock status: source-unverified" && unbound.ok,
+    JSON.stringify({ strict, mandate, advisory, unbound }),
+  );
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "setup-policylock-before-write-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  symlinkSync(PLUGINS_PATH, join(root, "plugins"), "dir");
+  mkdirSync(join(root, ".pipeline"), { recursive: true });
+  const sha = "a".repeat(40);
+  writeFileSync(join(root, ".pipeline", "private-overlay.yaml"), `shared:\n  sha: ${sha}\n`);
+  writeFileSync(join(root, ".claude", "policy-lock.yaml"), managedPolicyLockYaml({ mode: "strict", status: "source-unverified" }));
+  const sentinels = new Map([
+    [join(root, "pipeline.user.yaml"), "source-before\n"],
+    [join(root, ".claude", "settings.json"), "settings-before\n"],
+    [join(root, ".claude", "pipeline.json"), "pipeline-before\n"],
+    [join(root, ".claude", "pipeline.yaml"), "manifest-before\n"],
+  ]);
+  for (const [path, content] of sentinels) writeFileSync(path, content);
+  const code = await run(["--defaults"], { rootDir: root, spawn: () => ({ status: 0, stdout: `${sha}\n` }) });
+  const unchanged = [...sentinels].every(([path, content]) => readFileSync(path, "utf8") === content);
+  ok(
+    "run: strict fixed lock fails before source or runtime mutation even when generated manifest has no release",
+    code === 1 && unchanged,
+  );
   rmSync(root, { recursive: true, force: true });
 }
 {

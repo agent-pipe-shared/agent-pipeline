@@ -24,6 +24,8 @@ import {
   gateConfig,
   activePhases,
   loadDeployPolicy,
+  loadPolicyLock,
+  policyLockStatus,
   readDeviations,
   checkDeployPrecedence,
 } from "../../plugins/pipeline-core/lib/manifest.mjs";
@@ -42,6 +44,32 @@ function record(id, ok, detail) {
     failures.push(`${id}: ${detail}`);
     console.log(`FAIL  ${id} -- ${detail}`);
   }
+}
+
+function policyLockYaml({
+  mode = "mandate",
+  status = "resolved",
+  update = "pinned",
+  observedDigest,
+  updateStatus,
+  policyLines = [],
+  packId = "policy-pack-001",
+  version = "1.0.0",
+  digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+} = {}) {
+  return yaml(
+    "schema: pipeline.policy-lock.v0",
+    `pack_id: ${packId}`,
+    `version: ${version}`,
+    `digest: ${digest}`,
+    `mode: ${mode}`,
+    `update: ${update}`,
+    "verifier:",
+    `  status: ${status}`,
+    ...(observedDigest ? [`  observed_digest: ${observedDigest}`] : []),
+    ...(updateStatus ? [`  update_status: ${updateStatus}`] : []),
+    ...policyLines,
+  );
 }
 
 // ---- scratch dir for fixture files --------------------------------------------------------
@@ -1386,6 +1414,169 @@ writeFileSync(
     "loadDeployPolicy OK  a valid deploy-policy.yaml parses clean",
     result.status === "ok" && result.policy && result.policy.mode === "strict",
     `got ${JSON.stringify(result)}`,
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+
+// ---- fixed policy lock -- public status and fail direction ---------------------------------
+{
+  const root = mkdtempSync(join(tmpdir(), "manifest-policylock-unbound-"));
+  record(
+    "policyLock UNBOUND  absent fixed lock is inert and exposes only unbound",
+    loadPolicyLock(root).status === "unbound" && policyLockStatus(root) === "unbound",
+    `got ${JSON.stringify(loadPolicyLock(root))}`,
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "manifest-policylock-status-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  const statuses = ["resolved", "missing", "stale", "digest-mismatch", "policy-invalid", "source-unverified"];
+  const got = [];
+  for (const status of statuses) {
+    writeFileSync(join(root, ".claude", "policy-lock.yaml"), policyLockYaml({ status }));
+    got.push(policyLockStatus(root));
+  }
+  record(
+    "policyLock STATUS  all six bound public codes are deterministic and log-safe",
+    JSON.stringify(got) === JSON.stringify(statuses),
+    `got ${JSON.stringify(got)}`,
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "manifest-policylock-digest-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(
+    join(root, ".claude", "policy-lock.yaml"),
+    policyLockYaml({ observedDigest: "sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" }),
+  );
+  record(
+    "policyLock DIGEST  observed immutable digest disagreement wins over asserted status",
+    policyLockStatus(root) === "digest-mismatch",
+    `got ${JSON.stringify(loadPolicyLock(root))}`,
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "manifest-policylock-private-shapes-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  const cases = [
+    { packId: "https://private.example.invalid/owner/pack", version: "1.0.0" },
+    { packId: "private-owner-pack", version: "1.0.0" },
+    { packId: "policy-pack-001", version: "refs/heads/main" },
+    { packId: "policy-pack-001", version: "release-tag" },
+    { packId: "policy-pack-001", version: "1.0.0", digest: "sha1:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    { packId: "policy-pack-001", version: "1.0.0", digest: "not-a-digest" },
+  ];
+  const outcomes = [];
+  for (const entry of cases) {
+    writeFileSync(join(root, ".claude", "policy-lock.yaml"), policyLockYaml(entry));
+    outcomes.push({ public: policyLockStatus(root), loaded: loadPolicyLock(root) });
+  }
+  const serial = JSON.stringify(outcomes);
+  record(
+    "policyLock IDENTITY  URL/private/branch-or-tag substitutes and non-sha256 digests are policy-invalid without value leakage",
+    outcomes.every((entry) => entry.public === "policy-invalid" && entry.loaded.status === "policy-invalid") &&
+      !serial.includes("private.example.invalid") && !serial.includes("private-owner-pack") && !serial.includes("refs/heads/main") && !serial.includes("release-tag"),
+    `public=${JSON.stringify(outcomes.map((entry) => entry.public))}`,
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "manifest-policylock-enforcement-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(
+    join(root, ".claude", "pipeline.yaml"),
+    yaml(
+      "schema: pipeline.manifest.v0",
+      "release:",
+      "  environments:",
+      "    prod:",
+      "      adapter: a1",
+      "      healthcheck: check.sh",
+      "      rollback: rollback.sh",
+      "  adapters:",
+      "    a1:",
+      "      executor: ci",
+      "      credentials: oidc",
+    ),
+  );
+  writeFileSync(join(root, ".claude", "policy-lock.yaml"), policyLockYaml({ mode: "mandate", status: "source-unverified" }));
+  const mandate = loadManifest(root);
+  writeFileSync(join(root, ".claude", "policy-lock.yaml"), policyLockYaml({ mode: "advisory", status: "source-unverified" }));
+  const advisory = loadManifest(root);
+  record(
+    "policyLock FAIL DIRECTION  mandate blocks unverified binding while advisory only warns",
+    mandate.status === "invalid" && mandate.errors.some((e) => e.rule === "policy-lock") && advisory.status === "ok" && advisory.warnings.includes("managed policy lock status: source-unverified"),
+    `mandate=${JSON.stringify(mandate)} advisory=${JSON.stringify(advisory)}`,
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "manifest-policylock-precedence-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(
+    join(root, ".claude", "pipeline.yaml"),
+    yaml(
+      "schema: pipeline.manifest.v0",
+      "release:",
+      "  environments:",
+      "    prod:",
+      "      adapter: project-adapter",
+      "      healthcheck: check.sh",
+      "      rollback: rollback.sh",
+      "  adapters:",
+      "    project-adapter:",
+      "      executor: ci",
+      "      credentials: oidc",
+      "governance:",
+      "  policies_path: deliberately-ignored",
+    ),
+  );
+  writeFileSync(
+    join(root, ".claude", "policy-lock.yaml"),
+    policyLockYaml({ policyLines: ["policy:", "  adapters:", "    - managed-adapter"] }),
+  );
+  const result = loadManifest(root);
+  record(
+    "policyLock PRECEDENCE  a bound lock floor applies even when governance.policies_path is repointed",
+    result.status === "invalid" && result.errors.some((e) => e.rule === "adapters"),
+    `got ${JSON.stringify(result)}`,
+  );
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "manifest-policylock-updates-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  const manifest = yaml(
+    "schema: pipeline.manifest.v0",
+    "release:",
+    "  environments:",
+    "    prod:",
+    "      adapter: a1",
+    "      healthcheck: check.sh",
+    "      rollback: rollback.sh",
+    "  adapters:",
+    "    a1:",
+    "      executor: ci",
+    "      credentials: oidc",
+  );
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), manifest);
+  writeFileSync(join(root, ".claude", "policy-lock.yaml"), policyLockYaml({ update: "pinned", updateStatus: "required" }));
+  const pinned = loadManifest(root);
+  writeFileSync(join(root, ".claude", "policy-lock.yaml"), policyLockYaml({ update: "notify", updateStatus: "available" }));
+  const notify = loadManifest(root);
+  writeFileSync(join(root, ".claude", "policy-lock.yaml"), policyLockYaml({ update: "required", updateStatus: "required" }));
+  const required = loadManifest(root);
+  record(
+    "policyLock UPDATE  pinned stays inert, notify warns, required blocks only when declared invalid",
+    pinned.status === "ok" &&
+      notify.status === "ok" &&
+      notify.warnings.includes("managed policy lock update available") &&
+      required.status === "invalid" &&
+      required.errors.some((e) => e.rule === "policy-lock-update"),
+    `pinned=${JSON.stringify(pinned)} notify=${JSON.stringify(notify)} required=${JSON.stringify(required)}`,
   );
   rmSync(root, { recursive: true, force: true });
 }

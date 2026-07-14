@@ -44,6 +44,17 @@ showing how a legitimate `mandate`-mode exception is carried via `templates/risk
 format — the same guideline→enforced-rule pairing convention as
 [`worked-example.md`](worked-example.md) above, applied to the deploy phase.
 
+### Fixed managed policy lock
+
+[`policies/policy-lock.example.yaml`](policies/policy-lock.example.yaml) documents the
+separate managed-policy binding. A consuming repository places that public-safe shape at
+the fixed `.claude/policy-lock.yaml` path. It carries only an opaque pack ID, immutable
+version/digest, mode, update policy and verifier status code — never a source URL, account,
+credential, cache or absolute path. A bound `mandate`/`strict` lock whose status is not
+`resolved` fails closed before setup writes, for release validation, and for deploy-triggering
+pushes; `advisory` warns. The package neither fetches nor independently verifies a source, so its verifier
+status is an externally supplied assertion, not a claim of live trust resolution.
+
 ## Wiring (`.claude/pipeline.yaml`)
 
 A project points at its own governance directories via the manifest's `governance`

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.policy-lock.v0",
+  "title": "Public managed policy lock",
+  "description": "Credential-free fixed-location lock. Its verifier status is an externally supplied assertion; this schema neither resolves a source nor fetches policy material.",
+  "type": "object",
+  "required": ["schema", "pack_id", "version", "digest", "mode", "update", "verifier"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.policy-lock.v0"] },
+    "pack_id": { "type": "string", "description": "Opaque stable identifier; no URL, account, or repository coordinate." },
+    "version": { "type": "string", "description": "Immutable version label; mutable branches and tags are not verification." },
+    "digest": { "type": "string", "description": "Required sha256 immutable identity, validated semantically by manifest.mjs." },
+    "mode": { "type": "string", "enum": ["advisory", "mandate", "strict"] },
+    "update": { "type": "string", "enum": ["pinned", "notify", "required"] },
+    "verifier": {
+      "type": "object",
+      "required": ["status"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string", "enum": ["resolved", "missing", "stale", "digest-mismatch", "policy-invalid", "source-unverified"] },
+        "observed_digest": { "type": "string" },
+        "update_status": { "type": "string", "enum": ["current", "available", "required"] }
+      }
+    },
+    "policy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "adapters": { "type": "array", "items": { "type": "string" } },
+        "targets": { "type": "array", "items": { "type": "string" } },
+        "gates": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "promote_prod": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "type_floor": { "type": "string", "enum": ["automated", "human"] },
+                "mode_floor": { "type": "string", "enum": ["off", "warn", "blocking"] }
+              }
+            }
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": { "required": { "type": "boolean", "description": "Reserved until an owning runtime provides executable enforcement and tests." } }
+        }
+      }
+    }
+  }
+}
