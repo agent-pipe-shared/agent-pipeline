@@ -567,11 +567,15 @@ ok("parseArgv: --defaults --force -> both true", (() => {
 ok("parseArgv: --defaults alone -> force stays false", parseArgv(["--defaults"]).force === false);
 
 // ======================================================================================
-// compileSettingsJson — public projection never carries this pipeline's coordinates
+// compileSettingsJson — public projection carries only the generic marketplace binding
 // ======================================================================================
 {
   const settings = compileSettingsJson(null, buildDefaultAnswers(), "hash123");
-  ok("compileSettingsJson: omits agent-pipeline marketplace mapping", settings.extraKnownMarketplaces === undefined, JSON.stringify(settings.extraKnownMarketplaces));
+  ok(
+    "compileSettingsJson: projects the generic agent-pipeline marketplace mapping",
+    settings.extraKnownMarketplaces?.["agent-pipeline"]?.source?.repo === "agent-pipeline/agent-pipeline",
+    JSON.stringify(settings.extraKnownMarketplaces),
+  );
   ok("compileSettingsJson: no existing state -> synthesizes statusLine/enabledPlugins", settings.statusLine && settings.enabledPlugins);
   ok(
     "compileSettingsJson: gated (default) push_policy -> NO permissions key (ADR-0017 no bleed-over)",
@@ -598,8 +602,8 @@ ok("parseArgv: --defaults alone -> force stays false", parseArgv(["--defaults"])
   ok("compileSettingsJson: standing-approved -> statusLine/enabledPlugins still present", settings.statusLine && settings.enabledPlugins);
 }
 {
-  // existing settings.json preserved byte-faithfully outside the compiled fields (see file
-  // header "COMPILE MODEL"); extraKnownMarketplaces merges rather than replaces siblings.
+  // Existing settings.json is preserved outside the compiled fields; the generic pipeline
+  // marketplace projection merges rather than replacing siblings.
   const existing = {
     statusLine: { type: "command", command: "custom-status-line.mjs" },
     someUnrelatedField: "preserved",
@@ -610,7 +614,11 @@ ok("parseArgv: --defaults alone -> force stays false", parseArgv(["--defaults"])
   ok("compileSettingsJson: preserves unrelated existing top-level fields", settings.someUnrelatedField === "preserved");
   ok("compileSettingsJson: preserves the caller's own statusLine untouched", settings.statusLine.command === "custom-status-line.mjs");
   ok("compileSettingsJson: preserves a pre-existing sibling marketplace entry", !!settings.extraKnownMarketplaces["other-plugin"]);
-  ok("compileSettingsJson: removes legacy agent-pipeline marketplace projection", settings.extraKnownMarketplaces["agent-pipeline"] === undefined);
+  ok(
+    "compileSettingsJson: replaces a legacy agent-pipeline mapping with the generic binding",
+    settings.extraKnownMarketplaces["agent-pipeline"]?.source?.repo === "agent-pipeline/agent-pipeline",
+    JSON.stringify(settings.extraKnownMarketplaces["agent-pipeline"]),
+  );
 }
 
 // ======================================================================================

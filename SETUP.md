@@ -10,7 +10,7 @@ personalize it, bind the plugin, start a session.
 - **Node.js >= 24** — `setup.mjs` is dependency-free (Node builtins only, no `npm install` step).
 - **git**
 - **Claude Code**
-- Optional: **`gh`** or **`glab`**. Marketplace coordinates, credentials, account state and absolute paths are machine-local; do not put them in Public Core.
+- Optional: **`gh`** or **`glab`**. Credentials, account state and absolute paths are machine-local; do not put them in Public Core. The generic public marketplace binding is compiled by setup.
 
 ## Steps
 
@@ -47,7 +47,7 @@ shared:
   sha: <exact-40-hex-checked-out-sha>
 ```
 
-The lock must exactly match `git rev-parse HEAD`; missing, abbreviated or mismatched locks fail before source or runtime mutation. Keep marketplace/account/path mapping separately in ignored `.pipeline/machine-local.yaml`; setup never reads or projects it. Setup then writes `pipeline.user.yaml` and compiles the runtime configs.
+The lock must exactly match `git rev-parse HEAD`; missing, abbreviated or mismatched locks fail before source or runtime mutation. Keep credentials, account state and paths separately in ignored machine-local state; setup never reads or projects them. Setup then writes `pipeline.user.yaml`, compiles the runtime configs, and projects the generic public marketplace binding.
 
 **Non-interactive path:** `node setup.mjs --defaults` writes the conservative defaults with no prompts — useful for a first dry run or a CI check.
 
@@ -55,16 +55,9 @@ The lock must exactly match `git rev-parse HEAD`; missing, abbreviated or mismat
 
 ### 3. Bind the plugin
 
-The Public-Core `.claude/settings.json` enables the plugin but deliberately contains no marketplace coordinates. Use your ignored machine-local mapping to supply the appropriate local command:
+The Public-Core `.claude/settings.json` enables the plugin and, after setup, carries the generic public `agent-pipeline/agent-pipeline` marketplace binding. No owner-, account-, credential-, or machine-specific coordinates are committed. Install the plugin at project scope:
 
 ```
-# GitHub
-claude plugin marketplace add <owner>/<repo> --scope project
-
-# GitLab (gitlab.com or self-hosted)
-claude plugin marketplace add https://<host>/<owner>/<repo>.git --scope project
-
-# either host, once the marketplace is added
 claude plugin install pipeline-core@agent-pipeline --scope project
 ```
 
@@ -92,7 +85,7 @@ Before your first big feature, a quick look at [`docs/design/README.md`](docs/de
 
 | File | Compiled from (`pipeline.user.yaml`) | Read by |
 |---|---|---|
-| `.claude/settings.json` | `autonomy` only where applicable | Claude Code itself — plugin enablement, permissions, status line; no marketplace coordinates |
+| `.claude/settings.json` | `autonomy` only where applicable | Claude Code itself — plugin enablement, generic public marketplace binding, permissions, status line; no owner/account/machine coordinates |
 | `.claude/pipeline.json` | `autonomy`, `gates` | project calibration — the bootstrap check and the `pipeline-start`/`close-block` skills |
 | `.claude/pipeline.yaml` | `worktypes`, `models`, `gates`, `autonomy` | the declarative manifest layer — the PreToolUse guard hooks (`guard-devplan`, `guard-push`), the `stop-suggest` Stop-event hook (next-phase suggestion + context-budget warnings), and model routing; validated by `harness/scripts/validate-manifest.mjs` |
 
@@ -127,8 +120,9 @@ klonen, personalisieren, Plugin binden, Session starten.
 - **git**
 - **Claude Code**
 - Optional: **`gh`** (GitHub-CLI) oder **`glab`** (GitLab-CLI).
-  Marketplace-Koordinaten, Zugangsdaten, Account-Status und absolute Pfade
-  bleiben maschinenlokal; sie gehören nicht in den Public Core.
+  Zugangsdaten, Account-Status und absolute Pfade bleiben maschinenlokal; sie
+  gehören nicht in den Public Core. Das generische öffentliche Marketplace-
+  Binding wird von Setup kompiliert.
 
 ## Schritte
 
@@ -179,10 +173,11 @@ shared:
 ```
 
 Der Lock muss exakt `git rev-parse HEAD` entsprechen; fehlende, abgekürzte oder
-abweichende Locks schlagen vor Source- oder Runtime-Mutationen fehl. Marketplace-,
-Account- und Pfad-Mapping bleibt separat in der ignorierten
-`.pipeline/machine-local.yaml`; Setup liest oder projiziert sie nicht. Danach
-schreibt Setup `pipeline.user.yaml` und kompiliert die Laufzeit-Configs.
+abweichende Locks schlagen vor Source- oder Runtime-Mutationen fehl. Zugangsdaten,
+Account-Status und Pfade bleiben separat im ignorierten maschinenlokalen Zustand;
+Setup liest oder projiziert sie nicht. Danach schreibt Setup `pipeline.user.yaml`,
+kompiliert die Laufzeit-Configs und projiziert das generische öffentliche
+Marketplace-Binding.
 
 **Nicht-interaktiver Weg:** `node setup.mjs --defaults` schreibt die
 konservativen Defaults ohne Rückfragen — nützlich für einen ersten Trockenlauf
@@ -196,18 +191,13 @@ Rückfrage aus (der nicht-interaktive Modus überschreibt sie nie).
 
 ### 3. Plugin binden
 
-Die Public-Core-`.claude/settings.json` aktiviert das Plugin, enthält aber
-absichtlich keine Marketplace-Koordinaten. Nutze dein ignoriertes
-maschinenlokales Mapping für den passenden lokalen Befehl:
+Die Public-Core-`.claude/settings.json` aktiviert das Plugin und enthält nach
+Setup das generische öffentliche Marketplace-Binding
+`agent-pipeline/agent-pipeline`. Owner-, Account-, Zugangsdaten- oder
+maschinenbezogene Koordinaten werden nicht committed. Installiere das Plugin im
+Projekt-Scope:
 
 ```
-# GitHub
-claude plugin marketplace add <owner>/<repo> --scope project
-
-# GitLab (gitlab.com oder self-hosted)
-claude plugin marketplace add https://<host>/<owner>/<repo>.git --scope project
-
-# für beide Hosts, sobald der Marketplace hinzugefügt ist
 claude plugin install pipeline-core@agent-pipeline --scope project
 ```
 
@@ -258,7 +248,7 @@ zum Brainstorming einer soliden Anforderung, bevor sie in die Pipeline geht
 
 | Datei | Kompiliert aus (`pipeline.user.yaml`) | Gelesen von |
 |---|---|---|
-| `.claude/settings.json` | gegebenenfalls nur `autonomy` | Claude Code selbst — Plugin-Aktivierung, Permissions, Status-Zeile; keine Marketplace-Koordinaten |
+| `.claude/settings.json` | gegebenenfalls nur `autonomy` | Claude Code selbst — Plugin-Aktivierung, generisches öffentliches Marketplace-Binding, Permissions, Status-Zeile; keine Owner-, Account- oder Maschinenkoordinaten |
 | `.claude/pipeline.json` | `autonomy`, `gates` | Projekt-Kalibrierung — der Bootstrap-Check sowie die Skills `pipeline-start`/`close-block` |
 | `.claude/pipeline.yaml` | `worktypes`, `models`, `gates`, `autonomy` | die deklarative Manifest-Schicht — die PreToolUse-Guard-Hooks (`guard-devplan`, `guard-push`), der `stop-suggest`-Stop-Hook (Vorschlag der nächsten Phase + Kontext-Budget-Warnungen) sowie Modell-Routing; validiert über `harness/scripts/validate-manifest.mjs` |
 
