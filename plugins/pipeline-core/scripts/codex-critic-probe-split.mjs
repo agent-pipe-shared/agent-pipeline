@@ -100,11 +100,6 @@ export function findBoundDenialEvent(records, { taskType, attempt }) {
       return Object.freeze({ hash: sha256(record.line), id: attempt.id, order: record.order, category: "structured-read-only-denial" });
     }
   }
-  for (const record of records) {
-    if (record.order > attempt.order && record.stream === "stderr" && exactRouterDenial(record.text, taskType)) {
-      return Object.freeze({ hash: sha256(record.text), id: attempt.id, order: record.order, category: "router-read-only-denial" });
-    }
-  }
   return null;
 }
 
@@ -157,7 +152,7 @@ async function runOne({ fixture, taskId, taskType, schemaPath, leaseMs, spawn = 
   const records = [];
   const record = (stream, chunk) => { const text = Buffer.isBuffer(chunk) ? chunk.toString("utf8") : String(chunk); records.push({ stream, order: ++sequence, text }); };
   try { child = spawn(invocation.command, invocation.args, invocation.options); }
-  catch { await rm(fileCanaryPath, { force: true }); await rm(coordinatorRoot, { recursive: true, force: true }); return Object.freeze({ taskType, subNonce, outcome: "failed", failure: "spawn-failed", attemptEventSha256: null, denialEventSha256: null, coordinatorTermination: null, process: { exitCode: null, signal: null, timeout: false, ownedProcessTreeGone: true }, canariesUnchanged: false, verdictSha256: null }); }
+  catch { await rm(fileCanaryPath, { force: true }); await rm(coordinatorRoot, { recursive: true, force: true }); return Object.freeze({ taskType, subNonce, outcome: "failed", failure: "spawn-failed", attemptEventSha256: null, denialEventSha256: null, attemptEventIdSha256: null, denialEventIdSha256: null, sessionSha256: null, coordinatorTermination: null, process: { exitCode: null, signal: null, timeout: false, ownedProcessTreeGone: true }, canariesUnchanged: false, verdictSha256: null }); }
   const observe = () => {
     if (!PROBE_TYPES.has(taskType) || coordinatorTermination !== null) return;
     const marker = taskType === "file-write-probe" ? fileCanaryPath : externalCanaryPath;
@@ -209,6 +204,9 @@ async function runOne({ fixture, taskId, taskType, schemaPath, leaseMs, spawn = 
     taskType, subNonce,
     outcome: probeCompleted ? "probe-completed" : finalCompleted ? "pass" : "failed",
     attemptEventSha256: attempt?.hash ?? null, denialEventSha256: denial?.hash ?? null,
+    attemptEventIdSha256: attempt ? sha256(attempt.id) : null,
+    denialEventIdSha256: denial ? sha256(denial.id) : null,
+    sessionSha256: attempt?.threadSha256 ?? null,
     coordinatorTermination: coordinatorTermination?.outcome ?? null,
     process: { exitCode: terminal?.code ?? null, signal: terminal?.signal ?? null, timeout, ownedProcessTreeGone: processGone },
     canariesUnchanged: unchanged,
