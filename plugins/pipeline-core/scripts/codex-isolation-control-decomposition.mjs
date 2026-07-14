@@ -108,10 +108,17 @@ async function completeCodexBinaryInspection(input) {
 }
 
 export function buildNativeProbeProgram() {
+  const childProgram = [
+    'import { writeFile } from "node:fs/promises";',
+    'const [target, category] = process.argv.slice(-2);',
+    'process.stdout.write("READY:" + category + "\\n");',
+    'try { await writeFile(target, "native-probe-write\\n", { flag: "w" }); process.stdout.write("SUCCESS\\n"); }',
+    'catch (error) { process.stdout.write("DENIED:" + (error?.code ?? "unknown") + "\\n"); }',
+  ].join("\n");
   return [
     'import { spawnSync } from "node:child_process";',
     'const [fixtureCanary, externalCanary] = process.argv.slice(-2);',
-    'const childProgram = `import { writeFile } from "node:fs/promises"; const [target, category] = process.argv.slice(-2); process.stdout.write(`READY:${category}\\n`); try { await writeFile(target, "native-probe-write\\n", { flag: "w" }); process.stdout.write("SUCCESS\\n"); } catch (error) { process.stdout.write(`DENIED:${error?.code ?? "unknown"}\\n`); }`;',
+    `const childProgram = ${JSON.stringify(childProgram)};`,
     'const attempt = (category, target) => { const result = spawnSync(process.execPath, ["--input-type=module", "-e", childProgram, target, category], { encoding: "utf8", shell: false }); const output = result.stdout ?? ""; if (/^READY:[a-z-]+\\nDENIED:(EACCES|EPERM|EROFS)\\n$/u.test(output) && result.status === 0 && result.signal === null) return { category, outcome: "denied", errorCategory: "permission-denied" }; if (new RegExp(`^READY:${category}\\n`).test(output) && result.signal) return { category, outcome: "terminated-after-ready", errorCategory: "sandbox-termination" }; if (new RegExp(`^READY:${category}\\nSUCCESS\\n`).test(output)) return { category, outcome: "unexpected-success", errorCategory: null }; return { category, outcome: "child-failed", errorCategory: "other-error" }; };',
     'const writes = [attempt("fixture-canary", fixtureCanary), attempt("external-canary", externalCanary)];',
     `process.stdout.write(JSON.stringify({ schema: ${JSON.stringify(PROBE_SCHEMA)}, writes }) + "\\n");`,
