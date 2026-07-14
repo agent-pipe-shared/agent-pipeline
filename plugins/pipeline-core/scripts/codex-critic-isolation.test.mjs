@@ -42,6 +42,12 @@ async function check(name, fn) {
 
 function fixtureProfile() { return buildPermissionProfile({ fixtureRoot: "/tmp/profile-fixture", runtimeRoot: "/opt/codex/releases/0.144.4-test" }); }
 
+await check("lease policy separates fixed preflight and final-Critic bounds", () => {
+  assert.equal(CODEX_CRITIC_POLICY.preflightLeaseMs, 120_000);
+  assert.equal(CODEX_CRITIC_POLICY.criticLeaseMs, 300_000);
+  assert.equal(Object.hasOwn(CODEX_CRITIC_POLICY, "leaseMs"), false);
+});
+
 await check("profile is root-deny, read-scoped, network-off and contains no write grant", () => {
   const profile = fixtureProfile();
   assert.equal(profile.normalized.filesystem[0].path, ":root");
@@ -350,6 +356,7 @@ await check("aggregate binds exact HEAD/five artifacts and emits path-free publi
     const binaryInspection = { binarySha256: "a".repeat(64), versionSha256: "b".repeat(64), runtimeRoot: runtime, runtimeRootSha256: "c".repeat(64), runtimeManifestSha256: "e".repeat(64), runtimeEntries: 1 };
     const result = await runProfileBoundIsolation({ repoRoot: repo, candidateCommit: head, artifactPaths: CODEX_CRITIC_ARTIFACTS, externalParent: path.dirname(repo), resolvedBinary: "/tmp/codex", binaryInspection, inspectBinary: async () => binaryInspection, contractInspection: { contractSha256: "d".repeat(64) }, env: { PATH: "/bin", GITHUB_TOKEN: "private-token-canary" }, spawn: aggregateSpawn() });
     assert.equal(result.ok, true); assert.equal(result.envelope.preflight.ok, true); assert.equal(result.envelope.critic.ok, true);
+    assert.equal(result.envelope.preflightLeaseMs, 120_000); assert.equal(result.envelope.criticLeaseMs, 300_000);
     const publicEnvelope = JSON.stringify(result.envelope);
     assert.equal(publicEnvelope.includes(repo), false); assert.equal(publicEnvelope.includes(runtime), false); assert.equal(publicEnvelope.includes("private-token-canary"), false);
     for (const forbidden of ["stdoutTail", "stderrTail", "localDiagnostics", "REVIEW_BUNDLE_SHA256=", "agent_message"]) assert.equal(publicEnvelope.includes(forbidden), false, forbidden);
