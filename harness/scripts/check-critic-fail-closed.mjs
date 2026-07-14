@@ -33,6 +33,8 @@ const REQUIRED_MARKERS = Object.freeze([
   "substantive review stopped",
   "Do not read the prohibited content, search for a substitute",
 ]);
+const COPY_DELIMITER = "COPY EVERYTHING BELOW THIS LINE\n-->";
+const INLINE_REFERENCE_PLACEHOLDER = /\{\{[^}]*\bINLINE\b[^}]*\}\}/i;
 
 function stop(findingCategory) {
   return Object.freeze({ ok: false, findingCategory, action: "stop" });
@@ -71,7 +73,19 @@ export function checkCriticFailClosedContract(contractTexts) {
       errors.push(`${path}: unreadable`);
       continue;
     }
-    const normalized = text.replace(/\s+/g, " ");
+    let surface = text;
+    if (path === "templates/prompts/critic-review.md") {
+      const delimiterAt = text.indexOf(COPY_DELIMITER);
+      if (delimiterAt < 0) {
+        errors.push(`${path}: copied prompt delimiter is missing`);
+        continue;
+      }
+      surface = text.slice(delimiterAt + COPY_DELIMITER.length);
+      if (INLINE_REFERENCE_PLACEHOLDER.test(surface)) errors.push(`${path}: inline reference placeholder is forbidden`);
+      for (const placeholder of ["{{DISPATCH_LIST_PATH}}", "{{CLAIMS_EVIDENCE_PATH}}"])
+        if (!surface.includes(placeholder)) errors.push(`${path}: required reference placeholder is missing`);
+    }
+    const normalized = surface.replace(/\s+/g, " ");
     for (const marker of REQUIRED_MARKERS) if (!normalized.includes(marker)) errors.push(`${path}: missing fail-closed rule`);
   }
   return { ok: errors.length === 0, errors };
