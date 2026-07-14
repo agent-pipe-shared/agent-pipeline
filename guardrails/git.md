@@ -27,17 +27,17 @@ Rule IDs: `GIT-xx`.
 - **Why:** Theme-mix commits destroy revert granularity — the proven marathon-session failure.
 - **Verification:** Each merge/PR maps to one task/spec reference; the Critic flags recognizable theme-mix in diffs (tooling-policy AP-T3, verification section).
 
-## GIT-03 — Session traceability trailers (mandatory, all projects)
+## GIT-03 — Anonymous AI-assistance trailer (mandatory, all projects)
 
-- **MUST** end every commit message with both trailers:
+- **MUST** end every agent-authored commit message with this trailer:
 
   ```text
-  Co-Authored-By: Claude {{MODEL_NAME}} <noreply@anthropic.com>
-  Claude-Session: {{SESSION_URL}}
+  AI-Assisted: true
   ```
 
-- **Why:** The commit→session link is the bridge from any artifact back to the producing agent session — the only inheritance pattern that all three legacy projects share without divergence, and the designated substitute for archiving chat logs (Drei-Artefakte-Archiv, `docs/operating-model.md` §7).
-- **Verification:** `git log -5 --format=%B | rg "Claude-Session:"` shows the trailer on agent-authored commits; the `/close` ritual checks the current block's commits.
+- **MUST NOT** put provider- or model-specific co-author trailers, session URLs or IDs, account identifiers, or any other private correlation data into commit metadata. The anonymous marker is the complete AI-assistance signal; `Dispatch:` may identify a grounded work package but must not encode a provider, account, or session.
+- **Why:** Commit history needs a durable, provider-neutral assistance signal without turning public history into a correlation index. Work-package provenance remains in the versioned dispatch record and its grounded `Dispatch:` trailer; full chat logs are not archived.
+- **Verification:** `git log -5 --format=%B | rg "^AI-Assisted: true$"` samples the marker; the `/close` ritual checks the current block for prohibited correlation metadata.
 
 ## GIT-04 — No force-push, no history rewrite, no destructive bulk operations (guard union)
 

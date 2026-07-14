@@ -33,4 +33,4 @@
 
 - [ ] Stale worktrees cleaned or listed (WIP rule)
 - [ ] `/context` checked; at ~70–80 % or a natural boundary → planned session cut (next session bootstraps from the handover)
-- [ ] Commits: conventional, small, atomic; `Claude-Session:` trailer; no secrets, no machine-specific absolute paths
+- [ ] Commits: conventional, small, atomic; agent-authored commits carry `AI-Assisted: true`; no provider/model co-author, session URL/ID, account correlation, secrets, or machine-specific absolute paths

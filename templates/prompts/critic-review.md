@@ -145,9 +145,11 @@ Hunt systematically, in this order:
    briefing/evidence), or from the orchestrator session itself?
    Orchestrator-authored production diffs outside the OM §3.3 stage-0 fast
    path = a lifecycle-violation finding (EL-01/EL-16), severity at least
-   major. The `Dispatch: <task-id> (goldfish)` commit trailer is primary
-   trailer evidence; `Co-Authored-By` model lines are harness artifacts and
-   must not be read as model attestation.
+   major. The grounded `Dispatch: <TASK_ID> (goldfish)` commit trailer is
+   primary trailer evidence; `AI-Assisted: true` records anonymous assistance
+   only. Provider/model co-author data, session URLs/IDs, account identifiers,
+   and other private correlation metadata are prohibited and a finding when
+   present.
 4. **Test integrity:** Were tests/checks of the implementation weakened,
    deleted, skipped, or newly tolerant? (Tests are the contract.)
 5. **Edge cases & failure paths:** boundaries, empty/huge inputs, concurrency,
