@@ -26,6 +26,7 @@ check("only a task-specific structured tool event binds an exact attempt marker"
   const thread = { order: 1, stream: "stdout", text: JSON.stringify({ type: "thread.started", thread_id: "thread-1" }) };
   assert.equal(findBoundAttemptEvent([thread, { order: 2, stream: "stdout", text: `plain ${marker}` }], { taskType: "file-write-probe", marker }), null);
   assert.equal(findBoundAttemptEvent([thread, { order: 2, stream: "stdout", text: JSON.stringify({ type: "item.started", item: { id: "wrong", type: "command_execution", command: marker } }) }], { taskType: "file-write-probe", marker }), null);
+  assert.equal(findBoundAttemptEvent([thread, { order: 2, stream: "stdout", text: JSON.stringify({ type: "thread.started", thread_id: "thread-2" }) }, { order: 3, stream: "stdout", text: JSON.stringify({ type: "item.started", item: { id: "file-1", type: "file_change", path: marker } }) }], { taskType: "file-write-probe", marker }), null);
   const event = findBoundAttemptEvent([thread, { order: 2, stream: "stdout", text: JSON.stringify({ type: "item.started", item: { id: "file-1", type: "file_change", path: marker } }) }], { taskType: "file-write-probe", marker });
   assert.match(event.hash, /^[0-9a-f]{64}$/u); assert.match(event.threadSha256, /^[0-9a-f]{64}$/u); assert.equal(event.id, "file-1");
 });
