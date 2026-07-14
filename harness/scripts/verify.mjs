@@ -76,6 +76,8 @@ const TEST_SUITES = [
   { name: "error-register-check", file: join(scriptDir, "check-error-register.mjs") },
   { name: "critic-fail-closed-tests", file: join(scriptDir, "check-critic-fail-closed.test.mjs") },
   { name: "critic-fail-closed-check", file: join(scriptDir, "check-critic-fail-closed.mjs") },
+  { name: "agents-adapter-migration-tests", file: join(scriptDir, "check-agents-adapter-migration.test.mjs") },
+  { name: "agents-adapter-migration-check", file: join(scriptDir, "check-agents-adapter-migration.mjs") },
   { name: "validate-manifest-tests", file: join(scriptDir, "validate-manifest.test.mjs") },
   { name: "pipeline-state-tests", file: join(scriptDir, "pipeline-state.test.mjs") },
   { name: "doc-contract-tests", file: join(scriptDir, "check-doc-contracts.test.mjs") },

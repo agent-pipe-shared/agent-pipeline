@@ -46,6 +46,12 @@ import {
   validateCompiledPipelineYaml,
   validateSharedLock,
   validatePolicyLockPreflight,
+  classifyAgentsAdapter,
+  migrateAgentsAdapter,
+  validateAgentsAdapterMigrationAuthority,
+  LEGACY_AGENTS_ADAPTER,
+  MIGRATED_AGENTS_ADAPTER,
+  MIGRATED_AGENTS_ADAPTER_SHA256,
   parseArgv,
   resolveWarnDisposition,
   run,
@@ -639,6 +645,7 @@ ok("parseArgv: --defaults --force -> both true", (() => {
   return o.defaults === true && o.force === true;
 })());
 ok("parseArgv: --defaults alone -> force stays false", parseArgv(["--defaults"]).force === false);
+ok("parseArgv: explicit adapter migration is opt-in, never a normal-setup default", parseArgv(["--migrate-agents-adapter"]).migrateAgentsAdapter === true && parseArgv(["--defaults"]).migrateAgentsAdapter === false);
 
 // ======================================================================================
 // compileSettingsJson — public projection carries only the generic marketplace binding
@@ -818,6 +825,63 @@ ok("parseArgv: --defaults alone -> force stays false", parseArgv(["--defaults"])
   const manifestSchema = JSON.parse(readFileSync(new URL("./plugins/pipeline-core/scripts/pipeline-manifest.schema.json", import.meta.url), "utf8"));
   const { valid, errors } = validateAgainstSchema(reparsed.release, manifestSchema.properties.release);
   ok("renderPipelineYaml: compiled release: section validates against pipeline-manifest.schema.json's release shape", valid, errors.join("; "));
+}
+
+// ======================================================================================
+// optional AGENTS adapter migration — explicit only, known public legacy only
+// ======================================================================================
+{
+  const migratedBytes = Buffer.byteLength(MIGRATED_AGENTS_ADAPTER);
+  ok("classifyAgentsAdapter: absent remains absent", classifyAgentsAdapter({ exists: false }).status === "absent");
+  ok(
+    "classifyAgentsAdapter: exact public legacy metadata and integrity is the only mutable state",
+    classifyAgentsAdapter({ exists: true, isFile: true, byteLength: LEGACY_AGENTS_ADAPTER.byteLength, sha256: LEGACY_AGENTS_ADAPTER.sha256 }).status === "known-legacy",
+  );
+  ok(
+    "classifyAgentsAdapter: exact migrated pointer is byte-idempotent",
+    classifyAgentsAdapter({ exists: true, isFile: true, byteLength: migratedBytes, sha256: MIGRATED_AGENTS_ADAPTER_SHA256 }).status === "migrated",
+  );
+  for (const value of ["private-coordinate", "/absolute/path", "credential=value", "host: local", "account: user", "model: synthetic", "session: synthetic", "unknown-user-content"]) {
+    ok(
+      `classifyAgentsAdapter: ${value} never becomes a migration target`,
+      classifyAgentsAdapter({ exists: true, isFile: true, byteLength: LEGACY_AGENTS_ADAPTER.byteLength, sha256: value }).status === "manual-po-gate",
+    );
+  }
+}
+{
+  const runtimeManifestText = renderPipelineYaml(buildDefaultAnswers(), "agents-adapter-authority");
+  const valid = validateAgentsAdapterMigrationAuthority({ runtimeManifestText, pipelineStartPresent: true, operatingModelPresent: true });
+  const invalidManifest = validateAgentsAdapterMigrationAuthority({ runtimeManifestText: "schema: wrong\n", pipelineStartPresent: true, operatingModelPresent: true });
+  const missingStart = validateAgentsAdapterMigrationAuthority({ runtimeManifestText, pipelineStartPresent: false, operatingModelPresent: true });
+  ok("AGENTS adapter authority: valid runtime manifest, pipeline-start and Operating Model are required together", valid.ok && !invalidManifest.ok && !missingStart.ok);
+}
+{
+  const runtimeManifestText = renderPipelineYaml(buildDefaultAnswers(), "agents-adapter-run");
+  let writes = 0;
+  let written = null;
+  const common = {
+    runtimeManifestText,
+    pipelineStartPresent: true,
+    operatingModelPresent: true,
+    writeAgentsAdapter: (_path, text) => { writes += 1; written = text; },
+  };
+  const known = migrateAgentsAdapter("/synthetic", {
+    ...common,
+    agentsAdapterState: { status: "known-legacy", mutable: true },
+  });
+  ok("AGENTS adapter migration: known legacy writes the thin pointer exactly once", known.ok && known.status === "migrated" && writes === 1 && written === MIGRATED_AGENTS_ADAPTER);
+  for (const state of ["absent", "migrated", "manual-po-gate"]) {
+    writes = 0;
+    const result = migrateAgentsAdapter("/synthetic", { ...common, agentsAdapterState: { status: state, mutable: false } });
+    ok(`AGENTS adapter migration: ${state} performs zero writes`, writes === 0 && (state === "manual-po-gate" ? !result.ok : result.ok));
+  }
+  writes = 0;
+  const rejected = migrateAgentsAdapter("/synthetic", {
+    ...common,
+    pipelineStartPresent: false,
+    agentsAdapterState: { status: "known-legacy", mutable: true },
+  });
+  ok("AGENTS adapter migration: authority failure stops before target mutation", !rejected.ok && rejected.status === "authority-failed" && writes === 0);
 }
 
 // ---- summary ----------------------------------------------------------------------------
