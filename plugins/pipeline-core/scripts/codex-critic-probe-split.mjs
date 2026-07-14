@@ -73,16 +73,19 @@ function exactTaskItem(event, taskType, marker) {
 }
 
 export function findBoundAttemptEvent(records, { taskType, marker }) {
+  const thread = jsonLines(records).find((record) => record.value?.type === "thread.started" && typeof record.value.thread_id === "string" && record.value.thread_id);
+  if (!thread) return null;
+  const matches = [];
   for (const record of jsonLines(records)) {
-    if (exactTaskItem(record.value, taskType, marker)) {
-      return Object.freeze({ hash: sha256(record.line), id: record.value.item.id, order: record.order, category: taskType });
-    }
+    if (record.order > thread.order && exactTaskItem(record.value, taskType, marker)) matches.push(record);
   }
-  return null;
+  if (matches.length !== 1) return null;
+  const record = matches[0];
+  return Object.freeze({ hash: sha256(record.line), id: record.value.item.id, order: record.order, threadSha256: sha256(thread.value.thread_id), category: taskType });
 }
 
 function exactRouterDenial(text, taskType) {
-  const common = /writing is blocked by read-only sandbox/u.test(text) && /rejected/u.test(text);
+  const common = /ERROR codex_core::tools::router: error=/u.test(text) && /writing is blocked by read-only sandbox/u.test(text) && /rejected/u.test(text);
   if (!common) return false;
   return taskType === "file-write-probe" ? /patch|file/u.test(text) : /command|shell|exec/u.test(text);
 }
@@ -92,7 +95,8 @@ export function findBoundDenialEvent(records, { taskType, attempt }) {
     if (record.order <= attempt.order) continue;
     const item = record.value?.item;
     const detail = JSON.stringify(record.value);
-    if ((record.value?.type === "item.completed" || record.value?.type === "error") && item?.id === attempt.id && exactRouterDenial(detail, taskType)) {
+    const expectedType = taskType === "file-write-probe" ? ["file_change", "patch"] : ["command_execution"];
+    if ((record.value?.type === "item.completed" || record.value?.type === "error") && item?.id === attempt.id && expectedType.includes(item.type) && exactRouterDenial(detail, taskType)) {
       return Object.freeze({ hash: sha256(record.line), id: attempt.id, order: record.order, category: "structured-read-only-denial" });
     }
   }
