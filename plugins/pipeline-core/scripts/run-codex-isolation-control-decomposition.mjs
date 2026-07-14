@@ -30,7 +30,15 @@ export async function run({ commit, repoRoot = root } = {}) {
 if (import.meta.url === `file://${process.argv[1]}`) {
   try {
     const result = await run(parseArgs(process.argv.slice(2)));
-    process.stdout.write(`${JSON.stringify(result)}\n`);
+    if (!result.ok) {
+      for (const [label, diagnostic] of Object.entries(result.localDiagnostics ?? {})) {
+        if (!diagnostic) continue;
+        process.stderr.write(`codex-isolation-control-decomposition: local ${label} diagnostics stdout=${diagnostic.stdoutBytes}/${diagnostic.stdoutSha256} stderr=${diagnostic.stderrBytes}/${diagnostic.stderrSha256}\n`);
+        if (diagnostic.stderrTail) process.stderr.write(`codex-isolation-control-decomposition: local ${label} stderr tail (do not paste into receipt):\n${diagnostic.stderrTail}\n`);
+      }
+    }
+    const { localDiagnostics, ...publicResult } = result;
+    process.stdout.write(`${JSON.stringify(publicResult)}\n`);
     process.exitCode = result.ok ? 0 : 2;
   } catch (error) {
     process.stderr.write(`codex-isolation-control-decomposition: ${error.message}\n`);

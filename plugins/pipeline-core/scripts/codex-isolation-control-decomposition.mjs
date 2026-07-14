@@ -45,6 +45,16 @@ function bounded(target, chunk) {
   target.parts.push(slice);
 }
 
+function localDiagnostic(stdout, stderr) {
+  const text = (value) => Buffer.concat(value.parts).toString("utf8");
+  const tail = (value) => text(value).slice(-2_000);
+  return Object.freeze({
+    stdoutBytes: stdout.bytes, stderrBytes: stderr.bytes,
+    stdoutSha256: sha256(text(stdout)), stderrSha256: sha256(text(stderr)),
+    stdoutTail: tail(stdout), stderrTail: tail(stderr),
+  });
+}
+
 async function executable(candidate) {
   try { await access(candidate, constants.X_OK); return true; } catch { return false; }
 }
@@ -138,7 +148,7 @@ async function awaitChild(child, { leaseMs, onHeartbeat, label }) {
     child.once("exit", (code, signal) => settle({ code, signal, error: null }));
   });
   terminal = outcome;
-  return Object.freeze({ terminal, timedOut, stdout: Buffer.concat(stdout.parts), stderr: Buffer.concat(stderr.parts) });
+  return Object.freeze({ terminal, timedOut, stdout: Buffer.concat(stdout.parts), stderr: Buffer.concat(stderr.parts), diagnostics: localDiagnostic(stdout, stderr) });
 }
 
 async function hashes(...files) {
@@ -177,6 +187,7 @@ export async function runNativeSandboxProbe({ codexBinary, fixtureRoot, leaseMs 
     writes: result?.writes ?? null,
     canaries: { fixtureUnchanged: before[0].sha256 === after[0].sha256 && before[0].bytes === after[0].bytes, externalUnchanged: before[1].sha256 === after[1].sha256 && before[1].bytes === after[1].bytes },
     cleanup: true,
+    diagnostics: execution.diagnostics,
   });
 }
 
@@ -232,7 +243,14 @@ export async function runToollessFinalCritic({ fixture, codexBinary, schemaPath 
     invocationSha256: invocationHash(invocation.command, invocation.args), verdictSha256: bytes ? sha256(bytes) : null,
     process: { exitCode: execution.terminal.code, signal: execution.terminal.signal, timedOut: execution.timedOut, error: execution.terminal.error },
     stream: { toolFree: streamToolFree }, cleanup: true,
+    diagnostics: execution.diagnostics,
   });
+}
+
+function publicRun(run) {
+  if (!run) return null;
+  const { diagnostics, ...safe } = run;
+  return safe;
 }
 
 export async function runControlDecomposition({ repoRoot, candidateCommit, artifactPaths, schemaPath = DEFAULT_SCHEMA, leaseMs = DEFAULT_LEASE_MS, pathEnv = process.env.PATH, spawn = nodeSpawn, execFileSync = nodeExecFileSync, env = process.env, onHeartbeat = () => {} } = {}) {
@@ -251,8 +269,9 @@ export async function runControlDecomposition({ repoRoot, candidateCommit, artif
         schema: CONTROL_POLICY.schema, candidateCommit: fixture.manifest.candidateCommit, candidateTree: fixture.manifest.tree,
         fixtureManifestSha256: fixture.manifestHash, policySha256: sha256(JSON.stringify({ ...CONTROL_POLICY, critic: CODEX_CRITIC_POLICY })),
         sandbox: { mechanism: CONTROL_POLICY.mechanism, nativeProbeProfile: CONTROL_POLICY.nativeProbeProfile, criticSandbox: CONTROL_POLICY.criticSandbox, binarySha256: binary.binarySha256, versionSha256: binary.versionSha256, contractSha256: congruence.contractSha256, sameBinary: true },
-        probe, final,
+        probe: publicRun(probe), final: publicRun(final),
       },
+      localDiagnostics: Object.freeze({ probe: probe.diagnostics ?? null, final: final?.diagnostics ?? null }),
       reason: ok ? null : "control-decomposed isolation evidence is incomplete or failed",
     });
   } finally { await rm(fixture.root, { recursive: true, force: true }); }
