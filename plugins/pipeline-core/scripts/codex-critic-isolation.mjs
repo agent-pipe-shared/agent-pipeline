@@ -11,6 +11,7 @@ import { constants } from "node:fs";
 import { access, lstat, mkdir, mkdtemp, readFile, readdir, readlink, realpath, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { StringDecoder } from "node:string_decoder";
 import { TextDecoder } from "node:util";
 import { fileURLToPath } from "node:url";
 
@@ -25,6 +26,24 @@ const SAFE_ENV = new Set(["PATH", "HOME", "CODEX_HOME", "TMPDIR", "TMP", "TEMP",
 const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+$/u;
 const SAFE_PROFILE_ID = /^[a-z][a-z0-9-]{0,31}$/u;
 const BROAD_READ_ROOTS = new Set(["/home", "/mnt", "/opt", "/tmp", "/usr", "/var", os.homedir(), path.dirname(os.homedir())].map(normalizedPath));
+const DEBUG_REDACTED_SECRET = "[REDACTED_SECRET]";
+const DEBUG_REDACTED_QUERY = "[REDACTED_URL_QUERY]";
+const DEBUG_REDACTED_FRAGMENT = "[REDACTED_URL_FRAGMENT]";
+const DEBUG_REDACTED_PATH = "[REDACTED_ABSOLUTE_PATH]";
+const DEBUG_QUOTED_OR_ATOM = String.raw`(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,;}\]]+)`;
+const DEBUG_AUTHORIZATION = new RegExp(String.raw`((?<![A-Za-z0-9])authorization\b["']?\s*[:=]\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|(?:bearer|basic)\s+[^\s,;}\]]+|[^\s,;}\]]+)`, "giu");
+const DEBUG_BEARER = new RegExp(String.raw`(\bbearer\s+)${DEBUG_QUOTED_OR_ATOM}`, "giu");
+const DEBUG_COOKIE = new RegExp(String.raw`((?<![A-Za-z0-9])(?:set[-_]?cookie|cookie)\b["']?\s*[:=]\s*)(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^}\]]+)`, "giu");
+const DEBUG_NAMED_SECRET = new RegExp(String.raw`((?<![A-Za-z0-9])(?:x[-_]?api[-_]?key|api[-_ ]?key|access[-_]?token|refresh[-_]?token|id[-_]?token|client[-_]?secret|token|secret|password|passwd|pwd)\b["']?\s*[:=]\s*)${DEBUG_QUOTED_OR_ATOM}`, "giu");
+const DEBUG_ABSOLUTE_URL = /\b([a-z][a-z0-9+.-]*:\/\/[^\s?#"'<>]+)(\?[^\s#"'<>]*)?(#[^\s"'<>]*)?/giu;
+const DEBUG_RELATIVE_URL_QUERY = /(^|[\s=(])((?:\/{1,2})[^\s?#"'<>]*)(\?[^\s#"'<>]*)(#[^\s"'<>]*)?/gu;
+const DEBUG_RELATIVE_URL_FRAGMENT = /(^|[\s=(])((?:\/{1,2})[^\s?#"'<>]*)(#[^\s"'<>]*)/gu;
+const DEBUG_UNC_PATH = /(?<![A-Za-z0-9\\])\\\\[^\\/\s"'<>|?*\u0000-\u001f]+\\[^\\/\s"'<>|?*\u0000-\u001f]+(?:\\[^\\/\s"'<>|?*\u0000-\u001f]+)*/gu;
+const DEBUG_WINDOWS_PATH = /(?<![A-Za-z0-9])(?:[A-Za-z]:[\\/])(?:[^\s\\/"'<>|?*\u0000-\u001f]+[\\/])*[^\s\\/"'<>|?*\u0000-\u001f]*/gu;
+const DEBUG_UNIX_PATH = /(?<![A-Za-z0-9.:/\\])\/(?:[^\s/\\:"'<>|?*\u0000-\u001f]+\/)*[^\s/\\:"'<>|?*\u0000-\u001f]*/gu;
+const DEBUG_CONTROLS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu;
+const DEFAULT_DEBUG_PENDING_BYTES = 16 * 1024;
+const DEFAULT_DEBUG_OUTPUT_BYTES = 64 * 1024;
 
 export const CODEX_CRITIC_POLICY = Object.freeze({
   schema: "pipeline.codex-critic-profile-bound.v1",
@@ -120,6 +139,114 @@ export function sanitizeEnvironment(env = process.env) {
   }
   if (!clean.PATH) fail("minimal Codex environment requires PATH");
   return Object.freeze(clean);
+}
+
+function escapeDebugControl(character) {
+  const code = character.codePointAt(0);
+  if (code === 0x08) return "\\b";
+  if (code === 0x09) return "\\t";
+  if (code === 0x0a) return "\\n";
+  if (code === 0x0b) return "\\v";
+  if (code === 0x0c) return "\\f";
+  if (code === 0x0d) return "\\r";
+  return code <= 0xff ? `\\x${code.toString(16).padStart(2, "0")}` : `\\u${code.toString(16).padStart(4, "0")}`;
+}
+
+function sanitizeDebugLine(line) {
+  const escaped = line.replace(DEBUG_CONTROLS, escapeDebugControl);
+  const secrets = escaped
+    .replace(DEBUG_AUTHORIZATION, `$1${DEBUG_REDACTED_SECRET}`)
+    .replace(DEBUG_BEARER, `$1${DEBUG_REDACTED_SECRET}`)
+    .replace(DEBUG_COOKIE, `$1${DEBUG_REDACTED_SECRET}`)
+    .replace(DEBUG_NAMED_SECRET, `$1${DEBUG_REDACTED_SECRET}`);
+  const urls = secrets
+    .replace(DEBUG_ABSOLUTE_URL, (_match, base, query, fragment) => `${base}${query === undefined ? "" : `?${DEBUG_REDACTED_QUERY}`}${fragment === undefined ? "" : `#${DEBUG_REDACTED_FRAGMENT}`}`)
+    .replace(DEBUG_RELATIVE_URL_QUERY, (_match, prefix, base, _query, fragment) => `${prefix}${base}?${DEBUG_REDACTED_QUERY}${fragment === undefined ? "" : `#${DEBUG_REDACTED_FRAGMENT}`}`)
+    .replace(DEBUG_RELATIVE_URL_FRAGMENT, (_match, prefix, base) => `${prefix}${base}#${DEBUG_REDACTED_FRAGMENT}`);
+  return urls
+    .replace(DEBUG_UNC_PATH, DEBUG_REDACTED_PATH)
+    .replace(DEBUG_WINDOWS_PATH, DEBUG_REDACTED_PATH)
+    .replace(DEBUG_UNIX_PATH, DEBUG_REDACTED_PATH);
+}
+
+/**
+ * Creates an isolated streaming redactor for local debug lines. `write` accepts
+ * Buffer chunks and returns only complete sanitized lines; `finish` explicitly
+ * flushes a final unterminated line. Returned arrays and the writer are frozen,
+ * and no raw complete line is retained after an emission.
+ */
+export function createDebugLineRedactor({ maxPendingBytes = DEFAULT_DEBUG_PENDING_BYTES, maxOutputBytes = DEFAULT_DEBUG_OUTPUT_BYTES } = {}) {
+  if (![maxPendingBytes, maxOutputBytes].every((value) => Number.isSafeInteger(value) && value > 0)) fail("debug line redactor limits must be positive safe integers");
+  let decoder = new StringDecoder("utf8");
+  let pending = "";
+  let pendingBytes = 0;
+  let outputBytes = 0;
+  let state = "open";
+
+  function requireOpen() {
+    if (state !== "open") fail("debug line redactor is closed");
+  }
+
+  function overflow() {
+    pending = "";
+    pendingBytes = 0;
+    decoder = null;
+    state = "failed";
+    throw new RangeError("debug line redactor limit exceeded");
+  }
+
+  function addInput(segment) {
+    pendingBytes += segment.length;
+    if (pendingBytes > maxPendingBytes) overflow();
+    pending += decoder.write(segment);
+  }
+
+  function emitComplete(lines, emittedBytes) {
+    pending += decoder.end();
+    const complete = pending.endsWith("\r") ? pending.slice(0, -1) : pending;
+    pending = "";
+    pendingBytes = 0;
+    decoder = new StringDecoder("utf8");
+    const sanitized = sanitizeDebugLine(complete);
+    const nextBytes = emittedBytes + Buffer.byteLength(sanitized, "utf8") + 1;
+    if (outputBytes + nextBytes > maxOutputBytes) overflow();
+    lines.push(sanitized);
+    return nextBytes;
+  }
+
+  function write(chunk) {
+    requireOpen();
+    if (!Buffer.isBuffer(chunk)) fail("debug line redactor accepts Buffer chunks only");
+    const lines = [];
+    let emittedBytes = 0;
+    let offset = 0;
+    for (;;) {
+      const newline = chunk.indexOf(0x0a, offset);
+      if (newline === -1) break;
+      addInput(chunk.subarray(offset, newline));
+      emittedBytes = emitComplete(lines, emittedBytes);
+      offset = newline + 1;
+    }
+    addInput(chunk.subarray(offset));
+    outputBytes += emittedBytes;
+    return Object.freeze(lines);
+  }
+
+  function finish() {
+    requireOpen();
+    const lines = [];
+    let emittedBytes = 0;
+    if (pendingBytes > 0) emittedBytes = emitComplete(lines, emittedBytes);
+    else decoder.end();
+    outputBytes += emittedBytes;
+    pending = "";
+    pendingBytes = 0;
+    decoder = null;
+    state = "finished";
+    return Object.freeze(lines);
+  }
+
+  return Object.freeze({ write, finish });
 }
 
 function filesystemInline(entries) {

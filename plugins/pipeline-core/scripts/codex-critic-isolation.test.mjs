@@ -16,6 +16,7 @@ import {
   buildPermissionProfile,
   buildProfileBoundCodexCriticInvocation,
   buildReviewBundle,
+  createDebugLineRedactor,
   criticPrompt,
   ensureOwnedProcessGroupGone,
   inspectCodexBinary,
@@ -41,6 +42,76 @@ async function check(name, fn) {
 }
 
 function fixtureProfile() { return buildPermissionProfile({ fixtureRoot: "/tmp/profile-fixture", runtimeRoot: "/opt/codex/releases/0.144.4-test" }); }
+
+await check("debug redactor emits only complete lines and finish flushes explicitly", () => {
+  const redactor = createDebugLineRedactor();
+  assert.deepEqual(redactor.write(Buffer.from("prefix to")), []);
+  assert.deepEqual(redactor.write(Buffer.from("ken=split-private\nsecond\r")), ["prefix token=[REDACTED_SECRET]"]);
+  assert.deepEqual(redactor.write(Buffer.from("\npassword=finish-private")), ["second"]);
+  assert.deepEqual(redactor.finish(), ["password=[REDACTED_SECRET]"]);
+  assert.throws(() => redactor.write(Buffer.from("late\n")), /closed/u);
+});
+
+await check("debug redactor preserves UTF-8 split across arbitrary Buffer chunks", () => {
+  const input = Buffer.from("Grüße 🌍\n東京");
+  const redactor = createDebugLineRedactor();
+  const lines = [];
+  for (const byte of input) lines.push(...redactor.write(Buffer.from([byte])));
+  lines.push(...redactor.finish());
+  assert.deepEqual(lines, ["Grüße 🌍", "東京"]);
+});
+
+await check("debug redactor covers every credential family", () => {
+  const cases = [
+    ["HTTP_AUTHORIZATION: Bearer auth-private", "auth-private"],
+    ["scheme=Bearer bearer-private", "bearer-private"],
+    ["OPENAI_API_KEY=api-private", "api-private"],
+    ["GH_TOKEN: token-private", "token-private"],
+    ["CLIENT_SECRET=secret-private", "secret-private"],
+    ["DB_PASSWORD: password-private", "password-private"],
+    ["SESSION_COOKIE: session=cookie-private; preference=also-private", "cookie-private"],
+  ];
+  for (const [line, raw] of cases) {
+    const redactor = createDebugLineRedactor();
+    const output = redactor.write(Buffer.from(`${line}\n`));
+    assert.equal(output.length, 1, line);
+    assert.equal(output[0].includes(raw), false, line);
+    assert.match(output[0], /\[REDACTED_SECRET\]/u, line);
+    assert.deepEqual(redactor.finish(), []);
+  }
+});
+
+await check("debug redactor removes URL coordinates, paths and control bytes", () => {
+  const redactor = createDebugLineRedactor();
+  const raw = "url=https://example.invalid/review?account=private#fragment relative=/callback?code=private#state unix=/home/private/repo/file.txt drive=C:\\Users\\Private\\file.txt unc=\\\\server\\share\\private.txt controls=\u0000\t\u001b[31m\n";
+  const [output] = redactor.write(Buffer.from(raw));
+  assert.equal(output.includes("account=private"), false);
+  assert.equal(output.includes("code=private"), false);
+  assert.equal(output.includes("fragment"), false);
+  assert.equal(output.includes("/home/private"), false);
+  assert.equal(output.includes("C:\\Users"), false);
+  assert.equal(output.includes("\\\\server\\share"), false);
+  assert.equal(output.match(/\?\[REDACTED_URL_QUERY\]#\[REDACTED_URL_FRAGMENT\]/gu)?.length, 2);
+  assert.equal(output.match(/\[REDACTED_ABSOLUTE_PATH\]/gu)?.length, 4);
+  assert.match(output, /controls=\\x00\\t\\x1b\[31m/u);
+  assert.equal(/[\u0000-\u001f\u007f-\u009f]/u.test(output), false);
+  assert.deepEqual(redactor.finish(), []);
+});
+
+await check("debug redactor bounds pending and total output and never exposes raw values", () => {
+  const pendingRaw = "pending-private-value";
+  const pending = createDebugLineRedactor({ maxPendingBytes: 8, maxOutputBytes: 64 });
+  assert.throws(() => pending.write(Buffer.from(pendingRaw)), /limit exceeded/u);
+  assert.equal(JSON.stringify(pending).includes(pendingRaw), false);
+  assert.throws(() => pending.finish(), /closed/u);
+
+  const outputRaw = "output-private-value";
+  const output = createDebugLineRedactor({ maxPendingBytes: 64, maxOutputBytes: 3 });
+  assert.deepEqual(output.write(Buffer.from("ab\n")), ["ab"]);
+  assert.throws(() => output.write(Buffer.from(`${outputRaw}\n`)), /limit exceeded/u);
+  assert.equal(JSON.stringify(output).includes(outputRaw), false);
+  assert.throws(() => output.finish(), /closed/u);
+});
 
 await check("lease policy separates fixed preflight and final-Critic bounds", () => {
   assert.equal(CODEX_CRITIC_POLICY.preflightLeaseMs, 120_000);
