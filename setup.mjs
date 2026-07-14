@@ -84,7 +84,7 @@
  * VERIFY: node setup.test.mjs (pure-function coverage: detection/preset/render/drift
  * logic). The suite and the live routing-projection checker are wired into Full Verify.
  */
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -111,6 +111,29 @@ const PIPELINE_YAML_PATH = join(ROOT_DIR, ".claude", "pipeline.yaml");
 export const GENERATED_MARKER_PREFIX = "GENERATED from pipeline.user.yaml — edit there, then re-run setup";
 export const HUMAN_FACING_LANGUAGES = Object.freeze(["de", "en"]);
 
+// AGENTS.md is deliberately outside normal setup.  These constants identify only the
+// one public legacy adapter that this repository shipped; unknown files are never read
+// as text, copied, logged, or overwritten.
+export const LEGACY_AGENTS_ADAPTER = Object.freeze({
+  byteLength: 3510,
+  sha256: "cd0c87b87bc57e6d79f2e003fe764f02d681b6d3053363c1d003b6827d5d68ae",
+});
+export const MIGRATED_AGENTS_ADAPTER = `# Agent-Pipeline optional runtime adapter
+
+This file is a pointer, not a second ruleset.
+
+Before project work, invoke \`pipeline-core:pipeline-start\`. It is the required
+methodological entry and loads the calibrated runtime authorities.
+
+Authorities: runtime manifest \`.claude/pipeline.yaml\` and Operating Model
+\`docs/operating-model.md\`. Follow their re-entry rule.
+
+For Codex and other non-Claude runtimes this is methodology-only. It claims no
+Claude hooks, foreign tool or agent integration, model binding, or global host
+enforcement.
+`;
+export const MIGRATED_AGENTS_ADAPTER_SHA256 = "ebbed167eef7821ff42fe8389999a3a99f3487c4c611240afb3116cdf0cf27da";
+
 // ---- default answers (== the committed pipeline.user.yaml template's values) -----------------
 export function buildDefaultAnswers() {
   const routing = projectPreset("max", "claude");
@@ -135,6 +158,84 @@ function safeSpawn(spawn, command, args, opts = {}) {
   } catch {
     return { ok: false, stdout: "" };
   }
+}
+
+// ---- optional AGENTS adapter migration ----------------------------------------------------------
+// This boundary accepts only public-safe file metadata plus a detached digest result.  It never
+// decodes, parses, retains, copies, or prints an unknown AGENTS.md body.
+export function classifyAgentsAdapter({ exists, isFile = false, byteLength, sha256 } = {}) {
+  if (!exists) return { status: "absent", mutable: false };
+  if (!isFile || !Number.isInteger(byteLength)) return { status: "manual-po-gate", mutable: false };
+  if (byteLength === LEGACY_AGENTS_ADAPTER.byteLength && sha256 === LEGACY_AGENTS_ADAPTER.sha256) {
+    return { status: "known-legacy", mutable: true };
+  }
+  if (byteLength === Buffer.byteLength(MIGRATED_AGENTS_ADAPTER) && sha256 === MIGRATED_AGENTS_ADAPTER_SHA256) {
+    return { status: "migrated", mutable: false };
+  }
+  return { status: "manual-po-gate", mutable: false };
+}
+
+function inspectAgentsAdapter(rootDir, deps = {}) {
+  const path = join(rootDir, "AGENTS.md");
+  const exists = deps.existsSync ?? existsSync;
+  if (!exists(path)) return classifyAgentsAdapter({ exists: false });
+  let stat;
+  try {
+    stat = (deps.lstatSync ?? lstatSync)(path);
+  } catch {
+    return { status: "manual-po-gate", mutable: false };
+  }
+  if (!stat.isFile()) return classifyAgentsAdapter({ exists: true, isFile: false });
+  const byteLength = stat.size;
+  // Do not invoke an integrity helper for a size that cannot belong to either known public
+  // adapter. This keeps an unknown user file outside the compiler's content path.
+  if (![LEGACY_AGENTS_ADAPTER.byteLength, Buffer.byteLength(MIGRATED_AGENTS_ADAPTER)].includes(byteLength)) {
+    return classifyAgentsAdapter({ exists: true, isFile: true, byteLength });
+  }
+  const integrity = deps.agentsAdapterIntegrity
+    ? deps.agentsAdapterIntegrity(path)
+    : safeSpawn(deps.spawn ?? spawnSync, "sha256sum", [path], { cwd: rootDir }).stdout.trim().split(/\s+/)[0];
+  return classifyAgentsAdapter({ exists: true, isFile: true, byteLength, sha256: integrity });
+}
+
+/** Validates the three authorities named by the migrated pointer before any target write. */
+export function validateAgentsAdapterMigrationAuthority({ runtimeManifestText, pipelineStartPresent, operatingModelPresent, rootDir = ROOT_DIR } = {}) {
+  if (typeof runtimeManifestText !== "string") return { ok: false, reason: "runtime-manifest-unreadable" };
+  if (validateCompiledPipelineYaml(runtimeManifestText, rootDir).status !== "ok") return { ok: false, reason: "runtime-manifest-invalid" };
+  if (pipelineStartPresent !== true) return { ok: false, reason: "pipeline-start-unavailable" };
+  if (operatingModelPresent !== true) return { ok: false, reason: "operating-model-unavailable" };
+  return { ok: true };
+}
+
+/**
+ * Explicit migration only. Normal setup never calls this function, never creates AGENTS.md,
+ * and never examines its presence. A rejected authority or adapter state returns before write.
+ */
+export function migrateAgentsAdapter(rootDir = ROOT_DIR, deps = {}) {
+  let runtimeManifestText;
+  try {
+    runtimeManifestText = deps.runtimeManifestText ?? readFileSync(join(rootDir, ".claude", "pipeline.yaml"), "utf8");
+  } catch {
+    return { ok: false, status: "authority-failed", reason: "runtime-manifest-unreadable", writes: 0 };
+  }
+  const present = (path) => {
+    try { return (deps.lstatSync ?? lstatSync)(path).isFile(); } catch { return false; }
+  };
+  const authority = validateAgentsAdapterMigrationAuthority({
+    runtimeManifestText,
+    pipelineStartPresent: deps.pipelineStartPresent ?? present(join(rootDir, "plugins", "pipeline-core", "skills", "pipeline-start", "SKILL.md")),
+    operatingModelPresent: deps.operatingModelPresent ?? present(join(rootDir, "docs", "operating-model.md")),
+    rootDir,
+  });
+  if (!authority.ok) return { ok: false, status: "authority-failed", reason: authority.reason, writes: 0 };
+
+  const adapter = deps.agentsAdapterState ?? inspectAgentsAdapter(rootDir, deps);
+  if (adapter.status === "known-legacy") {
+    (deps.writeAgentsAdapter ?? writeFileSync)(join(rootDir, "AGENTS.md"), MIGRATED_AGENTS_ADAPTER);
+    return { ok: true, status: "migrated", writes: 1 };
+  }
+  if (adapter.status === "absent" || adapter.status === "migrated") return { ok: true, status: adapter.status, writes: 0 };
+  return { ok: false, status: "manual-po-gate", writes: 0 };
 }
 
 // ---- subscription-tier / autonomy presets (pure) -----------------------------------------------
@@ -876,6 +977,7 @@ export function parseArgv(argv) {
     defaults: argv.includes("--defaults"),
     help: argv.includes("--help") || argv.includes("-h"),
     force: argv.includes("--force") || argv.includes("--yes"),
+    migrateAgentsAdapter: argv.includes("--migrate-agents-adapter"),
   };
 }
 
@@ -889,9 +991,18 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
   const opts = parseArgv(argv);
   if (opts.help) {
     console.log(
-      "Usage: node setup.mjs [--defaults] [--force|--yes] [--help]\n  (no flags)     interactive setup\n  --defaults     non-interactive: conservative defaults, no prompts (test/CI)\n  --force/--yes  skip the hand-edit-drift confirmation (interactive) or allow the\n                 otherwise-refused overwrite (non-interactive) -- always warns loudly first\n  --help         this text",
+      "Usage: node setup.mjs [--defaults] [--force|--yes] [--migrate-agents-adapter] [--help]\n  (no flags)     interactive setup\n  --defaults     non-interactive: conservative defaults, no prompts (test/CI)\n  --force/--yes  skip the hand-edit-drift confirmation (interactive) or allow the\n                 otherwise-refused overwrite (non-interactive) -- always warns loudly first\n  --migrate-agents-adapter  explicit, optional migration of the one recognized public legacy adapter\n  --help         this text",
     );
     return 0;
+  }
+  if (opts.migrateAgentsAdapter) {
+    if (opts.defaults || opts.force || argv.length !== 1) {
+      console.error("setup.mjs: --migrate-agents-adapter is a standalone explicit command; no files were written.");
+      return 1;
+    }
+    const result = migrateAgentsAdapter(rootDir, deps);
+    console.log(`AGENTS adapter migration: ${result.status}.`);
+    return result.ok ? 0 : 2;
   }
 
   const defaults = buildDefaultAnswers();
