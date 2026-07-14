@@ -486,6 +486,12 @@ function requireOneActiveTraceChild(state, event, { criticOnly = false } = {}) {
   return { label, child };
 }
 
+function requireTraceCriticChild(state, event) {
+  const child = state.children.get("critic");
+  if (state.currentStep !== "critic" || child?.spawned !== true || child.phase === "failed" || child.phase === "requested") fail(`${event} requires its bound critic child`);
+  return child;
+}
+
 function requireActiveTraceRun(state, event) {
   if (state.phase !== "running") fail(`${event} is outside the active run`);
 }
@@ -625,13 +631,13 @@ function applyTraceTransition(state, event, payload) {
     return;
   }
   if (event === "stdin.closed") {
-    requireOneActiveTraceChild(state, event, { criticOnly: true });
+    requireTraceCriticChild(state, event);
     if (state.stdin !== "ending") fail("stdin close is out of order");
     state.stdin = "closed";
     return;
   }
   if (event === "stdin.error") {
-    requireOneActiveTraceChild(state, event, { criticOnly: true });
+    requireTraceCriticChild(state, event);
     if (!["requested", "accepted", "ending"].includes(state.stdin)) fail("stdin error is out of order");
     state.stdin = "error";
     state.failureObservedStep = state.currentStep;
@@ -1363,46 +1369,62 @@ export function createDebugChildObserver({
     if (!observeStdin || !spawnRecorded || finishRequested || stdinPhase !== "initial") return Promise.reject(new Error("debug child stdin write is out of order"));
     const bytes = Buffer.isBuffer(value) ? Buffer.from(value) : typeof value === "string" ? Buffer.from(value, "utf8") : null;
     if (bytes === null) return Promise.reject(new Error("debug child stdin accepts only Buffer or string input"));
-    const operation = schedule(async () => {
+    stdinPhase = "reserving";
+    const operation = (async () => {
       try {
-        await traceStore.append("stdin.write-requested", { bytes: bytes.length, sha256: sha256(bytes) });
-        stdinPhase = "requested";
-        await traceStore.sync();
+        await schedule(async () => {
+          await traceStore.append("stdin.write-requested", { bytes: bytes.length, sha256: sha256(bytes) });
+          stdinPhase = "requested";
+          await traceStore.sync();
+        });
+        requireHealthyStdin();
+        // Child stream callback/drain waits must never occupy the serialized
+        // trace tail: the hard lease needs that tail to record and signal.
         await waitForStdinWrite(bytes);
         requireHealthyStdin();
-        await traceStore.append("stdin.write-accepted", { bytes: bytes.length });
-        stdinPhase = "accepted";
-        requireHealthyStdin();
-        await traceStore.append("stdin.end-requested", {});
-        stdinPhase = "ending";
-        requireHealthyStdin();
-        await traceStore.sync();
+        const accepted = await schedule(async () => {
+          const appendGuarded = SECURE_TRACE_GUARDED_APPENDERS.get(traceStore);
+          const record = await appendGuarded("stdin.write-accepted", { bytes: bytes.length }, () => stdinFailureCategory === null && stdinPhase === "requested", () => { stdinPhase = "accepted"; });
+          return record.committed;
+        });
+        if (!accepted) requireHealthyStdin();
+        const ending = await schedule(async () => {
+          const appendGuarded = SECURE_TRACE_GUARDED_APPENDERS.get(traceStore);
+          const record = await appendGuarded("stdin.end-requested", {}, () => stdinFailureCategory === null && stdinPhase === "accepted", () => { stdinPhase = "ending"; });
+          if (record.committed) await traceStore.sync();
+          return record.committed;
+        });
+        if (!ending) requireHealthyStdin();
         await waitForStdinFinish();
         requireHealthyStdin();
         if (!stdinFinished) throw categoricalStdinError("premature-close");
         requireHealthyStdin();
-        const appendGuarded = SECURE_TRACE_GUARDED_APPENDERS.get(traceStore);
-        const closed = await appendGuarded("stdin.closed", {}, () => stdinFailureCategory === null, () => {
-          stdinClosed = true;
-          stdinPhase = "closed";
+        const closed = await schedule(async () => {
+          const appendGuarded = SECURE_TRACE_GUARDED_APPENDERS.get(traceStore);
+          return appendGuarded("stdin.closed", {}, () => stdinFailureCategory === null && stdinPhase === "ending", () => {
+            stdinClosed = true;
+            stdinPhase = "closed";
+          });
         });
         if (!closed.committed) requireHealthyStdin();
         return null;
       } catch (error) {
         const category = error?.debugCategory ?? stdinFailureCategory ?? "stdin-error";
-        if (!stdinErrorRecorded && ["requested", "accepted", "ending"].includes(stdinPhase)) {
-          await traceStore.append("stdin.error", { category });
-          stdinErrorRecorded = true;
-        }
-        if (stdinErrorRecorded) await traceStore.sync();
-        stdinFailureCategory ??= category;
-        stdinPhase = "error";
+        await schedule(async () => {
+          stdinFailureCategory ??= category;
+          if (!stdinErrorRecorded && !stdinClosed && ["requested", "accepted", "ending"].includes(stdinPhase)) {
+            await traceStore.append("stdin.error", { category: stdinFailureCategory });
+            stdinErrorRecorded = true;
+          }
+          if (stdinErrorRecorded) await traceStore.sync();
+          stdinPhase = "error";
+        });
         safeFailure();
         return category;
       } finally {
         stdinWaiter = null;
       }
-    });
+    })();
     return operation.then((category) => {
       if (category !== null) throw categoricalStdinError(category);
     });
@@ -1487,6 +1509,7 @@ export function createDebugChildObserver({
     return schedule(async () => {
       await traceStore.append("lease.expired", leasePayload());
       try { onLeaseExpired(); } catch { /* The durable trace remains authoritative. */ }
+      if (observeStdin && !stdinClosed && ["requested", "accepted", "ending"].includes(stdinPhase)) observeStdinFailure(categoricalStdinError("lease-expired"), "lease-expired");
       await recordSignal(signal);
       if (hardLease) scheduleHardKill();
     });
@@ -1913,7 +1936,7 @@ async function awaitChild(child, { leaseMs, onHeartbeat = () => {}, label }) {
   return Object.freeze({ terminal, timedOut, ownedProcessGroupGone, stdout, stderr, diagnostics: localFailureDiagnostic(stdout, stderr) });
 }
 
-async function runDebugObservedChild({ traceStore, spawn, invocation, leaseMs, label, stdin = null, privateIdentifiers = [], privateRoots = [], onHeartbeat = () => {}, onChildEvidence = () => {} }) {
+async function runDebugObservedChild({ traceStore, spawn, invocation, leaseMs, label, stdin = null, privateIdentifiers = [], privateRoots = [], diagnosticMode = "metadata", onHeartbeat = () => {}, onChildEvidence = () => {} }) {
   const stdout = capture(); const stderr = capture();
   const started = Date.now();
   let terminalResolve;
@@ -1929,7 +1952,7 @@ async function runDebugObservedChild({ traceStore, spawn, invocation, leaseMs, l
   };
   const spawned = await spawnDebugChildObserver({
     traceStore, spawn: observedSpawn, command: invocation.command, args: invocation.args, options: invocation.options, label,
-    privateIdentifiers, privateRoots, observeStdin: stdin !== null, diagnosticMode: "metadata", hardLease: true, leaseMs,
+    privateIdentifiers, privateRoots, observeStdin: stdin !== null, diagnosticMode, hardLease: true, leaseMs,
     onStdoutChunk: (chunk) => appendBounded(stdout, chunk), onStderrChunk: (chunk) => appendBounded(stderr, chunk),
     onLeaseExpired: () => { timedOut = true; },
     onHardKill: () => { hardKillResolve(); },
@@ -2190,7 +2213,7 @@ export async function runCodexCritic({ fixture, reviewBundle, permissionProfile,
   let execution;
   if (debugContext) {
     const debugInvocation = Object.freeze({ ...invocation, options: Object.freeze({ ...invocation.options, env: Object.freeze({ ...invocation.options.env, RUST_LOG: SAFE_DEBUG_RUST_LOG }) }) });
-    execution = await runDebugObservedChild({ ...debugContext, spawn, invocation: debugInvocation, leaseMs, label: "critic", stdin: prompt, onHeartbeat });
+    execution = await runDebugObservedChild({ ...debugContext, spawn, invocation: debugInvocation, leaseMs, label: "critic", stdin: prompt, diagnosticMode: "redacted", onHeartbeat });
     if (!execution.spawned) return Object.freeze({ ok: false, category: "spawn-failed", invocationSha256: invocationHash(invocation.command, invocation.args), diagnostics: null, debugTimedOut: false });
   } else {
     let child;
@@ -2332,7 +2355,7 @@ function debugCause(step, { critic, preflight, preflightChildEvidence = false } 
   if (step === "input" || step === "commit") return "coordinator-input";
   if (step === "preflight" && (preflight?.debugChildEvidence === true || preflightChildEvidence)) return "child-process";
   if (step === "preflight") return "unbestimmt";
-  if (step === "critic" && (critic?.stream?.events ?? 0) === 0) return "cli-before-turn";
+  if (step === "critic" && critic !== null && (critic.stream?.events ?? 0) === 0) return "cli-before-turn";
   if (step === "critic" && critic?.stream?.toolFree === false && critic.stream.events > 0) return "jsonl-lifecycle";
   if (step === "critic" && critic) return "child-process";
   if (step === "result") return "result-sink";
