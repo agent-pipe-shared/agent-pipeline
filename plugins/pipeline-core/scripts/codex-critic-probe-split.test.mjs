@@ -23,17 +23,18 @@ check("unknown task types and malformed parent nonce fail closed", () => {
 });
 check("only a task-specific structured tool event binds an exact attempt marker", () => {
   const marker = "FILE-PROBE-abc.txt";
-  assert.equal(findBoundAttemptEvent([{ order: 1, stream: "stdout", text: `plain ${marker}` }], { taskType: "file-write-probe", marker }), null);
-  assert.equal(findBoundAttemptEvent([{ order: 1, stream: "stdout", text: JSON.stringify({ type: "item.started", item: { id: "wrong", type: "command_execution", command: marker } }) }], { taskType: "file-write-probe", marker }), null);
-  const event = findBoundAttemptEvent([{ order: 1, stream: "stdout", text: JSON.stringify({ type: "item.started", item: { id: "file-1", type: "file_change", path: marker } }) }], { taskType: "file-write-probe", marker });
-  assert.match(event.hash, /^[0-9a-f]{64}$/u); assert.equal(event.id, "file-1");
+  const thread = { order: 1, stream: "stdout", text: JSON.stringify({ type: "thread.started", thread_id: "thread-1" }) };
+  assert.equal(findBoundAttemptEvent([thread, { order: 2, stream: "stdout", text: `plain ${marker}` }], { taskType: "file-write-probe", marker }), null);
+  assert.equal(findBoundAttemptEvent([thread, { order: 2, stream: "stdout", text: JSON.stringify({ type: "item.started", item: { id: "wrong", type: "command_execution", command: marker } }) }], { taskType: "file-write-probe", marker }), null);
+  const event = findBoundAttemptEvent([thread, { order: 2, stream: "stdout", text: JSON.stringify({ type: "item.started", item: { id: "file-1", type: "file_change", path: marker } }) }], { taskType: "file-write-probe", marker });
+  assert.match(event.hash, /^[0-9a-f]{64}$/u); assert.match(event.threadSha256, /^[0-9a-f]{64}$/u); assert.equal(event.id, "file-1");
 });
 check("denial is task-specific, ordered, and bound to the exact attempt", () => {
   const attempt = { id: "file-1", order: 2 };
-  assert.equal(findBoundDenialEvent([{ order: 1, stream: "stderr", text: "ERROR patch rejected: writing is blocked by read-only sandbox" }], { taskType: "file-write-probe", attempt }), null);
-  assert.equal(findBoundDenialEvent([{ order: 3, stream: "stderr", text: "ERROR command rejected: writing is blocked by read-only sandbox" }], { taskType: "file-write-probe", attempt }), null);
-  assert.equal(findBoundDenialEvent([{ order: 3, stream: "stdout", text: JSON.stringify({ type: "item.completed", item: { id: "other", type: "file_change", error: "patch rejected: writing is blocked by read-only sandbox" } }) }], { taskType: "file-write-probe", attempt }), null);
-  const denial = findBoundDenialEvent([{ order: 3, stream: "stdout", text: JSON.stringify({ type: "item.completed", item: { id: "file-1", type: "file_change", error: "patch rejected: writing is blocked by read-only sandbox" } }) }], { taskType: "file-write-probe", attempt });
+  assert.equal(findBoundDenialEvent([{ order: 1, stream: "stderr", text: "ERROR codex_core::tools::router: error=patch rejected: writing is blocked by read-only sandbox" }], { taskType: "file-write-probe", attempt }), null);
+  assert.equal(findBoundDenialEvent([{ order: 3, stream: "stderr", text: "ERROR codex_core::tools::router: error=command rejected: writing is blocked by read-only sandbox" }], { taskType: "file-write-probe", attempt }), null);
+  assert.equal(findBoundDenialEvent([{ order: 3, stream: "stdout", text: JSON.stringify({ type: "item.completed", item: { id: "other", type: "file_change", error: "ERROR codex_core::tools::router: error=patch rejected: writing is blocked by read-only sandbox" } }) }], { taskType: "file-write-probe", attempt }), null);
+  const denial = findBoundDenialEvent([{ order: 3, stream: "stdout", text: JSON.stringify({ type: "item.completed", item: { id: "file-1", type: "file_change", error: "ERROR codex_core::tools::router: error=patch rejected: writing is blocked by read-only sandbox" } }) }], { taskType: "file-write-probe", attempt });
   assert.match(denial.hash, /^[0-9a-f]{64}$/u); assert.equal(denial.id, "file-1");
 });
 function fakeSpawn() {
@@ -51,8 +52,9 @@ function fakeSpawn() {
           const marker = file ?? shell;
           const id = file ? "file-probe" : "shell-probe";
           const type = file ? "file_change" : "command_execution";
+          child.stdout.write(`${JSON.stringify({ type: "thread.started", thread_id: `thread-${id}` })}\n`);
           child.stdout.write(`${JSON.stringify({ type: "item.started", item: { id, type, target: marker } })}\n`);
-          child.stdout.write(`${JSON.stringify({ type: "item.completed", item: { id, type, error: `${file ? "patch" : "command"} rejected: writing is blocked by read-only sandbox` } })}\n`);
+          child.stdout.write(`${JSON.stringify({ type: "item.completed", item: { id, type, error: `ERROR codex_core::tools::router: error=${file ? "patch" : "command"} rejected: writing is blocked by read-only sandbox` } })}\n`);
         } else {
           await writeFile(outputPath, JSON.stringify({ findings: [], deliberately_not_flagged: [], trajectory_verdict: "consistent", trajectory_evidence: "synthetic", briefing_violations: [], pass: true }));
         }
