@@ -49,13 +49,14 @@ export function sanitizeEnvironment(env = process.env) {
   return Object.freeze(clean);
 }
 
-export function buildCodexCriticInvocation({ fixtureRoot, schemaPath, resultPath, model = CODEX_CRITIC_POLICY.model, effort = CODEX_CRITIC_POLICY.effort, env = process.env } = {}) {
+export function buildCodexCriticInvocation({ fixtureRoot, schemaPath, resultPath, model = CODEX_CRITIC_POLICY.model, effort = CODEX_CRITIC_POLICY.effort, codexBinary = "codex", env = process.env } = {}) {
   assertAbsolute(fixtureRoot, "fixtureRoot");
   assertAbsolute(schemaPath, "schemaPath");
   assertAbsolute(resultPath, "resultPath");
   if (model !== CODEX_CRITIC_POLICY.model || effort !== CODEX_CRITIC_POLICY.effort) fail("Codex Critic model/effort binding is fixed to Sol/max");
+  if (typeof codexBinary !== "string" || !codexBinary) fail("Codex Critic binary is required");
   return Object.freeze({
-    command: "codex",
+    command: codexBinary,
     args: Object.freeze([
       "exec", "--ignore-user-config", "--strict-config", "--ephemeral",
       "--model", model,
