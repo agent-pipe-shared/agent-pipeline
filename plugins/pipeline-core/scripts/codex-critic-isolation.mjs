@@ -54,6 +54,8 @@ const DEFAULT_TRACE_EVENTS = 4096;
 const DEBUG_DIAGNOSTIC_RAW_BYTES = 1024;
 const DEBUG_DIAGNOSTIC_BYTES = 4096;
 const DEBUG_PROC_INTERVAL_MS = 5000;
+const DEBUG_KILL_ESCALATION_MS = 500;
+const DEBUG_FORCED_SETTLEMENT_MS = 1_500;
 const SAFE_DEBUG_RUST_LOG = "codex_core=info,codex_exec=info";
 const TRACE_CATEGORY = /^[a-z][a-z0-9-]{0,63}$/u;
 const TRACE_SHA256 = /^[0-9a-f]{64}$/u;
@@ -69,7 +71,7 @@ export const CODEX_CRITIC_TRACE_EVENTS = Object.freeze([
   "trace.opened",
   "run.started", "run.completed", "run.failed",
   "step.started", "step.completed", "step.failed",
-  "child.spawn-requested", "child.spawned", "child.spawn-failed", "child.error", "child.exit", "child.close", "child.signal-requested", "child.signal-result",
+  "child.spawn-requested", "child.spawned", "child.spawn-failed", "child.error", "child.exit", "child.close", "child.signal-requested", "child.signal-result", "child.force-settled",
   "stdin.write-requested", "stdin.write-accepted", "stdin.end-requested", "stdin.closed", "stdin.error",
   "stream.chunk", "stream.jsonl-event", "stream.diagnostic", "stream.error",
   "process.sample",
@@ -388,6 +390,8 @@ function validateTracePayload(event, payload, { terminal = false, privateIdentif
     assertTraceKeys(payload, required, ["pid", "pgid"]); assertTraceCategory(payload.label, "child label"); assertTraceSignal(payload.signal, "child signal");
     if (Object.hasOwn(payload, "category")) assertTraceCategory(payload.category);
     for (const key of ["pid", "pgid"]) if (Object.hasOwn(payload, key)) assertTraceSafeInteger(payload[key], `child ${key}`, { nonnegative: true });
+  } else if (event === "child.force-settled") {
+    assertTraceKeys(payload, ["label", "category"]); assertTraceCategory(payload.label, "child label"); assertTraceCategory(payload.category);
   } else if (event === "stdin.write-requested") {
     assertTraceKeys(payload, ["bytes", "sha256"]); assertTraceSafeInteger(payload.bytes, "stdin bytes", { nonnegative: true }); assertTraceSha256(payload.sha256, "stdin sha256");
   } else if (event === "stdin.write-accepted") {
@@ -455,6 +459,8 @@ function traceChildIsActive(child) {
   return child?.phase === "spawned" || child?.phase === "errored" || child?.phase === "exited";
 }
 
+function traceChildBlocksFailure(child) { return traceChildIsActive(child) && child.forcedSettlement !== true; }
+
 function activeTraceChildren(state) { return [...state.children.entries()].filter(([, child]) => traceChildIsActive(child)); }
 
 function activeTraceChild(state) { return activeTraceChildren(state).length > 0; }
@@ -500,7 +506,7 @@ function applyTraceTransition(state, event, payload) {
     if (event === "run.completed") requireActiveTraceRun(state, event);
     else if (state.phase !== "awaiting-run-failure") fail("run.failed requires an exact failed-step prefix");
     if (state.currentStep !== null) fail("run cannot terminate with an active step");
-    if ([...state.children.values()].some((child) => child.phase === "requested" || child.phase === "spawned" || child.phase === "errored" || child.phase === "exited")) fail("run cannot terminate before every child closes or fails");
+    if ([...state.children.values()].some((child) => child.phase === "requested" || traceChildBlocksFailure(child))) fail("run cannot terminate before every child closes or reaches forced settlement");
     if ([...state.children.values()].some((child) => child.pendingSignal !== null)) fail("run cannot terminate with an unresolved child signal request");
     if ([...state.leases.values()].some((lease) => lease === "expired" || lease === "signaling")) fail("run cannot terminate before an expired lease signal resolves");
     if (!["initial", "closed", "error"].includes(state.stdin)) fail("run cannot terminate before stdin closes or fails");
@@ -523,7 +529,8 @@ function applyTraceTransition(state, event, payload) {
       state.currentStep = payload.step;
     } else {
       if (state.currentStep !== payload.step) fail("trace step terminal lacks its matching start");
-      if (activeTraceChild(state) || [...state.children.values()].some((child) => child.phase === "requested")) fail("trace step cannot terminate with an active child");
+      const blockingChild = activeTraceChildren(state).some(([, child]) => event === "step.completed" || traceChildBlocksFailure(child));
+      if (blockingChild || [...state.children.values()].some((child) => child.phase === "requested")) fail("trace step cannot terminate with an active child");
       if (payload.step === "preflight" && event === "step.completed") {
         if (TRACE_PREFLIGHT_CHILD_LABELS.some((label) => state.children.get(label)?.phase !== "closed" || state.children.get(label)?.spawned !== true)) fail("preflight completion requires its exact three-child cardinality");
         if (TRACE_PREFLIGHT_CHILD_LABELS.some((label) => state.leases.get(label) !== "armed")) fail("preflight completion requires exactly one armed lease for each child");
@@ -548,7 +555,7 @@ function applyTraceTransition(state, event, payload) {
     if (state.currentStep !== expectedTraceChildStep(payload.label)) fail("child spawn request is outside its bound step");
     if (state.children.has(payload.label)) fail("child spawn request is duplicated");
     if (activeTraceChild(state) || [...state.children.values()].some((child) => child.phase === "requested")) fail("child spawn requests must be serial and cardinality-bound");
-    state.children.set(payload.label, { phase: "requested", pendingSignal: null, spawned: false });
+    state.children.set(payload.label, { phase: "requested", pendingSignal: null, spawned: false, forcedSettlement: false });
     return;
   }
   if (event === "child.spawned" || event === "child.spawn-failed") {
@@ -580,17 +587,23 @@ function applyTraceTransition(state, event, payload) {
     return;
   }
   if (event === "child.signal-requested") {
-    const child = requireBoundTraceChild(state, payload.label, event, { active: true });
-    if (!child || !["spawned", "errored", "exited"].includes(child.phase) || child.pendingSignal !== null) fail("child signal request is out of order");
+    const child = requireBoundTraceChild(state, payload.label, event);
+    if (!child || !["spawned", "errored", "exited", "closed"].includes(child.phase) || child.pendingSignal !== null) fail("child signal request is out of order");
     child.pendingSignal = payload.signal;
     if (state.leases.get(payload.label) === "expired") state.leases.set(payload.label, "signaling");
     return;
   }
   if (event === "child.signal-result") {
-    const child = requireBoundTraceChild(state, payload.label, event, { active: true });
+    const child = requireBoundTraceChild(state, payload.label, event);
     if (!child || child.pendingSignal !== payload.signal) fail("child signal result lacks its matching request");
     child.pendingSignal = null;
     if (state.leases.get(payload.label) === "signaling") state.leases.set(payload.label, "handled");
+    return;
+  }
+  if (event === "child.force-settled") {
+    const child = requireBoundTraceChild(state, payload.label, event, { active: true });
+    if (state.leases.get(payload.label) !== "handled" || child.pendingSignal !== null || child.forcedSettlement) fail("forced settlement lacks completed hard-lease evidence");
+    child.forcedSettlement = true;
     return;
   }
   if (event === "stdin.write-requested") {
@@ -1084,21 +1097,23 @@ async function readDebugProcSample(pid, { readFile: readFileFn = readFile, readd
 
 /**
  * Attaches to a child whose spawn request was already durably recorded. The
- * public spawnDebugChildObserver wrapper owns that ordering. Productive
- * execution paths deliberately do not call these debug primitives yet.
+ * public spawnDebugChildObserver wrapper owns that ordering. Productive debug
+ * execution uses this observer while ordinary execution remains unchanged.
  */
 export function createDebugChildObserver({
   traceStore, child, label = "critic", privateIdentifiers = [], privateRoots = [], procIo = {},
-  observeStdin = true, diagnosticMode = "redacted", onStdoutChunk = () => {}, onStderrChunk = () => {}, onLeaseExpired = () => {},
+  observeStdin = true, diagnosticMode = "redacted", hardLease = false,
+  onStdoutChunk = () => {}, onStderrChunk = () => {}, onLeaseExpired = () => {}, onHardKill = () => {}, onForcedSettlement = () => {},
   clock = () => Number(process.hrtime.bigint() / 1_000_000n),
   setIntervalFn = setInterval, clearIntervalFn = clearInterval, setTimeoutFn = setTimeout, clearTimeoutFn = clearTimeout,
 } = {}) {
   if (!SECURE_TRACE_STORES.has(traceStore)) fail("debug child observer requires a verified secure trace store");
-  if (!child || typeof child.on !== "function" || !child.stdin || !child.stdout || !child.stderr) fail("debug child observer requires one spawned ChildProcess with stdio pipes");
-  for (const [stream, name] of [[child.stdin, "stdin"], [child.stdout, "stdout"], [child.stderr, "stderr"]]) if (typeof stream.on !== "function") fail(`debug child observer ${name} is not observable`);
+  if (!child || typeof child.on !== "function" || !child.stdout || !child.stderr) fail("debug child observer requires one spawned ChildProcess with observable output pipes");
+  if (observeStdin && !child.stdin) fail("debug child observer requires an observable stdin pipe");
+  for (const [stream, name] of [...(observeStdin ? [[child.stdin, "stdin"]] : []), [child.stdout, "stdout"], [child.stderr, "stderr"]]) if (typeof stream.on !== "function") fail(`debug child observer ${name} is not observable`);
   assertTraceCategory(label, "child label");
-  if (typeof observeStdin !== "boolean" || !["redacted", "metadata"].includes(diagnosticMode)) fail("debug child observer mode is invalid");
-  if ([onStdoutChunk, onStderrChunk, onLeaseExpired].some((callback) => typeof callback !== "function")) fail("debug child observer callbacks must be functions");
+  if (typeof observeStdin !== "boolean" || typeof hardLease !== "boolean" || !["redacted", "metadata"].includes(diagnosticMode)) fail("debug child observer mode is invalid");
+  if ([onStdoutChunk, onStderrChunk, onLeaseExpired, onHardKill, onForcedSettlement].some((callback) => typeof callback !== "function")) fail("debug child observer callbacks must be functions");
   if (typeof clock !== "function" || typeof setIntervalFn !== "function" || typeof clearIntervalFn !== "function" || typeof setTimeoutFn !== "function" || typeof clearTimeoutFn !== "function") fail("debug child observer clocks and timers must be functions");
 
   const stderrRedactor = createDebugLineRedactor({ maxPendingBytes: DEBUG_DIAGNOSTIC_RAW_BYTES, maxOutputBytes: DEFAULT_DEBUG_OUTPUT_BYTES, privateIdentifiers, privateRoots });
@@ -1124,6 +1139,8 @@ export function createDebugChildObserver({
   let spawnPgid = null;
   let procTimer = null;
   let leaseTimer = null;
+  let escalationTimer = null;
+  let settlementTimer = null;
   let leaseStarted = null;
   let leaseArming = false;
   let leaseExpired = false;
@@ -1226,9 +1243,12 @@ export function createDebugChildObserver({
     catch { append("stream.error", { stream: "stderr", category: "redaction-error" }); safeFailure(); }
   }
 
-  function stopTimers() {
+  function stopTimers({ preserveHardBound = false } = {}) {
     if (procTimer !== null) { clearIntervalFn(procTimer); procTimer = null; }
     if (leaseTimer !== null) { clearTimeoutFn(leaseTimer); leaseTimer = null; }
+    if (preserveHardBound) return;
+    if (escalationTimer !== null) { clearTimeoutFn(escalationTimer); escalationTimer = null; }
+    if (settlementTimer !== null) { clearTimeoutFn(settlementTimer); settlementTimer = null; }
   }
 
   function finishStreams() { finishStdout(); finishStderr(); }
@@ -1261,7 +1281,7 @@ export function createDebugChildObserver({
       procTimer?.unref?.();
       if (leaseMs !== null) {
         leaseTimer = setTimeoutFn(() => { expireLease({ signal }).catch(() => {}); }, leaseMs);
-        leaseTimer?.unref?.();
+        if (!hardLease) leaseTimer?.unref?.();
       }
       return result;
     });
@@ -1412,7 +1432,7 @@ export function createDebugChildObserver({
     }).then((result) => {
       leaseArming = false;
       leaseTimer = setTimeoutFn(() => { expireLease({ signal }).catch(() => {}); }, leaseMs);
-      leaseTimer?.unref?.();
+      if (!hardLease) leaseTimer?.unref?.();
       return result;
     }, (error) => { leaseArming = false; throw error; });
   }
@@ -1420,6 +1440,43 @@ export function createDebugChildObserver({
   function heartbeatLease() {
     if (leaseStarted === null || leaseExpired) return Promise.reject(new Error("debug child lease heartbeat is out of order"));
     return append("lease.heartbeat", leasePayload());
+  }
+
+  function signalChild(signal) {
+    try {
+      if (hardLease && process.platform !== "win32" && Number.isSafeInteger(spawnPgid) && spawnPgid > 0) process.kill(-spawnPgid, signal);
+      else if (typeof child.kill !== "function" || child.kill(signal) !== true) return "not-sent";
+      return "sent";
+    } catch (error) { return debugErrorCategory(error, "signal-error"); }
+  }
+
+  async function recordSignal(signal) {
+    const identity = {};
+    if (spawnPid !== null) { identity.pid = spawnPid; identity.pgid = spawnPgid; }
+    await traceStore.append("child.signal-requested", { label, signal, ...identity });
+    await traceStore.sync();
+    const category = signalChild(signal);
+    await traceStore.append("child.signal-result", { label, signal, category, ...(identity.pgid === undefined ? {} : { pgid: identity.pgid }) });
+    await traceStore.sync();
+  }
+
+  function scheduleHardKill() {
+    escalationTimer = setTimeoutFn(() => {
+      escalationTimer = null;
+      schedule(async () => {
+        await recordSignal("SIGKILL");
+        try { onHardKill(); } catch { /* The durable trace remains authoritative. */ }
+        settlementTimer = setTimeoutFn(() => {
+          settlementTimer = null;
+          schedule(async () => {
+            if (childClosed) return;
+            await traceStore.append("child.force-settled", { label, category: "close-unobserved" });
+            await traceStore.sync();
+            try { onForcedSettlement(); } catch { /* The hard bound remains authoritative. */ }
+          }).catch(() => {});
+        }, DEBUG_FORCED_SETTLEMENT_MS);
+      }).catch(() => {});
+    }, DEBUG_KILL_ESCALATION_MS);
   }
 
   function expireLease({ signal = "SIGTERM" } = {}) {
@@ -1430,14 +1487,8 @@ export function createDebugChildObserver({
     return schedule(async () => {
       await traceStore.append("lease.expired", leasePayload());
       try { onLeaseExpired(); } catch { /* The durable trace remains authoritative. */ }
-      const identity = {};
-      if (spawnPid !== null) { identity.pid = spawnPid; identity.pgid = spawnPgid; }
-      await traceStore.append("child.signal-requested", { label, signal, ...identity });
-      await traceStore.sync();
-      let category = "not-sent";
-      try { category = typeof child.kill === "function" && child.kill(signal) ? "sent" : "not-sent"; }
-      catch { category = "signal-error"; }
-      await traceStore.append("child.signal-result", { label, signal, category, ...(identity.pgid === undefined ? {} : { pgid: identity.pgid }) });
+      await recordSignal(signal);
+      if (hardLease) scheduleHardKill();
     });
   }
 
@@ -1463,7 +1514,10 @@ export function createDebugChildObserver({
 
   // Listener installation is intentionally contiguous and precedes every API
   // method capable of writing stdin.
-  child.on("error", (error) => { append("child.error", { label, category: debugErrorCategory(error, "process-error") }); safeFailure(); });
+  child.on("error", (error) => {
+    if (!spawnRecorded) return;
+    append("child.error", { label, category: debugErrorCategory(error, "process-error") }); safeFailure();
+  });
   if (observeStdin) child.stdin.on("error", (error) => { observeStdinFailure(error, "stdin-error"); });
   if (observeStdin) child.stdin.on("finish", () => {
     stdinFinished = true;
@@ -1475,19 +1529,20 @@ export function createDebugChildObserver({
   if (observeStdin) child.stdin.on("close", () => {
     if (!stdinFinished) observeStdinFailure(categoricalStdinError("premature-close"), "premature-close");
   });
-  child.stdout.on("data", consumeStdout);
-  child.stdout.on("error", (error) => { append("stream.error", { stream: "stdout", category: debugErrorCategory(error, "stream-error") }); safeFailure(); });
+  child.stdout.on("data", (chunk) => { if (spawnRecorded) consumeStdout(chunk); });
+  child.stdout.on("error", (error) => { if (spawnRecorded) { append("stream.error", { stream: "stdout", category: debugErrorCategory(error, "stream-error") }); safeFailure(); } });
   child.stdout.on("end", finishStdout);
   child.stdout.on("close", finishStdout);
-  child.stderr.on("data", consumeStderr);
-  child.stderr.on("error", (error) => { append("stream.error", { stream: "stderr", category: debugErrorCategory(error, "stream-error") }); safeFailure(); });
+  child.stderr.on("data", (chunk) => { if (spawnRecorded) consumeStderr(chunk); });
+  child.stderr.on("error", (error) => { if (spawnRecorded) { append("stream.error", { stream: "stderr", category: debugErrorCategory(error, "stream-error") }); safeFailure(); } });
   child.stderr.on("end", finishStderr);
   child.stderr.on("close", finishStderr);
-  child.on("exit", (code, signal) => { append("child.exit", { label, code: debugExitCode(code), signal: debugSignal(signal) }); });
+  child.on("exit", (code, signal) => { if (spawnRecorded) append("child.exit", { label, code: debugExitCode(code), signal: debugSignal(signal) }); });
   child.on("close", (code, signal) => {
+    if (!spawnRecorded) return;
     finishStreams();
     childClosed = true;
-    stopTimers();
+    stopTimers({ preserveHardBound: hardLease && leaseExpired });
     append("child.close", { label, code: debugExitCode(code), signal: debugSignal(signal) });
   });
 
@@ -1502,7 +1557,8 @@ export function createDebugChildObserver({
 export async function spawnDebugChildObserver({
   traceStore, spawn = nodeSpawn, command, args = [], options = {}, label = "critic",
   privateIdentifiers = [], privateRoots = [], procIo = {},
-  observeStdin = true, diagnosticMode = "redacted", onStdoutChunk = () => {}, onStderrChunk = () => {}, onLeaseExpired = () => {}, leaseMs = null, leaseSignal = "SIGTERM",
+  observeStdin = true, diagnosticMode = "redacted", hardLease = false,
+  onStdoutChunk = () => {}, onStderrChunk = () => {}, onLeaseExpired = () => {}, onHardKill = () => {}, onForcedSettlement = () => {}, leaseMs = null, leaseSignal = "SIGTERM",
   clock = () => Number(process.hrtime.bigint() / 1_000_000n),
   setIntervalFn = setInterval, clearIntervalFn = clearInterval, setTimeoutFn = setTimeout, clearTimeoutFn = clearTimeout,
 } = {}) {
@@ -1521,11 +1577,25 @@ export async function spawnDebugChildObserver({
   }
   let observer;
   try {
-    observer = createDebugChildObserver({ traceStore, child, label, privateIdentifiers, privateRoots, procIo, observeStdin, diagnosticMode, onStdoutChunk, onStderrChunk, onLeaseExpired, clock, setIntervalFn, clearIntervalFn, setTimeoutFn, clearTimeoutFn });
+    observer = createDebugChildObserver({ traceStore, child, label, privateIdentifiers, privateRoots, procIo, observeStdin, diagnosticMode, hardLease, onStdoutChunk, onStderrChunk, onLeaseExpired, onHardKill, onForcedSettlement, clock, setIntervalFn, clearIntervalFn, setTimeoutFn, clearTimeoutFn });
   } catch {
     await traceStore.append("child.spawn-failed", { label, category: "observer-attach-failed" });
     await traceStore.sync();
     return Object.freeze({ ok: false, category: "observer-attach-failed", child: null, observer: null });
+  }
+  if (!Number.isSafeInteger(child.pid) || child.pid <= 0) {
+    const outcome = await new Promise((resolve) => {
+      let settled = false;
+      const finish = (value) => { if (!settled) { settled = true; child.off?.("spawn", onSpawn); child.off?.("error", onError); resolve(value); } };
+      const onSpawn = () => finish({ ok: true });
+      const onError = (error) => finish({ ok: false, category: debugErrorCategory(error, "spawn-error") });
+      child.once("spawn", onSpawn); child.once("error", onError);
+    });
+    if (!outcome.ok || !Number.isSafeInteger(child.pid) || child.pid <= 0) {
+      await traceStore.append("child.spawn-failed", { label, category: outcome.ok ? "pid-unavailable" : outcome.category });
+      await traceStore.sync();
+      return Object.freeze({ ok: false, category: outcome.ok ? "pid-unavailable" : outcome.category, child: null, observer: null });
+    }
   }
   await observer.recordSpawn({ leaseMs, signal: leaseSignal });
   return Object.freeze({ ok: true, category: "spawned", child, observer });
@@ -1783,10 +1853,26 @@ function groupAlive(pid, kill = process.kill) {
   if (!Number.isInteger(pid) || pid <= 0 || process.platform === "win32") return false;
   try { kill(-pid, 0); return true; } catch { return false; }
 }
+function processAlive(pid, kill = process.kill) {
+  if (!Number.isInteger(pid) || pid <= 0) return false;
+  try { kill(pid, 0); return true; } catch { return false; }
+}
 // This proves only that the detached process group we created is gone. A child
 // that successfully escaped that PGID is outside the observable claim.
-export async function ensureOwnedProcessGroupGone(pid, kill = process.kill) {
-  if (process.platform === "win32" || !groupAlive(pid, kill)) return true;
+export async function ensureOwnedProcessGroupGone(pid, kill = process.kill, { terminate = true } = {}) {
+  if (typeof terminate !== "boolean") fail("owned process cleanup mode is invalid");
+  if (process.platform === "win32") {
+    if (!processAlive(pid, kill)) return true;
+    if (!terminate) return false;
+    try { kill(pid, "SIGTERM"); } catch {}
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    if (!processAlive(pid, kill)) return true;
+    try { kill(pid, "SIGKILL"); } catch {}
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    return !processAlive(pid, kill);
+  }
+  if (!groupAlive(pid, kill)) return true;
+  if (!terminate) return false;
   try { kill(-pid, "SIGTERM"); } catch {}
   await new Promise((resolve) => setTimeout(resolve, 100));
   if (!groupAlive(pid, kill)) return true;
@@ -1827,25 +1913,29 @@ async function awaitChild(child, { leaseMs, onHeartbeat = () => {}, label }) {
   return Object.freeze({ terminal, timedOut, ownedProcessGroupGone, stdout, stderr, diagnostics: localFailureDiagnostic(stdout, stderr) });
 }
 
-async function runDebugObservedChild({ traceStore, spawn, invocation, leaseMs, label, stdin = null, privateIdentifiers = [], privateRoots = [], onHeartbeat = () => {} }) {
+async function runDebugObservedChild({ traceStore, spawn, invocation, leaseMs, label, stdin = null, privateIdentifiers = [], privateRoots = [], onHeartbeat = () => {}, onChildEvidence = () => {} }) {
   const stdout = capture(); const stderr = capture();
   const started = Date.now();
   let terminalResolve;
   const terminalPromise = new Promise((resolve) => { terminalResolve = resolve; });
-  let terminalSettled = false; let timedOut = false;
+  let terminalSettled = false; let timedOut = false; let processErrored = false; let hardKillResolve;
+  const hardKillPromise = new Promise((resolve) => { hardKillResolve = resolve; });
   const settle = (value) => { if (!terminalSettled) { terminalSettled = true; terminalResolve(value); } };
   const observedSpawn = (command, args, options) => {
     const child = spawn(command, args, options);
-    child.once("error", () => settle({ code: null, signal: null, error: "process-error" }));
-    child.once("close", (code, signal) => settle({ code, signal, error: null }));
+    child.once("error", () => { processErrored = true; });
+    child.once("close", (code, signal) => settle({ code, signal, error: processErrored ? "process-error" : null }));
     return child;
   };
   const spawned = await spawnDebugChildObserver({
     traceStore, spawn: observedSpawn, command: invocation.command, args: invocation.args, options: invocation.options, label,
-    privateIdentifiers, privateRoots, observeStdin: stdin !== null, diagnosticMode: "metadata", leaseMs,
+    privateIdentifiers, privateRoots, observeStdin: stdin !== null, diagnosticMode: "metadata", hardLease: true, leaseMs,
     onStdoutChunk: (chunk) => appendBounded(stdout, chunk), onStderrChunk: (chunk) => appendBounded(stderr, chunk),
     onLeaseExpired: () => { timedOut = true; },
+    onHardKill: () => { hardKillResolve(); },
+    onForcedSettlement: () => settle({ code: null, signal: "SIGKILL", error: "lease-expired" }),
   });
+  try { onChildEvidence(); } catch { /* Evidence classification cannot alter execution. */ }
   if (!spawned.ok) return Object.freeze({ spawned: false, category: spawned.category, terminal: Object.freeze({ code: null, signal: null, error: "spawn-error" }), timedOut: false, ownedProcessGroupGone: true, stdout, stderr, diagnostics: null });
   const { child, observer } = spawned;
   let stdinError = null;
@@ -1860,7 +1950,8 @@ async function runDebugObservedChild({ traceStore, spawn, invocation, leaseMs, l
   heartbeat.unref?.();
   const terminal = await terminalPromise;
   clearInterval(heartbeat);
-  const ownedProcessGroupGone = await ensureOwnedProcessGroupGone(child.pid);
+  if (timedOut) await hardKillPromise;
+  const ownedProcessGroupGone = await ensureOwnedProcessGroupGone(child.pid, process.kill, { terminate: !timedOut });
   let observerError = null;
   try { await observer.finishAndDrain(); } catch { observerError = "observer-error"; }
   return Object.freeze({
@@ -1953,14 +2044,13 @@ function sandboxInvocation({ codexBinary, permissionProfile, cwd, command, env }
 
 async function runProbeCommand({ invocation, leaseMs, spawn, onHeartbeat, label, debugContext }) {
   if (debugContext) {
-    const debugInvocation = Object.freeze({ ...invocation, options: Object.freeze({ ...invocation.options, stdio: ["pipe", "pipe", "pipe"] }) });
-    const execution = await runDebugObservedChild({ ...debugContext, spawn, invocation: debugInvocation, leaseMs, label, stdin: null, onHeartbeat });
-    if (!execution.spawned) return Object.freeze({ ok: false, category: "spawn-failed", invocationSha256: invocationHash(invocation.command, invocation.args), diagnostics: null, debugTimedOut: false });
+    const execution = await runDebugObservedChild({ ...debugContext, spawn, invocation, leaseMs, label, stdin: null, onHeartbeat });
+    if (!execution.spawned) return Object.freeze({ ok: false, category: "spawn-failed", invocationSha256: invocationHash(invocation.command, invocation.args), diagnostics: null, debugTimedOut: false, debugChildEvidence: true });
     return Object.freeze({
       ok: !execution.timedOut && execution.ownedProcessGroupGone && !execution.stdout.overflow && !execution.stderr.overflow && execution.category === null,
       invocationSha256: invocationHash(invocation.command, invocation.args),
       process: Object.freeze({ exitCode: execution.terminal.code, signal: execution.terminal.signal, timedOut: execution.timedOut, ownedProcessGroupGone: execution.ownedProcessGroupGone, error: execution.terminal.error }),
-      diagnostics: execution.diagnostics, debugTimedOut: execution.timedOut,
+      diagnostics: execution.diagnostics, debugTimedOut: execution.timedOut, debugChildEvidence: true,
     });
   }
   let child;
@@ -2023,7 +2113,7 @@ export async function runPermissionProfilePreflight({ codexBinary, permissionPro
       external: Object.freeze({ before: before.external, after: after.external }),
       writeTarget: Object.freeze({ absentBefore: before.writeAbsent, absentAfter: after.writeAbsent }),
     });
-    return Object.freeze({ ok, category: ok ? "pass" : "profile-preflight-failed", profileSha256: permissionProfile.hash, probes: Object.freeze(Object.fromEntries(commands.map((probe) => [probe.key, runs[probe.key] ? Object.freeze({ invocationSha256: runs[probe.key].invocationSha256, process: runs[probe.key].process }) : null]))), canaries, canaryEvidence, cleanup: true, diagnostics: Object.freeze(Object.fromEntries(commands.map((probe) => [probe.key, runs[probe.key]?.diagnostics ?? null]))) });
+    return Object.freeze({ ok, category: ok ? "pass" : "profile-preflight-failed", profileSha256: permissionProfile.hash, probes: Object.freeze(Object.fromEntries(commands.map((probe) => [probe.key, runs[probe.key] ? Object.freeze({ invocationSha256: runs[probe.key].invocationSha256, process: runs[probe.key].process }) : null]))), canaries, canaryEvidence, cleanup: true, diagnostics: Object.freeze(Object.fromEntries(commands.map((probe) => [probe.key, runs[probe.key]?.diagnostics ?? null]))), ...(debugContext ? { debugChildEvidence: Object.values(runs).some((run) => run.debugChildEvidence === true) } : {}) });
   } finally {
     await rm(fixtureSentinel, { force: true }); await rm(writeTarget, { force: true }); await rm(coordinator, { recursive: true, force: true });
     if (configHome) await rm(configHome, { recursive: true, force: true });
@@ -2153,7 +2243,7 @@ export async function runCodexCritic({ fixture, reviewBundle, permissionProfile,
   }
 }
 
-function publicRun(run) { if (!run) return null; const { diagnostics, debugTimedOut, debugObserverOk, ...safe } = run; return safe; }
+function publicRun(run) { if (!run) return null; const { diagnostics, debugTimedOut, debugObserverOk, debugChildEvidence, ...safe } = run; return safe; }
 
 function binaryBinding(value) {
   return Object.freeze({
@@ -2237,12 +2327,13 @@ class DebugIsolationFailure extends Error {
   constructor(step, original = null) { super(`debug isolation failed at ${step}`); this.step = step; this.original = original; }
 }
 
-function debugCause(step, { critic, preflight } = {}) {
+function debugCause(step, { critic, preflight, preflightChildEvidence = false } = {}) {
   if (step === "critic" && critic?.debugTimedOut === true) return "response-stalled";
   if (step === "input" || step === "commit") return "coordinator-input";
-  if (step === "preflight" && Object.values(preflight?.probes ?? {}).some((probe) => probe?.process?.timedOut === true)) return "child-process";
-  if (step === "preflight") return "child-process";
-  if (step === "critic" && critic?.stream?.toolFree === false) return "jsonl-lifecycle";
+  if (step === "preflight" && (preflight?.debugChildEvidence === true || preflightChildEvidence)) return "child-process";
+  if (step === "preflight") return "unbestimmt";
+  if (step === "critic" && (critic?.stream?.events ?? 0) === 0) return "cli-before-turn";
+  if (step === "critic" && critic?.stream?.toolFree === false && critic.stream.events > 0) return "jsonl-lifecycle";
   if (step === "critic" && critic) return "child-process";
   if (step === "result") return "result-sink";
   if (["binary", "fixture", "bundle", "profile", "binding-before", "binding-after", "canary"].includes(step)) return "fixture-or-binding";
@@ -2300,7 +2391,7 @@ async function runProfileBoundIsolationDebug({ repoRoot, candidateCommit, artifa
   assertAbsolute(repoRoot, "repoRoot"); assertAbsolute(debugContext.tracePath, "tracePath");
   const debugScope = await mkdtemp(path.join(fixtureParent, "pipeline-codex-debug-fixture-"));
   let traceStore; let fixture = null; let currentStep = null; let resultEvidence = Object.freeze({ present: false, bytes: 0, sha256: null });
-  let codexBinary; let binary; let contract; let reviewBundle; let fixtureInventorySha256; let profile; let preflight = null; let critic = null;
+  let codexBinary; let binary; let contract; let reviewBundle; let fixtureInventorySha256; let profile; let preflight = null; let critic = null; let preflightChildEvidence = false;
   let inventoryAfterPreflight = null; let inventoryAfterCritic = null; let bindingStableBeforeCritic = false; let bindingStableAfterCritic = false;
   const privateRoots = [repoRoot, debugScope];
   try {
@@ -2345,7 +2436,7 @@ async function runProfileBoundIsolationDebug({ repoRoot, candidateCommit, artifa
     });
     const childDebug = { traceStore, privateIdentifiers: [], privateRoots: [repoRoot, fixture.root, binary.runtimeRoot] };
     await step("preflight", async () => {
-      preflight = await runPermissionProfilePreflight({ codexBinary, permissionProfile: profile, fixtureRoot: fixture.root, externalParent, spawn, env, onHeartbeat, debugContext: childDebug });
+      preflight = await runPermissionProfilePreflight({ codexBinary, permissionProfile: profile, fixtureRoot: fixture.root, externalParent, spawn, env, onHeartbeat, debugContext: { ...childDebug, onChildEvidence: () => { preflightChildEvidence = true; } } });
       return preflight;
     }, (value) => value.ok === true);
     await step("binding-before", async () => {
@@ -2381,7 +2472,7 @@ async function runProfileBoundIsolationDebug({ repoRoot, candidateCommit, artifa
     const failedStep = error instanceof DebugIsolationFailure ? error.step : currentStep;
     if (fixture) await rm(fixture.root, { recursive: true, force: true }).catch(() => {});
     if (traceStore && failedStep) {
-      const cause = debugCause(failedStep, { critic, preflight });
+      const cause = debugCause(failedStep, { critic, preflight, preflightChildEvidence });
       await traceStore.append("run.failed", { cause });
       const summary = await traceStore.finalize({ outcome: "failed", cause });
       try { onSummary(Object.freeze({ outcome: summary.outcome, cause: summary.cause, recordCount: summary.recordCount })); } catch { /* Summary display cannot alter evidence. */ }

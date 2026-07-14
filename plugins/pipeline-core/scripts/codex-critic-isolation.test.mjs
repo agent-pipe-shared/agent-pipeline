@@ -216,7 +216,7 @@ async function appendCompleteSuccessfulTrace(store) {
 await check("trace store publishes the exact closed event and step enums", () => {
   assert.deepEqual(CODEX_CRITIC_TRACE_EVENTS, [
     "trace.opened", "run.started", "run.completed", "run.failed", "step.started", "step.completed", "step.failed",
-    "child.spawn-requested", "child.spawned", "child.spawn-failed", "child.error", "child.exit", "child.close", "child.signal-requested", "child.signal-result",
+    "child.spawn-requested", "child.spawned", "child.spawn-failed", "child.error", "child.exit", "child.close", "child.signal-requested", "child.signal-result", "child.force-settled",
     "stdin.write-requested", "stdin.write-accepted", "stdin.end-requested", "stdin.closed", "stdin.error",
     "stream.chunk", "stream.jsonl-event", "stream.diagnostic", "stream.error", "process.sample", "lease.armed", "lease.heartbeat", "lease.expired", "result.observed", "trace.finalized",
   ]);
@@ -969,13 +969,39 @@ await check("debug critic timeout is classified response-stalled only after dura
   const runtime = await mkdtemp(path.join(os.tmpdir(), "profile-debug-timeout-runtime-")); const traceDirectory = await mkdtemp(path.join(os.tmpdir(), "profile-debug-timeout-trace-")); const tracePath = path.join(traceDirectory, "trace.jsonl");
   try {
     const store = await createSecureTraceStore({ tracePath, repoRoot: root, fixtureRoot: fixture.root, privateRoots: [root, fixture.root, runtime] }); await beginTraceStep(store, "critic");
-    const bundle = await buildReviewBundle(fixture);
-    const result = await runCodexCritic({ fixture, reviewBundle: bundle, permissionProfile: buildPermissionProfile({ fixtureRoot: fixture.root, runtimeRoot: runtime }), codexBinary: "/tmp/codex", schemaPath: path.join(fixture.root, "plugins/pipeline-core/scripts/critic-verdict.schema.json"), leaseMs: 20, env: { PATH: "/bin" }, spawn: (_command, _args, options) => spawnProcess("/bin/sh", ["-c", "sleep 5"], options), debugContext: { traceStore: store, privateRoots: [root, fixture.root, runtime] } });
+    const bundle = await buildReviewBundle(fixture); let childPid = null; const started = Date.now();
+    const result = await runCodexCritic({ fixture, reviewBundle: bundle, permissionProfile: buildPermissionProfile({ fixtureRoot: fixture.root, runtimeRoot: runtime }), codexBinary: "/tmp/codex", schemaPath: path.join(fixture.root, "plugins/pipeline-core/scripts/critic-verdict.schema.json"), leaseMs: 20, env: { PATH: "/bin" }, spawn: (_command, _args, options) => {
+      const child = spawnProcess(process.execPath, ["-e", 'process.on("SIGTERM",()=>{});setInterval(()=>{},1000)'], options); childPid = child.pid; return child;
+    }, debugContext: { traceStore: store, privateRoots: [root, fixture.root, runtime] } });
     assert.equal(result.ok, false); assert.equal(result.category, "lease-timeout"); assert.equal(result.process.timedOut, true); assert.equal(result.process.ownedProcessGroupGone, true);
+    assert.equal(Date.now() - started < 4_000, true); assert.throws(() => process.kill(childPid, 0));
     await store.append("step.failed", { step: "critic" }); await store.append("run.failed", { cause: "response-stalled" }); await store.finalize({ outcome: "failed", cause: "response-stalled" });
     const records = (await readFile(tracePath, "utf8")).trimEnd().split("\n").map(JSON.parse);
     assert.equal(records.some(({ event, payload }) => event === "lease.expired" && payload.label === "critic"), true);
+    assert.deepEqual(records.filter(({ event }) => event === "child.signal-requested").map(({ payload }) => payload.signal), ["SIGTERM", "SIGKILL"]);
+    assert.deepEqual(records.filter(({ event }) => event === "child.signal-result").map(({ payload }) => payload.signal), ["SIGTERM", "SIGKILL"]);
     assert.deepEqual(records.find(({ event }) => event === "run.failed").payload, { cause: "response-stalled" });
+  } finally { await rm(fixture.root, { recursive: true, force: true }); await rm(runtime, { recursive: true, force: true }); await rm(traceDirectory, { recursive: true, force: true }); }
+});
+
+await check("debug hard lease force-settles a child that never closes without inventing close evidence", async () => {
+  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const fixture = await buildExactFixture({ repoRoot: root, candidateCommit: head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
+  const runtime = await mkdtemp(path.join(os.tmpdir(), "profile-debug-forced-runtime-")); const traceDirectory = await mkdtemp(path.join(os.tmpdir(), "profile-debug-forced-trace-")); const tracePath = path.join(traceDirectory, "trace.jsonl");
+  try {
+    const store = await createSecureTraceStore({ tracePath, repoRoot: root, fixtureRoot: fixture.root }); await beginTraceStep(store, "critic");
+    const bundle = await buildReviewBundle(fixture); const started = Date.now();
+    const result = await runCodexCritic({ fixture, reviewBundle: bundle, permissionProfile: buildPermissionProfile({ fixtureRoot: fixture.root, runtimeRoot: runtime }), codexBinary: "/tmp/codex", schemaPath: path.join(fixture.root, "plugins/pipeline-core/scripts/critic-verdict.schema.json"), leaseMs: 20, env: { PATH: "/bin" }, spawn: () => {
+      const child = new EventEmitter(); child.pid = 987_654_321; child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.kill = () => true; return child;
+    }, debugContext: { traceStore: store, privateRoots: [root, fixture.root, runtime] } });
+    assert.equal(result.ok, false); assert.equal(result.category, "lease-timeout"); assert.equal(result.process.timedOut, true); assert.equal(result.process.ownedProcessGroupGone, true);
+    assert.equal(Date.now() - started >= 1_900 && Date.now() - started < 4_000, true);
+    await store.append("step.failed", { step: "critic" }); await store.append("run.failed", { cause: "response-stalled" }); await store.finalize({ outcome: "failed", cause: "response-stalled" });
+    const records = (await readFile(tracePath, "utf8")).trimEnd().split("\n").map(JSON.parse);
+    assert.equal(records.some(({ event, payload }) => event === "child.close" && payload.label === "critic"), false);
+    assert.deepEqual(records.find(({ event }) => event === "child.force-settled").payload, { label: "critic", category: "close-unobserved" });
+    assert.deepEqual(records.filter(({ event }) => event === "child.signal-requested").map(({ payload }) => payload.signal), ["SIGTERM", "SIGKILL"]);
+    assert.equal(records.at(-1).payload.outcome, "failed");
   } finally { await rm(fixture.root, { recursive: true, force: true }); await rm(runtime, { recursive: true, force: true }); await rm(traceDirectory, { recursive: true, force: true }); }
 });
 
@@ -1091,6 +1117,7 @@ function debugAggregateSpawn(criticOptions = {}, observedEnvironments = []) {
   return (command, args, options) => {
     observedEnvironments.push(options.env);
     const child = args[0] === "sandbox" ? base(command, args, options) : criticSpawn(criticOptions)(command, args, options);
+    if (args[0] === "sandbox") { assert.equal(options.stdio[0], "ignore"); child.stdin = null; }
     child.pid = pid; pid += 1;
     const emit = child.emit;
     child.emit = function debugLifecycle(event, ...values) {
@@ -1099,6 +1126,17 @@ function debugAggregateSpawn(criticOptions = {}, observedEnvironments = []) {
     };
     return child;
   };
+}
+
+function debugAggregateWithCritic(criticFactory) {
+  const probes = debugAggregateSpawn();
+  return (command, args, options) => args[0] === "sandbox" ? probes(command, args, options) : criticFactory(command, args, options);
+}
+
+function emptyDebugCritic(_command, _args, _options) {
+  const child = new EventEmitter(); child.pid = 61_001; child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.kill = () => true;
+  child.stdin.on("finish", () => queueMicrotask(() => { child.stdout.end(); child.stderr.end(); child.emit("exit", 0, null); child.emit("close", 0, null); }));
+  return child;
 }
 
 await check("aggregate binds exact HEAD/five artifacts and emits path-free public evidence", async () => {
@@ -1148,6 +1186,44 @@ await check("debug aggregate attributes missing result only from observed result
     assert.deepEqual(records.find(({ event }) => event === "run.failed").payload, { cause: "result-sink" });
     assert.deepEqual(records.at(-1).payload.outcome, "failed");
   } finally { await rm(repo, { recursive: true, force: true }); await rm(runtime, { recursive: true, force: true }); await rm(debugDirectory, { recursive: true, force: true }); }
+});
+
+await check("debug aggregate finalizes asynchronous pre-spawn ENOENT without pid or lease invention", async () => {
+  const { repo, head } = await syntheticRepo(); const runtime = await mkdtemp(path.join(os.tmpdir(), "profile-debug-enoent-runtime-")); const debugDirectory = await mkdtemp(path.join(os.tmpdir(), "profile-debug-enoent-trace-")); const tracePath = path.join(debugDirectory, "trace.jsonl");
+  try {
+    const binaryInspection = { binarySha256: "b".repeat(64), versionSha256: "c".repeat(64), runtimeRoot: runtime, runtimeRootSha256: "d".repeat(64), runtimeManifestSha256: "e".repeat(64), runtimeEntries: 1 };
+    const spawn = debugAggregateWithCritic((_command, _args, options) => spawnProcess(path.join(os.tmpdir(), "pipeline-codex-definitely-missing-binary"), [], options));
+    const result = await runProfileBoundIsolation({ repoRoot: repo, candidateCommit: head, artifactPaths: CODEX_CRITIC_ARTIFACTS, externalParent: path.dirname(repo), resolvedBinary: "/tmp/codex", binaryInspection, inspectBinary: async () => binaryInspection, contractInspection: { contractSha256: "f".repeat(64) }, env: { PATH: "/bin" }, spawn, debugContext: { tracePath } });
+    assert.equal(result.ok, false); assert.equal(result.envelope.critic.category, "spawn-failed");
+    const records = (await readFile(tracePath, "utf8")).trimEnd().split("\n").map(JSON.parse); const criticEvents = records.filter(({ payload }) => payload.label === "critic");
+    assert.deepEqual(criticEvents.map(({ event }) => event), ["child.spawn-requested", "child.spawn-failed"]);
+    assert.deepEqual(criticEvents[1].payload, { label: "critic", category: "not-found" });
+    assert.deepEqual(records.find(({ event }) => event === "run.failed").payload, { cause: "cli-before-turn" });
+    assert.equal(records.at(-1).event, "trace.finalized"); assert.equal(records.at(-1).payload.outcome, "failed");
+  } finally { await rm(repo, { recursive: true, force: true }); await rm(runtime, { recursive: true, force: true }); await rm(debugDirectory, { recursive: true, force: true }); }
+});
+
+await check("debug cause requires child or JSONL evidence and distinguishes pre-turn from lifecycle", async () => {
+  const cases = [
+    { name: "preflight-no-child", external: "missing", critic: null, expected: "unbestimmt" },
+    { name: "critic-empty", external: null, critic: emptyDebugCritic, expected: "cli-before-turn" },
+    { name: "critic-jsonl", external: null, critic: "tool-event", expected: "jsonl-lifecycle" },
+  ];
+  for (const [index, specification] of cases.entries()) {
+    const { repo, head } = await syntheticRepo(); const runtime = await mkdtemp(path.join(os.tmpdir(), `profile-debug-cause-${index}-runtime-`)); const debugDirectory = await mkdtemp(path.join(os.tmpdir(), `profile-debug-cause-${index}-trace-`)); const tracePath = path.join(debugDirectory, "trace.jsonl");
+    try {
+      const digit = String(index + 1); const binaryInspection = { binarySha256: digit.repeat(64), versionSha256: "a".repeat(64), runtimeRoot: runtime, runtimeRootSha256: "b".repeat(64), runtimeManifestSha256: "c".repeat(64), runtimeEntries: 1 };
+      const spawn = specification.critic === "tool-event" ? debugAggregateSpawn({ toolEvent: true }) : specification.critic ? debugAggregateWithCritic(specification.critic) : debugAggregateSpawn();
+      const externalParent = specification.external === "missing" ? path.join(debugDirectory, "absent-private-parent") : path.dirname(repo);
+      const result = await runProfileBoundIsolation({ repoRoot: repo, candidateCommit: head, artifactPaths: CODEX_CRITIC_ARTIFACTS, externalParent, resolvedBinary: "/tmp/codex", binaryInspection, inspectBinary: async () => binaryInspection, contractInspection: { contractSha256: "d".repeat(64) }, env: { PATH: "/bin" }, spawn, debugContext: { tracePath } });
+      assert.equal(result.ok, false, specification.name);
+      const records = (await readFile(tracePath, "utf8")).trimEnd().split("\n").map(JSON.parse);
+      assert.deepEqual(records.find(({ event }) => event === "run.failed").payload, { cause: specification.expected }, specification.name);
+      if (specification.name === "preflight-no-child") assert.equal(records.some(({ event }) => event.startsWith("child.")), false);
+      if (specification.name === "critic-empty") assert.equal(records.some(({ event }) => event === "stream.jsonl-event"), false);
+      if (specification.name === "critic-jsonl") assert.equal(records.some(({ event }) => event === "stream.jsonl-event"), true);
+    } finally { await rm(repo, { recursive: true, force: true }); await rm(runtime, { recursive: true, force: true }); await rm(debugDirectory, { recursive: true, force: true }); }
+  }
 });
 
 await check("aggregate blocks binary/runtime drift after preflight and before critic", async () => {
