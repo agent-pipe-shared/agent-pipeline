@@ -47,6 +47,23 @@ check("declared two-file contract surface is valid", () => {
   };
   assert.equal(checkCriticFailClosedContract(texts).ok, true);
 });
+check("usage-comment rule cannot satisfy the copied prompt contract", () => {
+  const prompt = readFileSync(join(root, "templates", "prompts", "critic-review.md"), "utf8");
+  const delimiterAt = prompt.indexOf("COPY EVERYTHING BELOW THIS LINE\n-->");
+  const corrupted = `${prompt.slice(0, delimiterAt)}${prompt.slice(delimiterAt).replace("CRITIC-FAIL-CLOSED: reference-only-stop", "removed")}`;
+  assert.equal(checkCriticFailClosedContract({
+    "roles/critic.md": readFileSync(join(root, "roles", "critic.md"), "utf8"),
+    "templates/prompts/critic-review.md": corrupted,
+  }).ok, false);
+});
+check("inline dispatch and claims placeholders fail closed", () => {
+  const prompt = readFileSync(join(root, "templates", "prompts", "critic-review.md"), "utf8");
+  const corrupted = prompt.replace("{{CLAIMS_EVIDENCE_PATH}}", "{{CLAIMS_PATH_OR_INLINE}}");
+  assert.equal(checkCriticFailClosedContract({
+    "roles/critic.md": readFileSync(join(root, "roles", "critic.md"), "utf8"),
+    "templates/prompts/critic-review.md": corrupted,
+  }).ok, false);
+});
 check("missing contract rule fails closed", () => {
   const texts = {
     "roles/critic.md": "CRITIC-FAIL-CLOSED: reference-only-stop\nsubstantive review stopped",
