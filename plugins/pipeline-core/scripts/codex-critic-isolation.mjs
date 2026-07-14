@@ -61,6 +61,7 @@ const TRACE_SIGNALS = new Set(["SIGHUP", "SIGINT", "SIGQUIT", "SIGILL", "SIGTRAP
 const TRACE_PROCESS_STATES = new Set(["R", "S", "D", "Z", "T", "t", "X", "x", "K", "W", "P", "I"]);
 const TRACE_CAUSES = new Set(["coordinator-input", "child-process", "cli-before-turn", "response-stalled", "jsonl-lifecycle", "result-sink", "fixture-or-binding", "cleanup", "unbestimmt"]);
 const SECURE_TRACE_STORES = new WeakSet();
+const SECURE_TRACE_DIAGNOSTIC_APPENDERS = new WeakMap();
 
 export const CODEX_CRITIC_TRACE_EVENTS = Object.freeze([
   "trace.opened",
@@ -195,22 +196,36 @@ function escapeDebugControl(character) {
 function assertDebugPrivateValues(values, label) {
   if (!Array.isArray(values) || values.length > 32) fail(`${label} must be a bounded array`);
   for (const value of values) if (typeof value !== "string" || value.length < 2 || Buffer.byteLength(value, "utf8") > 512 || /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/u.test(value)) fail(`${label} contains an invalid literal`);
-  return Object.freeze([...values].sort((left, right) => right.length - left.length));
+  return Object.freeze([...new Set(values.map((value) => value.normalize("NFKC")))].sort((left, right) => right.length - left.length));
 }
 
-function replaceDebugLiterals(value, literals, marker) {
+function escapeDebugRegExp(value) { return value.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&"); }
+
+function debugLiteralPattern(literal, platformPath) {
+  if (!platformPath) return escapeDebugRegExp(literal);
+  let source = "";
+  let offset = 0;
+  for (const match of literal.matchAll(/[\\/]+/gu)) {
+    source += escapeDebugRegExp(literal.slice(offset, match.index));
+    source += String.raw`[\\/]+`;
+    offset = match.index + match[0].length;
+  }
+  return source + escapeDebugRegExp(literal.slice(offset));
+}
+
+function replaceDebugLiterals(value, literals, marker, { platformPath = false } = {}) {
   let result = value;
-  for (const literal of literals) result = result.replaceAll(literal, marker);
+  for (const literal of literals) result = result.replace(new RegExp(debugLiteralPattern(literal, platformPath), "giu"), marker);
   return result;
 }
 
 function sanitizeDebugLine(line, { privateIdentifiers = [], privateRoots = [] } = {}) {
   const markers = [DEBUG_REDACTED_SECRET, DEBUG_REDACTED_URL, DEBUG_REDACTED_QUERY, DEBUG_REDACTED_FRAGMENT, DEBUG_REDACTED_PATH, DEBUG_REDACTED_IDENTIFIER];
   const protectedMarkers = markers.map((_marker, index) => `__PIPELINE_MARKER_${index}__`);
-  let protectedLine = line;
+  let protectedLine = line.normalize("NFKC");
   for (const [index, marker] of markers.entries()) protectedLine = protectedLine.replaceAll(marker, protectedMarkers[index]);
   const escaped = protectedLine.replace(DEBUG_CONTROLS, escapeDebugControl);
-  const privateSafe = replaceDebugLiterals(replaceDebugLiterals(escaped, privateRoots, DEBUG_REDACTED_PATH), privateIdentifiers, DEBUG_REDACTED_IDENTIFIER);
+  const privateSafe = replaceDebugLiterals(replaceDebugLiterals(escaped, privateRoots, DEBUG_REDACTED_PATH, { platformPath: true }), privateIdentifiers, DEBUG_REDACTED_IDENTIFIER);
   const secrets = privateSafe
     .replace(DEBUG_AUTHORIZATION, `$1${DEBUG_REDACTED_SECRET}`)
     .replace(DEBUG_BEARER, `$1${DEBUG_REDACTED_SECRET}`)
@@ -343,7 +358,7 @@ function assertTraceSignal(value, label, { nullable = false } = {}) {
   if (typeof value !== "string" || !TRACE_SIGNALS.has(value)) fail(`${label} is outside the signal enum`);
 }
 
-function validateTracePayload(event, payload, { terminal = false } = {}) {
+function validateTracePayload(event, payload, { terminal = false, privateIdentifiers = [], privateRoots = [] } = {}) {
   if (!TRACE_EVENT_SET.has(event)) fail("trace event is outside the closed enum");
   if (event === "trace.opened" || event === "run.started" || event === "stdin.end-requested" || event === "stdin.closed") {
     assertTraceKeys(payload, []);
@@ -389,7 +404,7 @@ function validateTracePayload(event, payload, { terminal = false } = {}) {
   } else if (event === "stream.diagnostic") {
     assertTraceKeys(payload, ["stream", "line"]);
     if (payload.stream !== "stderr") fail("trace diagnostic stream is outside the closed enum");
-    if (typeof payload.line !== "string" || Buffer.byteLength(payload.line, "utf8") > DEBUG_DIAGNOSTIC_BYTES || payload.line !== sanitizeDebugLine(payload.line)) fail("trace diagnostic line is not bounded sanitized text");
+    if (typeof payload.line !== "string" || Buffer.byteLength(payload.line, "utf8") > DEBUG_DIAGNOSTIC_BYTES || payload.line !== sanitizeDebugLine(payload.line, { privateIdentifiers, privateRoots })) fail("trace diagnostic line is not bounded sanitized text");
   } else if (event === "stream.error") {
     assertTraceKeys(payload, ["stream", "category"]);
     if (payload.stream !== "stdout" && payload.stream !== "stderr") fail("trace stream is outside the closed enum");
@@ -422,12 +437,45 @@ function validateTracePayload(event, payload, { terminal = false } = {}) {
   }
 }
 
+const TRACE_PREFLIGHT_CHILD_LABELS = Object.freeze([
+  "profile-preflight-fixture-read", "profile-preflight-external-read-denied", "profile-preflight-write-denied",
+]);
+const TRACE_PREFLIGHT_CHILD_SET = new Set(TRACE_PREFLIGHT_CHILD_LABELS);
+
 function createTraceReplayState() {
-  return { phase: "initial", terminal: null, currentStep: null, lastStep: -1, children: new Map(), stdin: "initial", leases: new Map() };
+  return {
+    phase: "initial", terminal: null, currentStep: null, nextStep: 0, failedStep: null,
+    children: new Map(), stdin: "initial", leases: new Map(), resultCount: 0, failureObservedStep: null,
+  };
 }
 
-function activeTraceChild(state) {
-  return [...state.children.values()].some((child) => child.phase === "spawned" || child.phase === "errored" || child.phase === "exited");
+function traceChildIsActive(child) {
+  return child?.phase === "spawned" || child?.phase === "errored" || child?.phase === "exited";
+}
+
+function activeTraceChildren(state) { return [...state.children.entries()].filter(([, child]) => traceChildIsActive(child)); }
+
+function activeTraceChild(state) { return activeTraceChildren(state).length > 0; }
+
+function expectedTraceChildStep(label) {
+  if (label === "critic") return "critic";
+  if (TRACE_PREFLIGHT_CHILD_SET.has(label)) return "preflight";
+  fail("child label is outside the fixed debug-run binding");
+}
+
+function requireBoundTraceChild(state, label, event, { active = false } = {}) {
+  if (state.currentStep !== expectedTraceChildStep(label)) fail(`${event} child label is outside its bound step`);
+  const child = state.children.get(label);
+  if (!child || (active && !traceChildIsActive(child))) fail(`${event} lacks its active bound child`);
+  return child;
+}
+
+function requireOneActiveTraceChild(state, event, { criticOnly = false } = {}) {
+  const active = activeTraceChildren(state);
+  if (active.length !== 1) fail(`${event} requires exactly one active bound child`);
+  const [label, child] = active[0];
+  if (state.currentStep !== expectedTraceChildStep(label) || (criticOnly && label !== "critic")) fail(`${event} is outside its active child step`);
+  return { label, child };
 }
 
 function requireActiveTraceRun(state, event) {
@@ -447,12 +495,14 @@ function applyTraceTransition(state, event, payload) {
     return;
   }
   if (event === "run.completed" || event === "run.failed") {
-    requireActiveTraceRun(state, event);
+    if (event === "run.completed") requireActiveTraceRun(state, event);
+    else if (state.phase !== "awaiting-run-failure") fail("run.failed requires an exact failed-step prefix");
     if (state.currentStep !== null) fail("run cannot terminate with an active step");
     if ([...state.children.values()].some((child) => child.phase === "requested" || child.phase === "spawned" || child.phase === "errored" || child.phase === "exited")) fail("run cannot terminate before every child closes or fails");
     if ([...state.children.values()].some((child) => child.pendingSignal !== null)) fail("run cannot terminate with an unresolved child signal request");
     if ([...state.leases.values()].some((lease) => lease === "expired" || lease === "signaling")) fail("run cannot terminate before an expired lease signal resolves");
     if (!["initial", "closed", "error"].includes(state.stdin)) fail("run cannot terminate before stdin closes or fails");
+    if (event === "run.completed" && (state.failedStep !== null || state.nextStep !== CODEX_CRITIC_TRACE_STEPS.length || state.resultCount !== 1)) fail("run.completed requires the complete fixed debug-run lifecycle");
     state.terminal = { outcome: event === "run.completed" ? "completed" : "failed", cause: payload.cause };
     state.phase = "terminal";
     return;
@@ -467,90 +517,115 @@ function applyTraceTransition(state, event, payload) {
   if (event.startsWith("step.")) {
     const stepIndex = CODEX_CRITIC_TRACE_STEPS.indexOf(payload.step);
     if (event === "step.started") {
-      if (state.currentStep !== null || stepIndex <= state.lastStep) fail("trace step start is duplicated, overlapping or out of fixed order");
+      if (state.currentStep !== null || stepIndex !== state.nextStep) fail("trace step start is duplicated, overlapping, skipped or out of fixed order");
       state.currentStep = payload.step;
     } else {
       if (state.currentStep !== payload.step) fail("trace step terminal lacks its matching start");
+      if (activeTraceChild(state) || [...state.children.values()].some((child) => child.phase === "requested")) fail("trace step cannot terminate with an active child");
+      if (payload.step === "preflight" && event === "step.completed") {
+        if (TRACE_PREFLIGHT_CHILD_LABELS.some((label) => state.children.get(label)?.phase !== "closed" || state.children.get(label)?.spawned !== true)) fail("preflight completion requires its exact three-child cardinality");
+      }
+      if (payload.step === "critic" && event === "step.completed") {
+        const critic = state.children.get("critic");
+        if (critic?.phase !== "closed" || critic.spawned !== true || state.stdin !== "closed") fail("critic completion requires exactly one closed critic child and stdin");
+      }
+      if (payload.step === "result" && state.resultCount !== 1) fail("result step requires exactly one result.observed event");
+      if (event === "step.completed" && state.failureObservedStep === payload.step) fail("a step with a closed failure event must end with step.failed");
       state.currentStep = null;
-      state.lastStep = stepIndex;
+      state.nextStep = stepIndex + 1;
+      if (event === "step.failed") {
+        state.failedStep = payload.step;
+        state.phase = "awaiting-run-failure";
+      }
     }
     return;
   }
   if (event === "child.spawn-requested") {
+    if (state.currentStep !== expectedTraceChildStep(payload.label)) fail("child spawn request is outside its bound step");
     if (state.children.has(payload.label)) fail("child spawn request is duplicated");
-    state.children.set(payload.label, { phase: "requested", pendingSignal: null });
+    if (activeTraceChild(state) || [...state.children.values()].some((child) => child.phase === "requested")) fail("child spawn requests must be serial and cardinality-bound");
+    state.children.set(payload.label, { phase: "requested", pendingSignal: null, spawned: false });
     return;
   }
   if (event === "child.spawned" || event === "child.spawn-failed") {
-    const child = state.children.get(payload.label);
+    const child = requireBoundTraceChild(state, payload.label, event);
     if (child?.phase !== "requested") fail(`${event} lacks its spawn request`);
     child.phase = event === "child.spawned" ? "spawned" : "failed";
+    child.spawned = event === "child.spawned";
+    if (event === "child.spawn-failed") state.failureObservedStep = state.currentStep;
     return;
   }
   if (event === "child.exit") {
-    const child = state.children.get(payload.label);
+    const child = requireBoundTraceChild(state, payload.label, event);
     if (!child || !["spawned", "errored"].includes(child.phase)) fail("child.exit lacks one live spawned child");
     child.phase = "exited";
     return;
   }
   if (event === "child.error") {
-    const child = state.children.get(payload.label);
-    if (!child || !["spawned", "errored", "exited"].includes(child.phase)) fail("child.error lacks one spawned child");
+    const child = requireBoundTraceChild(state, payload.label, event);
+    if (!child || child.phase !== "spawned") fail("child.error lacks one spawned child or is duplicated");
     child.phase = "errored";
+    state.failureObservedStep = state.currentStep;
     return;
   }
   if (event === "child.close") {
-    const child = state.children.get(payload.label);
-    if (!child || !["exited", "errored", "failed"].includes(child.phase)) fail("child.close must follow child.exit, child.error or child.spawn-failed");
+    const child = requireBoundTraceChild(state, payload.label, event);
+    if (!child || !["exited", "errored"].includes(child.phase)) fail("child.close must follow child.exit or child.error");
     child.phase = "closed";
     return;
   }
   if (event === "child.signal-requested") {
-    const child = state.children.get(payload.label);
+    const child = requireBoundTraceChild(state, payload.label, event, { active: true });
     if (!child || !["spawned", "errored", "exited"].includes(child.phase) || child.pendingSignal !== null) fail("child signal request is out of order");
     child.pendingSignal = payload.signal;
     if (state.leases.get(payload.label) === "expired") state.leases.set(payload.label, "signaling");
     return;
   }
   if (event === "child.signal-result") {
-    const child = state.children.get(payload.label);
+    const child = requireBoundTraceChild(state, payload.label, event, { active: true });
     if (!child || child.pendingSignal !== payload.signal) fail("child signal result lacks its matching request");
     child.pendingSignal = null;
     if (state.leases.get(payload.label) === "signaling") state.leases.set(payload.label, "handled");
     return;
   }
   if (event === "stdin.write-requested") {
-    if (!activeTraceChild(state) || state.stdin !== "initial") fail("stdin write request is out of order");
+    requireOneActiveTraceChild(state, event, { criticOnly: true });
+    if (state.stdin !== "initial") fail("stdin write request is out of order");
     state.stdin = "requested";
     return;
   }
   if (event === "stdin.write-accepted") {
+    requireOneActiveTraceChild(state, event, { criticOnly: true });
     if (state.stdin !== "requested") fail("stdin write acceptance lacks its request");
     state.stdin = "accepted";
     return;
   }
   if (event === "stdin.end-requested") {
+    requireOneActiveTraceChild(state, event, { criticOnly: true });
     if (state.stdin !== "accepted") fail("stdin end request lacks an accepted write");
     state.stdin = "ending";
     return;
   }
   if (event === "stdin.closed") {
+    requireOneActiveTraceChild(state, event, { criticOnly: true });
     if (state.stdin !== "ending" && state.stdin !== "error") fail("stdin close is out of order");
     state.stdin = "closed";
     return;
   }
   if (event === "stdin.error") {
+    requireOneActiveTraceChild(state, event, { criticOnly: true });
     if (!["requested", "accepted", "ending"].includes(state.stdin)) fail("stdin error is out of order");
     state.stdin = "error";
+    state.failureObservedStep = state.currentStep;
     return;
   }
   if (event === "stream.chunk" || event === "stream.jsonl-event" || event === "stream.diagnostic" || event === "stream.error" || event === "process.sample") {
-    if (!activeTraceChild(state)) fail(`${event} requires one spawned child that has not closed`);
+    requireOneActiveTraceChild(state, event);
+    if (event === "stream.error") state.failureObservedStep = state.currentStep;
     return;
   }
   if (event.startsWith("lease.")) {
-    const child = state.children.get(payload.label);
-    if (!child || !["spawned", "errored", "exited"].includes(child.phase)) fail("lease event requires its spawned child");
+    const child = requireBoundTraceChild(state, payload.label, event, { active: true });
     const lease = state.leases.get(payload.label) ?? "initial";
     if (event === "lease.armed") {
       if (lease !== "initial") fail("lease arm is duplicated");
@@ -560,10 +635,16 @@ function applyTraceTransition(state, event, payload) {
     } else {
       if (lease !== "armed") fail("lease expiry is outside an armed lease");
       state.leases.set(payload.label, "expired");
+      state.failureObservedStep = state.currentStep;
     }
     return;
   }
-  if (event === "result.observed") return;
+  if (event === "result.observed") {
+    if (state.currentStep !== "result" || state.resultCount !== 0) fail("result.observed must occur exactly once inside the result step");
+    state.resultCount = 1;
+    if (!payload.present) state.failureObservedStep = state.currentStep;
+    return;
+  }
   fail("trace event has no lifecycle transition");
 }
 
@@ -693,7 +774,7 @@ async function readBoundedTrace(handle, maxBytes) {
   return Buffer.concat(parts, position);
 }
 
-function assertTraceRecordSchema(record) {
+function assertTraceRecordSchema(record, privacy) {
   assertTraceKeys(record, ["seq", "wall_time", "monotonic_ns", "event", "payload", "previous_sha256", "record_sha256"]);
   assertTraceSafeInteger(record.seq, "trace sequence", { nonnegative: true });
   if (record.seq < 1) fail("trace sequence must start at one");
@@ -701,10 +782,10 @@ function assertTraceRecordSchema(record) {
   if (typeof record.monotonic_ns !== "string" || !TRACE_MONOTONIC_NS.test(record.monotonic_ns)) fail("trace monotonic_ns is invalid");
   if (record.previous_sha256 !== null) assertTraceSha256(record.previous_sha256, "trace previous_sha256");
   assertTraceSha256(record.record_sha256, "trace record_sha256");
-  validateTracePayload(record.event, record.payload, { terminal: record.event === "trace.finalized" });
+  validateTracePayload(record.event, record.payload, { terminal: record.event === "trace.finalized", ...privacy });
 }
 
-function verifyTraceRecords(buffer, maxEvents) {
+function verifyTraceRecords(buffer, maxEvents, privacy) {
   if (buffer.length === 0 || buffer.at(-1) !== 0x0a) fail("trace is truncated or lacks a final newline");
   let text;
   try { text = new TextDecoder("utf-8", { fatal: true }).decode(buffer); }
@@ -719,7 +800,7 @@ function verifyTraceRecords(buffer, maxEvents) {
     let record;
     try { record = JSON.parse(line); }
     catch (error) { throw new Error("trace contains invalid JSONL", { cause: error }); }
-    assertTraceRecordSchema(record);
+    assertTraceRecordSchema(record, privacy);
     if (record.seq !== index + 1) fail("trace sequence is not contiguous");
     if (record.previous_sha256 !== previousHash) fail("trace hash chain predecessor is inconsistent");
     const monotonic = BigInt(record.monotonic_ns);
@@ -743,10 +824,11 @@ function verifyTraceRecords(buffer, maxEvents) {
   return Object.freeze({ records: Object.freeze(records), rootSha256: terminal.record_sha256, priorRootSha256: prior, outcome: terminal.payload.outcome, cause: terminal.payload.cause });
 }
 
-export async function verifySecureTraceStore({ tracePath, binding, repoRoot, fixtureRoot, forbiddenRoots = [], maxBytes = DEFAULT_TRACE_BYTES, maxEvents = DEFAULT_TRACE_EVENTS, io: ioOverrides = {} } = {}) {
+export async function verifySecureTraceStore({ tracePath, binding, repoRoot, fixtureRoot, forbiddenRoots = [], maxBytes = DEFAULT_TRACE_BYTES, maxEvents = DEFAULT_TRACE_EVENTS, privateIdentifiers = [], privateRoots = [], io: ioOverrides = {} } = {}) {
   if (!binding || typeof binding.dev !== "string" || typeof binding.ino !== "string") fail("trace verification requires the original device/inode binding");
   for (const [value, label] of [[maxBytes, "trace byte bound"], [maxEvents, "trace event bound"]]) assertTraceSafeInteger(value, label, { nonnegative: true });
   if (maxBytes < 1 || maxEvents < 2) fail("trace verification bounds are too small");
+  const privacy = Object.freeze({ privateIdentifiers: assertDebugPrivateValues(privateIdentifiers, "trace privateIdentifiers"), privateRoots: assertDebugPrivateValues(privateRoots, "trace privateRoots") });
   const io = traceIo(ioOverrides);
   await validateTraceLocation({ tracePath, repoRoot, fixtureRoot, forbiddenRoots, target: "present", io });
   const handle = await io.open(tracePath, constants.O_RDONLY | constants.O_NOFOLLOW);
@@ -758,17 +840,18 @@ export async function verifySecureTraceStore({ tracePath, binding, repoRoot, fix
     if (before.size !== after.size || buffer.length !== after.size) fail("trace size changed during verification");
     const pathInfo = validateTraceStat(await io.lstat(tracePath), binding);
     if (pathInfo.size !== after.size) fail("trace path size is inconsistent");
-    const checked = verifyTraceRecords(buffer, maxEvents);
+    const checked = verifyTraceRecords(buffer, maxEvents, privacy);
     return Object.freeze({ ok: true, binding, bytes: buffer.length, recordCount: checked.records.length, rootSha256: checked.rootSha256, priorRootSha256: checked.priorRootSha256, outcome: checked.outcome, cause: checked.cause });
   } finally {
     await handle.close();
   }
 }
 
-export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot, forbiddenRoots = [], maxBytes = DEFAULT_TRACE_BYTES, maxEvents = DEFAULT_TRACE_EVENTS, now = () => new Date().toISOString(), monotonicNow = process.hrtime.bigint, io: ioOverrides = {} } = {}) {
+export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot, forbiddenRoots = [], maxBytes = DEFAULT_TRACE_BYTES, maxEvents = DEFAULT_TRACE_EVENTS, privateIdentifiers = [], privateRoots = [], now = () => new Date().toISOString(), monotonicNow = process.hrtime.bigint, io: ioOverrides = {} } = {}) {
   for (const [value, label] of [[maxBytes, "trace byte bound"], [maxEvents, "trace event bound"]]) assertTraceSafeInteger(value, label, { nonnegative: true });
   if (maxBytes < 1 || maxEvents < 2) fail("trace store bounds are too small");
   if (typeof now !== "function" || typeof monotonicNow !== "function") fail("trace clocks must be functions");
+  const privacy = Object.freeze({ privateIdentifiers: assertDebugPrivateValues(privateIdentifiers, "trace privateIdentifiers"), privateRoots: assertDebugPrivateValues(privateRoots, "trace privateRoots") });
   const io = traceIo(ioOverrides);
   await validateTraceLocation({ tracePath, repoRoot, fixtureRoot, forbiddenRoots, target: "absent", io });
   let handle;
@@ -805,7 +888,7 @@ export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot,
     }
 
     async function emit(event, payload, { terminal = false } = {}) {
-      validateTracePayload(event, payload, { terminal });
+      validateTracePayload(event, payload, { terminal, ...privacy });
       applyTraceTransition(replay, event, payload);
       const nextCount = count + 1;
       if (nextCount > maxEvents) fail("trace event bound exceeded");
@@ -826,8 +909,17 @@ export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot,
     function append(event, payload) {
       return operation(async () => {
         if (event === "trace.opened" || event === "trace.finalized") fail(`${event} is store-managed`);
+        if (event === "stream.diagnostic") fail("stream.diagnostic is observer-managed");
         if (count + 2 > maxEvents) fail("trace event bound leaves no room for finalization");
         const record = await emit(event, payload);
+        return Object.freeze({ seq: record.seq, recordSha256: record.record_sha256 });
+      });
+    }
+
+    function appendDiagnostic(payload) {
+      return operation(async () => {
+        if (count + 2 > maxEvents) fail("trace event bound leaves no room for finalization");
+        const record = await emit("stream.diagnostic", payload);
         return Object.freeze({ seq: record.seq, recordSha256: record.record_sha256 });
       });
     }
@@ -852,7 +944,7 @@ export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot,
         let finalLine;
         for (let iteration = 0; iteration < 16; iteration += 1) {
           const payload = { outcome, cause, priorRootSha256, recordCount: finalCount, totalBytes: predictedBytes };
-          validateTracePayload("trace.finalized", payload, { terminal: true });
+          validateTracePayload("trace.finalized", payload, { terminal: true, ...privacy });
           finalRecord = traceRecord({ seq: finalCount, wallTime, monotonicNs: monotonic, event: "trace.finalized", payload, previousSha256: priorRootSha256 });
           finalLine = traceLine(finalRecord);
           const actualBytes = bytes + finalLine.length;
@@ -868,12 +960,13 @@ export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot,
         else await handle.sync();
         await handle.close();
         state = "closed";
-        return verifySecureTraceStore({ tracePath, binding: opened.binding, repoRoot, fixtureRoot, forbiddenRoots, maxBytes, maxEvents, io: ioOverrides });
+        return verifySecureTraceStore({ tracePath, binding: opened.binding, repoRoot, fixtureRoot, forbiddenRoots, maxBytes, maxEvents, ...privacy, io: ioOverrides });
       });
     }
 
     const store = Object.freeze({ tracePath, binding: opened.binding, append, sync, finalize });
     SECURE_TRACE_STORES.add(store);
+    SECURE_TRACE_DIAGNOSTIC_APPENDERS.set(store, appendDiagnostic);
     return store;
   } catch (error) {
     if (handle) { try { await handle.close(); } catch { /* Preserve the creation failure. */ } }
@@ -947,9 +1040,9 @@ async function readDebugProcSample(pid, { readFile: readFileFn = readFile, readd
 }
 
 /**
- * Attaches a fail-closed debug observer to an already spawned ChildProcess.
- * Every listener is installed synchronously by this constructor; productive
- * execution paths deliberately do not call this primitive yet.
+ * Attaches to a child whose spawn request was already durably recorded. The
+ * public spawnDebugChildObserver wrapper owns that ordering. Productive
+ * execution paths deliberately do not call these debug primitives yet.
  */
 export function createDebugChildObserver({
   traceStore, child, label = "critic", privateIdentifiers = [], privateRoots = [], procIo = {},
@@ -973,6 +1066,12 @@ export function createDebugChildObserver({
   let stdoutFinished = false;
   let stderrFinished = false;
   let stdinClosed = false;
+  let stdinFinished = false;
+  let stdinFailureCategory = null;
+  let stdinErrorRecorded = false;
+  let stdinOperationActive = false;
+  let stdinWaiter = null;
+  let stdinPhase = "initial";
   let childClosed = false;
   let spawnRecorded = false;
   let spawnPid = null;
@@ -980,6 +1079,7 @@ export function createDebugChildObserver({
   let procTimer = null;
   let leaseTimer = null;
   let leaseStarted = null;
+  let leaseArming = false;
   let leaseExpired = false;
   let finishRequested = false;
 
@@ -1007,7 +1107,11 @@ export function createDebugChildObserver({
     return operation;
   }
 
-  function append(event, payload) { return schedule(() => traceStore.append(event, payload)); }
+  function append(event, payload) {
+    const writer = event === "stream.diagnostic" ? SECURE_TRACE_DIAGNOSTIC_APPENDERS.get(traceStore) : traceStore.append;
+    if (typeof writer !== "function") return Promise.reject(new Error("debug child observer diagnostic writer is unavailable"));
+    return schedule(() => event === "stream.diagnostic" ? writer(payload) : writer(event, payload));
+  }
 
   function appendStreamChunk(stream, chunk, cumulativeBytes) {
     append("stream.chunk", { stream, bytes: chunk.length, cumulativeBytes, sha256: sha256(chunk) });
@@ -1084,6 +1188,7 @@ export function createDebugChildObserver({
     if (childClosed || !spawnRecorded) return Promise.resolve();
     const pid = spawnPid;
     return schedule(async () => {
+      await traceStore.sync();
       const sample = Number.isSafeInteger(pid) && pid > 0 ? await readDebugProcSample(pid, procIo) : Object.freeze({ availability: "unavailable", category: "pid-unavailable" });
       await traceStore.append("process.sample", sample);
     });
@@ -1096,26 +1201,117 @@ export function createDebugChildObserver({
     spawnPid = pid;
     spawnPgid = pgid;
     const operation = schedule(async () => {
-      await traceStore.append("child.spawn-requested", { label });
       await traceStore.append("child.spawned", { label, pid, pgid });
+      await traceStore.sync();
     });
-    procTimer = setIntervalFn(() => { sampleProcess().catch(() => {}); }, DEBUG_PROC_INTERVAL_MS);
-    procTimer?.unref?.();
-    return operation;
+    return operation.then((result) => {
+      procTimer = setIntervalFn(() => { sampleProcess().catch(() => {}); }, DEBUG_PROC_INTERVAL_MS);
+      procTimer?.unref?.();
+      return result;
+    });
+  }
+
+  function categoricalStdinError(category) {
+    const error = new Error(`debug child stdin failed categorically: ${category}`);
+    error.debugCategory = category;
+    return error;
+  }
+
+  function observeStdinFailure(error, fallback) {
+    const category = debugErrorCategory(error, fallback);
+    if (stdinFailureCategory === null) stdinFailureCategory = category;
+    safeFailure();
+    stdinWaiter?.reject(categoricalStdinError(stdinFailureCategory));
+    if (!stdinOperationActive && !stdinErrorRecorded && !stdinClosed && ["requested", "accepted", "ending"].includes(stdinPhase)) {
+      stdinErrorRecorded = true;
+      stdinPhase = "error";
+      append("stdin.error", { category: stdinFailureCategory });
+    }
+  }
+
+  function waitForStdinWrite(bytes) {
+    return new Promise((resolve, reject) => {
+      let callbackAccepted = false;
+      let drainAccepted = null;
+      let settled = false;
+      const cleanup = () => {
+        child.stdin.off?.("drain", onDrain);
+        if (stdinWaiter?.reject === failWrite) stdinWaiter = null;
+      };
+      const succeed = () => {
+        if (!settled && callbackAccepted && drainAccepted === true) { settled = true; cleanup(); resolve(); }
+      };
+      const failWrite = (error) => {
+        if (!settled) { settled = true; cleanup(); reject(error); }
+      };
+      const onDrain = () => { drainAccepted = true; succeed(); };
+      stdinWaiter = { reject: failWrite };
+      try {
+        const accepted = child.stdin.write(bytes, (error) => {
+          if (error) { observeStdinFailure(error, "write-error"); return; }
+          callbackAccepted = true;
+          succeed();
+        });
+        drainAccepted = accepted !== false;
+        if (!drainAccepted) child.stdin.once("drain", onDrain);
+        succeed();
+      } catch (error) {
+        observeStdinFailure(error, "write-error");
+        failWrite(categoricalStdinError(stdinFailureCategory ?? "write-error"));
+      }
+    });
+  }
+
+  function waitForStdinFinish() {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const finish = () => { if (!settled) { settled = true; if (stdinWaiter?.reject === failEnd) stdinWaiter = null; resolve(); } };
+      const failEnd = (error) => { if (!settled) { settled = true; if (stdinWaiter?.reject === failEnd) stdinWaiter = null; reject(error); } };
+      stdinWaiter = { resolve: finish, reject: failEnd };
+      try { child.stdin.end(); }
+      catch (error) { observeStdinFailure(error, "end-error"); failEnd(categoricalStdinError(stdinFailureCategory ?? "end-error")); }
+    });
   }
 
   function writeAndEndStdin(value) {
-    if (!spawnRecorded || finishRequested) return Promise.reject(new Error("debug child stdin write is out of order"));
+    if (!spawnRecorded || finishRequested || stdinPhase !== "initial") return Promise.reject(new Error("debug child stdin write is out of order"));
     const bytes = Buffer.isBuffer(value) ? Buffer.from(value) : typeof value === "string" ? Buffer.from(value, "utf8") : null;
     if (bytes === null) return Promise.reject(new Error("debug child stdin accepts only Buffer or string input"));
-    return schedule(async () => {
-      await traceStore.append("stdin.write-requested", { bytes: bytes.length, sha256: sha256(bytes) });
-      try { child.stdin.write(bytes); }
-      catch { await traceStore.append("stdin.error", { category: "write-error" }); safeFailure(); return; }
-      await traceStore.append("stdin.write-accepted", { bytes: bytes.length });
-      await traceStore.append("stdin.end-requested", {});
-      try { child.stdin.end(); }
-      catch { await traceStore.append("stdin.error", { category: "end-error" }); safeFailure(); }
+    const operation = schedule(async () => {
+      stdinOperationActive = true;
+      try {
+        await traceStore.append("stdin.write-requested", { bytes: bytes.length, sha256: sha256(bytes) });
+        stdinPhase = "requested";
+        await traceStore.sync();
+        await waitForStdinWrite(bytes);
+        await traceStore.append("stdin.write-accepted", { bytes: bytes.length });
+        stdinPhase = "accepted";
+        await traceStore.append("stdin.end-requested", {});
+        stdinPhase = "ending";
+        await traceStore.sync();
+        await waitForStdinFinish();
+        if (!stdinFinished) throw categoricalStdinError("premature-close");
+        await traceStore.append("stdin.closed", {});
+        stdinClosed = true;
+        stdinPhase = "closed";
+        return null;
+      } catch (error) {
+        const category = error?.debugCategory ?? stdinFailureCategory ?? "stdin-error";
+        if (!stdinErrorRecorded && ["requested", "accepted", "ending"].includes(stdinPhase)) {
+          stdinErrorRecorded = true;
+          await traceStore.append("stdin.error", { category });
+        }
+        stdinFailureCategory ??= category;
+        stdinPhase = "error";
+        safeFailure();
+        return category;
+      } finally {
+        stdinWaiter = null;
+        stdinOperationActive = false;
+      }
+    });
+    return operation.then((category) => {
+      if (category !== null) throw categoricalStdinError(category);
     });
   }
 
@@ -1133,13 +1329,19 @@ export function createDebugChildObserver({
   }
 
   function armLease({ leaseMs, signal = "SIGTERM" } = {}) {
-    if (leaseStarted !== null || !Number.isSafeInteger(leaseMs) || leaseMs <= 0 || !TRACE_SIGNALS.has(signal)) return Promise.reject(new Error("debug child lease configuration is invalid"));
+    if (!spawnRecorded || leaseStarted !== null || leaseArming || !Number.isSafeInteger(leaseMs) || leaseMs <= 0 || !TRACE_SIGNALS.has(signal)) return Promise.reject(new Error("debug child lease configuration is invalid"));
     try { leaseStarted = readClock(); }
     catch (error) { return Promise.reject(error); }
-    const operation = append("lease.armed", leasePayload());
-    leaseTimer = setTimeoutFn(() => { expireLease({ signal }).catch(() => {}); }, leaseMs);
-    leaseTimer?.unref?.();
-    return operation;
+    leaseArming = true;
+    return schedule(async () => {
+      await traceStore.append("lease.armed", leasePayload());
+      await traceStore.sync();
+    }).then((result) => {
+      leaseArming = false;
+      leaseTimer = setTimeoutFn(() => { expireLease({ signal }).catch(() => {}); }, leaseMs);
+      leaseTimer?.unref?.();
+      return result;
+    }, (error) => { leaseArming = false; throw error; });
   }
 
   function heartbeatLease() {
@@ -1157,6 +1359,7 @@ export function createDebugChildObserver({
       const identity = {};
       if (spawnPid !== null) { identity.pid = spawnPid; identity.pgid = spawnPgid; }
       await traceStore.append("child.signal-requested", { label, signal, ...identity });
+      await traceStore.sync();
       let category = "not-sent";
       try { category = typeof child.kill === "function" && child.kill(signal) ? "sent" : "not-sent"; }
       catch { category = "signal-error"; }
@@ -1187,9 +1390,17 @@ export function createDebugChildObserver({
   // Listener installation is intentionally contiguous and precedes every API
   // method capable of writing stdin.
   child.on("error", (error) => { append("child.error", { label, category: debugErrorCategory(error, "process-error") }); safeFailure(); });
-  child.stdin.on("error", (error) => { append("stdin.error", { category: debugErrorCategory(error, "stdin-error") }); safeFailure(); });
-  child.stdin.on("finish", () => { if (!stdinClosed) { stdinClosed = true; append("stdin.closed", {}); } });
-  child.stdin.on("close", () => { if (!stdinClosed) { stdinClosed = true; append("stdin.closed", {}); } });
+  child.stdin.on("error", (error) => { observeStdinFailure(error, "stdin-error"); });
+  child.stdin.on("finish", () => {
+    stdinFinished = true;
+    if (stdinPhase === "ending") {
+      if (stdinWaiter?.resolve) stdinWaiter.resolve();
+      else if (!stdinClosed) { stdinClosed = true; stdinPhase = "closed"; append("stdin.closed", {}); }
+    } else if (!stdinClosed) observeStdinFailure(categoricalStdinError("premature-finish"), "premature-finish");
+  });
+  child.stdin.on("close", () => {
+    if (!stdinFinished) observeStdinFailure(categoricalStdinError("premature-close"), "premature-close");
+  });
   child.stdout.on("data", consumeStdout);
   child.stdout.on("error", (error) => { append("stream.error", { stream: "stdout", category: debugErrorCategory(error, "stream-error") }); safeFailure(); });
   child.stdout.on("end", finishStdout);
@@ -1207,6 +1418,42 @@ export function createDebugChildObserver({
   });
 
   return Object.freeze({ recordSpawn, writeAndEndStdin, armLease, heartbeatLease, expireLease, sampleProcess, finish, drain, finishAndDrain });
+}
+
+/**
+ * Durably records a spawn intent before invoking spawn, installs every child
+ * listener synchronously on return from spawn, then durably records the spawn
+ * outcome. This API is debug-only and is not wired into productive execution.
+ */
+export async function spawnDebugChildObserver({
+  traceStore, spawn = nodeSpawn, command, args = [], options = {}, label = "critic",
+  privateIdentifiers = [], privateRoots = [], procIo = {},
+  clock = () => Number(process.hrtime.bigint() / 1_000_000n),
+  setIntervalFn = setInterval, clearIntervalFn = clearInterval, setTimeoutFn = setTimeout, clearTimeoutFn = clearTimeout,
+} = {}) {
+  if (!SECURE_TRACE_STORES.has(traceStore)) fail("debug child spawn requires a verified secure trace store");
+  if (typeof spawn !== "function" || typeof command !== "string" || command.length === 0 || !Array.isArray(args) || !isPlainTraceObject(options)) fail("debug child spawn configuration is invalid");
+  assertTraceCategory(label, "child label");
+  await traceStore.append("child.spawn-requested", { label });
+  await traceStore.sync();
+  let child;
+  try { child = spawn(command, args, options); }
+  catch (error) {
+    const category = debugErrorCategory(error, "spawn-error");
+    await traceStore.append("child.spawn-failed", { label, category });
+    await traceStore.sync();
+    return Object.freeze({ ok: false, category, child: null, observer: null });
+  }
+  let observer;
+  try {
+    observer = createDebugChildObserver({ traceStore, child, label, privateIdentifiers, privateRoots, procIo, clock, setIntervalFn, clearIntervalFn, setTimeoutFn, clearTimeoutFn });
+  } catch {
+    await traceStore.append("child.spawn-failed", { label, category: "observer-attach-failed" });
+    await traceStore.sync();
+    return Object.freeze({ ok: false, category: "observer-attach-failed", child: null, observer: null });
+  }
+  await observer.recordSpawn();
+  return Object.freeze({ ok: true, category: "spawned", child, observer });
 }
 
 function filesystemInline(entries) {
