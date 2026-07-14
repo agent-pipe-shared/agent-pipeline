@@ -38,7 +38,8 @@ export const CODEX_CRITIC_POLICY = Object.freeze({
   // Historical probe/control modules still read this field. The new acceptance
   // invocation never consumes it and rejects every --sandbox argument.
   sandbox: "read-only",
-  leaseMs: 120_000,
+  preflightLeaseMs: 120_000,
+  criticLeaseMs: 300_000,
   sourceReference: Object.freeze({
     tag: "rust-v0.144.4",
     commit: "8c68d4c87dc54d38861f5114e920c3de2efa5876",
@@ -513,7 +514,7 @@ async function runProbeCommand({ invocation, leaseMs, spawn, onHeartbeat, label 
 async function hashedFile(file) { const bytes = await readFile(file); return Object.freeze({ sha256: sha256(bytes), bytes: bytes.length }); }
 async function pathAbsent(file) { try { await lstat(file); return false; } catch (error) { if (error?.code === "ENOENT") return true; throw error; } }
 
-export async function runPermissionProfilePreflight({ codexBinary, permissionProfile, fixtureRoot, externalParent, leaseMs = CODEX_CRITIC_POLICY.leaseMs, spawn = nodeSpawn, env = process.env, onHeartbeat = () => {} } = {}) {
+export async function runPermissionProfilePreflight({ codexBinary, permissionProfile, fixtureRoot, externalParent, leaseMs = CODEX_CRITIC_POLICY.preflightLeaseMs, spawn = nodeSpawn, env = process.env, onHeartbeat = () => {} } = {}) {
   assertAbsolute(codexBinary, "codexBinary"); assertAbsolute(fixtureRoot, "fixtureRoot"); assertAbsolute(externalParent, "externalParent"); assertPermissionProfile(permissionProfile);
   const fixtureRealpath = await realpath(fixtureRoot);
   if (fixtureRealpath !== permissionProfile.normalized.roots.fixture) fail("preflight fixture drifted from the bound profile");
@@ -609,7 +610,7 @@ export function inspectToolFreeJsonl(value) {
   return Object.freeze({ ok, category: ok ? "pass" : "invalid-lifecycle", events: lines.length, finalMessageText });
 }
 
-export async function runCodexCritic({ fixture, reviewBundle, permissionProfile, codexBinary, schemaPath = DEFAULT_SCHEMA, leaseMs = CODEX_CRITIC_POLICY.leaseMs, spawn = nodeSpawn, env = process.env, onHeartbeat = () => {} } = {}) {
+export async function runCodexCritic({ fixture, reviewBundle, permissionProfile, codexBinary, schemaPath = DEFAULT_SCHEMA, leaseMs = CODEX_CRITIC_POLICY.criticLeaseMs, spawn = nodeSpawn, env = process.env, onHeartbeat = () => {} } = {}) {
   if (!fixture?.root || !fixture?.manifest?.nonce) fail("verified fixture is required");
   assertPermissionProfile(permissionProfile); assertAbsolute(codexBinary, "codexBinary"); assertAbsolute(schemaPath, "schemaPath");
   if (!reviewBundle?.serialized || reviewBundle.value?.artifacts?.length !== fixture.manifest.artifacts.length) fail("complete review bundle is required");
@@ -734,6 +735,8 @@ export async function runProfileBoundIsolation({ repoRoot, candidateCommit, arti
         reviewContractSha256: reviewContractHash(),
         adapter: CODEX_CRITIC_POLICY.adapter,
         policySha256: sha256(canonical(CODEX_CRITIC_POLICY)),
+        preflightLeaseMs: CODEX_CRITIC_POLICY.preflightLeaseMs,
+        criticLeaseMs: CODEX_CRITIC_POLICY.criticLeaseMs,
         sourceReferenceSha256: sha256(canonical(CODEX_CRITIC_POLICY.sourceReference)),
         model: CODEX_CRITIC_POLICY.model,
         effort: CODEX_CRITIC_POLICY.effort,
