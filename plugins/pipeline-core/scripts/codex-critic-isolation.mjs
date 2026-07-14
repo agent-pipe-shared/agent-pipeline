@@ -8,7 +8,7 @@
 import { spawn as nodeSpawn, execFileSync as nodeExecFileSync } from "node:child_process";
 import { createHash, randomBytes } from "node:crypto";
 import { constants } from "node:fs";
-import { access, lstat, mkdir, mkdtemp, readFile, readdir, readlink, realpath, rm, stat, writeFile } from "node:fs/promises";
+import { access, lstat, mkdir, mkdtemp, open, readFile, readdir, readlink, realpath, rm, stat, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { StringDecoder } from "node:string_decoder";
@@ -44,6 +44,37 @@ const DEBUG_UNIX_PATH = /(?<![A-Za-z0-9.:/\\])\/(?:[^\s/\\:"'<>|?*\u0000-\u001f]
 const DEBUG_CONTROLS = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/gu;
 const DEFAULT_DEBUG_PENDING_BYTES = 16 * 1024;
 const DEFAULT_DEBUG_OUTPUT_BYTES = 64 * 1024;
+const DEFAULT_TRACE_BYTES = 4 * 1024 * 1024;
+const DEFAULT_TRACE_EVENTS = 4096;
+const TRACE_CATEGORY = /^[a-z][a-z0-9-]{0,63}$/u;
+const TRACE_SHA256 = /^[0-9a-f]{64}$/u;
+const TRACE_MONOTONIC_NS = /^(?:0|[1-9][0-9]*)$/u;
+const TRACE_SIGNALS = new Set(["SIGHUP", "SIGINT", "SIGQUIT", "SIGILL", "SIGTRAP", "SIGABRT", "SIGBUS", "SIGFPE", "SIGKILL", "SIGUSR1", "SIGSEGV", "SIGUSR2", "SIGPIPE", "SIGALRM", "SIGTERM", "SIGCHLD", "SIGCONT", "SIGSTOP", "SIGTSTP", "SIGTTIN", "SIGTTOU", "SIGURG", "SIGXCPU", "SIGXFSZ", "SIGVTALRM", "SIGPROF", "SIGWINCH", "SIGIO", "SIGPWR", "SIGSYS"]);
+const TRACE_PROCESS_STATES = new Set(["R", "S", "D", "Z", "T", "t", "X", "x", "K", "W", "P", "I"]);
+const TRACE_CAUSES = new Set(["coordinator-input", "child-process", "cli-before-turn", "response-stalled", "jsonl-lifecycle", "result-sink", "fixture-or-binding", "cleanup", "unbestimmt"]);
+
+export const CODEX_CRITIC_TRACE_EVENTS = Object.freeze([
+  "trace.opened",
+  "run.started", "run.completed", "run.failed",
+  "step.started", "step.completed", "step.failed",
+  "child.spawn-requested", "child.spawned", "child.spawn-failed", "child.exit", "child.close", "child.signal-requested", "child.signal-result",
+  "stdin.write-requested", "stdin.write-accepted", "stdin.end-requested", "stdin.closed", "stdin.error",
+  "stream.chunk", "stream.jsonl-event", "stream.error",
+  "process.sample",
+  "lease.armed", "lease.heartbeat", "lease.expired",
+  "result.observed",
+  "trace.finalized",
+]);
+
+export const CODEX_CRITIC_TRACE_STEPS = Object.freeze([
+  "input", "commit", "binary", "fixture", "bundle", "profile", "preflight", "binding-before", "critic", "binding-after", "result", "canary", "cleanup",
+]);
+
+const TRACE_EVENT_SET = new Set(CODEX_CRITIC_TRACE_EVENTS);
+const TRACE_STEP_SET = new Set(CODEX_CRITIC_TRACE_STEPS);
+const TRACE_JSONL_TYPES = new Set(["thread.started", "turn.started", "item.started", "item.completed", "turn.completed", "turn.failed", "thread.completed", "error", "unknown"]);
+const TRACE_ITEM_TYPES = new Set(["reasoning", "agent_message", "command_execution", "file_change", "mcp_tool_call", "web_search", "plan_update", "unknown"]);
+const TRACE_ITEM_STATUSES = new Set(["started", "completed", "failed", "in_progress", "unknown"]);
 
 export const CODEX_CRITIC_POLICY = Object.freeze({
   schema: "pipeline.codex-critic-profile-bound.v1",
@@ -247,6 +278,410 @@ export function createDebugLineRedactor({ maxPendingBytes = DEFAULT_DEBUG_PENDIN
   }
 
   return Object.freeze({ write, finish });
+}
+
+function isPlainTraceObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
+}
+
+function assertTraceKeys(value, required, optional = []) {
+  if (!isPlainTraceObject(value)) fail("trace payload must be a plain object");
+  const allowed = new Set([...required, ...optional]);
+  for (const key of required) if (!Object.hasOwn(value, key)) fail(`trace payload is missing ${key}`);
+  for (const key of Object.keys(value)) if (!allowed.has(key)) fail(`trace payload has unexpected ${key}`);
+}
+
+function assertTraceSafeInteger(value, label, { nonnegative = false } = {}) {
+  if (!Number.isSafeInteger(value) || (nonnegative && value < 0)) fail(`${label} must be ${nonnegative ? "a nonnegative " : "a "}safe integer`);
+}
+
+function assertTraceCategory(value, label = "trace category") {
+  if (typeof value !== "string" || !TRACE_CATEGORY.test(value)) fail(`${label} is invalid`);
+}
+
+function assertTraceSha256(value, label, { nullable = false } = {}) {
+  if (nullable && value === null) return;
+  if (typeof value !== "string" || !TRACE_SHA256.test(value)) fail(`${label} must be a lowercase SHA-256`);
+}
+
+function assertTraceSignal(value, label, { nullable = false } = {}) {
+  if (nullable && value === null) return;
+  if (typeof value !== "string" || !TRACE_SIGNALS.has(value)) fail(`${label} is outside the signal enum`);
+}
+
+function validateTracePayload(event, payload, { terminal = false } = {}) {
+  if (!TRACE_EVENT_SET.has(event)) fail("trace event is outside the closed enum");
+  if (event === "trace.opened" || event === "run.started" || event === "stdin.end-requested" || event === "stdin.closed") {
+    assertTraceKeys(payload, []);
+  } else if (event === "run.completed" || event === "run.failed") {
+    assertTraceKeys(payload, ["cause"]);
+    if (!TRACE_CAUSES.has(payload.cause)) fail("trace run cause is outside the closed enum");
+  } else if (event.startsWith("step.")) {
+    assertTraceKeys(payload, ["step"]);
+    if (!TRACE_STEP_SET.has(payload.step)) fail("trace step is outside the closed enum");
+  } else if (event === "child.spawn-requested") {
+    assertTraceKeys(payload, ["label"]); assertTraceCategory(payload.label, "child label");
+  } else if (event === "child.spawned") {
+    assertTraceKeys(payload, ["label", "pid", "pgid"]); assertTraceCategory(payload.label, "child label");
+    assertTraceSafeInteger(payload.pid, "child pid", { nonnegative: true }); assertTraceSafeInteger(payload.pgid, "child pgid", { nonnegative: true });
+  } else if (event === "child.spawn-failed") {
+    assertTraceKeys(payload, ["label", "category"]); assertTraceCategory(payload.label, "child label"); assertTraceCategory(payload.category);
+  } else if (event === "child.exit" || event === "child.close") {
+    assertTraceKeys(payload, ["label", "code", "signal"]); assertTraceCategory(payload.label, "child label");
+    if (payload.code !== null) assertTraceSafeInteger(payload.code, "child exit code");
+    assertTraceSignal(payload.signal, "child signal", { nullable: true });
+  } else if (event === "child.signal-requested" || event === "child.signal-result") {
+    const required = event === "child.signal-result" ? ["label", "signal", "category"] : ["label", "signal"];
+    assertTraceKeys(payload, required, ["pid", "pgid"]); assertTraceCategory(payload.label, "child label"); assertTraceSignal(payload.signal, "child signal");
+    if (Object.hasOwn(payload, "category")) assertTraceCategory(payload.category);
+    for (const key of ["pid", "pgid"]) if (Object.hasOwn(payload, key)) assertTraceSafeInteger(payload[key], `child ${key}`, { nonnegative: true });
+  } else if (event === "stdin.write-requested") {
+    assertTraceKeys(payload, ["bytes", "sha256"]); assertTraceSafeInteger(payload.bytes, "stdin bytes", { nonnegative: true }); assertTraceSha256(payload.sha256, "stdin sha256");
+  } else if (event === "stdin.write-accepted") {
+    assertTraceKeys(payload, ["bytes"]); assertTraceSafeInteger(payload.bytes, "stdin bytes", { nonnegative: true });
+  } else if (event === "stdin.error") {
+    assertTraceKeys(payload, ["category"]); assertTraceCategory(payload.category);
+  } else if (event === "stream.chunk") {
+    assertTraceKeys(payload, ["stream", "bytes", "cumulativeBytes", "sha256"]);
+    if (payload.stream !== "stdout" && payload.stream !== "stderr") fail("trace stream is outside the closed enum");
+    assertTraceSafeInteger(payload.bytes, "stream bytes", { nonnegative: true }); assertTraceSafeInteger(payload.cumulativeBytes, "stream cumulativeBytes", { nonnegative: true });
+    if (payload.cumulativeBytes < payload.bytes) fail("stream cumulativeBytes cannot be smaller than bytes");
+    assertTraceSha256(payload.sha256, "stream sha256");
+  } else if (event === "stream.jsonl-event") {
+    assertTraceKeys(payload, ["type", "itemType", "status"]);
+    if (!TRACE_JSONL_TYPES.has(payload.type) || !TRACE_ITEM_TYPES.has(payload.itemType) || !TRACE_ITEM_STATUSES.has(payload.status)) fail("trace JSONL lifecycle value is outside the closed enum");
+  } else if (event === "stream.error") {
+    assertTraceKeys(payload, ["stream", "category"]);
+    if (payload.stream !== "stdout" && payload.stream !== "stderr") fail("trace stream is outside the closed enum");
+    assertTraceCategory(payload.category);
+  } else if (event === "process.sample") {
+    assertTraceKeys(payload, ["availability"], ["state", "cpuUserTicks", "cpuSystemTicks", "rssPages", "fdCount", "wchanSha256", "category"]);
+    if (payload.availability !== "observed" && payload.availability !== "unavailable") fail("process availability is outside the closed enum");
+    const observations = ["state", "cpuUserTicks", "cpuSystemTicks", "rssPages", "fdCount", "wchanSha256"];
+    if (payload.availability === "unavailable" && observations.some((key) => Object.hasOwn(payload, key))) fail("unavailable process sample cannot contain observations");
+    if (Object.hasOwn(payload, "state") && !TRACE_PROCESS_STATES.has(payload.state)) fail("process state is outside the closed enum");
+    for (const key of ["cpuUserTicks", "cpuSystemTicks", "rssPages", "fdCount"]) if (Object.hasOwn(payload, key)) assertTraceSafeInteger(payload[key], `process ${key}`, { nonnegative: true });
+    if (Object.hasOwn(payload, "wchanSha256")) assertTraceSha256(payload.wchanSha256, "process wchanSha256");
+    if (Object.hasOwn(payload, "category")) assertTraceCategory(payload.category);
+  } else if (event.startsWith("lease.")) {
+    assertTraceKeys(payload, ["label", "elapsedMs", "stdoutBytes", "stderrBytes"]); assertTraceCategory(payload.label, "lease label");
+    for (const key of ["elapsedMs", "stdoutBytes", "stderrBytes"]) assertTraceSafeInteger(payload[key], `lease ${key}`, { nonnegative: true });
+  } else if (event === "result.observed") {
+    assertTraceKeys(payload, ["present", "bytes", "sha256"]);
+    if (typeof payload.present !== "boolean") fail("result present must be boolean");
+    assertTraceSafeInteger(payload.bytes, "result bytes", { nonnegative: true }); assertTraceSha256(payload.sha256, "result sha256", { nullable: true });
+    if (payload.present !== (payload.sha256 !== null)) fail("result presence and sha256 are inconsistent");
+    if (!payload.present && payload.bytes !== 0) fail("absent result must have zero bytes");
+  } else if (event === "trace.finalized") {
+    if (!terminal) fail("trace.finalized can only be emitted by finalize");
+    assertTraceKeys(payload, ["outcome", "cause", "priorRootSha256", "recordCount", "totalBytes"]);
+    if (payload.outcome !== "completed" && payload.outcome !== "failed") fail("trace outcome is outside the closed enum");
+    if (!TRACE_CAUSES.has(payload.cause)) fail("trace final cause is outside the closed enum");
+    assertTraceSha256(payload.priorRootSha256, "trace prior root");
+    assertTraceSafeInteger(payload.recordCount, "trace record count", { nonnegative: true }); assertTraceSafeInteger(payload.totalBytes, "trace total bytes", { nonnegative: true });
+  }
+}
+
+function traceStatBigInt(value) { return typeof value === "bigint" ? value : BigInt(value); }
+function traceStatSize(info) {
+  const size = Number(info.size);
+  if (!Number.isSafeInteger(size) || size < 0) fail("trace size is outside the safe bound");
+  return size;
+}
+function traceBinding(info) { return Object.freeze({ dev: String(info.dev), ino: String(info.ino) }); }
+function sameTraceBinding(left, right) { return left?.dev === right?.dev && left?.ino === right?.ino; }
+
+function validateTraceStat(info, expectedBinding = null) {
+  if (!info.isFile()) fail("trace target is not a regular file");
+  if ((traceStatBigInt(info.mode) & 0o777n) !== 0o600n) fail("trace target mode is not 0600");
+  if (traceStatBigInt(info.nlink) !== 1n) fail("trace target link count is not one");
+  const binding = traceBinding(info);
+  if (expectedBinding && !sameTraceBinding(binding, expectedBinding)) fail("trace device/inode binding changed");
+  return Object.freeze({ binding, size: traceStatSize(info) });
+}
+
+function traceIo(overrides = {}) {
+  return Object.freeze({ open: overrides.open ?? open, lstat: overrides.lstat ?? lstat, realpath: overrides.realpath ?? realpath });
+}
+
+async function assertTraceParents(tracePath, io) {
+  const parent = path.dirname(tracePath);
+  const parsed = path.parse(parent);
+  let current = parsed.root;
+  const relative = parent.slice(parsed.root.length);
+  for (const component of relative.split(path.sep).filter(Boolean)) {
+    current = path.join(current, component);
+    const info = await io.lstat(current);
+    if (info.isSymbolicLink()) fail("trace parent contains a symbolic link");
+    if (!info.isDirectory()) fail("trace parent component is not a directory");
+  }
+}
+
+async function canonicalTraceRoot(value, label, io) {
+  assertAbsolute(value, label);
+  const resolved = path.resolve(value);
+  let canonicalRoot;
+  try { canonicalRoot = await io.realpath(resolved); }
+  catch (error) { throw new Error(`${label} must exist for trace exclusion`, { cause: error }); }
+  return canonicalRoot;
+}
+
+function traceInside(candidate, root) {
+  const relative = path.relative(root, candidate);
+  return relative === "" || (!relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative));
+}
+
+async function validateTraceLocation({ tracePath, repoRoot, fixtureRoot, target, io }) {
+  assertAbsolute(tracePath, "tracePath");
+  if (path.resolve(tracePath) !== tracePath) fail("tracePath must be canonical and normalized");
+  const tempRoot = await io.realpath(os.tmpdir());
+  if (!traceInside(tracePath, tempRoot) || tracePath === tempRoot) fail("tracePath must be below the canonical OS temp directory");
+  await assertTraceParents(tracePath, io);
+  for (const [value, label] of [[repoRoot, "repoRoot"], [fixtureRoot, "fixtureRoot"]]) {
+    if (value === undefined || value === null) continue;
+    const excluded = await canonicalTraceRoot(value, label, io);
+    if (traceInside(tracePath, excluded)) fail(`tracePath must be outside ${label}`);
+  }
+  try {
+    const info = await io.lstat(tracePath);
+    if (info.isSymbolicLink()) fail("trace target cannot be a symbolic link");
+    if (target === "absent") fail("trace target must be absent");
+    if (!info.isFile()) fail("trace target is not a regular file");
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+    if (target === "present") fail("trace target is missing");
+  }
+}
+
+function traceWallTime(now) {
+  const value = now();
+  const text = value instanceof Date ? value.toISOString() : value;
+  if (typeof text !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/u.test(text) || new Date(text).toISOString() !== text) fail("trace wall time is invalid");
+  return text;
+}
+
+function traceMonotonicTime(monotonicNow, previous) {
+  let value;
+  try { value = BigInt(monotonicNow()); }
+  catch (error) { throw new Error("trace monotonic clock is invalid", { cause: error }); }
+  if (value < 0n || (previous !== null && value < previous)) fail("trace monotonic clock moved backwards");
+  return value;
+}
+
+function traceRecordWithoutHash({ seq, wallTime, monotonicNs, event, payload, previousSha256 }) {
+  return { seq, wall_time: wallTime, monotonic_ns: monotonicNs.toString(), event, payload, previous_sha256: previousSha256 };
+}
+
+function traceRecord(fields) {
+  const withoutHash = traceRecordWithoutHash(fields);
+  return { ...withoutHash, record_sha256: sha256(JSON.stringify(withoutHash)) };
+}
+
+function traceLine(record) { return Buffer.from(`${JSON.stringify(record)}\n`, "utf8"); }
+
+async function writeTraceBuffer(handle, buffer) {
+  let offset = 0;
+  while (offset < buffer.length) {
+    const result = await handle.write(buffer, offset, buffer.length - offset, null);
+    if (!Number.isSafeInteger(result?.bytesWritten) || result.bytesWritten <= 0 || result.bytesWritten > buffer.length - offset) fail("trace write returned an invalid byte count");
+    offset += result.bytesWritten;
+  }
+}
+
+async function readBoundedTrace(handle, maxBytes) {
+  const parts = [];
+  let position = 0;
+  while (position <= maxBytes) {
+    const chunk = Buffer.allocUnsafe(Math.min(64 * 1024, maxBytes + 1 - position));
+    const { bytesRead } = await handle.read(chunk, 0, chunk.length, position);
+    if (!Number.isSafeInteger(bytesRead) || bytesRead < 0 || bytesRead > chunk.length) fail("trace read returned an invalid byte count");
+    if (bytesRead === 0) break;
+    parts.push(chunk.subarray(0, bytesRead));
+    position += bytesRead;
+  }
+  if (position > maxBytes) fail("trace byte bound exceeded");
+  return Buffer.concat(parts, position);
+}
+
+function assertTraceRecordSchema(record) {
+  assertTraceKeys(record, ["seq", "wall_time", "monotonic_ns", "event", "payload", "previous_sha256", "record_sha256"]);
+  assertTraceSafeInteger(record.seq, "trace sequence", { nonnegative: true });
+  if (record.seq < 1) fail("trace sequence must start at one");
+  traceWallTime(() => record.wall_time);
+  if (typeof record.monotonic_ns !== "string" || !TRACE_MONOTONIC_NS.test(record.monotonic_ns)) fail("trace monotonic_ns is invalid");
+  if (record.previous_sha256 !== null) assertTraceSha256(record.previous_sha256, "trace previous_sha256");
+  assertTraceSha256(record.record_sha256, "trace record_sha256");
+  validateTracePayload(record.event, record.payload, { terminal: record.event === "trace.finalized" });
+}
+
+function verifyTraceRecords(buffer, maxEvents) {
+  if (buffer.length === 0 || buffer.at(-1) !== 0x0a) fail("trace is truncated or lacks a final newline");
+  let text;
+  try { text = new TextDecoder("utf-8", { fatal: true }).decode(buffer); }
+  catch (error) { throw new Error("trace is not valid UTF-8", { cause: error }); }
+  const lines = text.slice(0, -1).split("\n");
+  if (lines.length > maxEvents) fail("trace event bound exceeded");
+  let previousHash = null;
+  let previousMonotonic = null;
+  const records = [];
+  for (const [index, line] of lines.entries()) {
+    let record;
+    try { record = JSON.parse(line); }
+    catch (error) { throw new Error("trace contains invalid JSONL", { cause: error }); }
+    assertTraceRecordSchema(record);
+    if (record.seq !== index + 1) fail("trace sequence is not contiguous");
+    if (record.previous_sha256 !== previousHash) fail("trace hash chain predecessor is inconsistent");
+    const monotonic = BigInt(record.monotonic_ns);
+    if (previousMonotonic !== null && monotonic < previousMonotonic) fail("trace monotonic time decreased");
+    const expected = traceRecord({ seq: record.seq, wallTime: record.wall_time, monotonicNs: monotonic, event: record.event, payload: record.payload, previousSha256: record.previous_sha256 });
+    if (record.record_sha256 !== expected.record_sha256 || line !== JSON.stringify(expected)) fail("trace record hash or serialization is inconsistent");
+    if (index === 0 && record.event !== "trace.opened") fail("trace.opened must be the first record");
+    if (index > 0 && record.event === "trace.opened") fail("trace.opened can only occur once");
+    if (index < lines.length - 1 && record.event === "trace.finalized") fail("trace.finalized must be terminal");
+    previousHash = record.record_sha256;
+    previousMonotonic = monotonic;
+    records.push(record);
+  }
+  const terminal = records.at(-1);
+  if (!terminal || terminal.event !== "trace.finalized") fail("trace is missing its final record");
+  const prior = records.at(-2)?.record_sha256;
+  if (!prior || terminal.payload.priorRootSha256 !== prior || terminal.previous_sha256 !== prior) fail("trace final prior root is inconsistent");
+  if (terminal.payload.recordCount !== records.length) fail("trace final record count is inconsistent");
+  if (terminal.payload.totalBytes !== buffer.length) fail("trace final byte count is inconsistent");
+  return Object.freeze({ records: Object.freeze(records), rootSha256: terminal.record_sha256, priorRootSha256: prior, outcome: terminal.payload.outcome, cause: terminal.payload.cause });
+}
+
+export async function verifySecureTraceStore({ tracePath, binding, repoRoot, fixtureRoot, maxBytes = DEFAULT_TRACE_BYTES, maxEvents = DEFAULT_TRACE_EVENTS, io: ioOverrides = {} } = {}) {
+  if (!binding || typeof binding.dev !== "string" || typeof binding.ino !== "string") fail("trace verification requires the original device/inode binding");
+  for (const [value, label] of [[maxBytes, "trace byte bound"], [maxEvents, "trace event bound"]]) assertTraceSafeInteger(value, label, { nonnegative: true });
+  if (maxBytes < 1 || maxEvents < 2) fail("trace verification bounds are too small");
+  const io = traceIo(ioOverrides);
+  await validateTraceLocation({ tracePath, repoRoot, fixtureRoot, target: "present", io });
+  const handle = await io.open(tracePath, constants.O_RDONLY | constants.O_NOFOLLOW);
+  try {
+    const before = validateTraceStat(await handle.stat({ bigint: true }), binding);
+    if (before.size > maxBytes) fail("trace byte bound exceeded");
+    const buffer = await readBoundedTrace(handle, maxBytes);
+    const after = validateTraceStat(await handle.stat({ bigint: true }), binding);
+    if (before.size !== after.size || buffer.length !== after.size) fail("trace size changed during verification");
+    const pathInfo = validateTraceStat(await io.lstat(tracePath), binding);
+    if (pathInfo.size !== after.size) fail("trace path size is inconsistent");
+    const checked = verifyTraceRecords(buffer, maxEvents);
+    return Object.freeze({ ok: true, binding, bytes: buffer.length, recordCount: checked.records.length, rootSha256: checked.rootSha256, priorRootSha256: checked.priorRootSha256, outcome: checked.outcome, cause: checked.cause });
+  } finally {
+    await handle.close();
+  }
+}
+
+export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot, maxBytes = DEFAULT_TRACE_BYTES, maxEvents = DEFAULT_TRACE_EVENTS, now = () => new Date().toISOString(), monotonicNow = process.hrtime.bigint, io: ioOverrides = {} } = {}) {
+  for (const [value, label] of [[maxBytes, "trace byte bound"], [maxEvents, "trace event bound"]]) assertTraceSafeInteger(value, label, { nonnegative: true });
+  if (maxBytes < 1 || maxEvents < 2) fail("trace store bounds are too small");
+  if (typeof now !== "function" || typeof monotonicNow !== "function") fail("trace clocks must be functions");
+  const io = traceIo(ioOverrides);
+  await validateTraceLocation({ tracePath, repoRoot, fixtureRoot, target: "absent", io });
+  let handle;
+  try {
+    handle = await io.open(tracePath, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL | constants.O_NOFOLLOW, 0o600);
+    const opened = validateTraceStat(await handle.stat({ bigint: true }));
+    await assertTraceParents(tracePath, io);
+    if (await io.realpath(tracePath) !== tracePath) fail("created trace path is not canonical");
+    validateTraceStat(await io.lstat(tracePath), opened.binding);
+
+    let state = "open";
+    let count = 0;
+    let bytes = 0;
+    let previousHash = null;
+    let previousMonotonic = null;
+    let failure = null;
+    let tail = Promise.resolve();
+
+    async function poison(error) {
+      failure = error instanceof Error ? error : new Error(String(error));
+      state = "failed";
+      try { await handle.close(); } catch { /* The original store failure remains authoritative. */ }
+    }
+
+    async function operation(action) {
+      const result = tail.then(async () => {
+        if (state !== "open") throw failure ?? new Error("trace store is closed");
+        try { return await action(); }
+        catch (error) { await poison(error); throw error; }
+      });
+      tail = result.catch(() => {});
+      return result;
+    }
+
+    async function emit(event, payload, { terminal = false } = {}) {
+      validateTracePayload(event, payload, { terminal });
+      const nextCount = count + 1;
+      if (nextCount > maxEvents) fail("trace event bound exceeded");
+      const monotonic = traceMonotonicTime(monotonicNow, previousMonotonic);
+      const record = traceRecord({ seq: nextCount, wallTime: traceWallTime(now), monotonicNs: monotonic, event, payload, previousSha256: previousHash });
+      const line = traceLine(record);
+      if (bytes + line.length > maxBytes) fail("trace byte bound exceeded");
+      await writeTraceBuffer(handle, line);
+      count = nextCount;
+      bytes += line.length;
+      previousHash = record.record_sha256;
+      previousMonotonic = monotonic;
+      return record;
+    }
+
+    await emit("trace.opened", {});
+
+    function append(event, payload) {
+      return operation(async () => {
+        if (event === "trace.opened" || event === "trace.finalized") fail(`${event} is store-managed`);
+        if (count + 2 > maxEvents) fail("trace event bound leaves no room for finalization");
+        const record = await emit(event, payload);
+        return Object.freeze({ seq: record.seq, recordSha256: record.record_sha256 });
+      });
+    }
+
+    function sync() {
+      return operation(async () => {
+        if (typeof handle.datasync === "function") await handle.datasync();
+        else await handle.sync();
+        return Object.freeze({ recordCount: count, bytes, rootSha256: previousHash });
+      });
+    }
+
+    function finalize({ outcome, cause } = {}) {
+      return operation(async () => {
+        const finalCount = count + 1;
+        if (finalCount > maxEvents) fail("trace event bound exceeded");
+        const monotonic = traceMonotonicTime(monotonicNow, previousMonotonic);
+        const wallTime = traceWallTime(now);
+        const priorRootSha256 = previousHash;
+        let predictedBytes = bytes;
+        let finalRecord;
+        let finalLine;
+        for (let iteration = 0; iteration < 16; iteration += 1) {
+          const payload = { outcome, cause, priorRootSha256, recordCount: finalCount, totalBytes: predictedBytes };
+          validateTracePayload("trace.finalized", payload, { terminal: true });
+          finalRecord = traceRecord({ seq: finalCount, wallTime, monotonicNs: monotonic, event: "trace.finalized", payload, previousSha256: priorRootSha256 });
+          finalLine = traceLine(finalRecord);
+          const actualBytes = bytes + finalLine.length;
+          if (actualBytes === predictedBytes) break;
+          predictedBytes = actualBytes;
+        }
+        if (bytes + finalLine.length !== predictedBytes) fail("trace final byte prediction did not converge");
+        if (predictedBytes > maxBytes) fail("trace byte bound exceeded");
+        await writeTraceBuffer(handle, finalLine);
+        count = finalCount; bytes = predictedBytes; previousHash = finalRecord.record_sha256; previousMonotonic = monotonic;
+        if (typeof handle.datasync === "function") await handle.datasync();
+        else await handle.sync();
+        await handle.close();
+        state = "closed";
+        return verifySecureTraceStore({ tracePath, binding: opened.binding, repoRoot, fixtureRoot, maxBytes, maxEvents, io: ioOverrides });
+      });
+    }
+
+    return Object.freeze({ tracePath, binding: opened.binding, append, sync, finalize });
+  } catch (error) {
+    if (handle) { try { await handle.close(); } catch { /* Preserve the creation failure. */ } }
+    throw error;
+  }
 }
 
 function filesystemInline(entries) {
