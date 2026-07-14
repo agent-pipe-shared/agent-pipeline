@@ -690,6 +690,44 @@ await check("debug child observer accepts stdin only after callback and drain an
   });
 });
 
+await check("debug child observer rolls back final stdin close when EPIPE arrives during its trace append", () => withTraceCase(async ({ tracePath, options }) => {
+  let child; let injected = false;
+  const injectedOpen = async (...args) => {
+    const handle = await open(...args);
+    if (args.length < 3) return handle;
+    return {
+      stat: (...inner) => handle.stat(...inner),
+      write: async (buffer, ...inner) => {
+        if (!injected && buffer.includes(Buffer.from('"event":"stdin.closed"'))) {
+          injected = true;
+          await new Promise((resolve) => setImmediate(() => {
+            child.stdin.emit("error", Object.assign(new Error("final-append-private-error"), { code: "EPIPE" }));
+            resolve();
+          }));
+        }
+        return handle.write(buffer, ...inner);
+      },
+      datasync: () => handle.datasync(), sync: () => handle.sync(), close: () => handle.close(),
+    };
+  };
+  const store = await createSecureTraceStore({ ...options, io: { open: injectedOpen } }); await beginTraceStep(store, "critic");
+  child = observedChild();
+  child.stdin.write = (_chunk, callback) => { setImmediate(callback); return true; };
+  child.stdin.end = () => { setImmediate(() => child.stdin.emit("finish")); return child.stdin; };
+  const { observer } = await spawnDebugChildObserver({ traceStore: store, spawn: () => child, command: "/debug/codex", ...observerTimers() });
+  await assert.rejects(() => observer.writeAndEndStdin("final-append-private-payload"), /broken-pipe/u);
+  assert.equal(injected, true);
+  child.stdout.end(); child.stderr.end(); child.emit("exit", 1, null); child.emit("close", 1, null); await settleEvents();
+  await assert.rejects(() => observer.finishAndDrain(), /closed failure category/u);
+  await store.append("step.failed", { step: "critic" }); await store.append("run.failed", { cause: "coordinator-input" }); await store.finalize({ outcome: "failed", cause: "coordinator-input" });
+  const trace = await readFile(tracePath, "utf8");
+  assert.equal(trace.includes("final-append-private-error"), false);
+  assert.equal(trace.includes("final-append-private-payload"), false);
+  assert.equal(trace.includes('"event":"stdin.error"'), true);
+  assert.equal(trace.includes('"category":"broken-pipe"'), true);
+  assert.equal(trace.includes('"event":"stdin.closed"'), false);
+}));
+
 await check("debug child observer lease expiry records the signal pair, stops sampling and fails closed", () => withTraceCase(async ({ tracePath, options }) => {
   const store = await createSecureTraceStore(options); await beginTraceStep(store, "critic"); const timers = observerTimers(); const signals = [];
   const child = observedChild({ onKill: (signal) => { signals.push(signal); assert.equal(readFileSync(tracePath, "utf8").includes('"event":"child.signal-requested"'), true); return true; } });

@@ -62,6 +62,7 @@ const TRACE_PROCESS_STATES = new Set(["R", "S", "D", "Z", "T", "t", "X", "x", "K
 const TRACE_CAUSES = new Set(["coordinator-input", "child-process", "cli-before-turn", "response-stalled", "jsonl-lifecycle", "result-sink", "fixture-or-binding", "cleanup", "unbestimmt"]);
 const SECURE_TRACE_STORES = new WeakSet();
 const SECURE_TRACE_DIAGNOSTIC_APPENDERS = new WeakMap();
+const SECURE_TRACE_GUARDED_APPENDERS = new WeakMap();
 
 export const CODEX_CRITIC_TRACE_EVENTS = Object.freeze([
   "trace.opened",
@@ -753,10 +754,10 @@ function traceRecord(fields) {
 
 function traceLine(record) { return Buffer.from(`${JSON.stringify(record)}\n`, "utf8"); }
 
-async function writeTraceBuffer(handle, buffer) {
+async function writeTraceBuffer(handle, buffer, position) {
   let offset = 0;
   while (offset < buffer.length) {
-    const result = await handle.write(buffer, offset, buffer.length - offset, null);
+    const result = await handle.write(buffer, offset, buffer.length - offset, position + offset);
     if (!Number.isSafeInteger(result?.bytesWritten) || result.bytesWritten <= 0 || result.bytesWritten > buffer.length - offset) fail("trace write returned an invalid byte count");
     offset += result.bytesWritten;
   }
@@ -870,7 +871,7 @@ export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot,
     let bytes = 0;
     let previousHash = null;
     let previousMonotonic = null;
-    const replay = createTraceReplayState();
+    let replay = createTraceReplayState();
     let failure = null;
     let tail = Promise.resolve();
 
@@ -890,8 +891,28 @@ export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot,
       return result;
     }
 
-    async function emit(event, payload, { terminal = false } = {}) {
+    async function rollbackGuardedAppend(size) {
+      let rollbackHandle = handle;
+      let closeRollbackHandle = false;
+      if (typeof rollbackHandle.truncate !== "function") {
+        rollbackHandle = await io.open(tracePath, constants.O_WRONLY | constants.O_NOFOLLOW);
+        closeRollbackHandle = true;
+      }
+      try {
+        validateTraceStat(await rollbackHandle.stat({ bigint: true }), opened.binding);
+        await rollbackHandle.truncate(size);
+        if (typeof rollbackHandle.datasync === "function") await rollbackHandle.datasync();
+        else await rollbackHandle.sync();
+      } finally {
+        if (closeRollbackHandle) await rollbackHandle.close();
+      }
+      const restored = validateTraceStat(await handle.stat({ bigint: true }), opened.binding);
+      if (restored.size !== size) fail("trace guarded append rollback is inconsistent");
+    }
+
+    async function emit(event, payload, { terminal = false, guard = null, onCommit = null } = {}) {
       validateTracePayload(event, payload, { terminal, ...privacy });
+      const priorReplay = guard === null ? null : structuredClone(replay);
       applyTraceTransition(replay, event, payload);
       const nextCount = count + 1;
       if (nextCount > maxEvents) fail("trace event bound exceeded");
@@ -899,11 +920,18 @@ export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot,
       const record = traceRecord({ seq: nextCount, wallTime: traceWallTime(now), monotonicNs: monotonic, event, payload, previousSha256: previousHash });
       const line = traceLine(record);
       if (bytes + line.length > maxBytes) fail("trace byte bound exceeded");
-      await writeTraceBuffer(handle, line);
+      if (guard !== null && guard() !== true) { replay = priorReplay; return null; }
+      await writeTraceBuffer(handle, line, bytes);
+      if (guard !== null && guard() !== true) {
+        await rollbackGuardedAppend(bytes);
+        replay = priorReplay;
+        return null;
+      }
       count = nextCount;
       bytes += line.length;
       previousHash = record.record_sha256;
       previousMonotonic = monotonic;
+      onCommit?.();
       return record;
     }
 
@@ -924,6 +952,16 @@ export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot,
         if (count + 2 > maxEvents) fail("trace event bound leaves no room for finalization");
         const record = await emit("stream.diagnostic", payload);
         return Object.freeze({ seq: record.seq, recordSha256: record.record_sha256 });
+      });
+    }
+
+    function appendGuarded(event, payload, guard, onCommit) {
+      if (typeof guard !== "function" || typeof onCommit !== "function") return Promise.reject(new Error("trace guarded append requires callbacks"));
+      return operation(async () => {
+        if (event === "trace.opened" || event === "trace.finalized" || event === "stream.diagnostic") fail(`${event} cannot use guarded append`);
+        if (count + 2 > maxEvents) fail("trace event bound leaves no room for finalization");
+        const record = await emit(event, payload, { guard, onCommit });
+        return Object.freeze(record === null ? { committed: false } : { committed: true, seq: record.seq, recordSha256: record.record_sha256 });
       });
     }
 
@@ -957,7 +995,7 @@ export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot,
         if (bytes + finalLine.length !== predictedBytes) fail("trace final byte prediction did not converge");
         if (predictedBytes > maxBytes) fail("trace byte bound exceeded");
         applyTraceTransition(replay, "trace.finalized", finalRecord.payload);
-        await writeTraceBuffer(handle, finalLine);
+        await writeTraceBuffer(handle, finalLine, bytes);
         count = finalCount; bytes = predictedBytes; previousHash = finalRecord.record_sha256; previousMonotonic = monotonic;
         if (typeof handle.datasync === "function") await handle.datasync();
         else await handle.sync();
@@ -970,6 +1008,7 @@ export async function createSecureTraceStore({ tracePath, repoRoot, fixtureRoot,
     const store = Object.freeze({ tracePath, binding: opened.binding, append, sync, finalize });
     SECURE_TRACE_STORES.add(store);
     SECURE_TRACE_DIAGNOSTIC_APPENDERS.set(store, appendDiagnostic);
+    SECURE_TRACE_GUARDED_APPENDERS.set(store, appendGuarded);
     return store;
   } catch (error) {
     if (handle) { try { await handle.close(); } catch { /* Preserve the creation failure. */ } }
@@ -1308,9 +1347,12 @@ export function createDebugChildObserver({
         requireHealthyStdin();
         if (!stdinFinished) throw categoricalStdinError("premature-close");
         requireHealthyStdin();
-        await traceStore.append("stdin.closed", {});
-        stdinClosed = true;
-        stdinPhase = "closed";
+        const appendGuarded = SECURE_TRACE_GUARDED_APPENDERS.get(traceStore);
+        const closed = await appendGuarded("stdin.closed", {}, () => stdinFailureCategory === null, () => {
+          stdinClosed = true;
+          stdinPhase = "closed";
+        });
+        if (!closed.committed) requireHealthyStdin();
         return null;
       } catch (error) {
         const category = error?.debugCategory ?? stdinFailureCategory ?? "stdin-error";
