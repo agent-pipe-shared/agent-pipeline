@@ -178,6 +178,7 @@ function validTracePayloads() {
 async function appendSuccessfulPreflightChildren(store) {
   for (const [index, label] of ["profile-preflight-fixture-read", "profile-preflight-external-read-denied", "profile-preflight-write-denied"].entries()) {
     await store.append("child.spawn-requested", { label }); await store.append("child.spawned", { label, pid: 301 + index, pgid: 301 + index });
+    await store.append("lease.armed", { label, elapsedMs: 0, stdoutBytes: 0, stderrBytes: 0 });
     await store.append("child.exit", { label, code: index === 0 ? 0 : 2, signal: null }); await store.append("child.close", { label, code: index === 0 ? 0 : 2, signal: null });
   }
 }
@@ -387,6 +388,28 @@ await check("trace verifier replays lifecycle and rejects correctly hashed illeg
     await appendMinimalFailedTrace(store); await store.finalize({ outcome: "failed", cause: "unbestimmt" });
     await writeFile(tracePath, forgedTrace(specifications, "completed", "unbestimmt"), { mode: 0o600 });
     await assert.rejects(() => verifySecureTraceStore({ ...options, binding: store.binding }), /active run|step terminal|complete fixed/u);
+  });
+});
+
+await check("trace verifier requires one correctly labelled lease arm for every child in a complete success", async () => {
+  const complete = [["trace.opened", {}], ...validTracePayloads()];
+  const variants = [
+    complete.filter(([event]) => !event.startsWith("lease.")),
+    (() => {
+      const records = complete.map(([event, payload]) => [event, { ...payload }]);
+      const index = records.findIndex(([event]) => event === "lease.armed");
+      records.splice(index + 1, 0, [records[index][0], { ...records[index][1] }]);
+      return records;
+    })(),
+    complete.map(([event, payload]) => event === "lease.armed" && payload.label === "critic"
+      ? [event, { ...payload, label: "profile-preflight-fixture-read" }]
+      : [event, { ...payload }]),
+  ];
+  for (const specifications of variants) await withTraceCase(async ({ tracePath, options }) => {
+    const store = await createSecureTraceStore(options);
+    await appendMinimalFailedTrace(store); await store.finalize({ outcome: "failed", cause: "unbestimmt" });
+    await writeFile(tracePath, forgedTrace(specifications, "completed", "unbestimmt"), { mode: 0o600 });
+    await assert.rejects(() => verifySecureTraceStore({ ...options, binding: store.binding }), /lease|armed/u);
   });
 });
 
@@ -625,10 +648,45 @@ await check("debug child observer accepts stdin only after callback and drain an
     child.stdin.end = () => { setImmediate(() => child.stdin.emit("finish")); return child.stdin; };
     const { observer } = await spawnDebugChildObserver({ traceStore: store, spawn: () => child, command: "/debug/codex", ...timers });
     await observer.writeAndEndStdin("backpressure-private-payload");
+    await observer.armLease({ leaseMs: 1000 });
     assert.equal(callbackSawAccepted, false);
     assert.equal(readFileSync(tracePath, "utf8").includes('"event":"stdin.write-accepted"'), true);
     child.stdout.end(); child.stderr.end(); child.emit("exit", 0, null); child.emit("close", 0, null); await settleEvents();
     await observer.finishAndDrain(); await completeSuccessfulTraceFromCritic(store); await store.finalize({ outcome: "completed", cause: "unbestimmt" });
+  });
+  await withTraceCase(async ({ tracePath, options }) => {
+    let child;
+    const injectedOpen = async (...args) => {
+      const handle = await open(...args);
+      if (args.length < 3) return handle;
+      return {
+        stat: (...inner) => handle.stat(...inner),
+        write: async (buffer, ...inner) => {
+          if (buffer.includes(Buffer.from('"event":"stdin.write-accepted"'))) {
+            await new Promise((resolve) => setImmediate(() => {
+              child.stdin.emit("error", Object.assign(new Error("post-callback-private-error"), { code: "EPIPE" }));
+              resolve();
+            }));
+          }
+          return handle.write(buffer, ...inner);
+        },
+        datasync: () => handle.datasync(), sync: () => handle.sync(), close: () => handle.close(),
+      };
+    };
+    const store = await createSecureTraceStore({ ...options, io: { open: injectedOpen } }); await beginTraceStep(store, "critic");
+    child = observedChild();
+    child.stdin.write = (_chunk, callback) => { setImmediate(callback); return true; };
+    const { observer } = await spawnDebugChildObserver({ traceStore: store, spawn: () => child, command: "/debug/codex", ...observerTimers() });
+    await assert.rejects(() => observer.writeAndEndStdin("post-callback-private-payload"), /broken-pipe/u);
+    child.stdout.end(); child.stderr.end(); child.emit("exit", 1, null); child.emit("close", 1, null); await settleEvents();
+    await assert.rejects(() => observer.finishAndDrain(), /closed failure category/u);
+    await store.append("step.failed", { step: "critic" }); await store.append("run.failed", { cause: "coordinator-input" }); await store.finalize({ outcome: "failed", cause: "coordinator-input" });
+    const trace = await readFile(tracePath, "utf8");
+    assert.equal(trace.includes("post-callback-private-error"), false);
+    assert.equal(trace.includes("post-callback-private-payload"), false);
+    assert.equal(trace.includes('"event":"stdin.error"'), true);
+    assert.equal(trace.includes('"category":"broken-pipe"'), true);
+    assert.equal(trace.includes('"event":"stdin.closed"'), false);
   });
 });
 
@@ -653,7 +711,7 @@ await check("debug child observer records categorical proc unavailability withou
   const unavailable = Object.assign(new Error("proc-private-detail"), { code: "ENOENT" });
   const child = observedChild();
   const spawned = await spawnDebugChildObserver({ traceStore: store, spawn: () => child, command: "/debug/codex", procIo: { readFile: async () => { throw unavailable; }, readdir: async () => { throw unavailable; } }, ...timers }); const { observer } = spawned;
-  await observer.writeAndEndStdin(""); await observer.sampleProcess(); await settleEvents();
+  await observer.writeAndEndStdin(""); await observer.armLease({ leaseMs: 1000 }); await observer.sampleProcess(); await settleEvents();
   child.stdout.end(); child.stderr.end(); child.emit("exit", 0, null); child.emit("close", 0, null); await settleEvents();
   await observer.finishAndDrain(); await completeSuccessfulTraceFromCritic(store); await store.finalize({ outcome: "completed", cause: "unbestimmt" });
   const trace = await readFile(tracePath, "utf8"); assert.equal(trace.includes("proc-private-detail"), false);
