@@ -110,7 +110,7 @@ async function completeCodexBinaryInspection(input) {
 export function buildNativeProbeProgram() {
   return [
     'import { writeFile } from "node:fs/promises";',
-    'const [fixtureCanary, externalCanary] = process.argv.slice(2);',
+    'const [fixtureCanary, externalCanary] = process.argv.slice(-2);',
     'const normalize = (error) => ["EACCES", "EPERM", "EROFS"].includes(error?.code) ? "permission-denied" : "other-error";',
     'const attempt = async (category, target) => { try { await writeFile(target, "native-probe-write\\n", { flag: "w" }); return { category, outcome: "unexpected-success", errorCategory: null }; } catch (error) { return { category, outcome: "denied", errorCategory: normalize(error) }; } };',
     'const writes = await Promise.all([attempt("fixture-canary", fixtureCanary), attempt("external-canary", externalCanary)]);',
@@ -159,15 +159,15 @@ export async function runNativeSandboxProbe({ codexBinary, fixtureRoot, leaseMs 
   absolute(codexBinary, "codexBinary"); absolute(fixtureRoot, "fixtureRoot");
   if (!Number.isInteger(leaseMs) || leaseMs < 1_000 || leaseMs > 900_000) fail("leaseMs is out of range");
   const coordinator = await mkdtemp(path.join(os.tmpdir(), "agent-pipeline-native-probe-"));
-  const programPath = path.join(coordinator, "probe.mjs");
   const fixtureCanary = path.join(fixtureRoot, "native-probe-fixture-canary.txt");
   const externalCanary = path.join(coordinator, "native-probe-external-canary.txt");
   const program = buildNativeProbeProgram();
-  await writeFile(programPath, program, { mode: 0o600 });
   await writeFile(fixtureCanary, "fixture-canary-before\n", { mode: 0o600 });
   await writeFile(externalCanary, "external-canary-before\n", { mode: 0o600 });
   const before = await hashes(fixtureCanary, externalCanary);
-  const args = ["sandbox", "-P", CONTROL_POLICY.nativeProbeProfile, "--", process.execPath, programPath, fixtureCanary, externalCanary];
+  // Keep the coordinator source in argv rather than a coordinator-only file:
+  // :read-only may legitimately hide that temporary directory from the child.
+  const args = ["sandbox", "-P", CONTROL_POLICY.nativeProbeProfile, "--", process.execPath, "-e", program, fixtureCanary, externalCanary];
   const invocationSha256 = invocationHash(codexBinary, args);
   let child;
   try { child = spawn(codexBinary, args, { cwd: fixtureRoot, shell: false, windowsHide: true, stdio: ["ignore", "pipe", "pipe"] }); }
