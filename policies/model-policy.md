@@ -157,15 +157,12 @@ Terminology: Ultracode is not an API effort level but a runtime setting — it s
 - **Why:** "A single run can use meaningfully more tokens than working through the same task in conversation." The calibration run is deliberately a recommendation, not a requirement — it's skipped for known, proven workflow types.
 - **How to check:** for novel workflows expected to run >30 min, the telemetry line records whether a calibration run happened ("peculiarities").
 
-### MP-10 — HARD precondition for write-capable workflows
+### MP-10 — HARD precondition for write-capable workflow/runner dispatches
 
-- **Must (hard, blocking):** a workflow that changes files may ONLY start if all three preconditions are met:
-  1. **hook guardrails installed** — the git-guard union active as a PreToolUse hook;
-  2. **tight bash allowlist** — only the commands needed for the task allowed;
-  3. **worktree** — the run works in an isolated worktree, never on the main checkout.
+- **Must (hard, blocking):** before every workflow/runner invocation, the provider-neutral P5B runner receives a complete structured coordinator dispatch and executes the P5 preflight before its single injected synthetic-adapter call. `isolated-write` requires all three controls: (1) **hook guardrails installed** — the git-guard union active as a PreToolUse hook; (2) **task-tight allowlist** — only commands needed for that task; (3) **worktree** — a proven isolated worktree. `bounded-write` is allowed only after a visible PO decision and exclusively with complete positive, project-calibrated bounded-control evidence. `read-only` requires enforceable no-write capability. Every missing, ambiguous, or unsupported input rejects before adapter invocation.
 - **Why:** workflow subagents ALWAYS run in `acceptEdits` and inherit the session's tool allowlist — permission modes (`plan`, `ask`, project `defaultMode`) do NOT apply there. The only effective protection sits at the hook, allowlist, and isolation level.
 - **High-risk-project special rule:** for <PROJECT_B> (real devices, high stakes), write-capable workflows are permitted only with explicit PO approval until the guard migration is complete — in addition to the three preconditions. Whether each project's existing, possibly differing git-guard incarnations suffice as a transitional precondition until a shared union ships is governed by the project-specific calibration — ask the PO if in doubt.
-- **How to check:** the workflow start prompt names the three preconditions explicitly; the bootstrap check verifies hook installation; read-only workflows (research, audits without fixes) are exempt from MP-10.
+- **How to check:** the structured workflow start request proves mode, side effects, canonical paths, calibrated isolation, active guard, task-tight allowlist, exact verify, and escalation target; capability evidence is evaluable per claimed property. The preflight tests every rejection before adapter invocation. This rule covers only workflow/runner dispatches, not ordinary local or serial writers; those remain worktree-optional.
 
 ### MP-11 — Parallelism limit: 3–5 agents by default
 
@@ -469,15 +466,12 @@ Begriffsklärung: Ultracode ist kein API-Effort-Level, sondern ein Runtime-Setti
 - **Warum:** „A single run can use meaningfully more tokens than working through the same task in conversation." Der Kalibrierlauf ist bewusst eine Empfehlung, keine Pflicht — bei bekannten, erprobten Workflow-Typen entfällt er.
 - **Prüfweise:** Bei neuartigen Workflows > erwartete 30 Min Laufzeit dokumentiert die Telemetrie-Zeile, ob kalibriert wurde („Besonderheiten").
 
-### MP-10 — HARTE Vorbedingung für schreibende Workflows
+### MP-10 — HARTE Vorbedingung für schreibende Workflow-/Runner-Dispatches
 
-- **Gebot (hart, blockierend):** Ein Workflow, der Dateien ändert, darf NUR starten, wenn alle drei Vorbedingungen erfüllt sind:
-  1. **Hook-Guardrails installiert** — die git-guard-Union als PreToolUse-Hook aktiv;
-  2. **enge Bash-Allowlist** — nur die für den Task nötigen Kommandos freigegeben;
-  3. **Worktree** — der Run arbeitet in einem isolierten Worktree, nie auf dem Haupt-Checkout.
+- **Gebot (hart, blockierend):** Vor jeder Workflow-/Runner-Invocation erhält der providerneutrale P5B-Runner einen vollständigen strukturierten Coordinator-Dispatch und führt den P5-Preflight vor seinem einzigen injizierten synthetischen Adapter-Aufruf aus. `isolated-write` verlangt alle drei Vorbedingungen: (1) **Hook-Guardrails installiert** — die git-guard-Union als PreToolUse-Hook aktiv; (2) **enge Task-Allowlist** — nur die für den Task nötigen Kommandos; (3) **Worktree** — ein nachgewiesen isolierter Worktree. `bounded-write` ist nur nach sichtbarer PO-Entscheidung und ausschließlich bei vollständig positiv belegten, projektkalibrierten begrenzenden Kontrollen zulässig. `read-only` braucht eine durchsetzbare No-Write-Fähigkeit. Jede fehlende, unklare oder nicht unterstützte Eingabe wird vor der Adapter-Invocation abgewiesen.
 - **Warum:** Workflow-Subagents laufen **immer in `acceptEdits`** und erben die Tool-Allowlist der Session — Permission-Modi (`plan`, `ask`, Projekt-`defaultMode`) greifen dort NICHT. Der einzige wirksame Schutz liegt auf Hook-, Allowlist- und Isolations-Ebene.
 - **Hochrisiko-Projekt-Sonderregel:** Bei <PROJECT_B> (reale Geräte, hohe Stakes) sind schreibende Workflows bis zum Abschluss der Guard-Migration nur mit expliziter PO-Freigabe zulässig — zusätzlich zu den drei Vorbedingungen. Ob die je Projekt bestehenden, ggf. abweichenden git-guard-Inkarnationen als Übergangs-Voraussetzung genügen, bis eine gemeinsame Union ausgeliefert ist, regelt die projektspezifische Kalibrierung — im Zweifel den PO fragen.
-- **Prüfweise:** Workflow-Startprompt benennt die drei Vorbedingungen explizit; Bootstrap-Check verifiziert Hook-Installation; lesende Workflows (Recherche, Audit ohne Fixes) sind von MP-10 ausgenommen.
+- **Prüfweise:** Der strukturierte Workflow-Startauftrag belegt Modus, Side Effects, kanonische Pfade, kalibrierte Isolation, aktiven Guard, enge Task-Allowlist, exakten Verify und Eskalationsziel; Capability-Evidence ist pro beanspruchter Eigenschaft auswertbar. Der Preflight testet jeden Reject vor Adapter-Invocation. Diese Regel betrifft nur Workflow-/Runner-Dispatches, nicht ordentliche lokale oder serielle Writer; diese bleiben worktree-optional.
 
 ### MP-11 — Parallel-Limit: 3–5 Agents als Default
 
