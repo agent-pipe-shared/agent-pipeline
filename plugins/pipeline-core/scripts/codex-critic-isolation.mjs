@@ -152,6 +152,20 @@ function appendBounded(target, chunk, maxBytes) {
   target.parts.push(slice);
 }
 
+export function localFailureDiagnostic(stdout, stderr) {
+  const text = (value) => Buffer.concat(value.parts).toString("utf8");
+  const tail = (value) => text(value).slice(-2_000);
+  return Object.freeze({
+    stdoutBytes: stdout.bytes,
+    stderrBytes: stderr.bytes,
+    stdoutSha256: sha256(text(stdout)),
+    stderrSha256: sha256(text(stderr)),
+    // Local terminal aid only: callers must never place these tails in a receipt/envelope.
+    stdoutTail: tail(stdout),
+    stderrTail: tail(stderr),
+  });
+}
+
 function groupAlive(pid, kill = process.kill) {
   if (!Number.isInteger(pid) || pid <= 0 || process.platform === "win32") return false;
   try { kill(-pid, 0); return true; } catch { return false; }
@@ -185,10 +199,11 @@ function observableAttempts(logText, nonce, externalCanaryPath) {
   };
 }
 
-export async function runCodexCritic({ fixture, schemaPath = DEFAULT_SCHEMA, leaseMs = CODEX_CRITIC_POLICY.leaseMs, spawn = nodeSpawn, now = () => Date.now(), env = process.env } = {}) {
+export async function runCodexCritic({ fixture, schemaPath = DEFAULT_SCHEMA, leaseMs = CODEX_CRITIC_POLICY.leaseMs, heartbeatMs = 5_000, onHeartbeat = () => {}, spawn = nodeSpawn, now = () => Date.now(), env = process.env } = {}) {
   if (!fixture?.root || !fixture?.manifest?.nonce) fail("verified fixture is required");
   assertAbsolute(schemaPath, "schemaPath");
   if (!Number.isInteger(leaseMs) || leaseMs < 1_000 || leaseMs > 900_000) fail("leaseMs must be an integer between 1000 and 900000");
+  if (!Number.isInteger(heartbeatMs) || heartbeatMs < 250 || heartbeatMs > leaseMs) fail("heartbeatMs must be an integer between 250 and leaseMs");
   const coordinatorRoot = await mkdtemp(path.join(os.tmpdir(), "agent-pipeline-codex-coordinator-"));
   const resultPath = path.join(coordinatorRoot, `${fixture.manifest.nonce}.result.json`);
   const externalCanaryPath = path.join(coordinatorRoot, `${fixture.manifest.nonce}.external-canary.txt`);
@@ -210,6 +225,10 @@ export async function runCodexCritic({ fixture, schemaPath = DEFAULT_SCHEMA, lea
   child.stderr?.on("data", (chunk) => appendBounded(stderr, chunk, MAX_LOG_BYTES));
   child.stdin?.on("error", () => {});
   child.stdin?.end(`${criticPrompt({ nonce: fixture.manifest.nonce, externalCanaryPath })}\n`, "utf8");
+  const startedAt = now();
+  const heartbeat = setInterval(() => {
+    try { onHeartbeat(Object.freeze({ elapsedMs: Math.max(0, now() - startedAt), stdoutBytes: stdout.bytes, stderrBytes: stderr.bytes })); } catch {}
+  }, heartbeatMs);
   await new Promise((resolve) => {
     const timer = setTimeout(async () => {
       timedOut = true;
@@ -222,6 +241,7 @@ export async function runCodexCritic({ fixture, schemaPath = DEFAULT_SCHEMA, lea
     child.once("error", (error) => { terminal = { code: null, signal: null, error: error.message }; clearTimeout(timer); resolve(); });
     child.once("exit", (code, signal) => { terminal = { code, signal, error: null }; clearTimeout(timer); resolve(); });
   });
+  clearInterval(heartbeat);
   const ownedProcessTreeGone = await ensureOwnedProcessTreeGone(child.pid);
   const resultBytes = await readFile(resultPath).catch(() => null);
   const after = { fixture: await directoryHash(fixture.root), external: sha256(await readFile(externalCanaryPath)) };
@@ -256,7 +276,7 @@ export async function runCodexCritic({ fixture, schemaPath = DEFAULT_SCHEMA, lea
   const ok = terminal?.code === 0 && !timedOut && ownedProcessTreeGone && verdictError === null
     && envelope.canaries.fixtureUnchanged && envelope.canaries.externalUnchanged
     && attempts.fileTool && attempts.shell;
-  return Object.freeze({ ok, envelope, invocation, reason: ok ? null : "isolation acceptance evidence is incomplete or failed" });
+  return Object.freeze({ ok, envelope, invocation, diagnostics: localFailureDiagnostic(stdout, stderr), reason: ok ? null : "isolation acceptance evidence is incomplete or failed" });
 }
 
 export async function verifyFixtureTree(root) {

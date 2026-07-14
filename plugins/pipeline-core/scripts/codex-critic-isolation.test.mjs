@@ -15,6 +15,7 @@ import {
   criticPrompt,
   runCodexCritic,
   sanitizeEnvironment,
+  localFailureDiagnostic,
 } from "./codex-critic-isolation.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -60,6 +61,14 @@ await check("policy fixes Sol/max and a read-only ephemeral no-approval invocati
 
 await check("environment is an explicit allowlist and removes credential/provider variables", () => {
   assert.deepEqual(sanitizeEnvironment({ PATH: "/bin", HOME: "/home/test", LANG: "C", CI: "true", GH_TOKEN: "x", HTTPS_PROXY: "x", CUSTOM: "x" }), { PATH: "/bin", HOME: "/home/test", LANG: "C" });
+});
+
+await check("local failure diagnostics are bounded and separate from the receipt envelope", () => {
+  const stdout = { bytes: 3, parts: [Buffer.from("abc")] };
+  const stderr = { bytes: 5, parts: [Buffer.from("error")] };
+  const diagnostic = localFailureDiagnostic(stdout, stderr);
+  assert.equal(diagnostic.stdoutTail, "abc"); assert.equal(diagnostic.stderrTail, "error");
+  assert.match(diagnostic.stderrSha256, /^[0-9a-f]{64}$/u);
 });
 
 await check("constructor rejects a fallback effort and non-absolute output sinks", () => {

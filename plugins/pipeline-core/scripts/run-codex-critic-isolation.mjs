@@ -30,7 +30,17 @@ export function parseArgs(argv) {
 export async function run({ commit, repoRoot = root } = {}) {
   const fixture = await buildExactFixture({ repoRoot, candidateCommit: commit, artifactPaths: DEFAULT_ARTIFACTS });
   try {
-    const result = await runCodexCritic({ fixture });
+    const result = await runCodexCritic({
+      fixture,
+      onHeartbeat({ elapsedMs, stdoutBytes, stderrBytes }) {
+        process.stderr.write(`codex-critic-isolation: running ${Math.floor(elapsedMs / 1000)}s stdout=${stdoutBytes} stderr=${stderrBytes}\n`);
+      },
+    });
+    if (!result.ok) {
+      const diagnostic = result.diagnostics;
+      process.stderr.write(`codex-critic-isolation: local diagnostics stdout=${diagnostic.stdoutBytes}/${diagnostic.stdoutSha256} stderr=${diagnostic.stderrBytes}/${diagnostic.stderrSha256}\n`);
+      if (diagnostic.stderrTail) process.stderr.write(`codex-critic-isolation: local stderr tail (do not paste into receipt):\n${diagnostic.stderrTail}\n`);
+    }
     return Object.freeze({ ok: result.ok, envelope: result.envelope, reason: result.reason });
   } finally {
     await rm(fixture.root, { recursive: true, force: true });
