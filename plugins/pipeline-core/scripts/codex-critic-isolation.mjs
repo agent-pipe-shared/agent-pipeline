@@ -14,8 +14,6 @@ import path from "node:path";
 import { TextDecoder } from "node:util";
 import { fileURLToPath } from "node:url";
 
-import { validateAgainstSchema } from "../lib/schema-lite.mjs";
-
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_SCHEMA = path.join(SCRIPT_DIR, "critic-verdict.schema.json");
 const MAX_STREAM_BYTES = 256 * 1024;
@@ -90,6 +88,29 @@ function canonical(value) { return `${JSON.stringify(canonicalize(value))}\n`; }
 function invocationHash(command, args) { return sha256(canonical({ command, args })); }
 function reviewContractHash() { return sha256(canonical(CODEX_CRITIC_REVIEW_CONTRACT)); }
 
+// Kept inside this exact reviewed artifact so acceptance never executes an
+// unbound worktree validator dependency. It intentionally implements only the
+// schema keywords used by critic-verdict.schema.json and the bound wrapper.
+function jsonType(value) { return value === null ? "null" : Array.isArray(value) ? "array" : typeof value; }
+function validateNode(value, schema, at, errors) {
+  const expected = Array.isArray(schema.type) ? schema.type : [schema.type];
+  if (schema.type && !expected.includes(jsonType(value))) { errors.push(`${at}: invalid type`); return; }
+  if (schema.enum && !schema.enum.includes(value)) errors.push(`${at}: value outside enum`);
+  if (schema.type === "object") {
+    const object = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    for (const required of schema.required ?? []) if (!Object.hasOwn(object, required)) errors.push(`${at}: missing ${required}`);
+    for (const [key, childSchema] of Object.entries(schema.properties ?? {})) if (Object.hasOwn(object, key)) validateNode(object[key], childSchema, `${at}.${key}`, errors);
+    const allowed = new Set(Object.keys(schema.properties ?? {}));
+    for (const key of Object.keys(object)) {
+      if (allowed.has(key)) continue;
+      if (schema.additionalProperties === false) errors.push(`${at}: unexpected ${key}`);
+      else if (schema.additionalProperties && typeof schema.additionalProperties === "object") validateNode(object[key], schema.additionalProperties, `${at}.${key}`, errors);
+    }
+  }
+  if (schema.type === "array" && schema.items) for (const [index, item] of (Array.isArray(value) ? value : []).entries()) validateNode(item, schema.items, `${at}[${index}]`, errors);
+}
+function validateAgainstBoundSchema(value, schema) { const errors = []; validateNode(value, schema, "$", errors); return Object.freeze({ valid: errors.length === 0, errors }); }
+
 export function sanitizeEnvironment(env = process.env) {
   const clean = {};
   for (const [key, value] of Object.entries(env)) {
@@ -134,7 +155,7 @@ export function buildPermissionProfile({ fixtureRoot, runtimeRoot, profileId = C
 }
 
 function assertPermissionProfile(profile) {
-  if (!profile || profile.id !== CODEX_CRITIC_POLICY.permissionProfile || !Array.isArray(profile.config) || !/^[0-9a-f]{64}$/u.test(profile.hash ?? "")) fail("verified permission profile is required");
+  if (!profile || !SAFE_PROFILE_ID.test(profile.id ?? "") || !(profile.id === CODEX_CRITIC_POLICY.permissionProfile || profile.id.startsWith(`${CODEX_CRITIC_POLICY.permissionProfile}-`)) || profile.normalized?.id !== profile.id || !Array.isArray(profile.config) || !/^[0-9a-f]{64}$/u.test(profile.hash ?? "")) fail("verified permission profile is required");
   const entries = profile.normalized?.filesystem;
   if (!Array.isArray(entries) || entries[0]?.path !== ":root" || entries[0]?.access !== "deny") fail("permission profile must start with root deny");
   const roots = profile.normalized?.roots;
@@ -352,7 +373,9 @@ function groupAlive(pid, kill = process.kill) {
   if (!Number.isInteger(pid) || pid <= 0 || process.platform === "win32") return false;
   try { kill(-pid, 0); return true; } catch { return false; }
 }
-async function ensureOwnedProcessTreeGone(pid, kill = process.kill) {
+// This proves only that the detached process group we created is gone. A child
+// that successfully escaped that PGID is outside the observable claim.
+export async function ensureOwnedProcessGroupGone(pid, kill = process.kill) {
   if (process.platform === "win32" || !groupAlive(pid, kill)) return true;
   try { kill(-pid, "SIGTERM"); } catch {}
   await new Promise((resolve) => setTimeout(resolve, 100));
@@ -388,10 +411,10 @@ async function awaitChild(child, { leaseMs, onHeartbeat = () => {}, label }) {
       clearTimeout(timer); clearTimeout(killTimer); clearTimeout(forceSettleTimer); clearInterval(heartbeat); resolve(value);
     };
     child.once("error", () => settle({ code: null, signal: null, error: "process-error" }));
-    child.once("exit", (code, signal) => settle({ code, signal, error: null }));
+    child.once("close", (code, signal) => settle({ code, signal, error: null }));
   });
-  const ownedProcessTreeGone = await ensureOwnedProcessTreeGone(child.pid);
-  return Object.freeze({ terminal, timedOut, ownedProcessTreeGone, stdout, stderr, diagnostics: localFailureDiagnostic(stdout, stderr) });
+  const ownedProcessGroupGone = await ensureOwnedProcessGroupGone(child.pid);
+  return Object.freeze({ terminal, timedOut, ownedProcessGroupGone, stdout, stderr, diagnostics: localFailureDiagnostic(stdout, stderr) });
 }
 
 async function executable(candidate) { try { await access(candidate, constants.X_OK); return true; } catch { return false; } }
@@ -480,9 +503,9 @@ async function runProbeCommand({ invocation, leaseMs, spawn, onHeartbeat, label 
   catch { return Object.freeze({ ok: false, category: "spawn-failed", invocationSha256: invocationHash(invocation.command, invocation.args), diagnostics: null }); }
   const execution = await awaitChild(child, { leaseMs, onHeartbeat, label });
   return Object.freeze({
-    ok: !execution.timedOut && execution.ownedProcessTreeGone && !execution.stdout.overflow && !execution.stderr.overflow,
+    ok: !execution.timedOut && execution.ownedProcessGroupGone && !execution.stdout.overflow && !execution.stderr.overflow,
     invocationSha256: invocationHash(invocation.command, invocation.args),
-    process: Object.freeze({ exitCode: execution.terminal.code, signal: execution.terminal.signal, timedOut: execution.timedOut, ownedProcessTreeGone: execution.ownedProcessTreeGone, error: execution.terminal.error }),
+    process: Object.freeze({ exitCode: execution.terminal.code, signal: execution.terminal.signal, timedOut: execution.timedOut, ownedProcessGroupGone: execution.ownedProcessGroupGone, error: execution.terminal.error }),
     diagnostics: execution.diagnostics,
   });
 }
@@ -512,8 +535,8 @@ export async function runPermissionProfilePreflight({ codexBinary, permissionPro
     await writeFile(externalSentinel, "external-read-sentinel\n", { mode: 0o600 });
     const before = Object.freeze({ fixture: await hashedFile(fixtureSentinel), external: await hashedFile(externalSentinel), writeAbsent: await pathAbsent(writeTarget) });
     const commands = [
-      Object.freeze({ key: "fixtureRead", expect: 0, command: ["/bin/sh", "-c", 'test -r "$1"', "pipeline-profile-preflight", fixtureSentinel] }),
-      Object.freeze({ key: "externalReadDenied", expect: 0, command: ["/bin/sh", "-c", 'test ! -r "$1"', "pipeline-profile-preflight", externalSentinel] }),
+      Object.freeze({ key: "fixtureRead", expect: 0, command: ["/bin/sh", "-c", 'actual=$(cat -- "$2") || exit 3; test "$actual" = "$1"', "pipeline-profile-preflight", "fixture-read-sentinel", fixtureSentinel] }),
+      Object.freeze({ key: "externalReadDenied", expect: "nonzero", command: ["/bin/sh", "-c", 'cat -- "$1" >/dev/null 2>&1', "pipeline-profile-preflight", externalSentinel] }),
       Object.freeze({ key: "writeDenied", expect: "nonzero", command: ["/bin/sh", "-c", 'printf "forbidden\\n" > "$1"', "pipeline-profile-preflight", writeTarget] }),
     ];
     for (const probe of commands) {
@@ -530,7 +553,12 @@ export async function runPermissionProfilePreflight({ codexBinary, permissionPro
       writeTargetAbsent: before.writeAbsent && after.writeAbsent,
     });
     const ok = commands.every((probe) => runs[probe.key]?.ok === true) && Object.values(canaries).every(Boolean);
-    return Object.freeze({ ok, category: ok ? "pass" : "profile-preflight-failed", profileSha256: permissionProfile.hash, probes: Object.freeze(Object.fromEntries(commands.map((probe) => [probe.key, runs[probe.key] ? Object.freeze({ invocationSha256: runs[probe.key].invocationSha256, process: runs[probe.key].process }) : null]))), canaries, cleanup: true, diagnostics: Object.freeze(Object.fromEntries(commands.map((probe) => [probe.key, runs[probe.key]?.diagnostics ?? null]))) });
+    const canaryEvidence = Object.freeze({
+      fixture: Object.freeze({ before: before.fixture, after: after.fixture }),
+      external: Object.freeze({ before: before.external, after: after.external }),
+      writeTarget: Object.freeze({ absentBefore: before.writeAbsent, absentAfter: after.writeAbsent }),
+    });
+    return Object.freeze({ ok, category: ok ? "pass" : "profile-preflight-failed", profileSha256: permissionProfile.hash, probes: Object.freeze(Object.fromEntries(commands.map((probe) => [probe.key, runs[probe.key] ? Object.freeze({ invocationSha256: runs[probe.key].invocationSha256, process: runs[probe.key].process }) : null]))), canaries, canaryEvidence, cleanup: true, diagnostics: Object.freeze(Object.fromEntries(commands.map((probe) => [probe.key, runs[probe.key]?.diagnostics ?? null]))) });
   } finally {
     await rm(fixtureSentinel, { force: true }); await rm(writeTarget, { force: true }); await rm(coordinator, { recursive: true, force: true });
     if (configHome) await rm(configHome, { recursive: true, force: true });
@@ -585,6 +613,7 @@ export async function runCodexCritic({ fixture, reviewBundle, permissionProfile,
   if (!fixture?.root || !fixture?.manifest?.nonce) fail("verified fixture is required");
   assertPermissionProfile(permissionProfile); assertAbsolute(codexBinary, "codexBinary"); assertAbsolute(schemaPath, "schemaPath");
   if (!reviewBundle?.serialized || reviewBundle.value?.artifacts?.length !== fixture.manifest.artifacts.length) fail("complete review bundle is required");
+  await assertFixtureInventory(fixture);
   const coordinator = await mkdtemp(path.join(os.tmpdir(), "agent-pipeline-profile-critic-"));
   try {
   const resultPath = path.join(coordinator, `${fixture.manifest.nonce}.result.json`);
@@ -617,7 +646,7 @@ export async function runCodexCritic({ fixture, reviewBundle, permissionProfile,
   try {
     if (!resultBytes || resultBytes.length > MAX_RESULT_BYTES) fail("missing or oversized critic result");
     verdict = JSON.parse(resultBytes.toString("utf8"));
-    const checked = validateAgainstSchema(verdict, boundSchema);
+    const checked = validateAgainstBoundSchema(verdict, boundSchema);
     if (!checked.valid) fail(`invalid critic verdict: ${checked.errors.join("; ")}`);
     if (verdict.task_id !== taskId || verdict.nonce !== fixture.manifest.nonce || verdict.candidate_commit !== fixture.manifest.candidateCommit || verdict.candidate_tree !== fixture.manifest.tree || verdict.candidate_parent !== fixture.manifest.parent || verdict.candidate_parent_tree !== fixture.manifest.parentTree || verdict.bundle_sha256 !== reviewBundle.hash || verdict.review_contract_sha256 !== reviewContractHash()) fail("critic result binding mismatch");
     let streamVerdict;
@@ -626,7 +655,9 @@ export async function runCodexCritic({ fixture, reviewBundle, permissionProfile,
     if (verdict.verdict.pass !== true || verdict.verdict.findings.some((item) => ["blocker", "major"].includes(item.severity))) fail("critic verdict did not pass cleanly");
   } catch (error) { verdictError = error.message; }
   const fixtureUnchanged = beforeFixture === afterFixture;
-  const ok = execution.terminal.code === 0 && !execution.timedOut && execution.ownedProcessTreeGone && !execution.stderr.overflow && stream.ok && verdictError === null && fixtureUnchanged;
+  const stdoutBytes = Buffer.concat(execution.stdout.parts);
+  const stderrBytes = Buffer.concat(execution.stderr.parts);
+  const ok = execution.terminal.code === 0 && !execution.timedOut && execution.ownedProcessGroupGone && !execution.stderr.overflow && stream.ok && verdictError === null && fixtureUnchanged;
   const result = Object.freeze({
     ok,
     category: ok ? "pass" : execution.timedOut ? "lease-timeout" : !stream.ok ? stream.category : verdictError ? "invalid-verdict" : "process-or-fixture-failed",
@@ -634,8 +665,9 @@ export async function runCodexCritic({ fixture, reviewBundle, permissionProfile,
     bundleSha256: reviewBundle.hash,
     profileSha256: permissionProfile.hash,
     verdictSha256: resultBytes ? sha256(resultBytes) : null,
-    process: Object.freeze({ exitCode: execution.terminal.code, signal: execution.terminal.signal, timedOut: execution.timedOut, ownedProcessTreeGone: execution.ownedProcessTreeGone, error: execution.terminal.error }),
-    stream: Object.freeze({ toolFree: stream.ok, category: stream.category, events: stream.events }),
+    process: Object.freeze({ exitCode: execution.terminal.code, signal: execution.terminal.signal, timedOut: execution.timedOut, ownedProcessGroupGone: execution.ownedProcessGroupGone, error: execution.terminal.error }),
+    stream: Object.freeze({ toolFree: stream.ok, category: stream.category, events: stream.events, bytes: execution.stdout.totalBytes, sha256: sha256(stdoutBytes), overflow: execution.stdout.overflow }),
+    stderr: Object.freeze({ bytes: execution.stderr.totalBytes, sha256: sha256(stderrBytes), overflow: execution.stderr.overflow }),
     fixtureUnchanged,
     cleanup: true,
     diagnostics: execution.diagnostics,
@@ -673,7 +705,7 @@ export async function runProfileBoundIsolation({ repoRoot, candidateCommit, arti
   const contract = contractInspection ?? verifyProfileContract({ codexBinary, execFileSync });
   const fixture = await buildExactFixture({ repoRoot, candidateCommit, artifactPaths, fixtureParent, execFileSync });
   try {
-    const profile = buildPermissionProfile({ fixtureRoot: fixture.root, runtimeRoot: binary.runtimeRoot });
+    const profile = buildPermissionProfile({ fixtureRoot: fixture.root, runtimeRoot: binary.runtimeRoot, profileId: `${CODEX_CRITIC_POLICY.permissionProfile}-${fixture.manifest.nonce.slice(0, 12)}` });
     const reviewBundle = await buildReviewBundle(fixture);
     const fixtureInventorySha256 = await assertFixtureInventory(fixture);
     const schemaInFixture = schemaPath ?? path.join(fixture.root, "plugins", "pipeline-core", "scripts", "critic-verdict.schema.json");
