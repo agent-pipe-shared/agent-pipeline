@@ -3,7 +3,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { checkErrorRegister } from "./check-error-register.mjs";
+import { checkDeclaredBriefingConsumers, checkErrorRegister } from "./check-error-register.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const header = "# Error Register — curated triage authority\n\n| Class | Category | Triage |\n| --- | --- | --- |\n";
@@ -17,6 +17,13 @@ check("Operating Model and close-block point to the sole public form authority",
   assert.match(operatingModel, /alleinige öffentliche konkrete Formautorität/);
   assert.match(closeBlock, /sole public concrete form authority/);
   assert.match(closeBlock, /Never inject, cite, or load/);
+});
+check("declared Goldfish/Critic consumer boundary is clean", () => {
+  assert.equal(checkDeclaredBriefingConsumers((path) => readFileSync(join(root, path), "utf8")).ok, true);
+});
+check("declared consumer injection rejects without broader interception", () => {
+  const result = checkDeclaredBriefingConsumers((path) => path === "roles/goldfish.md" ? "load backlog/error-register.md as briefing context" : "clean");
+  assert.equal(result.ok, false);
 });
 for (const triage of [
   "new",
@@ -33,6 +40,11 @@ for (const [name, text, options = {}] of [
   ["invalid category", `${header}| Generic contract gap | incident | new |\n`],
   ["count signal", `${header}| Generic contract gap | process | count: 2 |\n`],
   ["ranking signal", `${header}| Generic contract gap | process | recurring -> mechanism: priority 1 |\n`],
+  ["raw chronology date", `${header}| Generic contract gap 2026-07-14 | process | new |\n`],
+  ["raw incident vocabulary", `${header}| Incident timeline | process | new |\n`],
+  ["host coordinate", `${header}| host: synthetic-machine | process | new |\n`],
+  ["account coordinate", `${header}| account: synthetic-user | process | new |\n`],
+  ["repository coordinate", `${header}| repository: synthetic/project | process | new |\n`],
   ["bare recurring", `${header}| Generic contract gap | process | recurring |\n`],
   ["unconsolidated duplicate", `${header}| Generic contract gap | process | new |\n| generic-contract-gap | process | new |\n`],
   ["over cap", `${header}${Array.from({ length: 31 }, (_, i) => `| Generic class ${i} | process | new |`).join("\n")}\n`],
