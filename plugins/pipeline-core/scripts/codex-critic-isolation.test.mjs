@@ -17,6 +17,7 @@ import {
   buildProfileBoundCodexCriticInvocation,
   buildReviewBundle,
   criticPrompt,
+  ensureOwnedProcessGroupGone,
   inspectCodexBinary,
   inspectToolFreeJsonl,
   localFailureDiagnostic,
@@ -54,6 +55,8 @@ await check("profile is root-deny, read-scoped, network-off and contains no writ
 
 await check("profile rejects roots, overlapping runtime and invalid identifiers", () => {
   assert.throws(() => buildPermissionProfile({ fixtureRoot: "/", runtimeRoot: "/opt/runtime" }));
+  assert.throws(() => buildPermissionProfile({ fixtureRoot: "/tmp", runtimeRoot: "/opt/codex/releases/0.144.4-test" }));
+  assert.throws(() => buildPermissionProfile({ fixtureRoot: "/tmp/a", runtimeRoot: "/usr" }));
   assert.throws(() => buildPermissionProfile({ fixtureRoot: "/tmp/same", runtimeRoot: "/tmp/same" }));
   assert.throws(() => buildPermissionProfile({ fixtureRoot: "/tmp/a", runtimeRoot: "/tmp/a/runtime" }));
   assert.throws(() => buildPermissionProfile({ fixtureRoot: os.homedir(), runtimeRoot: "/opt/codex/releases/0.144.4-test" }));
@@ -133,7 +136,7 @@ await check("fixture rejects traversal and duplicate artifact inputs before acce
 
 function childProcess(exitCode, afterSpawn = async () => {}) {
   const child = new EventEmitter(); child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.pid = null; child.kill = () => true;
-  queueMicrotask(async () => { await afterSpawn(child); child.stdout.end(); child.stderr.end(); child.emit("exit", exitCode, null); });
+  queueMicrotask(async () => { await afterSpawn(child); child.stdout.end(); child.stderr.end(); child.emit("close", exitCode, null); });
   return child;
 }
 
@@ -147,7 +150,7 @@ await check("direct profile preflight accepts read-allow/read-deny/write-deny an
       assert.equal(options.env.CODEX_HOME.startsWith(os.tmpdir()), true);
       assert.ok(args.includes("-P")); assert.equal(args.includes("--sandbox"), false);
       const script = args[args.indexOf("--") + 3];
-      return childProcess(script.includes("printf") ? 2 : 0);
+      return childProcess(script.includes("printf") || args.at(-1).includes("external-read-sentinel") ? 2 : 0);
     } });
     assert.equal(result.ok, true); assert.deepEqual(result.canaries, { fixtureUnchanged: true, externalUnchanged: true, writeTargetAbsent: true });
     assert.equal(JSON.stringify(result).includes(external), false);
@@ -157,7 +160,7 @@ await check("direct profile preflight accepts read-allow/read-deny/write-deny an
 await check("preflight fails closed on a successful forbidden write outcome", async () => {
   const fixture = await mkdtemp(path.join(os.tmpdir(), "profile-preflight-red-")); const runtime = await mkdtemp(path.join(os.tmpdir(), "profile-runtime-red-")); const external = await mkdtemp(path.join(os.tmpdir(), "profile-external-red-"));
   try {
-    const result = await runPermissionProfilePreflight({ codexBinary: "/tmp/codex", permissionProfile: buildPermissionProfile({ fixtureRoot: fixture, runtimeRoot: runtime }), fixtureRoot: fixture, externalParent: external, env: { PATH: "/bin" }, spawn: () => childProcess(0) });
+    const result = await runPermissionProfilePreflight({ codexBinary: "/tmp/codex", permissionProfile: buildPermissionProfile({ fixtureRoot: fixture, runtimeRoot: runtime }), fixtureRoot: fixture, externalParent: external, env: { PATH: "/bin" }, spawn: (_command, args) => childProcess(args.at(-1).includes("external-read-sentinel") ? 2 : 0) });
     assert.equal(result.ok, false); assert.equal(result.category, "profile-preflight-failed");
   } finally { await rm(fixture, { recursive: true, force: true }); await rm(runtime, { recursive: true, force: true }); await rm(external, { recursive: true, force: true }); }
 });
@@ -178,7 +181,7 @@ await check("JSONL parser enforces order, cardinality and no tool/post-terminal 
   assert.equal(inspectToolFreeJsonl(clean.replace(JSON.stringify({ type: "turn.completed" }), `${JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: "{}" } })}\n${JSON.stringify({ type: "turn.completed" })}`)).ok, false);
 });
 
-function criticSpawn({ toolEvent = false, badBinding = false, badVerdict = false, schemaInvalid = false, missingResult = false, oversizedResult = false, differentMessage = false, oversizedStream = false, exitCode = 0, capturePrompt = null } = {}) {
+function criticSpawn({ toolEvent = false, badBinding = false, badVerdict = false, schemaInvalid = false, missingResult = false, oversizedResult = false, differentMessage = false, oversizedStream = false, oversizedStderr = false, exitCode = 0, capturePrompt = null } = {}) {
   return (_command, args) => {
     const child = new EventEmitter(); child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.pid = null; child.kill = () => true;
     const chunks = []; child.stdin.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
@@ -195,7 +198,7 @@ function criticSpawn({ toolEvent = false, badBinding = false, badVerdict = false
       const events = [{ type: "thread.started" }, { type: "turn.started" }, { type: "item.started", item: { type: "reasoning" } }];
       if (toolEvent) events.push({ type: "item.started", item: { type: "command_execution" } });
       events.push({ type: "item.completed", item: { type: "agent_message", text: differentMessage ? "{}" : JSON.stringify(wrapper) } }, { type: "turn.completed" });
-      child.stdout.write(oversizedStream ? "x".repeat(300 * 1024) : `${events.map(JSON.stringify).join("\n")}\n`); child.stdout.end(); child.stderr.end(); child.emit("exit", exitCode, null);
+      child.stdout.write(oversizedStream ? "x".repeat(300 * 1024) : `${events.map(JSON.stringify).join("\n")}\n`); if (oversizedStderr) child.stderr.write("x".repeat(300 * 1024)); child.stdout.end(); child.stderr.end(); child.emit("close", exitCode, null);
     });
     return child;
   };
@@ -217,7 +220,7 @@ await check("tool events, replay binding and unclean verdict each fail closed", 
   const fixture = await buildExactFixture({ repoRoot: root, candidateCommit: head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] }); const runtime = await mkdtemp(path.join(os.tmpdir(), "profile-critic-red-"));
   try {
     const bundle = await buildReviewBundle(fixture); const profile = buildPermissionProfile({ fixtureRoot: fixture.root, runtimeRoot: runtime }); const schemaPath = path.join(fixture.root, "plugins/pipeline-core/scripts/critic-verdict.schema.json");
-    for (const options of [{ toolEvent: true }, { badBinding: true }, { badVerdict: true }, { schemaInvalid: true }, { missingResult: true }, { oversizedResult: true }, { differentMessage: true }, { oversizedStream: true }, { exitCode: 2 }]) {
+    for (const options of [{ toolEvent: true }, { badBinding: true }, { badVerdict: true }, { schemaInvalid: true }, { missingResult: true }, { oversizedResult: true }, { differentMessage: true }, { oversizedStream: true }, { oversizedStderr: true }, { exitCode: 2 }]) {
       const result = await runCodexCritic({ fixture, reviewBundle: bundle, permissionProfile: profile, codexBinary: "/tmp/codex", schemaPath, env: { PATH: "/bin" }, spawn: criticSpawn(options) });
       assert.equal(result.ok, false);
     }
@@ -231,7 +234,35 @@ await check("critic timeout terminates its owned process group and fails closed"
   try {
     const bundle = await buildReviewBundle(fixture);
     const result = await runCodexCritic({ fixture, reviewBundle: bundle, permissionProfile: buildPermissionProfile({ fixtureRoot: fixture.root, runtimeRoot: runtime }), codexBinary: "/tmp/codex", schemaPath: path.join(fixture.root, "plugins/pipeline-core/scripts/critic-verdict.schema.json"), leaseMs: 20, env: { PATH: "/bin" }, spawn: (_command, _args, options) => spawnProcess("/bin/sh", ["-c", "sleep 5"], options) });
-    assert.equal(result.ok, false); assert.equal(result.category, "lease-timeout"); assert.equal(result.process.timedOut, true); assert.equal(result.process.ownedProcessTreeGone, true);
+    assert.equal(result.ok, false); assert.equal(result.category, "lease-timeout"); assert.equal(result.process.timedOut, true); assert.equal(result.process.ownedProcessGroupGone, true);
+  } finally { await rm(fixture.root, { recursive: true, force: true }); await rm(runtime, { recursive: true, force: true }); }
+});
+
+await check("residual owned process group is detected when TERM and KILL cannot clean it", async () => {
+  const signals = [];
+  const gone = await ensureOwnedProcessGroupGone(424242, (_pid, signal) => { signals.push(signal); });
+  assert.equal(gone, false); assert.deepEqual(signals, [0, "SIGTERM", 0, "SIGKILL", 0]);
+});
+
+await check("synchronous spawn failure, asynchronous process error and signal fail closed", async () => {
+  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const fixture = await buildExactFixture({ repoRoot: root, candidateCommit: head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
+  const runtime = await mkdtemp(path.join(os.tmpdir(), "profile-process-fail-runtime-"));
+  try {
+    const reviewBundle = await buildReviewBundle(fixture); const permissionProfile = buildPermissionProfile({ fixtureRoot: fixture.root, runtimeRoot: runtime }); const schemaPath = path.join(fixture.root, "plugins/pipeline-core/scripts/critic-verdict.schema.json");
+    const common = { fixture, reviewBundle, permissionProfile, codexBinary: "/tmp/codex", schemaPath, leaseMs: 50, env: { PATH: "/bin" } };
+    const sync = await runCodexCritic({ ...common, spawn: () => { throw new Error("synthetic private spawn detail"); } });
+    assert.equal(sync.ok, false); assert.equal(sync.category, "spawn-failed"); assert.equal(JSON.stringify(sync).includes("synthetic private"), false);
+    const asynchronous = await runCodexCritic({ ...common, spawn: () => {
+      const child = new EventEmitter(); child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.pid = null; child.kill = () => true;
+      queueMicrotask(() => child.emit("error", new Error("synthetic private async detail"))); return child;
+    } });
+    assert.equal(asynchronous.ok, false); assert.equal(asynchronous.process.error, "process-error"); assert.equal(JSON.stringify(asynchronous).includes("synthetic private"), false);
+    const signaled = await runCodexCritic({ ...common, spawn: () => {
+      const child = new EventEmitter(); child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.pid = null; child.kill = () => true;
+      queueMicrotask(() => { child.stdout.end(); child.stderr.end(); child.emit("close", null, "SIGTERM"); }); return child;
+    } });
+    assert.equal(signaled.ok, false); assert.equal(signaled.process.signal, "SIGTERM");
   } finally { await rm(fixture.root, { recursive: true, force: true }); await rm(runtime, { recursive: true, force: true }); }
 });
 
@@ -281,9 +312,34 @@ await check("fixture fails closed on missing, symlink, invalid UTF-8 and oversiz
   } finally { await rm(oversized.repo, { recursive: true, force: true }); }
 });
 
+await check("bundle fails closed on total oversize, content drift and extra fixture files", async () => {
+  const total = await syntheticRepo();
+  try {
+    for (const file of CODEX_CRITIC_ARTIFACTS) await writeFile(path.join(total.repo, file), Buffer.alloc(430 * 1024, 0x61));
+    execFileSync("git", ["add", "--", ...CODEX_CRITIC_ARTIFACTS], { cwd: total.repo }); execFileSync("git", ["commit", "-qm", "total oversize"], { cwd: total.repo });
+    const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: total.repo, encoding: "utf8" }).trim();
+    const fixture = await buildExactFixture({ repoRoot: total.repo, candidateCommit: head, artifactPaths: CODEX_CRITIC_ARTIFACTS });
+    try { await assert.rejects(() => buildReviewBundle(fixture), /bundle exceeds/u); } finally { await rm(fixture.root, { recursive: true, force: true }); }
+  } finally { await rm(total.repo, { recursive: true, force: true }); }
+
+  const head = execFileSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  const drifted = await buildExactFixture({ repoRoot: root, candidateCommit: head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
+  try {
+    await writeFile(path.join(drifted.root, "plugins/pipeline-core/scripts/critic-verdict.schema.json"), "drift\n");
+    await assert.rejects(() => buildReviewBundle(drifted), /drifted/u);
+  } finally { await rm(drifted.root, { recursive: true, force: true }); }
+
+  const extra = await buildExactFixture({ repoRoot: root, candidateCommit: head, artifactPaths: ["plugins/pipeline-core/scripts/critic-verdict.schema.json"] });
+  const runtime = await mkdtemp(path.join(os.tmpdir(), "profile-extra-runtime-"));
+  try {
+    const bundle = await buildReviewBundle(extra); await writeFile(path.join(extra.root, "unexpected-public-extra.txt"), "extra\n");
+    await assert.rejects(() => runCodexCritic({ fixture: extra, reviewBundle: bundle, permissionProfile: buildPermissionProfile({ fixtureRoot: extra.root, runtimeRoot: runtime }), codexBinary: "/tmp/codex", schemaPath: path.join(extra.root, "plugins/pipeline-core/scripts/critic-verdict.schema.json"), env: { PATH: "/bin" }, spawn: criticSpawn() }), /extra files/u);
+  } finally { await rm(extra.root, { recursive: true, force: true }); await rm(runtime, { recursive: true, force: true }); }
+});
+
 function aggregateSpawn() {
   return (_command, args, options) => {
-    if (args[0] === "sandbox") { const script = args[args.indexOf("--") + 3]; return childProcess(script.includes("printf") ? 2 : 0); }
+    if (args[0] === "sandbox") { const script = args[args.indexOf("--") + 3]; return childProcess(script.includes("printf") || args.at(-1).includes("external-read-sentinel") ? 2 : 0); }
     return criticSpawn()(_command, args, options);
   };
 }
