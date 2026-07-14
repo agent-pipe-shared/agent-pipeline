@@ -54,6 +54,7 @@ const DEFAULT_TRACE_EVENTS = 4096;
 const DEBUG_DIAGNOSTIC_RAW_BYTES = 1024;
 const DEBUG_DIAGNOSTIC_BYTES = 4096;
 const DEBUG_PROC_INTERVAL_MS = 5000;
+const SAFE_DEBUG_RUST_LOG = "codex_core=info,codex_exec=info";
 const TRACE_CATEGORY = /^[a-z][a-z0-9-]{0,63}$/u;
 const TRACE_SHA256 = /^[0-9a-f]{64}$/u;
 const TRACE_MONOTONIC_NS = /^(?:0|[1-9][0-9]*)$/u;
@@ -1088,6 +1089,7 @@ async function readDebugProcSample(pid, { readFile: readFileFn = readFile, readd
  */
 export function createDebugChildObserver({
   traceStore, child, label = "critic", privateIdentifiers = [], privateRoots = [], procIo = {},
+  observeStdin = true, diagnosticMode = "redacted", onStdoutChunk = () => {}, onStderrChunk = () => {}, onLeaseExpired = () => {},
   clock = () => Number(process.hrtime.bigint() / 1_000_000n),
   setIntervalFn = setInterval, clearIntervalFn = clearInterval, setTimeoutFn = setTimeout, clearTimeoutFn = clearTimeout,
 } = {}) {
@@ -1095,6 +1097,8 @@ export function createDebugChildObserver({
   if (!child || typeof child.on !== "function" || !child.stdin || !child.stdout || !child.stderr) fail("debug child observer requires one spawned ChildProcess with stdio pipes");
   for (const [stream, name] of [[child.stdin, "stdin"], [child.stdout, "stdout"], [child.stderr, "stderr"]]) if (typeof stream.on !== "function") fail(`debug child observer ${name} is not observable`);
   assertTraceCategory(label, "child label");
+  if (typeof observeStdin !== "boolean" || !["redacted", "metadata"].includes(diagnosticMode)) fail("debug child observer mode is invalid");
+  if ([onStdoutChunk, onStderrChunk, onLeaseExpired].some((callback) => typeof callback !== "function")) fail("debug child observer callbacks must be functions");
   if (typeof clock !== "function" || typeof setIntervalFn !== "function" || typeof clearIntervalFn !== "function" || typeof setTimeoutFn !== "function" || typeof clearTimeoutFn !== "function") fail("debug child observer clocks and timers must be functions");
 
   const stderrRedactor = createDebugLineRedactor({ maxPendingBytes: DEBUG_DIAGNOSTIC_RAW_BYTES, maxOutputBytes: DEFAULT_DEBUG_OUTPUT_BYTES, privateIdentifiers, privateRoots });
@@ -1169,6 +1173,7 @@ export function createDebugChildObserver({
 
   function consumeStdout(chunk) {
     if (stdoutFinished || !Buffer.isBuffer(chunk)) { safeFailure(); return; }
+    try { onStdoutChunk(chunk); } catch { safeFailure(); }
     stdoutBytes += chunk.length;
     appendStreamChunk("stdout", chunk, stdoutBytes);
     stdoutPending = Buffer.concat([stdoutPending, chunk]);
@@ -1206,8 +1211,10 @@ export function createDebugChildObserver({
 
   function consumeStderr(chunk) {
     if (stderrFinished || !Buffer.isBuffer(chunk)) { safeFailure(); return; }
+    try { onStderrChunk(chunk); } catch { safeFailure(); }
     stderrBytes += chunk.length;
     appendStreamChunk("stderr", chunk, stderrBytes);
+    if (diagnosticMode === "metadata") return;
     try { emitDiagnosticLines(stderrRedactor.write(chunk)); }
     catch { append("stream.error", { stream: "stderr", category: "redaction-error" }); safeFailure(); }
   }
@@ -1236,19 +1243,26 @@ export function createDebugChildObserver({
     });
   }
 
-  function recordSpawn({ pid = child.pid, pgid = child.pid } = {}) {
+  function recordSpawn({ pid = child.pid, pgid = child.pid, leaseMs = null, signal = "SIGTERM" } = {}) {
     if (spawnRecorded) return Promise.reject(new Error("debug child spawn was already recorded"));
     if (!Number.isSafeInteger(pid) || pid <= 0 || !Number.isSafeInteger(pgid) || pgid <= 0) return Promise.reject(new Error("debug child observer requires safe pid metadata"));
+    if (leaseMs !== null && (!Number.isSafeInteger(leaseMs) || leaseMs <= 0 || !TRACE_SIGNALS.has(signal))) return Promise.reject(new Error("debug child lease configuration is invalid"));
     spawnRecorded = true;
     spawnPid = pid;
     spawnPgid = pgid;
+    if (leaseMs !== null) leaseStarted = readClock();
     const operation = schedule(async () => {
       await traceStore.append("child.spawned", { label, pid, pgid });
+      if (leaseMs !== null) await traceStore.append("lease.armed", leasePayload());
       await traceStore.sync();
     });
     return operation.then((result) => {
       procTimer = setIntervalFn(() => { sampleProcess().catch(() => {}); }, DEBUG_PROC_INTERVAL_MS);
       procTimer?.unref?.();
+      if (leaseMs !== null) {
+        leaseTimer = setTimeoutFn(() => { expireLease({ signal }).catch(() => {}); }, leaseMs);
+        leaseTimer?.unref?.();
+      }
       return result;
     });
   }
@@ -1326,7 +1340,7 @@ export function createDebugChildObserver({
   }
 
   function writeAndEndStdin(value) {
-    if (!spawnRecorded || finishRequested || stdinPhase !== "initial") return Promise.reject(new Error("debug child stdin write is out of order"));
+    if (!observeStdin || !spawnRecorded || finishRequested || stdinPhase !== "initial") return Promise.reject(new Error("debug child stdin write is out of order"));
     const bytes = Buffer.isBuffer(value) ? Buffer.from(value) : typeof value === "string" ? Buffer.from(value, "utf8") : null;
     if (bytes === null) return Promise.reject(new Error("debug child stdin accepts only Buffer or string input"));
     const operation = schedule(async () => {
@@ -1415,6 +1429,7 @@ export function createDebugChildObserver({
     safeFailure();
     return schedule(async () => {
       await traceStore.append("lease.expired", leasePayload());
+      try { onLeaseExpired(); } catch { /* The durable trace remains authoritative. */ }
       const identity = {};
       if (spawnPid !== null) { identity.pid = spawnPid; identity.pgid = spawnPgid; }
       await traceStore.append("child.signal-requested", { label, signal, ...identity });
@@ -1449,15 +1464,15 @@ export function createDebugChildObserver({
   // Listener installation is intentionally contiguous and precedes every API
   // method capable of writing stdin.
   child.on("error", (error) => { append("child.error", { label, category: debugErrorCategory(error, "process-error") }); safeFailure(); });
-  child.stdin.on("error", (error) => { observeStdinFailure(error, "stdin-error"); });
-  child.stdin.on("finish", () => {
+  if (observeStdin) child.stdin.on("error", (error) => { observeStdinFailure(error, "stdin-error"); });
+  if (observeStdin) child.stdin.on("finish", () => {
     stdinFinished = true;
     if (stdinPhase === "ending") {
       if (stdinWaiter?.resolve) stdinWaiter.resolve();
       else if (!stdinClosed && stdinFailureCategory === null && !stdinErrorRecorded) { stdinClosed = true; stdinPhase = "closed"; append("stdin.closed", {}); }
     } else if (!stdinClosed) observeStdinFailure(categoricalStdinError("premature-finish"), "premature-finish");
   });
-  child.stdin.on("close", () => {
+  if (observeStdin) child.stdin.on("close", () => {
     if (!stdinFinished) observeStdinFailure(categoricalStdinError("premature-close"), "premature-close");
   });
   child.stdout.on("data", consumeStdout);
@@ -1487,6 +1502,7 @@ export function createDebugChildObserver({
 export async function spawnDebugChildObserver({
   traceStore, spawn = nodeSpawn, command, args = [], options = {}, label = "critic",
   privateIdentifiers = [], privateRoots = [], procIo = {},
+  observeStdin = true, diagnosticMode = "redacted", onStdoutChunk = () => {}, onStderrChunk = () => {}, onLeaseExpired = () => {}, leaseMs = null, leaseSignal = "SIGTERM",
   clock = () => Number(process.hrtime.bigint() / 1_000_000n),
   setIntervalFn = setInterval, clearIntervalFn = clearInterval, setTimeoutFn = setTimeout, clearTimeoutFn = clearTimeout,
 } = {}) {
@@ -1505,13 +1521,13 @@ export async function spawnDebugChildObserver({
   }
   let observer;
   try {
-    observer = createDebugChildObserver({ traceStore, child, label, privateIdentifiers, privateRoots, procIo, clock, setIntervalFn, clearIntervalFn, setTimeoutFn, clearTimeoutFn });
+    observer = createDebugChildObserver({ traceStore, child, label, privateIdentifiers, privateRoots, procIo, observeStdin, diagnosticMode, onStdoutChunk, onStderrChunk, onLeaseExpired, clock, setIntervalFn, clearIntervalFn, setTimeoutFn, clearTimeoutFn });
   } catch {
     await traceStore.append("child.spawn-failed", { label, category: "observer-attach-failed" });
     await traceStore.sync();
     return Object.freeze({ ok: false, category: "observer-attach-failed", child: null, observer: null });
   }
-  await observer.recordSpawn();
+  await observer.recordSpawn({ leaseMs, signal: leaseSignal });
   return Object.freeze({ ok: true, category: "spawned", child, observer });
 }
 
@@ -1811,6 +1827,50 @@ async function awaitChild(child, { leaseMs, onHeartbeat = () => {}, label }) {
   return Object.freeze({ terminal, timedOut, ownedProcessGroupGone, stdout, stderr, diagnostics: localFailureDiagnostic(stdout, stderr) });
 }
 
+async function runDebugObservedChild({ traceStore, spawn, invocation, leaseMs, label, stdin = null, privateIdentifiers = [], privateRoots = [], onHeartbeat = () => {} }) {
+  const stdout = capture(); const stderr = capture();
+  const started = Date.now();
+  let terminalResolve;
+  const terminalPromise = new Promise((resolve) => { terminalResolve = resolve; });
+  let terminalSettled = false; let timedOut = false;
+  const settle = (value) => { if (!terminalSettled) { terminalSettled = true; terminalResolve(value); } };
+  const observedSpawn = (command, args, options) => {
+    const child = spawn(command, args, options);
+    child.once("error", () => settle({ code: null, signal: null, error: "process-error" }));
+    child.once("close", (code, signal) => settle({ code, signal, error: null }));
+    return child;
+  };
+  const spawned = await spawnDebugChildObserver({
+    traceStore, spawn: observedSpawn, command: invocation.command, args: invocation.args, options: invocation.options, label,
+    privateIdentifiers, privateRoots, observeStdin: stdin !== null, diagnosticMode: "metadata", leaseMs,
+    onStdoutChunk: (chunk) => appendBounded(stdout, chunk), onStderrChunk: (chunk) => appendBounded(stderr, chunk),
+    onLeaseExpired: () => { timedOut = true; },
+  });
+  if (!spawned.ok) return Object.freeze({ spawned: false, category: spawned.category, terminal: Object.freeze({ code: null, signal: null, error: "spawn-error" }), timedOut: false, ownedProcessGroupGone: true, stdout, stderr, diagnostics: null });
+  const { child, observer } = spawned;
+  let stdinError = null;
+  if (stdin !== null) {
+    try { await observer.writeAndEndStdin(stdin); }
+    catch { stdinError = "stdin-error"; }
+  }
+  const heartbeat = setInterval(() => {
+    observer.heartbeatLease().catch(() => {});
+    try { onHeartbeat({ label, elapsedMs: Date.now() - started, stdoutBytes: stdout.totalBytes, stderrBytes: stderr.totalBytes, liveness: true }); } catch {}
+  }, DEBUG_PROC_INTERVAL_MS);
+  heartbeat.unref?.();
+  const terminal = await terminalPromise;
+  clearInterval(heartbeat);
+  const ownedProcessGroupGone = await ensureOwnedProcessGroupGone(child.pid);
+  let observerError = null;
+  try { await observer.finishAndDrain(); } catch { observerError = "observer-error"; }
+  return Object.freeze({
+    spawned: true,
+    category: stdinError ?? observerError,
+    terminal: Object.freeze(terminal), timedOut, ownedProcessGroupGone, stdout, stderr,
+    diagnostics: localFailureDiagnostic(stdout, stderr),
+  });
+}
+
 async function executable(candidate) { try { await access(candidate, constants.X_OK); return true; } catch { return false; } }
 export async function resolveCodexBinary({ pathEnv = process.env.PATH, platform = process.platform } = {}) {
   if (typeof pathEnv !== "string" || !pathEnv) fail("PATH is required to resolve Codex");
@@ -1891,7 +1951,18 @@ function sandboxInvocation({ codexBinary, permissionProfile, cwd, command, env }
   return Object.freeze({ command: codexBinary, args: Object.freeze(args), options: Object.freeze({ cwd, shell: false, windowsHide: true, detached: process.platform !== "win32", stdio: ["ignore", "pipe", "pipe"], env }) });
 }
 
-async function runProbeCommand({ invocation, leaseMs, spawn, onHeartbeat, label }) {
+async function runProbeCommand({ invocation, leaseMs, spawn, onHeartbeat, label, debugContext }) {
+  if (debugContext) {
+    const debugInvocation = Object.freeze({ ...invocation, options: Object.freeze({ ...invocation.options, stdio: ["pipe", "pipe", "pipe"] }) });
+    const execution = await runDebugObservedChild({ ...debugContext, spawn, invocation: debugInvocation, leaseMs, label, stdin: null, onHeartbeat });
+    if (!execution.spawned) return Object.freeze({ ok: false, category: "spawn-failed", invocationSha256: invocationHash(invocation.command, invocation.args), diagnostics: null, debugTimedOut: false });
+    return Object.freeze({
+      ok: !execution.timedOut && execution.ownedProcessGroupGone && !execution.stdout.overflow && !execution.stderr.overflow && execution.category === null,
+      invocationSha256: invocationHash(invocation.command, invocation.args),
+      process: Object.freeze({ exitCode: execution.terminal.code, signal: execution.terminal.signal, timedOut: execution.timedOut, ownedProcessGroupGone: execution.ownedProcessGroupGone, error: execution.terminal.error }),
+      diagnostics: execution.diagnostics, debugTimedOut: execution.timedOut,
+    });
+  }
   let child;
   try { child = spawn(invocation.command, invocation.args, invocation.options); }
   catch { return Object.freeze({ ok: false, category: "spawn-failed", invocationSha256: invocationHash(invocation.command, invocation.args), diagnostics: null }); }
@@ -1907,7 +1978,7 @@ async function runProbeCommand({ invocation, leaseMs, spawn, onHeartbeat, label 
 async function hashedFile(file) { const bytes = await readFile(file); return Object.freeze({ sha256: sha256(bytes), bytes: bytes.length }); }
 async function pathAbsent(file) { try { await lstat(file); return false; } catch (error) { if (error?.code === "ENOENT") return true; throw error; } }
 
-export async function runPermissionProfilePreflight({ codexBinary, permissionProfile, fixtureRoot, externalParent, leaseMs = CODEX_CRITIC_POLICY.preflightLeaseMs, spawn = nodeSpawn, env = process.env, onHeartbeat = () => {} } = {}) {
+export async function runPermissionProfilePreflight({ codexBinary, permissionProfile, fixtureRoot, externalParent, leaseMs = CODEX_CRITIC_POLICY.preflightLeaseMs, spawn = nodeSpawn, env = process.env, onHeartbeat = () => {}, debugContext } = {}) {
   assertAbsolute(codexBinary, "codexBinary"); assertAbsolute(fixtureRoot, "fixtureRoot"); assertAbsolute(externalParent, "externalParent"); assertPermissionProfile(permissionProfile);
   const fixtureRealpath = await realpath(fixtureRoot);
   if (fixtureRealpath !== permissionProfile.normalized.roots.fixture) fail("preflight fixture drifted from the bound profile");
@@ -1924,18 +1995,18 @@ export async function runPermissionProfilePreflight({ codexBinary, permissionPro
   const runs = {};
   try {
     configHome = await mkdtemp(path.join(os.tmpdir(), "pipeline-codex-profile-config-"));
-    const cleanEnv = Object.freeze({ ...sanitizeEnvironment(env), CODEX_HOME: configHome });
+    const cleanEnv = Object.freeze({ ...sanitizeEnvironment(env), CODEX_HOME: configHome, ...(debugContext ? { RUST_LOG: SAFE_DEBUG_RUST_LOG } : {}) });
     await writeFile(fixtureSentinel, "fixture-read-sentinel\n", { mode: 0o600 });
     await writeFile(externalSentinel, "external-read-sentinel\n", { mode: 0o600 });
     const before = Object.freeze({ fixture: await hashedFile(fixtureSentinel), external: await hashedFile(externalSentinel), writeAbsent: await pathAbsent(writeTarget) });
     const commands = [
-      Object.freeze({ key: "fixtureRead", expect: 0, command: ["/bin/sh", "-c", 'actual=$(cat -- "$2") || exit 3; test "$actual" = "$1"', "pipeline-profile-preflight", "fixture-read-sentinel", fixtureSentinel] }),
-      Object.freeze({ key: "externalReadDenied", expect: "nonzero", command: ["/bin/sh", "-c", 'cat -- "$1" >/dev/null 2>&1', "pipeline-profile-preflight", externalSentinel] }),
-      Object.freeze({ key: "writeDenied", expect: "nonzero", command: ["/bin/sh", "-c", 'printf "forbidden\\n" > "$1"', "pipeline-profile-preflight", writeTarget] }),
+      Object.freeze({ key: "fixtureRead", label: "profile-preflight-fixture-read", expect: 0, command: ["/bin/sh", "-c", 'actual=$(cat -- "$2") || exit 3; test "$actual" = "$1"', "pipeline-profile-preflight", "fixture-read-sentinel", fixtureSentinel] }),
+      Object.freeze({ key: "externalReadDenied", label: "profile-preflight-external-read-denied", expect: "nonzero", command: ["/bin/sh", "-c", 'cat -- "$1" >/dev/null 2>&1', "pipeline-profile-preflight", externalSentinel] }),
+      Object.freeze({ key: "writeDenied", label: "profile-preflight-write-denied", expect: "nonzero", command: ["/bin/sh", "-c", 'printf "forbidden\\n" > "$1"', "pipeline-profile-preflight", writeTarget] }),
     ];
     for (const probe of commands) {
       const invocation = sandboxInvocation({ codexBinary, permissionProfile, cwd: fixtureRoot, command: probe.command, env: cleanEnv });
-      const result = await runProbeCommand({ invocation, leaseMs, spawn, onHeartbeat, label: `profile-preflight-${probe.key}` });
+      const result = await runProbeCommand({ invocation, leaseMs, spawn, onHeartbeat, label: debugContext ? probe.label : `profile-preflight-${probe.key}`, debugContext });
       const exitMatches = probe.expect === "nonzero" ? Number.isInteger(result.process?.exitCode) && result.process.exitCode !== 0 : result.process?.exitCode === probe.expect;
       runs[probe.key] = Object.freeze({ ...result, ok: result.ok && exitMatches });
       if (!runs[probe.key].ok) break;
@@ -2003,7 +2074,7 @@ export function inspectToolFreeJsonl(value) {
   return Object.freeze({ ok, category: ok ? "pass" : "invalid-lifecycle", events: lines.length, finalMessageText });
 }
 
-export async function runCodexCritic({ fixture, reviewBundle, permissionProfile, codexBinary, schemaPath = DEFAULT_SCHEMA, leaseMs = CODEX_CRITIC_POLICY.criticLeaseMs, spawn = nodeSpawn, env = process.env, onHeartbeat = () => {} } = {}) {
+export async function runCodexCritic({ fixture, reviewBundle, permissionProfile, codexBinary, schemaPath = DEFAULT_SCHEMA, leaseMs = CODEX_CRITIC_POLICY.criticLeaseMs, spawn = nodeSpawn, env = process.env, onHeartbeat = () => {}, debugContext } = {}) {
   if (!fixture?.root || !fixture?.manifest?.nonce) fail("verified fixture is required");
   assertPermissionProfile(permissionProfile); assertAbsolute(codexBinary, "codexBinary"); assertAbsolute(schemaPath, "schemaPath");
   if (!reviewBundle?.serialized || reviewBundle.value?.artifacts?.length !== fixture.manifest.artifacts.length) fail("complete review bundle is required");
@@ -2025,15 +2096,24 @@ export async function runCodexCritic({ fixture, reviewBundle, permissionProfile,
   await writeFile(boundSchemaPath, `${JSON.stringify(boundSchema, null, 2)}\n`, { mode: 0o600 });
   const beforeFixture = await directoryHash(fixture.root);
   const invocation = buildProfileBoundCodexCriticInvocation({ fixtureRoot: fixture.root, schemaPath: boundSchemaPath, resultPath, permissionProfile, codexBinary, env });
-  let child;
-  try { child = spawn(invocation.command, invocation.args, invocation.options); }
-  catch {
-    return Object.freeze({ ok: false, category: "spawn-failed", invocationSha256: invocationHash(invocation.command, invocation.args), diagnostics: null });
+  const prompt = `${criticPrompt({ bundle: reviewBundle, taskId, nonce: fixture.manifest.nonce, candidateCommit: fixture.manifest.candidateCommit, candidateTree: fixture.manifest.tree, candidateParent: fixture.manifest.parent, candidateParentTree: fixture.manifest.parentTree })}\n`;
+  let execution;
+  if (debugContext) {
+    const debugInvocation = Object.freeze({ ...invocation, options: Object.freeze({ ...invocation.options, env: Object.freeze({ ...invocation.options.env, RUST_LOG: SAFE_DEBUG_RUST_LOG }) }) });
+    execution = await runDebugObservedChild({ ...debugContext, spawn, invocation: debugInvocation, leaseMs, label: "critic", stdin: prompt, onHeartbeat });
+    if (!execution.spawned) return Object.freeze({ ok: false, category: "spawn-failed", invocationSha256: invocationHash(invocation.command, invocation.args), diagnostics: null, debugTimedOut: false });
+  } else {
+    let child;
+    try { child = spawn(invocation.command, invocation.args, invocation.options); }
+    catch {
+      return Object.freeze({ ok: false, category: "spawn-failed", invocationSha256: invocationHash(invocation.command, invocation.args), diagnostics: null });
+    }
+    child.stdin?.on("error", () => {});
+    child.stdin?.end(prompt, "utf8");
+    execution = await awaitChild(child, { leaseMs, onHeartbeat, label: "profile-bound-tool-less-critic" });
   }
-  child.stdin?.on("error", () => {});
-  child.stdin?.end(`${criticPrompt({ bundle: reviewBundle, taskId, nonce: fixture.manifest.nonce, candidateCommit: fixture.manifest.candidateCommit, candidateTree: fixture.manifest.tree, candidateParent: fixture.manifest.parent, candidateParentTree: fixture.manifest.parentTree })}\n`, "utf8");
-  const execution = await awaitChild(child, { leaseMs, onHeartbeat, label: "profile-bound-tool-less-critic" });
   const resultBytes = await readFile(resultPath).catch(() => null);
+  if (debugContext?.onResultEvidence) debugContext.onResultEvidence(Object.freeze({ present: resultBytes !== null, bytes: resultBytes?.length ?? 0, sha256: resultBytes === null ? null : sha256(resultBytes) }));
   const afterFixture = await directoryHash(fixture.root);
   const stream = execution.stdout.overflow ? Object.freeze({ ok: false, category: "oversized-stream", events: 0 }) : inspectToolFreeJsonl(Buffer.concat(execution.stdout.parts));
   let verdict = null; let verdictError = null;
@@ -2051,7 +2131,7 @@ export async function runCodexCritic({ fixture, reviewBundle, permissionProfile,
   const fixtureUnchanged = beforeFixture === afterFixture;
   const stdoutBytes = Buffer.concat(execution.stdout.parts);
   const stderrBytes = Buffer.concat(execution.stderr.parts);
-  const ok = execution.terminal.code === 0 && !execution.timedOut && execution.ownedProcessGroupGone && !execution.stderr.overflow && stream.ok && verdictError === null && fixtureUnchanged;
+  const ok = execution.terminal.code === 0 && !execution.timedOut && execution.ownedProcessGroupGone && !execution.stderr.overflow && stream.ok && verdictError === null && fixtureUnchanged && (!debugContext || execution.category === null);
   const result = Object.freeze({
     ok,
     category: ok ? "pass" : execution.timedOut ? "lease-timeout" : !stream.ok ? stream.category : verdictError ? "invalid-verdict" : "process-or-fixture-failed",
@@ -2065,6 +2145,7 @@ export async function runCodexCritic({ fixture, reviewBundle, permissionProfile,
     fixtureUnchanged,
     cleanup: true,
     diagnostics: execution.diagnostics,
+    ...(debugContext ? { debugTimedOut: execution.timedOut, debugObserverOk: execution.category === null } : {}),
   });
   return result;
   } finally {
@@ -2072,7 +2153,7 @@ export async function runCodexCritic({ fixture, reviewBundle, permissionProfile,
   }
 }
 
-function publicRun(run) { if (!run) return null; const { diagnostics, ...safe } = run; return safe; }
+function publicRun(run) { if (!run) return null; const { diagnostics, debugTimedOut, debugObserverOk, ...safe } = run; return safe; }
 
 function binaryBinding(value) {
   return Object.freeze({
@@ -2085,7 +2166,7 @@ function binaryBinding(value) {
 }
 function sameBinaryBinding(left, right) { return canonical(binaryBinding(left)) === canonical(binaryBinding(right)); }
 
-export async function runProfileBoundIsolation({ repoRoot, candidateCommit, artifactPaths, schemaPath, fixtureParent = os.tmpdir(), externalParent = path.dirname(repoRoot ?? ""), pathEnv = process.env.PATH, spawn = nodeSpawn, execFileSync = nodeExecFileSync, env = process.env, onHeartbeat = () => {}, resolvedBinary = null, binaryInspection = null, contractInspection = null, inspectBinary = inspectCodexBinary } = {}) {
+async function runProfileBoundIsolationNormal({ repoRoot, candidateCommit, artifactPaths, schemaPath, fixtureParent = os.tmpdir(), externalParent = path.dirname(repoRoot ?? ""), pathEnv = process.env.PATH, spawn = nodeSpawn, execFileSync = nodeExecFileSync, env = process.env, onHeartbeat = () => {}, resolvedBinary = null, binaryInspection = null, contractInspection = null, inspectBinary = inspectCodexBinary } = {}) {
   assertAbsolute(repoRoot, "repoRoot");
   if (!isFullSha(candidateCommit)) fail("candidateCommit must be a full SHA");
   if (!Array.isArray(artifactPaths) || artifactPaths.length !== CODEX_CRITIC_ARTIFACTS.length || artifactPaths.some((entry, index) => entry !== CODEX_CRITIC_ARTIFACTS[index])) fail("profile-bound acceptance requires the exact five public artifacts");
@@ -2150,6 +2231,170 @@ export async function runProfileBoundIsolation({ repoRoot, candidateCommit, arti
       reason: ok ? null : "profile-bound isolation evidence is incomplete or failed",
     });
   } finally { await rm(fixture.root, { recursive: true, force: true }); }
+}
+
+class DebugIsolationFailure extends Error {
+  constructor(step, original = null) { super(`debug isolation failed at ${step}`); this.step = step; this.original = original; }
+}
+
+function debugCause(step, { critic, preflight } = {}) {
+  if (step === "critic" && critic?.debugTimedOut === true) return "response-stalled";
+  if (step === "input" || step === "commit") return "coordinator-input";
+  if (step === "preflight" && Object.values(preflight?.probes ?? {}).some((probe) => probe?.process?.timedOut === true)) return "child-process";
+  if (step === "preflight") return "child-process";
+  if (step === "critic" && critic?.stream?.toolFree === false) return "jsonl-lifecycle";
+  if (step === "critic" && critic) return "child-process";
+  if (step === "result") return "result-sink";
+  if (["binary", "fixture", "bundle", "profile", "binding-before", "binding-after", "canary"].includes(step)) return "fixture-or-binding";
+  if (step === "cleanup") return "cleanup";
+  return "unbestimmt";
+}
+
+function isolationResult({ fixture, reviewBundle, fixtureInventorySha256, profile, binary, contract, preflight, critic, inventoryAfterPreflight, inventoryAfterCritic, bindingStableBeforeCritic, bindingStableAfterCritic }) {
+  const ok = preflight?.ok === true && bindingStableBeforeCritic === true && critic?.ok === true && bindingStableAfterCritic === true && inventoryAfterCritic === fixtureInventorySha256;
+  return Object.freeze({
+    ok,
+    envelope: Object.freeze({
+      schema: CODEX_CRITIC_POLICY.schema,
+      candidateCommit: fixture.manifest.candidateCommit,
+      candidateTree: fixture.manifest.tree,
+      candidateParent: fixture.manifest.parent,
+      candidateParentTree: fixture.manifest.parentTree,
+      fixtureManifestSha256: fixture.manifestHash,
+      fixtureInventorySha256,
+      reviewBundleSha256: reviewBundle.hash,
+      reviewContractSha256: reviewContractHash(),
+      adapter: CODEX_CRITIC_POLICY.adapter,
+      policySha256: sha256(canonical(CODEX_CRITIC_POLICY)),
+      preflightLeaseMs: CODEX_CRITIC_POLICY.preflightLeaseMs,
+      criticLeaseMs: CODEX_CRITIC_POLICY.criticLeaseMs,
+      sourceReferenceSha256: sha256(canonical(CODEX_CRITIC_POLICY.sourceReference)),
+      model: CODEX_CRITIC_POLICY.model,
+      effort: CODEX_CRITIC_POLICY.effort,
+      permissionProfileSha256: profile.hash,
+      binarySha256: binary.binarySha256,
+      versionSha256: binary.versionSha256,
+      runtimeRootSha256: binary.runtimeRootSha256,
+      runtimeManifestSha256: binary.runtimeManifestSha256,
+      runtimeEntries: binary.runtimeEntries,
+      contractSha256: contract.contractSha256,
+      bindingStableBeforeCritic: bindingStableBeforeCritic === true,
+      bindingStableAfterCritic: bindingStableAfterCritic === true,
+      fixtureInventoryStable: inventoryAfterPreflight === fixtureInventorySha256 && inventoryAfterCritic === fixtureInventorySha256,
+      preflight: publicRun(preflight),
+      critic: publicRun(critic),
+    }),
+    localDiagnostics: Object.freeze({ preflight: preflight?.diagnostics ?? null, critic: critic?.diagnostics ?? null }),
+    reason: ok ? null : "profile-bound isolation evidence is incomplete or failed",
+  });
+}
+
+async function runProfileBoundIsolationDebug({ repoRoot, candidateCommit, artifactPaths, schemaPath, fixtureParent = os.tmpdir(), externalParent = path.dirname(repoRoot ?? ""), pathEnv = process.env.PATH, spawn = nodeSpawn, execFileSync = nodeExecFileSync, env = process.env, onHeartbeat = () => {}, resolvedBinary = null, binaryInspection = null, contractInspection = null, inspectBinary = inspectCodexBinary, debugContext } = {}) {
+  if (!isPlainTraceObject(debugContext) || typeof debugContext.tracePath !== "string") fail("debugContext requires tracePath");
+  const allowed = new Set(["tracePath", "forbiddenRoots", "onProgress", "onSummary"]);
+  if (Object.keys(debugContext).some((key) => !allowed.has(key))) fail("debugContext contains an unknown field");
+  const forbiddenRoots = debugContext.forbiddenRoots ?? [];
+  if (!Array.isArray(forbiddenRoots)) fail("debugContext forbiddenRoots must be an array");
+  const onProgress = debugContext.onProgress ?? (() => {}); const onSummary = debugContext.onSummary ?? (() => {});
+  if (typeof onProgress !== "function" || typeof onSummary !== "function") fail("debugContext callbacks must be functions");
+  assertAbsolute(repoRoot, "repoRoot"); assertAbsolute(debugContext.tracePath, "tracePath");
+  const debugScope = await mkdtemp(path.join(fixtureParent, "pipeline-codex-debug-fixture-"));
+  let traceStore; let fixture = null; let currentStep = null; let resultEvidence = Object.freeze({ present: false, bytes: 0, sha256: null });
+  let codexBinary; let binary; let contract; let reviewBundle; let fixtureInventorySha256; let profile; let preflight = null; let critic = null;
+  let inventoryAfterPreflight = null; let inventoryAfterCritic = null; let bindingStableBeforeCritic = false; let bindingStableAfterCritic = false;
+  const privateRoots = [repoRoot, debugScope];
+  try {
+    traceStore = await createSecureTraceStore({ tracePath: debugContext.tracePath, repoRoot, fixtureRoot: debugScope, forbiddenRoots, privateRoots });
+    await traceStore.append("run.started", {});
+    const step = async (name, action, accepted = () => true) => {
+      currentStep = name; await traceStore.append("step.started", { step: name });
+      try {
+        const value = await action();
+        if (!accepted(value)) throw new DebugIsolationFailure(name);
+        await traceStore.append("step.completed", { step: name });
+        await traceStore.sync();
+        currentStep = null;
+        try { onProgress(Object.freeze({ step: name, status: "completed" })); } catch { /* Progress display cannot alter evidence. */ }
+        return value;
+      } catch (error) {
+        await traceStore.append("step.failed", { step: name }); currentStep = null;
+        throw error instanceof DebugIsolationFailure ? error : new DebugIsolationFailure(name, error);
+      }
+    };
+    await step("input", async () => {
+      if (!isFullSha(candidateCommit)) fail("candidateCommit must be a full SHA");
+      if (!Array.isArray(artifactPaths) || artifactPaths.length !== CODEX_CRITIC_ARTIFACTS.length || artifactPaths.some((entry, index) => entry !== CODEX_CRITIC_ARTIFACTS[index])) fail("profile-bound acceptance requires the exact five public artifacts");
+    });
+    await step("commit", async () => {
+      const head = gitText(repoRoot, ["rev-parse", "HEAD"], execFileSync);
+      if (head !== candidateCommit) fail("candidateCommit must equal the current Shared HEAD");
+      const dirty = git(repoRoot, ["status", "--porcelain=v1", "--", ...artifactPaths], execFileSync).toString("utf8").trim();
+      if (dirty) fail("profile-bound acceptance artifacts must be clean at candidate HEAD");
+    });
+    await step("binary", async () => {
+      codexBinary = resolvedBinary ?? await resolveCodexBinary({ pathEnv }); assertAbsolute(codexBinary, "codexBinary");
+      binary = binaryInspection ?? await inspectBinary({ codexBinary, execFileSync });
+      contract = contractInspection ?? verifyProfileContract({ codexBinary, execFileSync });
+      return codexBinary;
+    });
+    fixture = await step("fixture", () => buildExactFixture({ repoRoot, candidateCommit, artifactPaths, fixtureParent: debugScope, execFileSync }));
+    reviewBundle = await step("bundle", () => buildReviewBundle(fixture));
+    await step("profile", async () => {
+      profile = buildPermissionProfile({ fixtureRoot: fixture.root, runtimeRoot: binary.runtimeRoot, profileId: `${CODEX_CRITIC_POLICY.permissionProfile}-${fixture.manifest.nonce.slice(0, 12)}` });
+      fixtureInventorySha256 = await assertFixtureInventory(fixture);
+    });
+    const childDebug = { traceStore, privateIdentifiers: [], privateRoots: [repoRoot, fixture.root, binary.runtimeRoot] };
+    await step("preflight", async () => {
+      preflight = await runPermissionProfilePreflight({ codexBinary, permissionProfile: profile, fixtureRoot: fixture.root, externalParent, spawn, env, onHeartbeat, debugContext: childDebug });
+      return preflight;
+    }, (value) => value.ok === true);
+    await step("binding-before", async () => {
+      inventoryAfterPreflight = await assertFixtureInventory(fixture);
+      const beforeCriticBinary = await inspectBinary({ codexBinary, execFileSync });
+      bindingStableBeforeCritic = sameBinaryBinding(binary, beforeCriticBinary);
+      return bindingStableBeforeCritic && inventoryAfterPreflight === fixtureInventorySha256;
+    }, Boolean);
+    const schemaInFixture = schemaPath ?? path.join(fixture.root, "plugins", "pipeline-core", "scripts", "critic-verdict.schema.json");
+    await step("critic", async () => {
+      critic = await runCodexCritic({ fixture, reviewBundle, permissionProfile: profile, codexBinary, schemaPath: schemaInFixture, spawn, env, onHeartbeat, debugContext: { ...childDebug, onResultEvidence: (value) => { resultEvidence = value; } } });
+      return critic;
+    }, (value) => {
+      const processOk = value.process && value.process.exitCode === 0 && !value.process.timedOut && value.process.ownedProcessGroupGone && value.process.error === null;
+      return processOk && value.stream?.toolFree === true && value.stderr?.overflow === false && value.debugObserverOk === true;
+    });
+    await step("binding-after", async () => {
+      const afterCriticBinary = await inspectBinary({ codexBinary, execFileSync });
+      bindingStableAfterCritic = sameBinaryBinding(binary, afterCriticBinary);
+      return bindingStableAfterCritic;
+    }, Boolean);
+    await step("result", async () => { await traceStore.append("result.observed", resultEvidence); return critic.category !== "invalid-verdict"; }, Boolean);
+    await step("canary", async () => {
+      inventoryAfterCritic = await assertFixtureInventory(fixture);
+      return critic.fixtureUnchanged === true && inventoryAfterCritic === fixtureInventorySha256;
+    }, Boolean);
+    await step("cleanup", async () => { await rm(fixture.root, { recursive: true, force: true }); });
+    await traceStore.append("run.completed", { cause: "unbestimmt" });
+    const summary = await traceStore.finalize({ outcome: "completed", cause: "unbestimmt" });
+    try { onSummary(Object.freeze({ outcome: summary.outcome, cause: summary.cause, recordCount: summary.recordCount })); } catch { /* Summary display cannot alter evidence. */ }
+    return isolationResult({ fixture, reviewBundle, fixtureInventorySha256, profile, binary, contract, preflight, critic, inventoryAfterPreflight, inventoryAfterCritic, bindingStableBeforeCritic, bindingStableAfterCritic });
+  } catch (error) {
+    const failedStep = error instanceof DebugIsolationFailure ? error.step : currentStep;
+    if (fixture) await rm(fixture.root, { recursive: true, force: true }).catch(() => {});
+    if (traceStore && failedStep) {
+      const cause = debugCause(failedStep, { critic, preflight });
+      await traceStore.append("run.failed", { cause });
+      const summary = await traceStore.finalize({ outcome: "failed", cause });
+      try { onSummary(Object.freeze({ outcome: summary.outcome, cause: summary.cause, recordCount: summary.recordCount })); } catch { /* Summary display cannot alter evidence. */ }
+    }
+    if (error instanceof DebugIsolationFailure && ["preflight", "binding-before", "critic", "binding-after", "result", "canary"].includes(error.step)) {
+      return isolationResult({ fixture, reviewBundle, fixtureInventorySha256, profile, binary, contract, preflight, critic, inventoryAfterPreflight, inventoryAfterCritic, bindingStableBeforeCritic, bindingStableAfterCritic });
+    }
+    throw error instanceof DebugIsolationFailure && error.original ? error.original : error;
+  } finally { await rm(debugScope, { recursive: true, force: true }); }
+}
+
+export async function runProfileBoundIsolation(options = {}) {
+  return options.debugContext === undefined ? runProfileBoundIsolationNormal(options) : runProfileBoundIsolationDebug(options);
 }
 
 export async function verifyFixtureTree(root) { const info = await stat(root); if (!info.isDirectory()) fail("fixture root is not a directory"); return directoryHash(root); }
