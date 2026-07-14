@@ -691,14 +691,16 @@ await check("debug child observer accepts stdin only after callback and drain an
 });
 
 await check("debug child observer rolls back final stdin close when EPIPE arrives during its trace append", () => withTraceCase(async ({ tracePath, options }) => {
-  let child; let injected = false;
+  let child; let injected = false; const operations = [];
   const injectedOpen = async (...args) => {
     const handle = await open(...args);
     if (args.length < 3) return handle;
     return {
       stat: (...inner) => handle.stat(...inner),
       write: async (buffer, ...inner) => {
+        if (buffer.includes(Buffer.from('"event":"stdin.error"'))) operations.push("stdin.error");
         if (!injected && buffer.includes(Buffer.from('"event":"stdin.closed"'))) {
+          operations.push("stdin.closed");
           injected = true;
           await new Promise((resolve) => setImmediate(() => {
             child.stdin.emit("error", Object.assign(new Error("final-append-private-error"), { code: "EPIPE" }));
@@ -707,7 +709,8 @@ await check("debug child observer rolls back final stdin close when EPIPE arrive
         }
         return handle.write(buffer, ...inner);
       },
-      datasync: () => handle.datasync(), sync: () => handle.sync(), close: () => handle.close(),
+      datasync: () => { operations.push("sync"); return handle.datasync(); },
+      sync: () => { operations.push("sync"); return handle.sync(); }, close: () => handle.close(),
     };
   };
   const store = await createSecureTraceStore({ ...options, io: { open: injectedOpen } }); await beginTraceStep(store, "critic");
@@ -717,6 +720,7 @@ await check("debug child observer rolls back final stdin close when EPIPE arrive
   const { observer } = await spawnDebugChildObserver({ traceStore: store, spawn: () => child, command: "/debug/codex", ...observerTimers() });
   await assert.rejects(() => observer.writeAndEndStdin("final-append-private-payload"), /broken-pipe/u);
   assert.equal(injected, true);
+  assert.deepEqual(operations.slice(operations.lastIndexOf("stdin.error")), ["stdin.error", "sync"]);
   child.stdout.end(); child.stderr.end(); child.emit("exit", 1, null); child.emit("close", 1, null); await settleEvents();
   await assert.rejects(() => observer.finishAndDrain(), /closed failure category/u);
   await store.append("step.failed", { step: "critic" }); await store.append("run.failed", { cause: "coordinator-input" }); await store.finalize({ outcome: "failed", cause: "coordinator-input" });

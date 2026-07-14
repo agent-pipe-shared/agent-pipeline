@@ -1360,6 +1360,7 @@ export function createDebugChildObserver({
           await traceStore.append("stdin.error", { category });
           stdinErrorRecorded = true;
         }
+        if (stdinErrorRecorded) await traceStore.sync();
         stdinFailureCategory ??= category;
         stdinPhase = "error";
         safeFailure();
