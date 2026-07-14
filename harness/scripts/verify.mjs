@@ -57,6 +57,7 @@ const TEST_SUITES = [
   { name: "repository-freshness-tests", file: join(pluginScriptsDir, "repository-freshness.test.mjs") },
   { name: "critic-bare-tests", file: join(pluginScriptsDir, "critic-bare.test.mjs") },
   { name: "codex-critic-isolation-tests", file: join(pluginScriptsDir, "codex-critic-isolation.test.mjs") },
+  { name: "codex-critic-isolation-cli-tests", file: join(pluginScriptsDir, "run-codex-critic-isolation.test.mjs") },
   { name: "guard-git-tests", file: join(hooksDir, "guard-git.test.mjs") },
   { name: "guard-testpath-tests", file: join(hooksDir, "guard-testpath.test.mjs") },
   { name: "staleness-check-tests", file: join(hooksDir, "staleness-check.test.mjs") },
