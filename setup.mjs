@@ -138,6 +138,7 @@ export const PIPELINE_START_AUTHORITY = Object.freeze({
   byteLength: 33583,
   sha256: "78d141525a90f7ff97c4e34489b2f180531d3b77f0fa1480fcf323842a1e4335",
 });
+export const MIGRATED_AGENTS_DIRTY_TRANSITION = Object.freeze({ additions: 9, deletions: 62 });
 
 // ---- default answers (== the committed pipeline.user.yaml template's values) -----------------
 export function buildDefaultAnswers() {
@@ -168,7 +169,7 @@ function safeSpawn(spawn, command, args, opts = {}) {
 // ---- optional AGENTS adapter migration ----------------------------------------------------------
 // This boundary accepts only public-safe file metadata plus a detached digest result.  It never
 // decodes, parses, retains, copies, or prints an unknown AGENTS.md body.
-export function classifyAgentsAdapter({ exists, isFile = false, byteLength, gitBlob, isClean = false } = {}) {
+export function classifyAgentsAdapter({ exists, isFile = false, byteLength, gitBlob, isClean = false, worktreeBlob, additions, deletions } = {}) {
   if (!exists) return { status: "absent", mutable: false };
   if (!isFile || !Number.isInteger(byteLength)) return { status: "manual-po-gate", mutable: false };
   if (isClean && byteLength === LEGACY_AGENTS_ADAPTER.byteLength && gitBlob === LEGACY_AGENTS_ADAPTER.gitBlob) {
@@ -177,6 +178,16 @@ export function classifyAgentsAdapter({ exists, isFile = false, byteLength, gitB
   if (isClean && byteLength === Buffer.byteLength(MIGRATED_AGENTS_ADAPTER) && gitBlob === MIGRATED_AGENTS_ADAPTER_BLOB) {
     return { status: "migrated", mutable: false };
   }
+  // A successful write is intentionally not staged by setup.  Recognize only that exact
+  // one-step legacy→pointer transition; no other dirty state is admissible.
+  if (
+    !isClean &&
+    byteLength === Buffer.byteLength(MIGRATED_AGENTS_ADAPTER) &&
+    gitBlob === LEGACY_AGENTS_ADAPTER.gitBlob &&
+    worktreeBlob === MIGRATED_AGENTS_ADAPTER_BLOB &&
+    additions === MIGRATED_AGENTS_DIRTY_TRANSITION.additions &&
+    deletions === MIGRATED_AGENTS_DIRTY_TRANSITION.deletions
+  ) return { status: "migrated", mutable: false };
   return { status: "manual-po-gate", mutable: false };
 }
 
@@ -205,9 +216,23 @@ export function inspectAgentsAdapter(rootDir, deps = {}) {
         const blob = /^100\d+\s+([0-9a-f]{40})\s+\d+\tAGENTS\.md$/i.exec(index)?.[1] ?? null;
         let isClean = false;
         try { isClean = spawn("git", ["diff", "--quiet", "--", "AGENTS.md"], { cwd: rootDir }).status === 0; } catch { /* manual gate below */ }
-        return { gitBlob: blob, isClean };
+        if (isClean || blob !== LEGACY_AGENTS_ADAPTER.gitBlob || byteLength !== Buffer.byteLength(MIGRATED_AGENTS_ADAPTER)) return { gitBlob: blob, isClean };
+        const numstat = safeSpawn(spawn, "git", ["diff", "--numstat", "--", "AGENTS.md"], { cwd: rootDir }).stdout.trim();
+        const diff = /^(\d+)\t(\d+)\tAGENTS\.md$/.exec(numstat);
+        if (!diff || Number(diff[1]) !== MIGRATED_AGENTS_DIRTY_TRANSITION.additions || Number(diff[2]) !== MIGRATED_AGENTS_DIRTY_TRANSITION.deletions) return { gitBlob: blob, isClean };
+        const worktreeBlob = safeSpawn(spawn, "git", ["hash-object", "--", "AGENTS.md"], { cwd: rootDir }).stdout.trim();
+        return { gitBlob: blob, isClean, worktreeBlob, additions: Number(diff[1]), deletions: Number(diff[2]) };
       })();
-  return classifyAgentsAdapter({ exists: true, isFile: true, byteLength, gitBlob: gitState?.gitBlob, isClean: gitState?.isClean === true });
+  return classifyAgentsAdapter({
+    exists: true,
+    isFile: true,
+    byteLength,
+    gitBlob: gitState?.gitBlob,
+    isClean: gitState?.isClean === true,
+    worktreeBlob: gitState?.worktreeBlob,
+    additions: gitState?.additions,
+    deletions: gitState?.deletions,
+  });
 }
 
 /** Validates the three authorities named by the migrated pointer before any target write. */

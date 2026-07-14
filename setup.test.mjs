@@ -53,6 +53,7 @@ import {
   LEGACY_AGENTS_ADAPTER,
   MIGRATED_AGENTS_ADAPTER,
   MIGRATED_AGENTS_ADAPTER_BLOB,
+  MIGRATED_AGENTS_DIRTY_TRANSITION,
   PIPELINE_START_AUTHORITY,
   parseArgv,
   resolveWarnDisposition,
@@ -843,6 +844,31 @@ ok("parseArgv: explicit adapter migration is opt-in, never a normal-setup defaul
     "classifyAgentsAdapter: exact migrated pointer is byte-idempotent",
     classifyAgentsAdapter({ exists: true, isFile: true, byteLength: migratedBytes, gitBlob: MIGRATED_AGENTS_ADAPTER_BLOB, isClean: true }).status === "migrated",
   );
+  ok(
+    "classifyAgentsAdapter: exact legacy-index dirty pointer transition is idempotently migrated",
+    classifyAgentsAdapter({
+      exists: true,
+      isFile: true,
+      byteLength: migratedBytes,
+      gitBlob: LEGACY_AGENTS_ADAPTER.gitBlob,
+      isClean: false,
+      worktreeBlob: MIGRATED_AGENTS_ADAPTER_BLOB,
+      ...MIGRATED_AGENTS_DIRTY_TRANSITION,
+    }).status === "migrated",
+  );
+  ok(
+    "classifyAgentsAdapter: generic dirty pointer is not accepted",
+    classifyAgentsAdapter({
+      exists: true,
+      isFile: true,
+      byteLength: migratedBytes,
+      gitBlob: LEGACY_AGENTS_ADAPTER.gitBlob,
+      isClean: false,
+      worktreeBlob: MIGRATED_AGENTS_ADAPTER_BLOB,
+      additions: 1,
+      deletions: 1,
+    }).status === "manual-po-gate",
+  );
   for (const value of ["private-coordinate", "/absolute/path", "credential=value", "host: local", "account: user", "model: synthetic", "session: synthetic", "unknown-user-content"]) {
     ok(
       `classifyAgentsAdapter: ${value} never becomes a migration target`,
@@ -895,6 +921,33 @@ ok("parseArgv: explicit adapter migration is opt-in, never a normal-setup defaul
     agentsAdapterState: { status: "known-legacy", mutable: true },
   });
   ok("AGENTS adapter migration: invalid pipeline-start authority stops before target mutation", !rejected.ok && rejected.status === "authority-failed" && writes === 0);
+}
+{
+  const runtimeManifestText = renderPipelineYaml(buildDefaultAnswers(), "agents-adapter-transition");
+  let phase = "legacy";
+  let writes = 0;
+  const deps = {
+    runtimeManifestText,
+    pipelineStartAuthority: PIPELINE_START_AUTHORITY,
+    operatingModelPresent: true,
+    existsSync: () => true,
+    lstatSync: () => ({
+      isFile: () => true,
+      size: phase === "legacy" ? LEGACY_AGENTS_ADAPTER.byteLength : Buffer.byteLength(MIGRATED_AGENTS_ADAPTER),
+    }),
+    agentsAdapterGitState: () => phase === "legacy"
+      ? { gitBlob: LEGACY_AGENTS_ADAPTER.gitBlob, isClean: true }
+      : {
+          gitBlob: LEGACY_AGENTS_ADAPTER.gitBlob,
+          isClean: false,
+          worktreeBlob: MIGRATED_AGENTS_ADAPTER_BLOB,
+          ...MIGRATED_AGENTS_DIRTY_TRANSITION,
+        },
+    writeAgentsAdapter: () => { writes += 1; phase = "pointer-written"; },
+  };
+  const first = migrateAgentsAdapter("/synthetic", deps);
+  const second = migrateAgentsAdapter("/synthetic", deps);
+  ok("AGENTS adapter migration: real first-write then rerun succeeds with zero second write", first.ok && second.ok && first.status === "migrated" && second.status === "migrated" && writes === 1);
 }
 
 // ---- summary ----------------------------------------------------------------------------
