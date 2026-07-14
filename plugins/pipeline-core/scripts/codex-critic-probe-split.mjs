@@ -73,8 +73,9 @@ function exactTaskItem(event, taskType, marker) {
 }
 
 export function findBoundAttemptEvent(records, { taskType, marker }) {
-  const thread = jsonLines(records).find((record) => record.value?.type === "thread.started" && typeof record.value.thread_id === "string" && record.value.thread_id);
-  if (!thread) return null;
+  const threads = jsonLines(records).filter((record) => record.value?.type === "thread.started" && typeof record.value.thread_id === "string" && record.value.thread_id);
+  if (threads.length !== 1) return null;
+  const [thread] = threads;
   const matches = [];
   for (const record of jsonLines(records)) {
     if (record.order > thread.order && exactTaskItem(record.value, taskType, marker)) matches.push(record);
