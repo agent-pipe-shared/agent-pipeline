@@ -10,26 +10,16 @@
 #
 # This is the committed TEMPLATE state with conservative but working defaults
 # (a new colleague starts safe AND immediately functional). The SessionStart hook
-# `setup-check.mjs` recognizes this default state (owner_name/repo_owner unchanged)
-# and reminds you to run `node setup.mjs` as long as no real setup has run yet.
+# `setup-check.mjs` recognizes this unconfigured state. Personal coordinates and
+# credentials belong only in ignored machine-local mapping, never in Public Core.
 
-identity:
-  owner_name: "Your Name"           # appears nowhere in the methodology core, only in YOUR artifacts (commit trailer etc.)
-  repo_owner: "your-org"            # GitHub org/user or GitLab group of YOUR OWN repo
-  repo_name: "agent-pipeline"       # name of YOUR OWN repo (setup.mjs binds the plugin to it)
-  commit_trailer: true              # Co-Authored-By trailer on commits
+setup:
+  intent: unconfigured                  # unconfigured | consumer | maintainer
 
 language:
   human_facing: en                  # what the Pipeline PRODUCES: commits, reviews, new docs (de|en)
   agent_facing: en                  # roles/guardrails/skills (recommended: en)
   # Note: the SHIPPED documentation is de (human) / en (agent).
-
-platform:
-  git_host: github                  # github | gitlab   (setup.mjs detects it from `git remote -v`)
-  cli: gh                           # gh | glab         (setup.mjs sets this to match the host)
-  # Note on self-hosted GitLab: setup.mjs binds the marketplace binding to gitlab.com by
-  # default; for your own GitLab host, adjust the generated marketplace URL in
-  # .claude/settings.json (extraKnownMarketplaces) by hand afterwards.
 
 agent_runtime: claude-code          # claude-code (full enforcement) | other (methodology only → docs/runtime-boundary.md)
 

@@ -9,6 +9,11 @@ Thumbs.db
 # Machine-local Claude Code settings (never commit)
 .claude/settings.local.json
 
+# Private Overlay and machine-local marketplace/account/path mapping. The public
+# setup compiler consumes only private-overlay.yaml's anonymous immutable Shared SHA.
+.pipeline/private-overlay.yaml
+.pipeline/machine-local.yaml
+
 # Temp / scratch
 *.log
 *.tmp

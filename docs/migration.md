@@ -11,6 +11,20 @@ observe, add a thin committed calibration layer, and turn gates on one at a
 time — starting with the cheapest, most valuable ones. Nothing here is
 all-or-nothing.
 
+## Keep the three scopes separate
+
+Public Core is the portable, committed pipeline contract. A separately versioned
+Private Overlay carries only an anonymous immutable Shared SHA; it never supplies
+account, owner, repository or path coordinates to Public Core. Machine-local
+credentials and marketplace mapping are ignored and stay on the device. Start a
+second-device reconstruction from a Public snapshot, matching Private-Overlay SHA
+and local mapping; do not copy keys or turn a local fork into a new canonical source.
+Generated Public-Core projections are derived only from public inputs: they must
+not contain credentials, account/owner/repository coordinates, or absolute local
+paths. For rollback, reset or reclone the reviewed Public snapshot, recreate the
+matching anonymous SHA lock and local mapping on the device, then rerun setup;
+never promote a Private Overlay or machine-local mapping back into Public Core.
+
 ## Start read-only
 
 Bind the pipeline to your project before granting it any write autonomy. Bind
@@ -38,9 +52,9 @@ claude plugin install pipeline-core@agent-pipeline --scope project
 ```
 
 `--scope project` matters — the binding belongs to the repo, not your user
-profile. Commit the resulting `.claude/settings.json` (`extraKnownMarketplaces`
-and `enabledPlugins` entries) so every clone and CI run resolves the same
-plugin. Verify with `claude plugin list --json`.
+profile. Keep marketplace coordinates in ignored machine-local mapping, not in
+the committed Public Core `.claude/settings.json`; commit only portable plugin
+enablement and calibration. Verify locally with `claude plugin list --json`.
 
 Unlike the pipeline repo, a project repo has no `setup.mjs` — that script lives
 in your pipeline copy and personalizes *that* repo. In a project repo you
@@ -189,6 +203,23 @@ aus, lässt sie mitlesen, ergänzt eine dünne, committete Kalibrierungsschicht 
 schaltest die Gates einzeln scharf — beginnend mit den günstigsten und
 wirksamsten. Nichts hier ist Alles-oder-nichts.
 
+## Die drei Scopes getrennt halten
+
+Der Public Core ist der portable, committete Pipeline-Vertrag. Ein separat
+versioniertes Private Overlay trägt nur einen anonymen, unveränderlichen
+Shared-SHA; es liefert dem Public Core niemals Account-, Owner-, Repository- oder
+Pfadkoordinaten. Maschinenlokale Zugangsdaten und Marketplace-Mappings sind
+ignoriert und bleiben auf dem Gerät. Für eine Rekonstruktion auf einem zweiten
+Gerät beginne mit einem Public-Snapshot, passendem Private-Overlay-SHA und lokalem
+Mapping; kopiere keine Schlüssel und mache aus einem lokalen Fork keine neue
+kanonische Quelle. Generierte Public-Core-Projektionen werden ausschließlich aus
+öffentlichen Eingaben abgeleitet: Sie dürfen keine Zugangsdaten, Account-/Owner-/
+Repository-Koordinaten oder absoluten lokalen Pfade enthalten. Für einen Rollback
+setze den geprüften Public-Snapshot zurück oder klone ihn neu, erzeuge den
+passenden anonymen SHA-Lock und das lokale Mapping auf dem Gerät neu und führe
+Setup erneut aus; ein Private Overlay oder maschinenlokales Mapping darf nie in
+den Public Core zurückbefördert werden.
+
 ## Zunächst mit reinem Lesezugriff
 
 Binde die Pipeline an dein Projekt, bevor du ihr Schreibrechte gibst. Plugin
@@ -208,8 +239,8 @@ Vertrauen wächst.
 ## Plugin binden
 
 Die Mechanik ist identisch zu [`SETUP.md`](../SETUP.md) Schritt 3 — führe sie aus
-deinem **Projekt**-Repo aus und richte den Marketplace auf deine eigene Kopie des
-Pipeline-Repos:
+deinem **Projekt**-Repo aus und richte den Marketplace über dein lokales Mapping
+auf deine eigene Pipeline-Kopie:
 
 ```
 # GitHub
@@ -218,9 +249,10 @@ claude plugin install pipeline-core@agent-pipeline --scope project
 ```
 
 `--scope project` ist entscheidend — die Bindung gehört zum Repo, nicht zu deinem
-Nutzerprofil. Committe die entstandene `.claude/settings.json` (die Einträge
-`extraKnownMarketplaces` und `enabledPlugins`), damit jeder Klon und jeder
-CI-Lauf dasselbe Plugin auflöst. Prüfen mit `claude plugin list --json`.
+Nutzerprofil. Marketplace-Koordinaten gehören in das ignorierte maschinenlokale
+Mapping, nicht in die committete Public-Core-`.claude/settings.json`; committe
+nur portable Plugin-Aktivierung und Kalibrierung. Prüfen mit
+`claude plugin list --json`.
 
 Anders als das Pipeline-Repo hat ein Projekt-Repo kein `setup.mjs` — dieses Skript
 liegt in deiner Pipeline-Kopie und personalisiert *jenes* Repo. In einem

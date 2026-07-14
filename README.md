@@ -68,13 +68,16 @@ Around those roles:
 ## How it works
 
 Everything ships as a Claude Code plugin plus a small set of `.claude/` runtime
-configs, which you never hand-edit. You fill in **one** file, `pipeline.user.yaml`
-(your name, your repo, your language, your subscription tier, your autonomy
+configs, which you never hand-edit. You fill in **one public file**,
+`pipeline.user.yaml` (setup intent, language, subscription tier, autonomy
 preset), and `node setup.mjs` compiles it into the three runtime-canonical files
 Claude Code actually reads (`.claude/settings.json`, `.claude/pipeline.json`,
-`.claude/pipeline.yaml`). Re-run it any time you change your mind — it's
-drift-safe: untouched files recompile freely, but a file you hand-edited yourself
-triggers a confirmation before it's overwritten.
+`.claude/pipeline.yaml`). A separately versioned, ignored Private Overlay carries
+only the exact 40-hex SHA of that Public Core; marketplace/account/path mapping
+and credentials remain machine-local and are never read into a generated
+projection. Re-run setup any time you change your mind — it's drift-safe:
+untouched files recompile freely, but a file you hand-edited yourself triggers a
+confirmation before it's overwritten.
 
 Model routing per work method lives in its own block, `pipeline.user.yaml` →
 `worktypes` — one entry per session profile (design-first / advisor / speed),
@@ -306,14 +309,17 @@ Ergänzend dazu:
 
 Alles wird als Claude-Code-Plugin plus ein kleines Set an
 `.claude/`-Laufzeit-Configs ausgeliefert. Du bearbeitest diese Configs nicht von
-Hand: Du füllst **eine** Datei aus, `pipeline.user.yaml` (dein Name, dein Repo,
-deine Sprache, deine Abo-Stufe, dein Autonomie-Preset), und `node setup.mjs`
+Hand: Du füllst **eine öffentliche** Datei aus, `pipeline.user.yaml`
+(Setup-Absicht, Sprache, Abo-Stufe, Autonomie-Preset), und `node setup.mjs`
 kompiliert daraus die drei laufzeit-kanonischen Dateien, die Claude Code
 tatsächlich liest (`.claude/settings.json`, `.claude/pipeline.json`,
-`.claude/pipeline.yaml`). Führe es jederzeit erneut aus, wenn sich deine
-Antworten ändern — es ist driftsicher: unveränderte Dateien werden frei neu
-kompiliert, aber eine von Hand bearbeitete kompilierte Datei löst vor dem
-Überschreiben eine Rückfrage aus.
+`.claude/pipeline.yaml`). Ein separat versioniertes, ignoriertes Private Overlay
+trägt nur den exakten 40-hex-SHA dieses Public Core; Marketplace-/Account-/Pfad-
+Mapping und Zugangsdaten bleiben maschinenlokal und werden nie in eine generierte
+Projektion eingelesen. Führe es jederzeit erneut aus, wenn sich deine Antworten
+ändern — es ist driftsicher: unveränderte Dateien werden frei neu kompiliert,
+aber eine von Hand bearbeitete kompilierte Datei löst vor dem Überschreiben eine
+Rückfrage aus.
 
 Modell-Routing je Arbeitsmethode lebt in einem eigenen Block,
 `pipeline.user.yaml` → `worktypes` — ein Eintrag je Session-Profil

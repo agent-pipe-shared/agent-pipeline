@@ -2,9 +2,8 @@
 /**
  * setup.test.mjs — pure-function test suite for setup.mjs.
  *
- * Coverage contract (briefing DoD field 3, item 2): classifyOs, parseFirstRemoteUrl,
- * classifyGitHost, cliForHost, detectGitHost (injected fake spawn), applyAboPreset,
- * applyAutonomyPreset, normalizeLang, renderUserYaml (idempotent + byte-identical to the
+ * Coverage contract (briefing DoD field 3, item 2): applyAboPreset, applyAutonomyPreset,
+ * normalizeLang, renderUserYaml (idempotent + byte-identical to the
  * committed pipeline.user.yaml for buildDefaultAnswers()), answersFromParsed, shortHash,
  * generatedMarker/extractRecordedHash round-trip, decideCompileAction (all six branches),
  * compileSettingsJson (github shape + gitlab "source: url" fix), compilePipelineJson,
@@ -20,7 +19,7 @@
  * Run:   node setup.test.mjs
  * Exit:  0 = all cases pass · 1 = at least one case failed (failure list on stdout).
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -29,11 +28,6 @@ import { parseYaml } from "./plugins/pipeline-core/lib/yaml-lite.mjs";
 import { validateAgainstSchema } from "./plugins/pipeline-core/lib/schema-lite.mjs";
 
 import {
-  classifyOs,
-  parseFirstRemoteUrl,
-  classifyGitHost,
-  cliForHost,
-  detectGitHost,
   applyAboPreset,
   applyAutonomyPreset,
   resolveRoutingAnswers,
@@ -49,12 +43,15 @@ import {
   compilePipelineJson,
   renderPipelineYaml,
   validateCompiledPipelineYaml,
+  validateSharedLock,
   parseArgv,
   resolveWarnDisposition,
   run,
 } from "./setup.mjs";
 
 const USER_YAML_PATH = fileURLToPath(new URL("./pipeline.user.yaml", import.meta.url));
+const THREE_SCOPE_FIXTURES_PATH = fileURLToPath(new URL("./templates/three-scope-fixtures.md", import.meta.url));
+const PLUGINS_PATH = fileURLToPath(new URL("./plugins", import.meta.url));
 
 let pass = 0;
 const failures = [];
@@ -74,6 +71,66 @@ function ok(id, condition, detail) {
 {
   const result = validateCompiledPipelineYaml(renderPipelineYaml(buildDefaultAnswers(), "preflight-ok"));
   ok("validateCompiledPipelineYaml: generated default projection passes canonical validation", result.status === "ok", JSON.stringify(result.errors));
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "setup-overlay-missing-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  symlinkSync(PLUGINS_PATH, join(root, "plugins"), "dir");
+  const sentinels = new Map([
+    [join(root, "pipeline.user.yaml"), "source-before\n"],
+    [join(root, ".claude", "settings.json"), "settings-before\n"],
+    [join(root, ".claude", "pipeline.json"), "pipeline-before\n"],
+    [join(root, ".claude", "pipeline.yaml"), "manifest-before\n"],
+  ]);
+  for (const [path, content] of sentinels) writeFileSync(path, content);
+  const code = await run(["--defaults"], {
+    rootDir: root,
+    spawn: () => ({ status: 0, stdout: `${"a".repeat(40)}\n` }),
+  });
+  const unchanged = [...sentinels].every(([path, content]) => readFileSync(path, "utf8") === content);
+  ok("run: missing private-overlay fails before source or runtime mutation byte-identically", code === 1 && unchanged);
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "setup-overlay-real-idempotent-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  symlinkSync(PLUGINS_PATH, join(root, "plugins"), "dir");
+  const sha = "a".repeat(40);
+  mkdirSync(join(root, ".pipeline"), { recursive: true });
+  writeFileSync(join(root, ".pipeline", "private-overlay.yaml"), `shared:\n  sha: ${sha}\n`);
+  // This deliberately malformed local-only mapping proves setup consumes neither local
+  // coordinates nor a second configuration source; only the anonymous overlay lock is read.
+  writeFileSync(join(root, ".pipeline", "machine-local.yaml"), "local: [not parsed by setup\n");
+  const deps = {
+    rootDir: root,
+    spawn: (command, args) =>
+      command === "git" && args[0] === "rev-parse" ? { status: 0, stdout: `${sha}\n` } : { status: 1, stdout: "" },
+  };
+  const first = await run(["--defaults"], deps);
+  const outputs = ["pipeline.user.yaml", ".claude/settings.json", ".claude/pipeline.json", ".claude/pipeline.yaml"];
+  const firstBytes = outputs.map((path) => readFileSync(join(root, path), "utf8"));
+  const second = await run(["--defaults"], deps);
+  const secondBytes = outputs.map((path) => readFileSync(join(root, path), "utf8"));
+  ok("run: matching real private-overlay plus synthetic git HEAD permits deterministic setup", first === 0);
+  ok("run: matching real overlay rerun is idempotent without reading machine-local mapping", second === 0 && JSON.stringify(firstBytes) === JSON.stringify(secondBytes));
+  rmSync(root, { recursive: true, force: true });
+}
+
+// ======================================================================================
+// private overlay lock — exact immutable SHA and fail-closed before mutation
+// ======================================================================================
+{
+  const sha = "a".repeat(40);
+  ok("validateSharedLock: exact 40-hex lock matches checked-out Public Core", validateSharedLock(sha, sha).ok === true);
+  ok("validateSharedLock: missing lock fails closed", validateSharedLock(undefined, sha).reason === "missing-or-malformed-shared-sha");
+  ok("validateSharedLock: abbreviated lock fails closed", validateSharedLock("a".repeat(12), sha).reason === "missing-or-malformed-shared-sha");
+  ok("validateSharedLock: mismatch fails before mutation", validateSharedLock(sha, "b".repeat(40)).reason === "shared-sha-mismatch");
+}
+{
+  const fixtures = readFileSync(THREE_SCOPE_FIXTURES_PATH, "utf8");
+  ok("three-scope fixtures: consumer has no overlay and therefore safe-stops", fixtures.includes("Consumer") && fixtures.includes("must fail before mutation"));
+  ok("three-scope fixtures: maintainer lock is anonymous full 40-hex", fixtures.includes(`sha: ${"a".repeat(40)}`));
+  ok("three-scope fixtures: ignored mapping is never a setup projection", fixtures.includes("setup never reads or projects the mapping"));
 }
 
 {
@@ -107,86 +164,6 @@ function ok(id, condition, detail) {
     result.status === "invalid" && result.errors.some((error) => error.path === "release.environments.prod.adapter"),
     JSON.stringify(result.errors),
   );
-}
-
-// ======================================================================================
-// classifyOs
-// ======================================================================================
-ok("classifyOs: win32 -> windows", classifyOs("win32") === "windows");
-ok("classifyOs: darwin -> macos", classifyOs("darwin") === "macos");
-ok("classifyOs: linux -> linux", classifyOs("linux") === "linux");
-ok("classifyOs: aix (other) -> other", classifyOs("aix") === "other");
-
-// ======================================================================================
-// parseFirstRemoteUrl
-// ======================================================================================
-ok(
-  "parseFirstRemoteUrl: normal `git remote -v` output -> first URL",
-  parseFirstRemoteUrl("origin\thttps://github.com/acme/widgets.git (fetch)\norigin\thttps://github.com/acme/widgets.git (push)\n") ===
-    "https://github.com/acme/widgets.git",
-);
-ok("parseFirstRemoteUrl: empty string -> null", parseFirstRemoteUrl("") === null);
-ok("parseFirstRemoteUrl: whitespace-only -> null", parseFirstRemoteUrl("   \n  \n") === null);
-ok("parseFirstRemoteUrl: non-string input -> null", parseFirstRemoteUrl(null) === null);
-ok("parseFirstRemoteUrl: undefined input -> null", parseFirstRemoteUrl(undefined) === null);
-
-// ======================================================================================
-// classifyGitHost
-// ======================================================================================
-ok("classifyGitHost: github.com URL -> github", classifyGitHost("https://github.com/acme/widgets.git") === "github");
-ok("classifyGitHost: gitlab.com URL -> gitlab", classifyGitHost("https://gitlab.com/acme/widgets.git") === "gitlab");
-ok(
-  "classifyGitHost: self-hosted gitlab URL (host contains 'gitlab') -> gitlab",
-  classifyGitHost("git@gitlab.example.com:acme/widgets.git") === "gitlab",
-);
-ok("classifyGitHost: unrecognized host -> null", classifyGitHost("https://bitbucket.org/acme/widgets.git") === null);
-ok("classifyGitHost: empty string -> null", classifyGitHost("") === null);
-ok("classifyGitHost: null -> null", classifyGitHost(null) === null);
-
-// ======================================================================================
-// cliForHost
-// ======================================================================================
-ok("cliForHost: gitlab -> glab", cliForHost("gitlab") === "glab");
-ok("cliForHost: github -> gh", cliForHost("github") === "gh");
-
-// ======================================================================================
-// detectGitHost (injected fake spawn — no real git/gh/glab invocation)
-// ======================================================================================
-function fakeSpawn(byCommand) {
-  return (command) => byCommand[command] ?? { status: 1, error: new Error(`not mocked: ${command}`), stdout: "" };
-}
-
-{
-  const spawn = fakeSpawn({
-    git: { status: 0, stdout: "origin\thttps://gitlab.com/acme/widgets.git (fetch)\n" },
-  });
-  const host = detectGitHost("/fake/root", { spawn });
-  ok("detectGitHost: remote is gitlab -> gitlab", host === "gitlab", host);
-}
-{
-  const spawn = fakeSpawn({
-    git: { status: 0, stdout: "origin\thttps://github.com/acme/widgets.git (fetch)\n" },
-  });
-  const host = detectGitHost("/fake/root", { spawn });
-  ok("detectGitHost: remote is github -> github", host === "github", host);
-}
-{
-  const spawn = fakeSpawn({
-    git: { status: 0, stdout: "" }, // no remotes configured (fresh clone before P5's git init)
-    gh: { status: 1, error: new Error("gh not found"), stdout: "" },
-    glab: { status: 0, stdout: "glab version 1.2.3\n" },
-  });
-  const host = detectGitHost("/fake/root", { spawn });
-  ok("detectGitHost: no remote, glab-only on PATH -> gitlab", host === "gitlab", host);
-}
-{
-  const spawn = fakeSpawn({
-    git: { status: 0, stdout: "" },
-    gh: { status: 1, error: new Error("gh not found"), stdout: "" },
-    glab: { status: 1, error: new Error("glab not found"), stdout: "" },
-  });
-  const host = detectGitHost("/fake/root", { spawn });
-  ok("detectGitHost: no remote, neither CLI on PATH -> github (conservative default)", host === "github", host);
 }
 
 // ======================================================================================
@@ -391,14 +368,10 @@ ok("normalizeLang: undefined -> de", normalizeLang(undefined) === "de");
   );
 }
 {
-  const customized = {
-    ...buildDefaultAnswers(),
-    identity: { owner_name: "Jane Doe", repo_owner: "janedoe", repo_name: "my-fork", commit_trailer: false },
-    platform: { git_host: "gitlab", cli: "glab" },
-  };
+  const customized = { ...buildDefaultAnswers(), setup: { intent: "maintainer" } };
   const text = renderUserYaml(customized);
-  ok("renderUserYaml: reflects customized identity fields", text.includes('owner_name: "Jane Doe"') && text.includes('repo_owner: "janedoe"'));
-  ok("renderUserYaml: reflects customized platform fields", text.includes("git_host: gitlab") && text.includes("cli: glab"));
+  ok("renderUserYaml: reflects customized public setup intent", text.includes("intent: maintainer"));
+  ok("renderUserYaml: never renders identity or platform coordinates", !text.includes("identity:") && !text.includes("platform:"));
 }
 {
   // worktypes rendering: "off" quotes as a string sentinel, a model name renders bare.
@@ -436,10 +409,9 @@ ok("normalizeLang: undefined -> de", normalizeLang(undefined) === "de");
 }
 {
   const defaults = buildDefaultAnswers();
-  const partial = { identity: { owner_name: "Custom Name" }, autonomy: { push_policy: "standing-approved" } };
+  const partial = { setup: { intent: "maintainer" }, autonomy: { push_policy: "standing-approved" } };
   const merged = answersFromParsed(partial, defaults);
-  ok("answersFromParsed: partial merge overrides only the given identity field", merged.identity.owner_name === "Custom Name");
-  ok("answersFromParsed: partial merge keeps other identity fields from defaults", merged.identity.repo_owner === defaults.identity.repo_owner);
+  ok("answersFromParsed: partial merge overrides public setup intent", merged.setup.intent === "maintainer");
   ok("answersFromParsed: partial merge overrides autonomy.push_policy", merged.autonomy.push_policy === "standing-approved");
   ok("answersFromParsed: partial merge keeps autonomy.branch_model from defaults", merged.autonomy.branch_model === defaults.autonomy.branch_model);
   ok("answersFromParsed: untouched top-level blocks (language) stay at defaults", JSON.stringify(merged.language) === JSON.stringify(defaults.language));
@@ -595,15 +567,11 @@ ok("parseArgv: --defaults --force -> both true", (() => {
 ok("parseArgv: --defaults alone -> force stays false", parseArgv(["--defaults"]).force === false);
 
 // ======================================================================================
-// compileSettingsJson — github branch shape AND gitlab branch (source: url fix)
+// compileSettingsJson — public projection never carries this pipeline's coordinates
 // ======================================================================================
 {
-  const answers = { ...buildDefaultAnswers(), identity: { ...buildDefaultAnswers().identity, repo_owner: "acme", repo_name: "widgets" } };
-  const settings = compileSettingsJson(null, answers, "hash123");
-  const source = settings.extraKnownMarketplaces["agent-pipeline"].source;
-  ok("compileSettingsJson github: source.source is 'github'", source.source === "github", JSON.stringify(source));
-  ok("compileSettingsJson github: repo is owner/name", source.repo === "acme/widgets", JSON.stringify(source));
-  ok("compileSettingsJson github: no leftover 'url' key", source.url === undefined);
+  const settings = compileSettingsJson(null, buildDefaultAnswers(), "hash123");
+  ok("compileSettingsJson: omits agent-pipeline marketplace mapping", settings.extraKnownMarketplaces === undefined, JSON.stringify(settings.extraKnownMarketplaces));
   ok("compileSettingsJson: no existing state -> synthesizes statusLine/enabledPlugins", settings.statusLine && settings.enabledPlugins);
   ok(
     "compileSettingsJson: gated (default) push_policy -> NO permissions key (ADR-0017 no bleed-over)",
@@ -617,7 +585,6 @@ ok("parseArgv: --defaults alone -> force stays false", parseArgv(["--defaults"])
   // push*, mirroring the same condition renderPipelineYaml() uses (briefing fix, 2026-07-11).
   const answers = {
     ...buildDefaultAnswers(),
-    identity: { ...buildDefaultAnswers().identity, repo_owner: "acme", repo_name: "widgets" },
     autonomy: { ...buildDefaultAnswers().autonomy, push_policy: "standing-approved" },
   };
   const settings = compileSettingsJson(null, answers, "hash123-standing");
@@ -629,20 +596,6 @@ ok("parseArgv: --defaults alone -> force stays false", parseArgv(["--defaults"])
     JSON.stringify(settings.permissions),
   );
   ok("compileSettingsJson: standing-approved -> statusLine/enabledPlugins still present", settings.statusLine && settings.enabledPlugins);
-}
-{
-  const answers = {
-    ...buildDefaultAnswers(),
-    identity: { ...buildDefaultAnswers().identity, repo_owner: "acme", repo_name: "widgets" },
-    platform: { git_host: "gitlab", cli: "glab" },
-  };
-  const settings = compileSettingsJson(null, answers, "hash456");
-  const source = settings.extraKnownMarketplaces["agent-pipeline"].source;
-  ok("compileSettingsJson gitlab (bug fix): source.source is 'url', NOT 'git'", source.source === "url", JSON.stringify(source));
-  ok("compileSettingsJson gitlab: url ends with '.git'", typeof source.url === "string" && source.url.endsWith(".git"), source.url);
-  ok("compileSettingsJson gitlab: url embeds owner/repo", source.url.includes("acme/widgets.git"), source.url);
-  ok("compileSettingsJson gitlab: url defaults to the gitlab.com host", source.url.startsWith("https://gitlab.com/"), source.url);
-  ok("compileSettingsJson gitlab: no leftover 'repo' key (github-shape only)", source.repo === undefined);
 }
 {
   // existing settings.json preserved byte-faithfully outside the compiled fields (see file
@@ -657,7 +610,7 @@ ok("parseArgv: --defaults alone -> force stays false", parseArgv(["--defaults"])
   ok("compileSettingsJson: preserves unrelated existing top-level fields", settings.someUnrelatedField === "preserved");
   ok("compileSettingsJson: preserves the caller's own statusLine untouched", settings.statusLine.command === "custom-status-line.mjs");
   ok("compileSettingsJson: preserves a pre-existing sibling marketplace entry", !!settings.extraKnownMarketplaces["other-plugin"]);
-  ok("compileSettingsJson: still writes/updates the agent-pipeline marketplace entry", !!settings.extraKnownMarketplaces["agent-pipeline"]);
+  ok("compileSettingsJson: removes legacy agent-pipeline marketplace projection", settings.extraKnownMarketplaces["agent-pipeline"] === undefined);
 }
 
 // ======================================================================================

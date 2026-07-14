@@ -53,27 +53,9 @@
  * non-interactive mode is allowed to overwrite too (still with a loud WARN either way --
  * `--force` changes who decides, never whether the clobber is announced).
  *
- * GITLAB MARKETPLACE BINDING (bug fix): Claude Code has NO `git`
- * marketplace source type -- the authoritative shape (verified against the official Claude
- * Code docs) is `{ source: "url", url: "<full .git URL>" }`, which works for ANY git host,
- * including self-hosted GitLab (the earlier, WRONG shape compileSettingsJson used to emit --
- * a nonexistent "git" marketplace source type -- is fixed here). SELF-HOSTED GITLAB HOST
- * (design latitude,
- * decided BOUNDED-scope-safe): the `url` branch below still hardcodes `gitlab.com` rather than
- * threading the actually-detected remote host through `answers.platform` into
- * compileSettingsJson. Considered and rejected: `detectGitHost()`'s return contract (plain
- * "github"|"gitlab" strings) is exercised by fixed test cases in this file's own test suite
- * (remote-gitlab -> "gitlab", remote-github -> "github", etc.) -- widening it to also carry the
- * raw remote host would touch that locked contract, and the extra field would need to reach
- * BOTH the interactive (`promptAnswers`) and `--defaults` (`run()`) entry points without a
- * `pipeline.user.schema.json` change (that schema's `platform` object is
- * `additionalProperties: false`, so persisting the real host in `pipeline.user.yaml` itself
- * is out — an ephemeral, unpersisted field would need new plumbing through both paths for a
- * self-hosted-only edge case). That is exactly the "expands scope" case named in this wave's
- * briefing, so the safe fallback applies instead: keep `gitlab.com` as the default host and
- * document the manual override for self-hosted users (see the comment at the `url` branch
- * below and `pipeline.user.yaml`'s `platform:` section) -- they edit the generated
- * `.claude/settings.json` marketplace URL by hand after `node setup.mjs`.
+ * THREE-SCOPE BOUNDARY: Public Core contains no account, repository, marketplace, or machine
+ * coordinates. The ignored private overlay supplies only an anonymous immutable Shared SHA;
+ * machine-local mapping remains outside this compiler and is never parsed or projected here.
  *
  * IDEMPOTENCY: `renderUserYaml(DEFAULT_ANSWERS)` is byte-identical to the committed
  * `pipeline.user.yaml` template shipped alongside this script (same static comments, same
@@ -82,10 +64,9 @@
  * the "up-to-date" branch of decideCompileAction, since pipeline.user.yaml itself did not
  * change between the two runs). See DoD "second run idempotent".
  *
- * DETECTION vs. QUESTIONS (PRD §6): OS + git-host + CLI are DETECTED (never asked) on
- * every run, in both interactive and `--defaults` mode; the five questions (runtime,
- * identity, language, subscription-tier model preset, autonomy preset) are asked only in
- * interactive mode and are replaced by DEFAULT_ANSWERS' values under `--defaults`.
+ * QUESTIONS: interactive setup asks only public, portable intent (runtime, setup intent,
+ * language, subscription-tier model preset, autonomy preset). `--defaults` uses deterministic
+ * public defaults and never inspects repository, account, marketplace, or machine identity.
  *
  * USAGE:
  *   node setup.mjs              interactive (readline prompts, pre-filled from any
@@ -132,9 +113,8 @@ export const GENERATED_MARKER_PREFIX = "GENERATED from pipeline.user.yaml — ed
 export function buildDefaultAnswers() {
   const routing = projectPreset("max", "claude");
   return {
-    identity: { owner_name: "Your Name", repo_owner: "your-org", repo_name: "agent-pipeline", commit_trailer: true },
+    setup: { intent: "unconfigured" },
     language: { human_facing: "en", agent_facing: "en" },
-    platform: { git_host: "github", cli: "gh" },
     agent_runtime: "claude-code",
     // worktypes = THE place to route models per work method (the three session profiles:
     // design-first/advisor/speed) -- the orchestrator's own routing. models below stays the
@@ -143,58 +123,6 @@ export function buildDefaultAnswers() {
     autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
     gates: { dev_plan: "blocking", push: "blocking", security: "blocking", claude_md_max_lines: 200 },
   };
-}
-
-// ---- OS / git-host / CLI detection (pure classifiers, separate from the real I/O) -------------
-/** @param {NodeJS.Platform} platform */
-export function classifyOs(platform) {
-  if (platform === "win32") return "windows";
-  if (platform === "darwin") return "macos";
-  if (platform === "linux") return "linux";
-  return "other";
-}
-
-/** Extracts the first remote's URL from `git remote -v` output, or null. */
-export function parseFirstRemoteUrl(gitRemoteVOutput) {
-  if (typeof gitRemoteVOutput !== "string") return null;
-  const line = gitRemoteVOutput.split(/\r?\n/).find((l) => l.trim() !== "");
-  if (!line) return null;
-  const parts = line.trim().split(/\s+/);
-  return parts.length >= 2 ? parts[1] : null;
-}
-
-/** @param {string|null} remoteUrl @returns {"github"|"gitlab"|null} */
-export function classifyGitHost(remoteUrl) {
-  if (typeof remoteUrl !== "string" || remoteUrl === "") return null;
-  if (/github\.com/i.test(remoteUrl)) return "github";
-  if (/gitlab/i.test(remoteUrl)) return "gitlab";
-  return null;
-}
-
-/** @param {"github"|"gitlab"} host @returns {"gh"|"glab"} */
-export function cliForHost(host) {
-  return host === "gitlab" ? "glab" : "gh";
-}
-
-/**
- * Detects the git host: `git remote -v` first (real signal), then CLI availability
- * (`gh`/`glab` on PATH) as a fallback heuristic (briefing: "from git remote -v or
- * availability of gh/glab"), then "github" as the conservative, deterministic default
- * (matches buildDefaultAnswers().platform.git_host — fresh clones without a remote yet,
- * like this export before P5's `git init`, always resolve here).
- * @param {string} rootDir
- * @param {{spawn?: typeof spawnSync}} [deps] - injectable for tests
- */
-export function detectGitHost(rootDir, deps = {}) {
-  const spawn = deps.spawn ?? spawnSync;
-  const remoteRes = safeSpawn(spawn, "git", ["remote", "-v"], { cwd: rootDir });
-  const fromRemote = classifyGitHost(parseFirstRemoteUrl(remoteRes.stdout));
-  if (fromRemote) return fromRemote;
-
-  const hasGh = safeSpawn(spawn, "gh", ["--version"]).ok;
-  const hasGlab = safeSpawn(spawn, "glab", ["--version"]).ok;
-  if (hasGlab && !hasGh) return "gitlab";
-  return "github";
 }
 
 function safeSpawn(spawn, command, args, opts = {}) {
@@ -295,26 +223,16 @@ export function renderUserYaml(answers) {
 #
 # This is the committed TEMPLATE state with conservative but working defaults
 # (a new colleague starts safe AND immediately functional). The SessionStart hook
-# \`setup-check.mjs\` recognizes this default state (owner_name/repo_owner unchanged)
-# and reminds you to run \`node setup.mjs\` as long as no real setup has run yet.
+# \`setup-check.mjs\` recognizes this unconfigured state. Personal coordinates and
+# credentials belong only in ignored machine-local mapping, never in Public Core.
 
-identity:
-  owner_name: "${a.identity.owner_name}"           # appears nowhere in the methodology core, only in YOUR artifacts (commit trailer etc.)
-  repo_owner: "${a.identity.repo_owner}"            # GitHub org/user or GitLab group of YOUR OWN repo
-  repo_name: "${a.identity.repo_name}"       # name of YOUR OWN repo (setup.mjs binds the plugin to it)
-  commit_trailer: ${a.identity.commit_trailer}              # Co-Authored-By trailer on commits
+setup:
+  intent: ${a.setup.intent}                  # unconfigured | consumer | maintainer
 
 language:
   human_facing: ${a.language.human_facing}                  # what the Pipeline PRODUCES: commits, reviews, new docs (de|en)
   agent_facing: ${a.language.agent_facing}                  # roles/guardrails/skills (recommended: en)
   # Note: the SHIPPED documentation is de (human) / en (agent).
-
-platform:
-  git_host: ${a.platform.git_host}                  # github | gitlab   (setup.mjs detects it from \`git remote -v\`)
-  cli: ${a.platform.cli}                           # gh | glab         (setup.mjs sets this to match the host)
-  # Note on self-hosted GitLab: setup.mjs binds the marketplace binding to gitlab.com by
-  # default; for your own GitLab host, adjust the generated marketplace URL in
-  # .claude/settings.json (extraKnownMarketplaces) by hand afterwards.
 
 agent_runtime: ${a.agent_runtime}          # claude-code (full enforcement) | other (methodology only → docs/runtime-boundary.md)
 
@@ -452,9 +370,8 @@ export function answersFromParsed(parsed, defaults = buildDefaultAnswers()) {
     advisor: g(val, "advisor", def.advisor),
   });
   return {
-    identity: { ...d.identity, ...(parsed.identity && typeof parsed.identity === "object" ? parsed.identity : {}) },
+    setup: { ...d.setup, ...(parsed.setup && typeof parsed.setup === "object" ? parsed.setup : {}) },
     language: { ...d.language, ...(parsed.language && typeof parsed.language === "object" ? parsed.language : {}) },
-    platform: { ...d.platform, ...(parsed.platform && typeof parsed.platform === "object" ? parsed.platform : {}) },
     agent_runtime: g(parsed, "agent_runtime", d.agent_runtime),
     worktypes: {
       design: mergeWorktype(d.worktypes.design, parsed.worktypes?.design),
@@ -538,17 +455,13 @@ export function compileSettingsJson(existing, answers, sourceHash) {
             : {}),
           enabledPlugins: { "pipeline-core@agent-pipeline": true },
         };
-  const marketplaceName = "agent-pipeline"; // local alias key stays stable (D2: same alias, own repo underneath)
-  // GitLab: Claude Code marketplace source type is "url" (NOT "git" -- that type does not
-  // exist), value = the full .git clone URL. Host is gitlab.com by default -- self-hosted
-  // GitLab users: edit the marketplace url below by hand after setup.mjs runs (see file header
-  // "GITLAB MARKETPLACE BINDING" and pipeline.user.yaml's platform: section for the full
-  // rationale on why the detected host isn't threaded through automatically here).
-  const source =
-    answers.platform.git_host === "gitlab"
-      ? { source: "url", url: `https://gitlab.com/${answers.identity.repo_owner}/${answers.identity.repo_name}.git` }
-      : { source: "github", repo: `${answers.identity.repo_owner}/${answers.identity.repo_name}` };
-  base.extraKnownMarketplaces = { ...(base.extraKnownMarketplaces ?? {}), [marketplaceName]: { source } };
+  // Marketplace coordinates are machine-local. Never compile them from Public Core.
+  // Drop only this pipeline's legacy projection; unrelated caller entries stay untouched.
+  if (base.extraKnownMarketplaces && typeof base.extraKnownMarketplaces === "object") {
+    const { "agent-pipeline": _legacyPipelineMapping, ...otherMarketplaces } = base.extraKnownMarketplaces;
+    if (Object.keys(otherMarketplaces).length > 0) base.extraKnownMarketplaces = otherMarketplaces;
+    else delete base.extraKnownMarketplaces;
+  }
   base.$generated = generatedMarker(sourceHash);
   return base;
 }
@@ -559,7 +472,7 @@ export function compilePipelineJson(existing, answers, sourceHash) {
     existing && typeof existing === "object"
       ? { ...existing }
       : {
-          project: answers.identity.repo_name,
+          project: "pipeline-project",
           verify: "node harness/scripts/verify.mjs",
           handover: "docs/state.md",
           verification: "docs+tests",
@@ -714,6 +627,38 @@ export function validateCompiledPipelineYaml(text, rootDir = ROOT_DIR) {
   return validateManifest(manifest, { rootDir });
 }
 
+// ---- private overlay lock preflight -------------------------------------------------------------
+// The ignored overlay intentionally contains only an anonymous immutable Public-Core SHA.
+// Marketplace/account/path mapping is machine-local and is neither parsed nor projected here.
+export function validateSharedLock(lockSha, checkedOutSha) {
+  if (typeof lockSha !== "string" || !/^[0-9a-f]{40}$/i.test(lockSha)) {
+    return { ok: false, reason: "missing-or-malformed-shared-sha" };
+  }
+  if (typeof checkedOutSha !== "string" || !/^[0-9a-f]{40}$/i.test(checkedOutSha)) {
+    return { ok: false, reason: "unavailable-checked-out-sha" };
+  }
+  if (lockSha.toLowerCase() !== checkedOutSha.toLowerCase()) {
+    return { ok: false, reason: "shared-sha-mismatch" };
+  }
+  return { ok: true };
+}
+
+export function readPrivateOverlayLock(rootDir, deps = {}) {
+  if (deps.lockSha !== undefined || deps.checkedOutSha !== undefined) {
+    return validateSharedLock(deps.lockSha, deps.checkedOutSha);
+  }
+  const overlayPath = join(rootDir, ".pipeline", "private-overlay.yaml");
+  let lockSha;
+  try {
+    const parsed = parseYaml(readFileSync(overlayPath, "utf8"));
+    lockSha = parsed?.shared?.sha;
+  } catch {
+    return { ok: false, reason: "missing-or-malformed-shared-sha" };
+  }
+  const head = safeSpawn(deps.spawn ?? spawnSync, "git", ["rev-parse", "HEAD"], { cwd: rootDir });
+  return validateSharedLock(lockSha, head.ok ? head.stdout.trim() : null);
+}
+
 // ---- CLI I/O layer: real filesystem, real prompts, real exit -----------------------------------
 function readJsonSafe(path) {
   if (!existsSync(path)) return { existsOnDisk: false, parsedOk: true, raw: null, parsed: null };
@@ -788,10 +733,8 @@ async function promptAnswers(rl, previous) {
     );
   }
 
-  const owner_name = (await rl.question(`Your name (${previous.identity.owner_name}): `)).trim() || previous.identity.owner_name;
-  const repo_owner =
-    (await rl.question(`GitHub/GitLab owner of your repo (${previous.identity.repo_owner}): `)).trim() || previous.identity.repo_owner;
-  const repo_name = (await rl.question(`Repo name (${previous.identity.repo_name}): `)).trim() || previous.identity.repo_name;
+  const intentIn = (await rl.question(`Setup intent [consumer/maintainer] (${previous.setup.intent === "unconfigured" ? "consumer" : previous.setup.intent}): `)).trim();
+  const intent = intentIn === "maintainer" ? "maintainer" : intentIn === "consumer" ? "consumer" : previous.setup.intent === "unconfigured" ? "consumer" : previous.setup.intent;
 
   const humanIn = (await rl.question(`Language -- human-facing (commits/reviews/new docs) [de/en] (${previous.language.human_facing}): `)).trim();
   const agentIn = (await rl.question(`Language -- agent-facing (roles/guardrails/skills) [de/en] (${previous.language.agent_facing}): `)).trim();
@@ -814,14 +757,9 @@ async function promptAnswers(rl, previous) {
   ).trim().toLowerCase();
   const { worktypes, models, autonomy } = resolveRoutingAnswers(aboIn, autonomyIn, previous);
 
-  const git_host = detectGitHost(ROOT_DIR);
-  const cli = cliForHost(git_host);
-  console.log(`  Detected: OS=${classifyOs(process.platform)}, git host=${git_host}, CLI=${cli}.`);
-
   return {
-    identity: { owner_name, repo_owner, repo_name, commit_trailer: previous.identity.commit_trailer },
+    setup: { intent },
     language: { human_facing: humanIn ? normalizeLang(humanIn) : previous.language.human_facing, agent_facing: agentIn ? normalizeLang(agentIn) : previous.language.agent_facing },
-    platform: { git_host, cli },
     agent_runtime,
     worktypes,
     models,
@@ -834,20 +772,13 @@ async function promptAnswers(rl, previous) {
   };
 }
 
-function printNextSteps(answers) {
-  // Command shape must match compileSettingsJson's marketplace source (github: shorthand,
-  // gitlab: full .git clone URL -- gitlab.com marketplace source type is "url", not "git").
-  const addCmd =
-    answers.platform.git_host === "gitlab"
-      ? `claude plugin marketplace add https://gitlab.com/${answers.identity.repo_owner}/${answers.identity.repo_name}.git --scope project`
-      : `claude plugin marketplace add ${answers.identity.repo_owner}/${answers.identity.repo_name} --scope project`;
+function printNextSteps() {
   console.log(`
 Setup complete.
 
 Next steps:
-  1. Bind the plugin to your own repo (if not already done):
-       ${addCmd}
-       claude plugin install pipeline-core@agent-pipeline --scope project
+  1. Add the marketplace through ignored machine-local mapping; Public Core never
+     stores its coordinates. Then install pipeline-core at project scope.
   2. Start a new Claude Code session -- the bootstrap check runs automatically
      (/pipeline-core:pipeline-start).
   3. Try a first run in the "quick" profile (details: SETUP.md).
@@ -896,12 +827,11 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
   let rl = null;
   let answers;
   if (opts.defaults) {
-    // Detection still runs (never a "question") -- only the five interactive questions are
-    // replaced by the deterministic defaults (see file header "DETECTION vs. QUESTIONS").
-    const git_host = detectGitHost(rootDir);
+    // Non-interactive setup has no environment-derived inputs: it writes deterministic public
+    // defaults only. Repository/account/machine mapping is intentionally out of scope.
     answers = {
       ...defaults,
-      platform: { git_host, cli: cliForHost(git_host) },
+      setup: { intent: "consumer" },
       // release: carried over from the existing pipeline.user.yaml, if any -- `--defaults`
       // resets the five interactive answers, never a hand-edited release: section (ADR-0033/0034).
       ...(previous.release !== undefined ? { release: previous.release } : {}),
@@ -944,6 +874,13 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
     for (const error of manifestPreflight.errors) {
       console.error(`  ${error.reason ?? error.message ?? `${error.path}: expected ${error.expected}, got ${error.got}`}`);
     }
+    return 1;
+  }
+
+  const lockPreflight = readPrivateOverlayLock(rootDir, deps);
+  if (!lockPreflight.ok) {
+    if (rl) rl.close();
+    console.error(`setup.mjs: private-overlay Shared-SHA lock failed (${lockPreflight.reason}); no files were written.`);
     return 1;
   }
 
@@ -998,7 +935,7 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
   });
 
   if (rl) rl.close();
-  printNextSteps(answers);
+  printNextSteps();
   return 0;
 }
 
