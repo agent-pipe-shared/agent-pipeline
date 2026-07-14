@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { execFileSync, spawn as spawnProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
+import { readFileSync } from "node:fs";
 import { chmod, link, lstat, mkdir, mkdtemp, open, readFile, rm, symlink, truncate, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
@@ -19,7 +20,6 @@ import {
   buildPermissionProfile,
   buildProfileBoundCodexCriticInvocation,
   buildReviewBundle,
-  createDebugChildObserver,
   createSecureTraceStore,
   createDebugLineRedactor,
   criticPrompt,
@@ -31,6 +31,7 @@ import {
   runPermissionProfilePreflight,
   runProfileBoundIsolation,
   sanitizeEnvironment,
+  spawnDebugChildObserver,
   verifySecureTraceStore,
   verifyProfileContract,
 } from "./codex-critic-isolation.mjs";
@@ -120,14 +121,14 @@ await check("debug redactor bounds pending and total output and never exposes ra
   assert.throws(() => output.finish(), /closed/u);
 });
 
-await check("debug redactor removes URL authority, bare tokens, JWTs and injected private literals across splits", () => {
+await check("debug redactor removes URL authority, bare tokens, JWTs and case-normalized private literals across splits", () => {
   const rawValues = [
     "user-private", "host.private.invalid", "private/url/path", "file-private", "sk-privateCanary123",
     "ghp_PrivateCanary123", "eyJhbGciOiJIUzI1NiJ9.cHJpdmF0ZS1wYXlsb2Fk.cHJpdmF0ZS1zaWduYXR1cmU",
-    "space-private", "machine-private-17", "/srv/private-root-17",
+    "space-private", "machine-private-17", "c:/srv/private-root-17",
   ];
-  const redactor = createDebugLineRedactor({ privateIdentifiers: ["machine-private-17"], privateRoots: ["/srv/private-root-17"] });
-  const input = Buffer.from(`https://user-private:pass@host.private.invalid/private/url/path?q=private#fragment file:///tmp/file-private sk-privateCanary123 ghp_PrivateCanary123 eyJhbGciOiJIUzI1NiJ9.cHJpdmF0ZS1wYXlsb2Fk.cHJpdmF0ZS1zaWduYXR1cmU token space-private machine-private-17 /srv/private-root-17\n`);
+  const redactor = createDebugLineRedactor({ privateIdentifiers: ["MACHINE-PRIVATE-17"], privateRoots: ["C:\\Srv\\Private-Root-17"] });
+  const input = Buffer.from(`https://user-private:pass@host.private.invalid/private/url/path?q=private#fragment file:///tmp/file-private sk-privateCanary123 ghp_PrivateCanary123 eyJhbGciOiJIUzI1NiJ9.cHJpdmF0ZS1wYXlsb2Fk.cHJpdmF0ZS1zaWduYXR1cmU token space-private machine-private-17 c:/srv/private-root-17\n`);
   const lines = [];
   for (let offset = 0; offset < input.length; offset += 3) lines.push(...redactor.write(input.subarray(offset, offset + 3)));
   lines.push(...redactor.finish());
@@ -150,32 +151,65 @@ async function withTraceCase(fn) {
 
 function validTracePayloads() {
   const digest = "a".repeat(64);
-  return [
-    ["run.started", {}],
-    ["step.started", { step: "input" }], ["step.completed", { step: "input" }],
-    ["step.started", { step: "result" }], ["step.failed", { step: "result" }],
-    ["step.started", { step: "cleanup" }], ["step.completed", { step: "cleanup" }],
-    ["child.spawn-requested", { label: "failed-child" }], ["child.spawn-failed", { label: "failed-child", category: "spawn-error" }],
-    ["child.close", { label: "failed-child", code: null, signal: null }],
-    ["child.spawn-requested", { label: "errored-child" }], ["child.spawned", { label: "errored-child", pid: 102, pgid: 102 }],
-    ["child.error", { label: "errored-child", category: "process-error" }], ["child.close", { label: "errored-child", code: null, signal: null }],
-    ["child.spawn-requested", { label: "critic" }], ["child.spawned", { label: "critic", pid: 101, pgid: 101 }],
-    ["stdin.write-requested", { bytes: 12, sha256: digest }], ["stdin.write-accepted", { bytes: 12 }],
-    ["stdin.end-requested", {}], ["stdin.error", { category: "broken-pipe" }], ["stdin.closed", {}],
-    ["stream.chunk", { stream: "stdout", bytes: 4, cumulativeBytes: 4, sha256: digest }],
-    ["stream.jsonl-event", { type: "item.completed", itemType: "agent_message", status: "completed" }],
-    ["stream.diagnostic", { stream: "stderr", line: "token=[REDACTED_SECRET]" }],
-    ["stream.error", { stream: "stderr", category: "decode-error" }],
-    ["process.sample", { availability: "observed", state: "S", cpuUserTicks: 1, cpuSystemTicks: 2, rssPages: 3, fdCount: 4, wchanSha256: digest }],
-    ["lease.armed", { label: "critic", elapsedMs: 0, stdoutBytes: 0, stderrBytes: 0 }],
-    ["lease.heartbeat", { label: "critic", elapsedMs: 1000, stdoutBytes: 4, stderrBytes: 0 }],
-    ["lease.expired", { label: "critic", elapsedMs: 300000, stdoutBytes: 4, stderrBytes: 2 }],
-    ["child.signal-requested", { label: "critic", pid: 101, pgid: 101, signal: "SIGTERM" }],
-    ["child.signal-result", { label: "critic", pgid: 101, signal: "SIGTERM", category: "sent" }],
-    ["result.observed", { present: true, bytes: 12, sha256: digest }],
-    ["child.exit", { label: "critic", code: 0, signal: null }], ["child.close", { label: "critic", code: 0, signal: null }],
-    ["run.completed", { cause: "unbestimmt" }],
-  ];
+  const events = [["run.started", {}]];
+  for (const step of CODEX_CRITIC_TRACE_STEPS) {
+    events.push(["step.started", { step }]);
+    if (step === "preflight") {
+      for (const [index, label] of ["profile-preflight-fixture-read", "profile-preflight-external-read-denied", "profile-preflight-write-denied"].entries()) {
+        events.push(["child.spawn-requested", { label }], ["child.spawned", { label, pid: 201 + index, pgid: 201 + index }]);
+        events.push(["lease.armed", { label, elapsedMs: 0, stdoutBytes: 0, stderrBytes: 0 }]);
+        events.push(["child.exit", { label, code: index === 0 ? 0 : 2, signal: null }], ["child.close", { label, code: index === 0 ? 0 : 2, signal: null }]);
+      }
+    } else if (step === "critic") {
+      events.push(["child.spawn-requested", { label: "critic" }], ["child.spawned", { label: "critic", pid: 101, pgid: 101 }]);
+      events.push(["stdin.write-requested", { bytes: 12, sha256: digest }], ["stdin.write-accepted", { bytes: 12 }], ["stdin.end-requested", {}], ["stdin.closed", {}]);
+      events.push(["stream.chunk", { stream: "stdout", bytes: 4, cumulativeBytes: 4, sha256: digest }]);
+      events.push(["stream.jsonl-event", { type: "item.completed", itemType: "agent_message", status: "completed" }]);
+      events.push(["process.sample", { availability: "observed", state: "S", cpuUserTicks: 1, cpuSystemTicks: 2, rssPages: 3, fdCount: 4, wchanSha256: digest }]);
+      events.push(["lease.armed", { label: "critic", elapsedMs: 0, stdoutBytes: 4, stderrBytes: 0 }], ["lease.heartbeat", { label: "critic", elapsedMs: 1000, stdoutBytes: 4, stderrBytes: 0 }]);
+      events.push(["child.exit", { label: "critic", code: 0, signal: null }], ["child.close", { label: "critic", code: 0, signal: null }]);
+    } else if (step === "result") events.push(["result.observed", { present: true, bytes: 12, sha256: digest }]);
+    events.push(["step.completed", { step }]);
+  }
+  events.push(["run.completed", { cause: "unbestimmt" }]);
+  return events;
+}
+
+async function appendSuccessfulPreflightChildren(store) {
+  for (const [index, label] of ["profile-preflight-fixture-read", "profile-preflight-external-read-denied", "profile-preflight-write-denied"].entries()) {
+    await store.append("child.spawn-requested", { label }); await store.append("child.spawned", { label, pid: 301 + index, pgid: 301 + index });
+    await store.append("child.exit", { label, code: index === 0 ? 0 : 2, signal: null }); await store.append("child.close", { label, code: index === 0 ? 0 : 2, signal: null });
+  }
+}
+
+async function beginTraceStep(store, target) {
+  await store.append("run.started", {});
+  for (const step of CODEX_CRITIC_TRACE_STEPS) {
+    await store.append("step.started", { step });
+    if (step === target) return;
+    if (step === "preflight") await appendSuccessfulPreflightChildren(store);
+    await store.append("step.completed", { step });
+  }
+  throw new Error("target trace step is outside the fixed lifecycle");
+}
+
+async function completeSuccessfulTraceFromCritic(store) {
+  await store.append("step.completed", { step: "critic" });
+  for (const step of ["binding-after", "result", "canary", "cleanup"]) {
+    await store.append("step.started", { step });
+    if (step === "result") await store.append("result.observed", { present: true, bytes: 1, sha256: "b".repeat(64) });
+    await store.append("step.completed", { step });
+  }
+  await store.append("run.completed", { cause: "unbestimmt" });
+}
+
+async function appendMinimalFailedTrace(store, cause = "unbestimmt") {
+  await store.append("run.started", {}); await store.append("step.started", { step: "input" });
+  await store.append("step.failed", { step: "input" }); await store.append("run.failed", { cause });
+}
+
+async function appendCompleteSuccessfulTrace(store) {
+  for (const [event, payload] of validTracePayloads()) await store.append(event, payload);
 }
 
 await check("trace store publishes the exact closed event and step enums", () => {
@@ -190,10 +224,10 @@ await check("trace store publishes the exact closed event and step enums", () =>
   assert.equal(Object.isFrozen(CODEX_CRITIC_TRACE_STEPS), true);
 });
 
-await check("trace store accepts every event schema and clean final verification", () => withTraceCase(async ({ tracePath, options }) => {
+await check("trace store accepts the exact complete lifecycle and clean final verification", () => withTraceCase(async ({ tracePath, options }) => {
   let monotonic = 10n;
   const store = await createSecureTraceStore({ ...options, now: () => "2026-07-14T12:00:00.000Z", monotonicNow: () => monotonic++ });
-  for (const [event, payload] of validTracePayloads()) await store.append(event, payload);
+  await appendCompleteSuccessfulTrace(store);
   const synced = await store.sync();
   assert.equal(synced.recordCount, 1 + validTracePayloads().length);
   const final = await store.finalize({ outcome: "completed", cause: "unbestimmt" });
@@ -248,6 +282,17 @@ await check("trace payload schemas reject unsafe enum values, categories and inc
       await assert.rejects(() => store.append(event, payload), expected);
     });
   }
+  await withTraceCase(async ({ options }) => {
+    const store = await createSecureTraceStore({ ...options, privateIdentifiers: ["PRIVATE-HOST"] });
+    await assert.rejects(() => store.append("stream.diagnostic", { stream: "stderr", line: "private-host" }), /observer-managed/u);
+  });
+  await withTraceCase(async ({ options }) => {
+    const store = await createSecureTraceStore({ ...options, privateIdentifiers: ["PRIVATE-HOST"] }); await beginTraceStep(store, "critic");
+    const child = observedChild(); const timers = observerTimers();
+    const { observer } = await spawnDebugChildObserver({ traceStore: store, spawn: () => child, command: "/debug/codex", ...timers });
+    child.stderr.write(Buffer.from("private-host\n")); await settleEvents();
+    await assert.rejects(() => observer.finishAndDrain(), /trace operation failed/u);
+  });
 });
 
 await check("trace path validation rejects relative, noncanonical, outside, fixture, symlink and existing targets", () => withTraceCase(async ({ directory, fixtureRoot, tracePath, options }) => {
@@ -271,8 +316,7 @@ await check("trace path validation rejects relative, noncanonical, outside, fixt
 await check("trace location applies canonical generic forbidden roots during creation and verification", () => withTraceCase(async ({ directory, tracePath }) => {
   await assert.rejects(() => createSecureTraceStore({ tracePath, forbiddenRoots: [path.join(directory, "fixture", "..")] }), /outside forbiddenRoots\[0\]/u);
   const store = await createSecureTraceStore({ tracePath, forbiddenRoots: [root] });
-  await store.append("run.started", {}); await store.append("run.completed", { cause: "unbestimmt" });
-  await store.finalize({ outcome: "completed", cause: "unbestimmt" });
+  await appendMinimalFailedTrace(store); await store.finalize({ outcome: "failed", cause: "unbestimmt" });
   await assert.rejects(() => verifySecureTraceStore({ tracePath, binding: store.binding, forbiddenRoots: [directory] }), /outside forbiddenRoots\[0\]/u);
 }));
 
@@ -281,20 +325,34 @@ await check("trace lifecycle rejects duplicate terminals, illegal steps, child/s
     async (store) => store.append("run.completed", { cause: "unbestimmt" }),
     async (store) => { await store.append("run.started", {}); return store.append("run.started", {}); },
     async (store) => { await store.append("run.started", {}); return store.append("step.completed", { step: "input" }); },
-    async (store) => { await store.append("run.started", {}); await store.append("step.started", { step: "result" }); await store.append("step.completed", { step: "result" }); return store.append("step.started", { step: "input" }); },
+    async (store) => { await store.append("run.started", {}); return store.append("step.started", { step: "result" }); },
     async (store) => { await store.append("run.started", {}); return store.append("child.spawned", { label: "critic", pid: 1, pgid: 1 }); },
     async (store) => { await store.append("run.started", {}); return store.append("stdin.write-accepted", { bytes: 1 }); },
     async (store) => { await store.append("run.started", {}); return store.append("lease.heartbeat", { label: "critic", elapsedMs: 1, stdoutBytes: 0, stderrBytes: 0 }); },
-    async (store) => { await store.append("run.started", {}); await store.append("run.completed", { cause: "unbestimmt" }); return store.append("result.observed", { present: false, bytes: 0, sha256: null }); },
+    async (store) => { await beginTraceStep(store, "result"); return store.append("step.completed", { step: "result" }); },
+    async (store) => { await beginTraceStep(store, "result"); await store.append("result.observed", { present: false, bytes: 0, sha256: null }); return store.append("result.observed", { present: false, bytes: 0, sha256: null }); },
+    async (store) => { await beginTraceStep(store, "critic"); return store.append("child.spawn-requested", { label: "profile-preflight-fixture-read" }); },
+    async (store) => { await appendCompleteSuccessfulTrace(store); return store.append("result.observed", { present: false, bytes: 0, sha256: null }); },
   ];
   for (const runCase of cases) await withTraceCase(async ({ options }) => {
     const store = await createSecureTraceStore(options);
-    await assert.rejects(() => runCase(store), /run|step|spawn|stdin|lease|active/u);
+    await assert.rejects(() => runCase(store), /run|step|spawn|stdin|lease|active|result|child label/u);
   });
   await withTraceCase(async ({ options }) => {
     const store = await createSecureTraceStore(options);
-    await store.append("run.started", {}); await store.append("run.completed", { cause: "unbestimmt" });
-    await assert.rejects(() => store.finalize({ outcome: "failed", cause: "cleanup" }), /disagrees/u);
+    await appendMinimalFailedTrace(store, "cleanup");
+    await assert.rejects(() => store.finalize({ outcome: "completed", cause: "cleanup" }), /disagrees/u);
+  });
+  await withTraceCase(async ({ tracePath, options }) => {
+    const store = await createSecureTraceStore(options); await beginTraceStep(store, "critic");
+    const result = await spawnDebugChildObserver({ traceStore: store, command: "/debug/missing", spawn: () => {
+      assert.equal(readFileSync(tracePath, "utf8").includes('"event":"child.spawn-requested"'), true);
+      throw Object.assign(new Error("private spawn failure"), { code: "ENOENT" });
+    } });
+    assert.deepEqual({ ok: result.ok, category: result.category }, { ok: false, category: "not-found" });
+    assert.equal(readFileSync(tracePath, "utf8").includes('"event":"child.spawn-failed"'), true);
+    await store.append("step.failed", { step: "critic" }); await store.append("run.failed", { cause: "child-process" });
+    await store.finalize({ outcome: "failed", cause: "child-process" });
   });
 });
 
@@ -326,9 +384,9 @@ await check("trace verifier replays lifecycle and rejects correctly hashed illeg
   ];
   for (const specifications of illegal) await withTraceCase(async ({ tracePath, options }) => {
     const store = await createSecureTraceStore(options);
-    await store.append("run.started", {}); await store.append("run.completed", { cause: "unbestimmt" }); await store.finalize({ outcome: "completed", cause: "unbestimmt" });
+    await appendMinimalFailedTrace(store); await store.finalize({ outcome: "failed", cause: "unbestimmt" });
     await writeFile(tracePath, forgedTrace(specifications, "completed", "unbestimmt"), { mode: 0o600 });
-    await assert.rejects(() => verifySecureTraceStore({ ...options, binding: store.binding }), /active run|step terminal/u);
+    await assert.rejects(() => verifySecureTraceStore({ ...options, binding: store.binding }), /active run|step terminal|complete fixed/u);
   });
 });
 
@@ -339,7 +397,7 @@ await check("trace creation uses regular 0600 single-link file and binds device/
   assert.equal(info.mode & 0o777, 0o600);
   assert.equal(info.nlink, 1);
   assert.deepEqual(store.binding, { dev: String(info.dev), ino: String(info.ino) });
-  await store.append("run.started", {}); await store.append("run.failed", { cause: "cleanup" });
+  await appendMinimalFailedTrace(store, "cleanup");
   const alias = path.join(directory, "trace-alias.jsonl");
   await link(tracePath, alias);
   await assert.rejects(() => store.finalize({ outcome: "failed", cause: "cleanup" }), /link count/u);
@@ -348,14 +406,16 @@ await check("trace creation uses regular 0600 single-link file and binds device/
 await check("trace appends serialize with contiguous order and nondecreasing monotonic nanoseconds", () => withTraceCase(async ({ tracePath, options }) => {
   let tick = 0n;
   const store = await createSecureTraceStore({ ...options, monotonicNow: () => ++tick });
-  await store.append("run.started", {});
+  await beginTraceStep(store, "critic");
   await store.append("child.spawn-requested", { label: "critic" });
   await store.append("child.spawned", { label: "critic", pid: 101, pgid: 101 });
+  await store.append("stdin.write-requested", { bytes: 0, sha256: createHash("sha256").update("").digest("hex") });
+  await store.append("stdin.write-accepted", { bytes: 0 }); await store.append("stdin.end-requested", {}); await store.append("stdin.closed", {});
   await store.append("lease.armed", { label: "critic", elapsedMs: 0, stdoutBytes: 0, stderrBytes: 0 });
   await Promise.all(Array.from({ length: 12 }, (_unused, index) => store.append("lease.heartbeat", { label: "critic", elapsedMs: index, stdoutBytes: index, stderrBytes: 0 })));
   await store.append("child.exit", { label: "critic", code: 0, signal: null });
   await store.append("child.close", { label: "critic", code: 0, signal: null });
-  await store.append("run.completed", { cause: "unbestimmt" });
+  await completeSuccessfulTraceFromCritic(store);
   await store.finalize({ outcome: "completed", cause: "unbestimmt" });
   const records = (await readFile(tracePath, "utf8")).trimEnd().split("\n").map(JSON.parse);
   assert.deepEqual(records.map((record) => record.seq), Array.from({ length: records.length }, (_unused, index) => index + 1));
@@ -413,9 +473,8 @@ await check("trace verification detects truncation, mutation, replacement and mo
   for (const fault of ["truncation", "mutation", "replacement", "mode"]) {
     await withTraceCase(async ({ tracePath, options }) => {
       const store = await createSecureTraceStore(options);
-      await store.append("run.started", {});
-      await store.append("run.completed", { cause: "unbestimmt" });
-      await store.finalize({ outcome: "completed", cause: "unbestimmt" });
+      await appendMinimalFailedTrace(store);
+      await store.finalize({ outcome: "failed", cause: "unbestimmt" });
       const original = await readFile(tracePath);
       if (fault === "truncation") {
         const finalStart = original.lastIndexOf(0x0a, original.length - 2) + 1;
@@ -455,13 +514,27 @@ function observedChild({ pid = 4242, onWrite = () => {}, onEnd = () => {}, onKil
   return child;
 }
 
-function observerTimers() {
+function failingStdinChild(mode) {
+  const child = observedChild();
+  if (mode === "epipe") {
+    child.stdin.write = (_chunk, callback) => {
+      setImmediate(() => { const error = Object.assign(new Error("stdin-private-error"), { code: "EPIPE" }); child.stdin.emit("error", error); callback(error); });
+      return true;
+    };
+  } else {
+    child.stdin.write = (_chunk, callback) => { setImmediate(() => callback()); return true; };
+    child.stdin.end = () => { setImmediate(() => child.stdin.emit("close")); return child.stdin; };
+  }
+  return child;
+}
+
+function observerTimers(onArm = () => {}) {
   const state = { interval: null, timeout: null, clearedIntervals: 0, clearedTimeouts: 0 };
   return {
     state,
-    setIntervalFn(fn, milliseconds) { state.interval = { fn, milliseconds }; return { unref() {} }; },
+    setIntervalFn(fn, milliseconds) { onArm("interval"); state.interval = { fn, milliseconds }; return { unref() {} }; },
     clearIntervalFn() { state.clearedIntervals += 1; },
-    setTimeoutFn(fn, milliseconds) { state.timeout = { fn, milliseconds }; return { unref() {} }; },
+    setTimeoutFn(fn, milliseconds) { onArm("timeout"); state.timeout = { fn, milliseconds }; return { unref() {} }; },
     clearTimeoutFn() { state.clearedTimeouts += 1; },
   };
 }
@@ -469,14 +542,16 @@ function observerTimers() {
 function settleEvents() { return new Promise((resolve) => setImmediate(resolve)); }
 
 await check("debug child observer installs listeners before stdin and drains early split UTF-8 JSONL plus redacted stderr", () => withTraceCase(async ({ tracePath, options }) => {
-  const store = await createSecureTraceStore(options); await store.append("run.started", {});
-  const order = []; const timers = observerTimers(); const procPaths = [];
+  const store = await createSecureTraceStore({ ...options, privateIdentifiers: ["MACHINE-PRIVATE-17"] }); await beginTraceStep(store, "critic");
+  const order = []; const durableSnapshots = [];
+  const snapshot = (sideEffect) => durableSnapshots.push([sideEffect, readFileSync(tracePath, "utf8")]);
+  const timers = observerTimers(snapshot); const procPaths = [];
   const stdout = Buffer.from(`${JSON.stringify({ type: "thread.started" })}\n${JSON.stringify({ type: "item.completed", item: { type: "agent_message", text: "private-verdict-🌍" } })}\n`);
   const split = stdout.indexOf(Buffer.from("🌍")) + 1;
   const child = observedChild({
     listenerOrder: order,
-    onWrite: (_input, current) => { current.stdout.write(stdout.subarray(0, split)); current.stderr.write(Buffer.from("token=split-")); },
-    onEnd: (current) => { current.stdout.end(stdout.subarray(split)); current.stderr.end(Buffer.from("private\nmachine-private-17\n")); },
+    onWrite: (_input, current) => { snapshot("stdin-write"); current.stdout.write(stdout.subarray(0, split)); current.stderr.write(Buffer.from("token=split-")); },
+    onEnd: (current) => { snapshot("stdin-end"); current.stdout.end(stdout.subarray(split)); current.stderr.end(Buffer.from("private\nmachine-private-17\n")); },
   });
   const statFields = Array(22).fill("0"); statFields[0] = "S"; statFields[11] = "11"; statFields[12] = "12"; statFields[21] = "13";
   const procIo = {
@@ -490,8 +565,8 @@ await check("debug child observer installs listeners before stdin and drains ear
     readdir: async (target) => { procPaths.push(target); return ["0", "1", "2"]; },
   };
   let clock = 100;
-  const observer = createDebugChildObserver({ traceStore: store, child, label: "critic", privateIdentifiers: ["machine-private-17"], procIo, clock: () => clock, ...timers });
-  await observer.recordSpawn();
+  const spawned = await spawnDebugChildObserver({ traceStore: store, spawn: () => { snapshot("spawn"); return child; }, command: "/debug/codex", label: "critic", privateIdentifiers: ["machine-private-17"], procIo, clock: () => clock, ...timers });
+  assert.equal(spawned.ok, true); const { observer } = spawned;
   await observer.armLease({ leaseMs: 1000 }); clock = 125; await observer.heartbeatLease();
   await observer.writeAndEndStdin("stdin-private-content");
   await observer.sampleProcess();
@@ -505,7 +580,11 @@ await check("debug child observer installs listeners before stdin and drains ear
   assert.equal(order.indexOf("stdin:write") < order.indexOf("stdin:end"), true);
   assert.deepEqual(procPaths.sort(), ["/proc/4242/fd", "/proc/4242/stat", "/proc/4242/status", "/proc/4242/wchan"]);
   assert.equal(procPaths.some((entry) => entry.endsWith("cmdline") || entry.endsWith("environ")), false);
-  await store.append("run.completed", { cause: "unbestimmt" }); await store.finalize({ outcome: "completed", cause: "unbestimmt" });
+  await completeSuccessfulTraceFromCritic(store); await store.finalize({ outcome: "completed", cause: "unbestimmt" });
+  assert.equal(durableSnapshots.find(([sideEffect]) => sideEffect === "spawn")[1].includes('"event":"child.spawn-requested"'), true);
+  assert.equal(durableSnapshots.find(([sideEffect]) => sideEffect === "stdin-write")[1].includes('"event":"stdin.write-requested"'), true);
+  assert.equal(durableSnapshots.find(([sideEffect]) => sideEffect === "stdin-end")[1].includes('"event":"stdin.end-requested"'), true);
+  assert.equal(durableSnapshots.find(([sideEffect]) => sideEffect === "timeout")[1].includes('"event":"lease.armed"'), true);
   const trace = await readFile(tracePath, "utf8");
   for (const raw of ["stdin-private-content", "private-verdict", "split-private", "machine-private-17", "private-wchan-coordinate", "private-command"]) assert.equal(trace.includes(raw), false, raw);
   const records = trace.trimEnd().split("\n").map(JSON.parse);
@@ -517,43 +596,66 @@ await check("debug child observer installs listeners before stdin and drains ear
   assert.equal(records.some((record) => record.event === "process.sample" && record.payload.availability === "observed" && record.payload.fdCount === 3), true);
 }));
 
-await check("debug child observer classifies stdin errors without raw leakage and fails closed after draining", () => withTraceCase(async ({ tracePath, options }) => {
-  const store = await createSecureTraceStore(options); await store.append("run.started", {}); const timers = observerTimers();
-  const child = observedChild({ onWrite: (_input, current) => current.stdin.emit("error", Object.assign(new Error("stdin-private-error"), { code: "EPIPE" })) });
-  const observer = createDebugChildObserver({ traceStore: store, child, ...timers });
-  await observer.recordSpawn(); await observer.writeAndEndStdin("stdin-private-payload"); await settleEvents();
-  child.stdout.end(); child.stderr.end(); child.emit("exit", 1, null); child.emit("close", 1, null); await settleEvents();
-  await assert.rejects(() => observer.finishAndDrain(), /closed failure category/u);
-  await store.append("run.failed", { cause: "coordinator-input" }); await store.finalize({ outcome: "failed", cause: "coordinator-input" });
-  const trace = await readFile(tracePath, "utf8");
-  assert.equal(trace.includes("stdin-private-error"), false); assert.equal(trace.includes("stdin-private-payload"), false);
-  assert.equal(trace.includes('"event":"stdin.error"'), true); assert.equal(trace.includes('"category":"broken-pipe"'), true);
-}));
+await check("debug child observer accepts stdin only after callback and drain and rejects asynchronous EPIPE or premature close", async () => {
+  for (const [mode, category] of [["epipe", "broken-pipe"], ["close", "premature-close"]]) await withTraceCase(async ({ tracePath, options }) => {
+    const store = await createSecureTraceStore(options); await beginTraceStep(store, "critic"); const timers = observerTimers();
+    const child = failingStdinChild(mode);
+    const spawned = await spawnDebugChildObserver({ traceStore: store, spawn: () => child, command: "/debug/codex", ...timers });
+    const { observer } = spawned;
+    await assert.rejects(() => observer.writeAndEndStdin("stdin-private-payload"), new RegExp(category, "u"));
+    child.stdout.end(); child.stderr.end(); child.emit("exit", 1, null); child.emit("close", 1, null); await settleEvents();
+    await assert.rejects(() => observer.finishAndDrain(), /closed failure category/u);
+    await store.append("step.failed", { step: "critic" }); await store.append("run.failed", { cause: "coordinator-input" }); await store.finalize({ outcome: "failed", cause: "coordinator-input" });
+    const trace = await readFile(tracePath, "utf8");
+    assert.equal(trace.includes("stdin-private-error"), false); assert.equal(trace.includes("stdin-private-payload"), false);
+    assert.equal(trace.includes('"event":"stdin.error"'), true); assert.equal(trace.includes(`"category":"${category}"`), true);
+    if (mode === "epipe") assert.equal(trace.includes('"event":"stdin.write-accepted"'), false);
+    assert.equal(trace.includes('"event":"stdin.closed"'), false);
+  });
+  await withTraceCase(async ({ tracePath, options }) => {
+    const store = await createSecureTraceStore(options); await beginTraceStep(store, "critic"); const timers = observerTimers();
+    const child = observedChild(); let callbackSawAccepted = null;
+    child.stdin.write = (_chunk, callback) => {
+      setImmediate(() => {
+        callback(); callbackSawAccepted = readFileSync(tracePath, "utf8").includes('"event":"stdin.write-accepted"');
+        setImmediate(() => child.stdin.emit("drain"));
+      });
+      return false;
+    };
+    child.stdin.end = () => { setImmediate(() => child.stdin.emit("finish")); return child.stdin; };
+    const { observer } = await spawnDebugChildObserver({ traceStore: store, spawn: () => child, command: "/debug/codex", ...timers });
+    await observer.writeAndEndStdin("backpressure-private-payload");
+    assert.equal(callbackSawAccepted, false);
+    assert.equal(readFileSync(tracePath, "utf8").includes('"event":"stdin.write-accepted"'), true);
+    child.stdout.end(); child.stderr.end(); child.emit("exit", 0, null); child.emit("close", 0, null); await settleEvents();
+    await observer.finishAndDrain(); await completeSuccessfulTraceFromCritic(store); await store.finalize({ outcome: "completed", cause: "unbestimmt" });
+  });
+});
 
 await check("debug child observer lease expiry records the signal pair, stops sampling and fails closed", () => withTraceCase(async ({ tracePath, options }) => {
-  const store = await createSecureTraceStore(options); await store.append("run.started", {}); const timers = observerTimers(); const signals = [];
-  const child = observedChild({ onKill: (signal) => { signals.push(signal); return true; } });
+  const store = await createSecureTraceStore(options); await beginTraceStep(store, "critic"); const timers = observerTimers(); const signals = [];
+  const child = observedChild({ onKill: (signal) => { signals.push(signal); assert.equal(readFileSync(tracePath, "utf8").includes('"event":"child.signal-requested"'), true); return true; } });
   let clock = 1000;
-  const observer = createDebugChildObserver({ traceStore: store, child, clock: () => clock, ...timers });
-  await observer.recordSpawn(); await observer.writeAndEndStdin(Buffer.alloc(0)); await settleEvents();
+  const spawned = await spawnDebugChildObserver({ traceStore: store, spawn: () => child, command: "/debug/codex", clock: () => clock, ...timers }); const { observer } = spawned;
+  await observer.writeAndEndStdin(Buffer.alloc(0)); await settleEvents();
   await observer.armLease({ leaseMs: 25, signal: "SIGTERM" }); assert.equal(timers.state.timeout.milliseconds, 25);
   clock = 1025; await observer.expireLease({ signal: "SIGTERM" });
   child.stdout.end(); child.stderr.end(); child.emit("exit", null, "SIGTERM"); child.emit("close", null, "SIGTERM"); await settleEvents();
   await assert.rejects(() => observer.finishAndDrain(), /closed failure category/u);
   assert.deepEqual(signals, ["SIGTERM"]); assert.equal(timers.state.clearedIntervals > 0, true); assert.equal(timers.state.clearedTimeouts > 0, true);
-  await store.append("run.failed", { cause: "response-stalled" }); await store.finalize({ outcome: "failed", cause: "response-stalled" });
+  await store.append("step.failed", { step: "critic" }); await store.append("run.failed", { cause: "response-stalled" }); await store.finalize({ outcome: "failed", cause: "response-stalled" });
   const records = (await readFile(tracePath, "utf8")).trimEnd().split("\n").map(JSON.parse);
   assert.deepEqual(records.filter((record) => ["lease.expired", "child.signal-requested", "child.signal-result"].includes(record.event)).map((record) => record.event), ["lease.expired", "child.signal-requested", "child.signal-result"]);
 }));
 
 await check("debug child observer records categorical proc unavailability without leaking the read error", () => withTraceCase(async ({ tracePath, options }) => {
-  const store = await createSecureTraceStore(options); await store.append("run.started", {}); const timers = observerTimers();
+  const store = await createSecureTraceStore(options); await beginTraceStep(store, "critic"); const timers = observerTimers();
   const unavailable = Object.assign(new Error("proc-private-detail"), { code: "ENOENT" });
   const child = observedChild();
-  const observer = createDebugChildObserver({ traceStore: store, child, procIo: { readFile: async () => { throw unavailable; }, readdir: async () => { throw unavailable; } }, ...timers });
-  await observer.recordSpawn(); await observer.writeAndEndStdin(""); await observer.sampleProcess(); await settleEvents();
+  const spawned = await spawnDebugChildObserver({ traceStore: store, spawn: () => child, command: "/debug/codex", procIo: { readFile: async () => { throw unavailable; }, readdir: async () => { throw unavailable; } }, ...timers }); const { observer } = spawned;
+  await observer.writeAndEndStdin(""); await observer.sampleProcess(); await settleEvents();
   child.stdout.end(); child.stderr.end(); child.emit("exit", 0, null); child.emit("close", 0, null); await settleEvents();
-  await observer.finishAndDrain(); await store.append("run.completed", { cause: "unbestimmt" }); await store.finalize({ outcome: "completed", cause: "unbestimmt" });
+  await observer.finishAndDrain(); await completeSuccessfulTraceFromCritic(store); await store.finalize({ outcome: "completed", cause: "unbestimmt" });
   const trace = await readFile(tracePath, "utf8"); assert.equal(trace.includes("proc-private-detail"), false);
   const sample = trace.trimEnd().split("\n").map(JSON.parse).find((record) => record.event === "process.sample");
   assert.deepEqual(sample.payload, { availability: "unavailable", category: "not-found" });
