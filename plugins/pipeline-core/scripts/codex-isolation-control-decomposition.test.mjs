@@ -17,6 +17,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", ".
 check("native probe program deterministically carries both denied write categories", () => {
   const program = buildNativeProbeProgram();
   assert.match(program, /fixture-canary/u); assert.match(program, /external-canary/u); assert.match(program, /permission-denied/u);
+  assert.doesNotThrow(() => execFileSync(process.execPath, ["--input-type=module", "-e", program, "/dev/null", "/dev/null"], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }));
   assert.deepEqual(parseProbeResult(Buffer.from(JSON.stringify({ schema: "pipeline.codex-native-sandbox-probe.v1", writes: [
     { category: "fixture-canary", outcome: "denied", errorCategory: "permission-denied" },
     { category: "external-canary", outcome: "denied", errorCategory: "permission-denied" },
