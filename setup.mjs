@@ -116,7 +116,7 @@ export const HUMAN_FACING_LANGUAGES = Object.freeze(["de", "en"]);
 // as text, copied, logged, or overwritten.
 export const LEGACY_AGENTS_ADAPTER = Object.freeze({
   byteLength: 3510,
-  sha256: "cd0c87b87bc57e6d79f2e003fe764f02d681b6d3053363c1d003b6827d5d68ae",
+  gitBlob: "ede2f138fd199d2789f24e5f46ce1875ff1c2c10",
 });
 export const MIGRATED_AGENTS_ADAPTER = `# Agent-Pipeline optional runtime adapter
 
@@ -132,7 +132,12 @@ For Codex and other non-Claude runtimes this is methodology-only. It claims no
 Claude hooks, foreign tool or agent integration, model binding, or global host
 enforcement.
 `;
-export const MIGRATED_AGENTS_ADAPTER_SHA256 = "ebbed167eef7821ff42fe8389999a3a99f3487c4c611240afb3116cdf0cf27da";
+export const MIGRATED_AGENTS_ADAPTER_BLOB = "be9380c80a52ae45cfcdcbb3b6e7ebf6e2df01af";
+export const PIPELINE_START_AUTHORITY = Object.freeze({
+  reference: "pipeline-core:pipeline-start",
+  byteLength: 33583,
+  sha256: "78d141525a90f7ff97c4e34489b2f180531d3b77f0fa1480fcf323842a1e4335",
+});
 
 // ---- default answers (== the committed pipeline.user.yaml template's values) -----------------
 export function buildDefaultAnswers() {
@@ -163,19 +168,19 @@ function safeSpawn(spawn, command, args, opts = {}) {
 // ---- optional AGENTS adapter migration ----------------------------------------------------------
 // This boundary accepts only public-safe file metadata plus a detached digest result.  It never
 // decodes, parses, retains, copies, or prints an unknown AGENTS.md body.
-export function classifyAgentsAdapter({ exists, isFile = false, byteLength, sha256 } = {}) {
+export function classifyAgentsAdapter({ exists, isFile = false, byteLength, gitBlob, isClean = false } = {}) {
   if (!exists) return { status: "absent", mutable: false };
   if (!isFile || !Number.isInteger(byteLength)) return { status: "manual-po-gate", mutable: false };
-  if (byteLength === LEGACY_AGENTS_ADAPTER.byteLength && sha256 === LEGACY_AGENTS_ADAPTER.sha256) {
+  if (isClean && byteLength === LEGACY_AGENTS_ADAPTER.byteLength && gitBlob === LEGACY_AGENTS_ADAPTER.gitBlob) {
     return { status: "known-legacy", mutable: true };
   }
-  if (byteLength === Buffer.byteLength(MIGRATED_AGENTS_ADAPTER) && sha256 === MIGRATED_AGENTS_ADAPTER_SHA256) {
+  if (isClean && byteLength === Buffer.byteLength(MIGRATED_AGENTS_ADAPTER) && gitBlob === MIGRATED_AGENTS_ADAPTER_BLOB) {
     return { status: "migrated", mutable: false };
   }
   return { status: "manual-po-gate", mutable: false };
 }
 
-function inspectAgentsAdapter(rootDir, deps = {}) {
+export function inspectAgentsAdapter(rootDir, deps = {}) {
   const path = join(rootDir, "AGENTS.md");
   const exists = deps.existsSync ?? existsSync;
   if (!exists(path)) return classifyAgentsAdapter({ exists: false });
@@ -187,22 +192,30 @@ function inspectAgentsAdapter(rootDir, deps = {}) {
   }
   if (!stat.isFile()) return classifyAgentsAdapter({ exists: true, isFile: false });
   const byteLength = stat.size;
-  // Do not invoke an integrity helper for a size that cannot belong to either known public
-  // adapter. This keeps an unknown user file outside the compiler's content path.
+  // Do not invoke any content helper. A known public Git blob plus clean working-tree
+  // metadata is the fixed integrity proof; every other same-size file is manual/PO-only.
   if (![LEGACY_AGENTS_ADAPTER.byteLength, Buffer.byteLength(MIGRATED_AGENTS_ADAPTER)].includes(byteLength)) {
     return classifyAgentsAdapter({ exists: true, isFile: true, byteLength });
   }
-  const integrity = deps.agentsAdapterIntegrity
-    ? deps.agentsAdapterIntegrity(path)
-    : safeSpawn(deps.spawn ?? spawnSync, "sha256sum", [path], { cwd: rootDir }).stdout.trim().split(/\s+/)[0];
-  return classifyAgentsAdapter({ exists: true, isFile: true, byteLength, sha256: integrity });
+  const gitState = deps.agentsAdapterGitState
+    ? deps.agentsAdapterGitState(path)
+    : (() => {
+        const spawn = deps.spawn ?? spawnSync;
+        const index = safeSpawn(spawn, "git", ["ls-files", "--stage", "--", "AGENTS.md"], { cwd: rootDir }).stdout.trim();
+        const blob = /^100\d+\s+([0-9a-f]{40})\s+\d+\tAGENTS\.md$/i.exec(index)?.[1] ?? null;
+        let isClean = false;
+        try { isClean = spawn("git", ["diff", "--quiet", "--", "AGENTS.md"], { cwd: rootDir }).status === 0; } catch { /* manual gate below */ }
+        return { gitBlob: blob, isClean };
+      })();
+  return classifyAgentsAdapter({ exists: true, isFile: true, byteLength, gitBlob: gitState?.gitBlob, isClean: gitState?.isClean === true });
 }
 
 /** Validates the three authorities named by the migrated pointer before any target write. */
-export function validateAgentsAdapterMigrationAuthority({ runtimeManifestText, pipelineStartPresent, operatingModelPresent, rootDir = ROOT_DIR } = {}) {
+export function validateAgentsAdapterMigrationAuthority({ runtimeManifestText, pipelineStartAuthority, operatingModelPresent, rootDir = ROOT_DIR } = {}) {
   if (typeof runtimeManifestText !== "string") return { ok: false, reason: "runtime-manifest-unreadable" };
   if (validateCompiledPipelineYaml(runtimeManifestText, rootDir).status !== "ok") return { ok: false, reason: "runtime-manifest-invalid" };
-  if (pipelineStartPresent !== true) return { ok: false, reason: "pipeline-start-unavailable" };
+  if (!pipelineStartAuthority || pipelineStartAuthority.reference !== PIPELINE_START_AUTHORITY.reference) return { ok: false, reason: "pipeline-start-reference-mismatch" };
+  if (pipelineStartAuthority.byteLength !== PIPELINE_START_AUTHORITY.byteLength || pipelineStartAuthority.sha256 !== PIPELINE_START_AUTHORITY.sha256) return { ok: false, reason: "pipeline-start-authority-mismatch" };
   if (operatingModelPresent !== true) return { ok: false, reason: "operating-model-unavailable" };
   return { ok: true };
 }
@@ -221,9 +234,20 @@ export function migrateAgentsAdapter(rootDir = ROOT_DIR, deps = {}) {
   const present = (path) => {
     try { return (deps.lstatSync ?? lstatSync)(path).isFile(); } catch { return false; }
   };
+  const pipelineStartPath = join(rootDir, "plugins", "pipeline-core", "skills", "pipeline-start", "SKILL.md");
+  let pipelineStartAuthority = deps.pipelineStartAuthority;
+  if (pipelineStartAuthority === undefined) {
+    try {
+      const stat = (deps.lstatSync ?? lstatSync)(pipelineStartPath);
+      const sha256 = safeSpawn(deps.spawn ?? spawnSync, "sha256sum", [pipelineStartPath], { cwd: rootDir }).stdout.trim().split(/\s+/)[0];
+      pipelineStartAuthority = { reference: PIPELINE_START_AUTHORITY.reference, byteLength: stat.isFile() ? stat.size : null, sha256 };
+    } catch {
+      pipelineStartAuthority = null;
+    }
+  }
   const authority = validateAgentsAdapterMigrationAuthority({
     runtimeManifestText,
-    pipelineStartPresent: deps.pipelineStartPresent ?? present(join(rootDir, "plugins", "pipeline-core", "skills", "pipeline-start", "SKILL.md")),
+    pipelineStartAuthority,
     operatingModelPresent: deps.operatingModelPresent ?? present(join(rootDir, "docs", "operating-model.md")),
     rootDir,
   });

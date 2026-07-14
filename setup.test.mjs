@@ -47,11 +47,13 @@ import {
   validateSharedLock,
   validatePolicyLockPreflight,
   classifyAgentsAdapter,
+  inspectAgentsAdapter,
   migrateAgentsAdapter,
   validateAgentsAdapterMigrationAuthority,
   LEGACY_AGENTS_ADAPTER,
   MIGRATED_AGENTS_ADAPTER,
-  MIGRATED_AGENTS_ADAPTER_SHA256,
+  MIGRATED_AGENTS_ADAPTER_BLOB,
+  PIPELINE_START_AUTHORITY,
   parseArgv,
   resolveWarnDisposition,
   run,
@@ -835,25 +837,36 @@ ok("parseArgv: explicit adapter migration is opt-in, never a normal-setup defaul
   ok("classifyAgentsAdapter: absent remains absent", classifyAgentsAdapter({ exists: false }).status === "absent");
   ok(
     "classifyAgentsAdapter: exact public legacy metadata and integrity is the only mutable state",
-    classifyAgentsAdapter({ exists: true, isFile: true, byteLength: LEGACY_AGENTS_ADAPTER.byteLength, sha256: LEGACY_AGENTS_ADAPTER.sha256 }).status === "known-legacy",
+    classifyAgentsAdapter({ exists: true, isFile: true, byteLength: LEGACY_AGENTS_ADAPTER.byteLength, gitBlob: LEGACY_AGENTS_ADAPTER.gitBlob, isClean: true }).status === "known-legacy",
   );
   ok(
     "classifyAgentsAdapter: exact migrated pointer is byte-idempotent",
-    classifyAgentsAdapter({ exists: true, isFile: true, byteLength: migratedBytes, sha256: MIGRATED_AGENTS_ADAPTER_SHA256 }).status === "migrated",
+    classifyAgentsAdapter({ exists: true, isFile: true, byteLength: migratedBytes, gitBlob: MIGRATED_AGENTS_ADAPTER_BLOB, isClean: true }).status === "migrated",
   );
   for (const value of ["private-coordinate", "/absolute/path", "credential=value", "host: local", "account: user", "model: synthetic", "session: synthetic", "unknown-user-content"]) {
     ok(
       `classifyAgentsAdapter: ${value} never becomes a migration target`,
-      classifyAgentsAdapter({ exists: true, isFile: true, byteLength: LEGACY_AGENTS_ADAPTER.byteLength, sha256: value }).status === "manual-po-gate",
+      classifyAgentsAdapter({ exists: true, isFile: true, byteLength: LEGACY_AGENTS_ADAPTER.byteLength, gitBlob: value, isClean: false }).status === "manual-po-gate",
     );
   }
 }
 {
+  let contentHashCalls = 0;
+  const sameSizeUnknown = inspectAgentsAdapter("/synthetic", {
+    existsSync: () => true,
+    lstatSync: () => ({ isFile: () => true, size: LEGACY_AGENTS_ADAPTER.byteLength }),
+    agentsAdapterGitState: () => ({ gitBlob: "0".repeat(40), isClean: false }),
+    forbiddenContentHashHelper: () => { contentHashCalls += 1; },
+  });
+  ok("inspectAgentsAdapter: same-size unknown remains manual/PO without content-hash ingestion", sameSizeUnknown.status === "manual-po-gate" && contentHashCalls === 0);
+}
+{
   const runtimeManifestText = renderPipelineYaml(buildDefaultAnswers(), "agents-adapter-authority");
-  const valid = validateAgentsAdapterMigrationAuthority({ runtimeManifestText, pipelineStartPresent: true, operatingModelPresent: true });
-  const invalidManifest = validateAgentsAdapterMigrationAuthority({ runtimeManifestText: "schema: wrong\n", pipelineStartPresent: true, operatingModelPresent: true });
-  const missingStart = validateAgentsAdapterMigrationAuthority({ runtimeManifestText, pipelineStartPresent: false, operatingModelPresent: true });
-  ok("AGENTS adapter authority: valid runtime manifest, pipeline-start and Operating Model are required together", valid.ok && !invalidManifest.ok && !missingStart.ok);
+  const valid = validateAgentsAdapterMigrationAuthority({ runtimeManifestText, pipelineStartAuthority: PIPELINE_START_AUTHORITY, operatingModelPresent: true });
+  const invalidManifest = validateAgentsAdapterMigrationAuthority({ runtimeManifestText: "schema: wrong\n", pipelineStartAuthority: PIPELINE_START_AUTHORITY, operatingModelPresent: true });
+  const wrongReference = validateAgentsAdapterMigrationAuthority({ runtimeManifestText, pipelineStartAuthority: { ...PIPELINE_START_AUTHORITY, reference: "other:start" }, operatingModelPresent: true });
+  const wrongIntegrity = validateAgentsAdapterMigrationAuthority({ runtimeManifestText, pipelineStartAuthority: { ...PIPELINE_START_AUTHORITY, sha256: "0".repeat(64) }, operatingModelPresent: true });
+  ok("AGENTS adapter authority: valid runtime manifest, bound pipeline-start identity and Operating Model are required together", valid.ok && !invalidManifest.ok && !wrongReference.ok && !wrongIntegrity.ok);
 }
 {
   const runtimeManifestText = renderPipelineYaml(buildDefaultAnswers(), "agents-adapter-run");
@@ -861,7 +874,7 @@ ok("parseArgv: explicit adapter migration is opt-in, never a normal-setup defaul
   let written = null;
   const common = {
     runtimeManifestText,
-    pipelineStartPresent: true,
+    pipelineStartAuthority: PIPELINE_START_AUTHORITY,
     operatingModelPresent: true,
     writeAgentsAdapter: (_path, text) => { writes += 1; written = text; },
   };
@@ -878,10 +891,10 @@ ok("parseArgv: explicit adapter migration is opt-in, never a normal-setup defaul
   writes = 0;
   const rejected = migrateAgentsAdapter("/synthetic", {
     ...common,
-    pipelineStartPresent: false,
+    pipelineStartAuthority: { ...PIPELINE_START_AUTHORITY, sha256: "0".repeat(64) },
     agentsAdapterState: { status: "known-legacy", mutable: true },
   });
-  ok("AGENTS adapter migration: authority failure stops before target mutation", !rejected.ok && rejected.status === "authority-failed" && writes === 0);
+  ok("AGENTS adapter migration: invalid pipeline-start authority stops before target mutation", !rejected.ok && rejected.status === "authority-failed" && writes === 0);
 }
 
 // ---- summary ----------------------------------------------------------------------------
