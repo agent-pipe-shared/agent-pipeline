@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawn as spawnProcess } from "node:child_process";
 import { EventEmitter } from "node:events";
-import { chmod, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { chmod, link, lstat, mkdir, mkdtemp, open, readFile, rm, symlink, truncate, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
@@ -11,11 +11,14 @@ import { fileURLToPath } from "node:url";
 import {
   CODEX_CRITIC_ARTIFACTS,
   CODEX_CRITIC_POLICY,
+  CODEX_CRITIC_TRACE_EVENTS,
+  CODEX_CRITIC_TRACE_STEPS,
   buildCodexCriticInvocation,
   buildExactFixture,
   buildPermissionProfile,
   buildProfileBoundCodexCriticInvocation,
   buildReviewBundle,
+  createSecureTraceStore,
   createDebugLineRedactor,
   criticPrompt,
   ensureOwnedProcessGroupGone,
@@ -26,6 +29,7 @@ import {
   runPermissionProfilePreflight,
   runProfileBoundIsolation,
   sanitizeEnvironment,
+  verifySecureTraceStore,
   verifyProfileContract,
 } from "./codex-critic-isolation.mjs";
 
@@ -111,6 +115,226 @@ await check("debug redactor bounds pending and total output and never exposes ra
   assert.throws(() => output.write(Buffer.from(`${outputRaw}\n`)), /limit exceeded/u);
   assert.equal(JSON.stringify(output).includes(outputRaw), false);
   assert.throws(() => output.finish(), /closed/u);
+});
+
+async function withTraceCase(fn) {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "codex-trace-test-"));
+  const fixtureRoot = path.join(directory, "fixture");
+  await mkdir(fixtureRoot);
+  const tracePath = path.join(directory, "trace.jsonl");
+  try { return await fn({ directory, fixtureRoot, tracePath, options: { tracePath, repoRoot: root, fixtureRoot } }); }
+  finally { await rm(directory, { recursive: true, force: true }); }
+}
+
+function validTracePayloads() {
+  const digest = "a".repeat(64);
+  return [
+    ["run.started", {}], ["run.completed", { cause: "unbestimmt" }], ["run.failed", { cause: "child-process" }],
+    ["step.started", { step: "input" }], ["step.completed", { step: "result" }], ["step.failed", { step: "cleanup" }],
+    ["child.spawn-requested", { label: "critic" }], ["child.spawned", { label: "critic", pid: 101, pgid: 101 }],
+    ["child.spawn-failed", { label: "critic", category: "spawn-error" }],
+    ["child.exit", { label: "critic", code: 0, signal: null }], ["child.close", { label: "critic", code: null, signal: "SIGTERM" }],
+    ["child.signal-requested", { label: "critic", pid: 101, pgid: 101, signal: "SIGTERM" }],
+    ["child.signal-result", { label: "critic", pgid: 101, signal: "SIGKILL", category: "sent" }],
+    ["stdin.write-requested", { bytes: 12, sha256: digest }], ["stdin.write-accepted", { bytes: 12 }],
+    ["stdin.end-requested", {}], ["stdin.closed", {}], ["stdin.error", { category: "broken-pipe" }],
+    ["stream.chunk", { stream: "stdout", bytes: 4, cumulativeBytes: 4, sha256: digest }],
+    ["stream.jsonl-event", { type: "item.completed", itemType: "agent_message", status: "completed" }],
+    ["stream.error", { stream: "stderr", category: "decode-error" }],
+    ["process.sample", { availability: "observed", state: "S", cpuUserTicks: 1, cpuSystemTicks: 2, rssPages: 3, fdCount: 4, wchanSha256: digest }],
+    ["lease.armed", { label: "critic", elapsedMs: 0, stdoutBytes: 0, stderrBytes: 0 }],
+    ["lease.heartbeat", { label: "critic", elapsedMs: 1000, stdoutBytes: 4, stderrBytes: 0 }],
+    ["lease.expired", { label: "critic", elapsedMs: 300000, stdoutBytes: 4, stderrBytes: 2 }],
+    ["result.observed", { present: true, bytes: 12, sha256: digest }],
+  ];
+}
+
+await check("trace store publishes the exact closed event and step enums", () => {
+  assert.deepEqual(CODEX_CRITIC_TRACE_EVENTS, [
+    "trace.opened", "run.started", "run.completed", "run.failed", "step.started", "step.completed", "step.failed",
+    "child.spawn-requested", "child.spawned", "child.spawn-failed", "child.exit", "child.close", "child.signal-requested", "child.signal-result",
+    "stdin.write-requested", "stdin.write-accepted", "stdin.end-requested", "stdin.closed", "stdin.error",
+    "stream.chunk", "stream.jsonl-event", "stream.error", "process.sample", "lease.armed", "lease.heartbeat", "lease.expired", "result.observed", "trace.finalized",
+  ]);
+  assert.deepEqual(CODEX_CRITIC_TRACE_STEPS, ["input", "commit", "binary", "fixture", "bundle", "profile", "preflight", "binding-before", "critic", "binding-after", "result", "canary", "cleanup"]);
+  assert.equal(Object.isFrozen(CODEX_CRITIC_TRACE_EVENTS), true);
+  assert.equal(Object.isFrozen(CODEX_CRITIC_TRACE_STEPS), true);
+});
+
+await check("trace store accepts every event schema and clean final verification", () => withTraceCase(async ({ tracePath, options }) => {
+  let monotonic = 10n;
+  const store = await createSecureTraceStore({ ...options, now: () => "2026-07-14T12:00:00.000Z", monotonicNow: () => monotonic++ });
+  for (const [event, payload] of validTracePayloads()) await store.append(event, payload);
+  const synced = await store.sync();
+  assert.equal(synced.recordCount, 1 + validTracePayloads().length);
+  const final = await store.finalize({ outcome: "completed", cause: "unbestimmt" });
+  assert.equal(final.ok, true);
+  assert.equal(final.recordCount, 2 + validTracePayloads().length);
+  assert.equal(final.outcome, "completed");
+  assert.match(final.rootSha256, /^[0-9a-f]{64}$/u);
+  const bytes = await readFile(tracePath);
+  assert.equal(final.bytes, bytes.length);
+  const records = bytes.toString("utf8").trimEnd().split("\n").map(JSON.parse);
+  assert.deepEqual(records.map((record) => record.event), ["trace.opened", ...validTracePayloads().map(([event]) => event), "trace.finalized"]);
+  assert.deepEqual(records.map((record) => record.seq), records.map((_record, index) => index + 1));
+  assert.equal(records.every((record, index) => index === 0 ? record.previous_sha256 === null : record.previous_sha256 === records[index - 1].record_sha256), true);
+  assert.equal(records.at(-1).payload.totalBytes, bytes.length);
+  assert.equal(records.at(-1).payload.recordCount, records.length);
+  assert.equal(records.at(-1).payload.priorRootSha256, records.at(-2).record_sha256);
+  await assert.rejects(() => store.append("run.started", {}), /closed/u);
+}));
+
+await check("trace store rejects unknown events, every bad step event and additional payload keys", async () => {
+  await withTraceCase(async ({ options }) => {
+    const store = await createSecureTraceStore(options);
+    await assert.rejects(() => store.append("private.event", {}), /closed enum/u);
+    await assert.rejects(() => store.append("run.started", {}), /closed|enum/u);
+  });
+  for (const event of ["step.started", "step.completed", "step.failed"]) {
+    await withTraceCase(async ({ options }) => {
+      const store = await createSecureTraceStore(options);
+      await assert.rejects(() => store.append(event, { step: "arbitrary" }), /step.*closed enum/u);
+    });
+  }
+  await withTraceCase(async ({ options }) => {
+    const store = await createSecureTraceStore(options);
+    await assert.rejects(() => store.append("run.started", { detail: "not-allowed" }), /unexpected detail/u);
+  });
+});
+
+await check("trace payload schemas reject unsafe enum values, categories and inconsistent observations", async () => {
+  const invalid = [
+    ["child.signal-requested", { label: "critic", signal: "SIG_PRIVATE" }, /signal enum/u],
+    ["child.spawn-failed", { label: "critic", category: "raw error text" }, /category/u],
+    ["stream.jsonl-event", { type: "tool.call", itemType: "mcp_tool_call", status: "completed" }, /lifecycle/u],
+    ["stream.chunk", { stream: "private", bytes: 1, cumulativeBytes: 1, sha256: "a".repeat(64) }, /stream/u],
+    ["process.sample", { availability: "observed", state: "?" }, /process state/u],
+    ["process.sample", { availability: "unavailable", rssPages: 1 }, /cannot contain/u],
+    ["result.observed", { present: false, bytes: 1, sha256: null }, /zero bytes/u],
+    ["result.observed", { present: true, bytes: 1, sha256: null }, /inconsistent/u],
+  ];
+  for (const [event, payload, expected] of invalid) {
+    await withTraceCase(async ({ options }) => {
+      const store = await createSecureTraceStore(options);
+      await assert.rejects(() => store.append(event, payload), expected);
+    });
+  }
+});
+
+await check("trace path validation rejects relative, noncanonical, outside, fixture, symlink and existing targets", () => withTraceCase(async ({ directory, fixtureRoot, tracePath, options }) => {
+  await assert.rejects(() => createSecureTraceStore({ ...options, tracePath: "trace.jsonl" }), /absolute/u);
+  await assert.rejects(() => createSecureTraceStore({ ...options, tracePath: `${directory}${path.sep}nested${path.sep}..${path.sep}other.jsonl` }), /canonical/u);
+  await assert.rejects(() => createSecureTraceStore({ ...options, tracePath: path.join(root, "private-trace.jsonl") }), /OS temp/u);
+  await assert.rejects(() => createSecureTraceStore({ ...options, tracePath: path.join(fixtureRoot, "trace.jsonl") }), /outside fixtureRoot/u);
+
+  const realParent = path.join(directory, "real-parent");
+  const linkedParent = path.join(directory, "linked-parent");
+  await mkdir(realParent); await symlink(realParent, linkedParent);
+  await assert.rejects(() => createSecureTraceStore({ ...options, tracePath: path.join(linkedParent, "trace.jsonl") }), /symbolic link/u);
+
+  await writeFile(tracePath, "existing", { mode: 0o600 });
+  await assert.rejects(() => createSecureTraceStore(options), /absent/u);
+  await unlink(tracePath);
+  await symlink(path.join(directory, "missing-target"), tracePath);
+  await assert.rejects(() => createSecureTraceStore(options), /symbolic link/u);
+}));
+
+await check("trace creation uses regular 0600 single-link file and binds device/inode", () => withTraceCase(async ({ tracePath, directory, options }) => {
+  const store = await createSecureTraceStore(options);
+  const info = await lstat(tracePath);
+  assert.equal(info.isFile(), true);
+  assert.equal(info.mode & 0o777, 0o600);
+  assert.equal(info.nlink, 1);
+  assert.deepEqual(store.binding, { dev: String(info.dev), ino: String(info.ino) });
+  const alias = path.join(directory, "trace-alias.jsonl");
+  await link(tracePath, alias);
+  await assert.rejects(() => store.finalize({ outcome: "failed", cause: "cleanup" }), /link count/u);
+}));
+
+await check("trace appends serialize with contiguous order and nondecreasing monotonic nanoseconds", () => withTraceCase(async ({ tracePath, options }) => {
+  let tick = 0n;
+  const store = await createSecureTraceStore({ ...options, monotonicNow: () => ++tick });
+  await Promise.all(Array.from({ length: 12 }, (_unused, index) => store.append("lease.heartbeat", { label: "critic", elapsedMs: index, stdoutBytes: index, stderrBytes: 0 })));
+  await store.finalize({ outcome: "completed", cause: "unbestimmt" });
+  const records = (await readFile(tracePath, "utf8")).trimEnd().split("\n").map(JSON.parse);
+  assert.deepEqual(records.map((record) => record.seq), Array.from({ length: records.length }, (_unused, index) => index + 1));
+  assert.deepEqual(records.slice(1, -1).map((record) => record.payload.elapsedMs), Array.from({ length: 12 }, (_unused, index) => index));
+  assert.equal(records.every((record, index) => index === 0 || BigInt(record.monotonic_ns) >= BigInt(records[index - 1].monotonic_ns)), true);
+}));
+
+await check("trace store fails closed on event, byte and backward-clock bounds", async () => {
+  await withTraceCase(async ({ options }) => {
+    const store = await createSecureTraceStore({ ...options, maxEvents: 3 });
+    await store.append("run.started", {});
+    await assert.rejects(() => store.append("run.started", {}), /no room/u);
+    await assert.rejects(() => store.finalize({ outcome: "failed", cause: "unbestimmt" }), /closed|room/u);
+  });
+  await withTraceCase(async ({ options }) => {
+    await assert.rejects(() => createSecureTraceStore({ ...options, maxBytes: 1 }), /byte bound/u);
+  });
+  await withTraceCase(async ({ options }) => {
+    const times = [2n, 1n];
+    const store = await createSecureTraceStore({ ...options, monotonicNow: () => times.shift() });
+    await assert.rejects(() => store.append("run.started", {}), /backwards/u);
+    await assert.rejects(() => store.sync(), /backwards|closed/u);
+  });
+});
+
+await check("trace store fails closed on injected write and sync errors", async () => {
+  await withTraceCase(async ({ options }) => {
+    let writes = 0;
+    const injectedOpen = async (...args) => {
+      const handle = await open(...args);
+      if (args.length < 3) return handle;
+      return {
+        stat: (...inner) => handle.stat(...inner),
+        write: (...inner) => { writes += 1; return writes === 2 ? Promise.reject(new Error("injected-write")) : handle.write(...inner); },
+        datasync: () => handle.datasync(), sync: () => handle.sync(), close: () => handle.close(),
+      };
+    };
+    const store = await createSecureTraceStore({ ...options, io: { open: injectedOpen } });
+    await assert.rejects(() => store.append("run.started", {}), /injected-write/u);
+    await assert.rejects(() => store.sync(), /injected-write|closed/u);
+  });
+  await withTraceCase(async ({ options }) => {
+    const injectedOpen = async (...args) => {
+      const handle = await open(...args);
+      if (args.length < 3) return handle;
+      return { stat: (...inner) => handle.stat(...inner), write: (...inner) => handle.write(...inner), datasync: () => Promise.reject(new Error("injected-sync")), sync: () => Promise.reject(new Error("injected-sync")), close: () => handle.close() };
+    };
+    const store = await createSecureTraceStore({ ...options, io: { open: injectedOpen } });
+    await assert.rejects(() => store.sync(), /injected-sync/u);
+    await assert.rejects(() => store.append("run.started", {}), /injected-sync|closed/u);
+  });
+});
+
+await check("trace verification detects truncation, mutation, replacement and mode drift", async () => {
+  for (const fault of ["truncation", "mutation", "replacement", "mode"]) {
+    await withTraceCase(async ({ tracePath, options }) => {
+      const store = await createSecureTraceStore(options);
+      await store.append("run.started", {});
+      await store.finalize({ outcome: "completed", cause: "unbestimmt" });
+      const original = await readFile(tracePath);
+      if (fault === "truncation") {
+        const finalStart = original.lastIndexOf(0x0a, original.length - 2) + 1;
+        await truncate(tracePath, finalStart);
+        await assert.rejects(() => verifySecureTraceStore({ ...options, binding: store.binding }), /missing.*final|truncated/u);
+      } else if (fault === "mutation") {
+        const changed = Buffer.from(original);
+        const marker = Buffer.from('"record_sha256":"');
+        const offset = changed.indexOf(marker) + marker.length;
+        changed[offset] = changed[offset] === 0x61 ? 0x62 : 0x61;
+        await writeFile(tracePath, changed);
+        await assert.rejects(() => verifySecureTraceStore({ ...options, binding: store.binding }), /hash|predecessor/u);
+      } else if (fault === "replacement") {
+        await unlink(tracePath); await writeFile(tracePath, original, { mode: 0o600 });
+        await assert.rejects(() => verifySecureTraceStore({ ...options, binding: store.binding }), /device\/inode/u);
+      } else {
+        await chmod(tracePath, 0o640);
+        await assert.rejects(() => verifySecureTraceStore({ ...options, binding: store.binding }), /0600/u);
+      }
+    });
+  }
 });
 
 await check("lease policy separates fixed preflight and final-Critic bounds", () => {
