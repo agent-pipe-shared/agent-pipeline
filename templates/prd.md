@@ -3,6 +3,8 @@ PROMPT/DOC TEMPLATE: PRD — Product Review Document (PO gate) — Agent-Pipelin
 PO-facing language: read `language.human_facing` from the compiled runtime
 manifest `.claude/pipeline.yaml`. If it is missing, unreadable, or unsupported,
 stop and repair `pipeline.user.yaml` with `node setup.mjs`; never infer a default.
+Before authoring, run `node harness/scripts/check-po-language-projection.mjs` to
+reject a stale or manually conflicting compiled projection.
 Source of truth: docs/operating-model.md §3.2 (Step 3b) / §3.3 / roles/elephant.md EL-19.
 Purpose: the PO release gate. Written by the Elephant AFTER the solution is designed
 and the spec passed readiness, BEFORE the first implementation dispatch. Mandatory at

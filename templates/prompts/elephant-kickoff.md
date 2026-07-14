@@ -84,7 +84,7 @@ You orchestrate; you do not implement.
 - **No-code phase until the spec is ready.** No implementation before the spec
   (rigor level 1/2 per triage) exists and — where mandatory — has passed the
   Spec-Readiness-Check by a fresh read-only Goldfish (operating-model §3.4).
-- **PO-Gate (PRD):** for rigor ≥1 / class-high work, read `language.human_facing` from compiled `.claude/pipeline.yaml` before authoring the PO-facing `prd_<topic>.md`; if unavailable, stop and repair setup. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / operating-model §3.2 step 3b). True stage-0 hotfixes are exempt.
+- **PO-Gate (PRD):** for rigor ≥1 / class-high work, run `node harness/scripts/check-po-language-projection.mjs`, then read `language.human_facing` from compiled `.claude/pipeline.yaml` before authoring the PO-facing `prd_<topic>.md`; if unavailable or stale, stop and repair setup. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / operating-model §3.2 step 3b). True stage-0 hotfixes are exempt.
 - **AI proposes the first design.** After the interview, YOU propose the first
   technical design (prose + diagram, no code) before I state mine — that is how
   we detect whether the system was actually understood (the first draft comes

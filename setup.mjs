@@ -94,7 +94,7 @@ import { pathToFileURL } from "node:url";
 
 import { parseYaml, YamlLiteError } from "./plugins/pipeline-core/lib/yaml-lite.mjs";
 import { validateAgainstSchema } from "./plugins/pipeline-core/lib/schema-lite.mjs";
-import { loadPolicyLock, validateManifest } from "./plugins/pipeline-core/lib/manifest.mjs";
+import { loadPolicyLock, resolveHumanFacingLanguage, validateManifest } from "./plugins/pipeline-core/lib/manifest.mjs";
 import { projectManifestRouting, projectPreset, routingProvenance } from "./plugins/pipeline-core/lib/routing-projection.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -648,7 +648,44 @@ export function validateCompiledPipelineYaml(text, rootDir = ROOT_DIR) {
   } catch (error) {
     return { status: "invalid", errors: [{ reason: error.message }], warnings: [] };
   }
-  return validateManifest(manifest, { rootDir });
+  const result = validateManifest(manifest, { rootDir });
+  if (result.status !== "ok") return result;
+  const language = resolveHumanFacingLanguage(manifest);
+  if (language.ok) return result;
+  return {
+    ...result,
+    status: "invalid",
+    errors: [{ path: "language.human_facing", expected: "an explicit compiled PO-facing language", got: "missing or unsupported", reason: language.reason }],
+  };
+}
+
+/**
+ * Check the source/runtime projection before PO-facing authoring. Consumers
+ * still derive language only from the compiled runtime value; this guard merely
+ * rejects a stale or hand-edited runtime projection rather than repairing it.
+ */
+export function validatePoFacingLanguageProjection(userYamlText, runtimeYamlText, rootDir = ROOT_DIR) {
+  let source;
+  let runtime;
+  try {
+    source = parseYaml(userYamlText);
+    runtime = parseYaml(runtimeYamlText);
+  } catch (error) {
+    return { ok: false, reason: `unreadable PO-language projection: ${error.message}` };
+  }
+  const schema = JSON.parse(readFileSync(USER_SCHEMA_PATH, "utf8"));
+  const sourceShape = validateAgainstSchema(source, schema);
+  if (!sourceShape.valid) return { ok: false, reason: "pipeline.user.yaml is invalid; correct it before PO-facing authoring" };
+  const sourceLanguage = validateHumanFacingLanguage(source.language?.human_facing);
+  if (!sourceLanguage.ok) return sourceLanguage;
+  const runtimeValidation = validateCompiledPipelineYaml(runtimeYamlText, rootDir);
+  if (runtimeValidation.status !== "ok") return { ok: false, reason: "compiled runtime language is invalid; re-run setup" };
+  const runtimeLanguage = resolveHumanFacingLanguage(runtime);
+  if (!runtimeLanguage.ok) return runtimeLanguage;
+  if (sourceLanguage.value !== runtimeLanguage.value) {
+    return { ok: false, reason: "compiled runtime language disagrees with validated pipeline.user.yaml; re-run setup before PO-facing authoring" };
+  }
+  return { ok: true, value: runtimeLanguage.value };
 }
 
 // ---- private overlay lock preflight -------------------------------------------------------------

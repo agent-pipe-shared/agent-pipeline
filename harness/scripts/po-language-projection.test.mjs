@@ -7,7 +7,14 @@ import { fileURLToPath } from "node:url";
 
 import { parseYaml } from "../../plugins/pipeline-core/lib/yaml-lite.mjs";
 import { resolveHumanFacingLanguage, validateManifest } from "../../plugins/pipeline-core/lib/manifest.mjs";
-import { buildDefaultAnswers, renderPipelineYaml, validateHumanFacingLanguage } from "../../setup.mjs";
+import {
+  buildDefaultAnswers,
+  renderPipelineYaml,
+  renderUserYaml,
+  validateCompiledPipelineYaml,
+  validateHumanFacingLanguage,
+  validatePoFacingLanguageProjection,
+} from "../../setup.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 let passed = 0;
@@ -39,6 +46,9 @@ for (const [name, manifest] of [
     if (name !== "missing") assert.equal(validateManifest(manifest, { rootDir: root }).status, "invalid");
   });
 }
+check("missing runtime language rejects through the compiled runtime validator", () => {
+  assert.equal(validateCompiledPipelineYaml("schema: pipeline.manifest.v0\n", root).status, "invalid");
+});
 check("source language validator rejects missing, empty, and unknown values", () => {
   for (const value of [undefined, "", "fr"]) assert.equal(validateHumanFacingLanguage(value).ok, false);
 });
@@ -46,6 +56,13 @@ check("committed runtime language agrees with the committed user source", () => 
   const source = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
   const runtime = parseYaml(readFileSync(join(root, ".claude", "pipeline.yaml"), "utf8"));
   assert.deepEqual(resolveHumanFacingLanguage(runtime), { ok: true, value: source.language.human_facing });
+});
+check("validated source/runtime conflict rejects with a setup correction", () => {
+  const source = renderUserYaml({ ...buildDefaultAnswers(), language: { human_facing: "de", agent_facing: "en" } });
+  const runtime = renderPipelineYaml({ ...buildDefaultAnswers(), language: { human_facing: "en", agent_facing: "en" } }, "projection-conflict");
+  const result = validatePoFacingLanguageProjection(source, runtime, root);
+  assert.equal(result.ok, false);
+  assert.match(result.reason, /re-run setup/);
 });
 const consumers = [
   "templates/prd.md",
