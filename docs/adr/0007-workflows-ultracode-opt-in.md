@@ -15,7 +15,7 @@ Dynamic Workflows orchestrate up to 16 parallel / 1,000 agents; multi-agent cost
 Refinement (condition A2):
 
 - Opt-in via the keyword `ultracode` per task; not session-persistent (no `/effort ultracode`). Indication list per Decision 5: initial research, process-model/architecture exploration, audits, migrations.
-- Preconditions for WRITE-capable workflows — all three, hard: (1) git-guard hook union installed (hook layer also holds under `acceptEdits`; [ADR-0013](0013-git-guard-union.md)), (2) tight session Bash allowlist, (3) worktree.
+- Preconditions for WRITE-capable workflows: a workflow/runner dispatch reaches an injected synthetic adapter only through the provider-neutral P5B runner after the deterministic P5 preflight. `isolated-write` requires all three hard controls — (1) git-guard hook union installed (hook layer also holds under `acceptEdits`; [ADR-0013](0013-git-guard-union.md)), (2) tight task allowlist, (3) isolated worktree. `bounded-write` is allowed only when the dispatch declares that mode and the project calibration positively proves all bounded controls; otherwise it rejects before invocation. This boundary does not change ordinary local or serial writers, which remain worktree-optional.
 - **`<PROJECT_B>` special rule:** until the guard migration is complete, write-capable workflows in `<PROJECT_B>` run only with explicit PO approval (high stakes: real devices).
 - Calibration run (small slice) recommended for novel, large workflows — not a mandatory gate.
 
@@ -56,7 +56,7 @@ Dynamic Workflows orchestrieren bis 16 parallele / 1.000 Agents; Multi-Agent kos
 Präzisierung (Auflage A2):
 
 - Opt-in per Keyword `ultracode` pro Task; nicht session-dauerhaft (kein `/effort ultracode`). Indikationsliste gemäß Entscheidung 5: initiale Recherchen, Vorgehensmodell-/Architektur-Exploration, Audits, Migrationen.
-- Vorbedingungen für SCHREIBENDE Workflows — alle drei, hart: (1) git-guard-Union installiert (Hook-Ebene wirkt auch in `acceptEdits`; [ADR-0013](0013-git-guard-union.md)), (2) enge Bash-Allowlist der Session, (3) Worktree.
+- Vorbedingungen für SCHREIBENDE Workflows: Ein Workflow-/Runner-Dispatch erreicht einen injizierten synthetischen Adapter ausschließlich über den providerneutralen P5B-Runner nach dem deterministischen P5-Preflight. Für `isolated-write` gelten alle drei Kontrollen hart: (1) git-guard-Union installiert (Hook-Ebene wirkt auch in `acceptEdits`; [ADR-0013](0013-git-guard-union.md)), (2) enge Task-Allowlist, (3) isolierter Worktree. `bounded-write` ist nur zulässig, wenn der Dispatch diesen Modus deklariert und die Projektkalibrierung alle begrenzenden Kontrollen positiv belegt; sonst wird vor der Invocation abgewiesen. Diese Grenze ändert weder lokale noch serielle ordentliche Writer; sie bleiben worktree-optional.
 - **<PROJECT_B>-Sonderregel:** Bis zur abgeschlossenen Guard-Migration laufen schreibende Workflows in <PROJECT_B> nur mit expliziter PO-Freigabe (hohe Stakes: reale Geräte).
 - Kalibrierlauf (Small Slice) bei neuartigen großen Workflows empfohlen, keine Pflicht-Hürde.
 
