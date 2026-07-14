@@ -53,9 +53,10 @@
  * non-interactive mode is allowed to overwrite too (still with a loud WARN either way --
  * `--force` changes who decides, never whether the clobber is announced).
  *
- * THREE-SCOPE BOUNDARY: Public Core contains no account, repository, marketplace, or machine
- * coordinates. The ignored private overlay supplies only an anonymous immutable Shared SHA;
- * machine-local mapping remains outside this compiler and is never parsed or projected here.
+ * THREE-SCOPE BOUNDARY: Public Core contains no account, private-repository, credential, or
+ * machine coordinates. It projects the one generic public agent-pipeline marketplace binding.
+ * The ignored private overlay supplies only an anonymous immutable Shared SHA; machine-local
+ * credentials remain outside this compiler and are never parsed or projected here.
  *
  * IDEMPOTENCY: `renderUserYaml(DEFAULT_ANSWERS)` is byte-identical to the committed
  * `pipeline.user.yaml` template shipped alongside this script (same static comments, same
@@ -453,15 +454,23 @@ export function compileSettingsJson(existing, answers, sourceHash) {
           ...(answers.autonomy.push_policy === "standing-approved"
             ? { permissions: { allow: ["Bash(git push*)", "PowerShell(git push*)"] } }
             : {}),
+          extraKnownMarketplaces: {
+            "agent-pipeline": {
+              source: { source: "github", repo: "agent-pipeline/agent-pipeline" },
+            },
+          },
           enabledPlugins: { "pipeline-core@agent-pipeline": true },
         };
-  // Marketplace coordinates are machine-local. Never compile them from Public Core.
-  // Drop only this pipeline's legacy projection; unrelated caller entries stay untouched.
-  if (base.extraKnownMarketplaces && typeof base.extraKnownMarketplaces === "object") {
-    const { "agent-pipeline": _legacyPipelineMapping, ...otherMarketplaces } = base.extraKnownMarketplaces;
-    if (Object.keys(otherMarketplaces).length > 0) base.extraKnownMarketplaces = otherMarketplaces;
-    else delete base.extraKnownMarketplaces;
-  }
+  // The generic public marketplace binding is part of the staleness contract. It has no
+  // owner-specific or private coordinates; unrelated caller entries remain untouched.
+  const marketplaces =
+    base.extraKnownMarketplaces && typeof base.extraKnownMarketplaces === "object"
+      ? { ...base.extraKnownMarketplaces }
+      : {};
+  marketplaces["agent-pipeline"] = {
+    source: { source: "github", repo: "agent-pipeline/agent-pipeline" },
+  };
+  base.extraKnownMarketplaces = marketplaces;
   base.$generated = generatedMarker(sourceHash);
   return base;
 }
@@ -629,7 +638,8 @@ export function validateCompiledPipelineYaml(text, rootDir = ROOT_DIR) {
 
 // ---- private overlay lock preflight -------------------------------------------------------------
 // The ignored overlay intentionally contains only an anonymous immutable Public-Core SHA.
-// Marketplace/account/path mapping is machine-local and is neither parsed nor projected here.
+// Account/path mapping and credentials remain machine-local and are neither parsed nor
+// projected here; the generic public marketplace binding is compiled separately.
 export function validateSharedLock(lockSha, checkedOutSha) {
   if (typeof lockSha !== "string" || !/^[0-9a-f]{40}$/i.test(lockSha)) {
     return { ok: false, reason: "missing-or-malformed-shared-sha" };
@@ -777,8 +787,8 @@ function printNextSteps() {
 Setup complete.
 
 Next steps:
-  1. Add the marketplace through ignored machine-local mapping; Public Core never
-     stores its coordinates. Then install pipeline-core at project scope.
+  1. The generic public marketplace binding was compiled into .claude/settings.json.
+     Install pipeline-core at project scope.
   2. Start a new Claude Code session -- the bootstrap check runs automatically
      (/pipeline-core:pipeline-start).
   3. Try a first run in the "quick" profile (details: SETUP.md).
@@ -828,7 +838,7 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
   let answers;
   if (opts.defaults) {
     // Non-interactive setup has no environment-derived inputs: it writes deterministic public
-    // defaults only. Repository/account/machine mapping is intentionally out of scope.
+    // defaults only. Account and machine mapping is intentionally out of scope.
     answers = {
       ...defaults,
       setup: { intent: "consumer" },
