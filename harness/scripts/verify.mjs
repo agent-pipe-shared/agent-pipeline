@@ -72,6 +72,8 @@ const TEST_SUITES = [
   { name: "pipeline-state-tests", file: join(scriptDir, "pipeline-state.test.mjs") },
   { name: "doc-contract-tests", file: join(scriptDir, "check-doc-contracts.test.mjs") },
   { name: "doc-contract-check", file: join(scriptDir, "check-doc-contracts.mjs") },
+  { name: "language-canon-tests", file: join(scriptDir, "check-language-canon.test.mjs") },
+  { name: "language-canon-check", file: join(scriptDir, "check-language-canon.mjs") },
   { name: "security-scan-tests", file: join(scriptDir, "security-scan.test.mjs") },
   { name: "no-autoupdate-key-tests", file: join(scriptDir, "no-autoupdate-key.test.mjs") },
 ];
