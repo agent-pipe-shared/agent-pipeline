@@ -45,10 +45,9 @@ rationale the diff does not support.
   `Dispatch:`-style task ID is available from that context), append a trailing block line:
   `Dispatch: {{TASK_ID}} (goldfish)` — this is the deterministic authorship evidence the Critic and
   close-step 6b rely on; never fabricate a task ID if none was given.
-- **Harness-standard closing lines** (when the calling session already carries them, e.g.
-  `Co-Authored-By: Claude <model> <noreply@anthropic.com>` / `Claude-Session: {{URL}}`): keep them
-  in their existing final position, appended after any `Dispatch:` line — this skill does not
-  invent these lines itself; it only preserves them if the caller's session already supplies them.
+- **Anonymous assistance marker:** for an agent-authored commit, append `AI-Assisted: true` after
+  any grounded `Dispatch:` line. Do not add provider- or model-specific co-author trailers, session
+  URLs/IDs, account identifiers, or other private correlation metadata.
 - Do not add any trailer this skill cannot ground in the actual session/dispatch context.
 
 ## 5. Output — propose only, never commit
