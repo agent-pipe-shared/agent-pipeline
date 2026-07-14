@@ -72,6 +72,8 @@ const TEST_SUITES = [
   { name: "workflow-runner-boundary-tests", file: join(libDir, "workflow-runner-boundary.test.mjs") },
   { name: "po-language-projection-tests", file: join(scriptDir, "po-language-projection.test.mjs") },
   { name: "po-language-projection-check", file: join(scriptDir, "check-po-language-projection.mjs") },
+  { name: "error-register-tests", file: join(scriptDir, "check-error-register.test.mjs") },
+  { name: "error-register-check", file: join(scriptDir, "check-error-register.mjs") },
   { name: "validate-manifest-tests", file: join(scriptDir, "validate-manifest.test.mjs") },
   { name: "pipeline-state-tests", file: join(scriptDir, "pipeline-state.test.mjs") },
   { name: "doc-contract-tests", file: join(scriptDir, "check-doc-contracts.test.mjs") },
