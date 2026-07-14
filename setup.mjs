@@ -94,7 +94,7 @@ import { pathToFileURL } from "node:url";
 
 import { parseYaml, YamlLiteError } from "./plugins/pipeline-core/lib/yaml-lite.mjs";
 import { validateAgainstSchema } from "./plugins/pipeline-core/lib/schema-lite.mjs";
-import { validateManifest } from "./plugins/pipeline-core/lib/manifest.mjs";
+import { loadPolicyLock, validateManifest } from "./plugins/pipeline-core/lib/manifest.mjs";
 import { projectManifestRouting, projectPreset, routingProvenance } from "./plugins/pipeline-core/lib/routing-projection.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -653,6 +653,18 @@ export function validateSharedLock(lockSha, checkedOutSha) {
   return { ok: true };
 }
 
+/**
+ * Setup owns no resolver or source trust runtime.  It nevertheless refuses to mutate
+ * a governed checkout when its fixed managed lock is not statically resolved: this is
+ * the same pre-mutation boundary the deploy guard receives through manifest validation.
+ */
+export function validatePolicyLockPreflight(rootDir, deps = {}) {
+  const result = deps.policyLockResult ?? loadPolicyLock(rootDir);
+  if (result.status === "unbound" || result.status === "resolved") return { ok: true };
+  if (result.lock?.mode === "advisory") return { ok: true, warning: `managed policy lock status: ${result.status}` };
+  return { ok: false, reason: `managed-policy-lock-${result.status}` };
+}
+
 export function readPrivateOverlayLock(rootDir, deps = {}) {
   if (deps.lockSha !== undefined || deps.checkedOutSha !== undefined) {
     return validateSharedLock(deps.lockSha, deps.checkedOutSha);
@@ -886,6 +898,14 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
     }
     return 1;
   }
+
+  const policyLockPreflight = validatePolicyLockPreflight(rootDir, deps);
+  if (!policyLockPreflight.ok) {
+    if (rl) rl.close();
+    console.error(`setup.mjs: managed policy lock failed (${policyLockPreflight.reason}); no files were written.`);
+    return 1;
+  }
+  if (policyLockPreflight.warning) console.warn(`setup.mjs: WARNING ${policyLockPreflight.warning}.`);
 
   const lockPreflight = readPrivateOverlayLock(rootDir, deps);
   if (!lockPreflight.ok) {

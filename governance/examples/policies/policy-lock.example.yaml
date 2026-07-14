@@ -1,0 +1,21 @@
+# Generic fixture. A consuming repository places its real public-safe lock at the
+# fixed `.claude/policy-lock.yaml` location; it is never discovered through
+# governance.policies_path and contains no source coordinate, credential, cache, or path.
+schema: pipeline.policy-lock.v0
+pack_id: policy-pack-001
+version: 1.0.0
+digest: sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+mode: advisory
+update: pinned
+verifier:
+  status: source-unverified
+
+# `policy` is optional. When present it is the managed floor and is evaluated before
+# project configuration. `evidence.required` is reserved: this package does not claim
+# executable enforcement until an owning runtime and tests exist.
+policy:
+  gates:
+    promote_prod:
+      type_floor: human
+  evidence:
+    required: true

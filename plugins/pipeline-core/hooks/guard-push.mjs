@@ -94,6 +94,14 @@ function emit(code, lines) {
   process.exit(code);
 }
 
+/** Mirrors validate-manifest's message-first rendering for semantic policy findings. */
+function manifestFindingText(finding) {
+  if (typeof finding?.message === "string") return finding.message;
+  if (finding?.reason) return finding.reason;
+  if (finding?.path) return finding.path;
+  return "invalid manifest";
+}
+
 // ---- read tool input (fail-open) --------------------------------------------------
 let cmd = "";
 try {
@@ -612,21 +620,19 @@ function runDeployBranch(release, manifestResult, cmd) {
     if (isDeployTriggering) {
       // Case A: unconditional block -- no mode qualifier, no deployApproval carve-out
       // (an approval binds a config whose validity cannot be established).
-      const reason = manifestResult.errors?.[0]?.reason ?? manifestResult.errors?.[0]?.path ?? "invalid manifest";
+      const reason = manifestFindingText(manifestResult.errors?.[0]);
       emit(2, [
         `BLOCKED (guard-push deploy branch, plugin pipeline-core): .claude/pipeline.yaml is semantically invalid ` +
           `(${reason}) AND this push is deploy-triggering (release section present) -- unconditional block, no ` +
           `mode exception.`,
         `Finding(s) (${manifestResult.errors?.length ?? 0}):`,
-        ...(manifestResult.errors ?? []).map(
-          (e, i) => `  ${i + 1}. ${e.path ?? "(YAML)"}: expected ${e.expected}, got ${e.got}${e.reason ? ` (${e.reason})` : ""}`,
-        ),
+        ...(manifestResult.errors ?? []).map((e, i) => `  ${i + 1}. ${manifestFindingText(e)}`),
         `Fix: correct the manifest, or (in mandate mode) record a valid docs/risks.md deviation.`,
       ]);
     }
     // Case B: NOT deploy-triggering -- fall through to the normal push-gate checks; the
     // caller prepends this note to whatever message those checks end up emitting.
-    const reason = manifestResult.errors?.[0]?.reason ?? manifestResult.errors?.[0]?.path ?? "invalid manifest";
+    const reason = manifestFindingText(manifestResult.errors?.[0]);
     return {
       invalidityNote:
         `[guard-push] WARN: .claude/pipeline.yaml is semantically invalid (${reason}) -- release section ` +
@@ -674,7 +680,7 @@ const releaseSection = manifestResult.manifest?.release;
 const hasRelease = Boolean(releaseSection) && typeof releaseSection === "object" && !Array.isArray(releaseSection);
 
 if (manifestResult.status === "invalid" && !hasRelease) {
-  const reason = manifestResult.errors?.[0]?.reason ?? manifestResult.errors?.[0]?.path ?? "invalid manifest";
+  const reason = manifestFindingText(manifestResult.errors?.[0]);
   emit(1, [
     `[guard-push] WARN: .claude/pipeline.yaml is invalid (${reason}).`,
     `Push-Gate is being skipped (fail-open, never silently marked blocking/passing) -- please fix.`,

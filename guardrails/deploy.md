@@ -14,7 +14,7 @@ Rule IDs: `DP-xx`.
 A ruleset that claims more than the guard technically enforces is worse than no rule at all (gate honesty). The following are DOCUMENTED, ACCEPTED residuals, not silently-claimed coverage:
 
 - **Deliberate YAML corruption.** The deploy branch can only enforce fail-closed behavior once it can parse the manifest well enough to know a `release` section exists and read its trigger patterns. A parse-level-invalid `.claude/pipeline.yaml` (malformed YAML, no `.manifest` at all) is indistinguishable from "no release section" at the point the hook runs — it WARNs (exit 1), for ALL pushes, exactly like a release-less repo. An agent could deliberately corrupt the YAML immediately before a push to smuggle a deploy-triggering tag past the guard. This is an ACCEPTED limitation — blocking every push on any YAML typo would reintroduce the exact accident-blast-radius the guard family's fail-open convention exists to avoid, and would change behavior for a corrupt release-LESS repo.
-- **The repo-level `governance.policies_path` opt-out.** A project that never sets `governance.policies_path` in its manifest has no central deploy policy at all — the precedence engine and the guard's own malformed-central-policy fail-closed both have nothing to enforce. Opting a project INTO a central floor is a project-level configuration choice, not something this layer can impose from outside; a project that never configures it is simply ungoverned by a central policy (its own manifest `release` schema constraints — mandatory `rollback`/`healthcheck`/adapter-integrity — still apply regardless).
+- **An unbound repository has no managed lock.** Without the fixed `.claude/policy-lock.yaml`, this package has no managed floor; the legacy project-selected `governance.policies_path` remains optional. Once the fixed lock is present, changing or removing `governance.policies_path` cannot mute it. This package does not fetch or authenticate a policy source: verifier status is an external assertion, so server-side controls remain the load-bearing wall.
 - **Server-side controls are the load-bearing wall.** Everything in this file is agent-side, repo-file-based enforcement — readable and, in principle, editable by the very agent it constrains (SEC-07 framing). The PRIMARY defense against an unauthorized prod promotion is server-side: GitHub Environments with required reviewers, tag/branch protection rulesets, and OIDC trust conditions scoped to the deploying identity. A project that relies on this guardrail file alone, without configuring the server-side controls, has NOT actually closed the gate — it has only documented one.
 
 ---
@@ -35,13 +35,29 @@ A ruleset that claims more than the guard technically enforces is worse than no 
 - **Why:** A central deploy policy that a single project can silently loosen is not a floor — DP-02 is what makes the floor actually load-bearing across every project it governs.
 - **Verification:** `plugins/pipeline-core/lib/manifest.mjs` (`checkDeployPrecedence` / `loadDeployPolicy`) + its own test suite; `harness/scripts/validate-manifest.mjs` renders precedence-violation messages; `docs/risks.md` deviation records per `templates/risks.md`.
 
-## DP-03 — Evidence + deploy-log duty
+## DP-02a — Fixed lock status is the managed binding boundary
+
+- A tracked `.claude/policy-lock.yaml` uses a fixed repository-relative location and a
+  public-safe status code only: `unbound`, `resolved`, `missing`, `stale`,
+  `digest-mismatch`, `policy-invalid`, or `source-unverified`. It must carry an opaque
+  ID and immutable version/digest; branches and tags are not verification.
+- `mandate` and `strict` block setup before any source/runtime write, release validation,
+  and deploy-triggering pushes unless the status is `resolved`; `advisory` warns. `pinned` never searches for an update; `notify`
+  only reports one; `required` blocks only when its verifier declares the pinned version
+  unacceptable. No mode may lower a managed floor, extend an allow-list, or silence a
+  bound lock by removing a manifest key.
+- This is not a source resolver, installer, credential system, cache, or server-side
+  control. It deliberately exposes no pack name, URL, account, path or raw diagnostic.
+
+## DP-03 — Evidence + deploy-log duty (reserved runtime enforcement)
 
 - **MUST NOT** consider a deploy/promotion done without BOTH: a machine-written evidence artifact (`evidence/deploy-<env>-latest.json`, schema `pipeline.deploy-evidence.v0`) AND a standardized, append-only entry in `docs/deployments.md` (date, artifact, environment, approval reference, embedded evidence summary, rollback anchor, outcome).
 - The evidence file is the transient machine-gate input (rolling, overwritten by the next deploy); the log entry is the durable record — an entry that merely references a since-overwritten evidence file is incomplete.
 - The runbook step that calls `pipeline-state.mjs consume-deploy` after a successful triggering push lives in `docs/deploy/README.md` — this rule states the duty that tooling must satisfy.
 - **Why:** A "deploy" that leaves no durable, standardized trace is unauditable the moment the transient CI run scrolls off — the same machine-evidence discipline the rest of the pipeline already holds every other phase to.
-- **Verification:** `evidence/deploy-<env>-latest.json` presence + schema; `docs/deployments.md` entry presence and shape; Critic-checked against the close checklist (process AC, honestly named — no hook enforces prose content).
+- **Verification:** This remains a documented/process AC only. `evidence.required` is
+  reserved until its owning runtime adds executable enforcement and tests; no current
+  guard, example or status report claims otherwise.
 
 ## DP-04 — Rollback duty: no prod promotion without a named rollback
 

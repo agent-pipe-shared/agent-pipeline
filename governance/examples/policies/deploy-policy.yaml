@@ -1,10 +1,9 @@
 # Example central deploy policy (pipeline.deploy-policy.v0, ADR-0034).
 #
-# Discovered by plugins/pipeline-core/lib/manifest.mjs's loadDeployPolicy() at the
-# FIXED filename `deploy-policy.yaml` directly under the project manifest's
-# `governance.policies_path` (see governance/examples/README.md "Wiring"). Absence of
-# this file (or of `governance.policies_path` itself) means: no central policy, the
-# project decides its own deploy configuration unconstrained (ADR-0034).
+# Legacy/project-selected policy example, discovered by plugins/pipeline-core/lib/manifest.mjs
+# below the manifest's `governance.policies_path`. Its absence means this legacy path is
+# unbound. A tracked `.claude/policy-lock.yaml`, when present, is instead fixed-location
+# authoritative and cannot be muted by changing governance.policies_path.
 #
 # ADR-0034 defines the precedence axis this file sits on: central-beats-project is a
 # NEW precedence relationship between two repo-level artifacts (this file vs. a
@@ -59,9 +58,7 @@ gates:
     type_floor: human      # ordinal floor: automated < human
     mode_floor: blocking   # ordinal floor: off < warn < blocking
 
-# Evidence duty: a documented process requirement, not enforced by the precedence
-# engine itself -- `required: true` at central level is binding: no deploy under this
-# policy counts done without the evidence artifact + docs/deployments.md entry
-# (guardrails/deploy.md DP-03).
+# Evidence duty is reserved: `required: true` is NOT executable enforcement in this
+# package. An owning runtime must add enforcement and tests before any stronger claim.
 evidence:
   required: true
