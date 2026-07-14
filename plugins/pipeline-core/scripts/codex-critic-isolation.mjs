@@ -524,10 +524,12 @@ function applyTraceTransition(state, event, payload) {
       if (activeTraceChild(state) || [...state.children.values()].some((child) => child.phase === "requested")) fail("trace step cannot terminate with an active child");
       if (payload.step === "preflight" && event === "step.completed") {
         if (TRACE_PREFLIGHT_CHILD_LABELS.some((label) => state.children.get(label)?.phase !== "closed" || state.children.get(label)?.spawned !== true)) fail("preflight completion requires its exact three-child cardinality");
+        if (TRACE_PREFLIGHT_CHILD_LABELS.some((label) => state.leases.get(label) !== "armed")) fail("preflight completion requires exactly one armed lease for each child");
       }
       if (payload.step === "critic" && event === "step.completed") {
         const critic = state.children.get("critic");
         if (critic?.phase !== "closed" || critic.spawned !== true || state.stdin !== "closed") fail("critic completion requires exactly one closed critic child and stdin");
+        if (state.leases.get("critic") !== "armed") fail("critic completion requires exactly one armed critic lease");
       }
       if (payload.step === "result" && state.resultCount !== 1) fail("result step requires exactly one result.observed event");
       if (event === "step.completed" && state.failureObservedStep === payload.step) fail("a step with a closed failure event must end with step.failed");
@@ -571,6 +573,7 @@ function applyTraceTransition(state, event, payload) {
   if (event === "child.close") {
     const child = requireBoundTraceChild(state, payload.label, event);
     if (!child || !["exited", "errored"].includes(child.phase)) fail("child.close must follow child.exit or child.error");
+    if (state.leases.get(payload.label) === undefined && state.failureObservedStep !== state.currentStep) fail("completed child requires exactly one armed lease");
     child.phase = "closed";
     return;
   }
@@ -608,7 +611,7 @@ function applyTraceTransition(state, event, payload) {
   }
   if (event === "stdin.closed") {
     requireOneActiveTraceChild(state, event, { criticOnly: true });
-    if (state.stdin !== "ending" && state.stdin !== "error") fail("stdin close is out of order");
+    if (state.stdin !== "ending") fail("stdin close is out of order");
     state.stdin = "closed";
     return;
   }
@@ -1069,7 +1072,7 @@ export function createDebugChildObserver({
   let stdinFinished = false;
   let stdinFailureCategory = null;
   let stdinErrorRecorded = false;
-  let stdinOperationActive = false;
+  let stdinErrorQueued = false;
   let stdinWaiter = null;
   let stdinPhase = "initial";
   let childClosed = false;
@@ -1222,11 +1225,21 @@ export function createDebugChildObserver({
     if (stdinFailureCategory === null) stdinFailureCategory = category;
     safeFailure();
     stdinWaiter?.reject(categoricalStdinError(stdinFailureCategory));
-    if (!stdinOperationActive && !stdinErrorRecorded && !stdinClosed && ["requested", "accepted", "ending"].includes(stdinPhase)) {
-      stdinErrorRecorded = true;
-      stdinPhase = "error";
-      append("stdin.error", { category: stdinFailureCategory });
+    if (!stdinErrorQueued && !stdinErrorRecorded && !stdinClosed && ["requested", "accepted", "ending"].includes(stdinPhase)) {
+      stdinErrorQueued = true;
+      const queued = schedule(async () => {
+        if (!stdinErrorRecorded && !stdinClosed) {
+          await traceStore.append("stdin.error", { category: stdinFailureCategory });
+          stdinErrorRecorded = true;
+          stdinPhase = "error";
+        }
+      });
+      queued.finally(() => { stdinErrorQueued = false; }).catch(() => {});
     }
+  }
+
+  function requireHealthyStdin() {
+    if (stdinFailureCategory !== null) throw categoricalStdinError(stdinFailureCategory);
   }
 
   function waitForStdinWrite(bytes) {
@@ -1278,19 +1291,23 @@ export function createDebugChildObserver({
     const bytes = Buffer.isBuffer(value) ? Buffer.from(value) : typeof value === "string" ? Buffer.from(value, "utf8") : null;
     if (bytes === null) return Promise.reject(new Error("debug child stdin accepts only Buffer or string input"));
     const operation = schedule(async () => {
-      stdinOperationActive = true;
       try {
         await traceStore.append("stdin.write-requested", { bytes: bytes.length, sha256: sha256(bytes) });
         stdinPhase = "requested";
         await traceStore.sync();
         await waitForStdinWrite(bytes);
+        requireHealthyStdin();
         await traceStore.append("stdin.write-accepted", { bytes: bytes.length });
         stdinPhase = "accepted";
+        requireHealthyStdin();
         await traceStore.append("stdin.end-requested", {});
         stdinPhase = "ending";
+        requireHealthyStdin();
         await traceStore.sync();
         await waitForStdinFinish();
+        requireHealthyStdin();
         if (!stdinFinished) throw categoricalStdinError("premature-close");
+        requireHealthyStdin();
         await traceStore.append("stdin.closed", {});
         stdinClosed = true;
         stdinPhase = "closed";
@@ -1298,8 +1315,8 @@ export function createDebugChildObserver({
       } catch (error) {
         const category = error?.debugCategory ?? stdinFailureCategory ?? "stdin-error";
         if (!stdinErrorRecorded && ["requested", "accepted", "ending"].includes(stdinPhase)) {
-          stdinErrorRecorded = true;
           await traceStore.append("stdin.error", { category });
+          stdinErrorRecorded = true;
         }
         stdinFailureCategory ??= category;
         stdinPhase = "error";
@@ -1307,7 +1324,6 @@ export function createDebugChildObserver({
         return category;
       } finally {
         stdinWaiter = null;
-        stdinOperationActive = false;
       }
     });
     return operation.then((category) => {
@@ -1395,7 +1411,7 @@ export function createDebugChildObserver({
     stdinFinished = true;
     if (stdinPhase === "ending") {
       if (stdinWaiter?.resolve) stdinWaiter.resolve();
-      else if (!stdinClosed) { stdinClosed = true; stdinPhase = "closed"; append("stdin.closed", {}); }
+      else if (!stdinClosed && stdinFailureCategory === null && !stdinErrorRecorded) { stdinClosed = true; stdinPhase = "closed"; append("stdin.closed", {}); }
     } else if (!stdinClosed) observeStdinFailure(categoricalStdinError("premature-finish"), "premature-finish");
   });
   child.stdin.on("close", () => {
