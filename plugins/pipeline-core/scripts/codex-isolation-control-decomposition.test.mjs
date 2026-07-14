@@ -47,11 +47,13 @@ try {
   passed += 1; process.stdout.write("PASS  binary resolution rejects an empty PATH\n");
 } finally { await rm(temp, { recursive: true, force: true }); }
 
+let observedNativeArgs = null;
 function fakeSpawn() {
   return (_command, args) => {
     const child = new EventEmitter(); child.stdin = new PassThrough(); child.stdout = new PassThrough(); child.stderr = new PassThrough(); child.kill = () => true;
     queueMicrotask(async () => {
       if (args[0] === "sandbox") {
+        observedNativeArgs = args;
         child.stdout.write(`${JSON.stringify({ schema: "pipeline.codex-native-sandbox-probe.v1", writes: [
           { category: "fixture-canary", outcome: "denied", errorCategory: "permission-denied" },
           { category: "external-canary", outcome: "denied", errorCategory: "permission-denied" },
@@ -77,6 +79,7 @@ await (async () => {
   check("same resolved binary binds deterministic probe and tool-free final critic", () => {
     assert.equal(result.ok, true); assert.equal(result.envelope.sandbox.sameBinary, true);
     assert.equal(result.envelope.sandbox.mechanism, CONTROL_DECOMPOSITION_POLICY.mechanism);
+    assert.ok(observedNativeArgs.includes("--input-type=module"));
     assert.equal(result.envelope.probe.ok, true); assert.equal(result.envelope.probe.canaries.fixtureUnchanged, true);
     assert.equal(result.envelope.final.ok, true); assert.equal(result.envelope.final.stream.toolFree, true);
     assert.match(result.envelope.sandbox.binarySha256, /^[0-9a-f]{64}$/u);
