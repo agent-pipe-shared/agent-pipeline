@@ -20,10 +20,14 @@ check("native probe program deterministically carries both denied write categori
   assert.deepEqual(parseProbeResult(Buffer.from(JSON.stringify({ schema: "pipeline.codex-native-sandbox-probe.v1", writes: [
     { category: "fixture-canary", outcome: "denied", errorCategory: "permission-denied" },
     { category: "external-canary", outcome: "denied", errorCategory: "permission-denied" },
-  ] }) + "\n")), { writes: [
+  ] }) + "\n")), { accepted: true, writes: [
     { category: "fixture-canary", outcome: "denied", errorCategory: "permission-denied" },
     { category: "external-canary", outcome: "denied", errorCategory: "permission-denied" },
   ] });
+  assert.equal(parseProbeResult(Buffer.from(JSON.stringify({ schema: "pipeline.codex-native-sandbox-probe.v1", writes: [
+    { category: "fixture-canary", outcome: "terminated-after-ready", errorCategory: "sandbox-termination" },
+    { category: "external-canary", outcome: "denied", errorCategory: "permission-denied" },
+  ] }) + "\n"))?.accepted, false);
   assert.equal(parseProbeResult(Buffer.from("{}\n")), null);
 });
 

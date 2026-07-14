@@ -109,11 +109,11 @@ async function completeCodexBinaryInspection(input) {
 
 export function buildNativeProbeProgram() {
   return [
-    'import { writeFile } from "node:fs/promises";',
+    'import { spawnSync } from "node:child_process";',
     'const [fixtureCanary, externalCanary] = process.argv.slice(-2);',
-    'const normalize = (error) => ["EACCES", "EPERM", "EROFS"].includes(error?.code) ? "permission-denied" : "other-error";',
-    'const attempt = async (category, target) => { try { await writeFile(target, "native-probe-write\\n", { flag: "w" }); return { category, outcome: "unexpected-success", errorCategory: null }; } catch (error) { return { category, outcome: "denied", errorCategory: normalize(error) }; } };',
-    'const writes = await Promise.all([attempt("fixture-canary", fixtureCanary), attempt("external-canary", externalCanary)]);',
+    'const childProgram = `import { writeFile } from "node:fs/promises"; const [target, category] = process.argv.slice(-2); process.stdout.write(`READY:${category}\\n`); try { await writeFile(target, "native-probe-write\\n", { flag: "w" }); process.stdout.write("SUCCESS\\n"); } catch (error) { process.stdout.write(`DENIED:${error?.code ?? "unknown"}\\n`); }`;',
+    'const attempt = (category, target) => { const result = spawnSync(process.execPath, ["--input-type=module", "-e", childProgram, target, category], { encoding: "utf8", shell: false }); const output = result.stdout ?? ""; if (/^READY:[a-z-]+\\nDENIED:(EACCES|EPERM|EROFS)\\n$/u.test(output) && result.status === 0 && result.signal === null) return { category, outcome: "denied", errorCategory: "permission-denied" }; if (new RegExp(`^READY:${category}\\n`).test(output) && result.signal) return { category, outcome: "terminated-after-ready", errorCategory: "sandbox-termination" }; if (new RegExp(`^READY:${category}\\nSUCCESS\\n`).test(output)) return { category, outcome: "unexpected-success", errorCategory: null }; return { category, outcome: "child-failed", errorCategory: "other-error" }; };',
+    'const writes = [attempt("fixture-canary", fixtureCanary), attempt("external-canary", externalCanary)];',
     `process.stdout.write(JSON.stringify({ schema: ${JSON.stringify(PROBE_SCHEMA)}, writes }) + "\\n");`,
   ].join("\n");
 }
@@ -127,9 +127,10 @@ function parseProbeResult(stdout) {
     const expected = ["fixture-canary", "external-canary"];
     for (let index = 0; index < expected.length; index += 1) {
       const item = value.writes[index];
-      if (item?.category !== expected[index] || item.outcome !== "denied" || item.errorCategory !== "permission-denied") return null;
+      if (item?.category !== expected[index] || !["denied", "terminated-after-ready", "unexpected-success", "child-failed"].includes(item.outcome)) return null;
     }
-    return Object.freeze({ writes: value.writes.map((item) => ({ category: item.category, outcome: item.outcome, errorCategory: item.errorCategory })) });
+    const writes = value.writes.map((item) => ({ category: item.category, outcome: item.outcome, errorCategory: item.errorCategory }));
+    return Object.freeze({ accepted: writes.every((item) => item.outcome === "denied" && item.errorCategory === "permission-denied"), writes });
   } catch { return null; }
 }
 
@@ -178,7 +179,7 @@ export async function runNativeSandboxProbe({ codexBinary, fixtureRoot, leaseMs 
   await rm(fixtureCanary, { force: true });
   await rm(coordinator, { recursive: true, force: true });
   const unchanged = before.every((value, index) => value.sha256 === after[index].sha256 && value.bytes === after[index].bytes);
-  const ok = result !== null && unchanged;
+  const ok = result?.accepted === true && unchanged;
   return Object.freeze({
     ok,
     category: ok ? "pass" : execution.timedOut ? "lease-timeout" : execution.terminal.code === 0 ? "invalid-probe-result" : "probe-process-failed",
