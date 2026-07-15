@@ -43,7 +43,10 @@ the native host agent surface:
 1. `codex-critic-host.mjs prepare` validates an exact full-SHA candidate,
    creates an independent disposable checkout, removes every Git remote, runs
    the calibrated verify command under a stripped environment, binds
-   source-qualified references and content fingerprints, and writes a `0600`
+   source-qualified references and content fingerprints, generates a bounded
+   deterministic reference containing the exact ordered commit SHAs between
+   review base and candidate. That reference path is coordinator-reserved and
+   can never be supplied as request evidence. Prepare then writes a `0600`
    dispatch packet plus an undisclosed consumption record below a private,
    symlink-safe coordinator control directory. The candidate, ruleset, and the
    mandatory `private` and `shared` observers are captured before and checked

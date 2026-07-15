@@ -74,10 +74,16 @@ function createCandidate(root) {
   const base = run("git", ["rev-parse", "HEAD"], root);
   writeFileSync(join(root, "specs", "review.md"), "# Review spec\n\nCandidate.\n");
   run("git", ["add", "specs/review.md"], root);
-  run("git", ["commit", "-qm", "candidate"], root);
+  run("git", ["commit", "-qm", "candidate-one"], root);
+  const firstCandidate = run("git", ["rev-parse", "HEAD"], root);
+  writeFileSync(join(root, "policies", "guard.md"), "# Guard\n\nCandidate.\n");
+  run("git", ["add", "policies/guard.md"], root);
+  run("git", ["commit", "-qm", "candidate-two"], root);
+  const commit = run("git", ["rev-parse", "HEAD"], root);
   return {
     base,
-    commit: run("git", ["rev-parse", "HEAD"], root),
+    commits: [firstCandidate, commit],
+    commit,
     tree: run("git", ["rev-parse", "HEAD^{tree}"], root),
   };
 }
@@ -227,6 +233,11 @@ check("request rejects duplicate references", () => {
   const copy = structuredClone(request);
   copy.guardrail_paths.push(copy.guardrail_paths[0]);
   assert.throws(() => validateCriticRequest(copy), /duplicates/);
+});
+check("request rejects the coordinator-reserved diff reference", () => {
+  const copy = structuredClone(request);
+  copy.evidence_paths = ["evidence/codex-critic-commit-set.json"];
+  assert.throws(() => validateCriticRequest(copy), /coordinator-reserved diff reference/);
 });
 check("T1 request rejects a missing named PO waiver", () => {
   const copy = structuredClone(request);
@@ -395,6 +406,19 @@ check("prepared packet binds verify evidence and observer state", () => {
   assert.equal(prepared.references.some(({ kind }) => kind === "evidence"), true);
   assert.equal(typeof prepared.bindings.protectedBefore.candidate, "string");
   assert.equal(typeof prepared.bindings.protectedBefore["observer.private"], "string");
+});
+check("prepared packet binds the exact enumerated commit-set as its diff reference", () => {
+  assert.deepEqual(prepared.review.commits, candidate.commits);
+  assert.equal(prepared.review.diffReferencePath, "evidence/codex-critic-commit-set.json");
+  const diffReference = prepared.references.filter(({ source, kind }) => source === "review" && kind === "diff");
+  assert.equal(diffReference.length, 1);
+  assert.deepEqual(readJsonBounded(join(reviewRoot, diffReference[0].path)).value, {
+    schema: "pipeline.codex-critic-commit-set.v1",
+    base: candidate.base,
+    commits: candidate.commits,
+    candidateCommit: candidate.commit,
+    candidateTree: candidate.tree,
+  });
 });
 check("configured fsmonitor cannot run before the protected baseline", () => {
   assert.equal(existsSync(join(privateObserver, "ignored", "fsmonitor.txt")), false);
@@ -635,6 +659,15 @@ check("reference mutation blocks finalize", () => {
   writeFileSync(evidencePath, "{}\n");
   assert.throws(() => finalizeNativeCritic({ repoRoot: repo, pipelineRoot: rulesetRoot, controlDir: root, dispatchStatePath, preparedPath, returnPath, receiptPath, observers }), /reference set drift/);
   writeFileSync(evidencePath, original);
+});
+check("enumerated diff mutation blocks finalize", () => {
+  const diffPath = join(reviewRoot, prepared.review.diffReferencePath);
+  const original = readFileSync(diffPath);
+  const changed = readJsonBounded(diffPath).value;
+  changed.commits = [candidate.base];
+  writeJson(diffPath, changed);
+  assert.throws(() => finalizeNativeCritic({ repoRoot: repo, pipelineRoot: rulesetRoot, controlDir: root, dispatchStatePath, preparedPath, returnPath, receiptPath, observers }), /commit set drift|commit-set reference drift/);
+  writeFileSync(diffPath, original);
 });
 for (const [name, citation] of [["path-only", "specs/review.md"], ["synthetic trailing-newline", "specs/review.md:4"], ["out-of-range", "specs/review.md:999999"]]) {
   check(`${name} finding citation is rejected`, () => {

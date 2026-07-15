@@ -59,9 +59,11 @@ const EXECUTION_BINDING_PATHS = Object.freeze([
 ]);
 const ROLE_CONTRACT_PATH = "roles/critic.md";
 const PROMPT_CONTRACT_PATH = "templates/prompts/critic-review.md";
+const DIFF_REFERENCE_PATH = "evidence/codex-critic-commit-set.json";
 const MAX_JSON_BYTES = 256 * 1024;
 const MAX_INVENTORY_FILES = 100_000;
 const MAX_INVENTORY_BYTES = 2 * 1024 * 1024 * 1024;
+const MAX_REVIEW_COMMITS = 256;
 const SHA40 = /^[0-9a-f]{40}$/;
 const SHA256 = /^[0-9a-f]{64}$/;
 const SAFE_ID = /^[a-z0-9][a-z0-9._-]{2,79}$/;
@@ -344,6 +346,9 @@ export function validateCriticRequest(request) {
   }
   const allPaths = [request.calibration_path, request.spec_path, ...request.guardrail_paths, ...request.evidence_paths];
   if (new Set(allPaths).size !== allPaths.length) fail("request reference paths must be unique");
+  if (allPaths.includes(DIFF_REFERENCE_PATH)) {
+    fail("request must not claim the coordinator-reserved diff reference path");
+  }
   return request;
 }
 
@@ -402,6 +407,44 @@ function parseVerifyCommand(reviewRoot, calibrationPath) {
   const script = normalizeRepoRelativePath(match[1], "verify script");
   resolveRegularFile(reviewRoot, script);
   return { command: calibration.verify, script };
+}
+
+function enumerateReviewCommits(reviewRoot, base, candidate) {
+  const commits = gitText(reviewRoot, ["rev-list", "--reverse", "--topo-order", `${base}..${candidate}`])
+    .split("\n")
+    .filter(Boolean);
+  if (commits.length === 0 || commits.length > MAX_REVIEW_COMMITS) {
+    fail(`review commit set must contain 1..${MAX_REVIEW_COMMITS} commits`);
+  }
+  if (commits.some((commit) => !SHA40.test(commit)) || new Set(commits).size !== commits.length
+    || commits.at(-1) !== candidate) {
+    fail("review commit set is invalid or does not terminate at the candidate");
+  }
+  return commits;
+}
+
+function reviewCommitSet(base, candidate, tree, commits) {
+  return {
+    schema: "pipeline.codex-critic-commit-set.v1",
+    base,
+    commits,
+    candidateCommit: candidate,
+    candidateTree: tree,
+  };
+}
+
+function validateReviewCommitSet(reviewRoot, review) {
+  if (review.diffReferencePath !== DIFF_REFERENCE_PATH || !Array.isArray(review.commits)) {
+    fail("prepared review commit-set binding is invalid");
+  }
+  const expectedCommits = enumerateReviewCommits(reviewRoot, review.base, review.commit);
+  if (JSON.stringify(review.commits) !== JSON.stringify(expectedCommits)) fail("prepared review commit set drift");
+  const record = readJsonBounded(join(reviewRoot, review.diffReferencePath)).value;
+  exactKeys(record, ["schema", "base", "commits", "candidateCommit", "candidateTree"], "review commit-set reference");
+  if (JSON.stringify(record) !== JSON.stringify(reviewCommitSet(review.base, review.commit, review.tree, expectedCommits))) {
+    fail("review commit-set reference drift");
+  }
+  return expectedCommits;
 }
 
 function assertDisposableCheckout(reviewRoot, commit, allowedGenerated = []) {
@@ -464,6 +507,7 @@ function artifactBindings(reviewRoot, pipelineRoot, request) {
   const result = [
     { source: "review", kind: "calibration", ...resolveRegularFile(reviewRoot, request.calibration_path) },
     { source: "review", kind: "spec", ...resolveRegularFile(reviewRoot, request.spec_path) },
+    { source: "review", kind: "diff", ...resolveRegularFile(reviewRoot, DIFF_REFERENCE_PATH, { allowUntracked: true }) },
     ...request.guardrail_paths.map((path) => ({ source: "review", kind: "guardrail", ...resolveRegularFile(reviewRoot, path) })),
     ...request.evidence_paths.map((path) => ({ source: "review", kind: "evidence", ...resolveRegularFile(reviewRoot, path, { allowUntracked: true }) })),
     { source: "ruleset", kind: "role-contract", ...resolveRegularFile(pipelineRoot, ROLE_CONTRACT_PATH) },
@@ -590,7 +634,9 @@ export function captureRepositoryFingerprint(repoRoot, declaredArtifacts = []) {
     status: sha256(runGit(repoRoot, ["status", "--porcelain=v1", "-z", "--untracked-files=all"], { encoding: "buffer" }).stdout),
     untracked: inventoryPaths(repoRoot, ["ls-files", "--others", "--exclude-standard", "-z"], "untracked"),
     ignored: inventoryPaths(repoRoot, ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"], "ignored"),
-    artifacts: Object.fromEntries(declaredArtifacts.map((item) => [item.path, resolveRegularFile(repoRoot, item.path, { allowUntracked: item.kind === "evidence" }).sha256])),
+    artifacts: Object.fromEntries(declaredArtifacts.map((item) => [item.path, resolveRegularFile(repoRoot, item.path, {
+      allowUntracked: item.kind === "evidence" || item.kind === "diff",
+    }).sha256])),
     administrative: gitAdministrativeFingerprint(repoRoot),
   };
   return { sha256: sha256(canonicalJson(parts)), detail: parts };
@@ -740,7 +786,15 @@ export function prepareNativeCritic(options, deps = {}) {
   assertFingerprintMapEqual(protectedBefore, protectedFingerprintMap(repoRoot, pipelineRoot, observers), "checkout subprocess");
   const verify = (deps.runVerify ?? runCalibratedVerify)(reviewRoot, request.calibration_path);
   assertFingerprintMapEqual(protectedBefore, protectedFingerprintMap(repoRoot, pipelineRoot, observers), "verify subprocess");
-  assertDisposableCheckout(reviewRoot, request.candidate_commit, request.evidence_paths);
+  const commits = enumerateReviewCommits(reviewRoot, request.review_base, request.candidate_commit);
+  atomicWriteExclusive(join(reviewRoot, DIFF_REFERENCE_PATH), reviewCommitSet(
+    request.review_base,
+    request.candidate_commit,
+    request.candidate_tree,
+    commits,
+  ));
+  const generatedPaths = [...request.evidence_paths, DIFF_REFERENCE_PATH];
+  assertDisposableCheckout(reviewRoot, request.candidate_commit, generatedPaths);
   const references = artifactBindings(reviewRoot, pipelineRoot, request);
   const reviewFingerprint = captureRepositoryFingerprint(reviewRoot, references.filter(({ source }) => source === "review"));
   const before = protectedFingerprintMap(repoRoot, pipelineRoot, observers);
@@ -767,14 +821,22 @@ export function prepareNativeCritic(options, deps = {}) {
       returnChannel: "native-host-response-to-elephant",
       agentWritesReceipt: false,
       fixedInstruction: [
-        "Read only the role, prompt, candidate, spec, guardrails, and evidence references in this packet.",
+        "Read only the role, prompt, enumerated commit-set/diff, candidate, spec, guardrails, and evidence references in this packet.",
+        "Treat review.commits and the bound diff reference as the complete review object; verify the exact list before constructing the diff from review.base to review.commit.",
         "Do not use chat history, state, handover, prior verdicts, summaries, or private paths.",
         "Do not modify files and do not create a receipt.",
         "Return exactly one JSON object matching the host result contract.",
       ],
     },
     sources: { reviewRoot, rulesetRoot: pipelineRoot },
-    review: { root: reviewRoot, base: request.review_base, commit: request.candidate_commit, tree: request.candidate_tree },
+    review: {
+      root: reviewRoot,
+      base: request.review_base,
+      commits,
+      commit: request.candidate_commit,
+      tree: request.candidate_tree,
+      diffReferencePath: DIFF_REFERENCE_PATH,
+    },
     references,
     verify,
     assurance: ASSURANCE,
@@ -1006,7 +1068,7 @@ function validatePrepared(prepared) {
   if (prepared.assurance !== ASSURANCE || JSON.stringify(prepared.residualRisks) !== JSON.stringify(RESIDUAL_RISKS)) fail("prepared assurance boundary drift");
   exactKeys(prepared.route, ["duty", "runner", "alias", "model", "effort"], "prepared route");
   exactKeys(prepared.sources, ["reviewRoot", "rulesetRoot"], "prepared sources");
-  exactKeys(prepared.review, ["root", "base", "commit", "tree"], "prepared review");
+  exactKeys(prepared.review, ["root", "base", "commits", "commit", "tree", "diffReferencePath"], "prepared review");
   exactKeys(prepared.bindings, [
     "requestSha256", "referenceSetSha256", "reviewFingerprintSha256", "protectedBefore",
     "roleContractSha256", "promptContractSha256", "verdictSchemaSha256", "hostReturnSchemaSha256", "routingProvenance", "rulesetCheckoutSha", "executionSetSha256",
@@ -1018,6 +1080,7 @@ function validatePrepared(prepared) {
     || prepared.review.commit !== prepared.request.candidate_commit || prepared.review.tree !== prepared.request.candidate_tree) {
     fail("prepared review binding drift");
   }
+  validateReviewCommitSet(prepared.review.root, prepared.review);
   if (prepared.expectedTaskName !== `critic_${prepared.request.task_id.replace(/[^a-z0-9_]/g, "_")}`.slice(0, 64)) fail("prepared task name drift");
   if (!prepared.bindings.protectedBefore || typeof prepared.bindings.protectedBefore !== "object" || Array.isArray(prepared.bindings.protectedBefore)) {
     fail("prepared protected-root bindings invalid");
@@ -1052,6 +1115,8 @@ function validatePrepared(prepared) {
     exactKeys(reference, ["source", "kind", "path", "sha256", "bytes"], `prepared references[${index}]`);
     if (!new Set(["review", "ruleset"]).has(reference.source) || !SHA256.test(reference.sha256)) fail("prepared reference binding invalid");
   }
+  const diffReferences = prepared.references.filter(({ source, kind, path }) => source === "review" && kind === "diff" && path === DIFF_REFERENCE_PATH);
+  if (diffReferences.length !== 1) fail("prepared enumerated diff reference is missing or ambiguous");
 }
 
 function cleanupReviewRoot(prepared, dispatchState) {
@@ -1227,7 +1292,9 @@ export function finalizeNativeCritic(options) {
   const hostReturnRecord = readJsonBounded(returnPath);
   const validated = validateHostReturn(prepared, preparedRecord.sha256, hostReturnRecord.value);
 
-  assertDisposableCheckout(prepared.review.root, prepared.review.commit, prepared.request.evidence_paths);
+  const generatedPaths = [...prepared.request.evidence_paths, prepared.review.diffReferencePath];
+  assertDisposableCheckout(prepared.review.root, prepared.review.commit, generatedPaths);
+  validateReviewCommitSet(prepared.review.root, prepared.review);
   const referenceNow = artifactBindings(prepared.review.root, pipelineRoot, prepared.request);
   if (sha256(canonicalJson(referenceNow)) !== prepared.bindings.referenceSetSha256) fail("reference set drift after review");
   const reviewAfter = captureRepositoryFingerprint(prepared.review.root, referenceNow.filter(({ source }) => source === "review"));
