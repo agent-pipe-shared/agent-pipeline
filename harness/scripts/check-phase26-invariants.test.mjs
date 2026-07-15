@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -12,6 +12,7 @@ import {
   resultArg,
   sha256Canonical,
 } from "./check-phase26-invariants.mjs";
+import { validateAgainstSchema } from "../../plugins/pipeline-core/lib/schema-lite.mjs";
 
 const SHA = (char) => char.repeat(64);
 const roots = [];
@@ -66,7 +67,8 @@ function fixture() {
   const packageResult = {
     id: "package-p5-fixture",
     status: "implementation-pass; pushed-and-fetchback-verified",
-    fullVerify: { exitCode: 0 },
+    sharedCommit: "1".repeat(40),
+    fullVerify: { exitCode: 0, boundCommit: "1".repeat(40) },
     publicGate: { pushedOid: "1".repeat(40), fetchBackOid: "1".repeat(40), privacyFindings: 0 },
     loopEconomy: {
       criticCorrection: 1, deltaRegate: 1, productRetry: 1,
@@ -125,13 +127,15 @@ function fixture() {
   const result = {
     packageResults: [packageResult],
     finalIntegrations: [], decisionBriefs: [], courseDecisionIntents: [], courseDecisionReceipts: [],
+    externalEvidence: [],
     sdlcRunGraph: graph,
     sdlcRunGraphProjection: null,
     phase26InvariantEvidence: {
       schema: "pipeline.phase26-invariant-evidence.v1", packageId: "P2.6-P5",
       earlySmoke: {
         status: "pass", namedCapabilityId: "continuity-host-transport", elapsedFromImplementationStartMs: 1_800_000,
-        cumulativeLiveMs: 600_000, plannedPathCount: 10, changedPathCountBeforeSmoke: 1, evidenceSha256: SHA("d"),
+        cumulativeLiveMs: 600_000, plannedPathCount: 10, changedPathCountBeforeSmoke: 1,
+        evidenceId: "smoke-evidence", evidenceSha256: SHA("d"),
       },
       scope: {
         plannedPathCount: 10, actualPathCount: 11,
@@ -144,10 +148,32 @@ function fixture() {
         fullVerify: measurement([10_000, 11_000, 12_000, 13_000, 14_000], 30_000),
         ledgerWriter: measurement([10, 15, 20, 25, 30], 50),
       },
+      executionRouting: {
+        status: "unattested-nonconformance", requestedDuty: "codex_implementation",
+        requiredSelector: "terra", requiredEffort: "xhigh",
+        routeReceiptEvidenceId: null, routeReceiptEvidenceSha256: null,
+        phase3Disposition: "mandatory-dispatch-attestation",
+      },
+      legacyLedgerExemptions: [],
     },
   };
+  rebuildExternalEvidence(result);
   seal(result);
   return result;
+}
+
+function rebuildExternalEvidence(result) {
+  const evidence = new Map();
+  const add = (entry) => {
+    if (entry?.collection === "externalEvidence") evidence.set(entry.id, entry.sha256);
+  };
+  for (const holder of [...result.sdlcRunGraph.events, ...result.sdlcRunGraph.edges]) holder.sourceRefs.forEach(add);
+  result.sdlcRunGraph.loopRecords.flatMap((entry) => entry.triggerEvidence).forEach((entry) => evidence.set(entry.id, entry.sha256));
+  const smoke = result.phase26InvariantEvidence.earlySmoke;
+  evidence.set(smoke.evidenceId, smoke.evidenceSha256);
+  const route = result.phase26InvariantEvidence.executionRouting;
+  if (route.routeReceiptEvidenceId !== null) evidence.set(route.routeReceiptEvidenceId, route.routeReceiptEvidenceSha256);
+  result.externalEvidence = [...evidence].sort(([left], [right]) => left.localeCompare(right)).map(([id, sha256]) => ({ id, sha256 }));
 }
 
 function seal(result) {
@@ -209,6 +235,15 @@ test("canonical graph, all family dispositions, loop inventory, evidence and Mer
   assert.deepEqual(outcome, { ok: true, findings: [] });
 });
 
+test("published schema accepts the complete Result envelope that the checker reconciles", () => {
+  const schema = JSON.parse(readFileSync(new URL("./sdlc-run-graph.schema.json", import.meta.url), "utf8"));
+  assert.equal(schema.additionalProperties, true);
+  assert.equal(validateAgainstSchema(fixture(), schema).valid, true);
+  const malformed = fixture();
+  malformed.externalEvidence = "not-an-array";
+  assert.equal(validateAgainstSchema(malformed, schema).valid, false);
+});
+
 test("renderer is deterministic and exposes similarity grouping and configured loop counts", () => {
   const result = fixture();
   const first = renderSdlcMermaid(result.sdlcRunGraph);
@@ -252,6 +287,7 @@ test("zero/one reroute and course-gate families reconcile as typed records", () 
     }
   }
   refreshPackageRefs(result);
+  rebuildExternalEvidence(result);
   const outcome = checked(result);
   assert.deepEqual(outcome, { ok: true, findings: [] });
 });
@@ -296,11 +332,31 @@ test("legacy package records without a loop ledger do not acquire invented zeroe
   const result = fixture();
   const legacy = { id: "legacy-record", status: "historic" };
   result.packageResults.push(legacy);
+  result.phase26InvariantEvidence.legacyLedgerExemptions.push({
+    packageId: legacy.id, packageSha256: sha256Canonical(legacy), reason: "pre-p5-result-schema",
+  });
   result.sdlcRunGraph.events[0].sourceRefs.push({
     collection: "packageResults", id: legacy.id, sha256: sha256Canonical(legacy),
   });
   const outcome = checked(result);
   assert.deepEqual(outcome, { ok: true, findings: [] });
+});
+
+test("missing or stale legacy-ledger exemptions cannot hide current loop evidence", () => {
+  const missing = fixture();
+  const unbound = { id: "unbound-legacy", status: "historic" };
+  missing.packageResults.push(unbound);
+  missing.sdlcRunGraph.events[0].sourceRefs.push({ collection: "packageResults", id: unbound.id, sha256: sha256Canonical(unbound) });
+  assert(checked(missing).findings.some((finding) => finding.includes("lacks a bound loopEconomy ledger")));
+
+  const stale = fixture();
+  const legacy = { id: "stale-legacy", status: "historic" };
+  stale.packageResults.push(legacy);
+  stale.phase26InvariantEvidence.legacyLedgerExemptions.push({
+    packageId: legacy.id, packageSha256: SHA("f"), reason: "pre-p5-result-schema",
+  });
+  stale.sdlcRunGraph.events[0].sourceRefs.push({ collection: "packageResults", id: legacy.id, sha256: sha256Canonical(legacy) });
+  assert(checked(stale).findings.some((finding) => finding.includes("legacy ledger exemption")));
 });
 
 test("Mermaid tamper and stale projection digest both fail", () => {
@@ -342,6 +398,19 @@ test("a bounded edge cannot cite a fabricated Result-owned receipt", () => {
   assert(outcome.findings.some((finding) => finding.includes("fabricated or stale Result-owned")));
 });
 
+test("unreconciled external evidence and a disconnected cycle fail closed", () => {
+  const result = fixture();
+  result.sdlcRunGraph.edges[2].sourceRefs[1].sha256 = SHA("f");
+  assert(checked(result).findings.some((finding) => finding.includes("fabricated or stale Result-owned")));
+
+  const disconnected = fixture();
+  disconnected.sdlcRunGraph.events.push(event("event-08", 8, "work"), event("event-09", 9, "verify"));
+  disconnected.sdlcRunGraph.edges.push(edge("edge-10", "event-08", "event-09"), edge("edge-11", "event-09", "event-08"));
+  disconnected.sdlcRunGraph.graphCutoffEventId = "event-09";
+  rebuildExternalEvidence(disconnected);
+  assert(checked(disconnected).findings.some((finding) => finding.includes("not reachable from the graph start")));
+});
+
 test("graph cannot add a containing-Result or final-commit self-reference field", () => {
   const result = fixture();
   result.sdlcRunGraph.resultSha256 = SHA("f");
@@ -381,9 +450,20 @@ test("early smoke rejects the 20-percent boundary and live-time excess", () => {
 test("phase-close cannot precede green exact Verify and matching push fetch-back evidence", () => {
   const result = fixture();
   result.sdlcRunGraph.completionClaim = "phase-close";
+  result.phase26InvariantEvidence.executionRouting = {
+    status: "attested", requestedDuty: "codex_implementation", requiredSelector: "terra", requiredEffort: "xhigh",
+    routeReceiptEvidenceId: "route-receipt", routeReceiptEvidenceSha256: SHA("r"), phase3Disposition: "none",
+  };
+  rebuildExternalEvidence(result);
   result.packageResults[0].publicGate.fetchBackOid = "2".repeat(40);
   const outcome = checked(result);
   assert(outcome.findings.some((finding) => finding.includes("green Verify/push/fetch-back")));
+});
+
+test("phase-close rejects an unattested implementation route even with exact delivery evidence", () => {
+  const result = fixture();
+  result.sdlcRunGraph.completionClaim = "phase-close";
+  assert(checked(result).findings.some((finding) => finding.includes("requires an attested implementation dispatch")));
 });
 
 test("duplicate Result JSON keys and a second Mermaid authority block fail", () => {

@@ -45,6 +45,7 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, "..", "..");
+const phase26Result = process.env.PIPELINE_PHASE26_RESULT ?? null;
 const hooksDir = join(repoRoot, "plugins", "pipeline-core", "hooks");
 
 const libDir = join(repoRoot, "plugins", "pipeline-core", "lib");
@@ -96,7 +97,7 @@ const TEST_SUITES = [
   { name: "security-scan-tests", file: join(scriptDir, "security-scan.test.mjs") },
   { name: "no-autoupdate-key-tests", file: join(scriptDir, "no-autoupdate-key.test.mjs") },
   { name: "phase26-invariants-tests", file: join(scriptDir, "check-phase26-invariants.test.mjs") },
-  { name: "phase26-invariants-check", file: join(scriptDir, "check-phase26-invariants.mjs") },
+  { name: "phase26-invariants-check", file: join(scriptDir, "check-phase26-invariants.mjs"), args: phase26Result ? ["--result", phase26Result] : [] },
 ];
 
 // Manifest-gated phase steps: see header — only projects with `.claude/pipeline.yaml`
@@ -122,7 +123,7 @@ const PHASE_STEPS =
 const steps = [];
 for (const suite of [...TEST_SUITES, ...PHASE_STEPS]) {
   console.log(`\n=== ${suite.name} (${suite.file}) ===`);
-  const res = spawnSync(process.execPath, [suite.file], { encoding: "utf8", cwd: repoRoot });
+  const res = spawnSync(process.execPath, [suite.file, ...(suite.args ?? [])], { encoding: "utf8", cwd: repoRoot });
   if (res.stdout) process.stdout.write(res.stdout);
   if (res.stderr) process.stderr.write(res.stderr);
   const exitCode = res.status ?? 1;

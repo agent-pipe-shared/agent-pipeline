@@ -37,6 +37,7 @@ const LOOP_OUTCOMES = new Set(["succeeded", "failed", "stopped", "deferred"]);
 const EXIT_REASONS = new Set(["corrected", "regate-pass", "retry-pass", "retry-failed", "budget-exhausted", "po-stop", "po-defer"]);
 const SOURCE_COLLECTIONS = new Set(["packageResults", "finalIntegrations", "decisionBriefs", "courseDecisionIntents", "courseDecisionReceipts", "externalEvidence"]);
 const SHA256_RE = /^[a-f0-9]{64}$/;
+const COMMIT_RE = /^[a-f0-9]{40}$/;
 const SAFE_ID_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 function isObject(value) {
@@ -250,7 +251,28 @@ function resultCollectionId(collection, value) {
   if (collection === "finalIntegrations") return value.integrationId;
   if (collection === "decisionBriefs") return value.briefId;
   if (collection === "courseDecisionIntents" || collection === "courseDecisionReceipts") return value.idempotencyKey;
+  if (collection === "externalEvidence") return value.id;
   return null;
+}
+
+function evidenceInventory(result, findings) {
+  if (!Array.isArray(result.externalEvidence)) {
+    findings.push("pipeline-result externalEvidence must be an array");
+    return new Map();
+  }
+  const inventory = new Map();
+  for (const entry of result.externalEvidence) {
+    if (!validateEvidence(entry) || inventory.has(entry.id)) {
+      findings.push("externalEvidence contains a missing, malformed or duplicate stable ID");
+      continue;
+    }
+    inventory.set(entry.id, entry.sha256);
+  }
+  return inventory;
+}
+
+function inventoryContains(inventory, entry) {
+  return validateEvidence(entry) && inventory.get(entry.id) === entry.sha256;
 }
 
 function validateSourceReconciliation(result, graph, findings) {
@@ -270,7 +292,7 @@ function validateSourceReconciliation(result, graph, findings) {
       refs.set(key, ref.sha256);
     }
   }
-  for (const collection of ["packageResults", "finalIntegrations", "decisionBriefs", "courseDecisionIntents", "courseDecisionReceipts"]) {
+  for (const collection of ["packageResults", "finalIntegrations", "decisionBriefs", "courseDecisionIntents", "courseDecisionReceipts", "externalEvidence"]) {
     const values = result[collection];
     if (!Array.isArray(values)) {
       findings.push(`pipeline-result ${collection} must be an array`);
@@ -285,13 +307,13 @@ function validateSourceReconciliation(result, graph, findings) {
       }
       seen.add(id);
       const key = `${collection}:${id}`;
-      const expected = sha256Canonical(value);
+      const expected = collection === "externalEvidence" ? value.sha256 : sha256Canonical(value);
       actual.set(key, expected);
-      if (refs.get(key) !== expected) findings.push(`${key} is missing from graph sources or has a stale digest`);
+      if (collection !== "externalEvidence" && refs.get(key) !== expected) findings.push(`${key} is missing from graph sources or has a stale digest`);
     }
   }
   for (const [key, referencedDigest] of refs) {
-    if (!key.startsWith("externalEvidence:") && (!actual.has(key) || actual.get(key) !== referencedDigest)) {
+    if (!actual.has(key) || actual.get(key) !== referencedDigest) {
       findings.push(`${key} is a fabricated or stale Result-owned source reference`);
     }
   }
@@ -302,7 +324,32 @@ function validateSourceReconciliation(result, graph, findings) {
   if (graph.sourceEventSetSha256 !== sha256Canonical(sourceSet)) findings.push("sourceEventSetSha256 does not bind the ordered event source set");
 }
 
-function loopEconomySums(result, findings) {
+function legacyLedgerExemptions(result, evidence, findings) {
+  const entries = evidence?.legacyLedgerExemptions;
+  if (!Array.isArray(entries)) {
+    findings.push("phase26InvariantEvidence legacyLedgerExemptions must be an array");
+    return new Map();
+  }
+  const available = new Map((result.packageResults ?? []).map((entry) => [entry?.id, entry]));
+  const exemptions = new Map();
+  for (const entry of entries) {
+    if (!exactKeys(entry, ["packageId", "packageSha256", "reason"])
+      || !safeId(entry.packageId) || !digest(entry.packageSha256)
+      || entry.reason !== "pre-p5-result-schema" || exemptions.has(entry.packageId)) {
+      findings.push("legacyLedgerExemptions contains an invalid or duplicate bound entry");
+      continue;
+    }
+    const packageResult = available.get(entry.packageId);
+    if (!packageResult || isObject(packageResult.loopEconomy) || sha256Canonical(packageResult) !== entry.packageSha256) {
+      findings.push(`legacy ledger exemption ${entry.packageId} is stale, fabricated or masks a current ledger`);
+      continue;
+    }
+    exemptions.set(entry.packageId, entry.packageSha256);
+  }
+  return exemptions;
+}
+
+function loopEconomySums(result, evidence, findings) {
   const mapping = {
     criticCorrection: "critic-correction",
     deltaRegate: "delta-regate",
@@ -313,11 +360,15 @@ function loopEconomySums(result, findings) {
   };
   const sums = Object.fromEntries(Object.values(mapping).map((family) => [family, 0]));
   if (!Array.isArray(result.packageResults)) return sums;
+  const exemptions = legacyLedgerExemptions(result, evidence, findings);
   for (const packageResult of result.packageResults) {
-    // The Result predates this close gate.  Only records that explicitly own an
-    // economy ledger participate in the reconciliation; inventing zeroes for
-    // legacy records would turn the close graph into a second authority.
-    if (!isObject(packageResult?.loopEconomy)) continue;
+    if (!isObject(packageResult?.loopEconomy)) {
+      if (exemptions.get(packageResult?.id) !== sha256Canonical(packageResult)) {
+        findings.push(`package ${packageResult?.id ?? "unknown"} lacks a bound loopEconomy ledger`);
+      }
+      continue;
+    }
+    if (exemptions.has(packageResult.id)) findings.push(`package ${packageResult.id} has both a ledger and a legacy exemption`);
     for (const [field, family] of Object.entries(mapping)) {
       const count = packageResult.loopEconomy[field];
       if (!safeInteger(count)) findings.push(`package ${packageResult.id} loopEconomy.${field} must be a non-negative integer`);
@@ -327,7 +378,7 @@ function loopEconomySums(result, findings) {
   return sums;
 }
 
-function validateGraph(result, graph, findings) {
+function validateGraph(result, graph, findings, inventory) {
   const keys = ["schemaVersion", "featureId", "graphCutoffEventId", "sourceEventSetSha256", "completionClaim", "events", "edges", "boundedFamilies", "loopRecords"];
   if (!exactKeys(graph, keys) || graph.schemaVersion !== GRAPH_SCHEMA_VERSION || !safeId(graph.featureId)
     || !safeId(graph.graphCutoffEventId) || !digest(graph.sourceEventSetSha256)
@@ -373,6 +424,20 @@ function validateGraph(result, graph, findings) {
   for (const event of graph.events.slice(1)) {
     if (!graph.edges.some((edge) => edge.toEventId === event.eventId)) findings.push(`event ${event.eventId} is not connected to the traversed graph`);
   }
+  const reachable = new Set([graph.events[0]?.eventId]);
+  const pending = [graph.events[0]?.eventId];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    for (const edge of graph.edges.filter((candidate) => candidate.fromEventId === current)) {
+      if (!reachable.has(edge.toEventId)) {
+        reachable.add(edge.toEventId);
+        pending.push(edge.toEventId);
+      }
+    }
+  }
+  for (const event of graph.events) {
+    if (!reachable.has(event.eventId)) findings.push(`event ${event.eventId} is not reachable from the graph start`);
+  }
   for (const event of graph.events.filter((candidate) => candidate.eventType === "gate" || ["stopped", "deferred"].includes(candidate.outcome))) {
     if (event.decisionBriefId === null) findings.push(`gate/stop event ${event.eventId} lacks decisionBriefId`);
     if (event.decisionBriefId !== null && !event.sourceRefs.some((ref) => ref.collection === "decisionBriefs" && ref.id === event.decisionBriefId)) {
@@ -393,7 +458,7 @@ function validateGraph(result, graph, findings) {
   }
 
   if (graph.boundedFamilies.length !== FAMILY_CONTRACT.length) findings.push("boundedFamilies must inventory exactly seven families");
-  const economy = loopEconomySums(result, findings);
+  const economy = loopEconomySums(result, result.phase26InvariantEvidence, findings);
   for (let index = 0; index < FAMILY_CONTRACT.length; index += 1) {
     const [family, kind] = FAMILY_CONTRACT[index];
     const inventory = graph.boundedFamilies[index];
@@ -431,6 +496,9 @@ function validateGraph(result, graph, findings) {
     if (edges.length === 1 && loop.triggerEvidence.some((trigger) => !edges[0].sourceRefs.some((ref) => ref.id === trigger.id && ref.sha256 === trigger.sha256))) {
       findings.push(`loop ${loop.stableId} trigger evidence is not bound by its back-edge`);
     }
+    if (loop.triggerEvidence.some((trigger) => !inventoryContains(inventory, trigger))) {
+      findings.push(`loop ${loop.stableId} trigger evidence is absent from externalEvidence`);
+    }
     const expectedExitFamily = new Map([
       ["corrected", "critic-correction"], ["regate-pass", "delta-regate"],
       ["retry-pass", "product-retry"], ["retry-failed", "product-retry"],
@@ -447,14 +515,17 @@ function validateGraph(result, graph, findings) {
   validateSourceReconciliation(result, graph, findings);
 
   if (graph.completionClaim === "phase-close") {
+    if (result.phase26InvariantEvidence?.executionRouting?.status !== "attested") {
+      findings.push("phase-close requires an attested implementation dispatch; an unattested route remains a nonconformance");
+    }
     for (const packageResult of result.packageResults) {
       const gate = packageResult?.publicGate;
-      const expectedCommit = packageResult?.sharedCommit ?? packageResult?.sharedCommits?.at(-1) ?? null;
+      const expectedCommit = packageResult?.sharedCommit ?? packageResult?.sharedCommits?.at(-1);
       const verifyCandidates = [packageResult?.fullVerify, ...Object.values(packageResult?.fullVerify ?? {}).filter(isObject)];
-      const exactVerify = verifyCandidates.some((candidate) => candidate?.exitCode === 0
-        && (expectedCommit === null || candidate.boundCommit === expectedCommit || candidate.commit === expectedCommit));
-      if (!String(packageResult?.status ?? "").includes("pushed-and-fetchback-verified")
-        || !gate?.pushedOid || gate.pushedOid !== gate.fetchBackOid
+      const exactVerify = COMMIT_RE.test(expectedCommit ?? "") && verifyCandidates.some((candidate) => candidate?.exitCode === 0
+        && candidate.boundCommit === expectedCommit);
+      const delivered = /(?:^|;\s*)pushed-and-fetchback-verified(?:;|$)/.test(String(packageResult?.status ?? ""));
+      if (!delivered || !COMMIT_RE.test(gate?.pushedOid ?? "") || gate.pushedOid !== expectedCommit || gate.fetchBackOid !== expectedCommit
         || gate.privacyFindings !== 0 || !exactVerify) {
         findings.push(`phase-close package ${packageResult?.id ?? "unknown"} lacks green Verify/push/fetch-back evidence`);
       }
@@ -480,19 +551,20 @@ function validateMeasurement(name, value, exactLimit, findings) {
   if (p95 > exactLimit) findings.push(`${name} p95 ${p95}ms exceeds ${exactLimit}ms`);
 }
 
-function validateInvariantEvidence(result, evidence, findings) {
-  if (!exactKeys(evidence, ["schema", "packageId", "earlySmoke", "scope", "performance"])
+function validateInvariantEvidence(result, evidence, findings, inventory) {
+  if (!exactKeys(evidence, ["schema", "packageId", "earlySmoke", "scope", "performance", "executionRouting", "legacyLedgerExemptions"])
     || evidence.schema !== INVARIANT_EVIDENCE_SCHEMA || evidence.packageId !== PHASE_PACKAGE_ID) {
     findings.push(`phase26InvariantEvidence must use ${INVARIANT_EVIDENCE_SCHEMA} and package ${PHASE_PACKAGE_ID}`);
     return;
   }
   const smoke = evidence.earlySmoke;
-  if (!exactKeys(smoke, ["status", "namedCapabilityId", "elapsedFromImplementationStartMs", "cumulativeLiveMs", "plannedPathCount", "changedPathCountBeforeSmoke", "evidenceSha256"])
+  if (!exactKeys(smoke, ["status", "namedCapabilityId", "elapsedFromImplementationStartMs", "cumulativeLiveMs", "plannedPathCount", "changedPathCountBeforeSmoke", "evidenceId", "evidenceSha256"])
     || smoke.status !== "pass" || !safeId(smoke.namedCapabilityId) || !digest(smoke.evidenceSha256)
     || !safeInteger(smoke.elapsedFromImplementationStartMs) || smoke.elapsedFromImplementationStartMs > 3_600_000
     || !safeInteger(smoke.cumulativeLiveMs) || smoke.cumulativeLiveMs > 900_000
     || !safeInteger(smoke.plannedPathCount, 1) || !safeInteger(smoke.changedPathCountBeforeSmoke)
-    || smoke.changedPathCountBeforeSmoke * 5 >= smoke.plannedPathCount) {
+    || smoke.changedPathCountBeforeSmoke * 5 >= smoke.plannedPathCount
+    || !inventoryContains(inventory, { id: smoke.evidenceId, sha256: smoke.evidenceSha256 })) {
     findings.push("early smoke must be named/evidence-bound, within 60/15 minutes, and before 20 percent of planned paths");
   }
   const scope = evidence.scope;
@@ -531,6 +603,18 @@ function validateInvariantEvidence(result, evidence, findings) {
   validateMeasurement("Targeted Verify", performance.targetedVerify, 2_000, findings);
   validateMeasurement("Full Verify", performance.fullVerify, 30_000, findings);
   validateMeasurement("Ledger writer", performance.ledgerWriter, 50, findings);
+  const route = evidence.executionRouting;
+  if (!exactKeys(route, ["status", "requestedDuty", "requiredSelector", "requiredEffort", "routeReceiptEvidenceId", "routeReceiptEvidenceSha256", "phase3Disposition"])
+    || route.requestedDuty !== "codex_implementation" || route.requiredSelector !== "terra" || route.requiredEffort !== "xhigh"
+    || !["attested", "unattested-nonconformance"].includes(route.status)) {
+    findings.push("execution routing evidence is malformed or changes the approved Terra/xhigh request");
+  } else if (route.status === "attested") {
+    if (route.phase3Disposition !== "none" || !inventoryContains(inventory, { id: route.routeReceiptEvidenceId, sha256: route.routeReceiptEvidenceSha256 })) {
+      findings.push("attested execution routing lacks a bound external route receipt");
+    }
+  } else if (route.phase3Disposition !== "mandatory-dispatch-attestation" || route.routeReceiptEvidenceId !== null || route.routeReceiptEvidenceSha256 !== null) {
+    findings.push("unattested execution routing must remain an explicit Phase-3 nonconformance without a fabricated receipt");
+  }
 }
 
 function safeResultPath(root, resultPath) {
@@ -554,10 +638,11 @@ export function checkPhase26Invariants(root = DEFAULT_ROOT, resultPath) {
   findings.push(...parsed.findings);
   if (!parsed.result || parsed.mermaid === null) return { ok: false, findings };
   const result = parsed.result;
+  const inventory = evidenceInventory(result, findings);
   if (!isObject(result.sdlcRunGraph)) findings.push("pipeline-result must contain sdlcRunGraph");
-  else validateGraph(result, result.sdlcRunGraph, findings);
+  else validateGraph(result, result.sdlcRunGraph, findings, inventory);
   if (!isObject(result.phase26InvariantEvidence)) findings.push("pipeline-result must contain phase26InvariantEvidence");
-  else validateInvariantEvidence(result, result.phase26InvariantEvidence, findings);
+  else validateInvariantEvidence(result, result.phase26InvariantEvidence, findings, inventory);
   const binding = result.sdlcRunGraphProjection;
   if (!exactKeys(binding, ["generatorVersion", "graphSha256", "mermaidSha256"])
     || binding.generatorVersion !== PROJECTION_GENERATOR_VERSION || !digest(binding.graphSha256) || !digest(binding.mermaidSha256)) {

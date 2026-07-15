@@ -3,12 +3,18 @@
   "$id": "https://agent-pipeline.invalid/schemas/sdlc-run-graph.schema.json",
   "title": "Phase 2.6 actual SDLC run graph, projection binding and close evidence",
   "type": "object",
-  "additionalProperties": false,
-  "required": ["sdlcRunGraph", "sdlcRunGraphProjection", "phase26InvariantEvidence"],
+  "additionalProperties": true,
+  "required": ["sdlcRunGraph", "sdlcRunGraphProjection", "phase26InvariantEvidence", "packageResults", "finalIntegrations", "decisionBriefs", "courseDecisionIntents", "courseDecisionReceipts", "externalEvidence"],
   "properties": {
     "sdlcRunGraph": { "$ref": "#/$defs/graph" },
     "sdlcRunGraphProjection": { "$ref": "#/$defs/projection" },
-    "phase26InvariantEvidence": { "$ref": "#/$defs/invariantEvidence" }
+    "phase26InvariantEvidence": { "$ref": "#/$defs/invariantEvidence" },
+    "packageResults": { "type": "array" },
+    "finalIntegrations": { "type": "array" },
+    "decisionBriefs": { "type": "array" },
+    "courseDecisionIntents": { "type": "array" },
+    "courseDecisionReceipts": { "type": "array" },
+    "externalEvidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
   },
   "$defs": {
     "safeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
@@ -135,19 +141,20 @@
     },
     "invariantEvidence": {
       "type": "object", "additionalProperties": false,
-      "required": ["schema", "packageId", "earlySmoke", "scope", "performance"],
+      "required": ["schema", "packageId", "earlySmoke", "scope", "performance", "executionRouting", "legacyLedgerExemptions"],
       "properties": {
         "schema": { "const": "pipeline.phase26-invariant-evidence.v1" },
         "packageId": { "const": "P2.6-P5" },
         "earlySmoke": {
           "type": "object", "additionalProperties": false,
-          "required": ["status", "namedCapabilityId", "elapsedFromImplementationStartMs", "cumulativeLiveMs", "plannedPathCount", "changedPathCountBeforeSmoke", "evidenceSha256"],
+          "required": ["status", "namedCapabilityId", "elapsedFromImplementationStartMs", "cumulativeLiveMs", "plannedPathCount", "changedPathCountBeforeSmoke", "evidenceId", "evidenceSha256"],
           "properties": {
             "status": { "const": "pass" }, "namedCapabilityId": { "$ref": "#/$defs/safeId" },
             "elapsedFromImplementationStartMs": { "type": "integer", "minimum": 0, "maximum": 3600000 },
             "cumulativeLiveMs": { "type": "integer", "minimum": 0, "maximum": 900000 },
             "plannedPathCount": { "type": "integer", "minimum": 1 },
             "changedPathCountBeforeSmoke": { "type": "integer", "minimum": 0 },
+            "evidenceId": { "$ref": "#/$defs/safeId" },
             "evidenceSha256": { "$ref": "#/$defs/sha256" }
           }
         },
@@ -170,6 +177,31 @@
             "targetedVerify": { "$ref": "#/$defs/measurement" },
             "fullVerify": { "$ref": "#/$defs/measurement" },
             "ledgerWriter": { "$ref": "#/$defs/measurement" }
+          }
+        },
+        "executionRouting": {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "requestedDuty", "requiredSelector", "requiredEffort", "routeReceiptEvidenceId", "routeReceiptEvidenceSha256", "phase3Disposition"],
+          "properties": {
+            "status": { "enum": ["attested", "unattested-nonconformance"] },
+            "requestedDuty": { "const": "codex_implementation" },
+            "requiredSelector": { "const": "terra" },
+            "requiredEffort": { "const": "xhigh" },
+            "routeReceiptEvidenceId": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] },
+            "routeReceiptEvidenceSha256": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sha256" }] },
+            "phase3Disposition": { "enum": ["none", "mandatory-dispatch-attestation"] }
+          }
+        },
+        "legacyLedgerExemptions": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["packageId", "packageSha256", "reason"],
+            "properties": {
+              "packageId": { "$ref": "#/$defs/safeId" },
+              "packageSha256": { "$ref": "#/$defs/sha256" },
+              "reason": { "const": "pre-p5-result-schema" }
+            }
           }
         }
       }
