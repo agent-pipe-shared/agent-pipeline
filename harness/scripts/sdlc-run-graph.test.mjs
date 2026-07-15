@@ -154,6 +154,21 @@ function resequenceSingleCycle(graph) {
   return graph;
 }
 
+function resequenceAllCycles(graph) {
+  const nextSequence = new Map(graph.cycles.map(({ cycleId }) => [cycleId, 0]));
+  graph.events.forEach((entry, index) => {
+    entry.eventId = `event-${String(index + 1).padStart(3, "0")}`;
+    entry.sequence = nextSequence.get(entry.cycleId);
+    nextSequence.set(entry.cycleId, entry.sequence + 1);
+  });
+  for (const cycle of graph.cycles) {
+    cycle.eventIds = graph.events
+      .filter(({ cycleId }) => cycleId === cycle.cycleId)
+      .map(({ eventId }) => eventId);
+  }
+  return graph;
+}
+
 function retryGraph({ repeatedFailure = false, includeLaterCourse = false } = {}) {
   const graph = v2Graph();
   const signature = SHA256("f");
@@ -178,6 +193,25 @@ function retryGraph({ repeatedFailure = false, includeLaterCourse = false } = {}
   }
   graph.loopAggregates.find(({ family }) => family === "product-retry").count = 1;
   return resequenceSingleCycle(graph);
+}
+
+function retryGraphWithUnrelatedCourse() {
+  const graph = retryGraph({ repeatedFailure: true });
+  const signature = graph.events[0].failureSignature;
+  graph.cycles.push({
+    cycleId: "cycle-beta-01",
+    packageId: "package-beta",
+    sequence: 1,
+    eventIds: [],
+  });
+  graph.events.splice(2, 0, event("course-beta-placeholder", "cycle-beta-01", 0, "course", {
+    packageId: "package-beta",
+    actionId: "action-beta",
+    sourceEvidenceIds: ["course-decision-beta-01"],
+    faultDomain: "product",
+    failureSignature: signature,
+  }));
+  return resequenceAllCycles(graph);
 }
 
 function failoverGraph(failoverCount) {
@@ -229,7 +263,7 @@ function interleavedGraph() {
   return {
     schemaVersion: "pipeline.sdlc-run-graph.v2",
     featureId: "phase3a-interleaved-fixture",
-    completionClaim: "phase-close",
+    completionClaim: "candidate-handoff",
     cycles,
     events,
     loopAggregates: [
@@ -297,6 +331,19 @@ test("a recurring equal product signature requires a later course event", () => 
   earlyCourse.events.unshift(course);
   resequenceSingleCycle(earlyCourse);
   assertInvalid(earlyCourse, /product|signature|course|later|order/i);
+});
+
+test("an unrelated package course cannot satisfy alpha's recurring product failure", () => {
+  const unrelatedCourse = retryGraphWithUnrelatedCourse();
+  assertInvalid(unrelatedCourse, /product|signature|course|package-alpha|action-alpha|cycle-alpha|matching/i);
+
+  const matchingAlphaCourse = retryGraph({ repeatedFailure: true, includeLaterCourse: true });
+  assertValid(matchingAlphaCourse);
+  const course = matchingAlphaCourse.events.find(({ stage }) => stage === "course");
+  assert.deepEqual(
+    [course.packageId, course.actionId, course.cycleId],
+    ["package-alpha", "action-alpha", "cycle-alpha-01"],
+  );
 });
 
 test("environment failover is one-shot and a second failover fails", () => {

@@ -130,13 +130,37 @@ function finalDeliveryEvidence() {
   };
 }
 
-function boundStatusProjections(_result, status = "phase-close") {
-  return ["result", "state", "human", "package", "handoff"].map((projection, index) => ({
-    projection,
-    status,
-    sourceEvidenceId: `status-${projection}-evidence-01`,
-    sha256: SHA256(String(index + 1)),
-  }));
+function resultOwnedEvidence(result) {
+  const evidence = new Map();
+  if (result.finalDeliveryEvidence?.finalDeliveryEvidenceId) {
+    evidence.set(result.finalDeliveryEvidence.finalDeliveryEvidenceId, result.finalDeliveryEvidence);
+  }
+  for (const packageEntry of result.packageResults ?? []) {
+    if (packageEntry?.resultEvidenceId) evidence.set(packageEntry.resultEvidenceId, packageEntry);
+    for (const correction of packageEntry?.correctionRecords ?? []) {
+      if (correction?.correctionId) evidence.set(correction.correctionId, correction);
+    }
+    for (const receipt of packageEntry?.deltaReceipts ?? []) {
+      if (receipt?.receiptId) evidence.set(receipt.receiptId, receipt);
+    }
+  }
+  return evidence;
+}
+
+function boundStatusProjections(result, status = "phase-close") {
+  const projectionNames = ["result", "state", "human", "package", "handoff"];
+  const ownedEvidence = [...resultOwnedEvidence(result)];
+  assert(ownedEvidence.length >= projectionNames.length,
+    "the fixture must own at least five immutable evidence records for status projection bindings");
+  return projectionNames.map((projection, index) => {
+    const [sourceEvidenceId, source] = ownedEvidence[index];
+    return {
+      projection,
+      status,
+      sourceEvidenceId,
+      sha256: sha256Canonical(source),
+    };
+  });
 }
 
 function sealBindings(result) {
@@ -155,10 +179,10 @@ function sealBindings(result) {
   return result;
 }
 
-function coherenceFixture() {
+function coherenceFixture({ correctionPackage = "alpha" } = {}) {
   const packageResults = [
-    packageResult("alpha", { correction: true }),
-    packageResult("beta"),
+    packageResult("alpha", { correction: correctionPackage === "alpha" }),
+    packageResult("beta", { correction: correctionPackage === "beta" }),
   ];
   let nextEvent = 1;
   const builtCycles = packageResults.map((entry, index) => {
@@ -188,6 +212,25 @@ function coherenceFixture() {
   };
   result.statusProjections = boundStatusProjections(result);
   return sealBindings(result);
+}
+
+function incompleteAlphaCloseFixture({ failedDeliveryEvent }) {
+  const result = coherenceFixture({ correctionPackage: "beta" });
+  const alphaCycle = result.sdlcRunGraph.cycles.find(({ packageId }) => packageId === "package-alpha");
+  const alphaWork = findEvent(result, "package-alpha", "work");
+  const alphaDelivery = findEvent(result, "package-alpha", "delivery");
+  alphaDelivery.outcome = "failed";
+  alphaDelivery.sequence = 1;
+  const retainedAlphaEvents = failedDeliveryEvent ? [alphaWork, alphaDelivery] : [alphaWork];
+  const retainedIds = new Set(retainedAlphaEvents.map(({ eventId }) => eventId));
+  result.sdlcRunGraph.events = result.sdlcRunGraph.events.filter(
+    (entry) => entry.packageId !== "package-alpha" || retainedIds.has(entry.eventId),
+  );
+  alphaCycle.eventIds = retainedAlphaEvents.map(({ eventId }) => eventId);
+  result.packageResults.find(({ id }) => id === "package-alpha").delivery.outcome = "failed";
+  sealBindings(result);
+  result.statusProjections = boundStatusProjections(result);
+  return result;
 }
 
 function check(result) {
@@ -417,8 +460,36 @@ test("every successful delivery requires exactly one delivery and exact fetch-ba
 });
 
 test("phase-close requires each package to finish an ordered successful final delivery tail", () => {
-  const workOnly = deliveryCardinalityFixture(1, 0);
-  assertInvalid(workOnly, /phase-close|final-verify|delivery|fetch-back|close|terminal/i);
+  const complete = coherenceFixture();
+  const eventById = new Map(complete.sdlcRunGraph.events.map((entry) => [entry.eventId, entry]));
+  for (const packageEntry of complete.packageResults) {
+    const cycle = complete.sdlcRunGraph.cycles.find(({ packageId }) => packageId === packageEntry.id);
+    const chronology = cycle.eventIds.map((eventId) => eventById.get(eventId));
+    const tail = chronology.slice(-4);
+    assert.deepEqual(tail.map(({ stage }) => stage),
+      ["final-verify", "delivery", "fetch-back", "close"]);
+    assert(tail.every(({ outcome }) => outcome === "succeeded"));
+    const binding = complete.packageBindings.find(({ packageId }) => packageId === packageEntry.id);
+    assert.equal(binding.terminalCycleId, cycle.cycleId);
+    assert.equal(binding.terminalEventId, tail.at(-1).eventId);
+  }
+  assertValid(complete);
+
+  for (const failedDeliveryEvent of [false, true]) {
+    const incompleteAlpha = incompleteAlphaCloseFixture({ failedDeliveryEvent });
+    const alphaCycle = incompleteAlpha.sdlcRunGraph.cycles.find(({ packageId }) => packageId === "package-alpha");
+    const alphaBinding = incompleteAlpha.packageBindings.find(({ packageId }) => packageId === "package-alpha");
+    assert.equal(alphaBinding.terminalCycleId, alphaCycle.cycleId);
+    assert.equal(alphaBinding.terminalEventId, alphaCycle.eventIds.at(-1));
+    const betaCycle = incompleteAlpha.sdlcRunGraph.cycles.find(({ packageId }) => packageId === "package-beta");
+    const betaEvents = betaCycle.eventIds.map((eventId) =>
+      incompleteAlpha.sdlcRunGraph.events.find((entry) => entry.eventId === eventId));
+    assert.deepEqual(betaEvents.slice(-4).map(({ stage }) => stage),
+      ["final-verify", "delivery", "fetch-back", "close"]);
+    assert(betaEvents.slice(-4).every(({ outcome }) => outcome === "succeeded"));
+    assertInvalid(incompleteAlpha,
+      /package-alpha.*(?:final-verify|delivery|fetch-back|close|tail)|(?:tail|final-verify|delivery|fetch-back|close).*package-alpha/i);
+  }
 
   const outOfOrder = coherenceFixture();
   const betaFinalVerify = findEvent(outOfOrder, "package-beta", "final-verify");
@@ -611,11 +682,16 @@ test("status projection inventory is exactly result/state/human/package/handoff"
   assertInvalid(extra, /status|projection|graph|extra|inventory/i);
 });
 
-test("every status projection has a directly bound sourceEvidenceId and sha256", () => {
+test("every status projection resolves to immutable Result-owned evidence at its exact digest", () => {
   const result = coherenceFixture();
+  const ownedEvidence = resultOwnedEvidence(result);
   for (const projection of result.statusProjections) {
     assert.equal(typeof projection.sourceEvidenceId, "string");
     assert.match(projection.sha256, /^[a-f0-9]{64}$/);
+    assert.equal(ownedEvidence.has(projection.sourceEvidenceId), true,
+      `${projection.projection} must reference existing Result-owned evidence`);
+    assert.equal(projection.sha256, sha256Canonical(ownedEvidence.get(projection.sourceEvidenceId)),
+      `${projection.projection} must bind the exact immutable evidence digest`);
   }
   assertValid(result);
 
@@ -630,6 +706,16 @@ test("every status projection has a directly bound sourceEvidenceId and sha256",
   const malformedDigest = coherenceFixture();
   malformedDigest.statusProjections[2].sha256 = "not-a-sha256";
   assertInvalid(malformedDigest, /status|projection|sha256|digest|binding/i);
+
+  const fabricatedSource = coherenceFixture();
+  fabricatedSource.statusProjections[2].sourceEvidenceId = "fabricated-result-evidence";
+  fabricatedSource.statusProjections[2].sha256 = SHA256("f");
+  assertInvalid(fabricatedSource, /status|projection|sourceEvidence|resolve|fabricat|binding/i);
+
+  const staleDigest = coherenceFixture();
+  const correctDigest = staleDigest.statusProjections[3].sha256;
+  staleDigest.statusProjections[3].sha256 = SHA256(correctDigest[0] === "f" ? "e" : "f");
+  assertInvalid(staleDigest, /status|projection|sha256|digest|stale|binding/i);
 
   const unboundSource = coherenceFixture();
   unboundSource.statusProjections[3].sourceEvidenceId = "";

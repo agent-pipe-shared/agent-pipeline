@@ -283,32 +283,25 @@ function deriveLoopCounts(graph, findings) {
     counts["product-retry"] += Math.max(0, attempts.length - 1);
     if (attempts.length > 1) {
       const first = attempts[0];
+      const retry = attempts[1];
       if (first.outcome !== "failed" || first.faultDomain !== "product" || !digest(first.failureSignature)) {
         findings.push(`cycle ${cycle?.cycleId ?? "unknown"} product retry must follow one digest-bound failed product work attempt`);
       }
-      if (attempts.slice(1).some((attempt) => attempt.outcome === "failed"
-        && (attempt.faultDomain !== "product" || !digest(attempt.failureSignature)))) {
-        findings.push(`cycle ${cycle?.cycleId ?? "unknown"} failed product retry attempts require product failure signatures`);
+      if (retry.outcome === "failed" && !digest(retry.failureSignature)) {
+        findings.push(`cycle ${cycle?.cycleId ?? "unknown"} failed product retry requires a failure signature`);
       }
-    }
-  }
-
-  const signatureOccurrences = new Map();
-  graph.events.forEach((event, index) => {
-    if (event?.outcome === "failed" && event.faultDomain === "product" && digest(event.failureSignature)) {
-      const occurrences = signatureOccurrences.get(event.failureSignature) ?? [];
-      occurrences.push(index);
-      signatureOccurrences.set(event.failureSignature, occurrences);
-    }
-  });
-  for (const [signature, occurrences] of signatureOccurrences) {
-    if (occurrences.length < 2) continue;
-    const recurrenceIndex = occurrences[1];
-    const courseIndex = graph.events.findIndex((event, index) => index > recurrenceIndex
-      && event?.stage === "course" && event.faultDomain === "product"
-      && event.failureSignature === signature);
-    if (courseIndex === -1) {
-      findings.push(`recurring product failure signature ${signature} requires a later matching course event`);
+      if (first.outcome === "failed" && first.faultDomain === "product"
+        && retry.outcome === "failed" && retry.faultDomain === "product"
+        && retry.failureSignature === first.failureSignature) {
+        const retryIndex = graph.events.indexOf(retry);
+        const courseIndex = graph.events.findIndex((event, index) => index > retryIndex
+          && event?.stage === "course" && event.cycleId === retry.cycleId
+          && event.packageId === retry.packageId && event.actionId === retry.actionId
+          && event.faultDomain === "product" && event.failureSignature === retry.failureSignature);
+        if (courseIndex === -1) {
+          findings.push(`cycle ${cycle.cycleId} recurring product retry signature requires a later matching course event in the same package/action/cycle`);
+        }
+      }
     }
   }
   for (const event of graph.events.filter((entry) => entry?.stage === "failover")) {
@@ -319,24 +312,32 @@ function deriveLoopCounts(graph, findings) {
   return counts;
 }
 
-function validatePhaseCloseTail(graph, findings) {
-  if (graph.completionClaim !== "phase-close") return;
+function validateSuccessfulCloseChain(events, label, findings) {
   const expectedStages = ["final-verify", "delivery", "fetch-back", "close"];
-  const tail = graph.events.slice(-expectedStages.length);
+  const tail = events.slice(-expectedStages.length);
   if (tail.length !== expectedStages.length
     || tail.some((event, index) => event?.stage !== expectedStages[index] || event.outcome !== "succeeded")) {
-    findings.push("phase-close requires a successful terminal final-verify -> delivery -> fetch-back -> close chain");
+    findings.push(`${label} requires a successful terminal final-verify -> delivery -> fetch-back -> close chain`);
     return;
   }
-  const commit = tail[0].candidateCommit;
-  const tree = tail[0].tree;
-  if (tail.some((event) => event.candidateCommit !== commit || event.tree !== tree)) {
-    findings.push("phase-close terminal chain must bind one unchanged final commit/tree");
+  const [first] = tail;
+  if (tail.some((event) => event.candidateCommit !== first.candidateCommit || event.tree !== first.tree)) {
+    findings.push(`${label} terminal chain must bind one unchanged final commit/tree`);
   }
-  if (tail.some((event) => event.cycleId !== tail[0].cycleId
-    || event.packageId !== tail[0].packageId || event.actionId !== tail[0].actionId)) {
-    findings.push("phase-close terminal chain must remain in one package cycle/action");
+  if (tail.some((event) => event.cycleId !== first.cycleId
+    || event.packageId !== first.packageId || event.actionId !== first.actionId)) {
+    findings.push(`${label} terminal chain must remain in one package/action/cycle`);
   }
+}
+
+function validatePhaseCloseTail(graph, findings) {
+  if (graph.completionClaim !== "phase-close") return;
+  for (const cycle of graph.cycles) {
+    if (!isObject(cycle)) continue;
+    const cycleEvents = graph.events.filter((event) => isObject(event) && event.cycleId === cycle.cycleId);
+    validateSuccessfulCloseChain(cycleEvents, `phase-close cycle ${cycle.cycleId}/${cycle.packageId}`, findings);
+  }
+  validateSuccessfulCloseChain(graph.events, "phase-close global chronology", findings);
 }
 
 function validateV2(graph) {

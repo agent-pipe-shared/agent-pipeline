@@ -107,7 +107,7 @@ function validDelivery(delivery) {
   if (delivery.outcome !== "succeeded") {
     return ["failed", "stopped", "deferred", "superseded"].includes(delivery.outcome);
   }
-  return hasRequiredKeys(delivery, [
+  return exactKeys(delivery, [
     "outcome", "deliveryReceiptId", "fetchBackReceiptId", "pushedOid", "fetchedOid",
   ])
     && safeId(delivery.deliveryReceiptId) && safeId(delivery.fetchBackReceiptId)
@@ -175,13 +175,15 @@ function addEvidence(inventory, id, kind, packageId, actionId, findings, sha256 
 function buildEvidenceInventory(result, packages, finalEvidence, findings) {
   const inventory = new Map();
   for (const [packageId, packageResult] of packages) {
-    addEvidence(inventory, packageResult.resultEvidenceId, "PackageResult", packageId, packageResult.actionId, findings);
+    addEvidence(inventory, packageResult.resultEvidenceId, "PackageResult", packageId,
+      packageResult.actionId, findings, sha256Canonical(packageResult));
     const corrections = packageResult.correctionRecords;
     if (!Array.isArray(corrections)) {
       findings.push(`PackageResult ${packageId} correctionRecords must be an array`);
     } else {
       for (const correction of corrections) {
-        addEvidence(inventory, correction?.correctionId, "correction", packageId, correction?.actionId, findings);
+        addEvidence(inventory, correction?.correctionId, "correction", packageId,
+          correction?.actionId, findings, sha256Canonical(correction));
       }
     }
     const deltas = packageResult.deltaReceipts;
@@ -189,16 +191,21 @@ function buildEvidenceInventory(result, packages, finalEvidence, findings) {
       findings.push(`PackageResult ${packageId} deltaReceipts must be an array`);
     } else {
       for (const receipt of deltas) {
-        addEvidence(inventory, receipt?.receiptId, "delta receipt", packageId, receipt?.actionId, findings);
+        addEvidence(inventory, receipt?.receiptId, "delta receipt", packageId,
+          receipt?.actionId, findings, sha256Canonical(receipt));
       }
     }
     if (packageResult.delivery?.outcome === "succeeded") {
-      addEvidence(inventory, packageResult.delivery.deliveryReceiptId, "delivery receipt", packageId, packageResult.actionId, findings);
-      addEvidence(inventory, packageResult.delivery.fetchBackReceiptId, "fetch-back receipt", packageId, packageResult.actionId, findings);
+      const deliverySha256 = sha256Canonical(packageResult.delivery);
+      addEvidence(inventory, packageResult.delivery.deliveryReceiptId, "delivery receipt",
+        packageId, packageResult.actionId, findings, deliverySha256);
+      addEvidence(inventory, packageResult.delivery.fetchBackReceiptId, "fetch-back receipt",
+        packageId, packageResult.actionId, findings, deliverySha256);
     }
   }
   if (isObject(finalEvidence)) {
-    addEvidence(inventory, finalEvidence.finalDeliveryEvidenceId, "final delivery evidence", null, null, findings);
+    addEvidence(inventory, finalEvidence.finalDeliveryEvidenceId, "final delivery evidence",
+      null, null, findings, sha256Canonical(finalEvidence));
   }
   if (result.externalEvidence !== undefined) {
     if (!Array.isArray(result.externalEvidence)) findings.push("externalEvidence must be an array when present");
@@ -257,7 +264,12 @@ function validateDeliveryBijection(packages, graph, findings) {
   let expected = 0;
   for (const [packageId, packageResult] of packages) {
     const delivery = packageResult.delivery;
-    if (!isObject(delivery) || delivery.outcome !== "succeeded") continue;
+    if (!isObject(delivery) || delivery.outcome !== "succeeded") {
+      if (graph?.completionClaim === "phase-close") {
+        findings.push(`phase-close PackageResult ${packageId} requires one successful closed delivery record`);
+      }
+      continue;
+    }
     expected += 1;
     const packageEvents = graphEvents(graph).filter((event) => event.packageId === packageId);
     const pushEvents = packageEvents.filter((event) => event.stage === "delivery"
@@ -371,6 +383,15 @@ function validatePackageBindings(result, packages, graph, finalEvidence, finding
     if (binding.terminalEventId !== terminalEventId) {
       findings.push(`terminalEventId for ${binding.packageId} is not its terminal event`);
     }
+    if (graph?.completionClaim === "phase-close") {
+      const terminalEvent = graphEvents(graph).find((event) => event.eventId === binding.terminalEventId);
+      if (!terminalEvent || terminalEvent.stage !== "close" || terminalEvent.outcome !== "succeeded"
+        || terminalEvent.packageId !== binding.packageId
+        || terminalEvent.cycleId !== binding.terminalCycleId
+        || terminalEvent.actionId !== packageResult.actionId) {
+        findings.push(`phase-close binding for ${binding.packageId} must resolve its own successful terminal close event`);
+      }
+    }
   }
   for (const packageId of packages.keys()) {
     if (!seen.has(packageId)) findings.push(`packageBindings coverage is missing ${packageId}`);
@@ -393,7 +414,7 @@ function validateResultEnvelope(result, findings) {
   }
 }
 
-function validateStatuses(result, graph, findings) {
+function validateStatuses(result, graph, inventory, findings) {
   if (!["candidate-handoff", "phase-close"].includes(result.status)) {
     findings.push("Result status must be one supported explicit v2 lifecycle status");
   }
@@ -418,6 +439,10 @@ function validateStatuses(result, graph, findings) {
       findings.push(`status projection ${projection.projection} is duplicated`);
     }
     projectionNames.add(projection.projection);
+    const source = inventory.get(projection.sourceEvidenceId);
+    if (!source || source.sha256 !== projection.sha256) {
+      findings.push(`status projection ${projection.projection} has a missing, fabricated or stale sourceEvidenceId/sha256 binding`);
+    }
     if (projection.status !== result.status || projection.status !== expected) {
       findings.push(`status projection ${projection.projection}=${projection.status} conflicts with ${result.status}/${expected}`);
     }
@@ -447,7 +472,7 @@ function reconcilePhase3SdlcCoherence(result) {
   recordEventBijection(packages, graph, "deltaReceipts", "receiptId", "delta-regate", "delta receipt", findings);
   validateDeliveryBijection(packages, graph, findings);
   validatePackageBindings(result, packages, graph, finalEvidence, findings);
-  validateStatuses(result, graph, findings);
+  validateStatuses(result, graph, inventory, findings);
   return { ok: findings.length === 0, findings };
 }
 

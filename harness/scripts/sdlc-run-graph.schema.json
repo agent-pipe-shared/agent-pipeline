@@ -68,7 +68,35 @@
           "type": "array", "minItems": 1, "maxItems": 512,
           "items": { "$ref": "#/$defs/packageBindingV2" }
         }
-      }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["sdlcRunGraph"],
+            "properties": {
+              "sdlcRunGraph": {
+                "required": ["completionClaim"],
+                "properties": { "completionClaim": { "const": "phase-close" } }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "packageResults": {
+                "items": {
+                  "allOf": [
+                    { "$ref": "#/$defs/packageResultV2" },
+                    {
+                      "required": ["delivery"],
+                      "properties": { "delivery": { "$ref": "#/$defs/successfulDeliveryV2" } }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
     },
     "safeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
     "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
@@ -327,7 +355,7 @@
       }
     },
     "successfulDeliveryV2": {
-      "type": "object", "additionalProperties": true,
+      "type": "object", "additionalProperties": false,
       "required": ["outcome", "deliveryReceiptId", "fetchBackReceiptId", "pushedOid", "fetchedOid"],
       "properties": {
         "outcome": { "const": "succeeded" },
