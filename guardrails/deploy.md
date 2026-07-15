@@ -21,7 +21,7 @@ A ruleset that claims more than the guard technically enforces is worse than no 
 
 ## DP-01 — Promote consent: a deploy-trigger needs its OWN unconsumed approval
 
-- **MUST NOT** treat the standing push approval (`guardrails/git.md` GIT-05/GIT-08) as satisfying a deploy-triggering push to a `human-gate` environment. `standing-approved` covers ordinary commits to `main`; it never covers a `promote:prod`-class deployment.
+- **MUST NOT** treat the standing push approval (`guardrails/git.md` GIT-05/GIT-08) as satisfying a deploy-triggering push to a `human-gate` environment. `standing-approved` covers only the calibrated ordinary feature ref; it never covers a `promote:prod`-class deployment.
 - **MUST** hold a matching, unconsumed `deployApproval` — a record bound to `{forArtifact, forEnvironment}` (`harness/scripts/pipeline-state.mjs approve-deploy --env <env> --artifact <tag-or-sha> --by <name>`) — before such a push. "Unconsumed" means no `usedAt` mark; a consumed approval does not carry over to a second promotion of the same artifact.
 - Applies ONLY when a matched trigger ref resolves, via its adapter, to an environment declaring `promotion: human-gate` — an automated test-deploy environment never demands a manual approval (approval-fatigue defense).
 - **Why:** Without this rule, a plain `git push origin v1.0.0` in a repo with a standing push approval would auto-pass and fire a prod deploy in CI — a composition bypass.

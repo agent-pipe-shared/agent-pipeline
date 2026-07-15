@@ -25,6 +25,8 @@
     "mode": "required",
     "repositoryOwner": "agent-pipe-shared",
     "repositoryName": "agent-pipeline",
+    "remoteName": "origin",
+    "approvedFeatureBranch": "feat/v0.3-phase2.6-multi-cli",
     "sshHostAlias": "github-share",
     "sshAccount": "agent-pipe-shared",
     "authorName": "The Agent-Pipeline Contributors",

@@ -9,12 +9,15 @@
  * existing lifecycle instead of being guessed into Phase-2.6 rules.
  */
 import { readFileSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
 export const LIFECYCLE_SCHEMA = "pipeline.artifact-lifecycle.v1";
+export const CANONICAL_HUMAN_STATE_PATH = "docs/state.md";
+export const CANONICAL_MACHINE_STATE_PATH = ".claude/pipeline-state.json";
 
 const OWNERSHIP = Object.freeze({
   prd: "product-intent",
@@ -62,6 +65,10 @@ function readableFile(root, relPath, findings, label) {
     return null;
   }
   return safe;
+}
+
+function sha256File(root, relPath) {
+  return createHash("sha256").update(readFileSync(join(root, relPath))).digest("hex");
 }
 
 /** Parse exactly one Result JSON code block without accepting a second authority block. */
@@ -121,6 +128,9 @@ export function checkArtifactLifecycle(root = DEFAULT_ROOT, resultPath) {
     if (path && seenPaths.has(path)) findings.push(`${label}.path duplicates another artifact path`);
     if (path) seenPaths.add(path);
     if (!["active", "historical", "folded"].includes(artifact.state)) findings.push(`${label}.state must be active, historical, or folded`);
+    if (typeof artifact.authority !== "boolean") findings.push(`${label}.authority must be explicit boolean`);
+    if (artifact.state === "active" && artifact.authority !== true) findings.push(`${label} is active and must explicitly set authority=true`);
+    if (artifact.state !== "active" && artifact.authority !== false) findings.push(`${label} is historical/folded and must explicitly set authority=false`);
     if ((artifact.kind === "receipt" || artifact.kind === "archive") && artifact.authority !== false) {
       findings.push(`${label} is evidence/history and must explicitly set authority=false`);
     }
@@ -173,8 +183,10 @@ export function checkArtifactLifecycle(root = DEFAULT_ROOT, resultPath) {
     findings.push("artifactLifecycle.status is required");
     return { ok: false, findings };
   }
-  const machinePath = readableFile(root, status.machineStatePath, findings, "artifactLifecycle.status.machineStatePath");
-  const humanPath = readableFile(root, status.humanStatePath, findings, "artifactLifecycle.status.humanStatePath");
+  if (status.machineStatePath !== CANONICAL_MACHINE_STATE_PATH) findings.push(`artifactLifecycle.status.machineStatePath must equal ${CANONICAL_MACHINE_STATE_PATH}`);
+  if (status.humanStatePath !== CANONICAL_HUMAN_STATE_PATH) findings.push(`artifactLifecycle.status.humanStatePath must equal ${CANONICAL_HUMAN_STATE_PATH}`);
+  const machinePath = readableFile(root, CANONICAL_MACHINE_STATE_PATH, findings, "canonical machine pipeline state");
+  const humanPath = readableFile(root, CANONICAL_HUMAN_STATE_PATH, findings, "canonical human state");
   if (typeof status.phase !== "string" || status.phase.length === 0 || typeof status.resultStatus !== "string" || status.resultStatus.length === 0) {
     findings.push("artifactLifecycle.status must bind phase and resultStatus");
   }
@@ -185,6 +197,18 @@ export function checkArtifactLifecycle(root = DEFAULT_ROOT, resultPath) {
       const machine = JSON.parse(text);
       if (machine?.activeFeature?.id !== metadata.featureId) findings.push("machine state activeFeature.id does not match artifactLifecycle.featureId");
       if (machine?.activeFeature?.phase !== status.phase) findings.push("machine state activeFeature.phase does not match artifactLifecycle.status.phase");
+      if (machine?.activeFeature?.planPath !== activePrd?.path) findings.push("machine state activeFeature.planPath does not match the active PRD path");
+      const authority = machine?.continuity?.authority;
+      if (!authority || typeof authority !== "object") {
+        findings.push("machine state continuity.authority is required to bind the active PRD/Spec/Result");
+      } else {
+        for (const [kind, artifact] of [["prd", activePrd], ["spec", activeSpec], ["result", activeResult]]) {
+          const bound = authority[kind];
+          if (!artifact || !bound || bound.path !== artifact.path || bound.sha256 !== sha256File(root, artifact.path)) {
+            findings.push(`machine state continuity.authority.${kind} must bind the active ${kind} path and digest`);
+          }
+        }
+      }
     } catch {
       findings.push("machine pipeline state is not parseable JSON");
     }

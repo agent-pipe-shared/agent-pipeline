@@ -323,8 +323,11 @@ function resolveSourceCommit(binding) {
 // .claude/pipeline.json; it is a repository-local expected identity, never a global
 // git default or a private account profile.
 const PUBLIC_PUSH_IDENTITY_SCHEMA = "pipeline.public-push-identity.v1";
-const TRAILER_DENY = /^(?:co-authored-by|signed-off-by|reviewed-by|assisted-by|provider|session|private(?:-account)?)\s*:/im;
+const TRAILER_DENY = /^(?:co-authored-by|signed-off-by|reviewed-by|assisted-by|provider|model|session|run|trace|private(?:-account)?|account|operator|machine|host|workspace|worktree)\s*:/im;
 const EMAIL_IN_MESSAGE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+const PRIVATE_URL_IN_MESSAGE = /\bhttps?:\/\/(?!github\.com\/agent-pipe-shared\/agent-pipeline(?:[/?#]|$))\S+/i;
+const MACHINE_ABSOLUTE_PATH_IN_MESSAGE = /(?:^|[\s"'`])(?:\/(?:home|Users|mnt|private|var\/folders|tmp)(?:\/|$)|[A-Za-z]:[\\/])/m;
+const SECRET_LIKE_VALUE_IN_MESSAGE = /\b(?:gh[pousr]_[A-Za-z0-9_]{12,}|github_pat_[A-Za-z0-9_]{12,}|sk-[A-Za-z0-9_-]{12,}|AKIA[0-9A-Z]{12,})\b/;
 
 function localGitConfig(binding, key) {
   const result = spawnSync("git", ["-C", binding.projectDir, "config", "--local", "--get", key], {
@@ -332,6 +335,14 @@ function localGitConfig(binding, key) {
     timeout: 5000,
   });
   return result.status === 0 ? result.stdout.trim() : null;
+}
+
+function localGitConfigAll(binding, key) {
+  const result = spawnSync("git", ["-C", binding.projectDir, "config", "--local", "--get-all", key], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  return result.status === 0 ? result.stdout.split("\n").filter(Boolean) : [];
 }
 
 function readPublicPushIdentity(binding) {
@@ -345,7 +356,7 @@ function readPublicPushIdentity(binding) {
   const identity = parsed?.publicPushIdentity;
   if (identity === undefined) return { enabled: false };
   if (!identity || typeof identity !== "object" || Array.isArray(identity)) return { enabled: true, error: "publicPushIdentity calibration is malformed" };
-  const required = ["schema", "mode", "repositoryOwner", "repositoryName", "sshHostAlias", "sshAccount", "authorName", "authorEmail"];
+  const required = ["schema", "mode", "repositoryOwner", "repositoryName", "remoteName", "approvedFeatureBranch", "sshHostAlias", "sshAccount", "authorName", "authorEmail"];
   if (required.some((key) => typeof identity[key] !== "string" || identity[key].length === 0)) {
     return { enabled: true, error: "publicPushIdentity calibration is incomplete" };
   }
@@ -362,12 +373,12 @@ function remoteCoordinates(remoteUrl) {
   return match ? { host: match[1], owner: match[2], repository: match[3] } : null;
 }
 
-function anonymousRange(binding, sourceCommit) {
-  if (!binding.destination || !binding.destination.startsWith("refs/heads/")) {
+function anonymousRange(binding, sourceCommit, expected) {
+  if (!binding.destination || binding.destination !== `refs/heads/${expected.approvedFeatureBranch}`) {
     return { ok: false, reason: "anonymous-public pushes require an explicit refs/heads/<feature-branch> destination" };
   }
-  const branch = binding.destination.slice("refs/heads/".length);
-  if (!/^[A-Za-z0-9._/-]+$/.test(branch)) return { ok: false, reason: "anonymous-public destination branch is malformed" };
+  const branch = expected.approvedFeatureBranch;
+  if (!/^[A-Za-z0-9._/-]+$/.test(branch) || branch === "main") return { ok: false, reason: "anonymous-public destination branch is malformed" };
   const trackingRef = `refs/remotes/${binding.remote}/${branch}`;
   const base = spawnSync("git", ["-C", binding.projectDir, "rev-parse", "--verify", "--end-of-options", trackingRef], {
     encoding: "utf8",
@@ -393,6 +404,21 @@ function anonymousRange(binding, sourceCommit) {
   return { ok: true, entries };
 }
 
+function authenticatedSshAccount(identity) {
+  // `ssh -T` intentionally returns exit 1 after successful GitHub public-key
+  // authentication because GitHub exposes no shell.  The bounded greeting is
+  // the account evidence; a configured host alias alone only proves selection.
+  const result = spawnSync(
+    "ssh",
+    ["-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", identity.sshHostAlias],
+    { encoding: "utf8", timeout: 7000 },
+  );
+  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  return output.includes(`Hi ${identity.sshAccount}!`)
+    ? { ok: true }
+    : { ok: false, reason: "anonymous-public SSH account evidence does not name the calibrated dedicated account" };
+}
+
 function checkAnonymousPublicPush(binding, sourceCommit) {
   const calibration = readPublicPushIdentity(binding);
   if (!calibration.enabled) return [];
@@ -408,12 +434,18 @@ function checkAnonymousPublicPush(binding, sourceCommit) {
   for (const [key, value] of Object.entries(expectedConfig)) {
     if (localGitConfig(binding, key) !== value) failures.push(`anonymous-public local ${key} must equal its calibrated value`);
   }
+  if (binding.remote !== expected.remoteName) failures.push("anonymous-public push must use the calibrated remote name");
   const remote = remoteCoordinates(localGitConfig(binding, `remote.${binding.remote}.url`));
   if (!remote || remote.host !== expected.sshHostAlias || remote.owner !== expected.repositoryOwner || remote.repository !== expected.repositoryName) {
     failures.push("anonymous-public remote must bind the calibrated SSH host alias and repository owner");
   }
+  if (localGitConfigAll(binding, `remote.${binding.remote}.pushurl`).length > 0) {
+    failures.push("anonymous-public remote must not define a pushurl separate from its calibrated fetch URL");
+  }
   if (expected.sshAccount !== expected.repositoryOwner) failures.push("anonymous-public calibration must bind the dedicated SSH account to the repository owner");
-  const range = anonymousRange(binding, sourceCommit);
+  const ssh = authenticatedSshAccount(expected);
+  if (!ssh.ok) failures.push(ssh.reason);
+  const range = anonymousRange(binding, sourceCommit, expected);
   if (!range.ok) return [...failures, range.reason];
   for (const [commit, authorName, authorEmail, committerName, committerEmail, signature, message] of range.entries) {
     if (authorName !== expected.authorName || authorEmail !== expected.authorEmail) failures.push(`anonymous-public commit ${commit} has a non-neutral Author identity`);
@@ -421,6 +453,9 @@ function checkAnonymousPublicPush(binding, sourceCommit) {
     if (signature !== "N") failures.push(`anonymous-public commit ${commit} carries a signature`);
     if (TRAILER_DENY.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries a forbidden personal/provider/private trailer`);
     if (EMAIL_IN_MESSAGE.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries an email address in its message`);
+    if (PRIVATE_URL_IN_MESSAGE.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries a private or non-canonical URL`);
+    if (MACHINE_ABSOLUTE_PATH_IN_MESSAGE.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries a machine-specific absolute path`);
+    if (SECRET_LIKE_VALUE_IN_MESSAGE.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries a credential-shaped value`);
   }
   return failures;
 }
@@ -874,9 +909,9 @@ if (securityGate && securityGate.mode !== "off") {
   failures.push(...checkEvidenceFreshness("evidence/security-latest.json"));
 }
 
-// (b.1) self-application-only anonymous public range.  Its calibrated SSH host
-// alias is the dedicated-account selection evidence; the close ritual separately
-// requires a fresh `ssh -T` readback before the actual network operation.
+// (b.1) self-application-only anonymous public range and dedicated authenticated
+// SSH-account evidence. The close ritual repeats this preflight immediately before
+// the actual network operation, then fetches the pushed ref from a fresh repository.
 failures.push(...checkAnonymousPublicPush(pushBinding, sourceCommit));
 
 // (c) approval.

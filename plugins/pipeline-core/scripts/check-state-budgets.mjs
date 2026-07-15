@@ -4,10 +4,11 @@ import { readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { DEFAULT_ROOT, loadLifecycleMetadata } from "./check-artifact-lifecycle.mjs";
+import { DEFAULT_ROOT, loadLifecycleMetadata, CANONICAL_HUMAN_STATE_PATH, CANONICAL_MACHINE_STATE_PATH } from "./check-artifact-lifecycle.mjs";
 
 export const MAX_NORMAL_BOOTSTRAP_BYTES = 15360;
 export const MAX_OPERATIONAL_HEAD_BYTES = 8192;
+export const CANONICAL_NORMAL_BOOTSTRAP_PATHS = Object.freeze([CANONICAL_HUMAN_STATE_PATH, CANONICAL_MACHINE_STATE_PATH]);
 
 function safeRelativePath(root, value) {
   if (typeof value !== "string" || value.length === 0 || value.startsWith("/") || value.includes("\\")) return null;
@@ -49,13 +50,17 @@ export function checkStateBudgets(root = DEFAULT_ROOT, resultPath) {
   const unique = new Set(bootstrapPaths);
   if (unique.size !== bootstrapPaths.length) findings.push("budgets.bootstrapPaths must not contain duplicates");
   if (!status || typeof status !== "object") findings.push("artifactLifecycle.status is required for budget measurement");
-  if (status && (!unique.has(status.humanStatePath) || !unique.has(status.machineStatePath))) {
-    findings.push("normal bootstrap must include both human and machine operational state heads");
+  if (bootstrapPaths.length !== CANONICAL_NORMAL_BOOTSTRAP_PATHS.length
+    || !CANONICAL_NORMAL_BOOTSTRAP_PATHS.every((path, index) => bootstrapPaths[index] === path)) {
+    findings.push("budgets.bootstrapPaths must equal the canonical normal bootstrap set");
+  }
+  if (status && (status.humanStatePath !== CANONICAL_HUMAN_STATE_PATH || status.machineStatePath !== CANONICAL_MACHINE_STATE_PATH)) {
+    findings.push("status must name the canonical human and machine operational state heads");
   }
 
-  const human = status && byteSize(root, status.humanStatePath, findings, "human state head");
-  const machine = status && byteSize(root, status.machineStatePath, findings, "machine state head");
-  const bootstrap = bootstrapPaths.map((path, index) => byteSize(root, path, findings, `bootstrapPaths[${index}]`)).filter(Boolean);
+  const human = byteSize(root, CANONICAL_HUMAN_STATE_PATH, findings, "canonical human state head");
+  const machine = byteSize(root, CANONICAL_MACHINE_STATE_PATH, findings, "canonical machine state head");
+  const bootstrap = CANONICAL_NORMAL_BOOTSTRAP_PATHS.map((path, index) => byteSize(root, path, findings, `canonicalBootstrapPaths[${index}]`)).filter(Boolean);
   const bootstrapBytes = bootstrap.reduce((sum, entry) => sum + entry.bytes, 0);
   if (human && human.bytes > MAX_OPERATIONAL_HEAD_BYTES) findings.push(`human state head is ${human.bytes} bytes (max ${MAX_OPERATIONAL_HEAD_BYTES})`);
   if (machine && machine.bytes > MAX_OPERATIONAL_HEAD_BYTES) findings.push(`machine state head is ${machine.bytes} bytes (max ${MAX_OPERATIONAL_HEAD_BYTES})`);

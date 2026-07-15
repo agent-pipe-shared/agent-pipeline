@@ -93,7 +93,18 @@ function fixture({ humanBytes = 8192, machineBytes = 7168, archive = true } = {}
   metadata.budgets.bootstrapPaths = ["docs/state.md"];
   writeResult();
   const outcome = checkStateBudgets(root, "specs/result.md");
-  check("SB08 prevents hiding the machine state outside the normal bootstrap budget", !outcome.ok && outcome.findings.some((f) => f.includes("include both human and machine")), outcome.findings.join("; "));
+  check("SB08 prevents omitting a canonical state head from the normal bootstrap budget", !outcome.ok && outcome.findings.some((f) => f.includes("canonical normal bootstrap set")), outcome.findings.join("; "));
+}
+{
+  const { root, metadata, writeResult } = fixture();
+  write(root, "tiny/human.md", "tiny\n");
+  write(root, "tiny/machine.json", "{}\n");
+  metadata.status.humanStatePath = "tiny/human.md";
+  metadata.status.machineStatePath = "tiny/machine.json";
+  metadata.budgets.bootstrapPaths = ["tiny/human.md", "tiny/machine.json"];
+  writeResult();
+  const outcome = checkStateBudgets(root, "specs/result.md");
+  check("SB09 rejects Result-selected decoy state and bootstrap paths", !outcome.ok && outcome.findings.some((f) => f.includes("canonical")), outcome.findings.join("; "));
 }
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });

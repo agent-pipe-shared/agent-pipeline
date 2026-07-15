@@ -79,7 +79,7 @@ Rule IDs: `GIT-xx`.
 
 - **MUST** follow the committed project calibration (`.claude/pipeline.json`: `branchModel`, `autonomy`, `wipLimit`, `worktree`) for branching (pr-flow vs. direct-push+staging), merge form, and push autonomy; **MUST NOT** improvise a different flow.
 - **MUST** pass the project's defined merge/completion gate before anything reaches `main`: deterministic checks green + evidence (`guardrails/quality-gates.md`) + Critic per risk class (`docs/operating-model.md` §4.2).
-- Push/merge autonomy is whatever the calibration grants — and no more; consent for outward-effective actions never carries across contexts (`guardrails/global.md` GL-04). In this repo: pushing `main` at work-package boundaries is standing-approved by PO directive; destructive push forms remain guard-blocked.
+- Push/merge autonomy is whatever the calibration grants — and no more; consent for outward-effective actions never carries across contexts (`guardrails/global.md` GL-04). When this repo's `publicPushIdentity.mode` is `required`, its exact `approvedFeatureBranch` is the only ordinary push destination; an older standing-approval record never authorizes `main`, a tag, a release, merge or another branch. Destructive push forms remain guard-blocked.
 - Writing tasks run in a worktree per project calibration (ADR-0008); OPEN (Phase 4): validated worktree tier + fallback per project.
 - **Why:** The gate is the central invariant, the form is calibrated — <PROJECT_C>'s PR flow and <PROJECT_A>/<PROJECT_B> direct-push are deliberate differences, not drift.
 - **Verification:** Calibration file names the branch model; gate evidence exists before merge; the WIP rule (max 1 open human-gate item per project) is checked at dispatch time.
@@ -101,7 +101,7 @@ Rule IDs: `GIT-xx`.
 
 ## GIT-08 — Standing push approval does NOT cover a deploy-triggering ref
 
-- **MUST NOT** treat the standing push approval (GIT-05) as covering a push to a deploy-triggering ref (a release tag/branch pattern declared under a manifest `release` section, e.g. `refs/tags/v*`). `standing-approved` covers ORDINARY commits to `main`; it is explicitly carved out for deploy triggers.
+- **MUST NOT** treat the standing push approval (GIT-05) as covering a push to a deploy-triggering ref (a release tag/branch pattern declared under a manifest `release` section, e.g. `refs/tags/v*`). `standing-approved` covers only the calibrated ordinary feature ref, and is explicitly carved out for deploy triggers.
 - **MUST** obtain a fresh `deployApproval` bound to `{artifact, environment}` (`harness/scripts/pipeline-state.mjs approve-deploy --env <env> --artifact <tag-or-sha> --by <name>`) before a push that fires a `promote:prod`-class deployment to a `human-gate` environment — even when the repo's push gate is otherwise `standing-approved`.
 - Enforced by the `guard-push` deploy branch: the deploy branch's approval check runs INDEPENDENT of `gates.push.approval`, so it is never satisfied by the standing approval — see `guardrails/deploy.md` DP-01 for the full rule and `docs/adr/0017-push-policy-standing-approval.md`'s follow-up note for the ADR-side carve-out.
 - **Why:** Without this carve-out, `git push origin v1.0.0` would auto-pass under the standing approval and silently fire a prod deploy in CI — a composition bypass. A blanket "pushing to main is fine" approval was never meant to also mean "promoting to prod is fine".

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -32,13 +33,15 @@ function write(root, path, text) {
   mkdirSync(join(full, ".."), { recursive: true });
   writeFileSync(full, text);
 }
+function digest(root, path) {
+  return createHash("sha256").update(readFileSync(join(root, path))).digest("hex");
+}
 
 function fixture() {
   const root = mkdtempSync(join(tmpdir(), "artifact-lifecycle-"));
   roots.push(root);
   write(root, "specs/prd.md", "# PRD\n");
   write(root, "specs/spec.md", "# Spec\n");
-  write(root, ".claude/pipeline-state.json", JSON.stringify({ activeFeature: { id: "feature-x", phase: "implementation" } }));
   write(root, "docs/state.md", "Feature feature-x is in implementation.\n");
   write(root, "backlog/README.md", "Backlog owns unresolved future work, not active task status.\n");
   write(root, "CHANGELOG.md", "Changelog owns released user-visible delta, not work-in-progress completion.\n");
@@ -70,6 +73,16 @@ function fixture() {
   write(root, "specs/receipt.md", "receipt evidence\n");
   const writeResult = () => write(root, "specs/result.md", `# Result\n\n\`\`\`pipeline-result\n${JSON.stringify(result, null, 2)}\n\`\`\`\n`);
   writeResult();
+  write(root, ".claude/pipeline-state.json", JSON.stringify({
+    activeFeature: { id: "feature-x", planPath: "specs/prd.md", phase: "implementation" },
+    continuity: {
+      authority: {
+        prd: { path: "specs/prd.md", sha256: digest(root, "specs/prd.md") },
+        spec: { path: "specs/spec.md", sha256: digest(root, "specs/spec.md") },
+        result: { path: "specs/result.md", sha256: digest(root, "specs/result.md") },
+      },
+    },
+  }));
   return { root, result, writeResult };
 }
 
@@ -140,6 +153,27 @@ function fixture() {
   write(root, "backlog/README.md", "Active task status lives here.\n");
   const outcome = checkArtifactLifecycle(root, "specs/result.md");
   check("AL10 rejects backlog status-authority drift", !outcome.ok && outcome.findings.some((f) => f.includes("Backlog does not declare")), outcome.findings.join("; "));
+}
+{
+  const { root, result, writeResult } = fixture();
+  result.artifactLifecycle.artifacts.find((entry) => entry.kind === "prd").authority = false;
+  writeResult();
+  const outcome = checkArtifactLifecycle(root, "specs/result.md");
+  check("AL11 requires every active PRD/Spec/Result to explicitly claim authority", !outcome.ok && outcome.findings.some((f) => f.includes("active and must explicitly set authority=true")), outcome.findings.join("; "));
+}
+{
+  const { root, result, writeResult } = fixture();
+  result.artifactLifecycle.artifacts.push({ kind: "spec", path: "specs/old-spec.md", state: "historical", authority: true });
+  write(root, "specs/old-spec.md", "# superseded\n");
+  writeResult();
+  const outcome = checkArtifactLifecycle(root, "specs/result.md");
+  check("AL12 rejects historical PRD/Spec/Result authority claims", !outcome.ok && outcome.findings.some((f) => f.includes("historical/folded and must explicitly set authority=false")), outcome.findings.join("; "));
+}
+{
+  const { root } = fixture();
+  write(root, ".claude/pipeline-state.json", JSON.stringify({ activeFeature: { id: "feature-x", planPath: "specs/prd.md", phase: "implementation" } }));
+  const outcome = checkArtifactLifecycle(root, "specs/result.md");
+  check("AL13 requires canonical machine-state authority bindings", !outcome.ok && outcome.findings.some((f) => f.includes("continuity.authority is required")), outcome.findings.join("; "));
 }
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });
