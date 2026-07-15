@@ -26,19 +26,19 @@ From the repo root:
 node setup.mjs
 ```
 
-Interactive mode asks public setup intent, runtime, language, subscription tier and autonomy. Personal coordinates are not collected:
+Interactive mode asks public setup intent, runtime, language, direct role/worktype routes and autonomy. Personal coordinates are not collected:
 
 | Question | Values | Feeds |
 |---|---|---|
 | Runtime | `claude-code` (full hook/gate enforcement) or `other` (methodology only) | `agent_runtime` |
 | Setup intent | `consumer` or `maintainer` | `setup.intent` |
 | Language | human-facing (commits, reviews, new docs) and agent-facing (roles, guardrails, skills), each `de`/`en` | `language` |
-| Subscription tier | `pro`, `max`, or `api`/own — picks a model preset per work method and dispatch tier | `worktypes`, `models` |
+| Direct routes | recorded runner plus optional selector, effort and unavailable-provider policy for each worktype phase and duty | `routing` |
 | Autonomy preset | `conservative` (gated push, feature branches) or `autonomous` (standing-approved push, direct-to-main, advisor on) | `autonomy` |
 
-`max` is the recommended default preset: an Opus orchestrator (routed per work method — see below) plus a Sonnet three-tier dispatch palette (implement / mechanic / deep) and Sonnet review. `api`/own starts from the same Max preset — edit the model names directly in `pipeline.user.yaml` afterwards and re-run setup.
+There is no subscription question and no tier preset. `pipeline.user.v1` is the one editable routing authority: every active route records its runner, an `alias` or observed `model-id` selector, effort, unavailability policy, and the required dispatch receipt. The generated Claude `modelRouting` block remains semantically compatible with Shared candidate `654ebaf`; `runnerRoutes` is the provider-neutral runtime projection.
 
-**Route models per work method?** → `pipeline.user.yaml` → `worktypes`. That block is THE single place to set which model/effort/advisor runs for each of the three session profiles (design-first, advisor, speed) — see the comments in the file itself.
+**Route roles directly?** → `pipeline.user.yaml` → `routing`. That block is THE single place to set worktype phases and duties. For Codex, Design and independent Critic use the observed `gpt-5.6-sol` binding at `xhigh`; implementation, Goldfish, mechanic and deep retain the `terra` alias at `xhigh` until a host/CLI route receipt proves a concrete resolution. An alias, including a model name reported by an agent, is never an attestation.
 
 Before any write, create the ignored Private Overlay `.pipeline/private-overlay.yaml` with only the immutable Public-Core reference:
 
@@ -49,7 +49,7 @@ shared:
 
 The lock must exactly match `git rev-parse HEAD`; missing, abbreviated or mismatched locks fail before source or runtime mutation. Keep credentials, account state and paths separately in ignored machine-local state; setup never reads or projects them. Setup then writes `pipeline.user.yaml`, compiles the runtime configs, and projects the generic public marketplace binding.
 
-**Non-interactive path:** `node setup.mjs --defaults` writes the conservative defaults with no prompts — useful for a first dry run or a CI check.
+**Non-interactive path:** `node setup.mjs --defaults` writes the conservative direct-route defaults with no prompts — useful for a first dry run or a CI check. A pre-v1 file is first rendered as a visible `v0 → v1` migration preview; it is not silently treated as v1 before the complete v1 source validates.
 
 **Changed your mind later?** Edit `pipeline.user.yaml` by hand and run `node setup.mjs` again — it's drift-safe: cleanly-recompilable files are overwritten freely, but a compiled file you hand-edited yourself (without touching `pipeline.user.yaml`) triggers a confirmation before being overwritten (non-interactive mode never overwrites it at all).
 
@@ -87,7 +87,7 @@ Before your first big feature, a quick look at [`docs/design/README.md`](docs/de
 |---|---|---|
 | `.claude/settings.json` | `autonomy` only where applicable | Claude Code itself — plugin enablement, generic public marketplace binding, permissions, status line; no owner/account/machine coordinates |
 | `.claude/pipeline.json` | `autonomy`, `gates` | project calibration — the bootstrap check and the `pipeline-start`/`close-block` skills |
-| `.claude/pipeline.yaml` | `worktypes`, `models`, `gates`, `autonomy` | the declarative manifest layer — the PreToolUse guard hooks (`guard-devplan`, `guard-push`), the `stop-suggest` Stop-event hook (next-phase suggestion + context-budget warnings), and model routing; validated by `harness/scripts/validate-manifest.mjs` |
+| `.claude/pipeline.yaml` | `routing`, `gates`, `autonomy` | the declarative manifest layer — the PreToolUse guard hooks (`guard-devplan`, `guard-push`), the `stop-suggest` Stop-event hook (next-phase suggestion + context-budget warnings), Claude compatibility `modelRouting`, and provider-neutral `runnerRoutes`; validated by `harness/scripts/validate-manifest.mjs` |
 
 Every compiled file carries a `GENERATED from pipeline.user.yaml` marker so re-runs can tell a stale compile from a real hand-edit.
 Before setup writes any of these files, the complete generated manifest passes the same
@@ -142,26 +142,29 @@ node setup.mjs
 ```
 
 Der interaktive Modus fragt nach öffentlicher Setup-Absicht, Runtime, Sprache,
-Abo-Stufe und Autonomie. Persönliche Koordinaten werden nicht erhoben:
+direkten Rollen-/Worktype-Routen und Autonomie. Persönliche Koordinaten werden nicht erhoben:
 
 | Frage | Werte | Fließt in |
 |---|---|---|
 | Runtime | `claude-code` (volles Hook-/Gate-Enforcement) oder `other` (nur Methodik) | `agent_runtime` |
 | Setup-Absicht | `consumer` oder `maintainer` | `setup.intent` |
 | Sprache | human-facing (Commits, Reviews, neue Docs) und agent-facing (Rollen, Guardrails, Skills), je `de`/`en` | `language` |
-| Abo-Stufe | `pro`, `max` oder `api`/eigene — legt ein Modell-Preset je Arbeitsmethode und Dispatch-Stufe fest | `worktypes`, `models` |
+| Direkte Routen | festgehaltener Runner plus optionale Selector-, Effort- und Provider-Ausfall-Policy je Worktype-Phase und Duty | `routing` |
 | Autonomie-Preset | `konservativ` (gated Push, Feature-Branches) oder `autonom` (standing-approved Push, direkt auf main, Advisor an) | `autonomy` |
 
-`max` ist das empfohlene Default-Preset: ein Opus-Orchestrator (geroutet je
-Arbeitsmethode — siehe unten) plus eine Sonnet-Dreistufer-Dispatch-Palette
-(Implementierung / Mechanik / Deep) sowie Sonnet-Review. `api`/eigene startet
-vom selben Max-Preset — trage die Modellnamen danach direkt in
-`pipeline.user.yaml` ein und führe Setup erneut aus.
+Es gibt keine Abo-Frage und kein Tier-Preset. `pipeline.user.v1` ist die eine
+editierbare Routing-Autorität: jede aktive Route enthält Runner, `alias`- oder
+beobachteten `model-id`-Selector, Effort, Ausfall-Policy und den erforderlichen
+Dispatch-Receipt. Der generierte Claude-Block `modelRouting` bleibt semantisch
+kompatibel zu Shared-Kandidat `654ebaf`; `runnerRoutes` ist die
+providerneutrale Laufzeitprojektion.
 
-**Modelle je Arbeitsmethode routen?** → `pipeline.user.yaml` → `worktypes`.
-Dieser Block ist DIE eine Stelle, an der du Modell/Effort/Advisor für jedes
-der drei Session-Profile (Design-first, Advisor, Speed) festlegst — siehe die
-Kommentare direkt in der Datei.
+**Rollen direkt routen?** → `pipeline.user.yaml` → `routing`. Dieser Block ist
+DIE eine Stelle für Worktype-Phasen und Duties. Bei Codex nutzen Design und
+unabhängiger Critic die beobachtete Bindung `gpt-5.6-sol` mit `xhigh`;
+Implementierung, Goldfish, Mechanik und Deep behalten den Alias `terra` mit
+`xhigh`, bis ein Host-/CLI-Route-Receipt eine konkrete Auflösung beweist. Ein
+Alias — auch ein von einem Agent gemeldeter Modellname — ist keine Attestierung.
 
 Vor jedem Write legst du das ignorierte Private Overlay
 `.pipeline/private-overlay.yaml` an. Es enthält nur die unveränderliche
@@ -180,8 +183,10 @@ kompiliert die Laufzeit-Configs und projiziert das generische öffentliche
 Marketplace-Binding.
 
 **Nicht-interaktiver Weg:** `node setup.mjs --defaults` schreibt die
-konservativen Defaults ohne Rückfragen — nützlich für einen ersten Trockenlauf
-oder eine CI-Prüfung.
+konservativen Direct-Route-Defaults ohne Rückfragen — nützlich für einen ersten
+Trockenlauf oder eine CI-Prüfung. Eine Pre-v1-Datei wird vorher als sichtbare
+`v0 → v1`-Migration angekündigt; sie zählt nicht still als v1, bevor die
+vollständige v1-Source validiert.
 
 **Später umentschieden?** `pipeline.user.yaml` von Hand bearbeiten und
 `node setup.mjs` erneut ausführen — es ist driftsicher: sauber neu kompilierbare
@@ -250,7 +255,7 @@ zum Brainstorming einer soliden Anforderung, bevor sie in die Pipeline geht
 |---|---|---|
 | `.claude/settings.json` | gegebenenfalls nur `autonomy` | Claude Code selbst — Plugin-Aktivierung, generisches öffentliches Marketplace-Binding, Permissions, Status-Zeile; keine Owner-, Account- oder Maschinenkoordinaten |
 | `.claude/pipeline.json` | `autonomy`, `gates` | Projekt-Kalibrierung — der Bootstrap-Check sowie die Skills `pipeline-start`/`close-block` |
-| `.claude/pipeline.yaml` | `worktypes`, `models`, `gates`, `autonomy` | die deklarative Manifest-Schicht — die PreToolUse-Guard-Hooks (`guard-devplan`, `guard-push`), der `stop-suggest`-Stop-Hook (Vorschlag der nächsten Phase + Kontext-Budget-Warnungen) sowie Modell-Routing; validiert über `harness/scripts/validate-manifest.mjs` |
+| `.claude/pipeline.yaml` | `routing`, `gates`, `autonomy` | die deklarative Manifest-Schicht — die PreToolUse-Guard-Hooks (`guard-devplan`, `guard-push`), der `stop-suggest`-Stop-Hook (Vorschlag der nächsten Phase + Kontext-Budget-Warnungen), Claude-kompatibles `modelRouting` und providerneutrale `runnerRoutes`; validiert über `harness/scripts/validate-manifest.mjs` |
 
 Jede kompilierte Datei trägt einen `GENERATED from pipeline.user.yaml`-Marker,
 damit ein erneuter Lauf einen veralteten Kompilat-Stand von einem echten

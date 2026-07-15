@@ -4,8 +4,8 @@
   "verify": "node harness/scripts/verify.mjs",
   "$verify": "THE one gate command (E5) of this docs+guardrails repo: the verify wrapper (harness/scripts/verify.mjs, AC-G4-2) runs the full guard-family test set (guard-git.test.mjs: 1 block + 1 allow case per deny rule, quote-stripping, segment scoping, guard-config, override, global-option-normalization cases; guard-testpath.test.mjs: test-path PreToolUse guard cases) and writes a machine-generated JSON evidence artifact (evidence/verify-latest.json, schema pipeline.verify-evidence.v0, git-ignored — QG-03).",
   "handover": "docs/state.md",
-  "autonomy": "standing-approved",
-  "branchModel": "direct-main",
+  "autonomy": "gated",
+  "branchModel": "feature-branch",
   "verification": "docs+tests",
   "wipLimit": 1,
   "worktree": "optional",
@@ -19,5 +19,6 @@
     "close.pre": [
       "node harness/scripts/check-claude-md-lines.mjs"
     ]
-  }
+  },
+  "$generated": "GENERATED from pipeline.user.yaml — edit there, then re-run setup (sourceHash: f50333e44648b6ee)"
 }

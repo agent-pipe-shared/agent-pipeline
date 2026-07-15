@@ -2,19 +2,26 @@
 import {
   ROUTING_AUTHORITY,
   projectAgentFrontmatter,
+  projectClaudeManifestRouting,
+  projectDirectRoutingDefaults,
   projectHostDuty,
   projectManifestRouting,
   projectPreset,
   projectRunnerAssignment,
+  projectRunnerRoutes,
   resolveRunnerAlias,
   routingProvenance,
+  validateDirectRoute,
+  validateDirectRouting,
 } from "../lib/routing-projection.mjs";
 import {
   checkCodexPartialMappingContract,
   checkCodexNormalCriticDuty,
   checkRepository,
+  directManifestProjectionMatches,
   hasCurrentProvenance,
   manifestProjectionMatches,
+  runnerRouteProjectionMatches,
 } from "./check-routing-projections.mjs";
 
 let passed = 0;
@@ -97,6 +104,40 @@ check("RP21 pro preset remains projectable", projectPreset("pro", "claude").mode
 const designAdvisor = structuredClone(max.worktypes);
 designAdvisor.design.advisor = "opus";
 check("RP22 valid custom design advisor is projected", projectManifestRouting(designAdvisor, max.models).advisor_design.effort === "not-applicable");
+
+const direct = projectDirectRoutingDefaults();
+check("RP23 direct v1 defaults validate as the sole source", validateDirectRouting(direct).ok);
+check("RP24 direct Claude projection preserves the legacy modelRouting shape", directManifestProjectionMatches(projectClaudeManifestRouting(direct), direct));
+const runnerRoutes = projectRunnerRoutes(direct);
+check("RP25 all direct routes project deterministically", runnerRouteProjectionMatches(runnerRoutes, direct));
+check("RP26 Codex design and Critic request observed Sol/xhigh", runnerRoutes.duty_codex_design.selector.value === "gpt-5.6-sol" && runnerRoutes.duty_codex_design.effort === "xhigh" && runnerRoutes.duty_codex_independent_critic.selector.value === "gpt-5.6-sol");
+check("RP27 Codex implementation remains unresolved Terra alias", runnerRoutes.duty_codex_implementation.selector.kind === "alias" && runnerRoutes.duty_codex_implementation.selector.value === "terra" && runnerRoutes.duty_codex_implementation.resolutionStatus === "unresolved-alias");
+check("RP28 unobserved concrete Codex IDs fail closed", !validateDirectRoute({ ...direct.duties.codex_implementation, selector: { kind: "model-id", value: "invented-id" } }).ok);
+const directWithAdvisorOff = structuredClone(direct);
+directWithAdvisorOff.worktypes.feature.advisor = "off";
+check("RP29 any advisory route may be deliberately disabled", validateDirectRouting(directWithAdvisorOff).ok);
+const directWithWrongRunner = structuredClone(direct);
+directWithWrongRunner.worktypes.design.design_phase.runner = "codex";
+check("RP30 cross-runner worktype substitution fails closed before P5", !validateDirectRouting(directWithWrongRunner).ok);
+
+// This is the fixed Claude projection from Shared candidate 654ebaf. It is
+// intentionally a test fixture, never a second editable routing authority:
+// v1 must keep this compatibility projection semantically identical.
+const CLAUDE_654EBAF_MODEL_ROUTING = Object.freeze({
+  elephant_design_design: { model: "opus", effort: "high" },
+  elephant_design_execution: { model: "opus", effort: "high" },
+  elephant_feature_design: { model: "opus", effort: "high" },
+  elephant_feature_execution: { model: "sonnet-5", effort: "high" },
+  advisor_feature: { model: "opus", effort: "not-applicable" },
+  elephant_mini_design: { model: "sonnet-5", effort: "high" },
+  elephant_mini_execution: { model: "sonnet-5", effort: "high" },
+  advisor_mini: { model: "opus", effort: "not-applicable" },
+  goldfish: { model: "sonnet-5", effort: "medium" },
+  goldfish_mechanic: { model: "sonnet-5", effort: "low" },
+  goldfish_deep: { model: "sonnet-5", effort: "xhigh" },
+  critic: { model: "sonnet-5", effort: "max" },
+});
+check("RP31 direct v1 Claude projection is semantically identical to Shared 654ebaf", JSON.stringify(projectClaudeManifestRouting(direct)) === JSON.stringify(CLAUDE_654EBAF_MODEL_ROUTING));
 
 console.log(`\n${passed}/${passed + failed} checks passed.`);
 process.exit(failed === 0 ? 0 : 1);

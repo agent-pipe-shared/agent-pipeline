@@ -1,7 +1,6 @@
-# pipeline.yaml -- declarative pipeline manifest for THIS repo.
-# ADDITIVE to .claude/pipeline.json (project calibration) -- disjoint field sets, see
-# plugins/pipeline-core/lib/manifest.mjs file header for the dedup confirmation.
-# Schema: pipeline.manifest.v0 (plugins/pipeline-core/scripts/pipeline-manifest.schema.json).
+# pipeline.yaml -- declarative pipeline manifest (.claude/pipeline.yaml, schema pipeline.manifest.v0).
+# GENERATED from pipeline.user.yaml — edit there, then re-run setup (sourceHash: f50333e44648b6ee)
+# ADDITIVE to .claude/pipeline.json (project calibration) -- disjoint field sets.
 # Validate with: node harness/scripts/validate-manifest.mjs
 
 schema: pipeline.manifest.v0
@@ -9,8 +8,6 @@ schema: pipeline.manifest.v0
 language:
   human_facing: en
 
-# This repo is docs+guardrails only (no live UI) -- ui-design stays declared but its
-# condition keeps it inactive until flags.has_ui below flips true for a project that has one.
 phases:
   - name: design
     enabled: true
@@ -22,10 +19,6 @@ phases:
     enabled: true
     condition: has_ui
 
-# Exactly 2 blocking human gates (dev-plan, push) plus 1 blocking automated gate
-# (security) -- the PO's tuning directive. push carries a standing
-# approval (ADR-0017 precedent: the PO is PO/CEO, not a developer -- pushing main at
-# work-package boundaries is pre-approved, never a per-push live human touch).
 gates:
   dev-plan:
     mode: blocking
@@ -33,7 +26,7 @@ gates:
   push:
     mode: blocking
     type: human
-    approval: standing-approved # ADR-0017
+    approval: required
   security:
     mode: blocking
     type: automated
@@ -49,7 +42,7 @@ security:
       rules_dir: governance/examples/policies/semgrep
 
 modelRouting:
-  # Generated projection: authority=8f8bf30ba1d4793d mappings=9077223aa1c997c9 runner=claude source=pipeline.user.yaml.
+  # Generated Claude compatibility projection: authority=c766843a940a2546 mappings=56454ba88cef14b6 runner=claude source=pipeline.user.yaml routing.v1.
   # Do not edit this block as an independent routing authority.
   elephant_design_design:
     model: opus
@@ -87,6 +80,174 @@ modelRouting:
   critic:
     model: sonnet-5
     effort: max
+
+runnerRoutes:
+  # Generated provider-neutral projection: authority=c766843a940a2546 mappings=56454ba88cef14b6 runner=codex source=pipeline.user.yaml routing.v1.
+  # Alias resolution is not provider/model attestation; only a valid route receipt can attest it.
+  worktype_design_design_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_design_execution_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_feature_design_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_feature_execution_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: sonnet
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_feature_advisor:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: not-applicable
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_mini_design_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: sonnet
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_mini_execution_phase:
+    runner: claude
+    selector:
+      kind: alias
+      value: sonnet
+    effort: high
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  worktype_mini_advisor:
+    runner: claude
+    selector:
+      kind: alias
+      value: opus
+    effort: not-applicable
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  duty_implement:
+    runner: claude
+    selector:
+      kind: alias
+      value: sonnet
+    effort: medium
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  duty_mechanic:
+    runner: claude
+    selector:
+      kind: alias
+      value: sonnet
+    effort: low
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  duty_deep:
+    runner: claude
+    selector:
+      kind: alias
+      value: sonnet
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  duty_review:
+    runner: claude
+    selector:
+      kind: alias
+      value: sonnet
+    effort: max
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: runner-alias
+  duty_codex_design:
+    runner: codex
+    selector:
+      kind: model-id
+      value: gpt-5.6-sol
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: observed-model-id
+    resolutionEvidence: project-codex-binding
+  duty_codex_independent_critic:
+    runner: codex
+    selector:
+      kind: model-id
+      value: gpt-5.6-sol
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: observed-model-id
+    resolutionEvidence: project-codex-binding
+  duty_codex_implementation:
+    runner: codex
+    selector:
+      kind: alias
+      value: terra
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: unresolved-alias
+  duty_codex_goldfish:
+    runner: codex
+    selector:
+      kind: alias
+      value: terra
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: unresolved-alias
+  duty_codex_mechanic:
+    runner: codex
+    selector:
+      kind: alias
+      value: terra
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: unresolved-alias
+  duty_codex_deep:
+    runner: codex
+    selector:
+      kind: alias
+      value: terra
+    effort: xhigh
+    unavailability: defer
+    evidenceRequirement: dispatch-receipt
+    resolutionStatus: unresolved-alias
 
 profiles:
   active: full-sdlc

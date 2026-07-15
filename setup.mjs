@@ -66,7 +66,7 @@
  * change between the two runs). See DoD "second run idempotent".
  *
  * QUESTIONS: interactive setup asks only public, portable intent (runtime, setup intent,
- * language, subscription-tier model preset, autonomy preset). `--defaults` uses deterministic
+ * language, direct role/worktype routes, autonomy preset). `--defaults` uses deterministic
  * public defaults and never inspects repository, account, marketplace, or machine identity.
  *
  * USAGE:
@@ -95,7 +95,17 @@ import { pathToFileURL } from "node:url";
 import { parseYaml, YamlLiteError } from "./plugins/pipeline-core/lib/yaml-lite.mjs";
 import { validateAgainstSchema } from "./plugins/pipeline-core/lib/schema-lite.mjs";
 import { loadPolicyLock, resolveHumanFacingLanguage, validateManifest } from "./plugins/pipeline-core/lib/manifest.mjs";
-import { projectManifestRouting, projectPreset, routingProvenance } from "./plugins/pipeline-core/lib/routing-projection.mjs";
+import {
+  migrateLegacyRouting,
+  projectClaudeManifestRouting,
+  projectClaudeRouteInputs,
+  projectDirectRoutingDefaults,
+  projectManifestRouting,
+  projectPreset,
+  projectRunnerRoutes,
+  routingProvenance,
+  validateDirectRouting,
+} from "./plugins/pipeline-core/lib/routing-projection.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const ROOT_DIR = SCRIPT_DIR; // setup.mjs lives at the export root -- resolve relative
@@ -142,15 +152,17 @@ export const MIGRATED_AGENTS_DIRTY_TRANSITION = Object.freeze({ additions: 9, de
 
 // ---- default answers (== the committed pipeline.user.yaml template's values) -----------------
 export function buildDefaultAnswers() {
-  const routing = projectPreset("max", "claude");
+  const directRouting = projectDirectRoutingDefaults();
+  const legacyProjection = projectClaudeRouteInputs(directRouting);
   return {
+    schema: "pipeline.user.v1",
     setup: { intent: "unconfigured" },
     language: { human_facing: "en", agent_facing: "en" },
     agent_runtime: "claude-code",
-    // worktypes = THE place to route models per work method (the three session profiles:
-    // design-first/advisor/speed) -- the orchestrator's own routing. models below stays the
-    // dispatch-tier palette only (mechanic/implement/deep, plus critic's review).
-    ...routing,
+    // `routing` is the sole editable v1 source. These two values are derived
+    // compatibility projections for the still-stable Claude manifest only.
+    routing: directRouting,
+    ...legacyProjection,
     autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
     gates: { dev_plan: "blocking", push: "blocking", security: "blocking", claude_md_max_lines: 200 },
   };
@@ -287,13 +299,10 @@ export function migrateAgentsAdapter(rootDir = ROOT_DIR, deps = {}) {
   return { ok: false, status: "manual-po-gate", writes: 0 };
 }
 
-// ---- subscription-tier / autonomy presets (pure) -----------------------------------------------
+// ---- legacy-v0 migration / autonomy helpers (pure) ----------------------------------------------
 /**
- * @param {string} tier - "pro" | "max" | anything else ("api"/custom: uses the Max preset as a
- *   starting point)
- * @returns {{worktypes: object, models: object}} both preset-filled blocks -- worktypes carries
- *   the orchestrator/session-profile routing, models the dispatch-tier palette (see
- *   buildDefaultAnswers() for the shape).
+ * Legacy-v0 migration compatibility only. Interactive setup never calls this
+ * function and never asks a subscription question.
  */
 export function applyAboPreset(tier) {
   return projectPreset(tier === "pro" ? "pro" : "max", "claude");
@@ -307,20 +316,8 @@ export function applyAutonomyPreset(preset) {
 }
 
 /**
- * Resolves worktypes/models/autonomy for a (re-)run, given the raw subscription-tier and
- * autonomy-preset CLI answers plus the previously-parsed pipeline.user.yaml (or
- * buildDefaultAnswers() on a fresh install). RE-RUN SAFETY (Critic finding #2, 2026-07-10):
- * pressing Enter (empty answer, "") on EITHER question KEEPS the corresponding previous.*
- * values untouched -- a fresh preset is applied ONLY when the operator types an explicit
- * tier/preset, the deliberate override. Before this fix, promptAnswers() derived worktypes/
- * models/autonomy ONLY from applyAboPreset()/applyAutonomyPreset() and never consulted
- * `previous`, so pressing Enter through a re-run silently replaced a personalized routing
- * with the generic preset. On a fresh install `previous` already equals buildDefaultAnswers(),
- * which in turn equals applyAboPreset("max") (see the "matches buildDefaultAnswers()" test) --
- * so this is a no-op behaviour change for first-time setup.
- * @param {string} aboIn - raw (trimmed, lowercased) subscription-tier answer, "" = keep
- * @param {string} autonomyIn - raw (trimmed, lowercased) autonomy-preset answer, "" = keep
- * @param {object} previous - answersFromParsed(...) result (existing personalization or defaults)
+ * Legacy-v0 test/migration compatibility for the former subscription preset
+ * flow. New configuration and interactive setup use only v1 direct routes.
  */
 export function resolveRoutingAnswers(aboIn, autonomyIn, previous) {
   let worktypes;
@@ -362,11 +359,38 @@ export function validateHumanFacingLanguage(value) {
     : { ok: false, reason: "language.human_facing must be an explicit supported value (de or en)" };
 }
 
-/** Renders an advisor field: "off" gets quoted (a deliberate string sentinel, not a YAML
- * literal off-state -- yaml-lite has no bool coercion for it, but the quoting stays for human
- * readability/parity with the PRD's authoritative example); a model name renders bare. */
-function renderAdvisor(value) {
-  return value === "off" ? `"off"` : value;
+function renderDirectRoute(lines, indent, route) {
+  lines.push(`${indent}runner: ${route.runner}`);
+  lines.push(`${indent}selector:`);
+  lines.push(`${indent}  kind: ${route.selector.kind}`);
+  lines.push(`${indent}  value: ${route.selector.value}`);
+  lines.push(`${indent}effort: ${route.effort}`);
+  lines.push(`${indent}unavailability: ${route.unavailability}`);
+  lines.push(`${indent}evidenceRequirement: ${route.evidenceRequirement}`);
+}
+
+/** Render the single editable v1 routing authority. */
+export function renderDirectRoutingYaml(routing) {
+  const checked = validateDirectRouting(routing);
+  if (!checked.ok) throw new Error(`invalid direct routing: ${checked.errors.join(", ")}`);
+  const lines = ["routing:", "  worktypes:"];
+  for (const [profile, worktype] of Object.entries(routing.worktypes)) {
+    lines.push(`    ${profile}:`);
+    for (const phase of ["design_phase", "execution_phase", "advisor"]) {
+      const route = worktype[phase];
+      if (route === "off") lines.push(`      ${phase}: "off"`);
+      else {
+        lines.push(`      ${phase}:`);
+        renderDirectRoute(lines, "        ", route);
+      }
+    }
+  }
+  lines.push("  duties:");
+  for (const [duty, route] of Object.entries(routing.duties)) {
+    lines.push(`    ${duty}:`);
+    renderDirectRoute(lines, "      ", route);
+  }
+  return lines.join("\n");
 }
 
 // ---- pipeline.user.yaml: render + parse + validate ---------------------------------------------
@@ -389,6 +413,8 @@ export function renderUserYaml(answers) {
 # \`setup-check.mjs\` recognizes this unconfigured state. Personal coordinates and
 # credentials belong only in ignored machine-local mapping, never in Public Core.
 
+schema: ${a.schema}
+
 setup:
   intent: ${a.setup.intent}                  # unconfigured | consumer | maintainer
 
@@ -399,54 +425,12 @@ language:
 
 agent_runtime: ${a.agent_runtime}          # claude-code (full enforcement) | other (methodology only → docs/runtime-boundary.md)
 
-# setup.mjs asks your subscription tier and writes matching presets for both blocks
-# below (worktypes = orchestrator/session-profile routing, models = dispatch-tier routing):
-#   Pro:  all sonnet, effort-tiered (methodology fully usable)
-#   Max:  opus orchestrator + sonnet dispatch tiers (recommended, default below)
-#   API/custom: enter names freely (setup.mjs pre-fills with the Max preset as a starting point)
-#
-# THE place to route models per work method (= the three session profiles: design-first,
-# advisor, speed). Bugfix rule: a mini-scoped bugfix runs as \`mini\`; anything larger runs
-# as \`feature\` (QG-07 repro-first applies either way).
-worktypes:
-  design:                           # profile design-first -- features with a real design phase
-    design_phase:
-      model: ${a.worktypes.design.design_phase.model}
-      effort: ${a.worktypes.design.design_phase.effort}   # orchestrator until plan approval
-    execution_phase:
-      model: ${a.worktypes.design.execution_phase.model}
-      effort: ${a.worktypes.design.execution_phase.effort} # orchestrator after approval
-    advisor: ${renderAdvisor(a.worktypes.design.advisor)}
-  feature:                          # profile advisor -- the everyday method
-    design_phase:
-      model: ${a.worktypes.feature.design_phase.model}
-      effort: ${a.worktypes.feature.design_phase.effort}  # Opus designs; Sonnet executes below (phases differ)
-    execution_phase:
-      model: ${a.worktypes.feature.execution_phase.model}
-      effort: ${a.worktypes.feature.execution_phase.effort}
-    advisor: ${renderAdvisor(a.worktypes.feature.advisor)} # "off" | a model name (autonomous preset sets a model here)
-  mini:                             # profile speed -- mini-feature / hotfix
-    design_phase:
-      model: ${a.worktypes.mini.design_phase.model}
-      effort: ${a.worktypes.mini.design_phase.effort}
-    execution_phase:
-      model: ${a.worktypes.mini.execution_phase.model}
-      effort: ${a.worktypes.mini.execution_phase.effort}
-    advisor: ${renderAdvisor(a.worktypes.mini.advisor)}    # fixed pairing (small model orchestrates, bigger advisor watches)
-
-models:                             # dispatch tiers only (MP-27: mechanic/implement/deep, plus critic's review)
-  implement:
-    model: ${a.models.implement.model}
-    effort: ${a.models.implement.effort}
-  mechanic:
-    model: ${a.models.mechanic.model}
-    effort: ${a.models.mechanic.effort}
-  deep:
-    model: ${a.models.deep.model}
-    effort: ${a.models.deep.effort}
-  review:
-    model: ${a.models.review.model}
-    effort: ${a.models.review.effort}
+# Direct v1 route source. Every enabled duty/worktype names its runner surface,
+# selector, effort, unavailability policy and required dispatch evidence. The
+# generated Claude modelRouting and provider-neutral runnerRoutes are projections,
+# never second editable authorities. Codex Terra aliases remain unresolved until
+# a host/CLI route receipt observes a concrete model ID.
+${renderDirectRoutingYaml(a.routing)}
 
 autonomy:
   push_policy: ${a.autonomy.push_policy}                # gated | standing-approved
@@ -497,10 +481,6 @@ gates:
 #   push_policy:  standing-approved
 #   branch_model: direct-main
 #   wip_limit: 1
-#
-# worktypes:
-#   feature:
-#     advisor: opus
 # -----------------------------------------------------------------------------------------
 `;
 }
@@ -527,26 +507,26 @@ export function answersFromParsed(parsed, defaults = buildDefaultAnswers()) {
   if (!parsed || typeof parsed !== "object") return defaults;
   const d = defaults;
   const g = (obj, key, fallback) => (obj && typeof obj === "object" && obj[key] !== undefined ? obj[key] : fallback);
-  const mergeWorktype = (def, val) => ({
-    design_phase: { ...def.design_phase, ...(val?.design_phase ?? {}) },
-    execution_phase: { ...def.execution_phase, ...(val?.execution_phase ?? {}) },
-    advisor: g(val, "advisor", def.advisor),
-  });
+  // v0 had separate editable worktypes/models. Convert it once in memory to
+  // the v1 sole source; setup validates the complete rendered v1 before any
+  // source/runtime write. A v1 document remains structurally intact here so a
+  // malformed source cannot be silently repaired by defaults.
+  const routing = parsed.schema === "pipeline.user.v1" && parsed.routing && typeof parsed.routing === "object"
+    ? parsed.routing
+    : migrateLegacyRouting(parsed.worktypes, parsed.models);
+  let legacyProjection;
+  try {
+    legacyProjection = projectClaudeRouteInputs(routing);
+  } catch {
+    legacyProjection = { worktypes: d.worktypes, models: d.models };
+  }
   return {
+    schema: "pipeline.user.v1",
     setup: { ...d.setup, ...(parsed.setup && typeof parsed.setup === "object" ? parsed.setup : {}) },
     language: { ...d.language, ...(parsed.language && typeof parsed.language === "object" ? parsed.language : {}) },
     agent_runtime: g(parsed, "agent_runtime", d.agent_runtime),
-    worktypes: {
-      design: mergeWorktype(d.worktypes.design, parsed.worktypes?.design),
-      feature: mergeWorktype(d.worktypes.feature, parsed.worktypes?.feature),
-      mini: mergeWorktype(d.worktypes.mini, parsed.worktypes?.mini),
-    },
-    models: {
-      implement: { ...d.models.implement, ...(parsed.models?.implement ?? {}) },
-      mechanic: { ...d.models.mechanic, ...(parsed.models?.mechanic ?? {}) },
-      deep: { ...d.models.deep, ...(parsed.models?.deep ?? {}) },
-      review: { ...d.models.review, ...(parsed.models?.review ?? {}) },
-    },
+    routing,
+    ...legacyProjection,
     autonomy: { ...d.autonomy, ...(parsed.autonomy ?? {}) },
     gates: { ...d.gates, ...(parsed.gates ?? {}) },
     // release: OPTIONAL passthrough only (ADR-0033/0034) -- no default, no merge-over-defaults
@@ -717,6 +697,38 @@ export function renderModelRoutingYaml(worktypes, models) {
   return lines.join("\n");
 }
 
+/** Render both runtime projections from the one v1 direct-routing source. */
+export function renderDirectRoutingProjectionsYaml(routing) {
+  const claudeRouting = projectClaudeManifestRouting(routing);
+  const runnerRoutes = projectRunnerRoutes(routing);
+  const lines = [
+    "modelRouting:",
+    `  # Generated Claude compatibility projection: ${routingProvenance("claude")} source=pipeline.user.yaml routing.v1.`,
+    "  # Do not edit this block as an independent routing authority.",
+  ];
+  for (const [role, assignment] of Object.entries(claudeRouting)) {
+    lines.push(`  ${role}:`);
+    lines.push(`    model: ${assignment.model}`);
+    lines.push(`    effort: ${assignment.effort}`);
+  }
+  lines.push("", "runnerRoutes:");
+  lines.push(`  # Generated provider-neutral projection: ${routingProvenance("codex")} source=pipeline.user.yaml routing.v1.`);
+  lines.push("  # Alias resolution is not provider/model attestation; only a valid route receipt can attest it.");
+  for (const [name, route] of Object.entries(runnerRoutes)) {
+    lines.push(`  ${name}:`);
+    lines.push(`    runner: ${route.runner}`);
+    lines.push("    selector:");
+    lines.push(`      kind: ${route.selector.kind}`);
+    lines.push(`      value: ${route.selector.value}`);
+    lines.push(`    effort: ${route.effort}`);
+    lines.push(`    unavailability: ${route.unavailability}`);
+    lines.push(`    evidenceRequirement: ${route.evidenceRequirement}`);
+    lines.push(`    resolutionStatus: ${route.resolutionStatus}`);
+    if (typeof route.resolutionEvidence === "string") lines.push(`    resolutionEvidence: ${route.resolutionEvidence}`);
+  }
+  return lines.join("\n");
+}
+
 export function renderPipelineYaml(answers, sourceHash) {
   const pushApproval = answers.autonomy.push_policy === "standing-approved" ? "standing-approved" : "required";
   const base = `# pipeline.yaml -- declarative pipeline manifest (.claude/pipeline.yaml, schema pipeline.manifest.v0).
@@ -762,7 +774,7 @@ security:
       enabled: true
       rules_dir: governance/examples/policies/semgrep
 
-${renderModelRoutingYaml(answers.worktypes, answers.models)}
+${renderDirectRoutingProjectionsYaml(answers.routing)}
 
 profiles:
   active: full-sdlc
@@ -826,6 +838,9 @@ export function validatePoFacingLanguageProjection(userYamlText, runtimeYamlText
   const schema = JSON.parse(readFileSync(USER_SCHEMA_PATH, "utf8"));
   const sourceShape = validateAgainstSchema(source, schema);
   if (!sourceShape.valid) return { ok: false, reason: "pipeline.user.yaml is invalid; correct it before PO-facing authoring" };
+  if (!validateDirectRouting(source.routing).ok) {
+    return { ok: false, reason: "pipeline.user.yaml direct routing is invalid; correct it before PO-facing authoring" };
+  }
   const sourceLanguage = validateHumanFacingLanguage(source.language?.human_facing);
   if (!sourceLanguage.ok) return sourceLanguage;
   const runtimeValidation = validateCompiledPipelineYaml(runtimeYamlText, rootDir);
@@ -946,6 +961,33 @@ async function applyCompileDecision({ label, path, existingState, wantedText, so
   return { wrote: false, decision };
 }
 
+async function promptDirectRouting(rl, previous) {
+  const edit = (await rl.question("Edit direct role/worktype routes now? [y/N] ")).trim().toLowerCase();
+  const routing = structuredClone(previous);
+  if (!['y', 'yes', 'j', 'ja'].includes(edit)) return routing;
+  const routes = [];
+  for (const [profile, worktype] of Object.entries(routing.worktypes)) {
+    for (const phase of ["design_phase", "execution_phase", "advisor"]) {
+      if (worktype[phase] !== "off") routes.push([`worktype ${profile}/${phase}`, worktype, phase]);
+    }
+  }
+  for (const [duty, route] of Object.entries(routing.duties)) routes.push([`duty ${duty}`, routing.duties, duty]);
+  for (const [label, parent, key] of routes) {
+    const route = parent[key];
+    const kind = (await rl.question(`${label} selector kind [alias/model-id] (${route.selector.kind}): `)).trim();
+    const value = (await rl.question(`${label} selector value (${route.selector.value}): `)).trim();
+    const effort = (await rl.question(`${label} effort [low/medium/high/xhigh/max] (${route.effort}): `)).trim();
+    const unavailability = (await rl.question(`${label} when unavailable [defer/mapped-fallback] (${route.unavailability}): `)).trim();
+    parent[key] = {
+      ...route,
+      selector: { kind: kind || route.selector.kind, value: value || route.selector.value },
+      effort: effort || route.effort,
+      unavailability: unavailability || route.unavailability,
+    };
+  }
+  return routing;
+}
+
 async function promptAnswers(rl, previous) {
   console.log("\n=== Agent-Pipeline Setup ===\n");
 
@@ -963,28 +1005,21 @@ async function promptAnswers(rl, previous) {
   const humanIn = (await rl.question(`Language -- human-facing (commits/reviews/new docs) [de/en] (${previous.language.human_facing}): `)).trim();
   const agentIn = (await rl.question(`Language -- agent-facing (roles/guardrails/skills) [de/en] (${previous.language.agent_facing}): `)).trim();
 
-  const aboIn = (
-    await rl.question(
-      `Subscription tier -- press Enter to KEEP your current worktypes/models routing, or type pro/max/api to re-pick a preset (overwrites routing): `,
-    )
-  ).trim().toLowerCase();
-  if (aboIn !== "" && aboIn !== "pro" && aboIn !== "max") {
-    console.log(
-      "  API/custom chosen: models pre-filled with the Max preset -- enter your own model names/effort values directly in pipeline.user.yaml and re-run `node setup.mjs` afterwards.",
-    );
-  }
-
   const autonomyIn = (
     await rl.question(
       `Autonomy preset -- press Enter to KEEP your current autonomy setting, or type conservative/autonomous to re-pick a preset (overwrites it): `,
     )
   ).trim().toLowerCase();
-  const { worktypes, models, autonomy } = resolveRoutingAnswers(aboIn, autonomyIn, previous);
+  const routing = await promptDirectRouting(rl, previous.routing);
+  const { worktypes, models } = projectClaudeRouteInputs(routing);
+  const autonomy = autonomyIn === "" ? previous.autonomy : applyAutonomyPreset(autonomyIn);
 
   return {
+    schema: "pipeline.user.v1",
     setup: { intent },
     language: { human_facing: humanIn ? normalizeLang(humanIn) : previous.language.human_facing, agent_facing: agentIn ? normalizeLang(agentIn) : previous.language.agent_facing },
     agent_runtime,
+    routing,
     worktypes,
     models,
     autonomy,
@@ -1056,11 +1091,21 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
 
   const defaults = buildDefaultAnswers();
   const { raw: existingUserYamlRaw, parsed: existingUserYamlParsed } = loadUserYamlSafe(userYamlPath);
+  const needsV1Migration = existingUserYamlRaw !== null && existingUserYamlParsed?.schema !== "pipeline.user.v1";
   if (existingUserYamlRaw !== null) {
     const sourceLanguage = validateHumanFacingLanguage(existingUserYamlParsed?.language?.human_facing);
     if (!sourceLanguage.ok) {
       console.error(`setup.mjs: ${sourceLanguage.reason}; correct pipeline.user.yaml before compiling.`);
       return 1;
+    }
+    if (existingUserYamlParsed?.schema === "pipeline.user.v1") {
+      const sourceSchema = JSON.parse(readFileSync(USER_SCHEMA_PATH, "utf8"));
+      const sourceShape = validateAgainstSchema(existingUserYamlParsed, sourceSchema);
+      const sourceRouting = validateDirectRouting(existingUserYamlParsed.routing);
+      if (!sourceShape.valid || !sourceRouting.ok) {
+        console.error("setup.mjs: pipeline.user.v1 is invalid; correct it before compiling. No files were written.");
+        return 1;
+      }
     }
   }
   const previous = answersFromParsed(existingUserYamlParsed, defaults);
@@ -1070,9 +1115,12 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
   if (opts.defaults) {
     // Non-interactive setup has no environment-derived inputs: it writes deterministic public
     // defaults only. Account and machine mapping is intentionally out of scope.
+    const routing = needsV1Migration ? previous.routing : defaults.routing;
     answers = {
       ...defaults,
-      setup: { intent: "consumer" },
+      routing,
+      ...projectClaudeRouteInputs(routing),
+      setup: defaults.setup,
       // release: carried over from the existing pipeline.user.yaml, if any -- `--defaults`
       // resets the five interactive answers, never a hand-edited release: section (ADR-0033/0034).
       ...(previous.release !== undefined ? { release: previous.release } : {}),
@@ -1105,10 +1153,12 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
   }
   const schema = JSON.parse(readFileSync(USER_SCHEMA_PATH, "utf8"));
   const { valid, errors } = validateAgainstSchema(parsedForValidation, schema);
-  if (!valid) {
+  const directRouting = validateDirectRouting(answers.routing);
+  if (!valid || !directRouting.ok) {
     if (rl) rl.close();
     console.error("setup.mjs: internal error -- generated pipeline.user.yaml failed schema validation:");
     for (const e of errors) console.error(`  ${e}`);
+    for (const e of directRouting.errors ?? []) console.error(`  routing: ${e}`);
     return 1;
   }
 
@@ -1140,6 +1190,7 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
   }
 
   if (existingUserYamlRaw !== userYamlText) {
+    if (needsV1Migration) console.log("Migration preview: pipeline.user.v0 -> pipeline.user.v1 direct routes (Claude projection preserved; Codex aliases remain receipt-bound).");
     writeFileSync(userYamlPath, userYamlText);
     console.log("pipeline.user.yaml written.");
   } else {

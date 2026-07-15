@@ -97,6 +97,32 @@
         }
       }
     },
+    "runnerRoutes": {
+      "type": "object",
+      "description": "Generated provider-neutral route projection. Alias resolution is a request state, never model attestation.",
+      "additionalProperties": {
+        "type": "object",
+        "required": ["runner", "selector", "effort", "unavailability", "evidenceRequirement", "resolutionStatus"],
+        "additionalProperties": false,
+        "properties": {
+          "runner": { "type": "string", "enum": ["claude", "codex"] },
+          "selector": {
+            "type": "object",
+            "required": ["kind", "value"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "type": "string", "enum": ["alias", "model-id"] },
+              "value": { "type": "string" }
+            }
+          },
+          "effort": { "type": "string", "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] },
+          "unavailability": { "type": "string", "enum": ["defer", "mapped-fallback"] },
+          "evidenceRequirement": { "type": "string", "enum": ["dispatch-receipt"] },
+          "resolutionStatus": { "type": "string", "enum": ["runner-alias", "observed-model-id", "unresolved-alias", "unresolved-model-id"] },
+          "resolutionEvidence": { "type": "string" }
+        }
+      }
+    },
     "profiles": {
       "type": "object",
       "required": ["active"],

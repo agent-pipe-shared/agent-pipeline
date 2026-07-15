@@ -6,12 +6,16 @@ import { fileURLToPath } from "node:url";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import {
   ROUTING_AUTHORITY,
+  projectClaudeManifestRouting,
+  projectDirectRoutingDefaults,
   projectAgentFrontmatter,
   projectHostDuty,
   projectManifestRouting,
   projectRunnerAssignment,
+  projectRunnerRoutes,
   resolveRunnerAlias,
   routingProvenance,
+  validateDirectRouting,
 } from "../lib/routing-projection.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -23,6 +27,14 @@ function same(left, right) {
 
 export function manifestProjectionMatches(actual, worktypes, models) {
   return same(actual, projectManifestRouting(worktypes, models));
+}
+
+export function directManifestProjectionMatches(actual, routing) {
+  return same(actual, projectClaudeManifestRouting(routing));
+}
+
+export function runnerRouteProjectionMatches(actual, routing) {
+  return same(actual, projectRunnerRoutes(routing));
 }
 
 export function hasCurrentProvenance(text, runner = "claude") {
@@ -39,13 +51,15 @@ function frontmatterValue(text, key) {
 export function checkRepository(root = DEFAULT_ROOT) {
   const findings = [];
   const user = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
-  if (!user.worktypes || typeof user.worktypes !== "object") findings.push("pipeline.user.yaml worktypes missing");
-  if (!user.models || typeof user.models !== "object") findings.push("pipeline.user.yaml models missing");
+  if (user.schema !== "pipeline.user.v1") findings.push("pipeline.user.yaml v1 schema missing");
+  const direct = validateDirectRouting(user.routing);
+  if (!direct.ok) findings.push("pipeline.user.yaml direct routing invalid");
 
   const manifestText = readFileSync(join(root, ".claude", "pipeline.yaml"), "utf8");
   const manifest = parseYaml(manifestText);
-  if (!manifestProjectionMatches(manifest.modelRouting, user.worktypes, user.models)) findings.push(".claude/pipeline.yaml modelRouting drift");
-  if (!hasCurrentProvenance(manifestText)) findings.push(".claude/pipeline.yaml routing provenance drift");
+  if (direct.ok && !directManifestProjectionMatches(manifest.modelRouting, user.routing)) findings.push(".claude/pipeline.yaml Claude modelRouting drift");
+  if (direct.ok && !runnerRouteProjectionMatches(manifest.runnerRoutes, user.routing)) findings.push(".claude/pipeline.yaml runnerRoutes drift");
+  if (!hasCurrentProvenance(manifestText, "claude") || !hasCurrentProvenance(manifestText, "codex")) findings.push(".claude/pipeline.yaml routing provenance drift");
 
   for (const [path, assignment] of Object.entries(projectAgentFrontmatter())) {
     const text = readFileSync(join(root, path), "utf8");
@@ -106,5 +120,5 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
     for (const finding of findings) console.error(`FAIL ${finding}`);
     process.exit(2);
   }
-  console.log("Claude routing projections current; Codex Fable keeps its effort and the host-native criticNormal duty resolves to gpt-5.6-sol/xhigh.");
+  console.log("Direct v1 routing projections current; Claude compatibility is stable and Codex Terra remains an unresolved alias until a route receipt attests it.");
 }

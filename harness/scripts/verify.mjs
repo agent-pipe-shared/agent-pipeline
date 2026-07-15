@@ -54,6 +54,7 @@ const TEST_SUITES = [
   { name: "setup-tests", file: join(repoRoot, "setup.test.mjs") },
   { name: "routing-projection-tests", file: join(pluginScriptsDir, "check-routing-projections.test.mjs") },
   { name: "routing-projection-check", file: join(pluginScriptsDir, "check-routing-projections.mjs") },
+  { name: "route-receipt-tests", file: join(libDir, "route-receipt.test.mjs") },
   { name: "repository-freshness-tests", file: join(pluginScriptsDir, "repository-freshness.test.mjs") },
   { name: "critic-bare-tests", file: join(pluginScriptsDir, "critic-bare.test.mjs") },
   { name: "codex-critic-host-tests", file: join(pluginScriptsDir, "codex-critic-host.test.mjs") },

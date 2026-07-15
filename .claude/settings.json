@@ -13,5 +13,6 @@
   },
   "enabledPlugins": {
     "pipeline-core@agent-pipeline": true
-  }
+  },
+  "$generated": "GENERATED from pipeline.user.yaml — edit there, then re-run setup (sourceHash: f50333e44648b6ee)"
 }

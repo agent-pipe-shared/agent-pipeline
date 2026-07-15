@@ -457,17 +457,12 @@ ok("validateHumanFacingLanguage: rejects unsupported source value fail-closed", 
   ok("renderUserYaml: never renders identity or platform coordinates", !text.includes("identity:") && !text.includes("platform:"));
 }
 {
-  // worktypes rendering: "off" quotes as a string sentinel, a model name renders bare.
-  const withAdvisorSet = {
-    ...buildDefaultAnswers(),
-    worktypes: { ...buildDefaultAnswers().worktypes, feature: { ...buildDefaultAnswers().worktypes.feature, advisor: "opus" } },
-  };
+  const withAdvisorSet = buildDefaultAnswers();
   const text = renderUserYaml(withAdvisorSet);
-  ok("renderUserYaml: worktypes block present, above models", text.indexOf("worktypes:") > -1 && text.indexOf("worktypes:") < text.indexOf("models:"));
-  ok("renderUserYaml: worktypes.design.advisor renders as quoted \"off\"", text.includes('advisor: "off"'));
-  ok("renderUserYaml: worktypes.feature.advisor reflects an assigned model name (bare, unquoted)", text.includes("advisor: opus") && !text.includes('advisor: "opus"'));
-  ok("renderUserYaml: models block carries the new deep tier", text.includes("deep:") && text.includes("effort: xhigh"));
-  ok("renderUserYaml: models block no longer carries design/advisor", !/^\s{2}design:/m.test(text.slice(text.indexOf("\nmodels:"))));
+  ok("renderUserYaml: direct routing is the sole top-level source", text.includes("schema: pipeline.user.v1") && text.includes("\nrouting:\n") && !/^worktypes:|^models:/m.test(text));
+  ok("renderUserYaml: disabled design advisor stays an explicit off sentinel", text.includes('advisor: "off"'));
+  ok("renderUserYaml: feature advisor carries a nested direct selector", /advisor:\s*\n\s*runner: claude\s*\n\s*selector:\s*\n\s*kind: alias\s*\n\s*value: opus/.test(text));
+  ok("renderUserYaml: Codex Terra duty carries xhigh without a fabricated ID", /codex_implementation:\s*\n\s*runner: codex\s*\n\s*selector:\s*\n\s*kind: alias\s*\n\s*value: terra\s*\n\s*effort: xhigh/.test(text));
 }
 {
   // release: static commented starter example (ADR-0033/0034) -- always present, entirely
@@ -730,24 +725,25 @@ ok("parseArgv: explicit adapter migration is opt-in, never a normal-setup defaul
 // renderPipelineYaml — contains model-routing + gate values from answers
 // ======================================================================================
 {
+  const routing = structuredClone(buildDefaultAnswers().routing);
+  routing.worktypes.feature.execution_phase = {
+    ...routing.worktypes.feature.execution_phase,
+    selector: { kind: "alias", value: "opus" },
+  };
+  routing.duties.review = {
+    ...routing.duties.review,
+    selector: { kind: "alias", value: "haiku" },
+    effort: "high",
+  };
   const answers = {
     ...buildDefaultAnswers(),
-    worktypes: {
-      ...buildDefaultAnswers().worktypes,
-      feature: { design_phase: { model: "opus", effort: "max" }, execution_phase: { model: "opus", effort: "high" }, advisor: "off" },
-    },
-    models: {
-      implement: { model: "sonnet", effort: "medium" },
-      mechanic: { model: "sonnet", effort: "low" },
-      deep: { model: "sonnet", effort: "xhigh" },
-      review: { model: "haiku", effort: "high" },
-    },
+    routing,
     gates: { dev_plan: "warn", push: "blocking", security: "off", claude_md_max_lines: 200 },
     autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
   };
   const yaml = renderPipelineYaml(answers, "hashGHI");
   ok(
-    "renderPipelineYaml: full feature execution route mirrors worktypes.feature.execution_phase",
+    "renderPipelineYaml: full feature execution route mirrors direct worktype routing",
     /elephant_feature_execution:\s*\n\s*model: opus\s*\n\s*effort: high/.test(yaml),
     yaml,
   );
@@ -756,22 +752,22 @@ ok("parseArgv: explicit adapter migration is opt-in, never a normal-setup defaul
     (yaml.match(/^  elephant_(?:design|feature|mini)_(?:design|execution):$/gm) ?? []).length === 6,
   );
   ok(
-    "renderPipelineYaml: goldfish model-routing mirrors models.implement",
+    "renderPipelineYaml: goldfish model-routing mirrors direct implement duty",
     /goldfish:\s*\n\s*model: sonnet-5\s*\n\s*effort: medium/.test(yaml),
     yaml,
   );
   ok(
-    "renderPipelineYaml: goldfish_mechanic mirrors models.mechanic",
+    "renderPipelineYaml: goldfish_mechanic mirrors direct mechanic duty",
     /goldfish_mechanic:\s*\n\s*model: sonnet-5\s*\n\s*effort: low/.test(yaml),
     yaml,
   );
   ok(
-    "renderPipelineYaml: goldfish_deep mirrors models.deep (MP-27 3-tier completeness)",
+    "renderPipelineYaml: goldfish_deep mirrors direct deep duty (MP-27 3-tier completeness)",
     /goldfish_deep:\s*\n\s*model: sonnet-5\s*\n\s*effort: xhigh/.test(yaml),
     yaml,
   );
   ok(
-    "renderPipelineYaml: critic model-routing mirrors models.review",
+    "renderPipelineYaml: critic model-routing mirrors direct review duty",
     /critic:\s*\n\s*model: haiku\s*\n\s*effort: high/.test(yaml),
     yaml,
   );

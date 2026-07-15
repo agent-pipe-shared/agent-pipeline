@@ -13,6 +13,8 @@
 # `setup-check.mjs` recognizes this unconfigured state. Personal coordinates and
 # credentials belong only in ignored machine-local mapping, never in Public Core.
 
+schema: pipeline.user.v1
+
 setup:
   intent: unconfigured                  # unconfigured | consumer | maintainer
 
@@ -23,54 +25,162 @@ language:
 
 agent_runtime: claude-code          # claude-code (full enforcement) | other (methodology only → docs/runtime-boundary.md)
 
-# setup.mjs asks your subscription tier and writes matching presets for both blocks
-# below (worktypes = orchestrator/session-profile routing, models = dispatch-tier routing):
-#   Pro:  all sonnet, effort-tiered (methodology fully usable)
-#   Max:  opus orchestrator + sonnet dispatch tiers (recommended, default below)
-#   API/custom: enter names freely (setup.mjs pre-fills with the Max preset as a starting point)
-#
-# THE place to route models per work method (= the three session profiles: design-first,
-# advisor, speed). Bugfix rule: a mini-scoped bugfix runs as `mini`; anything larger runs
-# as `feature` (QG-07 repro-first applies either way).
-worktypes:
-  design:                           # profile design-first -- features with a real design phase
-    design_phase:
-      model: opus
-      effort: high   # orchestrator until plan approval
-    execution_phase:
-      model: opus
-      effort: high # orchestrator after approval
-    advisor: "off"
-  feature:                          # profile advisor -- the everyday method
-    design_phase:
-      model: opus
-      effort: high  # Opus designs; Sonnet executes below (phases differ)
-    execution_phase:
-      model: sonnet
-      effort: high
-    advisor: opus # "off" | a model name (autonomous preset sets a model here)
-  mini:                             # profile speed -- mini-feature / hotfix
-    design_phase:
-      model: sonnet
-      effort: high
-    execution_phase:
-      model: sonnet
-      effort: high
-    advisor: opus    # fixed pairing (small model orchestrates, bigger advisor watches)
-
-models:                             # dispatch tiers only (MP-27: mechanic/implement/deep, plus critic's review)
-  implement:
-    model: sonnet
-    effort: medium
-  mechanic:
-    model: sonnet
-    effort: low
-  deep:
-    model: sonnet
-    effort: xhigh
-  review:
-    model: sonnet
-    effort: max
+# Direct v1 route source. Every enabled duty/worktype names its runner surface,
+# selector, effort, unavailability policy and required dispatch evidence. The
+# generated Claude modelRouting and provider-neutral runnerRoutes are projections,
+# never second editable authorities. Codex Terra aliases remain unresolved until
+# a host/CLI route receipt observes a concrete model ID.
+routing:
+  worktypes:
+    design:
+      design_phase:
+        runner: claude
+        selector:
+          kind: alias
+          value: opus
+        effort: high
+        unavailability: defer
+        evidenceRequirement: dispatch-receipt
+      execution_phase:
+        runner: claude
+        selector:
+          kind: alias
+          value: opus
+        effort: high
+        unavailability: defer
+        evidenceRequirement: dispatch-receipt
+      advisor: "off"
+    feature:
+      design_phase:
+        runner: claude
+        selector:
+          kind: alias
+          value: opus
+        effort: high
+        unavailability: defer
+        evidenceRequirement: dispatch-receipt
+      execution_phase:
+        runner: claude
+        selector:
+          kind: alias
+          value: sonnet
+        effort: high
+        unavailability: defer
+        evidenceRequirement: dispatch-receipt
+      advisor:
+        runner: claude
+        selector:
+          kind: alias
+          value: opus
+        effort: not-applicable
+        unavailability: defer
+        evidenceRequirement: dispatch-receipt
+    mini:
+      design_phase:
+        runner: claude
+        selector:
+          kind: alias
+          value: sonnet
+        effort: high
+        unavailability: defer
+        evidenceRequirement: dispatch-receipt
+      execution_phase:
+        runner: claude
+        selector:
+          kind: alias
+          value: sonnet
+        effort: high
+        unavailability: defer
+        evidenceRequirement: dispatch-receipt
+      advisor:
+        runner: claude
+        selector:
+          kind: alias
+          value: opus
+        effort: not-applicable
+        unavailability: defer
+        evidenceRequirement: dispatch-receipt
+  duties:
+    implement:
+      runner: claude
+      selector:
+        kind: alias
+        value: sonnet
+      effort: medium
+      unavailability: defer
+      evidenceRequirement: dispatch-receipt
+    mechanic:
+      runner: claude
+      selector:
+        kind: alias
+        value: sonnet
+      effort: low
+      unavailability: defer
+      evidenceRequirement: dispatch-receipt
+    deep:
+      runner: claude
+      selector:
+        kind: alias
+        value: sonnet
+      effort: xhigh
+      unavailability: defer
+      evidenceRequirement: dispatch-receipt
+    review:
+      runner: claude
+      selector:
+        kind: alias
+        value: sonnet
+      effort: max
+      unavailability: defer
+      evidenceRequirement: dispatch-receipt
+    codex_design:
+      runner: codex
+      selector:
+        kind: model-id
+        value: gpt-5.6-sol
+      effort: xhigh
+      unavailability: defer
+      evidenceRequirement: dispatch-receipt
+    codex_independent_critic:
+      runner: codex
+      selector:
+        kind: model-id
+        value: gpt-5.6-sol
+      effort: xhigh
+      unavailability: defer
+      evidenceRequirement: dispatch-receipt
+    codex_implementation:
+      runner: codex
+      selector:
+        kind: alias
+        value: terra
+      effort: xhigh
+      unavailability: defer
+      evidenceRequirement: dispatch-receipt
+    codex_goldfish:
+      runner: codex
+      selector:
+        kind: alias
+        value: terra
+      effort: xhigh
+      unavailability: defer
+      evidenceRequirement: dispatch-receipt
+    codex_mechanic:
+      runner: codex
+      selector:
+        kind: alias
+        value: terra
+      effort: xhigh
+      unavailability: defer
+      evidenceRequirement: dispatch-receipt
+    codex_deep:
+      runner: codex
+      selector:
+        kind: alias
+        value: terra
+      effort: xhigh
+      unavailability: defer
+      evidenceRequirement: dispatch-receipt
 
 autonomy:
   push_policy: gated                # gated | standing-approved
@@ -121,8 +231,4 @@ gates:
 #   push_policy:  standing-approved
 #   branch_model: direct-main
 #   wip_limit: 1
-#
-# worktypes:
-#   feature:
-#     advisor: opus
 # -----------------------------------------------------------------------------------------
