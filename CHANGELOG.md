@@ -2,6 +2,8 @@
 
 All notable changes to the Agent Pipeline are documented here.
 
+Changelog owns released user-visible delta, not work-in-progress completion.
+
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning per [ADR-0002](docs/adr/0002-versioning-sha-then-semver.md): SHA-based in the early phase — the current commit on `main` is the valid, distributed state; SemVer + tags arrive once the stability phase begins.
 
 ## [Unreleased]

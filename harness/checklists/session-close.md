@@ -18,6 +18,7 @@
 - [ ] CLAUDE.md length gate green: ≤ {{CLAUDE_MD_MAX_LINES}} — growing means consolidating, moving to skills/hooks, or deleting
 - [ ] Memory is mirror only — contradictions corrected in favor of the repo
 - [ ] Authorship check (sub-step 6b — before Learn + measure): session's production diffs enumerated (`git log`/diff stat over the session range); mandatory question answered — "Whose are this session's production diffs?" — every diff maps to a Goldfish/Critic dispatch or the OM §3.3 stage-0 fast path; Elephant-authored diff outside stage-0 → INCIDENT (flag to the PO, note in handover + telemetry), never a retro discussion point
+- [ ] If `publicPushIdentity.mode: required`: final exact-commit Verify plus required privacy/security evidence is green; `ssh -T <sshHostAlias>` readback names the calibrated dedicated account; only the explicit approved feature branch was pushed; a fresh/disposable fetch-back equals the pushed OID. Any failure is recorded as unfinished/blocked — never substitute a main merge, tag, release, force-push or deletion.
 
 ## Learn + measure
 

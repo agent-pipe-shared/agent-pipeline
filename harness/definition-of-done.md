@@ -37,6 +37,8 @@ Copy this block into the task/spec (rigor ≥ 1) or the issue/brief (rigor 0). S
 - [ ] A1 verify green: `{{VERIFY_COMMAND}}` ran the full chain format → lint → typecheck → tests → build; exit code 0
 - [ ] A2 Evidence artifact: written by the script itself (file/log), names command + commit state + exit code — never model-authored prose (reference implementation: this repo's own `{{VERIFY_COMMAND}}` = `harness/scripts/verify.mjs` writes `evidence/verify-latest.json`, schema `pipeline.verify-evidence.v0`, per `guardrails/quality-gates.md` QG-03)
 - [ ] A3 Same-command rule: stop hook, delivery, and CI run exactly `{{VERIFY_COMMAND}}` — one truth for "green"
+- [ ] A3a Lifecycle authority (rigor 1/2 when opted in): exactly one active PRD and Spec plus at most one Result; receipts and archives are non-authoritative; amendments are folded or superseded; bounded machine/human state, Backlog and Changelog retain their declared ownership domains.
+- [ ] A3b Delivery readback (when the calibration requires anonymous public push): final exact-commit Verify/privacy/security evidence, calibrated neutral range identity, dedicated SSH-account readback, approved feature-branch push and fresh fetch-back OID equality are all present. Missing capability means `blocked`, never `done`.
 - [ ] A4 Test integrity: the implementing goldfish changed no tests/checks of its own implementation
 - [ ] A5 Gate honesty: what the chain does NOT check is named next to the evidence (input for B6)
 

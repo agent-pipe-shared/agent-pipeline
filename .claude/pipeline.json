@@ -20,5 +20,15 @@
       "node harness/scripts/check-claude-md-lines.mjs"
     ]
   },
+  "publicPushIdentity": {
+    "schema": "pipeline.public-push-identity.v1",
+    "mode": "required",
+    "repositoryOwner": "agent-pipe-shared",
+    "repositoryName": "agent-pipeline",
+    "sshHostAlias": "github-share",
+    "sshAccount": "agent-pipe-shared",
+    "authorName": "The Agent-Pipeline Contributors",
+    "authorEmail": "301875187+agent-pipe-shared@users.noreply.github.com"
+  },
   "$generated": "GENERATED from pipeline.user.yaml — edit there, then re-run setup (sourceHash: f50333e44648b6ee)"
 }

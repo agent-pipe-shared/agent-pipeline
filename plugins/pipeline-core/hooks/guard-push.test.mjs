@@ -53,6 +53,47 @@ function writeEvidence(dir, relPath, obj) {
   writeFileSync(full, typeof obj === "string" ? obj : JSON.stringify(obj));
 }
 
+function configureAnonymousPublicPush(dir, branch = "feat/v0.3-phase2.6-multi-cli") {
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(
+    join(dir, ".claude", "pipeline.json"),
+    JSON.stringify({
+      publicPushIdentity: {
+        schema: "pipeline.public-push-identity.v1",
+        mode: "required",
+        repositoryOwner: "agent-pipe-shared",
+        repositoryName: "agent-pipeline",
+        sshHostAlias: "github-share",
+        sshAccount: "agent-pipe-shared",
+        authorName: "The Agent-Pipeline Contributors",
+        authorEmail: "301875187+agent-pipe-shared@users.noreply.github.com",
+      },
+    }),
+  );
+  gitAt(dir, "config", "--local", "user.useConfigOnly", "true");
+  gitAt(dir, "config", "--local", "commit.gpgSign", "false");
+  gitAt(dir, "config", "--local", "user.name", "The Agent-Pipeline Contributors");
+  gitAt(dir, "config", "--local", "user.email", "301875187+agent-pipe-shared@users.noreply.github.com");
+  gitAt(dir, "config", "--local", "remote.origin.url", "git@github-share:agent-pipe-shared/agent-pipeline.git");
+  const base = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  gitAt(dir, "update-ref", `refs/remotes/origin/${branch}`, base);
+}
+
+function anonymousCommit(dir, name = "anonymous.txt", message = "anonymous feature") {
+  writeFileSync(join(dir, name), `${message}\n`);
+  gitAt(dir, "add", name);
+  gitAt(dir, "commit", "-q", "-m", message);
+  return gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+}
+
+function prepareAnonymousPublicPush(dir, branch = "feat/v0.3-phase2.6-multi-cli") {
+  configureAnonymousPublicPush(dir, branch);
+  const head = anonymousCommit(dir);
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  return { head, command: `git push origin HEAD:refs/heads/${branch}` };
+}
+
 function runGuard(command, dir, { cwd = dir, projectDir = dir, env = {} } = {}) {
   const res = spawnSync(process.execPath, [GUARD], {
     input: JSON.stringify({ tool_name: "Bash", tool_input: { command } }),
@@ -758,6 +799,67 @@ function deployApprovalState(forArtifact, forEnvironment) {
     WARN,
     { stderrIncludes: ["is semantically invalid", "release section present"] },
   );
+}
+
+// ---- PG26 anonymous-public self-application range -----------------------------------------------
+{
+  const { dir } = freshRepo("anonymous-public-green");
+  const { command } = prepareAnonymousPublicPush(dir);
+  check("PG26a allow  calibrated anonymous feature-branch range", command, dir, ALLOW, { stderrEmpty: true });
+}
+{
+  const { dir } = freshRepo("anonymous-public-personal-author");
+  const { command } = prepareAnonymousPublicPush(dir);
+  gitAt(dir, "config", "--local", "user.name", "Personal Name");
+  gitAt(dir, "config", "--local", "user.email", "personal@example.invalid");
+  anonymousCommit(dir, "personal.txt", "personal author");
+  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26b block  personal Author or Committer in the newly reachable range", command, dir, BLOCK, {
+    stderrIncludes: ["non-neutral Author identity", "non-neutral Committer identity"],
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-trailer");
+  const { command } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "trailer.txt", "privacy\n\nCo-authored-by: Personal <personal@example.invalid>");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26c block  personal/provider trailers and mail in the new range", command, dir, BLOCK, {
+    stderrIncludes: ["forbidden personal/provider/private trailer", "email address"],
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-private-coordinate");
+  const { command } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "private.txt", "privacy\n\nPrivate-Account: account-123");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26d block  private-account trailer in the new range", command, dir, BLOCK, {
+    stderrIncludes: ["forbidden personal/provider/private trailer"],
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-wrong-ssh");
+  const { command } = prepareAnonymousPublicPush(dir);
+  gitAt(dir, "config", "--local", "remote.origin.url", "git@github.com:agent-pipe-shared/agent-pipeline.git");
+  check("PG26e block  a generic or wrong SSH identity path", command, dir, BLOCK, {
+    stderrIncludes: ["calibrated SSH host alias"],
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-signing");
+  const { command } = prepareAnonymousPublicPush(dir);
+  gitAt(dir, "config", "--local", "commit.gpgSign", "true");
+  check("PG26f block  signing-enabled local configuration", command, dir, BLOCK, {
+    stderrIncludes: ["commit.gpgSign"],
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-unfetched-destination");
+  const { command } = prepareAnonymousPublicPush(dir);
+  gitAt(dir, "update-ref", "-d", "refs/remotes/origin/feat/v0.3-phase2.6-multi-cli");
+  check("PG26g block  missing fetched destination range evidence", command, dir, BLOCK, {
+    stderrIncludes: ["fetched destination tracking ref"],
+  });
 }
 
 // ---- Cleanup ----------------------------------------------------------------------------

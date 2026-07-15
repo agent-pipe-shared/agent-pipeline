@@ -8,6 +8,8 @@
 
 The backlog is the only place where improvements, observations, and open questions about the pipeline itself get **versioned** — never left only in a session's chat history (principle P2/§5.1 in [`docs/operating-model.md`](../docs/operating-model.md)). It is the concrete implementation of the feedback loop from [`docs/operating-model.md` §7](../docs/operating-model.md#7-feedback-loop).
 
+Backlog owns unresolved future work, not active task status.
+
 ## Item types
 
 Every item carries exactly one type in the frontmatter field `type`:
