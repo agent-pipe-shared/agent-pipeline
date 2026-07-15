@@ -215,7 +215,7 @@ import {
   writeSync,
 } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
@@ -230,6 +230,15 @@ export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
 export const CONTINUITY_LOCK_STALE_MS = 30_000;
 const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
+const CONTINUITY_RESULT_MAX_BYTES = 1_048_576;
+const FINAL_INTEGRATION_MAX_BYTES = 8_192;
+const POST_RESULT_SENTINEL = "$POST_RESULT_SHA256";
+const NEXT_TRANSITION_KEYS = new Set(["queueHead", "blocker", "resume", "recovery", "decisionTxn", "capacity"]);
+const RESULT_BINDING_KEYS = new Set(["path", "preResultSha256"]);
+const FINAL_ENTRY_KEYS = new Set([
+  "integrationId", "identity", "finalDigest", "finalOutcome", "preResultSha256",
+  "nextTransition", "nextTransitionSha256", "integratedRevision",
+]);
 const CONTINUITY_SUBCOMMANDS = new Set([
   "continuity-init",
   "continuity-cas",
@@ -519,7 +528,7 @@ export function atomicWriteContinuityState(dir, state, lock, deps = {}) {
   try {
     if (!assertContinuityLockOwned(lock)) return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
     fd = openSync(tmp, "wx", 0o600);
-    replaceFdContents(fd, text);
+    (deps.replaceStateFdContents ?? replaceFdContents)(fd, text);
     closeSync(fd);
     fd = undefined;
     if (!assertContinuityLockOwned(lock)) return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
@@ -531,18 +540,14 @@ export function atomicWriteContinuityState(dir, state, lock, deps = {}) {
     }
     return { ok: true, committed: true, code: "PS-CONTINUITY-WRITTEN", directorySyncSupported: synced.supported };
   } catch {
-    if (renamed) {
-      let exact = false;
-      try {
-        exact = readFileSync(target, "utf8") === text;
-      } catch {
-        /* target disposition remains unknown */
+    try {
+      if (readFileSync(target, "utf8") === text) {
+        return { ok: false, committed: true, code: "PS-CONTINUITY-COMMITTED-DURABILITY-UNKNOWN" };
       }
-      return exact
-        ? { ok: false, committed: true, code: "PS-CONTINUITY-COMMITTED-DURABILITY-UNKNOWN" }
-        : { ok: false, committed: null, code: "PS-CONTINUITY-COMMIT-INDETERMINATE" };
-    }
-    return { ok: false, committed: false, code: "PS-CONTINUITY-WRITE-IO" };
+    } catch { /* disposition remains unknown */ }
+    return renamed
+      ? { ok: false, committed: null, code: "PS-CONTINUITY-COMMIT-INDETERMINATE" }
+      : { ok: false, committed: false, code: "PS-CONTINUITY-WRITE-IO" };
   } finally {
     if (fd !== undefined) closeSync(fd);
     if (!renamed) safeUnlink(tmp);
@@ -640,6 +645,552 @@ function exactObjectKeys(value, keys) {
     && Object.keys(value).every((key) => keys.includes(key));
 }
 
+function sha256Bytes(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function sameJson(left, right) {
+  try {
+    return canonicalJson(left) === canonicalJson(right);
+  } catch {
+    return false;
+  }
+}
+
+function canonicalJson(value) {
+  if (value === null) return "null";
+  if (value === true) return "true";
+  if (value === false) return "false";
+  if (typeof value === "number") {
+    if (!Number.isSafeInteger(value)) throw new Error("unsafe number");
+    return String(value);
+  }
+  if (typeof value === "string") {
+    if (!/^[A-Za-z0-9$][A-Za-z0-9._:/$-]{0,511}$/.test(value)) throw new Error("unsafe string");
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value === null || typeof value !== "object") throw new Error("unsupported value");
+  const keys = Object.keys(value).sort();
+  return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+}
+
+/* JSON parser used for the authority block. JSON.parse silently accepts duplicate
+ * keys, so the Result codec owns this small closed parser and records the exact
+ * finalIntegrations token/entry ranges needed for byte-preserving splices. */
+function parseResultJsonStrict(source) {
+  let i = 0;
+  let arrayRange = null;
+  let entryRanges = [];
+  const ws = () => { while (i < source.length && /[ \t\n]/.test(source[i])) i++; };
+  const string = () => {
+    if (source[i] !== '"') throw new Error("string expected");
+    const start = i++;
+    while (i < source.length) {
+      const ch = source[i++];
+      if (ch === '"') return JSON.parse(source.slice(start, i));
+      if (ch === "\\") {
+        const esc = source[i++];
+        if (esc === "u") {
+          if (!/^[a-fA-F0-9]{4}$/.test(source.slice(i, i + 4))) throw new Error("bad escape");
+          i += 4;
+        } else if (!'"\\/bfnrt'.includes(esc ?? "")) throw new Error("bad escape");
+      } else if (ch.charCodeAt(0) < 0x20) throw new Error("control character");
+    }
+    throw new Error("unterminated string");
+  };
+  const value = (path = []) => {
+    ws();
+    if (source[i] === '"') return string();
+    if (source[i] === "{") {
+      i++;
+      const out = {};
+      const seen = new Set();
+      ws();
+      if (source[i] === "}") { i++; return out; }
+      while (true) {
+        ws();
+        const key = string();
+        if (seen.has(key)) throw new Error("duplicate key");
+        seen.add(key);
+        ws();
+        if (source[i++] !== ":") throw new Error("colon expected");
+        ws();
+        const childStart = i;
+        out[key] = value([...path, key]);
+        const childEnd = i;
+        if (path.length === 0 && key === "finalIntegrations") {
+          if (!Array.isArray(out[key])) throw new Error("finalIntegrations must be array");
+          arrayRange = { start: childStart, end: childEnd };
+        }
+        ws();
+        const separator = source[i++];
+        if (separator === "}") return out;
+        if (separator !== ",") throw new Error("comma expected");
+      }
+    }
+    if (source[i] === "[") {
+      const isFinal = path.length === 1 && path[0] === "finalIntegrations";
+      i++;
+      const out = [];
+      const ranges = [];
+      ws();
+      if (source[i] === "]") { i++; if (isFinal) entryRanges = ranges; return out; }
+      while (true) {
+        ws();
+        const start = i;
+        out.push(value([...path, String(out.length)]));
+        const end = i;
+        ranges.push({ start, end });
+        ws();
+        const separator = source[i++];
+        if (separator === "]") { if (isFinal) entryRanges = ranges; return out; }
+        if (separator !== ",") throw new Error("comma expected");
+      }
+    }
+    const tail = source.slice(i);
+    const literal = /^(true|false|null)/.exec(tail);
+    if (literal) {
+      i += literal[0].length;
+      return literal[0] === "true" ? true : literal[0] === "false" ? false : null;
+    }
+    const number = /^-?(?:0|[1-9][0-9]*)(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?/.exec(tail);
+    if (!number) throw new Error("value expected");
+    i += number[0].length;
+    const parsed = Number(number[0]);
+    if (!Number.isFinite(parsed) || (Number.isInteger(parsed) && !Number.isSafeInteger(parsed))) throw new Error("unsafe number");
+    return parsed;
+  };
+  const parsed = value();
+  ws();
+  if (i !== source.length || parsed === null || typeof parsed !== "object" || Array.isArray(parsed)
+    || arrayRange === null) throw new Error("invalid result root");
+  return { parsed, arrayRange, entryRanges };
+}
+
+const POST_RESULT_SENTINEL_PATHS = new Set([
+  "queueHead.dispatch.authorityDigests.resultSha256",
+]);
+
+function sentinelPositionsAreClosed(value, path = []) {
+  if (value === POST_RESULT_SENTINEL) return POST_RESULT_SENTINEL_PATHS.has(path.join("."));
+  if (Array.isArray(value)) {
+    return value.every((child, index) => sentinelPositionsAreClosed(child, [...path, String(index)]));
+  }
+  if (value !== null && typeof value === "object") {
+    return Object.entries(value).every(([key, child]) => sentinelPositionsAreClosed(child, [...path, key]));
+  }
+  return true;
+}
+
+/* A historical Result entry is authority, not an opaque checksum tuple. Rebuild a
+ * complete continuity state at the integrated revision and pass it through the
+ * canonical closed-schema validator. The synthetic Result path is recoverable from
+ * a decision brief when present; all other synthetic fields are fixed and inert. */
+function validHistoricalFinalSemantics(entry) {
+  const nextDispatch = entry.nextTransition?.queueHead?.dispatch ?? null;
+  if (entry.integratedRevision !== entry.identity?.queueRevision + 1
+    || entry.identity?.authorityDigests?.resultSha256 !== entry.preResultSha256
+    || !sentinelPositionsAreClosed(entry.nextTransition)
+    || (nextDispatch !== null
+      && nextDispatch.authorityDigests?.resultSha256 !== POST_RESULT_SENTINEL)
+    || (entry.finalOutcome === "failed" && entry.nextTransition?.blocker === null)) return false;
+  const materialized = replaceSentinel(entry.nextTransition, "0".repeat(64));
+  const resultPath = materialized.blocker?.decisionBrief?.resultPath ?? "Result.md";
+  const synthetic = {
+    schema: "pipeline.continuity.v0",
+    featureId: entry.identity.featureId,
+    revision: entry.integratedRevision,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" },
+    authority: {
+      prd: { path: "PRD.md", sha256: entry.identity.authorityDigests.prdSha256 },
+      spec: { path: "Spec.md", sha256: entry.identity.authorityDigests.specSha256 },
+      result: { path: resultPath, sha256: "0".repeat(64) },
+    },
+    queueHead: materialized.queueHead,
+    blocker: materialized.blocker,
+    acknowledgedFinal: {
+      identity: entry.identity,
+      resultDigest: entry.finalDigest,
+      finalOutcome: entry.finalOutcome,
+      integratedRevision: entry.integratedRevision,
+    },
+    resume: materialized.resume,
+    recovery: materialized.recovery,
+    decisionTxn: materialized.decisionTxn,
+    capacity: materialized.capacity,
+  };
+  return validateContinuityState(synthetic, entry.identity.featureId).ok;
+}
+
+function validateFinalEntry(entry, raw) {
+  try {
+    if (!exactObjectKeys(entry, [...FINAL_ENTRY_KEYS])
+      || !entry.integrationId?.startsWith("fi-")
+      || entry.integrationId.length !== 67
+      || !SHA256_RE.test(entry.integrationId.slice(3))
+      || !SHA256_RE.test(entry.finalDigest)
+      || !SHA256_RE.test(entry.preResultSha256)
+      || !SHA256_RE.test(entry.nextTransitionSha256)
+      || !new Set(["succeeded", "failed"]).has(entry.finalOutcome)
+      || !Number.isSafeInteger(entry.integratedRevision)
+      || !exactObjectKeys(entry.nextTransition, [...NEXT_TRANSITION_KEYS])
+      || Buffer.byteLength(raw, "utf8") > FINAL_INTEGRATION_MAX_BYTES
+      || canonicalJson(entry) !== raw
+      || sha256Bytes(canonicalJson(entry.nextTransition)) !== entry.nextTransitionSha256
+      || !validHistoricalFinalSemantics(entry)) return false;
+    const tuple = {
+      identity: entry.identity,
+      finalDigest: entry.finalDigest,
+      finalOutcome: entry.finalOutcome,
+      preResultSha256: entry.preResultSha256,
+      nextTransitionSha256: entry.nextTransitionSha256,
+    };
+    return entry.integrationId === `fi-${sha256Bytes(canonicalJson(tuple))}`;
+  } catch {
+    return false;
+  }
+}
+
+function resolveResultPathWithoutSymlinks(dir, relativePath) {
+  const root = realpathSync(dir);
+  let current = root;
+  const parts = relativePath.split("/");
+  for (let index = 0; index < parts.length; index++) {
+    current = join(current, parts[index]);
+    const stat = lstatSync(current);
+    if (stat.isSymbolicLink()
+      || (index < parts.length - 1 && !stat.isDirectory())
+      || (index === parts.length - 1 && !stat.isFile())) return null;
+    const real = realpathSync(current);
+    const rel = relative(root, real);
+    if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)
+      || real !== current) return null;
+  }
+  return { root, path: current, parent: dirname(current), relativePath };
+}
+
+function readResultAuthority(dir, binding) {
+  if (!exactObjectKeys(binding, [...RESULT_BINDING_KEYS])
+    || !SHA256_RE.test(binding.preResultSha256 ?? "")
+    || typeof binding.path !== "string" || binding.path.length < 1 || binding.path.length > 240
+    || isAbsolute(binding.path) || binding.path.includes("\\") || binding.path.includes("\0")
+    || binding.path.split("/").some((part) => part === "" || part === "." || part === "..")) {
+    return { ok: false, code: "PS-CONTINUITY-RESULT-BINDING" };
+  }
+  try {
+    const resolved = resolveResultPathWithoutSymlinks(dir, binding.path);
+    if (resolved === null) return { ok: false, code: "PS-CONTINUITY-RESULT-PATH" };
+    const stat = lstatSync(resolved.path);
+    if (stat.size < 1 || stat.size > CONTINUITY_RESULT_MAX_BYTES) {
+      return { ok: false, code: "PS-CONTINUITY-RESULT-PATH" };
+    }
+    const bytes = readFileSync(resolved.path);
+    const text = bytes.toString("utf8");
+    if (!Buffer.from(text, "utf8").equals(bytes) || text.startsWith("\uFEFF") || text.includes("\r")) {
+      return { ok: false, code: "PS-CONTINUITY-RESULT-CODEC" };
+    }
+    const matches = [...text.matchAll(/^```pipeline-result\n([\s\S]*?)\n```$/gm)];
+    if (matches.length !== 1) return { ok: false, code: "PS-CONTINUITY-RESULT-FENCE" };
+    const json = matches[0][1];
+    const jsonStart = matches[0].index + "```pipeline-result\n".length;
+    const strict = parseResultJsonStrict(json);
+    const integrations = strict.parsed.finalIntegrations;
+    const integrationIds = new Set();
+    const identities = new Set();
+    for (let index = 0; index < integrations.length; index++) {
+      const range = strict.entryRanges[index];
+      const raw = json.slice(range.start, range.end);
+      const entry = integrations[index];
+      if (!validateFinalEntry(entry, raw)) return { ok: false, code: "PS-CONTINUITY-RESULT-NONCANONICAL" };
+      const identityKey = canonicalJson(entry.identity);
+      if (integrationIds.has(entry.integrationId) || identities.has(identityKey)) {
+        return { ok: false, code: "PS-CONTINUITY-RESULT-CONFLICT" };
+      }
+      integrationIds.add(entry.integrationId);
+      identities.add(identityKey);
+    }
+    const arrayRaw = json.slice(strict.arrayRange.start, strict.arrayRange.end);
+    if ((integrations.length === 0 && arrayRaw !== "[]")
+      || (integrations.length > 0
+        && arrayRaw !== `[\n    ${strict.entryRanges.map((range) => json.slice(range.start, range.end)).join(",\n    ")}\n  ]`)) {
+      return { ok: false, code: "PS-CONTINUITY-RESULT-NONCANONICAL" };
+    }
+    return {
+      ok: true, code: "PS-CONTINUITY-RESULT-VALID", path: resolved.path, bytes, text,
+      sha256: sha256Bytes(bytes), json, jsonStart, strict, repoRoot: resolved.root,
+      relativePath: resolved.relativePath,
+    };
+  } catch {
+    return { ok: false, code: "PS-CONTINUITY-RESULT-INVALID" };
+  }
+}
+
+function replaceSentinel(value, digest) {
+  if (value === POST_RESULT_SENTINEL) return digest;
+  if (Array.isArray(value)) return value.map((child) => replaceSentinel(child, digest));
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, child]) => [key, replaceSentinel(child, digest)]));
+  }
+  return value;
+}
+
+function buildFinalEntry(identity, finalDigest, finalOutcome, preResultSha256, nextTransition, integratedRevision) {
+  if (!exactObjectKeys(nextTransition, [...NEXT_TRANSITION_KEYS])) return { ok: false, code: "PS-CONTINUITY-NEXT-TRANSITION" };
+  try {
+    const nextTransitionSha256 = sha256Bytes(canonicalJson(nextTransition));
+    const tuple = { identity, finalDigest, finalOutcome, preResultSha256, nextTransitionSha256 };
+    const entry = {
+      integrationId: `fi-${sha256Bytes(canonicalJson(tuple))}`,
+      identity: structuredClone(identity), finalDigest, finalOutcome, preResultSha256,
+      nextTransition: structuredClone(nextTransition), nextTransitionSha256, integratedRevision,
+    };
+    const raw = canonicalJson(entry);
+    return validateFinalEntry(entry, raw)
+      ? { ok: true, entry, raw }
+      : { ok: false, code: "PS-CONTINUITY-FINAL-ENTRY" };
+  } catch {
+    return { ok: false, code: "PS-CONTINUITY-FINAL-ENTRY" };
+  }
+}
+
+function spliceFinalEntry(result, built) {
+  const { strict, json, jsonStart, text } = result;
+  const integrations = strict.parsed.finalIntegrations;
+  const identityKey = canonicalJson(built.entry.identity);
+  const sameIdentityEntry = integrations.find((entry) => canonicalJson(entry.identity) === identityKey);
+  if (sameIdentityEntry) {
+    return sameIdentityEntry.integrationId === built.entry.integrationId && canonicalJson(sameIdentityEntry) === built.raw
+      ? { ok: true, code: "PS-CONTINUITY-RESULT-ENTRY-EXISTS", bytes: result.bytes, duplicate: true }
+      : { ok: false, code: "PS-CONTINUITY-RESULT-CONFLICT" };
+  }
+  const arrayRaw = json.slice(strict.arrayRange.start, strict.arrayRange.end);
+  const nextArray = integrations.length === 0
+    ? `[\n    ${built.raw}\n  ]`
+    : `${arrayRaw.slice(0, -4)},\n    ${built.raw}\n  ]`;
+  const absoluteStart = jsonStart + strict.arrayRange.start;
+  const absoluteEnd = jsonStart + strict.arrayRange.end;
+  const nextText = text.slice(0, absoluteStart) + nextArray + text.slice(absoluteEnd);
+  const bytes = Buffer.from(nextText, "utf8");
+  return bytes.length <= CONTINUITY_RESULT_MAX_BYTES
+    ? { ok: true, code: "PS-CONTINUITY-RESULT-PREPARED", bytes, duplicate: false }
+    : { ok: false, code: "PS-CONTINUITY-RESULT-SIZE" };
+}
+
+function priorResultBytes(result) {
+  const { strict, json, jsonStart, text } = result;
+  const count = strict.parsed.finalIntegrations.length;
+  if (count === 0) return null;
+  const arrayRaw = json.slice(strict.arrayRange.start, strict.arrayRange.end);
+  const nextArray = count === 1
+    ? "[]"
+    : `${arrayRaw.slice(0, strict.entryRanges.at(-1).start - strict.arrayRange.start - 6)}\n  ]`;
+  const absoluteStart = jsonStart + strict.arrayRange.start;
+  const absoluteEnd = jsonStart + strict.arrayRange.end;
+  return Buffer.from(text.slice(0, absoluteStart) + nextArray + text.slice(absoluteEnd), "utf8");
+}
+
+function atomicWriteResult(result, bytes, lock, deps = {}) {
+  const tmp = `${result.path}.tmp.${lock.ownerNonce}`;
+  let fd;
+  let renamed = false;
+  try {
+    if (!assertContinuityLockOwned(lock)) return { ok: false, committed: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
+    let resolved = resolveResultPathWithoutSymlinks(result.repoRoot, result.relativePath);
+    if (resolved === null || resolved.path !== result.path || resolved.parent !== dirname(tmp)) {
+      return { ok: false, committed: false, code: "PS-CONTINUITY-RESULT-PATH" };
+    }
+    fd = openSync(tmp, "wx", 0o600);
+    (deps.replaceResultFdContents ?? replaceFdContents)(fd, bytes);
+    closeSync(fd);
+    fd = undefined;
+    if (!assertContinuityLockOwned(lock)) return { ok: false, committed: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
+    resolved = resolveResultPathWithoutSymlinks(result.repoRoot, result.relativePath);
+    if (resolved === null || resolved.path !== result.path || resolved.parent !== dirname(tmp)) {
+      return { ok: false, committed: false, code: "PS-CONTINUITY-RESULT-PATH" };
+    }
+    (deps.renameResultSync ?? renameSync)(tmp, result.path);
+    renamed = true;
+    const synced = deps.syncResultDirectory?.(dirname(result.path)) ?? syncDirectory(dirname(result.path));
+    return synced.ok
+      ? { ok: true, committed: true, code: "PS-CONTINUITY-RESULT-WRITTEN" }
+      : { ok: false, committed: true, code: "PS-CONTINUITY-RESULT-DURABILITY-UNKNOWN" };
+  } catch {
+    try {
+      if (readFileSync(result.path).equals(bytes)) {
+        return { ok: false, committed: true, code: "PS-CONTINUITY-RESULT-DURABILITY-UNKNOWN" };
+      }
+    } catch { /* disposition remains unknown */ }
+    return renamed
+      ? { ok: false, committed: null, code: "PS-CONTINUITY-RESULT-COMMIT-INDETERMINATE" }
+      : { ok: false, committed: false, code: "PS-CONTINUITY-RESULT-WRITE-IO" };
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+    if (!renamed) safeUnlink(tmp);
+  }
+}
+
+function continuityResultMatchesState(dir, continuity) {
+  if (continuity.authority.result === null) return { ok: true };
+  const result = readResultAuthority(dir, {
+    path: continuity.authority.result.path,
+    preResultSha256: continuity.authority.result.sha256,
+  });
+  return result.ok && result.sha256 === continuity.authority.result.sha256
+    ? { ok: true, result }
+    : { ok: false, code: result.ok ? "PS-CONTINUITY-RESULT-DIGEST" : result.code };
+}
+
+function expectedFinalEntry(request, expectedRevision) {
+  const observation = request.observation;
+  return buildFinalEntry(
+    observation?.identity,
+    observation?.final?.resultDigest,
+    observation?.final?.outcome,
+    request.result?.preResultSha256,
+    request.nextTransition,
+    expectedRevision + 1,
+  );
+}
+
+function proposedFinalState(current, request, postResultSha256) {
+  const next = structuredClone(current);
+  next.revision = current.revision + 1;
+  next.authority.result = { path: current.authority.result.path, sha256: postResultSha256 };
+  const materialized = replaceSentinel(request.nextTransition, postResultSha256);
+  for (const key of NEXT_TRANSITION_KEYS) next[key] = materialized[key];
+  next.acknowledgedFinal = {
+    identity: structuredClone(request.observation?.identity),
+    resultDigest: request.observation?.final?.resultDigest,
+    finalOutcome: request.observation?.final?.outcome,
+    integratedRevision: next.revision,
+  };
+  return integrateContinuityFinal(current, {
+    expectedRevision: current.revision,
+    observation: request.observation,
+    next,
+  }, current.featureId);
+}
+
+function committedFinalStateMatches(current, request, expectedRevision) {
+  if (current.revision !== expectedRevision + 1
+    || current.authority.result === null
+    || current.authority.result.path !== request.result.path
+    || current.acknowledgedFinal === null
+    || current.acknowledgedFinal.integratedRevision !== current.revision
+    || current.acknowledgedFinal.resultDigest !== request.observation?.final?.resultDigest
+    || current.acknowledgedFinal.finalOutcome !== request.observation?.final?.outcome
+    || !sameJson(current.acknowledgedFinal.identity, request.observation?.identity)
+    || current.acknowledgedFinal.identity.authorityDigests.resultSha256 !== request.result.preResultSha256) return false;
+  const materialized = replaceSentinel(request.nextTransition, current.authority.result.sha256);
+  return [...NEXT_TRANSITION_KEYS].every((key) => sameJson(current[key], materialized[key]));
+}
+
+function runFinalIntegrationTransaction(dir, existing, expectedRevision, request, lock, deps) {
+  if (!exactObjectKeys(request, ["observation", "nextTransition", "result"])
+    || !exactObjectKeys(request.result, [...RESULT_BINDING_KEYS])
+    || !exactObjectKeys(request.nextTransition, [...NEXT_TRANSITION_KEYS])) {
+    return { ok: false, code: "PS-CONTINUITY-REQUEST", mutated: false };
+  }
+  const current = existing.state.continuity;
+  if (current === undefined || current.authority.result === null
+    || !validateContinuityState(current, existing.state.activeFeature?.id).ok
+    || current.authority.result.path !== request.result.path) {
+    return { ok: false, code: "PS-CONTINUITY-RESULT-BINDING", mutated: false };
+  }
+  const resultFile = readResultAuthority(dir, request.result);
+  if (!resultFile.ok) return { ok: false, code: resultFile.code, mutated: false };
+  const built = expectedFinalEntry(request, expectedRevision);
+  if (!built.ok) return { ok: false, code: built.code, mutated: false };
+
+  // Normal path or Result-before-State recovery: the persisted State still owns
+  // the old revision and old Result digest.
+  if (current.revision === expectedRevision) {
+    if (current.authority.result.sha256 !== request.result.preResultSha256) {
+      return { ok: false, code: "PS-CONTINUITY-RESULT-DIGEST", mutated: false };
+    }
+    let preparedBytes;
+    let resultAlreadyPrepared = false;
+    if (resultFile.sha256 === request.result.preResultSha256) {
+      const spliced = spliceFinalEntry(resultFile, built);
+      if (!spliced.ok || spliced.duplicate) {
+        return { ok: false, code: spliced.ok ? "PS-CONTINUITY-RESULT-CONFLICT" : spliced.code, mutated: false };
+      }
+      preparedBytes = spliced.bytes;
+    } else {
+      const prior = priorResultBytes(resultFile);
+      const last = resultFile.strict.parsed.finalIntegrations.at(-1);
+      const lastRange = resultFile.strict.entryRanges.at(-1);
+      const lastRaw = lastRange ? resultFile.json.slice(lastRange.start, lastRange.end) : null;
+      if (prior === null || sha256Bytes(prior) !== request.result.preResultSha256
+        || lastRaw !== built.raw || canonicalJson(last) !== built.raw) {
+        return { ok: false, code: "PS-CONTINUITY-RESULT-CONFLICT", mutated: false };
+      }
+      preparedBytes = resultFile.bytes;
+      resultAlreadyPrepared = true;
+    }
+    const postResultSha256 = sha256Bytes(preparedBytes);
+    const transition = proposedFinalState(current, request, postResultSha256);
+    if (!transition.ok || !transition.mutated) {
+      return { ok: false, code: transition.code, mutated: resultAlreadyPrepared };
+    }
+    if (!resultAlreadyPrepared) {
+      const prepared = atomicWriteResult(resultFile, preparedBytes, lock, deps);
+      if (!prepared.ok) return { ok: false, code: prepared.code, mutated: prepared.committed !== false, committed: prepared.committed };
+    }
+    /* Node cannot provide an OS-identity/isolation assertion here. Under the
+     * contractual single-Coordinator lock, re-check the complete non-symlink
+     * component chain and the exact prepared bytes immediately before State CAS.
+     * A hostile component swap outside that contract remains explicitly unclaimed. */
+    deps.beforeStateWrite?.();
+    if (!assertContinuityLockOwned(lock)) {
+      return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP", mutated: true, committed: false };
+    }
+    const preparedProbe = readResultAuthority(dir, request.result);
+    if (!preparedProbe.ok
+      || preparedProbe.path !== resultFile.path
+      || !preparedProbe.bytes.equals(preparedBytes)) {
+      return { ok: false, code: preparedProbe.ok ? "PS-CONTINUITY-RESULT-CHANGED" : preparedProbe.code, mutated: true, committed: false };
+    }
+    const next = { ...existing.state, continuity: transition.state, updatedAt: (deps.now ?? (() => new Date().toISOString()))() };
+    const written = atomicWriteContinuityState(dir, next, lock, deps);
+    if (!written.ok) return { ok: false, code: written.code, mutated: true, committed: written.committed };
+    return { ok: true, code: "PS-CONTINUITY-FINAL-COMMITTED", mutated: true, revision: transition.state.revision };
+  }
+
+  // State-before-Result reconstruction and exact committed duplicate.  This is
+  // admitted only by the old digest in the acknowledgement identity and by an
+  // exact hash of the reconstructed post-Result bytes.
+  if (!committedFinalStateMatches(current, request, expectedRevision)) {
+    return { ok: false, code: "PS-CONTINUITY-STALE", mutated: false };
+  }
+  const duplicateProbe = integrateContinuityFinal(current, {
+    expectedRevision: current.revision,
+    observation: request.observation,
+    next: current,
+  }, current.featureId);
+  if (!duplicateProbe.ok || duplicateProbe.code !== "CS-DUPLICATE-FINAL") {
+    return { ok: false, code: "PS-CONTINUITY-FINAL-REJECTED", mutated: false };
+  }
+  if (resultFile.sha256 === current.authority.result.sha256) {
+    const matching = resultFile.strict.parsed.finalIntegrations.find((entry) => entry.integrationId === built.entry.integrationId);
+    return matching && canonicalJson(matching) === built.raw
+      ? { ok: true, code: "PS-CONTINUITY-DUPLICATE-FINAL", mutated: false, revision: current.revision }
+      : { ok: false, code: "PS-CONTINUITY-RESULT-CONFLICT", mutated: false };
+  }
+  if (resultFile.sha256 !== request.result.preResultSha256
+    || resultFile.sha256 !== current.acknowledgedFinal.identity.authorityDigests.resultSha256) {
+    return { ok: false, code: "PS-CONTINUITY-RESULT-DIGEST", mutated: false };
+  }
+  const repaired = spliceFinalEntry(resultFile, built);
+  if (!repaired.ok || repaired.duplicate || sha256Bytes(repaired.bytes) !== current.authority.result.sha256) {
+    return { ok: false, code: repaired.ok ? "PS-CONTINUITY-RESULT-CONFLICT" : repaired.code, mutated: false };
+  }
+  const writeRepair = atomicWriteResult(resultFile, repaired.bytes, lock, deps);
+  if (!writeRepair.ok) return { ok: false, code: writeRepair.code, mutated: writeRepair.committed !== false, committed: writeRepair.committed };
+  return { ok: true, code: "PS-CONTINUITY-RESULT-REPAIRED", mutated: true, revision: current.revision };
+}
+
 function continuityTransition(sub, base, expectedRevision, request) {
   const featureId = base.activeFeature?.id;
   if (typeof featureId !== "string" || featureId.trim() === "") return { ok: false, code: "PS-CONTINUITY-NO-ACTIVE-FEATURE" };
@@ -689,6 +1240,28 @@ function runContinuityCommand(sub, flags, deps) {
     if (existing.status !== "ok") {
       console.error(`Error: continuity writer requires an existing valid ${SCHEMA_ID} state.`);
       return 2;
+    }
+    if (sub === "continuity-integrate-final") {
+      const transaction = runFinalIntegrationTransaction(dir, existing, expected.value, request.value, lock, deps);
+      if (!transaction.ok) {
+        const disposition = transaction.committed === null
+          ? "commit disposition is indeterminate"
+          : transaction.mutated
+            ? "Result prepare or repair may be durable; mutation is NOT reported as zero"
+            : "zero State and Result mutation";
+        console.error(`Error: continuity final transaction refused (${transaction.code}); ${disposition}.`);
+        return 2;
+      }
+      console.log(`${transaction.code}: continuity revision ${transaction.revision}; ${transaction.mutated ? "transaction persisted" : "accepted with zero mutation"}.`);
+      return 0;
+    }
+    const authorityState = sub === "continuity-init" ? request.value : existing.state.continuity;
+    if (authorityState?.authority?.result !== null) {
+      const coherent = continuityResultMatchesState(dir, authorityState);
+      if (!coherent.ok) {
+        console.error(`Error: continuity Result authority mismatch (${coherent.code}); zero mutation.`);
+        return 2;
+      }
     }
     const transition = continuityTransition(sub, existing.state, expected.value, request.value);
     if (!transition.ok) {

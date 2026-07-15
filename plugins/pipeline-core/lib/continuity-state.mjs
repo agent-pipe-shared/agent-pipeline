@@ -2,9 +2,10 @@
 import { normalizeContinuityHostObservation } from "./continuity-host-adapter.mjs";
 
 const ROOT_KEYS = new Set([
-  "schema", "featureId", "revision", "authority", "queueHead", "blocker",
+  "schema", "featureId", "revision", "runtime", "authority", "queueHead", "blocker",
   "acknowledgedFinal", "resume", "recovery", "decisionTxn", "capacity",
 ]);
+const RUNTIME_KEYS = new Set(["humanFacingLanguage", "activeDuty"]);
 const ARTIFACT_KEYS = new Set(["path", "sha256"]);
 const AUTHORITY_KEYS = new Set(["prd", "spec", "result"]);
 const QUEUE_KEYS = new Set([
@@ -52,6 +53,8 @@ const RESUME_REASONS = new Set(["active-turn", "host-no-background-wakeup", "po-
 const FALLBACK_STATUSES = new Set(["fallback-pending", "running", "completed", "failed"]);
 const FINAL_OUTCOMES = new Set(["succeeded", "failed"]);
 const FALLBACK_POLICIES = new Set(["defer", "pre-authorized-mapped-fallback"]);
+const HUMAN_FACING_LANGUAGES = new Set(["de", "en"]);
+const INTERRUPT_BLOCKER_TYPES = new Set(["authority", "security", "scope"]);
 const MAX_STATE_BYTES = 8_192;
 
 function isObject(value) {
@@ -92,6 +95,12 @@ function validAuthority(value) {
     && validArtifact(value.prd)
     && validArtifact(value.spec)
     && (value.result === null || validArtifact(value.result));
+}
+
+function validRuntime(value) {
+  return exactKeys(value, RUNTIME_KEYS)
+    && HUMAN_FACING_LANGUAGES.has(value.humanFacingLanguage)
+    && safeId(value.activeDuty);
 }
 
 function validIdentity(value) {
@@ -193,7 +202,8 @@ function validRecovery(value, state) {
     || !digest(value.resultDigest, true)
     || value.count !== 1) return false;
   if (state.queueHead !== null) {
-    return state.queueHead.environmentRerouteCount === 1
+    return value.fallbackStatus !== "failed"
+      && state.queueHead.environmentRerouteCount === 1
       && state.queueHead.productRetryCount === value.originProductRetryCount
       && state.queueHead.dispatch !== null
       && state.queueHead.dispatch.dispatchId === value.fallbackDispatchId;
@@ -237,6 +247,7 @@ export function validateContinuityState(value, activeFeatureId = undefined) {
     || !safeId(value.featureId)
     || !safeInteger(value.revision)
     || (activeFeatureId !== undefined && value.featureId !== activeFeatureId)
+    || !validRuntime(value.runtime)
     || !validAuthority(value.authority)
     || (value.queueHead === null) === (value.blocker === null)
     || (value.queueHead !== null && !validQueueHead(value.queueHead, value))
@@ -284,9 +295,30 @@ function sameDecisionTxn(left, right) {
     && [...DECISION_KEYS].every((key) => left[key] === right[key]);
 }
 
+function sameJson(left, right) {
+  return JSON.stringify(left) === JSON.stringify(right);
+}
+
+function interruptRetainsWork(current, next) {
+  if (next.resume.reasonCode !== "po-interrupt") return true;
+  const createsTypedBlocker = current.queueHead !== null
+    && current.blocker === null
+    && next.queueHead === null
+    && next.blocker !== null
+    && INTERRUPT_BLOCKER_TYPES.has(next.blocker.type);
+  const workRetained = createsTypedBlocker
+    || (sameJson(current.queueHead, next.queueHead) && sameJson(current.blocker, next.blocker));
+  return workRetained
+    && sameJson(current.acknowledgedFinal, next.acknowledgedFinal)
+    && sameJson(current.recovery, next.recovery)
+    && sameJson(current.decisionTxn, next.decisionTxn)
+    && sameJson(current.capacity, next.capacity);
+}
+
 function compareAndSwap(current, request, activeFeatureId, {
   allowAcknowledgementChange = false,
   allowDecisionChange = false,
+  allowResultAuthorityChange = false,
 } = {}) {
   const before = validateContinuityState(current, activeFeatureId);
   if (!before.ok || !exactKeys(request, CAS_KEYS) || !safeInteger(request.expectedRevision)) {
@@ -299,6 +331,14 @@ function compareAndSwap(current, request, activeFeatureId, {
     || request.next.revision !== current.revision + 1) return result(false, "CS-REVISION");
   const after = validateContinuityState(request.next, activeFeatureId);
   if (!after.ok) return result(false, after.code);
+  if (!sameJson(current.runtime, request.next.runtime)
+    || !sameJson(current.authority.prd, request.next.authority.prd)
+    || !sameJson(current.authority.spec, request.next.authority.spec)
+    || current.authority.result?.path !== request.next.authority.result?.path
+    || (!allowResultAuthorityChange && !sameJson(current.authority.result, request.next.authority.result))) {
+    return result(false, "CS-PROTECTED-AUTHORITY");
+  }
+  if (!interruptRetainsWork(current, request.next)) return result(false, "CS-INTERRUPT-DRIFT");
   if (!allowAcknowledgementChange
     && !sameAcknowledgement(current.acknowledgedFinal, request.next.acknowledgedFinal)) {
     return result(false, "CS-PROTECTED-ACK");
@@ -373,6 +413,16 @@ export function integrateContinuityFinal(current, request, activeFeatureId = und
   if (normalized.code !== "CHA-FINAL-READY") return result(false, "CS-FINAL-REJECTED");
 
   if (!isObject(request.next)) return result(false, "CS-REQUEST");
+  // Final integration owns only the acknowledgement, Result digest and the six
+  // semantic next-transition fields.  The caller must not smuggle mutations of
+  // feature/runtime/PRD/Spec or authority paths through the otherwise-valid CAS.
+  if (request.next.featureId !== current.featureId
+    || !sameJson(request.next.runtime, current.runtime)
+    || !sameJson(request.next.authority?.prd, current.authority.prd)
+    || !sameJson(request.next.authority?.spec, current.authority.spec)
+    || request.next.authority?.result?.path !== current.authority.result?.path) {
+    return result(false, "CS-PROTECTED-FINAL-FIELDS");
+  }
   const expectedAck = request.next.acknowledgedFinal;
   if (!exactKeys(expectedAck, ACK_KEYS)
     || !validIdentity(expectedAck.identity)
@@ -386,7 +436,7 @@ export function integrateContinuityFinal(current, request, activeFeatureId = und
   const cas = compareAndSwap(current, {
     expectedRevision: request.expectedRevision,
     next: request.next,
-  }, activeFeatureId, { allowAcknowledgementChange: true });
+  }, activeFeatureId, { allowAcknowledgementChange: true, allowResultAuthorityChange: true });
   return cas.ok ? result(true, "CS-FINAL-INTEGRATED", cas.state, true) : cas;
 }
 
@@ -458,6 +508,9 @@ export const CONTINUITY_STATE_CODES = Object.freeze([
   "CS-ACK-MISMATCH", "CS-FINAL-INTEGRATED", "CS-DECISION-PENDING", "CS-BLOCKED", "CS-NOT-DISPATCH-ACTION",
   "CS-DISPATCHABLE", "CS-DECISION-REPLAY", "CS-DECISION-CONFLICT",
   "CS-DECISION-INVALID", "CS-NO-DECISION-TXN", "CS-DECISION-RECEIPT-MISMATCH", "CS-PROTECTED-ACK", "CS-PROTECTED-DECISION",
+  "CS-PROTECTED-FINAL-FIELDS",
+  "CS-PROTECTED-AUTHORITY",
+  "CS-INTERRUPT-DRIFT",
 ]);
 
 export const CONTINUITY_STATE_MAX_BYTES = MAX_STATE_BYTES;

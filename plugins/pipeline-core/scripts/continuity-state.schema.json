@@ -4,11 +4,20 @@
   "title": "Provider-neutral bounded continuity state",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "featureId", "revision", "authority", "queueHead", "blocker", "acknowledgedFinal", "resume", "recovery", "decisionTxn", "capacity"],
+  "required": ["schema", "featureId", "revision", "runtime", "authority", "queueHead", "blocker", "acknowledgedFinal", "resume", "recovery", "decisionTxn", "capacity"],
   "properties": {
     "schema": { "type": "string", "enum": ["pipeline.continuity.v0"] },
-    "featureId": { "type": "string" },
-    "revision": { "type": "number" },
+    "featureId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "revision": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["humanFacingLanguage", "activeDuty"],
+      "properties": {
+        "humanFacingLanguage": { "type": "string", "enum": ["de", "en"] },
+        "activeDuty": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" }
+      }
+    },
     "authority": {
       "type": "object",
       "additionalProperties": false,
@@ -18,19 +27,19 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["path", "sha256"],
-          "properties": { "path": { "type": "string" }, "sha256": { "type": "string" } }
+          "properties": { "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*\\\\)(?!.*\\u0000)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//).{1,240}$" }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } }
         },
         "spec": {
           "type": "object",
           "additionalProperties": false,
           "required": ["path", "sha256"],
-          "properties": { "path": { "type": "string" }, "sha256": { "type": "string" } }
+          "properties": { "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*\\\\)(?!.*\\u0000)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//).{1,240}$" }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } }
         },
         "result": {
           "type": ["object", "null"],
           "additionalProperties": false,
           "required": ["path", "sha256"],
-          "properties": { "path": { "type": "string" }, "sha256": { "type": "string" } }
+          "properties": { "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*\\\\)(?!.*\\u0000)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//).{1,240}$" }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } }
         }
       }
     },
@@ -39,33 +48,33 @@
       "additionalProperties": false,
       "required": ["packageId", "actionId", "nextAction", "productRetryCount", "environmentRerouteCount", "dispatch"],
       "properties": {
-        "packageId": { "type": "string" },
-        "actionId": { "type": "string" },
+        "packageId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "actionId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
         "nextAction": { "type": "string", "enum": ["dispatch", "poll", "retrieve-final", "integrate-final", "review", "correct", "verify", "push", "fetch-back", "advance-package", "close"] },
-        "productRetryCount": { "type": "number" },
-        "environmentRerouteCount": { "type": "number" },
+        "productRetryCount": { "type": "integer", "enum": [0, 1] },
+        "environmentRerouteCount": { "type": "integer", "enum": [0, 1] },
         "dispatch": {
           "type": ["object", "null"],
           "additionalProperties": false,
           "required": ["featureId", "queueRevision", "packageId", "actionId", "dispatchId", "attemptId", "authorityDigests", "routeRequestSha256", "mayDelegate"],
           "properties": {
-            "featureId": { "type": "string" },
-            "queueRevision": { "type": "number" },
-            "packageId": { "type": "string" },
-            "actionId": { "type": "string" },
-            "dispatchId": { "type": "string" },
-            "attemptId": { "type": "string" },
+            "featureId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+            "queueRevision": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "packageId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+            "actionId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+            "dispatchId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+            "attemptId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
             "authorityDigests": {
               "type": "object",
               "additionalProperties": false,
               "required": ["prdSha256", "specSha256", "resultSha256"],
               "properties": {
-                "prdSha256": { "type": "string" },
-                "specSha256": { "type": "string" },
-                "resultSha256": { "type": ["string", "null"] }
+                "prdSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                "specSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                "resultSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
               }
             },
-            "routeRequestSha256": { "type": "string" },
+            "routeRequestSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "mayDelegate": { "type": "boolean", "enum": [false] }
           }
         }
@@ -77,14 +86,14 @@
       "required": ["type", "signature", "resumeCondition", "decisionBrief"],
       "properties": {
         "type": { "type": "string", "enum": ["authority", "security", "scope", "course", "capacity", "product", "environment", "unknown"] },
-        "signature": { "type": "string" },
+        "signature": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
         "resumeCondition": {
           "type": "object",
           "additionalProperties": false,
           "required": ["kind", "evidenceSha256"],
           "properties": {
             "kind": { "type": "string", "enum": ["po-decision", "evidence-change", "capacity-available", "authority-update", "manual"] },
-            "evidenceSha256": { "type": ["string", "null"] }
+            "evidenceSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
           }
         },
         "decisionBrief": {
@@ -92,9 +101,9 @@
           "additionalProperties": false,
           "required": ["decisionBriefId", "decisionBriefSha256", "resultPath"],
           "properties": {
-            "decisionBriefId": { "type": "string" },
-            "decisionBriefSha256": { "type": "string" },
-            "resultPath": { "type": "string" }
+            "decisionBriefId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+            "decisionBriefSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "resultPath": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*\\\\)(?!.*\\u0000)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//).{1,240}$" }
           }
         }
       }
@@ -109,29 +118,29 @@
           "additionalProperties": false,
           "required": ["featureId", "queueRevision", "packageId", "actionId", "dispatchId", "attemptId", "authorityDigests", "routeRequestSha256", "mayDelegate"],
           "properties": {
-            "featureId": { "type": "string" },
-            "queueRevision": { "type": "number" },
-            "packageId": { "type": "string" },
-            "actionId": { "type": "string" },
-            "dispatchId": { "type": "string" },
-            "attemptId": { "type": "string" },
+            "featureId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+            "queueRevision": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+            "packageId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+            "actionId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+            "dispatchId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+            "attemptId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
             "authorityDigests": {
               "type": "object",
               "additionalProperties": false,
               "required": ["prdSha256", "specSha256", "resultSha256"],
               "properties": {
-                "prdSha256": { "type": "string" },
-                "specSha256": { "type": "string" },
-                "resultSha256": { "type": ["string", "null"] }
+                "prdSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                "specSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+                "resultSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
               }
             },
-            "routeRequestSha256": { "type": "string" },
+            "routeRequestSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
             "mayDelegate": { "type": "boolean", "enum": [false] }
           }
         },
-        "resultDigest": { "type": "string" },
+        "resultDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "finalOutcome": { "type": "string", "enum": ["succeeded", "failed"] },
-        "integratedRevision": { "type": "number" }
+        "integratedRevision": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
       }
     },
     "resume": {
@@ -140,7 +149,7 @@
       "required": ["mode", "sourceRevision", "reasonCode"],
       "properties": {
         "mode": { "type": "string", "enum": ["immediate", "resume-on-next-turn"] },
-        "sourceRevision": { "type": "number" },
+        "sourceRevision": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
         "reasonCode": { "type": "string", "enum": ["active-turn", "host-no-background-wakeup", "po-interrupt", "compact-reload", "blocker"] }
       }
     },
@@ -149,18 +158,18 @@
       "additionalProperties": false,
       "required": ["originLaneId", "originDispatchId", "originAttemptId", "environmentEvidenceSha256", "sameLaneRetryProhibited", "fallbackStatus", "fallbackLaneId", "fallbackDispatchId", "narrowingContractSha256", "originProductRetryCount", "resultDigest", "count"],
       "properties": {
-        "originLaneId": { "type": "string" },
-        "originDispatchId": { "type": "string" },
-        "originAttemptId": { "type": "string" },
-        "environmentEvidenceSha256": { "type": "string" },
+        "originLaneId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "originDispatchId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "originAttemptId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "environmentEvidenceSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
         "sameLaneRetryProhibited": { "type": "boolean", "enum": [true] },
         "fallbackStatus": { "type": "string", "enum": ["fallback-pending", "running", "completed", "failed"] },
-        "fallbackLaneId": { "type": "string" },
-        "fallbackDispatchId": { "type": "string" },
-        "narrowingContractSha256": { "type": "string" },
-        "originProductRetryCount": { "type": "number" },
-        "resultDigest": { "type": ["string", "null"] },
-        "count": { "type": "number" }
+        "fallbackLaneId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "fallbackDispatchId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "narrowingContractSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "originProductRetryCount": { "type": "integer", "enum": [0, 1] },
+        "resultDigest": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+        "count": { "type": "integer", "enum": [1] }
       }
     },
     "decisionTxn": {
@@ -168,13 +177,13 @@
       "additionalProperties": false,
       "required": ["idempotencyKey", "briefSha256", "intentSha256", "selectedOptionId", "preSelectionRevision", "selectedRevision", "dispatchableRevision", "phase"],
       "properties": {
-        "idempotencyKey": { "type": "string" },
-        "briefSha256": { "type": "string" },
-        "intentSha256": { "type": "string" },
-        "selectedOptionId": { "type": "string" },
-        "preSelectionRevision": { "type": "number" },
-        "selectedRevision": { "type": "number" },
-        "dispatchableRevision": { "type": "number" },
+        "idempotencyKey": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "briefSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "intentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "selectedOptionId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "preSelectionRevision": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "selectedRevision": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "dispatchableRevision": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
         "phase": { "type": "string", "enum": ["state-applied"] }
       }
     },
@@ -183,9 +192,9 @@
       "additionalProperties": false,
       "required": ["concurrencyLimit", "reservedCriticSlots", "reservedRecoverySlots", "fallbackPolicy"],
       "properties": {
-        "concurrencyLimit": { "type": "number" },
-        "reservedCriticSlots": { "type": "number" },
-        "reservedRecoverySlots": { "type": "number" },
+        "concurrencyLimit": { "type": "integer", "minimum": 2, "maximum": 64 },
+        "reservedCriticSlots": { "type": "integer", "enum": [1] },
+        "reservedRecoverySlots": { "type": "integer", "enum": [1] },
         "fallbackPolicy": { "type": "string", "enum": ["defer", "pre-authorized-mapped-fallback"] }
       }
     }

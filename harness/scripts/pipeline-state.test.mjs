@@ -11,7 +11,7 @@
  * for `approve-push` end to end (spawnSync the actual CLI as a subprocess, mirroring
  * how a Goldfish/Elephant would invoke it).
  */
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync, symlinkSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync, renameSync, symlinkSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
@@ -53,6 +53,17 @@ function ok(id, cond, detail = "") {
   }
 }
 
+function captureConsoleError(action) {
+  const original = console.error;
+  const messages = [];
+  console.error = (...args) => messages.push(args.join(" "));
+  try {
+    return { value: action(), text: messages.join("\n") };
+  } finally {
+    console.error = original;
+  }
+}
+
 const FIXED_NOW = () => "2026-07-07T21:00:00.000Z";
 const FIXED_GIT_HEAD = () => ({ ok: true, commit: "abc123deadbeef" });
 const FIXED_NOW_MS = () => 60_000;
@@ -67,7 +78,8 @@ const continuityDeps = (dir, overrides = {}) => ({
 });
 const A = "a".repeat(64);
 const B = "b".repeat(64);
-const C = "c".repeat(64);
+const RESULT_FIXTURE = "```pipeline-result\n{\n  \"finalIntegrations\": []\n}\n```\n";
+const C = createHash("sha256").update(RESULT_FIXTURE).digest("hex");
 const D = "d".repeat(64);
 const CONTINUITY_FEATURE = "phase26-test";
 
@@ -103,6 +115,7 @@ function continuityState(overrides = {}) {
     schema: "pipeline.continuity.v0",
     featureId: CONTINUITY_FEATURE,
     revision: 0,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" },
     authority: {
       prd: { path: "specs/prd.md", sha256: A },
       spec: { path: "specs/spec.md", sha256: B },
@@ -127,10 +140,47 @@ function writeRequest(dir, name, value) {
 
 function seedContinuityRoot(dir) {
   run(["set-feature", "--id", CONTINUITY_FEATURE, "--plan-path", "specs/prd.md"], { dir, now: FIXED_NOW });
+  mkdirSync(join(dir, "specs"), { recursive: true });
+  writeFileSync(join(dir, "specs", "result.md"), RESULT_FIXTURE);
 }
 
 function continuityArgs(sub, revision, requestFile, token = "token-00000001") {
   return [sub, "--expected-revision", String(revision), "--request-file", requestFile, "--lock-token", token];
+}
+
+function finalTransactionFixture(dir, name = "txn") {
+  seedContinuityRoot(dir);
+  const initial = continuityState();
+  const initFile = writeRequest(dir, `${name}-init`, initial);
+  run(continuityArgs("continuity-init", "absent", initFile), continuityDeps(dir));
+  const resultJson = JSON.stringify({ verdict: "pass" });
+  const envelope = {
+    schema: "pipeline.continuity-final.v0", identity: continuityIdentity(), outcome: "succeeded",
+    resultJson, resultBytes: Buffer.byteLength(resultJson, "utf8"),
+  };
+  const delivered = { ...envelope, resultDigest: computeContinuityFinalDigest(envelope) };
+  const observation = { status: "completed", identity: continuityIdentity(), final: delivered };
+  const next = structuredClone(initial);
+  next.revision = 1;
+  next.acknowledgedFinal = {
+    identity: continuityIdentity(), resultDigest: delivered.resultDigest,
+    finalOutcome: "succeeded", integratedRevision: 1,
+  };
+  next.queueHead = continuityQueue({ actionId: `${name}-next`, nextAction: "dispatch", dispatch: null });
+  next.resume = { mode: "immediate", sourceRevision: 1, reasonCode: "active-turn" };
+  const nextTransition = Object.fromEntries(
+    ["queueHead", "blocker", "resume", "recovery", "decisionTxn", "capacity"].map((key) => [key, next[key]]),
+  );
+  const request = { observation, nextTransition, result: { path: "specs/result.md", preResultSha256: C } };
+  return { initial, request, requestFile: writeRequest(dir, `${name}-final`, request) };
+}
+
+function canonicalFixtureJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalFixtureJson).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalFixtureJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }
 
 // ---- PS01: approve-plan without --by is refused, nothing written ----------------------
@@ -928,19 +978,398 @@ function continuityArgs(sub, revision, requestFile, token = "token-00000001") {
   };
   next.queueHead = continuityQueue({ actionId: "writer-next", nextAction: "dispatch", dispatch: null });
   next.resume = { mode: "immediate", sourceRevision: 1, reasonCode: "active-turn" };
-  const requestFile = writeRequest(dir, "final", { observation, next });
+  const nextTransition = Object.fromEntries(
+    ["queueHead", "blocker", "resume", "recovery", "decisionTxn", "capacity"].map((key) => [key, next[key]]),
+  );
+  const requestFile = writeRequest(dir, "final", {
+    observation,
+    nextTransition,
+    result: { path: "specs/result.md", preResultSha256: C },
+  });
   const code = run(continuityArgs("continuity-integrate-final", 0, requestFile), continuityDeps(dir));
   const persisted = readState(dir).state.continuity;
   ok("PS44a final integration writer exits 0", code === 0, `got ${code}`);
   ok("PS44b acknowledgement and next head share revision 1", persisted.revision === 1 && persisted.acknowledgedFinal?.integratedRevision === 1);
   ok("PS44c persisted acknowledgement binds canonical final digest", persisted.acknowledgedFinal?.resultDigest === delivered.resultDigest);
   ok("PS44d persisted next head is dispatchable and has no stale dispatch", persisted.queueHead?.actionId === "writer-next" && persisted.queueHead?.dispatch === null);
+  const integratedResult = readFileSync(join(dir, "specs", "result.md"), "utf8");
+  ok("PS44e Result contains exactly one canonical immutable final integration", (integratedResult.match(/\"integrationId\":\"fi-/g) ?? []).length === 1 && persisted.authority.result.sha256 === createHash("sha256").update(integratedResult).digest("hex"));
   const beforeReplay = readFileSync(statePath(dir), "utf8");
-  const replay = run(continuityArgs("continuity-integrate-final", 1, requestFile), continuityDeps(dir));
-  ok("PS44e matching final replay is accepted without a write", replay === 0 && readFileSync(statePath(dir), "utf8") === beforeReplay);
-  const extraFile = writeRequest(dir, "final-extra", { observation, next, rawHostError: "must-not-be-ignored" });
-  const extra = run(continuityArgs("continuity-integrate-final", 1, extraFile), continuityDeps(dir));
-  ok("PS44f non-closed final request envelope is refused byte-null", extra === 2 && readFileSync(statePath(dir), "utf8") === beforeReplay);
+  const beforeResultReplay = readFileSync(join(dir, "specs", "result.md"), "utf8");
+  const replay = run(continuityArgs("continuity-integrate-final", 0, requestFile), continuityDeps(dir));
+  ok("PS44f matching final replay is accepted without either write", replay === 0 && readFileSync(statePath(dir), "utf8") === beforeReplay && readFileSync(join(dir, "specs", "result.md"), "utf8") === beforeResultReplay);
+  const extraFile = writeRequest(dir, "final-extra", { observation, nextTransition, result: { path: "specs/result.md", preResultSha256: C }, rawHostError: "must-not-be-ignored" });
+  const extra = run(continuityArgs("continuity-integrate-final", 0, extraFile), continuityDeps(dir));
+  ok("PS44g non-closed final request envelope is refused byte-null", extra === 2 && readFileSync(statePath(dir), "utf8") === beforeReplay && readFileSync(join(dir, "specs", "result.md"), "utf8") === beforeResultReplay);
+}
+
+// ---- PS44R: Result-before-State crash window replays one entry to one commit -----------
+{
+  const dir = freshDir("continuity-final-result-first");
+  const fixture = finalTransactionFixture(dir, "result-first");
+  const failed = run(continuityArgs("continuity-integrate-final", 0, fixture.requestFile), continuityDeps(dir, {
+    renameSync: () => { throw new Error("injected state rename failure"); },
+  }));
+  const preparedResult = readFileSync(join(dir, "specs", "result.md"), "utf8");
+  ok("PS44Ra State fault reports failure after durable Result prepare", failed === 2 && readState(dir).state.continuity.revision === 0 && (preparedResult.match(/\"integrationId\":\"fi-/g) ?? []).length === 1);
+  const replay = run(continuityArgs("continuity-integrate-final", 0, fixture.requestFile), continuityDeps(dir));
+  const replayedResult = readFileSync(join(dir, "specs", "result.md"), "utf8");
+  ok("PS44Rb exact Result-before-State replay commits State without duplicate append", replay === 0 && readState(dir).state.continuity.revision === 1 && replayedResult === preparedResult && (replayedResult.match(/\"integrationId\":\"fi-/g) ?? []).length === 1);
+}
+
+// ---- PS44S: reconstructive State-before-Result repair is hash-bound --------------------
+{
+  const dir = freshDir("continuity-final-state-first-repair");
+  const fixture = finalTransactionFixture(dir, "state-first");
+  const committed = run(continuityArgs("continuity-integrate-final", 0, fixture.requestFile), continuityDeps(dir));
+  const committedState = readFileSync(statePath(dir), "utf8");
+  const committedResult = readFileSync(join(dir, "specs", "result.md"), "utf8");
+  writeFileSync(join(dir, "specs", "result.md"), RESULT_FIXTURE);
+  const repair = run(continuityArgs("continuity-integrate-final", 0, fixture.requestFile), continuityDeps(dir));
+  ok("PS44Sa committed transaction fixture is valid", committed === 0);
+  ok("PS44Sb exact old Result is reconstructively repaired without State rewrite", repair === 0 && readFileSync(statePath(dir), "utf8") === committedState && readFileSync(join(dir, "specs", "result.md"), "utf8") === committedResult);
+  writeFileSync(join(dir, "specs", "result.md"), RESULT_FIXTURE.replace("[]", "[ ]"));
+  const beforeTamperState = readFileSync(statePath(dir), "utf8");
+  const conflict = run(continuityArgs("continuity-integrate-final", 0, fixture.requestFile), continuityDeps(dir));
+  ok("PS44Sc noncanonical/tampered old Result fails closed", conflict === 2 && readFileSync(statePath(dir), "utf8") === beforeTamperState);
+}
+
+// ---- PS44T: non-final transitions refuse State/Result authority drift ------------------
+{
+  const dir = freshDir("continuity-result-drift");
+  seedContinuityRoot(dir);
+  const initFile = writeRequest(dir, "drift-init", continuityState());
+  run(continuityArgs("continuity-init", "absent", initFile), continuityDeps(dir));
+  const next = structuredClone(readState(dir).state.continuity);
+  next.revision = 1;
+  next.queueHead.dispatch = null;
+  next.queueHead.nextAction = "verify";
+  next.resume = { mode: "immediate", sourceRevision: 1, reasonCode: "active-turn" };
+  const casFile = writeRequest(dir, "drift-cas", next);
+  writeFileSync(join(dir, "specs", "result.md"), RESULT_FIXTURE.replace("\"finalIntegrations\"", "\"tampered\""));
+  const before = readFileSync(statePath(dir), "utf8");
+  const drifted = run(continuityArgs("continuity-cas", 0, casFile), continuityDeps(dir));
+  ok("PS44T Result digest drift blocks other continuity commands byte-null", drifted === 2 && readFileSync(statePath(dir), "utf8") === before);
+}
+
+// ---- PS44U: every Result/State fault has an exact observable disposition ---------------
+{
+  const resultRenameDir = freshDir("continuity-result-rename-fault");
+  const resultRenameFixture = finalTransactionFixture(resultRenameDir, "result-rename-fault");
+  const beforeResultRename = readFileSync(join(resultRenameDir, "specs", "result.md"), "utf8");
+  const resultRenameObserved = captureConsoleError(() => run(
+    continuityArgs("continuity-integrate-final", 0, resultRenameFixture.requestFile),
+    continuityDeps(resultRenameDir, { renameResultSync: () => { throw new Error("injected Result rename fault"); } }),
+  ));
+  ok("PS44Ua Result pre-rename fault is explicitly zero-mutation", resultRenameObserved.value === 2
+    && readFileSync(join(resultRenameDir, "specs", "result.md"), "utf8") === beforeResultRename
+    && readState(resultRenameDir).state.continuity.revision === 0
+    && resultRenameObserved.text.includes("PS-CONTINUITY-RESULT-WRITE-IO")
+    && resultRenameObserved.text.includes("zero State and Result mutation"));
+
+  const resultEffectDir = freshDir("continuity-result-rename-effect");
+  const resultEffectFixture = finalTransactionFixture(resultEffectDir, "result-rename-effect");
+  const resultEffectObserved = captureConsoleError(() => run(
+    continuityArgs("continuity-integrate-final", 0, resultEffectFixture.requestFile),
+    continuityDeps(resultEffectDir, {
+      renameResultSync: (from, to) => { renameSync(from, to); throw new Error("rename took effect, then threw"); },
+    }),
+  ));
+  ok("PS44Ub Result rename-effect-then-throw is explicitly committed/not-zero", resultEffectObserved.value === 2
+    && readState(resultEffectDir).state.continuity.revision === 0
+    && (readFileSync(join(resultEffectDir, "specs", "result.md"), "utf8").match(/\"integrationId\":\"fi-/g) ?? []).length === 1
+    && resultEffectObserved.text.includes("PS-CONTINUITY-RESULT-DURABILITY-UNKNOWN")
+    && resultEffectObserved.text.includes("mutation is NOT reported as zero"));
+
+  const resultPreWriteDir = freshDir("continuity-result-pre-write-fault");
+  const resultPreWriteFixture = finalTransactionFixture(resultPreWriteDir, "result-pre-write-fault");
+  const beforeResultPreWrite = readFileSync(join(resultPreWriteDir, "specs", "result.md"), "utf8");
+  const resultPreWriteObserved = captureConsoleError(() => run(
+    continuityArgs("continuity-integrate-final", 0, resultPreWriteFixture.requestFile),
+    continuityDeps(resultPreWriteDir, {
+      replaceResultFdContents: () => { throw new Error("injected fault before temp write"); },
+    }),
+  ));
+  ok("PS44U pre-write Result fault is distinctly zero-mutation", resultPreWriteObserved.value === 2
+    && readFileSync(join(resultPreWriteDir, "specs", "result.md"), "utf8") === beforeResultPreWrite
+    && resultPreWriteObserved.text.includes("PS-CONTINUITY-RESULT-WRITE-IO")
+    && resultPreWriteObserved.text.includes("zero State and Result mutation"));
+
+  const resultFsyncDir = freshDir("continuity-result-fsync-fault");
+  const resultFsyncFixture = finalTransactionFixture(resultFsyncDir, "result-fsync-fault");
+  const beforeResultFsync = readFileSync(join(resultFsyncDir, "specs", "result.md"), "utf8");
+  let exactTempBytesWritten = false;
+  const resultFsyncObserved = captureConsoleError(() => run(
+    continuityArgs("continuity-integrate-final", 0, resultFsyncFixture.requestFile),
+    continuityDeps(resultFsyncDir, {
+      replaceResultFdContents: (fd, bytes) => {
+        writeSync(fd, bytes);
+        exactTempBytesWritten = true;
+        throw new Error("injected Result sync fault after exact temp write");
+      },
+    }),
+  ));
+  ok("PS44Uc Result fd-sync fault after exact temp write remains explicitly pre-commit", resultFsyncObserved.value === 2
+    && exactTempBytesWritten
+    && readFileSync(join(resultFsyncDir, "specs", "result.md"), "utf8") === beforeResultFsync
+    && !readdirSync(join(resultFsyncDir, "specs")).some((name) => name.includes(".tmp."))
+    && resultFsyncObserved.text.includes("PS-CONTINUITY-RESULT-WRITE-IO")
+    && resultFsyncObserved.text.includes("zero State and Result mutation"));
+
+  const resultDirSyncDir = freshDir("continuity-result-dir-sync-fault");
+  const resultDirSyncFixture = finalTransactionFixture(resultDirSyncDir, "result-dir-sync-fault");
+  const resultDirSyncObserved = captureConsoleError(() => run(
+    continuityArgs("continuity-integrate-final", 0, resultDirSyncFixture.requestFile),
+    continuityDeps(resultDirSyncDir, { syncResultDirectory: () => ({ ok: false, supported: true }) }),
+  ));
+  ok("PS44Ud Result directory-sync fault is explicitly committed/durability-unknown", resultDirSyncObserved.value === 2
+    && readState(resultDirSyncDir).state.continuity.revision === 0
+    && (readFileSync(join(resultDirSyncDir, "specs", "result.md"), "utf8").match(/\"integrationId\":\"fi-/g) ?? []).length === 1
+    && resultDirSyncObserved.text.includes("PS-CONTINUITY-RESULT-DURABILITY-UNKNOWN")
+    && resultDirSyncObserved.text.includes("mutation is NOT reported as zero"));
+
+  const stateEffectDir = freshDir("continuity-state-rename-effect");
+  const stateEffectFixture = finalTransactionFixture(stateEffectDir, "state-rename-effect");
+  const stateEffectObserved = captureConsoleError(() => run(
+    continuityArgs("continuity-integrate-final", 0, stateEffectFixture.requestFile),
+    continuityDeps(stateEffectDir, {
+      renameSync: (from, to) => { renameSync(from, to); throw new Error("State rename took effect, then threw"); },
+    }),
+  ));
+  ok("PS44Ue State rename-effect-then-throw is explicitly committed/durability-unknown", stateEffectObserved.value === 2
+    && readState(stateEffectDir).state.continuity.revision === 1
+    && stateEffectObserved.text.includes("PS-CONTINUITY-COMMITTED-DURABILITY-UNKNOWN")
+    && stateEffectObserved.text.includes("mutation is NOT reported as zero"));
+}
+
+// ---- PS44V: the between-writes window rechecks ownership and exact Result bytes --------
+{
+  const lossDir = freshDir("continuity-lock-loss-between-writes");
+  const lossFixture = finalTransactionFixture(lossDir, "lock-loss");
+  const lockLossObserved = captureConsoleError(() => run(
+    continuityArgs("continuity-integrate-final", 0, lossFixture.requestFile),
+    continuityDeps(lossDir, {
+      beforeStateWrite: () => writeFileSync(continuityLockPath(lossDir), JSON.stringify({
+        schema: CONTINUITY_LOCK_SCHEMA_ID,
+        token: "foreign-token-0001",
+        ownerNonce: "foreign-nonce-0001",
+        acquiredAtMs: FIXED_NOW_MS(),
+      }) + "\n"),
+    }),
+  ));
+  ok("PS44Va lock loss after durable Result explicitly blocks State without zero claim", lockLossObserved.value === 2
+    && readState(lossDir).state.continuity.revision === 0
+    && (readFileSync(join(lossDir, "specs", "result.md"), "utf8").match(/\"integrationId\":\"fi-/g) ?? []).length === 1
+    && lockLossObserved.text.includes("PS-CONTINUITY-LOCK-OWNERSHIP")
+    && lockLossObserved.text.includes("Result prepare or repair may be durable; mutation is NOT reported as zero"));
+
+  const tamperDir = freshDir("continuity-tamper-between-writes");
+  const tamperFixture = finalTransactionFixture(tamperDir, "tamper-between");
+  const tamperedObserved = captureConsoleError(() => run(
+    continuityArgs("continuity-integrate-final", 0, tamperFixture.requestFile),
+    continuityDeps(tamperDir, {
+      beforeStateWrite: () => writeFileSync(join(tamperDir, "specs", "result.md"), `${readFileSync(join(tamperDir, "specs", "result.md"), "utf8")}\n`),
+    }),
+  ));
+  ok("PS44Vb exact Result tamper explicitly blocks State without zero claim", tamperedObserved.value === 2
+    && readState(tamperDir).state.continuity.revision === 0
+    && tamperedObserved.text.includes("PS-CONTINUITY-RESULT-CHANGED")
+    && tamperedObserved.text.includes("Result prepare or repair may be durable; mutation is NOT reported as zero"));
+
+  const contenderDir = freshDir("continuity-concurrent-contender");
+  const contenderFixture = finalTransactionFixture(contenderDir, "contender");
+  let contender;
+  const serialized = run(continuityArgs("continuity-integrate-final", 0, contenderFixture.requestFile), continuityDeps(contenderDir, {
+    beforeStateWrite: () => { contender = acquireContinuityLock(contenderDir, "contender-token-01", continuityDeps(contenderDir)); },
+  }));
+  ok("PS44Vc concurrent lock contender is refused while owner commits", serialized === 0
+    && contender?.ok === false && contender?.code === "PS-CONTINUITY-LOCKED"
+    && readState(contenderDir).state.continuity.revision === 1);
+}
+
+// ---- PS44W: Result codec rejects ambiguous bytes and symlink ancestors -----------------
+{
+  const mutations = [
+    ["duplicate-key", (text) => text.replace('{\n  "finalIntegrations": []\n}', '{\n  "finalIntegrations": [],\n  "finalIntegrations": []\n}')],
+    ["duplicate-fence", (text) => `${text}${text}`],
+    ["crlf", (text) => text.replaceAll("\n", "\r\n")],
+    ["bom", (text) => `\uFEFF${text}`],
+  ];
+  for (const [name, mutate] of mutations) {
+    const dir = freshDir(`continuity-result-codec-${name}`);
+    const fixture = finalTransactionFixture(dir, `codec-${name}`);
+    writeFileSync(join(dir, "specs", "result.md"), mutate(RESULT_FIXTURE));
+    const before = readFileSync(statePath(dir), "utf8");
+    const refused = run(continuityArgs("continuity-integrate-final", 0, fixture.requestFile), continuityDeps(dir));
+    ok(`PS44W ${name} Result bytes are refused byte-null`, refused === 2 && readFileSync(statePath(dir), "utf8") === before);
+  }
+
+  const ancestorDir = freshDir("continuity-result-ancestor-symlink");
+  const outsideDir = freshDir("continuity-result-ancestor-target");
+  run(["set-feature", "--id", CONTINUITY_FEATURE, "--plan-path", "specs/prd.md"], { dir: ancestorDir, now: FIXED_NOW });
+  writeFileSync(join(outsideDir, "result.md"), RESULT_FIXTURE);
+  symlinkSync(outsideDir, join(ancestorDir, "specs"));
+  const initFile = writeRequest(ancestorDir, "ancestor-init", continuityState());
+  const before = readFileSync(statePath(ancestorDir), "utf8");
+  const refused = run(continuityArgs("continuity-init", "absent", initFile), continuityDeps(ancestorDir));
+  ok("PS44W ancestor symlink in Result path is refused before mutation", refused === 2
+    && readFileSync(statePath(ancestorDir), "utf8") === before);
+}
+
+// ---- PS44X: historical entries are recursively validated, not checksum-trusted ---------
+{
+  const rewriteHistoricalEntry = (dir, mutate) => {
+    const path = join(dir, "specs", "result.md");
+    const text = readFileSync(path, "utf8");
+    const json = JSON.parse(/^```pipeline-result\n([\s\S]*?)\n```$/m.exec(text)[1]);
+    const entry = json.finalIntegrations[0];
+    mutate(entry);
+    entry.nextTransitionSha256 = createHash("sha256").update(canonicalFixtureJson(entry.nextTransition)).digest("hex");
+    const tuple = {
+      identity: entry.identity,
+      finalDigest: entry.finalDigest,
+      finalOutcome: entry.finalOutcome,
+      preResultSha256: entry.preResultSha256,
+      nextTransitionSha256: entry.nextTransitionSha256,
+    };
+    entry.integrationId = `fi-${createHash("sha256").update(canonicalFixtureJson(tuple)).digest("hex")}`;
+    writeFileSync(path, `\`\`\`pipeline-result\n{\n  "finalIntegrations": [\n    ${canonicalFixtureJson(entry)}\n  ]\n}\n\`\`\`\n`);
+  };
+
+  const identityDir = freshDir("continuity-history-identity-garbage");
+  const identityFixture = finalTransactionFixture(identityDir, "history-identity");
+  run(continuityArgs("continuity-integrate-final", 0, identityFixture.requestFile), continuityDeps(identityDir));
+  rewriteHistoricalEntry(identityDir, (entry) => { entry.identity.mayDelegate = true; });
+  const identityStateBefore = readFileSync(statePath(identityDir), "utf8");
+  const identityReplay = run(continuityArgs("continuity-integrate-final", 0, identityFixture.requestFile), continuityDeps(identityDir));
+  ok("PS44Xa self-consistent historical identity garbage is refused", identityReplay === 2
+    && readFileSync(statePath(identityDir), "utf8") === identityStateBefore);
+
+  const shapeDir = freshDir("continuity-history-shape-garbage");
+  const shapeFixture = finalTransactionFixture(shapeDir, "history-shape");
+  run(continuityArgs("continuity-integrate-final", 0, shapeFixture.requestFile), continuityDeps(shapeDir));
+  rewriteHistoricalEntry(shapeDir, (entry) => { entry.nextTransition.capacity.reservedCriticSlots = 0; });
+  const shapeStateBefore = readFileSync(statePath(shapeDir), "utf8");
+  const shapeReplay = run(continuityArgs("continuity-integrate-final", 0, shapeFixture.requestFile), continuityDeps(shapeDir));
+  ok("PS44Xb self-consistent malformed historical transition is refused", shapeReplay === 2
+    && readFileSync(statePath(shapeDir), "utf8") === shapeStateBefore);
+
+  const literalDigestDir = freshDir("continuity-history-literal-post-digest");
+  const literalDigestFixture = finalTransactionFixture(literalDigestDir, "history-literal-digest");
+  run(continuityArgs("continuity-integrate-final", 0, literalDigestFixture.requestFile), continuityDeps(literalDigestDir));
+  rewriteHistoricalEntry(literalDigestDir, (entry) => {
+    entry.nextTransition.queueHead = continuityQueue({
+      actionId: "literal-next",
+      nextAction: "poll",
+      dispatch: continuityIdentity({
+        queueRevision: 1,
+        actionId: "literal-next",
+        dispatchId: "dispatch-literal-01",
+        attemptId: "attempt-literal-01",
+        authorityDigests: { prdSha256: A, specSha256: B, resultSha256: "0".repeat(64) },
+      }),
+    });
+  });
+  const literalStateBefore = readFileSync(statePath(literalDigestDir), "utf8");
+  const literalReplay = run(continuityArgs("continuity-integrate-final", 0, literalDigestFixture.requestFile), continuityDeps(literalDigestDir));
+  ok("PS44Xc self-consistent literal post-Result digest is refused without sentinel", literalReplay === 2
+    && readFileSync(statePath(literalDigestDir), "utf8") === literalStateBefore);
+
+  const failedQueueDir = freshDir("continuity-history-failed-with-queue");
+  const failedQueueFixture = finalTransactionFixture(failedQueueDir, "history-failed-queue");
+  run(continuityArgs("continuity-integrate-final", 0, failedQueueFixture.requestFile), continuityDeps(failedQueueDir));
+  rewriteHistoricalEntry(failedQueueDir, (entry) => { entry.finalOutcome = "failed"; });
+  const failedQueueStateBefore = readFileSync(statePath(failedQueueDir), "utf8");
+  const failedQueueReplay = run(continuityArgs("continuity-integrate-final", 0, failedQueueFixture.requestFile), continuityDeps(failedQueueDir));
+  ok("PS44Xd self-consistent failed final with queue instead of blocker is refused", failedQueueReplay === 2
+    && readFileSync(statePath(failedQueueDir), "utf8") === failedQueueStateBefore);
+}
+
+// ---- PS44Y: multi-entry Result-before-State replay removes only the exact tail ----------
+{
+  const dir = freshDir("continuity-multi-entry-replay");
+  seedContinuityRoot(dir);
+  const initial = continuityState();
+  run(continuityArgs("continuity-init", "absent", writeRequest(dir, "multi-init", initial)), continuityDeps(dir));
+
+  const firstResultJson = JSON.stringify({ verdict: "first" });
+  const firstEnvelope = {
+    schema: "pipeline.continuity-final.v0", identity: continuityIdentity(), outcome: "succeeded",
+    resultJson: firstResultJson, resultBytes: Buffer.byteLength(firstResultJson),
+  };
+  const firstFinal = { ...firstEnvelope, resultDigest: computeContinuityFinalDigest(firstEnvelope) };
+  const secondDispatch = continuityIdentity({
+    queueRevision: 1,
+    actionId: "second-action",
+    dispatchId: "dispatch-p1-02",
+    attemptId: "attempt-02",
+    authorityDigests: { prdSha256: A, specSha256: B, resultSha256: "$POST_RESULT_SHA256" },
+  });
+  const firstNext = {
+    queueHead: continuityQueue({ actionId: "second-action", nextAction: "poll", dispatch: secondDispatch }),
+    blocker: null,
+    resume: { mode: "immediate", sourceRevision: 1, reasonCode: "active-turn" },
+    recovery: null,
+    decisionTxn: null,
+    capacity: initial.capacity,
+  };
+  const firstRequest = writeRequest(dir, "multi-first", {
+    observation: { status: "completed", identity: continuityIdentity(), final: firstFinal },
+    nextTransition: firstNext,
+    result: { path: "specs/result.md", preResultSha256: C },
+  });
+  const first = run(continuityArgs("continuity-integrate-final", 0, firstRequest), continuityDeps(dir));
+  const afterFirst = readState(dir).state.continuity;
+  const exactSecondIdentity = afterFirst.queueHead.dispatch;
+  const secondResultJson = JSON.stringify({ verdict: "second" });
+  const secondEnvelope = {
+    schema: "pipeline.continuity-final.v0", identity: exactSecondIdentity, outcome: "succeeded",
+    resultJson: secondResultJson, resultBytes: Buffer.byteLength(secondResultJson),
+  };
+  const secondFinal = { ...secondEnvelope, resultDigest: computeContinuityFinalDigest(secondEnvelope) };
+  const secondNext = {
+    queueHead: continuityQueue({ actionId: "third-action", nextAction: "review", dispatch: null }),
+    blocker: null,
+    resume: { mode: "immediate", sourceRevision: 2, reasonCode: "active-turn" },
+    recovery: null,
+    decisionTxn: null,
+    capacity: initial.capacity,
+  };
+  const secondRequest = writeRequest(dir, "multi-second", {
+    observation: { status: "completed", identity: exactSecondIdentity, final: secondFinal },
+    nextTransition: secondNext,
+    result: { path: "specs/result.md", preResultSha256: afterFirst.authority.result.sha256 },
+  });
+  const interrupted = run(continuityArgs("continuity-integrate-final", 1, secondRequest), continuityDeps(dir, {
+    renameSync: () => { throw new Error("second State rename interrupted"); },
+  }));
+  const preparedTwo = readFileSync(join(dir, "specs", "result.md"), "utf8");
+  const replay = run(continuityArgs("continuity-integrate-final", 1, secondRequest), continuityDeps(dir));
+  ok("PS44Ya first historical integration commits", first === 0);
+  ok("PS44Yb second Result tail survives interrupted State write exactly once", interrupted === 2
+    && (preparedTwo.match(/\"integrationId\":\"fi-/g) ?? []).length === 2);
+  ok("PS44Yc multi-entry prior replay commits without splice/duplication", replay === 0
+    && readState(dir).state.continuity.revision === 2
+    && readFileSync(join(dir, "specs", "result.md"), "utf8") === preparedTwo);
+}
+
+// ---- PS44Z: duplicate replay comparison is canonical key-order independent --------------
+{
+  const dir = freshDir("continuity-replay-key-order");
+  const fixture = finalTransactionFixture(dir, "key-order");
+  run(continuityArgs("continuity-integrate-final", 0, fixture.requestFile), continuityDeps(dir));
+  const reordered = structuredClone(fixture.request);
+  reordered.observation.identity = Object.fromEntries(Object.entries(reordered.observation.identity).reverse());
+  const finalWithoutDigest = { ...reordered.observation.final, identity: reordered.observation.identity };
+  delete finalWithoutDigest.resultDigest;
+  reordered.observation.final = { ...finalWithoutDigest, resultDigest: computeContinuityFinalDigest(finalWithoutDigest) };
+  const replayFile = writeRequest(dir, "key-order-replay", reordered);
+  const beforeState = readFileSync(statePath(dir), "utf8");
+  const beforeResult = readFileSync(join(dir, "specs", "result.md"), "utf8");
+  const replay = run(continuityArgs("continuity-integrate-final", 0, replayFile), continuityDeps(dir));
+  ok("PS44Z canonical duplicate replay ignores object insertion order", replay === 0
+    && readFileSync(statePath(dir), "utf8") === beforeState
+    && readFileSync(join(dir, "specs", "result.md"), "utf8") === beforeResult);
 }
 
 // ---- PS45: decision state-applied marker blocks until its bound receipt clears it -----------
@@ -1031,7 +1460,7 @@ function continuityArgs(sub, revision, requestFile, token = "token-00000001") {
   seedContinuityRoot(dir);
   mkdirSync(join(dir, "specs"), { recursive: true });
   mkdirSync(join(dir, "evidence"), { recursive: true });
-  const resultText = "bound result authority\n";
+  const resultText = RESULT_FIXTURE;
   const closeEvidenceText = "bound close evidence\n";
   writeFileSync(join(dir, "specs", "result.md"), resultText);
   writeFileSync(join(dir, "evidence", "close.json"), closeEvidenceText);
