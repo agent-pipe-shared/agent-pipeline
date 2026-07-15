@@ -24,6 +24,13 @@ export const LOOP_FAMILIES = Object.freeze([
   "critic-correction", "delta-regate", "product-retry", "environment-failover",
 ]);
 
+export const LOOP_BOUNDS = Object.freeze({
+  "critic-correction": 2,
+  "delta-regate": 2,
+  "product-retry": 1,
+  "environment-failover": 1,
+});
+
 export const COMMIT_BOUND_STAGES = Object.freeze([
   "work", "stage-verify", "critic", "correction", "delta-regate",
   "intent", "state-cas", "final-verify", "delivery", "fetch-back", "close",
@@ -37,6 +44,31 @@ const FAULT_DOMAINS = new Set(["product", "execution-environment", "unknown"]);
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const GIT_OBJECT_ID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
 const SHA256 = /^[a-f0-9]{64}$/;
+const LEGACY_FAMILY_CONTRACT = Object.freeze([
+  ["initial-full-critic", "event"],
+  ["critic-correction", "back-edge"],
+  ["delta-regate", "back-edge"],
+  ["product-retry", "back-edge"],
+  ["environment-failover", "reroute"],
+  ["scope-course-stop", "gate"],
+  ["package-push-fetch-back", "event"],
+]);
+const LEGACY_FAMILIES = new Set(LEGACY_FAMILY_CONTRACT.map(([family]) => family));
+const LEGACY_BACK_EDGE_FAMILIES = new Set(["critic-correction", "delta-regate", "product-retry"]);
+const LEGACY_EVENT_TYPES = new Set([
+  "start", "work", "critic", "correction", "verify", "retry", "failover",
+  "gate", "po-decision", "push-fetch-back", "handoff", "close",
+]);
+const LEGACY_EDGE_KINDS = new Set(["event", "back-edge", "reroute", "gate"]);
+const LEGACY_LOOP_OUTCOMES = new Set(["succeeded", "failed", "stopped", "deferred"]);
+const LEGACY_EXIT_REASONS = new Set([
+  "corrected", "regate-pass", "retry-pass", "retry-failed", "budget-exhausted",
+  "po-stop", "po-defer",
+]);
+const LEGACY_SOURCE_COLLECTIONS = new Set([
+  "packageResults", "finalIntegrations", "decisionBriefs", "courseDecisionIntents",
+  "courseDecisionReceipts", "externalEvidence",
+]);
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -61,20 +93,130 @@ function gitObjectId(value) {
   return typeof value === "string" && GIT_OBJECT_ID.test(value);
 }
 
+function digest(value) {
+  return typeof value === "string" && SHA256.test(value);
+}
+
 function isStrictlyIncreasing(values) {
   return values.every((value, index) => typeof value === "string"
     && (index === 0 || (typeof values[index - 1] === "string" && values[index - 1] < value)));
 }
 
+function validateLegacySourceRef(ref) {
+  return exactKeys(ref, ["collection", "id", "sha256"])
+    && LEGACY_SOURCE_COLLECTIONS.has(ref.collection) && safeId(ref.id) && digest(ref.sha256);
+}
+
+function validateLegacyEvent(event) {
+  return exactKeys(event, [
+    "eventId", "sequence", "eventType", "outcome", "packageId", "actionId",
+    "originChainId", "boundedFamily", "decisionBriefId", "sourceRefs",
+  ])
+    && safeId(event.eventId) && safeInteger(event.sequence)
+    && LEGACY_EVENT_TYPES.has(event.eventType) && OUTCOME_SET.has(event.outcome)
+    && [event.packageId, event.actionId, event.originChainId].every(safeId)
+    && (event.boundedFamily === null || LEGACY_FAMILIES.has(event.boundedFamily))
+    && (event.decisionBriefId === null || safeId(event.decisionBriefId))
+    && Array.isArray(event.sourceRefs) && event.sourceRefs.length >= 1
+    && event.sourceRefs.length <= 32 && event.sourceRefs.every(validateLegacySourceRef);
+}
+
+function validateLegacyEdge(edge) {
+  return exactKeys(edge, [
+    "edgeId", "fromEventId", "toEventId", "kind", "boundedFamily", "loopStableId",
+    "sourceRefs",
+  ])
+    && [edge.edgeId, edge.fromEventId, edge.toEventId].every(safeId)
+    && LEGACY_EDGE_KINDS.has(edge.kind)
+    && (edge.boundedFamily === null || LEGACY_FAMILIES.has(edge.boundedFamily))
+    && (edge.loopStableId === null || safeId(edge.loopStableId))
+    && Array.isArray(edge.sourceRefs) && edge.sourceRefs.length >= 1
+    && edge.sourceRefs.length <= 32 && edge.sourceRefs.every(validateLegacySourceRef);
+}
+
+function validateLegacyEvidence(entry) {
+  return exactKeys(entry, ["id", "sha256"]) && safeId(entry.id) && digest(entry.sha256);
+}
+
+function validateLegacyLoop(loop) {
+  return exactKeys(loop, [
+    "stableId", "family", "packageId", "actionId", "originChainId", "triggerEvidence",
+    "attemptResultDigests", "normalizedFailureSignature", "similarityGroupId",
+    "observedCount", "configuredLimit", "outcome", "exitReason", "decisionBriefId",
+  ])
+    && [loop.stableId, loop.packageId, loop.actionId, loop.originChainId, loop.similarityGroupId].every(safeId)
+    && LEGACY_BACK_EDGE_FAMILIES.has(loop.family) && digest(loop.normalizedFailureSignature)
+    && Array.isArray(loop.triggerEvidence) && loop.triggerEvidence.length >= 1
+    && loop.triggerEvidence.length <= 32 && loop.triggerEvidence.every(validateLegacyEvidence)
+    && Array.isArray(loop.attemptResultDigests) && loop.attemptResultDigests.length >= 1
+    && loop.attemptResultDigests.length <= 16
+    && loop.attemptResultDigests.every((entry) => exactKeys(entry, ["attemptId", "resultSha256"])
+      && safeId(entry.attemptId) && digest(entry.resultSha256))
+    && safeInteger(loop.observedCount, 1) && safeInteger(loop.configuredLimit, 1)
+    && LEGACY_LOOP_OUTCOMES.has(loop.outcome) && LEGACY_EXIT_REASONS.has(loop.exitReason)
+    && (loop.decisionBriefId === null || safeId(loop.decisionBriefId));
+}
+
+/*
+ * Standalone graph callers receive the same closed structural contract as the
+ * historical checker. File-level v1 Result reads are still delegated to the
+ * unchanged Phase-2.6 checker, which owns its Result/source semantics.
+ */
 function validateLegacyV1(graph) {
   const findings = [];
-  if (!isObject(graph)
-    || graph.schemaVersion !== LEGACY_GRAPH_SCHEMA_VERSION
-    || !Array.isArray(graph.events)
-    || !Array.isArray(graph.edges)
-    || !Array.isArray(graph.boundedFamilies)
-    || !Array.isArray(graph.loopRecords)) {
-    findings.push("historical v1 graph is not readable as pipeline.sdlc-run-graph.v1");
+  const rootKeys = [
+    "schemaVersion", "featureId", "graphCutoffEventId", "sourceEventSetSha256",
+    "completionClaim", "events", "edges", "boundedFamilies", "loopRecords",
+  ];
+  if (!exactKeys(graph, rootKeys)) {
+    return { ok: false, findings: ["historical v1 graph violates the closed root contract"] };
+  }
+  if (graph.schemaVersion !== LEGACY_GRAPH_SCHEMA_VERSION || !safeId(graph.featureId)
+    || !safeId(graph.graphCutoffEventId) || !digest(graph.sourceEventSetSha256)
+    || !["candidate-handoff", "phase-close"].includes(graph.completionClaim)) {
+    findings.push("historical v1 graph has malformed root identity or completion fields");
+  }
+  if (!Array.isArray(graph.events) || graph.events.length < 1 || graph.events.length > 512) {
+    findings.push("historical v1 events must be a non-empty bounded array");
+  }
+  if (!Array.isArray(graph.edges) || graph.edges.length > 1024) {
+    findings.push("historical v1 edges must be a bounded array");
+  }
+  if (!Array.isArray(graph.boundedFamilies) || graph.boundedFamilies.length !== LEGACY_FAMILY_CONTRACT.length) {
+    findings.push("historical v1 boundedFamilies must inventory exactly seven families");
+  }
+  if (!Array.isArray(graph.loopRecords) || graph.loopRecords.length > 128) {
+    findings.push("historical v1 loopRecords must be a bounded array");
+  }
+  if (![graph.events, graph.edges, graph.boundedFamilies, graph.loopRecords].every(Array.isArray)) {
+    return { ok: false, findings };
+  }
+  if (!graph.events.every(validateLegacyEvent)) findings.push("historical v1 events contain a malformed closed record");
+  if (!graph.edges.every(validateLegacyEdge)) findings.push("historical v1 edges contain a malformed closed record");
+  if (!graph.loopRecords.every(validateLegacyLoop)) findings.push("historical v1 loopRecords contain a malformed closed record");
+  for (let index = 0; index < graph.boundedFamilies.length; index += 1) {
+    const entry = graph.boundedFamilies[index];
+    const expected = LEGACY_FAMILY_CONTRACT[index];
+    if (!exactKeys(entry, ["family", "kind", "count", "disposition"])
+      || entry.family !== expected?.[0] || entry.kind !== expected?.[1]
+      || !safeInteger(entry.count)
+      || entry.disposition !== (entry.count === 0 ? "not-triggered" : "executed")) {
+      findings.push(`historical v1 bounded family ${expected?.[0] ?? index} is missing, reordered or malformed`);
+    }
+  }
+  const eventIds = graph.events.map((event) => event?.eventId);
+  if (new Set(eventIds).size !== eventIds.length) findings.push("historical v1 event IDs must be unique");
+  if (!graph.events.every((event, index) => event?.sequence === index)) findings.push("historical v1 events must use contiguous sequence order");
+  if (graph.events.at(-1)?.eventId !== graph.graphCutoffEventId) findings.push("historical v1 cutoff must be the final event");
+  const edgeIds = graph.edges.map((edge) => edge?.edgeId);
+  if (new Set(edgeIds).size !== edgeIds.length
+    || edgeIds.some((id, index) => index > 0 && (!(typeof id === "string") || edgeIds[index - 1] >= id))) {
+    findings.push("historical v1 edge IDs must be unique and lexically ordered");
+  }
+  const loopIds = graph.loopRecords.map((loop) => loop?.stableId);
+  if (new Set(loopIds).size !== loopIds.length
+    || loopIds.some((id, index) => index > 0 && (!(typeof id === "string") || loopIds[index - 1] >= id))) {
+    findings.push("historical v1 loop IDs must be unique and lexically ordered");
   }
   return { ok: findings.length === 0, findings };
 }
@@ -127,6 +269,76 @@ function validateEventShape(event, findings) {
   }
 }
 
+function deriveLoopCounts(graph, findings) {
+  const counts = {
+    "critic-correction": graph.events.filter((event) => event?.stage === "correction").length,
+    "delta-regate": graph.events.filter((event) => event?.stage === "delta-regate").length,
+    "product-retry": 0,
+    "environment-failover": graph.events.filter((event) => event?.stage === "failover").length,
+  };
+  for (const cycle of graph.cycles) {
+    if (!isObject(cycle)) continue;
+    const attempts = graph.events.filter((event) => isObject(event)
+      && event.cycleId === cycle.cycleId && event.stage === "work");
+    counts["product-retry"] += Math.max(0, attempts.length - 1);
+    if (attempts.length > 1) {
+      const first = attempts[0];
+      if (first.outcome !== "failed" || first.faultDomain !== "product" || !digest(first.failureSignature)) {
+        findings.push(`cycle ${cycle?.cycleId ?? "unknown"} product retry must follow one digest-bound failed product work attempt`);
+      }
+      if (attempts.slice(1).some((attempt) => attempt.outcome === "failed"
+        && (attempt.faultDomain !== "product" || !digest(attempt.failureSignature)))) {
+        findings.push(`cycle ${cycle?.cycleId ?? "unknown"} failed product retry attempts require product failure signatures`);
+      }
+    }
+  }
+
+  const signatureOccurrences = new Map();
+  graph.events.forEach((event, index) => {
+    if (event?.outcome === "failed" && event.faultDomain === "product" && digest(event.failureSignature)) {
+      const occurrences = signatureOccurrences.get(event.failureSignature) ?? [];
+      occurrences.push(index);
+      signatureOccurrences.set(event.failureSignature, occurrences);
+    }
+  });
+  for (const [signature, occurrences] of signatureOccurrences) {
+    if (occurrences.length < 2) continue;
+    const recurrenceIndex = occurrences[1];
+    const courseIndex = graph.events.findIndex((event, index) => index > recurrenceIndex
+      && event?.stage === "course" && event.faultDomain === "product"
+      && event.failureSignature === signature);
+    if (courseIndex === -1) {
+      findings.push(`recurring product failure signature ${signature} requires a later matching course event`);
+    }
+  }
+  for (const event of graph.events.filter((entry) => entry?.stage === "failover")) {
+    if (event.faultDomain !== "execution-environment") {
+      findings.push(`failover event ${event.eventId ?? "unknown"} must remain in the execution-environment fault domain`);
+    }
+  }
+  return counts;
+}
+
+function validatePhaseCloseTail(graph, findings) {
+  if (graph.completionClaim !== "phase-close") return;
+  const expectedStages = ["final-verify", "delivery", "fetch-back", "close"];
+  const tail = graph.events.slice(-expectedStages.length);
+  if (tail.length !== expectedStages.length
+    || tail.some((event, index) => event?.stage !== expectedStages[index] || event.outcome !== "succeeded")) {
+    findings.push("phase-close requires a successful terminal final-verify -> delivery -> fetch-back -> close chain");
+    return;
+  }
+  const commit = tail[0].candidateCommit;
+  const tree = tail[0].tree;
+  if (tail.some((event) => event.candidateCommit !== commit || event.tree !== tree)) {
+    findings.push("phase-close terminal chain must bind one unchanged final commit/tree");
+  }
+  if (tail.some((event) => event.cycleId !== tail[0].cycleId
+    || event.packageId !== tail[0].packageId || event.actionId !== tail[0].actionId)) {
+    findings.push("phase-close terminal chain must remain in one package cycle/action");
+  }
+}
+
 function validateV2(graph) {
   const findings = [];
   const rootKeys = ["schemaVersion", "featureId", "completionClaim", "cycles", "events", "loopAggregates"];
@@ -162,7 +374,8 @@ function validateV2(graph) {
     cyclePackages.push(cycle.packageId);
     if (!safeId(cycle.cycleId) || !safeId(cycle.packageId)) findings.push(`cycle ${cycle.cycleId ?? "unknown"} has an invalid identity`);
     if (!safeInteger(cycle.sequence)) findings.push(`cycle ${cycle.cycleId} sequence must be a non-negative integer`);
-    if (!Array.isArray(cycle.eventIds) || cycle.eventIds.length < 1 || !cycle.eventIds.every(safeId)
+    if (!Array.isArray(cycle.eventIds) || cycle.eventIds.length < 1 || cycle.eventIds.length > 4096
+      || !cycle.eventIds.every(safeId)
       || new Set(cycle.eventIds).size !== cycle.eventIds.length) {
       findings.push(`cycle ${cycle.cycleId} event membership must contain ordered unique event IDs`);
     }
@@ -175,7 +388,8 @@ function validateV2(graph) {
   const membership = new Map();
   for (const cycle of graph.cycles) {
     if (!Array.isArray(cycle?.eventIds)) continue;
-    const actual = graph.events.filter((event) => event?.cycleId === cycle.cycleId).map((event) => event.eventId);
+    const actual = graph.events.filter((event) => isObject(event) && event.cycleId === cycle.cycleId)
+      .map((event) => event.eventId);
     if (actual.length !== cycle.eventIds.length || actual.some((id, index) => id !== cycle.eventIds[index])) {
       findings.push(`cycle ${cycle.cycleId} event membership does not preserve graph order`);
     }
@@ -185,6 +399,7 @@ function validateV2(graph) {
     });
   }
   for (const event of graph.events) {
+    if (!isObject(event)) continue;
     const cycle = cyclesById.get(event?.cycleId);
     if (!cycle) {
       findings.push(`event ${event?.eventId ?? "unknown"} references a missing cycle`);
@@ -194,13 +409,16 @@ function validateV2(graph) {
     if (membership.get(event.eventId) !== event.cycleId) findings.push(`event ${event.eventId} is absent from its cycle event membership`);
   }
   for (const cycle of graph.cycles) {
-    const cycleEvents = graph.events.filter((event) => event?.cycleId === cycle?.cycleId);
+    if (!isObject(cycle)) continue;
+    const cycleEvents = graph.events.filter((event) => isObject(event) && event.cycleId === cycle.cycleId);
     if (!cycleEvents.every((event, index) => event.sequence === index)) {
       findings.push(`cycle ${cycle?.cycleId ?? "unknown"} event sequence must be strict, integer and contiguous`);
     }
     const actions = new Set(cycleEvents.map((event) => event.actionId));
     if (actions.size > 1) findings.push(`cycle ${cycle?.cycleId ?? "unknown"} cannot change action dispatch identity`);
   }
+
+  validatePhaseCloseTail(graph, findings);
 
   if (graph.loopAggregates.length !== LOOP_FAMILIES.length) {
     findings.push("loopAggregates must contain exactly one aggregate per loop family");
@@ -213,7 +431,8 @@ function validateV2(graph) {
     }
     aggregateFamilies.push(aggregate.family);
     if (!LOOP_FAMILY_SET.has(aggregate.family)) findings.push(`loop aggregate ${aggregate.family} has an invalid family`);
-    if (!safeInteger(aggregate.count) || !safeInteger(aggregate.bound, 1) || aggregate.count > aggregate.bound) {
+    const fixedBound = LOOP_BOUNDS[aggregate.family];
+    if (!safeInteger(aggregate.count) || aggregate.bound !== fixedBound || aggregate.count > fixedBound) {
       findings.push(`loop aggregate ${aggregate.family} count/bound is invalid`);
     }
   }
@@ -221,12 +440,8 @@ function validateV2(graph) {
     || LOOP_FAMILIES.some((family, index) => aggregateFamilies[index] !== family)) {
     findings.push("loopAggregates must be unique and in stable family order");
   }
-  const stageCounts = new Map([
-    ["critic-correction", graph.events.filter((event) => event?.stage === "correction").length],
-    ["delta-regate", graph.events.filter((event) => event?.stage === "delta-regate").length],
-    ["environment-failover", graph.events.filter((event) => event?.stage === "failover").length],
-  ]);
-  for (const [family, count] of stageCounts) {
+  const chronologyCounts = deriveLoopCounts(graph, findings);
+  for (const [family, count] of Object.entries(chronologyCounts)) {
     const aggregate = graph.loopAggregates.find((entry) => entry?.family === family);
     if (aggregate && aggregate.count !== count) findings.push(`loop aggregate ${family} count does not match typed events`);
   }
@@ -259,38 +474,22 @@ export function createSdlcRunGraph(graph) {
   return freeze(copy);
 }
 
-function nodeId(value) {
-  return `n_${value.replaceAll(/[.:-]/g, "_")}`;
-}
-
 /** Render canonical LF-terminated Mermaid bytes from v2 graph data only. */
 export function renderSdlcMermaidV2(graph) {
   const checked = validateV2(graph);
   if (!checked.ok) throw new TypeError(`invalid v2 graph for projection: ${checked.findings.join("; ")}`);
 
   const lines = ["flowchart TD", "  graph_start([sdlc-v2-start])", "  graph_end([sdlc-v2-end])"];
-  for (const cycle of graph.cycles) {
-    const cycleNode = nodeId(cycle.cycleId);
-    lines.push(`  ${cycleNode}["cycle:${cycle.sequence}:${cycle.cycleId}:${cycle.packageId}"]`);
-    const cycleEvents = graph.events.filter((event) => event.cycleId === cycle.cycleId);
-    for (const event of cycleEvents) {
-      lines.push(`  ${nodeId(event.eventId)}["${event.sequence}:${event.stage}:${event.outcome}"]`);
-    }
-    if (cycleEvents.length > 0) {
-      lines.push(`  ${cycleNode} --> ${nodeId(cycleEvents[0].eventId)}`);
-      for (let index = 1; index < cycleEvents.length; index += 1) {
-        lines.push(`  ${nodeId(cycleEvents[index - 1].eventId)} --> ${nodeId(cycleEvents[index].eventId)}`);
-      }
-    }
+  for (let index = 0; index < graph.events.length; index += 1) {
+    const event = graph.events[index];
+    lines.push(`  event_${index}["${index}:${event.eventId}:${event.cycleId}:${event.sequence}:${event.stage}:${event.outcome}"]`);
   }
-  if (graph.cycles.length > 0) {
-    lines.push(`  graph_start --> ${nodeId(graph.cycles[0].cycleId)}`);
-    for (let index = 1; index < graph.cycles.length; index += 1) {
-      const priorEvents = graph.events.filter((event) => event.cycleId === graph.cycles[index - 1].cycleId);
-      lines.push(`  ${nodeId(priorEvents.at(-1).eventId)} --> ${nodeId(graph.cycles[index].cycleId)}`);
+  if (graph.events.length > 0) {
+    lines.push("  graph_start --> event_0");
+    for (let index = 1; index < graph.events.length; index += 1) {
+      lines.push(`  event_${index - 1} --> event_${index}`);
     }
-    const finalEvents = graph.events.filter((event) => event.cycleId === graph.cycles.at(-1).cycleId);
-    lines.push(`  ${nodeId(finalEvents.at(-1).eventId)} --> graph_end`);
+    lines.push(`  event_${graph.events.length - 1} --> graph_end`);
   }
   for (const aggregate of graph.loopAggregates) {
     lines.push(`  graph_start -.->|loop ${aggregate.family} count=${aggregate.count} bound=${aggregate.bound}| graph_end`);

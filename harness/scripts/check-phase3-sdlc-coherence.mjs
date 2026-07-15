@@ -10,7 +10,10 @@ import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { GRAPH_SCHEMA_VERSION, validateSdlcRunGraph } from "./sdlc-run-graph.mjs";
+import { checkPhase26Invariants } from "./check-phase26-invariants.mjs";
+import {
+  GRAPH_SCHEMA_VERSION, LEGACY_GRAPH_SCHEMA_VERSION, validateSdlcRunGraph,
+} from "./sdlc-run-graph.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..");
@@ -19,6 +22,11 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const SAFE_TARGET = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const GIT_OBJECT_ID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+export const AUTHORITATIVE_VERIFY_COMMAND = "node harness/scripts/verify.mjs";
+const RESULT_KEYS = [
+  "status", "statusProjections", "sdlcRunGraph", "packageResults",
+  "finalDeliveryEvidence", "packageBindings",
+];
 const FINAL_EVIDENCE_KEYS = [
   "finalDeliveryEvidenceId", "candidateCommit", "tree", "verifyCommand",
   "verifyResultDigest", "privacyDisposition", "securityDisposition",
@@ -28,6 +36,12 @@ const PACKAGE_BINDING_KEYS = [
   "packageId", "packageSha256", "terminalCycleId", "terminalEventId",
   "finalDeliveryEvidenceId",
 ];
+const PACKAGE_RESULT_KEYS = [
+  "id", "actionId", "resultEvidenceId", "candidateCommit", "correctionRecords",
+  "deltaReceipts",
+];
+const STATUS_PROJECTION_NAMES = Object.freeze(["result", "state", "human", "package", "handoff"]);
+const STATUS_PROJECTION_KEYS = ["projection", "status", "sourceEvidenceId", "sha256"];
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -36,6 +50,10 @@ function isObject(value) {
 function exactKeys(value, keys) {
   return isObject(value) && Object.keys(value).length === keys.length
     && keys.every((key) => Object.hasOwn(value, key));
+}
+
+function hasRequiredKeys(value, required) {
+  return isObject(value) && required.every((key) => Object.hasOwn(value, key));
 }
 
 function safeId(value) {
@@ -62,14 +80,6 @@ export function sha256Canonical(value) {
   return createHash("sha256").update(canonicalJson(value)).digest("hex");
 }
 
-function recordId(record, candidates) {
-  if (!isObject(record)) return null;
-  for (const candidate of candidates) {
-    if (safeId(record[candidate])) return record[candidate];
-  }
-  return null;
-}
-
 function graphEvents(graph) {
   return Array.isArray(graph?.events) ? graph.events.filter(isObject) : [];
 }
@@ -82,14 +92,47 @@ function sourceIds(event) {
   return Array.isArray(event?.sourceEvidenceIds) ? event.sourceEvidenceIds : [];
 }
 
+function validCorrectionRecord(record, actionId) {
+  return hasRequiredKeys(record, ["correctionId", "actionId"])
+    && safeId(record.correctionId) && record.actionId === actionId;
+}
+
+function validDeltaReceipt(receipt, actionId) {
+  return hasRequiredKeys(receipt, ["receiptId", "actionId"])
+    && safeId(receipt.receiptId) && receipt.actionId === actionId;
+}
+
+function validDelivery(delivery) {
+  if (!isObject(delivery)) return false;
+  if (delivery.outcome !== "succeeded") {
+    return ["failed", "stopped", "deferred", "superseded"].includes(delivery.outcome);
+  }
+  return hasRequiredKeys(delivery, [
+    "outcome", "deliveryReceiptId", "fetchBackReceiptId", "pushedOid", "fetchedOid",
+  ])
+    && safeId(delivery.deliveryReceiptId) && safeId(delivery.fetchBackReceiptId)
+    && gitObjectId(delivery.pushedOid) && gitObjectId(delivery.fetchedOid);
+}
+
 function validatePackageResults(result, graph, findings) {
   if (!Array.isArray(result.packageResults)) {
     findings.push("packageResults must be an array");
     return new Map();
   }
+  if (result.packageResults.length < 1 || result.packageResults.length > 512) {
+    findings.push("packageResults must be a non-empty bounded array");
+  }
   const packages = new Map();
   for (const entry of result.packageResults) {
-    if (!isObject(entry) || !safeId(entry.id) || !safeId(entry.actionId) || packages.has(entry.id)) {
+    if (!hasRequiredKeys(entry, PACKAGE_RESULT_KEYS)
+      || !safeId(entry.id) || !safeId(entry.actionId) || !safeId(entry.resultEvidenceId)
+      || !gitObjectId(entry.candidateCommit)
+      || !Array.isArray(entry.correctionRecords) || entry.correctionRecords.length > 2
+      || !entry.correctionRecords.every((record) => validCorrectionRecord(record, entry.actionId))
+      || !Array.isArray(entry.deltaReceipts) || entry.deltaReceipts.length > 2
+      || !entry.deltaReceipts.every((receipt) => validDeltaReceipt(receipt, entry.actionId))
+      || (Object.hasOwn(entry, "delivery") && !validDelivery(entry.delivery))
+      || packages.has(entry.id)) {
       findings.push(`PackageResult ${entry?.id ?? "unknown"} has a missing, malformed or duplicate identity`);
       continue;
     }
@@ -117,7 +160,7 @@ function validatePackageResults(result, graph, findings) {
   return packages;
 }
 
-function addEvidence(inventory, id, kind, packageId, actionId, findings) {
+function addEvidence(inventory, id, kind, packageId, actionId, findings, sha256 = null) {
   if (!safeId(id)) {
     findings.push(`${kind} has an invalid source evidence ID`);
     return;
@@ -126,7 +169,7 @@ function addEvidence(inventory, id, kind, packageId, actionId, findings) {
     findings.push(`sourceEvidence ID ${id} is duplicate or ambiguous`);
     return;
   }
-  inventory.set(id, { kind, packageId, actionId });
+  inventory.set(id, { kind, packageId, actionId, sha256 });
 }
 
 function buildEvidenceInventory(result, packages, finalEvidence, findings) {
@@ -149,7 +192,7 @@ function buildEvidenceInventory(result, packages, finalEvidence, findings) {
         addEvidence(inventory, receipt?.receiptId, "delta receipt", packageId, receipt?.actionId, findings);
       }
     }
-    if (isObject(packageResult.delivery)) {
+    if (packageResult.delivery?.outcome === "succeeded") {
       addEvidence(inventory, packageResult.delivery.deliveryReceiptId, "delivery receipt", packageId, packageResult.actionId, findings);
       addEvidence(inventory, packageResult.delivery.fetchBackReceiptId, "fetch-back receipt", packageId, packageResult.actionId, findings);
     }
@@ -160,7 +203,11 @@ function buildEvidenceInventory(result, packages, finalEvidence, findings) {
   if (result.externalEvidence !== undefined) {
     if (!Array.isArray(result.externalEvidence)) findings.push("externalEvidence must be an array when present");
     else for (const entry of result.externalEvidence) {
-      addEvidence(inventory, recordId(entry, ["id", "evidenceId", "receiptId"]), "external evidence", null, null, findings);
+      if (!exactKeys(entry, ["id", "sha256"]) || !safeId(entry.id) || !SHA256.test(entry.sha256)) {
+        findings.push("externalEvidence contains a malformed closed evidence binding");
+        continue;
+      }
+      addEvidence(inventory, entry.id, "external evidence", null, null, findings, entry.sha256);
     }
   }
   return inventory;
@@ -221,6 +268,9 @@ function validateDeliveryBijection(packages, graph, findings) {
       && pushEvents[0].cycleId === fetchEvents[0].cycleId
       && pushEvents[0].actionId === packageResult.actionId
       && fetchEvents[0].actionId === packageResult.actionId
+      && pushEvents[0].outcome === "succeeded" && fetchEvents[0].outcome === "succeeded"
+      && pushEvents[0].candidateCommit === delivery.pushedOid
+      && fetchEvents[0].candidateCommit === delivery.fetchedOid
       && pushEvents[0].sequence < fetchEvents[0].sequence;
     if (!exactPair) {
       findings.push(`successful delivery ${packageId} requires exactly one delivery/push and fetch-back/readback pair`);
@@ -234,8 +284,9 @@ function validateDeliveryBijection(packages, graph, findings) {
   }
   const allPushEvents = graphEvents(graph).filter((event) => event.stage === "delivery");
   const allFetchEvents = graphEvents(graph).filter((event) => event.stage === "fetch-back");
-  const deliveryIds = new Set([...packages.values()].map((entry) => entry.delivery?.deliveryReceiptId).filter(Boolean));
-  const fetchIds = new Set([...packages.values()].map((entry) => entry.delivery?.fetchBackReceiptId).filter(Boolean));
+  const deliveredPackages = [...packages.values()].filter((entry) => entry.delivery?.outcome === "succeeded");
+  const deliveryIds = new Set(deliveredPackages.map((entry) => entry.delivery.deliveryReceiptId));
+  const fetchIds = new Set(deliveredPackages.map((entry) => entry.delivery.fetchBackReceiptId));
   for (const event of allPushEvents) {
     const matches = sourceIds(event).filter((id) => deliveryIds.has(id));
     if (matches.length !== 1) findings.push(`delivery event ${event.eventId} does not resolve exactly one push receipt`);
@@ -258,6 +309,7 @@ function validateFinalEvidence(result, graph, findings) {
   if (!safeId(evidence.finalDeliveryEvidenceId)
     || !gitObjectId(evidence.candidateCommit) || !gitObjectId(evidence.tree)
     || typeof evidence.verifyCommand !== "string" || evidence.verifyCommand.length < 1
+    || evidence.verifyCommand.length > 1024
     || typeof evidence.verifyResultDigest !== "string" || !SHA256.test(evidence.verifyResultDigest)
     || !safeId(evidence.privacyDisposition) || !safeId(evidence.securityDisposition)
     || typeof evidence.approvedTarget !== "string" || !SAFE_TARGET.test(evidence.approvedTarget)
@@ -266,6 +318,9 @@ function validateFinalEvidence(result, graph, findings) {
   }
   if (evidence.pushedOid !== evidence.candidateCommit || evidence.fetchedOid !== evidence.pushedOid) {
     findings.push("finalDeliveryEvidence pushedOid/fetchedOid must exactly read back the final candidate commit");
+  }
+  if (graph.completionClaim === "phase-close" && evidence.verifyCommand !== AUTHORITATIVE_VERIFY_COMMAND) {
+    findings.push(`phase-close finalDeliveryEvidence must use the exact authoritative verify command: ${AUTHORITATIVE_VERIFY_COMMAND}`);
   }
   const finalStages = new Set(["final-verify", "delivery", "fetch-back", "close"]);
   for (const event of graphEvents(graph)) {
@@ -281,6 +336,9 @@ function validatePackageBindings(result, packages, graph, finalEvidence, finding
   if (!Array.isArray(result.packageBindings)) {
     findings.push("packageBindings must be an array with complete package coverage");
     return;
+  }
+  if (result.packageBindings.length < 1 || result.packageBindings.length > 512) {
+    findings.push("packageBindings must be a non-empty bounded array");
   }
   const seen = new Set();
   for (const binding of result.packageBindings) {
@@ -318,33 +376,61 @@ function validatePackageBindings(result, packages, graph, finalEvidence, finding
     if (!seen.has(packageId)) findings.push(`packageBindings coverage is missing ${packageId}`);
   }
   if (seen.size !== packages.size) findings.push("packageBindings coverage must be complete and duplicate-free");
+  if (graph?.completionClaim === "phase-close") {
+    const closeEvent = graphEvents(graph).at(-1);
+    const terminalBinding = result.packageBindings.find((binding) => binding?.packageId === closeEvent?.packageId);
+    if (!terminalBinding || terminalBinding.terminalCycleId !== closeEvent?.cycleId
+      || terminalBinding.terminalEventId !== closeEvent?.eventId
+      || terminalBinding.finalDeliveryEvidenceId !== finalEvidence?.finalDeliveryEvidenceId) {
+      findings.push("phase-close requires its terminal package binding to resolve the successful close event and final evidence");
+    }
+  }
+}
+
+function validateResultEnvelope(result, findings) {
+  if (!hasRequiredKeys(result, RESULT_KEYS)) {
+    findings.push("v2 Phase-3 Result is missing required coherence envelope fields");
+  }
 }
 
 function validateStatuses(result, graph, findings) {
-  if (typeof result.status !== "string") findings.push("Result status must be explicit for status reconciliation");
+  if (!["candidate-handoff", "phase-close"].includes(result.status)) {
+    findings.push("Result status must be one supported explicit v2 lifecycle status");
+  }
   const expected = graph?.completionClaim;
   if (result.status !== expected) findings.push(`Result status ${result.status ?? "missing"} conflicts with graph status ${expected ?? "missing"}`);
-  if (!Array.isArray(result.statusProjections) || result.statusProjections.length < 1) {
-    findings.push("statusProjections must reconcile existing close-state projections");
+  if (!Array.isArray(result.statusProjections) || result.statusProjections.length !== STATUS_PROJECTION_NAMES.length) {
+    findings.push("statusProjections must be the exact result/state/human/package/handoff inventory");
     return;
   }
   const projectionNames = new Set();
-  for (const projection of result.statusProjections) {
-    if (!isObject(projection) || !safeId(projection.projection) || typeof projection.status !== "string") {
-      findings.push("statusProjections contains a malformed projection");
-    } else {
-      if (projectionNames.has(projection.projection)) findings.push(`status projection ${projection.projection} is duplicated`);
-      projectionNames.add(projection.projection);
-      if (projection.status !== result.status || projection.status !== expected) {
-        findings.push(`status projection ${projection.projection}=${projection.status} conflicts with ${result.status}/${expected}`);
-      }
+  result.statusProjections.forEach((projection) => {
+    const projectionName = isObject(projection) ? projection.projection : "unknown";
+    if (!exactKeys(projection, STATUS_PROJECTION_KEYS)
+      || !STATUS_PROJECTION_NAMES.includes(projection.projection)
+      || !["candidate-handoff", "phase-close"].includes(projection.status)
+      || !safeId(projection.sourceEvidenceId) || typeof projection.sha256 !== "string"
+      || !SHA256.test(projection.sha256)) {
+      findings.push(`status projection ${projectionName} violates its closed immutable binding shape`);
+      return;
     }
+    if (projectionNames.has(projection.projection)) {
+      findings.push(`status projection ${projection.projection} is duplicated`);
+    }
+    projectionNames.add(projection.projection);
+    if (projection.status !== result.status || projection.status !== expected) {
+      findings.push(`status projection ${projection.projection}=${projection.status} conflicts with ${result.status}/${expected}`);
+    }
+  });
+  for (const name of STATUS_PROJECTION_NAMES) {
+    if (!projectionNames.has(name)) findings.push(`status projection inventory is missing ${name}`);
   }
 }
 
 function reconcilePhase3SdlcCoherence(result) {
   const findings = [];
   if (!isObject(result)) return { ok: false, findings: ["Phase-3 Result envelope must be one object"] };
+  validateResultEnvelope(result, findings);
   const graph = result.sdlcRunGraph;
   if (!isObject(graph) || graph.schemaVersion !== GRAPH_SCHEMA_VERSION) {
     findings.push(`Phase-3 coherence requires ${GRAPH_SCHEMA_VERSION}`);
@@ -485,6 +571,9 @@ export function checkPhase3SdlcCoherenceFile(root = DEFAULT_ROOT, resultPath) {
   try { source = readFileSync(path, "utf8"); } catch { return { ok: false, findings: ["Result is unreadable"] }; }
   const parsed = parsePhase3Result(source);
   if (!parsed.ok) return { ok: false, findings: parsed.findings };
+  if (parsed.result?.sdlcRunGraph?.schemaVersion === LEGACY_GRAPH_SCHEMA_VERSION) {
+    return checkPhase26Invariants(root, resultPath);
+  }
   return checkPhase3SdlcCoherence(parsed.result);
 }
 

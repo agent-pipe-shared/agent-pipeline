@@ -70,7 +70,7 @@ function v2Graph() {
     loopAggregates: [
       { family: "critic-correction", count: 1, bound: 2 },
       { family: "delta-regate", count: 1, bound: 2 },
-      { family: "product-retry", count: 1, bound: 1 },
+      { family: "product-retry", count: 0, bound: 1 },
       { family: "environment-failover", count: 0, bound: 1 },
     ],
   };
@@ -145,8 +145,163 @@ function deepFreeze(value) {
   return value;
 }
 
+function resequenceSingleCycle(graph) {
+  graph.events.forEach((entry, index) => {
+    entry.eventId = `event-${String(index + 1).padStart(3, "0")}`;
+    entry.sequence = index;
+  });
+  graph.cycles[0].eventIds = graph.events.map(({ eventId }) => eventId);
+  return graph;
+}
+
+function retryGraph({ repeatedFailure = false, includeLaterCourse = false } = {}) {
+  const graph = v2Graph();
+  const signature = SHA256("f");
+  Object.assign(graph.events[0], {
+    outcome: "failed",
+    faultDomain: "product",
+    failureSignature: signature,
+  });
+  graph.events.splice(1, 0, event("retry-placeholder", "cycle-alpha-01", 1, "work", {
+    outcome: repeatedFailure ? "failed" : "succeeded",
+    ...(repeatedFailure ? {
+      faultDomain: "product",
+      failureSignature: signature,
+    } : {}),
+  }));
+  if (includeLaterCourse) {
+    graph.events.splice(2, 0, event("course-placeholder", "cycle-alpha-01", 2, "course", {
+      sourceEvidenceIds: ["course-decision-alpha-01"],
+      faultDomain: "product",
+      failureSignature: signature,
+    }));
+  }
+  graph.loopAggregates.find(({ family }) => family === "product-retry").count = 1;
+  return resequenceSingleCycle(graph);
+}
+
+function failoverGraph(failoverCount) {
+  const graph = v2Graph();
+  const failovers = Array.from({ length: failoverCount }, (_, index) => event(
+    `failover-placeholder-${index}`,
+    "cycle-alpha-01",
+    index + 1,
+    "failover",
+    {
+      sourceEvidenceIds: [`failover-receipt-alpha-${index + 1}`],
+      faultDomain: "execution-environment",
+      failureSignature: SHA256(String(index + 1)),
+    },
+  ));
+  graph.events.splice(1, 0, ...failovers);
+  graph.loopAggregates.find(({ family }) => family === "environment-failover").count = failoverCount;
+  return resequenceSingleCycle(graph);
+}
+
+function interleavedGraph() {
+  const packages = ["alpha", "beta"];
+  const interleavedStages = ["work", "stage-verify", "critic", "intent", "state-cas"];
+  const cycles = packages.map((suffix, sequence) => ({
+    cycleId: `cycle-${suffix}-01`,
+    packageId: `package-${suffix}`,
+    sequence,
+    eventIds: [],
+  }));
+  const events = [];
+  for (const [sequence, stage] of interleavedStages.entries()) {
+    for (const [packageIndex, suffix] of packages.entries()) {
+      const eventId = `event-${String(events.length + 1).padStart(3, "0")}`;
+      events.push(event(eventId, `cycle-${suffix}-01`, sequence, stage, {
+        packageId: `package-${suffix}`,
+        actionId: `action-${suffix}`,
+      }));
+      cycles[packageIndex].eventIds.push(eventId);
+    }
+  }
+  for (const [offset, stage] of ["final-verify", "delivery", "fetch-back", "close"].entries()) {
+    const eventId = `event-${String(events.length + 1).padStart(3, "0")}`;
+    events.push(event(eventId, "cycle-beta-01", interleavedStages.length + offset, stage, {
+      packageId: "package-beta",
+      actionId: "action-beta",
+    }));
+    cycles[1].eventIds.push(eventId);
+  }
+  return {
+    schemaVersion: "pipeline.sdlc-run-graph.v2",
+    featureId: "phase3a-interleaved-fixture",
+    completionClaim: "phase-close",
+    cycles,
+    events,
+    loopAggregates: [
+      { family: "critic-correction", count: 0, bound: 2 },
+      { family: "delta-regate", count: 0, bound: 2 },
+      { family: "product-retry", count: 0, bound: 1 },
+      { family: "environment-failover", count: 0, bound: 1 },
+    ],
+  };
+}
+
+function mermaidNodeIdForEvent(mermaid, eventId) {
+  const definition = mermaid.split("\n").find((line) => line.includes(eventId) && line.includes("["));
+  assert(definition, `expected a rendered node definition for ${eventId}`);
+  const match = /^\s*([A-Za-z][A-Za-z0-9_]*)\s*\[/.exec(definition);
+  assert(match, `expected a stable Mermaid node ID for ${eventId}: ${definition}`);
+  return match[1];
+}
+
 test("a complete v2 chronological graph validates", () => {
   assertValid(v2Graph());
+});
+
+test("v2 loop-family bounds are fixed at 2/2/1/1 and cannot be caller-raised", () => {
+  const graph = v2Graph();
+  assert.deepEqual(
+    graph.loopAggregates.map(({ family, bound }) => [family, bound]),
+    [
+      ["critic-correction", 2],
+      ["delta-regate", 2],
+      ["product-retry", 1],
+      ["environment-failover", 1],
+    ],
+  );
+  assertValid(graph);
+
+  for (const family of graph.loopAggregates.map(({ family }) => family)) {
+    const raised = v2Graph();
+    raised.loopAggregates.find((entry) => entry.family === family).bound += 1;
+    assertInvalid(raised, new RegExp(`${family}|bound|fixed|2/2/1/1`, "i"));
+  }
+});
+
+test("product retry count is derived from a second work attempt", () => {
+  assertValid(retryGraph());
+
+  const hiddenRetry = retryGraph();
+  hiddenRetry.loopAggregates.find(({ family }) => family === "product-retry").count = 0;
+  assertInvalid(hiddenRetry, /product-retry|work attempt|count/i);
+
+  const fabricatedRetry = v2Graph();
+  fabricatedRetry.loopAggregates.find(({ family }) => family === "product-retry").count = 1;
+  assertInvalid(fabricatedRetry, /product-retry|work attempt|count/i);
+});
+
+test("a recurring equal product signature requires a later course event", () => {
+  assertValid(retryGraph({ repeatedFailure: true, includeLaterCourse: true }));
+
+  const missingCourse = retryGraph({ repeatedFailure: true });
+  assertInvalid(missingCourse, /product|signature|course|recurr|second/i);
+
+  const earlyCourse = retryGraph({ repeatedFailure: true, includeLaterCourse: true });
+  const courseIndex = earlyCourse.events.findIndex(({ stage }) => stage === "course");
+  const [course] = earlyCourse.events.splice(courseIndex, 1);
+  earlyCourse.events.unshift(course);
+  resequenceSingleCycle(earlyCourse);
+  assertInvalid(earlyCourse, /product|signature|course|later|order/i);
+});
+
+test("environment failover is one-shot and a second failover fails", () => {
+  assertValid(failoverGraph(1));
+  assertInvalid(failoverGraph(2), /environment-failover|failover|one-shot|bound/i);
 });
 
 test("v2 events have a closed shape", () => {
@@ -159,6 +314,31 @@ test("v2 graphs have a closed top-level shape", () => {
   const graph = v2Graph();
   graph.resultNarrative = "close looked fine according to free-form prose";
   assertInvalid(graph, /graph|closed|unexpected|additional|resultNarrative/i);
+});
+
+test("executed graph validation rejects empty and malformed v2 envelopes", () => {
+  const empty = {
+    schemaVersion: "pipeline.sdlc-run-graph.v2",
+    featureId: "phase3a-empty-fixture",
+    completionClaim: "phase-close",
+    cycles: [],
+    events: [],
+    loopAggregates: [
+      { family: "critic-correction", count: 0, bound: 2 },
+      { family: "delta-regate", count: 0, bound: 2 },
+      { family: "product-retry", count: 0, bound: 1 },
+      { family: "environment-failover", count: 0, bound: 1 },
+    ],
+  };
+  assertInvalid(empty, /empty|cycle|event|phase-close|terminal/i);
+
+  const malformed = v2Graph();
+  malformed.cycles = "not-a-cycle-array";
+  malformed.events = { fabricated: true };
+  let outcome;
+  assert.doesNotThrow(() => { outcome = validateSdlcRunGraph(malformed); });
+  assert.equal(outcome?.ok, false);
+  assert.equal(Array.isArray(outcome?.findings), true);
 });
 
 test("the stage and outcome vocabularies are closed", () => {
@@ -180,6 +360,41 @@ test("event IDs are unique and monotonically ordered", () => {
   const reversed = v2Graph();
   [reversed.events[0], reversed.events[1]] = [reversed.events[1], reversed.events[0]];
   assertInvalid(reversed, /event.*(?:monotonic|order)|order.*event/i);
+});
+
+test("interleaved cycle events validate and render in their exact original global order", () => {
+  const graph = interleavedGraph();
+  assertValid(graph);
+  const mermaid = renderSdlcMermaidV2(graph);
+  let previousOffset = -1;
+  for (const { eventId } of graph.events) {
+    const offset = mermaid.indexOf(eventId);
+    assert(offset > previousOffset,
+      `${eventId} must render after the preceding global event, not grouped by cycle`);
+    previousOffset = offset;
+  }
+});
+
+test("distinct valid event IDs never collide into one Mermaid node or a self-loop", () => {
+  const graph = interleavedGraph();
+  const replacements = new Map([
+    [graph.events.at(-2).eventId, "event-1"],
+    [graph.events.at(-1).eventId, "event.1"],
+  ]);
+  for (const entry of graph.events.slice(-2)) entry.eventId = replacements.get(entry.eventId);
+  for (const cycle of graph.cycles) {
+    cycle.eventIds = cycle.eventIds.map((eventId) => replacements.get(eventId) ?? eventId);
+  }
+  assertValid(graph);
+  const mermaid = renderSdlcMermaidV2(graph);
+  const hyphenNode = mermaidNodeIdForEvent(mermaid, "event-1");
+  const dotNode = mermaidNodeIdForEvent(mermaid, "event.1");
+  assert.notEqual(hyphenNode, dotNode, "punctuation-distinct event IDs must not sanitize to one node");
+  for (const nodeId of [hyphenNode, dotNode]) {
+    const selfLoop = new RegExp(`\\b${nodeId}\\b\\s*(?:-->|---|-.->).*\\b${nodeId}\\b`);
+    assert.equal(mermaid.split("\n").some((line) => selfLoop.test(line)), false,
+      `${nodeId} must not acquire a renderer-created self-loop`);
+  }
 });
 
 test("sequences are strict integers ordered within each cycle", () => {
@@ -246,6 +461,28 @@ test("commit and tree bindings reject malformed or half-null values", () => {
   assertInvalid(malformedTree, /tree/i);
 });
 
+test("phase-close cannot be projected from work alone", () => {
+  const graph = v2Graph();
+  graph.events = graph.events.slice(0, 1);
+  graph.cycles[0].eventIds = graph.events.map(({ eventId }) => eventId);
+  graph.loopAggregates.forEach((aggregate) => { aggregate.count = 0; });
+  assertInvalid(graph, /phase-close|final-verify|delivery|fetch-back|close|terminal/i);
+});
+
+test("phase-close requires an ordered successful final-verify/delivery/fetch-back/close tail", () => {
+  const outOfOrder = v2Graph();
+  const finalVerify = outOfOrder.events.find(({ stage }) => stage === "final-verify");
+  const delivery = outOfOrder.events.find(({ stage }) => stage === "delivery");
+  [finalVerify.stage, delivery.stage] = [delivery.stage, finalVerify.stage];
+  assertInvalid(outOfOrder, /final-verify|delivery|fetch-back|close|order/i);
+
+  for (const stage of ["final-verify", "delivery", "fetch-back", "close"]) {
+    const failed = v2Graph();
+    failed.events.find((entry) => entry.stage === stage).outcome = "failed";
+    assertInvalid(failed, new RegExp(`${stage}|phase-close|succeeded|outcome`, "i"));
+  }
+});
+
 test("every v2 event carries non-empty, duplicate-free immutable source evidence IDs", () => {
   const empty = v2Graph();
   empty.events[0].sourceEvidenceIds = [];
@@ -292,7 +529,7 @@ test("Mermaid emits one count-and-bound aggregate per loop family", () => {
   const expected = new Map([
     ["critic-correction", [1, 2]],
     ["delta-regate", [1, 2]],
-    ["product-retry", [1, 1]],
+    ["product-retry", [0, 1]],
     ["environment-failover", [0, 1]],
   ]);
   for (const [family, [count, bound]] of expected) {
@@ -326,6 +563,51 @@ test("the renderer fails closed instead of projecting a malformed v2 graph", () 
   assert.throws(() => renderSdlcMermaidV2(graph), /source|invalid|graph/i);
 });
 
+test("graph validation never throws for null, primitive or malformed collection inputs", () => {
+  const malformedInputs = [
+    null,
+    false,
+    7,
+    "pipeline.sdlc-run-graph.v2",
+    [],
+    {},
+    { schemaVersion: "pipeline.sdlc-run-graph.v2", cycles: null, events: [], loopAggregates: [] },
+    { schemaVersion: "pipeline.sdlc-run-graph.v2", cycles: [], events: null, loopAggregates: [] },
+    { schemaVersion: "pipeline.sdlc-run-graph.v2", cycles: [], events: [], loopAggregates: null },
+    { ...v2Graph(), cycles: [null] },
+    { ...v2Graph(), events: [null] },
+  ];
+  for (const input of malformedInputs) {
+    let outcome;
+    assert.doesNotThrow(() => { outcome = validateSdlcRunGraph(input); });
+    assert.equal(outcome?.ok, false, `malformed input must fail closed: ${String(input)}`);
+    assert.equal(Array.isArray(outcome?.findings), true);
+  }
+});
+
+test("graph validation fails closed without throwing on malformed sources and non-finite numbers", () => {
+  const malformedGraphs = [];
+  for (const sources of [null, "evidence-event-001", [null], ["evidence-event-001", Infinity]]) {
+    const graph = v2Graph();
+    graph.events[0].sourceEvidenceIds = sources;
+    malformedGraphs.push(graph);
+  }
+  for (const value of [NaN, Infinity, -Infinity]) {
+    const eventNumber = v2Graph();
+    eventNumber.events[0].sequence = value;
+    malformedGraphs.push(eventNumber);
+    const cycleNumber = v2Graph();
+    cycleNumber.cycles[0].sequence = value;
+    malformedGraphs.push(cycleNumber);
+  }
+  for (const graph of malformedGraphs) {
+    let outcome;
+    assert.doesNotThrow(() => { outcome = validateSdlcRunGraph(graph); });
+    assert.equal(outcome?.ok, false);
+    assert.equal(Array.isArray(outcome?.findings), true);
+  }
+});
+
 test("historical v1 remains readable without mutating its object or bytes", () => {
   const graph = legacyV1Graph();
   const sourceBytes = `${JSON.stringify(graph, null, 2)}\n`;
@@ -339,8 +621,12 @@ test("historical v1 remains readable without mutating its object or bytes", () =
 
 test("v1 compatibility does not reinterpret historical counters", () => {
   const graph = legacyV1Graph();
-  graph.boundedFamilies.find(({ family }) => family === "critic-correction").count = 19;
-  graph.boundedFamilies.find(({ family }) => family === "delta-regate").count = 20;
+  const criticCorrection = graph.boundedFamilies.find(({ family }) => family === "critic-correction");
+  criticCorrection.count = 19;
+  criticCorrection.disposition = "executed";
+  const deltaRegate = graph.boundedFamilies.find(({ family }) => family === "delta-regate");
+  deltaRegate.count = 20;
+  deltaRegate.disposition = "executed";
   const before = JSON.stringify(graph.boundedFamilies);
   const outcome = validateSdlcRunGraph(graph);
   assert.equal(outcome.ok, true, JSON.stringify(outcome.findings));

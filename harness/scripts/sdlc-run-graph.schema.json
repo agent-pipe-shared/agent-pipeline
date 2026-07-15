@@ -4,75 +4,72 @@
   "title": "Backward-readable SDLC run graph and close evidence",
   "type": "object",
   "additionalProperties": true,
-  "required": ["sdlcRunGraph", "packageResults"],
-  "oneOf": [
-    {
-      "required": ["sdlcRunGraph", "sdlcRunGraphProjection", "phase26InvariantEvidence", "packageResults", "finalIntegrations", "decisionBriefs", "courseDecisionIntents", "courseDecisionReceipts", "externalEvidence"],
-      "properties": { "sdlcRunGraph": { "$ref": "#/$defs/graph" } }
-    },
-    {
-      "required": ["status", "statusProjections", "sdlcRunGraph", "packageResults", "finalDeliveryEvidence", "packageBindings"],
-      "properties": { "sdlcRunGraph": { "$ref": "#/$defs/graphV2" } }
-    }
-  ],
   "properties": {
-    "sdlcRunGraph": {
+    "externalEvidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "sha256"],
+        "properties": {
+          "id": { "type": "string" },
+          "sha256": { "type": "string" }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/resultV1" },
+    { "$ref": "#/$defs/resultV2" }
+  ],
+  "$defs": {
+    "resultV1": {
       "type": "object",
-      "additionalProperties": false,
-      "oneOf": [{ "$ref": "#/$defs/graph" }, { "$ref": "#/$defs/graphV2" }],
+      "additionalProperties": true,
+      "required": ["sdlcRunGraph", "sdlcRunGraphProjection", "phase26InvariantEvidence", "packageResults", "finalIntegrations", "decisionBriefs", "courseDecisionIntents", "courseDecisionReceipts", "externalEvidence"],
       "properties": {
-        "schemaVersion": { "enum": ["pipeline.sdlc-run-graph.v1", "pipeline.sdlc-run-graph.v2"] },
-        "featureId": { "type": "string" },
-        "graphCutoffEventId": { "type": "string" },
-        "sourceEventSetSha256": { "type": "string" },
-        "completionClaim": { "enum": ["candidate-handoff", "phase-close"] },
-        "events": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "additionalProperties": false,
-            "properties": {
-              "eventId": { "type": "string" },
-              "cycleId": { "type": "string" },
-              "sequence": { "type": "number" },
-              "eventType": { "type": "string" },
-              "outcome": { "type": "string" },
-              "packageId": { "type": "string" },
-              "actionId": { "type": "string" },
-              "originChainId": { "type": "string" },
-              "boundedFamily": { "type": ["string", "null"] },
-              "decisionBriefId": { "type": ["string", "null"] },
-              "sourceRefs": { "type": "array" },
-              "stage": { "type": "string" },
-              "sourceEvidenceIds": { "type": "array" },
-              "candidateCommit": { "type": "string" },
-              "tree": { "type": "string" },
-              "faultDomain": { "type": "string" },
-              "failureSignature": { "type": "string" }
-            }
-          }
-        },
-        "edges": { "type": "array" },
-        "boundedFamilies": { "type": "array" },
-        "loopRecords": { "type": "array" },
-        "cycles": { "type": "array", "items": { "$ref": "#/$defs/cycleV2" } },
-        "loopAggregates": { "type": "array", "items": { "$ref": "#/$defs/loopAggregateV2" } }
+        "sdlcRunGraph": { "$ref": "#/$defs/graph" },
+        "sdlcRunGraphProjection": { "$ref": "#/$defs/projection" },
+        "phase26InvariantEvidence": { "$ref": "#/$defs/invariantEvidence" },
+        "packageResults": { "type": "array" },
+        "finalIntegrations": { "type": "array" },
+        "decisionBriefs": { "type": "array" },
+        "courseDecisionIntents": { "type": "array" },
+        "courseDecisionReceipts": { "type": "array" },
+        "externalEvidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
       }
     },
-    "sdlcRunGraphProjection": { "$ref": "#/$defs/projection" },
-    "phase26InvariantEvidence": { "$ref": "#/$defs/invariantEvidence" },
-    "packageResults": { "type": "array" },
-    "finalIntegrations": { "type": "array" },
-    "decisionBriefs": { "type": "array" },
-    "courseDecisionIntents": { "type": "array" },
-    "courseDecisionReceipts": { "type": "array" },
-    "externalEvidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
-    "status": { "type": "string" },
-    "statusProjections": { "type": "array", "items": { "$ref": "#/$defs/statusProjectionV2" } },
-    "finalDeliveryEvidence": { "$ref": "#/$defs/finalDeliveryEvidenceV2" },
-    "packageBindings": { "type": "array", "items": { "$ref": "#/$defs/packageBindingV2" } }
-  },
-  "$defs": {
+    "resultV2": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["status", "statusProjections", "sdlcRunGraph", "packageResults", "finalDeliveryEvidence", "packageBindings"],
+      "properties": {
+        "status": { "enum": ["candidate-handoff", "phase-close"] },
+        "statusProjections": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/statusProjectionV2" },
+          "allOf": [
+            { "contains": { "properties": { "projection": { "const": "result" } } }, "minContains": 1, "maxContains": 1 },
+            { "contains": { "properties": { "projection": { "const": "state" } } }, "minContains": 1, "maxContains": 1 },
+            { "contains": { "properties": { "projection": { "const": "human" } } }, "minContains": 1, "maxContains": 1 },
+            { "contains": { "properties": { "projection": { "const": "package" } } }, "minContains": 1, "maxContains": 1 },
+            { "contains": { "properties": { "projection": { "const": "handoff" } } }, "minContains": 1, "maxContains": 1 }
+          ]
+        },
+        "sdlcRunGraph": { "$ref": "#/$defs/graphV2" },
+        "packageResults": {
+          "type": "array", "minItems": 1, "maxItems": 512,
+          "items": { "$ref": "#/$defs/packageResultV2" }
+        },
+        "finalDeliveryEvidence": { "$ref": "#/$defs/finalDeliveryEvidenceV2" },
+        "packageBindings": {
+          "type": "array", "minItems": 1, "maxItems": 512,
+          "items": { "$ref": "#/$defs/packageBindingV2" }
+        }
+      }
+    },
     "safeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
     "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "family": {
@@ -224,6 +221,10 @@
           "then": { "required": ["faultDomain", "failureSignature"] }
         },
         {
+          "if": { "properties": { "stage": { "const": "failover" } } },
+          "then": { "properties": { "faultDomain": { "const": "execution-environment" } } }
+        },
+        {
           "if": { "required": ["faultDomain", "failureSignature"] },
           "then": {
             "anyOf": [
@@ -265,15 +266,106 @@
         "completionClaim": { "enum": ["candidate-handoff", "phase-close"] },
         "cycles": { "type": "array", "minItems": 1, "maxItems": 512, "items": { "$ref": "#/$defs/cycleV2" } },
         "events": { "type": "array", "minItems": 1, "maxItems": 4096, "items": { "$ref": "#/$defs/eventV2" } },
-        "loopAggregates": { "type": "array", "minItems": 4, "maxItems": 4, "items": { "$ref": "#/$defs/loopAggregateV2" } }
+        "loopAggregates": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "prefixItems": [
+            {
+              "allOf": [
+                { "$ref": "#/$defs/loopAggregateV2" },
+                { "properties": { "family": { "const": "critic-correction" }, "count": { "maximum": 2 }, "bound": { "const": 2 } } }
+              ]
+            },
+            {
+              "allOf": [
+                { "$ref": "#/$defs/loopAggregateV2" },
+                { "properties": { "family": { "const": "delta-regate" }, "count": { "maximum": 2 }, "bound": { "const": 2 } } }
+              ]
+            },
+            {
+              "allOf": [
+                { "$ref": "#/$defs/loopAggregateV2" },
+                { "properties": { "family": { "const": "product-retry" }, "count": { "maximum": 1 }, "bound": { "const": 1 } } }
+              ]
+            },
+            {
+              "allOf": [
+                { "$ref": "#/$defs/loopAggregateV2" },
+                { "properties": { "family": { "const": "environment-failover" }, "count": { "maximum": 1 }, "bound": { "const": 1 } } }
+              ]
+            }
+          ],
+          "items": false
+        }
       }
     },
     "statusProjectionV2": {
       "type": "object", "additionalProperties": false,
-      "required": ["projection", "status"],
+      "required": ["projection", "status", "sourceEvidenceId", "sha256"],
       "properties": {
-        "projection": { "$ref": "#/$defs/safeId" },
-        "status": { "enum": ["implementation-active", "candidate-handoff", "phase-close", "PO-closed"] }
+        "projection": { "enum": ["result", "state", "human", "package", "handoff"] },
+        "status": { "enum": ["candidate-handoff", "phase-close"] },
+        "sourceEvidenceId": { "$ref": "#/$defs/safeId" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "correctionRecordV2": {
+      "type": "object", "additionalProperties": true,
+      "required": ["correctionId", "actionId"],
+      "properties": {
+        "correctionId": { "$ref": "#/$defs/safeId" },
+        "actionId": { "$ref": "#/$defs/safeId" }
+      }
+    },
+    "deltaReceiptV2": {
+      "type": "object", "additionalProperties": true,
+      "required": ["receiptId", "actionId"],
+      "properties": {
+        "receiptId": { "$ref": "#/$defs/safeId" },
+        "actionId": { "$ref": "#/$defs/safeId" }
+      }
+    },
+    "successfulDeliveryV2": {
+      "type": "object", "additionalProperties": true,
+      "required": ["outcome", "deliveryReceiptId", "fetchBackReceiptId", "pushedOid", "fetchedOid"],
+      "properties": {
+        "outcome": { "const": "succeeded" },
+        "deliveryReceiptId": { "$ref": "#/$defs/safeId" },
+        "fetchBackReceiptId": { "$ref": "#/$defs/safeId" },
+        "pushedOid": { "$ref": "#/$defs/gitObjectIdV2" },
+        "fetchedOid": { "$ref": "#/$defs/gitObjectIdV2" }
+      }
+    },
+    "unsuccessfulDeliveryV2": {
+      "type": "object", "additionalProperties": true,
+      "required": ["outcome"],
+      "properties": {
+        "outcome": { "enum": ["failed", "stopped", "deferred", "superseded"] }
+      }
+    },
+    "packageResultV2": {
+      "type": "object", "additionalProperties": true,
+      "required": ["id", "actionId", "resultEvidenceId", "candidateCommit", "correctionRecords", "deltaReceipts"],
+      "properties": {
+        "id": { "$ref": "#/$defs/safeId" },
+        "actionId": { "$ref": "#/$defs/safeId" },
+        "resultEvidenceId": { "$ref": "#/$defs/safeId" },
+        "candidateCommit": { "$ref": "#/$defs/gitObjectIdV2" },
+        "correctionRecords": {
+          "type": "array", "maxItems": 2,
+          "items": { "$ref": "#/$defs/correctionRecordV2" }
+        },
+        "deltaReceipts": {
+          "type": "array", "maxItems": 2,
+          "items": { "$ref": "#/$defs/deltaReceiptV2" }
+        },
+        "delivery": {
+          "oneOf": [
+            { "$ref": "#/$defs/successfulDeliveryV2" },
+            { "$ref": "#/$defs/unsuccessfulDeliveryV2" }
+          ]
+        }
       }
     },
     "finalDeliveryEvidenceV2": {

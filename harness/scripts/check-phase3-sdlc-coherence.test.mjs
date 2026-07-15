@@ -130,6 +130,15 @@ function finalDeliveryEvidence() {
   };
 }
 
+function boundStatusProjections(_result, status = "phase-close") {
+  return ["result", "state", "human", "package", "handoff"].map((projection, index) => ({
+    projection,
+    status,
+    sourceEvidenceId: `status-${projection}-evidence-01`,
+    sha256: SHA256(String(index + 1)),
+  }));
+}
+
 function sealBindings(result) {
   const eventByCycle = new Map(result.sdlcRunGraph.cycles.map((cycle) => [cycle.cycleId, cycle.eventIds]));
   result.packageBindings = result.packageResults.map((packageEntry) => {
@@ -159,11 +168,7 @@ function coherenceFixture() {
   });
   const result = {
     status: "phase-close",
-    statusProjections: [
-      { projection: "result", status: "phase-close" },
-      { projection: "state", status: "phase-close" },
-      { projection: "human", status: "phase-close" },
-    ],
+    statusProjections: [],
     packageResults,
     sdlcRunGraph: {
       schemaVersion: "pipeline.sdlc-run-graph.v2",
@@ -181,6 +186,7 @@ function coherenceFixture() {
     finalDeliveryEvidence: finalDeliveryEvidence(),
     packageBindings: [],
   };
+  result.statusProjections = boundStatusProjections(result);
   return sealBindings(result);
 }
 
@@ -258,11 +264,7 @@ function deliveryCardinalityFixture(packageCount, mappedDeliveryCount) {
   }
   const result = {
     status: "phase-close",
-    statusProjections: [
-      { projection: "result", status: "phase-close" },
-      { projection: "state", status: "phase-close" },
-      { projection: "human", status: "phase-close" },
-    ],
+    statusProjections: [],
     packageResults,
     sdlcRunGraph: {
       schemaVersion: "pipeline.sdlc-run-graph.v2",
@@ -280,6 +282,7 @@ function deliveryCardinalityFixture(packageCount, mappedDeliveryCount) {
     finalDeliveryEvidence: finalDeliveryEvidence(),
     packageBindings: [],
   };
+  result.statusProjections = boundStatusProjections(result);
   return sealBindings(result);
 }
 
@@ -287,15 +290,55 @@ test("the complete sanitized v2 Result is coherent", () => {
   assertValid(coherenceFixture());
 });
 
-test("the published schema accepts the same complete v2 Result envelope", () => {
+test("schema-lite demonstrates its documented keyword limit and non-authoritative role", () => {
   const schema = JSON.parse(readFileSync(new URL("./sdlc-run-graph.schema.json", import.meta.url), "utf8"));
   const valid = validateAgainstSchema(coherenceFixture(), schema);
   assert.equal(valid.valid, true, JSON.stringify(valid.errors));
 
   const malformed = coherenceFixture();
   malformed.sdlcRunGraph.events[0].untrustedProse = "not in the closed event contract";
-  const invalid = validateAgainstSchema(malformed, schema);
-  assert.equal(invalid.valid, false);
+  const schemaLiteGap = validateAgainstSchema(malformed, schema);
+  assert.equal(schemaLiteGap.valid, true,
+    "schema-lite does not execute the published schema's $ref/oneOf nested event contract");
+  assertInvalid(malformed, /event|closed|unexpected|additional|untrustedProse/i);
+
+  const unsupportedFormalKeywords = {
+    type: "object",
+    required: ["ids", "digest"],
+    properties: {
+      ids: {
+        type: "array",
+        minItems: 1,
+        uniqueItems: true,
+        items: { type: "string", pattern: "^event-[0-9]+$" },
+      },
+      digest: { type: "string", pattern: "^[a-f0-9]{64}$", minLength: 64 },
+    },
+    additionalProperties: false,
+  };
+  const formallyInvalidButSchemaLiteAccepted = validateAgainstSchema(
+    { ids: [], digest: "not-a-digest" },
+    unsupportedFormalKeywords,
+  );
+  assert.equal(formallyInvalidButSchemaLiteAccepted.valid, true,
+    "schema-lite intentionally ignores minItems, uniqueItems, pattern and minLength");
+});
+
+test("executed runtime validation rejects empty and malformed v2 Result envelopes", () => {
+  const empty = coherenceFixture();
+  empty.packageResults = [];
+  empty.sdlcRunGraph.cycles = [];
+  empty.sdlcRunGraph.events = [];
+  empty.packageBindings = [];
+  assertInvalid(empty, /empty|PackageResult|cycle|event|phase-close|delivery/i);
+
+  const malformed = coherenceFixture();
+  malformed.sdlcRunGraph.cycles = null;
+  malformed.sdlcRunGraph.events = "not-an-event-array";
+  let outcome;
+  assert.doesNotThrow(() => { outcome = checkPhase3SdlcCoherence(malformed); });
+  assert.equal(outcome?.ok, false);
+  assert.equal(Array.isArray(outcome?.findings), true);
 });
 
 test("every PackageResult maps to one or more ordered events in exactly one cycle", () => {
@@ -373,6 +416,39 @@ test("every successful delivery requires exactly one delivery and exact fetch-ba
   assertInvalid(missingPush, /delivery|push|fetch-back.*pair/i);
 });
 
+test("phase-close requires each package to finish an ordered successful final delivery tail", () => {
+  const workOnly = deliveryCardinalityFixture(1, 0);
+  assertInvalid(workOnly, /phase-close|final-verify|delivery|fetch-back|close|terminal/i);
+
+  const outOfOrder = coherenceFixture();
+  const betaFinalVerify = findEvent(outOfOrder, "package-beta", "final-verify");
+  const betaDelivery = findEvent(outOfOrder, "package-beta", "delivery");
+  [betaFinalVerify.stage, betaDelivery.stage] = [betaDelivery.stage, betaFinalVerify.stage];
+  assertInvalid(outOfOrder, /package-beta|final-verify|delivery|fetch-back|close|order/i);
+
+  for (const stage of ["final-verify", "delivery", "fetch-back", "close"]) {
+    const failed = coherenceFixture();
+    findEvent(failed, "package-beta", stage).outcome = "failed";
+    assertInvalid(failed, new RegExp(`package-beta|${stage}|phase-close|succeeded|outcome`, "i"));
+  }
+});
+
+test("delivery and fetch-back event bindings must match the successful PackageResult", () => {
+  const failedDelivery = coherenceFixture();
+  failedDelivery.packageResults[1].delivery.outcome = "failed";
+  sealBindings(failedDelivery);
+  assertInvalid(failedDelivery, /package-beta|delivery|failed|phase-close/i);
+
+  const fetchCommitMismatch = coherenceFixture();
+  findEvent(fetchCommitMismatch, "package-beta", "fetch-back").candidateCommit = COMMIT("c");
+  assertInvalid(fetchCommitMismatch, /package-beta|fetch-back|commit|candidate|mismatch/i);
+
+  const fetchReceiptMismatch = coherenceFixture();
+  replaceEventSource(findEvent(fetchReceiptMismatch, "package-beta", "fetch-back"),
+    ["fetch-receipt-alpha-01"]);
+  assertInvalid(fetchReceiptMismatch, /package-beta|fetch-back|receipt|sourceEvidence|mismatch/i);
+});
+
 test("delivery and fetch-back receipts are each bijective", () => {
   const duplicateDelivery = coherenceFixture();
   const spareDelivery = findEvent(duplicateDelivery, "package-beta", "intent");
@@ -425,6 +501,10 @@ test("final evidence binds one internally exact final commit, tree, verify and r
   const missingDigest = coherenceFixture();
   delete missingDigest.finalDeliveryEvidence.verifyResultDigest;
   assertInvalid(missingDigest, /verifyResultDigest|verify.*digest|final/i);
+
+  const wrongCommand = coherenceFixture();
+  wrongCommand.finalDeliveryEvidence.verifyCommand = "npm test";
+  assertInvalid(wrongCommand, /verifyCommand|authoritative|node harness\/scripts\/verify\.mjs|exact/i);
 });
 
 test("package bindings provide complete duplicate-free package-ID coverage", () => {
@@ -472,6 +552,11 @@ test("terminal cycle and event references resolve to the owning package chronolo
   const nonTerminalEvent = coherenceFixture();
   nonTerminalEvent.packageBindings[1].terminalEventId = findEvent(nonTerminalEvent, "package-beta", "work").eventId;
   assertInvalid(nonTerminalEvent, /terminalEventId|terminal event|package-beta/i);
+
+  const fetchBackIsNotTerminalClose = coherenceFixture();
+  fetchBackIsNotTerminalClose.packageBindings[1].terminalEventId =
+    findEvent(fetchBackIsNotTerminalClose, "package-beta", "fetch-back").eventId;
+  assertInvalid(fetchBackIsNotTerminalClose, /terminalEventId|terminal|close|package-beta/i);
 });
 
 test("all graph source evidence IDs resolve without prose-based inference", () => {
@@ -493,22 +578,112 @@ test("the sanitized Phase-2.6 seven-vs-ten delivery regression fails closed", ()
 test("the sanitized contradictory close-status regression fails closed", () => {
   const result = coherenceFixture();
   result.status = "implementation-active";
-  result.statusProjections = [
-    { projection: "result", status: "implementation-active" },
-    { projection: "graph", status: "phase-close" },
-    { projection: "package", status: "PO-closed" },
-    { projection: "next-gate", status: "candidate-handoff" },
-  ];
+  result.statusProjections[0].status = "implementation-active";
+  result.statusProjections[1].status = "phase-close";
+  result.statusProjections[2].status = "PO-closed";
+  result.statusProjections[3].status = "phase-close";
+  result.statusProjections[4].status = "candidate-handoff";
   const outcome = check(result);
   assert.equal(outcome.ok, false);
   assert(outcome.findings.some((finding) => /status|implementation-active|phase-close|PO-closed|candidate-handoff/i.test(finding)),
     JSON.stringify(outcome.findings));
 });
 
-test("one compatible close status across projections remains valid", () => {
+test("status projection inventory is exactly result/state/human/package/handoff", () => {
   const result = coherenceFixture();
-  result.statusProjections.push({ projection: "graph", status: "phase-close" });
+  assert.deepEqual(result.statusProjections.map(({ projection }) => projection),
+    ["result", "state", "human", "package", "handoff"]);
   assertValid(result);
+
+  const missing = coherenceFixture();
+  missing.statusProjections.pop();
+  assertInvalid(missing, /status|projection|handoff|inventory|missing/i);
+
+  const duplicate = coherenceFixture();
+  duplicate.statusProjections.push({ ...duplicate.statusProjections[0] });
+  assertInvalid(duplicate, /status|projection|result|duplicate|inventory/i);
+
+  const extra = coherenceFixture();
+  extra.statusProjections.push({
+    ...extra.statusProjections[0],
+    projection: "graph",
+  });
+  assertInvalid(extra, /status|projection|graph|extra|inventory/i);
+});
+
+test("every status projection has a directly bound sourceEvidenceId and sha256", () => {
+  const result = coherenceFixture();
+  for (const projection of result.statusProjections) {
+    assert.equal(typeof projection.sourceEvidenceId, "string");
+    assert.match(projection.sha256, /^[a-f0-9]{64}$/);
+  }
+  assertValid(result);
+
+  const missingSource = coherenceFixture();
+  delete missingSource.statusProjections[0].sourceEvidenceId;
+  assertInvalid(missingSource, /status|projection|sourceEvidenceId|binding/i);
+
+  const missingDigest = coherenceFixture();
+  delete missingDigest.statusProjections[1].sha256;
+  assertInvalid(missingDigest, /status|projection|sha256|digest|binding/i);
+
+  const malformedDigest = coherenceFixture();
+  malformedDigest.statusProjections[2].sha256 = "not-a-sha256";
+  assertInvalid(malformedDigest, /status|projection|sha256|digest|binding/i);
+
+  const unboundSource = coherenceFixture();
+  unboundSource.statusProjections[3].sourceEvidenceId = "";
+  assertInvalid(unboundSource, /status|projection|sourceEvidence|unbound|empty|binding/i);
+
+  const unboundDigest = coherenceFixture();
+  unboundDigest.statusProjections[4].sha256 = "";
+  assertInvalid(unboundDigest, /status|projection|sha256|digest|unbound|empty|binding/i);
+});
+
+test("Result coherence checking never throws for null, primitive or malformed collection inputs", () => {
+  const malformedInputs = [
+    null,
+    false,
+    7,
+    "phase-close",
+    [],
+    {},
+    { status: "phase-close", packageResults: null, sdlcRunGraph: null },
+    { ...coherenceFixture(), packageResults: "not-an-array" },
+    { ...coherenceFixture(), packageBindings: [null] },
+    { ...coherenceFixture(), statusProjections: [null] },
+    { ...coherenceFixture(), sdlcRunGraph: { ...coherenceFixture().sdlcRunGraph, cycles: [null] } },
+    { ...coherenceFixture(), sdlcRunGraph: { ...coherenceFixture().sdlcRunGraph, events: [null] } },
+  ];
+  for (const input of malformedInputs) {
+    let outcome;
+    assert.doesNotThrow(() => { outcome = checkPhase3SdlcCoherence(input); });
+    assert.equal(outcome?.ok, false, `malformed Result input must fail closed: ${String(input)}`);
+    assert.equal(Array.isArray(outcome?.findings), true);
+  }
+});
+
+test("Result coherence checking fails closed without throwing on malformed sources and non-finite numbers", () => {
+  const malformedResults = [];
+  for (const sources of [null, "package-result-alpha", [null], ["package-result-alpha", Infinity]]) {
+    const result = coherenceFixture();
+    result.sdlcRunGraph.events[0].sourceEvidenceIds = sources;
+    malformedResults.push(result);
+  }
+  for (const value of [NaN, Infinity, -Infinity]) {
+    const eventNumber = coherenceFixture();
+    eventNumber.sdlcRunGraph.events[0].sequence = value;
+    malformedResults.push(eventNumber);
+    const cycleNumber = coherenceFixture();
+    cycleNumber.sdlcRunGraph.cycles[0].sequence = value;
+    malformedResults.push(cycleNumber);
+  }
+  for (const result of malformedResults) {
+    let outcome;
+    assert.doesNotThrow(() => { outcome = checkPhase3SdlcCoherence(result); });
+    assert.equal(outcome?.ok, false);
+    assert.equal(Array.isArray(outcome?.findings), true);
+  }
 });
 
 test("checker invocation without --result is an explicit successful SKIP", () => {
