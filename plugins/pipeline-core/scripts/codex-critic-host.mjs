@@ -544,6 +544,27 @@ function inventoryPaths(repoRoot, args, label) {
   return { count: entries.length, bytes, sha256: sha256(canonicalJson(entries)) };
 }
 
+function worktreeDirectoryInventory(repoRoot) {
+  const entries = [];
+  const walk = (directory, prefix = "") => {
+    for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (prefix === "" && entry.name === ".git") continue;
+      // The excluded instruction file is never opened or fingerprinted.
+      if (entry.name.toLowerCase() === "agents.md") continue;
+      const path = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
+      const absolute = join(directory, entry.name);
+      const info = lstatSync(absolute);
+      if (info.isDirectory() && !info.isSymbolicLink()) {
+        entries.push({ path, type: "directory", mode: info.mode & 0o777 });
+        walk(absolute, path);
+      }
+      if (entries.length > MAX_INVENTORY_FILES) fail("worktree directory inventory exceeds its bound");
+    }
+  };
+  walk(repoRoot);
+  return { count: entries.length, sha256: sha256(canonicalJson(entries)) };
+}
+
 function adminDirectoryInventory(root, label) {
   const entries = [];
   let bytes = 0;
@@ -634,6 +655,7 @@ export function captureRepositoryFingerprint(repoRoot, declaredArtifacts = []) {
     status: sha256(runGit(repoRoot, ["status", "--porcelain=v1", "-z", "--untracked-files=all"], { encoding: "buffer" }).stdout),
     untracked: inventoryPaths(repoRoot, ["ls-files", "--others", "--exclude-standard", "-z"], "untracked"),
     ignored: inventoryPaths(repoRoot, ["ls-files", "--others", "--ignored", "--exclude-standard", "-z"], "ignored"),
+    worktreeDirectories: worktreeDirectoryInventory(repoRoot),
     artifacts: Object.fromEntries(declaredArtifacts.map((item) => [item.path, resolveRegularFile(repoRoot, item.path, {
       allowUntracked: item.kind === "evidence" || item.kind === "diff",
     }).sha256])),

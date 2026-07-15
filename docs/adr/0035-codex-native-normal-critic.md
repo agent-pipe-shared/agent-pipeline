@@ -1,5 +1,7 @@
 # ADR-0035: Codex normal Critic through a native host boundary
 
+> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+
 > Agent-Pipeline v0.3 candidate · 2026-07-15
 
 **Status:** accepted (PO-approved Phase-2 close design, 2026-07-15)
@@ -90,8 +92,8 @@ evidence or commit trailers is not by itself a trajectory gap.
   completion.
 - Hash binding, no-remote review material, mandatory identity-bound observers,
   strict schemas, recoverable single-use publication, evidence-bound liveness,
-  and content-aware worktree plus Git-administration mutation detection fail
-  closed.
+  and content-aware worktree-directory plus Git-administration mutation
+  detection fail closed.
 - The controls do not prove absence of private reads, write-then-restore,
   writes outside observed roots, hidden tools, network effects, prompt
   injection, provider fallback, or escaped processes.
@@ -122,3 +124,134 @@ evidence or commit trailers is not by itself a trajectory gap.
 Re-evaluate when Codex exposes stable structured lifecycle/tool telemetry, a
 separately approved OS isolation adapter exists, or a newer CLI demonstrably
 fixes the archived post-turn stall.
+
+<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+
+# ADR-0035: Normaler Codex-Critic über eine native Host-Grenze
+
+> Agent-Pipeline v0.3 candidate · 2026-07-15
+
+**Status:** akzeptiert (vom PO freigegebenes Phase-2-Close-Design, 2026-07-15)
+
+## Kontext
+
+Der bestehende Critic-Vertrag setzt einen frischen Read-only-Reviewer voraus und
+fordert für Architektur-, Guardrail- und Sicherheitsänderungen einen stärkeren
+isolierten Lauf. Die Codex-CLI-Isolationsforschung lieferte nützliche
+fail-closed Kontrollen, doch der externe Review-Prozess blieb wiederholt nach
+Turn-Beginn stehen und lieferte kein Verdict. Diese Forschung bleibt erhalten,
+ohne dass der normale Review-Pfad von einem nicht funktionierenden verschachtelten
+CLI-Lebenszyklus abhängt.
+
+Codex braucht außerdem eine explizite Review-Duty. Das bisherige Runner-Mapping
+belegt nur den Alias `Fable -> gpt-5.6-sol` bei unverändertem Effort; es erhob
+bewusst keinen vollständigen Codex-Duty-Claim.
+
+## Entscheidung
+
+Die providerneutrale Host-Duty `criticNormal` wird ergänzt und für Codex auf
+`gpt-5.6-sol/xhigh` abgebildet. Bestehende Claude-Critic-Zuweisungen bleiben
+unverändert.
+
+Die v0.3-Implementierung ist bewusst ein Maintainer-/Self-Application-Gate.
+Prepare und Finalize verlangen beide einen expliziten sauberen vollständigen
+Shared-Ruleset-Git-Checkout, der physisch von der Kandidatenquelle getrennt ist
+und auf demselben exakten Commit steht. Ausführender Harness, Routing-Projektion,
+Konfigurationen und Validator-Schemas müssen byteidentisch zum gepinnten Checkout
+sein. Versteckte Index-Flags werden abgewiesen. Ein installierter Plugin-Cache
+gilt nicht stillschweigend als gleichwertige Provenienz; eine spätere
+cache-native Projektion benötigt einen eigenen Manifest-/Cache-Evidence-Vertrag.
+
+Für einen `T1`-Dispatch trägt der strikte Request zusätzlich eine sanitisierte
+Named-PO-Waiver-Bindung: Authority-Rolle, Risk-ID, begrenzter Scope,
+Autorisierungs-Evidence-Hash und exakt autorisierter Kandidatencommit. Prepare
+weist fehlende, fehlerhafte oder veraltete Bindungen ab. Das sanitisierte Receipt
+wiederholt sie, damit das private Close-Gate die zugrunde liegende Entscheidung
+ohne private Entscheidungstexte prüfen kann.
+
+Der normale Codex-Pfad ist zwischen deterministischem Coordinator-Harness und
+nativer Host-Agent-Oberfläche aufgeteilt:
+
+1. `codex-critic-host.mjs prepare` validiert einen exakten Full-SHA-Kandidaten,
+   erstellt einen unabhängigen disponiblen Checkout, entfernt alle Git-Remotes,
+   führt das kalibrierte Verify unter einer bereinigten Umgebung aus, bindet
+   quellenqualifizierte Referenzen und Content-Fingerprints und erzeugt eine
+   begrenzte deterministische Referenz mit den exakten geordneten Commit-SHAs
+   zwischen Review-Base und Kandidat. Dieser Referenzpfad ist für den
+   Coordinator reserviert und darf nie als Request-Evidence geliefert werden.
+   Prepare schreibt danach ein `0600`-Dispatch-Paket und einen nicht offengelegten
+   Consumption-Record unterhalb eines privaten symlinksicheren
+   Coordinator-Control-Verzeichnisses. Kandidat, Ruleset und die verpflichtenden
+   `private`- und `shared`-Observer werden vor und nach jedem kandidatenkontrollierten
+   Subprozess erfasst.
+2. Der Elephant startet genau einen frischen nativen Host-Critic ohne Chat-Historie.
+   Der Host verantwortet Dispatch, Fortschrittsbeobachtung, Interrupt und höchstens
+   eine Recovery. Repository-Code startet keinen Agent-Prozess.
+3. Der Elephant erfasst genau ein strukturiertes Resultat. Nur
+   `codex-critic-host.mjs finalize` darf es validieren und danach das sanitisierte
+   Receipt erzeugen; geprüft werden Route, Nonce, Kandidat, Liveness, Verdict,
+   Referenzen, ignored/untracked Content, Worktree-Verzeichnisse,
+   Git-Administration, Objektinventare und After-Fingerprints. Finalize nutzt
+   eine exklusive, crash-recoverable Single-use-Publikationstransaktion mit
+   atomarer No-overwrite-Publikation und dauerhaften Markern. PASS und FAIL
+   erzeugen beide ein Disposition-Receipt; freier Finding-Text bleibt im privaten
+   Host-Return, während das Receipt nur geschlossene Zitate, Schweregrade, IDs
+   und Hashes enthält.
+
+Das Receipt nennt das erreichte Niveau wörtlich:
+
+`normal-contractual-read-only; OS isolation not asserted`
+
+Der Host liefert derzeit keine kryptographische Attestierung der Modellidentität
+oder Tool-Nutzung. Das Receipt trennt die angeforderte/coordinator-bestätigte
+Route von einer Provider-Attestierung und hält letztere auf `false`.
+
+Der Read-only-Critic besitzt keinen Writer-Diff als Heartbeat. Seine Lease ist
+daher evidence-basiert: erste konkrete Evidence binnen 60 Sekunden, danach ein
+neuer content-gebundener Review-Meilenstein binnen 180 Sekunden bei unveränderter
+Gesamtlease von 480 Sekunden. Writer-Lanes nutzen stattdessen Diff-/Test-/Evidence-
+Fortschritt und dürfen reine vergangene Wall-Time nicht als Stall werten.
+
+Trajectory-Konsistenz betrifft die kalibrierten Verify-Artefakte und den
+reviewten Commit. Frischkontext-Dispatch und Host-Ausführung validiert der
+Coordinator-Umschlag erst nach dem Critic-Resultat; ihr Fehlen in
+Kandidaten-Evidence oder Commit-Trailern ist für sich keine Trajectory-Lücke.
+
+## Konsequenzen
+
+- Ein funktionierendes normales Codex-Review-Gate hängt nicht länger von der
+  Beendigung eines verschachtelten CLI-Prozesses ab.
+- Hash-Bindung, Remote-loses Review-Material, verpflichtende identitätsgebundene
+  Observer, strikte Schemas, recoverable Single-use-Publikation,
+  evidence-gebundene Liveness sowie content-sensitive Worktree-Verzeichnis- und
+  Git-Administrations-Mutationserkennung fail-closen.
+- Die Kontrollen beweisen nicht die Abwesenheit privater Reads, von
+  Write-then-restore, Writes außerhalb beobachteter Roots, versteckter Tools,
+  Netzwerkeffekten, Prompt-Injection, Provider-Fallback oder entkommener Prozesse.
+- Finale Fingerprints sind sequenzielle Point-in-time-Snapshots. Ein entkommener
+  Prozess kann sie nach der Erfassung veralten lassen; das Receipt behauptet
+  keinen transaktionalen Cross-Repository-Snapshot.
+- Cleanup des Review-Checkouts ist ein separater Best-effort-Hygieneschritt,
+  nachdem das Receipt dauerhaft ist; sein Erfolg ist kein Teil des Review-Verdicts.
+- Diese Lane erfüllt den verpflichtenden isolierten T1-Pfad **nicht**. Ihre
+  Nutzung anstelle von T1 verlangt einen Named, scope-bounded PO-Risk-Waiver.
+  Sie erzeugt nie einen Isolation- oder Codex-Conformance-Claim.
+- Die aufgeschobene Sandbox-Implementierung bleibt getrennte Forschung und darf
+  nur über ihre expliziten Backlog-Re-entry-Trigger fortgesetzt werden.
+
+## Verworfene Alternativen
+
+- Den verschachtelten Sandbox-Critic weiter wiederholen: für den v0.3-Close
+  verworfen, nachdem wiederholte begrenzte Läufe kein Verdict erzeugten.
+- Net-State-Checks als Isolation umbenennen: verworfen, weil Erkennung keine
+  Einschließung ist.
+- Unabhängiges Review entfernen: verworfen, weil der native Host-Critic ein
+  nützliches und funktionierendes semantisches Gate bleibt.
+- Die bestehende Claude-Critic-Route ändern: verworfen; diese Entscheidung fügt
+  eine Codex-Host-Duty hinzu und lässt Claude-Zuweisungen unverändert.
+
+## Wiedervorlage
+
+Erneut bewerten, wenn Codex stabile strukturierte Lifecycle-/Tool-Telemetrie
+exponiert, ein separat freigegebener OS-Isolationsadapter existiert oder eine
+neuere CLI den archivierten Stall nach Turn-Beginn nachweislich behebt.

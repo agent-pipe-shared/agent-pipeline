@@ -641,6 +641,14 @@ check("Git index mode-only mutation changes the administrative fingerprint", () 
   chmodSync(indexPath, 0o600);
   assert.notEqual(captureRepositoryFingerprint(indexObserver).sha256, before);
 });
+check("empty untracked worktree directory mutation changes the fingerprint", () => {
+  const emptyDirectory = join(sharedObserver, "empty-untracked-directory");
+  const before = captureRepositoryFingerprint(sharedObserver).sha256;
+  mkdirSync(emptyDirectory);
+  assert.notEqual(captureRepositoryFingerprint(sharedObserver).sha256, before);
+  rmSync(emptyDirectory, { recursive: true });
+  assert.equal(captureRepositoryFingerprint(sharedObserver).sha256, before);
+});
 check("symlinked Git index is rejected instead of dereferenced", () => {
   const indexObserver = createObserver(join(root, "index-symlink-observer"));
   const indexPath = join(indexObserver, ".git", "index");
