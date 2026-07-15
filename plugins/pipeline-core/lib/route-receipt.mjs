@@ -15,6 +15,9 @@ const SCHEMA_PATH = join(HERE, "..", "scripts", "route-receipt.schema.json");
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const GIT_OBJECT_ID = /^[a-f0-9]{40,64}$/;
+const EFFORTS = ["low", "medium", "high", "xhigh", "max", "not-applicable"];
+const PROVIDERS = ["anthropic", "openai"];
+const RUNNERS = ["claude", "codex"];
 
 export function loadRouteReceiptSchema(path = SCHEMA_PATH) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -30,25 +33,62 @@ function exactKeys(value, names) {
     && names.every((name) => Object.prototype.hasOwnProperty.call(value, name));
 }
 
+function isDuty(value) {
+  return typeof value === "string" && SAFE_ID.test(value);
+}
+
+function isWorktype(value) {
+  return value === null || (typeof value === "string" && SAFE_ID.test(value));
+}
+
+function isSelector(value) {
+  return exactKeys(value, ["kind", "value"])
+    && ["alias", "model-id"].includes(value.kind)
+    && typeof value.value === "string" && value.value.length > 0;
+}
+
 function isDispatchBinding(value) {
-  return exactKeys(value, ["dispatchId", "queueRevision", "candidateCommit", "candidateTree"])
+  return exactKeys(value, ["dispatchId", "queueRevision", "candidateCommit", "candidateTree", "requestedDuty", "requestedWorktype"])
     && SAFE_ID.test(value.dispatchId ?? "")
     && Number.isSafeInteger(value.queueRevision) && value.queueRevision >= 0
     && GIT_OBJECT_ID.test(value.candidateCommit ?? "")
-    && GIT_OBJECT_ID.test(value.candidateTree ?? "");
+    && GIT_OBJECT_ID.test(value.candidateTree ?? "")
+    && isDuty(value.requestedDuty)
+    && isWorktype(value.requestedWorktype);
 }
 
 function isTrustedEvidenceBinding(value) {
-  return exactKeys(value, ["source", "sha256"])
+  return exactKeys(value, [
+    "source",
+    "sha256",
+    "resultSha256",
+    "effectiveDuty",
+    "effectiveWorktype",
+    "effectiveRunner",
+    "effectiveSelector",
+    "effectiveProvider",
+    "effectiveModelId",
+    "effectiveEffort",
+  ])
     && ["host", "cli"].includes(value.source)
-    && SHA256.test(value.sha256 ?? "");
+    && SHA256.test(value.sha256 ?? "")
+    && SHA256.test(value.resultSha256 ?? "")
+    && isDuty(value.effectiveDuty)
+    && isWorktype(value.effectiveWorktype)
+    && RUNNERS.includes(value.effectiveRunner)
+    && isSelector(value.effectiveSelector)
+    && PROVIDERS.includes(value.effectiveProvider)
+    && typeof value.effectiveModelId === "string" && value.effectiveModelId.length > 0
+    && EFFORTS.includes(value.effectiveEffort);
 }
 
 function sameDispatchBinding(receipt, binding) {
   return receipt.dispatchId === binding.dispatchId
     && receipt.queueRevision === binding.queueRevision
     && receipt.candidateCommit === binding.candidateCommit
-    && receipt.candidateTree === binding.candidateTree;
+    && receipt.candidateTree === binding.candidateTree
+    && receipt.requestedDuty === binding.requestedDuty
+    && receipt.requestedWorktype === binding.requestedWorktype;
 }
 
 function sameEvidenceBinding(receiptEvidence, trustedEvidence) {
@@ -56,14 +96,26 @@ function sameEvidenceBinding(receiptEvidence, trustedEvidence) {
     && receiptEvidence?.sha256 === trustedEvidence.sha256;
 }
 
-function expectedEffectiveModelId(route) {
-  if (route.selector.kind === "model-id") return route.selector.value;
-  if (isTerraAlias(route)) return "gpt-5.6-terra";
+function sameObservedEffectiveRoute(receipt, trustedEvidence) {
+  return sameEvidenceBinding(receipt.resolutionEvidence, trustedEvidence)
+    && receipt.resultSha256 === trustedEvidence.resultSha256
+    && receipt.effectiveDuty === trustedEvidence.effectiveDuty
+    && receipt.effectiveWorktype === trustedEvidence.effectiveWorktype
+    && receipt.effectiveRunner === trustedEvidence.effectiveRunner
+    && sameSelector(receipt.effectiveSelector, trustedEvidence.effectiveSelector)
+    && receipt.effectiveProvider === trustedEvidence.effectiveProvider
+    && receipt.effectiveModelId === trustedEvidence.effectiveModelId
+    && receipt.effectiveEffort === trustedEvidence.effectiveEffort;
+}
+
+function expectedConfiguredFableModel(route) {
+  if (!isFableAlias(route)) return null;
   try {
-    return projectRunnerAssignment(route.runner, {
+    const assignment = projectRunnerAssignment(route.runner, {
       model: route.selector.value,
       effort: route.effort,
-    }).model;
+    });
+    return assignment.model === "gpt-5.6-sol" ? assignment.model : null;
   } catch {
     return null;
   }
@@ -71,6 +123,10 @@ function expectedEffectiveModelId(route) {
 
 function isTerraAlias(route) {
   return route.selector.kind === "alias" && route.selector.value.toLowerCase() === "terra";
+}
+
+function isFableAlias(route) {
+  return route.selector.kind === "alias" && route.selector.value.toLowerCase() === "fable";
 }
 
 function looksLikeSchema(value) {
@@ -92,9 +148,16 @@ function receiptSchema(dispatchBinding, trustedEvidence, schema) {
  * attest a route because it cannot stand in for either binding.
  */
 export function validateRouteReceipt(receipt, projectedRoute, dispatchBinding, trustedEvidence, schema) {
-  const route = validateDirectRoute(projectedRoute);
-  const structural = validateAgainstSchema(receipt, receiptSchema(dispatchBinding, trustedEvidence, schema));
-  if (!route.ok || !structural.valid) return { ok: false, reason: route.ok ? "schema" : "route" };
+  let route;
+  let structural;
+  try {
+    route = validateDirectRoute(projectedRoute);
+    if (route?.ok !== true) return { ok: false, reason: "route" };
+    structural = validateAgainstSchema(receipt, receiptSchema(dispatchBinding, trustedEvidence, schema));
+  } catch {
+    return { ok: false, reason: "schema" };
+  }
+  if (structural?.valid !== true) return { ok: false, reason: "schema" };
   if (!SAFE_ID.test(receipt.dispatchId ?? "")
     || !Number.isSafeInteger(receipt.queueRevision) || receipt.queueRevision < 0
     || !GIT_OBJECT_ID.test(receipt.candidateCommit ?? "")
@@ -113,16 +176,23 @@ export function validateRouteReceipt(receipt, projectedRoute, dispatchBinding, t
     return { ok: false, reason: "missing-trusted-binding" };
   }
   if (!sameDispatchBinding(receipt, dispatchBinding)
-    || !sameEvidenceBinding(receipt.resolutionEvidence, trustedEvidence)) {
+    || !sameObservedEffectiveRoute(receipt, trustedEvidence)) {
     return { ok: false, reason: "trusted-binding-mismatch" };
   }
   if (isTerraAlias(route.route) && trustedEvidence.source !== "host") {
     return { ok: false, reason: "terra-requires-host-evidence" };
   }
-  if (receipt.effectiveProvider !== expectedProviderForRunner(route.route.runner)
-    || receipt.effectiveModelId !== expectedEffectiveModelId(route.route)
-    || receipt.effectiveEffort !== route.route.effort) {
-    return { ok: false, reason: "effective-route-drift" };
+  if (route.route.runner === "codex"
+    && route.route.selector.kind === "alias"
+    && !isTerraAlias(route.route)
+    && !isFableAlias(route.route)) {
+    return { ok: false, reason: "unsupported-codex-alias" };
+  }
+  const fableModel = expectedConfiguredFableModel(route.route);
+  if (fableModel !== null
+    && (trustedEvidence.effectiveModelId !== fableModel
+      || trustedEvidence.effectiveEffort !== route.route.effort)) {
+    return { ok: false, reason: "configured-fable-route-drift" };
   }
   return { ok: true, effectiveRouteStatus: "attested" };
 }

@@ -3,7 +3,7 @@
   "$id": "pipeline.route-receipt.v1",
   "title": "Provider-neutral dispatch route receipt",
   "type": "object",
-  "required": ["schema", "dispatchId", "queueRevision", "candidateCommit", "candidateTree", "resultSha256", "requestedRunner", "requestedProvider", "requestedSelector", "requestedEffort", "effectiveProvider", "effectiveModelId", "effectiveEffort", "resolutionEvidence", "attestationAvailable", "effectiveRouteStatus"],
+  "required": ["schema", "dispatchId", "queueRevision", "candidateCommit", "candidateTree", "resultSha256", "requestedDuty", "requestedWorktype", "requestedRunner", "requestedProvider", "requestedSelector", "requestedEffort", "effectiveDuty", "effectiveWorktype", "effectiveRunner", "effectiveSelector", "effectiveProvider", "effectiveModelId", "effectiveEffort", "resolutionEvidence", "attestationAvailable", "effectiveRouteStatus"],
   "additionalProperties": false,
   "properties": {
     "schema": { "type": "string", "enum": ["pipeline.route-receipt.v1"] },
@@ -12,6 +12,8 @@
     "candidateCommit": { "type": "string" },
     "candidateTree": { "type": "string" },
     "resultSha256": { "type": "string" },
+    "requestedDuty": { "type": "string" },
+    "requestedWorktype": { "type": ["string", "null"] },
     "requestedRunner": { "type": "string", "enum": ["claude", "codex"] },
     "requestedProvider": { "type": "string", "enum": ["anthropic", "openai"] },
     "requestedSelector": {
@@ -24,6 +26,18 @@
       }
     },
     "requestedEffort": { "type": "string", "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] },
+    "effectiveDuty": { "type": "string" },
+    "effectiveWorktype": { "type": ["string", "null"] },
+    "effectiveRunner": { "type": "string", "enum": ["claude", "codex"] },
+    "effectiveSelector": {
+      "type": "object",
+      "required": ["kind", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["alias", "model-id"] },
+        "value": { "type": "string" }
+      }
+    },
     "effectiveProvider": { "type": "string", "enum": ["anthropic", "openai"] },
     "effectiveModelId": { "type": "string" },
     "effectiveEffort": { "type": "string", "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] },
