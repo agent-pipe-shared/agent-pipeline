@@ -196,10 +196,11 @@
           "type": "array",
           "items": {
             "type": "object", "additionalProperties": false,
-            "required": ["packageId", "packageSha256", "reason"],
+            "required": ["packageId", "packageSha256", "historicResultCommit", "reason"],
             "properties": {
               "packageId": { "$ref": "#/$defs/safeId" },
               "packageSha256": { "$ref": "#/$defs/sha256" },
+              "historicResultCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
               "reason": { "const": "pre-p5-result-schema" }
             }
           }

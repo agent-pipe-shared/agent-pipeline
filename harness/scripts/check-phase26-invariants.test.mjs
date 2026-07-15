@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,6 +16,7 @@ import {
 import { validateAgainstSchema } from "../../plugins/pipeline-core/lib/schema-lite.mjs";
 
 const SHA = (char) => char.repeat(64);
+const HISTORIC_COMMIT = "0".repeat(40);
 const roots = [];
 let passed = 0;
 
@@ -215,7 +217,15 @@ function bindDecisionBrief(result, loopRecord, outcome, exitReason) {
 function writeFixture(result, mermaid = seal(result)) {
   const root = mkdtempSync(join(tmpdir(), "phase26-invariants-"));
   roots.push(root);
-  writeFileSync(join(root, "Result.md"), `# Result\n\n\`\`\`pipeline-result\n${JSON.stringify(result, null, 2)}\n\`\`\`\n\n\`\`\`mermaid\n${mermaid}\`\`\`\n`);
+  const path = join(root, "Result.md");
+  const document = `# Result\n\n\`\`\`pipeline-result\n${JSON.stringify(result, null, 2)}\n\`\`\`\n\n\`\`\`mermaid\n${mermaid}\`\`\`\n`;
+  writeFileSync(path, document);
+  for (const args of [["init", "-q"], ["config", "user.name", "fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "Result.md"], ["commit", "-qm", "fixture"]]) {
+    const run = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+    if (run.status !== 0) throw new Error(run.stderr || `git ${args.join(" ")} failed`);
+  }
+  const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  writeFileSync(path, document.replaceAll(HISTORIC_COMMIT, head));
   return root;
 }
 
@@ -333,7 +343,7 @@ test("legacy package records without a loop ledger do not acquire invented zeroe
   const legacy = { id: "legacy-record", status: "historic" };
   result.packageResults.push(legacy);
   result.phase26InvariantEvidence.legacyLedgerExemptions.push({
-    packageId: legacy.id, packageSha256: sha256Canonical(legacy), reason: "pre-p5-result-schema",
+    packageId: legacy.id, packageSha256: sha256Canonical(legacy), historicResultCommit: HISTORIC_COMMIT, reason: "pre-p5-result-schema",
   });
   result.sdlcRunGraph.events[0].sourceRefs.push({
     collection: "packageResults", id: legacy.id, sha256: sha256Canonical(legacy),
@@ -353,7 +363,7 @@ test("missing or stale legacy-ledger exemptions cannot hide current loop evidenc
   const legacy = { id: "stale-legacy", status: "historic" };
   stale.packageResults.push(legacy);
   stale.phase26InvariantEvidence.legacyLedgerExemptions.push({
-    packageId: legacy.id, packageSha256: SHA("f"), reason: "pre-p5-result-schema",
+    packageId: legacy.id, packageSha256: SHA("f"), historicResultCommit: HISTORIC_COMMIT, reason: "pre-p5-result-schema",
   });
   stale.sdlcRunGraph.events[0].sourceRefs.push({ collection: "packageResults", id: legacy.id, sha256: sha256Canonical(legacy) });
   assert(checked(stale).findings.some((finding) => finding.includes("legacy ledger exemption")));
@@ -411,6 +421,12 @@ test("unreconciled external evidence and a disconnected cycle fail closed", () =
   assert(checked(disconnected).findings.some((finding) => finding.includes("not reachable from the graph start")));
 });
 
+test("a backward edge cannot evade loop accounting as an ordinary event", () => {
+  const result = fixture();
+  result.sdlcRunGraph.edges[3] = edge("edge-03", "event-03", "event-01");
+  assert(checked(result).findings.some((finding) => finding.includes("must be declared as a bounded back-edge")));
+});
+
 test("graph cannot add a containing-Result or final-commit self-reference field", () => {
   const result = fixture();
   result.sdlcRunGraph.resultSha256 = SHA("f");
@@ -464,6 +480,17 @@ test("phase-close rejects an unattested implementation route even with exact del
   const result = fixture();
   result.sdlcRunGraph.completionClaim = "phase-close";
   assert(checked(result).findings.some((finding) => finding.includes("requires an attested implementation dispatch")));
+});
+
+test("phase-close requires a successful terminal close cutoff", () => {
+  const result = fixture();
+  result.sdlcRunGraph.completionClaim = "phase-close";
+  result.phase26InvariantEvidence.executionRouting = {
+    status: "attested", requestedDuty: "codex_implementation", requiredSelector: "terra", requiredEffort: "xhigh",
+    routeReceiptEvidenceId: "route-receipt", routeReceiptEvidenceSha256: SHA("r"), phase3Disposition: "none",
+  };
+  rebuildExternalEvidence(result);
+  assert(checked(result).findings.some((finding) => finding.includes("successful terminal close event")));
 });
 
 test("duplicate Result JSON keys and a second Mermaid authority block fail", () => {

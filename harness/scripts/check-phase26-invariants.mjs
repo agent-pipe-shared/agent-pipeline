@@ -7,6 +7,7 @@
  * loop/source reconciliation, and the bounded early-smoke/scope/performance evidence.
  */
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -324,7 +325,18 @@ function validateSourceReconciliation(result, graph, findings) {
   if (graph.sourceEventSetSha256 !== sha256Canonical(sourceSet)) findings.push("sourceEventSetSha256 does not bind the ordered event source set");
 }
 
-function legacyLedgerExemptions(result, evidence, findings) {
+function historicPackage(root, resultPath, commit, packageId) {
+  if (!COMMIT_RE.test(commit ?? "")) return null;
+  const ancestor = spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", commit, "HEAD"], { encoding: "utf8", timeout: 5000 });
+  if (ancestor.status !== 0) return null;
+  const historic = spawnSync("git", ["-C", root, "show", `${commit}:${resultPath}`], { encoding: "utf8", timeout: 5000 });
+  if (historic.status !== 0) return null;
+  const parsed = parsePhase26Result(historic.stdout);
+  if (!parsed.ok || !Array.isArray(parsed.result?.packageResults)) return null;
+  return parsed.result.packageResults.find((entry) => entry?.id === packageId) ?? null;
+}
+
+function legacyLedgerExemptions(result, evidence, findings, provenance) {
   const entries = evidence?.legacyLedgerExemptions;
   if (!Array.isArray(entries)) {
     findings.push("phase26InvariantEvidence legacyLedgerExemptions must be an array");
@@ -333,14 +345,17 @@ function legacyLedgerExemptions(result, evidence, findings) {
   const available = new Map((result.packageResults ?? []).map((entry) => [entry?.id, entry]));
   const exemptions = new Map();
   for (const entry of entries) {
-    if (!exactKeys(entry, ["packageId", "packageSha256", "reason"])
+    if (!exactKeys(entry, ["packageId", "packageSha256", "historicResultCommit", "reason"])
       || !safeId(entry.packageId) || !digest(entry.packageSha256)
+      || !COMMIT_RE.test(entry.historicResultCommit ?? "")
       || entry.reason !== "pre-p5-result-schema" || exemptions.has(entry.packageId)) {
       findings.push("legacyLedgerExemptions contains an invalid or duplicate bound entry");
       continue;
     }
     const packageResult = available.get(entry.packageId);
-    if (!packageResult || isObject(packageResult.loopEconomy) || sha256Canonical(packageResult) !== entry.packageSha256) {
+    const historic = historicPackage(provenance.root, provenance.resultPath, entry.historicResultCommit, entry.packageId);
+    if (!packageResult || isObject(packageResult.loopEconomy) || sha256Canonical(packageResult) !== entry.packageSha256
+      || !historic || isObject(historic.loopEconomy) || sha256Canonical(historic) !== entry.packageSha256) {
       findings.push(`legacy ledger exemption ${entry.packageId} is stale, fabricated or masks a current ledger`);
       continue;
     }
@@ -349,7 +364,7 @@ function legacyLedgerExemptions(result, evidence, findings) {
   return exemptions;
 }
 
-function loopEconomySums(result, evidence, findings) {
+function loopEconomySums(result, evidence, findings, provenance) {
   const mapping = {
     criticCorrection: "critic-correction",
     deltaRegate: "delta-regate",
@@ -360,7 +375,7 @@ function loopEconomySums(result, evidence, findings) {
   };
   const sums = Object.fromEntries(Object.values(mapping).map((family) => [family, 0]));
   if (!Array.isArray(result.packageResults)) return sums;
-  const exemptions = legacyLedgerExemptions(result, evidence, findings);
+  const exemptions = legacyLedgerExemptions(result, evidence, findings, provenance);
   for (const packageResult of result.packageResults) {
     if (!isObject(packageResult?.loopEconomy)) {
       if (exemptions.get(packageResult?.id) !== sha256Canonical(packageResult)) {
@@ -378,7 +393,7 @@ function loopEconomySums(result, evidence, findings) {
   return sums;
 }
 
-function validateGraph(result, graph, findings, inventory) {
+function validateGraph(result, graph, findings, inventory, provenance) {
   const keys = ["schemaVersion", "featureId", "graphCutoffEventId", "sourceEventSetSha256", "completionClaim", "events", "edges", "boundedFamilies", "loopRecords"];
   if (!exactKeys(graph, keys) || graph.schemaVersion !== GRAPH_SCHEMA_VERSION || !safeId(graph.featureId)
     || !safeId(graph.graphCutoffEventId) || !digest(graph.sourceEventSetSha256)
@@ -412,6 +427,9 @@ function validateGraph(result, graph, findings, inventory) {
       if (!BACK_EDGE_FAMILIES.has(edge.boundedFamily) || edge.loopStableId === null) findings.push(`back-edge ${edge.edgeId} lacks its bounded loop binding`);
       if ((sequence.get(edge.fromEventId) ?? -1) <= (sequence.get(edge.toEventId) ?? -1)) findings.push(`back-edge ${edge.edgeId} must point to an earlier event`);
     } else if (edge.loopStableId !== null) findings.push(`non-back-edge ${edge.edgeId} cannot carry loopStableId`);
+    if (edge.kind !== "back-edge" && (sequence.get(edge.fromEventId) ?? -1) > (sequence.get(edge.toEventId) ?? -1)) {
+      findings.push(`backward edge ${edge.edgeId} must be declared as a bounded back-edge`);
+    }
     if (edge.kind === "reroute" && edge.boundedFamily !== "environment-failover") findings.push(`reroute ${edge.edgeId} must use environment-failover`);
     if (edge.boundedFamily !== null) {
       const expectedKind = new Map(FAMILY_CONTRACT).get(edge.boundedFamily);
@@ -458,7 +476,7 @@ function validateGraph(result, graph, findings, inventory) {
   }
 
   if (graph.boundedFamilies.length !== FAMILY_CONTRACT.length) findings.push("boundedFamilies must inventory exactly seven families");
-  const economy = loopEconomySums(result, result.phase26InvariantEvidence, findings);
+  const economy = loopEconomySums(result, result.phase26InvariantEvidence, findings, provenance);
   for (let index = 0; index < FAMILY_CONTRACT.length; index += 1) {
     const [family, kind] = FAMILY_CONTRACT[index];
     const inventory = graph.boundedFamilies[index];
@@ -515,6 +533,10 @@ function validateGraph(result, graph, findings, inventory) {
   validateSourceReconciliation(result, graph, findings);
 
   if (graph.completionClaim === "phase-close") {
+    const cutoff = graph.events.at(-1);
+    if (cutoff?.eventType !== "close" || cutoff.outcome !== "succeeded") {
+      findings.push("phase-close requires the cutoff to be one successful terminal close event");
+    }
     if (result.phase26InvariantEvidence?.executionRouting?.status !== "attested") {
       findings.push("phase-close requires an attested implementation dispatch; an unattested route remains a nonconformance");
     }
@@ -632,6 +654,7 @@ export function checkPhase26Invariants(root = DEFAULT_ROOT, resultPath) {
   let path;
   try { path = safeResultPath(root, resultPath); } catch { path = null; }
   if (path === null) return { ok: false, findings: ["Result path must be an existing non-symlink repository-relative file"] };
+  const provenance = { root: realpathSync(root), resultPath };
   let markdown;
   try { markdown = readFileSync(path, "utf8"); } catch { return { ok: false, findings: ["Result is unreadable"] }; }
   const parsed = parsePhase26Result(markdown);
@@ -640,7 +663,7 @@ export function checkPhase26Invariants(root = DEFAULT_ROOT, resultPath) {
   const result = parsed.result;
   const inventory = evidenceInventory(result, findings);
   if (!isObject(result.sdlcRunGraph)) findings.push("pipeline-result must contain sdlcRunGraph");
-  else validateGraph(result, result.sdlcRunGraph, findings, inventory);
+  else validateGraph(result, result.sdlcRunGraph, findings, inventory, provenance);
   if (!isObject(result.phase26InvariantEvidence)) findings.push("pipeline-result must contain phase26InvariantEvidence");
   else validateInvariantEvidence(result, result.phase26InvariantEvidence, findings, inventory);
   const binding = result.sdlcRunGraphProjection;
