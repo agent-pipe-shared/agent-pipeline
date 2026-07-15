@@ -96,26 +96,11 @@ flowchart LR
 
 ## How a run flows end to end
 
-```mermaid
-flowchart TD
-    ID["Idea"] --> P
-    ID -.->|"optional, advisory"| DS["Design pre-stage<br/>(self-service,<br/>docs/design/)"]
-    DS -.-> P
-    P["Profile / model decision"] --> PL["Plan artifact +<br/>human plan gate"]
-    PL --> R["Readiness check"]
-    R --> D["Dispatch<br/>(fresh context, briefing)"]
-    D --> G["Deterministic gates<br/>(verify, security scan)"]
-    G --> C["Risk-class-dependent Critic"]
-    C --> H["Human completion gate"]
-    H --> M["Merge + doc sync"]
-    M -.->|"optional, if manifest declares release"| REL["Release/Promotion<br/>(optional, §3.5)"]
-```
-
-Order matters: deterministic gates always run *before* any LLM judgment — a
-Critic never reviews a diff that hasn't already cleared the machine chain.
-
-An optional Release/Promotion tail can hook in after the merge (`REL` above) once
-a project's manifest declares a `release` section — detail in
+The maintained end-to-end flow, bounded recovery paths, authority boundaries,
+and gate reference live in [`PIPELINE_FLOW.md`](PIPELINE_FLOW.md). Invariant:
+deterministic gates run before semantic review; a Critic never judges a
+candidate that has not cleared the applicable machine chain.
+The optional Release/Promotion tail is documented in
 [`docs/deploy/README.md`](docs/deploy/README.md).
 
 ## The front door: optional design pre-stage
@@ -196,6 +181,8 @@ what's always portable and what's Claude-Code-specific.
 ## Learn more
 
 - [`SETUP.md`](SETUP.md) — onboarding: prerequisites, setup steps, troubleshooting.
+- [`PIPELINE_FLOW.md`](PIPELINE_FLOW.md) — the maintained end-to-end flow,
+  recovery bounds, authority boundaries, and gate reference.
 - [`docs/overview.md`](docs/overview.md) — the model in one read: how the roles,
   gates, and close ritual fit together end to end.
 - [`docs/usage.md`](docs/usage.md) — a day in the pipeline: what an ordinary
@@ -339,28 +326,13 @@ flowchart LR
 
 ## Wie ein Durchlauf abläuft
 
-```mermaid
-flowchart TD
-    ID["Idee"] --> P
-    ID -.->|"optional, advisory"| DS["Design-Vorstufe<br/>(Selbstbedienung,<br/>docs/design/)"]
-    DS -.-> P
-    P["Profil-/Modell-Entscheid"] --> PL["Plan-Artefakt +<br/>menschliches Plan-Gate"]
-    PL --> R["Readiness-Check"]
-    R --> D["Dispatch<br/>(frischer Kontext, Briefing)"]
-    D --> G["Deterministische Gates<br/>(verify, Security-Scan)"]
-    G --> C["Risikoklassen-abhängiger Critic"]
-    C --> H["Menschliches Abschluss-Gate"]
-    H --> M["Merge + Doku-Sync"]
-    M -.->|"optional, falls Manifest Release erklärt"| REL["Release/Promotion<br/>(optional, §3.5)"]
-```
-
-Entscheidend ist die Reihenfolge: Die maschinellen Gates laufen immer VOR jedem
-Urteil eines LLM — ein Critic bewertet nie einen Diff, der die deterministische
-Kette noch nicht durchlaufen hat.
-
-Ein optionaler Release/Promotion-Ausklang kann nach dem Merge andocken (`REL`
-oben), sobald das Manifest eines Projekts einen `release`-Abschnitt erklärt —
-Details in [`docs/deploy/README.md`](docs/deploy/README.md).
+Der gepflegte End-to-End-Ablauf, die begrenzten Recovery-Pfade,
+Autoritätsgrenzen und Gate-Referenz stehen in
+[`PIPELINE_FLOW.md`](PIPELINE_FLOW.md). Invariante: Deterministische Gates laufen
+vor semantischem Review; ein Critic bewertet keinen Kandidaten, der die
+anwendbare maschinelle Kette noch nicht bestanden hat.
+Der optionale Release/Promotion-Ausklang ist in
+[`docs/deploy/README.md`](docs/deploy/README.md) dokumentiert.
 
 ## Die Vordertür: optionale Design-Vorstufe
 
@@ -443,6 +415,8 @@ Claude-Code-spezifisch ist.
 
 - [`SETUP.md`](SETUP.md) — Onboarding: Voraussetzungen, Setup-Schritte,
   Fehlerbehebung.
+- [`PIPELINE_FLOW.md`](PIPELINE_FLOW.md) — der gepflegte End-to-End-Ablauf,
+  Recovery-Grenzen, Autoritätsgrenzen und die Gate-Referenz.
 - [`docs/overview.md`](docs/overview.md) — das Modell in einem Durchgang: wie
   Rollen, Gates und Abschluss-Ritual von Anfang bis Ende zusammenspielen.
 - [`docs/usage.md`](docs/usage.md) — ein Tag in der Pipeline: wie eine gewöhnliche
