@@ -326,8 +326,8 @@ const PUBLIC_PUSH_IDENTITY_SCHEMA = "pipeline.public-push-identity.v1";
 const TRAILER_DENY = /^(?:co-authored-by|signed-off-by|reviewed-by|assisted-by|provider|model|session|run|trace|private(?:-account)?|account|operator|machine|host|workspace|worktree)\s*:/im;
 const EMAIL_IN_MESSAGE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
 const PRIVATE_CORRELATION_IN_MESSAGE = /\b(?:provider|model|session|account|operator|codex|claude|openai|anthropic|gpt(?:[-\s]?[a-z0-9.]+)?|gemini|machine|host|workspace|worktree|correlation|trace(?:[-\s]?id)?|run[-\s]?id)\b/i;
-const PRIVATE_URL_IN_MESSAGE = /\b[a-z][a-z0-9+.-]*:\/\/\S+|\b(?:git|ssh)@[A-Za-z0-9.-]+:[^\s]+/i;
-const MACHINE_ABSOLUTE_PATH_IN_MESSAGE = /(?:^|[\s"'`])(?:\/[A-Za-z0-9._-]+(?:\/|$)|[A-Za-z]:[\\/]|\\\\[^\\\s]+[\\/])/m;
+const PRIVATE_URL_IN_MESSAGE = /\b[a-z][a-z0-9+.-]*:\S+|\b[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[^\s]+/i;
+const MACHINE_ABSOLUTE_PATH_IN_MESSAGE = /(?:^|[^A-Za-z0-9._-])(?:\/[A-Za-z0-9._-]+(?:\/|$)|[A-Za-z]:[\\/]|\\\\[^\\\s]+[\\/])/m;
 const SECRET_LIKE_VALUE_IN_MESSAGE = /\b(?:gh[pousr]_[A-Za-z0-9_]{12,}|github_pat_[A-Za-z0-9_]{12,}|sk-[A-Za-z0-9_-]{12,}|AKIA[0-9A-Z]{12,})\b/;
 
 function localGitConfig(binding, key) {

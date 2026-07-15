@@ -997,6 +997,16 @@ function deployApprovalState(forArtifact, forEnvironment) {
     env: { ...env, GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: "1" },
   });
 }
+{
+  const { dir } = freshRepo("anonymous-public-embedded-private-coordinates");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "embedded.txt", "privacy file:/etc/passwd cwd=/root/private alice@10.0.0.1:/srv/repo");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26u block  embedded file URI, root path and general SCP coordinate", command, dir, BLOCK, {
+    stderrIncludes: ["non-canonical URL", "machine-specific absolute path"],
+    env,
+  });
+}
 
 // ---- Cleanup ----------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
