@@ -577,8 +577,8 @@ function validateGraph(result, graph, findings, inventory, provenance) {
     if (graph.edges.some((edge) => edge.fromEventId === cutoff?.eventId)) {
       findings.push("phase-close terminal close event must have no outgoing edges");
     }
-    if (result.phase26InvariantEvidence?.executionRouting?.status !== "attested") {
-      findings.push("phase-close requires an attested implementation dispatch; an unattested route remains a nonconformance");
+    if (!["attested", "po-approved-phase3-deferral"].includes(result.phase26InvariantEvidence?.executionRouting?.status)) {
+      findings.push("phase-close requires an attested dispatch or an explicit PO-approved Phase-3 routing deferral");
     }
     for (const packageResult of result.packageResults) {
       const gate = packageResult?.publicGate;
@@ -668,14 +668,14 @@ function validateInvariantEvidence(result, evidence, findings, inventory) {
   const route = evidence.executionRouting;
   if (!exactKeys(route, ["status", "requestedDuty", "requiredSelector", "requiredEffort", "routeReceiptEvidenceId", "routeReceiptEvidenceSha256", "phase3Disposition"])
     || route.requestedDuty !== "codex_implementation" || route.requiredSelector !== "terra" || route.requiredEffort !== "xhigh"
-    || !["attested", "unattested-nonconformance"].includes(route.status)) {
+    || !["attested", "unattested-nonconformance", "po-approved-phase3-deferral"].includes(route.status)) {
     findings.push("execution routing evidence is malformed or changes the approved Terra/xhigh request");
   } else if (route.status === "attested") {
     if (route.phase3Disposition !== "none" || !inventoryContains(inventory, { id: route.routeReceiptEvidenceId, sha256: route.routeReceiptEvidenceSha256 })) {
       findings.push("attested execution routing lacks a bound external route receipt");
     }
   } else if (route.phase3Disposition !== "mandatory-dispatch-attestation" || route.routeReceiptEvidenceId !== null || route.routeReceiptEvidenceSha256 !== null) {
-    findings.push("unattested execution routing must remain an explicit Phase-3 nonconformance without a fabricated receipt");
+    findings.push("unattested or PO-deferred execution routing must remain an explicit Phase-3 obligation without a fabricated receipt");
   }
 }
 

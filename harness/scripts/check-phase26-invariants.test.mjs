@@ -494,7 +494,19 @@ test("phase-close cannot precede green exact Verify and matching push fetch-back
 test("phase-close rejects an unattested implementation route even with exact delivery evidence", () => {
   const result = fixture();
   result.sdlcRunGraph.completionClaim = "phase-close";
-  assert(checked(result).findings.some((finding) => finding.includes("requires an attested implementation dispatch")));
+  assert(checked(result).findings.some((finding) => finding.includes("requires an attested dispatch or an explicit PO-approved Phase-3 routing deferral")));
+});
+
+test("phase-close accepts an explicit PO-approved Phase-3 routing deferral", () => {
+  const result = fixture();
+  result.sdlcRunGraph.completionClaim = "phase-close";
+  result.sdlcRunGraph.events[7] = event("event-07", 7, "close");
+  result.phase26InvariantEvidence.executionRouting = {
+    status: "po-approved-phase3-deferral", requestedDuty: "codex_implementation", requiredSelector: "terra", requiredEffort: "xhigh",
+    routeReceiptEvidenceId: null, routeReceiptEvidenceSha256: null, phase3Disposition: "mandatory-dispatch-attestation",
+  };
+  rebuildExternalEvidence(result);
+  assert.deepEqual(checked(result), { ok: true, findings: [] });
 });
 
 test("phase-close requires a successful terminal close cutoff", () => {
