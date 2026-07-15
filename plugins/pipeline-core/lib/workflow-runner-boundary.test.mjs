@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
-import { runSyntheticWorkflowDispatch, WORKFLOW_RUNNER_CODES } from "./workflow-runner-boundary.mjs";
+import { normalizeWorkflowRunnerOutcome, runSyntheticWorkflowDispatch, WORKFLOW_RUNNER_CODES } from "./workflow-runner-boundary.mjs";
 
 let passed = 0;
+const A = "a".repeat(64);
+const B = "b".repeat(64);
 function check(name, fn) {
   fn();
   passed += 1;
@@ -89,5 +91,78 @@ check("adapter exception is reduced to a log-safe single-call outcome", () => {
   fake.adapter.invoke = () => { throw new Error("secret-shaped adapter error"); };
   const result = runSyntheticWorkflowDispatch(dispatch(), fake.adapter);
   assert.deepEqual(result, { ok: false, code: "WR-ADAPTER-FAILED", mode: "bounded-write", adapterInvocations: 1 });
+});
+
+const identity = { dispatchId: "dispatch-01", attemptId: "attempt-01" };
+const expected = { identity, acknowledgedResultSha256: null };
+const hostDiagnostic = { exitCode: 1, signal: null, stdoutBytes: 12, stderrBytes: 20, stdoutOverflow: false, stderrOverflow: false, tailSha256: A, capturedTailBytes: 32 };
+const trustedHost = { structured: true, code: "host-sandbox-bootstrap-rejected", beforeProductStart: true, evidenceSha256: B, diagnostic: hostDiagnostic, calibration: null };
+function observation(state, productVerdict = null, host = null) {
+  return { identity: structuredClone(identity), state, productVerdict, host };
+}
+check("bounded running observation stays non-final", () => {
+  const result = normalizeWorkflowRunnerOutcome(expected, observation("running"));
+  assert.equal(result.code, "WR-OUTCOME-RUNNING"); assert.equal(result.faultDomain, "unknown");
+});
+check("completed without a delivered final remains retrievable", () => {
+  assert.equal(normalizeWorkflowRunnerOutcome(expected, observation("completed")).code, "WR-OUTCOME-COMPLETED-UNDELIVERED");
+  assert.equal(normalizeWorkflowRunnerOutcome(expected, observation("completed-but-undelivered")).code, "WR-OUTCOME-COMPLETED-UNDELIVERED");
+});
+check("schema-valid succeeded final exposes only its digest", () => {
+  const result = normalizeWorkflowRunnerOutcome(expected, observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A }));
+  assert.equal(result.code, "WR-OUTCOME-FINAL"); assert.equal(result.resultSha256, A); assert.equal(result.faultDomain, "unknown");
+});
+check("already acknowledged digest is a duplicate", () => {
+  const result = normalizeWorkflowRunnerOutcome({ ...expected, acknowledgedResultSha256: A }, observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A }));
+  assert.equal(result.code, "WR-OUTCOME-DUPLICATE");
+});
+check("different digest after acknowledgement is a null-final conflict", () => {
+  const result = normalizeWorkflowRunnerOutcome({ ...expected, acknowledgedResultSha256: B }, observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A }));
+  assert.equal(result.ok, false); assert.equal(result.code, "WR-OUTCOME-CONFLICT"); assert.equal(result.resultSha256, null);
+});
+check("mismatched dispatch identity is stale and null-final", () => {
+  const input = observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A });
+  input.identity.dispatchId = "dispatch-old";
+  const result = normalizeWorkflowRunnerOutcome(expected, input);
+  assert.equal(result.code, "WR-OUTCOME-STALE"); assert.equal(result.resultSha256, null);
+});
+check("schema-valid failed product result wins over trusted host evidence", () => {
+  const result = normalizeWorkflowRunnerOutcome(expected, observation("failed", { schemaValid: true, outcome: "failed", resultSha256: A }, trustedHost));
+  assert.equal(result.code, "WR-OUTCOME-PRODUCT-FAILED"); assert.equal(result.faultDomain, "product");
+});
+check("trusted pre-start host evidence classifies environment", () => {
+  const result = normalizeWorkflowRunnerOutcome(expected, observation("failed", null, trustedHost));
+  assert.equal(result.code, "WR-OUTCOME-ENVIRONMENT-FAILED"); assert.equal(result.faultDomain, "execution-environment");
+});
+check("timeout and free-text-like host data remain unknown", () => {
+  const result = normalizeWorkflowRunnerOutcome(expected, observation("failed", null, { timeout: true, exitCode: 1, stderr: "sandbox failed" }));
+  assert.equal(result.code, "WR-OUTCOME-UNKNOWN-FAILED"); assert.equal(result.faultDomain, "unknown");
+});
+check("trusted code without bounded diagnostic remains unknown", () => {
+  const result = normalizeWorkflowRunnerOutcome(expected, observation("failed", null, { ...trustedHost, diagnostic: null }));
+  assert.equal(result.code, "WR-OUTCOME-UNKNOWN-FAILED");
+});
+check("schema-valid successful result can never become environment failure", () => {
+  const result = normalizeWorkflowRunnerOutcome(expected, observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A }, trustedHost));
+  assert.equal(result.code, "WR-OUTCOME-FINAL"); assert.notEqual(result.faultDomain, "execution-environment");
+});
+check("calibrated transport evidence requires its complete fresh predicate", () => {
+  const calibrated = {
+    ...trustedHost,
+    code: "host-sandbox-calibrated-transport-failure",
+    calibration: { fresh: false, exactHostCliVersionPrimitive: true, identicalControlDigests: true, liveSignatureMatched: true, receiptSha256: A },
+  };
+  assert.equal(normalizeWorkflowRunnerOutcome(expected, observation("failed", null, calibrated)).code, "WR-OUTCOME-UNKNOWN-FAILED");
+  calibrated.calibration.fresh = true;
+  assert.equal(normalizeWorkflowRunnerOutcome(expected, observation("failed", null, calibrated)).code, "WR-OUTCOME-ENVIRONMENT-FAILED");
+});
+check("raw result fields and malformed final combinations fail closed", () => {
+  const raw = observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A });
+  raw.productVerdict.raw = "forbidden";
+  assert.equal(normalizeWorkflowRunnerOutcome(expected, raw).code, "WR-OUTCOME-SCHEMA");
+  assert.equal(normalizeWorkflowRunnerOutcome(expected, observation("running", { schemaValid: true, outcome: "succeeded", resultSha256: A })).code, "WR-OUTCOME-SCHEMA");
+  const runningWithHostEvidence = normalizeWorkflowRunnerOutcome(expected, observation("running", null, trustedHost));
+  assert.equal(runningWithHostEvidence.ok, false); assert.equal(runningWithHostEvidence.code, "WR-OUTCOME-SCHEMA");
+  assert.equal(runningWithHostEvidence.faultDomain, "unknown"); assert.equal(runningWithHostEvidence.resultSha256, null);
 });
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);
