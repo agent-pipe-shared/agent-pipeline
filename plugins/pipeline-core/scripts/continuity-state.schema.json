@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.continuity.v0",
+  "title": "Provider-neutral bounded continuity state",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "featureId", "revision", "authority", "queueHead", "blocker", "acknowledgedFinal", "resume", "recovery", "decisionTxn", "capacity"],
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.continuity.v0"] },
+    "featureId": { "type": "string" },
+    "revision": { "type": "number" },
+    "authority": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prd", "spec", "result"],
+      "properties": {
+        "prd": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": { "path": { "type": "string" }, "sha256": { "type": "string" } }
+        },
+        "spec": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": { "path": { "type": "string" }, "sha256": { "type": "string" } }
+        },
+        "result": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": { "path": { "type": "string" }, "sha256": { "type": "string" } }
+        }
+      }
+    },
+    "queueHead": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["packageId", "actionId", "nextAction", "productRetryCount", "environmentRerouteCount", "dispatch"],
+      "properties": {
+        "packageId": { "type": "string" },
+        "actionId": { "type": "string" },
+        "nextAction": { "type": "string", "enum": ["dispatch", "poll", "retrieve-final", "integrate-final", "review", "correct", "verify", "push", "fetch-back", "advance-package", "close"] },
+        "productRetryCount": { "type": "number" },
+        "environmentRerouteCount": { "type": "number" },
+        "dispatch": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["featureId", "queueRevision", "packageId", "actionId", "dispatchId", "attemptId", "authorityDigests", "routeRequestSha256", "mayDelegate"],
+          "properties": {
+            "featureId": { "type": "string" },
+            "queueRevision": { "type": "number" },
+            "packageId": { "type": "string" },
+            "actionId": { "type": "string" },
+            "dispatchId": { "type": "string" },
+            "attemptId": { "type": "string" },
+            "authorityDigests": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["prdSha256", "specSha256", "resultSha256"],
+              "properties": {
+                "prdSha256": { "type": "string" },
+                "specSha256": { "type": "string" },
+                "resultSha256": { "type": ["string", "null"] }
+              }
+            },
+            "routeRequestSha256": { "type": "string" },
+            "mayDelegate": { "type": "boolean", "enum": [false] }
+          }
+        }
+      }
+    },
+    "blocker": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["type", "signature", "resumeCondition", "decisionBrief"],
+      "properties": {
+        "type": { "type": "string", "enum": ["authority", "security", "scope", "course", "capacity", "product", "environment", "unknown"] },
+        "signature": { "type": "string" },
+        "resumeCondition": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "evidenceSha256"],
+          "properties": {
+            "kind": { "type": "string", "enum": ["po-decision", "evidence-change", "capacity-available", "authority-update", "manual"] },
+            "evidenceSha256": { "type": ["string", "null"] }
+          }
+        },
+        "decisionBrief": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["decisionBriefId", "decisionBriefSha256", "resultPath"],
+          "properties": {
+            "decisionBriefId": { "type": "string" },
+            "decisionBriefSha256": { "type": "string" },
+            "resultPath": { "type": "string" }
+          }
+        }
+      }
+    },
+    "acknowledgedFinal": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["identity", "resultDigest", "finalOutcome", "integratedRevision"],
+      "properties": {
+        "identity": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["featureId", "queueRevision", "packageId", "actionId", "dispatchId", "attemptId", "authorityDigests", "routeRequestSha256", "mayDelegate"],
+          "properties": {
+            "featureId": { "type": "string" },
+            "queueRevision": { "type": "number" },
+            "packageId": { "type": "string" },
+            "actionId": { "type": "string" },
+            "dispatchId": { "type": "string" },
+            "attemptId": { "type": "string" },
+            "authorityDigests": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["prdSha256", "specSha256", "resultSha256"],
+              "properties": {
+                "prdSha256": { "type": "string" },
+                "specSha256": { "type": "string" },
+                "resultSha256": { "type": ["string", "null"] }
+              }
+            },
+            "routeRequestSha256": { "type": "string" },
+            "mayDelegate": { "type": "boolean", "enum": [false] }
+          }
+        },
+        "resultDigest": { "type": "string" },
+        "finalOutcome": { "type": "string", "enum": ["succeeded", "failed"] },
+        "integratedRevision": { "type": "number" }
+      }
+    },
+    "resume": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["mode", "sourceRevision", "reasonCode"],
+      "properties": {
+        "mode": { "type": "string", "enum": ["immediate", "resume-on-next-turn"] },
+        "sourceRevision": { "type": "number" },
+        "reasonCode": { "type": "string", "enum": ["active-turn", "host-no-background-wakeup", "po-interrupt", "compact-reload", "blocker"] }
+      }
+    },
+    "recovery": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["originLaneId", "originDispatchId", "originAttemptId", "environmentEvidenceSha256", "sameLaneRetryProhibited", "fallbackStatus", "fallbackLaneId", "fallbackDispatchId", "narrowingContractSha256", "originProductRetryCount", "resultDigest", "count"],
+      "properties": {
+        "originLaneId": { "type": "string" },
+        "originDispatchId": { "type": "string" },
+        "originAttemptId": { "type": "string" },
+        "environmentEvidenceSha256": { "type": "string" },
+        "sameLaneRetryProhibited": { "type": "boolean", "enum": [true] },
+        "fallbackStatus": { "type": "string", "enum": ["fallback-pending", "running", "completed", "failed"] },
+        "fallbackLaneId": { "type": "string" },
+        "fallbackDispatchId": { "type": "string" },
+        "narrowingContractSha256": { "type": "string" },
+        "originProductRetryCount": { "type": "number" },
+        "resultDigest": { "type": ["string", "null"] },
+        "count": { "type": "number" }
+      }
+    },
+    "decisionTxn": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["idempotencyKey", "briefSha256", "intentSha256", "selectedOptionId", "preSelectionRevision", "selectedRevision", "dispatchableRevision", "phase"],
+      "properties": {
+        "idempotencyKey": { "type": "string" },
+        "briefSha256": { "type": "string" },
+        "intentSha256": { "type": "string" },
+        "selectedOptionId": { "type": "string" },
+        "preSelectionRevision": { "type": "number" },
+        "selectedRevision": { "type": "number" },
+        "dispatchableRevision": { "type": "number" },
+        "phase": { "type": "string", "enum": ["state-applied"] }
+      }
+    },
+    "capacity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["concurrencyLimit", "reservedCriticSlots", "reservedRecoverySlots", "fallbackPolicy"],
+      "properties": {
+        "concurrencyLimit": { "type": "number" },
+        "reservedCriticSlots": { "type": "number" },
+        "reservedRecoverySlots": { "type": "number" },
+        "fallbackPolicy": { "type": "string", "enum": ["defer", "pre-authorized-mapped-fallback"] }
+      }
+    }
+  }
+}
