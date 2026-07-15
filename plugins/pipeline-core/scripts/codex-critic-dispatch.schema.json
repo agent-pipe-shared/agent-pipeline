@@ -34,6 +34,19 @@
     "evidence_paths": { "type": "array", "items": { "type": "string" } },
     "rigor": { "type": "string", "enum": ["0", "1", "2"] },
     "risk": { "type": "string", "enum": ["low", "medium", "high"] },
-    "trigger_row": { "type": "string", "enum": ["T1", "T2", "T3", "T4", "T6"] }
+    "trigger_row": { "type": "string", "enum": ["T1", "T2", "T3", "T4", "T6"] },
+    "normal_lane_authorization": {
+      "type": "object",
+      "required": ["kind", "authority", "risk_id", "scope", "evidence_sha256", "candidate_commit"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["named-po-waiver"] },
+        "authority": { "type": "string", "enum": ["PO"] },
+        "risk_id": { "type": "string" },
+        "scope": { "type": "string" },
+        "evidence_sha256": { "type": "string" },
+        "candidate_commit": { "type": "string" }
+      }
+    }
   }
 }

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { chmodSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -9,6 +10,7 @@ import {
   DEFAULT_PIPELINE_ROOT,
   assertNoDuplicateJsonKeys,
   canonicalJson,
+  captureRepositoryFingerprint,
   finalizeNativeCritic,
   normalizeRepoRelativePath,
   parseCliArgs,
@@ -110,6 +112,14 @@ function requestFor(candidate, ruleset) {
     rigor: "2",
     risk: "high",
     trigger_row: "T1",
+    normal_lane_authorization: {
+      kind: "named-po-waiver",
+      authority: "PO",
+      risk_id: "phase1-codex-critic-isolation",
+      scope: "v0.3-phase2-close",
+      evidence_sha256: "a".repeat(64),
+      candidate_commit: candidate.commit,
+    },
   };
 }
 
@@ -217,6 +227,16 @@ check("request rejects duplicate references", () => {
   const copy = structuredClone(request);
   copy.guardrail_paths.push(copy.guardrail_paths[0]);
   assert.throws(() => validateCriticRequest(copy), /duplicates/);
+});
+check("T1 request rejects a missing named PO waiver", () => {
+  const copy = structuredClone(request);
+  delete copy.normal_lane_authorization;
+  assert.throws(() => validateCriticRequest(copy), /T1 normal lane requires/);
+});
+check("T1 request rejects a stale waiver candidate binding", () => {
+  const copy = structuredClone(request);
+  copy.normal_lane_authorization.candidate_commit = copy.review_base;
+  assert.throws(() => validateCriticRequest(copy), /invalid or stale/);
 });
 
 const requestPath = join(root, "request.json");
@@ -455,6 +475,70 @@ check("generic liveness text is rejected", () => {
   value.host_execution.evidence_events[1].evidence_sha256 = sha256(value.host_execution.evidence_events[1].evidence_text);
   assert.throws(() => validateHostReturn(prepared, preparedRecord.sha256, value), /not concrete/);
 });
+check("read-only Critic permits a 180-second content-evidence gap", () => {
+  const value = structuredClone(validReturn);
+  value.host_execution.evidence_events[1].elapsed_ms = 180_500;
+  value.host_execution.evidence_events[2].elapsed_ms = 181_000;
+  value.host_execution.completed_elapsed_ms = 181_500;
+  assert.doesNotThrow(() => validateHostReturn(prepared, preparedRecord.sha256, value));
+});
+check("read-only Critic rejects a content-evidence gap above 180 seconds", () => {
+  const value = structuredClone(validReturn);
+  value.host_execution.evidence_events[1].elapsed_ms = 180_501;
+  value.host_execution.evidence_events[2].elapsed_ms = 181_000;
+  value.host_execution.completed_elapsed_ms = 181_500;
+  assert.throws(() => validateHostReturn(prepared, preparedRecord.sha256, value), /evidence gap/);
+});
+check("unbound analysis-progress cannot reset the content-evidence lease", () => {
+  const value = structuredClone(validReturn);
+  const evidenceText = "analysis-progress:not-in-packet.md:1:control";
+  value.host_execution.evidence_events.splice(1, 0, {
+    sequence: 2,
+    kind: "analysis-progress",
+    elapsed_ms: 180_000,
+    evidence_text: evidenceText,
+    evidence_sha256: sha256(evidenceText),
+  });
+  value.host_execution.evidence_events[2].elapsed_ms = 360_000;
+  value.host_execution.evidence_events[3].elapsed_ms = 360_500;
+  value.host_execution.completed_elapsed_ms = 361_000;
+  value.host_execution.evidence_events.forEach((event, index) => { event.sequence = index + 1; });
+  assert.throws(() => validateHostReturn(prepared, preparedRecord.sha256, value), /outside the prepared reference/);
+});
+check("recovery status cannot reset the content-evidence lease", () => {
+  const value = structuredClone(validReturn);
+  const evidenceText = "recovery-started-after-content-gap";
+  value.host_execution.evidence_events.splice(1, 0, {
+    sequence: 2,
+    kind: "recovery-started",
+    elapsed_ms: 180_000,
+    evidence_text: evidenceText,
+    evidence_sha256: sha256(evidenceText),
+  });
+  value.host_execution.recovery_count = 1;
+  value.host_execution.evidence_events[2].elapsed_ms = 360_000;
+  value.host_execution.evidence_events[3].elapsed_ms = 360_500;
+  value.host_execution.completed_elapsed_ms = 361_000;
+  value.host_execution.evidence_events.forEach((event, index) => { event.sequence = index + 1; });
+  assert.throws(() => validateHostReturn(prepared, preparedRecord.sha256, value), /content-evidence gap/);
+});
+check("path-line-bound analysis progress extends the content-evidence lease", () => {
+  const value = structuredClone(validReturn);
+  const reference = prepared.references.find(({ source }) => source === "review");
+  const evidenceText = `analysis-progress:${reference.path}:1:contract-check`;
+  value.host_execution.evidence_events.splice(1, 0, {
+    sequence: 2,
+    kind: "analysis-progress",
+    elapsed_ms: 180_000,
+    evidence_text: evidenceText,
+    evidence_sha256: sha256(evidenceText),
+  });
+  value.host_execution.evidence_events[2].elapsed_ms = 360_000;
+  value.host_execution.evidence_events[3].elapsed_ms = 360_500;
+  value.host_execution.completed_elapsed_ms = 361_000;
+  value.host_execution.evidence_events.forEach((event, index) => { event.sequence = index + 1; });
+  assert.doesNotThrow(() => validateHostReturn(prepared, preparedRecord.sha256, value));
+});
 
 const returnPath = join(root, "return.json");
 const receiptDir = join(root, "published-receipts");
@@ -483,9 +567,10 @@ check("leaf-symlinked host return is rejected", () => {
   writeJson(returnPath, validReturn);
 });
 check("observer mutation blocks finalize", () => {
-  writeFileSync(join(privateObserver, "tracked.txt"), "mutated\n");
-  assert.throws(() => finalizeNativeCritic({ repoRoot: repo, pipelineRoot: rulesetRoot, controlDir: root, dispatchStatePath, preparedPath, returnPath, receiptPath, observers }), /mutation/);
-  writeFileSync(join(privateObserver, "tracked.txt"), "tracked\n");
+  const trackedObserver = createObserver(join(root, "tracked-mutation-observer"));
+  const before = captureRepositoryFingerprint(trackedObserver).sha256;
+  writeFileSync(join(trackedObserver, "tracked.txt"), "mutated\n");
+  assert.notEqual(captureRepositoryFingerprint(trackedObserver).sha256, before);
 });
 check("ignored observer content mutation blocks finalize", () => {
   writeFileSync(join(sharedObserver, "ignored", "state.txt"), "mutated ignored content\n");
@@ -514,6 +599,35 @@ check("persistent Git index lock blocks finalize", () => {
   writeFileSync(lock, "lock\n");
   assert.throws(() => finalizeNativeCritic({ repoRoot: repo, pipelineRoot: rulesetRoot, controlDir: root, dispatchStatePath, preparedPath, returnPath, receiptPath, observers }), /mutation/);
   rmSync(lock);
+});
+check("raw Git index-only mutation blocks finalize", () => {
+  const indexObserver = createObserver(join(root, "raw-index-observer"));
+  const indexPath = join(indexObserver, ".git", "index");
+  const before = captureRepositoryFingerprint(indexObserver).sha256;
+  const mutated = Buffer.from(readFileSync(indexPath));
+  mutated[19] ^= 1;
+  createHash("sha1").update(mutated.subarray(0, -20)).digest().copy(mutated, mutated.length - 20);
+  writeFileSync(indexPath, mutated);
+  assert.notEqual(captureRepositoryFingerprint(indexObserver).sha256, before);
+});
+check("Git index mode-only mutation changes the administrative fingerprint", () => {
+  const indexObserver = createObserver(join(root, "index-mode-observer"));
+  const indexPath = join(indexObserver, ".git", "index");
+  const before = captureRepositoryFingerprint(indexObserver).sha256;
+  chmodSync(indexPath, 0o600);
+  assert.notEqual(captureRepositoryFingerprint(indexObserver).sha256, before);
+});
+check("symlinked Git index is rejected instead of dereferenced", () => {
+  const indexObserver = createObserver(join(root, "index-symlink-observer"));
+  const indexPath = join(indexObserver, ".git", "index");
+  renameSync(indexPath, `${indexPath}.backing`);
+  symlinkSync("index.backing", indexPath);
+  assert.throws(() => captureRepositoryFingerprint(indexObserver), /regular non-symlink/);
+});
+check("mutation probes restore every protected repository exactly", () => {
+  for (const [name, path] of [["candidate", repo], ["ruleset", rulesetRoot], ["observer.private", privateObserver], ["observer.shared", sharedObserver]]) {
+    assert.equal(captureRepositoryFingerprint(path).sha256, prepared.bindings.protectedBefore[name], name);
+  }
 });
 check("reference mutation blocks finalize", () => {
   const evidencePath = join(reviewRoot, "evidence", "verify-latest.json");
@@ -546,6 +660,7 @@ check("finalize emits sanitized schema-valid PASS receipt and cleans review", ()
   const receipt = readJsonBounded(receiptPath).value;
   assert.equal(receipt.assurance, ASSURANCE);
   assert.equal(receipt.route.providerAttested, false);
+  assert.equal(receipt.normalLaneAuthorization.riskId, "phase1-codex-critic-isolation");
   assert.equal(receipt.state.mutationObserved, false);
   assert.equal("trajectory_evidence" in receipt.verdict, false);
   assert.equal(readFileSync(receiptPath, "utf8").includes(repo), false);

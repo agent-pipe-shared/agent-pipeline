@@ -79,7 +79,7 @@ export const RESIDUAL_RISKS = Object.freeze([
 ]);
 export const HOST_LIMITS = Object.freeze({
   firstEvidenceMs: 60_000,
-  progressGapMs: 90_000,
+  progressGapMs: 180_000,
   maxElapsedMs: 480_000,
   maxRecoveries: 1,
 });
@@ -287,6 +287,9 @@ function calibratedEnv() {
 }
 
 export function runGit(repoRoot, args, options = {}) {
+  // Every repository-scoped Git invocation is preceded by a filesystem-only
+  // index check. This happens before Git can dereference a redirected index.
+  regularGitIndex(repoRoot, { allowMissing: args[0] === "checkout" });
   return run("git", [
     "-c", "core.hooksPath=/dev/null",
     "-c", "core.fsmonitor=false",
@@ -321,6 +324,16 @@ export function validateCriticRequest(request) {
     if (!SHA40.test(request[field])) fail(`${field} must be a full lowercase commit SHA`);
   }
   if (!SHA40.test(request.candidate_tree)) fail("candidate_tree must be a full lowercase tree SHA");
+  const authorization = request.normal_lane_authorization;
+  if (request.trigger_row === "T1" && !authorization) fail("T1 normal lane requires a named scope-bounded PO waiver");
+  if (authorization) {
+    if (authorization.kind !== "named-po-waiver" || authorization.authority !== "PO"
+      || !SAFE_ID.test(authorization.risk_id) || !SAFE_ID.test(authorization.scope)
+      || !SHA256.test(authorization.evidence_sha256)
+      || authorization.candidate_commit !== request.candidate_commit) {
+      fail("normal lane authorization is invalid or stale");
+    }
+  }
   request.calibration_path = normalizeRepoRelativePath(request.calibration_path, "calibration_path");
   request.spec_path = normalizeRepoRelativePath(request.spec_path, "spec_path");
   if (request.guardrail_paths.length === 0) fail("guardrail_paths must not be empty");
@@ -518,11 +531,42 @@ function adminDirectoryInventory(root, label) {
   return { count: entries.length, bytes, sha256: sha256(canonicalJson(entries)) };
 }
 
+function regularGitIndex(repoRoot, { allowMissing = false } = {}) {
+  const dotGit = join(repoRoot, ".git");
+  const dotGitInfo = lstatSync(dotGit);
+  if (dotGitInfo.isSymbolicLink()) fail(".git must not be a symlink");
+  let gitDir;
+  if (dotGitInfo.isDirectory()) {
+    gitDir = realpathSync(dotGit);
+  } else if (dotGitInfo.isFile()) {
+    const pointer = readFileSync(dotGit, "utf8");
+    const match = /^gitdir: ([^\r\n]+)\r?\n?$/.exec(pointer);
+    if (!match) fail(".git file is not a strict gitdir pointer");
+    gitDir = realpathSync(isAbsolute(match[1]) ? match[1] : resolve(repoRoot, match[1]));
+  } else {
+    fail(".git must be a directory or gitdir file");
+  }
+  const path = join(gitDir, "index");
+  let info;
+  try {
+    info = lstatSync(path);
+  } catch (error) {
+    if (allowMissing && error.code === "ENOENT") return { gitDir, path, info: null };
+    throw error;
+  }
+  if (!info.isFile() || info.isSymbolicLink()) fail("Git index must be a regular non-symlink file");
+  return { gitDir, path, info };
+}
+
 function gitAdministrativeFingerprint(repoRoot) {
-  const gitDir = realpathSync(gitText(repoRoot, ["rev-parse", "--absolute-git-dir"]));
+  const { gitDir, path: indexPath, info: indexInfo } = regularGitIndex(repoRoot);
   const commonRaw = gitText(repoRoot, ["rev-parse", "--git-common-dir"]);
   const commonDir = realpathSync(isAbsolute(commonRaw) ? commonRaw : resolve(repoRoot, commonRaw));
-  const roots = { git: adminDirectoryInventory(gitDir, "git-dir") };
+  const index = readFileSync(indexPath);
+  const roots = {
+    git: adminDirectoryInventory(gitDir, "git-dir"),
+    index: { type: "file", mode: indexInfo.mode & 0o777, bytes: index.length, sha256: sha256(index) },
+  };
   if (commonDir !== gitDir) roots.common = adminDirectoryInventory(commonDir, "git-common-dir");
   const dotGit = join(repoRoot, ".git");
   const link = lstatSync(dotGit);
@@ -533,6 +577,9 @@ function gitAdministrativeFingerprint(repoRoot) {
 }
 
 export function captureRepositoryFingerprint(repoRoot, declaredArtifacts = []) {
+  // Reject a redirected/special index before any ls-files/diff/status command
+  // can dereference it, block on it, or touch an external target.
+  regularGitIndex(repoRoot);
   const parts = {
     head: gitText(repoRoot, ["rev-parse", "HEAD"]),
     tree: gitText(repoRoot, ["rev-parse", "HEAD^{tree}"]),
@@ -870,17 +917,16 @@ export function validateHostReturn(prepared, preparedSha256, hostReturn, verdict
       fail("host liveness event kind is invalid");
     }
     if (!Number.isInteger(event.elapsed_ms) || event.elapsed_ms < prior) fail("host liveness events are not monotonic");
+    if (index === 0 && event.elapsed_ms > HOST_LIMITS.firstEvidenceMs) fail("first host evidence arrived too late");
     if (typeof event.evidence_text !== "string" || event.evidence_text.length < 16 || event.evidence_text.length > 2048) fail("host liveness evidence text is invalid");
     if (/^(?:running|alive|waiting|still working)\b/i.test(event.evidence_text)) fail("generic liveness text is not concrete evidence");
     if (sha256(event.evidence_text) !== event.evidence_sha256) fail("host liveness evidence hash mismatch");
     if (!SHA256.test(event.evidence_sha256) || hashes.has(event.evidence_sha256)) fail("host liveness evidence is invalid or repeated");
-    if (index === 0 && event.elapsed_ms > HOST_LIMITS.firstEvidenceMs) fail("first host evidence arrived too late");
-    if (index > 0 && event.elapsed_ms - prior > HOST_LIMITS.progressGapMs) fail("host evidence gap exceeded the lease");
     prior = event.elapsed_ms;
     hashes.add(event.evidence_sha256);
     kinds.push(event.kind);
   }
-  if (execution.completed_elapsed_ms < prior || execution.completed_elapsed_ms - prior > HOST_LIMITS.progressGapMs) fail("host completion liveness gap exceeded the lease");
+  if (execution.completed_elapsed_ms < prior) fail("host completion precedes its final event");
 
   const result = hostReturn.critic_result;
   exactKeys(result, [
@@ -898,11 +944,38 @@ export function validateHostReturn(prepared, preparedSha256, hostReturn, verdict
   const expectedStarted = `prepared:${preparedSha256}`;
   const expectedInspected = `reference-set:${prepared.bindings.referenceSetSha256}`;
   const expectedCompleted = `result:${sha256(canonicalJson(result))}`;
-  if (execution.evidence_events[0].evidence_text !== expectedStarted
-    || !execution.evidence_events.some(({ kind, evidence_text }) => kind === "evidence-inspected" && evidence_text === expectedInspected)
-    || execution.evidence_events.at(-1).evidence_text !== expectedCompleted) {
-    fail("host liveness evidence is not bound to the prepared packet and result");
+  const contentEvidence = [];
+  for (const event of execution.evidence_events) {
+    if (event.kind === "review-started" && event.evidence_text !== expectedStarted) fail("review-started evidence is not prepared-bound");
+    if (event.kind === "evidence-inspected" && event.evidence_text !== expectedInspected) fail("evidence-inspected event is not reference-bound");
+    if (event.kind === "review-completed" && event.evidence_text !== expectedCompleted) fail("review-completed evidence is not result-bound");
+    if (event.kind === "analysis-progress") {
+      const match = /^analysis-progress:([^:]+):([1-9][0-9]*):([A-Za-z0-9._-]{3,80})$/.exec(event.evidence_text);
+      if (!match) fail("analysis-progress evidence is not path/line/control-bound");
+      const [, path, rawLine] = match;
+      const reference = prepared.references.find((item) => item.path === path);
+      if (!reference) fail("analysis-progress path is outside the prepared reference set");
+      const sourceRoot = reference.source === "review" ? prepared.sources.reviewRoot
+        : reference.source === "ruleset" ? prepared.sources.rulesetRoot : null;
+      if (!sourceRoot) fail("analysis-progress reference source is invalid");
+      const content = readFileSync(resolve(sourceRoot, path), "utf8");
+      const lineCount = content.length === 0 ? 0 : (content.match(/\n/g)?.length ?? 0) + (content.endsWith("\n") ? 0 : 1);
+      if (Number(rawLine) > lineCount) fail("analysis-progress line is outside the prepared reference");
+    }
+    if (event.kind !== "recovery-started") contentEvidence.push(event);
   }
+  if (kinds.filter((kind) => kind === "review-started").length !== 1
+    || kinds.filter((kind) => kind === "evidence-inspected").length !== 1
+    || kinds.filter((kind) => kind === "review-completed").length !== 1) {
+    fail("host liveness evidence is not uniquely bound to prepared, references, and result");
+  }
+  if (contentEvidence[0].elapsed_ms > HOST_LIMITS.firstEvidenceMs) fail("first host evidence arrived too late");
+  for (let index = 1; index < contentEvidence.length; index++) {
+    if (contentEvidence[index].elapsed_ms - contentEvidence[index - 1].elapsed_ms > HOST_LIMITS.progressGapMs) {
+      fail("host content-evidence gap exceeded the lease");
+    }
+  }
+  if (execution.completed_elapsed_ms - contentEvidence.at(-1).elapsed_ms > HOST_LIMITS.progressGapMs) fail("host completion liveness gap exceeded the lease");
   const allowedDisclosure = new Set(["project-instructions", "git-status", "user-settings", "host-runtime", "none"]);
   if (!Array.isArray(result.context_disclosure) || result.context_disclosure.length === 0
     || result.context_disclosure.some((item) => !allowedDisclosure.has(item))
@@ -1079,6 +1152,18 @@ function validateReceiptSemantics(receipt, prepared, sanitizedVerdict) {
   if (receipt.route.duty !== "criticNormal" || receipt.route.runner !== "codex" || receipt.route.alias !== "fable"
     || receipt.route.requestedModel !== "gpt-5.6-sol" || receipt.route.requestedEffort !== "xhigh") fail("receipt route binding drift");
   if (receipt.state.mutationObserved !== false) fail("receipt mutation claim drift");
+  const authorization = prepared.request.normal_lane_authorization;
+  const expectedAuthorization = authorization ? {
+    kind: authorization.kind,
+    authority: authorization.authority,
+    riskId: authorization.risk_id,
+    scope: authorization.scope,
+    evidenceSha256: authorization.evidence_sha256,
+    candidateCommit: authorization.candidate_commit,
+  } : undefined;
+  if (JSON.stringify(receipt.normalLaneAuthorization) !== JSON.stringify(expectedAuthorization)) {
+    fail("receipt normal lane authorization drift");
+  }
   if (receipt.reviewPass !== sanitizedVerdict.pass || receipt.reviewPass !== (sanitizedVerdict.pass
     && sanitizedVerdict.findings.every(({ severity }) => !["blocker", "major"].includes(severity))
     && sanitizedVerdict.briefingViolationCount === 0
@@ -1190,6 +1275,16 @@ export function finalizeNativeCritic(options) {
     state: { before: prepared.bindings.protectedBefore, after, mutationObserved: false },
     assurance: ASSURANCE,
     residualRisks: [...RESIDUAL_RISKS],
+    ...(prepared.request.normal_lane_authorization ? {
+      normalLaneAuthorization: {
+        kind: prepared.request.normal_lane_authorization.kind,
+        authority: prepared.request.normal_lane_authorization.authority,
+        riskId: prepared.request.normal_lane_authorization.risk_id,
+        scope: prepared.request.normal_lane_authorization.scope,
+        evidenceSha256: prepared.request.normal_lane_authorization.evidence_sha256,
+        candidateCommit: prepared.request.normal_lane_authorization.candidate_commit,
+      },
+    } : {}),
     verdict: sanitizedVerdict,
     reviewPass: validated.reviewPass,
   };

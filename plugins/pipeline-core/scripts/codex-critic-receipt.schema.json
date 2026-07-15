@@ -136,6 +136,19 @@
         "pass": { "type": "boolean" }
       }
     },
-    "reviewPass": { "type": "boolean" }
+    "reviewPass": { "type": "boolean" },
+    "normalLaneAuthorization": {
+      "type": "object",
+      "required": ["kind", "authority", "riskId", "scope", "evidenceSha256", "candidateCommit"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["named-po-waiver"] },
+        "authority": { "type": "string", "enum": ["PO"] },
+        "riskId": { "type": "string" },
+        "scope": { "type": "string" },
+        "evidenceSha256": { "type": "string" },
+        "candidateCommit": { "type": "string" }
+      }
+    }
   }
 }

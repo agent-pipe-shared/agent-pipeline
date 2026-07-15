@@ -31,6 +31,12 @@ flags are rejected. An installed plugin cache is not silently treated as
 equivalent provenance; a future cache-native projection needs its own
 manifest/cache-evidence contract.
 
+For a `T1` dispatch the strict request also carries a sanitized named-PO-waiver
+binding: authority role, risk ID, bounded scope, authorization evidence hash,
+and the exact authorized candidate commit. Prepare rejects a missing, malformed,
+or stale binding. The sanitized receipt repeats it so the private close gate can
+verify the underlying decision without disclosing private decision prose.
+
 The normal Codex path is split across a deterministic coordinator harness and
 the native host agent surface:
 
@@ -63,6 +69,17 @@ The receipt states the achieved level verbatim:
 The host currently provides no cryptographic attestation of model identity or
 tool use. The receipt distinguishes the requested/coordinator-confirmed route
 from provider attestation and keeps the latter false.
+
+The read-only Critic has no writer diff to use as a heartbeat. Its lease is
+therefore evidence-based: first concrete evidence within 60 seconds, then a
+new content-bound review milestone within 180 seconds, with an unchanged total
+lease of 480 seconds. Writer lanes instead use diff/test/evidence progress and
+must not treat elapsed wall time alone as a stall.
+
+Trajectory consistency concerns the calibrated verify artifacts and reviewed
+commit. Fresh-context dispatch and host execution are validated after the
+Critic result by the coordinator envelope; their absence from candidate
+evidence or commit trailers is not by itself a trajectory gap.
 
 ## Consequences
 
