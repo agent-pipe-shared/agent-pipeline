@@ -18,8 +18,8 @@ Governing principle: **deterministic before probabilistic.** Stage 1 is machine 
 **Why:** "Reported done but not tested" is the documented main failure mode (P4).
 **Check:** The artifact was written by the script itself (file/log); model-authored prose does not qualify.
 
-**Rule (self-fix loop):** On red verify the goldfish fixes itself — max **2 failed attempts at the same problem**, then STOP + report with the failure state. Hard harness leashes: `maxTurns` in the agent frontmatter; stop-hook cap of 8 consecutive blocks.
-**Why:** Beyond two attempts the hit rate drops; a fresh context with a better briefing beats grinding on (OM §4.3, rung 1).
+**Rule (self-fix loop):** A closed-classified product failure may consume **one** automatic product retry. A matching second signature, any exhausted review/correction budget, and every unknown cause stop automatic work and create a course gate with a PO decision brief; no third automatic attempt exists. Hard harness leashes: `maxTurns` in the agent frontmatter; stop-hook cap of 8 consecutive blocks.
+**Why:** A fresh context with a better briefing beats grinding on; the decision brief makes the alternative courses explicit instead of turning a repeated error into an invisible loop (OM §4.3, rung 1).
 **Check:** The stop condition is in every briefing; the completion report names attempts and failure state.
 
 **Rule (gate honesty):** Every gate documents what it does NOT check. Gates are binary — sharp or deleted; warn-only only with an expiry date.
@@ -97,6 +97,29 @@ the executing harness/routing/schema set. It does not infer authority from an
 installed plugin cache. Review-checkout cleanup happens only after durable
 receipt publication and is not review evidence.
 
+**Phase 2.6 review economy:** round 1 at an architecture/security boundary is
+always **full**. A later round may be **delta** only when the Coordinator binds
+the exact base/head/tree, changed paths, changed-behaviour claims, an immutable
+prior receipt ID/digest, a complete hash-bound path-to-invariant map, and an
+unambiguous impact confirmation. Missing proof, an unknown path, a new trust
+boundary, or ambiguous impact falls back to full; it never silently narrows.
+There are at most two Critic rounds and two bundled correction commits per
+package; the host reconciles that exact correction range before selecting either
+full or delta. A Critic receives the selected mode and affected invariant IDs,
+never prior verdict prose or findings.
+
+**Progress and recovery:** elapsed time and liveness prose are not progress.
+The host records a monotonic vector over bound tree changes, verified output,
+trace, completed tests and delivered-result bytes. The stagnation interval may
+expire only while no component advances; the maximum elapsed time remains a
+separate resource cap. A verified sandbox/process-isolation failure immediately
+closes that origin lane: there is no same-lane retry. The Coordinator may create
+exactly one fresh, narrow fallback subagent with `mayDelegate=false`, frozen
+input/authority bindings and no state/authority write access. A second failure,
+an unproven environment cause, or any request for another child becomes a
+course gate. The inherited assurance remains
+`normal-contractual-read-only; OS isolation not asserted`.
+
 Accepted trade-off (ADR-0003): the standard Critic sees CLAUDE.md + git status — full input isolation exists only at `--bare` level. Headless runs record `total_cost_usd` from `--output-format json` in the telemetry line (MP-20 headless convention). **Disclosure + snapshot-ban:** the standard-stage report names the auto-injected context observed (CLAUDE.md, git-status snapshot, memory); that injected git status/commit log is NEVER used as a freshness reference — diff range and commit state come exclusively from the dispatch (§2.2), confirmed via the Critic's own `git` commands.
 **Check:** Writable tools available to a Critic = failed bootstrap → abort (wrong agent definition loaded).
 
@@ -144,7 +167,7 @@ Model escalation inside rework follows **MP-05** (criterion 3: same task class f
 
 | Rung | Owner | Hard abort/escalation criterion |
 |---|---|---|
-| 1 | Goldfish itself | verify red: max **2 failed attempts at the same problem** → STOP + report with failure state. Harness leashes: `maxTurns` frontmatter; stop-hook cap 8 consecutive blocks |
+| 1 | Goldfish itself | one closed product cause may receive one automatic retry; a matching second signature, unknown cause or exhausted budget → course gate + PO decision brief. Harness leashes: `maxTurns` frontmatter; stop-hook cap 8 consecutive blocks |
 | 2 | Critic | delivers findings only — **no dialogue with the goldfish, no own fixes** (read-only) |
 | 3 | Elephant | dispositions every finding (fix / reject with justification / the PO); harness checklist BEFORE re-dispatch or model escalation (G2/P1); rework = fresh context + refined briefing; max **2 rework cycles per task** |
 | 4 | the PO | MANDATORY on: blockers, > 2 rework cycles, irreversible/externally visible/costly matters, spec↔reality conflict, budget overrun (criterion: `policies/model-policy.md` MP-20) |

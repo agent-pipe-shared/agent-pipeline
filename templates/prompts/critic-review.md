@@ -61,6 +61,21 @@ USAGE (Elephant)
    git diff/log via Bash; no memory, no write tools).
    Hard level: run headless `claude -p --bare` with this prompt and a JSON
    schema for the verdict (shape at the end of this file).
+4. Phase-2.6 bounded re-review: the first architecture/security review is
+   `full`. A later `delta` dispatch is admissible only when it names the bound
+   base/head/tree, prior receipt ID/digest, changed paths/behaviour claims and
+   affected invariant IDs. Review only that delta plus those invariants; do not
+   request or read prior verdict prose. Missing/unknown/ambiguous impact means
+   full review, never an invented narrow scope. There are at most two Critic
+   rounds and two correction commits per package; the host reconciles that
+   exact correction range before it selects either mode.
+5. A sandbox/process-isolation failure is never retried in the same lane. Only
+   the Coordinator may immediately create the one narrow fresh fallback, with
+   frozen bindings and `mayDelegate=false`; a second/unproven failure is a PO
+   course gate. Do not spawn, request, or delegate a recovery yourself. Wall
+   time, generic liveness, timeout/nonzero/free text and agent self-report are
+   not progress or environment proof; retain the stated non-claim about OS
+   isolation.
 ═══════════════════════════════════════════════════════════════════════════
 COPY EVERYTHING BELOW THIS LINE
 -->

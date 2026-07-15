@@ -9,6 +9,7 @@
     "dispatchId",
     "candidate",
     "route",
+    "review",
     "liveness",
     "bindings",
     "state",
@@ -34,7 +35,7 @@
     },
     "route": {
       "type": "object",
-      "required": ["duty", "runner", "alias", "requestedModel", "requestedEffort", "coordinatorConfirmed", "providerAttested"],
+      "required": ["duty", "runner", "alias", "requestedModel", "requestedEffort", "mayDelegate", "coordinatorConfirmed", "providerAttested"],
       "additionalProperties": false,
       "properties": {
         "duty": { "type": "string" },
@@ -42,8 +43,19 @@
         "alias": { "type": "string" },
         "requestedModel": { "type": "string" },
         "requestedEffort": { "type": "string" },
+        "mayDelegate": { "type": "boolean", "enum": [false] },
         "coordinatorConfirmed": { "type": "boolean" },
         "providerAttested": { "type": "boolean", "enum": [false] }
+      }
+    },
+    "review": {
+      "type": "object",
+      "required": ["mode", "admissionCode", "affectedInvariantIds"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "type": "string", "enum": ["full", "delta"] },
+        "admissionCode": { "type": "string" },
+        "affectedInvariantIds": { "type": "array", "items": { "type": "string" } }
       }
     },
     "liveness": {
@@ -59,11 +71,24 @@
           "type": "array",
           "items": {
             "type": "object",
-            "required": ["elapsedMs", "evidenceSha256"],
+            "required": ["kind", "elapsedMs", "evidenceSha256", "progress"],
             "additionalProperties": false,
             "properties": {
+              "kind": { "type": "string", "enum": ["review-started", "evidence-inspected", "analysis-progress", "recovery-started", "review-completed"] },
               "elapsedMs": { "type": "number" },
-              "evidenceSha256": { "type": "string" }
+              "evidenceSha256": { "type": "string" },
+              "progress": {
+                "type": "object",
+                "required": ["boundTreeChanges", "verifiedOutputBytes", "traceBytes", "completedTestSteps", "deliveredResultBytes"],
+                "additionalProperties": false,
+                "properties": {
+                  "boundTreeChanges": { "type": "number" },
+                  "verifiedOutputBytes": { "type": "number" },
+                  "traceBytes": { "type": "number" },
+                  "completedTestSteps": { "type": "number" },
+                  "deliveredResultBytes": { "type": "number" }
+                }
+              }
             }
           }
         }

@@ -9,6 +9,7 @@ import {
   ASSURANCE,
   DEFAULT_PIPELINE_ROOT,
   assertNoDuplicateJsonKeys,
+  admitCriticReview,
   canonicalJson,
   captureRepositoryFingerprint,
   finalizeNativeCritic,
@@ -21,6 +22,7 @@ import {
   validateCriticRequest,
   validateHostReturn,
 } from "./codex-critic-host.mjs";
+import { sha256Canonical } from "../lib/review-economy.mjs";
 
 let passed = 0;
 const RULESET_PATHS = [
@@ -29,6 +31,7 @@ const RULESET_PATHS = [
   "plugins/pipeline-core/config/routing-authority.json",
   "plugins/pipeline-core/config/runner-mappings.json",
   "plugins/pipeline-core/lib/routing-projection.mjs",
+  "plugins/pipeline-core/lib/review-economy.mjs",
   "plugins/pipeline-core/lib/schema-lite.mjs",
   "plugins/pipeline-core/scripts/codex-critic-dispatch.schema.json",
   "plugins/pipeline-core/scripts/codex-critic-host-return.schema.json",
@@ -50,6 +53,35 @@ function run(command, args, cwd) {
 
 function writeJson(path, value) {
   writeFileSync(path, canonicalJson(value), { mode: 0o600 });
+}
+
+function writeAcceptedPriorReceipt(controlRoot, receiptId, candidateCommit) {
+  const directory = join(controlRoot, "accepted-critic-receipts");
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const path = join(directory, `${receiptId}.json`);
+  writeJson(path, {
+    schema: "pipeline.codex-critic-host-receipt.v1",
+    taskId: "prior-review",
+    dispatchId: receiptId,
+    candidate: { base: "b".repeat(40), commit: candidateCommit, tree: "c".repeat(40) },
+    route: { duty: "criticNormal", runner: "codex", alias: "fable", requestedModel: "gpt-5.6-sol", requestedEffort: "xhigh", mayDelegate: false, coordinatorConfirmed: true, providerAttested: false },
+    review: { mode: "full", admissionCode: "RE-FIRST-FULL", affectedInvariantIds: [] },
+    liveness: {
+      agentIdHash: "a".repeat(64), taskName: "critic_prior_review", completedElapsedMs: 1, recoveryCount: 0,
+      evidenceEvents: [{ kind: "review-completed", elapsedMs: 1, evidenceSha256: "b".repeat(64), progress: { boundTreeChanges: 0, verifiedOutputBytes: 0, traceBytes: 0, completedTestSteps: 0, deliveredResultBytes: 0 } }],
+    },
+    bindings: {
+      preparedSha256: "a".repeat(64), requestSha256: "b".repeat(64), referenceSetSha256: "c".repeat(64), resultSha256: "d".repeat(64),
+      reviewFingerprintBefore: "e".repeat(64), reviewFingerprintAfter: "f".repeat(64), roleContractSha256: "a".repeat(64), promptContractSha256: "b".repeat(64),
+      verdictSchemaSha256: "c".repeat(64), hostReturnSchemaSha256: "d".repeat(64), executionSetSha256: "e".repeat(64), routingProvenance: "f".repeat(64),
+    },
+    state: { before: {}, after: {}, mutationObserved: false },
+    assurance: "normal-contractual-read-only; OS isolation not asserted",
+    residualRisks: ["fixture"],
+    verdict: { findings: [], deliberatelyNotFlaggedSha256: "a".repeat(64), trajectoryVerdict: "consistent", trajectoryEvidenceSha256: "b".repeat(64), briefingViolationCount: 0, briefingViolationsSha256: "c".repeat(64), pass: true },
+    reviewPass: true,
+  });
+  return readJsonBounded(path).sha256;
 }
 
 function createCandidate(root) {
@@ -104,7 +136,7 @@ function createObserver(root) {
 
 function requestFor(candidate, ruleset) {
   return {
-    schema: "pipeline.codex-critic-request.v1",
+    schema: "pipeline.codex-critic-request.v2",
     task_id: "normal-critic-fixture",
     project: "fixture",
     ruleset_sha: ruleset,
@@ -118,6 +150,19 @@ function requestFor(candidate, ruleset) {
     rigor: "2",
     risk: "high",
     trigger_row: "T1",
+    review_economy: {
+      round: 1,
+      correction_commits: 0,
+      requested_mode: "full",
+      changed_paths: [],
+      changed_behavior_claims: [],
+      prior_receipt: null,
+      path_invariant_map: {},
+      path_invariant_map_sha256: null,
+      coordinator_impact_confirmed: false,
+      trust_boundary_changed: false,
+      impact_ambiguous: false,
+    },
     normal_lane_authorization: {
       kind: "named-po-waiver",
       authority: "PO",
@@ -145,6 +190,8 @@ function successfulReturn(prepared, preparedSha256, overrides = {}) {
     nonce: prepared.nonce,
     candidate_commit: prepared.review.commit,
     candidate_tree: prepared.review.tree,
+    review_mode: prepared.reviewPlan.mode,
+    affected_invariant_ids: prepared.reviewPlan.affectedInvariantIds,
     context_disclosure: ["project-instructions", "git-status"],
     achieved_assurance: ASSURANCE,
     verdict,
@@ -154,6 +201,18 @@ function successfulReturn(prepared, preparedSha256, overrides = {}) {
     ["review-started", `prepared:${preparedSha256}`],
     ["evidence-inspected", `reference-set:${prepared.bindings.referenceSetSha256}`],
     ["review-completed", `result:${sha256(canonicalJson(criticResult))}`],
+  ];
+  const baseProgress = { boundTreeChanges: 0, verifiedOutputBytes: 0, traceBytes: 0, completedTestSteps: 0, deliveredResultBytes: 0 };
+  const inspectedProgress = {
+    ...baseProgress,
+    boundTreeChanges: prepared.review.commits.length,
+    verifiedOutputBytes: prepared.verify.stdoutBytes + prepared.verify.stderrBytes,
+    completedTestSteps: prepared.verify.completedTestSteps,
+  };
+  const progress = [
+    baseProgress,
+    inspectedProgress,
+    { ...inspectedProgress, deliveredResultBytes: Buffer.byteLength(canonicalJson(criticResult), "utf8") },
   ];
   return {
     schema: "pipeline.codex-native-host-return.v1",
@@ -166,6 +225,7 @@ function successfulReturn(prepared, preparedSha256, overrides = {}) {
       resolved_model: "gpt-5.6-sol",
       resolved_effort: "xhigh",
       route_source: "project-duty+coordinator",
+      may_delegate: false,
       terminal_status: "completed",
       completed_elapsed_ms: 2_000,
       recovery_count: 0,
@@ -175,6 +235,7 @@ function successfulReturn(prepared, preparedSha256, overrides = {}) {
         elapsed_ms: 500 + index * 500,
         evidence_text,
         evidence_sha256: sha256(evidence_text),
+        progress: progress[index],
       })),
       ...overrides.host_execution,
     },
@@ -186,6 +247,7 @@ function rebindCompletion(value) {
   const event = value.host_execution.evidence_events.at(-1);
   event.evidence_text = `result:${sha256(canonicalJson(value.critic_result))}`;
   event.evidence_sha256 = sha256(event.evidence_text);
+  event.progress.deliveredResultBytes = Buffer.byteLength(canonicalJson(value.critic_result), "utf8");
 }
 
 check("duplicate JSON keys fail before JSON.parse", () => {
@@ -248,6 +310,30 @@ check("T1 request rejects a stale waiver candidate binding", () => {
   const copy = structuredClone(request);
   copy.normal_lane_authorization.candidate_commit = copy.review_base;
   assert.throws(() => validateCriticRequest(copy), /invalid or stale/);
+});
+check("request rejects a third Critic round before any checkout", () => {
+  const copy = structuredClone(request);
+  copy.review_economy.round = 3;
+  assert.throws(() => validateCriticRequest(copy), /RE-CRITIC-ROUND-LIMIT/);
+});
+check("request rejects a missing review economy before any checkout", () => {
+  const copy = structuredClone(request);
+  delete copy.review_economy;
+  assert.throws(() => validateCriticRequest(copy), /schema invalid/);
+});
+check("unprovable delta impact is downgraded to full rather than silently narrowed", () => {
+  const copy = structuredClone(request);
+  copy.review_economy.round = 2;
+  copy.review_economy.correction_commits = 1;
+  copy.review_economy.requested_mode = "delta";
+  copy.review_economy.changed_paths = ["unknown/path.mjs"];
+  copy.review_economy.changed_behavior_claims = ["behavior-unknown"];
+  copy.review_economy.prior_receipt = { id: "prior-receipt-01", sha256: "a".repeat(64) };
+  copy.review_economy.path_invariant_map = { "known/path.mjs": ["invariant-known"] };
+  copy.review_economy.path_invariant_map_sha256 = sha256Canonical(copy.review_economy.path_invariant_map);
+  copy.review_economy.coordinator_impact_confirmed = true;
+  assert.equal(admitCriticReview(copy).mode, "full");
+  assert.equal(admitCriticReview(copy).admissionCode, "RE-DELTA-FALLBACK-UNKNOWN-PATH");
 });
 
 const requestPath = join(root, "request.json");
@@ -382,7 +468,7 @@ const preparedResult = prepareNativeCritic({
   runVerify: (checkout) => {
     mkdirSync(join(checkout, "evidence"), { recursive: true });
     writeJson(join(checkout, "evidence", "verify-latest.json"), { schema: "fixture.verify.v1", exitCode: 0, commit: candidate.commit });
-    return { command: "node verify.mjs", stdoutSha256: sha256("ok"), stderrSha256: sha256("") };
+    return { command: "node verify.mjs", stdoutSha256: sha256("ok"), stderrSha256: sha256(""), stdoutBytes: 2, stderrBytes: 0, completedTestSteps: 1 };
   },
 });
 const preparedRecord = readJsonBounded(preparedPath);
@@ -420,6 +506,124 @@ check("prepared packet binds the exact enumerated commit-set as its diff referen
     candidateTree: candidate.tree,
   });
 });
+check("delta prepare binds only the actual changed path and its invariant", () => {
+  const control = join(root, "delta-control");
+  mkdirSync(control, { mode: 0o700 });
+  const delta = structuredClone(request);
+  delta.review_base = candidate.commits[0];
+  delta.review_economy = {
+    round: 2,
+    correction_commits: 1,
+    requested_mode: "delta",
+    changed_paths: ["policies/guard.md"],
+    changed_behavior_claims: ["guardrail-policy-change"],
+    prior_receipt: { id: "prior-receipt-01", sha256: null },
+    path_invariant_map: { "policies/guard.md": ["invariant-guardrail-policy"] },
+    path_invariant_map_sha256: null,
+    coordinator_impact_confirmed: true,
+    trust_boundary_changed: false,
+    impact_ambiguous: false,
+  };
+  delta.review_economy.prior_receipt.sha256 = writeAcceptedPriorReceipt(control, delta.review_economy.prior_receipt.id, delta.review_base);
+  delta.review_economy.path_invariant_map_sha256 = sha256Canonical(delta.review_economy.path_invariant_map);
+  const deltaRequestPath = join(control, "request.json");
+  const deltaPreparedPath = join(control, "prepared.json");
+  writeJson(deltaRequestPath, delta);
+  prepareNativeCritic({
+    repoRoot: repo,
+    pipelineRoot: rulesetRoot,
+    controlDir: control,
+    dispatchStatePath: join(control, "state.json"),
+    requestPath: deltaRequestPath,
+    preparedPath: deltaPreparedPath,
+    reviewRoot: join(control, "review"),
+    observers,
+  }, {
+    randomBytes: () => Buffer.alloc(32, 9),
+    runVerify: (checkout) => {
+      mkdirSync(join(checkout, "evidence"), { recursive: true });
+      writeJson(join(checkout, "evidence", "verify-latest.json"), { schema: "fixture.verify.v1", exitCode: 0, commit: candidate.commit });
+      return { command: "node verify.mjs", stdoutSha256: sha256("ok"), stderrSha256: sha256(""), stdoutBytes: 2, stderrBytes: 0, completedTestSteps: 1 };
+    },
+  });
+  const deltaPreparedRecord = readJsonBounded(deltaPreparedPath);
+  const deltaPrepared = deltaPreparedRecord.value;
+  assert.deepEqual(deltaPrepared.reviewPlan, {
+    mode: "delta",
+    admissionCode: "RE-DELTA-ADMITTED",
+    affectedInvariantIds: ["invariant-guardrail-policy"],
+  });
+  const hostReturn = successfulReturn(deltaPrepared, deltaPreparedRecord.sha256);
+  assert.doesNotThrow(() => validateHostReturn(deltaPrepared, deltaPreparedRecord.sha256, hostReturn));
+  hostReturn.critic_result.affected_invariant_ids = [];
+  rebindCompletion(hostReturn);
+  assert.throws(() => validateHostReturn(deltaPrepared, deltaPreparedRecord.sha256, hostReturn), /review-plan binding/);
+});
+check("delta preparation rejects a forged prior receipt or underreported correction range", () => {
+  const makeDelta = (control, correctionCommits, forgedDigest) => {
+    mkdirSync(control, { mode: 0o700 });
+    const delta = structuredClone(request);
+    delta.review_base = candidate.commits[0];
+    delta.review_economy = {
+      round: 2,
+      correction_commits: correctionCommits,
+      requested_mode: "delta",
+      changed_paths: ["policies/guard.md"],
+      changed_behavior_claims: ["guardrail-policy-change"],
+      prior_receipt: { id: "prior-receipt-02", sha256: null },
+      path_invariant_map: { "policies/guard.md": ["invariant-guardrail-policy"] },
+      path_invariant_map_sha256: null,
+      coordinator_impact_confirmed: true,
+      trust_boundary_changed: false,
+      impact_ambiguous: false,
+    };
+    const digest = writeAcceptedPriorReceipt(control, delta.review_economy.prior_receipt.id, delta.review_base);
+    delta.review_economy.prior_receipt.sha256 = forgedDigest ? "f".repeat(64) : digest;
+    delta.review_economy.path_invariant_map_sha256 = sha256Canonical(delta.review_economy.path_invariant_map);
+    const requestPath = join(control, "request.json");
+    writeJson(requestPath, delta);
+    return () => prepareNativeCritic({
+      repoRoot: repo, pipelineRoot: rulesetRoot, controlDir: control,
+      dispatchStatePath: join(control, "state.json"), requestPath,
+      preparedPath: join(control, "prepared.json"), reviewRoot: join(control, "review"), observers,
+    }, {
+      randomBytes: () => Buffer.alloc(32, correctionCommits + (forgedDigest ? 20 : 30)),
+      runVerify: (checkout) => {
+        mkdirSync(join(checkout, "evidence"), { recursive: true });
+        writeJson(join(checkout, "evidence", "verify-latest.json"), { schema: "fixture.verify.v1", exitCode: 0, commit: candidate.commit });
+        return { command: "node verify.mjs", stdoutSha256: sha256("ok"), stderrSha256: sha256(""), stdoutBytes: 2, stderrBytes: 0, completedTestSteps: 1 };
+      },
+    });
+  };
+  assert.throws(makeDelta(join(root, "delta-forged-receipt"), 1, true), /prior receipt digest mismatch/);
+  assert.throws(makeDelta(join(root, "delta-underreported-corrections"), 0, false), /correction commits/);
+});
+check("later full admission cannot bypass exact correction-range reconciliation", () => {
+  const control = join(root, "full-underreported-corrections");
+  mkdirSync(control, { mode: 0o700 });
+  const laterFull = structuredClone(request);
+  laterFull.review_base = candidate.commits[0];
+  laterFull.review_economy = {
+    round: 2,
+    correction_commits: 0,
+    requested_mode: "full",
+    changed_paths: [],
+    changed_behavior_claims: [],
+    prior_receipt: null,
+    path_invariant_map: {},
+    path_invariant_map_sha256: null,
+    coordinator_impact_confirmed: false,
+    trust_boundary_changed: false,
+    impact_ambiguous: false,
+  };
+  const laterFullRequestPath = join(control, "request.json");
+  writeJson(laterFullRequestPath, laterFull);
+  assert.throws(() => prepareNativeCritic({
+    repoRoot: repo, pipelineRoot: rulesetRoot, controlDir: control,
+    dispatchStatePath: join(control, "state.json"), requestPath: laterFullRequestPath,
+    preparedPath: join(control, "prepared.json"), reviewRoot: join(control, "review"), observers,
+  }), /correction commits/);
+});
 check("configured fsmonitor cannot run before the protected baseline", () => {
   assert.equal(existsSync(join(privateObserver, "ignored", "fsmonitor.txt")), false);
 });
@@ -441,7 +645,7 @@ check("verify-time observer mutation is detected before baselining", () => {
       mkdirSync(join(checkout, "evidence"), { recursive: true });
       writeJson(join(checkout, "evidence", "verify-latest.json"), { exitCode: 0 });
       writeFileSync(join(privateObserver, "ignored", "state.txt"), "verify mutated\n");
-      return { command: "node verify.mjs", stdoutSha256: sha256("ok"), stderrSha256: sha256("") };
+      return { command: "node verify.mjs", stdoutSha256: sha256("ok"), stderrSha256: sha256(""), stdoutBytes: 2, stderrBytes: 0, completedTestSteps: 1 };
     },
   }), /verify subprocess repository mutation/);
   writeFileSync(join(privateObserver, "ignored", "state.txt"), "initial\n");
@@ -453,6 +657,7 @@ check("valid host return passes pure validation", () => {
 });
 for (const [name, mutate, pattern] of [
   ["wrong model", (value) => { value.host_execution.resolved_model = "other"; }, /schema invalid|route mismatch/],
+  ["delegating host", (value) => { value.host_execution.may_delegate = true; }, /schema invalid|delegation/],
   ["wrong task name", (value) => { value.host_execution.task_name = "critic_other_task"; }, /task\/agent identity/],
   ["late first evidence", (value) => { value.host_execution.evidence_events[0].elapsed_ms = 60_001; }, /too late/],
   ["lease timeout", (value) => { value.host_execution.completed_elapsed_ms = 480_001; }, /lease/],
@@ -499,66 +704,88 @@ check("generic liveness text is rejected", () => {
   value.host_execution.evidence_events[1].evidence_sha256 = sha256(value.host_execution.evidence_events[1].evidence_text);
   assert.throws(() => validateHostReturn(prepared, preparedRecord.sha256, value), /not concrete/);
 });
-check("read-only Critic permits a 180-second content-evidence gap", () => {
+check("actual vector advance resets stagnation independently of wall time", () => {
   const value = structuredClone(validReturn);
   value.host_execution.evidence_events[1].elapsed_ms = 180_500;
   value.host_execution.evidence_events[2].elapsed_ms = 181_000;
   value.host_execution.completed_elapsed_ms = 181_500;
   assert.doesNotThrow(() => validateHostReturn(prepared, preparedRecord.sha256, value));
 });
-check("read-only Critic rejects a content-evidence gap above 180 seconds", () => {
+check("unchanged vector above the stagnation interval fails closed", () => {
   const value = structuredClone(validReturn);
-  value.host_execution.evidence_events[1].elapsed_ms = 180_501;
-  value.host_execution.evidence_events[2].elapsed_ms = 181_000;
-  value.host_execution.completed_elapsed_ms = 181_500;
-  assert.throws(() => validateHostReturn(prepared, preparedRecord.sha256, value), /evidence gap/);
+  const evidenceText = "recovery-started-after-progress-gap";
+  value.host_execution.evidence_events.splice(2, 0, {
+    sequence: 3,
+    kind: "recovery-started",
+    elapsed_ms: 181_001,
+    evidence_text: evidenceText,
+    evidence_sha256: sha256(evidenceText),
+    progress: { ...value.host_execution.evidence_events[1].progress },
+  });
+  value.host_execution.recovery_count = 1;
+  value.host_execution.evidence_events[3].elapsed_ms = 181_500;
+  value.host_execution.completed_elapsed_ms = 182_000;
+  value.host_execution.evidence_events.forEach((event, index) => { event.sequence = index + 1; });
+  assert.throws(() => validateHostReturn(prepared, preparedRecord.sha256, value), /progress stagnation/);
 });
-check("unbound analysis-progress cannot reset the content-evidence lease", () => {
+check("regressing progress vector fails closed", () => {
+  const value = structuredClone(validReturn);
+  value.host_execution.evidence_events[2].progress.boundTreeChanges = 0;
+  assert.throws(() => validateHostReturn(prepared, preparedRecord.sha256, value), /not bound/);
+});
+check("completed progress binds the exact result byte count", () => {
+  const value = structuredClone(validReturn);
+  value.host_execution.evidence_events.at(-1).progress.deliveredResultBytes += 1;
+  assert.throws(() => validateHostReturn(prepared, preparedRecord.sha256, value), /not bound/);
+});
+check("unbound analysis-progress cannot claim a vector advance", () => {
   const value = structuredClone(validReturn);
   const evidenceText = "analysis-progress:not-in-packet.md:1:control";
-  value.host_execution.evidence_events.splice(1, 0, {
-    sequence: 2,
+  value.host_execution.evidence_events.splice(2, 0, {
+    sequence: 3,
     kind: "analysis-progress",
     elapsed_ms: 180_000,
     evidence_text: evidenceText,
     evidence_sha256: sha256(evidenceText),
+    progress: { ...value.host_execution.evidence_events[1].progress, traceBytes: Buffer.byteLength(evidenceText, "utf8") },
   });
-  value.host_execution.evidence_events[2].elapsed_ms = 360_000;
   value.host_execution.evidence_events[3].elapsed_ms = 360_500;
+  value.host_execution.evidence_events[3].progress.traceBytes = Buffer.byteLength(evidenceText, "utf8");
   value.host_execution.completed_elapsed_ms = 361_000;
   value.host_execution.evidence_events.forEach((event, index) => { event.sequence = index + 1; });
   assert.throws(() => validateHostReturn(prepared, preparedRecord.sha256, value), /outside the prepared reference/);
 });
-check("recovery status cannot reset the content-evidence lease", () => {
+check("recovery status without an advance cannot reset the stagnation lease", () => {
   const value = structuredClone(validReturn);
   const evidenceText = "recovery-started-after-content-gap";
-  value.host_execution.evidence_events.splice(1, 0, {
-    sequence: 2,
+  value.host_execution.evidence_events.splice(2, 0, {
+    sequence: 3,
     kind: "recovery-started",
-    elapsed_ms: 180_000,
+    elapsed_ms: 181_001,
     evidence_text: evidenceText,
     evidence_sha256: sha256(evidenceText),
+    progress: { ...value.host_execution.evidence_events[1].progress },
   });
   value.host_execution.recovery_count = 1;
-  value.host_execution.evidence_events[2].elapsed_ms = 360_000;
-  value.host_execution.evidence_events[3].elapsed_ms = 360_500;
+  value.host_execution.evidence_events[3].elapsed_ms = 181_500;
   value.host_execution.completed_elapsed_ms = 361_000;
   value.host_execution.evidence_events.forEach((event, index) => { event.sequence = index + 1; });
-  assert.throws(() => validateHostReturn(prepared, preparedRecord.sha256, value), /content-evidence gap/);
+  assert.throws(() => validateHostReturn(prepared, preparedRecord.sha256, value), /progress stagnation/);
 });
-check("path-line-bound analysis progress extends the content-evidence lease", () => {
+check("path-line-bound analysis vector advance extends the stagnation lease", () => {
   const value = structuredClone(validReturn);
   const reference = prepared.references.find(({ source }) => source === "review");
   const evidenceText = `analysis-progress:${reference.path}:1:contract-check`;
-  value.host_execution.evidence_events.splice(1, 0, {
-    sequence: 2,
+  value.host_execution.evidence_events.splice(2, 0, {
+    sequence: 3,
     kind: "analysis-progress",
     elapsed_ms: 180_000,
     evidence_text: evidenceText,
     evidence_sha256: sha256(evidenceText),
+    progress: { ...value.host_execution.evidence_events[1].progress, traceBytes: Buffer.byteLength(evidenceText, "utf8") },
   });
-  value.host_execution.evidence_events[2].elapsed_ms = 360_000;
   value.host_execution.evidence_events[3].elapsed_ms = 360_500;
+  value.host_execution.evidence_events[3].progress.traceBytes = Buffer.byteLength(evidenceText, "utf8");
   value.host_execution.completed_elapsed_ms = 361_000;
   value.host_execution.evidence_events.forEach((event, index) => { event.sequence = index + 1; });
   assert.doesNotThrow(() => validateHostReturn(prepared, preparedRecord.sha256, value));
@@ -708,8 +935,12 @@ check("finalize emits sanitized schema-valid PASS receipt and cleans review", ()
   const receipt = readJsonBounded(receiptPath).value;
   assert.equal(receipt.assurance, ASSURANCE);
   assert.equal(receipt.route.providerAttested, false);
+  assert.equal(receipt.route.mayDelegate, false);
   assert.equal(receipt.normalLaneAuthorization.riskId, "phase1-codex-critic-isolation");
   assert.equal(receipt.state.mutationObserved, false);
+  assert.deepEqual(receipt.liveness.evidenceEvents, validReturn.host_execution.evidence_events.map(({ kind, elapsed_ms, evidence_sha256, progress }) => ({
+    kind, elapsedMs: elapsed_ms, evidenceSha256: evidence_sha256, progress,
+  })));
   assert.equal("trajectory_evidence" in receipt.verdict, false);
   assert.equal(readFileSync(receiptPath, "utf8").includes(repo), false);
 });
@@ -737,7 +968,7 @@ prepareNativeCritic({
   runVerify: (checkout) => {
     mkdirSync(join(checkout, "evidence"), { recursive: true });
     writeJson(join(checkout, "evidence", "verify-latest.json"), { schema: "fixture.verify.v1", exitCode: 0, commit: candidate.commit });
-    return { command: "node verify.mjs", stdoutSha256: sha256("ok"), stderrSha256: sha256("") };
+    return { command: "node verify.mjs", stdoutSha256: sha256("ok"), stderrSha256: sha256(""), stdoutBytes: 2, stderrBytes: 0, completedTestSteps: 1 };
   },
 });
 const failurePreparedRecord = readJsonBounded(failurePreparedPath);

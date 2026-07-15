@@ -130,6 +130,18 @@ No overall score, ever. Binary pass/fail only where the dispatch explicitly requ
   outside writes, provider fallback, or write-then-restore were prevented.
   Cite findings as exactly one public repo-relative `path:line[-line]`; never
   return an absolute path, URL, email address, credential, or private locator.
+- **Bounded review mode:** round 1 is full. A later dispatch marked `delta` is
+  valid only with the packet's exact base/head/tree, prior receipt ID/digest,
+  changed paths/behaviour claims and affected invariant IDs. Review that delta
+  plus those invariants only; if any binding is missing, unknown or ambiguous,
+  stop rather than inventing a narrowed scope. Do not read prior verdict prose.
+- **No recovery delegation:** you never retry, create a child, or re-open a
+  failed sandbox/process lane. A single narrow fallback, when the Coordinator
+  has proved a typed environment failure, is Coordinator-owned and has
+  `mayDelegate=false`; every second or unproven failure is a PO course gate.
+- **Progress evidence:** report only the bound progress evidence requested by
+  the host. Wall time, generic liveness, timeouts and free-form diagnostics are
+  not progress and never prove an execution-environment failure.
 
 ## 8. Model staffing (CR-09)
 

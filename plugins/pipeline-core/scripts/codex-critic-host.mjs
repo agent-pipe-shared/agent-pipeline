@@ -38,6 +38,7 @@ import { fileURLToPath } from "node:url";
 
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { projectHostDuty, routingProvenance } from "../lib/routing-projection.mjs";
+import { PROGRESS_COMPONENTS, admitReviewAttempt, evaluateProgress } from "../lib/review-economy.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_PIPELINE_ROOT = resolve(HERE, "..", "..", "..");
@@ -50,6 +51,7 @@ const EXECUTION_BINDING_PATHS = Object.freeze([
   "plugins/pipeline-core/config/routing-authority.json",
   "plugins/pipeline-core/config/runner-mappings.json",
   "plugins/pipeline-core/lib/routing-projection.mjs",
+  "plugins/pipeline-core/lib/review-economy.mjs",
   "plugins/pipeline-core/lib/schema-lite.mjs",
   "plugins/pipeline-core/scripts/codex-critic-dispatch.schema.json",
   "plugins/pipeline-core/scripts/codex-critic-host-return.schema.json",
@@ -349,7 +351,64 @@ export function validateCriticRequest(request) {
   if (allPaths.includes(DIFF_REFERENCE_PATH)) {
     fail("request must not claim the coordinator-reserved diff reference path");
   }
+  admitCriticReview(request);
   return request;
+}
+
+/** Bind the host contract to the closed full/delta admission decision. */
+function loadAcceptedPriorReceipt(controlRoot, priorReceipt, reviewBase) {
+  const receiptPath = assertSafeControlPath(join(controlRoot, "accepted-critic-receipts", `${priorReceipt.id}.json`), controlRoot, "accepted prior receipt");
+  const record = readJsonBounded(receiptPath);
+  if (record.sha256 !== priorReceipt.sha256) fail("accepted prior receipt digest mismatch");
+  assertSchema(record.value, RECEIPT_SCHEMA_PATH, "accepted prior receipt");
+  if (record.value.dispatchId !== priorReceipt.id || record.value.reviewPass !== true
+    || record.value.candidate.commit !== reviewBase) {
+    fail("accepted prior receipt is not a passed receipt for the delta base");
+  }
+  return record;
+}
+
+export function admitCriticReview(request, bindings = {}) {
+  const economy = request.review_economy;
+  if (!economy || !Array.isArray(economy.changed_paths) || !Array.isArray(economy.changed_behavior_claims)
+    || new Set(economy.changed_paths).size !== economy.changed_paths.length
+    || new Set(economy.changed_behavior_claims).size !== economy.changed_behavior_claims.length) {
+    fail("review economy has duplicate or missing declared inputs");
+  }
+  const admission = admitReviewAttempt({
+    round: economy.round,
+    correctionCommits: economy.correction_commits,
+    requestedMode: economy.requested_mode,
+    base: request.review_base,
+    head: request.candidate_commit,
+    tree: request.candidate_tree,
+    changedPaths: economy.changed_paths,
+    changedBehaviorClaims: economy.changed_behavior_claims,
+    priorReceipt: economy.prior_receipt,
+    pathInvariantMap: economy.path_invariant_map,
+    pathInvariantMapSha256: economy.path_invariant_map_sha256,
+    coordinatorImpactConfirmed: economy.coordinator_impact_confirmed,
+    trustBoundaryChanged: economy.trust_boundary_changed,
+    impactAmbiguous: economy.impact_ambiguous,
+  });
+  if (!admission.ok) fail(`review economy admission rejected: ${admission.code}`);
+  // A later full review can be requested deliberately or selected as a safe
+  // delta fallback.  Neither case may turn its correction range into an
+  // unmetered range: reconcile it before the admission mode is considered.
+  if (economy.round > 1 && bindings.controlRoot) {
+    if (!Number.isSafeInteger(bindings.correctionCommitCount)
+      || bindings.correctionCommitCount !== economy.correction_commits) {
+      fail("declared correction commits do not match the exact later-review commit range");
+    }
+  }
+  if (admission.mode === "delta" && bindings.controlRoot) {
+    loadAcceptedPriorReceipt(bindings.controlRoot, economy.prior_receipt, request.review_base);
+  }
+  return {
+    mode: admission.mode,
+    admissionCode: admission.code,
+    affectedInvariantIds: admission.affectedInvariantIds,
+  };
 }
 
 function resolveRegularFile(root, path, { allowUntracked = false } = {}) {
@@ -421,6 +480,16 @@ function enumerateReviewCommits(reviewRoot, base, candidate) {
     fail("review commit set is invalid or does not terminate at the candidate");
   }
   return commits;
+}
+
+function assertDeltaPathBinding(reviewRoot, request, reviewPlan) {
+  if (reviewPlan.mode !== "delta") return;
+  const actual = gitText(reviewRoot, ["diff", "--name-only", request.review_base, request.candidate_commit])
+    .split("\n").filter(Boolean).sort();
+  const declared = [...request.review_economy.changed_paths].sort();
+  if (JSON.stringify(actual) !== JSON.stringify(declared)) {
+    fail("delta changed paths do not match the bound candidate diff");
+  }
 }
 
 function reviewCommitSet(base, candidate, tree, commits) {
@@ -500,7 +569,21 @@ export function runCalibratedVerify(reviewRoot, calibrationPath) {
     command: verify.command,
     stdoutSha256: sha256(result.stdout ?? ""),
     stderrSha256: sha256(result.stderr ?? ""),
+    stdoutBytes: Buffer.byteLength(result.stdout ?? "", "utf8"),
+    stderrBytes: Buffer.byteLength(result.stderr ?? "", "utf8"),
+    completedTestSteps: 1,
   };
+}
+
+function validateVerifyEvidence(verify) {
+  exactKeys(verify, ["command", "stdoutSha256", "stderrSha256", "stdoutBytes", "stderrBytes", "completedTestSteps"], "calibrated verify evidence");
+  if (typeof verify.command !== "string" || verify.command.length < 1 || verify.command.length > 512
+    || !SHA256.test(verify.stdoutSha256) || !SHA256.test(verify.stderrSha256)
+    || !Number.isSafeInteger(verify.stdoutBytes) || verify.stdoutBytes < 0
+    || !Number.isSafeInteger(verify.stderrBytes) || verify.stderrBytes < 0
+    || !Number.isSafeInteger(verify.completedTestSteps) || verify.completedTestSteps < 1) {
+    fail("calibrated verify evidence is invalid");
+  }
 }
 
 function artifactBindings(reviewRoot, pipelineRoot, request) {
@@ -812,8 +895,11 @@ export function prepareNativeCritic(options, deps = {}) {
   (deps.createCheckout ?? createDisposableCheckout)(repoRoot, reviewRoot, request.candidate_commit, dispatchId, cleanupCapability);
   assertFingerprintMapEqual(protectedBefore, protectedFingerprintMap(repoRoot, pipelineRoot, observers), "checkout subprocess");
   const verify = (deps.runVerify ?? runCalibratedVerify)(reviewRoot, request.calibration_path);
+  validateVerifyEvidence(verify);
   assertFingerprintMapEqual(protectedBefore, protectedFingerprintMap(repoRoot, pipelineRoot, observers), "verify subprocess");
   const commits = enumerateReviewCommits(reviewRoot, request.review_base, request.candidate_commit);
+  const reviewPlan = admitCriticReview(request, { controlRoot, correctionCommitCount: commits.length });
+  assertDeltaPathBinding(reviewRoot, request, reviewPlan);
   atomicWriteExclusive(join(reviewRoot, DIFF_REFERENCE_PATH), reviewCommitSet(
     request.review_base,
     request.candidate_commit,
@@ -833,16 +919,20 @@ export function prepareNativeCritic(options, deps = {}) {
     nonce,
     expectedTaskName,
     request,
+    reviewPlan,
     route,
     hostContract: {
       owner: "Elephant",
       freshContext: true,
       forkTurns: "none",
       nativeOnly: true,
+      mayDelegate: false,
       firstEvidenceMs: HOST_LIMITS.firstEvidenceMs,
       progressGapMs: HOST_LIMITS.progressGapMs,
       maxElapsedMs: HOST_LIMITS.maxElapsedMs,
       maxRecoveries: HOST_LIMITS.maxRecoveries,
+      reviewMode: reviewPlan.mode,
+      affectedInvariantIds: reviewPlan.affectedInvariantIds,
       returnSchema: "pipeline.codex-critic-host-result.v1",
       returnSchemaPath: "plugins/pipeline-core/scripts/codex-critic-host-return.schema.json",
       returnChannel: "native-host-response-to-elephant",
@@ -852,6 +942,12 @@ export function prepareNativeCritic(options, deps = {}) {
         "Treat review.commits and the bound diff reference as the complete review object; verify the exact list before constructing the diff from review.base to review.commit.",
         "Do not use chat history, state, handover, prior verdicts, summaries, or private paths.",
         "Do not modify files and do not create a receipt.",
+        "Do not create or delegate to any child agent; mayDelegate is false.",
+        "Every liveness event carries a nondecreasing bound-tree/output/trace/test/result progress vector; elapsed time and prose are not progress.",
+        "For review-completed, progress.deliveredResultBytes is the UTF-8 byte length of the canonical JSON result object.",
+        reviewPlan.mode === "delta"
+          ? `Review only the bound delta and affected invariants: ${reviewPlan.affectedInvariantIds.join(",")}.`
+          : "Review the complete bound object as a full review.",
         "Return exactly one JSON object matching the host result contract.",
       ],
     },
@@ -974,6 +1070,45 @@ function sanitizeVerdictForReceipt(verdict, reviewRoot) {
   };
 }
 
+function zeroProgress() {
+  return Object.fromEntries(PROGRESS_COMPONENTS.map((key) => [key, 0]));
+}
+
+function assertProgressEvidence(prepared, result, events) {
+  const verifiedOutputBytes = prepared.verify.stdoutBytes + prepared.verify.stderrBytes;
+  const base = {
+    boundTreeChanges: prepared.review.commits.length,
+    verifiedOutputBytes,
+    traceBytes: 0,
+    completedTestSteps: prepared.verify.completedTestSteps,
+    deliveredResultBytes: 0,
+  };
+  let expected = zeroProgress();
+  let previous = zeroProgress();
+  let lastProgressAtMs = 0;
+  for (const event of events) {
+    if (event.kind === "evidence-inspected") expected = { ...base };
+    if (event.kind === "analysis-progress") {
+      expected = { ...expected, traceBytes: expected.traceBytes + Buffer.byteLength(event.evidence_text, "utf8") };
+    }
+    if (event.kind === "review-completed") {
+      expected = { ...base, traceBytes: expected.traceBytes, deliveredResultBytes: Buffer.byteLength(canonicalJson(result), "utf8") };
+    }
+    if (JSON.stringify(event.progress) !== JSON.stringify(expected)) {
+      fail("host progress vector is not bound to prepared evidence and event kind");
+    }
+    const progress = evaluateProgress(previous, event.progress, {
+      nowMs: event.elapsed_ms,
+      lastProgressAtMs,
+      stagnationIntervalMs: HOST_LIMITS.progressGapMs,
+    });
+    if (!progress.ok) fail("host progress vector is invalid");
+    if (progress.stagnant) fail("host progress stagnation lease exceeded");
+    previous = event.progress;
+    lastProgressAtMs = progress.lastProgressAtMs;
+  }
+}
+
 export function validateHostReturn(prepared, preparedSha256, hostReturn, verdictSchema = loadSchema(VERDICT_SCHEMA_PATH)) {
   assertSchema(hostReturn, HOST_RETURN_SCHEMA_PATH, "host return");
   exactKeys(hostReturn, ["schema", "host_execution", "critic_result"], "host return");
@@ -981,13 +1116,14 @@ export function validateHostReturn(prepared, preparedSha256, hostReturn, verdict
   const execution = hostReturn.host_execution;
   exactKeys(execution, [
     "agent_id", "task_name", "dispatch_id", "requested_alias", "requested_effort", "resolved_model",
-    "resolved_effort", "route_source", "terminal_status", "completed_elapsed_ms", "recovery_count", "evidence_events",
+    "resolved_effort", "route_source", "may_delegate", "terminal_status", "completed_elapsed_ms", "recovery_count", "evidence_events",
   ], "host_execution");
   if (execution.dispatch_id !== prepared.dispatchId) fail("host dispatch_id mismatch");
   if (execution.task_name !== prepared.expectedTaskName || typeof execution.agent_id !== "string" || execution.agent_id.length < 3) fail("invalid host task/agent identity");
   if (execution.requested_alias !== "fable" || execution.requested_effort !== "xhigh") fail("host requested route mismatch");
   if (execution.resolved_model !== "gpt-5.6-sol" || execution.resolved_effort !== "xhigh") fail("host confirmed route mismatch");
   if (execution.route_source !== "project-duty+coordinator") fail("host route source mismatch");
+  if (execution.may_delegate !== false) fail("host delegation contract mismatch");
   if (execution.terminal_status !== "completed") fail("host task did not complete");
   if (!Number.isInteger(execution.completed_elapsed_ms) || execution.completed_elapsed_ms < 0 || execution.completed_elapsed_ms > HOST_LIMITS.maxElapsedMs) {
     fail("host completion exceeded the bounded lease");
@@ -1000,7 +1136,7 @@ export function validateHostReturn(prepared, preparedSha256, hostReturn, verdict
   const hashes = new Set();
   const kinds = [];
   for (const [index, event] of execution.evidence_events.entries()) {
-    exactKeys(event, ["sequence", "kind", "elapsed_ms", "evidence_text", "evidence_sha256"], `evidence_events[${index}]`);
+    exactKeys(event, ["sequence", "kind", "elapsed_ms", "evidence_text", "evidence_sha256", "progress"], `evidence_events[${index}]`);
     if (event.sequence !== index + 1) fail("host liveness sequence is not contiguous");
     if (!new Set(["review-started", "evidence-inspected", "analysis-progress", "recovery-started", "review-completed"]).has(event.kind)) {
       fail("host liveness event kind is invalid");
@@ -1020,11 +1156,15 @@ export function validateHostReturn(prepared, preparedSha256, hostReturn, verdict
   const result = hostReturn.critic_result;
   exactKeys(result, [
     "schema", "dispatch_id", "prepared_sha256", "nonce", "candidate_commit", "candidate_tree",
-    "context_disclosure", "achieved_assurance", "verdict",
+    "review_mode", "affected_invariant_ids", "context_disclosure", "achieved_assurance", "verdict",
   ], "critic_result");
   if (result.schema !== "pipeline.codex-critic-host-result.v1") fail("critic result schema mismatch");
   if (result.dispatch_id !== prepared.dispatchId || result.prepared_sha256 !== preparedSha256 || result.nonce !== prepared.nonce) fail("critic result replay/binding mismatch");
   if (result.candidate_commit !== prepared.review.commit || result.candidate_tree !== prepared.review.tree) fail("critic candidate binding mismatch");
+  if (result.review_mode !== prepared.reviewPlan.mode
+    || JSON.stringify(result.affected_invariant_ids) !== JSON.stringify(prepared.reviewPlan.affectedInvariantIds)) {
+    fail("critic review-plan binding mismatch");
+  }
   if (result.achieved_assurance !== ASSURANCE) fail("critic assurance claim mismatch");
   if (kinds[0] !== "review-started" || !kinds.includes("evidence-inspected") || kinds.at(-1) !== "review-completed") {
     fail("host liveness lifecycle is incomplete");
@@ -1033,7 +1173,6 @@ export function validateHostReturn(prepared, preparedSha256, hostReturn, verdict
   const expectedStarted = `prepared:${preparedSha256}`;
   const expectedInspected = `reference-set:${prepared.bindings.referenceSetSha256}`;
   const expectedCompleted = `result:${sha256(canonicalJson(result))}`;
-  const contentEvidence = [];
   for (const event of execution.evidence_events) {
     if (event.kind === "review-started" && event.evidence_text !== expectedStarted) fail("review-started evidence is not prepared-bound");
     if (event.kind === "evidence-inspected" && event.evidence_text !== expectedInspected) fail("evidence-inspected event is not reference-bound");
@@ -1051,20 +1190,13 @@ export function validateHostReturn(prepared, preparedSha256, hostReturn, verdict
       const lineCount = content.length === 0 ? 0 : (content.match(/\n/g)?.length ?? 0) + (content.endsWith("\n") ? 0 : 1);
       if (Number(rawLine) > lineCount) fail("analysis-progress line is outside the prepared reference");
     }
-    if (event.kind !== "recovery-started") contentEvidence.push(event);
   }
   if (kinds.filter((kind) => kind === "review-started").length !== 1
     || kinds.filter((kind) => kind === "evidence-inspected").length !== 1
     || kinds.filter((kind) => kind === "review-completed").length !== 1) {
     fail("host liveness evidence is not uniquely bound to prepared, references, and result");
   }
-  if (contentEvidence[0].elapsed_ms > HOST_LIMITS.firstEvidenceMs) fail("first host evidence arrived too late");
-  for (let index = 1; index < contentEvidence.length; index++) {
-    if (contentEvidence[index].elapsed_ms - contentEvidence[index - 1].elapsed_ms > HOST_LIMITS.progressGapMs) {
-      fail("host content-evidence gap exceeded the lease");
-    }
-  }
-  if (execution.completed_elapsed_ms - contentEvidence.at(-1).elapsed_ms > HOST_LIMITS.progressGapMs) fail("host completion liveness gap exceeded the lease");
+  assertProgressEvidence(prepared, result, execution.evidence_events);
   const allowedDisclosure = new Set(["project-instructions", "git-status", "user-settings", "host-runtime", "none"]);
   if (!Array.isArray(result.context_disclosure) || result.context_disclosure.length === 0
     || result.context_disclosure.some((item) => !allowedDisclosure.has(item))
@@ -1086,11 +1218,14 @@ export function validateHostReturn(prepared, preparedSha256, hostReturn, verdict
 
 function validatePrepared(prepared) {
   exactKeys(prepared, [
-    "schema", "createdAt", "dispatchId", "nonce", "expectedTaskName", "request", "route", "hostContract", "sources", "review",
+    "schema", "createdAt", "dispatchId", "nonce", "expectedTaskName", "request", "reviewPlan", "route", "hostContract", "sources", "review",
     "references", "verify", "assurance", "residualRisks", "bindings",
   ], "prepared packet");
   if (prepared.schema !== "pipeline.codex-critic-prepared.v1") fail("prepared packet schema mismatch");
   validateCriticRequest(structuredClone(prepared.request));
+  const expectedReviewPlan = admitCriticReview(prepared.request);
+  exactKeys(prepared.reviewPlan, ["mode", "admissionCode", "affectedInvariantIds"], "prepared review plan");
+  if (JSON.stringify(prepared.reviewPlan) !== JSON.stringify(expectedReviewPlan)) fail("prepared review plan drift");
   if (!SHA256.test(prepared.nonce) || !/^[0-9a-f]{32}$/.test(prepared.dispatchId)) fail("prepared nonce/dispatch ID invalid");
   if (prepared.assurance !== ASSURANCE || JSON.stringify(prepared.residualRisks) !== JSON.stringify(RESIDUAL_RISKS)) fail("prepared assurance boundary drift");
   exactKeys(prepared.route, ["duty", "runner", "alias", "model", "effort"], "prepared route");
@@ -1107,6 +1242,7 @@ function validatePrepared(prepared) {
     || prepared.review.commit !== prepared.request.candidate_commit || prepared.review.tree !== prepared.request.candidate_tree) {
     fail("prepared review binding drift");
   }
+  validateVerifyEvidence(prepared.verify);
   validateReviewCommitSet(prepared.review.root, prepared.review);
   if (prepared.expectedTaskName !== `critic_${prepared.request.task_id.replace(/[^a-z0-9_]/g, "_")}`.slice(0, 64)) fail("prepared task name drift");
   if (!prepared.bindings.protectedBefore || typeof prepared.bindings.protectedBefore !== "object" || Array.isArray(prepared.bindings.protectedBefore)) {
@@ -1119,15 +1255,17 @@ function validatePrepared(prepared) {
     if (!/^(?:candidate|ruleset|observer\.(?:private|shared))$/.test(name) || !SHA256.test(hash)) fail("prepared protected-root binding invalid");
   }
   exactKeys(prepared.hostContract, [
-    "owner", "freshContext", "forkTurns", "nativeOnly", "firstEvidenceMs", "progressGapMs", "maxElapsedMs",
-    "maxRecoveries", "returnSchema", "returnSchemaPath", "returnChannel", "agentWritesReceipt", "fixedInstruction",
+    "owner", "freshContext", "forkTurns", "nativeOnly", "mayDelegate", "firstEvidenceMs", "progressGapMs", "maxElapsedMs",
+    "maxRecoveries", "reviewMode", "affectedInvariantIds", "returnSchema", "returnSchemaPath", "returnChannel", "agentWritesReceipt", "fixedInstruction",
   ], "prepared hostContract");
   if (prepared.hostContract.owner !== "Elephant" || prepared.hostContract.freshContext !== true
-    || prepared.hostContract.forkTurns !== "none" || prepared.hostContract.nativeOnly !== true
+    || prepared.hostContract.forkTurns !== "none" || prepared.hostContract.nativeOnly !== true || prepared.hostContract.mayDelegate !== false
     || prepared.hostContract.firstEvidenceMs !== HOST_LIMITS.firstEvidenceMs
     || prepared.hostContract.progressGapMs !== HOST_LIMITS.progressGapMs
     || prepared.hostContract.maxElapsedMs !== HOST_LIMITS.maxElapsedMs
     || prepared.hostContract.maxRecoveries !== HOST_LIMITS.maxRecoveries
+    || prepared.hostContract.reviewMode !== prepared.reviewPlan.mode
+    || JSON.stringify(prepared.hostContract.affectedInvariantIds) !== JSON.stringify(prepared.reviewPlan.affectedInvariantIds)
     || prepared.hostContract.returnSchema !== "pipeline.codex-critic-host-result.v1"
     || prepared.hostContract.returnSchemaPath !== "plugins/pipeline-core/scripts/codex-critic-host-return.schema.json"
     || prepared.hostContract.returnChannel !== "native-host-response-to-elephant"
@@ -1238,11 +1376,17 @@ function recoverReceiptTransaction({ controlRoot, consumePath, completePath, pen
   return { ok: true, receiptPath, receiptSha256: marker.receiptSha256, reviewPass: recoveredReceipt.reviewPass, recovered: true, cleanupComplete };
 }
 
-function validateReceiptSemantics(receipt, prepared, sanitizedVerdict) {
+function validateReceiptSemantics(receipt, prepared, sanitizedVerdict, execution) {
   if (receipt.assurance !== ASSURANCE || JSON.stringify(receipt.residualRisks) !== JSON.stringify(RESIDUAL_RISKS)) fail("receipt assurance boundary drift");
   if (receipt.route.providerAttested !== false || receipt.route.coordinatorConfirmed !== true) fail("receipt route claim drift");
   if (receipt.route.duty !== "criticNormal" || receipt.route.runner !== "codex" || receipt.route.alias !== "fable"
-    || receipt.route.requestedModel !== "gpt-5.6-sol" || receipt.route.requestedEffort !== "xhigh") fail("receipt route binding drift");
+    || receipt.route.requestedModel !== "gpt-5.6-sol" || receipt.route.requestedEffort !== "xhigh"
+    || receipt.route.mayDelegate !== false) fail("receipt route binding drift");
+  if (receipt.review.mode !== prepared.reviewPlan.mode
+    || receipt.review.admissionCode !== prepared.reviewPlan.admissionCode
+    || JSON.stringify(receipt.review.affectedInvariantIds) !== JSON.stringify(prepared.reviewPlan.affectedInvariantIds)) {
+    fail("receipt review-plan binding drift");
+  }
   if (receipt.state.mutationObserved !== false) fail("receipt mutation claim drift");
   const authorization = prepared.request.normal_lane_authorization;
   const expectedAuthorization = authorization ? {
@@ -1270,9 +1414,13 @@ function validateReceiptSemantics(receipt, prepared, sanitizedVerdict) {
   if (receipt.candidate.base !== prepared.review.base || receipt.candidate.commit !== prepared.review.commit
     || receipt.candidate.tree !== prepared.review.tree || !SHA40.test(receipt.candidate.base)
     || !SHA40.test(receipt.candidate.commit) || !SHA40.test(receipt.candidate.tree)) fail("receipt candidate drift");
+  const expectedLivenessEvents = execution.evidence_events.map(({ kind, elapsed_ms, evidence_sha256, progress }) => ({
+    kind, elapsedMs: elapsed_ms, evidenceSha256: evidence_sha256, progress,
+  }));
   if (receipt.liveness.taskName !== prepared.expectedTaskName || !SHA256.test(receipt.liveness.agentIdHash)
     || receipt.liveness.evidenceEvents.length === 0
-    || receipt.liveness.evidenceEvents.some(({ evidenceSha256 }) => !SHA256.test(evidenceSha256))) fail("receipt liveness binding invalid");
+    || receipt.liveness.evidenceEvents.some(({ evidenceSha256 }) => !SHA256.test(evidenceSha256))
+    || JSON.stringify(receipt.liveness.evidenceEvents) !== JSON.stringify(expectedLivenessEvents)) fail("receipt liveness binding invalid");
   if (JSON.stringify(receipt.state.before) !== JSON.stringify(prepared.bindings.protectedBefore)
     || JSON.stringify(receipt.state.after) !== JSON.stringify(prepared.bindings.protectedBefore)) fail("receipt protected-state binding drift");
   if (sanitizedVerdict.findings.some(({ detailSha256, evidence, specRef }) => !SHA256.test(detailSha256)
@@ -1342,15 +1490,23 @@ export function finalizeNativeCritic(options) {
       alias: prepared.route.alias,
       requestedModel: prepared.route.model,
       requestedEffort: prepared.route.effort,
+      mayDelegate: false,
       coordinatorConfirmed: true,
       providerAttested: false,
+    },
+    review: {
+      mode: prepared.reviewPlan.mode,
+      admissionCode: prepared.reviewPlan.admissionCode,
+      affectedInvariantIds: prepared.reviewPlan.affectedInvariantIds,
     },
     liveness: {
       agentIdHash: sha256(validated.execution.agent_id),
       taskName: validated.execution.task_name,
       completedElapsedMs: validated.execution.completed_elapsed_ms,
       recoveryCount: validated.execution.recovery_count,
-      evidenceEvents: validated.execution.evidence_events.map(({ elapsed_ms, evidence_sha256 }) => ({ elapsedMs: elapsed_ms, evidenceSha256: evidence_sha256 })),
+      evidenceEvents: validated.execution.evidence_events.map(({ kind, elapsed_ms, evidence_sha256, progress }) => ({
+        kind, elapsedMs: elapsed_ms, evidenceSha256: evidence_sha256, progress,
+      })),
     },
     bindings: {
       preparedSha256: preparedRecord.sha256,
@@ -1383,7 +1539,7 @@ export function finalizeNativeCritic(options) {
     reviewPass: validated.reviewPass,
   };
   assertSchema(receipt, RECEIPT_SCHEMA_PATH, "receipt");
-  validateReceiptSemantics(receipt, prepared, sanitizedVerdict);
+  validateReceiptSemantics(receipt, prepared, sanitizedVerdict, validated.execution);
   const published = completeReceiptTransaction({
     controlRoot, consumePath, completePath, pendingPath, receiptPath, receipt, prepared, dispatchState, cleanup: options.cleanup,
   });

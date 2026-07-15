@@ -17,11 +17,12 @@
     "evidence_paths",
     "rigor",
     "risk",
-    "trigger_row"
+    "trigger_row",
+    "review_economy"
   ],
   "additionalProperties": false,
   "properties": {
-    "schema": { "type": "string", "enum": ["pipeline.codex-critic-request.v1"] },
+    "schema": { "type": "string", "enum": ["pipeline.codex-critic-request.v2"] },
     "task_id": { "type": "string" },
     "project": { "type": "string" },
     "ruleset_sha": { "type": "string" },
@@ -35,6 +36,34 @@
     "rigor": { "type": "string", "enum": ["0", "1", "2"] },
     "risk": { "type": "string", "enum": ["low", "medium", "high"] },
     "trigger_row": { "type": "string", "enum": ["T1", "T2", "T3", "T4", "T6"] },
+    "review_economy": {
+      "type": "object",
+      "required": ["round", "correction_commits", "requested_mode", "changed_paths", "changed_behavior_claims", "prior_receipt", "path_invariant_map", "path_invariant_map_sha256", "coordinator_impact_confirmed", "trust_boundary_changed", "impact_ambiguous"],
+      "additionalProperties": false,
+      "properties": {
+        "round": { "type": "number" },
+        "correction_commits": { "type": "number" },
+        "requested_mode": { "type": "string", "enum": ["full", "delta"] },
+        "changed_paths": { "type": "array", "items": { "type": "string" } },
+        "changed_behavior_claims": { "type": "array", "items": { "type": "string" } },
+        "prior_receipt": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["id", "sha256"],
+              "additionalProperties": false,
+              "properties": { "id": { "type": "string" }, "sha256": { "type": "string" } }
+            }
+          ]
+        },
+        "path_invariant_map": { "type": "object", "additionalProperties": { "type": "array", "items": { "type": "string" } } },
+        "path_invariant_map_sha256": { "oneOf": [{ "type": "null" }, { "type": "string" }] },
+        "coordinator_impact_confirmed": { "type": "boolean" },
+        "trust_boundary_changed": { "type": "boolean" },
+        "impact_ambiguous": { "type": "boolean" }
+      }
+    },
     "normal_lane_authorization": {
       "type": "object",
       "required": ["kind", "authority", "risk_id", "scope", "evidence_sha256", "candidate_commit"],
