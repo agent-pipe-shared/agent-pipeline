@@ -156,15 +156,13 @@ function parseJsonNoDuplicateKeys(source) {
   return value;
 }
 
-export function parsePhase26Result(markdown) {
+function parsePipelineResultBlock(markdown) {
   if (typeof markdown !== "string" || markdown.startsWith("\uFEFF") || markdown.includes("\r")) {
     return { ok: false, findings: ["Result must be UTF-8/LF text without BOM or CR"] };
   }
   const resultBlocks = [...markdown.matchAll(/^```pipeline-result\n([\s\S]*?)^```\s*$/gm)];
-  const mermaidBlocks = [...markdown.matchAll(/^```mermaid\n([\s\S]*?)^```\s*$/gm)];
   const findings = [];
   if (resultBlocks.length !== 1) findings.push(`expected exactly one pipeline-result block, found ${resultBlocks.length}`);
-  if (mermaidBlocks.length !== 1) findings.push(`expected exactly one Mermaid block, found ${mermaidBlocks.length}`);
   let result = null;
   if (resultBlocks.length === 1) {
     try {
@@ -174,7 +172,17 @@ export function parsePhase26Result(markdown) {
       findings.push(`pipeline-result JSON is invalid (${error.message})`);
     }
   }
-  return { ok: findings.length === 0, findings, result, mermaid: mermaidBlocks.length === 1 ? mermaidBlocks[0][1] : null };
+  return { ok: findings.length === 0, findings, result };
+}
+
+export function parsePhase26Result(markdown) {
+  const parsed = parsePipelineResultBlock(markdown);
+  const findings = [...parsed.findings];
+  const mermaidBlocks = typeof markdown === "string"
+    ? [...markdown.matchAll(/^```mermaid\n([\s\S]*?)^```\s*$/gm)]
+    : [];
+  if (mermaidBlocks.length !== 1) findings.push(`expected exactly one Mermaid block, found ${mermaidBlocks.length}`);
+  return { ok: findings.length === 0, findings, result: parsed.result, mermaid: mermaidBlocks.length === 1 ? mermaidBlocks[0][1] : null };
 }
 
 function nodeId(eventId) {
@@ -325,15 +333,42 @@ function validateSourceReconciliation(result, graph, findings) {
   if (graph.sourceEventSetSha256 !== sha256Canonical(sourceSet)) findings.push("sourceEventSetSha256 does not bind the ordered event source set");
 }
 
-function historicPackage(root, resultPath, commit, packageId) {
+function resultAtCommit(root, resultPath, commit) {
   if (!COMMIT_RE.test(commit ?? "")) return null;
-  const ancestor = spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", commit, "HEAD"], { encoding: "utf8", timeout: 5000 });
-  if (ancestor.status !== 0) return null;
   const historic = spawnSync("git", ["-C", root, "show", `${commit}:${resultPath}`], { encoding: "utf8", timeout: 5000 });
   if (historic.status !== 0) return null;
-  const parsed = parsePhase26Result(historic.stdout);
-  if (!parsed.ok || !Array.isArray(parsed.result?.packageResults)) return null;
-  return parsed.result.packageResults.find((entry) => entry?.id === packageId) ?? null;
+  const parsed = parsePipelineResultBlock(historic.stdout);
+  return parsed.ok && isObject(parsed.result) ? parsed.result : null;
+}
+
+function p5SchemaIntroducedAt(root, resultPath, currentResult) {
+  const head = spawnSync("git", ["-C", root, "rev-parse", "HEAD"], { encoding: "utf8", timeout: 5000 });
+  const headCommit = head.status === 0 ? head.stdout.trim() : null;
+  if (!COMMIT_RE.test(headCommit ?? "")) return null;
+  const headResult = resultAtCommit(root, resultPath, headCommit);
+  const currentIsP5 = currentResult?.phase26InvariantEvidence?.schema === INVARIANT_EVIDENCE_SCHEMA;
+  const headIsP5 = headResult?.phase26InvariantEvidence?.schema === INVARIANT_EVIDENCE_SCHEMA;
+  if (!currentIsP5) return null;
+  // Before the first P5 Result commit, HEAD is the authenticated pre-P5 baseline.
+  // This is the only case where a legacy exemption may cite HEAD exactly.
+  if (!headIsP5) return { commit: headCommit, worktreeIntroduction: true };
+  const history = spawnSync("git", ["-C", root, "log", "--format=%H", "--reverse", "HEAD", "--", resultPath], { encoding: "utf8", timeout: 5000 });
+  if (history.status !== 0) return null;
+  for (const commit of history.stdout.split("\n").filter(Boolean)) {
+    if (resultAtCommit(root, resultPath, commit)?.phase26InvariantEvidence?.schema === INVARIANT_EVIDENCE_SCHEMA) {
+      return { commit, worktreeIntroduction: false };
+    }
+  }
+  return null;
+}
+
+function historicPackage(root, resultPath, commit, packageId, introduction) {
+  if (!COMMIT_RE.test(commit ?? "") || !introduction) return null;
+  const ancestor = spawnSync("git", ["-C", root, "merge-base", "--is-ancestor", commit, introduction.commit], { encoding: "utf8", timeout: 5000 });
+  if (ancestor.status !== 0 || (!introduction.worktreeIntroduction && commit === introduction.commit)) return null;
+  const historic = resultAtCommit(root, resultPath, commit);
+  if (!historic || historic?.phase26InvariantEvidence?.schema === INVARIANT_EVIDENCE_SCHEMA || !Array.isArray(historic.packageResults)) return null;
+  return historic.packageResults.find((entry) => entry?.id === packageId) ?? null;
 }
 
 function legacyLedgerExemptions(result, evidence, findings, provenance) {
@@ -344,6 +379,8 @@ function legacyLedgerExemptions(result, evidence, findings, provenance) {
   }
   const available = new Map((result.packageResults ?? []).map((entry) => [entry?.id, entry]));
   const exemptions = new Map();
+  const introduction = p5SchemaIntroducedAt(provenance.root, provenance.resultPath, result);
+  if (!introduction) findings.push("legacy ledger exemptions require an authenticated P5 schema-introduction boundary");
   for (const entry of entries) {
     if (!exactKeys(entry, ["packageId", "packageSha256", "historicResultCommit", "reason"])
       || !safeId(entry.packageId) || !digest(entry.packageSha256)
@@ -353,7 +390,7 @@ function legacyLedgerExemptions(result, evidence, findings, provenance) {
       continue;
     }
     const packageResult = available.get(entry.packageId);
-    const historic = historicPackage(provenance.root, provenance.resultPath, entry.historicResultCommit, entry.packageId);
+    const historic = historicPackage(provenance.root, provenance.resultPath, entry.historicResultCommit, entry.packageId, introduction);
     if (!packageResult || isObject(packageResult.loopEconomy) || sha256Canonical(packageResult) !== entry.packageSha256
       || !historic || isObject(historic.loopEconomy) || sha256Canonical(historic) !== entry.packageSha256) {
       findings.push(`legacy ledger exemption ${entry.packageId} is stale, fabricated or masks a current ledger`);
@@ -427,8 +464,8 @@ function validateGraph(result, graph, findings, inventory, provenance) {
       if (!BACK_EDGE_FAMILIES.has(edge.boundedFamily) || edge.loopStableId === null) findings.push(`back-edge ${edge.edgeId} lacks its bounded loop binding`);
       if ((sequence.get(edge.fromEventId) ?? -1) <= (sequence.get(edge.toEventId) ?? -1)) findings.push(`back-edge ${edge.edgeId} must point to an earlier event`);
     } else if (edge.loopStableId !== null) findings.push(`non-back-edge ${edge.edgeId} cannot carry loopStableId`);
-    if (edge.kind !== "back-edge" && (sequence.get(edge.fromEventId) ?? -1) > (sequence.get(edge.toEventId) ?? -1)) {
-      findings.push(`backward edge ${edge.edgeId} must be declared as a bounded back-edge`);
+    if (edge.kind !== "back-edge" && (sequence.get(edge.fromEventId) ?? -1) >= (sequence.get(edge.toEventId) ?? -1)) {
+      findings.push(`non-back-edge ${edge.edgeId} must point strictly forward or be declared as a bounded back-edge`);
     }
     if (edge.kind === "reroute" && edge.boundedFamily !== "environment-failover") findings.push(`reroute ${edge.edgeId} must use environment-failover`);
     if (edge.boundedFamily !== null) {
@@ -536,6 +573,9 @@ function validateGraph(result, graph, findings, inventory, provenance) {
     const cutoff = graph.events.at(-1);
     if (cutoff?.eventType !== "close" || cutoff.outcome !== "succeeded") {
       findings.push("phase-close requires the cutoff to be one successful terminal close event");
+    }
+    if (graph.edges.some((edge) => edge.fromEventId === cutoff?.eventId)) {
+      findings.push("phase-close terminal close event must have no outgoing edges");
     }
     if (result.phase26InvariantEvidence?.executionRouting?.status !== "attested") {
       findings.push("phase-close requires an attested implementation dispatch; an unattested route remains a nonconformance");

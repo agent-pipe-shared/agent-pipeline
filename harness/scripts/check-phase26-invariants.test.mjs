@@ -218,14 +218,23 @@ function writeFixture(result, mermaid = seal(result)) {
   const root = mkdtempSync(join(tmpdir(), "phase26-invariants-"));
   roots.push(root);
   const path = join(root, "Result.md");
+  const legacyIds = new Set(result.phase26InvariantEvidence.legacyLedgerExemptions.map((entry) => entry.packageId));
+  const historicDocument = `# Historic Result\n\n\`\`\`pipeline-result\n${JSON.stringify({
+    packageResults: result.packageResults.filter((entry) => legacyIds.has(entry.id)),
+  }, null, 2)}\n\`\`\`\n`;
   const document = `# Result\n\n\`\`\`pipeline-result\n${JSON.stringify(result, null, 2)}\n\`\`\`\n\n\`\`\`mermaid\n${mermaid}\`\`\`\n`;
-  writeFileSync(path, document);
-  for (const args of [["init", "-q"], ["config", "user.name", "fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "Result.md"], ["commit", "-qm", "fixture"]]) {
+  writeFileSync(path, historicDocument);
+  for (const args of [["init", "-q"], ["config", "user.name", "fixture"], ["config", "user.email", "fixture@example.invalid"], ["add", "Result.md"], ["commit", "-qm", "historic pre-p5 result"]]) {
     const run = spawnSync("git", args, { cwd: root, encoding: "utf8" });
     if (run.status !== 0) throw new Error(run.stderr || `git ${args.join(" ")} failed`);
   }
-  const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
-  writeFileSync(path, document.replaceAll(HISTORIC_COMMIT, head));
+  const historicCommit = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  writeFileSync(path, `${historicDocument}\n<!-- authenticated pre-p5 checkpoint -->\n`);
+  for (const args of [["add", "Result.md"], ["commit", "-qm", "pre-p5 checkpoint"]]) {
+    const run = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+    if (run.status !== 0) throw new Error(run.stderr || `git ${args.join(" ")} failed`);
+  }
+  writeFileSync(path, document.replaceAll(HISTORIC_COMMIT, historicCommit));
   return root;
 }
 
@@ -424,7 +433,13 @@ test("unreconciled external evidence and a disconnected cycle fail closed", () =
 test("a backward edge cannot evade loop accounting as an ordinary event", () => {
   const result = fixture();
   result.sdlcRunGraph.edges[3] = edge("edge-03", "event-03", "event-01");
-  assert(checked(result).findings.some((finding) => finding.includes("must be declared as a bounded back-edge")));
+  assert(checked(result).findings.some((finding) => finding.includes("must point strictly forward or be declared as a bounded back-edge")));
+});
+
+test("an ordinary self-loop cannot evade loop accounting", () => {
+  const result = fixture();
+  result.sdlcRunGraph.edges[3] = edge("edge-03", "event-03", "event-03");
+  assert(checked(result).findings.some((finding) => finding.includes("must point strictly forward or be declared as a bounded back-edge")));
 });
 
 test("graph cannot add a containing-Result or final-commit self-reference field", () => {
@@ -491,6 +506,42 @@ test("phase-close requires a successful terminal close cutoff", () => {
   };
   rebuildExternalEvidence(result);
   assert(checked(result).findings.some((finding) => finding.includes("successful terminal close event")));
+});
+
+test("phase-close terminal close cannot retain an outgoing back-edge", () => {
+  const result = fixture();
+  result.sdlcRunGraph.completionClaim = "phase-close";
+  result.sdlcRunGraph.events[7] = event("event-07", 7, "close");
+  result.phase26InvariantEvidence.executionRouting = {
+    status: "attested", requestedDuty: "codex_implementation", requiredSelector: "terra", requiredEffort: "xhigh",
+    routeReceiptEvidenceId: "route-receipt", routeReceiptEvidenceSha256: SHA("r"), phase3Disposition: "none",
+  };
+  result.sdlcRunGraph.edges.push(edge("edge-10", "event-07", "event-01", "back-edge", "critic-correction", "duplicate-loop", [
+    { collection: "packageResults", id: result.packageResults[0].id, sha256: sha256Canonical(result.packageResults[0]) }, externalRef("duplicate-trigger"),
+  ]));
+  rebuildExternalEvidence(result);
+  assert(checked(result).findings.some((finding) => finding.includes("terminal close event must have no outgoing edges")));
+});
+
+test("a P5-era commit cannot impersonate a pre-P5 legacy ledger snapshot", () => {
+  const result = fixture();
+  const legacy = { id: "legacy-record", status: "historic" };
+  result.packageResults.push(legacy);
+  result.phase26InvariantEvidence.legacyLedgerExemptions.push({
+    packageId: legacy.id, packageSha256: sha256Canonical(legacy), historicResultCommit: HISTORIC_COMMIT, reason: "pre-p5-result-schema",
+  });
+  result.sdlcRunGraph.events[0].sourceRefs.push({
+    collection: "packageResults", id: legacy.id, sha256: sha256Canonical(legacy),
+  });
+  const root = writeFixture(result);
+  for (const args of [["add", "Result.md"], ["commit", "-qm", "introduce p5 result"]]) {
+    const run = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+    if (run.status !== 0) throw new Error(run.stderr || `git ${args.join(" ")} failed`);
+  }
+  const p5Commit = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).stdout.trim();
+  const source = readFileSync(join(root, "Result.md"), "utf8").replace(/"historicResultCommit": "[a-f0-9]{40}"/, `"historicResultCommit": "${p5Commit}"`);
+  writeFileSync(join(root, "Result.md"), source);
+  assert(checkPhase26Invariants(root, "Result.md").findings.some((finding) => finding.includes("legacy ledger exemption legacy-record is stale, fabricated or masks a current ledger")));
 });
 
 test("duplicate Result JSON keys and a second Mermaid authority block fail", () => {
