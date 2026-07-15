@@ -1,0 +1,91 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.invalid/schemas/course-decision.schema.json",
+  "title": "Result-owned course decision artifacts",
+  "oneOf": [
+    { "$ref": "#/$defs/brief" },
+    { "$ref": "#/$defs/intent" },
+    { "$ref": "#/$defs/receipt" }
+  ],
+  "$defs": {
+    "safeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "sha40": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "path": { "type": "string", "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[A-Za-z0-9._/-]{1,240}$" },
+    "evidence": {
+      "type": "object", "additionalProperties": false, "required": ["id", "sha256"],
+      "properties": { "id": { "$ref": "#/$defs/safeId" }, "sha256": { "$ref": "#/$defs/sha256" } }
+    },
+    "triggerRecord": {
+      "type": "object", "additionalProperties": false,
+      "required": ["attemptId", "attemptSha256", "resultId", "resultSha256", "evidence"],
+      "properties": {
+        "attemptId": { "$ref": "#/$defs/safeId" }, "attemptSha256": { "$ref": "#/$defs/sha256" },
+        "resultId": { "$ref": "#/$defs/safeId" }, "resultSha256": { "$ref": "#/$defs/sha256" },
+        "evidence": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/evidence" } }
+      }
+    },
+    "courseKind": { "enum": ["bounded-diagnosis", "scope-split", "authority-rebaseline", "preauthorized-route-change", "defer", "stop"] },
+    "option": {
+      "type": "object", "additionalProperties": false,
+      "required": ["optionId", "kind", "equivalenceKey", "expectedOutcome", "scopeDelta", "requiredEvidence", "timeCost", "residualRisk", "securityAssuranceClaims", "claimImpact", "reversibility", "authority", "permittedOperations", "trustBoundary", "newTrustBoundaries", "rollbackImpact", "resumeImpact", "resumePredicate"],
+      "properties": {
+        "optionId": { "$ref": "#/$defs/safeId" }, "kind": { "$ref": "#/$defs/courseKind" }, "equivalenceKey": { "$ref": "#/$defs/safeId" }, "expectedOutcome": { "$ref": "#/$defs/safeId" },
+        "scopeDelta": {
+          "type": "object", "additionalProperties": false, "required": ["add", "modify", "remove"],
+          "properties": {
+            "add": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/path" } },
+            "modify": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/path" } },
+            "remove": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/path" } }
+          }
+        },
+        "requiredEvidence": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/evidence" } },
+        "timeCost": { "type": "object", "additionalProperties": false, "required": ["minimumMinutes", "maximumMinutes", "confidence"], "properties": { "minimumMinutes": { "type": "integer", "minimum": 0 }, "maximumMinutes": { "type": "integer", "minimum": 0 }, "confidence": { "enum": ["low", "medium", "high"] } } },
+        "residualRisk": { "$ref": "#/$defs/safeId" },
+        "securityAssuranceClaims": { "type": "array", "maxItems": 32, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } },
+        "claimImpact": {
+          "type": "object", "additionalProperties": false, "required": ["addedClaims", "removedClaims", "retainedNonClaims"],
+          "properties": {
+            "addedClaims": { "type": "array", "maxItems": 32, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } },
+            "removedClaims": { "type": "array", "maxItems": 32, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } },
+            "retainedNonClaims": { "type": "array", "maxItems": 32, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } }
+          }
+        },
+        "reversibility": { "enum": ["reversible", "conditional", "irreversible"] }, "authority": { "enum": ["po", "coordinator", "external"] },
+        "permittedOperations": { "type": "array", "maxItems": 32, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } },
+        "trustBoundary": { "enum": ["unchanged", "expanded"] },
+        "newTrustBoundaries": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } },
+        "rollbackImpact": { "$ref": "#/$defs/safeId" }, "resumeImpact": { "$ref": "#/$defs/safeId" },
+        "resumePredicate": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] }
+      }
+    },
+    "brief": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "briefId", "featureId", "revision", "gateId", "blockerId", "commit", "tree", "authorityDigests", "catalogVersion", "catalogSha256", "normalizedFailureSignature", "similarityGroupId", "triggerEvidence", "observedCount", "configuredLimit", "gateTrigger", "consumedBudgets", "invariants", "nonClaims", "forbiddenOperations", "exactPoDecisionQuestion", "alternatives", "eliminated", "recommendation", "poDecisionRequired", "defaultAction"],
+      "properties": {
+        "schema": { "const": "pipeline.course-decision-brief.v1" }, "briefId": { "$ref": "#/$defs/safeId" }, "featureId": { "$ref": "#/$defs/safeId" }, "revision": { "type": "integer", "minimum": 0 }, "gateId": { "$ref": "#/$defs/safeId" }, "blockerId": { "$ref": "#/$defs/safeId" },
+        "commit": { "$ref": "#/$defs/sha40" }, "tree": { "$ref": "#/$defs/sha40" },
+        "authorityDigests": { "type": "object", "additionalProperties": false, "required": ["prd", "spec"], "properties": { "prd": { "$ref": "#/$defs/sha256" }, "spec": { "$ref": "#/$defs/sha256" } } },
+        "catalogVersion": { "const": "pipeline-course-catalog.v1" }, "catalogSha256": { "$ref": "#/$defs/sha256" }, "normalizedFailureSignature": { "$ref": "#/$defs/sha256" }, "similarityGroupId": { "$ref": "#/$defs/safeId" },
+        "triggerEvidence": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/triggerRecord" } }, "observedCount": { "type": "integer", "minimum": 1 }, "configuredLimit": { "type": "integer", "minimum": 1 },
+        "gateTrigger": { "type": "object", "additionalProperties": false, "required": ["kind", "budget"], "properties": { "kind": { "enum": ["repeated-signature", "budget-exhausted"] }, "budget": { "oneOf": [{ "type": "null" }, { "enum": ["productRetries", "environmentReroutes", "reviewRounds", "correctionCommits"] }] } } },
+        "consumedBudgets": { "type": "object", "additionalProperties": false, "required": ["productRetries", "environmentReroutes", "reviewRounds", "correctionCommits"], "properties": { "productRetries": { "type": "integer", "minimum": 0, "maximum": 1 }, "environmentReroutes": { "type": "integer", "minimum": 0, "maximum": 1 }, "reviewRounds": { "type": "integer", "minimum": 0, "maximum": 2 }, "correctionCommits": { "type": "integer", "minimum": 0, "maximum": 2 } } },
+        "invariants": { "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } }, "nonClaims": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } }, "forbiddenOperations": { "type": "array", "maxItems": 64, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } }, "exactPoDecisionQuestion": { "type": "string", "minLength": 1, "maxLength": 512 },
+        "alternatives": { "type": "array", "minItems": 2, "maxItems": 6, "items": { "$ref": "#/$defs/option" } },
+        "eliminated": { "type": "array", "maxItems": 4, "items": { "type": "object", "additionalProperties": false, "required": ["kind", "reasonCode", "evidence"], "properties": { "kind": { "$ref": "#/$defs/courseKind" }, "reasonCode": { "enum": ["not-applicable", "authority-missing", "budget-exhausted", "evidence-missing", "invariant-weakened", "route-unavailable", "trust-boundary-expansion", "materially-equivalent"] }, "evidence": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/evidence" } } } } },
+        "recommendation": { "type": "object", "additionalProperties": false, "required": ["optionId", "evidence", "nonBinding"], "properties": { "optionId": { "$ref": "#/$defs/safeId" }, "evidence": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/evidence" } }, "nonBinding": { "const": true } } },
+        "poDecisionRequired": { "const": true }, "defaultAction": { "const": "no-action" }
+      }
+    },
+    "intent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "idempotencyKey", "briefId", "briefSha256", "blockerSignature", "optionId", "poEvidenceSha256", "expectedRevision", "selectedRevision", "dispatchableRevision"],
+      "properties": { "schema": { "const": "pipeline.course-decision-intent.v1" }, "idempotencyKey": { "$ref": "#/$defs/safeId" }, "briefId": { "$ref": "#/$defs/safeId" }, "briefSha256": { "$ref": "#/$defs/sha256" }, "blockerSignature": { "$ref": "#/$defs/sha256" }, "optionId": { "$ref": "#/$defs/safeId" }, "poEvidenceSha256": { "$ref": "#/$defs/sha256" }, "expectedRevision": { "type": "integer", "minimum": 0 }, "selectedRevision": { "type": "integer", "minimum": 1 }, "dispatchableRevision": { "type": "integer", "minimum": 2 } }
+    },
+    "receipt": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "idempotencyKey", "intentSha256", "briefSha256", "blockerSignature", "optionId", "preStateSha256", "postStateSha256", "preRevision", "postRevision", "casOutcome"],
+      "properties": { "schema": { "const": "pipeline.course-decision-receipt.v1" }, "idempotencyKey": { "$ref": "#/$defs/safeId" }, "intentSha256": { "$ref": "#/$defs/sha256" }, "briefSha256": { "$ref": "#/$defs/sha256" }, "blockerSignature": { "$ref": "#/$defs/sha256" }, "optionId": { "$ref": "#/$defs/safeId" }, "preStateSha256": { "$ref": "#/$defs/sha256" }, "postStateSha256": { "$ref": "#/$defs/sha256" }, "preRevision": { "type": "integer", "minimum": 0 }, "postRevision": { "type": "integer", "minimum": 0 }, "casOutcome": { "enum": ["applied", "stale", "conflict", "io-error"] } }
+    }
+  }
+}

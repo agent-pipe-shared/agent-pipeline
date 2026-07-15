@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.invalid/schemas/review-attempt.schema.json",
+  "title": "Phase 2.6 bounded review attempt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "featureId", "packageId", "review", "budgets", "progress", "failure"],
+  "properties": {
+    "schema": { "const": "pipeline.review-attempt.v1" },
+    "featureId": { "$ref": "#/$defs/safeId" },
+    "packageId": { "$ref": "#/$defs/safeId" },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["round", "requestedMode", "effectiveMode", "base", "head", "tree", "changedPaths", "changedBehaviorClaims", "affectedInvariantIds", "priorReceipt", "pathInvariantMap", "pathInvariantMapSha256", "coordinatorImpactConfirmed", "trustBoundaryChanged", "impactAmbiguous"],
+      "properties": {
+        "round": { "type": "integer", "minimum": 1, "maximum": 2 },
+        "requestedMode": { "enum": ["full", "delta"] },
+        "effectiveMode": { "enum": ["full", "delta"] },
+        "base": { "$ref": "#/$defs/sha40" },
+        "head": { "$ref": "#/$defs/sha40" },
+        "tree": { "$ref": "#/$defs/sha40" },
+        "changedPaths": { "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/path" } },
+        "changedBehaviorClaims": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } },
+        "affectedInvariantIds": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } },
+        "priorReceipt": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["id", "sha256"],
+              "properties": { "id": { "$ref": "#/$defs/safeId" }, "sha256": { "$ref": "#/$defs/sha256" } }
+            }
+          ]
+        },
+        "pathInvariantMap": {
+          "type": "object",
+          "minProperties": 1,
+          "maxProperties": 256,
+          "propertyNames": { "$ref": "#/$defs/path" },
+          "additionalProperties": { "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } }
+        },
+        "pathInvariantMapSha256": { "$ref": "#/$defs/sha256" },
+        "coordinatorImpactConfirmed": { "type": "boolean" },
+        "trustBoundaryChanged": { "type": "boolean" },
+        "impactAmbiguous": { "type": "boolean" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "round": { "const": 1 } }, "required": ["round"] },
+          "then": { "properties": { "effectiveMode": { "const": "full" } } }
+        },
+        {
+          "if": { "properties": { "effectiveMode": { "const": "delta" } }, "required": ["effectiveMode"] },
+          "then": {
+            "properties": {
+              "requestedMode": { "const": "delta" },
+              "priorReceipt": { "type": "object" },
+              "affectedInvariantIds": { "minItems": 1 },
+              "coordinatorImpactConfirmed": { "const": true },
+              "trustBoundaryChanged": { "const": false },
+              "impactAmbiguous": { "const": false }
+            }
+          }
+        }
+      ]
+    },
+    "budgets": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["criticRounds", "correctionCommits", "productRetries", "environmentReroutes", "elapsedResourceCapMs"],
+      "properties": {
+        "criticRounds": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "correctionCommits": { "type": "integer", "minimum": 0, "maximum": 2 },
+        "productRetries": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "environmentReroutes": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "elapsedResourceCapMs": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "progress": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["boundTreeChanges", "verifiedOutputBytes", "traceBytes", "completedTestSteps", "deliveredResultBytes", "lastProgressAtMs", "stagnationIntervalMs"],
+      "properties": {
+        "boundTreeChanges": { "$ref": "#/$defs/count" },
+        "verifiedOutputBytes": { "$ref": "#/$defs/count" },
+        "traceBytes": { "$ref": "#/$defs/count" },
+        "completedTestSteps": { "$ref": "#/$defs/count" },
+        "deliveredResultBytes": { "$ref": "#/$defs/count" },
+        "lastProgressAtMs": { "$ref": "#/$defs/count" },
+        "stagnationIntervalMs": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "failure": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["faultDomain", "capabilityId", "stage", "runner", "stableErrorCode", "exitCode", "signal", "boundedTailSha256", "capturedTailBytes", "tailOverflow", "classificationCode", "environmentEvidenceSha256"],
+          "properties": {
+            "faultDomain": { "enum": ["product", "execution-environment", "unknown"] },
+            "capabilityId": { "$ref": "#/$defs/safeId" },
+            "stage": { "$ref": "#/$defs/safeId" },
+            "runner": { "$ref": "#/$defs/safeId" },
+            "stableErrorCode": { "$ref": "#/$defs/safeId" },
+            "exitCode": { "type": ["integer", "null"], "minimum": 0, "maximum": 255 },
+            "signal": { "type": ["string", "null"], "pattern": "^SIG[A-Z0-9]+$" },
+            "boundedTailSha256": { "$ref": "#/$defs/sha256" },
+            "capturedTailBytes": { "type": "integer", "minimum": 0, "maximum": 4096 },
+            "tailOverflow": { "type": "boolean" },
+            "classificationCode": { "$ref": "#/$defs/safeId" },
+            "environmentEvidenceSha256": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sha256" }] }
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "safeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "sha40": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "path": { "type": "string", "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[A-Za-z0-9._/-]{1,240}$" },
+    "count": { "type": "integer", "minimum": 0 }
+  }
+}
