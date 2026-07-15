@@ -3,11 +3,14 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import {
   CONTINUITY_STATE_CODES,
+  applyCourseDecisionIntent,
   applyDecisionSelection,
+  clearCourseDecisionReceipt,
   clearDecisionSelection,
   compareAndSwapContinuity,
   continuityDispatchAllowed,
   integrateContinuityFinal,
+  recordCourseDecisionBrief,
   validateContinuityState,
 } from "./continuity-state.mjs";
 import { computeContinuityFinalDigest } from "./continuity-host-adapter.mjs";
@@ -650,6 +653,55 @@ check("clearing without a live decision marker never claims replay", () => {
   const result = clearDecisionSelection(state(), { expectedRevision: 0, receipt }, FEATURE);
   assert.equal(result.code, "CS-NO-DECISION-TXN");
   assert.equal(result.mutated, false);
+});
+
+check("Result-bound course brief, intent marker and receipt clear each advance only their authorized digest", () => {
+  const current = state({ queueHead: queueHead({ dispatch: null }) });
+  const blocker = courseBlocker();
+  const brief = recordCourseDecisionBrief(current, {
+    expectedRevision: 0,
+    result: { path: "specs/result.md", sha256: D },
+    blocker,
+    resume: { mode: "resume-on-next-turn", sourceRevision: 1, reasonCode: "blocker" },
+  }, FEATURE);
+  assert.equal(brief.code, "CS-CAS-APPLIED");
+  const txn = { ...decisionTxn(), preSelectionRevision: 1, selectedRevision: 2, dispatchableRevision: 3 };
+  const selected = applyCourseDecisionIntent(brief.state, {
+    expectedRevision: 1,
+    result: { path: "specs/result.md", sha256: A },
+    decisionTxn: txn,
+    queueHead: queueHead({ dispatch: null }),
+    blocker: null,
+    resume: { mode: "resume-on-next-turn", sourceRevision: 2, reasonCode: "blocker" },
+  }, FEATURE);
+  assert.equal(selected.code, "CS-CAS-APPLIED");
+  const cleared = clearCourseDecisionReceipt(selected.state, {
+    expectedRevision: 2,
+    result: { path: "specs/result.md", sha256: B },
+    receipt: {
+      idempotencyKey: txn.idempotencyKey, briefSha256: txn.briefSha256, intentSha256: txn.intentSha256,
+      selectedOptionId: txn.selectedOptionId, receiptSha256: C,
+      selectedRevision: txn.selectedRevision, dispatchableRevision: txn.dispatchableRevision,
+    },
+  }, FEATURE);
+  assert.equal(cleared.code, "CS-CAS-APPLIED");
+  assert.equal(cleared.state.revision, 3);
+  assert.equal(cleared.state.authority.result.sha256, B);
+  assert.equal(cleared.state.decisionTxn, null);
+});
+
+check("generic CAS cannot auto-resume a durable stop or defer disposition", () => {
+  const blocker = courseBlocker();
+  blocker.signature = `stop-${"a".repeat(32)}`;
+  blocker.resumeCondition = { kind: "authority-update", evidenceSha256: A };
+  const current = state({ revision: 1, queueHead: null, blocker, resume: { mode: "resume-on-next-turn", sourceRevision: 1, reasonCode: "blocker" } });
+  const next = structuredClone(current);
+  next.revision = 2;
+  next.queueHead = queueHead({ dispatch: null });
+  next.blocker = null;
+  next.resume = { mode: "resume-on-next-turn", sourceRevision: 2, reasonCode: "blocker" };
+  const blocked = compareAndSwapContinuity(current, { expectedRevision: 1, next }, FEATURE);
+  assert.equal(blocked.code, "CS-COURSE-DISPOSITION-PROTECTED");
 });
 
 check("PO interrupt retains the exact queue head while advancing only revision and resume", () => {

@@ -372,7 +372,7 @@ function validTriggerRecord(record) {
 }
 
 function validCourseOption(option) {
-  const keys = ["optionId", "kind", "equivalenceKey", "expectedOutcome", "scopeDelta", "requiredEvidence", "timeCost", "residualRisk", "securityAssuranceClaims", "claimImpact", "reversibility", "authority", "permittedOperations", "trustBoundary", "newTrustBoundaries", "rollbackImpact", "resumeImpact", "resumePredicate"];
+  const keys = ["optionId", "kind", "equivalenceKey", "expectedOutcome", "scopeDelta", "requiredEvidence", "timeCost", "residualRisk", "securityAssuranceClaims", "claimImpact", "reversibility", "authority", "permittedOperations", "trustBoundary", "newTrustBoundaries", "rollbackImpact", "resumeImpact", "resumePredicate", "continuationTransitionSha256"];
   return exactKeys(option, keys)
     && SAFE_ID.test(option.optionId ?? "") && COURSE_KINDS.includes(option.kind)
     && SAFE_ID.test(option.equivalenceKey ?? "") && typeof option.expectedOutcome === "string" && SAFE_ID.test(option.expectedOutcome)
@@ -396,9 +396,13 @@ function validCourseOption(option) {
       || (option.trustBoundary === "expanded" && option.newTrustBoundaries.length > 0))
     && SAFE_ID.test(option.rollbackImpact ?? "") && SAFE_ID.test(option.resumeImpact ?? "")
     && (option.resumePredicate === null || SAFE_ID.test(option.resumePredicate))
+    && (option.continuationTransitionSha256 === null || SHA256.test(option.continuationTransitionSha256))
     && (!["stop", "defer"].includes(option.kind) || option.authority === "po")
     && (option.kind !== "defer" || option.resumePredicate !== null)
-    && (option.kind !== "stop" || option.resumePredicate === null);
+    && (option.kind !== "stop" || option.resumePredicate === null)
+    && (["stop", "defer"].includes(option.kind)
+      ? option.continuationTransitionSha256 === null
+      : SHA256.test(option.continuationTransitionSha256));
 }
 
 function validEliminatedCourse(entry) {
@@ -475,10 +479,10 @@ export function buildCourseDecisionBrief(input) {
 }
 
 export function validateCourseDecisionIntent(intent, binding) {
-  const keys = ["schema", "idempotencyKey", "briefId", "briefSha256", "blockerSignature", "optionId", "poEvidenceSha256", "expectedRevision", "selectedRevision", "dispatchableRevision"];
+  const keys = ["schema", "idempotencyKey", "briefId", "briefSha256", "blockerSignature", "optionId", "poEvidenceSha256", "preStateSha256", "selectedTransitionSha256", "expectedRevision", "selectedRevision", "dispatchableRevision"];
   if (!exactKeys(intent, keys) || intent.schema !== "pipeline.course-decision-intent.v1"
     || ![intent.idempotencyKey, intent.briefId, intent.optionId].every((value) => SAFE_ID.test(value ?? ""))
-    || !SHA256.test(intent.briefSha256 ?? "") || !SHA256.test(intent.blockerSignature ?? "") || !SHA256.test(intent.poEvidenceSha256 ?? "")
+    || !SHA256.test(intent.briefSha256 ?? "") || !SHA256.test(intent.blockerSignature ?? "") || !SHA256.test(intent.poEvidenceSha256 ?? "") || !SHA256.test(intent.preStateSha256 ?? "") || !SHA256.test(intent.selectedTransitionSha256 ?? "")
     || !safeInteger(intent.expectedRevision) || intent.selectedRevision !== intent.expectedRevision + 1
     || intent.dispatchableRevision !== intent.selectedRevision + 1
     || !exactKeys(binding, ["briefId", "briefSha256", "blockerSignature", "optionIds"])

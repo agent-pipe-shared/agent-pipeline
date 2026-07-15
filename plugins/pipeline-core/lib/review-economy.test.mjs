@@ -221,6 +221,7 @@ function option(kind, index) {
     rollbackImpact: `rollback-${index}`,
     resumeImpact: `resume-${index}`,
     resumePredicate: kind === "defer" ? "external-predicate" : null,
+    continuationTransitionSha256: kind === "defer" || kind === "stop" ? null : A,
   };
 }
 
@@ -278,6 +279,8 @@ const intent = {
   blockerSignature: signature,
   optionId: "option-0",
   poEvidenceSha256: D,
+  preStateSha256: B,
+  selectedTransitionSha256: A,
   expectedRevision: 4,
   selectedRevision: 5,
   dispatchableRevision: 6,

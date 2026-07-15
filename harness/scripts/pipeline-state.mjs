@@ -133,6 +133,7 @@
  *                                                 matches nothing. Refuses blank
  *                                                 --env/--by (--artifact stays optional).
  *   continuity-init|continuity-cas|continuity-integrate-final|
+ *   continuity-record-course-brief|continuity-select-course|
  *   continuity-apply-decision|continuity-clear-decision
  *                  --expected-revision <absent|integer>
  *                  --request-file <repo-relative-json>
@@ -141,7 +142,9 @@
  *                                                 transitions. `init` alone accepts
  *                                                 `absent`; every later transition
  *                                                 binds the exact persisted revision.
- *                                                 The request envelope is closed and
+ *                                                 Course commands use Result-first,
+ *                                                 idempotent evidence transactions;
+ *                                                 the request envelope is closed and
  *                                                 validated by continuity-state.mjs.
  *                                                 Accepted passive/duplicate outcomes
  *                                                 exit 0 with zero mutation.
@@ -219,12 +222,22 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
+  applyCourseDecisionIntent,
   applyDecisionSelection,
+  clearCourseDecisionReceipt,
   clearDecisionSelection,
   compareAndSwapContinuity,
   integrateContinuityFinal,
+  recordCourseDecisionBrief,
   validateContinuityState,
 } from "../../plugins/pipeline-core/lib/continuity-state.mjs";
+import {
+  canonicalJson as canonicalDecisionJson,
+  sha256Canonical,
+  validateCourseDecisionBrief,
+  validateCourseDecisionIntent,
+  validateCourseDecisionReceipt,
+} from "../../plugins/pipeline-core/lib/review-economy.mjs";
 
 export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
@@ -239,10 +252,18 @@ const FINAL_ENTRY_KEYS = new Set([
   "integrationId", "identity", "finalDigest", "finalOutcome", "preResultSha256",
   "nextTransition", "nextTransitionSha256", "integratedRevision",
 ]);
+const RESULT_APPEND_COLLECTIONS = new Set([
+  "decisionBriefs",
+  "courseDecisionIntents",
+  "courseDecisionReceipts",
+  "finalIntegrations",
+]);
 const CONTINUITY_SUBCOMMANDS = new Set([
   "continuity-init",
   "continuity-cas",
   "continuity-integrate-final",
+  "continuity-record-course-brief",
+  "continuity-select-course",
   "continuity-apply-decision",
   "continuity-clear-decision",
 ]);
@@ -677,11 +698,11 @@ function canonicalJson(value) {
 
 /* JSON parser used for the authority block. JSON.parse silently accepts duplicate
  * keys, so the Result codec owns this small closed parser and records the exact
- * finalIntegrations token/entry ranges needed for byte-preserving splices. */
+ * append-only collection token/entry ranges needed for byte-preserving splices. */
 function parseResultJsonStrict(source) {
   let i = 0;
-  let arrayRange = null;
-  let entryRanges = [];
+  const collectionRanges = Object.create(null);
+  const collectionEntryRanges = Object.create(null);
   const ws = () => { while (i < source.length && /[ \t\n]/.test(source[i])) i++; };
   const string = () => {
     if (source[i] !== '"') throw new Error("string expected");
@@ -719,9 +740,9 @@ function parseResultJsonStrict(source) {
         const childStart = i;
         out[key] = value([...path, key]);
         const childEnd = i;
-        if (path.length === 0 && key === "finalIntegrations") {
-          if (!Array.isArray(out[key])) throw new Error("finalIntegrations must be array");
-          arrayRange = { start: childStart, end: childEnd };
+        if (path.length === 0 && RESULT_APPEND_COLLECTIONS.has(key)) {
+          if (!Array.isArray(out[key])) throw new Error(`${key} must be array`);
+          collectionRanges[key] = { start: childStart, end: childEnd };
         }
         ws();
         const separator = source[i++];
@@ -730,12 +751,12 @@ function parseResultJsonStrict(source) {
       }
     }
     if (source[i] === "[") {
-      const isFinal = path.length === 1 && path[0] === "finalIntegrations";
+      const collection = path.length === 1 && RESULT_APPEND_COLLECTIONS.has(path[0]) ? path[0] : null;
       i++;
       const out = [];
       const ranges = [];
       ws();
-      if (source[i] === "]") { i++; if (isFinal) entryRanges = ranges; return out; }
+      if (source[i] === "]") { i++; if (collection !== null) collectionEntryRanges[collection] = ranges; return out; }
       while (true) {
         ws();
         const start = i;
@@ -744,7 +765,7 @@ function parseResultJsonStrict(source) {
         ranges.push({ start, end });
         ws();
         const separator = source[i++];
-        if (separator === "]") { if (isFinal) entryRanges = ranges; return out; }
+        if (separator === "]") { if (collection !== null) collectionEntryRanges[collection] = ranges; return out; }
         if (separator !== ",") throw new Error("comma expected");
       }
     }
@@ -764,8 +785,15 @@ function parseResultJsonStrict(source) {
   const parsed = value();
   ws();
   if (i !== source.length || parsed === null || typeof parsed !== "object" || Array.isArray(parsed)
-    || arrayRange === null) throw new Error("invalid result root");
-  return { parsed, arrayRange, entryRanges };
+    || collectionRanges.finalIntegrations === undefined) throw new Error("invalid result root");
+  return {
+    parsed,
+    collectionRanges,
+    collectionEntryRanges,
+    // Backwards-compatible aliases for final-integration helpers below.
+    arrayRange: collectionRanges.finalIntegrations,
+    entryRanges: collectionEntryRanges.finalIntegrations ?? [],
+  };
 }
 
 const POST_RESULT_SENTINEL_PATHS = new Set([
@@ -852,6 +880,70 @@ function validateFinalEntry(entry, raw) {
   }
 }
 
+function collectionFormattingIsCanonical(strict, json, name) {
+  const range = strict.collectionRanges[name];
+  if (range === undefined) return true;
+  const entries = strict.parsed[name];
+  const ranges = strict.collectionEntryRanges[name] ?? [];
+  if (!Array.isArray(entries) || entries.length !== ranges.length) return false;
+  const arrayRaw = json.slice(range.start, range.end);
+  return (entries.length === 0 && arrayRaw === "[]")
+    || (entries.length > 0
+      && arrayRaw === `[\n    ${ranges.map((entryRange) => json.slice(entryRange.start, entryRange.end)).join(",\n    ")}\n  ]`);
+}
+
+/* Course artifacts are Result-owned append-only evidence.  Validate the exact
+ * canonical bytes first, then their semantic and cross-entry bindings; a State
+ * pointer is checked by the transaction that consumes it. */
+function validateCourseArtifacts(strict, json) {
+  const names = ["decisionBriefs", "courseDecisionIntents", "courseDecisionReceipts"];
+  if (names.some((name) => !collectionFormattingIsCanonical(strict, json, name))) return false;
+  const briefs = strict.parsed.decisionBriefs ?? [];
+  const intents = strict.parsed.courseDecisionIntents ?? [];
+  const receipts = strict.parsed.courseDecisionReceipts ?? [];
+  const briefById = new Map();
+  const intentByDigest = new Map();
+  const intentKeys = new Set();
+  const receiptKeys = new Set();
+  for (let index = 0; index < briefs.length; index++) {
+    const raw = json.slice(strict.collectionEntryRanges.decisionBriefs[index].start, strict.collectionEntryRanges.decisionBriefs[index].end);
+    const brief = briefs[index];
+    let verdict;
+    try { verdict = validateCourseDecisionBrief(brief); } catch { return false; }
+    if (!verdict.ok || canonicalDecisionJson(brief) !== raw || briefById.has(brief.briefId)) return false;
+    briefById.set(brief.briefId, { brief, sha256: verdict.sha256, raw });
+  }
+  for (let index = 0; index < intents.length; index++) {
+    const raw = json.slice(strict.collectionEntryRanges.courseDecisionIntents[index].start, strict.collectionEntryRanges.courseDecisionIntents[index].end);
+    const intent = intents[index];
+    const brief = briefById.get(intent?.briefId);
+    if (!brief || intent.briefSha256 !== brief.sha256 || intentKeys.has(intent.idempotencyKey)) return false;
+    let verdict;
+    try {
+      verdict = validateCourseDecisionIntent(intent, {
+        briefId: brief.brief.briefId,
+        briefSha256: brief.sha256,
+        blockerSignature: intent.blockerSignature,
+        optionIds: brief.brief.alternatives.map(({ optionId }) => optionId),
+      });
+    } catch { return false; }
+    if (!verdict.ok || canonicalDecisionJson(intent) !== raw) return false;
+    intentKeys.add(intent.idempotencyKey);
+    intentByDigest.set(verdict.sha256, { intent, sha256: verdict.sha256, raw });
+  }
+  for (let index = 0; index < receipts.length; index++) {
+    const raw = json.slice(strict.collectionEntryRanges.courseDecisionReceipts[index].start, strict.collectionEntryRanges.courseDecisionReceipts[index].end);
+    const receipt = receipts[index];
+    const intent = intentByDigest.get(receipt?.intentSha256);
+    if (!intent || receiptKeys.has(receipt.idempotencyKey)) return false;
+    let verdict;
+    try { verdict = validateCourseDecisionReceipt(receipt, intent.intent); } catch { return false; }
+    if (!verdict.ok || canonicalDecisionJson(receipt) !== raw) return false;
+    receiptKeys.add(receipt.idempotencyKey);
+  }
+  return true;
+}
+
 function resolveResultPathWithoutSymlinks(dir, relativePath) {
   const root = realpathSync(dir);
   let current = root;
@@ -910,16 +1002,17 @@ function readResultAuthority(dir, binding) {
       integrationIds.add(entry.integrationId);
       identities.add(identityKey);
     }
-    const arrayRaw = json.slice(strict.arrayRange.start, strict.arrayRange.end);
-    if ((integrations.length === 0 && arrayRaw !== "[]")
-      || (integrations.length > 0
-        && arrayRaw !== `[\n    ${strict.entryRanges.map((range) => json.slice(range.start, range.end)).join(",\n    ")}\n  ]`)) {
+    if (!collectionFormattingIsCanonical(strict, json, "finalIntegrations")) {
       return { ok: false, code: "PS-CONTINUITY-RESULT-NONCANONICAL" };
     }
+    if (!validateCourseArtifacts(strict, json)) return { ok: false, code: "PS-CONTINUITY-RESULT-NONCANONICAL" };
     return {
       ok: true, code: "PS-CONTINUITY-RESULT-VALID", path: resolved.path, bytes, text,
       sha256: sha256Bytes(bytes), json, jsonStart, strict, repoRoot: resolved.root,
       relativePath: resolved.relativePath,
+      decisionBriefs: strict.parsed.decisionBriefs ?? [],
+      courseDecisionIntents: strict.parsed.courseDecisionIntents ?? [],
+      courseDecisionReceipts: strict.parsed.courseDecisionReceipts ?? [],
     };
   } catch {
     return { ok: false, code: "PS-CONTINUITY-RESULT-INVALID" };
@@ -977,6 +1070,37 @@ function spliceFinalEntry(result, built) {
     : { ok: false, code: "PS-CONTINUITY-RESULT-SIZE" };
 }
 
+function spliceCourseArtifact(result, collection, artifact) {
+  if (!new Set(["decisionBriefs", "courseDecisionIntents", "courseDecisionReceipts"]).has(collection)
+    || result.strict.collectionRanges[collection] === undefined) {
+    return { ok: false, code: "PS-CONTINUITY-DECISION-COLLECTION" };
+  }
+  let raw;
+  try { raw = canonicalDecisionJson(artifact); } catch { return { ok: false, code: "PS-CONTINUITY-DECISION-ENTRY" }; }
+  const entries = result.strict.parsed[collection];
+  const key = collection === "decisionBriefs" ? artifact?.briefId : artifact?.idempotencyKey;
+  if (typeof key !== "string") return { ok: false, code: "PS-CONTINUITY-DECISION-ENTRY" };
+  const matching = entries.find((entry) => (collection === "decisionBriefs" ? entry.briefId : entry.idempotencyKey) === key);
+  if (matching) {
+    try {
+      return canonicalDecisionJson(matching) === raw
+        ? { ok: true, code: "PS-CONTINUITY-DECISION-ENTRY-EXISTS", bytes: result.bytes, duplicate: true, raw }
+        : { ok: false, code: "PS-CONTINUITY-RESULT-CONFLICT" };
+    } catch { return { ok: false, code: "PS-CONTINUITY-RESULT-CONFLICT" }; }
+  }
+  const range = result.strict.collectionRanges[collection];
+  const arrayRaw = result.json.slice(range.start, range.end);
+  const nextArray = entries.length === 0
+    ? `[\n    ${raw}\n  ]`
+    : `${arrayRaw.slice(0, -4)},\n    ${raw}\n  ]`;
+  const absoluteStart = result.jsonStart + range.start;
+  const absoluteEnd = result.jsonStart + range.end;
+  const bytes = Buffer.from(result.text.slice(0, absoluteStart) + nextArray + result.text.slice(absoluteEnd), "utf8");
+  return bytes.length <= CONTINUITY_RESULT_MAX_BYTES
+    ? { ok: true, code: "PS-CONTINUITY-RESULT-PREPARED", bytes, duplicate: false, raw }
+    : { ok: false, code: "PS-CONTINUITY-RESULT-SIZE" };
+}
+
 function priorResultBytes(result) {
   const { strict, json, jsonStart, text } = result;
   const count = strict.parsed.finalIntegrations.length;
@@ -988,6 +1112,22 @@ function priorResultBytes(result) {
   const absoluteStart = jsonStart + strict.arrayRange.start;
   const absoluteEnd = jsonStart + strict.arrayRange.end;
   return Buffer.from(text.slice(0, absoluteStart) + nextArray + text.slice(absoluteEnd), "utf8");
+}
+
+function priorCourseArtifactBytes(result, collection, raw) {
+  const range = result.strict.collectionRanges[collection];
+  const ranges = result.strict.collectionEntryRanges[collection] ?? [];
+  const entries = result.strict.parsed[collection] ?? [];
+  if (range === undefined || entries.length === 0) return null;
+  const lastRange = ranges.at(-1);
+  if (!lastRange || result.json.slice(lastRange.start, lastRange.end) !== raw) return null;
+  const arrayRaw = result.json.slice(range.start, range.end);
+  const nextArray = entries.length === 1
+    ? "[]"
+    : `${arrayRaw.slice(0, lastRange.start - range.start - 6)}\n  ]`;
+  const absoluteStart = result.jsonStart + range.start;
+  const absoluteEnd = result.jsonStart + range.end;
+  return Buffer.from(result.text.slice(0, absoluteStart) + nextArray + result.text.slice(absoluteEnd), "utf8");
 }
 
 function atomicWriteResult(result, bytes, lock, deps = {}) {
@@ -1191,6 +1331,371 @@ function runFinalIntegrationTransaction(dir, existing, expectedRevision, request
   return { ok: true, code: "PS-CONTINUITY-RESULT-REPAIRED", mutated: true, revision: current.revision };
 }
 
+function defaultGitBinding(dir) {
+  const head = spawnSync("git", ["rev-parse", "HEAD"], { cwd: dir, encoding: "utf8" });
+  const tree = spawnSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: dir, encoding: "utf8" });
+  if (head.error || tree.error || head.status !== 0 || tree.status !== 0
+    || !/^[a-f0-9]{40}$/.test(head.stdout?.trim() ?? "") || !/^[a-f0-9]{40}$/.test(tree.stdout?.trim() ?? "")) {
+    return { ok: false };
+  }
+  return { ok: true, commit: head.stdout.trim(), tree: tree.stdout.trim() };
+}
+
+function exactBriefForCurrentState(current, brief, blocker, gitBinding, expectedRevision) {
+  let verdict;
+  try { verdict = validateCourseDecisionBrief(brief); } catch { return { ok: false }; }
+  if (!verdict.ok || !gitBinding.ok || brief.featureId !== current.featureId
+    || brief.revision !== expectedRevision + 1
+    || brief.commit !== gitBinding.commit || brief.tree !== gitBinding.tree
+    || brief.authorityDigests.prd !== current.authority.prd.sha256
+    || brief.authorityDigests.spec !== current.authority.spec.sha256
+    || blocker?.type !== "course" || blocker.signature !== brief.normalizedFailureSignature
+    || blocker.decisionBrief?.decisionBriefId !== brief.briefId
+    || blocker.decisionBrief?.decisionBriefSha256 !== verdict.sha256
+    || blocker.decisionBrief?.resultPath !== current.authority.result?.path) return { ok: false };
+  return { ok: true, sha256: verdict.sha256 };
+}
+
+function committedCourseBriefStateMatches(current, request, expectedRevision, postResultSha256, briefSha256) {
+  return current.revision === expectedRevision + 1
+    && current.authority.result?.path === request.result.path
+    && current.authority.result?.sha256 === postResultSha256
+    && current.queueHead === null
+    && current.decisionTxn === null
+    && sameJson(current.blocker, request.blocker)
+    && current.blocker?.decisionBrief?.decisionBriefSha256 === briefSha256
+    && sameJson(current.resume, request.resume);
+}
+
+/* Result-first brief publication.  The Result entry is immutable evidence; the
+ * State transition merely projects its ID/digest/path and becomes the CAS point.
+ * An interrupted State write is resumed only when the exact post-Result bytes
+ * reconstruct to the State's pre-write digest. */
+function runCourseBriefTransaction(dir, existing, expectedRevision, request, lock, deps) {
+  if (!exactObjectKeys(request, ["brief", "blocker", "resume", "result"])
+    || !exactObjectKeys(request.result, [...RESULT_BINDING_KEYS])) {
+    return { ok: false, code: "PS-CONTINUITY-REQUEST", mutated: false };
+  }
+  const current = existing.state.continuity;
+  if (current === undefined || current.authority.result === null
+    || !validateContinuityState(current, existing.state.activeFeature?.id).ok
+    || current.authority.result.path !== request.result.path) {
+    return { ok: false, code: "PS-CONTINUITY-RESULT-BINDING", mutated: false };
+  }
+  const binding = (deps.gitBinding ?? defaultGitBinding)(dir);
+  const briefBinding = exactBriefForCurrentState(current, request.brief, request.blocker, binding, expectedRevision);
+  if (!briefBinding.ok) return { ok: false, code: "PS-CONTINUITY-COURSE-BRIEF", mutated: false };
+  const resultFile = readResultAuthority(dir, request.result);
+  if (!resultFile.ok) return { ok: false, code: resultFile.code, mutated: false };
+  const spliced = spliceCourseArtifact(resultFile, "decisionBriefs", request.brief);
+  if (!spliced.ok) return { ok: false, code: spliced.code, mutated: false };
+
+  if (current.revision === expectedRevision) {
+    if (current.queueHead?.dispatch !== null || current.authority.result.sha256 !== request.result.preResultSha256) {
+      return { ok: false, code: "PS-CONTINUITY-COURSE-BRIEF-STALE", mutated: false };
+    }
+    let preparedBytes;
+    let resultAlreadyPrepared = false;
+    if (resultFile.sha256 === request.result.preResultSha256) {
+      if (spliced.duplicate) return { ok: false, code: "PS-CONTINUITY-RESULT-CONFLICT", mutated: false };
+      preparedBytes = spliced.bytes;
+    } else {
+      const prior = priorCourseArtifactBytes(resultFile, "decisionBriefs", spliced.raw);
+      if (!spliced.duplicate || prior === null || sha256Bytes(prior) !== request.result.preResultSha256) {
+        return { ok: false, code: "PS-CONTINUITY-RESULT-CONFLICT", mutated: false };
+      }
+      preparedBytes = resultFile.bytes;
+      resultAlreadyPrepared = true;
+    }
+    const postResultSha256 = sha256Bytes(preparedBytes);
+    const transition = recordCourseDecisionBrief(current, {
+      expectedRevision,
+      result: { path: request.result.path, sha256: postResultSha256 },
+      blocker: request.blocker,
+      resume: request.resume,
+    }, current.featureId);
+    if (!transition.ok || !transition.mutated) return { ok: false, code: transition.code, mutated: resultAlreadyPrepared };
+    if (!resultAlreadyPrepared) {
+      const prepared = atomicWriteResult(resultFile, preparedBytes, lock, deps);
+      if (!prepared.ok) return { ok: false, code: prepared.code, mutated: prepared.committed !== false, committed: prepared.committed };
+    }
+    deps.beforeStateWrite?.();
+    if (!assertContinuityLockOwned(lock)) return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP", mutated: true, committed: false };
+    const preparedProbe = readResultAuthority(dir, request.result);
+    if (!preparedProbe.ok || preparedProbe.path !== resultFile.path || !preparedProbe.bytes.equals(preparedBytes)) {
+      return { ok: false, code: preparedProbe.ok ? "PS-CONTINUITY-RESULT-CHANGED" : preparedProbe.code, mutated: true, committed: false };
+    }
+    const next = { ...existing.state, continuity: transition.state, updatedAt: (deps.now ?? (() => new Date().toISOString()))() };
+    const written = atomicWriteContinuityState(dir, next, lock, deps);
+    if (!written.ok) return { ok: false, code: written.code, mutated: true, committed: written.committed };
+    return { ok: true, code: "PS-CONTINUITY-COURSE-BRIEF-COMMITTED", mutated: true, revision: transition.state.revision };
+  }
+
+  const postResultSha256 = resultFile.sha256;
+  if (!committedCourseBriefStateMatches(current, request, expectedRevision, postResultSha256, briefBinding.sha256)) {
+    return { ok: false, code: "PS-CONTINUITY-STALE", mutated: false };
+  }
+  const persisted = resultFile.decisionBriefs.find(({ briefId }) => briefId === request.brief.briefId);
+  try {
+    return persisted && canonicalDecisionJson(persisted) === spliced.raw
+      ? { ok: true, code: "PS-CONTINUITY-DUPLICATE-COURSE-BRIEF", mutated: false, revision: current.revision }
+      : { ok: false, code: "PS-CONTINUITY-RESULT-CONFLICT", mutated: false };
+  } catch { return { ok: false, code: "PS-CONTINUITY-RESULT-CONFLICT", mutated: false }; }
+}
+
+function decisionTxnForIntent(intent, intentSha256) {
+  return {
+    idempotencyKey: intent.idempotencyKey,
+    briefSha256: intent.briefSha256,
+    intentSha256,
+    selectedOptionId: intent.optionId,
+    preSelectionRevision: intent.expectedRevision,
+    selectedRevision: intent.selectedRevision,
+    dispatchableRevision: intent.dispatchableRevision,
+    phase: "state-applied",
+  };
+}
+
+function sameDecisionTxn(left, right) {
+  return left !== null && right !== null
+    && ["idempotencyKey", "briefSha256", "intentSha256", "selectedOptionId", "preSelectionRevision", "selectedRevision", "dispatchableRevision", "phase"]
+      .every((key) => left[key] === right[key]);
+}
+
+function sameSelectedTransition(current, selectedTransition) {
+  return sameJson(current.queueHead, selectedTransition.queueHead)
+    && sameJson(current.blocker, selectedTransition.blocker)
+    && sameJson(current.resume, selectedTransition.resume);
+}
+
+function resultEntryById(entries, key, value) {
+  return entries.find((entry) => entry?.[key] === value) ?? null;
+}
+
+function selectedTransitionMatchesCourseOption(brief, intent, selectedTransition) {
+  const option = brief.alternatives.find(({ optionId }) => optionId === intent.optionId);
+  if (!option) return false;
+  if (option.kind === "stop" || option.kind === "defer") {
+    const dispositionDigest = sha256Canonical({
+      schema: "pipeline.course-disposition.v1",
+      kind: option.kind,
+      idempotencyKey: intent.idempotencyKey,
+      briefSha256: intent.briefSha256,
+      optionId: option.optionId,
+      blockerSignature: intent.blockerSignature,
+      poEvidenceSha256: intent.poEvidenceSha256,
+      preStateSha256: intent.preStateSha256,
+      expectedRevision: intent.expectedRevision,
+      selectedRevision: intent.selectedRevision,
+      dispatchableRevision: intent.dispatchableRevision,
+      resumePredicate: option.resumePredicate,
+    });
+    const retainsBoundBlocker = selectedTransition.queueHead === null
+      && selectedTransition.blocker !== null
+      && selectedTransition.blocker.type === "course"
+      && selectedTransition.blocker.signature === `${option.kind}-${dispositionDigest.slice(0, 32)}`
+      && selectedTransition.blocker.decisionBrief?.decisionBriefId === brief.briefId
+      && selectedTransition.blocker.decisionBrief?.decisionBriefSha256 === intent.briefSha256;
+    if (!retainsBoundBlocker) return false;
+    return option.kind === "stop"
+      ? selectedTransition.blocker.resumeCondition?.kind === "authority-update"
+        && selectedTransition.blocker.resumeCondition?.evidenceSha256 === dispositionDigest
+      : selectedTransition.blocker.resumeCondition?.kind === "po-decision"
+        && selectedTransition.blocker.resumeCondition?.evidenceSha256 === dispositionDigest;
+  }
+  return selectedTransition.queueHead !== null
+    && selectedTransition.queueHead.dispatch === null
+    && selectedTransition.blocker === null
+    && option.continuationTransitionSha256 === sha256Canonical(selectedTransition);
+}
+
+function resultAfterIntentMatchesPre(resultFile, intent, preResultSha256) {
+  const spliced = spliceCourseArtifact(resultFile, "courseDecisionIntents", intent);
+  if (!spliced.ok || !spliced.duplicate) return false;
+  const prior = priorCourseArtifactBytes(resultFile, "courseDecisionIntents", spliced.raw);
+  return prior !== null && sha256Bytes(prior) === preResultSha256;
+}
+
+function resultAfterReceiptMatchesIntent(resultFile, receipt, intentResultSha256) {
+  const spliced = spliceCourseArtifact(resultFile, "courseDecisionReceipts", receipt);
+  if (!spliced.ok || !spliced.duplicate) return false;
+  const prior = priorCourseArtifactBytes(resultFile, "courseDecisionReceipts", spliced.raw);
+  return prior !== null && sha256Bytes(prior) === intentResultSha256;
+}
+
+function persistedSelectionReceipt(resultFile, intentSha256, idempotencyKey) {
+  return resultFile.courseDecisionReceipts.find((receipt) => receipt.intentSha256 === intentSha256
+    && receipt.idempotencyKey === idempotencyKey && receipt.casOutcome === "applied") ?? null;
+}
+
+/* One locked write-ahead selection transaction: immutable intent, state-applied
+ * marker, immutable receipt, then marker clear.  Each durable boundary is
+ * recovered by its existing idempotency key; no stage derives a new identity. */
+function runCourseSelectionTransaction(dir, existing, expectedRevision, request, lock, deps) {
+  if (!exactObjectKeys(request, ["intent", "selectedTransition", "result"])
+    || !exactObjectKeys(request.result, [...RESULT_BINDING_KEYS])
+    || !exactObjectKeys(request.selectedTransition, ["queueHead", "blocker", "resume"])) {
+    return { ok: false, code: "PS-CONTINUITY-REQUEST", mutated: false };
+  }
+  let current = existing.state.continuity;
+  if (current === undefined || current.authority.result === null
+    || !validateContinuityState(current, existing.state.activeFeature?.id).ok
+    || current.authority.result.path !== request.result.path) {
+    return { ok: false, code: "PS-CONTINUITY-RESULT-BINDING", mutated: false };
+  }
+  let resultFile = readResultAuthority(dir, request.result);
+  if (!resultFile.ok) return { ok: false, code: resultFile.code, mutated: false };
+  const brief = resultEntryById(resultFile.decisionBriefs, "briefId", request.intent?.briefId);
+  if (!brief || brief.briefId !== request.intent.briefId || sha256Canonical(brief) !== request.intent.briefSha256) {
+    return { ok: false, code: "PS-CONTINUITY-DECISION-BRIEF", mutated: false };
+  }
+  let intentVerdict;
+  try {
+    intentVerdict = validateCourseDecisionIntent(request.intent, {
+      briefId: brief.briefId,
+      briefSha256: request.intent.briefSha256,
+      blockerSignature: request.intent.blockerSignature,
+      optionIds: brief.alternatives.map(({ optionId }) => optionId),
+    });
+  } catch { return { ok: false, code: "PS-CONTINUITY-DECISION-INTENT", mutated: false }; }
+  if (!intentVerdict.ok || request.intent.selectedTransitionSha256 !== sha256Canonical(request.selectedTransition)
+    || !selectedTransitionMatchesCourseOption(brief, request.intent, request.selectedTransition)) {
+    return { ok: false, code: "PS-CONTINUITY-DECISION-INTENT", mutated: false };
+  }
+  const txn = decisionTxnForIntent(request.intent, intentVerdict.sha256);
+
+  if (current.revision === expectedRevision) {
+    let preStateBytes;
+    try { preStateBytes = readFileSync(statePath(dir)); } catch { return { ok: false, code: "PS-CONTINUITY-STATE-IO", mutated: false }; }
+    if (current.decisionTxn !== null || current.blocker === null || current.blocker.type !== "course"
+      || current.blocker.signature !== request.intent.blockerSignature
+      || current.blocker.decisionBrief?.decisionBriefId !== brief.briefId
+      || current.blocker.decisionBrief?.decisionBriefSha256 !== request.intent.briefSha256
+      || brief.revision !== current.revision
+      || current.authority.result.sha256 !== request.result.preResultSha256
+      || sha256Bytes(preStateBytes) !== request.intent.preStateSha256
+      || request.intent.expectedRevision !== expectedRevision) {
+      return { ok: false, code: "PS-CONTINUITY-DECISION-STALE", mutated: false };
+    }
+    const splicedIntent = spliceCourseArtifact(resultFile, "courseDecisionIntents", request.intent);
+    if (!splicedIntent.ok) return { ok: false, code: splicedIntent.code, mutated: false };
+    let intentBytes;
+    let intentAlreadyPrepared = false;
+    if (resultFile.sha256 === request.result.preResultSha256) {
+      if (splicedIntent.duplicate) return { ok: false, code: "PS-CONTINUITY-RESULT-CONFLICT", mutated: false };
+      intentBytes = splicedIntent.bytes;
+    } else {
+      const prior = priorCourseArtifactBytes(resultFile, "courseDecisionIntents", splicedIntent.raw);
+      if (!splicedIntent.duplicate || prior === null || sha256Bytes(prior) !== request.result.preResultSha256) {
+        return { ok: false, code: "PS-CONTINUITY-RESULT-CONFLICT", mutated: false };
+      }
+      intentBytes = resultFile.bytes;
+      intentAlreadyPrepared = true;
+    }
+    const intentResultSha256 = sha256Bytes(intentBytes);
+    const selected = applyCourseDecisionIntent(current, {
+      expectedRevision,
+      result: { path: request.result.path, sha256: intentResultSha256 },
+      decisionTxn: txn,
+      ...request.selectedTransition,
+    }, current.featureId);
+    if (!selected.ok || !selected.mutated) return { ok: false, code: selected.code, mutated: intentAlreadyPrepared };
+    if (!intentAlreadyPrepared) {
+      const prepared = atomicWriteResult(resultFile, intentBytes, lock, deps);
+      if (!prepared.ok) return { ok: false, code: prepared.code, mutated: prepared.committed !== false, committed: prepared.committed };
+    }
+    if (!assertContinuityLockOwned(lock)) return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP", mutated: true, committed: false };
+    const intentProbe = readResultAuthority(dir, request.result);
+    if (!intentProbe.ok || !intentProbe.bytes.equals(intentBytes)) {
+      return { ok: false, code: intentProbe.ok ? "PS-CONTINUITY-RESULT-CHANGED" : intentProbe.code, mutated: true, committed: false };
+    }
+    const selectedRoot = { ...existing.state, continuity: selected.state, updatedAt: (deps.now ?? (() => new Date().toISOString()))() };
+    const selectedBytes = Buffer.from(JSON.stringify(selectedRoot, null, 2) + "\n", "utf8");
+    const stateWrite = atomicWriteContinuityState(dir, selectedRoot, lock, deps);
+    if (!stateWrite.ok) return { ok: false, code: stateWrite.code, mutated: true, committed: stateWrite.committed };
+    current = selected.state;
+    resultFile = intentProbe;
+    if (!readFileSync(statePath(dir)).equals(selectedBytes)) {
+      return { ok: false, code: "PS-CONTINUITY-STATE-CHANGED", mutated: true, committed: false };
+    }
+  }
+
+  if (current.revision === request.intent.selectedRevision) {
+    let selectedStateBytes;
+    try { selectedStateBytes = readFileSync(statePath(dir)); } catch { return { ok: false, code: "PS-CONTINUITY-STATE-IO", mutated: true }; }
+    if (!sameDecisionTxn(current.decisionTxn, txn)
+      || !sameSelectedTransition(current, request.selectedTransition)
+      || sha256Bytes(selectedStateBytes) === request.intent.preStateSha256) {
+      return { ok: false, code: "PS-CONTINUITY-DECISION-CONFLICT", mutated: true };
+    }
+    const receipt = {
+      schema: "pipeline.course-decision-receipt.v1",
+      idempotencyKey: request.intent.idempotencyKey,
+      intentSha256: intentVerdict.sha256,
+      briefSha256: request.intent.briefSha256,
+      blockerSignature: request.intent.blockerSignature,
+      optionId: request.intent.optionId,
+      preStateSha256: request.intent.preStateSha256,
+      postStateSha256: sha256Bytes(selectedStateBytes),
+      preRevision: request.intent.expectedRevision,
+      postRevision: request.intent.selectedRevision,
+      casOutcome: "applied",
+    };
+    let receiptVerdict;
+    try { receiptVerdict = validateCourseDecisionReceipt(receipt, request.intent); } catch { return { ok: false, code: "PS-CONTINUITY-DECISION-RECEIPT", mutated: true }; }
+    if (!receiptVerdict.ok) return { ok: false, code: "PS-CONTINUITY-DECISION-RECEIPT", mutated: true };
+    const splicedReceipt = spliceCourseArtifact(resultFile, "courseDecisionReceipts", receipt);
+    if (!splicedReceipt.ok) return { ok: false, code: splicedReceipt.code, mutated: true };
+    let receiptBytes;
+    if (resultFile.sha256 === current.authority.result.sha256) {
+      if (!resultAfterIntentMatchesPre(resultFile, request.intent, request.result.preResultSha256)
+        || splicedReceipt.duplicate) return { ok: false, code: "PS-CONTINUITY-RESULT-CONFLICT", mutated: true };
+      receiptBytes = splicedReceipt.bytes;
+      const receiptWrite = atomicWriteResult(resultFile, receiptBytes, lock, deps);
+      if (!receiptWrite.ok) return { ok: false, code: receiptWrite.code, mutated: receiptWrite.committed !== false, committed: receiptWrite.committed };
+    } else {
+      if (!resultAfterReceiptMatchesIntent(resultFile, receipt, current.authority.result.sha256)) {
+        return { ok: false, code: "PS-CONTINUITY-RESULT-CONFLICT", mutated: true };
+      }
+      receiptBytes = resultFile.bytes;
+    }
+    const receiptResultSha256 = sha256Bytes(receiptBytes);
+    if (!assertContinuityLockOwned(lock)) return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP", mutated: true, committed: false };
+    const receiptProbe = readResultAuthority(dir, request.result);
+    if (!receiptProbe.ok || !receiptProbe.bytes.equals(receiptBytes)) {
+      return { ok: false, code: receiptProbe.ok ? "PS-CONTINUITY-RESULT-CHANGED" : receiptProbe.code, mutated: true, committed: false };
+    }
+    const cleared = clearCourseDecisionReceipt(current, {
+      expectedRevision: current.revision,
+      result: { path: request.result.path, sha256: receiptResultSha256 },
+      receipt: {
+        idempotencyKey: receipt.idempotencyKey,
+        briefSha256: receipt.briefSha256,
+        intentSha256: receipt.intentSha256,
+        selectedOptionId: receipt.optionId,
+        receiptSha256: receiptVerdict.sha256,
+        selectedRevision: receipt.postRevision,
+        dispatchableRevision: request.intent.dispatchableRevision,
+      },
+    }, current.featureId);
+    if (!cleared.ok || !cleared.mutated) return { ok: false, code: cleared.code, mutated: true };
+    const clearedRoot = { ...existing.state, continuity: cleared.state, updatedAt: (deps.now ?? (() => new Date().toISOString()))() };
+    const clearWrite = atomicWriteContinuityState(dir, clearedRoot, lock, deps);
+    if (!clearWrite.ok) return { ok: false, code: clearWrite.code, mutated: true, committed: clearWrite.committed };
+    return { ok: true, code: "PS-CONTINUITY-COURSE-SELECTION-COMMITTED", mutated: true, revision: cleared.state.revision };
+  }
+
+  if (current.revision === request.intent.dispatchableRevision && current.decisionTxn === null
+    && current.authority.result.sha256 === resultFile.sha256
+    && sameSelectedTransition(current, request.selectedTransition)) {
+    const receipt = persistedSelectionReceipt(resultFile, intentVerdict.sha256, request.intent.idempotencyKey);
+    return receipt && receipt.briefSha256 === request.intent.briefSha256 && receipt.optionId === request.intent.optionId
+      ? { ok: true, code: "PS-CONTINUITY-DUPLICATE-COURSE-SELECTION", mutated: false, revision: current.revision }
+      : { ok: false, code: "PS-CONTINUITY-RESULT-CONFLICT", mutated: false };
+  }
+  return { ok: false, code: "PS-CONTINUITY-STALE", mutated: false };
+}
+
 function continuityTransition(sub, base, expectedRevision, request) {
   const featureId = base.activeFeature?.id;
   if (typeof featureId !== "string" || featureId.trim() === "") return { ok: false, code: "PS-CONTINUITY-NO-ACTIVE-FEATURE" };
@@ -1250,6 +1755,34 @@ function runContinuityCommand(sub, flags, deps) {
             ? "Result prepare or repair may be durable; mutation is NOT reported as zero"
             : "zero State and Result mutation";
         console.error(`Error: continuity final transaction refused (${transaction.code}); ${disposition}.`);
+        return 2;
+      }
+      console.log(`${transaction.code}: continuity revision ${transaction.revision}; ${transaction.mutated ? "transaction persisted" : "accepted with zero mutation"}.`);
+      return 0;
+    }
+    if (sub === "continuity-record-course-brief") {
+      const transaction = runCourseBriefTransaction(dir, existing, expected.value, request.value, lock, deps);
+      if (!transaction.ok) {
+        const disposition = transaction.committed === null
+          ? "commit disposition is indeterminate"
+          : transaction.mutated
+            ? "Result prepare may be durable; mutation is NOT reported as zero"
+            : "zero State and Result mutation";
+        console.error(`Error: continuity course-brief transaction refused (${transaction.code}); ${disposition}.`);
+        return 2;
+      }
+      console.log(`${transaction.code}: continuity revision ${transaction.revision}; ${transaction.mutated ? "transaction persisted" : "accepted with zero mutation"}.`);
+      return 0;
+    }
+    if (sub === "continuity-select-course") {
+      const transaction = runCourseSelectionTransaction(dir, existing, expected.value, request.value, lock, deps);
+      if (!transaction.ok) {
+        const disposition = transaction.committed === null
+          ? "commit disposition is indeterminate"
+          : transaction.mutated
+            ? "a write-ahead stage may be durable; mutation is NOT reported as zero"
+            : "zero State and Result mutation";
+        console.error(`Error: continuity course-selection transaction refused (${transaction.code}); ${disposition}.`);
         return 2;
       }
       console.log(`${transaction.code}: continuity revision ${transaction.revision}; ${transaction.mutated ? "transaction persisted" : "accepted with zero mutation"}.`);
@@ -1642,7 +2175,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, set-phase, approve-plan, revoke-plan, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, continuity-init, continuity-cas, continuity-integrate-final, continuity-apply-decision, continuity-clear-decision.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, set-phase, approve-plan, revoke-plan, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, continuity-init, continuity-cas, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision.`,
       );
       return 2;
     }

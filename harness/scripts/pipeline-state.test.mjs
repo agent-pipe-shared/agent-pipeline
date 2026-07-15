@@ -32,6 +32,7 @@ import {
 import { computeContinuityFinalDigest } from "../../plugins/pipeline-core/lib/continuity-host-adapter.mjs";
 import { loadManifestSafe } from "../../plugins/pipeline-core/lib/manifest.mjs";
 import { loadStateSafe, resolveSuggestion } from "../../plugins/pipeline-core/hooks/stop-suggest.mjs";
+import { COURSE_KINDS, buildCourseDecisionBrief, sha256Canonical } from "../../plugins/pipeline-core/lib/review-economy.mjs";
 
 const CLI = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
 const ALL_DIRS = [];
@@ -79,6 +80,7 @@ const continuityDeps = (dir, overrides = {}) => ({
 const A = "a".repeat(64);
 const B = "b".repeat(64);
 const RESULT_FIXTURE = "```pipeline-result\n{\n  \"finalIntegrations\": []\n}\n```\n";
+const COURSE_RESULT_FIXTURE = "```pipeline-result\n{\n  \"decisionBriefs\": [],\n  \"courseDecisionIntents\": [],\n  \"courseDecisionReceipts\": [],\n  \"finalIntegrations\": []\n}\n```\n";
 const C = createHash("sha256").update(RESULT_FIXTURE).digest("hex");
 const D = "d".repeat(64);
 const CONTINUITY_FEATURE = "phase26-test";
@@ -142,6 +144,83 @@ function seedContinuityRoot(dir) {
   run(["set-feature", "--id", CONTINUITY_FEATURE, "--plan-path", "specs/prd.md"], { dir, now: FIXED_NOW });
   mkdirSync(join(dir, "specs"), { recursive: true });
   writeFileSync(join(dir, "specs", "result.md"), RESULT_FIXTURE);
+}
+
+function seedCourseContinuityRoot(dir) {
+  seedContinuityRoot(dir);
+  writeFileSync(join(dir, "specs", "result.md"), COURSE_RESULT_FIXTURE);
+  return createHash("sha256").update(COURSE_RESULT_FIXTURE).digest("hex");
+}
+
+function courseOption(kind, index, continuationTransitionSha256 = A) {
+  return {
+    optionId: `option-${index}`,
+    kind,
+    equivalenceKey: `course-${index}`,
+    expectedOutcome: `outcome-${index}`,
+    scopeDelta: { add: [], modify: [], remove: [] },
+    requiredEvidence: [{ id: `evidence-${index}`, sha256: A }],
+    timeCost: { minimumMinutes: 0, maximumMinutes: 30, confidence: "medium" },
+    residualRisk: `risk-${index}`,
+    securityAssuranceClaims: [],
+    claimImpact: { addedClaims: [], removedClaims: [], retainedNonClaims: ["os-isolation"] },
+    reversibility: "reversible",
+    authority: kind === "stop" || kind === "defer" ? "po" : "coordinator",
+    permittedOperations: [],
+    trustBoundary: "unchanged",
+    newTrustBoundaries: [],
+    rollbackImpact: `rollback-${index}`,
+    resumeImpact: `resume-${index}`,
+    resumePredicate: kind === "defer" ? "external-predicate" : null,
+    continuationTransitionSha256: kind === "defer" || kind === "stop" ? null : continuationTransitionSha256,
+  };
+}
+
+function courseBrief(revision = 1, continuationTransitionSha256 = A) {
+  return buildCourseDecisionBrief({
+    briefId: "brief-01",
+    featureId: CONTINUITY_FEATURE,
+    revision,
+    gateId: "gate-01",
+    blockerId: "blocker-01",
+    commit: "a".repeat(40),
+    tree: "b".repeat(40),
+    authorityDigests: { prd: A, spec: B },
+    normalizedFailureSignature: D,
+    similarityGroupId: "similar-product-failure",
+    triggerEvidence: [
+      { attemptId: "attempt-01", attemptSha256: A, resultId: "result-01", resultSha256: B, evidence: [{ id: "evidence-01", sha256: C }] },
+      { attemptId: "attempt-02", attemptSha256: B, resultId: "result-02", resultSha256: C, evidence: [{ id: "evidence-02", sha256: D }] },
+    ],
+    observedCount: 2,
+    configuredLimit: 1,
+    gateTrigger: { kind: "repeated-signature", budget: null },
+    consumedBudgets: { productRetries: 1, environmentReroutes: 0, reviewRounds: 1, correctionCommits: 1 },
+    invariants: ["INV-01"],
+    nonClaims: ["os-isolation"],
+    forbiddenOperations: ["main-merge", "force-push"],
+    exactPoDecisionQuestion: "Which evidence-bound course should be selected?",
+    alternatives: COURSE_KINDS.map((kind, index) => courseOption(kind, index, continuationTransitionSha256)),
+    eliminated: [],
+    recommendation: { optionId: "option-0", evidence: [{ id: "recommendation-evidence", sha256: A }], nonBinding: true },
+  });
+}
+
+function courseDispositionDigest(kind, intent, resumePredicate) {
+  return sha256Canonical({
+    schema: "pipeline.course-disposition.v1",
+    kind,
+    idempotencyKey: intent.idempotencyKey,
+    briefSha256: intent.briefSha256,
+    optionId: intent.optionId,
+    blockerSignature: intent.blockerSignature,
+    poEvidenceSha256: intent.poEvidenceSha256,
+    preStateSha256: intent.preStateSha256,
+    expectedRevision: intent.expectedRevision,
+    selectedRevision: intent.selectedRevision,
+    dispatchableRevision: intent.dispatchableRevision,
+    resumePredicate,
+  });
 }
 
 function continuityArgs(sub, revision, requestFile, token = "token-00000001") {
@@ -1417,6 +1496,208 @@ function canonicalFixtureJson(value) {
   const cleared = run(continuityArgs("continuity-clear-decision", 1, clearFile), continuityDeps(dir));
   const final = readState(dir).state.continuity;
   ok("PS45b bound receipt clears decision marker at pre-bound revision", cleared === 0 && final.revision === 2 && final.decisionTxn === null);
+}
+
+// ---- PS45C: Result-first course brief is canonical, bound and exactly recoverable ----------
+{
+  const dir = freshDir("continuity-course-brief");
+  const resultSha = seedCourseContinuityRoot(dir);
+  const initial = continuityState({
+    authority: { prd: { path: "specs/prd.md", sha256: A }, spec: { path: "specs/spec.md", sha256: B }, result: { path: "specs/result.md", sha256: resultSha } },
+    queueHead: continuityQueue({ dispatch: null }),
+  });
+  const initFile = writeRequest(dir, "course-init", initial);
+  run(continuityArgs("continuity-init", "absent", initFile), continuityDeps(dir));
+  const built = courseBrief();
+  const blocker = {
+    type: "course", signature: D,
+    resumeCondition: { kind: "po-decision", evidenceSha256: D },
+    decisionBrief: { decisionBriefId: built.brief.briefId, decisionBriefSha256: built.sha256, resultPath: "specs/result.md" },
+  };
+  const request = {
+    brief: built.brief,
+    blocker,
+    resume: { mode: "resume-on-next-turn", sourceRevision: 1, reasonCode: "blocker" },
+    result: { path: "specs/result.md", preResultSha256: resultSha },
+  };
+  const requestFile = writeRequest(dir, "course-brief", request);
+  const courseDeps = continuityDeps(dir, { gitBinding: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) });
+  const first = run(continuityArgs("continuity-record-course-brief", 0, requestFile), courseDeps);
+  const firstState = readState(dir).state.continuity;
+  const firstResult = readFileSync(join(dir, "specs", "result.md"), "utf8");
+  const replay = run(continuityArgs("continuity-record-course-brief", 0, requestFile), courseDeps);
+  ok("PS45Ca Result-first course brief advances State with its exact Result pointer", first === 0
+    && firstState.revision === 1 && firstState.queueHead === null
+    && firstState.blocker?.decisionBrief?.decisionBriefSha256 === built.sha256
+    && firstState.authority.result.sha256 === createHash("sha256").update(firstResult).digest("hex"));
+  ok("PS45Cb course brief replay is exact and performs zero mutation", replay === 0
+    && readFileSync(join(dir, "specs", "result.md"), "utf8") === firstResult
+    && readState(dir).state.continuity.revision === 1);
+}
+
+{
+  const dir = freshDir("continuity-course-brief-recovery");
+  const resultSha = seedCourseContinuityRoot(dir);
+  const initial = continuityState({
+    authority: { prd: { path: "specs/prd.md", sha256: A }, spec: { path: "specs/spec.md", sha256: B }, result: { path: "specs/result.md", sha256: resultSha } },
+    queueHead: continuityQueue({ dispatch: null }),
+  });
+  run(continuityArgs("continuity-init", "absent", writeRequest(dir, "recovery-init", initial)), continuityDeps(dir));
+  const built = courseBrief();
+  const requestFile = writeRequest(dir, "recovery-course-brief", {
+    brief: built.brief,
+    blocker: { type: "course", signature: D, resumeCondition: { kind: "po-decision", evidenceSha256: D }, decisionBrief: { decisionBriefId: built.brief.briefId, decisionBriefSha256: built.sha256, resultPath: "specs/result.md" } },
+    resume: { mode: "resume-on-next-turn", sourceRevision: 1, reasonCode: "blocker" },
+    result: { path: "specs/result.md", preResultSha256: resultSha },
+  });
+  const shared = { gitBinding: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) };
+  const interrupted = run(continuityArgs("continuity-record-course-brief", 0, requestFile), continuityDeps(dir, {
+    ...shared,
+    renameSync: () => { throw new Error("State rename interrupted"); },
+  }));
+  const prepared = readFileSync(join(dir, "specs", "result.md"), "utf8");
+  const replay = run(continuityArgs("continuity-record-course-brief", 0, requestFile), continuityDeps(dir, shared));
+  ok("PS45Cc interrupted State write reports durable Result preparation", interrupted === 2
+    && JSON.parse(prepared.match(/```pipeline-result\n([\s\S]*?)\n```/)[1]).decisionBriefs.length === 1);
+  ok("PS45Cd exact Result-before-State course replay commits without duplicate", replay === 0
+    && readFileSync(join(dir, "specs", "result.md"), "utf8") === prepared
+    && readState(dir).state.continuity.revision === 1);
+}
+
+// ---- PS45D: one literal selection writes intent, marker, receipt and clear ---------------
+{
+  const dir = freshDir("continuity-course-selection");
+  const resultSha = seedCourseContinuityRoot(dir);
+  const initial = continuityState({
+    authority: { prd: { path: "specs/prd.md", sha256: A }, spec: { path: "specs/spec.md", sha256: B }, result: { path: "specs/result.md", sha256: resultSha } },
+    queueHead: continuityQueue({ dispatch: null }),
+  });
+  run(continuityArgs("continuity-init", "absent", writeRequest(dir, "select-init", initial)), continuityDeps(dir));
+  const selectedTransition = {
+    queueHead: continuityQueue({ actionId: "selected-action", nextAction: "dispatch", dispatch: null }),
+    blocker: null,
+    resume: { mode: "resume-on-next-turn", sourceRevision: 2, reasonCode: "blocker" },
+  };
+  const built = courseBrief(1, sha256Canonical(selectedTransition));
+  const briefRequest = {
+    brief: built.brief,
+    blocker: { type: "course", signature: D, resumeCondition: { kind: "po-decision", evidenceSha256: D }, decisionBrief: { decisionBriefId: built.brief.briefId, decisionBriefSha256: built.sha256, resultPath: "specs/result.md" } },
+    resume: { mode: "resume-on-next-turn", sourceRevision: 1, reasonCode: "blocker" },
+    result: { path: "specs/result.md", preResultSha256: resultSha },
+  };
+  const binding = { gitBinding: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) };
+  run(continuityArgs("continuity-record-course-brief", 0, writeRequest(dir, "select-brief", briefRequest)), continuityDeps(dir, binding));
+  const blocked = readState(dir).state.continuity;
+  const intent = {
+    schema: "pipeline.course-decision-intent.v1",
+    idempotencyKey: "decision-key-01",
+    briefId: built.brief.briefId,
+    briefSha256: built.sha256,
+    blockerSignature: D,
+    optionId: "option-0",
+    poEvidenceSha256: C,
+    preStateSha256: createHash("sha256").update(readFileSync(statePath(dir))).digest("hex"),
+    selectedTransitionSha256: sha256Canonical(selectedTransition),
+    expectedRevision: 1,
+    selectedRevision: 2,
+    dispatchableRevision: 3,
+  };
+  const requestFile = writeRequest(dir, "select-course", {
+    intent,
+    selectedTransition,
+    result: { path: "specs/result.md", preResultSha256: blocked.authority.result.sha256 },
+  });
+  const first = run(continuityArgs("continuity-select-course", 1, requestFile), continuityDeps(dir, binding));
+  const final = readState(dir).state.continuity;
+  const result = JSON.parse(readFileSync(join(dir, "specs", "result.md"), "utf8").match(/```pipeline-result\n([\s\S]*?)\n```/)[1]);
+  const replay = run(continuityArgs("continuity-select-course", 1, requestFile), continuityDeps(dir, binding));
+  ok("PS45Da selection commits intent receipt and dispatchable state in bound revisions", first === 0
+    && final.revision === 3 && final.decisionTxn === null
+    && final.authority.result.sha256 === createHash("sha256").update(readFileSync(join(dir, "specs", "result.md"))).digest("hex")
+    && result.courseDecisionIntents.length === 1 && result.courseDecisionReceipts.length === 1
+    && result.courseDecisionReceipts[0].intentSha256 === sha256Canonical(intent));
+  ok("PS45Db selection replay admits only the same idempotency key with zero mutation", replay === 0
+    && readState(dir).state.continuity.revision === 3);
+}
+
+{
+  const dir = freshDir("continuity-course-selection-clear-recovery");
+  const resultSha = seedCourseContinuityRoot(dir);
+  const initial = continuityState({
+    authority: { prd: { path: "specs/prd.md", sha256: A }, spec: { path: "specs/spec.md", sha256: B }, result: { path: "specs/result.md", sha256: resultSha } },
+    queueHead: continuityQueue({ dispatch: null }),
+  });
+  run(continuityArgs("continuity-init", "absent", writeRequest(dir, "clear-init", initial)), continuityDeps(dir));
+  const selectedTransition = { queueHead: continuityQueue({ actionId: "selected-recovery", nextAction: "dispatch", dispatch: null }), blocker: null, resume: { mode: "resume-on-next-turn", sourceRevision: 2, reasonCode: "blocker" } };
+  const built = courseBrief(1, sha256Canonical(selectedTransition));
+  const binding = { gitBinding: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) };
+  run(continuityArgs("continuity-record-course-brief", 0, writeRequest(dir, "clear-brief", {
+    brief: built.brief,
+    blocker: { type: "course", signature: D, resumeCondition: { kind: "po-decision", evidenceSha256: D }, decisionBrief: { decisionBriefId: built.brief.briefId, decisionBriefSha256: built.sha256, resultPath: "specs/result.md" } },
+    resume: { mode: "resume-on-next-turn", sourceRevision: 1, reasonCode: "blocker" }, result: { path: "specs/result.md", preResultSha256: resultSha },
+  })), continuityDeps(dir, binding));
+  const blocked = readState(dir).state.continuity;
+  const intent = {
+    schema: "pipeline.course-decision-intent.v1", idempotencyKey: "decision-key-02", briefId: built.brief.briefId,
+    briefSha256: built.sha256, blockerSignature: D, optionId: "option-0", poEvidenceSha256: C,
+    preStateSha256: createHash("sha256").update(readFileSync(statePath(dir))).digest("hex"), selectedTransitionSha256: sha256Canonical(selectedTransition),
+    expectedRevision: 1, selectedRevision: 2, dispatchableRevision: 3,
+  };
+  const requestFile = writeRequest(dir, "clear-course", { intent, selectedTransition, result: { path: "specs/result.md", preResultSha256: blocked.authority.result.sha256 } });
+  let stateRenames = 0;
+  const interrupted = run(continuityArgs("continuity-select-course", 1, requestFile), continuityDeps(dir, {
+    ...binding,
+    renameSync: (...args) => { stateRenames += 1; if (stateRenames === 2) throw new Error("clear interrupted"); return renameSync(...args); },
+  }));
+  const selected = readState(dir).state.continuity;
+  const replay = run(continuityArgs("continuity-select-course", 1, requestFile), continuityDeps(dir, binding));
+  ok("PS45Dc receipt-before-clear interruption leaves a dispatch-blocking marker", interrupted === 2
+    && selected.revision === 2 && selected.decisionTxn?.idempotencyKey === intent.idempotencyKey);
+  ok("PS45Dd receipt-backed replay clears without a second intent or receipt", replay === 0
+    && readState(dir).state.continuity.revision === 3 && readState(dir).state.continuity.decisionTxn === null);
+}
+
+{
+  const dir = freshDir("continuity-course-stop");
+  const resultSha = seedCourseContinuityRoot(dir);
+  const initial = continuityState({
+    authority: { prd: { path: "specs/prd.md", sha256: A }, spec: { path: "specs/spec.md", sha256: B }, result: { path: "specs/result.md", sha256: resultSha } },
+    queueHead: continuityQueue({ dispatch: null }),
+  });
+  run(continuityArgs("continuity-init", "absent", writeRequest(dir, "stop-init", initial)), continuityDeps(dir));
+  const built = courseBrief();
+  const binding = { gitBinding: () => ({ ok: true, commit: "a".repeat(40), tree: "b".repeat(40) }) };
+  run(continuityArgs("continuity-record-course-brief", 0, writeRequest(dir, "stop-brief", {
+    brief: built.brief,
+    blocker: { type: "course", signature: D, resumeCondition: { kind: "po-decision", evidenceSha256: D }, decisionBrief: { decisionBriefId: built.brief.briefId, decisionBriefSha256: built.sha256, resultPath: "specs/result.md" } },
+    resume: { mode: "resume-on-next-turn", sourceRevision: 1, reasonCode: "blocker" }, result: { path: "specs/result.md", preResultSha256: resultSha },
+  })), continuityDeps(dir, binding));
+  const blocked = readState(dir).state.continuity;
+  const intent = {
+    schema: "pipeline.course-decision-intent.v1", idempotencyKey: "decision-key-stop", briefId: built.brief.briefId,
+    briefSha256: built.sha256, blockerSignature: D, optionId: "option-5", poEvidenceSha256: C,
+    preStateSha256: createHash("sha256").update(readFileSync(statePath(dir))).digest("hex"), selectedTransitionSha256: A,
+    expectedRevision: 1, selectedRevision: 2, dispatchableRevision: 3,
+  };
+  const digest = courseDispositionDigest("stop", intent, null);
+  const selectedTransition = {
+    queueHead: null,
+    blocker: {
+      type: "course", signature: `stop-${digest.slice(0, 32)}`,
+      resumeCondition: { kind: "authority-update", evidenceSha256: digest },
+      decisionBrief: { decisionBriefId: built.brief.briefId, decisionBriefSha256: built.sha256, resultPath: "specs/result.md" },
+    },
+    resume: { mode: "resume-on-next-turn", sourceRevision: 2, reasonCode: "blocker" },
+  };
+  intent.selectedTransitionSha256 = sha256Canonical(selectedTransition);
+  const result = run(continuityArgs("continuity-select-course", 1, writeRequest(dir, "stop-select", {
+    intent, selectedTransition, result: { path: "specs/result.md", preResultSha256: blocked.authority.result.sha256 },
+  })), continuityDeps(dir, binding));
+  const final = readState(dir).state.continuity;
+  ok("PS45De stop selection has no SHA fixed point and remains terminally blocked", result === 0
+    && final.revision === 3 && final.queueHead === null && final.decisionTxn === null
+    && /^stop-[a-f0-9]{32}$/.test(final.blocker?.signature ?? "")
+    && final.blocker?.resumeCondition.kind === "authority-update");
 }
 
 // ---- PS46: exchanged ownership nonce cannot release another writer's lock ------------------

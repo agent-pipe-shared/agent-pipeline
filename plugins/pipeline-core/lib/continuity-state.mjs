@@ -38,6 +38,9 @@ const CAS_KEYS = new Set(["expectedRevision", "next"]);
 const FINAL_REQUEST_KEYS = new Set(["expectedRevision", "observation", "next"]);
 const DECISION_APPLY_KEYS = new Set(["expectedRevision", "decisionTxn", "queueHead", "blocker", "resume"]);
 const DECISION_CLEAR_KEYS = new Set(["expectedRevision", "receipt"]);
+const COURSE_BRIEF_REQUEST_KEYS = new Set(["expectedRevision", "result", "blocker", "resume"]);
+const COURSE_DECISION_APPLY_KEYS = new Set(["expectedRevision", "result", "decisionTxn", "queueHead", "blocker", "resume"]);
+const COURSE_DECISION_CLEAR_KEYS = new Set(["expectedRevision", "result", "receipt"]);
 const DECISION_RECEIPT_KEYS = new Set([
   "idempotencyKey", "briefSha256", "intentSha256", "selectedOptionId",
   "receiptSha256", "selectedRevision", "dispatchableRevision",
@@ -315,6 +318,16 @@ function interruptRetainsWork(current, next) {
     && sameJson(current.capacity, next.capacity);
 }
 
+/* A selected stop/defer is Result-owned, but State carries this bounded
+ * disposition projection so generic CAS cannot auto-resume it.  A separately
+ * authorized transition must use a dedicated command, never the generic writer. */
+function retainsCourseDisposition(current, next) {
+  const blocker = current.blocker;
+  if (blocker === null || blocker.type !== "course"
+    || !/^(?:stop|defer)-[a-f0-9]{32}$/.test(blocker.signature)) return true;
+  return next.queueHead === null && sameJson(next.blocker, blocker);
+}
+
 function compareAndSwap(current, request, activeFeatureId, {
   allowAcknowledgementChange = false,
   allowDecisionChange = false,
@@ -339,6 +352,7 @@ function compareAndSwap(current, request, activeFeatureId, {
     return result(false, "CS-PROTECTED-AUTHORITY");
   }
   if (!interruptRetainsWork(current, request.next)) return result(false, "CS-INTERRUPT-DRIFT");
+  if (!retainsCourseDisposition(current, request.next)) return result(false, "CS-COURSE-DISPOSITION-PROTECTED");
   if (!allowAcknowledgementChange
     && !sameAcknowledgement(current.acknowledgedFinal, request.next.acknowledgedFinal)) {
     return result(false, "CS-PROTECTED-ACK");
@@ -475,6 +489,73 @@ export function applyDecisionSelection(current, request, activeFeatureId = undef
   });
 }
 
+function validResultReplacement(current, result) {
+  return current.authority.result !== null
+    && validArtifact(result)
+    && result.path === current.authority.result.path
+    && result.sha256 !== current.authority.result.sha256;
+}
+
+/** Bind a Result-persisted course brief before presenting the course blocker. */
+export function recordCourseDecisionBrief(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, COURSE_BRIEF_REQUEST_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  if (request.expectedRevision !== current.revision || current.queueHead === null || current.queueHead.dispatch !== null || current.blocker !== null
+    || current.decisionTxn !== null || !validResultReplacement(current, request.result)) {
+    return result(false, "CS-COURSE-BRIEF-STALE");
+  }
+  const synthetic = structuredClone(current);
+  synthetic.authority.result = request.result;
+  synthetic.queueHead = null;
+  synthetic.blocker = request.blocker;
+  synthetic.resume = request.resume;
+  synthetic.revision += 1;
+  if (!validBlocker(request.blocker, synthetic) || request.blocker.type !== "course"
+    || request.blocker.decisionBrief === null || !validResume(request.resume, synthetic.revision)) {
+    return result(false, "CS-COURSE-BRIEF-INVALID");
+  }
+  return compareAndSwap(current, { expectedRevision: request.expectedRevision, next: synthetic }, activeFeatureId, {
+    allowResultAuthorityChange: true,
+  });
+}
+
+/** Apply the write-ahead intent's selected state while advancing the Result digest. */
+export function applyCourseDecisionIntent(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, COURSE_DECISION_APPLY_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  if (current.decisionTxn !== null) {
+    const sameTxn = exactKeys(request.decisionTxn, DECISION_KEYS)
+      && [...DECISION_KEYS].every((key) => current.decisionTxn[key] === request.decisionTxn[key]);
+    return request.expectedRevision === current.revision && sameTxn
+      && sameJson(current.authority.result, request.result)
+      ? result(true, "CS-DECISION-REPLAY")
+      : result(false, "CS-DECISION-CONFLICT");
+  }
+  if (request.expectedRevision !== current.revision || current.blocker === null || !validResultReplacement(current, request.result)
+    || !validDecisionTxn(request.decisionTxn, current.revision + 1)
+    || request.decisionTxn.preSelectionRevision !== current.revision
+    || current.blocker.decisionBrief === null
+    || current.blocker.decisionBrief.decisionBriefSha256 !== request.decisionTxn.briefSha256
+    || (request.queueHead === null) === (request.blocker === null)
+    || !validResume(request.resume, current.revision + 1)) return result(false, "CS-DECISION-INVALID");
+
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.authority.result = request.result;
+  next.queueHead = request.queueHead;
+  next.blocker = request.blocker;
+  next.resume = request.resume;
+  next.decisionTxn = request.decisionTxn;
+  return compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowDecisionChange: true,
+    allowResultAuthorityChange: true,
+  });
+}
+
 /** Clear a matching durable decision receipt and make the selected state dispatchable. */
 export function clearDecisionSelection(current, request, activeFeatureId = undefined) {
   const before = validateContinuityState(current, activeFeatureId);
@@ -503,6 +584,35 @@ export function clearDecisionSelection(current, request, activeFeatureId = undef
   });
 }
 
+/** Clear a receipt-backed marker while binding the Result that contains that receipt. */
+export function clearCourseDecisionReceipt(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, COURSE_DECISION_CLEAR_KEYS)
+    || !safeInteger(request.expectedRevision)
+    || !exactKeys(request.receipt, DECISION_RECEIPT_KEYS)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  if (current.decisionTxn === null || !validResultReplacement(current, request.result)) return result(false, "CS-NO-DECISION-TXN");
+  const txn = current.decisionTxn;
+  const receipt = request.receipt;
+  if (request.expectedRevision !== current.revision
+    || !digest(receipt.receiptSha256)
+    || receipt.idempotencyKey !== txn.idempotencyKey
+    || receipt.briefSha256 !== txn.briefSha256
+    || receipt.intentSha256 !== txn.intentSha256
+    || receipt.selectedOptionId !== txn.selectedOptionId
+    || receipt.selectedRevision !== txn.selectedRevision
+    || receipt.dispatchableRevision !== txn.dispatchableRevision) return result(false, "CS-DECISION-RECEIPT-MISMATCH");
+  const next = structuredClone(current);
+  next.revision = txn.dispatchableRevision;
+  next.authority.result = request.result;
+  next.decisionTxn = null;
+  return compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowDecisionChange: true,
+    allowResultAuthorityChange: true,
+  });
+}
+
 export const CONTINUITY_STATE_CODES = Object.freeze([
   "CS-INVALID", "CS-STATE-BUDGET", "CS-VALID", "CS-REQUEST", "CS-STALE",
   "CS-REVISION-OVERFLOW", "CS-REVISION", "CS-CAS-APPLIED", "CS-NO-DISPATCH",
@@ -511,6 +621,8 @@ export const CONTINUITY_STATE_CODES = Object.freeze([
   "CS-ACK-MISMATCH", "CS-FINAL-INTEGRATED", "CS-DECISION-PENDING", "CS-BLOCKED", "CS-NOT-DISPATCH-ACTION",
   "CS-DISPATCHABLE", "CS-DECISION-REPLAY", "CS-DECISION-CONFLICT",
   "CS-DECISION-INVALID", "CS-NO-DECISION-TXN", "CS-DECISION-RECEIPT-MISMATCH", "CS-PROTECTED-ACK", "CS-PROTECTED-DECISION",
+  "CS-COURSE-BRIEF-STALE", "CS-COURSE-BRIEF-INVALID",
+  "CS-COURSE-DISPOSITION-PROTECTED",
   "CS-PROTECTED-FINAL-FIELDS",
   "CS-PROTECTED-AUTHORITY",
   "CS-INTERRUPT-DRIFT",

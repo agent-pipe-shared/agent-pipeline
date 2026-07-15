@@ -28,7 +28,7 @@
     "courseKind": { "enum": ["bounded-diagnosis", "scope-split", "authority-rebaseline", "preauthorized-route-change", "defer", "stop"] },
     "option": {
       "type": "object", "additionalProperties": false,
-      "required": ["optionId", "kind", "equivalenceKey", "expectedOutcome", "scopeDelta", "requiredEvidence", "timeCost", "residualRisk", "securityAssuranceClaims", "claimImpact", "reversibility", "authority", "permittedOperations", "trustBoundary", "newTrustBoundaries", "rollbackImpact", "resumeImpact", "resumePredicate"],
+      "required": ["optionId", "kind", "equivalenceKey", "expectedOutcome", "scopeDelta", "requiredEvidence", "timeCost", "residualRisk", "securityAssuranceClaims", "claimImpact", "reversibility", "authority", "permittedOperations", "trustBoundary", "newTrustBoundaries", "rollbackImpact", "resumeImpact", "resumePredicate", "continuationTransitionSha256"],
       "properties": {
         "optionId": { "$ref": "#/$defs/safeId" }, "kind": { "$ref": "#/$defs/courseKind" }, "equivalenceKey": { "$ref": "#/$defs/safeId" }, "expectedOutcome": { "$ref": "#/$defs/safeId" },
         "scopeDelta": {
@@ -56,7 +56,8 @@
         "trustBoundary": { "enum": ["unchanged", "expanded"] },
         "newTrustBoundaries": { "type": "array", "maxItems": 16, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } },
         "rollbackImpact": { "$ref": "#/$defs/safeId" }, "resumeImpact": { "$ref": "#/$defs/safeId" },
-        "resumePredicate": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] }
+        "resumePredicate": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] },
+        "continuationTransitionSha256": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sha256" }] }
       }
     },
     "brief": {
@@ -79,8 +80,8 @@
     },
     "intent": {
       "type": "object", "additionalProperties": false,
-      "required": ["schema", "idempotencyKey", "briefId", "briefSha256", "blockerSignature", "optionId", "poEvidenceSha256", "expectedRevision", "selectedRevision", "dispatchableRevision"],
-      "properties": { "schema": { "const": "pipeline.course-decision-intent.v1" }, "idempotencyKey": { "$ref": "#/$defs/safeId" }, "briefId": { "$ref": "#/$defs/safeId" }, "briefSha256": { "$ref": "#/$defs/sha256" }, "blockerSignature": { "$ref": "#/$defs/sha256" }, "optionId": { "$ref": "#/$defs/safeId" }, "poEvidenceSha256": { "$ref": "#/$defs/sha256" }, "expectedRevision": { "type": "integer", "minimum": 0 }, "selectedRevision": { "type": "integer", "minimum": 1 }, "dispatchableRevision": { "type": "integer", "minimum": 2 } }
+      "required": ["schema", "idempotencyKey", "briefId", "briefSha256", "blockerSignature", "optionId", "poEvidenceSha256", "preStateSha256", "selectedTransitionSha256", "expectedRevision", "selectedRevision", "dispatchableRevision"],
+      "properties": { "schema": { "const": "pipeline.course-decision-intent.v1" }, "idempotencyKey": { "$ref": "#/$defs/safeId" }, "briefId": { "$ref": "#/$defs/safeId" }, "briefSha256": { "$ref": "#/$defs/sha256" }, "blockerSignature": { "$ref": "#/$defs/sha256" }, "optionId": { "$ref": "#/$defs/safeId" }, "poEvidenceSha256": { "$ref": "#/$defs/sha256" }, "preStateSha256": { "$ref": "#/$defs/sha256" }, "selectedTransitionSha256": { "$ref": "#/$defs/sha256" }, "expectedRevision": { "type": "integer", "minimum": 0 }, "selectedRevision": { "type": "integer", "minimum": 1 }, "dispatchableRevision": { "type": "integer", "minimum": 2 } }
     },
     "receipt": {
       "type": "object", "additionalProperties": false,
