@@ -31,6 +31,7 @@
  *       { "forArtifact": "<tag-or-sha>", "forEnvironment": "<env>", "approvedBy": "<string>",
  *         "approvedAt": "<ISO-8601>", "usedAt": "<ISO-8601>"? }
  *     ] | absent,
+ *     "continuity": <closed pipeline.continuity.v0 object> | absent,
  *     "updatedAt": "<ISO-8601>"
  *   }
  *   Every field beyond `schema` is optional -- consumers (the two gate hooks) treat an
@@ -98,7 +99,11 @@
  *                                                 array (malformed -- never silently replaced
  *                                                 with []). See the forCommit DEVIATION note
  *                                                 in RULES below -- unlike approve-push, a git
- *                                                 failure here is NOT fatal.
+ *                                                 failure here is NOT fatal. With active
+ *                                                 continuity it additionally requires
+ *                                                 --continuity-close-request <repo-relative-json>
+ *                                                 bound to the exact close-head revision and
+ *                                                 byte-verified Result/close-evidence files.
  *   approve-deploy --env <environment> --artifact <tag-or-sha> --by <name>
  *                                                 Appends a record {forArtifact,
  *                                                 forEnvironment, approvedBy, approvedAt}
@@ -127,6 +132,19 @@
  *                                                 abandoned artifacts. Fails loudly if it
  *                                                 matches nothing. Refuses blank
  *                                                 --env/--by (--artifact stays optional).
+ *   continuity-init|continuity-cas|continuity-integrate-final|
+ *   continuity-apply-decision|continuity-clear-decision
+ *                  --expected-revision <absent|integer>
+ *                  --request-file <repo-relative-json>
+ *                  --lock-token <opaque-token>
+ *                                                 Coordinator-only continuity
+ *                                                 transitions. `init` alone accepts
+ *                                                 `absent`; every later transition
+ *                                                 binds the exact persisted revision.
+ *                                                 The request envelope is closed and
+ *                                                 validated by continuity-state.mjs.
+ *                                                 Accepted passive/duplicate outcomes
+ *                                                 exit 0 with zero mutation.
  *
  * RULES (all seven `--by`-taking subcommands: approve-plan/revoke-plan/approve-push/
  * close-feature/approve-deploy/consume-deploy/clear-deploy)
@@ -144,6 +162,17 @@
  *     newline) and is meant to be git-committed by design -- it IS the audit trail
  *     (mirrors `.claude/guard-override.log.jsonl`'s philosophy: state changes belong
  *     in history, not just on disk).
+ *   - Continuity writes additionally use an adjacent exclusive lock, a caller token
+ *     plus internal ownership nonce, same-token-only stale recovery, a same-directory
+ *     exclusive temp, file fsync, ownership re-check, atomic rename and directory
+ *     fsync where supported. Foreign locks are never stolen. This serializes the
+ *     Coordinator writer; it does not attest OS caller identity. Lock and recovery
+ *     records are fully synced before exclusive hard-link publication. An interrupted
+ *     recovery guard fails closed for explicit disposition instead of admitting a
+ *     second recovery owner.
+ *   - `set-feature` refuses to replace any active continuity feature. Only the
+ *     revision/evidence-bound `close-feature` path removes continuity, and its exact
+ *     request remains in the append-only closedFeatures audit entry.
  *   - All CLI user-facing output (stdout confirmations, stderr errors) is English.
  *   - DEVIATION (close-feature only, declared deliberately): unlike approve-push, a failed
  *     `git rev-parse HEAD` is NOT fatal for close-feature -- forCommit is set to `null`, a
@@ -170,13 +199,47 @@
  * without a subcommand exits 2 (usage error) -- see guard-devplan.test.mjs /
  * guard-push.test.mjs for the two hooks' own consumer-side coverage of this schema.
  */
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "node:fs";
-import { join } from "node:path";
+import {
+  closeSync,
+  existsSync,
+  fsyncSync,
+  ftruncateSync,
+  linkSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  unlinkSync,
+  writeSync,
+} from "node:fs";
+import { createHash, randomUUID } from "node:crypto";
+import { isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { resolve } from "node:path";
+import {
+  applyDecisionSelection,
+  clearDecisionSelection,
+  compareAndSwapContinuity,
+  integrateContinuityFinal,
+  validateContinuityState,
+} from "../../plugins/pipeline-core/lib/continuity-state.mjs";
 
 export const SCHEMA_ID = "pipeline.state.v0";
+export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
+export const CONTINUITY_LOCK_STALE_MS = 30_000;
+const CONTINUITY_REQUEST_MAX_BYTES = 32_768;
+const CONTINUITY_SUBCOMMANDS = new Set([
+  "continuity-init",
+  "continuity-cas",
+  "continuity-integrate-final",
+  "continuity-apply-decision",
+  "continuity-clear-decision",
+]);
+const LOCK_TOKEN_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
+const SHA256_RE = /^[a-f0-9]{64}$/;
+const LEGACY_WRITER_LOCK_TOKEN = "pipeline-legacy-writer-v0";
 
 /** Resolves the target project dir: $CLAUDE_PROJECT_DIR, else process.cwd(). */
 export function projectDir() {
@@ -218,10 +281,442 @@ export function readState(dir = projectDir()) {
   return { status: "ok", state: parsed };
 }
 
-function writeState(dir, state) {
+function writeState(dir, state, expectedState) {
+  const lock = acquireContinuityLock(dir, LEGACY_WRITER_LOCK_TOKEN);
+  if (!lock.ok) return { ok: false, committed: false, code: lock.code };
+  try {
+    const observed = readState(dir);
+    const observedBase = observed.status === "ok" ? observed.state : observed.status === "absent" ? { schema: SCHEMA_ID } : null;
+    if (observedBase === null || JSON.stringify(observedBase) !== JSON.stringify(expectedState)) {
+      return { ok: false, committed: false, code: "PS-STATE-STALE" };
+    }
+    if (state.continuity !== undefined) {
+      const valid = validateContinuityState(state.continuity, state.activeFeature?.id);
+      if (!valid.ok
+        || (expectedState.continuity !== undefined
+          && state.continuity.revision !== expectedState.continuity.revision)) {
+        return { ok: false, committed: false, code: "PS-STATE-CONTINUITY" };
+      }
+    }
+    return atomicWriteContinuityState(dir, state, lock);
+  } finally {
+    releaseContinuityLock(lock);
+  }
+}
+
+function stateWriteSucceeded(result) {
+  if (result.ok) return true;
+  if (result.committed) {
+    console.error(`Error: state replacement committed, but durability is indeterminate (${result.code}); mutation is NOT reported as zero.`);
+  } else if (result.committed === null) {
+    console.error(`Error: state replacement disposition is indeterminate (${result.code}); inspect persisted state before retry.`);
+  } else {
+    console.error(`Error: serialized state write failed before commit (${result.code}); zero mutation.`);
+  }
+  return false;
+}
+
+/** Adjacent continuity lock path. It is transient and must never be committed. */
+export function continuityLockPath(dir = projectDir()) {
+  return `${statePath(dir)}.lock`;
+}
+
+function lockRecoveryPath(dir = projectDir()) {
+  return `${continuityLockPath(dir)}.recover`;
+}
+
+function canonicalLockRecord(record) {
+  return JSON.stringify(record) + "\n";
+}
+
+function parseLockRecord(raw) {
+  let value;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
+  const keys = Object.keys(value);
+  if (keys.length !== 4 || !keys.every((key) => ["schema", "token", "ownerNonce", "acquiredAtMs"].includes(key))) return null;
+  if (value.schema !== CONTINUITY_LOCK_SCHEMA_ID
+    || !LOCK_TOKEN_RE.test(value.token)
+    || !LOCK_TOKEN_RE.test(value.ownerNonce)
+    || !Number.isSafeInteger(value.acquiredAtMs)
+    || value.acquiredAtMs < 0) return null;
+  return value;
+}
+
+function replaceFdContents(fd, text) {
+  const bytes = Buffer.from(text, "utf8");
+  ftruncateSync(fd, 0);
+  let offset = 0;
+  while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset, offset);
+  fsyncSync(fd);
+}
+
+function safeUnlink(path) {
+  try {
+    unlinkSync(path);
+  } catch (error) {
+    if (error?.code !== "ENOENT") throw error;
+  }
+}
+
+function syncDirectory(path) {
+  let fd;
+  try {
+    fd = openSync(path, "r");
+    fsyncSync(fd);
+    return { ok: true, supported: true };
+  } catch (error) {
+    if (["EINVAL", "ENOTSUP", "EBADF", "EPERM", "EISDIR"].includes(error?.code)) {
+      return { ok: true, supported: false };
+    }
+    return { ok: false, supported: true };
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+  }
+}
+
+function publishExclusiveRecord(path, record, directory) {
+  const candidate = `${path}.candidate.${record.ownerNonce}`;
+  let fd;
+  let linked = false;
+  try {
+    fd = openSync(candidate, "wx", 0o600);
+    replaceFdContents(fd, canonicalLockRecord(record));
+    closeSync(fd);
+    fd = undefined;
+    linkSync(candidate, path);
+    linked = true;
+    const synced = syncDirectory(directory);
+    return synced.ok
+      ? { ok: true, code: "PS-CONTINUITY-LOCK-PUBLISHED" }
+      : { ok: false, code: "PS-CONTINUITY-LOCK-PUBLISHED-DURABILITY-UNKNOWN", committed: true };
+  } catch (error) {
+    return { ok: false, code: error?.code === "EEXIST" ? "PS-CONTINUITY-LOCKED" : "PS-CONTINUITY-LOCK-IO", committed: linked };
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+    safeUnlink(candidate);
+  }
+}
+
+function acquireRecoveryGuard(dir, record) {
+  const path = lockRecoveryPath(dir);
+  const published = publishExclusiveRecord(path, record, join(dir, ".claude"));
+  return published.ok ? { ok: true, path, ...record } : published;
+}
+
+function releaseRecoveryGuard(guard) {
+  if (!guard?.ok) return false;
+  let current;
+  try {
+    current = parseLockRecord(readFileSync(guard.path, "utf8"));
+  } catch {
+    return false;
+  }
+  if (!current || current.token !== guard.token || current.ownerNonce !== guard.ownerNonce) return false;
+  try {
+    unlinkSync(guard.path);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Acquire an exclusive continuity writer lock. A stale lock may be recovered
+ * only by the same caller-supplied token. A new internal nonce prevents the old
+ * owner from releasing the recovered lock.
+ */
+export function acquireContinuityLock(dir, token, deps = {}) {
+  if (!LOCK_TOKEN_RE.test(token ?? "")) return { ok: false, code: "PS-CONTINUITY-LOCK-TOKEN" };
   const claudeDir = join(dir, ".claude");
   if (!existsSync(claudeDir)) mkdirSync(claudeDir, { recursive: true });
-  writeFileSync(statePath(dir), JSON.stringify(state, null, 2) + "\n", "utf8");
+  const path = continuityLockPath(dir);
+  const nowMs = deps.nowMs ?? Date.now;
+  const staleMs = deps.lockStaleMs ?? CONTINUITY_LOCK_STALE_MS;
+  const ownerNonce = deps.ownerNonce?.() ?? randomUUID();
+  if (!LOCK_TOKEN_RE.test(ownerNonce)) return { ok: false, code: "PS-CONTINUITY-LOCK-NONCE" };
+  const acquiredAtMs = nowMs();
+  const record = { schema: CONTINUITY_LOCK_SCHEMA_ID, token, ownerNonce, acquiredAtMs };
+
+  if (existsSync(lockRecoveryPath(dir))) return { ok: false, code: "PS-CONTINUITY-RECOVERY-IN-PROGRESS" };
+  const published = publishExclusiveRecord(path, record, claudeDir);
+  if (published.ok) {
+    return { ok: true, code: "PS-CONTINUITY-LOCKED", path, token, ownerNonce, recovered: false };
+  }
+  if (published.code !== "PS-CONTINUITY-LOCKED") return published;
+
+  let observed;
+  try {
+    observed = parseLockRecord(readFileSync(path, "utf8"));
+  } catch {
+    return { ok: false, code: "PS-CONTINUITY-LOCKED" };
+  }
+  const ageMs = observed ? acquiredAtMs - observed.acquiredAtMs : -1;
+  if (!observed || observed.token !== token || ageMs < staleMs) {
+    return { ok: false, code: "PS-CONTINUITY-LOCKED" };
+  }
+
+  const recoveryGuard = acquireRecoveryGuard(dir, record);
+  if (!recoveryGuard.ok) return recoveryGuard;
+  let recoveryComplete = false;
+
+  try {
+    const current = parseLockRecord(readFileSync(path, "utf8"));
+    const currentAgeMs = current ? acquiredAtMs - current.acquiredAtMs : -1;
+    if (!current
+      || current.token !== token
+      || current.ownerNonce !== observed.ownerNonce
+      || currentAgeMs < staleMs) return { ok: false, code: "PS-CONTINUITY-LOCKED" };
+    unlinkSync(path);
+    const recovered = publishExclusiveRecord(path, record, claudeDir);
+    if (!recovered.ok) return recovered;
+    safeUnlink(`${statePath(dir)}.tmp.${observed.ownerNonce}`);
+    recoveryComplete = true;
+  } catch {
+    return { ok: false, code: "PS-CONTINUITY-LOCK-IO" };
+  } finally {
+    if (recoveryComplete) releaseRecoveryGuard(recoveryGuard);
+  }
+  return { ok: true, code: "PS-CONTINUITY-LOCK-RECOVERED", path, token, ownerNonce, recovered: true };
+}
+
+/** Release only a lock whose caller token and internal nonce both still match. */
+export function releaseContinuityLock(lock) {
+  if (!lock?.ok) return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
+  let current;
+  try {
+    current = parseLockRecord(readFileSync(lock.path, "utf8"));
+  } catch {
+    return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
+  }
+  if (!current || current.token !== lock.token || current.ownerNonce !== lock.ownerNonce) {
+    return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
+  }
+  try {
+    unlinkSync(lock.path);
+    return { ok: true, code: "PS-CONTINUITY-UNLOCKED" };
+  } catch {
+    return { ok: false, code: "PS-CONTINUITY-LOCK-IO" };
+  }
+}
+
+function assertContinuityLockOwned(lock) {
+  const current = parseLockRecord(readFileSync(lock.path, "utf8"));
+  return current !== null && current.token === lock.token && current.ownerNonce === lock.ownerNonce;
+}
+
+/** Same-directory temp + file sync + ownership check + rename + directory sync. */
+export function atomicWriteContinuityState(dir, state, lock, deps = {}) {
+  const target = statePath(dir);
+  const tmp = `${target}.tmp.${lock.ownerNonce}`;
+  const text = JSON.stringify(state, null, 2) + "\n";
+  let fd;
+  let renamed = false;
+  try {
+    if (!assertContinuityLockOwned(lock)) return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
+    fd = openSync(tmp, "wx", 0o600);
+    replaceFdContents(fd, text);
+    closeSync(fd);
+    fd = undefined;
+    if (!assertContinuityLockOwned(lock)) return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
+    (deps.renameSync ?? renameSync)(tmp, target);
+    renamed = true;
+    const synced = deps.syncDirectory?.(join(dir, ".claude")) ?? syncDirectory(join(dir, ".claude"));
+    if (!synced.ok) {
+      return { ok: false, committed: true, code: "PS-CONTINUITY-COMMITTED-DURABILITY-UNKNOWN" };
+    }
+    return { ok: true, committed: true, code: "PS-CONTINUITY-WRITTEN", directorySyncSupported: synced.supported };
+  } catch {
+    if (renamed) {
+      let exact = false;
+      try {
+        exact = readFileSync(target, "utf8") === text;
+      } catch {
+        /* target disposition remains unknown */
+      }
+      return exact
+        ? { ok: false, committed: true, code: "PS-CONTINUITY-COMMITTED-DURABILITY-UNKNOWN" }
+        : { ok: false, committed: null, code: "PS-CONTINUITY-COMMIT-INDETERMINATE" };
+    }
+    return { ok: false, committed: false, code: "PS-CONTINUITY-WRITE-IO" };
+  } finally {
+    if (fd !== undefined) closeSync(fd);
+    if (!renamed) safeUnlink(tmp);
+  }
+}
+
+function safeRequestFile(dir, requestFile) {
+  if (typeof requestFile !== "string" || requestFile.length < 1 || requestFile.length > 240
+    || isAbsolute(requestFile) || requestFile.includes("\\") || requestFile.includes("\0")) return null;
+  const parts = requestFile.split("/");
+  if (parts.some((part) => part === "" || part === "." || part === "..")) return null;
+  const candidate = resolve(dir, requestFile);
+  const rel = relative(resolve(dir), candidate);
+  if (rel === "" || rel.startsWith(`..${sep}`) || rel === ".." || isAbsolute(rel)) return null;
+  try {
+    const stat = lstatSync(candidate);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 2 || stat.size > CONTINUITY_REQUEST_MAX_BYTES) return null;
+    const real = realpathSync(candidate);
+    const realRel = relative(realpathSync(dir), real);
+    return realRel !== "" && !realRel.startsWith(`..${sep}`) && realRel !== ".." && !isAbsolute(realRel) ? real : null;
+  } catch {
+    return null;
+  }
+}
+
+function readContinuityRequest(dir, requestFile) {
+  const path = safeRequestFile(dir, requestFile);
+  if (path === null) return { ok: false, code: "PS-CONTINUITY-REQUEST-FILE" };
+  try {
+    const value = JSON.parse(readFileSync(path, "utf8"));
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+      ? { ok: true, value }
+      : { ok: false, code: "PS-CONTINUITY-REQUEST" };
+  } catch {
+    return { ok: false, code: "PS-CONTINUITY-REQUEST" };
+  }
+}
+
+function hashBoundRepoFile(dir, binding, maxBytes = 1_048_576) {
+  if (!exactObjectKeys(binding, ["path", "sha256"])
+    || typeof binding.path !== "string"
+    || binding.path.length < 1
+    || binding.path.length > 240
+    || !SHA256_RE.test(binding.sha256)
+    || isAbsolute(binding.path)
+    || binding.path.includes("\\")
+    || binding.path.includes("\0")) return false;
+  const parts = binding.path.split("/");
+  if (parts.some((part) => part === "" || part === "." || part === "..")) return false;
+  const candidate = resolve(dir, binding.path);
+  try {
+    const stat = lstatSync(candidate);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 1 || stat.size > maxBytes) return false;
+    const real = realpathSync(candidate);
+    const realRel = relative(realpathSync(dir), real);
+    if (realRel === "" || realRel === ".." || realRel.startsWith(`..${sep}`) || isAbsolute(realRel)) return false;
+    return createHash("sha256").update(readFileSync(real)).digest("hex") === binding.sha256;
+  } catch {
+    return false;
+  }
+}
+
+function validateContinuityCloseRequest(dir, base, request) {
+  const continuity = base.continuity;
+  if (!exactObjectKeys(request, ["schema", "featureId", "expectedRevision", "result", "closeEvidence"])
+    || request.schema !== "pipeline.continuity-close.v0"
+    || request.featureId !== base.activeFeature?.id
+    || !Number.isSafeInteger(request.expectedRevision)
+    || request.expectedRevision !== continuity?.revision
+    || continuity.queueHead?.nextAction !== "close"
+    || continuity.queueHead?.dispatch !== null
+    || continuity.blocker !== null
+    || continuity.decisionTxn !== null
+    || continuity.authority.result === null
+    || !exactObjectKeys(request.result, ["path", "sha256"])
+    || request.result.path !== continuity.authority.result.path
+    || request.result.sha256 !== continuity.authority.result.sha256
+    || !hashBoundRepoFile(dir, request.result)
+    || !hashBoundRepoFile(dir, request.closeEvidence)) return false;
+  return validateContinuityState(continuity, base.activeFeature.id).ok;
+}
+
+function parseExpectedRevision(raw, allowAbsent = false) {
+  if (allowAbsent && raw === "absent") return { ok: true, value: "absent" };
+  if (!/^(0|[1-9][0-9]*)$/.test(raw ?? "")) return { ok: false };
+  const value = Number(raw);
+  return Number.isSafeInteger(value) ? { ok: true, value } : { ok: false };
+}
+
+function exactObjectKeys(value, keys) {
+  return value !== null
+    && typeof value === "object"
+    && !Array.isArray(value)
+    && Object.keys(value).length === keys.length
+    && Object.keys(value).every((key) => keys.includes(key));
+}
+
+function continuityTransition(sub, base, expectedRevision, request) {
+  const featureId = base.activeFeature?.id;
+  if (typeof featureId !== "string" || featureId.trim() === "") return { ok: false, code: "PS-CONTINUITY-NO-ACTIVE-FEATURE" };
+  if (sub === "continuity-init") {
+    if (expectedRevision !== "absent" || base.continuity !== undefined) return { ok: false, code: "PS-CONTINUITY-STALE" };
+    const valid = validateContinuityState(request, featureId);
+    return valid.ok && request.revision === 0
+      ? { ok: true, code: "PS-CONTINUITY-INITIALIZED", state: structuredClone(request), mutated: true }
+      : { ok: false, code: valid.ok ? "PS-CONTINUITY-REVISION" : valid.code };
+  }
+  if (base.continuity === undefined) return { ok: false, code: "PS-CONTINUITY-ABSENT" };
+  if (expectedRevision === "absent") return { ok: false, code: "PS-CONTINUITY-REVISION" };
+  if (sub === "continuity-cas") {
+    return compareAndSwapContinuity(base.continuity, { expectedRevision, next: request }, featureId);
+  }
+  if (sub === "continuity-integrate-final") {
+    if (!exactObjectKeys(request, ["observation", "next"])) return { ok: false, code: "PS-CONTINUITY-REQUEST" };
+    return integrateContinuityFinal(base.continuity, { expectedRevision, observation: request.observation, next: request.next }, featureId);
+  }
+  if (sub === "continuity-apply-decision") {
+    if (!exactObjectKeys(request, ["decisionTxn", "queueHead", "blocker", "resume"])) return { ok: false, code: "PS-CONTINUITY-REQUEST" };
+    return applyDecisionSelection(base.continuity, { expectedRevision, ...request }, featureId);
+  }
+  if (!exactObjectKeys(request, ["receipt"])) return { ok: false, code: "PS-CONTINUITY-REQUEST" };
+  return clearDecisionSelection(base.continuity, { expectedRevision, receipt: request.receipt }, featureId);
+}
+
+function runContinuityCommand(sub, flags, deps) {
+  const dir = deps.dir ?? projectDir();
+  const expected = parseExpectedRevision(flags["expected-revision"], sub === "continuity-init");
+  if (!expected.ok || isBlank(flags["request-file"]) || !LOCK_TOKEN_RE.test(flags["lock-token"] ?? "")) {
+    console.error(`Error: ${sub} requires --expected-revision <absent|integer>, --request-file <repo-relative-json> and --lock-token <opaque-token>.`);
+    return 2;
+  }
+  const request = readContinuityRequest(dir, flags["request-file"]);
+  if (!request.ok) {
+    console.error(`Error: continuity request refused (${request.code}).`);
+    return 2;
+  }
+  const lock = acquireContinuityLock(dir, flags["lock-token"], deps);
+  if (!lock.ok) {
+    console.error(`Error: continuity writer refused (${lock.code}).`);
+    return 2;
+  }
+  try {
+    const existing = readState(dir);
+    if (existing.status !== "ok") {
+      console.error(`Error: continuity writer requires an existing valid ${SCHEMA_ID} state.`);
+      return 2;
+    }
+    const transition = continuityTransition(sub, existing.state, expected.value, request.value);
+    if (!transition.ok) {
+      console.error(`Error: continuity transition refused (${transition.code}); zero mutation.`);
+      return 2;
+    }
+    if (!transition.mutated) {
+      console.log(`${transition.code}: accepted with zero mutation.`);
+      return 0;
+    }
+    const next = { ...existing.state, continuity: transition.state, updatedAt: (deps.now ?? (() => new Date().toISOString()))() };
+    const written = atomicWriteContinuityState(dir, next, lock, deps);
+    if (!written.ok) {
+      if (written.committed) {
+        console.error(`Error: continuity state committed, but durability is indeterminate (${written.code}); mutation is NOT reported as zero.`);
+      } else if (written.committed === null) {
+        console.error(`Error: continuity commit disposition is indeterminate (${written.code}); inspect the exact persisted revision before retry.`);
+      } else {
+        console.error(`Error: continuity write refused before commit (${written.code}); zero mutation.`);
+      }
+      return 2;
+    }
+    console.log(`${transition.code}: continuity revision ${transition.state.revision} written.`);
+    return 0;
+  } finally {
+    const released = releaseContinuityLock(lock);
+    if (!released.ok) console.error(`Warning: continuity lock release failed (${released.code}).`);
+  }
 }
 
 /** Minimal `--flag value` argv parser (subcommand already stripped by the caller). */
@@ -264,6 +759,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   const [sub, ...rest] = argv;
   const flags = parseFlags(rest);
 
+  if (CONTINUITY_SUBCOMMANDS.has(sub)) return runContinuityCommand(sub, flags, { ...deps, dir, now });
+
   const existing = readState(dir);
   if (existing.status === "malformed") {
     console.error(`Error: existing state file is invalid (${existing.error}) -- aborting WITHOUT changes.`);
@@ -281,6 +778,10 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error('Error: set-feature requires --id <id> and --plan-path <path> (both non-empty).');
         return 2;
       }
+      if (base.continuity !== undefined) {
+        console.error("Error: set-feature cannot replace an active continuity feature; close it through the revision/evidence-bound close gate first.");
+        return 2;
+      }
       const timestamp = now();
       const next = {
         ...base,
@@ -293,7 +794,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       delete next.planRevocation;
       delete next.phase; // F1 fix: strip any legacy top-level `phase` left over from a
       // pre-fix file -- phase now lives exclusively at activeFeature.phase.
-      writeState(dir, next);
+      if (!stateWriteSucceeded(writeState(dir, next, base))) {
+        return 2;
+      }
       console.log(`Feature "${id}" set. Plan path: ${planPath}. planApproved=false, phase="design".`);
       return 0;
     }
@@ -313,7 +816,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       };
       delete next.phase; // F1 fix: strip any legacy top-level `phase` left over from a
       // pre-fix file -- phase now lives exclusively at activeFeature.phase.
-      writeState(dir, next);
+      if (!stateWriteSucceeded(writeState(dir, next, base))) {
+        return 2;
+      }
       console.log(`Phase set: "${phase}".`);
       return 0;
     }
@@ -333,7 +838,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         updatedAt: approvedAt,
       };
       delete next.planRevocation;
-      writeState(dir, next);
+      if (!stateWriteSucceeded(writeState(dir, next, base))) {
+        return 2;
+      }
       console.log(`Plan approved by "${by}" on ${approvedAt}.`);
       return 0;
     }
@@ -352,7 +859,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         planRevocation: { revokedBy: by, revokedAt },
         updatedAt: revokedAt,
       };
-      writeState(dir, next);
+      if (!stateWriteSucceeded(writeState(dir, next, base))) {
+        return 2;
+      }
       console.log(`Plan approval revoked by "${by}" on ${revokedAt}.`);
       return 0;
     }
@@ -376,7 +885,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         pushApproval: { lastApproved: { approvedBy: by, approvedAt, forCommit: head.commit } },
         updatedAt: approvedAt,
       };
-      writeState(dir, next);
+      if (!stateWriteSucceeded(writeState(dir, next, base))) {
+        return 2;
+      }
       console.log(`Push approved by "${by}" for commit ${head.commit} (${approvedAt}).`);
       return 0;
     }
@@ -400,6 +911,15 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error('Error: existing closedFeatures is not an array -- aborting WITHOUT changes (no silent overwrite).');
         return 2;
       }
+      let continuityClose;
+      if (base.continuity !== undefined) {
+        const closeRequest = readContinuityRequest(dir, flags["continuity-close-request"]);
+        if (!closeRequest.ok || !validateContinuityCloseRequest(dir, base, closeRequest.value)) {
+          console.error("Error: active continuity requires --continuity-close-request <repo-relative-json> bound to the exact revision, Result and close evidence.");
+          return 2;
+        }
+        continuityClose = structuredClone(closeRequest.value);
+      }
       // DEVIATION vs. approve-push (declared in the header): a git failure here is NOT fatal --
       // forCommit becomes null, a warning goes to stderr, and the close proceeds (exit 0).
       const head = gitHead(dir);
@@ -420,6 +940,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         closedBy: by,
         forCommit,
       };
+      if (continuityClose !== undefined) closedEntry.continuityClose = continuityClose;
       const next = {
         ...base,
         schema: SCHEMA_ID,
@@ -430,7 +951,10 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       delete next.activeFeature;
       delete next.planApproval;
       delete next.planRevocation;
-      writeState(dir, next);
+      delete next.continuity;
+      if (!stateWriteSucceeded(writeState(dir, next, base))) {
+        return 2;
+      }
       console.log(
         `Feature "${activeFeature.id}" closed by "${by}" (commit ${forCommit ?? "—"}, ${closedAt}). activeFeature removed, planApproved=false.`,
       );
@@ -460,7 +984,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         deployApprovals: [...priorApprovals, entry],
         updatedAt: approvedAt,
       };
-      writeState(dir, next);
+      if (!stateWriteSucceeded(writeState(dir, next, base))) {
+        return 2;
+      }
       console.log(`Deploy approval granted by "${by}" for artifact "${artifact}" / environment "${env}" (${approvedAt}).`);
       return 0;
     }
@@ -495,7 +1021,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         deployApprovals: nextApprovals,
         updatedAt: usedAt,
       };
-      writeState(dir, next);
+      if (!stateWriteSucceeded(writeState(dir, next, base))) {
+        return 2;
+      }
       console.log(`Deploy approval consumed by "${by}" for artifact "${artifact}" / environment "${env}" (${usedAt}).`);
       return 0;
     }
@@ -530,7 +1058,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         deployApprovals: remaining,
         updatedAt: clearedAt,
       };
-      writeState(dir, next);
+      if (!stateWriteSucceeded(writeState(dir, next, base))) {
+        return 2;
+      }
       console.log(
         `${toRemove.length} open deploy approval(s) for environment "${env}"${isBlank(artifact) ? "" : ` / artifact "${artifact}"`} removed by "${by}" (${clearedAt}).`,
       );
@@ -539,7 +1069,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, set-phase, approve-plan, revoke-plan, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, set-phase, approve-plan, revoke-plan, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, continuity-init, continuity-cas, continuity-integrate-final, continuity-apply-decision, continuity-clear-decision.`,
       );
       return 2;
     }

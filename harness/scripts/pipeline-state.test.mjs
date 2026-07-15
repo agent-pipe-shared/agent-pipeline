@@ -11,13 +11,25 @@
  * for `approve-push` end to end (spawnSync the actual CLI as a subprocess, mirroring
  * how a Goldfish/Elephant would invoke it).
  */
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { run, readState, statePath, SCHEMA_ID } from "./pipeline-state.mjs";
+import {
+  acquireContinuityLock,
+  atomicWriteContinuityState,
+  continuityLockPath,
+  releaseContinuityLock,
+  run,
+  readState,
+  statePath,
+  CONTINUITY_LOCK_SCHEMA_ID,
+  SCHEMA_ID,
+} from "./pipeline-state.mjs";
+import { computeContinuityFinalDigest } from "../../plugins/pipeline-core/lib/continuity-host-adapter.mjs";
 import { loadManifestSafe } from "../../plugins/pipeline-core/lib/manifest.mjs";
 import { loadStateSafe, resolveSuggestion } from "../../plugins/pipeline-core/hooks/stop-suggest.mjs";
 
@@ -43,6 +55,83 @@ function ok(id, cond, detail = "") {
 
 const FIXED_NOW = () => "2026-07-07T21:00:00.000Z";
 const FIXED_GIT_HEAD = () => ({ ok: true, commit: "abc123deadbeef" });
+const FIXED_NOW_MS = () => 60_000;
+let nonceSequence = 0;
+const continuityDeps = (dir, overrides = {}) => ({
+  dir,
+  now: FIXED_NOW,
+  nowMs: FIXED_NOW_MS,
+  ownerNonce: () => `nonce-${String(++nonceSequence).padStart(8, "0")}`,
+  lockStaleMs: 30_000,
+  ...overrides,
+});
+const A = "a".repeat(64);
+const B = "b".repeat(64);
+const C = "c".repeat(64);
+const D = "d".repeat(64);
+const CONTINUITY_FEATURE = "phase26-test";
+
+function continuityIdentity(overrides = {}) {
+  return {
+    featureId: CONTINUITY_FEATURE,
+    queueRevision: 0,
+    packageId: "P1",
+    actionId: "continuity-writer",
+    dispatchId: "dispatch-p1-01",
+    attemptId: "attempt-01",
+    authorityDigests: { prdSha256: A, specSha256: B, resultSha256: C },
+    routeRequestSha256: D,
+    mayDelegate: false,
+    ...overrides,
+  };
+}
+
+function continuityQueue(overrides = {}) {
+  return {
+    packageId: "P1",
+    actionId: "continuity-writer",
+    nextAction: "poll",
+    productRetryCount: 0,
+    environmentRerouteCount: 0,
+    dispatch: continuityIdentity(),
+    ...overrides,
+  };
+}
+
+function continuityState(overrides = {}) {
+  return {
+    schema: "pipeline.continuity.v0",
+    featureId: CONTINUITY_FEATURE,
+    revision: 0,
+    authority: {
+      prd: { path: "specs/prd.md", sha256: A },
+      spec: { path: "specs/spec.md", sha256: B },
+      result: { path: "specs/result.md", sha256: C },
+    },
+    queueHead: continuityQueue(),
+    blocker: null,
+    acknowledgedFinal: null,
+    resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" },
+    recovery: null,
+    decisionTxn: null,
+    capacity: { concurrencyLimit: 3, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+    ...overrides,
+  };
+}
+
+function writeRequest(dir, name, value) {
+  const rel = `${name}.json`;
+  writeFileSync(join(dir, rel), JSON.stringify(value, null, 2) + "\n");
+  return rel;
+}
+
+function seedContinuityRoot(dir) {
+  run(["set-feature", "--id", CONTINUITY_FEATURE, "--plan-path", "specs/prd.md"], { dir, now: FIXED_NOW });
+}
+
+function continuityArgs(sub, revision, requestFile, token = "token-00000001") {
+  return [sub, "--expected-revision", String(revision), "--request-file", requestFile, "--lock-token", token];
+}
 
 // ---- PS01: approve-plan without --by is refused, nothing written ----------------------
 {
@@ -691,6 +780,326 @@ const FIXED_GIT_HEAD = () => ({ ok: true, commit: "abc123deadbeef" });
   ok("PS37a approve-deploy with non-array deployApprovals refused (exit 2)", code === 2, `got ${code}`);
   const after = readFileSync(statePath(dir), "utf8");
   ok("PS37b file left byte-identical (no silent overwrite)", after === before);
+}
+
+// ---- PS38: continuity init is revision-bound, atomic and leaves no transient files --------
+{
+  const dir = freshDir("continuity-init");
+  seedContinuityRoot(dir);
+  const requestFile = writeRequest(dir, "continuity-init", continuityState());
+  const code = run(continuityArgs("continuity-init", "absent", requestFile), continuityDeps(dir));
+  const state = readState(dir).state;
+  ok("PS38a continuity-init exit 0", code === 0, `got ${code}`);
+  ok("PS38b initialized continuity is persisted at revision 0", state.continuity?.revision === 0);
+  ok("PS38c continuity feature is bound to activeFeature.id", state.continuity?.featureId === state.activeFeature?.id);
+  ok("PS38d owned lock is released", !existsSync(continuityLockPath(dir)));
+  ok("PS38e same-directory temp is absent after rename", !readdirSync(join(dir, ".claude")).some((name) => name.includes(".tmp.")));
+}
+
+// ---- PS39: exact CAS advances once and stale replay is byte-null ---------------------------
+{
+  const dir = freshDir("continuity-cas");
+  seedContinuityRoot(dir);
+  const initFile = writeRequest(dir, "init", continuityState());
+  run(continuityArgs("continuity-init", "absent", initFile), continuityDeps(dir));
+  const next = structuredClone(readState(dir).state.continuity);
+  next.revision = 1;
+  next.queueHead = continuityQueue({ nextAction: "dispatch", dispatch: null });
+  next.resume = { mode: "immediate", sourceRevision: 1, reasonCode: "active-turn" };
+  const requestFile = writeRequest(dir, "next", next);
+  const first = run(continuityArgs("continuity-cas", 0, requestFile), continuityDeps(dir));
+  ok("PS39a exact continuity CAS exit 0", first === 0, `got ${first}`);
+  ok("PS39b exact continuity CAS advances to revision 1", readState(dir).state.continuity?.revision === 1);
+  const beforeReplay = readFileSync(statePath(dir), "utf8");
+  const replay = run(continuityArgs("continuity-cas", 0, requestFile), continuityDeps(dir));
+  ok("PS39c stale continuity CAS is refused", replay === 2, `got ${replay}`);
+  ok("PS39d stale continuity CAS performs zero byte mutation", readFileSync(statePath(dir), "utf8") === beforeReplay);
+}
+
+// ---- PS40: invalid XOR transition fails before write ---------------------------------------
+{
+  const dir = freshDir("continuity-xor");
+  seedContinuityRoot(dir);
+  const initFile = writeRequest(dir, "init", continuityState());
+  run(continuityArgs("continuity-init", "absent", initFile), continuityDeps(dir));
+  const invalid = structuredClone(readState(dir).state.continuity);
+  invalid.revision = 1;
+  invalid.queueHead.dispatch.queueRevision = 1;
+  invalid.blocker = {
+    type: "product",
+    signature: "invalid-both-v1",
+    resumeCondition: { kind: "manual", evidenceSha256: A },
+    decisionBrief: null,
+  };
+  const requestFile = writeRequest(dir, "invalid", invalid);
+  const before = readFileSync(statePath(dir), "utf8");
+  const code = run(continuityArgs("continuity-cas", 0, requestFile), continuityDeps(dir));
+  ok("PS40a queueHead+blocker XOR violation is refused", code === 2, `got ${code}`);
+  ok("PS40b invalid XOR transition performs zero byte mutation", readFileSync(statePath(dir), "utf8") === before);
+}
+
+// ---- PS41: a fresh foreign lock is preserved and blocks the writer -------------------------
+{
+  const dir = freshDir("continuity-foreign-lock");
+  seedContinuityRoot(dir);
+  const initFile = writeRequest(dir, "init", continuityState());
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  const foreign = {
+    schema: CONTINUITY_LOCK_SCHEMA_ID,
+    token: "foreign-token-01",
+    ownerNonce: "foreign-nonce-01",
+    acquiredAtMs: FIXED_NOW_MS(),
+  };
+  writeFileSync(continuityLockPath(dir), JSON.stringify(foreign) + "\n");
+  const before = readFileSync(statePath(dir), "utf8");
+  const code = run(continuityArgs("continuity-init", "absent", initFile), continuityDeps(dir));
+  ok("PS41a fresh foreign continuity lock blocks", code === 2, `got ${code}`);
+  ok("PS41b foreign lock remains byte-owned by the foreign token", readFileSync(continuityLockPath(dir), "utf8") === JSON.stringify(foreign) + "\n");
+  ok("PS41c blocked writer performs zero state mutation", readFileSync(statePath(dir), "utf8") === before);
+  foreign.acquiredAtMs = 0;
+  writeFileSync(continuityLockPath(dir), JSON.stringify(foreign) + "\n");
+  const staleForeign = run(continuityArgs("continuity-init", "absent", initFile), continuityDeps(dir));
+  ok("PS41d even a stale foreign-token lock cannot be recovered", staleForeign === 2 && readFileSync(continuityLockPath(dir), "utf8") === JSON.stringify(foreign) + "\n");
+}
+
+// ---- PS42: stale recovery requires the same token and rotates the internal nonce ------------
+{
+  const dir = freshDir("continuity-stale-lock");
+  seedContinuityRoot(dir);
+  const initFile = writeRequest(dir, "init", continuityState());
+  const stale = {
+    schema: CONTINUITY_LOCK_SCHEMA_ID,
+    token: "token-stale-001",
+    ownerNonce: "nonce-stale-old",
+    acquiredAtMs: 0,
+  };
+  writeFileSync(continuityLockPath(dir), JSON.stringify(stale) + "\n");
+  writeFileSync(`${statePath(dir)}.tmp.${stale.ownerNonce}`, "interrupted partial state\n");
+  const code = run(continuityArgs("continuity-init", "absent", initFile, stale.token), continuityDeps(dir));
+  ok("PS42a same-token stale lock is recovered and transition succeeds", code === 0, `got ${code}`);
+  ok("PS42b recovered owned lock is released", !existsSync(continuityLockPath(dir)));
+  ok("PS42c exclusive recovery guard is released after complete takeover", !existsSync(`${continuityLockPath(dir)}.recover`));
+  ok("PS42d only the stale owner's bound temp is cleaned", !existsSync(`${statePath(dir)}.tmp.${stale.ownerNonce}`));
+  writeFileSync(`${continuityLockPath(dir)}.recover`, JSON.stringify(stale) + "\n");
+  const guarded = acquireContinuityLock(dir, stale.token, continuityDeps(dir));
+  ok("PS42e orphaned recovery guard fails closed instead of admitting another owner", guarded.ok === false && guarded.code === "PS-CONTINUITY-RECOVERY-IN-PROGRESS");
+  ok("PS42f orphaned recovery guard remains for explicit disposition", existsSync(`${continuityLockPath(dir)}.recover`));
+}
+
+// ---- PS43: unsafe request paths and symlinks fail before lock acquisition -------------------
+{
+  const dir = freshDir("continuity-request-path");
+  seedContinuityRoot(dir);
+  const outside = writeRequest(dir, "real-request", continuityState());
+  symlinkSync(join(dir, outside), join(dir, "linked-request.json"));
+  const before = readFileSync(statePath(dir), "utf8");
+  const traversal = run(continuityArgs("continuity-init", "absent", "../request.json"), continuityDeps(dir));
+  const symlink = run(continuityArgs("continuity-init", "absent", "linked-request.json"), continuityDeps(dir));
+  ok("PS43a traversing request path is refused", traversal === 2, `got ${traversal}`);
+  ok("PS43b symlink request path is refused", symlink === 2, `got ${symlink}`);
+  ok("PS43c unsafe request attempts perform zero mutation", readFileSync(statePath(dir), "utf8") === before);
+  ok("PS43d unsafe request attempts never acquire a lock", !existsSync(continuityLockPath(dir)));
+}
+
+// ---- PS44: delivered final acknowledgement and next head persist in one atomic revision -----
+{
+  const dir = freshDir("continuity-final");
+  seedContinuityRoot(dir);
+  const initial = continuityState();
+  const initFile = writeRequest(dir, "init", initial);
+  run(continuityArgs("continuity-init", "absent", initFile), continuityDeps(dir));
+  const resultJson = JSON.stringify({ verdict: "pass" });
+  const envelope = {
+    schema: "pipeline.continuity-final.v0",
+    identity: continuityIdentity(),
+    outcome: "succeeded",
+    resultJson,
+    resultBytes: Buffer.byteLength(resultJson, "utf8"),
+  };
+  const delivered = { ...envelope, resultDigest: computeContinuityFinalDigest(envelope) };
+  const observation = { status: "completed", identity: continuityIdentity(), final: delivered };
+  const next = structuredClone(initial);
+  next.revision = 1;
+  next.acknowledgedFinal = {
+    identity: continuityIdentity(),
+    resultDigest: delivered.resultDigest,
+    finalOutcome: "succeeded",
+    integratedRevision: 1,
+  };
+  next.queueHead = continuityQueue({ actionId: "writer-next", nextAction: "dispatch", dispatch: null });
+  next.resume = { mode: "immediate", sourceRevision: 1, reasonCode: "active-turn" };
+  const requestFile = writeRequest(dir, "final", { observation, next });
+  const code = run(continuityArgs("continuity-integrate-final", 0, requestFile), continuityDeps(dir));
+  const persisted = readState(dir).state.continuity;
+  ok("PS44a final integration writer exits 0", code === 0, `got ${code}`);
+  ok("PS44b acknowledgement and next head share revision 1", persisted.revision === 1 && persisted.acknowledgedFinal?.integratedRevision === 1);
+  ok("PS44c persisted acknowledgement binds canonical final digest", persisted.acknowledgedFinal?.resultDigest === delivered.resultDigest);
+  ok("PS44d persisted next head is dispatchable and has no stale dispatch", persisted.queueHead?.actionId === "writer-next" && persisted.queueHead?.dispatch === null);
+  const beforeReplay = readFileSync(statePath(dir), "utf8");
+  const replay = run(continuityArgs("continuity-integrate-final", 1, requestFile), continuityDeps(dir));
+  ok("PS44e matching final replay is accepted without a write", replay === 0 && readFileSync(statePath(dir), "utf8") === beforeReplay);
+  const extraFile = writeRequest(dir, "final-extra", { observation, next, rawHostError: "must-not-be-ignored" });
+  const extra = run(continuityArgs("continuity-integrate-final", 1, extraFile), continuityDeps(dir));
+  ok("PS44f non-closed final request envelope is refused byte-null", extra === 2 && readFileSync(statePath(dir), "utf8") === beforeReplay);
+}
+
+// ---- PS45: decision state-applied marker blocks until its bound receipt clears it -----------
+{
+  const dir = freshDir("continuity-decision");
+  seedContinuityRoot(dir);
+  const blocker = {
+    type: "course",
+    signature: "repeat-product-v1",
+    resumeCondition: { kind: "po-decision", evidenceSha256: A },
+    decisionBrief: { decisionBriefId: "brief-01", decisionBriefSha256: B, resultPath: "specs/result.md" },
+  };
+  const initial = continuityState({ queueHead: null, blocker });
+  const initFile = writeRequest(dir, "init", initial);
+  run(continuityArgs("continuity-init", "absent", initFile), continuityDeps(dir));
+  const txn = {
+    idempotencyKey: "decision-key-01",
+    briefSha256: B,
+    intentSha256: C,
+    selectedOptionId: "continue-narrow",
+    preSelectionRevision: 0,
+    selectedRevision: 1,
+    dispatchableRevision: 2,
+    phase: "state-applied",
+  };
+  const applyFile = writeRequest(dir, "decision-apply", {
+    decisionTxn: txn,
+    queueHead: continuityQueue({ nextAction: "dispatch", dispatch: null }),
+    blocker: null,
+    resume: { mode: "resume-on-next-turn", sourceRevision: 1, reasonCode: "po-interrupt" },
+  });
+  const applied = run(continuityArgs("continuity-apply-decision", 0, applyFile), continuityDeps(dir));
+  ok("PS45a decision state-applied marker persists at selected revision", applied === 0 && readState(dir).state.continuity?.decisionTxn?.phase === "state-applied");
+  const clearFile = writeRequest(dir, "decision-clear", {
+    receipt: {
+      idempotencyKey: txn.idempotencyKey,
+      briefSha256: txn.briefSha256,
+      intentSha256: txn.intentSha256,
+      selectedOptionId: txn.selectedOptionId,
+      receiptSha256: D,
+      selectedRevision: 1,
+      dispatchableRevision: 2,
+    },
+  });
+  const cleared = run(continuityArgs("continuity-clear-decision", 1, clearFile), continuityDeps(dir));
+  const final = readState(dir).state.continuity;
+  ok("PS45b bound receipt clears decision marker at pre-bound revision", cleared === 0 && final.revision === 2 && final.decisionTxn === null);
+}
+
+// ---- PS46: exchanged ownership nonce cannot release another writer's lock ------------------
+{
+  const dir = freshDir("continuity-lock-exchange");
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  const lock = acquireContinuityLock(dir, "token-owner-001", continuityDeps(dir));
+  const exchanged = {
+    schema: CONTINUITY_LOCK_SCHEMA_ID,
+    token: lock.token,
+    ownerNonce: "nonce-foreign-new",
+    acquiredAtMs: FIXED_NOW_MS(),
+  };
+  writeFileSync(continuityLockPath(dir), JSON.stringify(exchanged) + "\n");
+  const released = releaseContinuityLock(lock);
+  ok("PS46a old owner cannot release exchanged nonce", released.ok === false && released.code === "PS-CONTINUITY-LOCK-OWNERSHIP");
+  ok("PS46b exchanged lock remains present and byte-identical", readFileSync(continuityLockPath(dir), "utf8") === JSON.stringify(exchanged) + "\n");
+}
+
+// ---- PS47: legacy state transitions share the same lock and preserve continuity -------------
+{
+  const dir = freshDir("continuity-legacy-serialization");
+  seedContinuityRoot(dir);
+  const initFile = writeRequest(dir, "init", continuityState());
+  run(continuityArgs("continuity-init", "absent", initFile), continuityDeps(dir));
+  const before = readFileSync(statePath(dir), "utf8");
+  const continuityBefore = structuredClone(readState(dir).state.continuity);
+  const foreign = acquireContinuityLock(dir, "continuity-owner-01", continuityDeps(dir));
+  const blocked = run(["set-phase", "--phase", "verify"], { dir, now: FIXED_NOW });
+  ok("PS47a legacy writer is blocked by the shared continuity lock", blocked === 2, `got ${blocked}`);
+  ok("PS47b blocked legacy writer performs zero byte mutation", readFileSync(statePath(dir), "utf8") === before);
+  releaseContinuityLock(foreign);
+  const allowed = run(["set-phase", "--phase", "verify"], { dir, now: FIXED_NOW });
+  ok("PS47c serialized legacy writer succeeds after lock release", allowed === 0, `got ${allowed}`);
+  ok("PS47d non-lifecycle legacy transition preserves continuity exactly", JSON.stringify(readState(dir).state.continuity) === JSON.stringify(continuityBefore));
+}
+
+// ---- PS48: feature lifecycle cannot retain continuity for the wrong active feature ----------
+{
+  const dir = freshDir("continuity-lifecycle-clear");
+  seedContinuityRoot(dir);
+  mkdirSync(join(dir, "specs"), { recursive: true });
+  mkdirSync(join(dir, "evidence"), { recursive: true });
+  const resultText = "bound result authority\n";
+  const closeEvidenceText = "bound close evidence\n";
+  writeFileSync(join(dir, "specs", "result.md"), resultText);
+  writeFileSync(join(dir, "evidence", "close.json"), closeEvidenceText);
+  const resultSha256 = createHash("sha256").update(resultText).digest("hex");
+  const closeEvidenceSha256 = createHash("sha256").update(closeEvidenceText).digest("hex");
+  const closeReady = continuityState();
+  closeReady.authority.result.sha256 = resultSha256;
+  closeReady.queueHead = continuityQueue({ nextAction: "close", dispatch: null });
+  const initFile = writeRequest(dir, "init", closeReady);
+  run(continuityArgs("continuity-init", "absent", initFile), continuityDeps(dir));
+  const beforeReset = readFileSync(statePath(dir), "utf8");
+  const reset = run(["set-feature", "--id", "next-feature", "--plan-path", "specs/next.md"], { dir, now: FIXED_NOW });
+  ok("PS48a set-feature cannot discard an open continuity feature", reset === 2, `got ${reset}`);
+  ok("PS48b refused replacement leaves state byte-identical", readFileSync(statePath(dir), "utf8") === beforeReset);
+  const closeRequest = {
+    schema: "pipeline.continuity-close.v0",
+    featureId: CONTINUITY_FEATURE,
+    expectedRevision: 0,
+    result: { path: "specs/result.md", sha256: resultSha256 },
+    closeEvidence: { path: "evidence/close.json", sha256: closeEvidenceSha256 },
+  };
+  const closeRequestFile = writeRequest(dir, "close-request", closeRequest);
+  const missingGate = run(["close-feature", "--by", "po-test"], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  ok("PS48c close-feature without revision/evidence request is refused", missingGate === 2, `got ${missingGate}`);
+  const closed = run(["close-feature", "--by", "po-test", "--continuity-close-request", closeRequestFile], { dir, now: FIXED_NOW, gitHead: FIXED_GIT_HEAD });
+  const final = readState(dir).state;
+  ok("PS48d revision/evidence-bound close-feature succeeds", closed === 0, `got ${closed}`);
+  ok("PS48e closing active feature removes continuity with activeFeature", final.activeFeature === undefined && final.continuity === undefined);
+  ok("PS48f closed audit entry persists the exact close request", JSON.stringify(final.closedFeatures?.at(-1)?.continuityClose) === JSON.stringify(closeRequest));
+}
+
+// ---- PS49: post-rename durability failure is never mislabeled as zero mutation ---------------
+{
+  const dir = freshDir("continuity-post-rename");
+  seedContinuityRoot(dir);
+  const lock = acquireContinuityLock(dir, "token-write-fault-01", continuityDeps(dir));
+  const next = structuredClone(readState(dir).state);
+  next.activeFeature.phase = "verify";
+  const postRename = atomicWriteContinuityState(dir, next, lock, {
+    syncDirectory: () => ({ ok: false, supported: true }),
+  });
+  ok("PS49a directory-sync failure reports committed durability-unknown", postRename.ok === false && postRename.committed === true && postRename.code === "PS-CONTINUITY-COMMITTED-DURABILITY-UNKNOWN");
+  ok("PS49b exact renamed target is observable despite red durability result", JSON.stringify(readState(dir).state) === JSON.stringify(next));
+  releaseContinuityLock(lock);
+
+  const second = acquireContinuityLock(dir, "token-write-fault-02", continuityDeps(dir));
+  const before = readFileSync(statePath(dir), "utf8");
+  const proposed = structuredClone(readState(dir).state);
+  proposed.activeFeature.phase = "close";
+  const preRename = atomicWriteContinuityState(dir, proposed, second, {
+    renameSync: () => { throw Object.assign(new Error("injected rename fault"), { code: "EIO" }); },
+  });
+  ok("PS49c pre-rename failure reports committed=false", preRename.ok === false && preRename.committed === false);
+  ok("PS49d pre-rename failure preserves target byte-identically", readFileSync(statePath(dir), "utf8") === before);
+  ok("PS49e pre-rename failure cleans its owned temp", !readdirSync(join(dir, ".claude")).some((name) => name.includes(`.tmp.${second.ownerNonce}`)));
+  releaseContinuityLock(second);
+}
+
+// ---- PS50: lock publication is atomic despite an unrelated interrupted candidate ------------
+{
+  const dir = freshDir("continuity-lock-publication");
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(`${continuityLockPath(dir)}.candidate.orphan-nonce`, "partial-record");
+  const lock = acquireContinuityLock(dir, "token-publish-001", continuityDeps(dir, { ownerNonce: () => "nonce-publish-001" }));
+  const record = JSON.parse(readFileSync(continuityLockPath(dir), "utf8"));
+  ok("PS50a unrelated partial candidate cannot become the published lock", lock.ok === true && record.schema === CONTINUITY_LOCK_SCHEMA_ID);
+  ok("PS50b published lock atomically carries exact token and owner nonce", record.token === lock.token && record.ownerNonce === lock.ownerNonce);
+  releaseContinuityLock(lock);
 }
 
 // ---- Cleanup ------------------------------------------------------------------------------
