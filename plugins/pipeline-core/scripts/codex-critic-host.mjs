@@ -549,8 +549,13 @@ function worktreeDirectoryInventory(repoRoot) {
   const walk = (directory, prefix = "") => {
     for (const entry of readdirSync(directory, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
       if (prefix === "" && entry.name === ".git") continue;
-      // The excluded instruction file is never opened or fingerprinted.
-      if (entry.name.toLowerCase() === "agents.md") continue;
+      // The excluded instruction file is never opened or fingerprinted. A
+      // directory with this reserved name is a distinct persistent-write
+      // surface: reject it from Dirent metadata without entering or opening it.
+      if (entry.name.toLowerCase() === "agents.md") {
+        if (entry.isDirectory() && !entry.isSymbolicLink()) fail("worktree contains reserved AGENTS.md directory");
+        continue;
+      }
       const path = prefix === "" ? entry.name : `${prefix}/${entry.name}`;
       const absolute = join(directory, entry.name);
       const info = lstatSync(absolute);

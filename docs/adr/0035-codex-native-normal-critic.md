@@ -52,7 +52,10 @@ the native host agent surface:
    dispatch packet plus an undisclosed consumption record below a private,
    symlink-safe coordinator control directory. The candidate, ruleset, and the
    mandatory `private` and `shared` observers are captured before and checked
-   after every candidate-controlled subprocess.
+   after every candidate-controlled subprocess. An instruction file named
+   `AGENTS.md` is never opened; a directory using that reserved name is instead
+   rejected from directory-entry metadata before it can become an unobserved
+   write surface.
 2. The Elephant starts exactly one fresh native host Critic with no chat
    history. The host owns dispatch, progress observations, interrupt, and at
    most one recovery. Repository code never starts an agent process.
@@ -183,7 +186,10 @@ nativer Host-Agent-Oberfläche aufgeteilt:
    Consumption-Record unterhalb eines privaten symlinksicheren
    Coordinator-Control-Verzeichnisses. Kandidat, Ruleset und die verpflichtenden
    `private`- und `shared`-Observer werden vor und nach jedem kandidatenkontrollierten
-   Subprozess erfasst.
+   Subprozess erfasst. Eine Instruktionsdatei namens `AGENTS.md` wird nie
+   geöffnet; ein Verzeichnis mit diesem reservierten Namen wird stattdessen anhand
+   seiner Directory-Entry-Metadaten abgewiesen, bevor es eine unbeobachtete
+   Schreibfläche werden kann.
 2. Der Elephant startet genau einen frischen nativen Host-Critic ohne Chat-Historie.
    Der Host verantwortet Dispatch, Fortschrittsbeobachtung, Interrupt und höchstens
    eine Recovery. Repository-Code startet keinen Agent-Prozess.

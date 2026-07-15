@@ -649,6 +649,13 @@ check("empty untracked worktree directory mutation changes the fingerprint", () 
   rmSync(emptyDirectory, { recursive: true });
   assert.equal(captureRepositoryFingerprint(sharedObserver).sha256, before);
 });
+check("reserved AGENTS.md directories fail closed without opening their contents", () => {
+  const reservedDirectory = join(sharedObserver, "AGENTS.md");
+  mkdirSync(reservedDirectory);
+  assert.throws(() => captureRepositoryFingerprint(sharedObserver), /reserved AGENTS\.md directory/);
+  rmSync(reservedDirectory, { recursive: true });
+  assert.equal(captureRepositoryFingerprint(sharedObserver).sha256, prepared.bindings.protectedBefore["observer.shared"]);
+});
 check("symlinked Git index is rejected instead of dereferenced", () => {
   const indexObserver = createObserver(join(root, "index-symlink-observer"));
   const indexPath = join(indexObserver, ".git", "index");
