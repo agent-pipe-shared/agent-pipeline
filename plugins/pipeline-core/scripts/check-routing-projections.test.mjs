@@ -2,6 +2,7 @@
 import {
   ROUTING_AUTHORITY,
   projectAgentFrontmatter,
+  projectHostDuty,
   projectManifestRouting,
   projectPreset,
   projectRunnerAssignment,
@@ -10,6 +11,7 @@ import {
 } from "../lib/routing-projection.mjs";
 import {
   checkCodexPartialMappingContract,
+  checkCodexNormalCriticDuty,
   checkRepository,
   hasCurrentProvenance,
   manifestProjectionMatches,
@@ -62,7 +64,17 @@ try {
   unsupportedEffort = true;
 }
 check("RP12b unsupported effort fails closed", unsupportedEffort);
-check("RP13 partial Codex mapping contract passes without a duty claim", checkCodexPartialMappingContract().ok);
+check("RP13 partial Codex alias mapping remains narrow", checkCodexPartialMappingContract().ok);
+const codexNormalCritic = projectHostDuty("criticNormal", "codex");
+check("RP13a Codex normal Critic duty is host-native Sol/xhigh", codexNormalCritic.model === "gpt-5.6-sol" && codexNormalCritic.effort === "xhigh" && codexNormalCritic.dispatch === "host-native");
+check("RP13b Codex normal Critic duty contract passes", checkCodexNormalCriticDuty().ok);
+let unknownHostDuty = false;
+try {
+  projectHostDuty("unknown", "codex");
+} catch {
+  unknownHostDuty = true;
+}
+check("RP13c unknown host duty fails closed", unknownHostDuty);
 check("RP14 committed projections match authority", checkRepository().ok);
 check("RP15 light is ceremony-only", ROUTING_AUTHORITY.dispatchProfiles.light.ceremonyOnly === true);
 check(

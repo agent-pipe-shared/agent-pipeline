@@ -15,6 +15,9 @@
       "effortMode": "identity"
     },
     "codex": {
+      "capabilities": {
+        "review": "gpt-5.6-sol"
+      },
       "aliases": {
         "fable": "gpt-5.6-sol"
       },

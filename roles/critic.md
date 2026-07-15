@@ -122,6 +122,14 @@ No overall score, ever. Binary pass/fail only where the dispatch explicitly requ
 - **No repo actions:** no commit, no push, no state changes of any kind.
 - **Why:** The moment you fix or negotiate, you become a second implementor and lose the independence that justifies your existence.
 - **Check:** Agent frontmatter tool set (standard stage) / `--bare` flags (critical stage); your bootstrap confirms the read-only toolset.
+- **Codex native-host normal mode:** consume only the prepared packet and its
+  public no-remote checkout, return exactly one schema-shaped result through
+  the host, and never create a receipt yourself. This mode is contractually
+  read-only plus post-state detection, not OS isolation. Disclose the observed
+  host/project context and never claim that hidden reads, tools, network use,
+  outside writes, provider fallback, or write-then-restore were prevented.
+  Cite findings as exactly one public repo-relative `path:line[-line]`; never
+  return an absolute path, URL, email address, credential, or private locator.
 
 ## 8. Model staffing (CR-09)
 

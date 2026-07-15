@@ -117,6 +117,11 @@ All values are overridable in `pipeline.user.yaml` — the "Pro" preset, for ins
 - **Why:** Critic input is small (spec + diff + guardrails, never chat history), so model quality dominates over input cost. On critical reviews, a missed finding is orders of magnitude more expensive than the tier difference.
 - **How to check:** the Critic briefing template contains "criticality → model" as a conditional part of the mandatory "dispatch metadata" field (canonical briefing field list: `docs/operating-model.md` §2.3); the telemetry line records the Critic model. ONE Critic agent + invocation parameter `model` (`plugins/pipeline-core/agents/critic.md`) — no fork for the critical case; the orchestrator sets the escalation per dispatch.
 - **Addendum (MP-27):** as Goldfish implementation effort (MP-27) drops, the importance of this review gate RISES rather than falls — the trigger criteria and model choice above stay UNCHANGED (criticality still governs architecture/guardrails/security, not Goldfish effort).
+- **Codex native-host duty (ADR-0035):** `criticNormal` is an explicit
+  runner-specific host duty at `gpt-5.6-sol/xhigh`; it is not derived by
+  silently translating the canonical Critic `max` assignment. Existing Claude
+  assignments remain unchanged. The duty is a normal review lane and does not
+  satisfy T1 isolation without a named, scope-bounded PO waiver.
 
 ### MP-22 — Minimum-tier principle: phase-scoped (design vs. execution)
 
@@ -424,6 +429,11 @@ Alle Werte sind in `pipeline.user.yaml` überschreibbar — das Preset „Pro" f
 - **Warum:** Der Critic-Input ist klein (Spec + Diff + Guardrails, nie Chat-Verlauf), daher dominiert Modellqualität über Inputkosten. Bei kritischen Reviews ist ein übersehener Befund um Größenordnungen teurer als die Tier-Differenz.
 - **Prüfweise:** Critic-Briefing-Template enthält „Kritikalität → Modell" als bedingten Teil des Pflichtfelds „Dispatch-Metadaten" (kanonische Briefing-Feldliste: `docs/operating-model.md` §2.3); Telemetrie-Zeile weist das Critic-Modell aus. EIN Critic-Agent + Invocation-Parameter `model` (`plugins/pipeline-core/agents/critic.md`) — kein Fork für den kritischen Fall; die Eskalation setzt der Orchestrator pro Dispatch.
 - **Ergänzung (MP-27):** Mit sinkendem Goldfish-Implementierungs-Effort (MP-27) STEIGT die Bedeutung dieses Review-Gates, statt sich zu verringern — die Trigger-Kriterien und Modellwahl oben bleiben dabei UNVERÄNDERT (Kritikalität entscheidet weiterhin über Architektur/Guardrails/Security, nicht der Goldfish-Effort).
+- **Native Codex-Host-Duty (ADR-0035):** `criticNormal` ist eine explizite
+  runnerspezifische Host-Duty auf `gpt-5.6-sol/xhigh`; sie entsteht nicht durch
+  eine stille Übersetzung der kanonischen Critic-Zuweisung `max`. Bestehende
+  Claude-Zuweisungen bleiben unverändert. Die Duty ist ein normaler Review-Pfad
+  und erfüllt T1-Isolation nur mit einem namentlichen, scope-begrenzten PO-Waiver.
 
 ### MP-22 — Minimum-tier principle: phase-scoped (design vs. execution)
 

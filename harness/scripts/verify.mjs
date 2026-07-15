@@ -56,6 +56,7 @@ const TEST_SUITES = [
   { name: "routing-projection-check", file: join(pluginScriptsDir, "check-routing-projections.mjs") },
   { name: "repository-freshness-tests", file: join(pluginScriptsDir, "repository-freshness.test.mjs") },
   { name: "critic-bare-tests", file: join(pluginScriptsDir, "critic-bare.test.mjs") },
+  { name: "codex-critic-host-tests", file: join(pluginScriptsDir, "codex-critic-host.test.mjs") },
   { name: "guard-git-tests", file: join(hooksDir, "guard-git.test.mjs") },
   { name: "guard-testpath-tests", file: join(hooksDir, "guard-testpath.test.mjs") },
   { name: "staleness-check-tests", file: join(hooksDir, "staleness-check.test.mjs") },

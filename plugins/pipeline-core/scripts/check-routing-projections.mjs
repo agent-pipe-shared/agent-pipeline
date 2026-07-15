@@ -7,6 +7,7 @@ import { parseYaml } from "../lib/yaml-lite.mjs";
 import {
   ROUTING_AUTHORITY,
   projectAgentFrontmatter,
+  projectHostDuty,
   projectManifestRouting,
   projectRunnerAssignment,
   resolveRunnerAlias,
@@ -83,13 +84,27 @@ export function checkCodexPartialMappingContract() {
   return { ok: findings.length === 0, findings };
 }
 
+export function checkCodexNormalCriticDuty() {
+  const findings = [];
+  try {
+    const route = projectHostDuty("criticNormal", "codex");
+    if (route.model !== "gpt-5.6-sol") findings.push("Codex normal Critic model drift");
+    if (route.effort !== "xhigh") findings.push("Codex normal Critic effort drift");
+    if (route.dispatch !== "host-native") findings.push("Codex normal Critic must remain host-native");
+  } catch (error) {
+    findings.push(`Codex normal Critic duty unavailable: ${error.message}`);
+  }
+  return { ok: findings.length === 0, findings };
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const repository = checkRepository();
   const codex = checkCodexPartialMappingContract();
-  const findings = [...repository.findings, ...codex.findings];
+  const normalCritic = checkCodexNormalCriticDuty();
+  const findings = [...repository.findings, ...codex.findings, ...normalCritic.findings];
   if (findings.length > 0) {
     for (const finding of findings) console.error(`FAIL ${finding}`);
     process.exit(2);
   }
-  console.log("Claude routing projections current; Codex partial mapping contract is Fable -> gpt-5.6-sol with unchanged supported effort only (no current Codex duty projection claim).");
+  console.log("Claude routing projections current; Codex Fable keeps its effort and the host-native criticNormal duty resolves to gpt-5.6-sol/xhigh.");
 }

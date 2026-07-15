@@ -82,6 +82,19 @@ export function resolveRunnerAlias(runner, alias, effort) {
   return projectRunnerAssignment(runner, { model: String(alias), effort });
 }
 
+export function projectHostDuty(duty, runner) {
+  const source = ROUTING_AUTHORITY.hostDuties?.[duty];
+  if (!source) throw new Error(`Unknown host duty: ${duty}`);
+  if (source.dispatch !== "host-native") throw new Error(`Unsupported host dispatch for duty: ${duty}`);
+  return {
+    duty,
+    runner,
+    ...projectRunnerAssignment(runner, source),
+    dispatch: source.dispatch,
+    assurance: source.assurance,
+  };
+}
+
 function manifestAssignment(runner, assignment) {
   if (!MANIFEST_EFFORTS.has(assignment.effort)) {
     throw new Error(`Unsupported manifest effort: ${assignment.effort}`);

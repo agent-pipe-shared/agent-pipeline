@@ -46,6 +46,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0032](0032-project-doc-structure.md) | Project documentation structure — release traceability, SBOM convention, living architecture document (GREENFIELD) | accepted | 2026-07-07 |
 | [0033](0033-release-promotion-phase.md) | Release/Promotion phase — optional, adapter-based SDLC tail phase | accepted | 2026-07-11 |
 | [0034](0034-deploy-precedence-central-vs-project.md) | Precedence — central deploy policy vs. project manifest, a new axis | accepted | 2026-07-11 |
+| [0035](0035-codex-native-normal-critic.md) | Codex normal Critic through a native host boundary | accepted | 2026-07-15 |
 
 ### Resubmissions
 
@@ -107,6 +108,7 @@ Architecture Decision Records der Agent-Pipeline. Die ADRs formalisieren das kan
 | [0032](0032-project-doc-structure.md) | Projekt-Doku-Struktur — Release-Traceability, SBOM-Konvention, lebendes Architektur-Dokument (GREENFIELD) | akzeptiert | 2026-07-07 |
 | [0033](0033-release-promotion-phase.md) | Release/Promotion-Phase — optionale, adapter-basierte SDLC-Tail-Phase | akzeptiert | 2026-07-11 |
 | [0034](0034-deploy-precedence-central-vs-project.md) | Präzedenz — zentrale Deploy-Policy vs. Projekt-Manifest, eine neue Achse | akzeptiert | 2026-07-11 |
+| [0035](0035-codex-native-normal-critic.md) | Normaler Codex-Critic über eine native Host-Grenze | akzeptiert | 2026-07-15 |
 
 ## Wiedervorlagen
 

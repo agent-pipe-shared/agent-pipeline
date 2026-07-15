@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.internal/schemas/codex-critic-dispatch.schema.json",
+  "title": "Codex native-host normal Critic request",
+  "type": "object",
+  "required": [
+    "schema",
+    "task_id",
+    "project",
+    "ruleset_sha",
+    "calibration_path",
+    "spec_path",
+    "review_base",
+    "candidate_commit",
+    "candidate_tree",
+    "guardrail_paths",
+    "evidence_paths",
+    "rigor",
+    "risk",
+    "trigger_row"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.codex-critic-request.v1"] },
+    "task_id": { "type": "string" },
+    "project": { "type": "string" },
+    "ruleset_sha": { "type": "string" },
+    "calibration_path": { "type": "string" },
+    "spec_path": { "type": "string" },
+    "review_base": { "type": "string" },
+    "candidate_commit": { "type": "string" },
+    "candidate_tree": { "type": "string" },
+    "guardrail_paths": { "type": "array", "items": { "type": "string" } },
+    "evidence_paths": { "type": "array", "items": { "type": "string" } },
+    "rigor": { "type": "string", "enum": ["0", "1", "2"] },
+    "risk": { "type": "string", "enum": ["low", "medium", "high"] },
+    "trigger_row": { "type": "string", "enum": ["T1", "T2", "T3", "T4", "T6"] }
+  }
+}

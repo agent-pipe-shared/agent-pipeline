@@ -106,6 +106,11 @@ The four roles map onto native Claude Code primitives: Elephant = long-lived mai
 
 **Mandate:** Checks spec fidelity, scope, edge cases AND trajectory. **Never** sees chat history or the implementer's own reasoning — input is exclusively spec + diff + guardrails + evidence artifact. Standard: a read-only subagent; for critical diffs, the harder isolation level `claude -p --bare` with a JSON-schema verdict.
 
+Codex maintainer self-application may use the normal native-host lane from ADR-0035: deterministic
+prepare/finalize around one fresh host agent, with a no-remote review checkout
+and post-state detection. Its receipt explicitly denies OS isolation; it does
+not replace the critical-diff isolation requirement without a named PO waiver.
+
 | Rule | Why | Verification method |
 |---|---|---|
 | **Must not:** No `memory`, no write tools. | `memory` automatically activates Write/Edit and breaks every read-only guarantee. | Agent frontmatter: a tight `tools` set; no `memory` field. |
@@ -705,6 +710,12 @@ Die vier Rollen mappen auf native Claude-Code-Primitives: Elephant = langlebige 
 ### 2.4 Critic — unabhängiger Prüfer (read-only)
 
 **Auftrag:** Prüft Spec-Treue, Scope, Edge Cases UND Trajektorie. Sieht **nie** Chat-Verlauf oder Implementor-Begründungen — Input ist ausschließlich Spec + Diff + Guardrails + Evidenz-Artefakt. Standard als read-only Subagent; für kritische Diffs die härtere Isolationsstufe `claude -p --bare` mit JSON-Schema-Verdikt.
+
+Die Codex-Maintainer-Selbstanwendung darf den normalen nativen Host-Pfad aus ADR-0035 verwenden:
+deterministisches Prepare/Finalize um genau einen frischen Host-Agenten,
+remote-loser Review-Checkout und nachgelagerte Zustandserkennung. Das Receipt
+verneint OS-Isolation ausdrücklich; ohne namentlichen PO-Waiver ersetzt dieser
+Pfad die Isolationspflicht für kritische Diffs nicht.
 
 | Regel | Warum | Prüfweise |
 |---|---|---|

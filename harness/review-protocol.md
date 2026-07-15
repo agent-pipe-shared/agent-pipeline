@@ -78,6 +78,25 @@ Canonical trigger wording (word-identical in `docs/operating-model.md` §3.3/§4
 | **Standard** | read-only subagent: tools Read/Grep/Glob + narrowly scoped Bash for `git diff`/`git log`; NO `memory`, NO write tools | all mandatory triggers except T1 |
 | **`--bare`** | separate `claude -p --bare` run with `--json-schema` verdict; skips ALL auto-discovery incl. CLAUDE.md and git status; context passed explicitly (`--append-system-prompt`, `--settings`); needs its own auth (`ANTHROPIC_API_KEY`/`apiKeyHelper`) | MANDATORY for T1 (A/G/S); optional escalation anywhere else |
 
+**Codex native-host normal lane:** Codex maintainer/self-application reviews may use the
+`criticNormal` host duty and `plugins/pipeline-core/scripts/codex-critic-host.mjs`.
+The deterministic harness prepares a no-remote checkout and hash-bound packet;
+the Elephant performs the native fresh-context dispatch; the finalizer checks
+the captured result, evidence-bound liveness, source-qualified references, and
+content fingerprints for the candidate plus mandatory `private` and `shared`
+observers. Coordinator artifacts live below a private symlink-safe control
+directory; each dispatch is single-use. Public receipts contain only closed
+citations and hashes, and both PASS and FAIL emit a disposition receipt through
+a crash-recoverable exclusive publication transaction. Its
+receipt MUST say `normal-contractual-read-only; OS isolation not asserted`.
+This lane is not a substitute for T1 isolation. A T1 use requires a named,
+scope-bounded PO waiver and still creates no isolation/conformance claim (ADR-0035).
+The v0.3 harness requires an explicit clean full Shared ruleset checkout that
+is separate from the candidate source, at the same commit, and byte-matched to
+the executing harness/routing/schema set. It does not infer authority from an
+installed plugin cache. Review-checkout cleanup happens only after durable
+receipt publication and is not review evidence.
+
 Accepted trade-off (ADR-0003): the standard Critic sees CLAUDE.md + git status — full input isolation exists only at `--bare` level. Headless runs record `total_cost_usd` from `--output-format json` in the telemetry line (MP-20 headless convention). **Disclosure + snapshot-ban:** the standard-stage report names the auto-injected context observed (CLAUDE.md, git-status snapshot, memory); that injected git status/commit log is NEVER used as a freshness reference — diff range and commit state come exclusively from the dispatch (§2.2), confirmed via the Critic's own `git` commands.
 **Check:** Writable tools available to a Critic = failed bootstrap → abort (wrong agent definition loaded).
 

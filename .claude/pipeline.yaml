@@ -49,7 +49,7 @@ security:
       rules_dir: governance/examples/policies/semgrep
 
 modelRouting:
-  # Generated projection: authority=7932e75def2ea6bd mappings=334243f47adab7dd runner=claude source=pipeline.user.yaml.
+  # Generated projection: authority=8f8bf30ba1d4793d mappings=9077223aa1c997c9 runner=claude source=pipeline.user.yaml.
   # Do not edit this block as an independent routing authority.
   elephant_design_design:
     model: opus

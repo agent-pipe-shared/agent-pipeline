@@ -69,5 +69,13 @@
       "allowedRoutes": ["mechanic", "implement"],
       "forbiddenClasses": ["high-risk", "architecture", "guardrail", "security"]
     }
+  },
+  "hostDuties": {
+    "criticNormal": {
+      "capability": "review",
+      "effort": "xhigh",
+      "dispatch": "host-native",
+      "assurance": "contractual-read-only-with-post-state-detection"
+    }
   }
 }
