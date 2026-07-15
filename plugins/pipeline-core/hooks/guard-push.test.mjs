@@ -885,7 +885,7 @@ function deployApprovalState(forArtifact, forEnvironment) {
 {
   const { dir } = freshRepo("anonymous-public-pushurl");
   const { command, env } = prepareAnonymousPublicPush(dir);
-  gitAt(dir, "config", "--local", "remote.origin.pushurl", "git@github-private:account-123/agent-pipeline.git");
+  gitAt(dir, "config", "--local", "remote.origin.pushurl", "git@wrong-host:wrong-owner/wrong-repo.git");
   check("PG26i block  pushurl cannot bypass the calibrated public remote", command, dir, BLOCK, {
     stderrIncludes: ["effective push URL"],
     env,
@@ -933,7 +933,7 @@ function deployApprovalState(forArtifact, forEnvironment) {
   const { dir } = freshRepo("anonymous-public-global-pushurl");
   const { command, env } = prepareAnonymousPublicPush(dir);
   const globalConfig = join(dir, "global.gitconfig");
-  writeFileSync(globalConfig, "[remote \"origin\"]\n\tpushurl = git@github-private:account-123/agent-pipeline.git\n");
+  writeFileSync(globalConfig, "[remote \"origin\"]\n\tpushurl = git@wrong-host:wrong-owner/wrong-repo.git\n");
   check("PG26n block  global pushurl cannot bypass the calibrated public remote", command, dir, BLOCK, {
     stderrIncludes: ["effective push URL"],
     env: { ...env, GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: "1" },
@@ -943,7 +943,7 @@ function deployApprovalState(forArtifact, forEnvironment) {
   const { dir } = freshRepo("anonymous-public-push-instead-of");
   const { command, env } = prepareAnonymousPublicPush(dir);
   const globalConfig = join(dir, "global.gitconfig");
-  writeFileSync(globalConfig, "[url \"git@github-private:account-123/\"]\n\tpushInsteadOf = git@github-share:agent-pipe-shared/\n");
+  writeFileSync(globalConfig, "[url \"git@wrong-host:wrong-owner/\"]\n\tpushInsteadOf = git@github-share:agent-pipe-shared/\n");
   check("PG26o block  pushInsteadOf cannot rewrite the calibrated public endpoint", command, dir, BLOCK, {
     stderrIncludes: ["effective push URL"],
     env: { ...env, GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: "1" },
