@@ -65,6 +65,14 @@ function measurement(samplesMs, limitMs) {
   };
 }
 
+function deliveryEnvelope(packageResult) {
+  return {
+    packageId: packageResult.id, packageSha256: sha256Canonical(packageResult),
+    status: "implementation-pass; pushed-and-fetchback-verified",
+    sharedCommit: packageResult.sharedCommit, fullVerify: packageResult.fullVerify, publicGate: packageResult.publicGate,
+  };
+}
+
 function fixture() {
   const packageResult = {
     id: "package-p5-fixture",
@@ -505,6 +513,7 @@ test("phase-close accepts an explicit PO-approved Phase-3 routing deferral", () 
     status: "po-approved-phase3-deferral", requestedDuty: "codex_implementation", requiredSelector: "terra", requiredEffort: "xhigh",
     routeReceiptEvidenceId: null, routeReceiptEvidenceSha256: null, phase3Disposition: "mandatory-dispatch-attestation",
   };
+  result.packageDeliveryEnvelopes = [deliveryEnvelope(result.packageResults[0])];
   rebuildExternalEvidence(result);
   assert.deepEqual(checked(result), { ok: true, findings: [] });
 });

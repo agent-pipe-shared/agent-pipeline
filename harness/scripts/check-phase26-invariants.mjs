@@ -430,6 +430,31 @@ function loopEconomySums(result, evidence, findings, provenance) {
   return sums;
 }
 
+function deliveryEnvelopes(result, findings) {
+  if (result.packageDeliveryEnvelopes === undefined) return new Map();
+  if (!Array.isArray(result.packageDeliveryEnvelopes)) {
+    findings.push("packageDeliveryEnvelopes must be an array when supplied");
+    return new Map();
+  }
+  const packages = new Map((result.packageResults ?? []).map((entry) => [entry?.id, entry]));
+  const envelopes = new Map();
+  for (const envelope of result.packageDeliveryEnvelopes) {
+    if (!exactKeys(envelope, ["packageId", "packageSha256", "status", "sharedCommit", "fullVerify", "publicGate"])
+      || !safeId(envelope.packageId) || !digest(envelope.packageSha256) || typeof envelope.status !== "string"
+      || !COMMIT_RE.test(envelope.sharedCommit ?? "") || !isObject(envelope.fullVerify) || !isObject(envelope.publicGate)) {
+      findings.push("packageDeliveryEnvelopes contains an invalid envelope");
+      continue;
+    }
+    const packageResult = packages.get(envelope.packageId);
+    if (!packageResult || envelopes.has(envelope.packageId) || sha256Canonical(packageResult) !== envelope.packageSha256) {
+      findings.push(`package delivery envelope ${envelope.packageId} is duplicate, stale or unbound`);
+      continue;
+    }
+    envelopes.set(envelope.packageId, envelope);
+  }
+  return envelopes;
+}
+
 function validateGraph(result, graph, findings, inventory, provenance) {
   const keys = ["schemaVersion", "featureId", "graphCutoffEventId", "sourceEventSetSha256", "completionClaim", "events", "edges", "boundedFamilies", "loopRecords"];
   if (!exactKeys(graph, keys) || graph.schemaVersion !== GRAPH_SCHEMA_VERSION || !safeId(graph.featureId)
@@ -570,6 +595,7 @@ function validateGraph(result, graph, findings, inventory, provenance) {
   validateSourceReconciliation(result, graph, findings);
 
   if (graph.completionClaim === "phase-close") {
+    const envelopes = deliveryEnvelopes(result, findings);
     const cutoff = graph.events.at(-1);
     if (cutoff?.eventType !== "close" || cutoff.outcome !== "succeeded") {
       findings.push("phase-close requires the cutoff to be one successful terminal close event");
@@ -581,12 +607,13 @@ function validateGraph(result, graph, findings, inventory, provenance) {
       findings.push("phase-close requires an attested dispatch or an explicit PO-approved Phase-3 routing deferral");
     }
     for (const packageResult of result.packageResults) {
-      const gate = packageResult?.publicGate;
-      const expectedCommit = packageResult?.sharedCommit ?? packageResult?.sharedCommits?.at(-1);
-      const verifyCandidates = [packageResult?.fullVerify, ...Object.values(packageResult?.fullVerify ?? {}).filter(isObject)];
+      const delivery = envelopes.get(packageResult?.id) ?? packageResult;
+      const gate = delivery?.publicGate;
+      const expectedCommit = delivery?.sharedCommit ?? delivery?.sharedCommits?.at(-1);
+      const verifyCandidates = [delivery?.fullVerify, ...Object.values(delivery?.fullVerify ?? {}).filter(isObject)];
       const exactVerify = COMMIT_RE.test(expectedCommit ?? "") && verifyCandidates.some((candidate) => candidate?.exitCode === 0
         && candidate.boundCommit === expectedCommit);
-      const delivered = /(?:^|;\s*)pushed-and-fetchback-verified(?:;|$)/.test(String(packageResult?.status ?? ""));
+      const delivered = /(?:^|;\s*)pushed-and-fetchback-verified(?:;|$)/.test(String(delivery?.status ?? ""));
       if (!delivered || !COMMIT_RE.test(gate?.pushedOid ?? "") || gate.pushedOid !== expectedCommit || gate.fetchBackOid !== expectedCommit
         || gate.privacyFindings !== 0 || !exactVerify) {
         findings.push(`phase-close package ${packageResult?.id ?? "unknown"} lacks green Verify/push/fetch-back evidence`);
