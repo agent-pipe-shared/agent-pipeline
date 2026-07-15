@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import {
   ROUTING_AUTHORITY,
+  expectedProviderForRunner,
   projectClaudeManifestRouting,
   projectDirectRoutingDefaults,
   projectAgentFrontmatter,
@@ -88,6 +89,12 @@ export function checkCodexPartialMappingContract() {
     if (resolved.model !== "gpt-5.6-sol" || resolved.effort !== effort) {
       findings.push(`Codex Fable binding drift at effort ${effort}`);
     }
+  }
+  if (expectedProviderForRunner("codex") !== "openai") {
+    findings.push("Codex provider binding drift");
+  }
+  if (expectedProviderForRunner("claude") !== "anthropic") {
+    findings.push("Claude provider binding drift");
   }
   try {
     resolveRunnerAlias("codex", "unknown", "high");

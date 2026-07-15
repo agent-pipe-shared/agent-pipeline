@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import {
   ROUTING_AUTHORITY,
+  expectedProviderForRunner,
   projectAgentFrontmatter,
   projectClaudeManifestRouting,
   projectDirectRoutingDefaults,
@@ -138,6 +139,14 @@ const CLAUDE_654EBAF_MODEL_ROUTING = Object.freeze({
   critic: { model: "sonnet-5", effort: "max" },
 });
 check("RP31 direct v1 Claude projection is semantically identical to Shared 654ebaf", JSON.stringify(projectClaudeManifestRouting(direct)) === JSON.stringify(CLAUDE_654EBAF_MODEL_ROUTING));
+
+const terraImplementation = direct.duties.codex_implementation;
+check("RP32 P1 Codex implementation requests Terra at xhigh", terraImplementation.runner === "codex" && terraImplementation.selector.kind === "alias" && terraImplementation.selector.value === "terra" && terraImplementation.effort === "xhigh");
+check("RP33 P1 runner providers stay explicitly mapped", expectedProviderForRunner("codex") === "openai" && expectedProviderForRunner("claude") === "anthropic");
+for (const effort of ["low", "medium", "high", "xhigh", "max"]) {
+  const assignment = projectRunnerAssignment("codex", { model: "fable", effort });
+  check(`RP34 P1 Fable resolves to Sol at identity ${effort} effort`, assignment.model === "gpt-5.6-sol" && assignment.effort === effort);
+}
 
 console.log(`\n${passed}/${passed + failed} checks passed.`);
 process.exit(failed === 0 ? 0 : 1);

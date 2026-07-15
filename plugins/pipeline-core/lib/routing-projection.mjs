@@ -9,6 +9,10 @@ const SUPPORTED_EFFORTS = new Set(["low", "medium", "high", "xhigh", "max"]);
 const MANIFEST_EFFORTS = new Set([...SUPPORTED_EFFORTS, "not-applicable"]);
 const DIRECT_UNAVAILABILITY = new Set(["defer", "mapped-fallback"]);
 const DIRECT_EVIDENCE_REQUIREMENTS = new Set(["dispatch-receipt"]);
+const RUNNER_PROVIDERS = Object.freeze({
+  claude: "anthropic",
+  codex: "openai",
+});
 
 const AUTHORITY_RAW = readFileSync(join(CONFIG_DIR, "routing-authority.json"), "utf8");
 const MAPPINGS_RAW = readFileSync(join(CONFIG_DIR, "runner-mappings.json"), "utf8");
@@ -29,6 +33,17 @@ function mappingFor(runner) {
   if (!mapping) throw new Error(`Unsupported runner: ${runner}`);
   if (mapping.effortMode !== "identity") throw new Error(`Unsupported effort mapping for runner: ${runner}`);
   return mapping;
+}
+
+/**
+ * Return the provider expected to execute a runner's route. This is an
+ * execution expectation, not evidence that any particular dispatch used it.
+ */
+export function expectedProviderForRunner(runner) {
+  mappingFor(runner);
+  const provider = RUNNER_PROVIDERS[runner];
+  if (!provider) throw new Error(`Unsupported provider mapping for runner: ${runner}`);
+  return provider;
 }
 
 function resolveCapability(runner, capability) {
