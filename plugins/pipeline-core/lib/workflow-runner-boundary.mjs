@@ -96,6 +96,32 @@ function validAdapter(adapter) {
 }
 
 /**
+ * Preserve only the structured, bounded evidence the Coordinator needs to
+ * decide whether it may ask the separately trusted continuity host to create
+ * a one-shot recovery.  This does not itself attest an environment failure:
+ * raw host/result text and every non-positive classifier outcome stay out of
+ * the capture object.
+ */
+function environmentCapture(classification, host) {
+  if (classification.faultDomain !== "execution-environment") return null;
+  const diagnostic = host.diagnostic;
+  const observedBytes = diagnostic.stdoutBytes + diagnostic.stderrBytes;
+  if (!Number.isSafeInteger(observedBytes)) return null;
+  return {
+    code: classification.code,
+    evidenceSha256: classification.evidenceSha256,
+    diagnostic: {
+      exitCode: diagnostic.exitCode,
+      signal: diagnostic.signal,
+      observedBytes,
+      boundedTailSha256: diagnostic.tailSha256,
+      capturedTailBytes: diagnostic.capturedTailBytes,
+      tailOverflow: diagnostic.stdoutOverflow || diagnostic.stderrOverflow,
+    },
+  };
+}
+
+/**
  * Validate and run one synthetic coordinator dispatch through the P5 preflight.
  *
  * The adapter result is deliberately not returned: it could be untrusted and
@@ -131,7 +157,10 @@ export function runSyntheticWorkflowDispatch(dispatch, adapter) {
 
 /**
  * Reduce one provider-neutral runner observation to bounded identity, lifecycle
- * and fault-domain evidence. Raw result/error text has no output channel.
+ * and fault-domain evidence. Raw result/error text has no output channel. A
+ * positive environment classification additionally carries only the bounded
+ * evidence that a Coordinator may present to its trusted host adapter; it is
+ * not a fallback admission or an OS-isolation claim.
  */
 export function normalizeWorkflowRunnerOutcome(expected, observation) {
   if (!exactKeyCount(expected, new Set(["identity", "acknowledgedResultSha256"]))
@@ -142,11 +171,11 @@ export function normalizeWorkflowRunnerOutcome(expected, observation) {
     || !exactKeyCount(observation.identity, new Set(["dispatchId", "attemptId"]))
     || !Object.values(observation.identity).every((value) => typeof value === "string" && SAFE_ID.test(value))
     || !OUTCOME_STATES.has(observation.state)) {
-    return { ok: false, code: "WR-OUTCOME-SCHEMA", identity: null, state: "unknown", faultDomain: "unknown", resultSha256: null };
+    return { ok: false, code: "WR-OUTCOME-SCHEMA", identity: null, state: "unknown", faultDomain: "unknown", resultSha256: null, environmentCapture: null };
   }
   if (observation.identity.dispatchId !== expected.identity.dispatchId
     || observation.identity.attemptId !== expected.identity.attemptId) {
-    return { ok: false, code: "WR-OUTCOME-STALE", identity: observation.identity, state: observation.state, faultDomain: "unknown", resultSha256: null };
+    return { ok: false, code: "WR-OUTCOME-STALE", identity: observation.identity, state: observation.state, faultDomain: "unknown", resultSha256: null, environmentCapture: null };
   }
   let productVerdict = null;
   let resultSha256 = null;
@@ -155,13 +184,22 @@ export function normalizeWorkflowRunnerOutcome(expected, observation) {
       || typeof observation.productVerdict.schemaValid !== "boolean"
       || !new Set(["succeeded", "failed", "blocked"]).has(observation.productVerdict.outcome)
       || (observation.productVerdict.resultSha256 !== null && !SHA256.test(observation.productVerdict.resultSha256))) {
-      return { ok: false, code: "WR-OUTCOME-SCHEMA", identity: observation.identity, state: observation.state, faultDomain: "unknown", resultSha256: null };
+      return { ok: false, code: "WR-OUTCOME-SCHEMA", identity: observation.identity, state: observation.state, faultDomain: "unknown", resultSha256: null, environmentCapture: null };
     }
     productVerdict = { schemaValid: observation.productVerdict.schemaValid, outcome: observation.productVerdict.outcome };
     resultSha256 = observation.productVerdict.resultSha256;
   }
   const classification = classifyFailureEvidence({ productVerdict, host: observation.host });
-  const base = { identity: observation.identity, state: observation.state, faultDomain: classification.faultDomain, resultSha256 };
+  // A capture is intentionally populated only by the valid failed/
+  // environment branch below. Invalid lifecycle combinations must not expose
+  // evidence that could be mistaken for an admission to recovery.
+  const base = {
+    identity: observation.identity,
+    state: observation.state,
+    faultDomain: classification.faultDomain,
+    resultSha256,
+    environmentCapture: null,
+  };
   if (observation.state === "running") return productVerdict === null && observation.host === null
     ? { ok: true, code: "WR-OUTCOME-RUNNING", ...base }
     : { ok: false, code: "WR-OUTCOME-SCHEMA", ...base, faultDomain: "unknown", resultSha256: null };
@@ -184,7 +222,17 @@ export function normalizeWorkflowRunnerOutcome(expected, observation) {
     return { ok: true, code: "WR-OUTCOME-PRODUCT-FAILED", ...base, faultDomain: "product" };
   }
   if (classification.faultDomain === "execution-environment") {
-    return { ok: true, code: "WR-OUTCOME-ENVIRONMENT-FAILED", ...base, resultSha256: null };
+    const capture = environmentCapture(classification, observation.host);
+    if (capture === null) {
+      return { ok: false, code: "WR-OUTCOME-SCHEMA", ...base, faultDomain: "unknown", resultSha256: null };
+    }
+    return {
+      ok: true,
+      code: "WR-OUTCOME-ENVIRONMENT-FAILED",
+      ...base,
+      resultSha256: null,
+      environmentCapture: capture,
+    };
   }
   return { ok: true, code: "WR-OUTCOME-UNKNOWN-FAILED", ...base, faultDomain: "unknown", resultSha256: null };
 }

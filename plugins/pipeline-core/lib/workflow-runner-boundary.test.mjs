@@ -129,14 +129,44 @@ check("mismatched dispatch identity is stale and null-final", () => {
 check("schema-valid failed product result wins over trusted host evidence", () => {
   const result = normalizeWorkflowRunnerOutcome(expected, observation("failed", { schemaValid: true, outcome: "failed", resultSha256: A }, trustedHost));
   assert.equal(result.code, "WR-OUTCOME-PRODUCT-FAILED"); assert.equal(result.faultDomain, "product");
+  assert.equal(result.environmentCapture, null);
 });
 check("trusted pre-start host evidence classifies environment", () => {
   const result = normalizeWorkflowRunnerOutcome(expected, observation("failed", null, trustedHost));
   assert.equal(result.code, "WR-OUTCOME-ENVIRONMENT-FAILED"); assert.equal(result.faultDomain, "execution-environment");
+  assert.deepEqual(result.environmentCapture, {
+    code: "host-sandbox-bootstrap-rejected",
+    evidenceSha256: B,
+    diagnostic: {
+      exitCode: 1, signal: null, observedBytes: 32, boundedTailSha256: A,
+      capturedTailBytes: 32, tailOverflow: false,
+    },
+  });
+});
+check("environment capture retains bounded overflow evidence but no raw host text", () => {
+  const overflowed = structuredClone(trustedHost);
+  overflowed.diagnostic.stdoutOverflow = true;
+  overflowed.diagnostic.stderrBytes = 21;
+  const result = normalizeWorkflowRunnerOutcome(expected, observation("failed", null, overflowed));
+  assert.equal(result.environmentCapture.diagnostic.observedBytes, 33);
+  assert.equal(result.environmentCapture.diagnostic.tailOverflow, true);
+  assert.equal(JSON.stringify(result.environmentCapture).includes("stderr"), false);
+  assert.equal(JSON.stringify(result.environmentCapture).includes("sandbox failed"), false);
+});
+check("unsafe aggregate host byte counts fail closed without a recovery capture", () => {
+  const oversized = structuredClone(trustedHost);
+  oversized.diagnostic.stdoutBytes = Number.MAX_SAFE_INTEGER;
+  oversized.diagnostic.stderrBytes = 1;
+  const result = normalizeWorkflowRunnerOutcome(expected, observation("failed", null, oversized));
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "WR-OUTCOME-SCHEMA");
+  assert.equal(result.faultDomain, "unknown");
+  assert.equal(result.environmentCapture, null);
 });
 check("timeout and free-text-like host data remain unknown", () => {
   const result = normalizeWorkflowRunnerOutcome(expected, observation("failed", null, { timeout: true, exitCode: 1, stderr: "sandbox failed" }));
   assert.equal(result.code, "WR-OUTCOME-UNKNOWN-FAILED"); assert.equal(result.faultDomain, "unknown");
+  assert.equal(result.environmentCapture, null);
 });
 check("trusted code without bounded diagnostic remains unknown", () => {
   const result = normalizeWorkflowRunnerOutcome(expected, observation("failed", null, { ...trustedHost, diagnostic: null }));
@@ -145,6 +175,7 @@ check("trusted code without bounded diagnostic remains unknown", () => {
 check("schema-valid successful result can never become environment failure", () => {
   const result = normalizeWorkflowRunnerOutcome(expected, observation("completed", { schemaValid: true, outcome: "succeeded", resultSha256: A }, trustedHost));
   assert.equal(result.code, "WR-OUTCOME-FINAL"); assert.notEqual(result.faultDomain, "execution-environment");
+  assert.equal(result.environmentCapture, null);
 });
 check("calibrated transport evidence requires its complete fresh predicate", () => {
   const calibrated = {
@@ -164,5 +195,6 @@ check("raw result fields and malformed final combinations fail closed", () => {
   const runningWithHostEvidence = normalizeWorkflowRunnerOutcome(expected, observation("running", null, trustedHost));
   assert.equal(runningWithHostEvidence.ok, false); assert.equal(runningWithHostEvidence.code, "WR-OUTCOME-SCHEMA");
   assert.equal(runningWithHostEvidence.faultDomain, "unknown"); assert.equal(runningWithHostEvidence.resultSha256, null);
+  assert.equal(runningWithHostEvidence.environmentCapture, null);
 });
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);
