@@ -95,6 +95,8 @@ const TEST_SUITES = [
   { name: "language-canon-check", file: join(scriptDir, "check-language-canon.mjs") },
   { name: "security-scan-tests", file: join(scriptDir, "security-scan.test.mjs") },
   { name: "no-autoupdate-key-tests", file: join(scriptDir, "no-autoupdate-key.test.mjs") },
+  { name: "phase26-invariants-tests", file: join(scriptDir, "check-phase26-invariants.test.mjs") },
+  { name: "phase26-invariants-check", file: join(scriptDir, "check-phase26-invariants.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects with `.claude/pipeline.yaml`

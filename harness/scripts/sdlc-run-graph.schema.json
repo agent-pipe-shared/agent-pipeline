@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.invalid/schemas/sdlc-run-graph.schema.json",
+  "title": "Phase 2.6 actual SDLC run graph, projection binding and close evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["sdlcRunGraph", "sdlcRunGraphProjection", "phase26InvariantEvidence"],
+  "properties": {
+    "sdlcRunGraph": { "$ref": "#/$defs/graph" },
+    "sdlcRunGraphProjection": { "$ref": "#/$defs/projection" },
+    "phase26InvariantEvidence": { "$ref": "#/$defs/invariantEvidence" }
+  },
+  "$defs": {
+    "safeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "family": {
+      "enum": [
+        "initial-full-critic", "critic-correction", "delta-regate",
+        "product-retry", "environment-failover", "scope-course-stop",
+        "package-push-fetch-back"
+      ]
+    },
+    "edgeKind": { "enum": ["event", "back-edge", "reroute", "gate"] },
+    "sourceRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["collection", "id", "sha256"],
+      "properties": {
+        "collection": { "enum": ["packageResults", "finalIntegrations", "decisionBriefs", "courseDecisionIntents", "courseDecisionReceipts", "externalEvidence"] },
+        "id": { "$ref": "#/$defs/safeId" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "event": {
+      "type": "object", "additionalProperties": false,
+      "required": ["eventId", "sequence", "eventType", "outcome", "packageId", "actionId", "originChainId", "boundedFamily", "decisionBriefId", "sourceRefs"],
+      "properties": {
+        "eventId": { "$ref": "#/$defs/safeId" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "eventType": { "enum": ["start", "work", "critic", "correction", "verify", "retry", "failover", "gate", "po-decision", "push-fetch-back", "handoff", "close"] },
+        "outcome": { "enum": ["succeeded", "failed", "stopped", "deferred", "superseded"] },
+        "packageId": { "$ref": "#/$defs/safeId" },
+        "actionId": { "$ref": "#/$defs/safeId" },
+        "originChainId": { "$ref": "#/$defs/safeId" },
+        "boundedFamily": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/family" }] },
+        "decisionBriefId": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] },
+        "sourceRefs": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/sourceRef" } }
+      }
+    },
+    "edge": {
+      "type": "object", "additionalProperties": false,
+      "required": ["edgeId", "fromEventId", "toEventId", "kind", "boundedFamily", "loopStableId", "sourceRefs"],
+      "properties": {
+        "edgeId": { "$ref": "#/$defs/safeId" },
+        "fromEventId": { "$ref": "#/$defs/safeId" },
+        "toEventId": { "$ref": "#/$defs/safeId" },
+        "kind": { "$ref": "#/$defs/edgeKind" },
+        "boundedFamily": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/family" }] },
+        "loopStableId": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] },
+        "sourceRefs": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/sourceRef" } }
+      }
+    },
+    "familyInventory": {
+      "type": "object", "additionalProperties": false,
+      "required": ["family", "kind", "count", "disposition"],
+      "properties": {
+        "family": { "$ref": "#/$defs/family" },
+        "kind": { "$ref": "#/$defs/edgeKind" },
+        "count": { "type": "integer", "minimum": 0 },
+        "disposition": { "enum": ["executed", "not-triggered"] }
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "sha256"],
+      "properties": { "id": { "$ref": "#/$defs/safeId" }, "sha256": { "$ref": "#/$defs/sha256" } }
+    },
+    "attemptResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["attemptId", "resultSha256"],
+      "properties": { "attemptId": { "$ref": "#/$defs/safeId" }, "resultSha256": { "$ref": "#/$defs/sha256" } }
+    },
+    "loop": {
+      "type": "object", "additionalProperties": false,
+      "required": ["stableId", "family", "packageId", "actionId", "originChainId", "triggerEvidence", "attemptResultDigests", "normalizedFailureSignature", "similarityGroupId", "observedCount", "configuredLimit", "outcome", "exitReason", "decisionBriefId"],
+      "properties": {
+        "stableId": { "$ref": "#/$defs/safeId" },
+        "family": { "enum": ["critic-correction", "delta-regate", "product-retry"] },
+        "packageId": { "$ref": "#/$defs/safeId" },
+        "actionId": { "$ref": "#/$defs/safeId" },
+        "originChainId": { "$ref": "#/$defs/safeId" },
+        "triggerEvidence": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/evidence" } },
+        "attemptResultDigests": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "$ref": "#/$defs/attemptResult" } },
+        "normalizedFailureSignature": { "$ref": "#/$defs/sha256" },
+        "similarityGroupId": { "$ref": "#/$defs/safeId" },
+        "observedCount": { "type": "integer", "minimum": 1 },
+        "configuredLimit": { "type": "integer", "minimum": 1 },
+        "outcome": { "enum": ["succeeded", "failed", "stopped", "deferred"] },
+        "exitReason": { "enum": ["corrected", "regate-pass", "retry-pass", "retry-failed", "budget-exhausted", "po-stop", "po-defer"] },
+        "decisionBriefId": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] }
+      }
+    },
+    "graph": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "featureId", "graphCutoffEventId", "sourceEventSetSha256", "completionClaim", "events", "edges", "boundedFamilies", "loopRecords"],
+      "properties": {
+        "schemaVersion": { "const": "pipeline.sdlc-run-graph.v1" },
+        "featureId": { "$ref": "#/$defs/safeId" },
+        "graphCutoffEventId": { "$ref": "#/$defs/safeId" },
+        "sourceEventSetSha256": { "$ref": "#/$defs/sha256" },
+        "completionClaim": { "enum": ["candidate-handoff", "phase-close"] },
+        "events": { "type": "array", "minItems": 1, "maxItems": 512, "items": { "$ref": "#/$defs/event" } },
+        "edges": { "type": "array", "maxItems": 1024, "items": { "$ref": "#/$defs/edge" } },
+        "boundedFamilies": { "type": "array", "minItems": 7, "maxItems": 7, "items": { "$ref": "#/$defs/familyInventory" } },
+        "loopRecords": { "type": "array", "maxItems": 128, "items": { "$ref": "#/$defs/loop" } }
+      }
+    },
+    "projection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["generatorVersion", "graphSha256", "mermaidSha256"],
+      "properties": {
+        "generatorVersion": { "const": "pipeline-sdlc-mermaid.v1" },
+        "graphSha256": { "$ref": "#/$defs/sha256" },
+        "mermaidSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "measurement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sampleCount", "samplesMs", "p95Ms", "limitMs"],
+      "properties": {
+        "sampleCount": { "type": "integer", "minimum": 5, "maximum": 50 },
+        "samplesMs": { "type": "array", "minItems": 5, "maxItems": 50, "items": { "type": "integer", "minimum": 0 } },
+        "p95Ms": { "type": "integer", "minimum": 0 },
+        "limitMs": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "invariantEvidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "packageId", "earlySmoke", "scope", "performance"],
+      "properties": {
+        "schema": { "const": "pipeline.phase26-invariant-evidence.v1" },
+        "packageId": { "const": "P2.6-P5" },
+        "earlySmoke": {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "namedCapabilityId", "elapsedFromImplementationStartMs", "cumulativeLiveMs", "plannedPathCount", "changedPathCountBeforeSmoke", "evidenceSha256"],
+          "properties": {
+            "status": { "const": "pass" }, "namedCapabilityId": { "$ref": "#/$defs/safeId" },
+            "elapsedFromImplementationStartMs": { "type": "integer", "minimum": 0, "maximum": 3600000 },
+            "cumulativeLiveMs": { "type": "integer", "minimum": 0, "maximum": 900000 },
+            "plannedPathCount": { "type": "integer", "minimum": 1 },
+            "changedPathCountBeforeSmoke": { "type": "integer", "minimum": 0 },
+            "evidenceSha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "scope": {
+          "type": "object", "additionalProperties": false,
+          "required": ["plannedPathCount", "actualPathCount", "plannedAcceptanceCriteriaCount", "actualAcceptanceCriteriaCount", "newTrustBoundaries", "deltaDisposition", "decisionBriefId"],
+          "properties": {
+            "plannedPathCount": { "type": "integer", "minimum": 1 }, "actualPathCount": { "type": "integer", "minimum": 0 },
+            "plannedAcceptanceCriteriaCount": { "type": "integer", "minimum": 1 }, "actualAcceptanceCriteriaCount": { "type": "integer", "minimum": 0 },
+            "newTrustBoundaries": { "type": "array", "maxItems": 32, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } },
+            "deltaDisposition": { "enum": ["not-required", "approved"] },
+            "decisionBriefId": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] }
+          }
+        },
+        "performance": {
+          "type": "object", "additionalProperties": false,
+          "required": ["method", "targetedVerify", "fullVerify", "ledgerWriter"],
+          "properties": {
+            "method": { "const": "repeated-monotonic-wall-clock-ms.v1" },
+            "targetedVerify": { "$ref": "#/$defs/measurement" },
+            "fullVerify": { "$ref": "#/$defs/measurement" },
+            "ledgerWriter": { "$ref": "#/$defs/measurement" }
+          }
+        }
+      }
+    }
+  }
+}
