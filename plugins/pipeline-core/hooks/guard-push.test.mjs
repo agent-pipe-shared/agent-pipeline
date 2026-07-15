@@ -887,7 +887,7 @@ function deployApprovalState(forArtifact, forEnvironment) {
   const { command, env } = prepareAnonymousPublicPush(dir);
   gitAt(dir, "config", "--local", "remote.origin.pushurl", "git@github-private:account-123/agent-pipeline.git");
   check("PG26i block  pushurl cannot bypass the calibrated public remote", command, dir, BLOCK, {
-    stderrIncludes: ["must not define a pushurl"],
+    stderrIncludes: ["effective push URL"],
     env,
   });
 }
@@ -905,7 +905,7 @@ function deployApprovalState(forArtifact, forEnvironment) {
   const head = anonymousCommit(dir, "metadata.txt", "privacy\n\nProvider: neutral\nModel: generic\nSession: opaque");
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   check("PG26k block  provider/model/session correlation metadata", command, dir, BLOCK, {
-    stderrIncludes: ["forbidden personal/provider/private trailer"],
+    stderrIncludes: ["forbidden private correlation metadata"],
     env,
   });
 }
@@ -915,7 +915,7 @@ function deployApprovalState(forArtifact, forEnvironment) {
   const head = anonymousCommit(dir, "url.txt", "privacy\n\nSee https://private.example.invalid/session/opaque from /home/operator/worktree");
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   check("PG26l block  private URLs and machine paths in the complete range", command, dir, BLOCK, {
-    stderrIncludes: ["private or non-canonical URL", "machine-specific absolute path"],
+    stderrIncludes: ["non-canonical URL", "machine-specific absolute path"],
     env,
   });
 }
@@ -926,6 +926,46 @@ function deployApprovalState(forArtifact, forEnvironment) {
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   check("PG26m block  credential-shaped metadata in the complete range", command, dir, BLOCK, {
     stderrIncludes: ["credential-shaped value"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-global-pushurl");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const globalConfig = join(dir, "global.gitconfig");
+  writeFileSync(globalConfig, "[remote \"origin\"]\n\tpushurl = git@github-private:account-123/agent-pipeline.git\n");
+  check("PG26n block  global pushurl cannot bypass the calibrated public remote", command, dir, BLOCK, {
+    stderrIncludes: ["effective push URL"],
+    env: { ...env, GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: "1" },
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-push-instead-of");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const globalConfig = join(dir, "global.gitconfig");
+  writeFileSync(globalConfig, "[url \"git@github-private:account-123/\"]\n\tpushInsteadOf = git@github-share:agent-pipe-shared/\n");
+  check("PG26o block  pushInsteadOf cannot rewrite the calibrated public endpoint", command, dir, BLOCK, {
+    stderrIncludes: ["effective push URL"],
+    env: { ...env, GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: "1" },
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-free-text-correlation");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "correlation.txt", "privacy session opaque-123 for account operator42");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26p block  free-text session and account correlation", command, dir, BLOCK, {
+    stderrIncludes: ["forbidden private correlation metadata"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-non-http-private-coordinates");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "coordinates.txt", "privacy ssh://private.example.invalid/repo \\\\host\\share /root/worktree");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26q block  SSH URLs, UNC paths and root paths", command, dir, BLOCK, {
+    stderrIncludes: ["non-canonical URL", "machine-specific absolute path"],
     env,
   });
 }

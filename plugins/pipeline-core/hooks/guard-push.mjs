@@ -325,8 +325,9 @@ function resolveSourceCommit(binding) {
 const PUBLIC_PUSH_IDENTITY_SCHEMA = "pipeline.public-push-identity.v1";
 const TRAILER_DENY = /^(?:co-authored-by|signed-off-by|reviewed-by|assisted-by|provider|model|session|run|trace|private(?:-account)?|account|operator|machine|host|workspace|worktree)\s*:/im;
 const EMAIL_IN_MESSAGE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
-const PRIVATE_URL_IN_MESSAGE = /\bhttps?:\/\/(?!github\.com\/agent-pipe-shared\/agent-pipeline(?:[/?#]|$))\S+/i;
-const MACHINE_ABSOLUTE_PATH_IN_MESSAGE = /(?:^|[\s"'`])(?:\/(?:home|Users|mnt|private|var\/folders|tmp)(?:\/|$)|[A-Za-z]:[\\/])/m;
+const PRIVATE_CORRELATION_IN_MESSAGE = /\b(?:provider|model|session|account|operator|codex|claude|openai|anthropic|gpt(?:[-\s]?[a-z0-9.]+)?|gemini|machine|host|workspace|worktree|correlation|trace(?:[-\s]?id)?|run[-\s]?id)\b/i;
+const PRIVATE_URL_IN_MESSAGE = /\b[a-z][a-z0-9+.-]*:\/\/\S+|\b(?:git|ssh)@[A-Za-z0-9.-]+:[^\s]+/i;
+const MACHINE_ABSOLUTE_PATH_IN_MESSAGE = /(?:^|[\s"'`])(?:\/[A-Za-z0-9._-]+(?:\/|$)|[A-Za-z]:[\\/]|\\\\[^\\\s]+[\\/])/m;
 const SECRET_LIKE_VALUE_IN_MESSAGE = /\b(?:gh[pousr]_[A-Za-z0-9_]{12,}|github_pat_[A-Za-z0-9_]{12,}|sk-[A-Za-z0-9_-]{12,}|AKIA[0-9A-Z]{12,})\b/;
 
 function localGitConfig(binding, key) {
@@ -337,8 +338,8 @@ function localGitConfig(binding, key) {
   return result.status === 0 ? result.stdout.trim() : null;
 }
 
-function localGitConfigAll(binding, key) {
-  const result = spawnSync("git", ["-C", binding.projectDir, "config", "--local", "--get-all", key], {
+function effectivePushUrls(binding) {
+  const result = spawnSync("git", ["-C", binding.projectDir, "remote", "get-url", "--push", "--all", binding.remote], {
     encoding: "utf8",
     timeout: 5000,
   });
@@ -439,8 +440,10 @@ function checkAnonymousPublicPush(binding, sourceCommit) {
   if (!remote || remote.host !== expected.sshHostAlias || remote.owner !== expected.repositoryOwner || remote.repository !== expected.repositoryName) {
     failures.push("anonymous-public remote must bind the calibrated SSH host alias and repository owner");
   }
-  if (localGitConfigAll(binding, `remote.${binding.remote}.pushurl`).length > 0) {
-    failures.push("anonymous-public remote must not define a pushurl separate from its calibrated fetch URL");
+  const expectedPushUrl = `git@${expected.sshHostAlias}:${expected.repositoryOwner}/${expected.repositoryName}.git`;
+  const effectiveUrls = effectivePushUrls(binding);
+  if (effectiveUrls.length !== 1 || effectiveUrls[0] !== expectedPushUrl) {
+    failures.push("anonymous-public effective push URL must be exactly the calibrated SSH endpoint");
   }
   if (expected.sshAccount !== expected.repositoryOwner) failures.push("anonymous-public calibration must bind the dedicated SSH account to the repository owner");
   const ssh = authenticatedSshAccount(expected);
@@ -453,7 +456,8 @@ function checkAnonymousPublicPush(binding, sourceCommit) {
     if (signature !== "N") failures.push(`anonymous-public commit ${commit} carries a signature`);
     if (TRAILER_DENY.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries a forbidden personal/provider/private trailer`);
     if (EMAIL_IN_MESSAGE.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries an email address in its message`);
-    if (PRIVATE_URL_IN_MESSAGE.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries a private or non-canonical URL`);
+    if (PRIVATE_CORRELATION_IN_MESSAGE.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries forbidden private correlation metadata`);
+    if (PRIVATE_URL_IN_MESSAGE.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries a non-canonical URL`);
     if (MACHINE_ABSOLUTE_PATH_IN_MESSAGE.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries a machine-specific absolute path`);
     if (SECRET_LIKE_VALUE_IN_MESSAGE.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries a credential-shaped value`);
   }

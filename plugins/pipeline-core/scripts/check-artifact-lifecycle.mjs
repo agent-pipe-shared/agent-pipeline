@@ -198,14 +198,19 @@ export function checkArtifactLifecycle(root = DEFAULT_ROOT, resultPath) {
       if (machine?.activeFeature?.id !== metadata.featureId) findings.push("machine state activeFeature.id does not match artifactLifecycle.featureId");
       if (machine?.activeFeature?.phase !== status.phase) findings.push("machine state activeFeature.phase does not match artifactLifecycle.status.phase");
       if (machine?.activeFeature?.planPath !== activePrd?.path) findings.push("machine state activeFeature.planPath does not match the active PRD path");
-      const authority = machine?.continuity?.authority;
+      // The control plane need not already have the Phase-2.6 continuity
+      // writer installed.  The stable machine-side binding is deliberately an
+      // additive data-only map: old writers preserve it and new writers may
+      // carry it forward, while this gate still binds all three documents to
+      // the actual machine state rather than trusting Result metadata alone.
+      const authority = machine?.artifactAuthority;
       if (!authority || typeof authority !== "object") {
-        findings.push("machine state continuity.authority is required to bind the active PRD/Spec/Result");
+        findings.push("machine state artifactAuthority is required to bind the active PRD/Spec/Result");
       } else {
         for (const [kind, artifact] of [["prd", activePrd], ["spec", activeSpec], ["result", activeResult]]) {
           const bound = authority[kind];
           if (!artifact || !bound || bound.path !== artifact.path || bound.sha256 !== sha256File(root, artifact.path)) {
-            findings.push(`machine state continuity.authority.${kind} must bind the active ${kind} path and digest`);
+            findings.push(`machine state artifactAuthority.${kind} must bind the active ${kind} path and digest`);
           }
         }
       }

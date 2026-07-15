@@ -75,12 +75,10 @@ function fixture() {
   writeResult();
   write(root, ".claude/pipeline-state.json", JSON.stringify({
     activeFeature: { id: "feature-x", planPath: "specs/prd.md", phase: "implementation" },
-    continuity: {
-      authority: {
-        prd: { path: "specs/prd.md", sha256: digest(root, "specs/prd.md") },
-        spec: { path: "specs/spec.md", sha256: digest(root, "specs/spec.md") },
-        result: { path: "specs/result.md", sha256: digest(root, "specs/result.md") },
-      },
+    artifactAuthority: {
+      prd: { path: "specs/prd.md", sha256: digest(root, "specs/prd.md") },
+      spec: { path: "specs/spec.md", sha256: digest(root, "specs/spec.md") },
+      result: { path: "specs/result.md", sha256: digest(root, "specs/result.md") },
     },
   }));
   return { root, result, writeResult };
@@ -173,7 +171,7 @@ function fixture() {
   const { root } = fixture();
   write(root, ".claude/pipeline-state.json", JSON.stringify({ activeFeature: { id: "feature-x", planPath: "specs/prd.md", phase: "implementation" } }));
   const outcome = checkArtifactLifecycle(root, "specs/result.md");
-  check("AL13 requires canonical machine-state authority bindings", !outcome.ok && outcome.findings.some((f) => f.includes("continuity.authority is required")), outcome.findings.join("; "));
+  check("AL13 requires canonical machine-state authority bindings", !outcome.ok && outcome.findings.some((f) => f.includes("artifactAuthority is required")), outcome.findings.join("; "));
 }
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });
