@@ -1399,7 +1399,7 @@ function canonicalFixtureJson(value) {
     decisionTxn: txn,
     queueHead: continuityQueue({ nextAction: "dispatch", dispatch: null }),
     blocker: null,
-    resume: { mode: "resume-on-next-turn", sourceRevision: 1, reasonCode: "po-interrupt" },
+    resume: { mode: "resume-on-next-turn", sourceRevision: 1, reasonCode: "blocker" },
   });
   const applied = run(continuityArgs("continuity-apply-decision", 0, applyFile), continuityDeps(dir));
   ok("PS45a decision state-applied marker persists at selected revision", applied === 0 && readState(dir).state.continuity?.decisionTxn?.phase === "state-applied");

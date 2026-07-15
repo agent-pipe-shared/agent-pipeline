@@ -401,7 +401,10 @@ export function integrateContinuityFinal(current, request, activeFeatureId = und
   const normalized = normalizeContinuityHostObservation({
     expected: current.queueHead.dispatch,
     observation: request.observation,
-    priorAcknowledgement: adapterAck(current.acknowledgedFinal),
+    // A prior acknowledgement belongs to the preceding dispatch. Exact replay
+    // of that identity is handled above; carrying it into the active dispatch
+    // would make every legitimate sequential final look like an identity clash.
+    priorAcknowledgement: null,
   });
   const passiveCodes = new Map([
     ["CHA-RUNNING", "CS-RUNNING"],
