@@ -969,6 +969,34 @@ function deployApprovalState(forArtifact, forEnvironment) {
     env,
   });
 }
+{
+  const { dir } = freshRepo("anonymous-public-field-separator");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "separator.txt", "privacy\x1fSession: opaque");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26r block  field-separator metadata cannot escape range privacy", command, dir, BLOCK, {
+    stderrIncludes: ["forbidden private correlation metadata"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-transport-env");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  check("PG26s block  GIT_SSH_COMMAND cannot diverge from the account probe", command, dir, BLOCK, {
+    stderrIncludes: ["transport must not override"],
+    env: { ...env, GIT_SSH_COMMAND: "ssh -i wrong-key" },
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-transport-config");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const globalConfig = join(dir, "global.gitconfig");
+  writeFileSync(globalConfig, "[core]\n\tsshCommand = ssh -i wrong-key\n");
+  check("PG26t block  core.sshCommand cannot diverge from the account probe", command, dir, BLOCK, {
+    stderrIncludes: ["transport must not override"],
+    env: { ...env, GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: "1" },
+  });
+}
 
 // ---- Cleanup ----------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {

@@ -338,6 +338,14 @@ function localGitConfig(binding, key) {
   return result.status === 0 ? result.stdout.trim() : null;
 }
 
+function effectiveGitConfig(binding, key) {
+  const result = spawnSync("git", ["-C", binding.projectDir, "config", "--get", key], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  return result.status === 0 ? result.stdout.trim() : null;
+}
+
 function effectivePushUrls(binding) {
   const result = spawnSync("git", ["-C", binding.projectDir, "remote", "get-url", "--push", "--all", binding.remote], {
     encoding: "utf8",
@@ -394,14 +402,34 @@ function anonymousRange(binding, sourceCommit, expected) {
     timeout: 5000,
   });
   if (ancestry.status !== 0) return { ok: false, reason: "anonymous-public destination is not an ancestor of the pushed source" };
-  const log = spawnSync(
-    "git",
-    ["-C", binding.projectDir, "log", "--format=%H%x1f%an%x1f%ae%x1f%cn%x1f%ce%x1f%G?%x1f%B%x1e", "--no-notes", `${baseCommit}..${sourceCommit}`],
-    { encoding: "utf8", timeout: 5000 },
-  );
-  if (log.status !== 0) return { ok: false, reason: "anonymous-public commit range cannot be read" };
-  const entries = log.stdout.split("\x1e").filter((entry) => entry.trim().length > 0).map((line) => line.split("\x1f"));
-  if (entries.length === 0) return { ok: false, reason: "anonymous-public push contains no newly reachable commit" };
+  const commits = spawnSync("git", ["-C", binding.projectDir, "rev-list", "--reverse", `${baseCommit}..${sourceCommit}`], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  if (commits.status !== 0) return { ok: false, reason: "anonymous-public commit range cannot be read" };
+  const commitIds = commits.stdout.split("\n").filter(Boolean);
+  if (commitIds.length === 0) return { ok: false, reason: "anonymous-public push contains no newly reachable commit" };
+  const entries = [];
+  for (const commit of commitIds) {
+    const object = spawnSync("git", ["-C", binding.projectDir, "cat-file", "-p", commit], { encoding: "utf8", timeout: 5000 });
+    const signature = spawnSync("git", ["-C", binding.projectDir, "log", "-1", "--format=%G?", "--no-notes", commit], { encoding: "utf8", timeout: 5000 });
+    if (object.status !== 0 || signature.status !== 0) return { ok: false, reason: "anonymous-public commit range cannot be decoded" };
+    const bodyAt = object.stdout.indexOf("\n\n");
+    const headers = bodyAt === -1 ? object.stdout : object.stdout.slice(0, bodyAt);
+    const message = bodyAt === -1 ? "" : object.stdout.slice(bodyAt + 2);
+    const author = /^author (.*) <([^>\n]+)> \d+ [+-]\d{4}$/m.exec(headers);
+    const committer = /^committer (.*) <([^>\n]+)> \d+ [+-]\d{4}$/m.exec(headers);
+    if (!author || !committer) return { ok: false, reason: "anonymous-public commit identity headers cannot be decoded" };
+    entries.push({
+      commit,
+      authorName: author[1],
+      authorEmail: author[2],
+      committerName: committer[1],
+      committerEmail: committer[2],
+      signature: signature.stdout.trim(),
+      message,
+    });
+  }
   return { ok: true, entries };
 }
 
@@ -445,12 +473,15 @@ function checkAnonymousPublicPush(binding, sourceCommit) {
   if (effectiveUrls.length !== 1 || effectiveUrls[0] !== expectedPushUrl) {
     failures.push("anonymous-public effective push URL must be exactly the calibrated SSH endpoint");
   }
+  if (process.env.GIT_SSH || process.env.GIT_SSH_COMMAND || effectiveGitConfig(binding, "core.sshCommand")) {
+    failures.push("anonymous-public transport must not override the calibrated SSH host-alias path");
+  }
   if (expected.sshAccount !== expected.repositoryOwner) failures.push("anonymous-public calibration must bind the dedicated SSH account to the repository owner");
   const ssh = authenticatedSshAccount(expected);
   if (!ssh.ok) failures.push(ssh.reason);
   const range = anonymousRange(binding, sourceCommit, expected);
   if (!range.ok) return [...failures, range.reason];
-  for (const [commit, authorName, authorEmail, committerName, committerEmail, signature, message] of range.entries) {
+  for (const { commit, authorName, authorEmail, committerName, committerEmail, signature, message } of range.entries) {
     if (authorName !== expected.authorName || authorEmail !== expected.authorEmail) failures.push(`anonymous-public commit ${commit} has a non-neutral Author identity`);
     if (committerName !== expected.authorName || committerEmail !== expected.authorEmail) failures.push(`anonymous-public commit ${commit} has a non-neutral Committer identity`);
     if (signature !== "N") failures.push(`anonymous-public commit ${commit} carries a signature`);
