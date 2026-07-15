@@ -1,12 +1,64 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://agent-pipeline.invalid/schemas/sdlc-run-graph.schema.json",
-  "title": "Phase 2.6 actual SDLC run graph, projection binding and close evidence",
+  "title": "Backward-readable SDLC run graph and close evidence",
   "type": "object",
   "additionalProperties": true,
-  "required": ["sdlcRunGraph", "sdlcRunGraphProjection", "phase26InvariantEvidence", "packageResults", "finalIntegrations", "decisionBriefs", "courseDecisionIntents", "courseDecisionReceipts", "externalEvidence"],
+  "required": ["sdlcRunGraph", "packageResults"],
+  "oneOf": [
+    {
+      "required": ["sdlcRunGraph", "sdlcRunGraphProjection", "phase26InvariantEvidence", "packageResults", "finalIntegrations", "decisionBriefs", "courseDecisionIntents", "courseDecisionReceipts", "externalEvidence"],
+      "properties": { "sdlcRunGraph": { "$ref": "#/$defs/graph" } }
+    },
+    {
+      "required": ["status", "statusProjections", "sdlcRunGraph", "packageResults", "finalDeliveryEvidence", "packageBindings"],
+      "properties": { "sdlcRunGraph": { "$ref": "#/$defs/graphV2" } }
+    }
+  ],
   "properties": {
-    "sdlcRunGraph": { "$ref": "#/$defs/graph" },
+    "sdlcRunGraph": {
+      "type": "object",
+      "additionalProperties": false,
+      "oneOf": [{ "$ref": "#/$defs/graph" }, { "$ref": "#/$defs/graphV2" }],
+      "properties": {
+        "schemaVersion": { "enum": ["pipeline.sdlc-run-graph.v1", "pipeline.sdlc-run-graph.v2"] },
+        "featureId": { "type": "string" },
+        "graphCutoffEventId": { "type": "string" },
+        "sourceEventSetSha256": { "type": "string" },
+        "completionClaim": { "enum": ["candidate-handoff", "phase-close"] },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "eventId": { "type": "string" },
+              "cycleId": { "type": "string" },
+              "sequence": { "type": "number" },
+              "eventType": { "type": "string" },
+              "outcome": { "type": "string" },
+              "packageId": { "type": "string" },
+              "actionId": { "type": "string" },
+              "originChainId": { "type": "string" },
+              "boundedFamily": { "type": ["string", "null"] },
+              "decisionBriefId": { "type": ["string", "null"] },
+              "sourceRefs": { "type": "array" },
+              "stage": { "type": "string" },
+              "sourceEvidenceIds": { "type": "array" },
+              "candidateCommit": { "type": "string" },
+              "tree": { "type": "string" },
+              "faultDomain": { "type": "string" },
+              "failureSignature": { "type": "string" }
+            }
+          }
+        },
+        "edges": { "type": "array" },
+        "boundedFamilies": { "type": "array" },
+        "loopRecords": { "type": "array" },
+        "cycles": { "type": "array", "items": { "$ref": "#/$defs/cycleV2" } },
+        "loopAggregates": { "type": "array", "items": { "$ref": "#/$defs/loopAggregateV2" } }
+      }
+    },
     "sdlcRunGraphProjection": { "$ref": "#/$defs/projection" },
     "phase26InvariantEvidence": { "$ref": "#/$defs/invariantEvidence" },
     "packageResults": { "type": "array" },
@@ -14,7 +66,11 @@
     "decisionBriefs": { "type": "array" },
     "courseDecisionIntents": { "type": "array" },
     "courseDecisionReceipts": { "type": "array" },
-    "externalEvidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
+    "externalEvidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } },
+    "status": { "type": "string" },
+    "statusProjections": { "type": "array", "items": { "$ref": "#/$defs/statusProjectionV2" } },
+    "finalDeliveryEvidence": { "$ref": "#/$defs/finalDeliveryEvidenceV2" },
+    "packageBindings": { "type": "array", "items": { "$ref": "#/$defs/packageBindingV2" } }
   },
   "$defs": {
     "safeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
@@ -118,6 +174,133 @@
         "edges": { "type": "array", "maxItems": 1024, "items": { "$ref": "#/$defs/edge" } },
         "boundedFamilies": { "type": "array", "minItems": 7, "maxItems": 7, "items": { "$ref": "#/$defs/familyInventory" } },
         "loopRecords": { "type": "array", "maxItems": 128, "items": { "$ref": "#/$defs/loop" } }
+      }
+    },
+    "gitObjectIdV2": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+    "stageV2": {
+      "enum": [
+        "work", "stage-verify", "critic", "correction", "delta-regate",
+        "intent", "state-cas", "final-verify", "delivery", "fetch-back",
+        "close", "course", "failover"
+      ]
+    },
+    "outcomeV2": { "enum": ["succeeded", "failed", "stopped", "deferred", "superseded"] },
+    "eventV2": {
+      "type": "object", "additionalProperties": false,
+      "required": ["eventId", "cycleId", "sequence", "packageId", "actionId", "stage", "sourceEvidenceIds", "outcome"],
+      "properties": {
+        "eventId": { "$ref": "#/$defs/safeId" },
+        "cycleId": { "$ref": "#/$defs/safeId" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "packageId": { "$ref": "#/$defs/safeId" },
+        "actionId": { "$ref": "#/$defs/safeId" },
+        "stage": { "$ref": "#/$defs/stageV2" },
+        "sourceEvidenceIds": {
+          "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true,
+          "items": { "$ref": "#/$defs/safeId" }
+        },
+        "candidateCommit": { "$ref": "#/$defs/gitObjectIdV2" },
+        "tree": { "$ref": "#/$defs/gitObjectIdV2" },
+        "faultDomain": { "enum": ["product", "execution-environment", "unknown"] },
+        "failureSignature": { "$ref": "#/$defs/sha256" },
+        "outcome": { "$ref": "#/$defs/outcomeV2" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "stage": { "enum": ["work", "stage-verify", "critic", "correction", "delta-regate", "intent", "state-cas", "final-verify", "delivery", "fetch-back", "close"] } } },
+          "then": { "required": ["candidateCommit", "tree"] }
+        },
+        {
+          "if": { "anyOf": [{ "required": ["faultDomain"] }, { "required": ["failureSignature"] }] },
+          "then": { "required": ["faultDomain", "failureSignature"] }
+        },
+        {
+          "if": {
+            "anyOf": [
+              { "properties": { "outcome": { "const": "failed" } } },
+              { "properties": { "stage": { "const": "failover" } } }
+            ]
+          },
+          "then": { "required": ["faultDomain", "failureSignature"] }
+        },
+        {
+          "if": { "required": ["faultDomain", "failureSignature"] },
+          "then": {
+            "anyOf": [
+              { "properties": { "outcome": { "const": "failed" } } },
+              { "properties": { "stage": { "enum": ["course", "failover"] } } }
+            ]
+          }
+        }
+      ]
+    },
+    "cycleV2": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cycleId", "packageId", "sequence", "eventIds"],
+      "properties": {
+        "cycleId": { "$ref": "#/$defs/safeId" },
+        "packageId": { "$ref": "#/$defs/safeId" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "eventIds": {
+          "type": "array", "minItems": 1, "maxItems": 4096, "uniqueItems": true,
+          "items": { "$ref": "#/$defs/safeId" }
+        }
+      }
+    },
+    "loopAggregateV2": {
+      "type": "object", "additionalProperties": false,
+      "required": ["family", "count", "bound"],
+      "properties": {
+        "family": { "enum": ["critic-correction", "delta-regate", "product-retry", "environment-failover"] },
+        "count": { "type": "integer", "minimum": 0 },
+        "bound": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "graphV2": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "featureId", "completionClaim", "cycles", "events", "loopAggregates"],
+      "properties": {
+        "schemaVersion": { "const": "pipeline.sdlc-run-graph.v2" },
+        "featureId": { "$ref": "#/$defs/safeId" },
+        "completionClaim": { "enum": ["candidate-handoff", "phase-close"] },
+        "cycles": { "type": "array", "minItems": 1, "maxItems": 512, "items": { "$ref": "#/$defs/cycleV2" } },
+        "events": { "type": "array", "minItems": 1, "maxItems": 4096, "items": { "$ref": "#/$defs/eventV2" } },
+        "loopAggregates": { "type": "array", "minItems": 4, "maxItems": 4, "items": { "$ref": "#/$defs/loopAggregateV2" } }
+      }
+    },
+    "statusProjectionV2": {
+      "type": "object", "additionalProperties": false,
+      "required": ["projection", "status"],
+      "properties": {
+        "projection": { "$ref": "#/$defs/safeId" },
+        "status": { "enum": ["implementation-active", "candidate-handoff", "phase-close", "PO-closed"] }
+      }
+    },
+    "finalDeliveryEvidenceV2": {
+      "type": "object", "additionalProperties": false,
+      "required": ["finalDeliveryEvidenceId", "candidateCommit", "tree", "verifyCommand", "verifyResultDigest", "privacyDisposition", "securityDisposition", "approvedTarget", "pushedOid", "fetchedOid"],
+      "properties": {
+        "finalDeliveryEvidenceId": { "$ref": "#/$defs/safeId" },
+        "candidateCommit": { "$ref": "#/$defs/gitObjectIdV2" },
+        "tree": { "$ref": "#/$defs/gitObjectIdV2" },
+        "verifyCommand": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "verifyResultDigest": { "$ref": "#/$defs/sha256" },
+        "privacyDisposition": { "$ref": "#/$defs/safeId" },
+        "securityDisposition": { "$ref": "#/$defs/safeId" },
+        "approvedTarget": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$" },
+        "pushedOid": { "$ref": "#/$defs/gitObjectIdV2" },
+        "fetchedOid": { "$ref": "#/$defs/gitObjectIdV2" }
+      }
+    },
+    "packageBindingV2": {
+      "type": "object", "additionalProperties": false,
+      "required": ["packageId", "packageSha256", "terminalCycleId", "terminalEventId", "finalDeliveryEvidenceId"],
+      "properties": {
+        "packageId": { "$ref": "#/$defs/safeId" },
+        "packageSha256": { "$ref": "#/$defs/sha256" },
+        "terminalCycleId": { "$ref": "#/$defs/safeId" },
+        "terminalEventId": { "$ref": "#/$defs/safeId" },
+        "finalDeliveryEvidenceId": { "$ref": "#/$defs/safeId" }
       }
     },
     "projection": {
