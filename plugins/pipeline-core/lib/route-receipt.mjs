@@ -13,6 +13,7 @@ import { expectedProviderForRunner, projectRunnerAssignment, validateDirectRoute
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SCHEMA_PATH = join(HERE, "..", "scripts", "route-receipt.schema.json");
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 const GIT_OBJECT_ID = /^[a-f0-9]{40,64}$/;
 const EFFORTS = ["low", "medium", "high", "xhigh", "max", "not-applicable"];
@@ -41,10 +42,14 @@ function isWorktype(value) {
   return value === null || (typeof value === "string" && SAFE_ID.test(value));
 }
 
-function isSelector(value) {
+function isModelId(value) {
+  return typeof value === "string" && MODEL_ID.test(value);
+}
+
+function isObservedModelSelector(value) {
   return exactKeys(value, ["kind", "value"])
-    && ["alias", "model-id"].includes(value.kind)
-    && typeof value.value === "string" && value.value.length > 0;
+    && value.kind === "model-id"
+    && isModelId(value.value);
 }
 
 function isDispatchBinding(value) {
@@ -76,9 +81,9 @@ function isTrustedEvidenceBinding(value) {
     && isDuty(value.effectiveDuty)
     && isWorktype(value.effectiveWorktype)
     && RUNNERS.includes(value.effectiveRunner)
-    && isSelector(value.effectiveSelector)
+    && isObservedModelSelector(value.effectiveSelector)
     && PROVIDERS.includes(value.effectiveProvider)
-    && typeof value.effectiveModelId === "string" && value.effectiveModelId.length > 0
+    && isModelId(value.effectiveModelId)
     && EFFORTS.includes(value.effectiveEffort);
 }
 
@@ -108,25 +113,16 @@ function sameObservedEffectiveRoute(receipt, trustedEvidence) {
     && receipt.effectiveEffort === trustedEvidence.effectiveEffort;
 }
 
-function expectedConfiguredFableModel(route) {
-  if (!isFableAlias(route)) return null;
-  try {
-    const assignment = projectRunnerAssignment(route.runner, {
-      model: route.selector.value,
-      effort: route.effort,
-    });
-    return assignment.model === "gpt-5.6-sol" ? assignment.model : null;
-  } catch {
-    return null;
-  }
-}
-
 function isTerraAlias(route) {
   return route.selector.kind === "alias" && route.selector.value.toLowerCase() === "terra";
 }
 
-function isFableAlias(route) {
-  return route.selector.kind === "alias" && route.selector.value.toLowerCase() === "fable";
+function expectedConfiguredCodexAlias(route) {
+  if (route.runner !== "codex" || route.selector.kind !== "alias" || isTerraAlias(route)) return null;
+  return projectRunnerAssignment(route.runner, {
+    model: route.selector.value,
+    effort: route.effort,
+  });
 }
 
 function looksLikeSchema(value) {
@@ -179,20 +175,37 @@ export function validateRouteReceipt(receipt, projectedRoute, dispatchBinding, t
     || !sameObservedEffectiveRoute(receipt, trustedEvidence)) {
     return { ok: false, reason: "trusted-binding-mismatch" };
   }
+  if (receipt.effectiveDuty !== receipt.requestedDuty
+    || receipt.effectiveWorktype !== receipt.requestedWorktype
+    || receipt.effectiveRunner !== receipt.requestedRunner
+    || receipt.effectiveRunner !== route.route.runner
+    || receipt.effectiveProvider !== receipt.requestedProvider
+    || receipt.effectiveProvider !== expectedProviderForRunner(route.route.runner)
+    || receipt.effectiveEffort !== receipt.requestedEffort
+    || receipt.effectiveEffort !== route.route.effort) {
+    return { ok: false, reason: "effective-route-drift" };
+  }
+  if (receipt.effectiveSelector.kind !== "model-id"
+    || receipt.effectiveSelector.value !== receipt.effectiveModelId) {
+    return { ok: false, reason: "effective-model-identity-drift" };
+  }
+  if (route.route.selector.kind === "model-id"
+    && receipt.effectiveModelId !== route.route.selector.value) {
+    return { ok: false, reason: "requested-model-identity-drift" };
+  }
   if (isTerraAlias(route.route) && trustedEvidence.source !== "host") {
     return { ok: false, reason: "terra-requires-host-evidence" };
   }
-  if (route.route.runner === "codex"
-    && route.route.selector.kind === "alias"
-    && !isTerraAlias(route.route)
-    && !isFableAlias(route.route)) {
+  let configuredAlias;
+  try {
+    configuredAlias = expectedConfiguredCodexAlias(route.route);
+  } catch {
     return { ok: false, reason: "unsupported-codex-alias" };
   }
-  const fableModel = expectedConfiguredFableModel(route.route);
-  if (fableModel !== null
-    && (trustedEvidence.effectiveModelId !== fableModel
-      || trustedEvidence.effectiveEffort !== route.route.effort)) {
-    return { ok: false, reason: "configured-fable-route-drift" };
+  if (configuredAlias !== null
+    && (receipt.effectiveModelId !== configuredAlias.model
+      || receipt.effectiveEffort !== configuredAlias.effort)) {
+    return { ok: false, reason: "configured-codex-alias-route-drift" };
   }
   return { ok: true, effectiveRouteStatus: "attested" };
 }

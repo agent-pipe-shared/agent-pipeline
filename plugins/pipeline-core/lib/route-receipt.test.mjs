@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { validateRouteReceipt } from "./route-receipt.mjs";
-import { projectDirectRoutingDefaults, validateDirectRoute } from "./routing-projection.mjs";
+import { projectDirectRoutingDefaults, projectRunnerAssignment, validateDirectRoute } from "./routing-projection.mjs";
 
 let passed = 0;
 let failed = 0;
@@ -294,6 +294,147 @@ const fableWrongEffortReceipt = receiptFor(
 );
 check("RR77 Fable mutually agreeing non-Sol observed evidence fails closed", rejects(fableNonSolReceipt, fableRoute, DISPATCH_BINDING, FABLE_NON_SOL_EVIDENCE));
 check("RR78 Fable mutually agreeing nonidentity effort fails closed", rejects(fableWrongEffortReceipt, fableRoute, DISPATCH_BINDING, FABLE_WRONG_EFFORT_EVIDENCE));
+
+const JOINT_SEMANTIC_DRIFTS = [
+  ["effectiveDuty", "duty", "codex_goldfish"],
+  ["effectiveWorktype", "worktype", "design_phase"],
+  ["effectiveRunner", "runner", "claude"],
+  ["effectiveProvider", "provider", "anthropic"],
+  ["effectiveEffort", "effort", "high"],
+];
+rr = 79;
+for (const [field, label, value] of JOINT_SEMANTIC_DRIFTS) {
+  const observed = { ...TERRA_OBSERVED, [field]: value };
+  const evidence = trustedEvidenceFor("host", FIXTURE.hostDigest, observed);
+  const receipt = receiptFor(
+    terraRoute,
+    REQUESTED_DUTY,
+    REQUESTED_WORKTYPE,
+    observed,
+    evidence,
+    {},
+  );
+  check(`RR${rr} mutually agreeing but semantically wrong effective ${label} fails closed`, rejects(receipt, terraRoute, DISPATCH_BINDING, evidence));
+  rr += 1;
+}
+
+const directModelCandidate = [
+  ...Object.values(routing.duties),
+  ...Object.values(routing.worktypes).flatMap((profile) => Object.values(profile)),
+].find((route) => route !== "off" && route.selector.kind === "model-id");
+const directModelRoute = directModelCandidate ?? Object.freeze({
+  ...terraRoute,
+  selector: { kind: "model-id", value: "missing-direct-model-route" },
+});
+const DIRECT_MODEL_DUTY = "direct_model_regression";
+const DIRECT_MODEL_BINDING = Object.freeze({
+  ...DISPATCH_BINDING,
+  requestedDuty: DIRECT_MODEL_DUTY,
+});
+const DIRECT_MODEL_OBSERVED = Object.freeze({
+  ...TERRA_OBSERVED,
+  effectiveDuty: DIRECT_MODEL_DUTY,
+  effectiveRunner: directModelRoute.runner,
+  effectiveSelector: Object.freeze({ kind: "model-id", value: directModelRoute.selector.value }),
+  effectiveProvider: directModelRoute.runner === "claude" ? "anthropic" : "openai",
+  effectiveModelId: directModelRoute.selector.value,
+  effectiveEffort: directModelRoute.effort,
+});
+const DIRECT_MODEL_EVIDENCE = Object.freeze(trustedEvidenceFor("host", FIXTURE.hostDigest, DIRECT_MODEL_OBSERVED));
+const directModelReceipt = receiptFor(
+  directModelRoute,
+  DIRECT_MODEL_DUTY,
+  REQUESTED_WORKTYPE,
+  DIRECT_MODEL_OBSERVED,
+  DIRECT_MODEL_EVIDENCE,
+  {},
+);
+check("RR84 direct model-id route accepts its exact effective model", directModelCandidate !== undefined && accepts(directModelReceipt, directModelRoute, DIRECT_MODEL_BINDING, DIRECT_MODEL_EVIDENCE));
+
+const differentDirectModelId = directModelRoute.selector.value === "gpt-5.6-alternate"
+  ? "gpt-5.6-different"
+  : "gpt-5.6-alternate";
+const DIFFERENT_DIRECT_MODEL_OBSERVED = Object.freeze({
+  ...DIRECT_MODEL_OBSERVED,
+  effectiveSelector: Object.freeze({ kind: "model-id", value: differentDirectModelId }),
+  effectiveModelId: differentDirectModelId,
+});
+const DIFFERENT_DIRECT_MODEL_EVIDENCE = Object.freeze(trustedEvidenceFor("host", FIXTURE.hostDigest, DIFFERENT_DIRECT_MODEL_OBSERVED));
+const differentDirectModelReceipt = receiptFor(
+  directModelRoute,
+  DIRECT_MODEL_DUTY,
+  REQUESTED_WORKTYPE,
+  DIFFERENT_DIRECT_MODEL_OBSERVED,
+  DIFFERENT_DIRECT_MODEL_EVIDENCE,
+  {},
+);
+check("RR85 direct model-id route rejects a different mutually attested effective model", directModelCandidate !== undefined && rejects(differentDirectModelReceipt, directModelRoute, DIRECT_MODEL_BINDING, DIFFERENT_DIRECT_MODEL_EVIDENCE));
+
+const INVALID_EFFECTIVE_MODEL_IDENTITIES = [
+  ["whitespace", { effectiveSelector: { kind: "model-id", value: " gpt-5.6-terra" }, effectiveModelId: " gpt-5.6-terra" }],
+  ["invalid characters", { effectiveSelector: { kind: "model-id", value: "gpt-5.6?terra" }, effectiveModelId: "gpt-5.6?terra" }],
+  ["overlength", { effectiveSelector: { kind: "model-id", value: "m".repeat(129) }, effectiveModelId: "m".repeat(129) }],
+  ["selector kind alias", { effectiveSelector: { kind: "alias", value: "gpt-5.6-terra" }, effectiveModelId: "gpt-5.6-terra" }],
+  ["selector/model disagreement", { effectiveSelector: { kind: "model-id", value: "gpt-5.6-alternate" }, effectiveModelId: "gpt-5.6-terra" }],
+];
+rr = 86;
+for (const [label, overrides] of INVALID_EFFECTIVE_MODEL_IDENTITIES) {
+  const observed = { ...TERRA_OBSERVED, ...overrides };
+  const evidence = trustedEvidenceFor("host", FIXTURE.hostDigest, observed);
+  const receipt = receiptFor(
+    terraRoute,
+    REQUESTED_DUTY,
+    REQUESTED_WORKTYPE,
+    observed,
+    evidence,
+    {},
+  );
+  check(`RR${rr} mutually agreeing trusted effective model ${label} fails closed`, rejects(receipt, terraRoute, DISPATCH_BINDING, evidence));
+  rr += 1;
+}
+
+let projectedFable;
+try {
+  projectedFable = projectRunnerAssignment("codex", {
+    model: fableRoute.selector.value,
+    effort: fableRoute.effort,
+  });
+} catch {
+  projectedFable = null;
+}
+check("RR91 Codex Fable quality alias projects to Sol at the same valid effort", projectedFable?.model === "gpt-5.6-sol" && projectedFable?.effort === fableRoute.effort);
+check("RR92 Codex Fable quality alias rejects a mutually attested non-Sol model", rejects(fableNonSolReceipt, fableRoute, DISPATCH_BINDING, FABLE_NON_SOL_EVIDENCE));
+
+const fableUnsupportedEffortRoute = Object.freeze({
+  ...fableRoute,
+  effort: "not-applicable",
+});
+const FABLE_UNSUPPORTED_EFFORT_OBSERVED = Object.freeze({
+  ...FABLE_OBSERVED,
+  effectiveEffort: "not-applicable",
+});
+const FABLE_UNSUPPORTED_EFFORT_EVIDENCE = Object.freeze(trustedEvidenceFor("cli", FIXTURE.hostDigest, FABLE_UNSUPPORTED_EFFORT_OBSERVED));
+const fableUnsupportedEffortReceipt = receiptFor(
+  fableUnsupportedEffortRoute,
+  REQUESTED_DUTY,
+  REQUESTED_WORKTYPE,
+  FABLE_UNSUPPORTED_EFFORT_OBSERVED,
+  FABLE_UNSUPPORTED_EFFORT_EVIDENCE,
+  {},
+);
+check("RR93 Codex Fable quality alias rejects an unsupported effort even when attested", validateDirectRoute(fableUnsupportedEffortRoute).ok && rejects(fableUnsupportedEffortReceipt, fableUnsupportedEffortRoute, DISPATCH_BINDING, FABLE_UNSUPPORTED_EFFORT_EVIDENCE));
+
+const ALTERNATE_TERRA_CLI_EVIDENCE = Object.freeze(trustedEvidenceFor("cli", FIXTURE.hostDigest, ALTERNATE_TERRA_OBSERVED));
+const alternateTerraCliReceipt = receiptFor(
+  terraRoute,
+  REQUESTED_DUTY,
+  REQUESTED_WORKTYPE,
+  ALTERNATE_TERRA_OBSERVED,
+  ALTERNATE_TERRA_CLI_EVIDENCE,
+  {},
+);
+check("RR94 Terra accepts an alternate concrete model ID with matching host attestation", accepts(alternateTerraReceipt, terraRoute, DISPATCH_BINDING, ALTERNATE_TERRA_EVIDENCE));
+check("RR95 Terra still rejects matching CLI attestation for an alternate concrete model ID", rejects(alternateTerraCliReceipt, terraRoute, DISPATCH_BINDING, ALTERNATE_TERRA_CLI_EVIDENCE));
 
 console.log(`\n${passed}/${passed + failed} checks passed.`);
 process.exit(failed === 0 ? 0 : 1);
