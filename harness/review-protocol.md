@@ -103,8 +103,9 @@ the exact base/head/tree, changed paths, changed-behaviour claims, an immutable
 prior receipt ID/digest, a complete hash-bound path-to-invariant map, and an
 unambiguous impact confirmation. Missing proof, an unknown path, a new trust
 boundary, or ambiguous impact falls back to full; it never silently narrows.
-There are at most three Critic rounds and three bundled correction commits per
-package; the host reconciles that exact correction range before selecting either
+There are at most four Critic rounds (the initial run plus one fresh re-Critic
+for each of at most three bundled correction commits) per package; the host
+reconciles that exact correction range before selecting either
 full or delta. A Critic receives the selected mode and affected invariant IDs,
 never prior verdict prose or findings.
 
