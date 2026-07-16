@@ -157,12 +157,13 @@ change scope, gate disposition, remote recovery and rollback evidence.
 Unavailable measurements are `unknown`, never zero. These records are
 observational: they never pass, fail, skip, reopen, or otherwise alter a gate.
 
-Every mandatory check is assigned exactly one owner: `deterministic-verify`,
+Every mandatory check in the caller-held authoritative inventory is assigned exactly one owner: `deterministic-verify`,
 `semantic-critic`, `trajectory-critic`, or `human-risk`. The ownership map
 binds an error class and assertion fingerprint. Equal fingerprints are reported
 as exact overlaps with evidence; reporting an overlap removes no assertion,
-owner, or gate. Missing, duplicated, or ambiguous ownership fails the map's
-reporting validation rather than silently choosing a replacement control.
+owner, or gate. The map's own mandatory-ID claim must reconcile exactly to that
+independent inventory; missing, duplicated, or ambiguous ownership fails the
+map's reporting validation rather than silently choosing a replacement control.
 
 ## 3. Verdict processing by the Elephant (gate decision)
 

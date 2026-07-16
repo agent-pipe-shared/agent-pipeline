@@ -37,6 +37,10 @@ function ownership(overrides = {}) {
   };
 }
 
+function expectedInventory(map) {
+  return [...map.mandatoryCheckIds];
+}
+
 function overlap(leftCheckId = "verify-1", rightCheckId = "verify-2", fingerprint = D, overrides = {}) {
   return {
     leftCheckId,
@@ -50,7 +54,8 @@ function overlap(leftCheckId = "verify-1", rightCheckId = "verify-2", fingerprin
 }
 
 check("OW01 accepts a complete, unambiguous ownership map", () => {
-  assert.equal(validateCheckOwnershipMap(ownership()).ok, true);
+  const map = ownership();
+  assert.equal(validateCheckOwnershipMap(map, expectedInventory(map)).ok, true);
 });
 
 for (const [name, mutate] of [
@@ -64,20 +69,20 @@ for (const [name, mutate] of [
   check(`OW02 rejects ${name} fail-closed`, () => {
     const map = ownership();
     mutate(map);
-    assert.equal(validateCheckOwnershipMap(map).ok, false);
+    assert.equal(validateCheckOwnershipMap(map, expectedInventory(map)).ok, false);
   });
 }
 
 check("OW03 requires exact overlap fingerprint evidence for every shared assertion", () => {
   const checks = [ownedCheck("verify-1"), ownedCheck("verify-2")];
   const withoutEvidence = ownership({ mandatoryCheckIds: ["verify-1", "verify-2"], checks });
-  assert.equal(validateCheckOwnershipMap(withoutEvidence).ok, false);
+  assert.equal(validateCheckOwnershipMap(withoutEvidence, expectedInventory(withoutEvidence)).ok, false);
 
   const withEvidence = ownership({
     mandatoryCheckIds: ["verify-1", "verify-2"], checks,
     overlaps: [overlap()],
   });
-  assert.equal(validateCheckOwnershipMap(withEvidence).ok, true);
+  assert.equal(validateCheckOwnershipMap(withEvidence, expectedInventory(withEvidence)).ok, true);
 });
 
 for (const [name, mutate] of [
@@ -95,7 +100,7 @@ for (const [name, mutate] of [
       overlaps: [overlap()],
     });
     mutate(map);
-    assert.equal(validateCheckOwnershipMap(map).ok, false);
+    assert.equal(validateCheckOwnershipMap(map, expectedInventory(map)).ok, false);
   });
 }
 
@@ -106,10 +111,10 @@ check("OW05 overlap reports are deterministic and preserve the supplied map", ()
     overlaps: [overlap()],
   });
   const before = JSON.stringify(map);
-  const first = reportCheckOwnershipOverlaps(map);
+  const first = reportCheckOwnershipOverlaps(map, expectedInventory(map));
   const reversed = structuredClone(map);
   reversed.checks.reverse();
-  const second = reportCheckOwnershipOverlaps(reversed);
+  const second = reportCheckOwnershipOverlaps(reversed, expectedInventory(reversed));
   assert.equal(first.ok, true);
   assert.deepEqual(first, second);
   assert.equal(JSON.stringify(map), before);
@@ -118,14 +123,49 @@ check("OW05 overlap reports are deterministic and preserve the supplied map", ()
 check("OW06 an ownership map cannot add, mutate, or remove gate configuration", () => {
   const map = ownership();
   const before = JSON.stringify(map);
-  const report = reportCheckOwnershipOverlaps(map);
+  const report = reportCheckOwnershipOverlaps(map, expectedInventory(map));
   assert.equal(report.ok, true);
   assert.equal(JSON.stringify(map), before);
 
   const attemptedGateMutation = ownership({
     gateConfiguration: { verify: { outcome: "skipped", remove: true } },
   });
-  assert.equal(validateCheckOwnershipMap(attemptedGateMutation).ok, false);
+  assert.equal(validateCheckOwnershipMap(attemptedGateMutation, expectedInventory(attemptedGateMutation)).ok, false);
+});
+
+check("OW07 rejects omitted, malformed, and duplicate expected mandatory inventories before map authority", () => {
+  const map = ownership();
+  for (const expected of [undefined, [], "verify-1", ["verify-1", "verify-1"], ["not safe id!"]]) {
+    const validation = validateCheckOwnershipMap(map, expected);
+    const report = reportCheckOwnershipOverlaps(map, expected);
+    assert.equal(validation.ok, false);
+    assert.equal(validation.code, "COM-EXPECTED-INVENTORY");
+    assert.equal(report.ok, false);
+    assert.equal(report.code, "COM-EXPECTED-INVENTORY");
+  }
+});
+
+check("OW08 rejects caller inventory mismatches rather than deriving authority from the map", () => {
+  const map = ownership();
+  for (const expected of [["verify-2"], ["verify-1", "verify-2"]]) {
+    const validation = validateCheckOwnershipMap(map, expected);
+    const report = reportCheckOwnershipOverlaps(map, expected);
+    assert.equal(validation.ok, false);
+    assert.equal(validation.code, "COM-MANDATORY-MISMATCH");
+    assert.equal(report.ok, false);
+    assert.equal(report.code, "COM-MANDATORY-MISMATCH");
+  }
+});
+
+check("OW09 expected inventory callers and reports are non-mutating", () => {
+  const map = ownership();
+  const expected = ["verify-1"];
+  const beforeMap = JSON.stringify(map);
+  const beforeExpected = JSON.stringify(expected);
+  assert.equal(validateCheckOwnershipMap(map, expected).ok, true);
+  assert.equal(reportCheckOwnershipOverlaps(map, expected).ok, true);
+  assert.equal(JSON.stringify(map), beforeMap);
+  assert.equal(JSON.stringify(expected), beforeExpected);
 });
 
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);

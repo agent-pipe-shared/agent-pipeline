@@ -99,4 +99,13 @@ check("ME06 summary fails closed for malformed input and contains no synthetic z
   assert.match(JSON.stringify(summary.summary), /unknown/);
 });
 
+check("ME07 rejects distinct metric IDs that try to summarize the same cycle and gate twice", () => {
+  const duplicate = summarizeSdlcEfficiencyMetrics([
+    metric({ metricId: "metric-cycle-gate-a" }),
+    metric({ metricId: "metric-cycle-gate-b" }),
+  ]);
+  assert.equal(duplicate.ok, false);
+  assert.equal(duplicate.code, "SEM-DUPLICATE-GATE-CYCLE");
+});
+
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);

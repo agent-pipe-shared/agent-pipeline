@@ -17,9 +17,17 @@ function sha(value) { return typeof value === "string" && SHA256.test(value); }
 function oid(value) { return typeof value === "string" && OID.test(value); }
 function evidence(value) { return Array.isArray(value) && value.length > 0 && value.length <= 128 && value.every(id) && new Set(value).size === value.length; }
 function pair(left, right) { return `${left}\u0000${right}`; }
+function authoritativeInventory(value) { return Array.isArray(value) && value.length > 0 && value.length <= 512 && value.every(id) && new Set(value).size === value.length; }
 
-/** Return all validation findings; a map must be complete and unambiguous to pass. */
-export function validateCheckOwnershipMap(value) {
+/**
+ * Return all validation findings. The authoritative mandatory inventory is
+ * caller-held input, never a map self-declaration, so coverage cannot pass by
+ * merely omitting a required check from the submitted map.
+ */
+export function validateCheckOwnershipMap(value, expectedMandatoryCheckIds = undefined) {
+  if (!authoritativeInventory(expectedMandatoryCheckIds)) {
+    return { ok: false, code: "COM-EXPECTED-INVENTORY", findings: ["caller must supply a non-empty duplicate-free authoritative mandatory inventory"] };
+  }
   const findings = [];
   if (!exact(value, ROOT_KEYS) || value.schema !== CHECK_OWNERSHIP_SCHEMA) return { ok: false, code: "COM-INVALID", findings: ["map must use the closed ownership schema"] };
   if (!exact(value.candidate, CANDIDATE_KEYS) || !oid(value.candidate.commit) || !oid(value.candidate.tree)) findings.push("candidate must bind exact commit and tree OIDs");
@@ -35,6 +43,11 @@ export function validateCheckOwnershipMap(value) {
     else checks.set(check.checkId, check);
   }
   const mandatory = new Set(Array.isArray(value.mandatoryCheckIds) ? value.mandatoryCheckIds : []);
+  const expected = new Set(expectedMandatoryCheckIds);
+  let inventoryMismatch = false;
+  for (const checkId of expected) if (!mandatory.has(checkId)) inventoryMismatch = true;
+  for (const checkId of mandatory) if (!expected.has(checkId)) inventoryMismatch = true;
+  if (inventoryMismatch) findings.push("map mandatoryCheckIds must exactly reconcile to the caller-held authoritative inventory");
   for (const checkId of mandatory) if (!checks.has(checkId)) findings.push("every mandatory check must have one ownership entry");
   for (const checkId of checks.keys()) if (!mandatory.has(checkId)) findings.push("ownership entries must not introduce a non-mandatory check");
 
@@ -70,12 +83,12 @@ export function validateCheckOwnershipMap(value) {
       if (!actualPairs.has(pair(group[left], group[right]))) findings.push("every identical assertion fingerprint must be reported as an overlap");
     }
   }
-  return { ok: findings.length === 0, code: findings.length === 0 ? "COM-VALID" : "COM-INVALID", findings };
+  return { ok: findings.length === 0, code: findings.length === 0 ? "COM-VALID" : inventoryMismatch ? "COM-MANDATORY-MISMATCH" : "COM-INVALID", findings };
 }
 
 /** Produce a stable overlap report. It records overlaps only and never removes a check or owner. */
-export function reportCheckOwnershipOverlaps(value) {
-  const valid = validateCheckOwnershipMap(value);
+export function reportCheckOwnershipOverlaps(value, expectedMandatoryCheckIds = undefined) {
+  const valid = validateCheckOwnershipMap(value, expectedMandatoryCheckIds);
   if (!valid.ok) return { ok: false, code: valid.code, overlaps: [], findings: valid.findings };
   const overlaps = value.overlaps.map((overlap) => ({
     checkIds: [overlap.leftCheckId, overlap.rightCheckId],

@@ -60,11 +60,15 @@ function total(records, path) {
 export function summarizeSdlcEfficiencyMetrics(records) {
   if (!Array.isArray(records)) return { ok: false, code: "SEM-RECORDS", summary: null };
   const ids = new Set();
+  const gateCycles = new Set();
   for (const record of records) {
     const valid = validateSdlcEfficiencyMetric(record);
     if (!valid.ok) return { ok: false, code: valid.code, summary: null };
     if (ids.has(record.metricId)) return { ok: false, code: "SEM-DUPLICATE-METRIC", summary: null };
     ids.add(record.metricId);
+    const gateCycle = `${record.cycleId}\u0000${record.gateId}`;
+    if (gateCycles.has(gateCycle)) return { ok: false, code: "SEM-DUPLICATE-GATE-CYCLE", summary: null };
+    gateCycles.add(gateCycle);
   }
   const ordered = [...records].sort((left, right) => left.metricId.localeCompare(right.metricId));
   const byOutcome = Object.fromEntries(OUTCOMES.map((outcome) => [outcome, 0]));
