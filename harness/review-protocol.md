@@ -103,7 +103,7 @@ the exact base/head/tree, changed paths, changed-behaviour claims, an immutable
 prior receipt ID/digest, a complete hash-bound path-to-invariant map, and an
 unambiguous impact confirmation. Missing proof, an unknown path, a new trust
 boundary, or ambiguous impact falls back to full; it never silently narrows.
-There are at most two Critic rounds and two bundled correction commits per
+There are at most three Critic rounds and three bundled correction commits per
 package; the host reconciles that exact correction range before selecting either
 full or delta. A Critic receives the selected mode and affected invariant IDs,
 never prior verdict prose or findings.
@@ -170,7 +170,7 @@ map's reporting validation rather than silently choosing a replacement control.
 **Rule (validate first):** Findings that violate the skip rule or lack evidence are rejected with a short note — no debate.
 **Rule (disposition):** EVERY blocker/major finding receives exactly one disposition: **fix** (rework dispatch) · **reject with recorded justification** · **escalate to the PO**. Minor findings: fix now, file as backlog item, or reject.
 **Rule (rework):** Rework is a **NEW dispatch with fresh context and a refined briefing** — never continued work in the failed context. BEFORE any re-dispatch or model escalation, run the harness checklist (P1 / `policies/tooling-policy.md` G2): (1) briefing complete and consistent? (2) context clean? (3) tools/permissions right-sized? (4) hooks/gates wired and actually run?
-**Rule (cycle cap):** Max **2 rework cycles per task**, then the PO — mandatory, no exceptions.
+**Rule (cycle cap):** Max **3 rework cycles per task**, then the PO — mandatory, no exceptions.
 **Rule (re-review):** After rework, the trigger table (§2.1) re-applies to the new diff; mandatory triggers → a NEW fresh Critic run. A Critic context is never reused — it would anchor on its own previous findings (same rationale as the readiness-check repetition rule, OM §3.4).
 **Rule (no dialogue):** There is never a Critic↔Goldfish dialogue; the Elephant mediates via briefings.
 **Why:** Findings without dispositions rot; unbounded rework cycles are the expensive form of grinding; a reused reviewer stops being fresh.
@@ -186,8 +186,8 @@ Model escalation inside rework follows **MP-05** (criterion 3: same task class f
 |---|---|---|
 | 1 | Goldfish itself | one closed product cause may receive one automatic retry; a matching second signature, unknown cause or exhausted budget → course gate + PO decision brief. Harness leashes: `maxTurns` frontmatter; stop-hook cap 8 consecutive blocks |
 | 2 | Critic | delivers findings only — **no dialogue with the goldfish, no own fixes** (read-only) |
-| 3 | Elephant | dispositions every finding (fix / reject with justification / the PO); harness checklist BEFORE re-dispatch or model escalation (G2/P1); rework = fresh context + refined briefing; max **2 rework cycles per task** |
-| 4 | the PO | MANDATORY on: blockers, > 2 rework cycles, irreversible/externally visible/costly matters, spec↔reality conflict, budget overrun (criterion: `policies/model-policy.md` MP-20) |
+| 3 | Elephant | dispositions every finding (fix / reject with justification / the PO); harness checklist BEFORE re-dispatch or model escalation (G2/P1); rework = fresh context + refined briefing; max **3 rework cycles per task** |
+| 4 | the PO | MANDATORY on: blockers, > 3 rework cycles, irreversible/externally visible/costly matters, spec↔reality conflict, budget overrun (criterion: `policies/model-policy.md` MP-20) |
 
 Flow diagram: `docs/operating-model.md` §4.3 (normative; this table is its operational summary).
 
