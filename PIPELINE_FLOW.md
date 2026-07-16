@@ -125,7 +125,7 @@ flowchart TD
     FOK -->|"yes"| RESUME["Resume bounded work"]
     FOK -->|"no"| COURSE
     EQUAL -->|"no"| COURSE
-    KIND -->|"semantic finding"| SBUDGET{"Fewer than 2 semantic rework cycles used?"}
+    KIND -->|"semantic finding"| SBUDGET{"Fewer than 3 semantic rework cycles used?"}
     SBUDGET -->|"yes"| CORRECT["Fresh semantic correction starts next cycle"]
     CORRECT --> REGATE["Independent delta re-gate"]
     REGATE --> DOK{"Delta re-gate passes?"}
@@ -142,9 +142,9 @@ product work. It freezes the authority bindings, narrows the task, and forbids
 delegation. A second environment failure, an unproven cause, a repeated product
 signature, or an exhausted budget goes directly to the course gate. There is no
 third automatic product attempt. Each fresh semantic-correction dispatch consumes
-one rework cycle. At most two rework cycles are allowed per task; after the second
-unsuccessful cycle, the next step is the PO course gate, never a third rework
-dispatch.
+one local rework cycle. At most three fresh local rework cycles are allowed per
+task; only when a further correction would exceed that budget (>3) does the next
+step become the PO course gate, never a fourth rework dispatch.
 
 ## Authority and evidence
 
@@ -180,9 +180,9 @@ or challenge claims, but none can authorize work by itself.
 | Route, capacity, and authority preflight | Elephant and deterministic harness | Every fresh dispatch | Current authority digests, approved route, available reserved capacity, bounded scope, and non-delegation contract all match | Defer, select a pre-authorized route, repair authority, or open a course gate; do not dispatch |
 | Stage 1 Verify | Goldfish and deterministic harness | Every implementation or correction candidate | The configured full machine chain is green and produced commit-bound evidence | Classify the failure; allow at most one qualifying product retry, otherwise course-gate it |
 | Security | Deterministic security harness | The current manifest declares the phase | Required scanners report policy-acceptable status and exact-commit evidence; `SKIPPED` is not `PASS`, and `ERROR` fails closed | Correct findings, restore the scanner, or stop according to manifest thresholds and policy |
-| Risk-based Critic | Fresh Critic; Elephant owns disposition | The rigor, risk, or diff trigger matrix requires semantic review | The independent review is complete and every admissible finding has a recorded disposition | Dispatch a fresh semantic correction within the two-cycle budget, reject with recorded justification, or escalate to the PO |
-| Independent delta re-gate | Fresh Critic; Elephant owns the gate | A semantic correction changes the reviewed candidate | The exact correction delta is independently reviewed against affected invariants and has no unresolved blocker | Re-correct only while fewer than two rework cycles have been used; after cycle 2, open the PO course gate |
-| Course-decision transaction | PO selects; deterministic harness records | Repeated signature, unknown cause, exhausted budget, scope conflict, two semantic rework cycles used, or another recovery limit | Result-first intent, State CAS, and durable matching receipt agree on one idempotent transition | Recover the exact durable stage or remain blocked; never infer or replay a different choice |
+| Risk-based Critic | Fresh Critic; Elephant owns disposition | The rigor, risk, or diff trigger matrix requires semantic review | The independent review is complete and every admissible finding has a recorded disposition | Dispatch a fresh local semantic correction within the three-cycle budget, reject with recorded justification, or escalate to the PO |
+| Independent delta re-gate | Fresh Critic; Elephant owns the gate | A semantic correction changes the reviewed candidate | The exact correction delta is independently reviewed against affected invariants and has no unresolved blocker | Re-correct only while fewer than three rework cycles have been used; after cycle 3, open the PO course gate because a further correction would exceed the budget |
+| Course-decision transaction | PO selects; deterministic harness records | Repeated signature, unknown cause, exhausted budget, scope conflict, a correction need beyond three semantic rework cycles, or another recovery limit | Result-first intent, State CAS, and durable matching receipt agree on one idempotent transition | Recover the exact durable stage or remain blocked; never infer or replay a different choice |
 | Final exact-commit Full Verify | Deterministic harness and Elephant | Documentation sync and the final commit are complete | Full Verify is regenerated and green for that exact commit, and all required privacy or security checks have policy-acceptable exact-commit dispositions, with `SKIPPED` remaining explicitly `SKIPPED` | Correct, synchronize, make a new final commit, and regenerate the applicable evidence; the candidate is not delivered |
 | Delivery boundary | Elephant, with PO consent where required | Any push or externally effective action | Target, ref, authority, and consent match before the final commit; after exact-commit evidence, calibrated SSH identity readback matches before push | Perform no external action and report unfinished or blocked |
 | Push and exact fetch-back | Deterministic harness and Elephant | The delivery contract requires a remote push | The approved exact OID is pushed to the approved explicit feature branch and a fresh/disposable fetch-back resolves to the same OID | Remain unfinished or blocked; never substitute another branch, merge, tag, or force operation |

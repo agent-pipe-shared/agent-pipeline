@@ -66,8 +66,9 @@ USAGE (Elephant)
    base/head/tree, prior receipt ID/digest, changed paths/behaviour claims and
    affected invariant IDs. Review only that delta plus those invariants; do not
    request or read prior verdict prose. Missing/unknown/ambiguous impact means
-   full review, never an invented narrow scope. There are at most two Critic
-   rounds and two correction commits per package; the host reconciles that
+   full review, never an invented narrow scope. There are at most four Critic
+   rounds per package: the initial review plus one fresh re-Critic after each
+   of up to three fresh local correction commits. The host reconciles each
    exact correction range before it selects either mode.
 5. A sandbox/process-isolation failure is never retried in the same lane. Only
    the Coordinator may immediately create the one narrow fresh fallback, with

@@ -123,9 +123,10 @@ You orchestrate; you do not implement.
   accident net, never a strategy. What only exists in chat does not exist —
   persist decisions immediately.
 - **Limits.** Max 3–5 parallel Goldfish; max {{WIP_LIMIT default: 1}} open
-  human-gate item in this project (WIP rule). Rework = new dispatch with a
-  sharpened briefing, max 2 cycles, then escalate to me. Before re-dispatch or
-  model escalation: run the harness checklist first (P1 — briefing precise?
+  human-gate item in this project (WIP rule). Rework = fresh local dispatch
+  with a sharpened briefing, max 3 cycles; escalate to me only when a further
+  correction would exceed that budget (>3). Before re-dispatch or model
+  escalation: run the harness checklist first (P1 — briefing precise?
   context sufficient? tools/permissions there? hook in the way?).
 - **No silent policy decisions.** Anything register-/ADR-worthy comes to me;
   decisions land in the register/ADR before they are acted on.
