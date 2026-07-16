@@ -148,6 +148,22 @@ Mandatory report sections:
 
 ---
 
+## 2.6 Shadow metrics and check ownership
+
+P3A records a `pipeline.sdlc-efficiency-metrics.v1` shadow record for each
+gate/cycle when data is exposed. It binds the exact candidate and
+tool/runner/schema versions, and records durations, exposed usage, findings,
+change scope, gate disposition, remote recovery and rollback evidence.
+Unavailable measurements are `unknown`, never zero. These records are
+observational: they never pass, fail, skip, reopen, or otherwise alter a gate.
+
+Every mandatory check is assigned exactly one owner: `deterministic-verify`,
+`semantic-critic`, `trajectory-critic`, or `human-risk`. The ownership map
+binds an error class and assertion fingerprint. Equal fingerprints are reported
+as exact overlaps with evidence; reporting an overlap removes no assertion,
+owner, or gate. Missing, duplicated, or ambiguous ownership fails the map's
+reporting validation rather than silently choosing a replacement control.
+
 ## 3. Verdict processing by the Elephant (gate decision)
 
 **Rule (validate first):** Findings that violate the skip rule or lack evidence are rejected with a short note — no debate.

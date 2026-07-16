@@ -6,6 +6,7 @@
 
 - [ ] Stage 1 green: verify passed + evidence artifact exists (no Critic on red builds)
 - [ ] Trigger row determined (`harness/review-protocol.md` §2.1) and recorded for the gate decision
+- [ ] Ownership annotation recorded for each mandatory check: deterministic verify / semantic Critic / trajectory Critic / human risk; any exact assertion-fingerprint overlap is reported, never used to remove a check
 - [ ] Model per row: the review-tier model standard · escalate to a higher-capability model for risk class high or any architecture/guardrail/security diff (MP-07)
 - [ ] Isolation: A/G/S diff → `--bare` + JSON-schema verdict MANDATORY; otherwise read-only subagent
 - [ ] Dispatch contains ONLY paths/refs + metadata: spec path, diff ref, guardrail paths, evidence path, rigor/risk, trigger row, regelwerk SHA — no justifications, no chat history, no prior verdicts
@@ -36,3 +37,4 @@
 - [ ] Rework = new dispatch, fresh context, refined briefing; max 2 cycles, then the PO (mandatory)
 - [ ] Re-review after rework by a NEW fresh Critic where triggers still apply — never reuse a Critic context
 - [ ] Gate decision recorded: trigger row, dispositions, cycle count; telemetry line for the Critic run
+- [ ] Shadow metrics, when available, bind this gate/cycle to exact candidate and tool/runner/schema versions; unavailable values are `unknown`, never zero, and do not change the verdict
