@@ -187,6 +187,67 @@
         "phase": { "type": "string", "enum": ["state-applied"] }
       }
     },
+    "closeTransition": {
+      "type": ["object", "null"],
+      "description": "Recoverable projection of one Result-first close intent; State CAS is its logical commit point.",
+      "additionalProperties": false,
+      "required": ["intentId", "expectedRevision", "authorityDigests", "graphSha256", "packageBindingsSha256", "resultDigest", "receiptId", "receiptSha256", "candidateCommit", "candidateTree", "stage1Verify", "phase", "finalVerify", "delivery"],
+      "properties": {
+        "intentId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "expectedRevision": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "authorityDigests": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["prdSha256", "specSha256", "resultSha256"],
+          "properties": {
+            "prdSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "specSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "resultSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
+        "graphSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "packageBindingsSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "resultDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "receiptId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+        "receiptSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "candidateCommit": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+        "candidateTree": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+        "stage1Verify": {
+          "type": "object",
+          "description": "Green Stage-1 full verify evidence recorded before semantic review and required before close CAS.",
+          "additionalProperties": false,
+          "required": ["commandSha256", "resultSha256", "candidateCommit", "candidateTree"],
+          "properties": {
+            "commandSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "resultSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "candidateCommit": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+            "candidateTree": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" }
+          }
+        },
+        "phase": { "type": "string", "enum": ["state-cas", "verified", "delivered", "readback", "closed"] },
+        "finalVerify": {
+          "type": ["object", "null"],
+          "description": "Post-CAS full verify; runtime validation requires commandSha256 to equal stage1Verify.commandSha256 and candidate OID/tree to equal the current candidate.",
+          "additionalProperties": false,
+          "required": ["commandSha256", "resultSha256", "candidateCommit", "candidateTree"],
+          "properties": {
+            "commandSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "resultSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "candidateCommit": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+            "candidateTree": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" }
+          }
+        },
+        "delivery": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["pushedOid", "fetchedOid"],
+          "properties": {
+            "pushedOid": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+            "fetchedOid": { "type": ["string", "null"], "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" }
+          }
+        }
+      }
+    },
     "capacity": {
       "type": "object",
       "additionalProperties": false,

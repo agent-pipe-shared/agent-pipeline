@@ -4,6 +4,7 @@ import { normalizeContinuityHostObservation } from "./continuity-host-adapter.mj
 const ROOT_KEYS = new Set([
   "schema", "featureId", "revision", "runtime", "authority", "queueHead", "blocker",
   "acknowledgedFinal", "resume", "recovery", "decisionTxn", "capacity",
+  "closeTransition",
 ]);
 const RUNTIME_KEYS = new Set(["humanFacingLanguage", "activeDuty"]);
 const ARTIFACT_KEYS = new Set(["path", "sha256"]);
@@ -34,6 +35,24 @@ const DECISION_KEYS = new Set([
 const CAPACITY_KEYS = new Set([
   "concurrencyLimit", "reservedCriticSlots", "reservedRecoverySlots", "fallbackPolicy",
 ]);
+const CLOSE_TRANSITION_KEYS = new Set([
+  "intentId", "expectedRevision", "authorityDigests", "graphSha256",
+  "packageBindingsSha256", "resultDigest", "receiptId", "receiptSha256",
+  "candidateCommit", "candidateTree", "stage1Verify", "phase", "finalVerify", "delivery",
+]);
+const CLOSE_INTENT_KEYS = new Set([
+  "intentId", "expectedRevision", "authorityDigests", "graphSha256",
+  "packageBindingsSha256", "resultDigest", "receiptId", "receiptSha256",
+  "candidateCommit", "candidateTree", "stage1Verify",
+]);
+const CLOSE_VERIFY_KEYS = new Set(["commandSha256", "resultSha256", "candidateCommit", "candidateTree"]);
+const CLOSE_DELIVERY_KEYS = new Set(["pushedOid", "fetchedOid"]);
+const CLOSE_BEGIN_REQUEST_KEYS = new Set(["expectedRevision", "intent", "result"]);
+const CLOSE_VERIFY_REQUEST_KEYS = new Set(["expectedRevision", "result", "verify"]);
+const CLOSE_MUTATION_REQUEST_KEYS = new Set(["expectedRevision", "result", "candidateCommit", "candidateTree"]);
+const CLOSE_DELIVERY_REQUEST_KEYS = new Set(["expectedRevision", "result", "pushedOid"]);
+const CLOSE_READBACK_REQUEST_KEYS = new Set(["expectedRevision", "result", "fetchedOid"]);
+const CLOSE_COMPLETE_REQUEST_KEYS = new Set(["expectedRevision", "result"]);
 const CAS_KEYS = new Set(["expectedRevision", "next"]);
 const FINAL_REQUEST_KEYS = new Set(["expectedRevision", "observation", "next"]);
 const DECISION_APPLY_KEYS = new Set(["expectedRevision", "decisionTxn", "queueHead", "blocker", "resume"]);
@@ -57,6 +76,7 @@ const FALLBACK_STATUSES = new Set(["fallback-pending", "running", "completed", "
 const FINAL_OUTCOMES = new Set(["succeeded", "failed"]);
 const FALLBACK_POLICIES = new Set(["defer", "pre-authorized-mapped-fallback"]);
 const HUMAN_FACING_LANGUAGES = new Set(["de", "en"]);
+const CLOSE_PHASES = new Set(["state-cas", "verified", "delivered", "readback", "closed"]);
 const INTERRUPT_BLOCKER_TYPES = new Set(["authority", "security", "scope"]);
 const MAX_STATE_BYTES = 8_192;
 
@@ -70,6 +90,12 @@ function exactKeys(value, keys) {
   return actual.length === keys.size && actual.every((key) => keys.has(key));
 }
 
+function allowedKeys(value, keys, requiredKeys) {
+  if (!isObject(value)) return false;
+  const actual = Object.keys(value);
+  return actual.every((key) => keys.has(key)) && requiredKeys.every((key) => Object.hasOwn(value, key));
+}
+
 function safeInteger(value, min = 0, max = Number.MAX_SAFE_INTEGER) {
   return Number.isSafeInteger(value) && value >= min && value <= max;
 }
@@ -80,6 +106,10 @@ function digest(value, nullable = false) {
 
 function safeId(value) {
   return typeof value === "string" && SAFE_ID.test(value);
+}
+
+function gitOid(value) {
+  return typeof value === "string" && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value);
 }
 
 function safePath(value) {
@@ -239,13 +269,87 @@ function validCapacity(value) {
     && FALLBACK_POLICIES.has(value.fallbackPolicy);
 }
 
+function validAuthorityDigests(value) {
+  return exactKeys(value, IDENTITY_AUTHORITY_KEYS)
+    && digest(value.prdSha256)
+    && digest(value.specSha256)
+    && digest(value.resultSha256, true);
+}
+
+function sameAuthorityDigests(left, right) {
+  return validAuthorityDigests(left) && validAuthorityDigests(right)
+    && left.prdSha256 === right.prdSha256
+    && left.specSha256 === right.specSha256
+    && left.resultSha256 === right.resultSha256;
+}
+
+function validCloseIntentFields(value) {
+  return isObject(value)
+    && safeId(value.intentId)
+    && safeInteger(value.expectedRevision)
+    && validAuthorityDigests(value.authorityDigests)
+    && digest(value.graphSha256)
+    && digest(value.packageBindingsSha256)
+    && digest(value.resultDigest)
+    && safeId(value.receiptId)
+    && digest(value.receiptSha256)
+    && gitOid(value.candidateCommit)
+    && gitOid(value.candidateTree)
+    && validStageVerify(value.stage1Verify);
+}
+
+function validCloseIntent(value) {
+  return exactKeys(value, CLOSE_INTENT_KEYS) && validCloseIntentFields(value);
+}
+
+function validStageVerify(value) {
+  return exactKeys(value, CLOSE_VERIFY_KEYS)
+    && digest(value.commandSha256)
+    && digest(value.resultSha256)
+    && gitOid(value.candidateCommit)
+    && gitOid(value.candidateTree);
+}
+
+function validCloseVerify(value, transition) {
+  return exactKeys(value, CLOSE_VERIFY_KEYS)
+    && digest(value.commandSha256)
+    && digest(value.resultSha256)
+    && value.commandSha256 === transition.stage1Verify.commandSha256
+    && value.candidateCommit === transition.candidateCommit
+    && value.candidateTree === transition.candidateTree;
+}
+
+function validCloseDelivery(value) {
+  return exactKeys(value, CLOSE_DELIVERY_KEYS)
+    && gitOid(value.pushedOid)
+    && (value.fetchedOid === null || gitOid(value.fetchedOid));
+}
+
+function validCloseTransition(value, state) {
+  if (value === undefined || value === null) return true;
+  if (!exactKeys(value, CLOSE_TRANSITION_KEYS)
+    || !validCloseIntentFields(value)
+    || !CLOSE_PHASES.has(value.phase)
+    || value.authorityDigests.prdSha256 !== state.authority.prd.sha256
+    || value.authorityDigests.specSha256 !== state.authority.spec.sha256
+    || state.authority.result === null
+    || value.resultDigest !== state.authority.result.sha256
+    || value.expectedRevision >= state.revision) return false;
+  if (value.phase === "state-cas") return value.finalVerify === null && value.delivery === null;
+  if (!validCloseVerify(value.finalVerify, value)) return false;
+  if (value.phase === "verified") return value.delivery === null;
+  if (!validCloseDelivery(value.delivery)) return false;
+  if (value.phase === "delivered") return value.delivery.fetchedOid === null;
+  return value.delivery.fetchedOid === value.delivery.pushedOid;
+}
+
 function result(ok, code, state = null, mutated = false) {
   return { ok, code, mutated, state };
 }
 
 /** Validate one bounded continuity object. */
 export function validateContinuityState(value, activeFeatureId = undefined) {
-  if (!exactKeys(value, ROOT_KEYS)
+  if (!allowedKeys(value, ROOT_KEYS, [...ROOT_KEYS].filter((key) => key !== "closeTransition"))
     || value.schema !== "pipeline.continuity.v0"
     || !safeId(value.featureId)
     || !safeInteger(value.revision)
@@ -259,7 +363,8 @@ export function validateContinuityState(value, activeFeatureId = undefined) {
     || !validResume(value.resume, value.revision)
     || !validRecovery(value.recovery, value)
     || !validDecisionTxn(value.decisionTxn, value.revision)
-    || !validCapacity(value.capacity)) {
+    || !validCapacity(value.capacity)
+    || !validCloseTransition(value.closeTransition, value)) {
     return { ok: false, code: "CS-INVALID" };
   }
   let bytes;
@@ -496,6 +601,188 @@ function validResultReplacement(current, result) {
     && result.sha256 !== current.authority.result.sha256;
 }
 
+function closeIntentMatches(transition, intent, resultArtifact) {
+  return transition !== null
+    && validCloseIntent(intent)
+    && transition.intentId === intent.intentId
+    && transition.expectedRevision === intent.expectedRevision
+    && sameAuthorityDigests(transition.authorityDigests, intent.authorityDigests)
+    && transition.graphSha256 === intent.graphSha256
+    && transition.packageBindingsSha256 === intent.packageBindingsSha256
+    && transition.receiptId === intent.receiptId
+    && transition.receiptSha256 === intent.receiptSha256
+    && transition.candidateCommit === intent.candidateCommit
+    && transition.candidateTree === intent.candidateTree
+    && sameJson(transition.stage1Verify, intent.stage1Verify)
+    && transition.resultDigest === resultArtifact?.sha256;
+}
+
+function closeReplay(current, expectedRevision, phase, matches) {
+  return matches && current.closeTransition?.phase === phase
+    && (expectedRevision === current.revision || expectedRevision === current.closeTransition.expectedRevision)
+    ? result(true, "CS-CLOSE-REPLAY", structuredClone(current))
+    : null;
+}
+
+function replaceCloseResult(current, resultArtifact) {
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.authority.result = resultArtifact;
+  next.closeTransition.resultDigest = resultArtifact.sha256;
+  return next;
+}
+
+/**
+ * Apply the State half of a Result-first close intent. The caller persists the
+ * deterministic Result intent before invoking this pure CAS proposal. Replays
+ * are accepted both before and after State acknowledgement; no cross-file
+ * atomicity is claimed.
+ */
+export function beginCloseTransition(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, CLOSE_BEGIN_REQUEST_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  if (current.closeTransition !== undefined && current.closeTransition !== null) {
+    return closeIntentMatches(current.closeTransition, request.intent, request.result)
+      ? result(true, "CS-CLOSE-REPLAY", structuredClone(current))
+      : result(false, "CS-CLOSE-CONFLICT");
+  }
+  if (request.expectedRevision !== current.revision || !validCloseIntent(request.intent)
+    || !validResultReplacement(current, request.result)
+    || current.queueHead === null || current.queueHead.nextAction !== "close"
+    || request.intent.expectedRevision !== current.revision
+    || !sameAuthorityDigests(request.intent.authorityDigests, {
+      prdSha256: current.authority.prd.sha256,
+      specSha256: current.authority.spec.sha256,
+      resultSha256: current.authority.result?.sha256 ?? null,
+    })
+    || request.intent.resultDigest !== request.result.sha256) return result(false, "CS-CLOSE-INTENT-INVALID");
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.authority.result = request.result;
+  next.closeTransition = { ...request.intent, phase: "state-cas", finalVerify: null, delivery: null };
+  const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowResultAuthorityChange: true,
+  });
+  return cas.ok ? result(true, "CS-CLOSE-CAS-APPLIED", cas.state, true) : cas;
+}
+
+/** Record a full verify that ran on the exact post-CAS candidate. */
+export function recordCloseFinalVerify(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, CLOSE_VERIFY_REQUEST_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  const transition = current.closeTransition;
+  const replay = closeReplay(current, request.expectedRevision, "verified",
+    transition !== null && sameJson(transition.finalVerify, request.verify) && transition.resultDigest === request.result?.sha256);
+  if (replay) return replay;
+  if (request.expectedRevision !== current.revision || transition === null || transition.phase !== "state-cas"
+    || !validResultReplacement(current, request.result) || !validCloseVerify(request.verify, transition)) {
+    return result(false, "CS-CLOSE-VERIFY-INVALID");
+  }
+  const next = replaceCloseResult(current, request.result);
+  next.closeTransition.phase = "verified";
+  next.closeTransition.finalVerify = structuredClone(request.verify);
+  const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowResultAuthorityChange: true,
+  });
+  return cas.ok ? result(true, "CS-CLOSE-VERIFY-RECORDED", cas.state, true) : cas;
+}
+
+/** A tracked candidate mutation invalidates final-verify evidence before delivery. */
+export function recordCloseCandidateMutation(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, CLOSE_MUTATION_REQUEST_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  const transition = current.closeTransition;
+  if (request.expectedRevision !== current.revision || transition === null
+    || !new Set(["state-cas", "verified"]).has(transition.phase)
+    || !validResultReplacement(current, request.result)
+    || !gitOid(request.candidateCommit) || !gitOid(request.candidateTree)
+    || (request.candidateCommit === transition.candidateCommit && request.candidateTree === transition.candidateTree)) {
+    return result(false, "CS-CLOSE-MUTATION-INVALID");
+  }
+  const next = replaceCloseResult(current, request.result);
+  next.closeTransition.candidateCommit = request.candidateCommit;
+  next.closeTransition.candidateTree = request.candidateTree;
+  next.closeTransition.phase = "state-cas";
+  next.closeTransition.finalVerify = null;
+  next.closeTransition.delivery = null;
+  const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowResultAuthorityChange: true,
+  });
+  return cas.ok ? result(true, "CS-CLOSE-VERIFY-STALE", cas.state, true) : cas;
+}
+
+/** Delivery is permitted only after a still-exact final verify. */
+export function recordCloseDelivery(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, CLOSE_DELIVERY_REQUEST_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  const transition = current.closeTransition;
+  const replay = closeReplay(current, request.expectedRevision, "delivered",
+    transition !== null && transition.delivery?.pushedOid === request.pushedOid && transition.resultDigest === request.result?.sha256);
+  if (replay) return replay;
+  if (request.expectedRevision !== current.revision || transition === null || transition.phase !== "verified"
+    || !validResultReplacement(current, request.result) || request.pushedOid !== transition.candidateCommit) {
+    return result(false, "CS-CLOSE-DELIVERY-BLOCKED");
+  }
+  const next = replaceCloseResult(current, request.result);
+  next.closeTransition.phase = "delivered";
+  next.closeTransition.delivery = { pushedOid: request.pushedOid, fetchedOid: null };
+  const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowResultAuthorityChange: true,
+  });
+  return cas.ok ? result(true, "CS-CLOSE-DELIVERY-RECORDED", cas.state, true) : cas;
+}
+
+/** Record an exact OID fetch-back; the delivery tail cannot change candidate bytes. */
+export function recordCloseReadback(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, CLOSE_READBACK_REQUEST_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  const transition = current.closeTransition;
+  const replay = closeReplay(current, request.expectedRevision, "readback",
+    transition !== null && transition.delivery?.fetchedOid === request.fetchedOid && transition.resultDigest === request.result?.sha256);
+  if (replay) return replay;
+  if (request.expectedRevision !== current.revision || transition === null || transition.phase !== "delivered"
+    || !validResultReplacement(current, request.result) || request.fetchedOid !== transition.delivery?.pushedOid) {
+    return result(false, "CS-CLOSE-READBACK-BLOCKED");
+  }
+  const next = replaceCloseResult(current, request.result);
+  next.closeTransition.phase = "readback";
+  next.closeTransition.delivery.fetchedOid = request.fetchedOid;
+  const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowResultAuthorityChange: true,
+  });
+  return cas.ok ? result(true, "CS-CLOSE-READBACK-RECORDED", cas.state, true) : cas;
+}
+
+/** Mark a read-back-confirmed transition closed without permitting a delivery-tail mutation. */
+export function completeCloseTransition(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, CLOSE_COMPLETE_REQUEST_KEYS) || !safeInteger(request.expectedRevision)) {
+    return result(false, before.ok ? "CS-REQUEST" : before.code);
+  }
+  const transition = current.closeTransition;
+  const replay = closeReplay(current, request.expectedRevision, "closed",
+    transition !== null && transition.resultDigest === request.result?.sha256);
+  if (replay) return replay;
+  if (request.expectedRevision !== current.revision || transition === null || transition.phase !== "readback"
+    || !validResultReplacement(current, request.result)) return result(false, "CS-CLOSE-COMPLETE-BLOCKED");
+  const next = replaceCloseResult(current, request.result);
+  next.closeTransition.phase = "closed";
+  const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
+    allowResultAuthorityChange: true,
+  });
+  return cas.ok ? result(true, "CS-CLOSE-CLOSED", cas.state, true) : cas;
+}
+
 /** Bind a Result-persisted course brief before presenting the course blocker. */
 export function recordCourseDecisionBrief(current, request, activeFeatureId = undefined) {
   const before = validateContinuityState(current, activeFeatureId);
@@ -626,6 +913,11 @@ export const CONTINUITY_STATE_CODES = Object.freeze([
   "CS-PROTECTED-FINAL-FIELDS",
   "CS-PROTECTED-AUTHORITY",
   "CS-INTERRUPT-DRIFT",
+  "CS-CLOSE-REPLAY", "CS-CLOSE-CONFLICT", "CS-CLOSE-INTENT-INVALID",
+  "CS-CLOSE-CAS-APPLIED", "CS-CLOSE-VERIFY-INVALID", "CS-CLOSE-VERIFY-RECORDED",
+  "CS-CLOSE-MUTATION-INVALID", "CS-CLOSE-VERIFY-STALE", "CS-CLOSE-DELIVERY-BLOCKED",
+  "CS-CLOSE-DELIVERY-RECORDED", "CS-CLOSE-READBACK-BLOCKED",
+  "CS-CLOSE-READBACK-RECORDED", "CS-CLOSE-COMPLETE-BLOCKED", "CS-CLOSE-CLOSED",
 ]);
 
 export const CONTINUITY_STATE_MAX_BYTES = MAX_STATE_BYTES;

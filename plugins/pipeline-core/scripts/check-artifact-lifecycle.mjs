@@ -18,6 +18,14 @@ export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
 export const LIFECYCLE_SCHEMA = "pipeline.artifact-lifecycle.v1";
 export const CANONICAL_HUMAN_STATE_PATH = "docs/state.md";
 export const CANONICAL_MACHINE_STATE_PATH = ".claude/pipeline-state.json";
+export const CLOSE_LIFECYCLE_STATUS = Object.freeze({
+  intent: "close-intent",
+  "state-cas": "close-cas",
+  verified: "close-verified",
+  delivered: "close-delivered",
+  readback: "close-readback",
+  closed: "closed",
+});
 
 const OWNERSHIP = Object.freeze({
   prd: "product-intent",
@@ -96,6 +104,87 @@ export function loadLifecycleMetadata(root = DEFAULT_ROOT, resultPath) {
 
 function activeByKind(artifacts, kind) {
   return artifacts.filter((artifact) => artifact?.kind === kind && artifact?.state === "active");
+}
+
+function sha256(value) {
+  return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+}
+
+function oid(value) {
+  return typeof value === "string" && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/.test(value);
+}
+
+function closedKeys(value, keys) {
+  return isObject(value) && Object.keys(value).length === keys.length
+    && keys.every((key) => Object.hasOwn(value, key));
+}
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (!isObject(value)) return JSON.stringify(value);
+  return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+}
+
+const CLOSE_KEYS = ["intentId", "expectedRevision", "authorityDigests", "graphSha256", "packageBindingsSha256", "resultDigest", "receiptId", "receiptSha256", "candidateCommit", "candidateTree", "stage1Verify", "phase", "finalVerify", "delivery"];
+const VERIFY_KEYS = ["commandSha256", "resultSha256", "candidateCommit", "candidateTree"];
+const DELIVERY_KEYS = ["pushedOid", "fetchedOid"];
+
+function validVerify(value, transition, exactCandidate) {
+  return closedKeys(value, VERIFY_KEYS)
+    && sha256(value.commandSha256) && sha256(value.resultSha256)
+    && oid(value.candidateCommit) && oid(value.candidateTree)
+    && (!exactCandidate || (value.commandSha256 === transition.stage1Verify.commandSha256
+      && value.candidateCommit === transition.candidateCommit && value.candidateTree === transition.candidateTree));
+}
+
+function validCloseProjection(value, allowIntent = false) {
+  if (!closedKeys(value, CLOSE_KEYS)
+    || typeof value.intentId !== "string" || value.intentId.length === 0
+    || !Number.isSafeInteger(value.expectedRevision) || value.expectedRevision < 0
+    || !closedKeys(value.authorityDigests, ["prdSha256", "specSha256", "resultSha256"])
+    || !sha256(value.authorityDigests.prdSha256) || !sha256(value.authorityDigests.specSha256)
+    || !(value.authorityDigests.resultSha256 === null || sha256(value.authorityDigests.resultSha256))
+    || !sha256(value.graphSha256) || !sha256(value.packageBindingsSha256) || !sha256(value.resultDigest)
+    || typeof value.receiptId !== "string" || value.receiptId.length === 0 || !sha256(value.receiptSha256)
+    || !oid(value.candidateCommit) || !oid(value.candidateTree)
+    || !validVerify(value.stage1Verify, value, false)) return false;
+  const phaseAllowed = allowIntent ? Object.hasOwn(CLOSE_LIFECYCLE_STATUS, value.phase) : Object.hasOwn(CLOSE_LIFECYCLE_STATUS, value.phase) && value.phase !== "intent";
+  if (!phaseAllowed) return false;
+  if (value.phase === "intent" || value.phase === "state-cas") return value.finalVerify === null && value.delivery === null;
+  if (!validVerify(value.finalVerify, value, true)) return false;
+  if (value.phase === "verified") return value.delivery === null;
+  if (!closedKeys(value.delivery, DELIVERY_KEYS) || !oid(value.delivery.pushedOid)
+    || !(value.delivery.fetchedOid === null || oid(value.delivery.fetchedOid))) return false;
+  if (value.phase === "delivered") return value.delivery.fetchedOid === null;
+  return value.delivery.fetchedOid === value.delivery.pushedOid;
+}
+
+/** Derive the single status instead of accepting competing status prose. */
+export function deriveCloseLifecycleStatus(resultTransition, machineTransition) {
+  if (resultTransition === undefined && machineTransition === undefined) return { ok: true, status: "implementation-active" };
+  if (!validCloseProjection(resultTransition, true)) return { ok: false, reason: "Result closeTransition is not a closed valid projection" };
+  if (resultTransition.phase === "intent") {
+    return machineTransition === undefined || machineTransition === null
+      ? { ok: true, status: CLOSE_LIFECYCLE_STATUS.intent }
+      : { ok: false, reason: "Result intent conflicts with an acknowledged machine close transition" };
+  }
+  if (!validCloseProjection(machineTransition, false)) return { ok: false, reason: "machine closeTransition is missing or invalid" };
+  if (canonicalJson(resultTransition) !== canonicalJson(machineTransition)) {
+    return { ok: false, reason: "Result and machine close transitions differ" };
+  }
+  return { ok: true, status: CLOSE_LIFECYCLE_STATUS[machineTransition.phase] };
+}
+
+/** Return bounded lifecycle-projection findings suitable for the CLI and tests. */
+export function validateCloseLifecycleProjection(resultTransition, machineTransition, status, resultStatus, machinePhase) {
+  const derived = deriveCloseLifecycleStatus(resultTransition, machineTransition);
+  if (!derived.ok) return [derived.reason];
+  const findings = [];
+  if (status?.lifecycleStatus !== derived.status) findings.push("artifactLifecycle.status.lifecycleStatus does not match the derived close lifecycle status");
+  if (status?.phase !== derived.status) findings.push("artifactLifecycle.status.phase does not match the derived close lifecycle status");
+  if (status?.resultStatus !== derived.status || resultStatus !== derived.status) findings.push("Result status does not match the derived close lifecycle status");
+  if (machinePhase !== derived.status) findings.push("machine state activeFeature.phase does not match the derived close lifecycle status");
+  return findings;
 }
 
 /**
@@ -191,10 +280,11 @@ export function checkArtifactLifecycle(root = DEFAULT_ROOT, resultPath) {
     findings.push("artifactLifecycle.status must bind phase and resultStatus");
   }
   if (result.status !== status.resultStatus) findings.push("Result status does not match artifactLifecycle.status.resultStatus");
+  let machine = null;
   if (machinePath) {
     const text = readUtf8(join(root, machinePath), findings, "machine pipeline state");
     try {
-      const machine = JSON.parse(text);
+      machine = JSON.parse(text);
       if (machine?.activeFeature?.id !== metadata.featureId) findings.push("machine state activeFeature.id does not match artifactLifecycle.featureId");
       if (machine?.activeFeature?.phase !== status.phase) findings.push("machine state activeFeature.phase does not match artifactLifecycle.status.phase");
       if (machine?.activeFeature?.planPath !== activePrd?.path) findings.push("machine state activeFeature.planPath does not match the active PRD path");
@@ -209,7 +299,10 @@ export function checkArtifactLifecycle(root = DEFAULT_ROOT, resultPath) {
       } else {
         for (const [kind, artifact] of [["prd", activePrd], ["spec", activeSpec], ["result", activeResult]]) {
           const bound = authority[kind];
-          if (!artifact || !bound || bound.path !== artifact.path || bound.sha256 !== sha256File(root, artifact.path)) {
+          const resultFirstIntent = kind === "result" && metadata.closeTransition?.phase === "intent"
+            && bound?.sha256 === metadata.closeTransition.authorityDigests?.resultSha256;
+          if (!artifact || !bound || bound.path !== artifact.path
+            || (bound.sha256 !== sha256File(root, artifact.path) && !resultFirstIntent)) {
             findings.push(`machine state artifactAuthority.${kind} must bind the active ${kind} path and digest`);
           }
         }
@@ -225,6 +318,19 @@ export function checkArtifactLifecycle(root = DEFAULT_ROOT, resultPath) {
     for (const marker of status.humanRequiredText) {
       if (typeof marker !== "string" || marker.length === 0 || !human.includes(marker)) findings.push("human state does not contain a required status marker");
     }
+  }
+
+  // P3 is additive: legacy opted-in lifecycle Results retain their existing
+  // bounded projection until they declare a close transition. Once declared,
+  // Result intent and Continuity State are reconciled as one lifecycle.
+  if (Object.hasOwn(metadata, "closeTransition")) {
+    for (const finding of validateCloseLifecycleProjection(
+      metadata.closeTransition,
+      machine?.closeTransition,
+      status,
+      result.status,
+      machine?.activeFeature?.phase,
+    )) findings.push(finding);
   }
 
   const backlogPath = readableFile(root, status.backlogPath, findings, "artifactLifecycle.status.backlogPath");

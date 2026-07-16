@@ -5,11 +5,17 @@ import {
   CONTINUITY_STATE_CODES,
   applyCourseDecisionIntent,
   applyDecisionSelection,
+  beginCloseTransition,
   clearCourseDecisionReceipt,
   clearDecisionSelection,
   compareAndSwapContinuity,
+  completeCloseTransition,
   continuityDispatchAllowed,
   integrateContinuityFinal,
+  recordCloseCandidateMutation,
+  recordCloseDelivery,
+  recordCloseFinalVerify,
+  recordCloseReadback,
   recordCourseDecisionBrief,
   validateContinuityState,
 } from "./continuity-state.mjs";
@@ -27,6 +33,7 @@ const A = "a".repeat(64);
 const B = "b".repeat(64);
 const C = "c".repeat(64);
 const D = "d".repeat(64);
+const E = "e".repeat(64);
 const FEATURE = "v0.3-phase2.6-sdlc-throughput-hardening";
 const schema = JSON.parse(readFileSync(fileURLToPath(new URL("../scripts/continuity-state.schema.json", import.meta.url)), "utf8"));
 
@@ -103,6 +110,7 @@ function state(overrides = {}) {
     resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" },
     recovery: null,
     decisionTxn: null,
+    closeTransition: null,
     capacity: {
       concurrencyLimit: 3,
       reservedCriticSlots: 1,
@@ -156,6 +164,53 @@ function integratedNext(current, observation, finalOutcome = "succeeded") {
     };
   }
   return next;
+}
+
+const CLOSE_COMMIT = "1".repeat(40);
+const CLOSE_TREE = "2".repeat(40);
+const MUTATED_COMMIT = "3".repeat(40);
+const MUTATED_TREE = "4".repeat(40);
+
+function closeResult(sha256 = D) {
+  return { path: "specs/result.md", sha256 };
+}
+
+function closeIntent(overrides = {}) {
+  return {
+    intentId: "close-intent-01",
+    expectedRevision: 0,
+    authorityDigests: { prdSha256: A, specSha256: B, resultSha256: C },
+    graphSha256: D,
+    packageBindingsSha256: A,
+    resultDigest: D,
+    receiptId: "close-receipt-01",
+    receiptSha256: B,
+    candidateCommit: CLOSE_COMMIT,
+    candidateTree: CLOSE_TREE,
+    stage1Verify: {
+      commandSha256: C,
+      resultSha256: D,
+      candidateCommit: CLOSE_COMMIT,
+      candidateTree: CLOSE_TREE,
+    },
+    ...overrides,
+  };
+}
+
+function closeReadyState() {
+  return state({ queueHead: queueHead({ nextAction: "close", dispatch: null }) });
+}
+
+function finalVerify(commit = CLOSE_COMMIT, tree = CLOSE_TREE, resultSha256 = E, commandSha256 = C) {
+  return { commandSha256, resultSha256, candidateCommit: commit, candidateTree: tree };
+}
+
+function beginClose(current = closeReadyState()) {
+  return beginCloseTransition(current, {
+    expectedRevision: current.revision,
+    intent: closeIntent(),
+    result: closeResult(),
+  }, FEATURE);
 }
 
 check("valid queue state passes runtime and supported schema subset", () => {
@@ -750,6 +805,173 @@ check("PO interrupt may replace work only with a typed authority security or sco
   next.blocker = courseBlocker();
   next.resume = { mode: "resume-on-next-turn", sourceRevision: 1, reasonCode: "po-interrupt" };
   assert.equal(compareAndSwapContinuity(invalid, { expectedRevision: 0, next }, FEATURE).code, "CS-INTERRUPT-DRIFT");
+});
+
+check("close writes deterministic Result intent before the State CAS logical commit", () => {
+  const current = closeReadyState();
+  const first = beginClose(current);
+  assert.equal(first.ok, true);
+  assert.equal(first.mutated, true);
+  assert.equal(first.state.revision, 1);
+  assert.equal(first.state.closeTransition.phase, "state-cas");
+  assert.equal(first.state.closeTransition.expectedRevision, 0);
+  assert.equal(first.state.closeTransition.resultDigest, D);
+  assert.equal(first.state.closeTransition.finalVerify, null);
+  assert.equal(first.state.closeTransition.delivery, null);
+});
+
+check("Result-before-State and State-acknowledged close crashes replay the exact same transition", () => {
+  const current = closeReadyState();
+  const first = beginClose(current);
+  const resultBeforeStateReplay = beginClose(current);
+  assert.equal(resultBeforeStateReplay.ok, true);
+  assert.equal(resultBeforeStateReplay.mutated, true);
+  assert.equal(JSON.stringify(resultBeforeStateReplay.state), JSON.stringify(first.state));
+
+  const before = JSON.stringify(first.state);
+  const acknowledgedReplay = beginClose(first.state);
+  assert.equal(acknowledgedReplay.ok, true);
+  assert.equal(acknowledgedReplay.mutated, false);
+  assert.match(acknowledgedReplay.code, /REPLAY$/);
+  assert.equal(JSON.stringify(first.state), before);
+});
+
+check("close CAS expected revision is the logical commit point and stale input is fail-closed", () => {
+  const current = closeReadyState();
+  const before = JSON.stringify(current);
+  const stale = beginCloseTransition(current, {
+    expectedRevision: 1,
+    intent: closeIntent(),
+    result: closeResult(D),
+  }, FEATURE);
+  assert.equal(stale.ok, false);
+  assert.equal(stale.mutated, false);
+  assert.equal(JSON.stringify(current), before);
+});
+
+check("close requires an exact green Stage-1 verify before it may enter semantic close", () => {
+  const current = closeReadyState();
+  const before = JSON.stringify(current);
+  const missingStage1 = beginCloseTransition(current, {
+    expectedRevision: 0,
+    intent: closeIntent({ stage1Verify: null }),
+    result: closeResult(D),
+  }, FEATURE);
+  assert.equal(missingStage1.ok, false);
+  assert.equal(missingStage1.mutated, false);
+  assert.equal(JSON.stringify(current), before);
+});
+
+check("final full verify must bind the post-CAS exact candidate and preserve the Stage-1 command", () => {
+  const cas = beginClose().state;
+  const wrongCandidate = recordCloseFinalVerify(cas, {
+    expectedRevision: cas.revision,
+    result: closeResult(A),
+    verify: finalVerify(MUTATED_COMMIT, MUTATED_TREE),
+  }, FEATURE);
+  assert.equal(wrongCandidate.ok, false);
+  assert.equal(wrongCandidate.mutated, false);
+
+  const wrongCommand = recordCloseFinalVerify(cas, {
+    expectedRevision: cas.revision,
+    result: closeResult(A),
+    verify: finalVerify(CLOSE_COMMIT, CLOSE_TREE, E, B),
+  }, FEATURE);
+  assert.equal(wrongCommand.ok, false);
+  assert.equal(wrongCommand.mutated, false);
+
+  const verified = recordCloseFinalVerify(cas, {
+    expectedRevision: cas.revision,
+    result: closeResult(A),
+    verify: finalVerify(),
+  }, FEATURE);
+  assert.equal(verified.ok, true);
+  assert.equal(verified.state.closeTransition.phase, "verified");
+  assert.equal(verified.state.closeTransition.finalVerify.commandSha256,
+    verified.state.closeTransition.stage1Verify.commandSha256);
+});
+
+check("tracked candidate mutation stales final evidence and blocks delivery until same-command reverify", () => {
+  const cas = beginClose().state;
+  const verified = recordCloseFinalVerify(cas, {
+    expectedRevision: cas.revision, result: closeResult(A), verify: finalVerify(),
+  }, FEATURE).state;
+  const stale = recordCloseCandidateMutation(verified, {
+    expectedRevision: verified.revision,
+    result: closeResult(B), candidateCommit: MUTATED_COMMIT, candidateTree: MUTATED_TREE,
+  }, FEATURE);
+  assert.equal(stale.ok, true);
+  assert.equal(stale.state.closeTransition.phase, "state-cas");
+  assert.equal(stale.state.closeTransition.finalVerify, null);
+  const blocked = recordCloseDelivery(stale.state, {
+    expectedRevision: stale.state.revision, result: closeResult(C), pushedOid: MUTATED_COMMIT,
+  }, FEATURE);
+  assert.equal(blocked.ok, false);
+  assert.equal(blocked.mutated, false);
+
+  const reverified = recordCloseFinalVerify(stale.state, {
+    expectedRevision: stale.state.revision,
+    result: closeResult(C), verify: finalVerify(MUTATED_COMMIT, MUTATED_TREE, A),
+  }, FEATURE);
+  assert.equal(reverified.ok, true);
+  assert.equal(reverified.state.closeTransition.finalVerify.commandSha256, C);
+});
+
+check("delivery, exact readback, and close permit no candidate mutation in their tail", () => {
+  const cas = beginClose().state;
+  const verified = recordCloseFinalVerify(cas, {
+    expectedRevision: cas.revision, result: closeResult(A), verify: finalVerify(),
+  }, FEATURE).state;
+  const delivered = recordCloseDelivery(verified, {
+    expectedRevision: verified.revision, result: closeResult(B), pushedOid: CLOSE_COMMIT,
+  }, FEATURE);
+  assert.equal(delivered.ok, true);
+  assert.equal(delivered.state.closeTransition.phase, "delivered");
+  const mutationBefore = JSON.stringify(delivered.state);
+  const mutation = recordCloseCandidateMutation(delivered.state, {
+    expectedRevision: delivered.state.revision,
+    result: closeResult(C), candidateCommit: MUTATED_COMMIT, candidateTree: MUTATED_TREE,
+  }, FEATURE);
+  assert.equal(mutation.ok, false);
+  assert.equal(mutation.mutated, false);
+  assert.equal(JSON.stringify(delivered.state), mutationBefore);
+
+  const badReadback = recordCloseReadback(delivered.state, {
+    expectedRevision: delivered.state.revision, result: closeResult(C), fetchedOid: MUTATED_COMMIT,
+  }, FEATURE);
+  assert.equal(badReadback.ok, false);
+  assert.equal(badReadback.mutated, false);
+  const readback = recordCloseReadback(delivered.state, {
+    expectedRevision: delivered.state.revision, result: closeResult(C), fetchedOid: CLOSE_COMMIT,
+  }, FEATURE);
+  assert.equal(readback.ok, true);
+  const closed = completeCloseTransition(readback.state, {
+    expectedRevision: readback.state.revision, result: closeResult(D),
+  }, FEATURE);
+  assert.equal(closed.ok, true);
+  assert.equal(closed.state.closeTransition.phase, "closed");
+});
+
+check("malformed close input and contradictory receipt identities are total and null-mutating", () => {
+  const current = closeReadyState();
+  const before = JSON.stringify(current);
+  const malformed = beginCloseTransition(current, {
+    expectedRevision: 0,
+    intent: { ...closeIntent(), authorityDigests: { prdSha256: A } },
+    result: closeResult(D),
+  }, FEATURE);
+  assert.equal(malformed.ok, false);
+  assert.equal(malformed.mutated, false);
+  assert.equal(JSON.stringify(current), before);
+
+  const cas = beginClose().state;
+  const contradictory = recordCloseFinalVerify(cas, {
+    expectedRevision: cas.revision,
+    result: closeResult(D),
+    verify: finalVerify(),
+  }, FEATURE);
+  assert.equal(contradictory.ok, false);
+  assert.equal(contradictory.mutated, false);
 });
 
 check("closed code vocabulary has no raw-data channel", () => {
