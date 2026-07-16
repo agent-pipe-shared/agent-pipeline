@@ -68,8 +68,8 @@ function v2Graph() {
     }],
     events,
     loopAggregates: [
-      { family: "critic-correction", count: 1, bound: 2 },
-      { family: "delta-regate", count: 1, bound: 2 },
+      { family: "critic-correction", count: 1, bound: 3 },
+      { family: "delta-regate", count: 1, bound: 3 },
       { family: "product-retry", count: 0, bound: 1 },
       { family: "environment-failover", count: 0, bound: 1 },
     ],
@@ -267,8 +267,8 @@ function interleavedGraph() {
     cycles,
     events,
     loopAggregates: [
-      { family: "critic-correction", count: 0, bound: 2 },
-      { family: "delta-regate", count: 0, bound: 2 },
+      { family: "critic-correction", count: 0, bound: 3 },
+      { family: "delta-regate", count: 0, bound: 3 },
       { family: "product-retry", count: 0, bound: 1 },
       { family: "environment-failover", count: 0, bound: 1 },
     ],
@@ -287,13 +287,13 @@ test("a complete v2 chronological graph validates", () => {
   assertValid(v2Graph());
 });
 
-test("v2 loop-family bounds are fixed at 2/2/1/1 and cannot be caller-raised", () => {
+test("v2 loop-family bounds are fixed at 3/3/1/1 and cannot be caller-raised", () => {
   const graph = v2Graph();
   assert.deepEqual(
     graph.loopAggregates.map(({ family, bound }) => [family, bound]),
     [
-      ["critic-correction", 2],
-      ["delta-regate", 2],
+      ["critic-correction", 3],
+      ["delta-regate", 3],
       ["product-retry", 1],
       ["environment-failover", 1],
     ],
@@ -303,7 +303,7 @@ test("v2 loop-family bounds are fixed at 2/2/1/1 and cannot be caller-raised", (
   for (const family of graph.loopAggregates.map(({ family }) => family)) {
     const raised = v2Graph();
     raised.loopAggregates.find((entry) => entry.family === family).bound += 1;
-    assertInvalid(raised, new RegExp(`${family}|bound|fixed|2/2/1/1`, "i"));
+    assertInvalid(raised, new RegExp(`${family}|bound|fixed|3/3/1/1`, "i"));
   }
 });
 
@@ -386,8 +386,8 @@ test("executed graph validation rejects empty and malformed v2 envelopes", () =>
     cycles: [],
     events: [],
     loopAggregates: [
-      { family: "critic-correction", count: 0, bound: 2 },
-      { family: "delta-regate", count: 0, bound: 2 },
+      { family: "critic-correction", count: 0, bound: 3 },
+      { family: "delta-regate", count: 0, bound: 3 },
       { family: "product-retry", count: 0, bound: 1 },
       { family: "environment-failover", count: 0, bound: 1 },
     ],
@@ -589,8 +589,8 @@ test("Mermaid emits one count-and-bound aggregate per loop family", () => {
   const mermaid = renderSdlcMermaidV2(v2Graph());
   const lines = mermaid.split("\n");
   const expected = new Map([
-    ["critic-correction", [1, 2]],
-    ["delta-regate", [1, 2]],
+    ["critic-correction", [1, 3]],
+    ["delta-regate", [1, 3]],
     ["product-retry", [0, 1]],
     ["environment-failover", [0, 1]],
   ]);

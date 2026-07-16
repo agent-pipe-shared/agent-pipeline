@@ -302,13 +302,13 @@
             {
               "allOf": [
                 { "$ref": "#/$defs/loopAggregateV2" },
-                { "properties": { "family": { "const": "critic-correction" }, "count": { "maximum": 2 }, "bound": { "const": 2 } } }
+                { "properties": { "family": { "const": "critic-correction" }, "count": { "maximum": 3 }, "bound": { "const": 3 } } }
               ]
             },
             {
               "allOf": [
                 { "$ref": "#/$defs/loopAggregateV2" },
-                { "properties": { "family": { "const": "delta-regate" }, "count": { "maximum": 2 }, "bound": { "const": 2 } } }
+                { "properties": { "family": { "const": "delta-regate" }, "count": { "maximum": 3 }, "bound": { "const": 3 } } }
               ]
             },
             {
@@ -381,11 +381,11 @@
         "resultEvidenceId": { "$ref": "#/$defs/safeId" },
         "candidateCommit": { "$ref": "#/$defs/gitObjectIdV2" },
         "correctionRecords": {
-          "type": "array", "maxItems": 2,
+          "type": "array", "maxItems": 3,
           "items": { "$ref": "#/$defs/correctionRecordV2" }
         },
         "deltaReceipts": {
-          "type": "array", "maxItems": 2,
+          "type": "array", "maxItems": 3,
           "items": { "$ref": "#/$defs/deltaReceiptV2" }
         },
         "delivery": {

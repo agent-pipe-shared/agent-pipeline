@@ -127,9 +127,9 @@ function validatePackageResults(result, graph, findings) {
     if (!hasRequiredKeys(entry, PACKAGE_RESULT_KEYS)
       || !safeId(entry.id) || !safeId(entry.actionId) || !safeId(entry.resultEvidenceId)
       || !gitObjectId(entry.candidateCommit)
-      || !Array.isArray(entry.correctionRecords) || entry.correctionRecords.length > 2
+      || !Array.isArray(entry.correctionRecords) || entry.correctionRecords.length > 3
       || !entry.correctionRecords.every((record) => validCorrectionRecord(record, entry.actionId))
-      || !Array.isArray(entry.deltaReceipts) || entry.deltaReceipts.length > 2
+      || !Array.isArray(entry.deltaReceipts) || entry.deltaReceipts.length > 3
       || !entry.deltaReceipts.every((receipt) => validDeltaReceipt(receipt, entry.actionId))
       || (Object.hasOwn(entry, "delivery") && !validDelivery(entry.delivery))
       || packages.has(entry.id)) {

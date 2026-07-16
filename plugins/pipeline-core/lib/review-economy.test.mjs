@@ -129,8 +129,10 @@ ok("RE19 map digest drift forces full", admitReviewAttempt({ ...delta, pathInvar
 ok("RE20 prior receipt omission forces full", admitReviewAttempt({ ...delta, priorReceipt: null }).mode === "full");
 ok("RE21 new trust boundary forces full", admitReviewAttempt({ ...delta, trustBoundaryChanged: true }).mode === "full");
 ok("RE22 ambiguous impact forces full", admitReviewAttempt({ ...delta, impactAmbiguous: true }).mode === "full");
-ok("RE23 third Critic round creates course gate", admitReviewAttempt({ ...delta, round: 3 }).courseGateRequired === true);
-ok("RE24 third correction commit creates course gate", admitReviewAttempt({ ...delta, correctionCommits: 3 }).courseGateRequired === true);
+ok("RE23 fourth Critic round remains within the approved budget", admitReviewAttempt({ ...delta, round: 4 }).courseGateRequired !== true);
+ok("RE24 fourth Critic round creates course gate", admitReviewAttempt({ ...delta, round: 5 }).courseGateRequired === true);
+ok("RE25 third correction commit remains within the approved budget", admitReviewAttempt({ ...delta, correctionCommits: 3 }).courseGateRequired !== true);
+ok("RE26 fourth correction commit creates course gate", admitReviewAttempt({ ...delta, correctionCommits: 4 }).courseGateRequired === true);
 
 const baseAction = {
   failure,

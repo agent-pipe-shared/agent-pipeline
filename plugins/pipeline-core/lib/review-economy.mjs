@@ -28,8 +28,8 @@ export const TRUSTED_ENVIRONMENT_CODES = Object.freeze([
 ]);
 export const DIAGNOSTIC_TAIL_MAX_UTF8_BYTES = 4096;
 export const REVIEW_LIMITS = Object.freeze({
-  criticRounds: 2,
-  correctionCommits: 2,
+  criticRounds: 4,
+  correctionCommits: 3,
   productRetries: 1,
   environmentReroutes: 1,
 });
@@ -431,7 +431,7 @@ export function validateCourseDecisionBrief(brief) {
     || (brief.gateTrigger.budget !== null && !new Set(["productRetries", "environmentReroutes", "reviewRounds", "correctionCommits"]).has(brief.gateTrigger.budget))
     || !exactKeys(brief.consumedBudgets, ["productRetries", "environmentReroutes", "reviewRounds", "correctionCommits"])
     || !safeInteger(brief.consumedBudgets.productRetries, 1) || !safeInteger(brief.consumedBudgets.environmentReroutes, 1)
-    || !safeInteger(brief.consumedBudgets.reviewRounds, 2) || !safeInteger(brief.consumedBudgets.correctionCommits, 2)
+    || !safeInteger(brief.consumedBudgets.reviewRounds, 4) || !safeInteger(brief.consumedBudgets.correctionCommits, 3)
     || !validStringList(brief.invariants) || brief.invariants.length === 0 || !validStringList(brief.nonClaims)
     || !validStringList(brief.forbiddenOperations) || brief.forbiddenOperations.length === 0 || typeof brief.exactPoDecisionQuestion !== "string"
     || brief.exactPoDecisionQuestion.length < 1 || brief.exactPoDecisionQuestion.length > 512
@@ -440,7 +440,7 @@ export function validateCourseDecisionBrief(brief) {
     || brief.poDecisionRequired !== true || brief.defaultAction !== "no-action") {
     return { ok: false, code: "RE-BRIEF-SHAPE" };
   }
-  const budgetLimits = { productRetries: 1, environmentReroutes: 1, reviewRounds: 2, correctionCommits: 2 };
+  const budgetLimits = { productRetries: 1, environmentReroutes: 1, reviewRounds: 4, correctionCommits: 3 };
   if (brief.gateTrigger.kind === "repeated-signature") {
     if (brief.gateTrigger.budget !== null || brief.observedCount <= brief.configuredLimit) return { ok: false, code: "RE-BRIEF-TRIGGER-NOT-PROVEN" };
   } else if (brief.gateTrigger.budget === null

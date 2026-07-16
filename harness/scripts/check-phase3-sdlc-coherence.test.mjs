@@ -201,8 +201,8 @@ function coherenceFixture({ correctionPackage = "alpha" } = {}) {
       cycles: builtCycles.map(({ cycle }) => cycle),
       events: builtCycles.flatMap(({ events }) => events),
       loopAggregates: [
-        { family: "critic-correction", count: 1, bound: 2 },
-        { family: "delta-regate", count: 1, bound: 2 },
+        { family: "critic-correction", count: 1, bound: 3 },
+        { family: "delta-regate", count: 1, bound: 3 },
         { family: "product-retry", count: 0, bound: 1 },
         { family: "environment-failover", count: 0, bound: 1 },
       ],
@@ -316,8 +316,8 @@ function deliveryCardinalityFixture(packageCount, mappedDeliveryCount) {
       cycles,
       events,
       loopAggregates: [
-        { family: "critic-correction", count: 0, bound: 2 },
-        { family: "delta-regate", count: 0, bound: 2 },
+        { family: "critic-correction", count: 0, bound: 3 },
+        { family: "delta-regate", count: 0, bound: 3 },
         { family: "product-retry", count: 0, bound: 1 },
         { family: "environment-failover", count: 0, bound: 1 },
       ],

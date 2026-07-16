@@ -111,6 +111,13 @@ prepare/finalize around one fresh host agent, with a no-remote review checkout
 and post-state detection. Its receipt explicitly denies OS isolation; it does
 not replace the critical-diff isolation requirement without a named PO waiver.
 
+**Runner mapping:** runner selection stays explicit instead of flattening model
+names. Claude assignments retain their configured Opus/Sonnet bindings. For
+Codex, every duty named `Fable` resolves to `gpt-5.6-sol` at the same effort
+tier; `Terra` remains a requested alias until an observed route receipt names
+an effective provider model. Codex has no default Advisor: an advisor exists
+only where the project configuration explicitly enables one.
+
 | Rule | Why | Verification method |
 |---|---|---|
 | **Must not:** No `memory`, no write tools. | `memory` automatically activates Write/Edit and breaks every read-only guarantee. | Agent frontmatter: a tight `tools` set; no `memory` field. |
@@ -338,6 +345,24 @@ Three shapes are equally provided for: (a) full test→prod with health/smoke ev
 
 The adapter contract, evidence schema, and the precedence engine (central vs. project-owned deploy policy) are NOT spelled out here — canon altitude stops at the guarantee, not the mechanism. Detail: [ADR-0033](adr/0033-release-promotion-phase.md) (phase concept, adapter, degrade shapes), [ADR-0034](adr/0034-deploy-precedence-central-vs-project.md) (precedence axis central↔project).
 
+### 3.6 Evidence coherence for bounded SDLC cycles
+
+For a bounded cycle, the structured `sdlcRunGraph` is the authority for stage
+order, counters and evidence bindings. Mermaid is a deterministic,
+human-readable projection of that graph; it cannot add a stage, alter a bound
+or make a delivery claim. The normal Stage-1 verify runs on each implementation
+or correction candidate. A second, final Full Verify runs on the exact
+post-mutation candidate after the Result-first intent and recoverable State-CAS
+transition, but before any delivery or fetch-back. Any later mutation makes that
+final evidence stale and requires a new final verify.
+
+Result prepares the intended transition first; State-CAS is the recoverable
+logical commit point; the receipt records the one applied or unapplied outcome.
+Recovery resumes that recorded transition rather than inferring a new choice.
+Efficiency metrics and check-ownership reports remain shadow-only: they may
+expose unknowns, overlap and throughput evidence, but cannot select a gate,
+authorize a delivery or coerce an unknown measurement to zero.
+
 ## 4. Review system (two-stage)
 
 Principle: **deterministic before probabilistic**. Stage 1 is machine and blocking; stage 2 is LLM judgment and delivers findings for the Elephant's gate decision.
@@ -437,7 +462,7 @@ flowchart TD
 |---|---|---|
 | 1 | Goldfish itself | `verify` red: max. **2 failed attempts at the same problem**, then stop + report with the failure state. Hard leashes of the harness: `maxTurns` in the agent frontmatter; stop-hook cap of 8 consecutive blocks. |
 | 2 | Critic | Delivers only findings; **no Critic↔Goldfish dialogue**, no fixes of its own (read-only). |
-| 3 | Elephant | Disposes of every finding (fix it / reject with reason / escalate to the PO). **Before re-dispatch or model escalation: run the harness checklist per P1 / tooling-policy G2 (briefing precise? context sufficient? tools/permissions present? a hook in the way?).** Rework = **a new dispatch with a fresh context and a sharpened briefing**, never continued work in the failed context. Max. **3 rework cycles per task**, then the PO. |
+| 3 | Elephant | Disposes of every finding (fix it / reject with reason / escalate to the PO). **Before re-dispatch or model escalation: run the harness checklist per P1 / tooling-policy G2 (briefing precise? context sufficient? tools/permissions present? a hook in the way?).** Rework = **a fresh local dispatch with a fresh context and a sharpened briefing**, never continued work in the failed context. Max. **3 rework cycles per task**; only a further correction (>3) opens the PO course gate. |
 | 4 | the PO | Mandatory escalation on: blockers, >3 rework cycles, irreversible/externally-visible/costly actions, a spec↔reality conflict, budget overrun (→ ../policies/model-policy.md). |
 
 ## 5. Session lifecycle & context policy
@@ -717,6 +742,14 @@ remote-loser Review-Checkout und nachgelagerte Zustandserkennung. Das Receipt
 verneint OS-Isolation ausdrücklich; ohne namentlichen PO-Waiver ersetzt dieser
 Pfad die Isolationspflicht für kritische Diffs nicht.
 
+**Runner-Zuordnung:** Die Runner-Auswahl bleibt explizit, statt Modellnamen zu
+vereinheitlichen. Claude-Zuweisungen behalten ihre konfigurierten Opus-/Sonnet-
+Bindungen. Bei Codex wird jede `Fable`-Pflicht auf `gpt-5.6-sol` mit derselben
+Effort-Stufe aufgelöst; `Terra` bleibt ein angeforderter Alias, bis ein beobachtetes
+Route-Receipt ein effektives Provider-Modell belegt. Codex hat keinen Default-
+Advisor: Ein Advisor existiert nur, wenn ihn die Projektkonfiguration explizit
+aktiviert.
+
 | Regel | Warum | Prüfweise |
 |---|---|---|
 | **Verbot:** Kein `memory`, keine Schreib-Tools. | `memory` aktiviert automatisch Write/Edit und bricht jede Read-only-Garantie. | Agent-Frontmatter: enges `tools`-Set; kein `memory`-Feld. |
@@ -944,6 +977,26 @@ Drei Ausprägungen sind gleichrangig vorgesehen: (a) volles test→prod mit Heal
 
 Adapter-Vertrag, Evidenz-Schema und die Präzedenz-Engine (zentrale vs. projekteigene Deploy-Policy) sind NICHT hier ausformuliert — Kanon-Höhe endet an der Garantie, nicht am Mechanismus. Detail: [ADR-0033](adr/0033-release-promotion-phase.md) (Phasenkonzept, Adapter, Degrade-Shapes), [ADR-0034](adr/0034-deploy-precedence-central-vs-project.md) (Präzedenz-Achse zentral↔Projekt).
 
+### 3.6 Evidenzkohärenz für begrenzte SDLC-Zyklen
+
+Für einen begrenzten Zyklus ist der strukturierte `sdlcRunGraph` die Autorität
+für Stage-Reihenfolge, Zähler und Evidenzbindungen. Mermaid ist eine
+deterministische, menschenlesbare Projektion dieses Graphen; sie kann keine
+Stage hinzufügen, kein Limit ändern und keine Delivery behaupten. Der normale
+Stage-1-Verify läuft für jeden Implementierungs- oder Korrektur-Kandidaten. Ein
+zweiter, finaler Full Verify läuft auf dem exakten Kandidaten nach dem
+Result-first-Intent und dem wiederherstellbaren State-CAS-Übergang, aber vor
+jeder Delivery oder Fetch-back. Jede spätere Mutation macht diese finale Evidenz
+stale und erfordert einen neuen finalen Verify.
+
+Result bereitet den beabsichtigten Übergang zuerst vor; State-CAS ist der
+wiederherstellbare logische Commitpunkt; das Receipt hält genau ein angewendetes
+oder nicht angewendetes Ergebnis fest. Recovery setzt diesen gebuchten Übergang
+fort, statt eine neue Entscheidung zu erraten. Effizienzmetriken und
+Check-Ownership-Reports bleiben shadow-only: Sie dürfen Unknowns, Überlappungen
+und Throughput-Evidenz sichtbar machen, aber kein Gate wählen, keine Delivery
+autorisieren und keine unbekannte Messung zu null zwingen.
+
 ## 4. Review-System (zweistufig)
 
 Grundsatz: **deterministisch vor probabilistisch**. Stufe 1 ist Maschine und blockierend; Stufe 2 ist LLM-Judgment und liefert Befunde für den Gate-Entscheid des Elephant.
@@ -1043,7 +1096,7 @@ flowchart TD
 |---|---|---|
 | 1 | Goldfish selbst | `verify` rot: max. **2 Fehlversuche am selben Problem**, dann Stop + Bericht mit Fehlstand. Harte Leinen des Harness: `maxTurns` im Agent-Frontmatter; Stop-Hook-Cap 8 konsekutive Blocks. |
 | 2 | Critic | Liefert nur Befunde; **kein Dialog Critic↔Goldfish**, keine eigenen Fixes (read-only). |
-| 3 | Elephant | Disponiert jeden Befund (fixen lassen / begründet ablehnen / an the PO). **Vor Re-Dispatch oder Modell-Eskalation: Harness-Checkliste gemäß Leitprinzip P1 / tooling-policy G2 durchgehen (Briefing präzise? Kontext ausreichend? Tools/Permissions da? Hook im Weg?).** Nacharbeit = **neuer Dispatch mit frischem Kontext und präzisiertem Briefing**, nie Weiterarbeit im gescheiterten Kontext. Max. **3 Nacharbeitszyklen je Task**, dann the PO. |
+| 3 | Elephant | Disponiert jeden Befund (fixen lassen / begründet ablehnen / an the PO). **Vor Re-Dispatch oder Modell-Eskalation: Harness-Checkliste gemäß Leitprinzip P1 / tooling-policy G2 durchgehen (Briefing präzise? Kontext ausreichend? Tools/Permissions da? Hook im Weg?).** Nacharbeit = **frischer lokaler Dispatch mit frischem Kontext und präzisiertem Briefing**, nie Weiterarbeit im gescheiterten Kontext. Max. **3 Nacharbeitszyklen je Task**; erst eine weitere Korrektur (>3) öffnet das PO-Course-Gate. |
 | 4 | the PO | Pflicht-Eskalation bei: Blockern, >3 Nacharbeitszyklen, Irreversiblem/Außenwirksamem/Kostenpflichtigem, Zielkonflikt Spec↔Realität, Budget-Überschreitung (→ ../policies/model-policy.md). |
 
 ## 5. Session-Lifecycle & Kontext-Politik

@@ -98,6 +98,10 @@ const TEST_SUITES = [
   { name: "no-autoupdate-key-tests", file: join(scriptDir, "no-autoupdate-key.test.mjs") },
   { name: "phase26-invariants-tests", file: join(scriptDir, "check-phase26-invariants.test.mjs") },
   { name: "phase26-invariants-check", file: join(scriptDir, "check-phase26-invariants.mjs"), args: phase26Result ? ["--result", phase26Result] : [] },
+  { name: "sdlc-run-graph-tests", file: join(scriptDir, "sdlc-run-graph.test.mjs") },
+  { name: "phase3-sdlc-coherence-tests", file: join(scriptDir, "check-phase3-sdlc-coherence.test.mjs") },
+  { name: "sdlc-efficiency-metrics-tests", file: join(scriptDir, "sdlc-efficiency-metrics.test.mjs") },
+  { name: "check-ownership-tests", file: join(scriptDir, "check-ownership.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects with `.claude/pipeline.yaml`

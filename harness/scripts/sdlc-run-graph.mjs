@@ -25,8 +25,8 @@ export const LOOP_FAMILIES = Object.freeze([
 ]);
 
 export const LOOP_BOUNDS = Object.freeze({
-  "critic-correction": 2,
-  "delta-regate": 2,
+  "critic-correction": 3,
+  "delta-regate": 3,
   "product-retry": 1,
   "environment-failover": 1,
 });
