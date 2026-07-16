@@ -182,7 +182,6 @@ function closeIntent(overrides = {}) {
     authorityDigests: { prdSha256: A, specSha256: B, resultSha256: C },
     graphSha256: D,
     packageBindingsSha256: A,
-    resultDigest: D,
     receiptId: "close-receipt-01",
     receiptSha256: B,
     candidateCommit: CLOSE_COMMIT,
@@ -820,6 +819,22 @@ check("close writes deterministic Result intent before the State CAS logical com
   assert.equal(first.state.closeTransition.delivery, null);
 });
 
+check("close intent binds the pre-append Result rather than claiming a self-hash", () => {
+  const current = closeReadyState();
+  const selfHash = beginCloseTransition(current, {
+    expectedRevision: 0,
+    intent: closeIntent({ resultDigest: D }),
+    result: closeResult(D),
+  }, FEATURE);
+  assert.equal(selfHash.ok, false);
+  assert.equal(selfHash.mutated, false);
+
+  const applied = beginClose(current);
+  assert.equal(applied.ok, true);
+  assert.equal(applied.state.closeTransition.authorityDigests.resultSha256, C);
+  assert.equal(applied.state.closeTransition.resultDigest, D);
+});
+
 check("Result-before-State and State-acknowledged close crashes replay the exact same transition", () => {
   const current = closeReadyState();
   const first = beginClose(current);
@@ -972,6 +987,61 @@ check("malformed close input and contradictory receipt identities are total and 
   }, FEATURE);
   assert.equal(contradictory.ok, false);
   assert.equal(contradictory.mutated, false);
+});
+
+for (const phase of ["delivered", "closed"]) {
+  check(`generic CAS cannot forge a syntactically valid direct ${phase} close transition`, () => {
+    const current = closeReadyState();
+    const before = JSON.stringify(current);
+    const next = structuredClone(current);
+    next.revision = 1;
+    next.closeTransition = {
+      ...closeIntent({ resultDigest: C }),
+      phase,
+      finalVerify: finalVerify(),
+      delivery: phase === "delivered"
+        ? { pushedOid: CLOSE_COMMIT, fetchedOid: null }
+        : { pushedOid: CLOSE_COMMIT, fetchedOid: CLOSE_COMMIT },
+    };
+    const forged = compareAndSwapContinuity(current, { expectedRevision: 0, next }, FEATURE);
+    assert.equal(forged.ok, false);
+    assert.equal(forged.mutated, false);
+    assert.equal(JSON.stringify(current), before);
+  });
+}
+
+check("generic CAS cannot clear or advance a typed close transition", () => {
+  const current = beginClose().state;
+  const clear = structuredClone(current);
+  clear.revision += 1;
+  clear.closeTransition = null;
+  assert.equal(compareAndSwapContinuity(current, {
+    expectedRevision: current.revision, next: clear,
+  }, FEATURE).ok, false);
+
+  const advance = structuredClone(current);
+  advance.revision += 1;
+  advance.closeTransition.phase = "closed";
+  advance.closeTransition.finalVerify = finalVerify();
+  advance.closeTransition.delivery = { pushedOid: CLOSE_COMMIT, fetchedOid: CLOSE_COMMIT };
+  assert.equal(compareAndSwapContinuity(current, {
+    expectedRevision: current.revision, next: advance,
+  }, FEATURE).ok, false);
+});
+
+check("persisted close transition fails closed on authority or delivery-candidate drift", () => {
+  const cas = beginClose().state;
+  const authorityDrift = structuredClone(cas);
+  authorityDrift.closeTransition.authorityDigests.prdSha256 = B;
+  assert.equal(validateContinuityState(authorityDrift, FEATURE).ok, false);
+
+  const verified = recordCloseFinalVerify(cas, {
+    expectedRevision: cas.revision, result: closeResult(A), verify: finalVerify(),
+  }, FEATURE).state;
+  const deliveryDrift = structuredClone(verified);
+  deliveryDrift.closeTransition.phase = "delivered";
+  deliveryDrift.closeTransition.delivery = { pushedOid: MUTATED_COMMIT, fetchedOid: null };
+  assert.equal(validateContinuityState(deliveryDrift, FEATURE).ok, false);
 });
 
 check("closed code vocabulary has no raw-data channel", () => {

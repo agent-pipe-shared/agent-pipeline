@@ -126,8 +126,14 @@ function canonicalJson(value) {
 }
 
 const CLOSE_KEYS = ["intentId", "expectedRevision", "authorityDigests", "graphSha256", "packageBindingsSha256", "resultDigest", "receiptId", "receiptSha256", "candidateCommit", "candidateTree", "stage1Verify", "phase", "finalVerify", "delivery"];
+const RESULT_INTENT_KEYS = ["intentId", "expectedRevision", "authorityDigests", "graphSha256", "packageBindingsSha256", "receiptId", "receiptSha256", "candidateCommit", "candidateTree", "stage1Verify", "phase", "finalVerify", "delivery"];
 const VERIFY_KEYS = ["commandSha256", "resultSha256", "candidateCommit", "candidateTree"];
 const DELIVERY_KEYS = ["pushedOid", "fetchedOid"];
+const HUMAN_LIFECYCLE_MARKERS = Object.freeze([
+  "implementation-active", "close-intent", "close-cas", "close-verified",
+  "close-delivered", "close-readback", "closed", "candidate-handoff",
+  "pending-candidate-handoff", "handoff", "phase-close", "PO-closed",
+]);
 
 function validVerify(value, transition, exactCandidate) {
   return closedKeys(value, VERIFY_KEYS)
@@ -137,40 +143,52 @@ function validVerify(value, transition, exactCandidate) {
       && value.candidateCommit === transition.candidateCommit && value.candidateTree === transition.candidateTree));
 }
 
-function validCloseProjection(value, allowIntent = false) {
-  if (!closedKeys(value, CLOSE_KEYS)
-    || typeof value.intentId !== "string" || value.intentId.length === 0
-    || !Number.isSafeInteger(value.expectedRevision) || value.expectedRevision < 0
-    || !closedKeys(value.authorityDigests, ["prdSha256", "specSha256", "resultSha256"])
-    || !sha256(value.authorityDigests.prdSha256) || !sha256(value.authorityDigests.specSha256)
-    || !(value.authorityDigests.resultSha256 === null || sha256(value.authorityDigests.resultSha256))
-    || !sha256(value.graphSha256) || !sha256(value.packageBindingsSha256) || !sha256(value.resultDigest)
-    || typeof value.receiptId !== "string" || value.receiptId.length === 0 || !sha256(value.receiptSha256)
-    || !oid(value.candidateCommit) || !oid(value.candidateTree)
-    || !validVerify(value.stage1Verify, value, false)) return false;
-  const phaseAllowed = allowIntent ? Object.hasOwn(CLOSE_LIFECYCLE_STATUS, value.phase) : Object.hasOwn(CLOSE_LIFECYCLE_STATUS, value.phase) && value.phase !== "intent";
-  if (!phaseAllowed) return false;
-  if (value.phase === "intent" || value.phase === "state-cas") return value.finalVerify === null && value.delivery === null;
+function validIntentFields(value) {
+  return isObject(value)
+    && typeof value.intentId === "string" && value.intentId.length > 0
+    && Number.isSafeInteger(value.expectedRevision) && value.expectedRevision >= 0
+    && closedKeys(value.authorityDigests, ["prdSha256", "specSha256", "resultSha256"])
+    && sha256(value.authorityDigests.prdSha256) && sha256(value.authorityDigests.specSha256)
+    && (value.authorityDigests.resultSha256 === null || sha256(value.authorityDigests.resultSha256))
+    && sha256(value.graphSha256) && sha256(value.packageBindingsSha256)
+    && typeof value.receiptId === "string" && value.receiptId.length > 0 && sha256(value.receiptSha256)
+    && oid(value.candidateCommit) && oid(value.candidateTree)
+    && validVerify(value.stage1Verify, value, false);
+}
+
+function validResultIntentProjection(value) {
+  return closedKeys(value, RESULT_INTENT_KEYS)
+    && validIntentFields(value)
+    && value.phase === "intent"
+    && value.finalVerify === null
+    && value.delivery === null;
+}
+
+function validCloseProjection(value) {
+  if (!closedKeys(value, CLOSE_KEYS) || !validIntentFields(value) || !sha256(value.resultDigest)
+    || value.phase === "intent") return false;
+  if (value.phase === "state-cas") return value.finalVerify === null && value.delivery === null;
   if (!validVerify(value.finalVerify, value, true)) return false;
   if (value.phase === "verified") return value.delivery === null;
   if (!closedKeys(value.delivery, DELIVERY_KEYS) || !oid(value.delivery.pushedOid)
     || !(value.delivery.fetchedOid === null || oid(value.delivery.fetchedOid))) return false;
+  if (value.delivery.pushedOid !== value.candidateCommit) return false;
   if (value.phase === "delivered") return value.delivery.fetchedOid === null;
   return value.delivery.fetchedOid === value.delivery.pushedOid;
 }
 
 /** Derive the single status instead of accepting competing status prose. */
 export function deriveCloseLifecycleStatus(resultTransition, machineTransition) {
-  if (resultTransition === undefined && machineTransition === undefined) return { ok: true, status: "implementation-active" };
-  if (!validCloseProjection(resultTransition, true)) return { ok: false, reason: "Result closeTransition is not a closed valid projection" };
-  if (resultTransition.phase === "intent") {
-    return machineTransition === undefined || machineTransition === null
-      ? { ok: true, status: CLOSE_LIFECYCLE_STATUS.intent }
-      : { ok: false, reason: "Result intent conflicts with an acknowledged machine close transition" };
-  }
-  if (!validCloseProjection(machineTransition, false)) return { ok: false, reason: "machine closeTransition is missing or invalid" };
-  if (canonicalJson(resultTransition) !== canonicalJson(machineTransition)) {
-    return { ok: false, reason: "Result and machine close transitions differ" };
+  const hasResultTransition = resultTransition !== undefined && resultTransition !== null;
+  const hasMachineTransition = machineTransition !== undefined && machineTransition !== null;
+  if (!hasResultTransition && !hasMachineTransition) return { ok: true, status: "implementation-active" };
+  if (!hasResultTransition) return { ok: false, reason: "machine closeTransition has no Result counterpart" };
+  if (!validResultIntentProjection(resultTransition)) return { ok: false, reason: "Result closeTransition must be an immutable valid intent" };
+  if (!hasMachineTransition) return { ok: true, status: CLOSE_LIFECYCLE_STATUS.intent };
+  if (!validCloseProjection(machineTransition)) return { ok: false, reason: "machine closeTransition is missing or invalid" };
+  const immutableKeys = ["intentId", "expectedRevision", "authorityDigests", "graphSha256", "packageBindingsSha256", "receiptId", "receiptSha256", "candidateCommit", "candidateTree", "stage1Verify"];
+  if (immutableKeys.some((key) => canonicalJson(resultTransition[key]) !== canonicalJson(machineTransition[key]))) {
+    return { ok: false, reason: "Result intent and machine close transition differ" };
   }
   return { ok: true, status: CLOSE_LIFECYCLE_STATUS[machineTransition.phase] };
 }
@@ -185,6 +203,18 @@ export function validateCloseLifecycleProjection(resultTransition, machineTransi
   if (status?.resultStatus !== derived.status || resultStatus !== derived.status) findings.push("Result status does not match the derived close lifecycle status");
   if (machinePhase !== derived.status) findings.push("machine state activeFeature.phase does not match the derived close lifecycle status");
   return findings;
+}
+
+function resultIntentBindsActiveAuthorities(transition, activeDigests) {
+  return isObject(transition)
+    && isObject(transition.authorityDigests)
+    && transition.authorityDigests.prdSha256 === activeDigests.prdSha256
+    && transition.authorityDigests.specSha256 === activeDigests.specSha256;
+}
+
+function machineTransitionBindsResultEvidence(transition, activeDigests) {
+  return resultIntentBindsActiveAuthorities(transition, activeDigests)
+    && transition.resultDigest === activeDigests.resultSha256;
 }
 
 /**
@@ -311,26 +341,58 @@ export function checkArtifactLifecycle(root = DEFAULT_ROOT, resultPath) {
       findings.push("machine pipeline state is not parseable JSON");
     }
   }
-  if (!Array.isArray(status.humanRequiredText) || status.humanRequiredText.length === 0) {
-    findings.push("artifactLifecycle.status.humanRequiredText must carry bounded status markers");
-  } else if (humanPath) {
-    const human = readUtf8(join(root, humanPath), findings, "human state") ?? "";
-    for (const marker of status.humanRequiredText) {
-      if (typeof marker !== "string" || marker.length === 0 || !human.includes(marker)) findings.push("human state does not contain a required status marker");
-    }
-  }
-
   // P3 is additive: legacy opted-in lifecycle Results retain their existing
   // bounded projection until they declare a close transition. Once declared,
   // Result intent and Continuity State are reconciled as one lifecycle.
-  if (Object.hasOwn(metadata, "closeTransition")) {
+  const hasResultTransition = metadata.closeTransition !== undefined && metadata.closeTransition !== null;
+  const hasMachineTransition = machine?.closeTransition !== undefined && machine?.closeTransition !== null;
+  const transitionDeclared = hasResultTransition || hasMachineTransition;
+  const resultTransition = hasResultTransition ? metadata.closeTransition : undefined;
+  const machineTransition = hasMachineTransition ? machine.closeTransition : undefined;
+  const derivedClose = transitionDeclared
+    ? deriveCloseLifecycleStatus(resultTransition, machineTransition)
+    : null;
+  if (transitionDeclared) {
     for (const finding of validateCloseLifecycleProjection(
-      metadata.closeTransition,
-      machine?.closeTransition,
+      resultTransition,
+      machineTransition,
       status,
       result.status,
       machine?.activeFeature?.phase,
     )) findings.push(finding);
+    const activeDigests = {
+      prdSha256: activePrd ? sha256File(root, activePrd.path) : null,
+      specSha256: activeSpec ? sha256File(root, activeSpec.path) : null,
+      resultSha256: activeResult ? sha256File(root, activeResult.path) : null,
+    };
+    if (hasResultTransition && !resultIntentBindsActiveAuthorities(resultTransition, activeDigests)) {
+      findings.push("Result closeTransition must bind the active PRD/Spec digests; its Result digest is the pre-append input binding");
+    }
+    if (hasMachineTransition && !machineTransitionBindsResultEvidence(machineTransition, activeDigests)) {
+      findings.push("machine closeTransition must bind active PRD/Spec digests and the active Result digest through resultDigest");
+    }
+  }
+
+  let human = null;
+  if (!Array.isArray(status.humanRequiredText) || status.humanRequiredText.length === 0) {
+    findings.push("artifactLifecycle.status.humanRequiredText must carry bounded status markers");
+  } else if (humanPath) {
+    human = readUtf8(join(root, humanPath), findings, "human state") ?? "";
+    for (const marker of status.humanRequiredText) {
+      if (typeof marker !== "string" || marker.length === 0 || !human.includes(marker)) findings.push("human state does not contain a required status marker");
+    }
+  }
+  if (transitionDeclared && derivedClose?.ok) {
+    const expected = derivedClose.status;
+    if (!Array.isArray(status.humanRequiredText) || status.humanRequiredText.length !== 1
+      || status.humanRequiredText[0] !== expected) {
+      findings.push("artifactLifecycle.status.humanRequiredText must contain exactly the derived lifecycle marker");
+    }
+    if (human !== null) {
+      const present = HUMAN_LIFECYCLE_MARKERS.filter((marker) => human.includes(marker));
+      if (!present.includes(expected)) findings.push("human state does not contain the derived lifecycle marker");
+      if (present.some((marker) => marker !== expected)) findings.push("human state contains contradictory lifecycle markers");
+    }
   }
 
   const backlogPath = readableFile(root, status.backlogPath, findings, "artifactLifecycle.status.backlogPath");

@@ -42,7 +42,7 @@ const CLOSE_TRANSITION_KEYS = new Set([
 ]);
 const CLOSE_INTENT_KEYS = new Set([
   "intentId", "expectedRevision", "authorityDigests", "graphSha256",
-  "packageBindingsSha256", "resultDigest", "receiptId", "receiptSha256",
+  "packageBindingsSha256", "receiptId", "receiptSha256",
   "candidateCommit", "candidateTree", "stage1Verify",
 ]);
 const CLOSE_VERIFY_KEYS = new Set(["commandSha256", "resultSha256", "candidateCommit", "candidateTree"]);
@@ -290,7 +290,6 @@ function validCloseIntentFields(value) {
     && validAuthorityDigests(value.authorityDigests)
     && digest(value.graphSha256)
     && digest(value.packageBindingsSha256)
-    && digest(value.resultDigest)
     && safeId(value.receiptId)
     && digest(value.receiptSha256)
     && gitOid(value.candidateCommit)
@@ -339,6 +338,7 @@ function validCloseTransition(value, state) {
   if (!validCloseVerify(value.finalVerify, value)) return false;
   if (value.phase === "verified") return value.delivery === null;
   if (!validCloseDelivery(value.delivery)) return false;
+  if (value.delivery.pushedOid !== value.candidateCommit) return false;
   if (value.phase === "delivered") return value.delivery.fetchedOid === null;
   return value.delivery.fetchedOid === value.delivery.pushedOid;
 }
@@ -437,6 +437,7 @@ function compareAndSwap(current, request, activeFeatureId, {
   allowAcknowledgementChange = false,
   allowDecisionChange = false,
   allowResultAuthorityChange = false,
+  allowCloseTransitionChange = false,
 } = {}) {
   const before = validateContinuityState(current, activeFeatureId);
   if (!before.ok || !exactKeys(request, CAS_KEYS) || !safeInteger(request.expectedRevision)) {
@@ -449,6 +450,10 @@ function compareAndSwap(current, request, activeFeatureId, {
     || request.next.revision !== current.revision + 1) return result(false, "CS-REVISION");
   const after = validateContinuityState(request.next, activeFeatureId);
   if (!after.ok) return result(false, after.code);
+  if (!allowCloseTransitionChange
+    && !sameJson(current.closeTransition ?? null, request.next.closeTransition ?? null)) {
+    return result(false, "CS-PROTECTED-CLOSE-TRANSITION");
+  }
   if (!sameJson(current.runtime, request.next.runtime)
     || !sameJson(current.authority.prd, request.next.authority.prd)
     || !sameJson(current.authority.spec, request.next.authority.spec)
@@ -657,13 +662,20 @@ export function beginCloseTransition(current, request, activeFeatureId = undefin
       specSha256: current.authority.spec.sha256,
       resultSha256: current.authority.result?.sha256 ?? null,
     })
-    || request.intent.resultDigest !== request.result.sha256) return result(false, "CS-CLOSE-INTENT-INVALID");
+  ) return result(false, "CS-CLOSE-INTENT-INVALID");
   const next = structuredClone(current);
   next.revision += 1;
   next.authority.result = request.result;
-  next.closeTransition = { ...request.intent, phase: "state-cas", finalVerify: null, delivery: null };
+  next.closeTransition = {
+    ...request.intent,
+    resultDigest: request.result.sha256,
+    phase: "state-cas",
+    finalVerify: null,
+    delivery: null,
+  };
   const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
     allowResultAuthorityChange: true,
+    allowCloseTransitionChange: true,
   });
   return cas.ok ? result(true, "CS-CLOSE-CAS-APPLIED", cas.state, true) : cas;
 }
@@ -687,6 +699,7 @@ export function recordCloseFinalVerify(current, request, activeFeatureId = undef
   next.closeTransition.finalVerify = structuredClone(request.verify);
   const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
     allowResultAuthorityChange: true,
+    allowCloseTransitionChange: true,
   });
   return cas.ok ? result(true, "CS-CLOSE-VERIFY-RECORDED", cas.state, true) : cas;
 }
@@ -713,6 +726,7 @@ export function recordCloseCandidateMutation(current, request, activeFeatureId =
   next.closeTransition.delivery = null;
   const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
     allowResultAuthorityChange: true,
+    allowCloseTransitionChange: true,
   });
   return cas.ok ? result(true, "CS-CLOSE-VERIFY-STALE", cas.state, true) : cas;
 }
@@ -736,6 +750,7 @@ export function recordCloseDelivery(current, request, activeFeatureId = undefine
   next.closeTransition.delivery = { pushedOid: request.pushedOid, fetchedOid: null };
   const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
     allowResultAuthorityChange: true,
+    allowCloseTransitionChange: true,
   });
   return cas.ok ? result(true, "CS-CLOSE-DELIVERY-RECORDED", cas.state, true) : cas;
 }
@@ -759,6 +774,7 @@ export function recordCloseReadback(current, request, activeFeatureId = undefine
   next.closeTransition.delivery.fetchedOid = request.fetchedOid;
   const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
     allowResultAuthorityChange: true,
+    allowCloseTransitionChange: true,
   });
   return cas.ok ? result(true, "CS-CLOSE-READBACK-RECORDED", cas.state, true) : cas;
 }
@@ -779,6 +795,7 @@ export function completeCloseTransition(current, request, activeFeatureId = unde
   next.closeTransition.phase = "closed";
   const cas = compareAndSwap(current, { expectedRevision: request.expectedRevision, next }, activeFeatureId, {
     allowResultAuthorityChange: true,
+    allowCloseTransitionChange: true,
   });
   return cas.ok ? result(true, "CS-CLOSE-CLOSED", cas.state, true) : cas;
 }
@@ -912,6 +929,7 @@ export const CONTINUITY_STATE_CODES = Object.freeze([
   "CS-COURSE-DISPOSITION-PROTECTED",
   "CS-PROTECTED-FINAL-FIELDS",
   "CS-PROTECTED-AUTHORITY",
+  "CS-PROTECTED-CLOSE-TRANSITION",
   "CS-INTERRUPT-DRIFT",
   "CS-CLOSE-REPLAY", "CS-CLOSE-CONFLICT", "CS-CLOSE-INTENT-INVALID",
   "CS-CLOSE-CAS-APPLIED", "CS-CLOSE-VERIFY-INVALID", "CS-CLOSE-VERIFY-RECORDED",

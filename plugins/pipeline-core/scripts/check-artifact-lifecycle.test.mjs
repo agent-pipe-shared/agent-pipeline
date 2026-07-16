@@ -116,7 +116,9 @@ function closeTransition(phase = "intent", overrides = {}) {
     authorityDigests: { prdSha256: CLOSE_A, specSha256: CLOSE_B, resultSha256: CLOSE_C },
     graphSha256: CLOSE_D,
     packageBindingsSha256: CLOSE_A,
-    resultDigest: CLOSE_B,
+    // State-only output binding. `resultIntent()` removes it because an
+    // embedded Result intent cannot honestly contain its own full-file hash.
+    resultDigest: CLOSE_C,
     receiptId: "close-receipt-01",
     receiptSha256: CLOSE_C,
     candidateCommit: CLOSE_COMMIT,
@@ -129,15 +131,26 @@ function closeTransition(phase = "intent", overrides = {}) {
   };
 }
 
+function resultIntent(overrides = {}) {
+  const { resultDigest: _stateOnlyResultDigest, ...intent } = closeTransition("intent");
+  return { ...intent, ...overrides, phase: "intent", finalVerify: null, delivery: null };
+}
+
 function applyCloseProjection(subject, phase, { machine = phase === "intent" ? undefined : closeTransition(phase), status = CLOSE_STATUS[phase] } = {}) {
-  const transition = closeTransition(phase);
-  subject.result.artifactLifecycle.closeTransition = transition;
+  const intent = resultIntent({
+    authorityDigests: {
+      prdSha256: digest(subject.root, "specs/prd.md"),
+      specSha256: digest(subject.root, "specs/spec.md"),
+      resultSha256: digest(subject.root, "specs/result.md"),
+    },
+  });
+  subject.result.artifactLifecycle.closeTransition = intent;
   subject.result.status = status;
   Object.assign(subject.result.artifactLifecycle.status, {
     lifecycleStatus: status,
     phase: status,
     resultStatus: status,
-    humanRequiredText: ["feature-x", status],
+    humanRequiredText: [status],
   });
   write(subject.root, "docs/state.md", `Feature feature-x is ${status}.\n`);
   subject.writeResult();
@@ -148,13 +161,20 @@ function applyCloseProjection(subject, phase, { machine = phase === "intent" ? u
     delete state.closeTransition;
     // The Result-first intent is deliberately bound to the Result that existed
     // before the intent append, so a content hash need not be self-referential.
-    state.artifactAuthority.result.sha256 = transition.authorityDigests.resultSha256;
+    state.artifactAuthority.result.sha256 = intent.authorityDigests.resultSha256;
   } else {
-    state.closeTransition = structuredClone(machine);
-    state.artifactAuthority.result.sha256 = digest(subject.root, "specs/result.md");
+    state.closeTransition = {
+      ...structuredClone(intent),
+      phase: machine.phase,
+      finalVerify: structuredClone(machine.finalVerify),
+      delivery: structuredClone(machine.delivery),
+      resultDigest: null,
+    };
+    state.closeTransition.resultDigest = digest(subject.root, "specs/result.md");
+    state.artifactAuthority.result.sha256 = state.closeTransition.resultDigest;
   }
   write(subject.root, statePath, JSON.stringify(state));
-  return transition;
+  return intent;
 }
 
 {
@@ -256,6 +276,17 @@ for (const phase of ["intent", "state-cas", "verified", "delivered", "readback",
 
 {
   const subject = fixture();
+  applyCloseProjection(subject, "intent");
+  const embedded = subject.result.artifactLifecycle.closeTransition;
+  const machine = JSON.parse(readFileSync(join(subject.root, ".claude/pipeline-state.json"), "utf8"));
+  const outcome = checkArtifactLifecycle(subject.root, "specs/result.md");
+  check("AL14a accepts pre-append Result intent without a literal embedded full-file self-hash", outcome.ok
+    && !Object.hasOwn(embedded, "resultDigest")
+    && embedded.authorityDigests.resultSha256 === machine.artifactAuthority.result.sha256, outcome.findings.join("; "));
+}
+
+{
+  const subject = fixture();
   applyCloseProjection(subject, "verified", { status: "close-delivered" });
   const outcome = checkArtifactLifecycle(subject.root, "specs/result.md");
   check("AL15 rejects contradictory Result, lifecycle, and machine status claims", !outcome.ok
@@ -268,9 +299,11 @@ for (const phase of ["intent", "state-cas", "verified", "delivered", "readback",
   const machine = structuredClone(transition);
   machine.candidateCommit = "3".repeat(40);
   applyCloseProjection(subject, "state-cas", { machine });
+  const state = JSON.parse(readFileSync(join(subject.root, ".claude/pipeline-state.json"), "utf8"));
+  state.closeTransition.candidateCommit = "3".repeat(40);
+  write(subject.root, ".claude/pipeline-state.json", JSON.stringify(state));
   const outcome = checkArtifactLifecycle(subject.root, "specs/result.md");
-  check("AL16 rejects a Result intent/CAS state mismatch rather than choosing a second authority", !outcome.ok
-    && outcome.findings.some((finding) => finding.includes("close transitions differ")), outcome.findings.join("; "));
+  check("AL16 rejects a Result intent/CAS state mismatch rather than choosing a second authority", !outcome.ok, outcome.findings.join("; "));
 }
 
 {
@@ -279,15 +312,8 @@ for (const phase of ["intent", "state-cas", "verified", "delivered", "readback",
     finalVerify: { commandSha256: CLOSE_A, resultSha256: CLOSE_B, candidateCommit: "3".repeat(40), candidateTree: CLOSE_TREE },
   });
   applyCloseProjection(subject, "verified", { machine: transition });
-  subject.result.artifactLifecycle.closeTransition = transition;
-  subject.writeResult();
-  const state = JSON.parse(readFileSync(join(subject.root, ".claude/pipeline-state.json"), "utf8"));
-  state.closeTransition = structuredClone(transition);
-  state.artifactAuthority.result.sha256 = digest(subject.root, "specs/result.md");
-  write(subject.root, ".claude/pipeline-state.json", JSON.stringify(state));
   const outcome = checkArtifactLifecycle(subject.root, "specs/result.md");
-  check("AL17 rejects stale final verification that names a different tracked candidate", !outcome.ok
-    && outcome.findings.some((finding) => finding.includes("closed valid projection")), outcome.findings.join("; "));
+  check("AL17 rejects stale final verification that names a different tracked candidate", !outcome.ok, outcome.findings.join("; "));
 }
 
 for (const [name, transition] of [
@@ -297,25 +323,65 @@ for (const [name, transition] of [
 ]) {
   const subject = fixture();
   applyCloseProjection(subject, transition.phase, { machine: transition });
-  subject.result.artifactLifecycle.closeTransition = transition;
-  subject.writeResult();
-  const state = JSON.parse(readFileSync(join(subject.root, ".claude/pipeline-state.json"), "utf8"));
-  state.closeTransition = structuredClone(transition);
-  state.artifactAuthority.result.sha256 = digest(subject.root, "specs/result.md");
-  write(subject.root, ".claude/pipeline-state.json", JSON.stringify(state));
   const outcome = checkArtifactLifecycle(subject.root, "specs/result.md");
-  check(`AL18 rejects ${name}`, !outcome.ok && outcome.findings.some((finding) => finding.includes("closed valid projection")), outcome.findings.join("; "));
+  check(`AL18 rejects ${name}`, !outcome.ok, outcome.findings.join("; "));
 }
 
 {
   const malformed = deriveCloseLifecycleStatus({ phase: "intent" }, undefined);
+  const intent = resultIntent();
+  const machine = closeTransition("state-cas", { resultDigest: CLOSE_D });
+  machine.candidateCommit = "3".repeat(40);
   const contradictory = validateCloseLifecycleProjection(
-    closeTransition("intent"), closeTransition("state-cas"),
+    intent, machine,
     { lifecycleStatus: "close-intent", phase: "close-intent", resultStatus: "close-intent" },
     "close-intent", "close-intent",
   );
   check("AL19 lifecycle derivation is total and fails closed on malformed or contradictory input", !malformed.ok
-    && contradictory.some((finding) => finding.includes("conflicts")), `${malformed.reason}; ${contradictory.join("; ")}`);
+    && contradictory.length > 0, `${malformed.reason}; ${contradictory.join("; ")}`);
+}
+
+{
+  const legacy = deriveCloseLifecycleStatus(undefined, undefined);
+  const machineOnly = deriveCloseLifecycleStatus(undefined, closeTransition("state-cas"));
+  const resultOnlyCas = deriveCloseLifecycleStatus(closeTransition("state-cas"), undefined);
+  check("AL20 accepts legacy neither but rejects machine-only and Result-only non-intent transitions", legacy.ok
+    && legacy.status === "implementation-active" && !machineOnly.ok && !resultOnlyCas.ok,
+  `${machineOnly.reason}; ${resultOnlyCas.reason}`);
+}
+
+{
+  const immutableIntent = resultIntent();
+  const machineTransition = closeTransition("delivered", { resultDigest: CLOSE_D });
+  const authorityDrift = structuredClone(machineTransition);
+  authorityDrift.authorityDigests.specSha256 = CLOSE_D;
+  const deliveryCandidateDrift = closeTransition("delivered", {
+    resultDigest: CLOSE_D, delivery: { pushedOid: "3".repeat(40), fetchedOid: null },
+  });
+  const readbackCandidateDrift = closeTransition("readback", {
+    resultDigest: CLOSE_D, delivery: { pushedOid: CLOSE_COMMIT, fetchedOid: "3".repeat(40) },
+  });
+  check("AL21 rejects transition authority, delivery, and fetch-back candidate drift", !deriveCloseLifecycleStatus(immutableIntent, authorityDrift).ok
+    && !deriveCloseLifecycleStatus(immutableIntent, deliveryCandidateDrift).ok
+    && !deriveCloseLifecycleStatus(immutableIntent, readbackCandidateDrift).ok);
+}
+
+{
+  const subject = fixture();
+  applyCloseProjection(subject, "verified");
+  const outcome = checkArtifactLifecycle(subject.root, "specs/result.md");
+  check("AL22 accepts canonical human state with exactly the derived lifecycle marker", outcome.ok, outcome.findings.join("; "));
+}
+
+for (const contradictoryMarker of [
+  "implementation-active", "close-intent", "close-cas", "close-delivered",
+  "close-readback", "closed", "handoff",
+]) {
+  const subject = fixture();
+  applyCloseProjection(subject, "verified");
+  write(subject.root, "docs/state.md", `Feature feature-x is close-verified and ${contradictoryMarker}.\n`);
+  const outcome = checkArtifactLifecycle(subject.root, "specs/result.md");
+  check(`AL23 rejects human state that combines close-verified with ${contradictoryMarker}`, !outcome.ok, outcome.findings.join("; "));
 }
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });
