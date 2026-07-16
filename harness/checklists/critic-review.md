@@ -34,7 +34,7 @@
 - [ ] Findings failing the evidence bar or skip rule rejected with a short note
 - [ ] EVERY blocker/major dispositioned: fix (fresh rework dispatch) / reject with justification / escalate to the PO
 - [ ] Before re-dispatch: harness checklist first — briefing? context? tools/permissions? hooks? (G2/P1)
-- [ ] Rework = new dispatch, fresh context, refined briefing; max 3 local cycles, then PO decision (mandatory)
+- [ ] Rework = fresh local dispatch, fresh context, refined briefing; max 3 local cycles, and open the PO course gate only when a further correction would exceed that budget (>3)
 - [ ] Re-review after rework by a NEW fresh Critic where triggers still apply — never reuse a Critic context
 - [ ] Gate decision recorded: trigger row, dispositions, cycle count; telemetry line for the Critic run
 - [ ] Shadow metrics, when available, bind this gate/cycle to exact candidate and tool/runner/schema versions; unavailable values are `unknown`, never zero, and do not change the verdict
