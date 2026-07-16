@@ -169,10 +169,10 @@ nothing grinds indefinitely:
    debugs the *harness* first — was the briefing complete, the context clean,
    the tools right-sized, the hooks wired? Most agent failures are
    configuration failures. Rework is a *new* dispatch with a fresh context and
-   a sharpened brief, never continued work in the failed one — capped at two
+   a sharpened brief, never continued work in the failed one — capped at three
    cycles per task.
 
-4. **Product Owner.** Blockers, more than two rework cycles, spec-versus-reality
+4. **Product Owner.** Blockers, more than three rework cycles, spec-versus-reality
    conflicts, and anything irreversible, externally visible, or costly escalate
    to you. These are exactly the judgments that aren't delegable.
 
@@ -411,9 +411,9 @@ Sprosse, damit nichts endlos festläuft:
    sauber, die Werkzeuge passend zugeschnitten, die Hooks verdrahtet? Die meisten
    Agenten-Fehler sind Konfigurationsfehler. Nacharbeit ist ein *neuer* Dispatch
    mit frischem Kontext und geschärftem Briefing, nie Weiterarbeit im
-   gescheiterten — gedeckelt auf zwei Zyklen je Aufgabe.
+   gescheiterten — gedeckelt auf drei Zyklen je Aufgabe.
 
-4. **Product Owner.** Blocker, mehr als zwei Nacharbeitszyklen, Konflikte
+4. **Product Owner.** Blocker, mehr als drei Nacharbeitszyklen, Konflikte
    zwischen Spec und Realität und alles Irreversible, nach außen Wirksame oder
    Kostenpflichtige eskalieren zu dir. Das sind genau die Urteile, die sich nicht
    delegieren lassen.

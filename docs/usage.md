@@ -82,7 +82,7 @@ Each result runs the **two-stage review**:
 
 The Elephant takes the Critic's findings and decides: merge, or rework. Rework is a
 *new* dispatch with a sharper briefing, never continued work in the context that
-already went wrong — capped at **two cycles** before it comes to you.
+already went wrong — capped at **three cycles** before it comes to you.
 
 Throughout, the git guardrails hold regardless of what any agent asks for: no
 force-push, no history rewrite, no deleted protected branches, no skipped hooks.
@@ -92,7 +92,7 @@ message from your staged diff but never commits for you.
 ## 5. Decide the exceptions
 
 You're not in the loop for every task — by design. The Elephant pulls you back in
-only for judgment that can't be delegated: a blocker, more than **two rework cycles**
+only for judgment that can't be delegated: a blocker, more than **three rework cycles**
 on one task, anything irreversible/externally visible/costly, or a
 spec-versus-reality conflict. High-stakes work (live systems, architecture or
 guardrail changes) also gets a **human sign-off** on the finished result — it can
@@ -255,7 +255,7 @@ Jedes Ergebnis durchläuft das **zweistufige Review**:
 
 Der Elephant nimmt die Befunde des Critic und entscheidet: mergen oder nacharbeiten.
 Nacharbeit ist ein *neuer* Dispatch mit schärferem Briefing, nie weitergeführte
-Arbeit im bereits verunglückten Kontext — gedeckelt auf zwei Runden, dann landet es
+Arbeit im bereits verunglückten Kontext — gedeckelt auf drei Runden, dann landet es
 bei dir.
 
 Durchgängig halten die git-Guardrails, egal worum ein Agent bittet: kein
@@ -267,7 +267,7 @@ vor, committet aber nie für dich.
 ## 5. Ausnahmen entscheiden
 
 Du bist bewusst nicht bei jeder Aufgabe im Spiel. Der Elephant holt dich nur für die
-nicht delegierbaren Urteilsklassen zurück: einen Blocker, mehr als zwei
+nicht delegierbaren Urteilsklassen zurück: einen Blocker, mehr als drei
 Nacharbeitsrunden an einer Aufgabe, alles Irreversible, nach außen Wirkende oder
 Kostenpflichtige, oder einen Widerspruch zwischen Spec und Realität. Arbeit mit
 hohen Stakes (Live-Systeme, Architektur- oder Guardrail-Änderungen) bekommt

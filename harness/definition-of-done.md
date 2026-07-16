@@ -71,7 +71,7 @@ Copy this block into the task/spec (rigor ≥ 1) or the issue/brief (rigor 0). S
 |---|---|---|
 | `done` | Every applicable A/B item green, incl. {{HUMAN_GATE}} where triggered. | Elephant (gate decision) or the PO (human gate) — never the implementing goldfish |
 | `🟡 not-human-verified` | Part A green, mandatory Critic processed — but a human verification ({{HUMAN_GATE}}: PIE run, live devices, spot check) is still pending. | Elephant, listing exactly WHAT is unverified |
-| `blocked` | A mandatory item cannot pass: verify red after the two-attempt rule, a stop condition fired, > 2 rework cycles, or a PO decision pending. | Goldfish (stop) or Elephant (gate), with reason + escalation rung (`harness/review-protocol.md` §4) |
+| `blocked` | A mandatory item cannot pass: verify red after the separate two-attempt retry rule, a stop condition fired, > 3 rework cycles, or a PO decision pending. | Goldfish (stop) or Elephant (gate), with reason + escalation rung (`harness/review-protocol.md` §4) |
 
 Per-check results inside reports are three-valued as well: **pass / fail / not verifiable** (`docs/operating-model.md` §2.3, report field 1).
 

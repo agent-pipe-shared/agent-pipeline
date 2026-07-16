@@ -416,8 +416,8 @@ flowchart TD
     C2 --> B
     B --> GE{"Elephant: gate decision
     (every finding disposed of)"}
-    GE -->|"Rework (max. 2 cycles)"| G
-    GE -->|"> 2 cycles OR blocker
+    GE -->|"Rework (max. 3 cycles)"| G
+    GE -->|"> 3 cycles OR blocker
     OR irreversible/externally-visible/costly"| A["The PO: decision"]
     GE -->|"passed"| M["Merge + docs sync
     (rollback anchor + procedure with an
@@ -437,8 +437,8 @@ flowchart TD
 |---|---|---|
 | 1 | Goldfish itself | `verify` red: max. **2 failed attempts at the same problem**, then stop + report with the failure state. Hard leashes of the harness: `maxTurns` in the agent frontmatter; stop-hook cap of 8 consecutive blocks. |
 | 2 | Critic | Delivers only findings; **no Critic↔Goldfish dialogue**, no fixes of its own (read-only). |
-| 3 | Elephant | Disposes of every finding (fix it / reject with reason / escalate to the PO). **Before re-dispatch or model escalation: run the harness checklist per P1 / tooling-policy G2 (briefing precise? context sufficient? tools/permissions present? a hook in the way?).** Rework = **a new dispatch with a fresh context and a sharpened briefing**, never continued work in the failed context. Max. **2 rework cycles per task**, then the PO. |
-| 4 | the PO | Mandatory escalation on: blockers, >2 rework cycles, irreversible/externally-visible/costly actions, a spec↔reality conflict, budget overrun (→ ../policies/model-policy.md). |
+| 3 | Elephant | Disposes of every finding (fix it / reject with reason / escalate to the PO). **Before re-dispatch or model escalation: run the harness checklist per P1 / tooling-policy G2 (briefing precise? context sufficient? tools/permissions present? a hook in the way?).** Rework = **a new dispatch with a fresh context and a sharpened briefing**, never continued work in the failed context. Max. **3 rework cycles per task**, then the PO. |
+| 4 | the PO | Mandatory escalation on: blockers, >3 rework cycles, irreversible/externally-visible/costly actions, a spec↔reality conflict, budget overrun (→ ../policies/model-policy.md). |
 
 ## 5. Session lifecycle & context policy
 
@@ -1022,8 +1022,8 @@ flowchart TD
     C2 --> B
     B --> GE{"Elephant: Gate-Entscheid
     (jeder Befund disponiert)"}
-    GE -->|"Nacharbeit (max. 2 Zyklen)"| G
-    GE -->|"> 2 Zyklen ODER Blocker
+    GE -->|"Nacharbeit (max. 3 Zyklen)"| G
+    GE -->|"> 3 Zyklen ODER Blocker
     ODER irreversibel/außenwirksam/kostenpflichtig"| A["the PO: Entscheid"]
     GE -->|"bestanden"| M["Merge + Doku-Sync
     (Rollback-Anker + -Prozedur bei
@@ -1043,8 +1043,8 @@ flowchart TD
 |---|---|---|
 | 1 | Goldfish selbst | `verify` rot: max. **2 Fehlversuche am selben Problem**, dann Stop + Bericht mit Fehlstand. Harte Leinen des Harness: `maxTurns` im Agent-Frontmatter; Stop-Hook-Cap 8 konsekutive Blocks. |
 | 2 | Critic | Liefert nur Befunde; **kein Dialog Critic↔Goldfish**, keine eigenen Fixes (read-only). |
-| 3 | Elephant | Disponiert jeden Befund (fixen lassen / begründet ablehnen / an the PO). **Vor Re-Dispatch oder Modell-Eskalation: Harness-Checkliste gemäß Leitprinzip P1 / tooling-policy G2 durchgehen (Briefing präzise? Kontext ausreichend? Tools/Permissions da? Hook im Weg?).** Nacharbeit = **neuer Dispatch mit frischem Kontext und präzisiertem Briefing**, nie Weiterarbeit im gescheiterten Kontext. Max. **2 Nacharbeitszyklen je Task**, dann the PO. |
-| 4 | the PO | Pflicht-Eskalation bei: Blockern, >2 Nacharbeitszyklen, Irreversiblem/Außenwirksamem/Kostenpflichtigem, Zielkonflikt Spec↔Realität, Budget-Überschreitung (→ ../policies/model-policy.md). |
+| 3 | Elephant | Disponiert jeden Befund (fixen lassen / begründet ablehnen / an the PO). **Vor Re-Dispatch oder Modell-Eskalation: Harness-Checkliste gemäß Leitprinzip P1 / tooling-policy G2 durchgehen (Briefing präzise? Kontext ausreichend? Tools/Permissions da? Hook im Weg?).** Nacharbeit = **neuer Dispatch mit frischem Kontext und präzisiertem Briefing**, nie Weiterarbeit im gescheiterten Kontext. Max. **3 Nacharbeitszyklen je Task**, dann the PO. |
+| 4 | the PO | Pflicht-Eskalation bei: Blockern, >3 Nacharbeitszyklen, Irreversiblem/Außenwirksamem/Kostenpflichtigem, Zielkonflikt Spec↔Realität, Budget-Überschreitung (→ ../policies/model-policy.md). |
 
 ## 5. Session-Lifecycle & Kontext-Politik
 
