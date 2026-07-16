@@ -346,6 +346,21 @@ test("an unrelated package course cannot satisfy alpha's recurring product failu
   );
 });
 
+test("relabeling the repeated product retry as unknown cannot evade the course gate", () => {
+  const relabeledRetry = retryGraph({ repeatedFailure: true });
+  const [, secondWorkAttempt] = relabeledRetry.events.filter(({ stage }) => stage === "work");
+  assert.equal(secondWorkAttempt.failureSignature, relabeledRetry.events[0].failureSignature);
+  secondWorkAttempt.faultDomain = "unknown";
+  assertInvalid(relabeledRetry, /product|signature|unknown|course|relabel|recurr/i);
+
+  const sameDomainWithCourse = retryGraph({ repeatedFailure: true, includeLaterCourse: true });
+  assertValid(sameDomainWithCourse);
+  assert.deepEqual(
+    sameDomainWithCourse.events.filter(({ stage }) => stage === "work").map(({ faultDomain }) => faultDomain),
+    ["product", "product"],
+  );
+});
+
 test("environment failover is one-shot and a second failover fails", () => {
   assertValid(failoverGraph(1));
   assertInvalid(failoverGraph(2), /environment-failover|failover|one-shot|bound/i);

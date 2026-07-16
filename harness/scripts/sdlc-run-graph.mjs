@@ -287,8 +287,9 @@ function deriveLoopCounts(graph, findings) {
       if (first.outcome !== "failed" || first.faultDomain !== "product" || !digest(first.failureSignature)) {
         findings.push(`cycle ${cycle?.cycleId ?? "unknown"} product retry must follow one digest-bound failed product work attempt`);
       }
-      if (retry.outcome === "failed" && !digest(retry.failureSignature)) {
-        findings.push(`cycle ${cycle?.cycleId ?? "unknown"} failed product retry requires a failure signature`);
+      if (retry.outcome === "failed"
+        && (retry.faultDomain !== "product" || !digest(retry.failureSignature))) {
+        findings.push(`cycle ${cycle?.cycleId ?? "unknown"} failed product retry must remain in the product fault domain with a failure signature`);
       }
       if (first.outcome === "failed" && first.faultDomain === "product"
         && retry.outcome === "failed" && retry.faultDomain === "product"
