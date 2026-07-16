@@ -311,9 +311,9 @@ check("T1 request rejects a stale waiver candidate binding", () => {
   copy.normal_lane_authorization.candidate_commit = copy.review_base;
   assert.throws(() => validateCriticRequest(copy), /invalid or stale/);
 });
-check("request rejects a third Critic round before any checkout", () => {
+check("request rejects a fifth Critic round before any checkout", () => {
   const copy = structuredClone(request);
-  copy.review_economy.round = 3;
+  copy.review_economy.round = 5;
   assert.throws(() => validateCriticRequest(copy), /RE-CRITIC-ROUND-LIMIT/);
 });
 check("request rejects a missing review economy before any checkout", () => {
