@@ -55,11 +55,11 @@ disposition, plugin registration, and final feature-branch delivery
   Sentinel go-live work is explicit Public backlog, not an imported private
   authority or a completion claim.
 - The preceding session loaded Public plugin version
-  `0.2.0+codex.20260720195249`; this block registers the new cachebusted
-  candidate `0.2.0+codex.20260720222336`. The configured local marketplace
-  snapshot still read back the preceding version because this candidate is not
-  pushed yet; after branch refresh, a fresh Codex thread, cache refresh, and
-  full bootstrap remain required before runtime evidence may trust it.
+  `0.2.0+codex.20260720195249`; this block registered the cachebusted
+  candidate `0.2.0+codex.20260720222336`. The feature branch and its remote
+  fetch-back now read back the exact candidate, and the local marketplace was
+  refreshed and reinstalled to that version. A fresh Codex thread must still
+  run the full bootstrap before runtime evidence may trust a future refresh.
 - Advisor export consent is durably recorded as repository-scoped `approved` in
   `pipeline.user.yaml`. Setup reports only the bounded approval/disabled state;
   it never prints raw questions, answers, credentials, paths, or environment
@@ -140,8 +140,10 @@ disposition, plugin registration, and final feature-branch delivery
   through the approved host boundary after a sandbox-only `EPERM` attempt.
   Documentation-only close mutations require the exact final Verify tail.
 - The pre-close candidate `cb8219464937cfc4cb7ff50e2bf5579bfa78f6b5` passed the
-  full Verify and Security gates with exit 0. Close metadata and the final
-  exact-candidate Verify/readback are the remaining delivery-tail steps.
+  full Verify and Security gates with exit 0. The close metadata commit
+  `cb9de1ca5c2d0a7403cd55743ff47a7c19cf83dd` and its exact remote fetch-back
+  are complete; this handover therefore records residual Sentinel work rather
+  than an unfinished delivery tail.
 - Session PO authorizations for this Sentinel continuation: the bounded TP-3
   exception may be used for additive Verify registrations and restored after
   each edit; after all required gates and exact remote readback are green, the
