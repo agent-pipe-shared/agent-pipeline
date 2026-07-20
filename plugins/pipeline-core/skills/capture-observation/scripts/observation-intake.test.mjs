@@ -165,6 +165,7 @@ test("repository references fail closed unless they match the resolved public ta
     evidence: "Related report: https://github.com/another-public/project/issues/9",
   }), { publicRepository: PUBLIC_REPOSITORY });
   assert.equal(crossRepositoryEvidence.status, "privacy-rejected");
+  assert.equal(crossRepositoryEvidence.reason, "external-reference-in-free-text");
   assert(!JSON.stringify(crossRepositoryEvidence).includes("another-public"));
 
   const unresolved = prepareObservation(validInput({
@@ -177,7 +178,7 @@ test("repository references fail closed unless they match the resolved public ta
   });
 });
 
-test("alternative genuine GitHub repository coordinates remain target-bound", () => {
+test("free-text repository coordinates are rejected regardless of target", () => {
   for (const reference of [
     "https://www.github.com/private-overlay/agent-pipeline/issues/41",
     "https://github.com:443/private-overlay/agent-pipeline/issues/41",
@@ -189,16 +190,6 @@ test("alternative genuine GitHub repository coordinates remain target-bound", ()
     "https://github.com./private-overlay/agent-pipeline/issues/41",
     "ssh://git@github.com/private-overlay/agent-pipeline.git",
     "git@github.com:private-overlay/agent-pipeline.git",
-  ]) {
-    const output = prepareObservation(validInput({ evidence: `Related report: ${reference}` }), {
-      publicRepository: PUBLIC_REPOSITORY,
-    });
-    assert.equal(output.status, "privacy-rejected");
-    assert.equal(output.reason, "repository-reference-outside-public-target");
-    assert(!JSON.stringify(output).includes("private-overlay"));
-  }
-
-  for (const reference of [
     "https://www.github.com/agent-pipe-shared/agent-pipeline/issues/12",
     "https://github.com:443/agent-pipe-shared/agent-pipeline/issues/12",
     "https://api.github.com/repos/agent-pipe-shared/agent-pipeline/issues/12",
@@ -211,19 +202,36 @@ test("alternative genuine GitHub repository coordinates remain target-bound", ()
     const output = prepareObservation(validInput({ evidence: `Related report: ${reference}` }), {
       publicRepository: PUBLIC_REPOSITORY,
     });
-    assert.equal(output.status, "ready");
+    assert.equal(output.status, "privacy-rejected");
+    assert.equal(output.reason, "external-reference-in-free-text");
+    assert(!JSON.stringify(output).includes(reference));
   }
 });
 
-test("same-repository GitHub references remain in the canonical preview", () => {
+test("nested and encoded GitHub repository coordinates are validated independently", () => {
+  for (const reference of [
+    "https://github.com/agent-pipe-shared/agent-pipeline/issues/1?next=https://github.com/private-overlay/agent-pipeline/issues/41",
+    "https://github.com/agent-pipe-shared/agent-pipeline/issues/1#next=https://www.github.com/private-overlay/agent-pipeline/issues/41",
+    "https://github.com/agent-pipe-shared/agent-pipeline/issues/1?next=https%3A%2F%2Fgithub.com%2Fprivate-overlay%2Fagent-pipeline%2Fissues%2F41",
+    "github.com/agent-pipe-shared/agent-pipeline/issues/1?next=github.com/private-overlay/agent-pipeline/issues/41",
+  ]) {
+    const output = prepareObservation(validInput({ evidence: `Related report: ${reference}` }), {
+      publicRepository: PUBLIC_REPOSITORY,
+    });
+    assert.equal(output.status, "privacy-rejected");
+    assert.equal(output.reason, "external-reference-in-free-text");
+    assert(!JSON.stringify(output).includes("private-overlay"));
+  }
+});
+
+test("same-repository links remain available only through the structured source field", () => {
   const link = "https://github.com/agent-pipe-shared/agent-pipeline/blob/main/backlog/items/example.md";
   const output = prepareObservation(validInput({
-    evidence: "Related issue: https://github.com/AGENT-PIPE-SHARED/AGENT-PIPELINE/issues/12",
+    evidence: "Related issue is recorded in the structured source field.",
     sourceBacklogLinks: [link],
   }), { publicRepository: PUBLIC_REPOSITORY });
   assert.equal(output.status, "ready");
   assert.match(output.body, new RegExp(link.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
-  assert.match(output.body, /AGENT-PIPE-SHARED\/AGENT-PIPELINE\/issues\/12/);
 });
 
 test("CLI binds repository-reference validation to the resolved public target", async () => {
