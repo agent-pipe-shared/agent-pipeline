@@ -316,6 +316,15 @@ This step ends in a **third mandatory confirmation line** (verbatim, printed dir
 
 ## Step 2 — Staleness check against the marketplace remote (Elephant only)
 
+- **Locked private-overlay exception:** when Step 1a completed through the
+  Codex private-overlay branch with schema-valid `activated` readback, use
+  that readback's candidate/plugin/source-cache binding as the runner-neutral
+  Public-Core freshness evidence for this project. Do not require a
+  Claude-specific `.claude/settings.json` marketplace entry or a Claude CLI
+  refresh command in the private overlay. The authenticated bridge owns the
+  lock-bound comparison; retain only its sanitized status and do not echo
+  private coordinates or receipts.
+
 - Run `node plugins/pipeline-core/scripts/ruleset-freshness.mjs --repo "$PWD"`.
   The helper derives the marketplace URL from the **committed**
   `.claude/settings.json`, bounds remote access to 30 seconds, sanitizes

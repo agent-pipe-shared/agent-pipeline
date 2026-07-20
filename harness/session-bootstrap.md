@@ -162,6 +162,14 @@ This step ends in a **third mandatory confirmation line** (printed directly unde
 
 ### Step 2 — Staleness check against the marketplace remote
 
+- **Locked private-overlay exception:** when the Codex private-overlay branch
+  completed with a schema-valid `activated` bridge readback, that readback's
+  lock-bound candidate/plugin/source-cache comparison is the runner-neutral
+  Public-Core freshness evidence for the overlay. Do not require a
+  Claude-specific `.claude/settings.json` marketplace entry or a Claude CLI
+  refresh command in that project. Retain only the sanitized bridge status;
+  private coordinates and receipts remain private.
+
 - **Requirement:** run `node plugins/pipeline-core/scripts/ruleset-freshness.mjs --repo "$PWD"`. It derives the remote from the committed `.claude/settings.json`, uses bounded remote access and a disposable bare repository, and never changes source refs/config. Consumer installs require equality. In the Agent-Pipeline self-application checkout, `equal|ahead` is current; `behind|diverged` is stale; `unknown` is unchecked. On Codex, use the host-authorized network-open/read-only command boundary directly instead of first producing a known sandbox DNS failure.
 - **Note (mechanism, only on a STALE warning from the SessionStart hook):** if the plugin's SessionStart hook reports a STALE warning IN THIS SESSION naming the installed SHA and remote SHA by name, Step 2 may adopt that result as equivalent evidence instead of re-running `ls-remote` itself. The real hook output otherwise only has a constant fresh-path bootstrap line without SHAs — it looks identical whether the SHAs match or the hook fired fail-open for lack of resolvability, and is therefore NOT usable as substitution proof. If only that constant line is present, or no hook output exists at all, Step 2 still requires its own `ls-remote`.
 - **Why:** third-party marketplaces don't auto-update; without this check, two-machine cache drift replaces the old copy-paste drift.

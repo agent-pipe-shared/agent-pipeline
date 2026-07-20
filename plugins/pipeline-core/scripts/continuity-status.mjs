@@ -12,13 +12,45 @@
  *
  * Usage: node plugins/pipeline-core/scripts/continuity-status.mjs [--root <project-dir>] [--host-supports-background]
  */
-import { resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { projectDir, readState } from "../../../harness/scripts/pipeline-state.mjs";
 import { projectReadContinuityStatus } from "../lib/continuity-status.mjs";
 import { readGateEstimateEvidence } from "../lib/gate-estimate.mjs";
 import { observeGitSource } from "../lib/source-observation.mjs";
+
+/**
+ * Installed-plugin read path.  The plugin may run without the Public Core
+ * checkout (and therefore without its harness directory); only the Public
+ * checkout may provide the sanctioned state writer.  Keep this reader local
+ * and deliberately never import the writer from the repository harness.
+ */
+export function projectDir() {
+  return process.env.CLAUDE_PROJECT_DIR || process.cwd();
+}
+
+export function readState(dir = projectDir()) {
+  let raw;
+  try {
+    raw = readFileSync(join(dir, ".claude", "pipeline-state.json"), "utf8");
+  } catch {
+    return { status: "absent" };
+  }
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch (error) {
+    return { status: "malformed", error: `invalid JSON (${error.message})` };
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return { status: "malformed", error: "content is not a top-level JSON object" };
+  }
+  if (parsed.schema !== undefined && parsed.schema !== "pipeline.state.v0") {
+    return { status: "malformed", error: `unknown schema "${parsed.schema}" (expected "pipeline.state.v0")` };
+  }
+  return { status: "ok", state: parsed };
+}
 
 function parseArgs(argv) {
   const options = { root: projectDir(), hostSupportsBackground: false };
