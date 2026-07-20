@@ -161,6 +161,12 @@ export const ADVISOR_EXPORT_DISCLOSURE = [
   "It does not authorize secrets, credentials, unrelated paths, raw question/answer persistence, or a runner/model substitution.",
   "The default is decline; missing or declined consent keeps Advisory off without starting a probe or child.",
 ].join("\n");
+export const ADVISOR_EXPORT_ENABLED_STATUS = "Advisory export is enabled: repository-scoped consent is approved; only one advisory question and allowlisted candidate material may be exported.";
+export const ADVISOR_EXPORT_DISABLED_STATUS = "Advisory is disabled: advisor export consent is missing or declined.";
+
+export function renderAdvisorExportStatus(advisorExport) {
+  return advisorExport?.enabled === true ? ADVISOR_EXPORT_ENABLED_STATUS : ADVISOR_EXPORT_DISABLED_STATUS;
+}
 
 export function renderToolchainSetupReport(preflight) {
   if (!preflight || !Array.isArray(preflight.results)) return ["Toolchain prerequisites: unavailable (invalid preflight result)."];
@@ -1519,8 +1525,10 @@ Legacy v0/v1/v2 sources are never compiled. Review and activate their one-way V3
     console.log("pipeline.user.v3 and its runner-neutral advisory runtime projections are current; setup performed no writes.");
     const advisorExport = validatePipelineUserV3(existingUserYamlParsed, { source: "pipeline.user.yaml" }).advisoryExport;
     if (!advisorExport.enabled) {
-      console.log(`Advisory is disabled: advisor export consent is ${advisorExport.consent}.`);
+      console.log(renderAdvisorExportStatus(advisorExport));
       console.log(`To review the disclosure and configure consent, run:\n  ${ADVISOR_EXPORT_CONFIGURATION_COMMAND}`);
+    } else {
+      console.log(renderAdvisorExportStatus(advisorExport));
     }
     let toolchain;
     try {

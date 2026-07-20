@@ -59,6 +59,9 @@ import {
   PIPELINE_START_AUTHORITY,
   ADVISOR_EXPORT_CONFIGURATION_COMMAND,
   ADVISOR_EXPORT_DISCLOSURE,
+  ADVISOR_EXPORT_ENABLED_STATUS,
+  ADVISOR_EXPORT_DISABLED_STATUS,
+  renderAdvisorExportStatus,
   renderToolchainSetupReport,
   parseArgv,
   renderAdvisorExportConsent,
@@ -114,6 +117,13 @@ function ok(id, condition, detail) {
       && ADVISOR_EXPORT_DISCLOSURE.includes("allowlisted repository candidate material")
       && ADVISOR_EXPORT_DISCLOSURE.includes("default is decline")
       && ADVISOR_EXPORT_CONFIGURATION_COMMAND === "node setup.mjs --configure-advisor-export",
+  );
+  ok(
+    "advisor export consent: setup reports the approved/disabled status without raw export data",
+    renderAdvisorExportStatus({ enabled: true, consent: "approved" }) === ADVISOR_EXPORT_ENABLED_STATUS
+      && renderAdvisorExportStatus({ enabled: false, consent: "declined" }) === ADVISOR_EXPORT_DISABLED_STATUS
+      && !ADVISOR_EXPORT_ENABLED_STATUS.includes("question/answer")
+      && !ADVISOR_EXPORT_ENABLED_STATUS.includes("credential"),
   );
 }
 {
