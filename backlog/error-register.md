@@ -11,6 +11,7 @@ The only allowed table form is:
 | --- | --- | --- |
 | Independent review context can be contaminated by coordinator status traffic. | process | new |
 | Production delivery provenance can be incomplete when required dispatch metadata is omitted. | process | new |
+| Cross-repository guard overrides can bind audit storage to the coordinator checkout instead of the target repository. | tooling | new |
 
 Use one concise, generic class per distinct root cause. Similar classes are
 merged; the board holds at most approximately 30 classes. `new` is allowed for

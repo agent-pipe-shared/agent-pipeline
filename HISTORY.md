@@ -1,5 +1,47 @@
 # History
 
+## 2026-07-20 — Public V3 repository normalization and overlay boundary
+
+- Finalized the Public V3 Foundation candidate, anonymized the Codex plugin
+  manifest, refreshed its cache-safe version, installed it from the Shared
+  feature branch, and verified source/cache byte identity. A new session is
+  required before the refreshed plugin is treated as loaded.
+- Audited portable work from Multi-CLI 0.3, Storm, Batman, and Hawkeye; no
+  portable implementation file was missing. Remaining Sentinel obligations and
+  bounded Multi-CLI efficiency pilots were recorded as Public backlog work.
+- Reduced the Public remote to unchanged `main` plus the V3 feature branch.
+  Anonymous obsolete histories received recovery tags; histories containing
+  non-neutral authorship were retained offline instead of republished.
+- Reduced the separate private repository to a pinned 12-file consumer overlay
+  on `main`, with all former branch tips preserved as ancestors and in local
+  recovery artifacts. No private material was copied into Public Core.
+- Recorded that the overlay lock is declarative but not yet automatically
+  activated by the installed plugin. Bootstrap and go-live claims remain
+  fail-closed pending the Public activation adapter.
+- Used one PO-confirmed GG-03 override solely for a normal private `main`
+  fast-forward. The close residue check found that the cross-repository audit
+  ledger initially bound to the coordinator checkout; the private record was
+  preserved locally and no private command data entered Public history.
+- Pre-close Full Verify completed through the approved host boundary with 101
+  steps and exact Verify/Security evidence at `d85cae3`. The sandbox-only
+  attempt failed on local process/socket `EPERM` and was not counted as gate
+  evidence.
+
+### Lessons
+
+- Public archive tags need an anonymity scan of all newly reachable commit
+  metadata before publication; an offline bundle is the correct archive for a
+  history that fails that boundary.
+- A pinned overlay lock without a loader and validator is a declaration, not a
+  runtime binding or bootstrap proof.
+- Cross-repository guard evaluation and its one-time audit ledger must resolve
+  the same physical target before an override is admitted.
+
+### Open / next
+
+See the canonical [handover](docs/state.md) for the exact delivery tail and the
+bounded go-live backlog.
+
 ## 2026-07-20 — Public V3 Foundation stabilization
 
 - Reconciled Public Core self-application, marketplace, inventory, portable
