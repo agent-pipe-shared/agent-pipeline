@@ -57,6 +57,8 @@ function validInput(overrides = {}) {
   return { ...base, ...overrides };
 }
 
+const PUBLIC_REPOSITORY = "agent-pipe-shared/agent-pipeline";
+
 test("closed input schema rejects additional top-level and environment fields", () => {
   const extraTop = prepareObservation({ ...validInput(), rawLogs: "not allowed" });
   assert.equal(extraTop.status, "invalid-input");
@@ -147,6 +149,57 @@ test("public-safe content is conservatively redacted without changing the source
   assert.match(output.body, /<redacted-private-network>/);
   assert.deepEqual(input, before);
   assert(output.redactions.length >= 6);
+});
+
+test("repository references fail closed unless they match the resolved public target", () => {
+  const privateReference = prepareObservation(validInput({
+    sourceBacklogLinks: ["https://github.com/private-overlay/agent-pipeline/issues/41"],
+  }), { publicRepository: PUBLIC_REPOSITORY });
+  assert.deepEqual(privateReference, {
+    schema: "pipeline.capture-observation-result.v1",
+    status: "privacy-rejected",
+    reason: "repository-reference-outside-public-target",
+  });
+
+  const crossRepositoryEvidence = prepareObservation(validInput({
+    evidence: "Related report: https://github.com/another-public/project/issues/9",
+  }), { publicRepository: PUBLIC_REPOSITORY });
+  assert.equal(crossRepositoryEvidence.status, "privacy-rejected");
+  assert(!JSON.stringify(crossRepositoryEvidence).includes("another-public"));
+
+  const unresolved = prepareObservation(validInput({
+    sourceBacklogLinks: ["https://github.com/agent-pipe-shared/agent-pipeline/issues/12"],
+  }));
+  assert.deepEqual(unresolved, {
+    schema: "pipeline.capture-observation-result.v1",
+    status: "setup-required",
+    reason: "public-repository-unresolved",
+  });
+});
+
+test("same-repository GitHub references remain in the canonical preview", () => {
+  const link = "https://github.com/agent-pipe-shared/agent-pipeline/blob/main/backlog/items/example.md";
+  const output = prepareObservation(validInput({
+    evidence: "Related issue: https://github.com/AGENT-PIPE-SHARED/AGENT-PIPELINE/issues/12",
+    sourceBacklogLinks: [link],
+  }), { publicRepository: PUBLIC_REPOSITORY });
+  assert.equal(output.status, "ready");
+  assert.match(output.body, new RegExp(link.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(output.body, /AGENT-PIPE-SHARED\/AGENT-PIPELINE\/issues\/12/);
+});
+
+test("CLI binds repository-reference validation to the resolved public target", async () => {
+  let stdout = "";
+  const exitCode = await runCli(["--repository", PUBLIC_REPOSITORY], {
+    readFileFn: async () => JSON.stringify(validInput({
+      sourceBacklogLinks: ["https://github.com/agent-pipe-shared/agent-pipeline/issues/12"],
+    })),
+    writeStdout: (value) => {
+      stdout += value;
+    },
+  });
+  assert.equal(exitCode, 0);
+  assert.equal(JSON.parse(stdout).status, "ready");
 });
 
 test("unknown is explicit and versions, candidates, OS, and areas remain closed", () => {
