@@ -213,6 +213,9 @@ for (const name of [
   "private-key.md",
   "PRIVATE.KEY.md",
   "private—key.md",
+  "pass-word.md",
+  "passWord.md",
+  "pass-phrase.md",
 ]) test(`rejects normalized prohibited path segment ${name}`, () => {
   const root = fixture();
   try {
@@ -225,6 +228,9 @@ for (const [name, content] of [
   ["named password assignment", "password = fixture-value\n"],
   ["normalized API key assignment", "API_KEY: fixture-value\n"],
   ["camel-case private key assignment", "privateKey = external-reference\n"],
+  ["separated password assignment", "pass-word = fixture-value\n"],
+  ["camel-case password assignment", "passWord: fixture-value\n"],
+  ["separated passphrase assignment", "pass-phrase = fixture-value\n"],
   ["PEM private-key material", "-----BEGIN OPENSSH PRIVATE KEY-----\nfixture\n-----END OPENSSH PRIVATE KEY-----\n"],
 ]) test(`rejects prohibited content: ${name}`, () => {
   const root = fixture();

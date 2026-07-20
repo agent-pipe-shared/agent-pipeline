@@ -43,7 +43,9 @@ const PROHIBITED_SECRET_WORDS = new Set([
   "secret", "secrets", "credential", "credentials", "token", "tokens",
   "password", "passwords", "passwd", "passphrase",
 ]);
-const PROHIBITED_COMPOUNDS = new Set(["apikey", "privatekey"]);
+const PROHIBITED_COMPOUNDS = new Set([
+  "apikey", "privatekey", "password", "passwords", "passphrase",
+]);
 const PRIVATE_KEY_BLOCK = /-----BEGIN(?: [A-Z0-9][A-Z0-9 -]{0,64})? PRIVATE KEY-----/u;
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 const AUTHENTICATED_ADMISSIONS = new WeakMap();
