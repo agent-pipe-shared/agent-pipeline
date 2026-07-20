@@ -1,6 +1,6 @@
 ---
 type: workflow-improvement
-status: new
+status: in-progress
 created: 2026-07-20
 source: Public review of the slim private-overlay consumer activation boundary
 owner: Pipeline Elephant
@@ -73,7 +73,29 @@ evidence before implementation or any readiness claim.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
-- **Decision:**
-- **Rationale:**
-- **Assignment (if accepted):**
-- **Date:**
+- **Decision:** Accepted as Sentinel package **SNT-A**. The original item is
+  translated into the independently reviewable slices SNT-A1 admission,
+  SNT-A2 Public Source/Installed identity, SNT-A3 digest-bound projection and
+  PO-profile publication, and SNT-A4 combined bootstrap/readback integration.
+- **Rationale:** A slim overlay cannot use a private setup script or harness as
+  an identity or activation fallback. The bridge therefore belongs in the
+  installed Public Core and must remain explicit, read-before-write,
+  exact-candidate-bound, authenticated at input consumption, and sanitized at
+  every machine-evidence boundary.
+- **Assignment (if accepted):** Pipeline Elephant, with independent Goldfish
+  implementation slices and a fresh Critic before activation.
+- **Date:** 2026-07-20
+
+## Implementation checkpoint — 2026-07-20
+
+- SNT-A1 through SNT-A3 are implemented locally with focused positive and
+  fail-closed tests; they are not yet a published or activated candidate.
+- SNT-A4 integration, aggregate Verify registration, installed-cache/slim-
+  overlay end-to-end evidence, independent Critic review, exact-candidate
+  publication, reinstall, and activation readback remain required.
+- The current implementation session uses a PO-authorized temporary Codex
+  Sol/high route exception. The intended execution route remains Terra/high;
+  no evidence from this session may claim that Terra was observed.
+- Completion of SNT-A removes only the private-overlay activation prerequisite.
+  It does not by itself satisfy the separate Sentinel go-live, legal,
+  publication, documentation, or full project-calibration gates.

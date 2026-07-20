@@ -1,0 +1,12 @@
+interface:
+  display_name: "Capture Observation"
+  short_description: "Sanitize and publish canonical GitHub observations"
+  default_prompt: "Use $capture-observation to capture, preview, and publish this behavior as a canonical GitHub observation."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "github"
+      description: "GitHub MCP server for issue label checks, duplicate search, publication, and readback"
+      transport: "streamable_http"
+      url: "https://api.githubcopilot.com/mcp/"

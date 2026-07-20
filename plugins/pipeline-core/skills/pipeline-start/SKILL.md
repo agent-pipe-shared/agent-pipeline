@@ -59,6 +59,70 @@ Goldfish/Critic normally receive their compact variant embedded in the dispatch 
 Before selecting a profile, model or advisory adapter, verify the project's
 actual route authority:
 
+### Codex private-overlay activation bridge
+
+For Codex, first test whether the governed project root contains the exact file
+`.agent-pipeline/core.lock.json`. If it does, this locked-project branch is a
+mandatory alternative to the ordinary public-project V3 source/runtime check
+below. After an authenticated `activated` result and actual context delivery,
+continue at Step 1b; do not also execute the numbered public-project branch:
+
+1. Resolve the absolute root of the **currently loaded `pipeline-core` plugin**
+   from this skill's own loaded location. In the command below
+   `PIPELINE_PLUGIN_ROOT` denotes that resolved root; it is not a value sourced
+   from the project or its environment. Never select a wrapper under `$PWD`, a
+   project-local `plugins/` tree, the private overlay, or another checkout.
+2. Through the host-authorized local read-only execution boundary run exactly:
+
+   `node "${PIPELINE_PLUGIN_ROOT}/scripts/codex-private-overlay-activation.mjs" status --project-root "$PWD"`
+
+   The wrapper, not a project-local setup or harness, owns Codex source
+   observation, lock admission, runtime projection/PO-profile readback, and the
+   authenticated one-time private-input consume. Do not run project-local
+   `setup.mjs`, a local harness, or a copied activation script as an SNT-A
+   identity/admission substitute.
+3. Accept only a schema-valid result from that invocation:
+   - `activation-required`: **STOP before Step 1b and print no confirmation
+     line.** Report the returned reason and `planSha256`; perform no mutation,
+     do not invoke `activate`, and do not silently fall back to the public V3
+     path. Activation remains a separately reviewed, digest-bound action.
+   - `rejected`, a non-zero exit, malformed output, an unavailable `status`
+     operation, or missing authenticated readback: **FAIL CLOSED.** Diagnose
+     read-only, use no private input as authority, and print no confirmation
+     line.
+   - `activated`: this is the only activation status that may establish the
+     private overlay's authenticated identity/readback. Retain its
+     `planSha256` only for the immediately following consistency check; the
+     sanitized status alone is never private context.
+4. Immediately after a schema-valid `activated` status, run exactly the second
+   plugin-local command through the same boundary and resolved plugin root:
+
+   `node "${PIPELINE_PLUGIN_ROOT}/scripts/codex-private-overlay-activation.mjs" load-context --project-root "$PWD"`
+
+   Accept private context only when the result has exact schema
+   `pipeline.private-overlay-operational-context.v1`, status `context-loaded`,
+   and the same `planSha256` as the activated readback. Its bounded `entries`
+   are private operational context for this turn only. They contain class and
+   text, not private filenames, and are not machine evidence. Do not echo,
+   quote, summarize into public output, persist, log, cache, commit, or export
+   either the envelope or its contents.
+5. A rejected context envelope remains fail-closed with its sanitized reason.
+   If `load-context` is unavailable, non-zero without a valid rejection, or
+   emits malformed, mismatched, oversized, filename-bearing, or otherwise
+   invalid output, **STOP** and report
+   `SNT-A-CODEX-CONTEXT-TRANSFER-UNAVAILABLE`. Do not infer or reconstruct the
+   private inputs from the project checkout, status stdout, setup, or harness.
+   Only `activated` plus schema-valid `context-loaded` may continue to the
+   separate Step 3–5 checks and their F4 behavior.
+
+Passing this locked-project branch replaces only SNT-A identity, admission,
+projection and private-input authentication. It does **not** satisfy or replace
+the project-specific Step 3 calibration/denies, Step 4 handover, or Step 5
+verify checks; those remain separate and retain their F4 behavior.
+
+When `.agent-pipeline/core.lock.json` is absent, use the ordinary public-project
+V3 source/runtime check:
+
 1. `pipeline.user.yaml` must exist and declare `schema: pipeline.user.v3`.
    Neither a V1/V2 compatibility projection nor the installed plugin cache is
    a substitute authority.
@@ -288,6 +352,7 @@ This step ends in a **third mandatory confirmation line** (verbatim, printed dir
      `python3 -m pip install semgrep`; Gitleaks and OSV-Scanner receive their
      platform-specific commands in the same result shape.
    - When the preflight reports non-ready under `securityGate: blocking`, fail closed only for security/release/public-baseline claims and their dependent gates. Do not invent F4, repair the environment, or turn this read-only bootstrap observation into a general write prohibition: those broader effects have no authority here. Under `warn` or `off`, surface the typed condition and continue without a readiness claim.
+7. **Observation/document governance (Agent-Pipeline checkout only):** when either `governance/observation-doc-governance.json` or `.github/ISSUE_TEMPLATE/observation.yml` exists, require both plus `harness/scripts/check-observation-governance.mjs`, then run `node harness/scripts/check-observation-governance.mjs`. A missing counterpart, non-zero result, malformed policy, unclassified `docs/` artifact, or Issue/Backlog/overlay contract drift is case **F6**: fail closed before writing or dispatch and print no confirmation line. The checker is read-only and creates no Issue, label, backlog item, or network request. Do not apply this source-repository control to consumer repositories that carry none of these governance artifacts.
 
 ## Step 4 — Handover/state file (Elephant only; Goldfish/Critic FORBIDDEN)
 
@@ -428,7 +493,7 @@ for this profile; no advisor probe or receipt is permitted.
 
 **Why:** a mini-feature or a hotfix used to run under the same heavy ceremony as an architecture rebuild — the exceeded proportionality guardrail. Mini cuts the ceremony without touching a single deterministic guardrail.
 
-## Failure cases F1–F5 (binding behavior)
+## Failure cases F1–F6 (binding behavior)
 
 | Case | Finding | Binding behavior |
 |---|---|---|
@@ -437,6 +502,7 @@ for this profile; no advisor probe or receipt is permitted.
 | **F3** | Offline / remote unreachable | Warn + continue on cache state (the cache is a complete copy; day-to-day operation is offline-capable). Redo the staleness check at next connectivity, at latest at the next bootstrap. Confirmation line carries the offline suffix. |
 | **F4** | Calibration or handover file missing (or verify command missing) | **STOP for writing work.** Read-only analysis stays allowed. Offer creation: draft the missing calibration from the required-field list in step 3 (canonical example: `templates/pipeline.json.example` in the agent-pipeline repo — an installed plugin cannot read repo templates, so generate the draft from the field list). Newly created files MUST be named to the PO for confirmation — a new calibration is a project-policy decision, never an agent's solo act. **The confirmation line still prints** (F4 is the expected initial state in not-yet-migrated projects, not a bootstrap failure): the affected field reads `MISSING (F4)` (step 6) plus the mandatory suffix `· F4: read-only analysis only until calibration/handover is created`. |
 | **F5** | `pipeline.user.v3` missing/invalid, V3 migration required, or a V3-owned runtime projection is changed/unreadable | **FAIL CLOSED.** Read-only diagnosis only. Do not use V1/V2 or runtime bytes as fallback authority, do not start advisory, do not write/dispatch, and print **no confirmation line**. Repair only through the explicit V3 migration/apply or an independently reviewed authority correction; then rerun bootstrap from Step 1a. |
+| **F6** | Agent-Pipeline observation/document governance is missing, malformed, incomplete, or drifted | **FAIL CLOSED.** Read-only diagnosis only; no writing, dispatch, confirmation line, automatic inventory classification, backlog promotion, or deletion. Correct the governed artifact and rerun the checker and bootstrap. |
 
 Why F2 has the guardrail exception: a stale ruleset with old hooks means the session works under WEAKER protection than decided — exactly the state the pipeline exists to abolish. Feature/doc deltas may wait; protection deltas may not.
 

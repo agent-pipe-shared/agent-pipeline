@@ -11,6 +11,8 @@ import { lstatSync, readFileSync, realpathSync } from "node:fs";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { checkObservationGovernance } from "./check-observation-governance.mjs";
+
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const EXCLUDED_PATH = "AGENTS.md";
 function posixPath(value) {
@@ -399,10 +401,19 @@ export function checkRepository(rootInput, options = {}) {
     findings.push(`authority: ${error.message}`);
   }
 
+  const observationGovernance = checkObservationGovernance(root, { optionalWhenAbsent: true });
+  for (const item of observationGovernance.findings) findings.push(`observation-governance: ${item}`);
+
   findings.sort();
   return {
     findings,
-    stats: { markdownFiles: markdownPaths.length, linksChecked, anchorsChecked, excludedLinks },
+    stats: {
+      markdownFiles: markdownPaths.length,
+      linksChecked,
+      anchorsChecked,
+      excludedLinks,
+      observationGovernance: observationGovernance.applicable ? "checked" : "not-applicable",
+    },
   };
 }
 

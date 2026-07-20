@@ -33,6 +33,7 @@ import {
   validatePoGateAuthority,
   validatePoGateLanguageProjection,
   validatePoGateProfileReceipt,
+  validatePoGateProfileForRepository,
 } from "./po-gate-authority.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -132,6 +133,16 @@ function fixture({ linkedLanguage = null } = {}) {
         ...overrides,
       });
     },
+    validateProfile(overrides = {}) {
+      const topology = {
+        repoRoot: current,
+        gitCommonDir: common,
+        primaryRoot: primary,
+        registeredWorktreeRoots: current === primary ? [primary] : [primary, current],
+        ...overrides,
+      };
+      return validatePoGateProfileForRepository({ repoRoot: current }, { topology });
+    },
     cleanup() { rmSync(base, { recursive: true, force: true }); },
   };
 }
@@ -160,6 +171,95 @@ check("narrow PO-language projection ignores runner schema while requiring an ex
   );
   assert.equal(validatePoGateLanguageProjection("language:\n  human_facing: de\n", runtime("de")).ok, true);
   assert.equal(validatePoGateLanguageProjection(source("en"), runtime("de")).code, "PO-PROFILE-PROJECTION-INVALID");
+});
+
+check("profile-only readback validates the receipt without pipeline-state, PRD or Spec inputs", () => {
+  withFixture({}, ({ primary, validateProfile }) => {
+    rmSync(join(primary, ".claude", "pipeline-state.json"), { force: true });
+    rmSync(join(primary, "specs"), { recursive: true, force: true });
+    const result = validateProfile();
+    assert.equal(result.ok, true, JSON.stringify(result));
+    assert.equal(result.code, "PO-PROFILE-AUTHORITY-VALID");
+    assert.deepEqual(Object.keys(result.value), [
+      "schema",
+      "humanFacing",
+      "sourceSha256",
+      "runtimeSha256",
+      "receiptSha256",
+      "repositoryFingerprint",
+    ]);
+    assert.equal(result.value.schema, "pipeline.po-gate-authority-evidence.v1");
+    assert.equal(result.value.humanFacing, "de");
+  });
+});
+
+check("profile-only readback rejects missing, stale and non-0600 receipts", () => {
+  for (const mutation of [
+    ({ receiptPath }) => unlinkSync(receiptPath),
+    ({ receiptPath }) => chmodSync(receiptPath, 0o644),
+    ({ primary }) => write(join(primary, "pipeline.user.yaml"), `${source("de")}# stale\n`),
+    ({ primary }) => write(join(primary, ".claude", "pipeline.yaml"), runtime("en")),
+  ]) {
+    withFixture({}, (fixtureValue) => {
+      mutation(fixtureValue);
+      const result = fixtureValue.validateProfile();
+      assert.equal(result.ok, false);
+      assert.ok(["PO-PROFILE-RECEIPT-INVALID", "PO-PROFILE-RECEIPT-STALE"].includes(result.code), JSON.stringify(result));
+    });
+  }
+});
+
+check("profile-only readback rejects symlinked receipt, source and runtime inputs", () => {
+  withFixture({}, ({ base, receiptPath, validateProfile }) => {
+    const outside = join(base, "outside-receipt.json");
+    write(outside, readFileSync(receiptPath), 0o600);
+    unlinkSync(receiptPath);
+    symlinkSync(outside, receiptPath);
+    assert.equal(validateProfile().code, "PO-PROFILE-RECEIPT-INVALID");
+  });
+  for (const relativePath of ["pipeline.user.yaml", ".claude/pipeline.yaml"]) {
+    withFixture({}, ({ base, primary, validateProfile }) => {
+      const target = join(primary, relativePath);
+      const outside = join(base, `outside-${relativePath.replaceAll("/", "-")}`);
+      write(outside, readFileSync(target));
+      unlinkSync(target);
+      symlinkSync(outside, target);
+      assert.equal(validateProfile().code, "PO-PROFILE-RECEIPT-STALE");
+    });
+  }
+});
+
+check("profile-only readback follows the existing registered linked-worktree authority", () => {
+  withFixture({ linkedLanguage: "en" }, ({ primary, receipt, validateProfile }) => {
+    const linked = validateProfile();
+    assert.equal(linked.ok, true, JSON.stringify(linked));
+    assert.equal(linked.value.humanFacing, "de");
+    assert.equal(linked.value.sourceSha256, receipt.sourceSha256);
+    const unregistered = validateProfile({ registeredWorktreeRoots: [primary] });
+    assert.equal(unregistered.ok, false);
+    assert.equal(unregistered.code, "PO-GATE-WORKTREE-UNREGISTERED");
+  });
+});
+
+check("profile-only failures and evidence never expose machine-local paths or raw profile bytes", () => {
+  withFixture({ linkedLanguage: "en" }, ({ base, primary, current, receiptPath, validateProfile }) => {
+    const validOutput = JSON.stringify(validateProfile());
+    chmodSync(receiptPath, 0o644);
+    const failedOutput = JSON.stringify(validateProfile());
+    for (const output of [validOutput, failedOutput]) {
+      for (const forbidden of [base, primary, current, source("de"), runtime("de")]) {
+        assert.equal(output.includes(forbidden), false);
+      }
+    }
+  });
+  withFixture({}, ({ base, primary }) => {
+    const unavailable = validatePoGateProfileForRepository({ repoRoot: primary }, {
+      spawn: () => { throw new Error(`private topology ${base}`); },
+    });
+    assert.equal(unavailable.code, "PO-PROFILE-AUTHORITY-UNAVAILABLE");
+    assert.equal(JSON.stringify(unavailable).includes(base), false);
+    assert.equal(JSON.stringify(unavailable).includes(primary), false);
+  });
 });
 
 check("source, runtime, common receipt and one marked PRD form one valid authority", () => {

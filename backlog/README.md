@@ -5,7 +5,15 @@
 
 ## Purpose
 
-The backlog is the only place where improvements, observations, and open questions about the pipeline itself get **versioned** — never left only in a session's chat history (principle P2/§5.1 in [`docs/operating-model.md`](../docs/operating-model.md)). It is the concrete implementation of the feedback loop from [`docs/operating-model.md` §7](../docs/operating-model.md#7-feedback-loop).
+The backlog is the versioned work queue for triaged improvements and open
+questions about the pipeline itself — never leave accepted work only in a
+session's chat history (principle P2/§5.1 in
+[`docs/operating-model.md`](../docs/operating-model.md)). Public unconfirmed
+behavior observations use a GitHub Issue as their single source from capture
+through triage; only accepted implementation work is linked into this backlog,
+as defined by the [observation intake governance](../docs/observation-intake.md).
+The backlog remains the concrete implementation of the feedback loop from
+[`docs/operating-model.md` §7](../docs/operating-model.md#7-feedback-loop).
 
 ## Item types
 

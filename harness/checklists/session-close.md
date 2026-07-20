@@ -9,6 +9,7 @@
 - [ ] Open 🟡 and blocked items listed in the handover — nothing silently dropped
 - [ ] Every blocker/major Critic finding dispositioned; mandatory-trigger tasks have a findings report before merge
 - [ ] Stage-1 Verify is green before semantic Critic review; its command/result digests and candidate OID/tree are retained as closed evidence
+- [ ] Agent-Pipeline source checkout only: observation/document governance precheck is green before Verify; missing/drifted artifacts or unclassified `docs/` files leave close unfinished
 - [ ] Result-first close intent binds the current authority, graph and package-binding digests before the expected-revision State CAS; replay a crash window with the same intent bytes/receipt identity (State CAS is the logical commit point, not cross-file atomicity)
 - [ ] After the last tracked candidate mutation, the same full Verify is green on the exact post-transition commit/tree; any later tracked mutation marks it stale and blocks delivery
 - [ ] Delivery and fetch-back are a no-mutation tail: pushed and fetched OIDs are the exact verified candidate OID, and lifecycle close occurs only after exact readback
