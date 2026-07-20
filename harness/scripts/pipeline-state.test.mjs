@@ -1598,7 +1598,7 @@ function canonicalFixtureJson(value) {
   const initFile = writeRequest(dir, "init", initial);
   run(continuityArgs("continuity-init", "absent", initFile), continuityDeps(dir));
   const txn = {
-    idempotencyKey: "decision-key-01",
+    idempotencyKey: "idempotency-fixture-01",
     briefSha256: B,
     intentSha256: C,
     selectedOptionId: "continue-narrow",
@@ -1723,7 +1723,7 @@ function canonicalFixtureJson(value) {
   const blocked = readState(dir).state.continuity;
   const intent = {
     schema: "pipeline.course-decision-intent.v1",
-    idempotencyKey: "decision-key-01",
+    idempotencyKey: "idempotency-fixture-01",
     briefId: built.brief.briefId,
     briefSha256: built.sha256,
     blockerSignature: D,
@@ -1771,7 +1771,7 @@ function canonicalFixtureJson(value) {
   })), continuityDeps(dir, binding));
   const blocked = readState(dir).state.continuity;
   const intent = {
-    schema: "pipeline.course-decision-intent.v1", idempotencyKey: "decision-key-02", briefId: built.brief.briefId,
+    schema: "pipeline.course-decision-intent.v1", idempotencyKey: "idempotency-fixture-02", briefId: built.brief.briefId,
     briefSha256: built.sha256, blockerSignature: D, optionId: "option-0", poEvidenceSha256: C,
     preStateSha256: createHash("sha256").update(readFileSync(statePath(dir))).digest("hex"), selectedTransitionSha256: sha256Canonical(selectedTransition),
     expectedRevision: 1, selectedRevision: 2, dispatchableRevision: 3,

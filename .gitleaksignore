@@ -9,11 +9,11 @@ ef5ab2e63b1bfc0bd8035c123a44463009ecdf47:plugins/pipeline-core/lib/continuity-st
 1af37e77272abff3450de8318a6269a2451baca2:plugins/pipeline-core/lib/review-economy.test.mjs:generic-api-key:275
 8c86381c5eded88209ef77b9b23ba7a113f43f28:harness/scripts/pipeline-state.test.mjs:generic-api-key:960
 f06d6b57f3cd5d06e8ab3a5e5389aa4a6e5b0f26:specs/2026-07-11-plugin-scope-kanon/prd_plugin-scope-kanon.md:generic-api-key:12
+89c3c2ebf73d2b8cd3b43ee0ea463d2819c5f49f:harness/scripts/pipeline-state.test.mjs:generic-api-key:1601
+89c3c2ebf73d2b8cd3b43ee0ea463d2819c5f49f:harness/scripts/pipeline-state.test.mjs:generic-api-key:1726
+89c3c2ebf73d2b8cd3b43ee0ea463d2819c5f49f:harness/scripts/pipeline-state.test.mjs:generic-api-key:1774
 # Equivalent exact fingerprints for the current worktree scanner mode.
 plugins/pipeline-core/lib/review-economy.test.mjs:generic-api-key:278
 plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:628
 plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:690
 plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:715
-harness/scripts/pipeline-state.test.mjs:generic-api-key:1468
-harness/scripts/pipeline-state.test.mjs:generic-api-key:1593
-harness/scripts/pipeline-state.test.mjs:generic-api-key:1641
