@@ -174,7 +174,7 @@ identity and the advisory receipt remain separate requirements.
   especially after a credit-limit/reset event. Session effort is not reliably
   introspectable: set it once from the V3 route and record the explicit value.
   Read-only work may proceed while host confirmation is pending; writes may not.
-- Run `node plugins/pipeline-core/scripts/bootstrap-env-check.mjs` and require
+- Run `node "${PIPELINE_PLUGIN_ROOT}/scripts/bootstrap-env-check.mjs"` and require
   its explicit `status: clear` receipt. This proves
   `CLAUDE_CODE_SUBAGENT_MODEL` is **not set** without treating normal empty
   `printenv` output as an error or disclosing a configured value. A set value
@@ -187,7 +187,7 @@ identity and the advisory receipt remain separate requirements.
 ### Codex local app-server health (Elephant only)
 
 For a Codex session, run the read-only local observation
-`node plugins/pipeline-core/scripts/codex-app-server-health.mjs` through the
+`node "${PIPELINE_PLUGIN_ROOT}/scripts/codex-app-server-health.mjs"` through the
 host-authorized local execution boundary before
 claiming that a local agent thread, visible subagent activity, or durable host
 execution is available. Do not first probe it in a workspace sandbox that
@@ -198,7 +198,7 @@ wakeup. Any other `CAS-*` result is a typed local-host incident: do not invent
 an active worker or reclassify the defect as a Pipeline implementation result.
 
 The known attended recovery is
-`node plugins/pipeline-core/scripts/codex-app-server-health.mjs --recover`.
+`node "${PIPELINE_PLUGIN_ROOT}/scripts/codex-app-server-health.mjs" --recover`.
 It performs at most one fixed `codex app-server daemon restart`, then requires
 a fresh healthy observation; it never loops, launches a model, or changes a
 repository. It is deliberately outside this read-only bootstrap step. A failed
@@ -219,7 +219,7 @@ recovery keeps the exact `CAS-*` code and the operator guidance for
 - **Affected Codex child boundary:** before the first child for every sandboxed
   read-only Codex advisory, readiness, or Critic duty, require the generic
   selected host bridge
-  `plugins/pipeline-core/scripts/sandboxed-readonly-host-bridge.mjs`. Supply
+  `"${PIPELINE_PLUGIN_ROOT}/scripts/sandboxed-readonly-host-bridge.mjs"`. Supply
   its exact selected ID only; the bridge must read back the selected
   `network-open/read-only` profile before launch. A missing, stale, drifted, or
   host-mode-unavailable selection returns its typed no-child result and starts
@@ -228,8 +228,8 @@ recovery keeps the exact `CAS-*` code and the operator guidance for
   does not exist through an unbound host fallback.
 - For Epic/Feature, start the duty through
   the repository-owned closed launcher for
-  `plugins/pipeline-core/scripts/advisory-host-bridge.mjs`,
-  `plugins/pipeline-core/scripts/codex-advisory-bootstrap.mjs` for Codex, with exactly one
+  `"${PIPELINE_PLUGIN_ROOT}/scripts/advisory-host-bridge.mjs"`,
+  `"${PIPELINE_PLUGIN_ROOT}/scripts/codex-advisory-bootstrap.mjs"` for Codex, with exactly one
   material question, bound to the current candidate commit/tree and queue
   revision. The launcher reads the standing `advisor_export.consent` decision
   from validated `pipeline.user.v3`; do not rebuild or export its input with
@@ -325,7 +325,7 @@ This step ends in a **third mandatory confirmation line** (verbatim, printed dir
   lock-bound comparison; retain only its sanitized status and do not echo
   private coordinates or receipts.
 
-- Run `node plugins/pipeline-core/scripts/ruleset-freshness.mjs --repo "$PWD"`.
+- Run `node "${PIPELINE_PLUGIN_ROOT}/scripts/ruleset-freshness.mjs" --repo "$PWD"`.
   The helper derives the marketplace URL from the **committed**
   `.claude/settings.json`, bounds remote access to 30 seconds, sanitizes
   transport/authentication failures, and never updates source refs/config.
@@ -337,7 +337,7 @@ This step ends in a **third mandatory confirmation line** (verbatim, printed dir
   known network-restricted workspace sandbox: that produces a misleading DNS
   error before the authoritative host observation. The host result, including
   `unknown`, is the one bootstrap observation.
-- Working repository (EVERY writable governed project, including self-application): run `node "${CLAUDE_PLUGIN_ROOT}/scripts/repository-freshness.mjs"` (from this source checkout: `node plugins/pipeline-core/scripts/repository-freshness.mjs`). This is separate from marketplace/plugin freshness. It compares through a disposable bare repository and never fetches into the source checkout. `equal|ahead` permit writes. `behind|diverged|detached|no-upstream|unknown` STOP writes and dispatch while read-only diagnosis remains allowed. `unknown` covers fetch failure/timeout, unavailable upstream, and insufficient shallow history; never call it fresh. Other unmerged remote branches are bounded information only, never a branch-selection gate.
+- Working repository (EVERY writable governed project, including self-application): run `node "${PIPELINE_PLUGIN_ROOT}/scripts/repository-freshness.mjs"`. This is separate from marketplace/plugin freshness. It compares through a disposable bare repository and never fetches into the source checkout. `equal|ahead` permit writes. `behind|diverged|detached|no-upstream|unknown` STOP writes and dispatch while read-only diagnosis remains allowed. `unknown` covers fetch failure/timeout, unavailable upstream, and insufficient shallow history; never call it fresh. Other unmerged remote branches are bounded information only, never a branch-selection gate.
 - This is a point-in-time protocol check, not an atomic lock or global enforcement claim: the remote may advance immediately afterwards, and SessionStart context is not an OS-level write barrier. The helper never pulls, merges, rebases, checks out, or writes source refs/config.
 - Why: third-party marketplaces do not auto-update; only an explicit refresh propagates — without this check, two-machine cache drift silently replaces the old copy-paste drift.
 
@@ -346,9 +346,9 @@ This step ends in a **third mandatory confirmation line** (verbatim, printed dir
 1. Check `.claude/pipeline.json` **EXISTS** in the project, then read it completely. Keys starting with `$` are documentation and ignored. Required minimum fields: `project`, `verify`, `autonomy`, `branchModel`, `worktree`, `stakes`, `constraints` (schema: operating-model §8; canonical example: `templates/pipeline.json.example` in the agent-pipeline repo). Optional `handover` names the handover file (default `docs/state.md`). Missing file or missing required fields → case **F4**.
 2. Check project **denies where they actually live**: committed `.claude/settings.json` (permissions) and/or `.claude/guard-config.json` (git-guard extra denies) — NOT in pipeline.json. Verify the committed deny surface exists for projects that declare one.
 3. Critic role: read only the guardrail/constraint parts as review benchmark.
-4. **Declarative manifest + governance (existence check FIRST, same discipline as F4):** check whether `.claude/pipeline.yaml` (the OPTIONAL declarative manifest — distinct from the required `.claude/pipeline.json` calibration above) EXISTS. If it does: (a) validate it via `node harness/scripts/validate-manifest.mjs` — existence/exit-code check only, no need to parse the full output at bootstrap; (b) read the manifest's `governance.guidelines_path` (and `policies_path`, if present) so the guidelines are already in the Elephant's session context from the start, not fetched later mid-task. A missing `.claude/pipeline.yaml` is NOT a failure case — the manifest is fully optional and F4 does not apply to it — skip this sub-step silently.
-5. **Repository-scoped PO authority:** run `node harness/scripts/check-po-gate-authority.mjs` from the current checkout. It revalidates the canonical primary checkout's narrow source/runtime PO-language projection against the mode-`0600` receipt below the Git common directory and, when a feature is active, requires exactly one physical `prd_*.md`: `activeFeature.planPath`, carrying exactly one marker for that language. Branch-local profile bytes are neither authority nor a bootstrap repair target. Any receipt, primary-projection, topology, cardinality, path, marker, or digest failure blocks PO-facing authoring and `approve-plan`. Repair the receipt only with `node setup.mjs --publish-po-profile` in the canonical primary checkout, or correct the active feature authority; never copy or rewrite another worktree's profile during bootstrap.
-6. **Self-application toolchain preflight (Agent-Pipeline checkout only):** when the current checkout is the Agent-Pipeline source checkout and contains both `plugins/pipeline-core/scripts/toolchain-preflight.mjs` and its repository-local `harness/` dependencies, run `node plugins/pipeline-core/scripts/toolchain-preflight.mjs --root "$PWD"`. This is a read-only observation: it resolves/probes fixed executables and inputs, does not write a receipt, does not install a tool, and does not alter checkout, configuration, or Git state. Never substitute `${CLAUDE_PLUGIN_ROOT}` and never run it in a consumer project merely because `pipeline-core` is installed: scanner configuration and license inputs are project-owned, while this preflight is the Pipeline repository's self-application control.
+4. **Declarative manifest + governance (existence check FIRST, same discipline as F4):** check whether `.claude/pipeline.yaml` (the OPTIONAL declarative manifest — distinct from the required `.claude/pipeline.json` calibration above) EXISTS. If it does: (a) validate it through the loaded plugin's manifest validator — existence/exit-code check only, no need to parse the full output at bootstrap; (b) read the manifest's `governance.guidelines_path` (and `policies_path`, if present) so the guidelines are already in the Elephant's session context from the start, not fetched later mid-task. A missing `.claude/pipeline.yaml` is NOT a failure case — the manifest is fully optional and F4 does not apply to it — skip this sub-step silently. For an authenticated private overlay, do not require Public-Core manifest or governance files from the consumer checkout.
+5. **Repository-scoped PO authority (Public source checkout only):** run the repository-owned `check-po-gate-authority.mjs` check only when the current checkout is the Agent-Pipeline Public source checkout. An authenticated private overlay has already received the bridge's sanitized PO/profile readback; it must not look for Public `harness/` files, a Public primary checkout, or Public PRD cardinality. Missing Public PO-gate files in a private consumer checkout are therefore not an F4/F6 failure.
+6. **Self-application toolchain preflight (Agent-Pipeline checkout only):** when the current checkout is the Agent-Pipeline source checkout and contains both `plugins/pipeline-core/scripts/toolchain-preflight.mjs` and its repository-local `harness/` dependencies, run `node "${PIPELINE_PLUGIN_ROOT}/scripts/toolchain-preflight.mjs" --root "$PWD"`. This is a read-only observation: it resolves/probes fixed executables and inputs, does not write a receipt, does not install a tool, and does not alter checkout, configuration, or Git state. Never substitute `${CLAUDE_PLUGIN_ROOT}` and never run it in a consumer project merely because `pipeline-core` is installed: scanner configuration and license inputs are project-owned, while this preflight is the Pipeline repository's self-application control.
    - `TCP-READY` permits the self-application toolchain-ready statement. Any other typed result remains factual even when its process exit is `0` under a `warn` or `off` security mode; do not convert it into readiness.
    - `execution_environment`, `probe_timeout`, and `probe_error` describe an
      unobserved host boundary, not a missing binary. Re-run this exact preflight
@@ -361,15 +361,15 @@ This step ends in a **third mandatory confirmation line** (verbatim, printed dir
      `python3 -m pip install semgrep`; Gitleaks and OSV-Scanner receive their
      platform-specific commands in the same result shape.
    - When the preflight reports non-ready under `securityGate: blocking`, fail closed only for security/release/public-baseline claims and their dependent gates. Do not invent F4, repair the environment, or turn this read-only bootstrap observation into a general write prohibition: those broader effects have no authority here. Under `warn` or `off`, surface the typed condition and continue without a readiness claim.
-7. **Observation/document governance (Agent-Pipeline checkout only):** when either `governance/observation-doc-governance.json` or `.github/ISSUE_TEMPLATE/observation.yml` exists, require both plus `harness/scripts/check-observation-governance.mjs`, then run `node harness/scripts/check-observation-governance.mjs`. A missing counterpart, non-zero result, malformed policy, unclassified `docs/` artifact, or Issue/Backlog/overlay contract drift is case **F6**: fail closed before writing or dispatch and print no confirmation line. The checker is read-only and creates no Issue, label, backlog item, or network request. Do not apply this source-repository control to consumer repositories that carry none of these governance artifacts.
+7. **Observation/document governance (Agent-Pipeline source checkout only):** when either `governance/observation-doc-governance.json` or `.github/ISSUE_TEMPLATE/observation.yml` exists in the current Public source checkout, require both plus the Public-Core `check-observation-governance.mjs` checker and run `node harness/scripts/check-observation-governance.mjs` there. A missing counterpart, non-zero result, malformed policy, unclassified `docs/` artifact, or Issue/Backlog/overlay contract drift is case **F6**: fail closed before writing or dispatch and print no confirmation line. The checker is read-only and creates no Issue, label, backlog item, or network request. Do not probe for or require this source-repository control in a private consumer overlay.
 
 ## Step 4 — Handover/state file (Elephant only; Goldfish/Critic FORBIDDEN)
 
 - Read the project's handover file completely (path from calibration `handover`, default `docs/state.md`; in the agent-pipeline repo: `docs/state.md`). It is the SINGLE authoritative state source; memory is mirror only.
 - Extract the last-updated date for the confirmation line.
 - Drift check (default threshold): warn when the repo's last commit is NEWER than the handover state AND the delta since then contains at least one non-docs commit (docs-only deltas do not trigger the warning; merge-completion gate). A project MAY override via the `$driftThreshold` comment key in `.claude/pipeline.json` (default applies if absent).
-- **Interaction-continuity re-entry:** run the read-only `node plugins/pipeline-core/scripts/continuity-status.mjs --root "$PWD"`. When it reports active, nonblocked work with a known next action, bootstrap treats that action as mandatory continuation: answer ordinary informational messages and record additive input, then execute the same persisted next action. Startup, resume, crash recovery and automatic/manual compact are not terminal task boundaries. Only an explicit pause/cancel/replace/redirect, a named gate, completion or a typed blocker may stop. The compact hook projects the same duty through `interaction-continuity.mjs`; never reconstruct it from chat history.
-- **Local cleanup session (Elephant only):** before the first pipeline-created temporary resource, run `node plugins/pipeline-core/scripts/session-cleanup.mjs start --repo "$PWD"` once and retain only its `sessionId` plus `descriptorSha256` in continuity runtime state. On Codex, use the host-authorized repository-local execution boundary directly when the workspace sandbox forbids nested Git subprocesses; do not first run a known-to-fail sandbox probe. The nonce stays solely in the private Git-common-dir descriptor. Bootstrap, compact recovery and both close profiles use that same descriptor ID **and the persisted digest**; they never regenerate a nonce, accept a changed descriptor or infer a cleanup target from a path prefix.
+- **Interaction-continuity re-entry:** run the read-only `node "${PIPELINE_PLUGIN_ROOT}/scripts/continuity-status.mjs" --root "$PWD"`. When it reports active, nonblocked work with a known next action, bootstrap treats that action as mandatory continuation: answer ordinary informational messages and record additive input, then execute the same persisted next action. Startup, resume, crash recovery and automatic/manual compact are not terminal task boundaries. Only an explicit pause/cancel/replace/redirect, a named gate, completion or a typed blocker may stop. The compact hook projects the same duty through `interaction-continuity.mjs`; never reconstruct it from chat history.
+- **Local cleanup session (Elephant only):** before the first pipeline-created temporary resource, run `node "${PIPELINE_PLUGIN_ROOT}/scripts/session-cleanup.mjs" start --repo "$PWD"` once and retain only its `sessionId` plus `descriptorSha256` in continuity runtime state. On Codex, use the host-authorized repository-local execution boundary directly when the workspace sandbox forbids nested Git subprocesses; do not first run a known-to-fail sandbox probe. The nonce stays solely in the private Git-common-dir descriptor. Bootstrap, compact recovery and both close profiles use that same descriptor ID **and the persisted digest**; they never regenerate a nonce, accept a changed descriptor or infer a cleanup target from a path prefix.
 
 ## Step 5 — Verify gate available
 
@@ -425,7 +425,7 @@ No placeholders, no "unknown" outside the defined suffix cases. **Prohibition:**
 Immediately after the confirmation line, the Elephant starts the bounded
 session-power controller for the exact cleanup descriptor retained in Step 4:
 
-`node plugins/pipeline-core/scripts/session-power.mjs start --session-id ID --expected-descriptor-sha256 SHA`
+`node "${PIPELINE_PLUGIN_ROOT}/scripts/session-power.mjs" start --session-id ID --expected-descriptor-sha256 SHA`
 
 This command is permitted only after the confirmation line and before the
 first Pipeline-created temporary advisory or sandbox resource. It receives no

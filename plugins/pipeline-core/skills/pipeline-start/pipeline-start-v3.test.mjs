@@ -100,7 +100,7 @@ const cases = [
   }],
   ["existing provenance and Elephant role checks remain", () => {
     assert.match(skill, /git rev-parse HEAD/u);
-    assert.match(skill, /ruleset-freshness\.mjs --repo "\$PWD"/u);
+    assert.match(skill, /ruleset-freshness\.mjs" --repo "\$PWD"/u);
     assert.match(skill, /`equal\|ahead` is current/u);
     assert.match(skill, /host-authorized\s+network-open\/read-only command boundary/u);
     assert.match(skill, /bootstrap-env-check\.mjs/u);
@@ -119,7 +119,7 @@ const cases = [
   }],
   ["self-application probes the managed toolchain without exporting pipeline scope to consumers", () => {
     assert.match(skill, /Self-application toolchain preflight/u);
-    assert.match(skill, /toolchain-preflight\.mjs --root "\$PWD"/u);
+    assert.match(skill, /toolchain-preflight\.mjs" --root "\$PWD"/u);
     assert.match(skill, /Agent-Pipeline checkout only/u);
     assert.match(skill, /never run it in a consumer project/u);
     assert.match(skill, /read-only observation/u);
@@ -130,7 +130,7 @@ const cases = [
     assert.match(skill, /never recommend\s+reinstalling/u);
   }],
   ["self-application observation governance fails closed before writes", () => {
-    assert.match(skill, /Observation\/document governance \(Agent-Pipeline checkout only\)/u);
+    assert.match(skill, /Observation\/document governance \(Agent-Pipeline source checkout only\)/u);
     assert.match(skill, /node harness\/scripts\/check-observation-governance\.mjs/u);
     assert.match(skill, /unclassified `docs\/` artifact/u);
     assert.match(skill, /case \*\*F6\*\*/u);
