@@ -18,6 +18,16 @@ loads the enabled plugin's skills and hooks. A repository checkout, GitHub,
 the client update mechanism, the local cache, and the runtime each form a
 separate trust boundary. Trust in one does not automatically attest another.
 
+## Marketplace admission evidence
+
+For the committed public coordinate `agent-pipe-shared/agent-pipeline`, a
+review-time external observation on 2026-07-20 found the public canonical
+repository URL `https://github.com/agent-pipe-shared/agent-pipeline`, with both
+`HEAD` and `refs/heads/main` at
+`9344a5a9b5f246584da1c9946d396f1bd88c1ce2`. This observation is not a
+cryptographic pin, automatic-update authorization, or a substitute for future
+source review.
+
 ## Threats, controls, and residual risk
 
 | Threat | Controls | Residual risk |

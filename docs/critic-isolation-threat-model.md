@@ -1,91 +1,87 @@
-# Bedrohungsmodell für den isolierten Codex-Critic
+# Threat model for the isolated Codex Critic
 
-**Status:** Batman F1 mit Hawkeye HAW-S · Spezifikations- und Nachweisgrenze,
-noch keine starke Produktivaktivierung
+**Status:** Batman F1 with Hawkeye HAW-S · specification and evidence boundary;
+not yet a strong production activation
 
-**Bezugsvertrag:**
+**Reference contract:**
 [ADR-0037 — Batman bounded assurance](adr/0037-batman-bounded-assurance.md#decision)
 
-## Aussagegrenze
+## Claim boundary
 
-Die Zwischenklasse gilt in Hawkeye nicht nur für den Critic, sondern für die
-drei expliziten Codex-Read-only-Duties `advisory`, `readiness` und `critic`.
-Jede dieser Pfade muss vor einem Kindprozess denselben selektierten,
-netzwerkoffenen Read-only-Transport, den Profil-Readback und eine an Dispatch
-und Execution gebundene Receipt verwenden. Das erweitert weder die
-Input-/Netzwerkisolation noch die zulässige Assurance über die unten genannte
-Zwischenklasse hinaus.
+In Hawkeye, the intermediate class applies not only to the Critic, but also to
+the three explicit Codex read-only duties: `advisory`, `readiness`, and
+`critic`. Before a child process, each path must use the same selected,
+network-open read-only transport, profile readback, and receipt bound to
+dispatch and execution. This neither extends input/network isolation nor raises
+the permitted assurance beyond the intermediate class stated below.
 
-Ein Review darf vier voneinander unabhängige Aussagen führen. Jede Aussage hat
-den Zustand `proven`, `disproven` oder `not-proven` und ihre eigenen
-Evidenzreferenzen. Ein Beleg für eine Aussage belegt keine andere:
+A review may make four independent claims. Each claim has the state `proven`,
+`disproven`, or `not-proven` and its own evidence references. Evidence for one
+claim does not establish another:
 
-1. `briefingBounded`: Das Briefing benennt ausschließlich die erlaubten
-   Materialien.
-2. `inputConfined`: Der Critic konnte ausschließlich die materialisierten und
-   vor dem Dispatch gebundenen Eingaben lesen.
-3. `technicallyIsolatedReadOnly`: Eine technische Grenze hat nicht erlaubte
-   Reads sowie sämtliche nicht erlaubten Writes und Netzverbindungen
-   unterbunden.
-4. `verdictIntegrity`: Das vollständige, schema-valide Urteil stammt aus genau
-   diesem Lauf und wurde unverändert zurückgegeben.
+1. `briefingBounded`: The briefing names only the permitted materials.
+2. `inputConfined`: The Critic could read only the materialized inputs bound
+   before dispatch.
+3. `technicallyIsolatedReadOnly`: A technical boundary prevented unauthorized
+   reads as well as all unauthorized writes and network connections.
+4. `verdictIntegrity`: The complete schema-valid verdict came from this exact
+   run and was returned unchanged.
 
-`not-proven` wird niemals hochgestuft. `proven` und `disproven` brauchen
-mindestens einen typisierten Byte-Nachweis; `not-proven` führt keine scheinbare
-Evidenz. Widersprüchliche oder unbekannte Zustände sind ungültig. Die geschlossene
-Maschinenform steht in
+`not-proven` is never promoted. `proven` and `disproven` require at least one
+typed byte-level proof; `not-proven` carries no apparent evidence. Conflicting
+or unknown states are invalid. The closed machine form is in
 `plugins/pipeline-core/scripts/codex-isolated-critic-claims.schema.json`.
 
-## Erlaubte Eingaben
+## Permitted inputs
 
-Reviewmaterial besteht ausschließlich aus den geordnet materialisierten Bytes
-der benannten Spec, dem fixierten Kandidaten-Diff, den benannten
-Guardrails/Constraints und der benannten Evidenz. Jeder Eintrag wird vor dem
-Dispatch durch Art, normalisierten relativen Pfad, Bytezahl und SHA-256 gebunden.
-Digests sind Bindungen, kein Ersatz für Reviewmaterial.
+Review material consists solely of the ordered materialized bytes of the named
+specification, the fixed candidate diff, the named guardrails/constraints, and
+the named evidence. Before dispatch, every entry is bound by kind, normalized
+relative path, byte count, and SHA-256. Digests are bindings, not a substitute
+for review material.
 
-Chatverlauf, Handover, Memory, automatisch geladene Repository-Anweisungen,
-Implementor-Begründungen, globale Benutzerkonfiguration sowie nicht gelistete
-Repository-Pfade gehören nicht in die isolierte Lane. Laufzeitabhängigkeiten wie
-der aufgelöste Node-Binary- und Loader-Readset werden separat gebunden; sie sind
-kein Reviewmaterial.
+Chat history, handover, memory, automatically loaded repository instructions,
+implementor rationale, global user configuration, and repository paths not on
+the list do not belong in the isolated lane. Runtime dependencies such as the
+resolved Node binary and loader read set are bound separately; they are not
+review material.
 
-## Bedrohungen und Kontrollen
+## Threats and controls
 
-| Bedrohung | Prävention | Erkennung | Verbleibendes Risiko |
+| Threat | Prevention | Detection | Residual risk |
 | --- | --- | --- | --- |
-| Prompt-Confinement wird als Isolation ausgegeben | Getrennte Claims und geschlossene Assurance-Klassen verbieten die Ableitung technischer Isolation aus einem knappen Briefing. | Receipt und Claim-Objekt müssen den tatsächlichen Beleg je Eigenschaft nennen. | Ein Modell kann ein erlaubtes Dokument falsch interpretieren; das ist Reviewqualität, keine Grenzverletzung. |
-| Kontext- oder Autoload-Kontamination | Frischer Kontext; materialisierte Input-Allowlist; Handover, Chat, Memory, User-Konfiguration und Autoload-Pfade sind ausgeschlossen. | Negativ-Canaries und Read-Denials für nicht gelistete Pfade; Input-Manifest-Digest im Receipt. | Prozessinterne Runner-Metadaten bleiben nur insoweit sichtbar, wie der Runner sie zwingend injiziert; ohne Negativbeleg bleibt `inputConfined` `not-proven`. |
-| Externe Datei-Reads oder Pfadalias umgehen die Allowlist | Aufgelöste Realpfade, Root-Deny, symlink-/hardlinkbewusste Prüfung und separater Runtime-Readset. | A/B-Probes für direkte Pfade, Symlinks, Hardlinks, Elternpfade und verschobene Sensitive-Roots. | Kernel-, Mount- oder Sandbox-Änderungen nach dem Preflight invalidieren die Kompatibilität; sie werden nicht vorausgesetzt. |
-| Write oder Write-then-restore | Nur frisches Output-Verzeichnis schreibbar; alle übrigen Roots read-only beziehungsweise denied. | Vorher-/Nachher-Hashes und Canaries nach jedem positiven und negativen Fall. | Ein nicht beobachteter Schreibpfad bleibt möglich, bis die Testmatrix ihn abdeckt; Nachzustand allein ist kein Präventionsbeleg. |
-| Zugriff auf Credentials, SSH, Remotes oder globale Git-/User-Konfiguration | Aufgelöste HOME-, Credential-, SSH-, Git-Config- und nicht freigegebene Repository-Roots explizit außerhalb des Profils. | Denial-Probes mit synthetischen Canaries; Receipts enthalten nur redigierte Klassen. | Neu hinzukommende oder plattformspezifische Credential-Orte benötigen ein Profil-/Preflight-Update. |
-| Netzwerkexfiltration | Starke Lane setzt Netzwerk technisch auf aus; `network.enabled=true` darf nur die Zwischenklasse ergeben. | Loopback-Canary und Profil-Readback; Netzwerkmodus wird digestgebunden im Receipt geführt. | Die Zwischenklasse ist ausdrücklich netzoffen und behauptet keine Input-/Netzwerkisolation. |
-| Advisory-, Readiness- oder Critic-Start umgeht die Auswahl | Alle drei Codex-Read-only-Duties bauen nur aus gebundenen Dispatch-Fakten einen gemeinsamen Selector-Request; der Host darf den Adapter erst nach Exact-ID-Readback starten. | Selection-, Execution- und Duty-Receipt binden dieselbe ID, denselben Request und den Profil-Readback; Drift liefert `no-usable-review` ohne Kindprozess. | Ein Host ohne aktuelle Auswahl ist nicht nutzbar; er darf weder die bekannte netzwerkgesperrte Variante zuerst versuchen noch auf Bedienerwissen zurückfallen. |
-| Child-, stdin/EOF- oder stdout/stderr-Verlust | Fixer toolfreier Payload und gebundene Prozessgruppe; A/B-Kontrolle außerhalb und innerhalb der Grenze. | Semantischer Bytevergleich von stdin/EOF, stdout, stderr und Child-Exit. | Ein grüner Minimalpayload beweist nicht jede spätere CLI-Ausgabeform; CLI-/Schema-Wechsel invalidiert das Gate. |
-| Lebenszyklus-Stall wird mit lebendem PID verwechselt | Gebundene First-Event-, No-Progress- und Gesamtlaufzeit; PID-Lebendigkeit zählt nicht als semantischer Fortschritt. | Strukturierte Lifecycle-Ereignisse und Heartbeats mit neuen semantischen Bytes. | Scheduler- oder Hostdruck kann einen echten Lauf als Timeout klassifizieren; fail-closed verhindert nur einen falschen Erfolg. |
-| PID-Wiederverwendung oder fremdes Cleanup | Neue eigene Prozessgruppe; vor TERM/KILL werden Gruppe und Eigentumsbindung erneut geprüft. | Cleanup-Ereignisse unterscheiden `cleanup-not-owned` und `cleanup-failed`; Fremdprozess-Canary. | Wenn Eigentum nicht beweisbar ist, bleibt der Prozess eventuell bestehen; der Review gilt dann nicht. |
-| Verdict-Schemafehler, Truncation oder Replay | Geschlossenes Verdict-Schema; Lauf-/Packet-/Input-/Lifecycle-Bindungen; begrenzte Streams und eindeutige IDs. | Vollständigkeits-, Digest-, Schema-, Reihenfolge- und Replay-Prüfung vor Admission. | Digestbindung authentifiziert keinen Provider; effektive Modellidentität bleibt ein eigener Provenienzclaim. |
-| Stiller Fehler erzeugt einen Erfolgsclaim | Fail-closed Terminalcodes; Erfolg verlangt schema-valides Verdict und passende Isolationsevidenz. | Coordinator unterscheidet Verdict, Schemafehler, Permission-, Setup-, Child/stdio-, Stall-, Timeout- und Cleanup-Fehler. | Coordinator-Ausfall vor persistiertem Receipt liefert keinen verwertbaren Review, auch wenn das Modell intern fertig war. |
-| CLI-, OS-, WSL- oder Dateisystemdrift | Versioniertes Kompatibilitätsgate bindet exakte CLI-Version, Profilbytes, Plattform- und Dateisystemklasse. | Preflight pro Zielklasse und frischer lokaler Kompatibilitäts-Receipt. | Eine bisher ungetestete Plattform ist `unsupported` oder `diagnostic-only`, nicht implizit kompatibel. |
-| Providerexport umgeht die lokale Datenfreigabe | Beide produktiven Candidate-Packet-Hosts müssen vor ihrem ersten Provider-Handoff die geschlossene V3-Policy gegen das vollständige Paket und die abgeleitete Export-View prüfen. Runner und Provider sind fest gekoppelt (`claude`/`anthropic`, `codex`/`openai`). Der Packet-Preflight materialisiert zusätzlich den exakten binären Base→Commit-Diff als private Datei im Checkout. | Der Coordinator persistiert vor Dispatch genau ein mode-0600 `pipeline.critic-export-receipt.v1` je tatsächlich gewählter Assurance-Klasse im privaten Paketverzeichnis; Export-View, Dispatch und finales Review-Receipt binden Base, Commit, Tree sowie Pfad/Bytezahl/SHA-256 des vor jedem Lifecycle-Schritt gegen `git diff` revalidierten Snapshots. | Das Receipt belegt die lokale Autorisierung, nicht Annahme oder Verarbeitung durch den Provider. Zusätzliche Host-/Provider-Safety-Gates bleiben unabhängig und sichtbar. |
-| Starker Claude-Pfad fällt erst nach dem Preflight aus | Eine starke Autorisierung darf keinen schwachen Export decken. Der schwache Same-Runner-Fallback durchläuft die Policy erneut und erhält ein eigenes Receipt, bevor sein Dispatchmaterial erzeugt wird. | Getrennte `export-native.json`- und `export-fallback.json`-Receipts sowie unterschiedliche Assurance-Digests verhindern stille Umdeutung. | Ist die zweite Autorisierung nicht vollständig oder das Paket inzwischen abgelaufen, bleibt der Claimed-Lauf ohne verwertbares Review blockiert; ein Erfolg darf daraus nicht entstehen. |
+| Prompt confinement is presented as isolation | Separate claims and closed assurance classes prohibit inferring technical isolation from a short briefing. | The receipt and claim object must name the actual evidence for each property. | A model can misinterpret a permitted document; that is review quality, not a boundary violation. |
+| Context or autoload contamination | Fresh context; materialized input allowlist; handover, chat, memory, user configuration, and autoload paths are excluded. | Negative canaries and read denials for unlisted paths; input-manifest digest in the receipt. | Process-internal runner metadata remains visible only to the extent the runner necessarily injects it; without negative evidence, `inputConfined` remains `not-proven`. |
+| External file reads or path aliases bypass the allowlist | Resolved real paths, root deny, symlink-/hardlink-aware checking, and a separate runtime read set. | A/B probes for direct paths, symlinks, hardlinks, parent paths, and relocated sensitive roots. | Kernel, mount, or sandbox changes after preflight invalidate compatibility; they are not assumed. |
+| Write or write-then-restore | Only a fresh output directory is writable; all other roots are read-only or denied. | Before/after hashes and canaries after every positive and negative case. | An unobserved write path remains possible until the test matrix covers it; the post-state alone is not prevention evidence. |
+| Access to credentials, SSH, remotes, or global Git/user configuration | Resolved HOME, credential, SSH, Git-config, and non-approved repository roots are explicitly outside the profile. | Denial probes with synthetic canaries; receipts include only redacted classes. | Newly added or platform-specific credential locations require a profile/preflight update. |
+| Network exfiltration | The strong lane technically disables networking; `network.enabled=true` may yield only the intermediate class. | Loopback canary and profile readback; the network mode is digest-bound in the receipt. | The intermediate class is explicitly network-open and makes no input/network-isolation claim. |
+| Advisory, readiness, or Critic startup bypasses the selection | All three Codex read-only duties build a shared selector request only from bound dispatch facts; the host may start the adapter only after exact-ID readback. | Selection, execution, and duty receipts bind the same ID, the same request, and the profile readback; drift returns `no-usable-review` without a child process. | A host without a current selection is unusable; it may neither try the known network-restricted variant first nor fall back to operator knowledge. |
+| Child, stdin/EOF, or stdout/stderr loss | Fixed tool-free payload and bound process group; A/B control outside and inside the boundary. | Semantic byte comparison of stdin/EOF, stdout, stderr, and child exit. | A green minimal payload does not prove every later CLI output shape; CLI/schema changes invalidate the gate. |
+| Lifecycle stall is confused with a live PID | Bound first-event, no-progress, and total runtime; PID liveness does not count as semantic progress. | Structured lifecycle events and heartbeats with new semantic bytes. | Scheduler or host pressure can classify a real run as a timeout; fail-closed prevents only a false success. |
+| PID reuse or foreign cleanup | A new owned process group; before TERM/KILL, group and ownership binding are checked again. | Cleanup events distinguish `cleanup-not-owned` and `cleanup-failed`; foreign-process canary. | If ownership is not provable, the process may remain; the review is then invalid. |
+| Verdict schema error, truncation, or replay | Closed verdict schema; run/packet/input/lifecycle bindings; bounded streams and unique IDs. | Completeness, digest, schema, ordering, and replay checks before admission. | Digest binding does not authenticate a provider; effective model identity remains a separate provenance claim. |
+| Silent failure creates a success claim | Fail-closed terminal codes; success requires a schema-valid verdict and matching isolation evidence. | The coordinator distinguishes verdict, schema, permission, setup, child/stdio, stall, timeout, and cleanup errors. | Coordinator failure before a persisted receipt produces no usable review, even if the model internally finished. |
+| CLI, OS, WSL, or filesystem drift | A versioned compatibility gate binds the exact CLI version, profile bytes, platform class, and filesystem class. | Preflight for each target class and a fresh local compatibility receipt. | A previously untested platform is `unsupported` or `diagnostic-only`, not implicitly compatible. |
+| Provider export bypasses local data release | Both production candidate-packet hosts must validate the closed V3 policy against the full packet and derived export view before their first provider handoff. Runner and provider are fixed together (`claude`/`anthropic`, `codex`/`openai`). The packet preflight also materializes the exact binary base-to-commit diff as a private file in the checkout. | Before dispatch, the coordinator persists exactly one mode-0600 `pipeline.critic-export-receipt.v1` for each actually selected assurance class in the private packet directory; export view, dispatch, and final review receipt bind base, commit, tree, and path/byte-count/SHA-256 of snapshots revalidated against `git diff` before every lifecycle step. | The receipt proves local authorization, not acceptance or processing by the provider. Additional host/provider safety gates remain independent and visible. |
+| The strong Claude path fails only after preflight | Strong authorization must not cover weak export. The weak same-runner fallback rechecks the policy and receives its own receipt before its dispatch material is produced. | Separate `export-native.json` and `export-fallback.json` receipts and different assurance digests prevent silent reinterpretation. | If the second authorization is incomplete or the packet has meanwhile expired, the claimed run remains blocked without a usable review; this cannot produce success. |
 
-## Assurance-Grenzen
+## Assurance boundaries
 
-- `technically-isolated` setzt alle vier bewiesenen Claims und einen grünen,
-  netzwerkgesperrten starken Preflight voraus.
+- `technically-isolated` requires all four proven claims and a green,
+  network-restricted strong preflight.
 - `sandbox-read-only-except-coordinator-scratch; input/network isolation not asserted`
-  belegt technische Schreibsperre außerhalb des exakten Coordinator-Scratch-
-  Roots und vollständige Child/stdio-Lifecycle-Daten, aber weder
-  Input-Confinement noch Netzwerksperre.
-- `functional-equivalent-read-only; OS isolation not asserted` bleibt genau ein
-  schwacher Same-Runner-Fallback. Seine Read-only-Grenze ist vertraglich, nicht
-  durch das Betriebssystem bewiesen.
-- Fehlendes oder ungültiges Verdict, fehlende Grenzbelege, Stall, Timeout oder
-  Cleanup-Unklarheit ergeben `no-usable-review`.
+  proves a technical write barrier outside the exact coordinator scratch root
+  and complete child/stdio lifecycle data, but neither input confinement nor
+  network blocking.
+- `functional-equivalent-read-only; OS isolation not asserted` remains exactly
+  one weak same-runner fallback. Its read-only boundary is contractual, not
+  proven by the operating system.
+- A missing or invalid verdict, missing boundary evidence, stall, timeout, or
+  cleanup uncertainty yields `no-usable-review`.
 
-Es gibt keine stille Kaskade von stark über Zwischenklasse zu schwach, keinen
-zweiten Fallback und keinen automatischen Runner-Wechsel. Die starke isolierte
-Lane bleibt upstream-gated. Die V3-Exportautorität ist dagegen in beiden
-bestehenden Candidate-Packet-Hosts aktiv; sie ändert weder deren technische
-Isolation noch die zulässigen Assurance-Claims.
+There is no silent cascade from strong through the intermediate class to weak,
+no second fallback, and no automatic runner switch. The strong isolated lane
+remains upstream-gated. The V3 export authority is active in both existing
+candidate-packet hosts; it changes neither their technical isolation nor the
+permitted assurance claims.
