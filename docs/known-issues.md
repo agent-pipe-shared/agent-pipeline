@@ -26,15 +26,31 @@ publication or other sharing, rollback uses ordinary revert commits on shared
 history only. `reset`, `rebase`, force-pushes, and other rewrites of shared
 history are excluded.
 
-The changes affect documentation and backlog items only. There is no schema,
-data, or runtime migration, and consequently no migration or downgrade step.
+The rollback scope is not documentation-only. It includes the committed
+marketplace coordinate in `.claude/settings.json`, changed from
+`agent-pipeline/agent-pipeline` to `agent-pipe-shared/agent-pipeline`, together
+with its `extraKnownMarketplaces.agent-pipeline` and enabled
+`pipeline-core@agent-pipeline` binding. It also includes the portable Verify
+aggregate change: `harness/scripts/verify.mjs` no longer runs
+`po-gate-authority-check`, and `docs/product-capability-inventory.json` no
+longer lists that Verify phase or its ownership mapping. The CLI's separate
+unit/runtime fail-closed behavior remains in scope and is not represented as
+removed.
 
-The machine-local PO-gate-authority CLI has been removed from the portable
-Verify aggregate while its unit/runtime fail-closed behavior remains intact.
-The three deterministic secret-like fixture strings were replaced with
-non-secret identifiers. Their obsolete worktree suppressions were replaced by
-only the exact commit-bound fingerprints required for immutable history; no
-path-wide or rule-wide Gitleaks suppression was added.
+The security rollback scope includes the three scanner-safe fixture identifier
+changes in `harness/scripts/pipeline-state.test.mjs` and only these Gitleaks
+suppression changes: the three removed worktree fingerprints at lines 1468,
+1593, and 1641; the three immutable-history fingerprints for commit
+`89c3c2ebf73d2b8cd3b43ee0ea463d2819c5f49f` at lines 1601, 1726, and 1774; and
+the three equivalent immutable-history fingerprints for commit
+`49bd5c5956a8a3a092ef5fff9d6718168e54c973` at those same lines. No path-wide
+or rule-wide Gitleaks suppression was added. There is no schema, data, or
+runtime migration, so no migration or downgrade step is required.
+
+An ordinary revert must restore or remove exactly the corresponding marketplace
+configuration, Verify/test, inventory, and commit-bound Gitleaks changes in the
+reverted commits; it must not substitute a broad Gitleaks allowlist or a
+history rewrite.
 
 TP-3 and TP-5 were temporarily removed under explicit PO authorization solely
 for these briefed edits and restored exactly before the final gates. This narrow

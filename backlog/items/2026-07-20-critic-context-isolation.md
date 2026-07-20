@@ -2,6 +2,9 @@
 type: workflow-improvement
 status: new
 created: 2026-07-20
+owner: Pipeline Elephant
+due: 2026-07-27
+expires: 2026-08-03
 source: Public V3 Foundation stabilization close retro: an independent Critic run was discarded after an out-of-band coordinator status message reached its context
 ---
 
@@ -32,6 +35,13 @@ observation only while a Critic is running, and reserve follow-up messages for
 after it has completed or been explicitly abandoned. Add a deterministic
 dispatch checklist assertion that a Critic receives paths and references only,
 with no coordinator prose after launch.
+
+## Ownership and expiry
+
+The next Pipeline Elephant owns triage and an accepted implementation package.
+The triage due date is **2026-07-27**. If no decision is recorded by
+**2026-08-03**, this item expires and must be renewed with current evidence
+rather than silently retained as an active commitment.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 

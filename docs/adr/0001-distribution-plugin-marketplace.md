@@ -24,6 +24,10 @@ Detail: this repo (planned `{{REPO_OWNER}}/agent-pipeline`, private) is the mark
 - Plugin cache can go stale: during the SHA phase a change only propagates on refresh; a first offline binding fails (Critic finding L3-03). Mitigation: bootstrap with an SHA/staleness check ([ADR-0010](0010-session-bootstrap.md), condition A5).
 - New dependency on the GitHub remote for updates; day-to-day operation after setup continues to run offline.
 
+The public marketplace's supply-chain and update trust boundary, including the
+committed project binding, is documented in the
+[Marketplace supply-chain threat model](../marketplace-supply-chain-threat-model.md).
+
 ## Rejected alternatives
 
 - **git submodule** — pins exactly, but is the most error-prone option (detached HEAD, empty directories) and hits freshly starting Goldfish sessions particularly hard.
