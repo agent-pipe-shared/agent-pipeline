@@ -769,6 +769,12 @@
       "member": "pipeline-state-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-gate-authority-fixture-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "po-gate-authority-fixture-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1256,6 +1262,7 @@
         "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:po-gate-authority-fixture-tests",
         "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
         "verify-phase:harness/scripts/verify.mjs:po-language-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:post-compact-reground-tests",

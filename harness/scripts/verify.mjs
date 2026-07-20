@@ -115,6 +115,7 @@ const TEST_SUITES = [
   { name: "git-cmd-tests", file: join(libDir, "git-cmd.test.mjs") },
   { name: "workflow-writer-preflight-tests", file: join(libDir, "workflow-writer-preflight.test.mjs") },
   { name: "workflow-runner-boundary-tests", file: join(libDir, "workflow-runner-boundary.test.mjs") },
+  { name: "po-gate-authority-fixture-tests", file: join(libDir, "po-gate-authority.test.mjs") },
   { name: "po-language-projection-tests", file: join(scriptDir, "po-language-projection.test.mjs") },
   { name: "po-language-projection-check", file: join(scriptDir, "check-po-language-projection.mjs") },
   { name: "error-register-tests", file: join(scriptDir, "check-error-register.test.mjs") },

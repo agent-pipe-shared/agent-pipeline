@@ -3,7 +3,9 @@ type: workflow-improvement
 status: new
 created: 2026-07-20
 source: Public V3 Foundation stabilization review of formal review and dispatch retries
+owner: Pipeline Elephant
 due: 2026-08-03
+expires: 2026-08-10
 ---
 
 # Bound review retries to valid evidence
@@ -50,6 +52,13 @@ The acceptance boundary is:
 This is **P2**: it improves review economics after the P1 recovery false-success
 boundary is addressed. The owner is the next Pipeline Elephant with review-
 economy and receipt-contract scope. Target review date: **2026-08-03**.
+
+## Ownership and expiry
+
+The next Pipeline Elephant owns triage and an accepted implementation package.
+The triage due date is **2026-08-03**. If no decision is recorded by
+**2026-08-10**, this item expires and must be renewed with current evidence
+before further implementation or prioritization.
 
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
