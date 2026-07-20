@@ -177,6 +177,36 @@ test("repository references fail closed unless they match the resolved public ta
   });
 });
 
+test("alternative genuine GitHub repository coordinates remain target-bound", () => {
+  for (const reference of [
+    "https://www.github.com/private-overlay/agent-pipeline/issues/41",
+    "https://github.com:443/private-overlay/agent-pipeline/issues/41",
+    "https://api.github.com/repos/private-overlay/agent-pipeline/issues/41",
+    "https://raw.githubusercontent.com/private-overlay/agent-pipeline/main/file.md",
+    "ssh://git@github.com/private-overlay/agent-pipeline.git",
+    "git@github.com:private-overlay/agent-pipeline.git",
+  ]) {
+    const output = prepareObservation(validInput({ evidence: `Related report: ${reference}` }), {
+      publicRepository: PUBLIC_REPOSITORY,
+    });
+    assert.equal(output.status, "privacy-rejected");
+    assert.equal(output.reason, "repository-reference-outside-public-target");
+    assert(!JSON.stringify(output).includes("private-overlay"));
+  }
+
+  for (const reference of [
+    "https://www.github.com/agent-pipe-shared/agent-pipeline/issues/12",
+    "https://github.com:443/agent-pipe-shared/agent-pipeline/issues/12",
+    "https://api.github.com/repos/agent-pipe-shared/agent-pipeline/issues/12",
+    "https://raw.githubusercontent.com/agent-pipe-shared/agent-pipeline/main/README.md",
+  ]) {
+    const output = prepareObservation(validInput({ evidence: `Related report: ${reference}` }), {
+      publicRepository: PUBLIC_REPOSITORY,
+    });
+    assert.equal(output.status, "ready");
+  }
+});
+
 test("same-repository GitHub references remain in the canonical preview", () => {
   const link = "https://github.com/agent-pipe-shared/agent-pipeline/blob/main/backlog/items/example.md";
   const output = prepareObservation(validInput({
