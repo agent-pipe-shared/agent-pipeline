@@ -124,12 +124,14 @@ function specialEntry(kind, access) { return { path: { type: "special", value: {
 
 /**
  * Compile the committed intent into the opaque `codex/sandbox-state-meta`
- * shape consumed by Codex CLI 0.144.6. The profile intent remains a separate
- * authority and is never embedded into, or inferred from, this runtime state.
+ * shape consumed by the Codex CLI. The CLI owns helper selection; the profile
+ * intent remains a separate authority and is never embedded into, or inferred
+ * from, this runtime state. In particular, do not add codexLinuxSandboxExe:
+ * the bundled helper is an implementation detail of the selected CLI.
  */
 export function compilePermissionProfile(kind, roots) {
   const loaded = loadProfileIntent(kind);
-  exactKeys(roots, ["inputRoot", "outputRoot", "runtimeReadSet", "deniedRoots", "sensitiveRoots", "sandboxCwd", "sandboxHelperPath"], "compile roots");
+  exactKeys(roots, ["inputRoot", "outputRoot", "runtimeReadSet", "deniedRoots", "sensitiveRoots", "sandboxCwd"], "compile roots");
   const inputRoot = physicalDirectory(roots.inputRoot, "inputRoot");
   const outputRoot = physicalDirectory(roots.outputRoot, "outputRoot");
   const runtimeReadSet = uniqueRuntimePaths(roots.runtimeReadSet, "runtimeReadSet");
@@ -137,7 +139,6 @@ export function compilePermissionProfile(kind, roots) {
   const sensitiveRoots = uniquePhysicalPaths(roots.sensitiveRoots, "sensitiveRoots");
   if (deniedRoots.length < 1 || sensitiveRoots.length < 1) fail("profile-error", "strong probe roots must include denied and sensitive controls");
   const sandboxCwd = physicalDirectory(roots.sandboxCwd, "sandboxCwd");
-  const sandboxHelperPath = physicalFile(roots.sandboxHelperPath, "sandboxHelperPath");
   if (!overlaps(inputRoot, sandboxCwd)) fail("profile-error", "sandboxCwd must be inside inputRoot");
   const groups = [inputRoot, outputRoot, ...runtimeReadSet, ...deniedRoots, ...sensitiveRoots];
   for (let a = 0; a < groups.length; a += 1) for (let b = a + 1; b < groups.length; b += 1) {
@@ -152,7 +153,6 @@ export function compilePermissionProfile(kind, roots) {
       file_system: { type: "restricted", entries },
       network: kind === "strong" ? "restricted" : "enabled",
     },
-    codexLinuxSandboxExe: sandboxHelperPath,
     sandboxCwd: pathToFileURL(sandboxCwd).href,
     useLegacyLandlock: false,
   };
@@ -181,13 +181,12 @@ export function buildSandboxInvocation({ codexPath, sandboxStateJson, sandboxSta
 }
 
 export function validateCodexSandboxState(state) {
-  exactKeys(state, ["permissionProfile", "codexLinuxSandboxExe", "sandboxCwd", "useLegacyLandlock"], "Codex sandbox state");
+  exactKeys(state, ["permissionProfile", "sandboxCwd", "useLegacyLandlock"], "Codex sandbox state");
   exactKeys(state.permissionProfile, ["type", "file_system", "network"], "Codex permission profile");
   exactKeys(state.permissionProfile.file_system, ["type", "entries"], "Codex filesystem profile");
   if (state.permissionProfile.type !== "managed" || state.permissionProfile.file_system.type !== "restricted"
     || !new Set(["restricted", "enabled"]).has(state.permissionProfile.network)
     || !Array.isArray(state.permissionProfile.file_system.entries) || state.permissionProfile.file_system.entries.length < 1
-    || typeof state.codexLinuxSandboxExe !== "string" || !isAbsolute(state.codexLinuxSandboxExe)
     || typeof state.sandboxCwd !== "string" || !state.sandboxCwd.startsWith("file://")
     || state.useLegacyLandlock !== false) fail("profile-error", "Codex sandbox state is not the closed 0.144.6 interface");
   for (const entry of state.permissionProfile.file_system.entries) {
@@ -264,7 +263,7 @@ function canaryProjection(canaries) {
 }
 
 export function evaluatePreflight(observation) {
-  exactKeys(observation, ["kind", "cli", "sandboxHelper", "platform", "profile", "compiledState", "readback", "control", "sandbox", "probes", "canaries", "events", "durationMs", "streamBytes", "terminalCode"], "preflight observation");
+  exactKeys(observation, ["kind", "cli", "observedHelper", "platform", "profile", "compiledState", "readback", "control", "sandbox", "probes", "canaries", "events", "durationMs", "streamBytes", "terminalCode"], "preflight observation");
   const kind = validateProfileIntent(observation.profile.value, observation.kind);
   validateDigest(observation.profile.rawSha256, "profile digest");
   validateDigest(observation.compiledState.rawSha256, "compiled state digest");
@@ -321,7 +320,8 @@ export function evaluatePreflight(observation) {
   const receipt = {
     schema: PREFLIGHT_SCHEMA,
     cli: observation.cli,
-    sandboxHelper: observation.sandboxHelper,
+    sandboxTransport: { selection: "codex-cli-owned" },
+    observedHelper: observation.observedHelper,
     platform: observation.platform,
     profile: { id: observation.profile.value.id, rawSha256: observation.profile.rawSha256, compiledStateSha256: observation.compiledState.rawSha256 },
     networkEnabled: observation.profile.value.networkEnabled,
@@ -342,8 +342,9 @@ export function validatePreflightReceipt(receipt) {
   rewriteInteger(schema);
   const result = validateAgainstSchema(receipt, schema);
   if (!result.valid) fail("internal-error", `receipt schema mismatch: ${result.errors.join("; ")}`);
-  for (const digest of [receipt.cli.artifactSha256, receipt.sandboxHelper.artifactSha256, receipt.profile.rawSha256, receipt.profile.compiledStateSha256, receipt.canaries.manifestSha256, receipt.eventChainSha256]) validateDigest(digest, "receipt digest");
-  if (receipt.sandboxHelper.sameArtifactAsCli !== (receipt.sandboxHelper.artifactSha256 === receipt.cli.artifactSha256)) fail("internal-error", "sandbox helper artifact relation is false");
+  validateDigest(receipt.cli.artifactSha256, "CLI receipt digest");
+  if (receipt.observedHelper.artifactSha256 !== null) validateDigest(receipt.observedHelper.artifactSha256, "observed helper receipt digest");
+  for (const digest of [receipt.profile.rawSha256, receipt.profile.compiledStateSha256, receipt.canaries.manifestSha256, receipt.eventChainSha256]) validateDigest(digest, "receipt digest");
   if (!Number.isSafeInteger(receipt.durationMs) || !Number.isSafeInteger(receipt.canaries.count) || receipt.canaries.count < 1) fail("internal-error", "receipt numeric fields are invalid");
   const text = canonicalJson(receipt);
   if (/\/(?:home|users)\/|\\users\\|support|account|credential|ssh:|https?:|git@/i.test(text)) fail("internal-error", "receipt contains private or remote material");
@@ -612,10 +613,10 @@ function persistReceipt(path, receipt) {
 }
 
 /** Execute the real, default-off A/B harness and persist one sanitized receipt. */
-export async function runCodexSandboxPreflight({ kind, codexPath, sandboxHelperPath, receiptPath }) {
+export async function runCodexSandboxPreflight({ kind, codexPath, observedHelperPath = null, receiptPath }) {
   if (!new Set(["strong", "intermediate"]).has(kind)) fail("profile-error", "kind must be strong or intermediate");
   codexPath = physicalFile(realpathSync(codexPath), "codexPath");
-  sandboxHelperPath = physicalFile(realpathSync(sandboxHelperPath), "sandboxHelperPath");
+  if (observedHelperPath !== null && observedHelperPath !== undefined) observedHelperPath = physicalFile(realpathSync(observedHelperPath), "observedHelperPath");
   const nodePath = physicalFile(realpathSync(process.execPath), "nodePath");
   const root = realpathSync(mkdtempSync(join(tmpdir(), "codex-sandbox-preflight-")));
   const startedAt = Date.now();
@@ -641,7 +642,6 @@ export async function runCodexSandboxPreflight({ kind, codexPath, sandboxHelperP
       deniedRoots: [sandboxFixture.deniedRoot],
       sensitiveRoots: [sandboxFixture.sensitiveRoot],
       sandboxCwd: sandboxFixture.inputRoot,
-      sandboxHelperPath,
     });
     const stateJson = compiled.raw.toString("utf8");
     const invocation = buildSandboxInvocation({ codexPath, sandboxStateJson: stateJson, sandboxStateSha256: compiled.compiledStateSha256, nodePath, payloadPath: PAYLOAD_PATH, payloadArgs: [payloadRequest(sandboxFixture, network, codexPath)] });
@@ -660,7 +660,7 @@ export async function runCodexSandboxPreflight({ kind, codexPath, sandboxHelperP
     const receipt = evaluatePreflight({
       kind,
       cli,
-      sandboxHelper: { artifactSha256: sha256(readFileSync(sandboxHelperPath)), sameArtifactAsCli: sha256(readFileSync(sandboxHelperPath)) === cli.artifactSha256 },
+      observedHelper: { role: "diagnostic-only", artifactSha256: observedHelperPath ? sha256(readFileSync(observedHelperPath)) : null },
       platform,
       profile: { value: compiled.profile, rawSha256: compiled.profileRawSha256 },
       compiledState: { rawSha256: compiled.compiledStateSha256 },
@@ -683,11 +683,13 @@ export async function runCodexSandboxPreflight({ kind, codexPath, sandboxHelperP
 }
 
 function usage() {
-  return "usage: codex-sandbox-preflight.mjs --run --kind <strong|intermediate> --codex <absolute-path> --sandbox-helper <absolute-path> --receipt <absolute-new-path>";
+  return "usage: codex-sandbox-preflight.mjs --run --kind <strong|intermediate> --codex <absolute-path> [--observed-helper <absolute-path>] --receipt <absolute-new-path>";
 }
 function parseCli(argv) {
-  if (argv.length !== 9 || argv[0] !== "--run" || argv[1] !== "--kind" || argv[3] !== "--codex" || argv[5] !== "--sandbox-helper" || argv[7] !== "--receipt") fail("profile-error", usage());
-  return { kind: argv[2], codexPath: argv[4], sandboxHelperPath: argv[6], receiptPath: argv[8] };
+  if (![7, 9].includes(argv.length) || argv[0] !== "--run" || argv[1] !== "--kind" || argv[3] !== "--codex") fail("profile-error", usage());
+  if (argv.length === 7 && (argv[5] !== "--receipt")) fail("profile-error", usage());
+  if (argv.length === 9 && (argv[5] !== "--observed-helper" || argv[7] !== "--receipt")) fail("profile-error", usage());
+  return { kind: argv[2], codexPath: argv[4], observedHelperPath: argv.length === 9 ? argv[6] : null, receiptPath: argv[argv.length - 1] };
 }
 
 if (process.argv[1] && realpathSync(resolve(process.argv[1])) === fileURLToPath(import.meta.url)) {

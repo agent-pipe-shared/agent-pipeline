@@ -14,7 +14,7 @@ function roots(t) {
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const make = (name) => { const path = join(root, name); mkdirSync(path); return realpathSync(path); };
   const value = { inputRoot: make("input"), outputRoot: make("output"), runtimeReadSet: [realpathSync(process.execPath), "/proc/self", "/dev/null"], deniedRoots: [make("denied")], sensitiveRoots: [make("sensitive")] };
-  return { ...value, sandboxCwd: value.inputRoot, sandboxHelperPath: realpathSync(process.execPath) };
+  return { ...value, sandboxCwd: value.inputRoot };
 }
 
 function observation(kind = "strong") {
@@ -24,7 +24,6 @@ function observation(kind = "strong") {
     : [{ path: { type: "special", value: { kind: "root" } }, access: "read" }, { path: { type: "path", path: "/tmp/output" }, access: "write" }];
   const state = {
     permissionProfile: { type: "managed", file_system: { type: "restricted", entries }, network: kind === "strong" ? "restricted" : "enabled" },
-    codexLinuxSandboxExe: "/opt/codex",
     sandboxCwd: "file:///tmp/input",
     useLegacyLandlock: false,
   };
@@ -33,7 +32,7 @@ function observation(kind = "strong") {
   return {
     kind,
     cli: { version: "0.144.6", artifactSha256: "d".repeat(64) },
-    sandboxHelper: { artifactSha256: "d".repeat(64), sameArtifactAsCli: true },
+    observedHelper: { role: "diagnostic-only", artifactSha256: "d".repeat(64) },
     platform: { os: "linux", kernelClass: "wsl2", filesystemClass: "wsl-native" },
     profile: { value: profile.value, rawSha256: profile.rawSha256 },
     compiledState: { rawSha256: sha256(Buffer.from(canonicalJson(state))) },
@@ -61,12 +60,22 @@ test("profile compilation binds physical nonoverlapping roots and fixed shell-fr
   const compiled = compilePermissionProfile("strong", roots(t));
   assert.equal(compiled.state.permissionProfile.network, "restricted");
   assert.equal(compiled.state.permissionProfile.file_system.entries.some((entry) => entry.path.type === "special" && entry.path.value.kind === "minimal"), false);
-  assert.deepEqual(Object.keys(compiled.state).sort(), ["codexLinuxSandboxExe", "permissionProfile", "sandboxCwd", "useLegacyLandlock"]);
+  assert.deepEqual(Object.keys(compiled.state).sort(), ["permissionProfile", "sandboxCwd", "useLegacyLandlock"]);
   assert.match(compiled.profileRawSha256, /^[0-9a-f]{64}$/);
   const sandboxStateJson = compiled.raw.toString("utf8");
   const invocation = buildSandboxInvocation({ codexPath: "/opt/codex", sandboxStateJson, sandboxStateSha256: sha256(Buffer.from(sandboxStateJson)), nodePath: "/usr/bin/node", payloadPath: "/opt/preflight.mjs" });
   assert.deepEqual(invocation.argv.slice(0, 3), ["sandbox", "--sandbox-state-json", sandboxStateJson]);
   assert.equal(invocation.options.shell, false);
+});
+
+test("CLI-owned helper selection rejects the incompatible explicit helper state", (t) => {
+  const compiled = compilePermissionProfile("intermediate", { ...roots(t), runtimeReadSet: [realpathSync(process.execPath), "/proc/self", "/dev/null"] });
+  const legacy = JSON.parse(compiled.raw.toString("utf8"));
+  legacy.codexLinuxSandboxExe = "/opt/incompatible-bwrap";
+  assert.throws(() => buildSandboxInvocation({
+    codexPath: "/opt/codex", sandboxStateJson: canonicalJson(legacy), sandboxStateSha256: sha256(Buffer.from(canonicalJson(legacy))),
+    nodePath: "/usr/bin/node", payloadPath: "/opt/preflight.mjs",
+  }), { code: "profile-error" });
 });
 
 test("profile compilation rejects root aliases", (t) => {

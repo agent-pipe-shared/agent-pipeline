@@ -25,7 +25,7 @@
       "filesystemClass": "drvfs",
       "permissionProfileId": "codex-critic-intermediate.v1",
       "permissionProfileSha256": "e2f47f7e8da67f093b747ee3966e910063521ed2843de0d763acffd40e52868f",
-      "preflightSchemaSha256": "c42ae8e8314011a03deea7e59230a21ee9a945dc6ed3c92e2f039b69faa4fd9e",
+      "preflightSchemaSha256": "8764982d49d5dd4a96ff47730774cced8c051817262de4052ba46d5f0d3b1364",
       "networkEnabled": true,
       "initialState": "intermediate-preflight-candidate"
     },
@@ -40,7 +40,7 @@
       "filesystemClass": "wsl-native",
       "permissionProfileId": "codex-critic-intermediate.v1",
       "permissionProfileSha256": "e2f47f7e8da67f093b747ee3966e910063521ed2843de0d763acffd40e52868f",
-      "preflightSchemaSha256": "c42ae8e8314011a03deea7e59230a21ee9a945dc6ed3c92e2f039b69faa4fd9e",
+      "preflightSchemaSha256": "8764982d49d5dd4a96ff47730774cced8c051817262de4052ba46d5f0d3b1364",
       "networkEnabled": true,
       "initialState": "intermediate-preflight-candidate"
     }

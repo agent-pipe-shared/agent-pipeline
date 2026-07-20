@@ -77,9 +77,11 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
   const resolvedCodex = resolveExecutable("codex");
   if (typeof resolvedCodex !== "string") throw new Error("Codex executable is unavailable");
   const codexPath = realpathSync(resolvedCodex);
+  // Codex selects the compatible sandbox helper itself.  If the bundled file
+  // is present, pass it only as diagnostic evidence; it is never placed in
+  // sandbox state and never attested as the selected transport.
   const helperCandidate = join(dirname(dirname(codexPath)), "codex-resources", "bwrap");
-  if (!existsSync(helperCandidate) || !lstatSync(helperCandidate).isFile()) throw new Error("Codex sandbox helper is unavailable");
-  const sandboxHelperPath = realpathSync(helperCandidate);
+  const observedHelperPath = existsSync(helperCandidate) && lstatSync(helperCandidate).isFile() ? realpathSync(helperCandidate) : null;
   const git = (values) => execFileSync("git", values, { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
   const candidateCommit = git(["rev-parse", "HEAD"]);
   const candidateTree = git(["rev-parse", "HEAD^{tree}"]);
@@ -93,7 +95,7 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
       dispatch: { dispatchId: args.dispatchId, queueRevision: args.queueRevision, candidateCommit, candidateTree },
       advisorExport: { consent: "approved" },
       sandboxContext: { repoFingerprint, referenceSetSha256: sha256(JSON.stringify([...new Set(args.references)].sort())) },
-      sandboxRuntime: { schema: "pipeline.codex-sandbox-runtime.v1", repoRoot, codexPath, sandboxHelperPath, sessionCleanup: { sessionId: args.sessionId, descriptorSha256: args.descriptorSha256 } },
+      sandboxRuntime: { schema: "pipeline.codex-sandbox-runtime.v1", repoRoot, codexPath, observedHelperPath, sessionCleanup: { sessionId: args.sessionId, descriptorSha256: args.descriptorSha256 } },
     };
     writeFileSync(inputPath, JSON.stringify(input), { flag: "wx", mode: 0o600 });
     return await (dependencies.runAdvisoryHostBridgeFn ?? runAdvisoryHostBridge)(["--input", inputPath, "--receipt", resolve(repoRoot, args.receipt)]);

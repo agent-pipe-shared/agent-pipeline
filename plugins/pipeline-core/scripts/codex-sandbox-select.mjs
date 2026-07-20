@@ -106,7 +106,7 @@ function toolchain(observed = {}) {
   return {
     cliVersion: observed.cliVersion ?? null,
     cliSha256: observed.cliSha256 ?? null,
-    sandboxHelperSha256: observed.sandboxHelperSha256 ?? null,
+    observedHelperSha256: observed.observedHelperSha256 ?? null,
     selectionSchemaSha256: observed.selectionSchemaSha256 ?? null,
   };
 }
@@ -202,7 +202,7 @@ function defaultCompatibilityProjection(observed) {
   const actualHost = host(observed);
   const preflightReceipt = observed.compatibilityObservation.preflight?.receipt;
   if (actual.cliVersion !== entry.cliVersion || actual.cliSha256 !== entry.releasedArtifactSha256
-    || actual.selectionSchemaSha256 !== SELECTION_SCHEMA_SHA256 || actual.sandboxHelperSha256 !== preflightReceipt?.sandboxHelper?.artifactSha256
+    || actual.selectionSchemaSha256 !== SELECTION_SCHEMA_SHA256 || actual.observedHelperSha256 !== preflightReceipt?.observedHelper?.artifactSha256
     || actualHost.platformClass !== "linux-wsl2" || actualHost.filesystemClass !== expectedFilesystem
     || actualHost.bootIdSha256 !== sha256(String(observed.compatibilityObservation.bootId))) {
     throw new Error("current host/toolchain evidence does not bind the selected compatibility entry");
@@ -260,9 +260,9 @@ export function validateSandboxSelection(value) {
     || !SHA256.test(value.repoFingerprint) || !DUTIES.has(value.duty) || !["selected", "unavailable"].includes(value.status)
     || Number.isNaN(Date.parse(value.observedAt))) fail("selection header is invalid");
   checkDispatch(value.dispatch, { request: true });
-  exactKeys(value.toolchain, ["cliVersion", "cliSha256", "sandboxHelperSha256", "selectionSchemaSha256"], "toolchain");
+  exactKeys(value.toolchain, ["cliVersion", "cliSha256", "observedHelperSha256", "selectionSchemaSha256"], "toolchain");
   if (value.toolchain.cliVersion !== null && (typeof value.toolchain.cliVersion !== "string" || !/^[\x21-\x7e]{1,64}$/.test(value.toolchain.cliVersion))) fail("toolchain version is invalid");
-  checkDigest(value.toolchain.cliSha256, "CLI sha256", true); checkDigest(value.toolchain.sandboxHelperSha256, "sandbox helper sha256", true); checkDigest(value.toolchain.selectionSchemaSha256, "selection schema sha256", true);
+  checkDigest(value.toolchain.cliSha256, "CLI sha256", true); checkDigest(value.toolchain.observedHelperSha256, "observed helper sha256", true); checkDigest(value.toolchain.selectionSchemaSha256, "selection schema sha256", true);
   exactKeys(value.host, ["platformClass", "kernel", "filesystemClass", "bootIdSha256"], "host");
   if (value.host.platformClass !== null && !["linux-native", "linux-wsl2", "macos-native", "windows-native"].includes(value.host.platformClass)
     || value.host.filesystemClass !== null && !["linux-native", "wsl2-native", "wsl2-9p", "macos-apfs", "windows-ntfs"].includes(value.host.filesystemClass)) fail("host class is invalid");
@@ -284,7 +284,7 @@ export function validateSandboxSelection(value) {
   checkDigest(value.compatibilityReceiptSha256, "compatibility receipt", true);
   if (value.status === "selected") {
     if (value.failureClass !== null || value.compatibilityReceiptSha256 === null || value.profile.scratchRootSha256 === null
-      || value.profile.sha256 === null || value.toolchain.cliVersion === null || value.toolchain.cliSha256 === null || value.toolchain.sandboxHelperSha256 === null || value.toolchain.selectionSchemaSha256 === null
+      || value.profile.sha256 === null || value.toolchain.cliVersion === null || value.toolchain.cliSha256 === null || value.toolchain.selectionSchemaSha256 === null
       || value.host.platformClass === null || value.host.filesystemClass === null || value.host.bootIdSha256 === null || Object.values(value.host.kernel).some((entry) => entry === null)
       || value.preflight.receiptSha256 === null || value.preflight.eligibility !== "intermediate" || value.preflight.terminalCode !== "eligible"
       || canonicalJson(value.assurance) !== canonicalJson(SANDBOX_ASSURANCE)) fail("selected record contradicts its evidence");

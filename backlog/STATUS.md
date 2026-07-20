@@ -16,10 +16,11 @@
 | pipeline.project-scoped-github-issue-operations | open | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.recovery-preview-callback-attestation | open | defect | pipeline | 2026-07-20 | — |
 | pipeline.sentinel-go-live-completion | open | workflow-improvement | pipeline | 2026-07-20 | — |
+| pipeline.source-available-commercial-licensing | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.spec-retention-on-close | open | defect | pipeline | 2026-07-20 | — |
 
 ## Counts
 
 - open: 10
-- in_progress: 2
+- in_progress: 3
 - closed: 0

@@ -1,0 +1,5 @@
+{
+  "$schema": "pipeline.third-party-licenses.v1",
+  "$comment": "This repository has no package-manager dependency manifest. The empty declaration is an explicit inventory result for the current Public Core candidate, not a legal approval of future dependencies.",
+  "dependencies": []
+}

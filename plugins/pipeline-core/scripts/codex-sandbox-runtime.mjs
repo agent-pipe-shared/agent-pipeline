@@ -60,7 +60,7 @@ function platformClass(filesystemClass) {
   fail("Codex sandbox platform class is unsupported");
 }
 function validateRuntime(value) {
-  exactKeys(value, ["schema", "repoRoot", "codexPath", "sandboxHelperPath", "sessionCleanup"], "Codex sandbox runtime");
+  exactKeys(value, ["schema", "repoRoot", "codexPath", "observedHelperPath", "sessionCleanup"], "Codex sandbox runtime");
   if (value.schema !== RUNTIME_SCHEMA) fail("Codex sandbox runtime schema is invalid");
   exactKeys(value.sessionCleanup, ["sessionId", "descriptorSha256"], "Codex sandbox session cleanup");
   if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(value.sessionCleanup.sessionId) || !SHA256.test(value.sessionCleanup.descriptorSha256)) {
@@ -69,7 +69,7 @@ function validateRuntime(value) {
   return {
     repoRoot: physicalDirectory(value.repoRoot, "repository root"),
     codexPath: physicalFile(value.codexPath, "Codex executable"),
-    sandboxHelperPath: physicalFile(value.sandboxHelperPath, "Codex sandbox helper"),
+    observedHelperPath: value.observedHelperPath === null ? null : physicalFile(value.observedHelperPath, "observed Codex sandbox helper"),
     sessionCleanup: structuredClone(value.sessionCleanup),
   };
 }
@@ -84,13 +84,12 @@ function compiledIntermediateReadback(runtime, scratch, selectedProfile = null) 
   const compiled = compilePermissionProfile("intermediate", {
     inputRoot: runtime.repoRoot,
     outputRoot: scratch.path,
-    runtimeReadSet: [...new Set([...resolveNodeRuntimeReadSet(process.execPath), runtime.codexPath, runtime.sandboxHelperPath, CODEX_ADVISORY_CHILD_PATH])].sort(),
+    runtimeReadSet: [...new Set([...resolveNodeRuntimeReadSet(process.execPath), runtime.codexPath, CODEX_ADVISORY_CHILD_PATH])].sort(),
     // The intermediate compiled form does not include deny entries, but its
     // shared compiler requires two real, non-overlapping control roots.
     deniedRoots: ["/proc"],
     sensitiveRoots: ["/sys"],
     sandboxCwd: runtime.repoRoot,
-    sandboxHelperPath: runtime.sandboxHelperPath,
   });
   const stateJson = compiled.raw.toString("utf8");
   let state;
@@ -101,7 +100,7 @@ function compiledIntermediateReadback(runtime, scratch, selectedProfile = null) 
     && entries[0]?.access === "read" && entries[0]?.path?.type === "special" && entries[0]?.path?.value?.kind === "root"
     && entries[1]?.access === "write" && entries[1]?.path?.type === "path" && entries[1]?.path?.path === scratch.path
     && state.permissionProfile.network === "enabled"
-    && state.codexLinuxSandboxExe === runtime.sandboxHelperPath
+    && !Object.hasOwn(state, "codexLinuxSandboxExe")
     && state.sandboxCwd === pathToFileURL(runtime.repoRoot).href
     && compiled.compiledStateSha256 === sha256(Buffer.from(stateJson));
   if (!exactIntermediate) fail("Codex compiled sandbox state does not match the documented intermediate profile");
@@ -189,7 +188,7 @@ export function createCodexSandboxRuntimeTransport({ sandboxContext, sandboxRunt
       chmodSync(root, 0o700);
       const receiptPath = join(root, "receipt.json");
       const startedAtMs = Date.now();
-      const pending = runCodexSandboxPreflight({ kind: "intermediate", codexPath: runtime.codexPath, sandboxHelperPath: runtime.sandboxHelperPath, receiptPath })
+      const pending = runCodexSandboxPreflight({ kind: "intermediate", codexPath: runtime.codexPath, observedHelperPath: runtime.observedHelperPath, receiptPath })
         .finally(() => { rmSync(root, { recursive: true, force: true }); });
       let wrapped;
       wrapped = pending.then((receipt) => {
@@ -233,7 +232,7 @@ export function createCodexSandboxRuntimeTransport({ sandboxContext, sandboxRunt
         return {
           cliVersion: receipt.cli.version,
           cliSha256: receipt.cli.artifactSha256,
-          sandboxHelperSha256: receipt.sandboxHelper.artifactSha256,
+          observedHelperSha256: receipt.observedHelper.artifactSha256,
           selectionSchemaSha256: SELECTION_SCHEMA_SHA256,
           platformClass: platform.platformClass,
           kernel: { sysname: type(), release: release(), machine: arch() },

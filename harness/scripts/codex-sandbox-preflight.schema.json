@@ -4,7 +4,7 @@
   "title": "Sanitized Codex sandbox preflight receipt",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "cli", "sandboxHelper", "platform", "profile", "networkEnabled", "vectors", "canaries", "eventChainSha256", "durationMs", "eligibility", "terminalCode"],
+  "required": ["schema", "cli", "sandboxTransport", "observedHelper", "platform", "profile", "networkEnabled", "vectors", "canaries", "eventChainSha256", "durationMs", "eligibility", "terminalCode"],
   "properties": {
     "schema": { "type": "string", "enum": ["pipeline.codex-sandbox-preflight.v1"] },
     "cli": {
@@ -16,13 +16,21 @@
         "artifactSha256": { "type": "string" }
       }
     },
-    "sandboxHelper": {
+    "sandboxTransport": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["artifactSha256", "sameArtifactAsCli"],
+      "required": ["selection"],
       "properties": {
-        "artifactSha256": { "type": "string" },
-        "sameArtifactAsCli": { "type": "boolean" }
+        "selection": { "const": "codex-cli-owned" }
+      }
+    },
+    "observedHelper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["role", "artifactSha256"],
+      "properties": {
+        "role": { "const": "diagnostic-only" },
+        "artifactSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" }
       }
     },
     "platform": {

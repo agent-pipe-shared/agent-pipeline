@@ -20,3 +20,8 @@ plugins/pipeline-core/lib/review-economy.test.mjs:generic-api-key:278
 plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:628
 plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:690
 plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:715
+# Historical false positives from the recovered Sentinel spec metadata. The
+# current Public files contain no inherited digest values; these exact
+# commit/path/rule/line fingerprints are retained narrowly for history scans.
+933e1a8d17d6c7bed040d13f8fccca2511fff9dc:docs/spec-archive/2026-07-20-sentinel-recovery/spec.md:generic-api-key:17
+966e3190138921a20533cb2d44cbfc70d8113e9b:specs/2026-07-19-sprint-sentinel-epic/spec.md:generic-api-key:17

@@ -13,7 +13,7 @@ const CONTEXT = { repoFingerprint: "a".repeat(64), referenceSetSha256: "b".repea
 test("the standard runtime adapter rejects missing or caller-shaped host coordinates before preflight or a model launch", () => {
   assert.throws(() => createCodexSandboxRuntimeTransport({ sandboxContext: CONTEXT }));
   assert.throws(() => createCodexSandboxRuntimeTransport({ sandboxContext: CONTEXT, sandboxRuntime: {
-    schema: "pipeline.codex-sandbox-runtime.v1", repoRoot: "/not-a-repository", codexPath: "/not-a-codex", sandboxHelperPath: "/not-a-helper",
+    schema: "pipeline.codex-sandbox-runtime.v1", repoRoot: "/not-a-repository", codexPath: "/not-a-codex", observedHelperPath: null,
   } }));
   assert.throws(() => createCodexSandboxRuntimeTransport({ sandboxContext: { ...CONTEXT, userProse: "network enabled please" } }));
 });

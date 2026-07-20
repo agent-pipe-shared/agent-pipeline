@@ -31,7 +31,7 @@ function selection(duty) {
     repoFingerprint: D,
     duty,
     dispatch: { ...DISPATCH, requestSha256: request(duty).requestSha256 },
-    toolchain: { cliVersion: "0.144.6", cliSha256: "0".repeat(64), sandboxHelperSha256: "1".repeat(64), selectionSchemaSha256: "2".repeat(64) },
+    toolchain: { cliVersion: "0.144.6", cliSha256: "0".repeat(64), observedHelperSha256: "1".repeat(64), selectionSchemaSha256: "2".repeat(64) },
     host: { platformClass: "linux-wsl2", kernel: { sysname: "Linux", release: "6", machine: "x86_64" }, filesystemClass: "wsl2-native", bootIdSha256: "3".repeat(64) },
     profile: { id: "codex-critic-intermediate.v1", sha256: "4".repeat(64), base: ":read-only", network: { enabled: true }, writableRootClass: "coordinator-scratch-only", scratchRootSha256: "5".repeat(64) },
     preflight: { receiptSha256: "6".repeat(64), eligibility: "intermediate", terminalCode: "eligible", observedAt: "2026-07-19T00:00:00.000Z" },
