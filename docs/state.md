@@ -93,8 +93,9 @@ observation/document governance
 
 ## Open items and next block
 
-- Exact close candidate `17115fe07e7e455635c055771110dde7b0fc54e9` is pushed to
-  `origin/feat/v3-public-core-foundation` and fetched back with matching OID.
+- The SNT-A implementation candidate `17115fe07e7e455635c055771110dde7b0fc54e9`
+  and the subsequent documentation-only close commit are pushed to
+  `origin/feat/v3-public-core-foundation` with exact fetch-back readback.
   Public `origin/main` was not changed.
 - The private overlay lock is updated and pushed to its normal `main`; the
   next session must run the explicit `inspect` → `plan` → `activate` →
