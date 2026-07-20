@@ -72,11 +72,19 @@ is complete.
 
 ## Review and result
 
-- Data-privacy review: pending independent exact-diff review.
-- Focused tests: pending correction candidate.
-- Exact-candidate Verify: pending final delivery candidate.
-- Independent Critic: initial combined review failed; follow-up is restricted
-  to the correction delta for this contract.
+- Data-privacy review: **PASS** on the exact correction delta
+  `df456fef615db809b1a48bb9f7ee77f367b090b6..f7e76063c9e15b136fbd8344dcd54a12c1bd0d36`.
+  The independent review confirmed that SCP-style references fail closed and
+  that structured GitHub references accept only canonical, same-target paths
+  without query, fragment, or percent encoding.
+- Review assurance: `functional-equivalent-read-only; OS isolation not asserted`.
+- Focused tests: **PASS**, 19/19, candidate-bound evidence in
+  `/tmp/observation-reference-channels-evidence.json`.
+- Exact-candidate Verify: **PASS** at
+  `f7e76063c9e15b136fbd8344dcd54a12c1bd0d36` before this documentation-only
+  sign-off update; the final Close candidate must run Verify again.
+- Independent Critic: initial combined review failed; the required bounded
+  correction-delta review now records **DATA-PRIVACY PASS**.
 
 ## Triage
 
