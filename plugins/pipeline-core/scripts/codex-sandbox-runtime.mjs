@@ -17,7 +17,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { canonicalJson, loadCompatibilityPolicy } from "../lib/codex-sandbox-compatibility.mjs";
 import { finalizeTemporaryResource, inspectSessionClosure, inspectTemporaryResource, loadSessionDescriptor, registerTemporaryIntent, sealTemporaryResource } from "../lib/worktree-lifecycle.mjs";
-import { compilePermissionProfile, resolveNodeRuntimeReadSet, runCodexSandboxPreflight, validateCodexSandboxState } from "../../../harness/scripts/codex-sandbox-preflight.mjs";
+import { compilePermissionProfile, resolveNodeRuntimeReadSet, runCodexSandboxPreflight, validateCodexSandboxState } from "./codex-sandbox-preflight.mjs";
 import { buildSandboxRequest, createRepositorySandboxSelectionStore, SELECTION_SCHEMA_SHA256 } from "./codex-sandbox-select.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -246,7 +246,7 @@ export function createCodexSandboxRuntimeTransport({ sandboxContext, sandboxRunt
             bootId: currentBootId, nowMs: observedAtMs,
             preflight: {
               bootId: currentBootId, observedAtMs, rawSha256: sha256(Buffer.from(canonicalJson(receipt))),
-              schemaSha256: sha256(readFileSync(new URL("../../../harness/scripts/codex-sandbox-preflight.schema.json", import.meta.url))), receipt,
+              schemaSha256: sha256(readFileSync(new URL("./codex-sandbox-preflight.schema.json", import.meta.url))), receipt,
             },
             runner: null, shadow: null, activation: null, routePostimageSha256: null,
           },

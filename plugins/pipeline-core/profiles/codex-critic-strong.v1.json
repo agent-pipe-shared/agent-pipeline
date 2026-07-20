@@ -1,0 +1,16 @@
+{
+  "schema": "pipeline.codex-sandbox-profile-intent.v1",
+  "id": "codex-critic-strong.v1",
+  "basePolicy": ":empty",
+  "networkEnabled": false,
+  "claims": {
+    "inputConfinement": true,
+    "technicalWriteDenial": true,
+    "networkConfinement": true
+  },
+  "roots": {
+    "readOnly": ["$INPUT_ROOT", "$RUNTIME_READ_SET"],
+    "readWrite": ["$OUTPUT_ROOT"],
+    "denied": ["$DENIED_ROOTS", "$SENSITIVE_ROOTS"]
+  }
+}

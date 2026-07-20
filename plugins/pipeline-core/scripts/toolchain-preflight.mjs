@@ -6,10 +6,10 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { loadManifest } from "../lib/manifest.mjs";
-import { probeGitleaks } from "../../../harness/scripts/security-readiness/gitleaks-readiness.mjs";
-import { probeOsvScanner } from "../../../harness/scripts/security-readiness/osv-scanner-readiness.mjs";
-import { probeSemgrep } from "../../../harness/scripts/security-readiness/semgrep-readiness.mjs";
-import { buildHandle, executableIdentity, resolveSystemExecutable, runProbe, sha256 } from "../../../harness/scripts/security-readiness/tool-identity.mjs";
+import { probeGitleaks } from "./security-readiness/gitleaks-readiness.mjs";
+import { probeOsvScanner } from "./security-readiness/osv-scanner-readiness.mjs";
+import { probeSemgrep } from "./security-readiness/semgrep-readiness.mjs";
+import { buildHandle, executableIdentity, resolveSystemExecutable, runProbe, sha256 } from "./tool-identity.mjs";
 
 export const TOOLCHAIN_SCHEMA = "pipeline.toolchain-preflight.v1";
 export const FIXED_TOOLS = Object.freeze(["node", "git", "gitleaks", "osv-scanner", "semgrep", "license-check"]);
