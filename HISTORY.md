@@ -1,5 +1,42 @@
 # History
 
+## 2026-07-20 — Public V3 Foundation stabilization
+
+- Reconciled Public Core self-application, marketplace, inventory, portable
+  Verify, documentation-link, and Gitleaks-fixture drift from baseline
+  `89c3c2e`; no private user, machine, secret, or runtime data was transferred.
+- Kept recovery-preview callback attestation and evidence-bound review retries
+  as explicit P1/P2 public backlog design work, not as a false completion claim.
+- Documented the PO-authorized temporary TP-3/TP-5 removal and exact restoration.
+  That course authorization is not a Critic PASS, review verdict, or release
+  approval.
+- An independent Critic identified a missing rollback path and a conflict between
+  stale public-language guidance and ADR-0011. The rollback path and the
+  English-canonical Public Core boundary were corrected; a final fresh Critic
+  review remains required for the exact close candidate.
+- The close authorship check found missing public `Dispatch:` trailers on
+  Goldfish delivery commits. The gap is recorded as a process incident and a
+  public backlog correction; it is not repaired by inventing provenance.
+- A separate clean P2.6 worktree was verified as fully synchronized, preserved
+  as a Git bundle and source archive, then removed without force. Its branch and
+  remote ref remain outside this stabilization block.
+- Pre-close Full Verify completed with exit 0 and machine-written Verify/Security
+  evidence at `6b423d1`; no push, merge, tag, or release was performed.
+
+### Lessons
+
+- Public language policy must be enforced from ADR-0011 at the Public Core
+  boundary; private-overlay conventions cannot silently redefine public
+  backlog or history language.
+- Independent Critic review is only credible when active monitoring cannot
+  inject coordinator prose into the review context; a contaminated attempt must
+  be discarded rather than relabeled as independent.
+
+### Open / next
+
+See the canonical [handover](docs/state.md) for the exact final Verify, fresh
+Critic, and feature-branch delivery sequence.
+
 ## 2026-07-19 — Hawkeye formaler Scope-Transfer
 
 - Den aktiven Feature-Lifecycle `sprint-hawkeye-epic` als PO-gesteuerten

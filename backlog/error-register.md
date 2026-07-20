@@ -9,6 +9,8 @@ The only allowed table form is:
 
 | Class | Category | Triage |
 | --- | --- | --- |
+| Independent review context can be contaminated by coordinator status traffic. | process | new |
+| Production delivery provenance can be incomplete when required dispatch metadata is omitted. | process | new |
 
 Use one concise, generic class per distinct root cause. Similar classes are
 merged; the board holds at most approximately 30 classes. `new` is allowed for

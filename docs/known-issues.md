@@ -37,6 +37,5 @@ only the exact commit-bound fingerprints required for immutable history; no
 path-wide or rule-wide Gitleaks suppression was added.
 
 TP-3 and TP-5 were temporarily removed under explicit PO authorization solely
-for these briefed edits. The main session owns restoring both entries exactly
-before the final gates. This narrow course authorization is not a Critic PASS,
-review verdict, or release approval.
+for these briefed edits and restored exactly before the final gates. This narrow
+course authorization is not a Critic PASS, review verdict, or release approval.
