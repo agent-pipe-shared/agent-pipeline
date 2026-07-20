@@ -1,8 +1,7 @@
 # Backlog — Agent Pipeline
 
-> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
-
-> Human-facing process documentation (ADR-0011) — the item content itself is also German (backlog item prose); frontmatter field names and item file structure (`backlog/items/TEMPLATE.md`) are English.
+> Public Core backlog items are English-canonical (ADR-0011). German may appear
+> only as an explicitly marked, bounded reader aid in a public user document.
 
 ## Purpose
 
@@ -23,7 +22,7 @@ Every item carries exactly one type in the frontmatter field `type`:
 
 ## Storage & format
 
-- One item = one file under `backlog/items/`, naming scheme `YYYY-MM-DD-short-german-slug.md` (date = `created`, not a due date).
+- One item = one file under `backlog/items/`, naming scheme `YYYY-MM-DD-short-english-slug.md` (date = `created`, not a due date).
 - Structure and mandatory frontmatter: [`backlog/items/TEMPLATE.md`](items/TEMPLATE.md) — required fields `type` / `status` / `created` / `source`; optional fields (e.g. `due` for scheduled follow-ups) are marked as such in the template.
 - Items are **never deleted**, only progressed in status (append-only evidence; cf. [`docs/operating-model.md` §6](../docs/operating-model.md#6-evidence-review-and-recovery)) — rejected or completed items stay in place with their rationale.
 
