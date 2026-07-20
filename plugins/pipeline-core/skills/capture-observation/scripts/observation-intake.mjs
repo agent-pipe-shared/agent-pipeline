@@ -55,12 +55,12 @@ const OMITTED = "omitted";
 const PUBLIC_VERSION = /^(?:unknown|[A-Za-z0-9][A-Za-z0-9._+-]{0,79})$/;
 const PUBLIC_CAPABILITY = /^(?:unknown|[A-Za-z0-9][A-Za-z0-9 ._:/+-]{0,119})$/;
 const CANDIDATE = /^(?:unknown|[0-9a-f]{7,40})$/;
-const SOURCE_LINK = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(?:blob|issues|pull)\/.+$/;
+const SOURCE_LINK = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(?:blob\/[A-Za-z0-9._~!$&'()*+,;=\/-]+|issues\/[1-9][0-9]*|pull\/[1-9][0-9]*)$/;
 const PUBLIC_REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
 const FREE_TEXT_EXTERNAL_REFERENCE = Object.freeze([
   /\b(?:https?|git|ssh):\/\//iu,
   /\b(?:www\.)?(?:(?:[A-Za-z0-9-]+\.)*(?:github\.com|githubusercontent\.com)|github\.dev)[/:]/iu,
-  /\bgit@github\.com:/iu,
+  /\b[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[^\s]+/iu,
   /%(?:25)*3a%(?:25)*2f%(?:25)*2f/iu,
 ]);
 

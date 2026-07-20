@@ -135,7 +135,7 @@ test("secret-like, prompt, and oversized raw-log content is rejected", () => {
 test("public-safe content is conservatively redacted without changing the source object", () => {
   const input = validInput({
     actual: "user=alice on hostname=workstation used /home/alice/repo and alice@example.test",
-    reproduction: "The private remote was git@private.example:team/repo.git.",
+    reproduction: "Run the public preflight after applying local configuration.",
     evidence: "The service contacted 192.168.1.5:8080.",
   });
   const before = structuredClone(input);
@@ -145,10 +145,9 @@ test("public-safe content is conservatively redacted without changing the source
   assert.match(output.body, /hostname=<redacted-host>/);
   assert.match(output.body, /\/home\/<redacted>\/repo/);
   assert.match(output.body, /<redacted-email>/);
-  assert.match(output.body, /<redacted-private-remote>/);
   assert.match(output.body, /<redacted-private-network>/);
   assert.deepEqual(input, before);
-  assert(output.redactions.length >= 6);
+  assert(output.redactions.length >= 5);
 });
 
 test("repository references fail closed unless they match the resolved public target", () => {
@@ -190,6 +189,7 @@ test("free-text repository coordinates are rejected regardless of target", () =>
     "https://github.com./private-overlay/agent-pipeline/issues/41",
     "ssh://git@github.com/private-overlay/agent-pipeline.git",
     "git@github.com:private-overlay/agent-pipeline.git",
+    "git@private.example:team/repo.git",
     "https://www.github.com/agent-pipe-shared/agent-pipeline/issues/12",
     "https://github.com:443/agent-pipe-shared/agent-pipeline/issues/12",
     "https://api.github.com/repos/agent-pipe-shared/agent-pipeline/issues/12",
@@ -232,6 +232,20 @@ test("same-repository links remain available only through the structured source 
   }), { publicRepository: PUBLIC_REPOSITORY });
   assert.equal(output.status, "ready");
   assert.match(output.body, new RegExp(link.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+});
+
+test("structured source links reject query, fragment, encoding, and noncanonical issue references", () => {
+  for (const link of [
+    "https://github.com/agent-pipe-shared/agent-pipeline/issues/12?next=https://github.com/private-overlay/agent-pipeline/issues/41",
+    "https://github.com/agent-pipe-shared/agent-pipeline/issues/12#private-overlay/agent-pipeline",
+    "https://github.com/agent-pipe-shared/agent-pipeline/blob/main/private%2Fcoordinate.md",
+    "https://github.com/agent-pipe-shared/agent-pipeline/issues/latest",
+  ]) {
+    const output = prepareObservation(validInput({ sourceBacklogLinks: [link] }), {
+      publicRepository: PUBLIC_REPOSITORY,
+    });
+    assert.equal(output.status, "invalid-input");
+  }
 });
 
 test("CLI binds repository-reference validation to the resolved public target", async () => {
