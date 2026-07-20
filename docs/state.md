@@ -68,6 +68,12 @@ disposition, plugin registration, and final feature-branch delivery
   accepted that no custom lawyer-reviewed two-user license is being offered.
   The commercial boundary and this disposition are recorded in the Public
   license evidence; release and hosted/commercial rights remain separate gates.
+- The current continuation made one native Selected-Sandbox advisory attempt;
+  the host returned typed `sandbox_selection_unavailable` without starting a
+  child. The PO-authorized ADR-0041 functional-equivalent consult then
+  answered exactly one fresh read-only question. This is gate-capable only
+  with the residual assurance that no Selected-Sandbox execution, OS isolation,
+  or model identity is asserted.
 - SNT-A1 through SNT-A4 are implemented. Focused tests and Full Verify passed
   at candidate `f7e76063c9e15b136fbd8344dcd54a12c1bd0d36` (tree
   `375601dcfd4f23aa0669e39d2e652aca10381d46`). The independent SNT-A Critic
