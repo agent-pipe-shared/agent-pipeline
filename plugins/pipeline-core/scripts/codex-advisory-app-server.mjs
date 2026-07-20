@@ -5,7 +5,7 @@ import { spawn } from "node:child_process";
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { buildSandboxInvocation } from "../../../harness/scripts/codex-sandbox-preflight.mjs";
+import { buildSandboxInvocation } from "./codex-sandbox-preflight.mjs";
 
 const CHILD = realpathSync(fileURLToPath(new URL("./codex-advisory-app-server-child.mjs", import.meta.url)));
 const MODEL = "gpt-5.6-sol";

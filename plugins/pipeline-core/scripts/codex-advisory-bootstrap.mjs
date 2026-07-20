@@ -12,7 +12,7 @@ import { TextDecoder } from "node:util";
 import { derivePoGateRepositoryFingerprint, resolvePoGateRepositoryTopology } from "../lib/po-gate-authority.mjs";
 import { validatePipelineUserV3 } from "../lib/runner-profiles-v3.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
-import { resolveSystemExecutable } from "../../../harness/scripts/security-readiness/tool-identity.mjs";
+import { resolveSystemExecutable } from "./tool-identity.mjs";
 import { runAdvisoryHostBridge } from "./advisory-host-bridge.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
