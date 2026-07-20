@@ -1,0 +1,64 @@
+{
+  "schema": "pipeline.runtime-projection-owned-keys.v3",
+  "targets": [
+    {
+      "path": ".claude/settings.json",
+      "format": "json",
+      "projection": "preserve-only",
+      "ownedKeys": []
+    },
+    {
+      "path": ".claude/pipeline.json",
+      "format": "json",
+      "projection": "human-role-display-v3",
+      "ownedKeys": ["humanRoles.po.displayLabel"]
+    },
+    {
+      "path": ".claude/pipeline.yaml",
+      "format": "yaml",
+      "projection": "claude-model-routing-v3",
+      "ownedKeys": ["language.human_facing", "modelRouting", "runnerRoutes", "criticExport", "session.keep_awake"],
+      "nativeModelAliases": {
+        "fable": "fable",
+        "opus": "opus",
+        "sonnet": "sonnet-5"
+      },
+      "bindings": [
+        { "targetKey": "elephant_epic_design", "kind": "profile-phase", "profileId": "epic", "phaseId": "design_phase" },
+        { "targetKey": "elephant_epic_execution", "kind": "profile-phase", "profileId": "epic", "phaseId": "execution_phase" },
+        { "targetKey": "advisor_epic", "kind": "advisory-profile", "profileId": "epic" },
+        { "targetKey": "elephant_feature_design", "kind": "profile-phase", "profileId": "feature", "phaseId": "design_phase" },
+        { "targetKey": "elephant_feature_execution", "kind": "profile-phase", "profileId": "feature", "phaseId": "execution_phase" },
+        { "targetKey": "advisor_feature", "kind": "advisory-profile", "profileId": "feature" },
+        { "targetKey": "elephant_mini_design", "kind": "profile-phase", "profileId": "mini", "phaseId": "design_phase" },
+        { "targetKey": "elephant_mini_execution", "kind": "profile-phase", "profileId": "mini", "phaseId": "execution_phase" },
+        { "targetKey": "goldfish", "kind": "duty", "dutyId": "implement" },
+        { "targetKey": "goldfish_mechanic", "kind": "duty", "dutyId": "mechanic" },
+        { "targetKey": "goldfish_deep", "kind": "duty", "dutyId": "deep" },
+        { "targetKey": "critic", "kind": "duty", "dutyId": "critic_normal" }
+      ]
+    },
+    {
+      "path": ".codex/config.toml",
+      "format": "toml",
+      "projection": "preserve-only",
+      "ownedKeys": []
+    },
+    {
+      "path": ".codex/agents/implementor.toml",
+      "format": "toml",
+      "projection": "codex-custom-agent-v3",
+      "ownedKeys": ["model", "model_reasoning_effort"],
+      "cell": { "kind": "duty", "dutyId": "implement" },
+      "decision": 10
+    },
+    {
+      "path": ".codex/agents/critic.toml",
+      "format": "toml",
+      "projection": "codex-custom-agent-v3",
+      "ownedKeys": ["model", "model_reasoning_effort"],
+      "cell": { "kind": "duty", "dutyId": "critic_normal" },
+      "decision": 3
+    }
+  ]
+}

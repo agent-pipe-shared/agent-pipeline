@@ -1,0 +1,48 @@
+{
+  "schema": "pipeline.codex-sandbox-compatibility-policy.v1",
+  "maxEvidenceAgeMs": 86400000,
+  "fallback": {
+    "laneId": "codex-host-functional-read-only",
+    "runnerId": "codex",
+    "assuranceLiteral": "functional-equivalent-read-only; OS isolation not asserted",
+    "allowedFailureCodes": [
+      "binary-missing",
+      "unsupported-profile",
+      "sandbox-setup-error",
+      "permission-denial",
+      "child-stdio-error"
+    ]
+  },
+  "entries": [
+    {
+      "id": "codex-0.144.6-wsl2-drvfs-intermediate",
+      "runnerId": "codex",
+      "primaryLaneId": "codex-sandbox-intermediate",
+      "fallbackLaneId": "codex-host-functional-read-only",
+      "cliVersion": "0.144.6",
+      "releasedArtifactSha256": "a31ae9450a26216eb1e7c53102fd42123dd675974310b0e2ca3aa4cb622a2c15",
+      "kernelClass": "wsl2",
+      "filesystemClass": "drvfs",
+      "permissionProfileId": "codex-critic-intermediate.v1",
+      "permissionProfileSha256": "e2f47f7e8da67f093b747ee3966e910063521ed2843de0d763acffd40e52868f",
+      "preflightSchemaSha256": "c42ae8e8314011a03deea7e59230a21ee9a945dc6ed3c92e2f039b69faa4fd9e",
+      "networkEnabled": true,
+      "initialState": "intermediate-preflight-candidate"
+    },
+    {
+      "id": "codex-0.144.6-wsl2-native-intermediate",
+      "runnerId": "codex",
+      "primaryLaneId": "codex-sandbox-intermediate",
+      "fallbackLaneId": "codex-host-functional-read-only",
+      "cliVersion": "0.144.6",
+      "releasedArtifactSha256": "a31ae9450a26216eb1e7c53102fd42123dd675974310b0e2ca3aa4cb622a2c15",
+      "kernelClass": "wsl2",
+      "filesystemClass": "wsl-native",
+      "permissionProfileId": "codex-critic-intermediate.v1",
+      "permissionProfileSha256": "e2f47f7e8da67f093b747ee3966e910063521ed2843de0d763acffd40e52868f",
+      "preflightSchemaSha256": "c42ae8e8314011a03deea7e59230a21ee9a945dc6ed3c92e2f039b69faa4fd9e",
+      "networkEnabled": true,
+      "initialState": "intermediate-preflight-candidate"
+    }
+  ]
+}

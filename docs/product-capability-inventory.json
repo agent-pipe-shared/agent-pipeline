@@ -1,0 +1,1948 @@
+{
+  "schema": "pipeline.product-capability-inventory.v1",
+  "sourceBaseline": {
+    "commit": "43551e40561a59ff0cb0eb063413866e5f8df471",
+    "tree": "24875588cfb72c38e5032f5a9e43b447c291ba42"
+  },
+  "criticReceiptSha256": "PENDING_SANCTIONED_CRITIC_RECEIPT",
+  "surfaces": [
+    {
+      "surfaceId": "agent-role:plugins/pipeline-core/agents/afk-claude-worker.md:afk-claude-worker",
+      "kind": "agent-role",
+      "path": "plugins/pipeline-core/agents/afk-claude-worker.md",
+      "member": "afk-claude-worker"
+    },
+    {
+      "surfaceId": "agent-role:plugins/pipeline-core/agents/consult-advisor.md:consult-advisor",
+      "kind": "agent-role",
+      "path": "plugins/pipeline-core/agents/consult-advisor.md",
+      "member": "consult-advisor"
+    },
+    {
+      "surfaceId": "agent-role:plugins/pipeline-core/agents/critic.md:critic",
+      "kind": "agent-role",
+      "path": "plugins/pipeline-core/agents/critic.md",
+      "member": "critic"
+    },
+    {
+      "surfaceId": "agent-role:plugins/pipeline-core/agents/goldfish-deep.md:goldfish-deep",
+      "kind": "agent-role",
+      "path": "plugins/pipeline-core/agents/goldfish-deep.md",
+      "member": "goldfish-deep"
+    },
+    {
+      "surfaceId": "agent-role:plugins/pipeline-core/agents/goldfish-implementor.md:goldfish-implementor",
+      "kind": "agent-role",
+      "path": "plugins/pipeline-core/agents/goldfish-implementor.md",
+      "member": "goldfish-implementor"
+    },
+    {
+      "surfaceId": "agent-role:plugins/pipeline-core/agents/goldfish-mechanic.md:goldfish-mechanic",
+      "kind": "agent-role",
+      "path": "plugins/pipeline-core/agents/goldfish-mechanic.md",
+      "member": "goldfish-mechanic"
+    },
+    {
+      "surfaceId": "agent-role:plugins/pipeline-core/agents/plan-verifier.md:plan-verifier",
+      "kind": "agent-role",
+      "path": "plugins/pipeline-core/agents/plan-verifier.md",
+      "member": "plan-verifier"
+    },
+    {
+      "surfaceId": "agent-role:plugins/pipeline-core/agents/readiness-reviewer.md:readiness-reviewer",
+      "kind": "agent-role",
+      "path": "plugins/pipeline-core/agents/readiness-reviewer.md",
+      "member": "readiness-reviewer"
+    },
+    {
+      "surfaceId": "duty:pipeline.user.yaml:advisory",
+      "kind": "duty",
+      "path": "pipeline.user.yaml",
+      "member": "advisory"
+    },
+    {
+      "surfaceId": "duty:pipeline.user.yaml:critic_high_risk",
+      "kind": "duty",
+      "path": "pipeline.user.yaml",
+      "member": "critic_high_risk"
+    },
+    {
+      "surfaceId": "duty:pipeline.user.yaml:critic_normal",
+      "kind": "duty",
+      "path": "pipeline.user.yaml",
+      "member": "critic_normal"
+    },
+    {
+      "surfaceId": "duty:pipeline.user.yaml:deep",
+      "kind": "duty",
+      "path": "pipeline.user.yaml",
+      "member": "deep"
+    },
+    {
+      "surfaceId": "duty:pipeline.user.yaml:implement",
+      "kind": "duty",
+      "path": "pipeline.user.yaml",
+      "member": "implement"
+    },
+    {
+      "surfaceId": "duty:pipeline.user.yaml:mechanic",
+      "kind": "duty",
+      "path": "pipeline.user.yaml",
+      "member": "mechanic"
+    },
+    {
+      "surfaceId": "duty:pipeline.user.yaml:readiness",
+      "kind": "duty",
+      "path": "pipeline.user.yaml",
+      "member": "readiness"
+    },
+    {
+      "surfaceId": "duty:pipeline.user.yaml:test_author",
+      "kind": "duty",
+      "path": "pipeline.user.yaml",
+      "member": "test_author"
+    },
+    {
+      "surfaceId": "governance-extension:governance/examples/guidelines:guidelines",
+      "kind": "governance-extension",
+      "path": "governance/examples/guidelines",
+      "member": "guidelines"
+    },
+    {
+      "surfaceId": "governance-extension:governance/examples/policies:policies",
+      "kind": "governance-extension",
+      "path": "governance/examples/policies",
+      "member": "policies"
+    },
+    {
+      "surfaceId": "guard:plugins/pipeline-core/hooks/guard-apply-patch.mjs:guard-apply-patch",
+      "kind": "guard",
+      "path": "plugins/pipeline-core/hooks/guard-apply-patch.mjs",
+      "member": "guard-apply-patch"
+    },
+    {
+      "surfaceId": "guard:plugins/pipeline-core/hooks/guard-devplan.mjs:guard-devplan",
+      "kind": "guard",
+      "path": "plugins/pipeline-core/hooks/guard-devplan.mjs",
+      "member": "guard-devplan"
+    },
+    {
+      "surfaceId": "guard:plugins/pipeline-core/hooks/guard-git.mjs:guard-git",
+      "kind": "guard",
+      "path": "plugins/pipeline-core/hooks/guard-git.mjs",
+      "member": "guard-git"
+    },
+    {
+      "surfaceId": "guard:plugins/pipeline-core/hooks/guard-push.mjs:guard-push",
+      "kind": "guard",
+      "path": "plugins/pipeline-core/hooks/guard-push.mjs",
+      "member": "guard-push"
+    },
+    {
+      "surfaceId": "guard:plugins/pipeline-core/hooks/guard-testpath.mjs:guard-testpath",
+      "kind": "guard",
+      "path": "plugins/pipeline-core/hooks/guard-testpath.mjs",
+      "member": "guard-testpath"
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:Bash:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/codex-hooks.json",
+      "member": "PreToolUse:Bash:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\""
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:apply_patch|Edit|Write:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/codex-hooks.json",
+      "member": "PreToolUse:apply_patch|Edit|Write:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\""
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\""
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\""
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-devplan.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-devplan.mjs\""
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\""
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\""
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs\""
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/staleness-check.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/staleness-check.mjs\""
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:Stop::node \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-suggest.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "Stop::node \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-suggest.mjs\""
+    },
+    {
+      "surfaceId": "human-role:roles/critic.md:critic",
+      "kind": "human-role",
+      "path": "roles/critic.md",
+      "member": "critic"
+    },
+    {
+      "surfaceId": "human-role:roles/elephant.md:elephant",
+      "kind": "human-role",
+      "path": "roles/elephant.md",
+      "member": "elephant"
+    },
+    {
+      "surfaceId": "human-role:roles/goldfish.md:goldfish",
+      "kind": "human-role",
+      "path": "roles/goldfish.md",
+      "member": "goldfish"
+    },
+    {
+      "surfaceId": "profile:pipeline.user.yaml:epic",
+      "kind": "profile",
+      "path": "pipeline.user.yaml",
+      "member": "epic"
+    },
+    {
+      "surfaceId": "profile:pipeline.user.yaml:feature",
+      "kind": "profile",
+      "path": "pipeline.user.yaml",
+      "member": "feature"
+    },
+    {
+      "surfaceId": "profile:pipeline.user.yaml:mini",
+      "kind": "profile",
+      "path": "pipeline.user.yaml",
+      "member": "mini"
+    },
+    {
+      "surfaceId": "publication:.claude-plugin/marketplace.json:marketplace",
+      "kind": "publication",
+      "path": ".claude-plugin/marketplace.json",
+      "member": "marketplace"
+    },
+    {
+      "surfaceId": "publication:plugins/pipeline-core/.claude-plugin/plugin.json:plugin-manifest",
+      "kind": "publication",
+      "path": "plugins/pipeline-core/.claude-plugin/plugin.json",
+      "member": "plugin-manifest"
+    },
+    {
+      "surfaceId": "publication:plugins/pipeline-core/.codex-plugin/plugin.json:codex-plugin-manifest",
+      "kind": "publication",
+      "path": "plugins/pipeline-core/.codex-plugin/plugin.json",
+      "member": "codex-plugin-manifest"
+    },
+    {
+      "surfaceId": "publication:plugins/pipeline-core/scripts/public-baseline-diagnose.mjs:public-baseline-diagnose",
+      "kind": "publication",
+      "path": "plugins/pipeline-core/scripts/public-baseline-diagnose.mjs",
+      "member": "public-baseline-diagnose"
+    },
+    {
+      "surfaceId": "publication:plugins/pipeline-core/scripts/publication-close-journal.mjs:publication-close-journal",
+      "kind": "publication",
+      "path": "plugins/pipeline-core/scripts/publication-close-journal.mjs",
+      "member": "publication-close-journal"
+    },
+    {
+      "surfaceId": "release:plugins/pipeline-core/scripts/codex-plugin-validator-parity.mjs:codex-plugin-validator-parity",
+      "kind": "release",
+      "path": "plugins/pipeline-core/scripts/codex-plugin-validator-parity.mjs",
+      "member": "codex-plugin-validator-parity"
+    },
+    {
+      "surfaceId": "release:plugins/pipeline-core/scripts/native-plugin-readback.mjs:native-plugin-readback",
+      "kind": "release",
+      "path": "plugins/pipeline-core/scripts/native-plugin-readback.mjs",
+      "member": "native-plugin-readback"
+    },
+    {
+      "surfaceId": "release:plugins/pipeline-core/scripts/neutral-range-plan.mjs:neutral-range-plan",
+      "kind": "release",
+      "path": "plugins/pipeline-core/scripts/neutral-range-plan.mjs",
+      "member": "neutral-range-plan"
+    },
+    {
+      "surfaceId": "setup:setup.mjs:setup",
+      "kind": "setup",
+      "path": "setup.mjs",
+      "member": "setup"
+    },
+    {
+      "surfaceId": "skill:plugins/pipeline-core/skills/advisor-consult/SKILL.md:advisor-consult",
+      "kind": "skill",
+      "path": "plugins/pipeline-core/skills/advisor-consult/SKILL.md",
+      "member": "advisor-consult"
+    },
+    {
+      "surfaceId": "skill:plugins/pipeline-core/skills/close-block/SKILL.md:close-block",
+      "kind": "skill",
+      "path": "plugins/pipeline-core/skills/close-block/SKILL.md",
+      "member": "close-block"
+    },
+    {
+      "surfaceId": "skill:plugins/pipeline-core/skills/close-feature/SKILL.md:close-feature",
+      "kind": "skill",
+      "path": "plugins/pipeline-core/skills/close-feature/SKILL.md",
+      "member": "close-feature"
+    },
+    {
+      "surfaceId": "skill:plugins/pipeline-core/skills/conventional-commit/SKILL.md:conventional-commit",
+      "kind": "skill",
+      "path": "plugins/pipeline-core/skills/conventional-commit/SKILL.md",
+      "member": "conventional-commit"
+    },
+    {
+      "surfaceId": "skill:plugins/pipeline-core/skills/critic-review/SKILL.md:critic-review",
+      "kind": "skill",
+      "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
+      "member": "critic-review"
+    },
+    {
+      "surfaceId": "skill:plugins/pipeline-core/skills/pipeline-start/SKILL.md:pipeline-start",
+      "kind": "skill",
+      "path": "plugins/pipeline-core/skills/pipeline-start/SKILL.md",
+      "member": "pipeline-start"
+    },
+    {
+      "surfaceId": "template-extension:templates/CLAUDE.project.md:CLAUDE.project.md",
+      "kind": "template-extension",
+      "path": "templates/CLAUDE.project.md",
+      "member": "CLAUDE.project.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/adr.md:adr.md",
+      "kind": "template-extension",
+      "path": "templates/adr.md",
+      "member": "adr.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/architecture-doc.md:architecture-doc.md",
+      "kind": "template-extension",
+      "path": "templates/architecture-doc.md",
+      "member": "architecture-doc.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/costs.md:costs.md",
+      "kind": "template-extension",
+      "path": "templates/costs.md",
+      "member": "costs.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/cutover-checklist.md:cutover-checklist.md",
+      "kind": "template-extension",
+      "path": "templates/cutover-checklist.md",
+      "member": "cutover-checklist.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/deploy-adapter.md:deploy-adapter.md",
+      "kind": "template-extension",
+      "path": "templates/deploy-adapter.md",
+      "member": "deploy-adapter.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/dev-plan.md:dev-plan.md",
+      "kind": "template-extension",
+      "path": "templates/dev-plan.md",
+      "member": "dev-plan.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/guard-config.json.example:guard-config.json.example",
+      "kind": "template-extension",
+      "path": "templates/guard-config.json.example",
+      "member": "guard-config.json.example"
+    },
+    {
+      "surfaceId": "template-extension:templates/handover.md:handover.md",
+      "kind": "template-extension",
+      "path": "templates/handover.md",
+      "member": "handover.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/pipeline.json.example:pipeline.json.example",
+      "kind": "template-extension",
+      "path": "templates/pipeline.json.example",
+      "member": "pipeline.json.example"
+    },
+    {
+      "surfaceId": "template-extension:templates/pipeline.yaml.example:pipeline.yaml.example",
+      "kind": "template-extension",
+      "path": "templates/pipeline.yaml.example",
+      "member": "pipeline.yaml.example"
+    },
+    {
+      "surfaceId": "template-extension:templates/prd.md:prd.md",
+      "kind": "template-extension",
+      "path": "templates/prd.md",
+      "member": "prd.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/prompts/critic-review.md:prompts/critic-review.md",
+      "kind": "template-extension",
+      "path": "templates/prompts/critic-review.md",
+      "member": "prompts/critic-review.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/prompts/elephant-kickoff.md:prompts/elephant-kickoff.md",
+      "kind": "template-extension",
+      "path": "templates/prompts/elephant-kickoff.md",
+      "member": "prompts/elephant-kickoff.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/prompts/goldfish-task.md:prompts/goldfish-task.md",
+      "kind": "template-extension",
+      "path": "templates/prompts/goldfish-task.md",
+      "member": "prompts/goldfish-task.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/prompts/kickoff-new-project.md:prompts/kickoff-new-project.md",
+      "kind": "template-extension",
+      "path": "templates/prompts/kickoff-new-project.md",
+      "member": "prompts/kickoff-new-project.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/prompts/session-bootstrap-check.md:prompts/session-bootstrap-check.md",
+      "kind": "template-extension",
+      "path": "templates/prompts/session-bootstrap-check.md",
+      "member": "prompts/session-bootstrap-check.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/release-manifest.md:release-manifest.md",
+      "kind": "template-extension",
+      "path": "templates/release-manifest.md",
+      "member": "release-manifest.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/retro.md:retro.md",
+      "kind": "template-extension",
+      "path": "templates/retro.md",
+      "member": "retro.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/risks.md:risks.md",
+      "kind": "template-extension",
+      "path": "templates/risks.md",
+      "member": "risks.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/roadmap.md:roadmap.md",
+      "kind": "template-extension",
+      "path": "templates/roadmap.md",
+      "member": "roadmap.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/spec.md:spec.md",
+      "kind": "template-extension",
+      "path": "templates/spec.md",
+      "member": "spec.md"
+    },
+    {
+      "surfaceId": "template-extension:templates/three-scope-fixtures.md:three-scope-fixtures.md",
+      "kind": "template-extension",
+      "path": "templates/three-scope-fixtures.md",
+      "member": "three-scope-fixtures.md"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisor-consult-v3-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "advisor-consult-v3-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisory-coordinator-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "advisory-coordinator-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisory-host-bridge-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "advisory-host-bridge-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisory-receipt-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "advisory-receipt-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "agents-adapter-migration-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "agents-adapter-migration-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "artifact-lifecycle-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "artifact-lifecycle-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:backlog-state-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "backlog-state-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:bootstrap-env-check-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "bootstrap-env-check-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:check-ownership-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "check-ownership-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:claude-critic-host-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "claude-critic-host-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-app-server-health-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-app-server-health-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-critic-host-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-critic-host-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-plugin-validator-parity-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-plugin-validator-parity-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-sandbox-compatibility-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-sandbox-compatibility-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-sandbox-preflight-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-sandbox-preflight-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-sandbox-runtime-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-sandbox-runtime-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-sandbox-select-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-sandbox-select-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "continuity-host-adapter-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-state-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "continuity-state-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-status-cli-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "continuity-status-cli-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-status-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "continuity-status-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "critic-bare-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-export-policy-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "critic-export-policy-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "critic-fail-closed-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "critic-fail-closed-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-packet-governance-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "critic-packet-governance-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:delivery-course-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "delivery-course-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:doc-contract-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "doc-contract-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:doc-contract-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "doc-contract-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:error-register-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "error-register-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:error-register-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "error-register-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:git-cmd-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "git-cmd-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-devplan-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-git-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-push-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-testpath-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:language-canon-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "language-canon-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:language-canon-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "language-canon-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "main-session-route-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:no-autoupdate-key-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "no-autoupdate-key-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:p3b-runner-conformance-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "p3b-runner-conformance-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:parallel-dispatch-planner-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "parallel-dispatch-planner-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phase26-invariants-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phase26-invariants-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phase26-invariants-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phase26-invariants-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phase3-sdlc-coherence-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phase3-sdlc-coherence-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "pipeline-start-v3-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "pipeline-state-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-gate-authority-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "po-gate-authority-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "po-language-projection-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-language-projection-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "po-language-projection-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:post-compact-reground-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "post-compact-reground-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "repository-freshness-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:review-economy-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "review-economy-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:route-receipt-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "route-receipt-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:routing-projection-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "routing-projection-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:routing-projection-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "routing-projection-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:ruleset-freshness-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "ruleset-freshness-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:runner-profile-migration-v2-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "runner-profile-migration-v2-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:runner-profile-migration-v3-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "runner-profile-migration-v3-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:runner-profiles-v2-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "runner-profiles-v2-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:runner-profiles-v3-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "runner-profiles-v3-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:runner-usage-v1-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "runner-usage-v1-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:runtime-projection-v2-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "runtime-projection-v2-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:runtime-projection-v3-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "runtime-projection-v3-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:sandboxed-readonly-duty-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "sandboxed-readonly-duty-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:sandboxed-readonly-host-bridge-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "sandboxed-readonly-host-bridge-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:schema-lite-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "schema-lite-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:sdlc-efficiency-metrics-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "sdlc-efficiency-metrics-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:sdlc-run-graph-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "sdlc-run-graph-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:security-scan",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "security-scan"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:security-scan-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "security-scan-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:setup-check-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "setup-check-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:setup-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "setup-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:spec-readiness-host-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "spec-readiness-host-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:staleness-check-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "staleness-check-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:state-budget-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "state-budget-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:state-budget-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "state-budget-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:statusline-context-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "statusline-context-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:stop-suggest-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "stop-suggest-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:validate-manifest",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "validate-manifest"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:validate-manifest-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "validate-manifest-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:workflow-runner-boundary-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "workflow-runner-boundary-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:workflow-writer-preflight-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "workflow-writer-preflight-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:yaml-lite-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "yaml-lite-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:document-identifier-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "document-identifier-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:document-hooks-manifest-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "document-hooks-manifest-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:document-hooks-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "document-hooks-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:document-lifecycle-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "document-lifecycle-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-document-binding-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "private-document-binding-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:human-role-label-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "human-role-label-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:human-role-rendering-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "human-role-rendering-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:product-capability-inventory-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "product-capability-inventory-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "release-version-plan-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-cleanup-power-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "session-cleanup-power-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-power-cli-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "session-power-cli-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-power-controller-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "session-power-controller-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-power-core-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "session-power-core-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:worktree-lifecycle-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "worktree-lifecycle-tests"
+    }
+  ],
+  "capabilities": [
+    {
+      "id": "claude-hook-safety",
+      "publicName": "Command and write-path guardrails",
+      "problem": "Dangerous commands and unverified changes need deterministic local policy checks.",
+      "benefit": "Configured hook families enforce command, write-path, plan, test-path, and push safeguards.",
+      "status": "shipped",
+      "surfaceIds": [
+        "guard:plugins/pipeline-core/hooks/guard-apply-patch.mjs:guard-apply-patch",
+        "guard:plugins/pipeline-core/hooks/guard-devplan.mjs:guard-devplan",
+        "guard:plugins/pipeline-core/hooks/guard-git.mjs:guard-git",
+        "guard:plugins/pipeline-core/hooks/guard-push.mjs:guard-push",
+        "guard:plugins/pipeline-core/hooks/guard-testpath.mjs:guard-testpath",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-devplan.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/staleness-check.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:Stop::node \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-suggest.mjs\""
+      ],
+      "runners": [
+        "claude"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "unavailable",
+          "reasonCode": "claude-host-hook-contract"
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/hooks/guard-apply-patch.mjs",
+        "plugins/pipeline-core/hooks/guard-devplan.mjs",
+        "plugins/pipeline-core/hooks/guard-git.mjs",
+        "plugins/pipeline-core/hooks/guard-push.mjs",
+        "plugins/pipeline-core/hooks/guard-testpath.mjs",
+        "plugins/pipeline-core/hooks/hooks.json"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/hooks/guard-git.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-claude-hook-safety",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "plugins/pipeline-core/hooks/hooks.json",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "codex-host-hook-bridge",
+      "publicName": "Codex host safety bridge",
+      "problem": "Codex host behavior and available safety controls vary by host and platform.",
+      "benefit": "A Codex-native hook bridge applies the available command and write-path policy without promising controls the host cannot provide.",
+      "status": "host-dependent",
+      "surfaceIds": [
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:Bash:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:apply_patch|Edit|Write:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+        "publication:plugins/pipeline-core/.codex-plugin/plugin.json:codex-plugin-manifest"
+      ],
+      "runners": [
+        "codex",
+        "host-only"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "unavailable",
+          "reasonCode": "codex-host-hook-only"
+        },
+        "codex": {
+          "status": "host-dependent",
+          "reasonCode": "host-hook-lifecycle"
+        }
+      },
+      "platforms": [
+        "all",
+        "linux",
+        "macos",
+        "windows",
+        "wsl"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "Codex plugin host"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/.codex-plugin/plugin.json",
+        "plugins/pipeline-core/hooks/codex-hooks.json"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-codex-host-hook-bridge",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "plugins/pipeline-core/.codex-plugin/plugin.json",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "deterministic-verification",
+      "publicName": "Deterministic verification",
+      "problem": "A delivery needs reproducible evidence instead of an informal test claim.",
+      "benefit": "One registered Verify entry point runs the declared suites and records machine-readable results.",
+      "status": "shipped",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:advisor-consult-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:advisory-coordinator-tests",
+        "verify-phase:harness/scripts/verify.mjs:advisory-host-bridge-tests",
+        "verify-phase:harness/scripts/verify.mjs:advisory-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-check",
+        "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-tests",
+        "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-check",
+        "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:backlog-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:bootstrap-env-check-tests",
+        "verify-phase:harness/scripts/verify.mjs:check-ownership-tests",
+        "verify-phase:harness/scripts/verify.mjs:claude-critic-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-app-server-health-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-critic-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-plugin-validator-parity-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-sandbox-compatibility-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-sandbox-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-sandbox-runtime-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-sandbox-select-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-status-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-status-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-export-policy-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-check",
+        "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-tests",
+        "verify-phase:harness/scripts/verify.mjs:critic-packet-governance-tests",
+        "verify-phase:harness/scripts/verify.mjs:delivery-course-tests",
+        "verify-phase:harness/scripts/verify.mjs:doc-contract-check",
+        "verify-phase:harness/scripts/verify.mjs:doc-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:document-hooks-manifest-tests",
+        "verify-phase:harness/scripts/verify.mjs:document-hooks-tests",
+        "verify-phase:harness/scripts/verify.mjs:document-identifier-tests",
+        "verify-phase:harness/scripts/verify.mjs:document-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:error-register-check",
+        "verify-phase:harness/scripts/verify.mjs:error-register-tests",
+        "verify-phase:harness/scripts/verify.mjs:git-cmd-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-role-label-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-role-rendering-tests",
+        "verify-phase:harness/scripts/verify.mjs:language-canon-check",
+        "verify-phase:harness/scripts/verify.mjs:language-canon-tests",
+        "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
+        "verify-phase:harness/scripts/verify.mjs:no-autoupdate-key-tests",
+        "verify-phase:harness/scripts/verify.mjs:p3b-runner-conformance-tests",
+        "verify-phase:harness/scripts/verify.mjs:parallel-dispatch-planner-tests",
+        "verify-phase:harness/scripts/verify.mjs:phase26-invariants-check",
+        "verify-phase:harness/scripts/verify.mjs:phase26-invariants-tests",
+        "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-check",
+        "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:po-gate-authority-check",
+        "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
+        "verify-phase:harness/scripts/verify.mjs:po-language-projection-tests",
+        "verify-phase:harness/scripts/verify.mjs:post-compact-reground-tests",
+        "verify-phase:harness/scripts/verify.mjs:private-document-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:product-capability-inventory-tests",
+        "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",
+        "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
+        "verify-phase:harness/scripts/verify.mjs:review-economy-tests",
+        "verify-phase:harness/scripts/verify.mjs:route-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:routing-projection-check",
+        "verify-phase:harness/scripts/verify.mjs:routing-projection-tests",
+        "verify-phase:harness/scripts/verify.mjs:ruleset-freshness-tests",
+        "verify-phase:harness/scripts/verify.mjs:runner-profile-migration-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:runner-profile-migration-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:runner-profiles-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:runner-profiles-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:runner-usage-v1-tests",
+        "verify-phase:harness/scripts/verify.mjs:runtime-projection-v2-tests",
+        "verify-phase:harness/scripts/verify.mjs:runtime-projection-v3-tests",
+        "verify-phase:harness/scripts/verify.mjs:sandboxed-readonly-duty-tests",
+        "verify-phase:harness/scripts/verify.mjs:sandboxed-readonly-host-bridge-tests",
+        "verify-phase:harness/scripts/verify.mjs:schema-lite-tests",
+        "verify-phase:harness/scripts/verify.mjs:sdlc-efficiency-metrics-tests",
+        "verify-phase:harness/scripts/verify.mjs:sdlc-run-graph-tests",
+        "verify-phase:harness/scripts/verify.mjs:security-scan",
+        "verify-phase:harness/scripts/verify.mjs:security-scan-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-cleanup-power-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-power-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-power-controller-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-power-core-tests",
+        "verify-phase:harness/scripts/verify.mjs:setup-check-tests",
+        "verify-phase:harness/scripts/verify.mjs:setup-tests",
+        "verify-phase:harness/scripts/verify.mjs:spec-readiness-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:staleness-check-tests",
+        "verify-phase:harness/scripts/verify.mjs:state-budget-check",
+        "verify-phase:harness/scripts/verify.mjs:state-budget-tests",
+        "verify-phase:harness/scripts/verify.mjs:statusline-context-tests",
+        "verify-phase:harness/scripts/verify.mjs:stop-suggest-tests",
+        "verify-phase:harness/scripts/verify.mjs:validate-manifest",
+        "verify-phase:harness/scripts/verify.mjs:validate-manifest-tests",
+        "verify-phase:harness/scripts/verify.mjs:workflow-runner-boundary-tests",
+        "verify-phase:harness/scripts/verify.mjs:workflow-writer-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:worktree-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:yaml-lite-tests"
+      ],
+      "runners": [
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "harness/scripts/verify.mjs"
+      ],
+      "testEvidence": [
+        "harness/scripts/check-doc-contracts.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-deterministic-verification",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": ".claude/pipeline.json",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "governance-example-extensions",
+      "publicName": "Governance extension examples",
+      "problem": "Adopters need a bounded starting point for project governance without treating examples as universal policy.",
+      "benefit": "Guideline and policy examples show where an adopting repository can supply its own governed extensions.",
+      "status": "optional",
+      "surfaceIds": [
+        "governance-extension:governance/examples/guidelines:guidelines",
+        "governance-extension:governance/examples/policies:policies"
+      ],
+      "runners": [
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "explicit adopter activation"
+      ],
+      "productionEvidence": [
+        "governance/examples/guidelines",
+        "governance/examples/policies"
+      ],
+      "testEvidence": [
+        "harness/scripts/validate-manifest.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-governance-example-extensions",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": ".claude/pipeline.yaml",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "human-accountability-roles",
+      "publicName": "Human accountability roles",
+      "problem": "Agent delivery needs clear human decision and review accountability.",
+      "benefit": "The operating model names orchestration, implementation, and independent-review responsibilities.",
+      "status": "shipped",
+      "surfaceIds": [
+        "human-role:roles/critic.md:critic",
+        "human-role:roles/elephant.md:elephant",
+        "human-role:roles/goldfish.md:goldfish"
+      ],
+      "runners": [
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "roles/critic.md",
+        "roles/elephant.md",
+        "roles/goldfish.md"
+      ],
+      "testEvidence": [
+        "harness/scripts/check-doc-contracts.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-human-accountability-roles",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "plugin-distribution-and-publication",
+      "publicName": "Plugin distribution and publication controls",
+      "problem": "Projects need a versioned installation path and bounded publication operations.",
+      "benefit": "Marketplace and plugin manifests bind the distributable plugin while publication commands retain explicit evidence boundaries.",
+      "status": "optional",
+      "surfaceIds": [
+        "publication:.claude-plugin/marketplace.json:marketplace",
+        "publication:plugins/pipeline-core/.claude-plugin/plugin.json:plugin-manifest",
+        "publication:plugins/pipeline-core/scripts/public-baseline-diagnose.mjs:public-baseline-diagnose",
+        "publication:plugins/pipeline-core/scripts/publication-close-journal.mjs:publication-close-journal",
+        "release:plugins/pipeline-core/scripts/codex-plugin-validator-parity.mjs:codex-plugin-validator-parity"
+      ],
+      "runners": [
+        "claude",
+        "codex",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "host-dependent",
+          "reasonCode": "validator-parity-pending"
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "explicit adopter activation"
+      ],
+      "productionEvidence": [
+        ".claude-plugin/marketplace.json",
+        "plugins/pipeline-core/.claude-plugin/plugin.json",
+        "plugins/pipeline-core/scripts/codex-plugin-validator-parity.mjs",
+        "plugins/pipeline-core/scripts/public-baseline-diagnose.mjs",
+        "plugins/pipeline-core/scripts/publication-close-journal.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/scripts/codex-plugin-validator-parity.test.mjs",
+        "plugins/pipeline-core/scripts/publication-close-journal.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-plugin-distribution-and-publication",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": ".claude/settings.json",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "release-planning-controls",
+      "publicName": "Release planning controls",
+      "problem": "A public export or release needs a bounded plan before references are changed.",
+      "benefit": "Release planning utilities compute and validate the candidate boundary before publication.",
+      "status": "optional",
+      "surfaceIds": [
+        "release:plugins/pipeline-core/scripts/native-plugin-readback.mjs:native-plugin-readback",
+        "release:plugins/pipeline-core/scripts/neutral-range-plan.mjs:neutral-range-plan"
+      ],
+      "runners": [
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "explicit adopter activation"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/scripts/native-plugin-readback.mjs",
+        "plugins/pipeline-core/scripts/neutral-range-plan.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/scripts/neutral-range-plan.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "OPERATING_MODEL",
+          "anchorId": "capability-release-planning-controls",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "session-and-delivery-skills",
+      "publicName": "Session and delivery skills",
+      "problem": "Recurring delivery rituals are easy to omit or apply inconsistently.",
+      "benefit": "Installable skills provide bounded bootstrap, advisory, review, close, and commit-message workflows.",
+      "status": "shipped",
+      "surfaceIds": [
+        "skill:plugins/pipeline-core/skills/advisor-consult/SKILL.md:advisor-consult",
+        "skill:plugins/pipeline-core/skills/close-block/SKILL.md:close-block",
+        "skill:plugins/pipeline-core/skills/close-feature/SKILL.md:close-feature",
+        "skill:plugins/pipeline-core/skills/conventional-commit/SKILL.md:conventional-commit",
+        "skill:plugins/pipeline-core/skills/critic-review/SKILL.md:critic-review",
+        "skill:plugins/pipeline-core/skills/pipeline-start/SKILL.md:pipeline-start"
+      ],
+      "runners": [
+        "claude",
+        "codex",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/skills/advisor-consult/SKILL.md",
+        "plugins/pipeline-core/skills/close-block/SKILL.md",
+        "plugins/pipeline-core/skills/close-feature/SKILL.md",
+        "plugins/pipeline-core/skills/conventional-commit/SKILL.md",
+        "plugins/pipeline-core/skills/critic-review/SKILL.md",
+        "plugins/pipeline-core/skills/pipeline-start/SKILL.md"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-session-and-delivery-skills",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "setup-and-runtime-projection",
+      "publicName": "Setup and runtime projection",
+      "problem": "A project needs one checked source for configuration and generated runtime projections.",
+      "benefit": "Setup validates and projects supported configuration into host-facing files.",
+      "status": "shipped",
+      "surfaceIds": [
+        "setup:setup.mjs:setup"
+      ],
+      "runners": [
+        "claude",
+        "codex",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "setup.mjs"
+      ],
+      "testEvidence": [
+        "setup.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "SETUP",
+          "anchorId": "capability-setup-and-runtime-projection",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "pipeline.user.yaml",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "specialist-agent-roles",
+      "publicName": "Specialist delivery agents",
+      "problem": "Teams need bounded specialist contexts for execution, planning, readiness, and review work.",
+      "benefit": "The plugin supplies named specialist roles with explicit task boundaries.",
+      "status": "shipped",
+      "surfaceIds": [
+        "agent-role:plugins/pipeline-core/agents/afk-claude-worker.md:afk-claude-worker",
+        "agent-role:plugins/pipeline-core/agents/consult-advisor.md:consult-advisor",
+        "agent-role:plugins/pipeline-core/agents/critic.md:critic",
+        "agent-role:plugins/pipeline-core/agents/goldfish-deep.md:goldfish-deep",
+        "agent-role:plugins/pipeline-core/agents/goldfish-implementor.md:goldfish-implementor",
+        "agent-role:plugins/pipeline-core/agents/goldfish-mechanic.md:goldfish-mechanic",
+        "agent-role:plugins/pipeline-core/agents/plan-verifier.md:plan-verifier",
+        "agent-role:plugins/pipeline-core/agents/readiness-reviewer.md:readiness-reviewer"
+      ],
+      "runners": [
+        "claude",
+        "codex",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/agents/afk-claude-worker.md",
+        "plugins/pipeline-core/agents/consult-advisor.md",
+        "plugins/pipeline-core/agents/critic.md",
+        "plugins/pipeline-core/agents/goldfish-deep.md",
+        "plugins/pipeline-core/agents/goldfish-implementor.md",
+        "plugins/pipeline-core/agents/goldfish-mechanic.md",
+        "plugins/pipeline-core/agents/plan-verifier.md",
+        "plugins/pipeline-core/agents/readiness-reviewer.md"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/scripts/critic-bare.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-specialist-agent-roles",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "starter-templates",
+      "publicName": "Project starter templates",
+      "problem": "New projects need consistent starting files without inheriting hidden behavior.",
+      "benefit": "Templates provide visible starting points for configuration, plans, reviews, and delivery records.",
+      "status": "optional",
+      "surfaceIds": [
+        "template-extension:templates/CLAUDE.project.md:CLAUDE.project.md",
+        "template-extension:templates/adr.md:adr.md",
+        "template-extension:templates/architecture-doc.md:architecture-doc.md",
+        "template-extension:templates/costs.md:costs.md",
+        "template-extension:templates/cutover-checklist.md:cutover-checklist.md",
+        "template-extension:templates/deploy-adapter.md:deploy-adapter.md",
+        "template-extension:templates/dev-plan.md:dev-plan.md",
+        "template-extension:templates/guard-config.json.example:guard-config.json.example",
+        "template-extension:templates/handover.md:handover.md",
+        "template-extension:templates/pipeline.json.example:pipeline.json.example",
+        "template-extension:templates/pipeline.yaml.example:pipeline.yaml.example",
+        "template-extension:templates/prd.md:prd.md",
+        "template-extension:templates/prompts/critic-review.md:prompts/critic-review.md",
+        "template-extension:templates/prompts/elephant-kickoff.md:prompts/elephant-kickoff.md",
+        "template-extension:templates/prompts/goldfish-task.md:prompts/goldfish-task.md",
+        "template-extension:templates/prompts/kickoff-new-project.md:prompts/kickoff-new-project.md",
+        "template-extension:templates/prompts/session-bootstrap-check.md:prompts/session-bootstrap-check.md",
+        "template-extension:templates/release-manifest.md:release-manifest.md",
+        "template-extension:templates/retro.md:retro.md",
+        "template-extension:templates/risks.md:risks.md",
+        "template-extension:templates/roadmap.md:roadmap.md",
+        "template-extension:templates/spec.md:spec.md",
+        "template-extension:templates/three-scope-fixtures.md:three-scope-fixtures.md"
+      ],
+      "runners": [
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "explicit adopter activation"
+      ],
+      "productionEvidence": [
+        "templates/CLAUDE.project.md",
+        "templates/adr.md",
+        "templates/architecture-doc.md",
+        "templates/costs.md",
+        "templates/cutover-checklist.md",
+        "templates/deploy-adapter.md",
+        "templates/dev-plan.md",
+        "templates/guard-config.json.example",
+        "templates/handover.md",
+        "templates/pipeline.json.example",
+        "templates/pipeline.yaml.example",
+        "templates/prd.md",
+        "templates/prompts/critic-review.md",
+        "templates/prompts/elephant-kickoff.md",
+        "templates/prompts/goldfish-task.md",
+        "templates/prompts/kickoff-new-project.md",
+        "templates/prompts/session-bootstrap-check.md",
+        "templates/release-manifest.md",
+        "templates/retro.md",
+        "templates/risks.md",
+        "templates/roadmap.md",
+        "templates/spec.md",
+        "templates/three-scope-fixtures.md"
+      ],
+      "testEvidence": [
+        "harness/scripts/validate-manifest.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-starter-templates",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "v3-routed-duties",
+      "publicName": "V3 routed duties",
+      "problem": "Different delivery duties require explicit runner, evidence, and fallback decisions.",
+      "benefit": "V3 configuration records the supported advisory, review, delivery, and readiness duties.",
+      "status": "shipped",
+      "surfaceIds": [
+        "duty:pipeline.user.yaml:advisory",
+        "duty:pipeline.user.yaml:critic_high_risk",
+        "duty:pipeline.user.yaml:critic_normal",
+        "duty:pipeline.user.yaml:deep",
+        "duty:pipeline.user.yaml:implement",
+        "duty:pipeline.user.yaml:mechanic",
+        "duty:pipeline.user.yaml:readiness",
+        "duty:pipeline.user.yaml:test_author"
+      ],
+      "runners": [
+        "claude",
+        "codex",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "pipeline.user.yaml"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/runner-profiles-v3.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-v3-routed-duties",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "pipeline.user.yaml",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "v3-work-profiles",
+      "publicName": "V3 work profiles",
+      "problem": "Teams need a declared process shape for epic, feature, and small bounded work.",
+      "benefit": "The supported V3 profiles select documented routes and process expectations.",
+      "status": "shipped",
+      "surfaceIds": [
+        "profile:pipeline.user.yaml:epic",
+        "profile:pipeline.user.yaml:feature",
+        "profile:pipeline.user.yaml:mini"
+      ],
+      "runners": [
+        "claude",
+        "codex",
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "pipeline.user.yaml"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/runner-profiles-v3.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "README",
+          "anchorId": "capability-v3-work-profiles",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "pipeline.user.yaml",
+      "specializedOnlyReason": null
+    }
+  ]
+}

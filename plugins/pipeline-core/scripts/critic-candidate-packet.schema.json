@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.critic-candidate-packet.v1",
+  "type": "object",
+  "required": ["schema", "packetId", "createdAt", "expiresAt", "request", "ruleset", "route", "candidate", "diffPaths", "references", "governance", "checkout", "cleanupCapability", "bindings"],
+  "properties": {
+    "schema": { "const": "pipeline.critic-candidate-packet.v1" },
+    "packetId": { "type": "string", "pattern": "^[a-f0-9]{32}$" },
+    "createdAt": { "type": "string" },
+    "expiresAt": { "type": "string" },
+    "request": { "type": "object" },
+    "ruleset": { "type": "object" },
+    "route": { "type": "object" },
+    "candidate": { "type": "object" },
+    "diffPaths": { "type": "array", "items": { "type": "string" } },
+    "references": { "type": "array", "items": { "type": "object" } },
+    "governance": { "type": "object" },
+    "checkout": { "type": "object" },
+    "cleanupCapability": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "bindings": { "type": "object" }
+  },
+  "additionalProperties": false
+}

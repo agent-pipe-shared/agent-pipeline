@@ -1,10 +1,13 @@
+<!-- po-language: de -->
 <!--
 PROMPT/DOC TEMPLATE: PRD — Product Review Document (PO gate) — Agent-Pipeline
-PO-facing language: read `language.human_facing` from the compiled runtime
-manifest `.claude/pipeline.yaml`. If it is missing, unreadable, or unsupported,
-stop and repair `pipeline.user.yaml` with `node setup.mjs`; never infer a default.
-Before authoring, run `node harness/scripts/check-po-language-projection.mjs` to
-reject a stale or manually conflicting compiled projection.
+PO-facing language: run `node harness/scripts/check-po-gate-authority.mjs` and use
+the repository-scoped language it validates from the canonical primary checkout's
+narrow source/runtime projection and common mode-0600 receipt. Branch-local profile
+bytes are not authority. If it reports `en`, replace the marker above accordingly.
+Never infer a default, copy another worktree's profile, or author through a failure.
+The active feature directory contains exactly one physical `prd_*.md`, equal to
+`.claude/pipeline-state.json.activeFeature.planPath`; specs/design/SDPs are never PRDs.
 Source of truth: docs/operating-model.md §3.2 (Step 3b) / §3.3 / roles/elephant.md EL-19.
 Purpose: the PO release gate. Written by the Elephant AFTER the solution is designed
 and the spec passed readiness, BEFORE the first implementation dispatch. Mandatory at

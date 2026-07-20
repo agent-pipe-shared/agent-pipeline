@@ -1,0 +1,58 @@
+{
+  "schema": "pipeline.runtime-projection-owned-keys.v2",
+  "targets": [
+    {
+      "path": ".claude/settings.json",
+      "format": "json",
+      "projection": "preserve-only",
+      "ownedKeys": []
+    },
+    {
+      "path": ".claude/pipeline.yaml",
+      "format": "yaml",
+      "projection": "claude-model-routing-v2",
+      "ownedKeys": ["modelRouting"],
+      "nativeModelAliases": {
+        "fable": "fable",
+        "opus": "opus",
+        "sonnet": "sonnet-5"
+      },
+      "bindings": [
+        { "targetKey": "elephant_design_design", "kind": "profile-phase", "profileId": "design", "phaseId": "design_phase" },
+        { "targetKey": "elephant_design_execution", "kind": "profile-phase", "profileId": "design", "phaseId": "execution_phase" },
+        { "targetKey": "elephant_feature_design", "kind": "profile-phase", "profileId": "feature", "phaseId": "design_phase" },
+        { "targetKey": "elephant_feature_execution", "kind": "profile-phase", "profileId": "feature", "phaseId": "execution_phase" },
+        { "targetKey": "advisor_feature", "kind": "profile-phase", "profileId": "feature", "phaseId": "advisory" },
+        { "targetKey": "elephant_mini_design", "kind": "profile-phase", "profileId": "mini", "phaseId": "design_phase" },
+        { "targetKey": "elephant_mini_execution", "kind": "profile-phase", "profileId": "mini", "phaseId": "execution_phase" },
+        { "targetKey": "advisor_mini", "kind": "profile-phase", "profileId": "mini", "phaseId": "advisory" },
+        { "targetKey": "goldfish", "kind": "duty", "dutyId": "implement" },
+        { "targetKey": "goldfish_mechanic", "kind": "duty", "dutyId": "mechanic" },
+        { "targetKey": "goldfish_deep", "kind": "duty", "dutyId": "deep" },
+        { "targetKey": "critic", "kind": "duty", "dutyId": "critic_normal" }
+      ]
+    },
+    {
+      "path": ".codex/config.toml",
+      "format": "toml",
+      "projection": "preserve-only",
+      "ownedKeys": []
+    },
+    {
+      "path": ".codex/agents/implementor.toml",
+      "format": "toml",
+      "projection": "codex-custom-agent-v2",
+      "ownedKeys": ["model", "model_reasoning_effort"],
+      "cell": { "kind": "duty", "dutyId": "implement" },
+      "decision": 10
+    },
+    {
+      "path": ".codex/agents/critic.toml",
+      "format": "toml",
+      "projection": "codex-custom-agent-v2",
+      "ownedKeys": ["model", "model_reasoning_effort"],
+      "cell": { "kind": "duty", "dutyId": "critic_normal" },
+      "decision": 3
+    }
+  ]
+}

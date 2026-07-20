@@ -2,8 +2,9 @@
 /**
  * setup.mjs — the Shareable Edition's personalization compiler.
  *
- * Turns the ONE source-of-intent config (`pipeline.user.yaml`) into the three
- * runtime-canonical configs this repo already ships and reads at every session
+ * The historical legacy v1 compiler turned its ONE source-of-intent config
+ * (`pipeline.user.yaml`) into the three runtime-canonical configs this repo
+ * already ships and reads at every session
  * (`.claude/settings.json`, `.claude/pipeline.json`, `.claude/pipeline.yaml`) — see
  * the PRD §5/§5a/§6/§7 (Config-Schichtenmodell: user.yaml = source of intent,
  * this script = compiler, the three existing files stay runtime-canonical; no hook/skill
@@ -58,44 +59,85 @@
  * The ignored private overlay supplies only an anonymous immutable Shared SHA; machine-local
  * credentials remain outside this compiler and are never parsed or projected here.
  *
- * IDEMPOTENCY: `renderUserYaml(DEFAULT_ANSWERS)` is byte-identical to the committed
- * `pipeline.user.yaml` template shipped alongside this script (same static comments, same
- * default values) — so a first `--defaults` run against a pristine clone is already a
- * no-op diff, and a second `--defaults` run changes nothing (all three compile targets hit
- * the "up-to-date" branch of decideCompileAction, since pipeline.user.yaml itself did not
- * change between the two runs). See DoD "second run idempotent".
+ * LEGACY BUILDER: `renderUserYaml(DEFAULT_ANSWERS)` remains deterministic only
+ * for migration fixtures and compatibility tests. It deliberately emits v1 and
+ * is no longer byte-identical to the committed V3 source. Normal setup never
+ * invokes this builder and never writes the source or runtime projections.
  *
- * QUESTIONS: interactive setup asks only public, portable intent (runtime, setup intent,
- * language, subscription-tier model preset, autonomy preset). `--defaults` uses deterministic
- * public defaults and never inspects repository, account, marketplace, or machine identity.
+ * V3 AUTHORITY CUTOVER: legacy compiler and V2 verification helpers remain for
+ * compatibility tests, but normal setup accepts only `pipeline.user.v3` plus
+ * its V3 runtime projections. The explicit V3 migration owns every source or
+ * runtime write needed to reach that state. This prevents an old profile-level
+ * `advisor: off` value from disabling runner-neutral advisory.
  *
  * USAGE:
- *   node setup.mjs              interactive (readline prompts, pre-filled from any
- *                                existing pipeline.user.yaml -- re-run-safe)
- *   node setup.mjs --defaults   non-interactive: writes the conservative default
- *                                pipeline.user.yaml + compiles, no prompts (test/CI path)
- *   node setup.mjs --force      (or --yes) skips the hand-edit-drift confirmation instead of
- *                                asking (interactive) or refusing (non-interactive) -- see
- *                                "DRIFT DETECTION" above. Always prints a loud warning before
- *                                clobbering a hand-edited compiled file; combine with
- *                                --defaults for a fully unattended "just overwrite" run.
+ *   node setup.mjs              verifies the current V3 source/runtime state
+ *   node setup.mjs --defaults   same verification path; it never recreates a
+ *                                legacy v1 source or projection
+ *   node setup.mjs --configure-advisor-export
+ *                              disclose the repository export boundary, ask
+ *                              with default decline, and record only that V3
+ *                              consent field atomically
+ *   node setup.mjs --publish-po-profile
+ *                              validates only the canonical primary PO-language
+ *                              pair and publishes its private common receipt
+ *   node setup.mjs --force      (or --yes) is rejected: only the V3 migration's
+ *                                `apply --activate` may write V3 authority.
  *   node setup.mjs --help       usage text, exit 0
  *
  * VERIFY: node setup.test.mjs (pure-function coverage: detection/preset/render/drift
  * logic). The suite and the live routing-projection checker are wired into Full Verify.
  */
-import { existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import {
+  chmodSync,
+  closeSync,
+  constants,
+  existsSync,
+  fsyncSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { dirname, join, relative, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { createInterface } from "node:readline/promises";
 import { pathToFileURL } from "node:url";
 
 import { parseYaml, YamlLiteError } from "./plugins/pipeline-core/lib/yaml-lite.mjs";
 import { validateAgainstSchema } from "./plugins/pipeline-core/lib/schema-lite.mjs";
-import { loadPolicyLock, resolveHumanFacingLanguage, validateManifest } from "./plugins/pipeline-core/lib/manifest.mjs";
-import { projectManifestRouting, projectPreset, routingProvenance } from "./plugins/pipeline-core/lib/routing-projection.mjs";
+import { loadManifest, loadPolicyLock, resolveHumanFacingLanguage, validateManifest } from "./plugins/pipeline-core/lib/manifest.mjs";
+import { validatePipelineUserV2 } from "./plugins/pipeline-core/lib/runner-profiles-v2.mjs";
+import { planRuntimeProjectionV2, readRuntimeProjectionV2Baselines } from "./plugins/pipeline-core/lib/runtime-projection-v2.mjs";
+import { validatePipelineUserV3 } from "./plugins/pipeline-core/lib/runner-profiles-v3.mjs";
+import { planRuntimeProjectionV3, readRuntimeProjectionV3Baselines } from "./plugins/pipeline-core/lib/runtime-projection-v3.mjs";
+import { runToolchainPreflight } from "./plugins/pipeline-core/scripts/toolchain-preflight.mjs";
+import {
+  migrateLegacyRouting,
+  projectClaudeManifestRouting,
+  projectClaudeRouteInputs,
+  projectDirectRoutingDefaults,
+  projectManifestRouting,
+  projectPreset,
+  projectRunnerRoutes,
+  routingProvenance,
+  validateDirectRouting,
+} from "./plugins/pipeline-core/lib/routing-projection.mjs";
+import {
+  PO_GATE_PROFILE_RECEIPT_RELATIVE_PATH,
+  createPoGateProfileReceipt,
+  derivePoGateRepositoryFingerprint,
+  poGateProfileReceiptPath,
+  resolvePoGateRepositoryTopology,
+  serializePoGateProfileReceipt,
+  validatePoGateLanguageProjection,
+} from "./plugins/pipeline-core/lib/po-gate-authority.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
 export const ROOT_DIR = SCRIPT_DIR; // setup.mjs lives at the export root -- resolve relative
@@ -110,6 +152,203 @@ const PIPELINE_YAML_PATH = join(ROOT_DIR, ".claude", "pipeline.yaml");
 
 export const GENERATED_MARKER_PREFIX = "GENERATED from pipeline.user.yaml — edit there, then re-run setup";
 export const HUMAN_FACING_LANGUAGES = Object.freeze(["de", "en"]);
+export const RUNNER_PROFILE_V2_MIGRATION_COMMAND = "node plugins/pipeline-core/scripts/runner-profile-migration-v2.mjs";
+export const RUNNER_PROFILE_V3_MIGRATION_COMMAND = "node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs";
+export const ADVISOR_EXPORT_CONFIGURATION_COMMAND = "node setup.mjs --configure-advisor-export";
+export const ADVISOR_EXPORT_DISCLOSURE = [
+  "Advisor export is repository-scoped and optional.",
+  "Approval allows the configured same-runner advisor to receive one advisory question and the allowlisted repository candidate material needed to answer it.",
+  "It does not authorize secrets, credentials, unrelated paths, raw question/answer persistence, or a runner/model substitution.",
+  "The default is decline; missing or declined consent keeps Advisory off without starting a probe or child.",
+].join("\n");
+
+export function renderToolchainSetupReport(preflight) {
+  if (!preflight || !Array.isArray(preflight.results)) return ["Toolchain prerequisites: unavailable (invalid preflight result)."];
+  const relevant = preflight.results.filter(({ status }) => status !== "not_required");
+  const lines = [`Toolchain prerequisites: ${preflight.ok ? "ready" : preflight.code}.`];
+  for (const entry of relevant) {
+    const version = entry.version === null ? "version n/a" : `version ${entry.version}`;
+    lines.push(`  ${entry.tool}: ${entry.status} (${version})`);
+    if (entry.affectedClaim) lines.push(`    Blocked claim: ${entry.affectedClaim}`);
+    if (entry.installCommand) lines.push(`    Review, then run: ${entry.installCommand}`);
+    else if (entry.guidance && entry.status !== "ready") lines.push(`    ${entry.guidance}`);
+  }
+  lines.push("  Setup did not install or modify any tool.");
+  return lines;
+}
+
+/** V3 is the only setup authority after the runner-neutral advisory cutover. */
+export function v3MigrationRequiredMessage(schema) {
+  const source = schema === "pipeline.user.v2"
+    ? "The detected pipeline.user.v2 is an accepted one-way V3 migration input."
+    : schema === "pipeline.user.v1" || schema === undefined || schema === null
+      ? "The detected legacy source is accepted only as a V3 migration input."
+      : "pipeline.user.yaml is not a current pipeline.user.v3 authority.";
+  return [
+    `setup.mjs: runner-neutral advisory requires pipeline.user.v3 before setup can continue. ${source}`,
+    "No source or runtime projection was written.",
+    "Inspect and review the digest-only plan before explicit activation:",
+    `  ${RUNNER_PROFILE_V3_MIGRATION_COMMAND} inspect --root \"$PWD\"`,
+    `  ${RUNNER_PROFILE_V3_MIGRATION_COMMAND} plan --root \"$PWD\"`,
+    `  ${RUNNER_PROFILE_V3_MIGRATION_COMMAND} apply --root \"$PWD\" --activate`,
+  ].join("\n");
+}
+
+/**
+ * P3B deliberately keeps activation outside this legacy compiler.  It must
+ * not turn a v0/v1 route, especially its unresolved `terra` alias, into a
+ * fresh authoritative runtime projection.  I3 validates, plans, and
+ * transactionally applies the frozen v2 authority instead.
+ */
+export function v2MigrationRequiredMessage(schema) {
+  const source = schema === "pipeline.user.v1"
+    ? "The detected pipeline.user.v1 is accepted only as an I3 migration input."
+    : schema === undefined || schema === null
+      ? "pipeline.user.yaml is absent or unreadable."
+      : "pipeline.user.yaml is not a current pipeline.user.v2 authority.";
+  return [
+    `setup.mjs: P3B requires pipeline.user.v2 before setup can continue. ${source}`,
+    "No files were written; legacy v1 routing and its Terra alias were not compiled.",
+    "Inspect and review the explicit migration before activation:",
+    `  ${RUNNER_PROFILE_V2_MIGRATION_COMMAND} inspect --root \"$PWD\"`,
+    `  ${RUNNER_PROFILE_V2_MIGRATION_COMMAND} plan --root \"$PWD\"`,
+    `  ${RUNNER_PROFILE_V2_MIGRATION_COMMAND} apply --root \"$PWD\" --activate`,
+  ].join("\n");
+}
+
+/**
+ * Validate the v2 source and verify that its declared I2-owned runtime
+ * projections are already current.  This is deliberately read-only: I3 owns
+ * explicit activation, while the legacy setup compiler must never regenerate
+ * a v1 source or overwrite a v2-owned projection.
+ */
+export function validateV2SourceAndRuntime(intent, rootDir = ROOT_DIR) {
+  const source = "pipeline.user.yaml";
+  const intentValidation = validatePipelineUserV2(intent, { source });
+  if (!intentValidation.ok) {
+    return { ok: false, reason: "invalid-v2-source", diagnostics: intentValidation.errors };
+  }
+  let projection;
+  try {
+    projection = planRuntimeProjectionV2(intent, {
+      source,
+      baselines: readRuntimeProjectionV2Baselines(rootDir),
+    });
+  } catch (error) {
+    return { ok: false, reason: "v2-runtime-unreadable", diagnostics: [{ path: "$.runtime", code: "baseline_read", message: error.message }] };
+  }
+  if (projection.status !== "ready") {
+    return { ok: false, reason: "invalid-v2-runtime", diagnostics: projection.diagnostics ?? [] };
+  }
+  const staleTargets = projection.targets.filter((target) => target.changed).map((target) => target.path);
+  if (staleTargets.length > 0) {
+    return { ok: false, reason: "v2-runtime-drift", diagnostics: staleTargets.map((path) => ({
+      path,
+      code: "runtime_projection_drift",
+      message: "the declared v2 runtime projection is not current",
+      repair: "run the explicit runner-profile migration apply command with activation",
+    })) };
+  }
+  return { ok: true, diagnostics: [] };
+}
+
+/** Read back the complete generated V3 manifest, including optional document Policy state. */
+export function validateV3ManifestReadback(rootDir = ROOT_DIR, deps = {}) {
+  const result = (deps.loadManifest ?? loadManifest)(rootDir);
+  if (result.status === "ok") return { ok: true, diagnostics: [] };
+  return {
+    ok: false,
+    reason: "invalid-v3-manifest",
+    diagnostics: [{
+      path: "$.runtime.manifest",
+      code: "manifest_readback",
+      message: "the compiled V3 manifest, document Policy, or document runtime projection is invalid",
+      repair: "repair the public source/runtime mismatch before setup or activation",
+    }],
+  };
+}
+
+/** Read-only V3 source and runtime convergence check used by normal setup. */
+export function validateV3SourceAndRuntime(intent, rootDir = ROOT_DIR) {
+  const source = "pipeline.user.yaml";
+  const intentValidation = validatePipelineUserV3(intent, { source });
+  if (!intentValidation.ok) return { ok: false, reason: "invalid-v3-source", diagnostics: intentValidation.errors };
+  let projection;
+  try {
+    projection = planRuntimeProjectionV3(intent, { source, baselines: readRuntimeProjectionV3Baselines(rootDir) });
+  } catch (error) {
+    return { ok: false, reason: "v3-runtime-unreadable", diagnostics: [{ path: "$.runtime", code: "baseline_read", message: error.message }] };
+  }
+  if (projection.status !== "ready") return { ok: false, reason: "invalid-v3-runtime", diagnostics: projection.diagnostics ?? [] };
+  const staleTargets = projection.targets.filter((target) => target.changed).map((target) => target.path);
+  if (staleTargets.length > 0) {
+    return { ok: false, reason: "v3-runtime-drift", diagnostics: staleTargets.map((path) => ({
+      path,
+      code: "runtime_projection_drift",
+      message: "the declared V3 runtime projection is not current",
+      repair: "run the explicit V3 runner-profile migration apply command with activation",
+    })) };
+  }
+  const manifestReadback = validateV3ManifestReadback(rootDir);
+  if (!manifestReadback.ok) return manifestReadback;
+  return { ok: true, diagnostics: [] };
+}
+
+/** Patch only the optional public-safe V3 consent block. */
+export function renderAdvisorExportConsent(sourceBytes, consent) {
+  if (!["approved", "declined"].includes(consent)) throw new Error("advisor export consent must be approved or declined");
+  const parsed = parseYaml(sourceBytes);
+  const before = validatePipelineUserV3(parsed, { source: "pipeline.user.yaml" });
+  if (!before.ok) throw new Error("pipeline.user.yaml must be valid pipeline.user.v3 before advisor export consent can change");
+  const eol = sourceBytes.includes("\r\n") ? "\r\n" : "\n";
+  const rendered = `advisor_export:${eol}  consent: ${JSON.stringify(consent)}${eol}`;
+  const lines = sourceBytes.split(/(?<=\n)/u);
+  let offset = 0;
+  const blocks = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index].replace(/[\r\n]+$/u, "");
+    if (!/^advisor_export:\s*(?:#.*)?$/u.test(line)) {
+      offset += lines[index].length;
+      continue;
+    }
+    const start = offset;
+    let end = sourceBytes.length;
+    let cursor = offset + lines[index].length;
+    for (let next = index + 1; next < lines.length; next += 1) {
+      const candidate = lines[next].replace(/[\r\n]+$/u, "");
+      if (candidate.length > 0 && !candidate.startsWith(" ") && !candidate.startsWith("\t")) {
+        end = cursor;
+        break;
+      }
+      cursor += lines[next].length;
+    }
+    blocks.push({ start, end });
+    offset += lines[index].length;
+  }
+  if (blocks.length > 1) throw new Error("pipeline.user.yaml contains duplicate advisor_export blocks");
+  const updated = blocks.length === 1
+    ? `${sourceBytes.slice(0, blocks[0].start)}${rendered}${sourceBytes.slice(blocks[0].end)}`
+    : `${rendered}${sourceBytes}`;
+  const after = validatePipelineUserV3(parseYaml(updated), { source: "pipeline.user.yaml" });
+  if (!after.ok || after.advisoryExport.consent !== consent) throw new Error("advisor export consent patch did not produce valid pipeline.user.v3 authority");
+  return updated;
+}
+
+function writeAdvisorExportConsentAtomic(path, bytes) {
+  const info = lstatSync(path);
+  if (!info.isFile() || info.isSymbolicLink()) throw new Error("pipeline.user.yaml must be a regular project-local file");
+  const temporary = `${path}.advisor-export-${process.pid}-${randomUUID()}.tmp`;
+  try {
+    writeFileSync(temporary, bytes, { encoding: "utf8", flag: "wx", mode: info.mode & 0o777 });
+    const descriptor = openSync(temporary, constants.O_RDONLY);
+    try { fsyncSync(descriptor); } finally { closeSync(descriptor); }
+    renameSync(temporary, path);
+    fsyncDirectory(dirname(path));
+  } catch (error) {
+    try { if (existsSync(temporary)) unlinkSync(temporary); } catch {}
+    throw error;
+  }
+}
 
 // AGENTS.md is deliberately outside normal setup.  These constants identify only the
 // one public legacy adapter that this repository shipped; unknown files are never read
@@ -140,17 +379,19 @@ export const PIPELINE_START_AUTHORITY = Object.freeze({
 });
 export const MIGRATED_AGENTS_DIRTY_TRANSITION = Object.freeze({ additions: 9, deletions: 62 });
 
-// ---- default answers (== the committed pipeline.user.yaml template's values) -----------------
+// ---- legacy v1 default answers (migration/test compatibility only) ----------------------------
 export function buildDefaultAnswers() {
-  const routing = projectPreset("max", "claude");
+  const directRouting = projectDirectRoutingDefaults();
+  const legacyProjection = projectClaudeRouteInputs(directRouting);
   return {
+    schema: "pipeline.user.v1",
     setup: { intent: "unconfigured" },
     language: { human_facing: "en", agent_facing: "en" },
     agent_runtime: "claude-code",
-    // worktypes = THE place to route models per work method (the three session profiles:
-    // design-first/advisor/speed) -- the orchestrator's own routing. models below stays the
-    // dispatch-tier palette only (mechanic/implement/deep, plus critic's review).
-    ...routing,
+    // `routing` is the sole editable v1 source. These two values are derived
+    // compatibility projections for the still-stable Claude manifest only.
+    routing: directRouting,
+    ...legacyProjection,
     autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
     gates: { dev_plan: "blocking", push: "blocking", security: "blocking", claude_md_max_lines: 200 },
   };
@@ -287,13 +528,10 @@ export function migrateAgentsAdapter(rootDir = ROOT_DIR, deps = {}) {
   return { ok: false, status: "manual-po-gate", writes: 0 };
 }
 
-// ---- subscription-tier / autonomy presets (pure) -----------------------------------------------
+// ---- legacy-v0 migration / autonomy helpers (pure) ----------------------------------------------
 /**
- * @param {string} tier - "pro" | "max" | anything else ("api"/custom: uses the Max preset as a
- *   starting point)
- * @returns {{worktypes: object, models: object}} both preset-filled blocks -- worktypes carries
- *   the orchestrator/session-profile routing, models the dispatch-tier palette (see
- *   buildDefaultAnswers() for the shape).
+ * Legacy-v0 migration compatibility only. Interactive setup never calls this
+ * function and never asks a subscription question.
  */
 export function applyAboPreset(tier) {
   return projectPreset(tier === "pro" ? "pro" : "max", "claude");
@@ -307,20 +545,8 @@ export function applyAutonomyPreset(preset) {
 }
 
 /**
- * Resolves worktypes/models/autonomy for a (re-)run, given the raw subscription-tier and
- * autonomy-preset CLI answers plus the previously-parsed pipeline.user.yaml (or
- * buildDefaultAnswers() on a fresh install). RE-RUN SAFETY (Critic finding #2, 2026-07-10):
- * pressing Enter (empty answer, "") on EITHER question KEEPS the corresponding previous.*
- * values untouched -- a fresh preset is applied ONLY when the operator types an explicit
- * tier/preset, the deliberate override. Before this fix, promptAnswers() derived worktypes/
- * models/autonomy ONLY from applyAboPreset()/applyAutonomyPreset() and never consulted
- * `previous`, so pressing Enter through a re-run silently replaced a personalized routing
- * with the generic preset. On a fresh install `previous` already equals buildDefaultAnswers(),
- * which in turn equals applyAboPreset("max") (see the "matches buildDefaultAnswers()" test) --
- * so this is a no-op behaviour change for first-time setup.
- * @param {string} aboIn - raw (trimmed, lowercased) subscription-tier answer, "" = keep
- * @param {string} autonomyIn - raw (trimmed, lowercased) autonomy-preset answer, "" = keep
- * @param {object} previous - answersFromParsed(...) result (existing personalization or defaults)
+ * Legacy-v0 test/migration compatibility for the former subscription preset
+ * flow. New configuration and interactive setup use only v1 direct routes.
  */
 export function resolveRoutingAnswers(aboIn, autonomyIn, previous) {
   let worktypes;
@@ -362,11 +588,38 @@ export function validateHumanFacingLanguage(value) {
     : { ok: false, reason: "language.human_facing must be an explicit supported value (de or en)" };
 }
 
-/** Renders an advisor field: "off" gets quoted (a deliberate string sentinel, not a YAML
- * literal off-state -- yaml-lite has no bool coercion for it, but the quoting stays for human
- * readability/parity with the PRD's authoritative example); a model name renders bare. */
-function renderAdvisor(value) {
-  return value === "off" ? `"off"` : value;
+function renderDirectRoute(lines, indent, route) {
+  lines.push(`${indent}runner: ${route.runner}`);
+  lines.push(`${indent}selector:`);
+  lines.push(`${indent}  kind: ${route.selector.kind}`);
+  lines.push(`${indent}  value: ${route.selector.value}`);
+  lines.push(`${indent}effort: ${route.effort}`);
+  lines.push(`${indent}unavailability: ${route.unavailability}`);
+  lines.push(`${indent}evidenceRequirement: ${route.evidenceRequirement}`);
+}
+
+/** Render the single editable v1 routing authority. */
+export function renderDirectRoutingYaml(routing) {
+  const checked = validateDirectRouting(routing);
+  if (!checked.ok) throw new Error(`invalid direct routing: ${checked.errors.join(", ")}`);
+  const lines = ["routing:", "  worktypes:"];
+  for (const [profile, worktype] of Object.entries(routing.worktypes)) {
+    lines.push(`    ${profile}:`);
+    for (const phase of ["design_phase", "execution_phase", "advisor"]) {
+      const route = worktype[phase];
+      if (route === "off") lines.push(`      ${phase}: "off"`);
+      else {
+        lines.push(`      ${phase}:`);
+        renderDirectRoute(lines, "        ", route);
+      }
+    }
+  }
+  lines.push("  duties:");
+  for (const [duty, route] of Object.entries(routing.duties)) {
+    lines.push(`    ${duty}:`);
+    renderDirectRoute(lines, "      ", route);
+  }
+  return lines.join("\n");
 }
 
 // ---- pipeline.user.yaml: render + parse + validate ---------------------------------------------
@@ -389,6 +642,8 @@ export function renderUserYaml(answers) {
 # \`setup-check.mjs\` recognizes this unconfigured state. Personal coordinates and
 # credentials belong only in ignored machine-local mapping, never in Public Core.
 
+schema: ${a.schema}
+
 setup:
   intent: ${a.setup.intent}                  # unconfigured | consumer | maintainer
 
@@ -399,54 +654,12 @@ language:
 
 agent_runtime: ${a.agent_runtime}          # claude-code (full enforcement) | other (methodology only → docs/runtime-boundary.md)
 
-# setup.mjs asks your subscription tier and writes matching presets for both blocks
-# below (worktypes = orchestrator/session-profile routing, models = dispatch-tier routing):
-#   Pro:  all sonnet, effort-tiered (methodology fully usable)
-#   Max:  opus orchestrator + sonnet dispatch tiers (recommended, default below)
-#   API/custom: enter names freely (setup.mjs pre-fills with the Max preset as a starting point)
-#
-# THE place to route models per work method (= the three session profiles: design-first,
-# advisor, speed). Bugfix rule: a mini-scoped bugfix runs as \`mini\`; anything larger runs
-# as \`feature\` (QG-07 repro-first applies either way).
-worktypes:
-  design:                           # profile design-first -- features with a real design phase
-    design_phase:
-      model: ${a.worktypes.design.design_phase.model}
-      effort: ${a.worktypes.design.design_phase.effort}   # orchestrator until plan approval
-    execution_phase:
-      model: ${a.worktypes.design.execution_phase.model}
-      effort: ${a.worktypes.design.execution_phase.effort} # orchestrator after approval
-    advisor: ${renderAdvisor(a.worktypes.design.advisor)}
-  feature:                          # profile advisor -- the everyday method
-    design_phase:
-      model: ${a.worktypes.feature.design_phase.model}
-      effort: ${a.worktypes.feature.design_phase.effort}  # Opus designs; Sonnet executes below (phases differ)
-    execution_phase:
-      model: ${a.worktypes.feature.execution_phase.model}
-      effort: ${a.worktypes.feature.execution_phase.effort}
-    advisor: ${renderAdvisor(a.worktypes.feature.advisor)} # "off" | a model name (autonomous preset sets a model here)
-  mini:                             # profile speed -- mini-feature / hotfix
-    design_phase:
-      model: ${a.worktypes.mini.design_phase.model}
-      effort: ${a.worktypes.mini.design_phase.effort}
-    execution_phase:
-      model: ${a.worktypes.mini.execution_phase.model}
-      effort: ${a.worktypes.mini.execution_phase.effort}
-    advisor: ${renderAdvisor(a.worktypes.mini.advisor)}    # fixed pairing (small model orchestrates, bigger advisor watches)
-
-models:                             # dispatch tiers only (MP-27: mechanic/implement/deep, plus critic's review)
-  implement:
-    model: ${a.models.implement.model}
-    effort: ${a.models.implement.effort}
-  mechanic:
-    model: ${a.models.mechanic.model}
-    effort: ${a.models.mechanic.effort}
-  deep:
-    model: ${a.models.deep.model}
-    effort: ${a.models.deep.effort}
-  review:
-    model: ${a.models.review.model}
-    effort: ${a.models.review.effort}
+# Direct v1 route source. Every enabled duty/worktype names its runner surface,
+# selector, effort, unavailability policy and required dispatch evidence. The
+# generated Claude modelRouting and provider-neutral runnerRoutes are projections,
+# never second editable authorities. Codex Terra aliases remain unresolved until
+# a host/CLI route receipt observes a concrete model ID.
+${renderDirectRoutingYaml(a.routing)}
 
 autonomy:
   push_policy: ${a.autonomy.push_policy}                # gated | standing-approved
@@ -497,10 +710,6 @@ gates:
 #   push_policy:  standing-approved
 #   branch_model: direct-main
 #   wip_limit: 1
-#
-# worktypes:
-#   feature:
-#     advisor: opus
 # -----------------------------------------------------------------------------------------
 `;
 }
@@ -527,26 +736,26 @@ export function answersFromParsed(parsed, defaults = buildDefaultAnswers()) {
   if (!parsed || typeof parsed !== "object") return defaults;
   const d = defaults;
   const g = (obj, key, fallback) => (obj && typeof obj === "object" && obj[key] !== undefined ? obj[key] : fallback);
-  const mergeWorktype = (def, val) => ({
-    design_phase: { ...def.design_phase, ...(val?.design_phase ?? {}) },
-    execution_phase: { ...def.execution_phase, ...(val?.execution_phase ?? {}) },
-    advisor: g(val, "advisor", def.advisor),
-  });
+  // v0 had separate editable worktypes/models. Convert it once in memory to
+  // the v1 sole source; setup validates the complete rendered v1 before any
+  // source/runtime write. A v1 document remains structurally intact here so a
+  // malformed source cannot be silently repaired by defaults.
+  const routing = parsed.schema === "pipeline.user.v1" && parsed.routing && typeof parsed.routing === "object"
+    ? parsed.routing
+    : migrateLegacyRouting(parsed.worktypes, parsed.models);
+  let legacyProjection;
+  try {
+    legacyProjection = projectClaudeRouteInputs(routing);
+  } catch {
+    legacyProjection = { worktypes: d.worktypes, models: d.models };
+  }
   return {
+    schema: "pipeline.user.v1",
     setup: { ...d.setup, ...(parsed.setup && typeof parsed.setup === "object" ? parsed.setup : {}) },
     language: { ...d.language, ...(parsed.language && typeof parsed.language === "object" ? parsed.language : {}) },
     agent_runtime: g(parsed, "agent_runtime", d.agent_runtime),
-    worktypes: {
-      design: mergeWorktype(d.worktypes.design, parsed.worktypes?.design),
-      feature: mergeWorktype(d.worktypes.feature, parsed.worktypes?.feature),
-      mini: mergeWorktype(d.worktypes.mini, parsed.worktypes?.mini),
-    },
-    models: {
-      implement: { ...d.models.implement, ...(parsed.models?.implement ?? {}) },
-      mechanic: { ...d.models.mechanic, ...(parsed.models?.mechanic ?? {}) },
-      deep: { ...d.models.deep, ...(parsed.models?.deep ?? {}) },
-      review: { ...d.models.review, ...(parsed.models?.review ?? {}) },
-    },
+    routing,
+    ...legacyProjection,
     autonomy: { ...d.autonomy, ...(parsed.autonomy ?? {}) },
     gates: { ...d.gates, ...(parsed.gates ?? {}) },
     // release: OPTIONAL passthrough only (ADR-0033/0034) -- no default, no merge-over-defaults
@@ -618,7 +827,7 @@ export function compileSettingsJson(existing, answers, sourceHash) {
             : {}),
           extraKnownMarketplaces: {
             "agent-pipeline": {
-              source: { source: "github", repo: "agent-pipeline/agent-pipeline" },
+              source: { source: "github", repo: "agent-pipe-shared/agent-pipeline" },
             },
           },
           enabledPlugins: { "pipeline-core@agent-pipeline": true },
@@ -630,7 +839,7 @@ export function compileSettingsJson(existing, answers, sourceHash) {
       ? { ...base.extraKnownMarketplaces }
       : {};
   marketplaces["agent-pipeline"] = {
-    source: { source: "github", repo: "agent-pipeline/agent-pipeline" },
+    source: { source: "github", repo: "agent-pipe-shared/agent-pipeline" },
   };
   base.extraKnownMarketplaces = marketplaces;
   base.$generated = generatedMarker(sourceHash);
@@ -717,6 +926,38 @@ export function renderModelRoutingYaml(worktypes, models) {
   return lines.join("\n");
 }
 
+/** Render both runtime projections from the one v1 direct-routing source. */
+export function renderDirectRoutingProjectionsYaml(routing) {
+  const claudeRouting = projectClaudeManifestRouting(routing);
+  const runnerRoutes = projectRunnerRoutes(routing);
+  const lines = [
+    "modelRouting:",
+    `  # Generated Claude compatibility projection: ${routingProvenance("claude")} source=pipeline.user.yaml routing.v1.`,
+    "  # Do not edit this block as an independent routing authority.",
+  ];
+  for (const [role, assignment] of Object.entries(claudeRouting)) {
+    lines.push(`  ${role}:`);
+    lines.push(`    model: ${assignment.model}`);
+    lines.push(`    effort: ${assignment.effort}`);
+  }
+  lines.push("", "runnerRoutes:");
+  lines.push(`  # Generated provider-neutral projection: ${routingProvenance("codex")} source=pipeline.user.yaml routing.v1.`);
+  lines.push("  # Alias resolution is not provider/model attestation; only a valid route receipt can attest it.");
+  for (const [name, route] of Object.entries(runnerRoutes)) {
+    lines.push(`  ${name}:`);
+    lines.push(`    runner: ${route.runner}`);
+    lines.push("    selector:");
+    lines.push(`      kind: ${route.selector.kind}`);
+    lines.push(`      value: ${route.selector.value}`);
+    lines.push(`    effort: ${route.effort}`);
+    lines.push(`    unavailability: ${route.unavailability}`);
+    lines.push(`    evidenceRequirement: ${route.evidenceRequirement}`);
+    lines.push(`    resolutionStatus: ${route.resolutionStatus}`);
+    if (typeof route.resolutionEvidence === "string") lines.push(`    resolutionEvidence: ${route.resolutionEvidence}`);
+  }
+  return lines.join("\n");
+}
+
 export function renderPipelineYaml(answers, sourceHash) {
   const pushApproval = answers.autonomy.push_policy === "standing-approved" ? "standing-approved" : "required";
   const base = `# pipeline.yaml -- declarative pipeline manifest (.claude/pipeline.yaml, schema pipeline.manifest.v0).
@@ -728,6 +969,9 @@ schema: pipeline.manifest.v0
 
 language:
   human_facing: ${answers.language.human_facing}
+
+session:
+  keep_awake: ${answers.session?.keep_awake === true ? "true" : "false"}
 
 phases:
   - name: design
@@ -762,7 +1006,7 @@ security:
       enabled: true
       rules_dir: governance/examples/policies/semgrep
 
-${renderModelRoutingYaml(answers.worktypes, answers.models)}
+${renderDirectRoutingProjectionsYaml(answers.routing)}
 
 profiles:
   active: full-sdlc
@@ -823,9 +1067,20 @@ export function validatePoFacingLanguageProjection(userYamlText, runtimeYamlText
   } catch (error) {
     return { ok: false, reason: `unreadable PO-language projection: ${error.message}` };
   }
-  const schema = JSON.parse(readFileSync(USER_SCHEMA_PATH, "utf8"));
-  const sourceShape = validateAgainstSchema(source, schema);
-  if (!sourceShape.valid) return { ok: false, reason: "pipeline.user.yaml is invalid; correct it before PO-facing authoring" };
+  if (source.schema === "pipeline.user.v3") {
+    const v3 = validateV3SourceAndRuntime(source, rootDir);
+    if (!v3.ok) return { ok: false, reason: "pipeline.user.v3 or its declared runtime projection is invalid; run the explicit V3 migration/apply workflow before PO-facing authoring" };
+  } else if (source.schema === "pipeline.user.v2") {
+    const v2 = validateV2SourceAndRuntime(source, rootDir);
+    if (!v2.ok) return { ok: false, reason: "pipeline.user.v2 or its declared runtime projection is invalid; run the explicit v2 migration/apply workflow before PO-facing authoring" };
+  } else {
+    const schema = JSON.parse(readFileSync(USER_SCHEMA_PATH, "utf8"));
+    const sourceShape = validateAgainstSchema(source, schema);
+    if (!sourceShape.valid) return { ok: false, reason: "pipeline.user.yaml is invalid; correct it before PO-facing authoring" };
+    if (!validateDirectRouting(source.routing).ok) {
+      return { ok: false, reason: "pipeline.user.yaml direct routing is invalid; correct it before PO-facing authoring" };
+    }
+  }
   const sourceLanguage = validateHumanFacingLanguage(source.language?.human_facing);
   if (!sourceLanguage.ok) return sourceLanguage;
   const runtimeValidation = validateCompiledPipelineYaml(runtimeYamlText, rootDir);
@@ -836,6 +1091,100 @@ export function validatePoFacingLanguageProjection(userYamlText, runtimeYamlText
     return { ok: false, reason: "compiled runtime language disagrees with validated pipeline.user.yaml; re-run setup before PO-facing authoring" };
   }
   return { ok: true, value: runtimeLanguage.value };
+}
+
+function ensurePhysicalPrivateDirectory(commonDir, relativeDirectory) {
+  let cursor = realpathSync(commonDir);
+  for (const component of relativeDirectory.split(/[\\/]/u).filter(Boolean)) {
+    cursor = join(cursor, component);
+    if (!existsSync(cursor)) mkdirSync(cursor, { mode: 0o700 });
+    const info = lstatSync(cursor);
+    if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(cursor) !== cursor) {
+      throw new Error("unsafe local receipt directory");
+    }
+  }
+  return cursor;
+}
+
+function fsyncDirectory(path) {
+  const descriptor = openSync(path, constants.O_RDONLY);
+  try { fsyncSync(descriptor); } finally { closeSync(descriptor); }
+}
+
+/**
+ * Publish the repository-local profile authority after source/runtime validation.
+ * The operation never copies a profile into another worktree and never returns an
+ * absolute machine path as evidence.
+ */
+export function publishPoGateProfileReceipt({
+  rootDir,
+  userYamlText,
+  runtimeYamlText,
+  updatedAt = new Date().toISOString(),
+}, deps = {}) {
+  const projection = validatePoGateLanguageProjection(userYamlText, runtimeYamlText);
+  if (!projection.ok) return { ok: false, code: "PO-PROFILE-PROJECTION-INVALID", reason: projection.reason };
+
+  let topology;
+  try {
+    topology = deps.topology ?? resolvePoGateRepositoryTopology(rootDir, deps);
+  } catch {
+    return { ok: false, code: "PO-PROFILE-TOPOLOGY-INVALID", reason: "repository topology is unavailable" };
+  }
+  if (realpathSync(rootDir) !== topology.primaryRoot || topology.repoRoot !== topology.primaryRoot) {
+    return { ok: false, code: "PO-PROFILE-NOT-PRIMARY", reason: "sanctioned setup must run from the canonical primary checkout" };
+  }
+
+  let temporary = null;
+  let published = false;
+  try {
+    const receipt = createPoGateProfileReceipt({
+      repositoryFingerprint: derivePoGateRepositoryFingerprint({
+        gitCommonDir: topology.gitCommonDir,
+        primaryRoot: topology.primaryRoot,
+      }),
+      primaryRoot: topology.primaryRoot,
+      sourceBytes: userYamlText,
+      runtimeBytes: runtimeYamlText,
+      updatedAt,
+    });
+    const target = poGateProfileReceiptPath(topology.gitCommonDir);
+    const relativeParent = dirname(PO_GATE_PROFILE_RECEIPT_RELATIVE_PATH).split(sep).join("/");
+    const parent = ensurePhysicalPrivateDirectory(topology.gitCommonDir, relativeParent);
+    if (relative(topology.gitCommonDir, parent).startsWith("..")) throw new Error("receipt parent escaped Git common directory");
+    if (existsSync(target)) {
+      const current = lstatSync(target);
+      if (!current.isFile() || current.isSymbolicLink() || realpathSync(target) !== target) throw new Error("unsafe receipt target");
+    }
+    temporary = join(parent, `.profile-receipt.${process.pid}.${randomUUID()}.tmp`);
+    const serializedReceipt = serializePoGateProfileReceipt(receipt);
+    const descriptor = openSync(temporary, constants.O_WRONLY | constants.O_CREAT | constants.O_EXCL, 0o600);
+    try {
+      writeFileSync(descriptor, serializedReceipt);
+      fsyncSync(descriptor);
+    } finally {
+      closeSync(descriptor);
+    }
+    chmodSync(temporary, 0o600);
+    renameSync(temporary, target);
+    temporary = null;
+    published = true;
+    fsyncDirectory(parent);
+    return {
+      ok: true,
+      code: "PO-PROFILE-RECEIPT-PUBLISHED",
+      humanFacing: receipt.humanFacing,
+      receiptSha256: createHash("sha256").update(serializedReceipt).digest("hex"),
+    };
+  } catch {
+    if (temporary !== null && existsSync(temporary)) {
+      try { unlinkSync(temporary); } catch { /* best-effort cleanup of an unpublished temp */ }
+    }
+    if (published) {
+      return { ok: false, code: "PO-PROFILE-RECEIPT-DURABILITY-UNKNOWN", reason: "the atomic receipt rename succeeded but directory durability could not be confirmed" };
+    }
+    return { ok: false, code: "PO-PROFILE-RECEIPT-WRITE-FAILED", reason: "the common profile receipt could not be published atomically" };
+  }
 }
 
 // ---- private overlay lock preflight -------------------------------------------------------------
@@ -946,6 +1295,33 @@ async function applyCompileDecision({ label, path, existingState, wantedText, so
   return { wrote: false, decision };
 }
 
+async function promptDirectRouting(rl, previous) {
+  const edit = (await rl.question("Edit direct role/worktype routes now? [y/N] ")).trim().toLowerCase();
+  const routing = structuredClone(previous);
+  if (!['y', 'yes', 'j', 'ja'].includes(edit)) return routing;
+  const routes = [];
+  for (const [profile, worktype] of Object.entries(routing.worktypes)) {
+    for (const phase of ["design_phase", "execution_phase", "advisor"]) {
+      if (worktype[phase] !== "off") routes.push([`worktype ${profile}/${phase}`, worktype, phase]);
+    }
+  }
+  for (const [duty, route] of Object.entries(routing.duties)) routes.push([`duty ${duty}`, routing.duties, duty]);
+  for (const [label, parent, key] of routes) {
+    const route = parent[key];
+    const kind = (await rl.question(`${label} selector kind [alias/model-id] (${route.selector.kind}): `)).trim();
+    const value = (await rl.question(`${label} selector value (${route.selector.value}): `)).trim();
+    const effort = (await rl.question(`${label} effort [low/medium/high/xhigh/max] (${route.effort}): `)).trim();
+    const unavailability = (await rl.question(`${label} when unavailable [defer/mapped-fallback] (${route.unavailability}): `)).trim();
+    parent[key] = {
+      ...route,
+      selector: { kind: kind || route.selector.kind, value: value || route.selector.value },
+      effort: effort || route.effort,
+      unavailability: unavailability || route.unavailability,
+    };
+  }
+  return routing;
+}
+
 async function promptAnswers(rl, previous) {
   console.log("\n=== Agent-Pipeline Setup ===\n");
 
@@ -963,28 +1339,21 @@ async function promptAnswers(rl, previous) {
   const humanIn = (await rl.question(`Language -- human-facing (commits/reviews/new docs) [de/en] (${previous.language.human_facing}): `)).trim();
   const agentIn = (await rl.question(`Language -- agent-facing (roles/guardrails/skills) [de/en] (${previous.language.agent_facing}): `)).trim();
 
-  const aboIn = (
-    await rl.question(
-      `Subscription tier -- press Enter to KEEP your current worktypes/models routing, or type pro/max/api to re-pick a preset (overwrites routing): `,
-    )
-  ).trim().toLowerCase();
-  if (aboIn !== "" && aboIn !== "pro" && aboIn !== "max") {
-    console.log(
-      "  API/custom chosen: models pre-filled with the Max preset -- enter your own model names/effort values directly in pipeline.user.yaml and re-run `node setup.mjs` afterwards.",
-    );
-  }
-
   const autonomyIn = (
     await rl.question(
       `Autonomy preset -- press Enter to KEEP your current autonomy setting, or type conservative/autonomous to re-pick a preset (overwrites it): `,
     )
   ).trim().toLowerCase();
-  const { worktypes, models, autonomy } = resolveRoutingAnswers(aboIn, autonomyIn, previous);
+  const routing = await promptDirectRouting(rl, previous.routing);
+  const { worktypes, models } = projectClaudeRouteInputs(routing);
+  const autonomy = autonomyIn === "" ? previous.autonomy : applyAutonomyPreset(autonomyIn);
 
   return {
+    schema: "pipeline.user.v1",
     setup: { intent },
     language: { human_facing: humanIn ? normalizeLang(humanIn) : previous.language.human_facing, agent_facing: agentIn ? normalizeLang(agentIn) : previous.language.agent_facing },
     agent_runtime,
+    routing,
     worktypes,
     models,
     autonomy,
@@ -1027,25 +1396,37 @@ export function parseArgv(argv) {
     help: argv.includes("--help") || argv.includes("-h"),
     force: argv.includes("--force") || argv.includes("--yes"),
     migrateAgentsAdapter: argv.includes("--migrate-agents-adapter"),
+    publishPoProfile: argv.includes("--publish-po-profile"),
+    configureAdvisorExport: argv.includes("--configure-advisor-export"),
   };
 }
 
 export async function run(argv = process.argv.slice(2), deps = {}) {
   const rootDir = deps.rootDir ?? ROOT_DIR;
-  const renderPipelineYamlFn = deps.renderPipelineYamlFn ?? renderPipelineYaml;
   const userYamlPath = join(rootDir, "pipeline.user.yaml");
-  const settingsJsonPath = join(rootDir, ".claude", "settings.json");
-  const pipelineJsonPath = join(rootDir, ".claude", "pipeline.json");
-  const pipelineYamlPath = join(rootDir, ".claude", "pipeline.yaml");
   const opts = parseArgv(argv);
   if (opts.help) {
     console.log(
-      "Usage: node setup.mjs [--defaults] [--force|--yes] [--migrate-agents-adapter] [--help]\n  (no flags)     interactive setup\n  --defaults     non-interactive: conservative defaults, no prompts (test/CI)\n  --force/--yes  skip the hand-edit-drift confirmation (interactive) or allow the\n                 otherwise-refused overwrite (non-interactive) -- always warns loudly first\n  --migrate-agents-adapter  explicit, optional migration of the one recognized public legacy adapter\n  --help         this text",
+      `Usage: node setup.mjs [--defaults] [--configure-advisor-export] [--publish-po-profile] [--migrate-agents-adapter] [--help]
+  (no flags)     verify the current pipeline.user.v3 and V3-owned projections
+  --defaults     same read-only V3 verification for CI/automation
+  --configure-advisor-export
+                 show the repository export disclosure, ask with default decline,
+                 and atomically record approved/declined in pipeline.user.yaml
+  --publish-po-profile  publish only the canonical primary PO-language receipt;
+                 no runner/profile migration or runtime rewrite
+  --migrate-agents-adapter  explicit, optional migration of the one recognized public legacy adapter
+  --help         this text
+
+Legacy v0/v1/v2 sources are never compiled. Review and activate their one-way V3 migration with:
+  ${RUNNER_PROFILE_V3_MIGRATION_COMMAND} inspect --root "$PWD"
+  ${RUNNER_PROFILE_V3_MIGRATION_COMMAND} plan --root "$PWD"
+  ${RUNNER_PROFILE_V3_MIGRATION_COMMAND} apply --root "$PWD" --activate`,
     );
     return 0;
   }
   if (opts.migrateAgentsAdapter) {
-    if (opts.defaults || opts.force || argv.length !== 1) {
+    if (opts.defaults || opts.force || opts.publishPoProfile || opts.configureAdvisorExport || argv.length !== 1) {
       console.error("setup.mjs: --migrate-agents-adapter is a standalone explicit command; no files were written.");
       return 1;
     }
@@ -1053,14 +1434,111 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
     console.log(`AGENTS adapter migration: ${result.status}.`);
     return result.ok ? 0 : 2;
   }
+  if (opts.publishPoProfile) {
+    if (opts.defaults || opts.force || opts.configureAdvisorExport || argv.length !== 1) {
+      console.error("setup.mjs: --publish-po-profile is a standalone explicit command; no profile or route was written.");
+      return 1;
+    }
+    let userYamlText;
+    let runtimeYamlText;
+    try {
+      userYamlText = readFileSync(userYamlPath, "utf8");
+      runtimeYamlText = readFileSync(join(rootDir, ".claude", "pipeline.yaml"), "utf8");
+    } catch {
+      console.error("setup.mjs: canonical primary PO-language source/runtime is unreadable; no receipt was written.");
+      return 2;
+    }
+    const publish = (deps.publishPoGateProfileReceipt ?? publishPoGateProfileReceipt)({
+      rootDir,
+      userYamlText,
+      runtimeYamlText,
+      updatedAt: (deps.now ?? (() => new Date().toISOString()))(),
+    }, deps);
+    if (!publish.ok) {
+      console.error(`setup.mjs: ${publish.code} (${publish.reason}); no profile, route or PRD was copied or rewritten.`);
+      return 2;
+    }
+    console.log(`Repository-scoped PO profile receipt published for language ${publish.humanFacing}.`);
+    return 0;
+  }
+  if (opts.force) {
+    console.error("setup.mjs: --force/--yes cannot authorize a V3 authority write; use the explicit V3 apply --activate workflow.");
+    return 2;
+  }
 
-  const defaults = buildDefaultAnswers();
   const { raw: existingUserYamlRaw, parsed: existingUserYamlParsed } = loadUserYamlSafe(userYamlPath);
+  const hasV3Source = existingUserYamlRaw !== null && existingUserYamlParsed?.schema === "pipeline.user.v3";
+  const needsV1Migration = existingUserYamlRaw !== null && existingUserYamlParsed?.schema !== "pipeline.user.v1";
+  if (!hasV3Source) {
+    console.error(v3MigrationRequiredMessage(existingUserYamlParsed?.schema));
+    return 2;
+  }
+  if (opts.configureAdvisorExport) {
+    if (opts.defaults || opts.force || argv.length !== 1) {
+      console.error("setup.mjs: --configure-advisor-export is a standalone explicit command; no files were written.");
+      return 1;
+    }
+    const validateV3 = deps.validateV3SourceAndRuntime ?? validateV3SourceAndRuntime;
+    const v3 = validateV3(existingUserYamlParsed, rootDir);
+    if (!v3.ok) {
+      console.error(`setup.mjs: pipeline.user.v3 is not ready (${v3.reason}); advisor export consent was not changed.`);
+      return 1;
+    }
+    console.log(ADVISOR_EXPORT_DISCLOSURE);
+    let answer = deps.advisorExportConsentAnswer;
+    if (answer === undefined) {
+      const rl = createInterface({ input: process.stdin, output: process.stdout });
+      try { answer = await rl.question("Approve advisor export for this repository? [y/N] "); }
+      finally { rl.close(); }
+    }
+    const normalized = String(answer ?? "").trim().toLowerCase();
+    const consent = ["y", "yes", "j", "ja", "approved"].includes(normalized) ? "approved" : "declined";
+    try {
+      const updated = renderAdvisorExportConsent(existingUserYamlRaw, consent);
+      (deps.writeAdvisorExportConsentAtomic ?? writeAdvisorExportConsentAtomic)(userYamlPath, updated);
+    } catch (error) {
+      console.error(`setup.mjs: advisor export consent was not recorded (${error.message}).`);
+      return 1;
+    }
+    console.log(`Advisor export consent recorded as ${consent}.`);
+    return 0;
+  }
   if (existingUserYamlRaw !== null) {
     const sourceLanguage = validateHumanFacingLanguage(existingUserYamlParsed?.language?.human_facing);
     if (!sourceLanguage.ok) {
       console.error(`setup.mjs: ${sourceLanguage.reason}; correct pipeline.user.yaml before compiling.`);
       return 1;
+    }
+    const validateV3 = deps.validateV3SourceAndRuntime ?? validateV3SourceAndRuntime;
+    const v3 = validateV3(existingUserYamlParsed, rootDir);
+    if (!v3.ok) {
+      console.error(`setup.mjs: pipeline.user.v3 is not ready (${v3.reason}); no files were written.`);
+      for (const diagnostic of v3.diagnostics) console.error(`  ${diagnostic.path}: ${diagnostic.message}`);
+      return 1;
+    }
+    console.log("pipeline.user.v3 and its runner-neutral advisory runtime projections are current; setup performed no writes.");
+    const advisorExport = validatePipelineUserV3(existingUserYamlParsed, { source: "pipeline.user.yaml" }).advisoryExport;
+    if (!advisorExport.enabled) {
+      console.log(`Advisory is disabled: advisor export consent is ${advisorExport.consent}.`);
+      console.log(`To review the disclosure and configure consent, run:\n  ${ADVISOR_EXPORT_CONFIGURATION_COMMAND}`);
+    }
+    let toolchain;
+    try {
+      toolchain = (deps.runToolchainPreflight ?? runToolchainPreflight)({ rootDir });
+    } catch (error) {
+      console.error(`setup.mjs: toolchain preflight failed (${error.message}); no tool was installed.`);
+      return 2;
+    }
+    for (const line of renderToolchainSetupReport(toolchain)) console.log(line);
+    return toolchain.exitCode;
+    if (existingUserYamlParsed?.schema === "pipeline.user.v1") {
+      const sourceSchema = JSON.parse(readFileSync(USER_SCHEMA_PATH, "utf8"));
+      const sourceShape = validateAgainstSchema(existingUserYamlParsed, sourceSchema);
+      const sourceRouting = validateDirectRouting(existingUserYamlParsed.routing);
+      if (!sourceShape.valid || !sourceRouting.ok) {
+        console.error("setup.mjs: pipeline.user.v1 is invalid; correct it before compiling. No files were written.");
+        return 1;
+      }
     }
   }
   const previous = answersFromParsed(existingUserYamlParsed, defaults);
@@ -1070,9 +1548,12 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
   if (opts.defaults) {
     // Non-interactive setup has no environment-derived inputs: it writes deterministic public
     // defaults only. Account and machine mapping is intentionally out of scope.
+    const routing = needsV1Migration ? previous.routing : defaults.routing;
     answers = {
       ...defaults,
-      setup: { intent: "consumer" },
+      routing,
+      ...projectClaudeRouteInputs(routing),
+      setup: defaults.setup,
       // release: carried over from the existing pipeline.user.yaml, if any -- `--defaults`
       // resets the five interactive answers, never a hand-edited release: section (ADR-0033/0034).
       ...(previous.release !== undefined ? { release: previous.release } : {}),
@@ -1105,10 +1586,12 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
   }
   const schema = JSON.parse(readFileSync(USER_SCHEMA_PATH, "utf8"));
   const { valid, errors } = validateAgainstSchema(parsedForValidation, schema);
-  if (!valid) {
+  const directRouting = validateDirectRouting(answers.routing);
+  if (!valid || !directRouting.ok) {
     if (rl) rl.close();
     console.error("setup.mjs: internal error -- generated pipeline.user.yaml failed schema validation:");
     for (const e of errors) console.error(`  ${e}`);
+    for (const e of directRouting.errors ?? []) console.error(`  routing: ${e}`);
     return 1;
   }
 
@@ -1140,6 +1623,7 @@ export async function run(argv = process.argv.slice(2), deps = {}) {
   }
 
   if (existingUserYamlRaw !== userYamlText) {
+    if (needsV1Migration) console.log("Migration preview: pipeline.user.v0 -> pipeline.user.v1 direct routes (Claude projection preserved; Codex aliases remain receipt-bound).");
     writeFileSync(userYamlPath, userYamlText);
     console.log("pipeline.user.yaml written.");
   } else {

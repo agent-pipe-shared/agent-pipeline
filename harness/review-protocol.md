@@ -18,8 +18,8 @@ Governing principle: **deterministic before probabilistic.** Stage 1 is machine 
 **Why:** "Reported done but not tested" is the documented main failure mode (P4).
 **Check:** The artifact was written by the script itself (file/log); model-authored prose does not qualify.
 
-**Rule (self-fix loop):** On red verify the goldfish fixes itself — max **2 failed attempts at the same problem**, then STOP + report with the failure state. Hard harness leashes: `maxTurns` in the agent frontmatter; stop-hook cap of 8 consecutive blocks.
-**Why:** Beyond two attempts the hit rate drops; a fresh context with a better briefing beats grinding on (OM §4.3, rung 1).
+**Rule (self-fix loop):** A closed-classified product failure may consume **one** automatic product retry. A matching second signature, any exhausted review/correction budget, and every unknown cause stop automatic work and create a course gate with a PO decision brief; no third automatic attempt exists. Hard harness leashes: `maxTurns` in the agent frontmatter; stop-hook cap of 8 consecutive blocks.
+**Why:** A fresh context with a better briefing beats grinding on; the decision brief makes the alternative courses explicit instead of turning a repeated error into an invisible loop (OM §4.3, rung 1).
 **Check:** The stop condition is in every briefing; the completion report names attempts and failure state.
 
 **Rule (gate honesty):** Every gate documents what it does NOT check. Gates are binary — sharp or deleted; warn-only only with an expiry date.
@@ -39,20 +39,20 @@ Evaluate all rows; the **strictest matching row wins** — a diff that superfici
 | Row | Situation | Critic | Model / Effort | Isolation |
 |---|---|---|---|---|
 | **T0** | Mechanical/deterministic diff (lockfiles, generated artifacts, pure formatting, zero semantic delta) | none — auto-pass; evidence = the generating command + the `verify` gate output | — | — |
-| **T1** | A/G/S diff — regardless of diff size and rigor level | MANDATORY | the higher-capability model | `--bare` + JSON-schema verdict MANDATORY, in addition |
-| **T2** | Risk class high | MANDATORY | the higher-capability model | read-only subagent (Elephant may still choose `--bare`) |
+| **T1** | A/G/S diff — regardless of diff size and rigor level | MANDATORY | the higher-capability model | selected runner's usable native isolation + JSON-schema-shaped verdict; if unavailable/unusable, the standing PO-authorized functional-equivalent read-only lane |
+| **T2** | Risk class high | MANDATORY | the higher-capability model | read-only subagent (Elephant may still choose runner-native isolation) |
 | **T3** | Rigor 2, standard | MANDATORY | the review-tier model FIRST — escalate to the higher-capability model ONLY on (a) a finding ≥ major, (b) an A/G/S touch discovered during review, or (c) a contested/contradictory verdict (T6). The higher-capability model is never the first pass for a non-A/G/S rigor-2 diff. | read-only subagent |
 | **T4** | Rigor 1 standard · risk class medium · rigor 0 WITH risk flag | MANDATORY, BLOCKING | the review-tier model FIRST — same cascade as T3 (escalate to the higher-capability model only on finding ≥ major / discovered A/G/S touch / contested verdict) | read-only subagent |
 | **T5** | Rigor 0 + risk class low + no risk flag | none — verify + evidence suffice (fast path) | — | — |
 | **T6** | Review-tier findings contested or contradictory | Elephant's option | a higher-capability-model second opinion | NEW fresh context — never a debate in the same context |
 
-**Non-blocking option (risk class low only):** where T3 or T4 is triggered by rigor level rather than by risk class medium/high, and the diff's risk class is low (non-A/G/S), the critic run MAY proceed non-blocking — parallel to the next package's implementation dispatch — instead of gating it; ALL findings from that run are still dispositioned before the wave closes or before push. Risk class medium or high stays blocking; high + A/G/S additionally keeps T1's higher-capability-model-mandatory + `--bare` requirement unchanged (T1 row untouched, including the documented `--bare`-suspension status quo).
+**Non-blocking option (risk class low only):** where T3 or T4 is triggered by rigor level rather than by risk class medium/high, and the diff's risk class is low (non-A/G/S), the critic run MAY proceed non-blocking — parallel to the next package's implementation dispatch — instead of gating it; ALL findings from that run are still dispositioned before the wave closes or before push. Risk class medium or high stays blocking; high + A/G/S additionally keeps T1's higher-capability-model and runner-native-isolation-or-functional-equivalent requirement unchanged.
 
 **Bundling default:** one bundled critic per delivery wave is the default; per-package critics run only when risk classes inside the wave differ from each other.
 
 Canonical trigger wording (word-identical in `docs/operating-model.md` §3.3/§4.2, ADR-0003, and ADR-0014 — on any divergence the canonical wording wins over the table above):
 
-> "Every architecture/guardrail/security diff runs with the escalated review-tier model (higher capability level) AND additionally in `--bare` isolation. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher capability level applies there only when, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
+> "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier AND with the selected runner's usable native isolation; if that isolation is technically unavailable or unusable in the current host setup, the standing PO-authorized functional equivalent is ONE fresh independently briefed, contractually read-only Critic subagent with a JSON-schema-shaped verdict and the literal assurance `functional-equivalent-read-only; OS isolation not asserted`. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher-capability tier applies there only when, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
 
 **Why staggered:** The Critic is expensive and must not decay into ceremony — a documented discipline-erosion risk; A/G/S zones are exactly where a weaker checker has correlated blind spots. Evidence for the cascade/non-blocking relaxation: the last 3 canon critics after a passed readiness check + first-pass delivery returned PASS with 0 findings; real blockers occurred only on risky live-code changes in a governed project (two blockers, one fail-open major finding). Community evidence: Meta's risk-tiered gating held quality at relaxed gates (incident rate 1/50 baseline).
 **Check:** The gate decision documents the applied row; merge requires a findings report for every mandatory trigger (OM §4.2).
@@ -68,7 +68,7 @@ Canonical trigger wording (word-identical in `docs/operating-model.md` §3.3/§4
 5. Metadata: task id, rigor level, risk class, applied trigger row + "criticality → model" (MP-07), ruleset SHA.
 
 **Never in the dispatch:** chat history, Elephant reasoning or summaries of the work, goldfish completion-report rationale, prior Critic verdicts (a fresh run must not anchor).
-**Why:** Two residual contamination channels are structurally closed: (a) CLAUDE.md/git-status autoload → `--bare` duty for A/G/S diffs; (b) Elephant framing → the Critic builds its input itself; the Elephant passes paths, never justifications.
+**Why:** Two residual contamination channels are structurally bounded: (a) A/G/S uses the selected runner's native isolation where usable, otherwise the standing functional-equivalent lane explicitly discloses its non-OS-isolated limit; (b) Elephant framing → the Critic builds its input itself; the Elephant passes paths, never justifications.
 **Check:** The dispatch text contains no prose about the solution; the Critic's bootstrap confirmation (`harness/session-bootstrap.md` §6.3); the trajectory section proves the Critic actually pulled diff/spec/evidence itself.
 
 ### 2.3 Isolation levels
@@ -76,9 +76,65 @@ Canonical trigger wording (word-identical in `docs/operating-model.md` §3.3/§4
 | Level | Mechanics | When |
 |---|---|---|
 | **Standard** | read-only subagent: tools Read/Grep/Glob + narrowly scoped Bash for `git diff`/`git log`; NO `memory`, NO write tools | all mandatory triggers except T1 |
-| **`--bare`** | separate `claude -p --bare` run with `--json-schema` verdict; skips ALL auto-discovery incl. CLAUDE.md and git status; context passed explicitly (`--append-system-prompt`, `--settings`); needs its own auth (`ANTHROPIC_API_KEY`/`apiKeyHelper`) | MANDATORY for T1 (A/G/S); optional escalation anywhere else |
+| **Runner-native** | the selected runner's strongest usable native isolation. For Claude this is the `claude -p --bare` adapter with a JSON-schema verdict; it skips auto-discovery and requires its own explicit context/auth wiring. Other runners use their own equivalent native mechanism, never a silent Claude substitution. | first choice for T1; optional escalation elsewhere |
+| **Functional equivalent** | **one** fresh independently briefed Critic subagent: no chat/history or implementer reasoning; refs-only bounded input; strict read-only/no-write/no-subdelegation instruction; fixed candidate commit and diff; higher-capability route; JSON-schema-shaped verdict; literal assurance `functional-equivalent-read-only; OS isolation not asserted`. It never asserts OS isolation or effective model identity. | T1 only when the selected runner's native isolation is technically unavailable or unusable in the current host setup, under the standing PO authorization |
 
-Accepted trade-off (ADR-0003): the standard Critic sees CLAUDE.md + git status — full input isolation exists only at `--bare` level. Headless runs record `total_cost_usd` from `--output-format json` in the telemetry line (MP-20 headless convention). **Disclosure + snapshot-ban:** the standard-stage report names the auto-injected context observed (CLAUDE.md, git-status snapshot, memory); that injected git status/commit log is NEVER used as a freshness reference — diff range and commit state come exclusively from the dispatch (§2.2), confirmed via the Critic's own `git` commands.
+**Codex native-host functional-equivalent lane:** Codex maintainer/self-application
+reviews may use the
+`criticNormal` host duty and `plugins/pipeline-core/scripts/codex-critic-host.mjs`.
+The deterministic harness prepares a no-remote checkout and hash-bound packet;
+the Elephant performs **one** native fresh-context, independently briefed
+contractual read-only dispatch with no subdelegation; the finalizer checks
+the captured result, evidence-bound liveness, source-qualified references, and
+content fingerprints for the candidate plus mandatory `private` and `shared`
+observers. Coordinator artifacts live below a private symlink-safe control
+directory; each dispatch is single-use. Public receipts contain only closed
+citations and hashes, and both PASS and FAIL emit a disposition receipt through
+a crash-recoverable exclusive publication transaction. Its
+receipt MUST say `functional-equivalent-read-only; OS isolation not asserted`
+for T1. This is the standing PO-authorized functional equivalent when Codex
+native isolation is unavailable or unusable; it creates no OS-isolation,
+effective-model-identity, or conformance claim (ADR-0035).
+The v0.3 harness requires an explicit clean full Shared ruleset checkout that
+is separate from the candidate source, at the same commit, and byte-matched to
+the executing harness/routing/schema set. It does not infer authority from an
+installed plugin cache. Review-checkout cleanup happens only after durable
+receipt publication and is not review evidence.
+
+**Phase 2.6 review economy:** round 1 at an architecture/security boundary is
+always **full**. A later round may be **delta** only when the Coordinator binds
+the exact base/head/tree, changed paths, changed-behaviour claims, an immutable
+prior receipt ID/digest, a complete hash-bound path-to-invariant map, and an
+unambiguous impact confirmation. Missing proof, an unknown path, a new trust
+boundary, or ambiguous impact falls back to full; it never silently narrows.
+There are at most four Critic rounds (the initial run plus one fresh re-Critic
+for each of at most three bundled correction commits) per package; the host
+reconciles that exact correction range before selecting either
+full or delta. A Critic receives the selected mode and affected invariant IDs,
+never prior verdict prose or findings.
+
+**Progress and recovery:** elapsed time and liveness prose are not progress.
+The host records a monotonic vector over bound tree changes, verified output,
+trace, completed tests and delivered-result bytes. The stagnation interval may
+expire only while no component advances; the maximum elapsed time remains a
+separate resource cap. A verified sandbox/process-isolation failure immediately
+closes that origin lane: there is no same-lane retry. The Coordinator may use
+the standing functional-equivalent lane exactly as specified above — one fresh,
+independently briefed Critic with `mayDelegate=false`, frozen input/authority
+bindings, fixed candidate commit/diff, and no state/authority write access. A
+second failure, an unproven environment cause, or any request for another child
+becomes a PO course gate. The assurance is
+`functional-equivalent-read-only; OS isolation not asserted`.
+
+Accepted trade-off (ADR-0003): a standard Critic can see runner-injected
+context; strong native isolation is runner-specific, and the functional
+equivalent makes its non-OS-isolated limit explicit. Claude headless runs
+record `total_cost_usd` from `--output-format json` in the telemetry line where
+that runtime exposes it (MP-20 convention). **Disclosure + snapshot-ban:** the
+standard-stage report names the auto-injected context observed (CLAUDE.md,
+git-status snapshot, memory); that injected git status/commit log is NEVER used
+as a freshness reference — diff range and commit state come exclusively from
+the dispatch (§2.2), confirmed via the Critic's own `git` commands.
 **Check:** Writable tools available to a Critic = failed bootstrap → abort (wrong agent definition loaded).
 
 ### 2.4 Findings format (transfer format 3, OM §2.4)
@@ -94,7 +150,7 @@ Mandatory report sections:
 
 - **"Deliberately not flagged"** (canonical rubric name for the read-only Critic): aspects explicitly checked and found ok — distinguishes "checked, ok" from "not looked at". ("Deliberately NOT changed" remains the rubric of writing roles.)
 - **Trajectory check:** were the claimed checks actually executed per evidence — command matches `{{VERIFY_COMMAND}}`, commit state matches the reviewed diff, exit code consistent? Verdict mandatory.
-- **No overall score.** Binary pass/fail only where the Elephant explicitly requests a verdict — the `--bare` JSON schema always requests one.
+- **No overall score.** Binary pass/fail only where the Elephant explicitly requests a verdict — every T1 runner-native or functional-equivalent schema-shaped verdict requests one.
 
 ### 2.5 Anti-overreporting
 
@@ -106,12 +162,29 @@ Mandatory report sections:
 
 ---
 
+## 2.6 Shadow metrics and check ownership
+
+P3A records a `pipeline.sdlc-efficiency-metrics.v1` shadow record for each
+gate/cycle when data is exposed. It binds the exact candidate and
+tool/runner/schema versions, and records durations, exposed usage, findings,
+change scope, gate disposition, remote recovery and rollback evidence.
+Unavailable measurements are `unknown`, never zero. These records are
+observational: they never pass, fail, skip, reopen, or otherwise alter a gate.
+
+Every mandatory check in the caller-held authoritative inventory is assigned exactly one owner: `deterministic-verify`,
+`semantic-critic`, `trajectory-critic`, or `human-risk`. The ownership map
+binds an error class and assertion fingerprint. Equal fingerprints are reported
+as exact overlaps with evidence; reporting an overlap removes no assertion,
+owner, or gate. The map's own mandatory-ID claim must reconcile exactly to that
+independent inventory; missing, duplicated, or ambiguous ownership fails the
+map's reporting validation rather than silently choosing a replacement control.
+
 ## 3. Verdict processing by the Elephant (gate decision)
 
 **Rule (validate first):** Findings that violate the skip rule or lack evidence are rejected with a short note — no debate.
 **Rule (disposition):** EVERY blocker/major finding receives exactly one disposition: **fix** (rework dispatch) · **reject with recorded justification** · **escalate to the PO**. Minor findings: fix now, file as backlog item, or reject.
 **Rule (rework):** Rework is a **NEW dispatch with fresh context and a refined briefing** — never continued work in the failed context. BEFORE any re-dispatch or model escalation, run the harness checklist (P1 / `policies/tooling-policy.md` G2): (1) briefing complete and consistent? (2) context clean? (3) tools/permissions right-sized? (4) hooks/gates wired and actually run?
-**Rule (cycle cap):** Max **2 rework cycles per task**, then the PO — mandatory, no exceptions.
+**Rule (cycle cap):** Max **3 fresh local rework cycles per task**. Open the PO course gate only when a further correction would exceed that budget (>3) — mandatory, no exceptions.
 **Rule (re-review):** After rework, the trigger table (§2.1) re-applies to the new diff; mandatory triggers → a NEW fresh Critic run. A Critic context is never reused — it would anchor on its own previous findings (same rationale as the readiness-check repetition rule, OM §3.4).
 **Rule (no dialogue):** There is never a Critic↔Goldfish dialogue; the Elephant mediates via briefings.
 **Why:** Findings without dispositions rot; unbounded rework cycles are the expensive form of grinding; a reused reviewer stops being fresh.
@@ -125,10 +198,10 @@ Model escalation inside rework follows **MP-05** (criterion 3: same task class f
 
 | Rung | Owner | Hard abort/escalation criterion |
 |---|---|---|
-| 1 | Goldfish itself | verify red: max **2 failed attempts at the same problem** → STOP + report with failure state. Harness leashes: `maxTurns` frontmatter; stop-hook cap 8 consecutive blocks |
+| 1 | Goldfish itself | one closed product cause may receive one automatic retry; a matching second signature, unknown cause or exhausted budget → course gate + PO decision brief. Harness leashes: `maxTurns` frontmatter; stop-hook cap 8 consecutive blocks |
 | 2 | Critic | delivers findings only — **no dialogue with the goldfish, no own fixes** (read-only) |
-| 3 | Elephant | dispositions every finding (fix / reject with justification / the PO); harness checklist BEFORE re-dispatch or model escalation (G2/P1); rework = fresh context + refined briefing; max **2 rework cycles per task** |
-| 4 | the PO | MANDATORY on: blockers, > 2 rework cycles, irreversible/externally visible/costly matters, spec↔reality conflict, budget overrun (criterion: `policies/model-policy.md` MP-20) |
+| 3 | Elephant | dispositions every finding (fix / reject with justification / the PO); harness checklist BEFORE re-dispatch or model escalation (G2/P1); rework = fresh local context + refined briefing; max **3 rework cycles per task**, then a PO course gate only for a further correction (>3) |
+| 4 | the PO | MANDATORY on: blockers, > 3 rework cycles, irreversible/externally visible/costly matters, spec↔reality conflict, budget overrun (criterion: `policies/model-policy.md` MP-20) |
 
 Flow diagram: `docs/operating-model.md` §4.3 (normative; this table is its operational summary).
 

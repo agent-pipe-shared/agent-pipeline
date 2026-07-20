@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.neutral-range-plan.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "sourceRepositoryFingerprint", "publicRepositoryFingerprint", "sourceBaseCommit", "sourceBaseTree",
+    "sourceCandidateCommit", "sourceCandidateTree", "publicBaseCommit", "publicBaseTree", "publicBaseCommitterEpoch",
+    "sourceDelta", "operations", "exclusions", "transformRecords", "publicBaseManifest", "resultManifest",
+    "resultManifestDigest", "exclusionReview", "exclusionReviewDigest", "author", "committer", "authorTimestamp", "committerTimestamp",
+    "message", "signed", "commitCount", "parentCommits", "plumbing", "leakagePolicyDigest", "machineDenySet",
+    "machineDenySetDigest", "allowances", "gitleaksFindings", "generatedPatchSha256", "generatedPatch",
+    "resultCommit", "resultTree", "planDigest"
+  ],
+  "properties": {
+    "schema": { "const": "pipeline.neutral-range-plan.v1" },
+    "sourceRepositoryFingerprint": { "$ref": "#/$defs/sha256" }, "publicRepositoryFingerprint": { "$ref": "#/$defs/sha256" },
+    "sourceBaseCommit": { "$ref": "#/$defs/oid" }, "sourceBaseTree": { "$ref": "#/$defs/oid" },
+    "sourceCandidateCommit": { "$ref": "#/$defs/oid" }, "sourceCandidateTree": { "$ref": "#/$defs/oid" },
+    "publicBaseCommit": { "$ref": "#/$defs/oid" }, "publicBaseTree": { "$ref": "#/$defs/oid" },
+    "publicBaseCommitterEpoch": { "type": "integer" },
+    "sourceDelta": { "type": "array", "uniqueItems": true, "items": { "type": "string" } },
+    "operations": { "$ref": "public-path-manifest.schema.json" },
+    "exclusions": { "type": "array", "items": { "$ref": "#/$defs/exclusion" } },
+    "transformRecords": { "type": "array", "maxItems": 0 },
+    "publicBaseManifest": { "$ref": "#/$defs/treeManifest" }, "resultManifest": { "$ref": "#/$defs/treeManifest" },
+    "resultManifestDigest": { "$ref": "#/$defs/sha256" },
+    "exclusionReview": { "oneOf": [{ "$ref": "neutral-exclusion-review.schema.json" }, { "type": "null" }] },
+    "exclusionReviewDigest": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+    "author": { "const": "Agent Pipeline Public <agent-pipeline-public@users.noreply.github.com>" },
+    "committer": { "const": "Agent Pipeline Public <agent-pipeline-public@users.noreply.github.com>" },
+    "authorTimestamp": { "type": "integer" }, "committerTimestamp": { "type": "integer" },
+    "message": { "const": "chore(public): synchronisiert freigegebene Artefakte\n" }, "signed": { "const": false }, "commitCount": { "const": 1 },
+    "parentCommits": { "type": "array", "minItems": 1, "maxItems": 1, "items": { "$ref": "#/$defs/oid" } },
+    "plumbing": { "$ref": "#/$defs/plumbing" },
+    "leakagePolicyDigest": { "$ref": "#/$defs/sha256" }, "machineDenySet": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "machineDenySetDigest": { "$ref": "#/$defs/sha256" },
+    "allowances": { "type": "array", "items": { "$ref": "#/$defs/allowance" } }, "gitleaksFindings": { "type": "array" },
+    "generatedPatchSha256": { "$ref": "#/$defs/sha256" }, "generatedPatch": { "type": "string" },
+    "resultCommit": { "$ref": "#/$defs/oid" }, "resultTree": { "$ref": "#/$defs/oid" }, "planDigest": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "oid": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "mode": { "enum": ["100644", "100755"] },
+    "treeEntry": { "type": "object", "additionalProperties": false, "required": ["path", "mode", "rawSha256"], "properties": { "path": { "type": "string" }, "mode": { "$ref": "#/$defs/mode" }, "rawSha256": { "$ref": "#/$defs/sha256" } } },
+    "treeManifest": { "type": "array", "items": { "$ref": "#/$defs/treeEntry" } },
+    "exclusion": { "type": "object", "additionalProperties": false, "required": ["path", "reason"], "properties": { "path": { "type": "string" }, "reason": { "type": "string", "minLength": 3, "maxLength": 240 } } },
+    "allowance": { "type": "object", "additionalProperties": false, "required": ["ruleId", "normalizedValueSha256"], "properties": { "ruleId": { "const": "url-host" }, "normalizedValueSha256": { "$ref": "#/$defs/sha256" } } },
+    "plumbing": { "type": "object", "additionalProperties": false, "required": ["commands", "shell", "privateIndex", "clearedEnvironment", "nullSystemConfig", "nullGlobalConfig", "hooksDisabled", "filtersDisabled", "signingDisabled", "editorDisabled", "pagerDisabled", "credentialHelpersDisabled", "remoteHelpersDisabled", "networkDisabled"], "properties": { "commands": { "const": [["git", "read-tree"], ["git", "hash-object", "-w", "--stdin", "--no-filters"], ["git", "update-index", "-z", "--index-info"], ["git", "write-tree"], ["git", "commit-tree"]] }, "shell": { "const": false }, "privateIndex": { "const": true }, "clearedEnvironment": { "const": true }, "nullSystemConfig": { "const": true }, "nullGlobalConfig": { "const": true }, "hooksDisabled": { "const": true }, "filtersDisabled": { "const": true }, "signingDisabled": { "const": true }, "editorDisabled": { "const": true }, "pagerDisabled": { "const": true }, "credentialHelpersDisabled": { "const": true }, "remoteHelpersDisabled": { "const": true }, "networkDisabled": { "const": true } } }
+  }
+}

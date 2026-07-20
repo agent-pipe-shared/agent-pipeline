@@ -1,0 +1,19 @@
+# Exact historical false positives: deterministic test identifiers and one
+# unsupported-key documentation sentence.  Each entry is a gitleaks finding
+# fingerprint, not a path/rule-wide suppression.
+2a70bd48a7f6e4e7a3dceceb70904ad3cc880f5d:harness/scripts/pipeline-state.test.mjs:generic-api-key:1593
+2a70bd48a7f6e4e7a3dceceb70904ad3cc880f5d:harness/scripts/pipeline-state.test.mjs:generic-api-key:1641
+ef5ab2e63b1bfc0bd8035c123a44463009ecdf47:plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:451
+ef5ab2e63b1bfc0bd8035c123a44463009ecdf47:plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:513
+ef5ab2e63b1bfc0bd8035c123a44463009ecdf47:plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:538
+1af37e77272abff3450de8318a6269a2451baca2:plugins/pipeline-core/lib/review-economy.test.mjs:generic-api-key:275
+8c86381c5eded88209ef77b9b23ba7a113f43f28:harness/scripts/pipeline-state.test.mjs:generic-api-key:960
+f06d6b57f3cd5d06e8ab3a5e5389aa4a6e5b0f26:specs/2026-07-11-plugin-scope-kanon/prd_plugin-scope-kanon.md:generic-api-key:12
+# Equivalent exact fingerprints for the current worktree scanner mode.
+plugins/pipeline-core/lib/review-economy.test.mjs:generic-api-key:278
+plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:628
+plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:690
+plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:715
+harness/scripts/pipeline-state.test.mjs:generic-api-key:1468
+harness/scripts/pipeline-state.test.mjs:generic-api-key:1593
+harness/scripts/pipeline-state.test.mjs:generic-api-key:1641

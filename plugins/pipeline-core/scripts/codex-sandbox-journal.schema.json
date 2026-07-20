@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.codex-sandbox-journal.v1",
+  "title": "Closed selected Codex sandbox recovery journal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "repoFingerprint", "selectionId", "compatibilityPath", "compatibilityBytesBase64", "compatibilitySha256", "selectionPath", "selectionBytesBase64", "selectionSha256", "executionPath", "executionBytesBase64", "executionSha256", "dutyReceiptSchema", "dutyReceiptSha256", "phase", "createdAt"],
+  "properties": {
+    "schema": { "const": "pipeline.codex-sandbox-journal.v1" },
+    "repoFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "selectionId": { "type": "string", "pattern": "^css_[a-z2-7]{25}[aeimquy4]$" },
+    "compatibilityPath": { "type": "string" },
+    "compatibilityBytesBase64": { "type": ["string", "null"] },
+    "compatibilitySha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "selectionPath": { "type": "string" },
+    "selectionBytesBase64": { "type": "string" },
+    "selectionSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "executionPath": { "type": "string" },
+    "executionBytesBase64": { "type": ["string", "null"] },
+    "executionSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "dutyReceiptSchema": { "type": ["string", "null"] },
+    "dutyReceiptSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "phase": { "enum": ["selected", "executed", "duty-bound"] },
+    "createdAt": { "type": "string", "format": "date-time" }
+  }
+}

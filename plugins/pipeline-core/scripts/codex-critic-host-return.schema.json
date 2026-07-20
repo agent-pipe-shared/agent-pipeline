@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.internal/schemas/codex-critic-host-return.schema.json",
+  "title": "Coordinator-captured Codex native-host return",
+  "type": "object",
+  "required": ["schema", "host_execution", "critic_result"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.codex-native-host-return.v1"] },
+    "host_execution": {
+      "type": "object",
+      "required": ["agent_id", "task_name", "dispatch_id", "requested_alias", "requested_effort", "resolved_model", "resolved_effort", "route_source", "may_delegate", "terminal_status", "completed_elapsed_ms", "recovery_count", "evidence_events"],
+      "additionalProperties": false,
+      "properties": {
+        "agent_id": { "type": "string" },
+        "task_name": { "type": "string" },
+        "dispatch_id": { "type": "string" },
+        "requested_alias": { "type": "string", "enum": ["fable"] },
+        "requested_effort": { "type": "string", "enum": ["xhigh"] },
+        "resolved_model": { "type": "string", "enum": ["gpt-5.6-sol"] },
+        "resolved_effort": { "type": "string", "enum": ["xhigh"] },
+        "route_source": { "type": "string", "enum": ["project-duty+coordinator"] },
+        "may_delegate": { "type": "boolean", "enum": [false] },
+        "terminal_status": { "type": "string", "enum": ["completed"] },
+        "completed_elapsed_ms": { "type": "number" },
+        "recovery_count": { "type": "number" },
+        "evidence_events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["sequence", "kind", "elapsed_ms", "evidence_text", "evidence_sha256", "progress"],
+            "additionalProperties": false,
+            "properties": {
+              "sequence": { "type": "number" },
+              "kind": { "type": "string", "enum": ["review-started", "evidence-inspected", "analysis-progress", "recovery-started", "review-completed"] },
+              "elapsed_ms": { "type": "number" },
+              "evidence_text": { "type": "string" },
+              "evidence_sha256": { "type": "string" },
+              "progress": {
+                "type": "object",
+                "required": ["boundTreeChanges", "verifiedOutputBytes", "traceBytes", "completedTestSteps", "deliveredResultBytes"],
+                "additionalProperties": false,
+                "properties": {
+                  "boundTreeChanges": { "type": "number" },
+                  "verifiedOutputBytes": { "type": "number" },
+                  "traceBytes": { "type": "number" },
+                  "completedTestSteps": { "type": "number" },
+                  "deliveredResultBytes": { "type": "number" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "critic_result": {
+      "type": "object",
+      "required": ["schema", "dispatch_id", "prepared_sha256", "nonce", "candidate_commit", "candidate_tree", "review_mode", "affected_invariant_ids", "context_disclosure", "achieved_assurance", "verdict"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "type": "string", "enum": ["pipeline.codex-critic-host-result.v1"] },
+        "dispatch_id": { "type": "string" },
+        "prepared_sha256": { "type": "string" },
+        "nonce": { "type": "string" },
+        "candidate_commit": { "type": "string" },
+        "candidate_tree": { "type": "string" },
+        "review_mode": { "type": "string", "enum": ["full", "delta"] },
+        "affected_invariant_ids": { "type": "array", "items": { "type": "string" } },
+        "context_disclosure": { "type": "array", "items": { "type": "string", "enum": ["project-instructions", "git-status", "user-settings", "host-runtime", "none"] } },
+        "achieved_assurance": {
+          "type": "string",
+          "enum": [
+            "normal-contractual-read-only; OS isolation not asserted",
+            "functional-equivalent-read-only; OS isolation not asserted"
+          ]
+        },
+        "verdict": { "type": "object" }
+      }
+    }
+  }
+}

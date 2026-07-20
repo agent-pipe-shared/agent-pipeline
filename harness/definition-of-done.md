@@ -37,8 +37,11 @@ Copy this block into the task/spec (rigor ≥ 1) or the issue/brief (rigor 0). S
 - [ ] A1 verify green: `{{VERIFY_COMMAND}}` ran the full chain format → lint → typecheck → tests → build; exit code 0
 - [ ] A2 Evidence artifact: written by the script itself (file/log), names command + commit state + exit code — never model-authored prose (reference implementation: this repo's own `{{VERIFY_COMMAND}}` = `harness/scripts/verify.mjs` writes `evidence/verify-latest.json`, schema `pipeline.verify-evidence.v0`, per `guardrails/quality-gates.md` QG-03)
 - [ ] A3 Same-command rule: stop hook, delivery, and CI run exactly `{{VERIFY_COMMAND}}` — one truth for "green"
+- [ ] A3a Lifecycle authority (rigor 1/2 when opted in): exactly one active PRD and Spec plus at most one Result; receipts and archives are non-authoritative; amendments are folded or superseded; bounded machine/human state, Backlog and Changelog retain their declared ownership domains.
+- [ ] A3b Delivery readback (when the calibration requires anonymous public push): final exact-commit Verify/privacy/security evidence, calibrated neutral range identity, dedicated SSH-account readback, approved feature-branch push and fresh fetch-back OID equality are all present. Missing capability means `blocked`, never `done`.
 - [ ] A4 Test integrity: the implementing goldfish changed no tests/checks of its own implementation
 - [ ] A5 Gate honesty: what the chain does NOT check is named next to the evidence (input for B6)
+- [ ] A6 Evidence coherence: the authoritative run graph, Result-first/State-CAS receipt, and both applicable verify artifacts agree; Mermaid and shadow metrics are projections only
 
 **B. Judgment (Critic + human)**
 - [ ] B1 Critic ran per trigger table where mandatory (`harness/review-protocol.md` §2.1); findings report present
@@ -69,7 +72,7 @@ Copy this block into the task/spec (rigor ≥ 1) or the issue/brief (rigor 0). S
 |---|---|---|
 | `done` | Every applicable A/B item green, incl. {{HUMAN_GATE}} where triggered. | Elephant (gate decision) or the PO (human gate) — never the implementing goldfish |
 | `🟡 not-human-verified` | Part A green, mandatory Critic processed — but a human verification ({{HUMAN_GATE}}: PIE run, live devices, spot check) is still pending. | Elephant, listing exactly WHAT is unverified |
-| `blocked` | A mandatory item cannot pass: verify red after the two-attempt rule, a stop condition fired, > 2 rework cycles, or a PO decision pending. | Goldfish (stop) or Elephant (gate), with reason + escalation rung (`harness/review-protocol.md` §4) |
+| `blocked` | A mandatory item cannot pass: verify red after the separate two-attempt retry rule, a stop condition fired, a correction need beyond 3 fresh local rework cycles, or a PO decision pending. | Goldfish (stop) or Elephant (gate), with reason + escalation rung (`harness/review-protocol.md` §4) |
 
 Per-check results inside reports are three-valued as well: **pass / fail / not verifiable** (`docs/operating-model.md` §2.3, report field 1).
 

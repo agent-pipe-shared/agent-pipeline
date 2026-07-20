@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.usage-route-binding.v1",
+  "title": "Usage event to accepted route-receipt binding facade",
+  "description": "Adds dispatch, native turn, registry-cell, candidate and usage-event correlation without changing pipeline.route-receipt.v1 or reusing its result and route-evidence digests.",
+  "type": "object",
+  "required": ["schema", "dispatchId", "cell", "candidateCommit", "candidateTree", "usageEventSha256"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "pipeline.usage-route-binding.v1" },
+    "dispatchId": { "type": "string", "minLength": 1 },
+    "threadId": { "type": "string", "minLength": 1 },
+    "turnId": { "type": "string", "minLength": 1 },
+    "cell": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "dutyId"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "duty" },
+            "dutyId": { "enum": ["implement", "mechanic", "deep", "test_author", "critic_normal", "critic_high_risk", "readiness"] }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "profileId", "phaseId"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "const": "profile-phase" },
+            "profileId": { "enum": ["design", "feature", "mini"] },
+            "phaseId": { "enum": ["design_phase", "execution_phase", "advisory"] }
+          }
+        }
+      ]
+    },
+    "candidateCommit": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "candidateTree": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "usageEventSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  },
+  "dependentRequired": {
+    "turnId": ["threadId"]
+  }
+}

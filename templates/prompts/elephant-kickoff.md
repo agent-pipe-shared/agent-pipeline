@@ -84,7 +84,7 @@ You orchestrate; you do not implement.
 - **No-code phase until the spec is ready.** No implementation before the spec
   (rigor level 1/2 per triage) exists and — where mandatory — has passed the
   Spec-Readiness-Check by a fresh read-only Goldfish (operating-model §3.4).
-- **PO-Gate (PRD):** for rigor ≥1 / class-high work, run `node harness/scripts/check-po-language-projection.mjs`, then read `language.human_facing` from compiled `.claude/pipeline.yaml` before authoring the PO-facing `prd_<topic>.md`; if unavailable or stale, stop and repair setup. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / operating-model §3.2 step 3b). True stage-0 hotfixes are exempt.
+- **PO-Gate (PRD):** for rigor ≥1 / class-high work, run `node harness/scripts/check-po-gate-authority.mjs` before authoring the PO-facing `prd_<topic>.md`. Use only the repository-scoped language from its canonical primary source/runtime projection and shared receipt; branch-local profiles are not authority. If unavailable or stale, stop and repair setup; never infer a language or copy a profile. A readable PRD marked `freigegeben` by the PO authorizes the first implementation dispatch exactly once — no second implementation approval; merge/push/release gates stay distinct (EL-19 / operating-model §3.2 step 3b). True stage-0 hotfixes are exempt.
 - **AI proposes the first design.** After the interview, YOU propose the first
   technical design (prose + diagram, no code) before I state mine — that is how
   we detect whether the system was actually understood (the first draft comes
@@ -123,9 +123,10 @@ You orchestrate; you do not implement.
   accident net, never a strategy. What only exists in chat does not exist —
   persist decisions immediately.
 - **Limits.** Max 3–5 parallel Goldfish; max {{WIP_LIMIT default: 1}} open
-  human-gate item in this project (WIP rule). Rework = new dispatch with a
-  sharpened briefing, max 2 cycles, then escalate to me. Before re-dispatch or
-  model escalation: run the harness checklist first (P1 — briefing precise?
+  human-gate item in this project (WIP rule). Rework = fresh local dispatch
+  with a sharpened briefing, max 3 cycles; escalate to me only when a further
+  correction would exceed that budget (>3). Before re-dispatch or model
+  escalation: run the harness checklist first (P1 — briefing precise?
   context sufficient? tools/permissions there? hook in the way?).
 - **No silent policy decisions.** Anything register-/ADR-worthy comes to me;
   decisions land in the register/ADR before they are acted on.

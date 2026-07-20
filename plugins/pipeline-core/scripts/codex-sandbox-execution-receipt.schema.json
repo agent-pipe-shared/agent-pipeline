@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.codex-sandbox-execution-receipt.v1",
+  "title": "Sanitized selected Codex sandbox execution receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "selectionId", "selectionSha256", "repoFingerprint", "duty", "dispatch", "requested", "observed", "terminal", "assurance", "dutyReceipt", "createdAt"],
+  "properties": {
+    "schema": { "const": "pipeline.codex-sandbox-execution-receipt.v1" },
+    "selectionId": { "type": "string", "pattern": "^css_[a-z2-7]{25}[aeimquy4]$" },
+    "selectionSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "repoFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "duty": { "enum": ["advisory", "readiness", "critic"] },
+    "dispatch": { "type": "object" },
+    "requested": { "type": "object", "additionalProperties": false, "required": ["runner", "model"], "properties": { "runner": { "const": "codex" }, "model": { "type": "string" } } },
+    "observed": { "type": "object", "additionalProperties": false, "required": ["cliSha256", "profileSha256", "networkEnabled", "scratchRootSha256"], "properties": { "cliSha256": { "type": ["string", "null"] }, "profileSha256": { "type": ["string", "null"] }, "networkEnabled": { "type": ["boolean", "null"] }, "scratchRootSha256": { "type": ["string", "null"] } } },
+    "terminal": { "type": "object", "additionalProperties": false, "required": ["childStarted", "exitCode", "stdioStatus", "cleanupStatus"], "properties": { "childStarted": { "type": "boolean" }, "exitCode": { "type": ["integer", "null"] }, "stdioStatus": { "enum": ["complete", "lost", "not-started"] }, "cleanupStatus": { "enum": ["complete", "pending", "not-started"] } } },
+    "assurance": { "type": "object" },
+    "dutyReceipt": { "type": "object", "additionalProperties": false, "required": ["schema", "sha256", "status"], "properties": { "schema": { "type": "string" }, "sha256": { "type": ["string", "null"] }, "status": { "enum": ["answered", "reviewed", "unavailable", "error"] } } },
+    "createdAt": { "type": "string", "format": "date-time" }
+  }
+}

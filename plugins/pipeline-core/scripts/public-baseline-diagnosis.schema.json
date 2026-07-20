@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.public-baseline-diagnosis.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "classification", "reason", "caps", "repositoryFingerprint", "remoteFingerprint", "ref", "commit", "tree", "commandDigest", "toolchainReceiptDigest", "hostCalibrationReceiptDigest", "attemptsDigest", "verifyEventsDigest", "securityArtifactDigest", "outputTailDigest", "priorEvidenceStatus", "priorSourceDigest", "failureSignature", "recordDigest"],
+  "properties": {
+    "schema": { "const": "pipeline.public-baseline-diagnosis.v1" },
+    "classification": { "enum": ["not-reproduced", "environment-confirmed", "product-confirmed", "ambiguous"] },
+    "reason": { "type": "string" },
+    "caps": { "type": "object", "additionalProperties": false, "required": ["firstStepMs", "noProgressMs", "outerMs"], "properties": { "firstStepMs": { "const": 60000 }, "noProgressMs": { "const": 180000 }, "outerMs": { "const": 900000 } } },
+    "repositoryFingerprint": { "$ref": "#/$defs/sha256" }, "remoteFingerprint": { "$ref": "#/$defs/sha256" },
+    "ref": { "type": "string", "pattern": "^refs/heads/[A-Za-z0-9._/-]+$" }, "commit": { "$ref": "#/$defs/oid" }, "tree": { "$ref": "#/$defs/oid" },
+    "commandDigest": { "$ref": "#/$defs/sha256" }, "toolchainReceiptDigest": { "$ref": "#/$defs/sha256" }, "hostCalibrationReceiptDigest": { "$ref": "#/$defs/sha256" },
+    "attemptsDigest": { "$ref": "#/$defs/sha256" }, "verifyEventsDigest": { "$ref": "#/$defs/sha256" }, "securityArtifactDigest": { "$ref": "#/$defs/nullableSha256" },
+    "outputTailDigest": { "$ref": "#/$defs/sha256" }, "priorEvidenceStatus": { "enum": ["available", "unavailable"] }, "priorSourceDigest": { "$ref": "#/$defs/sha256" },
+    "failureSignature": { "$ref": "#/$defs/nullableSha256" }, "recordDigest": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": { "oid": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "nullableSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] } }
+}

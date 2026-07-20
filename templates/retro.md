@@ -51,7 +51,7 @@ If there is an item: adopted into the Pipeline backlog as a `workflow-improvemen
 |---|---|---|
 | First-pass rate (Goldfish submissions without a rework cycle) | {{n of m}} | {{if falling: debug the harness first, P1}} |
 | Look-away (interventions needed per dispatch) | {{n of m without intervention}} | {{if rising: briefings are improving}} |
-| Total rework cycles | {{NUMBER}} | {{>2 per task = was this an escalation case?}} |
+| Total rework cycles | {{NUMBER}} | {{>3 fresh local cycles per task = was this a PO course-gate case?}} |
 | Notable events (MP-05/MP-07 escalations, cache, fallbacks) | {{SHORT_NOTE or —}} | |
 
 ## 3. Lessons → Escalation Path

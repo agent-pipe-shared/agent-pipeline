@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.sdlc-efficiency-metrics.v1",
+  "title": "Shadow-only SDLC efficiency metric",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "metricId", "cycleId", "gateId", "candidate", "timing", "usage", "finding", "change", "gate", "checkpointRecoveryUse", "versions"],
+  "properties": {
+    "schema": { "const": "pipeline.sdlc-efficiency-metrics.v1" },
+    "metricId": { "$ref": "#/$defs/id" },
+    "cycleId": { "$ref": "#/$defs/id" },
+    "gateId": { "$ref": "#/$defs/id" },
+    "candidate": {
+      "type": "object", "additionalProperties": false, "required": ["commit", "tree"],
+      "properties": { "commit": { "$ref": "#/$defs/oid" }, "tree": { "$ref": "#/$defs/oid" } }
+    },
+    "timing": {
+      "type": "object", "additionalProperties": false, "required": ["wallDurationMs", "queueDurationMs", "remoteRoundtripDurationMs"],
+      "properties": { "wallDurationMs": { "$ref": "#/$defs/measurement" }, "queueDurationMs": { "$ref": "#/$defs/measurement" }, "remoteRoundtripDurationMs": { "$ref": "#/$defs/measurement" } }
+    },
+    "usage": {
+      "type": "object", "additionalProperties": false, "required": ["inputBytes", "outputBytes", "contextBytes", "inputTokens", "outputTokens", "contextTokens"],
+      "properties": { "inputBytes": { "$ref": "#/$defs/measurement" }, "outputBytes": { "$ref": "#/$defs/measurement" }, "contextBytes": { "$ref": "#/$defs/measurement" }, "inputTokens": { "$ref": "#/$defs/measurement" }, "outputTokens": { "$ref": "#/$defs/measurement" }, "contextTokens": { "$ref": "#/$defs/measurement" } }
+    },
+    "finding": {
+      "type": "object", "additionalProperties": false, "required": ["findingId", "novelty", "severity", "errorClass"],
+      "properties": {
+        "findingId": { "anyOf": [{ "$ref": "#/$defs/id" }, { "const": "unknown" }] },
+        "novelty": { "enum": ["novel", "recurring", "none", "unknown"] },
+        "severity": { "enum": ["blocker", "high", "major", "minor", "none", "unknown"] },
+        "errorClass": { "anyOf": [{ "$ref": "#/$defs/id" }, { "const": "none" }, { "const": "unknown" }] }
+      }
+    },
+    "change": {
+      "type": "object", "additionalProperties": false, "required": ["changedPathCount", "affectedInvariantIds"],
+      "properties": { "changedPathCount": { "$ref": "#/$defs/measurement" }, "affectedInvariantIds": { "anyOf": [{ "type": "array", "maxItems": 256, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }, { "const": "unknown" }] } }
+    },
+    "gate": {
+      "type": "object", "additionalProperties": false, "required": ["mode", "outcome", "reworkDisposition", "reopened", "rollbackDisposition"],
+      "properties": {
+        "mode": { "enum": ["full", "delta", "stage-verify", "final-verify", "semantic-critic", "trajectory-critic", "course", "failover", "unknown"] },
+        "outcome": { "enum": ["passed", "failed", "blocked", "skipped", "unknown"] },
+        "reworkDisposition": { "enum": ["none", "rework", "reopen", "defer", "unknown"] },
+        "reopened": { "type": ["boolean", "string"], "enum": [true, false, "unknown"] },
+        "rollbackDisposition": { "enum": ["none", "rolled-back", "rollback-pending", "not-applicable", "unknown"] }
+      }
+    },
+    "checkpointRecoveryUse": { "type": ["boolean", "string"], "enum": [true, false, "unknown"] },
+    "versions": {
+      "type": "object", "additionalProperties": false, "required": ["toolVersion", "runnerVersion", "schemaVersion"],
+      "properties": { "toolVersion": { "$ref": "#/$defs/version" }, "runnerVersion": { "$ref": "#/$defs/version" }, "schemaVersion": { "$ref": "#/$defs/version" } }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "oid": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+    "measurement": { "anyOf": [{ "type": "integer", "minimum": 0, "maximum": 9007199254740991 }, { "const": "unknown" }] },
+    "version": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]{0,127}$" }
+  }
+}

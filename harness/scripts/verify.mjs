@@ -45,6 +45,8 @@ import { fileURLToPath } from "node:url";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, "..", "..");
+const phase26Result = process.env.PIPELINE_PHASE26_RESULT ?? null;
+const phase3Result = process.env.PIPELINE_PHASE3_RESULT ?? null;
 const hooksDir = join(repoRoot, "plugins", "pipeline-core", "hooks");
 
 const libDir = join(repoRoot, "plugins", "pipeline-core", "lib");
@@ -54,14 +56,25 @@ const TEST_SUITES = [
   { name: "setup-tests", file: join(repoRoot, "setup.test.mjs") },
   { name: "routing-projection-tests", file: join(pluginScriptsDir, "check-routing-projections.test.mjs") },
   { name: "routing-projection-check", file: join(pluginScriptsDir, "check-routing-projections.mjs") },
+  { name: "route-receipt-tests", file: join(libDir, "route-receipt.test.mjs") },
+  { name: "artifact-lifecycle-tests", file: join(pluginScriptsDir, "check-artifact-lifecycle.test.mjs") },
+  { name: "artifact-lifecycle-check", file: join(pluginScriptsDir, "check-artifact-lifecycle.mjs") },
+  { name: "state-budget-tests", file: join(pluginScriptsDir, "check-state-budgets.test.mjs") },
+  { name: "state-budget-check", file: join(pluginScriptsDir, "check-state-budgets.mjs") },
   { name: "repository-freshness-tests", file: join(pluginScriptsDir, "repository-freshness.test.mjs") },
+  { name: "ruleset-freshness-tests", file: join(pluginScriptsDir, "ruleset-freshness.test.mjs") },
+  { name: "bootstrap-env-check-tests", file: join(pluginScriptsDir, "bootstrap-env-check.test.mjs") },
   { name: "critic-bare-tests", file: join(pluginScriptsDir, "critic-bare.test.mjs") },
-  { name: "codex-critic-isolation-tests", file: join(pluginScriptsDir, "codex-critic-isolation.test.mjs") },
-  { name: "codex-critic-isolation-cli-tests", file: join(pluginScriptsDir, "run-codex-critic-isolation.test.mjs") },
-  { name: "codex-critic-probe-split-tests", file: join(pluginScriptsDir, "codex-critic-probe-split.test.mjs") },
-  { name: "codex-critic-probe-split-cli-tests", file: join(pluginScriptsDir, "run-codex-critic-probe-split.test.mjs") },
-  { name: "codex-isolation-control-decomposition-tests", file: join(pluginScriptsDir, "codex-isolation-control-decomposition.test.mjs") },
-  { name: "codex-isolation-control-decomposition-cli-tests", file: join(pluginScriptsDir, "run-codex-isolation-control-decomposition.test.mjs") },
+  { name: "codex-critic-host-tests", file: join(pluginScriptsDir, "codex-critic-host.test.mjs") },
+  { name: "claude-critic-host-tests", file: join(pluginScriptsDir, "critic-claude-host.test.mjs") },
+  { name: "continuity-host-adapter-tests", file: join(libDir, "continuity-host-adapter.test.mjs") },
+  { name: "continuity-state-tests", file: join(libDir, "continuity-state.test.mjs") },
+  { name: "main-session-route-tests", file: join(libDir, "main-session-route.test.mjs") },
+  { name: "session-power-core-tests", file: join(libDir, "session-power.test.mjs") },
+  { name: "session-power-controller-tests", file: join(pluginScriptsDir, "session-power-controller.test.mjs") },
+  { name: "session-power-cli-tests", file: join(pluginScriptsDir, "session-power.test.mjs") },
+  { name: "session-cleanup-power-tests", file: join(pluginScriptsDir, "session-cleanup-power.test.mjs") },
+  { name: "review-economy-tests", file: join(libDir, "review-economy.test.mjs") },
   { name: "guard-git-tests", file: join(hooksDir, "guard-git.test.mjs") },
   { name: "guard-testpath-tests", file: join(hooksDir, "guard-testpath.test.mjs") },
   { name: "staleness-check-tests", file: join(hooksDir, "staleness-check.test.mjs") },
@@ -73,6 +86,32 @@ const TEST_SUITES = [
   { name: "statusline-context-tests", file: join(pluginScriptsDir, "statusline-context.test.mjs") },
   { name: "yaml-lite-tests", file: join(libDir, "yaml-lite.test.mjs") },
   { name: "schema-lite-tests", file: join(libDir, "schema-lite.test.mjs") },
+  { name: "runner-profiles-v2-tests", file: join(libDir, "runner-profiles-v2.test.mjs") },
+  { name: "runtime-projection-v2-tests", file: join(libDir, "runtime-projection-v2.test.mjs") },
+  { name: "runner-profile-migration-v2-tests", file: join(libDir, "runner-profile-migration-v2.test.mjs") },
+  { name: "runner-profiles-v3-tests", file: join(libDir, "runner-profiles-v3.test.mjs") },
+  { name: "runtime-projection-v3-tests", file: join(libDir, "runtime-projection-v3.test.mjs") },
+  { name: "runner-profile-migration-v3-tests", file: join(libDir, "runner-profile-migration-v3.test.mjs") },
+  { name: "human-role-label-tests", file: join(libDir, "human-role-labels.test.mjs") },
+  { name: "human-role-rendering-tests", file: join(libDir, "human-role-rendering.test.mjs") },
+  { name: "advisory-receipt-tests", file: join(libDir, "advisory-receipt.test.mjs") },
+  { name: "advisory-coordinator-tests", file: join(libDir, "advisory-coordinator.test.mjs") },
+  { name: "critic-export-policy-tests", file: join(libDir, "critic-export-policy.test.mjs") },
+  { name: "advisory-host-bridge-tests", file: join(pluginScriptsDir, "advisory-host-bridge.test.mjs") },
+  { name: "codex-sandbox-preflight-tests", file: join(scriptDir, "codex-sandbox-preflight.test.mjs") },
+  { name: "codex-sandbox-compatibility-tests", file: join(libDir, "codex-sandbox-compatibility.test.mjs") },
+  { name: "codex-sandbox-select-tests", file: join(pluginScriptsDir, "codex-sandbox-select.test.mjs") },
+  { name: "codex-sandbox-runtime-tests", file: join(pluginScriptsDir, "codex-sandbox-runtime.test.mjs") },
+  { name: "codex-app-server-health-tests", file: join(pluginScriptsDir, "codex-app-server-health.test.mjs") },
+  { name: "codex-plugin-validator-parity-tests", file: join(pluginScriptsDir, "codex-plugin-validator-parity.test.mjs") },
+  { name: "worktree-lifecycle-tests", file: join(libDir, "worktree-lifecycle.test.mjs") },
+  { name: "advisor-consult-v3-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "advisor-consult", "advisor-consult-v3.test.mjs") },
+  { name: "sandboxed-readonly-duty-tests", file: join(libDir, "sandboxed-readonly-duty.test.mjs") },
+  { name: "sandboxed-readonly-host-bridge-tests", file: join(pluginScriptsDir, "sandboxed-readonly-host-bridge.test.mjs") },
+  { name: "spec-readiness-host-tests", file: join(pluginScriptsDir, "spec-readiness-host.test.mjs") },
+  { name: "pipeline-start-v3-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "pipeline-start", "pipeline-start-v3.test.mjs") },
+  { name: "runner-usage-v1-tests", file: join(libDir, "runner-usage-v1.test.mjs") },
+  { name: "p3b-runner-conformance-tests", file: join(libDir, "p3b-runner-conformance.test.mjs") },
   { name: "git-cmd-tests", file: join(libDir, "git-cmd.test.mjs") },
   { name: "workflow-writer-preflight-tests", file: join(libDir, "workflow-writer-preflight.test.mjs") },
   { name: "workflow-runner-boundary-tests", file: join(libDir, "workflow-runner-boundary.test.mjs") },
@@ -85,6 +124,13 @@ const TEST_SUITES = [
   { name: "agents-adapter-migration-tests", file: join(scriptDir, "check-agents-adapter-migration.test.mjs") },
   { name: "agents-adapter-migration-check", file: join(scriptDir, "check-agents-adapter-migration.mjs") },
   { name: "validate-manifest-tests", file: join(scriptDir, "validate-manifest.test.mjs") },
+  { name: "document-hooks-tests", file: join(libDir, "document-hooks.test.mjs") },
+  { name: "document-identifier-tests", file: join(libDir, "document-identifiers.test.mjs") },
+  { name: "document-lifecycle-tests", file: join(libDir, "document-lifecycle.test.mjs") },
+  { name: "document-hooks-manifest-tests", file: join(pluginScriptsDir, "document-hooks-manifest.test.mjs") },
+  { name: "private-document-binding-tests", file: join(pluginScriptsDir, "document-binding.test.mjs") },
+  { name: "release-version-plan-tests", file: join(pluginScriptsDir, "release-version-plan.test.mjs") },
+  { name: "product-capability-inventory-tests", file: join(scriptDir, "check-product-capability-inventory.test.mjs") },
   { name: "pipeline-state-tests", file: join(scriptDir, "pipeline-state.test.mjs") },
   { name: "doc-contract-tests", file: join(scriptDir, "check-doc-contracts.test.mjs") },
   { name: "doc-contract-check", file: join(scriptDir, "check-doc-contracts.mjs") },
@@ -92,6 +138,20 @@ const TEST_SUITES = [
   { name: "language-canon-check", file: join(scriptDir, "check-language-canon.mjs") },
   { name: "security-scan-tests", file: join(scriptDir, "security-scan.test.mjs") },
   { name: "no-autoupdate-key-tests", file: join(scriptDir, "no-autoupdate-key.test.mjs") },
+  { name: "phase26-invariants-tests", file: join(scriptDir, "check-phase26-invariants.test.mjs") },
+  { name: "phase26-invariants-check", file: join(scriptDir, "check-phase26-invariants.mjs"), args: phase26Result ? ["--result", phase26Result] : [] },
+  { name: "sdlc-run-graph-tests", file: join(scriptDir, "sdlc-run-graph.test.mjs") },
+  { name: "phase3-sdlc-coherence-tests", file: join(scriptDir, "check-phase3-sdlc-coherence.test.mjs") },
+  { name: "phase3-sdlc-coherence-check", file: join(scriptDir, "check-phase3-sdlc-coherence.mjs"), args: phase3Result ? ["--result", phase3Result] : [] },
+  { name: "sdlc-efficiency-metrics-tests", file: join(scriptDir, "sdlc-efficiency-metrics.test.mjs") },
+  { name: "check-ownership-tests", file: join(scriptDir, "check-ownership.test.mjs") },
+  { name: "backlog-state-tests", file: join(libDir, "backlog-state.test.mjs") },
+  { name: "parallel-dispatch-planner-tests", file: join(libDir, "parallel-dispatch-planner.test.mjs") },
+  { name: "continuity-status-tests", file: join(libDir, "continuity-status.test.mjs") },
+  { name: "continuity-status-cli-tests", file: join(pluginScriptsDir, "continuity-status.test.mjs") },
+  { name: "delivery-course-tests", file: join(libDir, "delivery-course.test.mjs") },
+  { name: "critic-packet-governance-tests", file: join(libDir, "critic-packet-governance.test.mjs") },
+  { name: "po-gate-authority-check", file: join(scriptDir, "check-po-gate-authority.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects with `.claude/pipeline.yaml`
@@ -117,7 +177,7 @@ const PHASE_STEPS =
 const steps = [];
 for (const suite of [...TEST_SUITES, ...PHASE_STEPS]) {
   console.log(`\n=== ${suite.name} (${suite.file}) ===`);
-  const res = spawnSync(process.execPath, [suite.file], { encoding: "utf8", cwd: repoRoot });
+  const res = spawnSync(process.execPath, [suite.file, ...(suite.args ?? [])], { encoding: "utf8", cwd: repoRoot });
   if (res.stdout) process.stdout.write(res.stdout);
   if (res.stderr) process.stderr.write(res.stderr);
   const exitCode = res.status ?? 1;

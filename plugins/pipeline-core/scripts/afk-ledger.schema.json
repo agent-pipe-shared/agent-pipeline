@@ -1,0 +1,183 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.afk-ledger-record.v1",
+  "title": "AFK immutable write-ahead-ledger record",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "activationId", "sequence", "type", "previousHash", "recordedAt", "body"],
+  "properties": {
+    "schema": { "const": "pipeline.afk-ledger-record.v1" },
+    "activationId": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "type": {
+      "enum": [
+        "activation-intent", "activation-ready", "entry-intent", "entry-applied",
+        "review-freeze", "review-intent", "promotion-applied", "entry-receipt",
+        "review-complete", "lock-recovered", "blocked"
+      ]
+    },
+    "previousHash": { "$ref": "#/$defs/sha256" },
+    "recordedAt": { "type": "string", "format": "date-time" },
+    "body": { "type": "object" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "type": { "const": "activation-intent" } } },
+      "then": { "properties": { "body": { "$ref": "#/$defs/activationIntent" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "activation-ready" } } },
+      "then": { "properties": { "body": { "$ref": "#/$defs/activationReady" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "entry-intent" } } },
+      "then": { "properties": { "body": { "$ref": "#/$defs/entryIntent" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "entry-applied" } } },
+      "then": { "properties": { "body": { "$ref": "#/$defs/entryApplied" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "review-freeze" } } },
+      "then": { "properties": { "body": { "$ref": "#/$defs/reviewFreeze" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "review-intent" } } },
+      "then": { "properties": { "body": { "$ref": "#/$defs/reviewIntent" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "promotion-applied" } } },
+      "then": { "properties": { "body": { "$ref": "#/$defs/promotionApplied" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "entry-receipt" } } },
+      "then": { "properties": { "body": { "$ref": "#/$defs/entryReceipt" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "review-complete" } } },
+      "then": { "properties": { "body": { "$ref": "#/$defs/reviewComplete" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "lock-recovered" } } },
+      "then": { "properties": { "body": { "$ref": "#/$defs/lockRecovered" } } }
+    },
+    {
+      "if": { "properties": { "type": { "const": "blocked" } } },
+      "then": { "properties": { "body": { "$ref": "#/$defs/blocked" } } }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "oid": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+    "safeId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$" },
+    "closed": { "type": "object", "additionalProperties": false },
+    "activationIntent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["receipt", "privateRef", "expectedPrivateRefOid"],
+      "properties": {
+        "receipt": { "type": "object" },
+        "privateRef": { "type": "string", "pattern": "^refs/agent-pipeline/afk/[0-9a-f]{32}$" },
+        "expectedPrivateRefOid": { "type": "null" }
+      }
+    },
+    "activationReady": {
+      "type": "object", "additionalProperties": false,
+      "required": ["receiptSha256", "privateRef", "privateRefOid"],
+      "properties": {
+        "receiptSha256": { "$ref": "#/$defs/sha256" },
+        "privateRef": { "type": "string", "pattern": "^refs/agent-pipeline/afk/[0-9a-f]{32}$" },
+        "privateRefOid": { "$ref": "#/$defs/oid" }
+      }
+    },
+    "entryWrite": {
+      "type": "object", "additionalProperties": false,
+      "required": ["operation", "path", "baseMode", "baseBlobOid", "resultMode", "resultContentBase64", "resultSha256", "resultBlobOid"],
+      "properties": {
+        "operation": { "enum": ["put", "delete"] },
+        "path": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "baseMode": { "enum": ["100644", "100755", null] },
+        "baseBlobOid": { "oneOf": [{ "$ref": "#/$defs/oid" }, { "type": "null" }] },
+        "resultMode": { "enum": ["100644", "100755", null] },
+        "resultContentBase64": { "type": ["string", "null"] },
+        "resultSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+        "resultBlobOid": { "oneOf": [{ "$ref": "#/$defs/oid" }, { "type": "null" }] }
+      }
+    },
+    "entryIntent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["entryId", "request", "proposal", "requestSha256", "resultSha256", "parentCommit", "parentTree", "resultTree", "resultCommit", "objectFormat", "identity", "gitTimestamp", "message", "writes"],
+      "properties": {
+        "entryId": { "$ref": "#/$defs/safeId" },
+        "request": { "type": "object" },
+        "proposal": { "type": "object" },
+        "requestSha256": { "$ref": "#/$defs/sha256" },
+        "resultSha256": { "$ref": "#/$defs/sha256" },
+        "parentCommit": { "$ref": "#/$defs/oid" },
+        "parentTree": { "$ref": "#/$defs/oid" },
+        "resultTree": { "$ref": "#/$defs/oid" },
+        "resultCommit": { "$ref": "#/$defs/oid" },
+        "objectFormat": { "enum": ["sha1", "sha256"] },
+        "identity": {
+          "type": "object", "additionalProperties": false, "required": ["name", "email"],
+          "properties": { "name": { "type": "string" }, "email": { "type": "string" } }
+        },
+        "gitTimestamp": { "type": "string", "pattern": "^[0-9]+ \\+0000$" },
+        "message": { "type": "string", "minLength": 1, "maxLength": 4096 },
+        "writes": { "type": "array", "items": { "$ref": "#/$defs/entryWrite" } }
+      }
+    },
+    "entryApplied": {
+      "type": "object", "additionalProperties": false,
+      "required": ["entryId", "privateRef", "parentCommit", "resultCommit", "resultTree"],
+      "properties": {
+        "entryId": { "$ref": "#/$defs/safeId" }, "privateRef": { "type": "string" },
+        "parentCommit": { "$ref": "#/$defs/oid" }, "resultCommit": { "$ref": "#/$defs/oid" },
+        "resultTree": { "$ref": "#/$defs/oid" }
+      }
+    },
+    "disposition": {
+      "type": "object", "additionalProperties": false, "required": ["entryId", "sequence", "decision"],
+      "properties": { "entryId": { "$ref": "#/$defs/safeId" }, "sequence": { "type": "integer", "minimum": 1 }, "decision": { "enum": ["accept", "reject"] } }
+    },
+    "reviewFreeze": {
+      "type": "object", "additionalProperties": false,
+      "required": ["reviewId", "cause", "ledgerSequence", "ledgerHeadSha256", "privateRefOid", "featureRef", "featureBaseOid", "frozenAt"],
+      "properties": {
+        "reviewId": { "$ref": "#/$defs/safeId" }, "cause": { "enum": ["expiry", "revocation", "explicit-review"] },
+        "ledgerSequence": { "type": "integer", "minimum": 1 }, "ledgerHeadSha256": { "$ref": "#/$defs/sha256" },
+        "privateRefOid": { "$ref": "#/$defs/oid" }, "featureRef": { "type": "string", "pattern": "^refs/heads/" },
+        "featureBaseOid": { "$ref": "#/$defs/oid" }, "frozenAt": { "type": "string", "format": "date-time" }
+      }
+    },
+    "reviewIntent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["reviewId", "attributedBy", "reviewedAt", "freezeRecordSha256", "dispositions", "acceptedPrefixLength", "promotionOid", "reviewSha256"],
+      "properties": {
+        "reviewId": { "$ref": "#/$defs/safeId" }, "attributedBy": { "type": "string" }, "reviewedAt": { "type": "string", "format": "date-time" },
+        "freezeRecordSha256": { "$ref": "#/$defs/sha256" }, "dispositions": { "type": "array", "items": { "$ref": "#/$defs/disposition" } },
+        "acceptedPrefixLength": { "type": "integer", "minimum": 0 }, "promotionOid": { "$ref": "#/$defs/oid" }, "reviewSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "promotionApplied": {
+      "type": "object", "additionalProperties": false, "required": ["reviewId", "featureRef", "baseOid", "promotionOid", "moved"],
+      "properties": { "reviewId": { "$ref": "#/$defs/safeId" }, "featureRef": { "type": "string" }, "baseOid": { "$ref": "#/$defs/oid" }, "promotionOid": { "$ref": "#/$defs/oid" }, "moved": { "type": "boolean" } }
+    },
+    "entryReceipt": {
+      "type": "object", "additionalProperties": false, "required": ["reviewId", "entryId", "sequence", "decision", "entryCommit", "receiptSha256"],
+      "properties": { "reviewId": { "$ref": "#/$defs/safeId" }, "entryId": { "$ref": "#/$defs/safeId" }, "sequence": { "type": "integer", "minimum": 1 }, "decision": { "enum": ["accept", "reject"] }, "entryCommit": { "$ref": "#/$defs/oid" }, "receiptSha256": { "$ref": "#/$defs/sha256" } }
+    },
+    "reviewComplete": {
+      "type": "object", "additionalProperties": false, "required": ["reviewId", "reviewSha256", "promotionOid", "receiptSha256List"],
+      "properties": { "reviewId": { "$ref": "#/$defs/safeId" }, "reviewSha256": { "$ref": "#/$defs/sha256" }, "promotionOid": { "$ref": "#/$defs/oid" }, "receiptSha256List": { "type": "array", "items": { "$ref": "#/$defs/sha256" } } }
+    },
+    "lockOwner": {
+      "type": "object", "additionalProperties": false, "required": ["schema", "hostId", "bootId", "pid", "processStart", "activationId", "ownerNonce", "acquiredAt"],
+      "properties": { "schema": { "const": "pipeline.afk-writer-lock.v1" }, "hostId": { "$ref": "#/$defs/safeId" }, "bootId": { "$ref": "#/$defs/safeId" }, "pid": { "type": "integer", "minimum": 1 }, "processStart": { "type": "string" }, "activationId": { "type": "string", "pattern": "^[0-9a-f]{32}$" }, "ownerNonce": { "$ref": "#/$defs/sha256" }, "acquiredAt": { "type": "string", "format": "date-time" } }
+    },
+    "lockRecovered": {
+      "type": "object", "additionalProperties": false, "required": ["oldOwner", "newOwner", "evidence"],
+      "properties": { "oldOwner": { "$ref": "#/$defs/lockOwner" }, "newOwner": { "$ref": "#/$defs/lockOwner" }, "evidence": { "type": "object", "additionalProperties": false, "required": ["sameHost", "sameBoot", "dead", "observedAt"], "properties": { "sameHost": { "const": true }, "sameBoot": { "const": true }, "dead": { "const": true }, "observedAt": { "type": "string", "format": "date-time" } } } }
+    },
+    "blocked": { "type": "object", "additionalProperties": false, "required": ["reasonCode"], "properties": { "reasonCode": { "type": "string", "pattern": "^AFK-[A-Z0-9-]{1,96}$" } } }
+  }
+}

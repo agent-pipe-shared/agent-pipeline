@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.release-version-plan.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "planId", "decisionId", "decisionSha256", "evidenceRevision", "documentEvidenceSha256", "externalPrerequisite", "targetVersion", "targetTag", "privateProductCandidate", "neutralPublicProductCandidate", "versions", "surfaceDigests", "recovery", "status", "createdAt"],
+  "properties": {
+    "schema": { "const": "pipeline.release-version-plan.v1" },
+    "planId": { "$ref": "#/$defs/sha256" },
+    "decisionId": { "$ref": "#/$defs/sha256" },
+    "decisionSha256": { "$ref": "#/$defs/sha256" },
+    "evidenceRevision": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "documentEvidenceSha256": { "$ref": "#/$defs/sha256" },
+    "externalPrerequisite": { "$ref": "#/$defs/externalPrerequisite" },
+    "targetVersion": { "$ref": "#/$defs/stableVersion" },
+    "targetTag": { "type": "string", "pattern": "^v(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$" },
+    "privateProductCandidate": { "$ref": "#/$defs/candidate" },
+    "neutralPublicProductCandidate": { "$ref": "#/$defs/candidate" },
+    "versions": { "$ref": "#/$defs/versions" },
+    "surfaceDigests": { "$ref": "#/$defs/surfaceDigests" },
+    "recovery": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/recovery" }] },
+    "status": { "const": "sealed" },
+    "createdAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "oid": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+    "stableVersion": { "type": "string", "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$" },
+    "candidate": { "type": "object", "additionalProperties": false, "required": ["repositoryFingerprint", "commit", "tree"], "properties": { "repositoryFingerprint": { "$ref": "#/$defs/sha256" }, "commit": { "$ref": "#/$defs/oid" }, "tree": { "$ref": "#/$defs/oid" } } },
+    "externalPrerequisite": { "type": "object", "additionalProperties": false, "required": ["itemId", "closureCommit", "resultSha256", "transitionSha256", "privateLicenseGateSha256", "neutralPublicLicenseGateSha256"], "properties": { "itemId": { "const": "pipeline.source-available-commercial-licensing" }, "closureCommit": { "$ref": "#/$defs/oid" }, "resultSha256": { "$ref": "#/$defs/sha256" }, "transitionSha256": { "$ref": "#/$defs/sha256" }, "privateLicenseGateSha256": { "$ref": "#/$defs/sha256" }, "neutralPublicLicenseGateSha256": { "$ref": "#/$defs/sha256" } } },
+    "versions": { "type": "object", "additionalProperties": false, "required": ["versionFile", "codexPlugin", "claudePlugin", "codexMarketplaceResolved", "claudeMarketplaceResolved"], "properties": { "versionFile": { "$ref": "#/$defs/stableVersion" }, "codexPlugin": { "$ref": "#/$defs/stableVersion" }, "claudePlugin": { "$ref": "#/$defs/stableVersion" }, "codexMarketplaceResolved": { "$ref": "#/$defs/stableVersion" }, "claudeMarketplaceResolved": { "$ref": "#/$defs/stableVersion" } } },
+    "surfaceDigest": { "type": "object", "additionalProperties": false, "required": ["surface", "path", "sha256"], "properties": { "surface": { "enum": ["versionFile", "codexPlugin", "claudePlugin", "codexMarketplaceResolved", "claudeMarketplaceResolved"] }, "path": { "type": "string", "minLength": 1 }, "sha256": { "$ref": "#/$defs/sha256" } } },
+    "surfaceDigests": { "type": "object", "additionalProperties": false, "required": ["private", "neutralPublic"], "properties": { "private": { "type": "array", "minItems": 5, "maxItems": 5, "items": { "$ref": "#/$defs/surfaceDigest" } }, "neutralPublic": { "type": "array", "minItems": 5, "maxItems": 5, "items": { "$ref": "#/$defs/surfaceDigest" } } } },
+    "recovery": { "type": "object", "additionalProperties": false, "required": ["compensationId", "compensationSha256"], "properties": { "compensationId": { "$ref": "#/$defs/sha256" }, "compensationSha256": { "$ref": "#/$defs/sha256" } } }
+  }
+}

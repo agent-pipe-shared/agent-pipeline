@@ -1,102 +1,150 @@
 ---
 name: advisor-consult
-description: "Ready dispatch pattern for the bound read-only `consult-advisor` subagent (Task-tool subagent_type: consult-advisor) - the MANDATORY primary workaround (MP-26g) when the advisor tool reports unavailable/error in an `advisor`-profile session, or when the session-start advisor readiness probe (session-bootstrap.md Step 1b) fails. Dispatch metadata: log the consult under the advisor-tier ledger label (MP-26g telemetry), and set the Task-tool `model` invocation parameter to your configured advisor model's enum value (`pipeline.user.yaml -> worktypes.<profile>.advisor`) - the enum, not the ledger label; EXACTLY one question per consult; hard read-only (tools: Read, Grep, Glob only - no Edit/Write/Bash, no repo mutation). The answer feeds the Elephant's own judgment, never auto-applied. Use PROACTIVELY the moment an advisor call returns unavailable/error - do not silently drop advisory and do not unilaterally switch the main model up to a higher-capability tier instead of running this pattern (MP-26g)."
-argument-hint: "<one question for the advisor-replacement consult>"
+description: "Consent-gated advisory consult adapter for Epic and Feature. Codex uses a selected-sandbox Sol consult with Read/Grep/Glob/Bash; Claude retains its Fable/Opus then Read/Grep/Glob consult chain. One fresh question, no memory/handover/mutation, sanitized receipt only."
+argument-hint: "<exactly one advisory question>"
 ---
 
-# advisor-consult — read-only advisor consult subagent (advisor-outage workaround, MP-26g)
+# advisor-consult — runner-neutral, fresh read-only advisory
 
-Normative source (canon pointer, not a runtime read): `policies/model-policy.md`
-MP-26(g). This skill is the STANDING mechanism that policy prescribes; running it is not optional
-once the trigger below fires.
+Normative route authority: `plugins/pipeline-core/config/runner-profiles-v3.json`.
+Execution authority: `plugins/pipeline-core/lib/advisory-coordinator.mjs`.
 
-## When to use (hard trigger, MP-26g)
+Advisory is a **duty**, not a profile phase and not a Critic verdict. It is
+eligible for `epic` and `feature`, disabled for `mini`, and additionally gated
+by `pipeline.user.v3` `advisor_export.consent`. Missing or `declined` consent
+is an accepted Advisory-off bootstrap state: no probe, child, export or
+receipt. Its answer only informs the Elephant's own judgment. A consult never
+edits files, applies its answer, changes a gate, or changes the main model.
 
-The session runs profile `advisor` AND an advisor call — the session-start readiness probe
-(`harness/session-bootstrap.md` / `pipeline-start` SKILL.md, Step 1b) or any later advisor
-consult — returns `unavailable` or an error.
+## Registered routes
 
-**This is the MANDATORY PRIMARY response.** Two documented anti-patterns are explicitly NOT
-substitutes for running this skill (MP-26g — a real observed failure mode): (i) silently dropping
-advisory and continuing without any advisor channel, and (ii) unilaterally switching the session's
-MAIN model up to a higher-capability tier (e.g. the design-tier model) in reaction to the outage.
-Escalating the ADVISOR channel to a higher-capability model (`/advisor <higher-tier-model>`) stays
-available, but only as an OFFER the Elephant puts to the PO (MP-26g point 3) — never a unilateral
-escape the session takes on its own.
+- **Codex:** fresh `consult-advisor` on the configured Codex route, currently
+  Sol, is the registered adapter and the selected sandbox is its only
+  transport. Typed unavailability, no-child, profile drift, incomplete
+  stdio/cleanup or wrong identity stays fail-closed. There is no unbound host
+  shell/consult fallback, invented native Codex advisor or Claude substitution.
+- **Claude:** native Fable is primary. Only after its bounded repeated failure
+  may the registered same-runner native Opus fallback run. If the native
+  adapters remain unavailable or fail, a fresh hard-read-only Claude consult
+  runs on the registered consult route.
+- **Every route:** runner, role, selector and fallback order come from the V3
+  registry. An adapter must not silently switch runner, main model, session
+  role, or fallback order.
 
-Do NOT skip the PO's immediate notification (MP-26g point 1) — this skill is the point-2 workaround,
-not a replacement for the point-1 alert.
+Call `coordinateAdvisory(...)`; do not manually recreate this chain. The
+coordinator binds every attempt to the same question and candidate dispatch,
+rejects runner drift, classifies adapter failures without retaining raw errors,
+and emits the common `pipeline.advisory-receipt.v1`.
 
-## Dispatch pattern (ready one-liner)
+The production host entrypoint is
+`plugins/pipeline-core/scripts/advisory-host-bridge.mjs`. Start it with a
+temporary JSON input and a receipt target. For each `adapter.request` JSON line,
+invoke exactly the named native host capability or fresh `consult-advisor`
+subagent, then return the observed result as the matching `adapter.result` JSON
+line on stdin. The bridge—not the host conversation—advances retries and
+fallbacks, verifies the configured model identity, and atomically persists the
+sanitized receipt. It consumes (unlinks) the temporary raw input before the
+first adapter request. Exit 0 means answered; exit 2 means a typed fail-closed
+advisory outcome; 64/70 are invocation/bridge failures. Never persist the
+JSON-line runtime transport.
 
-**Bound hard-read-only agent:** `plugins/pipeline-core/agents/consult-advisor.md`
-defines the `consult-advisor` agent with a HARD `tools: Read, Grep, Glob` allowlist (no Write/Edit/
-Bash at all — enforced by the harness, not just by prompt convention). Dispatch via the **Task
-tool**:
+### Affected Codex sandbox host
 
-- `subagent_type: consult-advisor` — the bound agent above, **never `general-purpose`** for this
-  pattern anymore (the read-only contract used to be prompt-level-only; it is now a hard allowlist).
-- Task-tool **`model` invocation parameter:** set it to the model ENUM VALUE the Task tool accepts
-  for your configured advisor tier (`pipeline.user.yaml -> worktypes.<profile>.advisor`). Keep this ENUM VALUE
-  distinct from the dispatch-ledger/telemetry LABEL you log the consult under (EL-21). Some setups
-  use a human-readable label in the ledger (the one the close-ritual "peculiarities" line uses for
-  the advisor-model cost share) that is NOT a valid Task-tool `model` value — state BOTH explicitly
-  and keep them apart, so a session running this pattern under advisor-outage pressure does not pass
-  the label string where the enum value is expected. This mirrors the same per-dispatch
-  model-override mechanism MP-07 already established for the Critic's escalation to a
-  higher-capability review model (`plugins/pipeline-core/agents/critic.md`: the escalation is set by
-  the Elephant per dispatch).
+On a registered affected Codex host, selection occurs before the first child:
+the explicit host path obtains a `selectionId` from the committed selector and consumes it through
+`sandboxed-readonly-host-bridge.mjs`. The only selected transport is the
+documented network-open/read-only profile; compiled profile readback precedes
+launch. `host-mode-unavailable` is a typed no-child outcome, not a request for
+an unbound host consult or user-mode prose. The execution receipt binds the same dispatch and sanitized
+duty receipt. Its assurance is exactly
+`sandbox-read-only-except-coordinator-scratch; input/network isolation not asserted`.
 
-Dispatch prompt template (fill in exactly ONE question, nothing else):
+### PO-authorized functional-equivalent pass after a Codex sandbox stop
+
+ADR-0041 records the PO's standing amendment for this repository. Only after
+exactly one selected Codex sandbox attempt ends in a typed `no-child` or
+`unavailable` outcome, the Elephant may request one fresh, host-internal direct
+`consult-advisor` subagent as a **PO-authorized functional-equivalent pass**.
+This is a local continuity lane, not an alternate native Codex transport: it is
+local, fresh, hard-read-only, has exactly the same one question and no
+handover, memory, repository mutation, network export, raw-answer persistence,
+model-identity assertion or auto-apply. It must not retry, replace, repair or
+mask the selected sandbox attempt.
+
+If that one local consult returns an answer within those limits, it is
+gate-capable advisory evidence for the affected PO gate, bootstrap/readiness
+decision, Critic prerequisite, or Epic-close prerequisite. Its status is
+`po-authorized-functional-equivalent`, not `answered` and not native sandbox
+success. It is valid until the PO revokes it or a functional Codex CLI selected
+sandbox becomes available, at which point the registered selected transport is
+again required. A local consult failure, a second question, any mutation, or
+any export is not a pass and has no further fallback.
+
+The residual assurance is mandatory in every claim: **no attested
+selected-sandbox execution; OS isolation and model identity are not asserted**.
+It emits no `pipeline.advisory-receipt.v1` and no selected-sandbox execution
+attestation. Retain only a sanitized functional-equivalent status record bound
+to the candidate and question/answer digests; never retain raw question,
+answer, prompt, transport, trace, private path, or error. This PO-authorized
+functional-equivalent pass is the sole exception to the normal non-success
+rule; it does not alter the native route, coordinator authority, or Claude
+fallback order.
+
+## Consult dispatch contract
+
+The bound agent is `plugins/pipeline-core/agents/consult-advisor.md`:
+
+- `subagent_type: consult-advisor`, never `general-purpose`;
+- runner and model selector exactly as supplied by the coordinator;
+- exactly **one string question** per dispatch;
+- a genuinely fresh context: no chat history, handover, implementor rationale,
+  inherited memory, or previous consult conversation;
+- Claude hard tool allowlist `Read, Grep, Glob`;
+- selected Codex hard tool payload `Read, Grep, Glob, Bash`; Bash exists only
+  inside the exact selected `network-open/read-only` profile, with the checkout
+  read-only and coordinator scratch as the sole writable root;
+- no Write, Edit, memory, repository mutation or unbound host Bash;
+- one returned prose answer, never auto-applied.
+
+The coordinator payload carries these machine-checkable launch constraints:
+`oneQuestion=true`, `freshContext=true`,
+`contextPolicy=fresh-no-handover-no-chat-history-no-implementor-rationale`,
+`tools=[Read,Grep,Glob]` for Claude or
+`tools=[Read,Grep,Glob,Bash]` for selected Codex, `memory=false`, and
+`autoApply=false`.
+
+Host dispatch prompt (insert the coordinator's single question verbatim):
 
 ```
-role=consult-advisor, ledger label = advisor tier (Task-tool invocation parameter is model=<your configured worktypes.<profile>.advisor enum>, which may differ from the ledger label)
+role=consult-advisor; runner/model are the coordinator-bound V3 route
 
-You are a read-only consult subagent standing in for an unavailable advisor
-(MP-26g workaround). You have Read/Grep/Glob ONLY - a hard
-allowlist enforced by the `consult-advisor` agent definition, not just a prompt
-convention. Do NOT use Write, Edit, or any Bash command.
+You are a fresh, hard-read-only advisory consult. Use only the exact tools in
+the coordinator payload (Claude: Read/Grep/Glob; selected Codex:
+Read/Grep/Glob/Bash). You have no chat history, handover, implementor rationale
+or memory. Selected Codex Bash must not be used to attempt mutation.
 
-Answer exactly ONE question from repo/context inspection, then stop:
+Answer exactly this ONE question from repository inspection, then stop:
 
 {{THE_ONE_QUESTION}}
 
-Return your answer as prose. Do not propose or make any repo changes yourself -
-your answer feeds the Elephant's own judgment, it is never auto-applied.
+Return prose with file:line evidence where relevant. Do not mutate the
+repository and do not frame the answer as a decision or auto-applied verdict.
 ```
 
-Rules (hard, mirror MP-26g verbatim):
+A second question always requires a second fresh dispatch. If the question
+cannot be answered within the read-only boundary, that limitation is the
+answer; the boundary is never loosened.
 
-- **Exactly ONE question per consult.** No batching, no multi-turn follow-up loop inside the same
-  dispatch — a second question is a second, separate dispatch.
-- **Read-only, no exceptions.** If the question cannot be answered from Read/Grep/Glob alone, that
-  is itself the answer to report back ("not answerable read-only, needs X") — never loosen the
-  contract to get an answer.
-- **The answer feeds judgment, it is never auto-applied.** The Elephant reads the subagent's prose
-  answer and decides — exactly like an advisor consult would have worked, never like a Goldfish
-  diff the Elephant merges unreviewed.
+## Receipt and privacy boundary
 
-## Using the answer
+The runtime answer is returned separately to the Elephant. Outside the exact
+ADR-0041 functional-equivalent status record, only the common advisory receipt
+may be persisted. It contains SHA-256 bindings for question
+and answer plus route, adapter, observed identity/status, candidate binding and
+a redacted fallback class. It must never contain raw questions, raw answers,
+prompts, traces, exception messages, credentials or private paths.
 
-- Treat the returned prose exactly as an advisor answer would have been treated — input to the
-  Elephant's own judgment at the decision point that triggered the original advisor call, never a
-  verdict to apply mechanically.
-- Log the consult in the session's dispatch ledger (EL-21, `roles/elephant.md`) like any other
-  subagent dispatch: `role=consult-advisor`, the advisor-outage trigger, and the question asked —
-  this is what lets the close ritual's telemetry line (MP-20, "peculiarities") show the
-  advisor-model cost share correctly and lets a later session/Critic audit the trail.
-
-## Relationship to the full MP-26(g) sequence
-
-1. Immediate notification to the PO on the FIRST failure (this skill does not replace that alert).
-2. **This skill** — the standing, mandatory-primary workaround.
-3. Offer `/advisor <higher-tier-model>` to the PO as an ADDITIONAL option, never as a silent
-   unilateral switch of the session's main model.
-
-## Live-validation caveat
-
-The advisor-outage TRIGGER path (session-bootstrap.md readiness probe, Step 1b) is currently
-specified but not yet live-validated against a real advisor outage — a follow-up item, since it
-needs an actual outage to observe. This skill's own dispatch pattern (Task-tool invocation,
-`consult-advisor` agent, prompt contract) is immediately usable independent of that open validation
-item.
+Outside the exact ADR-0041 PO-authorized functional-equivalent pass, an
+invalid/missing receipt, wrong-provider identity, runner drift, malformed
+adapter result or exhausted fallback chain is a failed advisory attempt. It
+must not become an advisory-success, review, gate or conformance claim.

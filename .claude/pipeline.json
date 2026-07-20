@@ -19,5 +19,10 @@
     "close.pre": [
       "node harness/scripts/check-claude-md-lines.mjs"
     ]
+  },
+  "humanRoles": {
+    "po": {
+      "displayLabel": "PO"
+    }
   }
 }

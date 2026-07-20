@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.claude-critic-receipt.v1",
+  "type": "object",
+  "required": ["schema", "packetId", "packetDigest", "candidate", "route", "assurance", "verdictSha256", "reviewPass"],
+  "properties": {
+    "schema": { "const": "pipeline.claude-critic-receipt.v1" },
+    "packetId": { "type": "string" },
+    "packetDigest": { "type": "string" },
+    "candidate": { "type": "object" },
+    "route": { "type": "object" },
+    "assurance": { "enum": ["claude-native-bare-read-only", "functional-equivalent-read-only; OS isolation not asserted"] },
+    "verdictSha256": { "type": "string" },
+    "reviewPass": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

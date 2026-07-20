@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.critic-route-activation.v1",
+  "title": "Attended Critic route activation journal",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "activationId", "mode", "status", "revision", "runnerId", "primaryLaneId", "fallbackLaneId", "route", "evidence", "approval", "events", "createdAtMs", "updatedAtMs"],
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.critic-route-activation.v1"] },
+    "activationId": { "type": "string" },
+    "mode": { "type": "string", "enum": ["intermediate", "strong", "rollback"] },
+    "status": { "type": "string", "enum": ["prepared", "evidence-bound", "po-approved", "applied", "verified", "suspended"] },
+    "revision": { "type": "integer" },
+    "runnerId": { "type": "string" },
+    "primaryLaneId": { "type": "string" },
+    "fallbackLaneId": { "type": "string" },
+    "route": {
+      "type": "object", "additionalProperties": false,
+      "required": ["projectionPath", "preimageSha256", "postimageSha256", "inventory", "inventorySha256"],
+      "properties": {
+        "projectionPath": { "type": "string" },
+        "preimageSha256": { "type": "string" },
+        "postimageSha256": { "type": "string" },
+        "inventory": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["path", "preimageSha256", "postimageSha256"],
+            "properties": {
+              "path": { "type": "string" },
+              "preimageSha256": { "type": "string" },
+              "postimageSha256": { "type": "string" }
+            }
+          }
+        },
+        "inventorySha256": { "type": "string" }
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["preflightSha256", "runnerSha256", "compatibilitySha256", "shadowSha256", "verifySha256", "t1Sha256", "compatibilityEntryId"],
+      "properties": {
+        "preflightSha256": { "type": ["string", "null"] }, "runnerSha256": { "type": ["string", "null"] },
+        "compatibilitySha256": { "type": ["string", "null"] }, "shadowSha256": { "type": ["string", "null"] },
+        "verifySha256": { "type": ["string", "null"] }, "t1Sha256": { "type": ["string", "null"] },
+        "compatibilityEntryId": { "type": ["string", "null"] }
+      }
+    },
+    "approval": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["approvalId", "approvedAtMs", "attributedTo"],
+      "properties": { "approvalId": { "type": "string" }, "approvedAtMs": { "type": "integer" }, "attributedTo": { "type": "string", "enum": ["PO"] } }
+    },
+    "events": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sequence", "type", "atMs", "previousHash", "eventHash"],
+        "properties": {
+          "sequence": { "type": "integer" },
+          "type": { "type": "string" },
+          "atMs": { "type": "integer" },
+          "previousHash": { "type": ["string", "null"] },
+          "eventHash": { "type": "string" }
+        }
+      }
+    },
+    "createdAtMs": { "type": "integer" },
+    "updatedAtMs": { "type": "integer" }
+  }
+}

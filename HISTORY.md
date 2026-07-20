@@ -1,0 +1,175 @@
+# History
+
+## 2026-07-19 — Hawkeye formaler Scope-Transfer
+
+- Den aktiven Feature-Lifecycle `sprint-hawkeye-epic` als PO-gesteuerten
+  Scope-Transfer geschlossen; kein Release, Tag, Push oder Backlog-Close wird
+  daraus abgeleitet.
+- Der grüne Kandidat umfasst die überarbeitete Nutzerdokumentation,
+  Codex-Sandbox-Kompatibilität, PO-Anzeige, Keep-Awake und die dokumentierte
+  öffentliche Dokument-Hook-Grundlage.
+- Die unvollständige regulierte Dokumenten-Vertikale und der Releasepfad wurden
+  nicht als Produktfähigkeit beworben. Ihr nächster Vertrag ist
+  `/tmp/control-contracts-go-live-designphase.md`; die PO-Festlegung erhält
+  HAW-C und HAW-E gemeinsam als vollständigen nächsten Feature-Sprint.
+- Full Verify des Übergabestands: 96 Schritte, Exit 0.
+
+### Lessons
+
+- Ein Epic darf durch einen expliziten Scope-Transfer enden, aber offene
+  Backlog-Items und nicht vertikal vollständige Sicherheitsfunktionen bleiben
+  sichtbar offen; ein grüner Teiltest ersetzt keinen Produktabschluss.
+
+### Open / next
+
+Siehe den kanonischen [Handover](docs/state.md) und den dort referenzierten
+Feature-/Go-Live-Vertrag.
+
+## 2026-07-19 — Hawkeye Epic bis zum PRD-Gate vorbereitet
+
+- Hawkeye wurde auf dem geschlossenen Batman-/V3-Commit als eigenes
+  Epic-Feature im Designzustand angelegt; es gibt genau ein deutsches PRD.
+- Die Level-2-Spec schließt Dokumentationskonsolidierung, private regulierte
+  Dokument-Hooks und sessiongebundenes Wachhalten in fünf vertikalen Slices.
+- Mehrere frische Readiness-Runden deckten fehlende Crash-Journale,
+  Prozessnachfahren-, TOCTOU-, Größen- und Kandidatenbindungen auf. Die finale
+  Fassung besitzt geschlossene Recovery-Verträge und erhielt von Architektur
+  und Security jeweils `READY` ohne Blocker oder Major.
+- Der PRD-Gate-Zwischenstand enthält keine Produktimplementierung und keine
+  Remote-Aktion; die PO-Freigabe von 1A–7A bleibt der nächste Schritt.
+
+### Lessons
+
+- Multi-Ressourcen-Übergänge brauchen bereits vor Readiness eine explizite
+  Ressourcen-/Phasenmatrix mit genau einer Recovery-Autorität; das Wort
+  „atomar“ ersetzt keine Crashfenster.
+- Ein Zeit- oder Größenlimit ist erst belastbar, wenn die gewählte Architektur
+  das Überschreiten technisch vor dem unerlaubten Seiteneffekt verhindert.
+- Kandidatenfelder in getrackten Zustandsobjekten müssen Implementierungs- und
+  Post-Bookkeeping-Kandidaten trennen, damit kein Selbsthash entsteht.
+
+### Open / next
+
+PO-Gate und Wiedereinstieg stehen ausschließlich im kanonischen
+[Handover](docs/state.md).
+
+## 2026-07-19 — Batman und Runner-V3-Cutover geschlossen
+
+- Batman liefert die bestätigten Epic-/Feature-/Mini-Profile, runner-neutrale
+  Advisory-Duty, belastbare Continuity, kanonische Worktree-/PO-Autorität,
+  AFK-Grenzen und den gestuften Critic-Pfad.
+- Die nie aktivierte V2-Brücke wurde durch `pipeline.user.v3` ersetzt. Codex
+  verwendet Sol-Consult; Claude verwendet Fable mit explizitem Opus- und
+  Same-Runner-Consult-Fallback. Receipts verhindern stille Rollen-, Modell- und
+  Assurance-Wechsel.
+- Der Critic-Export bindet Kandidat, Basis und materialisierten Diff. TTL,
+  Snapshot und persistierte Autorisierung werden unmittelbar vor dem
+  Provider-Handoff erneut geprüft.
+- Der exakte Implementierungscommit `9df52a65cb4dcb151b30c8714b0a41b25cd8c442`
+  bestand Full Verify und Security Evidence. Die native Codex-Installation und
+  eine frische V3-Sitzung bestätigten die neue Basis.
+- Das V3-Cutover-Backlog-Item und der Feature-Lifecycle wurden über die
+  sanktionierten Writer geschlossen. Private und neutrale Public-Publikation
+  bleiben getrennte, nachgelagerte Readback-Vorgänge.
+
+### Lessons
+
+- Exportautorisierung muss am letzten Punkt vor Offenlegung erneut gegen Zeit,
+  Kandidat und durable Policy geprüft werden; eine Prüfung im Finalizer ist zu
+  spät.
+- Ein Plugin-Quellstand ist erst nach nativem Reinstall und frischer
+  Session-Provenienz die Basis der nächsten Pipeline-Sitzung.
+- Direkte Elephant-Korrekturen bleiben ein zu dokumentierender Ausnahmefall;
+  unabhängige Reviews fanden hier mehrere reale Grenzlücken und rechtfertigten
+  die zusätzliche Runde.
+
+### Open / next
+
+Hawkeye startet im Epic-/Design-Modus mit genau einem deutschen PRD. Scope und
+Wiedereinstieg stehen im kanonischen [Handover](docs/state.md).
+
+## 2026-07-18 — Batman design checkpoint
+
+- Anchored Batman on the completed Storm commit and confirmed a five-slice Epic
+  decomposition for AFK, preflight, Verify, activation and publication.
+- Completed one independent readiness pass per slice. All five drafts were
+  revised from their findings. Fresh second passes then rejected all five broad
+  cuts and opened an architecture course gate rather than a third correction grind.
+- The PO fixed the bounded course: capability-bounded AFK with ledger authority,
+  one static six-suite Verify postimage, one lifecycle with two typed channels,
+  and process attribution without a new authentication mechanism. ADR-0037 owns
+  the decision; internal child-contract readiness is next.
+- No implementation, plugin/cache mutation or remote action occurred.
+
+### Lessons
+
+- Stateful guard designs need their authority receipt, durable storage, crash
+  recovery and exact enforcement surfaces in the first slice draft; operation
+  labels and broad file lists are not implementation contracts.
+- Provider activation must model the first stale-cache transition separately:
+  an old loaded guard cannot prove that its own replacement is active.
+
+### Open / next
+
+See the canonical [handover](docs/state.md); it is the sole source of current
+and next-state information.
+
+## 2026-07-18 — Storm publication remediation started
+
+- Verified the two local GitHub identities and bound the calibrated public alias
+  to the dedicated public account.
+- Reinstalled Pipeline Core from a persistent Storm marketplace source so a new
+  Codex session loads the worktree-aware guard implementation rather than the
+  earlier cache snapshot.
+- Split attributable private delivery from the separately curated neutral public
+  delivery. No remote publication is claimed until a newly loaded session has
+  completed the normal guarded push and fetch-back readback.
+- The PO re-scoped the uncompleted delivery to Batman and the regulated
+  document/adoption work to Hawkeye; the new roadmap allocation is the durable
+  successor to this preparation package.
+
+## 2026-07-18 — Storm operational control local close
+
+- Closed the local Storm feature at product candidate
+  `7602e99dd3a6668ceab687d8806fd0892096e7e4` after exact-candidate Full Verify
+  (58 registered steps, exit 0), focused-suite evidence, and explicit PO
+  acceptance of the bounded TP-3 exception.
+- The feature lifecycle was closed through the sanctioned state writer. Its
+  post-close publication remediation is tracked separately; publication is not
+  claimed by this local-close entry.
+
+### Lessons
+
+- A protected aggregate gate needs a task-scoped, auditable additive-registration
+  path; a PO exception must transfer the missing mechanism into a real open
+  backlog item rather than turning it into an implicit completion claim.
+- Public publication needs an identity-alias preflight before it becomes part of
+  a close promise.
+- A push guard must resolve the actual Git target worktree before it evaluates
+  candidate Evidence; otherwise a clean feature branch can be blocked by stale
+  sibling state.
+
+### Open / next
+
+See the canonical [handover](docs/state.md); it is the sole source of current
+and next-state information.
+
+## 2026-07-17 — Sprint P3B implementation close
+
+- Closed the local P3B implementation feature at candidate
+  `620b7f0d8a1ccf4a8fdbc4eaeda59f5ec66490fb` after exact-candidate Full Verify
+  (58 steps, exit 0) and explicit PO acceptance of the documented exceptions.
+- No merge, push, tag, release, or other remote action occurred.
+
+### Lessons
+
+- A T1 packet must derive and include every manifest-declared governance path
+  before the reviewer is dispatched; a formal review rejection is costly even
+  when the PO accepts the phase-level outcome.
+- Intermediate status questions must not interrupt autonomous approved work;
+  the active plan resumes until its defined gate.
+
+### Open / next
+
+See the canonical [handover](docs/state.md); it is the sole source of current
+and next-state information.

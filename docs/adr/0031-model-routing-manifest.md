@@ -28,6 +28,22 @@ The Claude adapter retains its existing assignments unchanged. The Codex adapter
 
 The Phase 2 implementation stores the provider-neutral default assignments in `plugins/pipeline-core/config/routing-authority.json`, runner mappings separately in `plugins/pipeline-core/config/runner-mappings.json`, and compiles the Claude manifest through `setup.mjs`. The deterministic projection gate checks the committed user configuration, full manifest routing matrix, fixed agent frontmatter, and source hashes. Its Codex scope is intentionally partial: it proves only Fable → `gpt-5.6-sol` with unchanged effort and fail-closed behavior for unsupported identities; it does not claim a complete Codex runner projection.
 
+## Historical Phase 2.6 direct-route extension (2026-07-15)
+
+`pipeline.user.v1` replaces the user-facing subscription presets with one direct, versioned route source. Each active worktype phase and duty declares exactly a runner, a selector (`alias` or `model-id`), an effort tier, an unavailability policy, and a required dispatch receipt. Setup recognizes an unversioned or v0 source only as a migration input, prints a v0-to-v1 preview, and writes no v1 source or runtime projection until the complete v1 shape validates.
+
+The legacy Claude `modelRouting` projection is retained solely for compatibility and is deterministically checked as semantically identical to Shared candidate `654ebaf`; Claude runner mappings and agent frontmatter remain unchanged. The additive `runnerRoutes` projection is provider-neutral at the manifest boundary. It does not substitute or infer a model identity.
+
+This historical v1 direct-route binding used an unresolved `terra` alias for
+some Codex duties. P3B v2 supersedes that selector for its execution cells:
+`Terra` now means the exact **requested** Codex model ID `gpt-5.6-terra` at the
+registered effort; it is not a claim about the effective provider model.
+Fable duties resolve to `gpt-5.6-sol` at the same effort tier, while Claude
+assignments remain unchanged. A route or effective model is attested only by a
+valid same-dispatch receipt with its required bindings. Agent self-report and a
+missing or invalid receipt are insufficient; the route stays unresolved,
+unavailable, or unbound according to the relevant contract.
+
 ## Consequences
 
 Runtime tools retain a machine-readable view without creating competing policy. Adding a runner requires a bounded adapter mapping and projection tests rather than edits throughout the kernel.

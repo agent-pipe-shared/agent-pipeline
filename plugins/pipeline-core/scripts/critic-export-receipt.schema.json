@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.critic-export-receipt.v1",
+  "type": "object",
+  "required": ["schema", "policySha256", "packetSha256", "exportViewSha256", "packetId", "candidate", "dataClass", "provider", "packetSchema", "packetBoundary", "assuranceClass", "pipelineDecision", "reasonCode", "externalGates", "checkedAtMs"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "pipeline.critic-export-receipt.v1" },
+    "policySha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "packetSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "exportViewSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "packetId": { "type": ["string", "null"], "pattern": "^[a-f0-9]{32}$" },
+    "candidate": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["base", "commit", "tree"],
+          "additionalProperties": false,
+          "properties": {
+            "base": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+            "commit": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+            "tree": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" }
+          }
+        }
+      ]
+    },
+    "dataClass": { "const": "repository-candidate" },
+    "provider": { "type": ["string", "null"] },
+    "packetSchema": { "type": ["string", "null"] },
+    "packetBoundary": { "const": "candidate-diff-and-allowlisted-references" },
+    "assuranceClass": { "type": ["string", "null"] },
+    "pipelineDecision": { "enum": ["authorized", "denied"] },
+    "reasonCode": { "type": "string" },
+    "externalGates": {
+      "type": "object",
+      "required": ["host", "provider"],
+      "additionalProperties": false,
+      "properties": {
+        "host": { "enum": ["not-observed", "approved", "additional-check-required", "denied"] },
+        "provider": { "enum": ["not-observed", "approved", "additional-check-required", "denied"] }
+      }
+    },
+    "checkedAtMs": { "type": "integer", "minimum": 0 }
+  }
+}

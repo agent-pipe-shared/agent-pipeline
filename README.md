@@ -4,9 +4,8 @@ A versioned operating model for agentic software development — clone it, run o
 setup script, and adopt a battle-tested set of roles, review gates, and guardrails
 for your own projects.
 
-*Where this stands: v0.2.0 — a week and a half of build time, a solo project,
-multiple dogfooding rounds so far (this release itself was shipped under its
-own Release/Promotion phase). Feedback welcome.*
+*Where this stands: an actively developed public core, shaped through public
+feature branches and dogfooding rounds. Feedback welcome.*
 
 > **A note on language.** This operating model was first built in German and then
 > made English-first for release. The docs are English-primary — bilingual files
@@ -67,21 +66,45 @@ Around those roles:
 
 ## How it works
 
-Everything ships as a Claude Code plugin plus a small set of `.claude/` runtime
-configs, which you never hand-edit. You fill in **one public file**,
-`pipeline.user.yaml` (setup intent, language, subscription tier, autonomy
-preset), and `node setup.mjs` compiles it into the three runtime-canonical files
-Claude Code actually reads (`.claude/settings.json`, `.claude/pipeline.json`,
-`.claude/pipeline.yaml`). A separately versioned, ignored Private Overlay carries
-only the exact 40-hex SHA of that Public Core; marketplace/account/path mapping
-and credentials remain machine-local and are never read into a generated
-projection. Re-run setup any time you change your mind — it's drift-safe:
-untouched files recompile freely, but a file you hand-edited yourself triggers a
-confirmation before it's overwritten.
+### Three roots, one direction of dependency
 
-Model routing per work method lives in its own block, `pipeline.user.yaml` →
-`worktypes` — one entry per session profile (design-first / advisor / speed),
-each with its own model, effort, and advisor setting.
+**Public Core** is the portable, committed contract: methodology, plugin,
+templates, and the public `pipeline.user.yaml` authority. Develop it on public
+feature branches. A separately versioned, ignored **Private Extension** (also
+called the Private Overlay) consumes one pinned, immutable Public-Core SHA; it
+does not feed account, owner, repository, or path coordinates back into the
+core. **Local user, PC, and runtime-data roots** hold credentials, marketplace
+and account mappings, absolute paths, local settings, caches, and session data.
+They stay ignored and are never compiled into a public projection. This keeps a
+second device reproducible from the public snapshot plus its matching private
+pin, without copying secrets or local history.
+
+`pipeline.user.yaml` is the public source of setup intent. `node setup.mjs`
+compiles its owned runtime projections; **never hand-edit generated runtime
+configuration**. Change the source, then rerun setup or the explicit V3
+migration below. The compiler detects drift rather than silently treating a
+local edit as authority.
+
+V3 has registered routes for both Claude and Codex. Claude Code is the
+full-enforcement runtime: its plugin and hooks can enforce configured guards.
+Codex and other CLIs can use the same roles, evidence, and review methodology,
+but this does not claim Claude hooks, plugin installation, automatic guards, or
+model identity. For Codex, every duty assigned to Fable resolves to
+`gpt-5.6-sol` at the same effort tier; Claude assignments remain unchanged.
+See [`docs/runtime-boundary.md`](docs/runtime-boundary.md) for the exact
+division of responsibility.
+
+The native Codex selected-sandbox route remains the preferred, attested route;
+this README does **not** claim that its current host limitation is fixed. After
+exactly one typed `no-child` or `unavailable` result, a PO-authorized exception
+may run one fresh, internal, hard-read-only consult on the same single question.
+It permits no handover, memory, mutation, network export, raw-answer retention,
+auto-apply, second question, or retry. A successful exception is only a
+functional-equivalent pass, never native sandbox success: `no attested
+selected-sandbox execution; OS isolation and model identity are not asserted`.
+
+Model routing lives in V3 profiles (`epic`, `feature`, `mini`), with model and
+effort selected per phase and runner.
 
 ```mermaid
 flowchart LR
@@ -179,6 +202,26 @@ human.
 See [`SETUP.md`](SETUP.md) for the full walkthrough: clone, run `node setup.mjs`,
 bind the plugin, start your first session.
 
+### Command lifecycle
+
+Run these commands from the indicated checkout; they are the concise, normal
+lifecycle rather than a replacement for the detailed setup guide.
+
+| When | Exact command |
+| --- | --- |
+| Initial pipeline-source setup | `node setup.mjs` |
+| Normal session start | `/pipeline-core:pipeline-start` |
+| Verify the current change | `node harness/scripts/verify.mjs` |
+| Close a completed block | `/pipeline-core:close-block` |
+| Update a Claude Code binding, then reload the running host | `claude plugin marketplace update agent-pipeline`<br>`claude plugin update pipeline-core@agent-pipeline --scope project`<br>`/reload-plugins` |
+| Inspect a V3 authority (pipeline source only) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"` |
+| Plan its V3-owned changes (pipeline source only) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"` |
+| Explicitly activate the reviewed V3 plan (pipeline source only) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate` |
+
+The V3 sequence is deliberately inspect → plan → explicit activation; `apply
+--activate` is its only write step. Read it back with `node setup.mjs`. Do not
+use these source-authority commands in an arbitrary application repository.
+
 Before your first big feature, a quick look at
 [`docs/design/README.md`](docs/design/README.md) pays off — a self-service
 guide for brainstorming a solid requirement before it enters the pipeline
@@ -215,13 +258,9 @@ This operating model is a synthesis, not an invention. It adapts and builds on
 the ideas in three published works, and we thank their authors for the thinking
 that shaped it:
 
-- the **"Elephants & Goldfish" role model (EGM)** — source of the Elephant and
-  Goldfish roles and the principle that the document, not the session, carries
-  the knowledge;
-- Google's **"New SDLC" (vibe-coding playbook)** — source of *Agent = Model +
-  Harness*, the orchestrator capability model, and stakes-driven discipline;
-- Google's **"Day 5" whitepaper** — source of the approval-fatigue analysis
-  behind the deliberately minimal set of human gates.
+- [Dave Rensin, **“Elephants, Goldfish and the New Golden Age of Software Engineering”**](https://research.google/pubs/elephants-goldfish-and-the-new-golden-age-of-software-engineering/) — source of the Elephant and Goldfish roles and the principle that the document, not the session, carries the knowledge;
+- [Addy Osmani, Shubham Saboo, Sokratis Kartakis, **“The New SDLC With Vibe Coding”**](https://addyosmani.com/blog/new-sdlc-vibe-coding/) — source of *Agent = Model + Harness*, the orchestrator capability model, and stakes-driven discipline;
+- [Google/Kaggle, **“Spec-Driven Production Grade Development in the Age of Vibe Coding”**](https://www.kaggle.com/whitepaper-spec-driven-production-grade-development-in-the-age-of-vibe-coding) — source of the approval-fatigue analysis behind the deliberately minimal set of human gates.
 
 Where this repository departs from these sources — for example, recasting the
 Goldfish as an executor rather than a checker — it says so, and why, in
@@ -238,9 +277,9 @@ Ein versioniertes Operating Model für agentische Softwareentwicklung — klonen
 ein Setup-Skript ausführen und ein erprobtes Set aus Rollen, Review-Gates und
 Guardrails für die eigenen Projekte übernehmen.
 
-*Wo das gerade steht: v0.2.0 — anderthalb Wochen Bauzeit, ein Soloprojekt,
-mittlerweile mehrere Dogfooding-Runden (dieses Release selbst wurde unter der
-eigenen Release/Promotion-Phase ausgeliefert). Feedback willkommen.*
+*Wo das gerade steht: ein aktiv entwickelter Public Core, der über öffentliche
+Feature-Branches und Dogfooding-Runden weiterentwickelt wird. Feedback
+willkommen.*
 
 > **Zur Sprache.** Dieses Operating Model entstand zuerst auf Deutsch und wurde für
 > die Veröffentlichung auf Englisch-first umgestellt. Die Doku ist englisch-primär —
@@ -307,24 +346,49 @@ Ergänzend dazu:
 
 ## Wie es funktioniert
 
-Alles wird als Claude-Code-Plugin plus ein kleines Set an
-`.claude/`-Laufzeit-Configs ausgeliefert. Du bearbeitest diese Configs nicht von
-Hand: Du füllst **eine öffentliche** Datei aus, `pipeline.user.yaml`
-(Setup-Absicht, Sprache, Abo-Stufe, Autonomie-Preset), und `node setup.mjs`
-kompiliert daraus die drei laufzeit-kanonischen Dateien, die Claude Code
-tatsächlich liest (`.claude/settings.json`, `.claude/pipeline.json`,
-`.claude/pipeline.yaml`). Ein separat versioniertes, ignoriertes Private Overlay
-trägt nur den exakten 40-hex-SHA dieses Public Core; Marketplace-/Account-/Pfad-
-Mapping und Zugangsdaten bleiben maschinenlokal und werden nie in eine generierte
-Projektion eingelesen. Führe es jederzeit erneut aus, wenn sich deine Antworten
-ändern — es ist driftsicher: unveränderte Dateien werden frei neu kompiliert,
-aber eine von Hand bearbeitete kompilierte Datei löst vor dem Überschreiben eine
-Rückfrage aus.
+### Drei Wurzeln, eine Abhängigkeitsrichtung
 
-Modell-Routing je Arbeitsmethode lebt in einem eigenen Block,
-`pipeline.user.yaml` → `worktypes` — ein Eintrag je Session-Profil
-(Design-first / Advisor / Speed), jeweils mit eigenem Modell, Effort und
-Advisor-Einstellung.
+Der **Public Core** ist der portable, committete Vertrag: Methodik, Plugin,
+Templates und die öffentliche `pipeline.user.yaml`-Autorität. Seine Entwicklung
+findet auf öffentlichen Feature-Branches statt. Eine separat versionierte,
+ignorierte **Private Extension** (auch Private Overlay genannt) konsumiert genau
+einen gepinnten, unveränderlichen Public-Core-SHA; sie liefert keine Account-,
+Owner-, Repository- oder Pfadkoordinaten zurück in den Core. **Lokale User-,
+PC- und Runtime-Datenwurzeln** enthalten Zugangsdaten, Marketplace- und
+Account-Mappings, absolute Pfade, lokale Einstellungen, Caches und Session-Daten.
+Sie bleiben ignoriert und werden nie in eine öffentliche Projektion kompiliert.
+So ist ein zweites Gerät aus dem öffentlichen Snapshot plus passendem Private-Pin
+reproduzierbar, ohne Secrets oder lokale Historie zu kopieren.
+
+`pipeline.user.yaml` ist die öffentliche Quelle der Setup-Absicht. `node
+setup.mjs` kompiliert die zugehörigen Runtime-Projektionen; **generierte
+Runtime-Konfiguration wird nie von Hand bearbeitet**. Ändere die Quelle und
+führe danach Setup oder die explizite V3-Migration unten erneut aus. Der
+Compiler erkennt Drift, statt eine lokale Änderung stillschweigend zur Autorität
+zu machen.
+
+V3 hat registrierte Routen für Claude und Codex. Claude Code ist die
+Full-Enforcement-Laufzeit: Plugin und Hooks können konfigurierte Guardrails
+durchsetzen. Codex und andere CLIs können dieselbe Rollen-, Evidenz- und
+Review-Methodik nutzen, aber daraus folgt weder ein Anspruch auf Claude-Hooks,
+Plugin-Installation, automatische Guardrails noch Modellidentität. In Codex
+wird jede Fable-Aufgabe bei gleichem Effort-Tier zu `gpt-5.6-sol` aufgelöst;
+Claude-Zuweisungen bleiben unverändert. Die genaue Zuständigkeitsgrenze steht in
+[`docs/runtime-boundary.md`](docs/runtime-boundary.md).
+
+Die native Codex-Selected-Sandbox-Route bleibt der bevorzugte, attestierte Weg;
+diese README behauptet **nicht**, dass die aktuelle Host-Einschränkung behoben
+ist. Nach genau einem typisierten Ergebnis `no-child` oder `unavailable` darf
+eine PO-autorisierte Ausnahme genau einen frischen, internen,
+hard-read-only-Consult zur selben einzelnen Frage ausführen. Sie erlaubt weder
+Handover noch Memory, Mutation, Netzwerkexport, Rohantwort-Aufbewahrung,
+Auto-Apply, zweite Frage oder Retry. Ein erfolgreicher Ausnahmefall ist nur ein
+Funktionsäquivalenz-Pass, nie ein nativer Sandbox-Erfolg: `keine attestierte
+Selected-Sandbox-Ausführung; OS-Isolation und Modellidentität werden nicht
+behauptet`.
+
+Das Modellrouting liegt in V3-Profilen (`epic`, `feature`, `mini`); Modell und
+Effort werden je Phase und Runner ausgewählt.
 
 ```mermaid
 flowchart LR
@@ -424,6 +488,27 @@ Urteil bleibt trotzdem immer beim Menschen.
 Der vollständige Ablauf steht in [`SETUP.md`](SETUP.md): klonen, `node setup.mjs`
 ausführen, Plugin binden, erste Session starten.
 
+### Befehls-Lebenszyklus
+
+Führe die Befehle im jeweils genannten Checkout aus; sie bilden den kompakten
+normalen Ablauf ab und ersetzen nicht den detaillierten Setup-Guide.
+
+| Wann | Exakter Befehl |
+| --- | --- |
+| Initiales Pipeline-Source-Setup | `node setup.mjs` |
+| Normaler Session-Start | `/pipeline-core:pipeline-start` |
+| Aktuelle Änderung verifizieren | `node harness/scripts/verify.mjs` |
+| Fertigen Block abschließen | `/pipeline-core:close-block` |
+| Claude-Code-Binding aktualisieren und laufenden Host neu laden | `claude plugin marketplace update agent-pipeline`<br>`claude plugin update pipeline-core@agent-pipeline --scope project`<br>`/reload-plugins` |
+| V3-Autorität inspizieren (nur Pipeline Source) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"` |
+| Ihre V3-eigenen Änderungen planen (nur Pipeline Source) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"` |
+| Geprüften V3-Plan explizit aktivieren (nur Pipeline Source) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate` |
+
+Die V3-Reihenfolge ist bewusst Inspect → Plan → explizite Aktivierung;
+`apply --activate` ist ihr einziger Write-Schritt. Lies anschließend mit `node
+setup.mjs` zurück. Nutze diese Source-Autoritätsbefehle nicht in einem beliebigen
+Anwendungs-Repository.
+
 Vor dem ersten großen Feature lohnt ein kurzer Blick in
 [`docs/design/README.md`](docs/design/README.md) — der Selbstbedienungs-Guide
 zum Brainstorming einer soliden Anforderung, bevor sie in die Pipeline geht
@@ -462,14 +547,9 @@ Dieses Operating Model ist eine Synthese, keine Erfindung. Es adaptiert die
 Ideen aus drei veröffentlichten Arbeiten und baut auf ihnen auf; wir danken
 ihren Autorinnen und Autoren für die Denkarbeit, die es geprägt hat:
 
-- das **„Elephants & Goldfish"-Rollenmodell (EGM)** — Quelle der Elephant- und
-  Goldfish-Rollen und des Prinzips, dass das Dokument, nicht die Session, das
-  Wissen trägt;
-- Googles **„New SDLC" (Vibe-Coding-Playbook)** — Quelle von *Agent = Model +
-  Harness*, des Orchestrator-Capability-Modells und der stakes-getriebenen
-  Disziplin;
-- Googles **„Day 5"-Whitepaper** — Quelle der Approval-Fatigue-Analyse hinter
-  dem bewusst minimalen Satz an Human-Gates.
+- [Dave Rensin, **„Elephants, Goldfish and the New Golden Age of Software Engineering“**](https://research.google/pubs/elephants-goldfish-and-the-new-golden-age-of-software-engineering/) — Quelle der Elephant- und Goldfish-Rollen und des Prinzips, dass das Dokument, nicht die Session, das Wissen trägt;
+- [Addy Osmani, Shubham Saboo, Sokratis Kartakis, **„The New SDLC With Vibe Coding“**](https://addyosmani.com/blog/new-sdlc-vibe-coding/) — Quelle von *Agent = Model + Harness*, des Orchestrator-Capability-Modells und der stakes-getriebenen Disziplin;
+- [Google/Kaggle, **„Spec-Driven Production Grade Development in the Age of Vibe Coding“**](https://www.kaggle.com/whitepaper-spec-driven-production-grade-development-in-the-age-of-vibe-coding) — Quelle der Approval-Fatigue-Analyse hinter dem bewusst minimalen Satz an Human-Gates.
 
 Wo dieses Repository von diesen Quellen abweicht — etwa indem der Goldfish als
 Ausführender statt als Prüfer neu geschnitten wird —, sagt es das und warum, in

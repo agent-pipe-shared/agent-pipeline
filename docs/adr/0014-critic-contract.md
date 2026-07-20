@@ -26,7 +26,19 @@ The Critic must:
 
 The report includes a **Deliberately not flagged** section for plausible concerns rejected due to insufficient evidence, irrelevance, or deterministic enforcement elsewhere. The Critic does not repeat findings already enforced by a deterministic gate unless the gate itself is missing, stale, or not bound to the reviewed content.
 
-Risk policy selects staffing and isolation. High-risk architecture, guardrail, and security changes require the configured highest review capability and the strongest available isolation. When a runner cannot provide that isolation, the report records the contamination limit and the coordinator either adds an independent review path or stops at the applicable gate.
+Risk policy selects staffing and isolation. High-risk architecture, guardrail,
+and security changes require the configured highest review capability and the
+selected runner's usable native isolation first. The standing PO-authorized
+fallback is exact, not an implicit cross-runner substitution:
+
+> "Every architecture/guardrail/security diff runs with the Critic on the higher-capability tier AND with the selected runner's usable native isolation; if that isolation is technically unavailable or unusable in the current host setup, the standing PO-authorized functional equivalent is ONE fresh independently briefed, contractually read-only Critic subagent with a JSON-schema-shaped verdict and the literal assurance `functional-equivalent-read-only; OS isolation not asserted`. Rigor level 2 makes the Critic mandatory (default: the review-tier model); escalation to the higher-capability tier applies there only when, in addition, the risk class is high OR an architecture/guardrail/security diff is present."
+
+The functional equivalent has no chat/history or implementer reasoning,
+refs-only bounded input, strict read-only/no-write/no-subdelegation instruction,
+and a fixed candidate commit and diff. It never asserts OS isolation or
+effective-model identity. If the selected runner cannot provide even this
+contractual independent review, the coordinator stops at the applicable PO
+course gate.
 
 Model names and spawn mechanics belong to runner mappings. The kernel contract is provider-neutral; any runner-specific mapping must preserve the required capability and independence.
 

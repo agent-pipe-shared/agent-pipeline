@@ -20,10 +20,17 @@ USAGE (Elephant)
    verdict (never a higher-capability first pass for a non-A/G/S class-mittel
    diff); class-niedrig (non-A/G/S) critic runs MAY be non-blocking (parallel to
    the next package). ARCHITECTURE, GUARDRAIL, or SECURITY diffs = the
-   higher-capability review model at max MANDATORY and additionally the `--bare`
-   isolation level with JSON verdict (canonical trigger wording: operating-model
-   §4.2 — German text authoritative), UNCHANGED. Record the applied matrix row
-   (incl. cascade stage, if any) in your gate decision.
+   higher-capability review model at max MANDATORY plus the selected runner's
+   usable native isolation with JSON-schema-shaped verdict. If that isolation is
+   technically unavailable or unusable in the current host setup, use the
+   standing PO-authorized functional equivalent: ONE fresh independently
+   briefed, contractually read-only Critic subagent, no chat/history or
+   implementer reasoning, refs-only bounded input, strict no-write and
+   no-subdelegation, fixed candidate commit/diff, and literal assurance
+   `functional-equivalent-read-only; OS isolation not asserted`. Never silently
+   substitute a different runner; if this contractual lane is unavailable, stop
+   at a PO course gate. Record the applied matrix row (incl. cascade stage, if
+   any) and assurance in your gate decision.
 2. Fill ONLY paths and identifiers below. Pass NO reasoning, NO summaries of
    the implementation, NO chat history — the Critic constructs its own input
    from the paths (the PO's rule: Elephant hands over paths, never
@@ -58,9 +65,28 @@ USAGE (Elephant)
    consume a narrative, continue the review, or issue a substantive pass/fail
    judgment.
 3. Standard level: dispatch as read-only subagent (tools: Read/Grep/Glob +
-   git diff/log via Bash; no memory, no write tools).
-   Hard level: run headless `claude -p --bare` with this prompt and a JSON
-   schema for the verdict (shape at the end of this file).
+   git diff/log via Bash; no memory, no write tools). T1 hard level: use the
+   selected runner's usable native isolation first; `claude -p --bare` is the
+   Claude adapter, not a cross-runner default. When native isolation is
+   unavailable or unusable, dispatch the standing functional-equivalent Critic
+   lane specified in item 1 with the JSON schema shape at the end of this file.
+4. Phase-2.6 bounded re-review: the first architecture/security review is
+   `full`. A later `delta` dispatch is admissible only when it names the bound
+   base/head/tree, prior receipt ID/digest, changed paths/behaviour claims and
+   affected invariant IDs. Review only that delta plus those invariants; do not
+   request or read prior verdict prose. Missing/unknown/ambiguous impact means
+   full review, never an invented narrow scope. There are at most four Critic
+   rounds per package: the initial review plus one fresh re-Critic after each
+   of up to three fresh local correction commits. The host reconciles each
+   exact correction range before it selects either mode.
+5. A native-isolation failure is never retried in the same lane. The Coordinator
+   may use exactly one standing functional-equivalent Critic with frozen
+   bindings and `mayDelegate=false`; a second/unproven failure, inability to
+   provide contractual read-only review, or another-child request is a PO course
+   gate. Do not spawn, request, or delegate a recovery yourself. Wall
+   time, generic liveness, timeout/nonzero/free text and agent self-report are
+   not progress or environment proof; retain the stated non-claim about OS
+   isolation.
 ═══════════════════════════════════════════════════════════════════════════
 COPY EVERYTHING BELOW THIS LINE
 -->
@@ -115,7 +141,8 @@ review, or issue a substantive pass/fail judgment.
 
 Dispatch metadata (operating-model §2.3 field 6, critic variant):
 - Ruleset SHA: {{RULESET_SHA}} (echo in your confirmation line)
-- Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "guardrail diff → higher-capability review model at max + --bare isolation" or "standard → review-tier model at max" or "class-mittel cascade → review-tier model at max first, escalate to the higher-capability review model only on major finding / A-G-S touch / contested verdict" or "mechanical auto-pass (T0) → no critic dispatched"}}
+- Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "guardrail diff → higher-capability review model at max + selected runner native isolation" or "standard → review-tier model at max" or "class-mittel cascade → review-tier model at max first, escalate to the higher-capability review model only on major finding / A-G-S touch / contested verdict" or "mechanical auto-pass (T0) → no critic dispatched"}}
+- T1 isolation/assurance: {{T1_ASSURANCE e.g. "runner-native: <runner adapter/capability>; OS-isolation claim only as evidenced" or "functional-equivalent-read-only; OS isolation not asserted"}}
 - {{ADVISOR_SESSION_LINE: if this dispatch runs inside an `advisor`-profile Elephant session, include verbatim: "Advisor sessions: do not consult the advisor" (MP-26d) — else delete this line.}}
 
 If anything else was handed to you (explanations, "background", implementor
@@ -127,8 +154,11 @@ First output line (compact bootstrap confirmation, verbatim canonical format):
 
 > Bootstrap check passed: ruleset {{RULESET_SHA}} loaded · Project {{PROJECT_NAME}} · Calibration {{CALIBRATION_FILE|n/a}} · State n/a (Critic sees no history) · Role Critic
 
-Confirm you have no write tools. If you can write, the wrong agent definition
-is loaded: stop and report bootstrap failure.
+For a runner-native lane, confirm that no write tools are available; otherwise
+stop with bootstrap failure. In the Codex functional-equivalent lane, disclose
+`functional-equivalent-read-only; OS isolation not asserted`; write capability
+is a residual host limitation, not an isolation claim. Invoke no write tool or
+mutating command and do not delegate.
 
 **Disclosure duty + snapshot-ban (accepted CLAUDE.md autoload):** name in
 your report which context was auto-injected into you (CLAUDE.md content,
@@ -226,7 +256,11 @@ Now switch stance: the hunt was harsh, the report is honest. For EACH candidate:
 
 ## Report format (mandatory)
 
-**Report-header requirement:** open the report with the observed model identity — the verbatim model-identity line from your own system prompt — before Finding 1; a resumed/continued session MUST re-state it. A verdict delivered from a segment whose observed model differs from the dispatch mandate above is invalid (SendMessage-resume does not inherit the dispatch model override).
+**Report-header requirement:** open the report with the requested route from the
+dispatch and effective-model identity `unknown` unless direct same-dispatch
+route evidence observes it. Never infer effective identity from a selector or
+host label. A resumed/continued session MUST re-state the requested route and
+any direct evidence; a verdict with evidenced route contradiction is invalid.
 
 1. **Findings** (ordered by severity), each exactly:
    - `Gap`: what is missing/deviates vs. spec or guardrail (1–2 sentences)
@@ -242,8 +276,9 @@ Now switch stance: the hunt was harsh, the report is honest. For EACH candidate:
 5. No overall score. Binary pass/fail ONLY if the dispatch requests it here:
    {{VERDICT_REQUESTED: "yes — pass/fail required" | "no"}}
 
-<!-- Hard isolation level only (--bare, architecture/guardrail/security diffs):
-request this JSON verdict via json-schema in the headless call.
+<!-- T1 runner-native isolation or standing functional-equivalent lane only:
+request this JSON-shaped verdict through the selected runner's native mechanism
+or through the independently briefed contractual read-only Critic.
 {
   "findings": [{ "gap": "...", "risk": "...", "severity": "blocker|major|minor",
                  "evidence": "file:line — quote", "spec_ref": "AC-n | guardrail-id" }],
@@ -253,5 +288,5 @@ request this JSON verdict via json-schema in the headless call.
   "briefing_violations": ["..."],
   "pass": true
 }
-OPEN (Phase 4): versioned --bare wrapper script + schema file with exactly this
-shape; the comment above is the binding contract until then. -->
+OPEN (Phase 4): versioned runner-adapter schema files with exactly this shape;
+the comment above is the binding contract until then. -->

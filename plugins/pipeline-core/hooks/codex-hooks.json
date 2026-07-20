@@ -1,0 +1,31 @@
+{
+  "description": "Codex safety bridge for shell commands and write-path policy.",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+            "commandWindows": "node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+            "timeout": 10,
+            "statusMessage": "Checking Agent-Pipeline command policy"
+          }
+        ]
+      },
+      {
+        "matcher": "apply_patch|Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+            "commandWindows": "node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+            "timeout": 10,
+            "statusMessage": "Checking Agent-Pipeline write policy"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -4,13 +4,23 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseYaml } from "../lib/yaml-lite.mjs";
+import { validatePipelineUserV2 } from "../lib/runner-profiles-v2.mjs";
+import { planRuntimeProjectionV2, readRuntimeProjectionV2Baselines } from "../lib/runtime-projection-v2.mjs";
+import { validatePipelineUserV3 } from "../lib/runner-profiles-v3.mjs";
+import { planRuntimeProjectionV3, readRuntimeProjectionV3Baselines } from "../lib/runtime-projection-v3.mjs";
 import {
   ROUTING_AUTHORITY,
+  expectedProviderForRunner,
+  projectClaudeManifestRouting,
+  projectDirectRoutingDefaults,
   projectAgentFrontmatter,
+  projectHostDuty,
   projectManifestRouting,
   projectRunnerAssignment,
+  projectRunnerRoutes,
   resolveRunnerAlias,
   routingProvenance,
+  validateDirectRouting,
 } from "../lib/routing-projection.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -24,6 +34,14 @@ export function manifestProjectionMatches(actual, worktypes, models) {
   return same(actual, projectManifestRouting(worktypes, models));
 }
 
+export function directManifestProjectionMatches(actual, routing) {
+  return same(actual, projectClaudeManifestRouting(routing));
+}
+
+export function runnerRouteProjectionMatches(actual, routing) {
+  return same(actual, projectRunnerRoutes(routing));
+}
+
 export function hasCurrentProvenance(text, runner = "claude") {
   return text.includes(routingProvenance(runner));
 }
@@ -35,16 +53,97 @@ function frontmatterValue(text, key) {
   return match?.[1] ?? null;
 }
 
+/**
+ * The v2 source is authoritative only through I2's frozen projection plan.
+ * This check is read-only and rejects drift; it never falls back to the v1
+ * compiler or treats a requested selector as effective-model evidence.
+ */
+export function checkV2RuntimeProjection(root, user) {
+  const findings = [];
+  const validation = validatePipelineUserV2(user, { source: "pipeline.user.yaml" });
+  if (!validation.ok) {
+    findings.push("pipeline.user.yaml v2 schema or registry validation failed");
+    return findings;
+  }
+  let plan;
+  try {
+    plan = planRuntimeProjectionV2(user, {
+      source: "pipeline.user.yaml",
+      baselines: readRuntimeProjectionV2Baselines(root),
+    });
+  } catch (error) {
+    findings.push(`pipeline.user.yaml v2 runtime baselines unreadable: ${error.message}`);
+    return findings;
+  }
+  if (plan.status !== "ready") {
+    findings.push(`pipeline.user.yaml v2 runtime projection is ${plan.status}`);
+    return findings;
+  }
+  for (const target of plan.targets) {
+    if (target.changed) findings.push(`${target.path} v2 owned projection drift`);
+  }
+  return findings;
+}
+
+/**
+ * V3 projects only the declared runtime-owned bytes. In particular, Claude
+ * receives advisor_epic/advisor_feature compatibility routes while Codex
+ * advisory remains a receipt-bound consult duty and therefore has no invented
+ * native custom-agent projection.
+ */
+export function checkV3RuntimeProjection(root, user) {
+  const findings = [];
+  const validation = validatePipelineUserV3(user, { source: "pipeline.user.yaml" });
+  if (!validation.ok) {
+    findings.push("pipeline.user.yaml V3 schema or registry validation failed");
+    return findings;
+  }
+  let plan;
+  try {
+    plan = planRuntimeProjectionV3(user, {
+      source: "pipeline.user.yaml",
+      baselines: readRuntimeProjectionV3Baselines(root),
+    });
+  } catch (error) {
+    findings.push(`pipeline.user.yaml V3 runtime baselines unreadable: ${error.message}`);
+    return findings;
+  }
+  if (plan.status !== "ready") {
+    findings.push(`pipeline.user.yaml V3 runtime projection is ${plan.status}`);
+    return findings;
+  }
+  for (const target of plan.targets) {
+    if (target.changed) findings.push(`${target.path} V3 owned projection drift`);
+  }
+  const claude = plan.targets.find((target) => target.path === ".claude/pipeline.yaml");
+  const routeKeys = new Set((claude?.routes ?? []).map((route) => route.targetKey));
+  if (!routeKeys.has("advisor_epic") || !routeKeys.has("advisor_feature") || routeKeys.has("advisor_mini")) {
+    findings.push("V3 Claude advisory compatibility projection drift");
+  }
+  if (plan.targets.some((target) => target.path.includes("advisor") || target.route?.cell?.dutyId === "advisory")) {
+    findings.push("V3 Codex advisory must remain consult-only without a native custom-agent projection");
+  }
+  return findings;
+}
+
 export function checkRepository(root = DEFAULT_ROOT) {
   const findings = [];
   const user = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
-  if (!user.worktypes || typeof user.worktypes !== "object") findings.push("pipeline.user.yaml worktypes missing");
-  if (!user.models || typeof user.models !== "object") findings.push("pipeline.user.yaml models missing");
+  if (user.schema === "pipeline.user.v3") {
+    findings.push(...checkV3RuntimeProjection(root, user));
+  } else if (user.schema === "pipeline.user.v2") {
+    findings.push(...checkV2RuntimeProjection(root, user));
+  } else {
+    if (user.schema !== "pipeline.user.v1") findings.push("pipeline.user.yaml v1 schema missing");
+    const direct = validateDirectRouting(user.routing);
+    if (!direct.ok) findings.push("pipeline.user.yaml direct routing invalid");
 
-  const manifestText = readFileSync(join(root, ".claude", "pipeline.yaml"), "utf8");
-  const manifest = parseYaml(manifestText);
-  if (!manifestProjectionMatches(manifest.modelRouting, user.worktypes, user.models)) findings.push(".claude/pipeline.yaml modelRouting drift");
-  if (!hasCurrentProvenance(manifestText)) findings.push(".claude/pipeline.yaml routing provenance drift");
+    const manifestText = readFileSync(join(root, ".claude", "pipeline.yaml"), "utf8");
+    const manifest = parseYaml(manifestText);
+    if (direct.ok && !directManifestProjectionMatches(manifest.modelRouting, user.routing)) findings.push(".claude/pipeline.yaml Claude modelRouting drift");
+    if (direct.ok && !runnerRouteProjectionMatches(manifest.runnerRoutes, user.routing)) findings.push(".claude/pipeline.yaml runnerRoutes drift");
+    if (!hasCurrentProvenance(manifestText, "claude") || !hasCurrentProvenance(manifestText, "codex")) findings.push(".claude/pipeline.yaml routing provenance drift");
+  }
 
   for (const [path, assignment] of Object.entries(projectAgentFrontmatter())) {
     const text = readFileSync(join(root, path), "utf8");
@@ -74,6 +173,12 @@ export function checkCodexPartialMappingContract() {
       findings.push(`Codex Fable binding drift at effort ${effort}`);
     }
   }
+  if (expectedProviderForRunner("codex") !== "openai") {
+    findings.push("Codex provider binding drift");
+  }
+  if (expectedProviderForRunner("claude") !== "anthropic") {
+    findings.push("Claude provider binding drift");
+  }
   try {
     resolveRunnerAlias("codex", "unknown", "high");
     findings.push("Codex unknown alias did not fail closed");
@@ -83,13 +188,27 @@ export function checkCodexPartialMappingContract() {
   return { ok: findings.length === 0, findings };
 }
 
+export function checkCodexNormalCriticDuty() {
+  const findings = [];
+  try {
+    const route = projectHostDuty("criticNormal", "codex");
+    if (route.model !== "gpt-5.6-sol") findings.push("Codex normal Critic model drift");
+    if (route.effort !== "xhigh") findings.push("Codex normal Critic effort drift");
+    if (route.dispatch !== "host-native") findings.push("Codex normal Critic must remain host-native");
+  } catch (error) {
+    findings.push(`Codex normal Critic duty unavailable: ${error.message}`);
+  }
+  return { ok: findings.length === 0, findings };
+}
+
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   const repository = checkRepository();
   const codex = checkCodexPartialMappingContract();
-  const findings = [...repository.findings, ...codex.findings];
+  const normalCritic = checkCodexNormalCriticDuty();
+  const findings = [...repository.findings, ...codex.findings, ...normalCritic.findings];
   if (findings.length > 0) {
     for (const finding of findings) console.error(`FAIL ${finding}`);
     process.exit(2);
   }
-  console.log("Claude routing projections current; Codex partial mapping contract is Fable -> gpt-5.6-sol with unchanged supported effort only (no current Codex duty projection claim).");
+  console.log("Routing projections current for the configured source version; requested selectors remain separate from effective-model evidence.");
 }

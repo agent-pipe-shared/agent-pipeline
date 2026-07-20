@@ -1,0 +1,84 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.user.v3",
+  "title": "Runner-neutral advisory project intent",
+  "type": "object",
+  "required": ["schema", "language", "agent_runtime", "runners", "routing", "usage", "autonomy", "gates", "critic_export"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "pipeline.user.v3" },
+    "language": { "$ref": "#/$defs/language" },
+    "agent_runtime": { "enum": ["claude-code", "other"] },
+    "runners": { "$ref": "#/$defs/runners" },
+    "routing": { "$ref": "#/$defs/routing" },
+    "usage": { "$ref": "#/$defs/usage" },
+    "autonomy": { "$ref": "#/$defs/autonomy" },
+    "gates": { "$ref": "#/$defs/gates" },
+    "critic_export": { "$ref": "#/$defs/critic_export" },
+    "advisor_export": { "$ref": "#/$defs/advisor_export" },
+    "roles": { "$ref": "#/$defs/roles" },
+    "session": { "$ref": "#/$defs/session" }
+  },
+  "$defs": {
+    "language": { "type": "object", "required": ["human_facing", "agent_facing"], "additionalProperties": false, "properties": { "human_facing": { "enum": ["de", "en"] }, "agent_facing": { "enum": ["de", "en"] } } },
+    "runners": { "type": "object", "required": ["enabled", "default"], "additionalProperties": false, "properties": { "enabled": { "type": "array", "minItems": 1, "maxItems": 2, "uniqueItems": true, "items": { "enum": ["claude", "codex"] } }, "default": { "enum": ["claude", "codex"] } } },
+    "routing": { "type": "object", "required": ["profiles", "duties"], "additionalProperties": false, "properties": { "profiles": { "type": "object", "required": ["epic", "feature", "mini"], "additionalProperties": false }, "duties": { "type": "object", "required": ["implement", "mechanic", "deep", "test_author", "critic_normal", "critic_high_risk", "readiness", "advisory"], "additionalProperties": false } } },
+    "usage": { "type": "object", "required": ["common_projection", "raw_persistence"], "additionalProperties": false, "properties": { "common_projection": { "const": "pipeline.runner-usage.v1" }, "raw_persistence": { "const": "none" } } },
+    "autonomy": { "type": "object", "required": ["push_policy", "branch_model", "wip_limit"], "additionalProperties": false, "properties": { "push_policy": { "enum": ["gated", "standing-approved"] }, "branch_model": { "enum": ["feature-branch", "direct-main"] }, "wip_limit": { "type": "integer", "minimum": 1 } } },
+    "gates": { "type": "object", "required": ["dev_plan", "push", "security", "claude_md_max_lines"], "additionalProperties": false, "properties": { "dev_plan": { "enum": ["blocking", "warn", "off"] }, "push": { "enum": ["blocking", "warn", "off"] }, "security": { "enum": ["blocking", "warn", "off"] }, "claude_md_max_lines": { "type": "integer", "minimum": 1 } } },
+    "advisor_export": {
+      "type": "object",
+      "required": ["consent"],
+      "additionalProperties": false,
+      "properties": { "consent": { "enum": ["approved", "declined"] } }
+    },
+    "roles": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "po": {
+          "type": "object",
+          "required": ["display_label"],
+          "additionalProperties": false,
+          "properties": {
+            "display_label": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "session": {
+      "type": "object",
+      "required": ["keep_awake"],
+      "additionalProperties": false,
+      "properties": {
+        "keep_awake": { "type": "boolean" }
+      }
+    },
+    "critic_export": {
+      "type": "object",
+      "required": ["schema", "mode", "rules"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "const": "pipeline.critic-export-policy.v1" },
+        "mode": { "const": "allowlisted" },
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 3,
+          "items": {
+            "type": "object",
+            "required": ["dataClass", "provider", "packetSchema", "packetBoundary", "assuranceClass"],
+            "additionalProperties": false,
+            "properties": {
+              "dataClass": { "const": "repository-candidate" },
+              "provider": { "enum": ["anthropic", "openai"] },
+              "packetSchema": { "const": "pipeline.critic-candidate-packet.v1" },
+              "packetBoundary": { "const": "candidate-diff-and-allowlisted-references" },
+              "assuranceClass": { "enum": ["claude-native-bare-read-only", "functional-equivalent-read-only; OS isolation not asserted"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

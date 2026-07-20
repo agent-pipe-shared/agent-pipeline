@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.internal/schemas/codex-isolated-critic-verdict.schema.json",
+  "title": "Candidate- and input-bound isolated Critic verdict",
+  "type": "object",
+  "required": ["schema", "dispatchNonce", "attemptNonce", "candidate", "inputSetSha256", "result"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.codex-isolated-critic-verdict.v1"] },
+    "dispatchNonce": { "type": "string" },
+    "attemptNonce": { "type": "string" },
+    "candidate": {
+      "type": "object",
+      "required": ["commit", "tree", "diffSha256"],
+      "additionalProperties": false,
+      "properties": {
+        "commit": { "type": "string" },
+        "tree": { "type": "string" },
+        "diffSha256": { "type": "string" }
+      }
+    },
+    "inputSetSha256": { "type": "string" },
+    "result": {
+      "type": "object",
+      "required": ["findings", "deliberatelyNotFlagged", "trajectoryVerdict", "trajectoryEvidence", "briefingViolations", "pass"],
+      "additionalProperties": false,
+      "properties": {
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["gap", "risk", "severity", "evidence", "specRef"],
+            "additionalProperties": false,
+            "properties": {
+              "gap": { "type": "string" },
+              "risk": { "type": "string" },
+              "severity": { "type": "string", "enum": ["blocker", "major", "minor"] },
+              "evidence": { "type": "string" },
+              "specRef": { "type": "string" }
+            }
+          }
+        },
+        "deliberatelyNotFlagged": { "type": "array", "items": { "type": "string" } },
+        "trajectoryVerdict": { "type": "string", "enum": ["consistent", "inconsistent", "not-verifiable"] },
+        "trajectoryEvidence": { "type": "string" },
+        "briefingViolations": { "type": "array", "items": { "type": "string" } },
+        "pass": { "type": "boolean" }
+      }
+    }
+  }
+}

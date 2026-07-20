@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.internal/schemas/codex-isolated-critic-receipt.schema.json",
+  "title": "Sanitized isolated Codex Critic receipt",
+  "type": "object",
+  "required": ["schema", "dispatchNonce", "attemptNonce", "candidate", "cli", "platform", "profile", "inputSetSha256", "preflight", "eventChainSha256", "verdictSha256", "durationMs", "cleanup", "terminalCode", "reviewPass", "claims", "emittedAtMs"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.codex-isolated-critic-receipt.v1"] },
+    "dispatchNonce": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+    "attemptNonce": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+    "candidate": {
+      "type": "object",
+      "required": ["commit", "tree", "diffSha256"],
+      "additionalProperties": false,
+      "properties": {
+        "commit": { "type": "string" },
+        "tree": { "type": "string" },
+        "diffSha256": { "type": "string" }
+      }
+    },
+    "cli": {
+      "type": "object",
+      "required": ["version", "compatibilityClass"],
+      "additionalProperties": false,
+      "properties": { "version": { "type": "string" }, "compatibilityClass": { "type": "string" } }
+    },
+    "platform": {
+      "type": "object",
+      "required": ["os", "kernelClass", "filesystemClass"],
+      "additionalProperties": false,
+      "properties": { "os": { "type": "string" }, "kernelClass": { "type": "string" }, "filesystemClass": { "type": "string" } }
+    },
+    "profile": {
+      "type": "object",
+      "required": ["id", "rawSha256"],
+      "additionalProperties": false,
+      "properties": { "id": { "type": "string" }, "rawSha256": { "type": "string" } }
+    },
+    "inputSetSha256": { "type": "string" },
+    "preflight": {
+      "type": "object",
+      "required": ["schema", "rawSha256"],
+      "additionalProperties": false,
+      "properties": { "schema": { "type": "string" }, "rawSha256": { "type": "string" } }
+    },
+    "eventChainSha256": { "type": "string" },
+    "verdictSha256": { "type": ["string", "null"] },
+    "durationMs": { "type": "integer", "minimum": 0 },
+    "cleanup": {
+      "type": "object",
+      "required": ["status", "ownershipMatched"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string", "enum": ["not-needed", "attempted-complete", "attempted-failed", "refused-not-owned"] },
+        "ownershipMatched": { "type": "boolean" }
+      }
+    },
+    "terminalCode": { "type": "string", "enum": ["verdict-success", "verdict-schema-error", "permission-denial", "sandbox-setup-error", "child-stdio-error", "lifecycle-stall", "timeout", "coordinator-cleanup"] },
+    "reviewPass": { "type": "boolean" },
+    "claims": { "$ref": "codex-isolated-critic-claims.schema.json" },
+    "emittedAtMs": { "type": "integer", "minimum": 0 }
+  }
+}

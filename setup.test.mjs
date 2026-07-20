@@ -3,8 +3,8 @@
  * setup.test.mjs — pure-function test suite for setup.mjs.
  *
  * Coverage contract (briefing DoD field 3, item 2): applyAboPreset, applyAutonomyPreset,
- * normalizeLang, renderUserYaml (idempotent + byte-identical to the
- * committed pipeline.user.yaml for buildDefaultAnswers()), answersFromParsed, shortHash,
+ * normalizeLang, renderUserYaml (deterministic legacy migration fixture),
+ * answersFromParsed, shortHash,
  * generatedMarker/extractRecordedHash round-trip, decideCompileAction (all six branches),
  * compileSettingsJson (github shape + gitlab "source: url" fix), compilePipelineJson,
  * renderPipelineYaml, parseArgv (--defaults/--force/--yes/--help flag parsing),
@@ -13,21 +13,22 @@
  * Every function under test here is a PURE builder/classifier (setup.mjs's own header:
  * "I/O happens in the caller") — none of them touch the filesystem, so no OS tmpdir is
  * needed for this suite. This test file never reads/writes this repo's real .claude/
- * configs or pipeline.user.yaml (read-only comparison against the committed
- * pipeline.user.yaml for the byte-identity check only).
+ * configs or pipeline.user.yaml (the committed source is read only to prove
+ * that the legacy builder cannot replace V3 authority).
  *
  * Run:   node setup.test.mjs
  * Exit:  0 = all cases pass · 1 = at least one case failed (failure list on stdout).
  */
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseYaml } from "./plugins/pipeline-core/lib/yaml-lite.mjs";
 import { validateAgainstSchema } from "./plugins/pipeline-core/lib/schema-lite.mjs";
 
 import {
+  ROOT_DIR,
   applyAboPreset,
   applyAutonomyPreset,
   resolveRoutingAnswers,
@@ -44,6 +45,7 @@ import {
   compilePipelineJson,
   renderPipelineYaml,
   validateCompiledPipelineYaml,
+  publishPoGateProfileReceipt,
   validateSharedLock,
   validatePolicyLockPreflight,
   classifyAgentsAdapter,
@@ -55,14 +57,33 @@ import {
   MIGRATED_AGENTS_ADAPTER_BLOB,
   MIGRATED_AGENTS_DIRTY_TRANSITION,
   PIPELINE_START_AUTHORITY,
+  ADVISOR_EXPORT_CONFIGURATION_COMMAND,
+  ADVISOR_EXPORT_DISCLOSURE,
+  renderToolchainSetupReport,
   parseArgv,
+  renderAdvisorExportConsent,
   resolveWarnDisposition,
   run,
+  v3MigrationRequiredMessage,
 } from "./setup.mjs";
+import { poGateProfileReceiptPath } from "./plugins/pipeline-core/lib/po-gate-authority.mjs";
 
 const USER_YAML_PATH = fileURLToPath(new URL("./pipeline.user.yaml", import.meta.url));
 const THREE_SCOPE_FIXTURES_PATH = fileURLToPath(new URL("./templates/three-scope-fixtures.md", import.meta.url));
 const PLUGINS_PATH = fileURLToPath(new URL("./plugins", import.meta.url));
+const READY_TOOLCHAIN = Object.freeze({
+  ok: true,
+  code: "TCP-READY",
+  exitCode: 0,
+  results: [
+    { tool: "node", status: "ready", version: "24.15.0", affectedClaim: null, installCommand: null, guidance: null },
+    { tool: "git", status: "ready", version: "2.50.1", affectedClaim: null, installCommand: null, guidance: null },
+    { tool: "gitleaks", status: "not_required", version: null, affectedClaim: null, installCommand: null, guidance: null },
+    { tool: "osv-scanner", status: "not_required", version: null, affectedClaim: null, installCommand: null, guidance: null },
+    { tool: "semgrep", status: "not_required", version: null, affectedClaim: null, installCommand: null, guidance: null },
+    { tool: "license-check", status: "not_required", version: null, affectedClaim: null, installCommand: null, guidance: null },
+  ],
+});
 
 let pass = 0;
 const failures = [];
@@ -74,6 +95,50 @@ function ok(id, condition, detail) {
     failures.push(`${id}${detail !== undefined ? `: ${detail}` : ""}`);
     console.log(`FAIL  ${id}${detail !== undefined ? ` — ${detail}` : ""}`);
   }
+}
+{
+  const approvedSource = readFileSync(USER_YAML_PATH, "utf8");
+  const withoutConsent = approvedSource.replace(/advisor_export:\n  consent: "approved"\n/u, "");
+  const declined = renderAdvisorExportConsent(withoutConsent, "declined");
+  const approved = renderAdvisorExportConsent(declined, "approved");
+  ok(
+    "advisor export consent: byte-bounded patch supports conservative absence, decline, and approval",
+    !withoutConsent.includes("advisor_export:")
+      && parseYaml(declined).advisor_export?.consent === "declined"
+      && parseYaml(approved).advisor_export?.consent === "approved"
+      && approved.replace(/advisor_export:\n  consent: "approved"\n/u, "") === withoutConsent,
+  );
+  ok(
+    "advisor export consent: disclosure names exported data and default decline with a copyable setup command",
+    ADVISOR_EXPORT_DISCLOSURE.includes("one advisory question")
+      && ADVISOR_EXPORT_DISCLOSURE.includes("allowlisted repository candidate material")
+      && ADVISOR_EXPORT_DISCLOSURE.includes("default is decline")
+      && ADVISOR_EXPORT_CONFIGURATION_COMMAND === "node setup.mjs --configure-advisor-export",
+  );
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "setup-advisor-export-"));
+  const source = readFileSync(USER_YAML_PATH, "utf8").replace(/advisor_export:\n  consent: "approved"\n/u, "");
+  writeFileSync(join(root, "pipeline.user.yaml"), source);
+  const before = readFileSync(join(root, "pipeline.user.yaml"), "utf8");
+  const readonlyCode = await run([], {
+    rootDir: root,
+    validateV3SourceAndRuntime: () => ({ ok: true, diagnostics: [] }),
+    runToolchainPreflight: () => READY_TOOLCHAIN,
+  });
+  const afterReadonly = readFileSync(join(root, "pipeline.user.yaml"), "utf8");
+  const configuredCode = await run(["--configure-advisor-export"], {
+    rootDir: root,
+    validateV3SourceAndRuntime: () => ({ ok: true, diagnostics: [] }),
+    advisorExportConsentAnswer: "",
+    writeAdvisorExportConsentAtomic: (path, bytes) => writeFileSync(path, bytes),
+  });
+  ok(
+    "run: no-flag V3 check stays read-only and explicit consent prompt defaults to decline",
+    readonlyCode === 0 && configuredCode === 0 && before === source && afterReadonly === before
+      && parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8")).advisor_export?.consent === "declined",
+  );
+  rmSync(root, { recursive: true, force: true });
 }
 
 function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" } = {}) {
@@ -98,6 +163,121 @@ function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" }
   ok("validateCompiledPipelineYaml: generated default projection passes canonical validation", result.status === "ok", JSON.stringify(result.errors));
 }
 {
+  const root = mkdtempSync(join(tmpdir(), "setup-po-profile-receipt-"));
+  const common = join(root, ".git");
+  mkdirSync(common, { recursive: true });
+  symlinkSync(PLUGINS_PATH, join(root, "plugins"), "dir");
+  symlinkSync(join(ROOT_DIR, "governance"), join(root, "governance"), "dir");
+  const userYamlText = renderUserYaml(buildDefaultAnswers());
+  const runtimeYamlText = renderPipelineYaml(buildDefaultAnswers(), "po-profile");
+  const topology = { repoRoot: root, primaryRoot: root, gitCommonDir: common, registeredWorktreeRoots: [root] };
+  const first = publishPoGateProfileReceipt({ rootDir: root, userYamlText, runtimeYamlText, updatedAt: "2026-07-18T18:00:00.000Z" }, { topology });
+  const target = poGateProfileReceiptPath(common);
+  const firstBytes = readFileSync(target, "utf8");
+  const second = publishPoGateProfileReceipt({ rootDir: root, userYamlText, runtimeYamlText, updatedAt: "2026-07-18T18:01:00.000Z" }, { topology });
+  const leftovers = readFileSync(target, "utf8");
+  ok("PO profile receipt: validated primary projection publishes canonical mode-0600 receipt", first.ok && second.ok && (statSync(target).mode & 0o777) === 0o600 && firstBytes !== leftovers);
+  ok("PO profile receipt: atomic replacement leaves no adjacent temp", JSON.stringify(readdirSync(dirname(target)).sort()) === JSON.stringify(["profile-receipt.json"]));
+  ok("PO profile receipt: publisher result exposes digests but no machine path", /^[0-9a-f]{64}$/u.test(second.receiptSha256) && !JSON.stringify(second).includes(root));
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "setup-po-profile-invalid-"));
+  const common = join(root, ".git");
+  mkdirSync(common, { recursive: true });
+  symlinkSync(PLUGINS_PATH, join(root, "plugins"), "dir");
+  symlinkSync(join(ROOT_DIR, "governance"), join(root, "governance"), "dir");
+  const userYamlText = renderUserYaml(buildDefaultAnswers());
+  const runtimeYamlText = renderPipelineYaml({ ...buildDefaultAnswers(), language: { human_facing: "de", agent_facing: "en" } }, "po-profile-drift");
+  const topology = { repoRoot: root, primaryRoot: root, gitCommonDir: common, registeredWorktreeRoots: [root] };
+  const result = publishPoGateProfileReceipt({ rootDir: root, userYamlText, runtimeYamlText, updatedAt: "2026-07-18T18:00:00.000Z" }, { topology });
+  ok("PO profile receipt: source/runtime disagreement fails before common-dir mutation", !result.ok && result.code === "PO-PROFILE-PROJECTION-INVALID" && !existsSync(poGateProfileReceiptPath(common)));
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const base = mkdtempSync(join(tmpdir(), "setup-po-profile-linked-"));
+  const primary = join(base, "primary");
+  const linked = join(base, "linked");
+  const common = join(base, "common.git");
+  for (const root of [primary, linked, common]) mkdirSync(root, { recursive: true });
+  symlinkSync(PLUGINS_PATH, join(linked, "plugins"), "dir");
+  symlinkSync(join(ROOT_DIR, "governance"), join(linked, "governance"), "dir");
+  const userYamlText = renderUserYaml(buildDefaultAnswers());
+  const runtimeYamlText = renderPipelineYaml(buildDefaultAnswers(), "po-profile-linked");
+  const before = `${userYamlText}\n# linked sentinel\n`;
+  writeFileSync(join(linked, "pipeline.user.yaml"), before);
+  const result = publishPoGateProfileReceipt({ rootDir: linked, userYamlText, runtimeYamlText, updatedAt: "2026-07-18T18:00:00.000Z" }, {
+    topology: { repoRoot: linked, primaryRoot: primary, gitCommonDir: common, registeredWorktreeRoots: [primary, linked] },
+  });
+  ok("PO profile receipt: linked setup fails without copying or rewriting its branch profile", !result.ok && result.code === "PO-PROFILE-NOT-PRIMARY" && readFileSync(join(linked, "pipeline.user.yaml"), "utf8") === before && !existsSync(poGateProfileReceiptPath(common)));
+  rmSync(base, { recursive: true, force: true });
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "setup-po-profile-run-order-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  const legacySource = "schema: pipeline.user.v1\nlanguage:\n  human_facing: de\n";
+  const runtime = "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: de\n";
+  writeFileSync(join(root, "pipeline.user.yaml"), legacySource);
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), runtime);
+  let publishes = 0;
+  const explicit = await run(["--publish-po-profile"], {
+    rootDir: root,
+    now: () => "2026-07-18T18:00:00.000Z",
+    publishPoGateProfileReceipt(input) {
+      publishes += 1;
+      return input.userYamlText === legacySource && input.runtimeYamlText === runtime
+        ? { ok: true, code: "PO-PROFILE-RECEIPT-PUBLISHED", humanFacing: "de" }
+        : { ok: false, code: "PO-PROFILE-PROJECTION-INVALID", reason: "unexpected bytes" };
+    },
+  });
+  const v3Source = "schema: pipeline.user.v3\nlanguage:\n  human_facing: de\n";
+  writeFileSync(join(root, "pipeline.user.yaml"), v3Source);
+  const verified = await run(["--defaults"], {
+    rootDir: root,
+    validateV3SourceAndRuntime: () => ({ ok: true, diagnostics: [] }),
+    runToolchainPreflight: () => READY_TOOLCHAIN,
+    publishPoGateProfileReceipt: () => { publishes += 100; return { ok: true }; },
+  });
+  ok("run: explicit PO receipt publication accepts V3 language authority without coupling normal verification", explicit === 0 && verified === 0 && publishes === 1);
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const report = renderToolchainSetupReport({
+    ok: false,
+    code: "TCP-BINARY-MISSING",
+    exitCode: 2,
+    results: [
+      { tool: "node", status: "ready", version: "24.15.0", affectedClaim: null, installCommand: null, guidance: null },
+      { tool: "semgrep", status: "binary_missing", version: null, affectedClaim: "Security readiness cannot be claimed until semgrep is installed.", installCommand: "sudo apt-get update && sudo apt-get install -y pipx && pipx install semgrep", guidance: "install semgrep" },
+    ],
+  });
+  ok(
+    "setup toolchain report includes versions, blocked claims, executable prerequisite chains, and the no-install boundary",
+    report.includes("  node: ready (version 24.15.0)")
+      && report.includes("    Blocked claim: Security readiness cannot be claimed until semgrep is installed.")
+      && report.includes("    Review, then run: sudo apt-get update && sudo apt-get install -y pipx && pipx install semgrep")
+      && report.at(-1) === "  Setup did not install or modify any tool.",
+  );
+}
+{
+  const report = renderToolchainSetupReport({
+    ok: false,
+    code: "TCP-EXECUTION-ENVIRONMENT",
+    exitCode: 2,
+    results: [{
+      tool: "semgrep", status: "execution_environment", version: null,
+      affectedClaim: "Toolchain readiness for semgrep was not observed at the current execution boundary.",
+      installCommand: null,
+      guidance: "Rerun the no-flag setup or self-application preflight through the host-authorized local read-only boundary; do not reinstall semgrep from this result.",
+    }],
+  });
+  ok(
+    "setup toolchain report treats execution boundaries as observations rather than missing installations",
+    report.some((line) => line.includes("host-authorized local read-only boundary"))
+      && report.every((line) => !line.includes("Install Semgrep") && !line.includes("pipx install semgrep")),
+  );
+}
+{
   const root = mkdtempSync(join(tmpdir(), "setup-overlay-missing-"));
   mkdirSync(join(root, ".claude"), { recursive: true });
   symlinkSync(PLUGINS_PATH, join(root, "plugins"), "dir");
@@ -113,7 +293,42 @@ function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" }
     spawn: () => ({ status: 0, stdout: `${"a".repeat(40)}\n` }),
   });
   const unchanged = [...sentinels].every(([path, content]) => readFileSync(path, "utf8") === content);
-  ok("run: missing private-overlay fails before source or runtime mutation byte-identically", code === 1 && unchanged);
+  ok("run: a v1 source is migration-only and setup leaves source/runtime byte-identical", code === 2 && unchanged);
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "setup-v2-source-required-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  symlinkSync(PLUGINS_PATH, join(root, "plugins"), "dir");
+  const sentinels = new Map([
+    [join(root, ".claude", "settings.json"), "settings-before\n"],
+    [join(root, ".claude", "pipeline.json"), "pipeline-before\n"],
+    [join(root, ".claude", "pipeline.yaml"), "manifest-before\n"],
+  ]);
+  for (const [path, content] of sentinels) writeFileSync(path, content);
+  const code = await run(["--defaults"], { rootDir: root });
+  const unchanged = !existsSync(join(root, "pipeline.user.yaml"))
+    && [...sentinels].every(([path, content]) => readFileSync(path, "utf8") === content);
+  ok("run: a new install without V3 source fails closed instead of creating legacy defaults", code === 2 && unchanged);
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const text = v3MigrationRequiredMessage("pipeline.user.v1");
+  ok(
+    "V3 migration diagnostic names all explicit review and activation steps",
+    text.includes("accepted only as a V3 migration input")
+      && text.includes(" inspect --root \"$PWD\"")
+      && text.includes(" plan --root \"$PWD\"")
+      && text.includes(" apply --root \"$PWD\" --activate"),
+  );
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "setup-v2-force-rejected-"));
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  const target = join(root, ".claude", "pipeline.yaml");
+  writeFileSync(target, "runtime-before\n");
+  const code = await run(["--defaults", "--force"], { rootDir: root });
+  ok("run: --force cannot bypass explicit V3 migration activation", code === 2 && readFileSync(target, "utf8") === "runtime-before\n");
   rmSync(root, { recursive: true, force: true });
 }
 for (const [name, source] of [
@@ -133,7 +348,7 @@ for (const [name, source] of [
   for (const [path, content] of sentinels) writeFileSync(path, content);
   const code = await run(["--defaults"], { rootDir: root, spawn: () => ({ status: 0, stdout: `${"a".repeat(40)}\n` }) });
   const unchanged = [...sentinels].every(([path, content]) => readFileSync(path, "utf8") === content);
-  ok(`run: ${name} human-facing source rejects before every runtime mutation`, code === 1 && unchanged);
+  ok(`run: ${name} non-V3 source is never compiled and leaves every runtime target unchanged`, code === 2 && unchanged);
   rmSync(root, { recursive: true, force: true });
 }
 {
@@ -167,8 +382,8 @@ for (const [name, source] of [
   const code = await run(["--defaults"], { rootDir: root, spawn: () => ({ status: 0, stdout: `${sha}\n` }) });
   const unchanged = [...sentinels].every(([path, content]) => readFileSync(path, "utf8") === content);
   ok(
-    "run: strict fixed lock fails before source or runtime mutation even when generated manifest has no release",
-    code === 1 && unchanged,
+    "run: legacy source stops at the P3B migration gate before policy or runtime mutation",
+    code === 2 && unchanged,
   );
   rmSync(root, { recursive: true, force: true });
 }
@@ -182,18 +397,24 @@ for (const [name, source] of [
   // This deliberately malformed local-only mapping proves setup consumes neither local
   // coordinates nor a second configuration source; only the anonymous overlay lock is read.
   writeFileSync(join(root, ".pipeline", "machine-local.yaml"), "local: [not parsed by setup\n");
+  const outputs = new Map([
+    ["pipeline.user.yaml", renderUserYaml(buildDefaultAnswers())],
+    [".claude/settings.json", "settings-before\n"],
+    [".claude/pipeline.json", "pipeline-before\n"],
+    [".claude/pipeline.yaml", "manifest-before\n"],
+  ]);
+  for (const [path, bytes] of outputs) writeFileSync(join(root, path), bytes);
   const deps = {
     rootDir: root,
     spawn: (command, args) =>
       command === "git" && args[0] === "rev-parse" ? { status: 0, stdout: `${sha}\n` } : { status: 1, stdout: "" },
   };
   const first = await run(["--defaults"], deps);
-  const outputs = ["pipeline.user.yaml", ".claude/settings.json", ".claude/pipeline.json", ".claude/pipeline.yaml"];
-  const firstBytes = outputs.map((path) => readFileSync(join(root, path), "utf8"));
+  const firstBytes = [...outputs.keys()].map((path) => readFileSync(join(root, path), "utf8"));
   const second = await run(["--defaults"], deps);
-  const secondBytes = outputs.map((path) => readFileSync(join(root, path), "utf8"));
-  ok("run: matching real private-overlay plus synthetic git HEAD permits deterministic setup", first === 0);
-  ok("run: matching real overlay rerun is idempotent without reading machine-local mapping", second === 0 && JSON.stringify(firstBytes) === JSON.stringify(secondBytes));
+  const secondBytes = [...outputs.keys()].map((path) => readFileSync(join(root, path), "utf8"));
+  ok("run: matching legacy overlay still cannot authorize a v1 compiler write", first === 2);
+  ok("run: repeated legacy setup attempts are byte-identical without reading machine-local mapping", second === 2 && JSON.stringify(firstBytes) === JSON.stringify(secondBytes));
   rmSync(root, { recursive: true, force: true });
 }
 
@@ -226,7 +447,7 @@ for (const [name, source] of [
   for (const [path, content] of sentinels) writeFileSync(path, content);
   const code = await run(["--defaults"], { rootDir: root, renderPipelineYamlFn: () => "schema: wrong.schema\n" });
   const unchanged = [...sentinels].every(([path, content]) => existsSync(path) && readFileSync(path, "utf8") === content);
-  ok("run: invalid generated manifest exits 1 and leaves source plus all runtime targets byte-identical", code === 1 && unchanged);
+  ok("run: legacy source does not invoke the v1 manifest compiler and leaves all targets byte-identical", code === 2 && unchanged);
   rmSync(root, { recursive: true, force: true });
 }
 {
@@ -435,7 +656,7 @@ ok("validateHumanFacingLanguage: rejects empty source value fail-closed", valida
 ok("validateHumanFacingLanguage: rejects unsupported source value fail-closed", validateHumanFacingLanguage("fr").ok === false);
 
 // ======================================================================================
-// renderUserYaml — idempotency + byte-identity to the committed pipeline.user.yaml
+// renderUserYaml — deterministic legacy migration fixture, never V3 authority
 // ======================================================================================
 {
   const defaults = buildDefaultAnswers();
@@ -445,9 +666,8 @@ ok("validateHumanFacingLanguage: rejects unsupported source value fail-closed", 
 
   const committed = readFileSync(USER_YAML_PATH, "utf8");
   ok(
-    "renderUserYaml(buildDefaultAnswers()) is byte-identical to the committed pipeline.user.yaml template",
-    first === committed,
-    first === committed ? undefined : `lengths: rendered=${first.length} committed=${committed.length}`,
+    "renderUserYaml(buildDefaultAnswers()) remains v1-only and cannot overwrite committed V3 authority",
+    parseYaml(first).schema === "pipeline.user.v1" && parseYaml(committed).schema === "pipeline.user.v3" && first !== committed,
   );
 }
 {
@@ -457,17 +677,12 @@ ok("validateHumanFacingLanguage: rejects unsupported source value fail-closed", 
   ok("renderUserYaml: never renders identity or platform coordinates", !text.includes("identity:") && !text.includes("platform:"));
 }
 {
-  // worktypes rendering: "off" quotes as a string sentinel, a model name renders bare.
-  const withAdvisorSet = {
-    ...buildDefaultAnswers(),
-    worktypes: { ...buildDefaultAnswers().worktypes, feature: { ...buildDefaultAnswers().worktypes.feature, advisor: "opus" } },
-  };
+  const withAdvisorSet = buildDefaultAnswers();
   const text = renderUserYaml(withAdvisorSet);
-  ok("renderUserYaml: worktypes block present, above models", text.indexOf("worktypes:") > -1 && text.indexOf("worktypes:") < text.indexOf("models:"));
-  ok("renderUserYaml: worktypes.design.advisor renders as quoted \"off\"", text.includes('advisor: "off"'));
-  ok("renderUserYaml: worktypes.feature.advisor reflects an assigned model name (bare, unquoted)", text.includes("advisor: opus") && !text.includes('advisor: "opus"'));
-  ok("renderUserYaml: models block carries the new deep tier", text.includes("deep:") && text.includes("effort: xhigh"));
-  ok("renderUserYaml: models block no longer carries design/advisor", !/^\s{2}design:/m.test(text.slice(text.indexOf("\nmodels:"))));
+  ok("renderUserYaml: direct routing is the sole top-level source", text.includes("schema: pipeline.user.v1") && text.includes("\nrouting:\n") && !/^worktypes:|^models:/m.test(text));
+  ok("renderUserYaml: disabled design advisor stays an explicit off sentinel", text.includes('advisor: "off"'));
+  ok("renderUserYaml: feature advisor carries a nested direct selector", /advisor:\s*\n\s*runner: claude\s*\n\s*selector:\s*\n\s*kind: alias\s*\n\s*value: opus/.test(text));
+  ok("renderUserYaml: Codex Terra duty carries xhigh without a fabricated ID", /codex_implementation:\s*\n\s*runner: codex\s*\n\s*selector:\s*\n\s*kind: alias\s*\n\s*value: terra\s*\n\s*effort: xhigh/.test(text));
 }
 {
   // release: static commented starter example (ADR-0033/0034) -- always present, entirely
@@ -649,6 +864,8 @@ ok("parseArgv: --defaults --force -> both true", (() => {
 })());
 ok("parseArgv: --defaults alone -> force stays false", parseArgv(["--defaults"]).force === false);
 ok("parseArgv: explicit adapter migration is opt-in, never a normal-setup default", parseArgv(["--migrate-agents-adapter"]).migrateAgentsAdapter === true && parseArgv(["--defaults"]).migrateAgentsAdapter === false);
+ok("parseArgv: explicit PO-profile publication is opt-in and standalone", parseArgv(["--publish-po-profile"]).publishPoProfile === true && parseArgv(["--defaults"]).publishPoProfile === false);
+ok("parseArgv: advisor export configuration is explicit and standalone", parseArgv(["--configure-advisor-export"]).configureAdvisorExport === true && parseArgv([]).configureAdvisorExport === false);
 
 // ======================================================================================
 // compileSettingsJson — public projection carries only the generic marketplace binding
@@ -657,7 +874,7 @@ ok("parseArgv: explicit adapter migration is opt-in, never a normal-setup defaul
   const settings = compileSettingsJson(null, buildDefaultAnswers(), "hash123");
   ok(
     "compileSettingsJson: projects the generic agent-pipeline marketplace mapping",
-    settings.extraKnownMarketplaces?.["agent-pipeline"]?.source?.repo === "agent-pipeline/agent-pipeline",
+    settings.extraKnownMarketplaces?.["agent-pipeline"]?.source?.repo === "agent-pipe-shared/agent-pipeline",
     JSON.stringify(settings.extraKnownMarketplaces),
   );
   ok("compileSettingsJson: no existing state -> synthesizes statusLine/enabledPlugins", settings.statusLine && settings.enabledPlugins);
@@ -700,7 +917,7 @@ ok("parseArgv: explicit adapter migration is opt-in, never a normal-setup defaul
   ok("compileSettingsJson: preserves a pre-existing sibling marketplace entry", !!settings.extraKnownMarketplaces["other-plugin"]);
   ok(
     "compileSettingsJson: replaces a legacy agent-pipeline mapping with the generic binding",
-    settings.extraKnownMarketplaces["agent-pipeline"]?.source?.repo === "agent-pipeline/agent-pipeline",
+    settings.extraKnownMarketplaces["agent-pipeline"]?.source?.repo === "agent-pipe-shared/agent-pipeline",
     JSON.stringify(settings.extraKnownMarketplaces["agent-pipeline"]),
   );
 }
@@ -730,24 +947,25 @@ ok("parseArgv: explicit adapter migration is opt-in, never a normal-setup defaul
 // renderPipelineYaml — contains model-routing + gate values from answers
 // ======================================================================================
 {
+  const routing = structuredClone(buildDefaultAnswers().routing);
+  routing.worktypes.feature.execution_phase = {
+    ...routing.worktypes.feature.execution_phase,
+    selector: { kind: "alias", value: "opus" },
+  };
+  routing.duties.review = {
+    ...routing.duties.review,
+    selector: { kind: "alias", value: "haiku" },
+    effort: "high",
+  };
   const answers = {
     ...buildDefaultAnswers(),
-    worktypes: {
-      ...buildDefaultAnswers().worktypes,
-      feature: { design_phase: { model: "opus", effort: "max" }, execution_phase: { model: "opus", effort: "high" }, advisor: "off" },
-    },
-    models: {
-      implement: { model: "sonnet", effort: "medium" },
-      mechanic: { model: "sonnet", effort: "low" },
-      deep: { model: "sonnet", effort: "xhigh" },
-      review: { model: "haiku", effort: "high" },
-    },
+    routing,
     gates: { dev_plan: "warn", push: "blocking", security: "off", claude_md_max_lines: 200 },
     autonomy: { push_policy: "gated", branch_model: "feature-branch", wip_limit: 1 },
   };
   const yaml = renderPipelineYaml(answers, "hashGHI");
   ok(
-    "renderPipelineYaml: full feature execution route mirrors worktypes.feature.execution_phase",
+    "renderPipelineYaml: full feature execution route mirrors direct worktype routing",
     /elephant_feature_execution:\s*\n\s*model: opus\s*\n\s*effort: high/.test(yaml),
     yaml,
   );
@@ -756,22 +974,22 @@ ok("parseArgv: explicit adapter migration is opt-in, never a normal-setup defaul
     (yaml.match(/^  elephant_(?:design|feature|mini)_(?:design|execution):$/gm) ?? []).length === 6,
   );
   ok(
-    "renderPipelineYaml: goldfish model-routing mirrors models.implement",
+    "renderPipelineYaml: goldfish model-routing mirrors direct implement duty",
     /goldfish:\s*\n\s*model: sonnet-5\s*\n\s*effort: medium/.test(yaml),
     yaml,
   );
   ok(
-    "renderPipelineYaml: goldfish_mechanic mirrors models.mechanic",
+    "renderPipelineYaml: goldfish_mechanic mirrors direct mechanic duty",
     /goldfish_mechanic:\s*\n\s*model: sonnet-5\s*\n\s*effort: low/.test(yaml),
     yaml,
   );
   ok(
-    "renderPipelineYaml: goldfish_deep mirrors models.deep (MP-27 3-tier completeness)",
+    "renderPipelineYaml: goldfish_deep mirrors direct deep duty (MP-27 3-tier completeness)",
     /goldfish_deep:\s*\n\s*model: sonnet-5\s*\n\s*effort: xhigh/.test(yaml),
     yaml,
   );
   ok(
-    "renderPipelineYaml: critic model-routing mirrors models.review",
+    "renderPipelineYaml: critic model-routing mirrors direct review duty",
     /critic:\s*\n\s*model: haiku\s*\n\s*effort: high/.test(yaml),
     yaml,
   );

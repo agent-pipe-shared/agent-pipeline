@@ -18,9 +18,9 @@
  * Run:   node harness/scripts/security-scan.test.mjs
  * Exit:  0 = all cases pass, 1 = at least one case failed (failure list on stdout).
  */
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -88,7 +88,23 @@ function writeFixtureBinary(name, jsBody) {
 }
 
 function fixtureSpawnFn(cmd, args, opts) {
-  return spawnSync(cmd, args, { ...opts, shell: process.platform === "win32" });
+  // Fixture scripts need a shell on Windows, but the Node preflight must retain
+  // the production `shell: false` contract.
+  return spawnSync(cmd, args, { ...opts, shell: process.platform === "win32" && cmd !== process.execPath });
+}
+
+function permissionDeniedSpawnFn(code) {
+  const error = new Error("operation not permitted by execution environment");
+  error.code = code;
+  return { status: null, stdout: "", stderr: "", error };
+}
+
+function epermSpawnFn() {
+  return permissionDeniedSpawnFn("EPERM");
+}
+
+function eaccesSpawnFn() {
+  return permissionDeniedSpawnFn("EACCES");
 }
 
 function makeRootDir(label) {
@@ -152,20 +168,38 @@ process.exit(0);
 `,
 );
 
+const gitleaksUnexpectedShape = writeFixtureBinary(
+  "gitleaks-unexpected-shape",
+  `import { writeFileSync } from "node:fs";
+const args = process.argv.slice(2);
+const reportPath = args[args.indexOf("--report-path") + 1];
+writeFileSync(reportPath, JSON.stringify({ findings: [] }));
+process.exit(0);
+`,
+);
+
 // ---------------------------------------------------------------------------------------------
 // osv-scanner fixture binaries
 // ---------------------------------------------------------------------------------------------
 
 const osvClean = writeFixtureBinary(
   "osv-clean",
-  `process.stdout.write(JSON.stringify({ results: [] }));
+  `if (process.argv.includes("--version")) {
+  process.stdout.write("osv-scanner version: 2.0.3\\n");
+  process.exit(0);
+}
+process.stdout.write(JSON.stringify({ results: [] }));
 process.exit(0);
 `,
 );
 
 const osvFindings = writeFixtureBinary(
   "osv-findings",
-  `const report = {
+  `if (process.argv.includes("--version")) {
+  process.stdout.write("osv-scanner version: 2.0.3\\n");
+  process.exit(0);
+}
+const report = {
   results: [
     {
       source: { path: "package-lock.json" },
@@ -177,6 +211,7 @@ const osvFindings = writeFixtureBinary(
             { id: "GHSA-yyyy-numeric", summary: "ReDoS", severity: [{ type: "CVSS_V3", score: "7.8" }] },
             { id: "GHSA-zzzz-unknown", summary: "Unclear severity vuln" },
           ],
+          groups: [{ ids: ["GHSA-xxxx-critical"] }],
         },
       ],
     },
@@ -189,22 +224,108 @@ process.exit(1);
 
 const osvCrash = writeFixtureBinary(
   "osv-crash",
-  `process.stdout.write("totally not json {{{");
+  `if (process.argv.includes("--version")) {
+  process.stdout.write("osv-scanner version: 2.0.3\\n");
+  process.exit(0);
+}
+process.stdout.write("totally not json {{{");
 process.exit(2);
+`,
+);
+
+const osvMissingResults = writeFixtureBinary(
+  "osv-missing-results",
+  `if (process.argv.includes("--version")) {
+  process.stdout.write("osv-scanner version: 2.0.3\\n");
+  process.exit(0);
+}
+process.stdout.write(JSON.stringify({ schema: "unexpected" }));
+process.exit(0);
+`,
+);
+
+const osvMalformedPackages = writeFixtureBinary(
+  "osv-malformed-packages",
+  `if (process.argv.includes("--version")) {
+  process.stdout.write("osv-scanner version: 2.0.3\\n");
+  process.exit(0);
+}
+process.stdout.write(JSON.stringify({
+  results: [{ source: { path: "package-lock.json" }, packages: {} }],
+}));
+process.exit(0);
+`,
+);
+
+const osvMissingGroups = writeFixtureBinary(
+  "osv-missing-groups",
+  `if (process.argv.includes("--version")) {
+  process.stdout.write("osv-scanner version: 2.0.3\\n");
+  process.exit(0);
+}
+process.stdout.write(JSON.stringify({
+  results: [{
+    source: { path: "package-lock.json" },
+    packages: [{
+      package: { name: "lodash", version: "4.17.15" },
+      vulnerabilities: [{ id: "GHSA-xxxx" }],
+    }],
+  }],
+}));
+process.exit(1);
+`,
+);
+
+const osvMalformedVulnerability = writeFixtureBinary(
+  "osv-malformed-vulnerability",
+  `if (process.argv.includes("--version")) {
+  process.stdout.write("osv-scanner version: 2.0.3\\n");
+  process.exit(0);
+}
+process.stdout.write(JSON.stringify({
+  results: [{
+    source: { path: "package-lock.json" },
+    packages: [{
+      package: { name: "lodash", version: "4.17.15" },
+      vulnerabilities: [{ id: 7 }],
+      groups: [],
+    }],
+  }],
+}));
+process.exit(1);
 `,
 );
 
 const osvNoPackageSources = writeFixtureBinary(
   "osv-no-package-sources",
-  `process.stderr.write("No package sources found, --help for usage information.\\n");
+  `if (process.argv.includes("--version")) {
+  process.stdout.write("osv-scanner version: 2.0.3\\n");
+  process.exit(0);
+}
+process.stderr.write("No package sources found, --help for usage information.\\n");
 process.exit(128);
 `,
 );
 
 const osvExit128Other = writeFixtureBinary(
   "osv-exit-128-other",
-  `process.stderr.write("fatal: some other unrelated crash\\n");
+  `if (process.argv.includes("--version")) {
+  process.stdout.write("osv-scanner version: 2.0.3\\n");
+  process.exit(0);
+}
+process.stderr.write("fatal: some other unrelated crash\\n");
 process.exit(128);
+`,
+);
+
+const osvV1 = writeFixtureBinary(
+  "osv-v1",
+  `if (process.argv.includes("--version")) {
+  process.stdout.write("osv-scanner version: 1.9.2\\n");
+  process.exit(0);
+}
+process.stderr.write("v1 scan syntax should never run\\n");
+process.exit(99);
 `,
 );
 
@@ -249,6 +370,27 @@ const semgrepCrash = writeFixtureBinary(
   "semgrep-crash",
   `process.stdout.write("<<<not-json>>>");
 process.exit(2);
+`,
+);
+
+const semgrepNonzeroCleanBody = writeFixtureBinary(
+  "semgrep-nonzero-clean-body",
+  `process.stdout.write(JSON.stringify({ results: [] }));
+process.exit(1);
+`,
+);
+
+const semgrepErrorPayload = writeFixtureBinary(
+  "semgrep-error-payload",
+  `process.stdout.write(JSON.stringify({ results: [], errors: [{ message: "rule loading failed" }] }));
+process.exit(0);
+`,
+);
+
+const semgrepMissingResults = writeFixtureBinary(
+  "semgrep-missing-results",
+  `process.stdout.write(JSON.stringify({ version: "1.0" }));
+process.exit(0);
 `,
 );
 
@@ -300,10 +442,26 @@ process.exit(2);
   assertIncludes("gitleaks run: garbage reason mentions unparseable", result.reason, "unparseable");
 }
 {
+  const rootDir = makeRootDir("gitleaks-unexpected-shape-root");
+  const result = await gitleaksAdapter.run({ rootDir, config: { binaryPath: gitleaksUnexpectedShape }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("gitleaks run: valid JSON object report -> scanner_error", { status: result.status, classification: result.classification, count: result.findings.length }, { status: "ERROR", classification: "scanner_error", count: 0 });
+}
+{
   const rootDir = makeRootDir("gitleaks-notinstalled-root");
   const result = await gitleaksAdapter.run({ rootDir, config: {}, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
   assertEqual("gitleaks run: not installed -> SKIPPED", result.status, "SKIPPED");
+  assertEqual("gitleaks run: not installed -> binary_missing classification", result.classification, "binary_missing");
   assertTrue("gitleaks run: SKIPPED carries a reason", typeof result.reason === "string" && result.reason.length > 0, result.reason);
+}
+{
+  const rootDir = makeRootDir("gitleaks-eperm-root");
+  const result = await gitleaksAdapter.run({ rootDir, config: { binaryPath: gitleaksClean }, spawnFn: epermSpawnFn, timeoutMs: 5000 });
+  assertEqual("gitleaks run: EPERM -> execution_environment (not missing/finding)", { status: result.status, classification: result.classification, findings: result.findings.length }, { status: "ERROR", classification: "execution_environment", findings: 0 });
+}
+{
+  const rootDir = makeRootDir("gitleaks-eacces-root");
+  const result = await gitleaksAdapter.run({ rootDir, config: { binaryPath: gitleaksClean }, spawnFn: eaccesSpawnFn, timeoutMs: 5000 });
+  assertEqual("gitleaks run: EACCES -> execution_environment (not missing/finding)", { status: result.status, classification: result.classification, findings: result.findings.length }, { status: "ERROR", classification: "execution_environment", findings: 0 });
 }
 
 // ===============================================================================================
@@ -340,6 +498,29 @@ process.exit(2);
   assertEqual("osv-scanner run: garbage output + exit code 2 -> ERROR", result.status, "ERROR");
 }
 {
+  const rootDir = makeRootDir("osv-missing-results-root");
+  const result = await osvScannerAdapter.run({ rootDir, config: { binaryPath: osvMissingResults }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("osv-scanner run: valid JSON without top-level results[] -> scanner_error", { status: result.status, classification: result.classification }, { status: "ERROR", classification: "scanner_error" });
+}
+{
+  const rootDir = makeRootDir("osv-malformed-packages-root");
+  const result = await osvScannerAdapter.run({ rootDir, config: { binaryPath: osvMalformedPackages }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("osv-scanner run: v2 result with packages object (not array) -> scanner_error", { status: result.status, classification: result.classification, findings: result.findings.length }, { status: "ERROR", classification: "scanner_error", findings: 0 });
+  assertIncludes("osv-scanner run: malformed packages failure names results[0].packages", result.reason, "results[0].packages");
+}
+{
+  const rootDir = makeRootDir("osv-missing-groups-root");
+  const result = await osvScannerAdapter.run({ rootDir, config: { binaryPath: osvMissingGroups }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("osv-scanner run: v2 package without groups[] -> scanner_error", { status: result.status, classification: result.classification, findings: result.findings.length }, { status: "ERROR", classification: "scanner_error", findings: 0 });
+  assertIncludes("osv-scanner run: missing groups failure names results[0].packages[0].groups", result.reason, "results[0].packages[0].groups");
+}
+{
+  const rootDir = makeRootDir("osv-malformed-vulnerability-root");
+  const result = await osvScannerAdapter.run({ rootDir, config: { binaryPath: osvMalformedVulnerability }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("osv-scanner run: v2 vulnerability with non-string id -> scanner_error", { status: result.status, classification: result.classification, findings: result.findings.length }, { status: "ERROR", classification: "scanner_error", findings: 0 });
+  assertIncludes("osv-scanner run: malformed vulnerability failure names id", result.reason, "id");
+}
+{
   // F2 fix: exit 128 + "No package sources found" -- project has nothing to scan, honest
   // SKIPPED, not a blocking ERROR (specs/2026-07-07-ap1-tuning/e2e-demo.md Finding F2).
   const rootDir = makeRootDir("osv-no-package-sources-root");
@@ -354,6 +535,22 @@ process.exit(2);
   const result = await osvScannerAdapter.run({ rootDir, config: { binaryPath: osvExit128Other }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
   assertEqual("osv-scanner run: exit 128 with DIFFERENT output -> still ERROR (fail-closed)", result.status, "ERROR");
   assertIncludes("osv-scanner run: exit-128-other reason mentions exit code", result.reason, "exited 128");
+}
+{
+  const rootDir = makeRootDir("osv-v1-root");
+  const result = await osvScannerAdapter.run({ rootDir, config: { binaryPath: osvV1 }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("osv-scanner run: major v1 -> incompatible_major before scan", { status: result.status, classification: result.classification, findings: result.findings.length }, { status: "ERROR", classification: "incompatible_major", findings: 0 });
+  assertIncludes("osv-scanner run: incompatible major names v2 requirement", result.reason, "v2");
+}
+{
+  const rootDir = makeRootDir("osv-eperm-root");
+  const result = await osvScannerAdapter.run({ rootDir, config: { binaryPath: osvClean }, spawnFn: epermSpawnFn, timeoutMs: 5000 });
+  assertEqual("osv-scanner run: EPERM version probe -> execution_environment", { status: result.status, classification: result.classification, findings: result.findings.length }, { status: "ERROR", classification: "execution_environment", findings: 0 });
+}
+{
+  const rootDir = makeRootDir("osv-eacces-root");
+  const result = await osvScannerAdapter.run({ rootDir, config: { binaryPath: osvClean }, spawnFn: eaccesSpawnFn, timeoutMs: 5000 });
+  assertEqual("osv-scanner run: EACCES version probe -> execution_environment", { status: result.status, classification: result.classification, findings: result.findings.length }, { status: "ERROR", classification: "execution_environment", findings: 0 });
 }
 
 // ===============================================================================================
@@ -383,6 +580,31 @@ process.exit(2);
   const rootDir = makeRootDir("semgrep-crash-root");
   const result = await semgrepAdapter.run({ rootDir, config: { binaryPath: semgrepCrash }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
   assertEqual("semgrep run: garbage output -> ERROR", result.status, "ERROR");
+}
+{
+  const rootDir = makeRootDir("semgrep-nonzero-clean-body-root");
+  const result = await semgrepAdapter.run({ rootDir, config: { binaryPath: semgrepNonzeroCleanBody }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("semgrep run: nonzero exit with clean-looking results[] -> scanner_error", { status: result.status, classification: result.classification }, { status: "ERROR", classification: "scanner_error" });
+}
+{
+  const rootDir = makeRootDir("semgrep-error-payload-root");
+  const result = await semgrepAdapter.run({ rootDir, config: { binaryPath: semgrepErrorPayload }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("semgrep run: JSON error payload with empty results[] -> scanner_error", { status: result.status, classification: result.classification }, { status: "ERROR", classification: "scanner_error" });
+}
+{
+  const rootDir = makeRootDir("semgrep-missing-results-root");
+  const result = await semgrepAdapter.run({ rootDir, config: { binaryPath: semgrepMissingResults }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("semgrep run: valid JSON without results[] -> scanner_error", { status: result.status, classification: result.classification }, { status: "ERROR", classification: "scanner_error" });
+}
+{
+  const rootDir = makeRootDir("semgrep-eperm-root");
+  const result = await semgrepAdapter.run({ rootDir, config: { binaryPath: semgrepClean }, spawnFn: epermSpawnFn, timeoutMs: 5000 });
+  assertEqual("semgrep run: EPERM -> execution_environment (not missing/finding)", { status: result.status, classification: result.classification, findings: result.findings.length }, { status: "ERROR", classification: "execution_environment", findings: 0 });
+}
+{
+  const rootDir = makeRootDir("semgrep-eacces-root");
+  const result = await semgrepAdapter.run({ rootDir, config: { binaryPath: semgrepClean }, spawnFn: eaccesSpawnFn, timeoutMs: 5000 });
+  assertEqual("semgrep run: EACCES -> execution_environment (not missing/finding)", { status: result.status, classification: result.classification, findings: result.findings.length }, { status: "ERROR", classification: "execution_environment", findings: 0 });
 }
 
 // ===============================================================================================
@@ -470,6 +692,36 @@ process.exit(2);
   });
   assertEqual("license-check run: malformed allowlist JSON -> ERROR", result.status, "ERROR");
 }
+{
+  const rootDir = makeRootDir("license-invalid-allowlist-root");
+  writeLicenseFiles(rootDir, {
+    allowlist: { allow: ["MIT"] },
+    declared: { dependencies: [] },
+  });
+  const result = await licenseCheckAdapter.run({
+    rootDir,
+    config: {
+      allowlistPath: join(rootDir, "governance", "examples", "policies", "license-allowlist.json"),
+      declaredPath: join(rootDir, "third-party-licenses.json"),
+    },
+  });
+  assertEqual("license-check run: valid JSON allowlist without deny[] -> scanner_error", { status: result.status, classification: result.classification, count: result.findings.length }, { status: "ERROR", classification: "scanner_error", count: 0 });
+}
+{
+  const rootDir = makeRootDir("license-invalid-declaration-root");
+  writeLicenseFiles(rootDir, {
+    allowlist: { allow: ["MIT"], deny: [] },
+    declared: {},
+  });
+  const result = await licenseCheckAdapter.run({
+    rootDir,
+    config: {
+      allowlistPath: join(rootDir, "governance", "examples", "policies", "license-allowlist.json"),
+      declaredPath: join(rootDir, "third-party-licenses.json"),
+    },
+  });
+  assertEqual("license-check run: valid JSON declaration without dependencies[] -> scanner_error", { status: result.status, classification: result.classification, count: result.findings.length }, { status: "ERROR", classification: "scanner_error", count: 0 });
+}
 
 // ===============================================================================================
 // RUNNER (security-scan.mjs / runSecurityScan) aggregation cases
@@ -492,6 +744,8 @@ process.exit(2);
     ],
   );
   assertEqual("runner: manifest absent -> default thresholds", evidence.thresholds, { block_on: ["critical", "high"] });
+  assertEqual("runner: manifest absent -> binary-backed SKIPPED entries classify binary_missing", evidence.scanners.slice(0, 3).map((s) => s.classification), ["binary_missing", "binary_missing", "binary_missing"]);
+  assertEqual("runner: manifest absent -> child-process preflight succeeds", evidence.execution.childProcessPreflight, { status: "PASS", classification: "success" });
   const evidenceFile = join(rootDir, "evidence", "security-latest.json");
   assertTrue("runner: evidence file written (manifest-absent path)", existsSync(evidenceFile), evidenceFile);
   const onDisk = JSON.parse(readFileSync(evidenceFile, "utf8"));
@@ -554,7 +808,7 @@ governance:
   assertEqual("runner: mixed statuses -> findings array carries the 2 gitleaks findings", evidence.findings.length, 2);
   assertTrue(
     "runner: evidence full schema field set",
-    ["schema", "project", "command", "commit", "finishedAt", "thresholds", "scanners", "findings", "exitCode"].every((k) =>
+    ["schema", "project", "command", "commit", "finishedAt", "thresholds", "execution", "scanners", "findings", "exitCode"].every((k) =>
       Object.prototype.hasOwnProperty.call(evidence, k),
     ),
     JSON.stringify(Object.keys(evidence)),
@@ -568,6 +822,40 @@ governance:
     existsSync(join(rootDir, "evidence", "security-latest.json")),
     "evidence/security-latest.json missing",
   );
+}
+
+{
+  const rootDir = makeRootDir("runner-child-preflight-eperm-root");
+  const env = {
+    PIPELINE_GITLEAKS_PATH: gitleaksClean,
+    PIPELINE_OSV_SCANNER_PATH: osvClean,
+    PIPELINE_SEMGREP_PATH: semgrepClean,
+  };
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env, spawnFn: epermSpawnFn, timeoutMs: 5000 });
+  assertEqual("runner: child preflight EPERM is execution_environment", evidence.execution.childProcessPreflight.classification, "execution_environment");
+  assertEqual(
+    "runner: child preflight EPERM preempts all binary scanners without missing/finding classification",
+    evidence.scanners.slice(0, 3).map((s) => [s.tool, s.status, s.classification, s.findingCount]),
+    [
+      ["gitleaks", "ERROR", "execution_environment", 0],
+      ["osv-scanner", "ERROR", "execution_environment", 0],
+      ["semgrep", "ERROR", "execution_environment", 0],
+    ],
+  );
+  assertEqual("runner: child preflight EPERM is fail-closed", exitCode, 2);
+}
+
+{
+  const rootDir = makeRootDir("runner-child-preflight-eacces-root");
+  const env = {
+    PIPELINE_GITLEAKS_PATH: gitleaksClean,
+    PIPELINE_OSV_SCANNER_PATH: osvClean,
+    PIPELINE_SEMGREP_PATH: semgrepClean,
+  };
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env, spawnFn: eaccesSpawnFn, timeoutMs: 5000 });
+  assertEqual("runner: child preflight EACCES is execution_environment", evidence.execution.childProcessPreflight.classification, "execution_environment");
+  assertEqual("runner: child preflight EACCES preempts binary scanners", evidence.scanners.slice(0, 3).map((s) => s.classification), ["execution_environment", "execution_environment", "execution_environment"]);
+  assertEqual("runner: child preflight EACCES is fail-closed", exitCode, 2);
 }
 
 {
@@ -688,6 +976,33 @@ security:
   assertEqual("runner: all scanners disabled -> exit 0", exitCode, 0);
 }
 
+{
+  const rootDir = makeRootDir("runner-standard-user-bin-root");
+  const fakeHome = makeRootDir("runner-standard-user-bin-home");
+  const localBin = join(fakeHome, ".local", "bin");
+  mkdirSync(localBin, { recursive: true });
+  symlinkSync(semgrepClean, join(localBin, "semgrep"));
+  writeManifest(
+    rootDir,
+    `schema: pipeline.manifest.v0
+
+security:
+  scanners:
+    gitleaks:
+      enabled: false
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: true
+    license-check:
+      enabled: false
+`,
+  );
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env: { HOME: fakeHome, PATH: `${dirname(process.execPath)}:/usr/bin:/bin` }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("runner: standard user-local Semgrep is discovered outside arbitrary PATH", evidence.scanners.map((entry) => [entry.tool, entry.status]), [["semgrep", "PASS"]]);
+  assertEqual("runner: standard user-local Semgrep keeps a clean scan non-blocking", exitCode, 0);
+}
+
 // ===============================================================================================
 // CLI smoke test (real child process, bare rootDir -> everything SKIPPED, exit 0)
 // ===============================================================================================
@@ -695,7 +1010,9 @@ security:
 {
   const rootDir = makeRootDir("cli-smoke-root");
   const { PIPELINE_GITLEAKS_PATH, PIPELINE_OSV_SCANNER_PATH, PIPELINE_SEMGREP_PATH, ...baseEnv } = process.env;
-  const res = spawnSync(process.execPath, [SCRIPT, "--root", rootDir, "--timeout-ms", "5000"], { encoding: "utf8", env: baseEnv });
+  // A blank PATH plus an empty fixture HOME keeps this bare-root smoke
+  // independent from host-installed system and standard per-user scanners.
+  const res = spawnSync(process.execPath, [SCRIPT, "--root", rootDir, "--timeout-ms", "5000"], { encoding: "utf8", env: { ...baseEnv, HOME: rootDir, PATH: "", Path: "" }, shell: false });
   assertEqual("CLI: bare rootDir -> exit 0", res.status, 0);
   assertIncludes("CLI: stdout contains verdict line", res.stdout, "Verdict: CLEAN");
   assertIncludes("CLI: stdout reports evidence path", res.stdout, "Evidence written:");

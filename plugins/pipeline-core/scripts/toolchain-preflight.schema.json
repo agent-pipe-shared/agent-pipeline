@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.toolchain-preflight.v1",
+  "type": "object",
+  "required": ["schema", "ok", "code", "status", "manifest", "securityGate", "platform", "results", "preparedHandles", "exitCode"],
+  "properties": {
+    "schema": { "const": "pipeline.toolchain-preflight.v1" },
+    "ok": { "type": "boolean" },
+    "code": { "type": "string" },
+    "status": { "type": "string" },
+    "manifest": { "type": "object" },
+    "securityGate": { "enum": ["blocking", "warn", "off"] },
+    "platform": { "enum": ["linux", "darwin", "win32", "unsupported"] },
+    "results": {
+      "type": "array",
+      "minItems": 6,
+      "maxItems": 6,
+      "items": {
+        "type": "object",
+        "required": ["tool", "status", "version", "capabilities", "preparedHandleDigest", "affectedClaim", "installCommand", "installAttempted", "guidance"],
+        "additionalProperties": false,
+        "properties": {
+          "tool": { "enum": ["node", "git", "gitleaks", "osv-scanner", "semgrep", "license-check"] },
+          "status": { "type": "string" },
+          "version": { "type": ["string", "null"] },
+          "capabilities": { "type": "array", "items": { "type": "string" } },
+          "preparedHandleDigest": { "type": ["string", "null"] },
+          "affectedClaim": { "type": ["string", "null"] },
+          "installCommand": { "type": ["string", "null"] },
+          "installAttempted": { "const": false },
+          "guidance": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "preparedHandles": { "type": "object" },
+    "exitCode": { "enum": [0, 1, 2] }
+  },
+  "additionalProperties": false
+}

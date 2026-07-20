@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.invalid/schemas/workflow-fallback-receipt.schema.json",
+  "title": "Coordinator-only one-shot workflow fallback receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "creatorDuty", "featureId", "revision", "packageId", "actionId", "origin", "fault", "sameLaneRetryProhibited", "fallback", "bindings", "permissions", "budgets", "outputSchemaSha256", "mayDelegate", "globalWritesProhibited", "outcome", "resultSha256", "assurance"],
+  "properties": {
+    "schema": { "const": "pipeline.workflow-fallback-receipt.v1" },
+    "creatorDuty": { "const": "Coordinator" },
+    "featureId": { "$ref": "#/$defs/safeId" },
+    "revision": { "type": "integer", "minimum": 0 },
+    "packageId": { "$ref": "#/$defs/safeId" },
+    "actionId": { "$ref": "#/$defs/safeId" },
+    "origin": {
+      "type": "object", "additionalProperties": false,
+      "required": ["dispatchId", "attemptId", "laneId"],
+      "properties": { "dispatchId": { "$ref": "#/$defs/safeId" }, "attemptId": { "$ref": "#/$defs/safeId" }, "laneId": { "$ref": "#/$defs/safeId" } }
+    },
+    "fault": {
+      "type": "object", "additionalProperties": false,
+      "required": ["code", "evidenceSha256"],
+      "properties": {
+        "code": { "enum": ["host-sandbox-bootstrap-rejected", "host-sandbox-capability-unsupported", "host-sandbox-broker-disconnected", "host-sandbox-calibrated-transport-failure"] },
+        "evidenceSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "sameLaneRetryProhibited": { "const": true },
+    "fallback": {
+      "type": "object", "additionalProperties": false,
+      "required": ["laneId", "dispatchId", "environmentRerouteCount"],
+      "properties": { "laneId": { "$ref": "#/$defs/safeId" }, "dispatchId": { "$ref": "#/$defs/safeId" }, "environmentRerouteCount": { "const": 1 } }
+    },
+    "bindings": {
+      "type": "object", "additionalProperties": false,
+      "required": ["taskSha256", "commit", "tree", "inputSha256", "authorityPaths", "authorityDigests"],
+      "properties": {
+        "taskSha256": { "$ref": "#/$defs/sha256" },
+        "commit": { "$ref": "#/$defs/sha40" },
+        "tree": { "$ref": "#/$defs/sha40" },
+        "inputSha256": { "$ref": "#/$defs/sha256" },
+        "authorityPaths": {
+          "type": "object", "additionalProperties": false, "required": ["prd", "spec", "result"],
+          "properties": { "prd": { "$ref": "#/$defs/path" }, "spec": { "$ref": "#/$defs/path" }, "result": { "$ref": "#/$defs/path" } }
+        },
+        "authorityDigests": {
+          "type": "object", "additionalProperties": false, "required": ["prd", "spec", "result"],
+          "properties": { "prd": { "$ref": "#/$defs/sha256" }, "spec": { "$ref": "#/$defs/sha256" }, "result": { "$ref": "#/$defs/sha256" } }
+        }
+      }
+    },
+    "permissions": {
+      "type": "object", "additionalProperties": false,
+      "required": ["readPaths", "writePaths", "tools"],
+      "properties": {
+        "readPaths": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/path" } },
+        "writePaths": { "type": "array", "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/writablePath" } },
+        "tools": { "type": "array", "maxItems": 32, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } }
+      }
+    },
+    "budgets": {
+      "type": "object", "additionalProperties": false,
+      "required": ["walltimeMs", "turns", "commands", "outputBytes"],
+      "properties": { "walltimeMs": { "$ref": "#/$defs/positive" }, "turns": { "$ref": "#/$defs/positive" }, "commands": { "$ref": "#/$defs/positive" }, "outputBytes": { "$ref": "#/$defs/positive" } }
+    },
+    "outputSchemaSha256": { "$ref": "#/$defs/sha256" },
+    "mayDelegate": { "const": false },
+    "globalWritesProhibited": { "const": true },
+    "outcome": { "enum": ["pending", "running", "succeeded", "failed", "blocked"] },
+    "resultSha256": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sha256" }] },
+    "assurance": { "const": "normal-contractual-read-only; OS isolation not asserted" }
+  },
+  "$defs": {
+    "safeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "sha40": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "path": { "type": "string", "pattern": "^(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[A-Za-z0-9._/-]{1,240}$" },
+    "writablePath": { "type": "string", "pattern": "^(?!(?:\\.claude|\\.pipeline)/)(?!docs/state\\.md$)(?!/)(?!.*//)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*\\\\)[A-Za-z0-9._/-]{1,240}$" },
+    "positive": { "type": "integer", "minimum": 1 }
+  }
+}

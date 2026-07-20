@@ -53,6 +53,44 @@ Implemented as a skill (Phase 3): **`/pipeline-core:pipeline-start`** (canonical
 2. **One line in the project's CLAUDE.md** ("Run `/pipeline-core:pipeline-start` first") as an advisory fallback. If the skill invocation fails ("unknown skill"), that is precisely the evidence of case **F1** (ruleset missing) — the fallback thus detects the absence of the main layer.
 3. The **confirmation line** (Step 6) makes execution auditable for the PO and for hooks.
 
+#### V3 advisor-export override (ADR-0040)
+
+For `pipeline.user.v3`, validate `advisor_export` before every advisory action.
+Missing consent and `consent: declined` are valid, accepted Advisory-off
+states: bootstrap performs no adapter probe, selected-sandbox lookup, child,
+export, or receipt, and may complete with `Advisory disabled-no-consent ·
+Receipt n/a`. The read-only `node setup.mjs` check never writes this decision;
+it prints the exact explicit workflow command
+`node setup.mjs --configure-advisor-export`, whose disclosure names the single
+question and allowlisted repository candidate material and defaults to decline.
+
+With `consent: approved`, Epic/Feature invokes only the registered same-runner
+primary duty. Claude routing and Read/Grep/Glob consult tools are unchanged.
+Codex uses the repository-owned closed launcher (never a raw `node -e` export)
+and one ephemeral native App-Server turn on `openai/gpt-5.6-sol`; standing V3
+consent replaces per-run export approval. Its one bounded UTF-8 question is
+passed only on stdin, never in launcher argv. Codex receives exactly
+Read/Grep/Glob/Bash only inside the exact selected
+`network-open/read-only` transport; an unbound host shell/consult is not a
+fallback. No-child, wrong identity, missing profile readback, incomplete stdio
+or incomplete cleanup remains non-success without a duplicate consult. Such a
+primary failure is printed as `Advisory degraded-direct-subagent · Receipt n/a
+· Reason CODE`; bootstrap may complete and run one separate fresh read-only
+direct subagent. That degraded fallback emits no Pipeline Advisory receipt or
+attestation, satisfies no review/readiness/gate claim, and is never
+auto-applied. A
+missing configured tool result must name the blocked claim, include a copyable
+platform-appropriate install command whose own installer prerequisites were
+verified or embedded in the command, and report `installAttempted:false`;
+bootstrap never runs that command automatically. npm is not a substitute for
+Gitleaks, OSV-Scanner, or Semgrep. Standard user-local pipx/Go binary locations
+are recognized explicitly, and probe scratch must use bounded temporary
+storage instead of being mistaken for a missing installation.
+`execution_environment`, `probe_timeout`, and `probe_error` are host-boundary
+observations, not missing installations: rerun no-flag setup/self-application
+preflight through the host-authorized local read-only boundary and never
+recommend reinstalling from those statuses.
+
 ### Step 1 — Determine plugin presence + loaded state
 
 - **Requirement:** determine whether `pipeline-core` is installed and loaded, and determine the loaded state: during the SHA phase the commit SHA, from the SemVer phase onward the version (resolution order: `plugin.json` version → marketplace entry → commit SHA).
@@ -89,7 +127,7 @@ Implemented as a skill (Phase 3): **`/pipeline-core:pipeline-start`** (canonical
 
   **Advisor hygiene (new order):** if an advisor is already running under the `design-first` profile (a leftover from a prior `advisor` profile — an advisor-model user setting persists per machine), the bootstrap checks in this order: (1) ask about parallel advisor sessions of other projects on this machine; (2) prefer the project-local off switch `"advisorModel": ""` in `.claude/settings.local.json` (the live settings validator rejects `null` even though the docs mention it; `$comment` keys are invalid in `settings.local.json`); (3) `/advisor off` ONLY if no parallel session is affected; (4) **divergence = mandatory question (PO condition "one always decides"):** if the ACTUAL advisor state diverges from the intended state of the chosen profile (e.g. a machine-inherited advisor in a design-first session), the bootstrap presents the resolution as an AskUserQuestion (keep advisor / project-local off / `/advisor off`) — silent inheritance is a bootstrap defect; informing without asking does NOT fulfill the duty.
 - **Requirement (Elephant, profile-bound):** set and **verify** model/effort per the profile chosen in Step 1b (`policies/model-policy.md` MP-01/MP-17): profile `design-first` → **phase-aware:** if the design for this topic is ALREADY approved (the normal case of a follow-up execution session after an EL-25 cut), the session starts DIRECTLY in the execution phase, `/model opus` + `/effort max` from session start, the design-tier model otherwise only for T1 critics/readiness subagents; otherwise `/model opus` + `/effort xhigh` until the PRD approval gate, then EXACTLY ONCE `/effort max` (EL-24, sanctioned exception MP-17/MP-18); profile `advisor` → already from session start `/model opus` + `/effort max` + advisor activated (MP-26 — default, as long as the advisor model is billed outside the plan quota); profile `speed` (NEW) → model/effort/advisor per `policies/model-policy.md` (MP-28) already from session start — fixed mapping, no phase switch, no advisor-hygiene flow check needed. Effort is **session-only** and must be set anew at every session start. **Notice duty:** `xhigh` remains the design-phase default; `max` is otherwise NOT generically recommended for guardrail/architecture/refactoring sessions — `max` applies only under model-fallback operation, for implement-/mechanic-tier dispatches, for PO-designated special tasks (e.g. initial sessions of entirely new topics; under MP-08 indication the Ultracode task opt-in remains an alternative), or for planned execution-phase operation on the design-tier model (profiles `design-first`/`advisor`). Notice duty now means: name the option when the PO themself flags such a special task — no more proactive pitching. The PO decides.
-- **Requirement:** confirm that `CLAUDE_CODE_SUBAGENT_MODEL` is **NOT** set (MP-04) — the env var would override the frontmatter of all subagents and silently defeat the model matrix.
+- **Requirement:** run `node plugins/pipeline-core/scripts/bootstrap-env-check.mjs` and require its explicit `status: clear` receipt (MP-04). This confirms that `CLAUDE_CODE_SUBAGENT_MODEL` is **NOT** set without presenting normal empty `printenv` output as an error or disclosing a configured value; the env var would override the frontmatter of all subagents and silently defeat the model matrix.
 - **Roles:** mandatory for the Elephant (§6.1). Goldfish/Critic get model/effort from agent frontmatter resp. dispatch (MP-02/MP-07) — this step is skipped for them.
 - **Model-identity hardening:** the active model identity is confirmed from OBSERVED evidence (`/model` output or explicit PO confirmation), never assumed — especially in the turns immediately following a credit/limit event (risk of a silent fallback to a different model).
 - **Verification (profile-bound):** profile `design-first`: before the PRD gate the extra line confirms the design-tier model at `xhigh`; after the gate at `max` plus identity proof (`/model` output). Profile `advisor`: the extra line confirms the design-tier model at `max` AND an attached advisor from session start onward. The extra line of the Elephant confirmation (§6.1) names model/effort/profile/advisor (extended format, see Step 6); deviations from the role default require justification against `policies/model-policy.md`.
@@ -124,7 +162,7 @@ This step ends in a **third mandatory confirmation line** (printed directly unde
 
 ### Step 2 — Staleness check against the marketplace remote
 
-- **Requirement:** compare the installed state with the remote HEAD of the marketplace repo, e.g. `git ls-remote <marketplace-url> HEAD`. The URL is in the project's committed `.claude/settings.json` (`extraKnownMarketplaces` entry) — the skill can derive it from there, no hardcoding.
+- **Requirement:** run `node plugins/pipeline-core/scripts/ruleset-freshness.mjs --repo "$PWD"`. It derives the remote from the committed `.claude/settings.json`, uses bounded remote access and a disposable bare repository, and never changes source refs/config. Consumer installs require equality. In the Agent-Pipeline self-application checkout, `equal|ahead` is current; `behind|diverged` is stale; `unknown` is unchecked. On Codex, use the host-authorized network-open/read-only command boundary directly instead of first producing a known sandbox DNS failure.
 - **Note (mechanism, only on a STALE warning from the SessionStart hook):** if the plugin's SessionStart hook reports a STALE warning IN THIS SESSION naming the installed SHA and remote SHA by name, Step 2 may adopt that result as equivalent evidence instead of re-running `ls-remote` itself. The real hook output otherwise only has a constant fresh-path bootstrap line without SHAs — it looks identical whether the SHAs match or the hook fired fail-open for lack of resolvability, and is therefore NOT usable as substitution proof. If only that constant line is present, or no hook output exists at all, Step 2 still requires its own `ls-remote`.
 - **Why:** third-party marketplaces don't auto-update; without this check, two-machine cache drift replaces the old copy-paste drift.
 - **Verification:** SHA match = current. Mismatch = stale → case **F2**. Remote unreachable → case **F3**. The check needs network + credentials for the private repo (see §5).
@@ -272,7 +310,22 @@ The Elephant must additionally be able to speak to the session-lifecycle policy 
 
 - **Input is exhaustively defined:** spec, diff, guardrails/constraints (incl. relevant calibration portions as a check standard) and the evidence artifacts of the work under review. **Explicitly NO handover, NO chat history, NO implementor rationale.** Why: the Critic is meant to judge independently — history context creates exactly the anchoring effects it's meant to neutralize.
 - No staleness check: the Critic checks against the state the assignment names it; keeping the ruleset current is the Elephant's duty.
-- Confirmation that **no write tools** are available (read-only subagent, possibly `--bare` tier for critical diffs) — if writing is possible, the bootstrap has failed (wrong agent definition loaded).
+- Confirmation that **no write tools** are available. For critical T1 diffs,
+  confirm the selected runner's usable native isolation; `claude -p --bare`
+  remains a Claude runner adapter, not a global critical-review mechanism. If
+  that isolation is technically unavailable or unusable in the current host
+  setup, confirm the standing PO-authorized functional equivalent: **one**
+  fresh independently briefed Critic subagent with no chat/history or
+  implementer reasoning, refs-only bounded input, strict
+  read-only/no-write/no-subdelegation instruction, fixed candidate commit and
+  diff, higher-capability route, JSON-schema-shaped verdict, and the literal
+  assurance `functional-equivalent-read-only; OS isolation not asserted`. This
+  is a standing authorization, not a per-candidate waiver: it preserves every
+  T1 trigger, higher-capability escalation, evidence, independence, and
+  finding-disposition requirement. The contractual read-only equivalent never
+  claims OS isolation or effective provider model identity; if even it cannot
+  be provided, stop at a PO course gate. If writing is possible, the bootstrap
+  has failed (wrong agent definition loaded).
 - **Compact confirmation** (field "State" deliberately omitted):
 
   > "Bootstrap check passed: ruleset \<SHA from assignment\> loaded · Project \<name\> · Calibration \<file|n/a\> · State n/a (Critic sees no history) · Role Critic"
@@ -394,6 +447,33 @@ Als Skill implementiert (Phase 3): **`/pipeline-core:pipeline-start`** (kanonisc
 2. **Eine Zeile in der Projekt-CLAUDE.md** („Führe zuerst `/pipeline-core:pipeline-start` aus") als advisory Fallback. Schlägt die Skill-Invokation fehl („unknown skill"), ist genau das der Nachweis von Fall **F1** (Regelwerk fehlt) — der Fallback detektiert also die Abwesenheit der Hauptschicht.
 3. Die **Bestätigungszeile** (Schritt 6) macht den Vollzug für den PO und für Hooks prüfbar.
 
+#### V3-Override für Advisor-Export (ADR-0040)
+
+Bei `pipeline.user.v3` wird `advisor_export` vor jeder Advisory-Aktion
+validiert. Fehlende Zustimmung und `consent: declined` sind gültige,
+akzeptierte Advisory-aus-Zustände: Der Bootstrap startet weder Adapter-Probe,
+Sandbox-Auswahl, Kind noch Export oder Receipt und darf mit `Advisory
+disabled-no-consent · Receipt n/a` abschließen. Der Read-only-Check
+`node setup.mjs` schreibt diese Entscheidung nie, sondern zeigt den exakten
+expliziten Befehl `node setup.mjs --configure-advisor-export`; dessen
+Offenlegung nennt die einzelne Frage und das allowlist-begrenzte
+Repository-Kandidatenmaterial und lehnt standardmäßig ab.
+
+Mit `consent: approved` läuft für Epic/Feature ausschließlich die registrierte
+Same-Runner-Duty. Claude-Routing und Read/Grep/Glob bleiben unverändert. Codex
+erhält Read/Grep/Glob/Bash ausschließlich im exakt ausgewählten
+`network-open/read-only`-Transport; eine ungebundene Host-Shell bzw. ein
+ungebundener Consult ist kein Fallback. No-child, falsche Identität, fehlendes
+Profil-Readback oder unvollständige stdio-/Cleanup-Evidenz bleibt ohne
+doppelten Consult ein Nicht-Erfolg. Ein fehlendes konfiguriertes Werkzeug nennt
+den blockierten Claim und einen kopierbaren plattformgerechten Installbefehl,
+dessen Installer-Voraussetzungen geprüft oder im Befehl enthalten sind, sowie
+`installAttempted:false`; der Bootstrap führt ihn nie automatisch aus. npm ist
+kein Ersatz für Gitleaks, OSV-Scanner oder Semgrep. Standardmäßige lokale
+pipx-/Go-Binary-Verzeichnisse werden explizit erkannt; Probe-Scratch liegt in
+gebundenem temporärem Speicher und darf nicht als fehlende Installation
+fehlklassifiziert werden.
+
 ### Schritt 1 — Plugin-Präsenz + geladenen Stand ermitteln
 
 - **Gebot:** Stelle fest, ob `pipeline-core` installiert und geladen ist, und ermittle den geladenen Stand: in der SHA-Phase den Commit-SHA, ab SemVer-Phase die Version (Auflösungsreihenfolge: `plugin.json`-Version → Marketplace-Eintrag → Commit-SHA).
@@ -430,7 +510,7 @@ Als Skill implementiert (Phase 3): **`/pipeline-core:pipeline-start`** (kanonisc
 
   **Advisor-Hygiene (neue Reihenfolge):** Läuft im Profil `design-first` bereits ein Advisor (Rest eines vorherigen `advisor`-Profils — ein Advisor-Modell-User-Setting persistiert je Maschine), prüft der Bootstrap in dieser Reihenfolge: (1) Frage nach parallelen Advisor-Sessions anderer Projekte auf dieser Maschine; (2) bevorzuge den projekt-lokalen Off-Schalter `"advisorModel": ""` in `.claude/settings.local.json` (der Live-Settings-Validator lehnt `null` ab, obwohl die Doku es nennt; `$comment`-Schlüssel sind in `settings.local.json` ungültig); (3) `/advisor off` NUR, wenn keine parallele Session betroffen ist; (4) **Divergenz = Pflichtfrage (PO-Bedingung „man entscheidet immer"):** weicht der TATSÄCHLICHE Advisor-Zustand vom beabsichtigten Zustand des gewählten Profils ab (z. B. maschinen-vererbter Advisor in einer design-first-Session), legt der Bootstrap die Auflösung als AskUserQuestion vor (Advisor behalten / projekt-lokal aus / `/advisor off`) — stille Vererbung ist ein Bootstrap-Defekt, Informieren ohne Fragen erfüllt die Pflicht NICHT.
 - **Gebot (Elephant, profilgebunden):** Setze und **verifiziere** Modell/Effort gemäß dem in Schritt 1b gewählten Profil (`policies/model-policy.md` MP-01/MP-17): Profil `design-first` → **phasenbewusst:** ist das Design für dieses Thema BEREITS freigegeben (Regelfall einer Folge-Ausführungssession nach EL-25-Schnitt), startet die Session DIREKT in der Ausführungsphase, `/model opus` + `/effort max` ab Sessionbeginn, das Design-Tier-Modell sonst nur für T1-Critics/Readiness-Subagenten; sonst `/model opus` + `/effort xhigh` bis zum PRD-Freigabe-Gate, danach GENAU EINMAL `/effort max` (EL-24, sanktionierte Ausnahme MP-17/MP-18); Profil `advisor` → bereits ab Sessionbeginn `/model opus` + `/effort max` + Advisor aktiviert (MP-26 — Standard, solange das Advisor-Modell außerhalb des Plan-Kontingents abgerechnet wird); Profil `speed` (NEU) → Modell/Effort/Advisor gemäß `policies/model-policy.md` (MP-28) bereits ab Sessionbeginn — fixe Zuordnung, kein Phasenwechsel, keine Advisor-Hygiene-Ablaufprüfung nötig. Effort ist **session-only** und muss bei jedem Sessionstart neu gesetzt werden. **Hinweispflicht:** `xhigh` bleibt der Design-Phase-Standard; `max` wird sonst NICHT generisch für Guardrail-/Architektur-/Refactoring-Sessions empfohlen — `max` gilt nur bei Modell-Fallback-Betrieb, bei Implement-/Mechanic-Tier-Dispatches, für vom PO benannte Sondertasks (z. B. initiale Sessions ganz neuer Themen; bei MP-08-Indikation weiterhin alternativ der Ultracode-Task-Opt-in), oder bei geplantem Ausführungsphasen-Betrieb auf dem Design-Tier-Modell (Profile `design-first`/`advisor`). Hinweispflicht heißt jetzt: die Option benennen, wenn der PO selbst einen solchen Sondertask ausweist — kein proaktives Anpreisen mehr. Der PO entscheidet.
-- **Gebot:** Bestätige, dass `CLAUDE_CODE_SUBAGENT_MODEL` **NICHT** gesetzt ist (MP-04) — die Env-Var würde das Frontmatter aller Subagents überschreiben und die Modell-Matrix still aushebeln.
+- **Gebot:** Führe `node plugins/pipeline-core/scripts/bootstrap-env-check.mjs` aus und verlange den expliziten Receipt `status: clear` (MP-04). Damit ist bestätigt, dass `CLAUDE_CODE_SUBAGENT_MODEL` **NICHT** gesetzt ist, ohne eine normale leere `printenv`-Ausgabe als Fehler darzustellen oder einen gesetzten Wert offenzulegen; die Env-Var würde das Frontmatter aller Subagents überschreiben und die Modell-Matrix still aushebeln.
 - **Rollen:** Pflicht für den Elephant (§6.1). Goldfish/Critic beziehen Modell/Effort aus Agent-Frontmatter bzw. Dispatch (MP-02/MP-07) — für sie entfällt der Schritt.
 - **Modell-Identitäts-Härtung:** Die aktive Modell-Identität wird aus BEOBACHTETER Evidenz bestätigt (`/model`-Ausgabe oder explizite PO-Bestätigung), nie angenommen — insbesondere in den Turns unmittelbar nach einem Credit-/Limit-Ereignis (Risiko eines stillen Fallbacks auf ein anderes Modell).
 - **Prüfweise (profilgebunden):** Profil `design-first`: vor dem PRD-Gate bestätigt die Zusatzzeile das Design-Tier-Modell bei `xhigh`; nach dem Gate bei `max` plus Identitätsnachweis (`/model`-Ausgabe). Profil `advisor`: die Zusatzzeile bestätigt von Sessionbeginn an das Design-Tier-Modell bei `max` UND einen angehängten Advisor. Die Zusatzzeile der Elephant-Bestätigung (§6.1) nennt Modell/Effort/Profil/Advisor (erweitertes Format, s. Schritt 6); Abweichungen vom Rollen-Default sind begründungspflichtig gegen `policies/model-policy.md`.
@@ -465,7 +545,7 @@ Dieser Schritt endet in einer **dritten verbindlichen Bestätigungszeile** (Deut
 
 ### Schritt 2 — Staleness-Check gegen den Marketplace-Remote
 
-- **Gebot:** Vergleiche den installierten Stand mit dem Remote-HEAD des Marketplace-Repos, z. B. `git ls-remote <marketplace-url> HEAD`. Die URL steht in der committeten `.claude/settings.json` des Projekts (`extraKnownMarketplaces`-Eintrag) — der Skill kann sie von dort ableiten, kein Hardcoding.
+- **Gebot:** Führe `node plugins/pipeline-core/scripts/ruleset-freshness.mjs --repo "$PWD"` aus. Der Helper leitet das Remote aus der committeten `.claude/settings.json` ab, nutzt begrenzten Remote-Zugriff und ein wegwerfbares Bare-Repository und verändert keine Source-Refs/-Config. Consumer-Installationen verlangen Gleichheit. Im Agent-Pipeline-Self-Application-Checkout gilt `equal|ahead` als aktuell, `behind|diverged` als stale und `unknown` als ungeprüft. Unter Codex wird direkt die host-autorisierte network-open/read-only Befehlsgrenze verwendet, statt zuerst einen bekannten Sandbox-DNS-Fehler zu erzeugen.
 - **Hinweis (Mechanismus, nur bei STALE-Warnung des SessionStart-Hooks):** Meldet der SessionStart-Hook des Plugins in DIESER Session eine STALE-Warnung, die installierten SHA und Remote-SHA namentlich nennt, darf Schritt 2 dieses Ergebnis als gleichwertige Evidenz übernehmen statt `ls-remote` selbst erneut auszuführen. Die reale Hook-Ausgabe kennt sonst nur eine konstante Fresh-Pfad-Bootstrap-Zeile ohne SHAs — sie fällt identisch aus, ob die SHAs übereinstimmen oder der Hook mangels Auflösbarkeit fail-open ausgelöst hat, und taugt deshalb NICHT als Substitutionsnachweis. Liegt nur diese konstante Zeile vor oder fehlt jede Hook-Ausgabe, gilt Schritt 2 unverändert per eigenem `ls-remote`.
 - **Warum:** Drittanbieter-Marketplaces auto-updaten nicht; ohne diesen Check ersetzt Zwei-Rechner-Cache-Drift die alte Copy-Paste-Drift.
 - **Prüfweise:** SHA-Gleichheit = aktuell. Abweichung = stale → Fall **F2**. Remote nicht erreichbar → Fall **F3**. Der Check braucht Netz + Credentials fürs private Repo (siehe §5).
@@ -613,7 +693,25 @@ Der Elephant muss außerdem zur Session-Lifecycle-Politik auskunftsfähig sein (
 
 - **Input ist abschließend definiert:** Spec, Diff, Guardrails/Constraints (inkl. relevanter Kalibrierungs-Anteile als Prüfmaßstab) und die Evidenz-Artefakte des Prüflings. **Explizit KEIN Handover, KEIN Chat-Verlauf, KEINE Implementor-Begründungen.** Warum: Der Critic soll unabhängig urteilen — Verlaufskontext erzeugt genau die Ankereffekte, die er neutralisieren soll.
 - Kein Staleness-Check: Der Critic prüft gegen den Stand, den ihm der Auftrag nennt; Aktualität des Regelwerks zu sichern ist Elephant-Pflicht.
-- Bestätigung, dass **keine Schreib-Tools** verfügbar sind (read-only Subagent, ggf. `--bare`-Stufe für kritische Diffs) — ist Schreiben möglich, ist der Bootstrap gescheitert (falsche Agent-Definition geladen).
+- Bestätigung, dass **keine Schreib-Tools** verfügbar sind. Für kritische
+  T1-Diffs ist die nutzbare native Isolation des ausgewählten Runners zu
+  bestätigen; `claude -p --bare` bleibt ein Adapter des Claude-Runners, kein
+  globaler Critical-Review-Mechanismus. Ist diese Isolation im aktuellen
+  Host-Setup technisch nicht verfügbar oder nicht nutzbar, ist die stehende
+  PO-autorisierte funktionale Entsprechung zu bestätigen: **genau ein** frisch
+  und unabhängig gebriefter Critic-Subagent ohne Chat/History oder
+  Implementierer-Reasoning, mit begrenzter Refs-only-Eingabe, strikter
+  Read-only/No-write/No-subdelegation-Anweisung, festem Kandidaten-Commit und
+  Diff, einer Route auf höherem Capability-Tier, schemaförmigem JSON-Verdikt
+  und dem wörtlichen Assurance-Literal
+  `functional-equivalent-read-only; OS isolation not asserted`. Dies ist eine
+  stehende Autorisierung, kein Kandidat-für-Kandidat-Waiver: Sie erhält jeden
+  T1-Trigger, die Eskalation auf höheres Capability-Tier, Evidenz,
+  Unabhängigkeit und jede Befund-Dispositionspflicht. Die vertragliche
+  Read-only-Entsprechung behauptet weder OS-Isolation noch eine effektive
+  Provider-Modellidentität; kann auch sie nicht bereitgestellt werden, ist am
+  PO-Kurs-Gate zu stoppen. Ist Schreiben möglich, ist der Bootstrap gescheitert
+  (falsche Agent-Definition geladen).
 - **Kompakte Bestätigung** (Feld „Stand" entfällt bewusst):
 
   > „Bootstrap-Check bestanden: Regelwerk \<SHA aus Auftrag\> geladen · Projekt \<name\> · Kalibrierung \<datei|n/a\> · Stand n/a (Critic sieht keinen Verlauf) · Rolle Critic"

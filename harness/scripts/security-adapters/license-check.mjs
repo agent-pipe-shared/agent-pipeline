@@ -39,6 +39,27 @@ export function isInstalled(_env = process.env) {
   return { installed: true };
 }
 
+function isStringArray(value) {
+  return Array.isArray(value) && value.every((item) => typeof item === "string" && item.trim().length > 0);
+}
+
+function isRecord(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function validAllowlist(value) {
+  return isRecord(value) && isStringArray(value.allow) && isStringArray(value.deny);
+}
+
+function validDeclaration(value) {
+  return isRecord(value)
+    && Array.isArray(value.dependencies)
+    && value.dependencies.every((dependency) => isRecord(dependency)
+      && typeof dependency.name === "string" && dependency.name.trim().length > 0
+      && typeof dependency.license === "string" && dependency.license.trim().length > 0
+      && (dependency.version === undefined || typeof dependency.version === "string"));
+}
+
 export async function run({ config = {} } = {}) {
   const allowlistPath = config.allowlistPath;
   const declaredPath = config.declaredPath;
@@ -59,19 +80,38 @@ export async function run({ config = {} } = {}) {
   try {
     allowlist = JSON.parse(readFileSync(allowlistPath, "utf8"));
   } catch (err) {
-    return { status: "ERROR", findings: [], raw: null, reason: `malformed license-allowlist.json (${allowlistPath}): ${err.message}` };
+    return { status: "ERROR", classification: "scanner_error", findings: [], raw: null, reason: `malformed license-allowlist.json (${allowlistPath}): ${err.message}` };
   }
 
   let declared;
   try {
     declared = JSON.parse(readFileSync(declaredPath, "utf8"));
   } catch (err) {
-    return { status: "ERROR", findings: [], raw: null, reason: `malformed third-party-licenses.json (${declaredPath}): ${err.message}` };
+    return { status: "ERROR", classification: "scanner_error", findings: [], raw: null, reason: `malformed third-party-licenses.json (${declaredPath}): ${err.message}` };
   }
 
-  const allow = new Set(Array.isArray(allowlist?.allow) ? allowlist.allow : []);
-  const deny = new Set(Array.isArray(allowlist?.deny) ? allowlist.deny : []);
-  const dependencies = Array.isArray(declared?.dependencies) ? declared.dependencies : [];
+  if (!validAllowlist(allowlist)) {
+    return {
+      status: "ERROR",
+      classification: "scanner_error",
+      findings: [],
+      raw: { allowlist, declared },
+      reason: "unexpected license-allowlist.json shape (expected allow[] and deny[] of non-empty strings)",
+    };
+  }
+  if (!validDeclaration(declared)) {
+    return {
+      status: "ERROR",
+      classification: "scanner_error",
+      findings: [],
+      raw: { allowlist, declared },
+      reason: "unexpected third-party-licenses.json shape (expected dependencies[] with name and license strings)",
+    };
+  }
+
+  const allow = new Set(allowlist.allow);
+  const deny = new Set(allowlist.deny);
+  const { dependencies } = declared;
 
   const findings = [];
   for (const dep of dependencies) {

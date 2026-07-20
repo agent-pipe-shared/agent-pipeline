@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.check-ownership.v1",
+  "title": "Mandatory check ownership and overlap map",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "candidate", "mandatoryCheckIds", "checks", "overlaps"],
+  "properties": {
+    "schema": { "const": "pipeline.check-ownership.v1" },
+    "candidate": {
+      "type": "object", "additionalProperties": false, "required": ["commit", "tree"],
+      "properties": { "commit": { "$ref": "#/$defs/oid" }, "tree": { "$ref": "#/$defs/oid" } }
+    },
+    "mandatoryCheckIds": { "type": "array", "minItems": 1, "maxItems": 512, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } },
+    "checks": {
+      "type": "array", "minItems": 1, "maxItems": 512,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["checkId", "owner", "errorClass", "assertionFingerprint", "evidenceIds"],
+        "properties": {
+          "checkId": { "$ref": "#/$defs/id" },
+          "owner": { "enum": ["deterministic-verify", "semantic-critic", "trajectory-critic", "human-risk"] },
+          "errorClass": { "$ref": "#/$defs/id" },
+          "assertionFingerprint": { "$ref": "#/$defs/sha256" },
+          "evidenceIds": { "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+        }
+      }
+    },
+    "overlaps": {
+      "type": "array", "maxItems": 4096,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["leftCheckId", "rightCheckId", "leftAssertionFingerprint", "rightAssertionFingerprint", "overlapFingerprint", "evidenceIds"],
+        "properties": {
+          "leftCheckId": { "$ref": "#/$defs/id" }, "rightCheckId": { "$ref": "#/$defs/id" },
+          "leftAssertionFingerprint": { "$ref": "#/$defs/sha256" }, "rightAssertionFingerprint": { "$ref": "#/$defs/sha256" },
+          "overlapFingerprint": { "$ref": "#/$defs/sha256" },
+          "evidenceIds": { "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": { "$ref": "#/$defs/id" } }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "id": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "oid": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

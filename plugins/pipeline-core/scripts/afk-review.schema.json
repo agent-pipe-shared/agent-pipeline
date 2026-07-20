@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.afk-review.v1",
+  "title": "Closed AFK PO review or per-entry disposition receipt",
+  "oneOf": [
+    { "$ref": "#/$defs/review" },
+    { "$ref": "#/$defs/receipt" }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "oid": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+    "safeId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,127}$" },
+    "disposition": {
+      "type": "object", "additionalProperties": false,
+      "required": ["entryId", "sequence", "decision"],
+      "properties": {
+        "entryId": { "$ref": "#/$defs/safeId" },
+        "sequence": { "type": "integer", "minimum": 1 },
+        "decision": { "enum": ["accept", "reject"] }
+      }
+    },
+    "review": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "activationId", "reviewId", "attributedBy", "reviewedAt", "freezeRecordSha256", "dispositions", "acceptedPrefixLength", "promotionOid", "reviewSha256"],
+      "properties": {
+        "schema": { "const": "pipeline.afk-review.v1" },
+        "activationId": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "reviewId": { "$ref": "#/$defs/safeId" },
+        "attributedBy": { "type": "string", "minLength": 1, "maxLength": 256 },
+        "reviewedAt": { "type": "string", "format": "date-time" },
+        "freezeRecordSha256": { "$ref": "#/$defs/sha256" },
+        "dispositions": { "type": "array", "items": { "$ref": "#/$defs/disposition" } },
+        "acceptedPrefixLength": { "type": "integer", "minimum": 0 },
+        "promotionOid": { "$ref": "#/$defs/oid" },
+        "reviewSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "receipt": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "activationId", "reviewId", "reviewSha256", "entryId", "sequence", "decision", "entryCommit", "receiptSha256"],
+      "properties": {
+        "schema": { "const": "pipeline.afk-entry-receipt.v1" },
+        "activationId": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+        "reviewId": { "$ref": "#/$defs/safeId" },
+        "reviewSha256": { "$ref": "#/$defs/sha256" },
+        "entryId": { "$ref": "#/$defs/safeId" },
+        "sequence": { "type": "integer", "minimum": 1 },
+        "decision": { "enum": ["accept", "reject"] },
+        "entryCommit": { "$ref": "#/$defs/oid" },
+        "receiptSha256": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

@@ -1,0 +1,367 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.user.v2",
+  "title": "Runner-honest project intent",
+  "type": "object",
+  "required": ["schema", "language", "agent_runtime", "runners", "routing", "usage", "autonomy", "gates"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "pipeline.user.v2" },
+    "setup": {
+      "type": "object",
+      "required": ["intent"],
+      "additionalProperties": false,
+      "properties": {
+        "intent": { "enum": ["unconfigured", "consumer", "maintainer"] }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "required": ["owner_name", "repo_owner", "repo_name", "commit_trailer"],
+      "additionalProperties": false,
+      "properties": {
+        "owner_name": { "type": "string" },
+        "repo_owner": { "type": "string" },
+        "repo_name": { "type": "string" },
+        "commit_trailer": { "type": "boolean" }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "required": ["git_host", "cli"],
+      "additionalProperties": false,
+      "properties": {
+        "git_host": { "enum": ["github", "gitlab"] },
+        "cli": { "enum": ["gh", "glab"] }
+      },
+      "oneOf": [
+        { "properties": { "git_host": { "const": "github" }, "cli": { "const": "gh" } } },
+        { "properties": { "git_host": { "const": "gitlab" }, "cli": { "const": "glab" } } }
+      ]
+    },
+    "release": { "$ref": "#/$defs/release" },
+    "language": {
+      "type": "object",
+      "required": ["human_facing", "agent_facing"],
+      "additionalProperties": false,
+      "properties": {
+        "human_facing": { "enum": ["de", "en"] },
+        "agent_facing": { "enum": ["de", "en"] }
+      }
+    },
+    "agent_runtime": { "enum": ["claude-code", "other"] },
+    "runners": {
+      "type": "object",
+      "required": ["enabled", "default"],
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "enum": ["claude", "codex"] }
+        },
+        "default": { "enum": ["claude", "codex"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "default": { "const": "claude" } }, "required": ["default"] },
+          "then": { "properties": { "enabled": { "contains": { "const": "claude" } } } }
+        },
+        {
+          "if": { "properties": { "default": { "const": "codex" } }, "required": ["default"] },
+          "then": { "properties": { "enabled": { "contains": { "const": "codex" } } } }
+        }
+      ]
+    },
+    "routing": {
+      "type": "object",
+      "required": ["profiles", "duties"],
+      "additionalProperties": false,
+      "properties": {
+        "profiles": {
+          "type": "object",
+          "required": ["design", "feature", "mini"],
+          "additionalProperties": false,
+          "properties": {
+            "design": { "$ref": "#/$defs/profile" },
+            "feature": { "$ref": "#/$defs/profile" },
+            "mini": { "$ref": "#/$defs/profile" }
+          }
+        },
+        "duties": {
+          "type": "object",
+          "required": ["implement", "mechanic", "deep", "test_author", "critic_normal", "critic_high_risk", "readiness"],
+          "additionalProperties": false,
+          "properties": {
+            "implement": { "$ref": "#/$defs/duty" },
+            "mechanic": { "$ref": "#/$defs/duty" },
+            "deep": { "$ref": "#/$defs/duty" },
+            "test_author": { "$ref": "#/$defs/duty" },
+            "critic_normal": { "$ref": "#/$defs/duty" },
+            "critic_high_risk": { "$ref": "#/$defs/duty" },
+            "readiness": { "$ref": "#/$defs/duty" }
+          }
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "required": ["common_projection", "raw_persistence"],
+      "additionalProperties": false,
+      "properties": {
+        "common_projection": { "const": "pipeline.runner-usage.v1" },
+        "raw_persistence": { "const": "none" }
+      }
+    },
+    "autonomy": {
+      "type": "object",
+      "required": ["push_policy", "branch_model", "wip_limit"],
+      "additionalProperties": false,
+      "properties": {
+        "push_policy": { "enum": ["gated", "standing-approved"] },
+        "branch_model": { "enum": ["feature-branch", "direct-main"] },
+        "wip_limit": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "gates": {
+      "type": "object",
+      "required": ["dev_plan", "push", "security", "claude_md_max_lines"],
+      "additionalProperties": false,
+      "properties": {
+        "dev_plan": { "enum": ["blocking", "warn", "off"] },
+        "push": { "enum": ["blocking", "warn", "off"] },
+        "security": { "enum": ["blocking", "warn", "off"] },
+        "claude_md_max_lines": { "type": "integer", "minimum": 1 }
+      }
+    }
+  },
+  "$defs": {
+    "selectorClaude": {
+      "type": "object",
+      "required": ["kind", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "alias" },
+        "value": { "enum": ["fable", "opus", "sonnet"] }
+      }
+    },
+    "selectorCodex": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "value"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "model-id" }, "value": { "const": "gpt-5.6-sol" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "value"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "model-id" }, "value": { "const": "gpt-5.6-terra" } }
+        }
+      ]
+    },
+    "unknown": {
+      "type": "object",
+      "required": ["reason", "owner", "reviewBy"],
+      "additionalProperties": false,
+      "properties": {
+        "reason": { "type": "string", "minLength": 1 },
+        "owner": { "type": "string", "minLength": 1 },
+        "reviewBy": { "type": "string", "format": "date", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" }
+      }
+    },
+    "fallbackClaude": {
+      "type": "object",
+      "required": ["selector", "effort", "evidence", "approvalDecision"],
+      "additionalProperties": false,
+      "properties": {
+        "selector": { "$ref": "#/$defs/selectorClaude" },
+        "effort": { "enum": ["low", "medium", "high", "xhigh", "max"] },
+        "evidence": { "const": "dispatch-receipt" },
+        "approvalDecision": { "type": "string", "minLength": 1 }
+      }
+    },
+    "fallbackClaudeAdvisory": {
+      "type": "object",
+      "required": ["selector", "effort", "evidence", "approvalDecision"],
+      "additionalProperties": false,
+      "properties": {
+        "selector": { "$ref": "#/$defs/selectorClaude" },
+        "effort": { "const": "not-applicable" },
+        "evidence": { "const": "dispatch-receipt" },
+        "approvalDecision": { "type": "string", "minLength": 1 }
+      }
+    },
+    "fallbackCodex": {
+      "type": "object",
+      "required": ["selector", "effort", "evidence", "approvalDecision"],
+      "additionalProperties": false,
+      "properties": {
+        "selector": { "$ref": "#/$defs/selectorCodex" },
+        "effort": { "enum": ["xhigh", "max"] },
+        "evidence": { "const": "dispatch-receipt" },
+        "approvalDecision": { "type": "string", "minLength": 1 }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "selector": { "properties": { "value": { "const": "gpt-5.6-terra" } }, "required": ["value"] } }, "required": ["selector"] },
+          "then": { "properties": { "effort": { "const": "xhigh" } } }
+        }
+      ]
+    },
+    "claudeCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": { "enum": ["default", "opt-in", "off", "unavailable", "unknown"] },
+        "selector": { "$ref": "#/$defs/selectorClaude" },
+        "effort": { "enum": ["low", "medium", "high", "xhigh", "max"] },
+        "unavailable": { "enum": ["defer", "mapped-fallback"] },
+        "evidence": { "const": "dispatch-receipt" },
+        "reasonCode": { "enum": ["profile-disabled", "no-approved-native-capability"] },
+        "fallback": { "$ref": "#/$defs/fallbackClaude" },
+        "unknown": { "$ref": "#/$defs/unknown" }
+      },
+      "oneOf": [
+        { "required": ["state", "selector", "effort", "unavailable", "evidence"], "properties": { "state": { "enum": ["default", "opt-in"] }, "unavailable": { "const": "defer" } }, "not": { "anyOf": [{ "required": ["reasonCode"] }, { "required": ["fallback"] }, { "required": ["unknown"] }] } },
+        { "required": ["state", "selector", "effort", "unavailable", "evidence", "fallback"], "properties": { "state": { "enum": ["default", "opt-in"] }, "unavailable": { "const": "mapped-fallback" } }, "not": { "anyOf": [{ "required": ["reasonCode"] }, { "required": ["unknown"] }] } },
+        { "required": ["state", "selector", "effort", "unavailable", "evidence", "reasonCode"], "properties": { "state": { "const": "off" }, "unavailable": { "const": "defer" }, "reasonCode": { "const": "profile-disabled" } }, "not": { "anyOf": [{ "required": ["fallback"] }, { "required": ["unknown"] }] } },
+        { "required": ["state", "unavailable", "reasonCode"], "properties": { "state": { "const": "off" }, "unavailable": { "const": "defer" }, "reasonCode": { "const": "profile-disabled" } }, "not": { "anyOf": [{ "required": ["selector"] }, { "required": ["effort"] }, { "required": ["evidence"] }, { "required": ["fallback"] }, { "required": ["unknown"] }] } },
+        { "required": ["state", "unavailable", "reasonCode"], "properties": { "state": { "const": "unavailable" }, "unavailable": { "const": "defer" } }, "not": { "anyOf": [{ "required": ["selector"] }, { "required": ["effort"] }, { "required": ["evidence"] }, { "required": ["fallback"] }, { "required": ["unknown"] }] } },
+        { "required": ["state", "unavailable", "unknown"], "properties": { "state": { "const": "unknown" }, "unavailable": { "const": "defer" } }, "not": { "anyOf": [{ "required": ["selector"] }, { "required": ["effort"] }, { "required": ["evidence"] }, { "required": ["reasonCode"] }, { "required": ["fallback"] }] } }
+      ]
+    },
+    "claudeAdvisoryCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": { "enum": ["default", "opt-in", "off", "unavailable", "unknown"] },
+        "selector": { "$ref": "#/$defs/selectorClaude" },
+        "effort": { "const": "not-applicable" },
+        "unavailable": { "enum": ["defer", "mapped-fallback"] },
+        "evidence": { "const": "dispatch-receipt" },
+        "reasonCode": { "enum": ["profile-disabled", "no-approved-native-capability"] },
+        "fallback": { "$ref": "#/$defs/fallbackClaudeAdvisory" },
+        "unknown": { "$ref": "#/$defs/unknown" }
+      },
+      "oneOf": [
+        { "required": ["state", "selector", "effort", "unavailable", "evidence"], "properties": { "state": { "enum": ["default", "opt-in"] }, "unavailable": { "const": "defer" } }, "not": { "anyOf": [{ "required": ["reasonCode"] }, { "required": ["fallback"] }, { "required": ["unknown"] }] } },
+        { "required": ["state", "selector", "effort", "unavailable", "evidence", "fallback"], "properties": { "state": { "enum": ["default", "opt-in"] }, "unavailable": { "const": "mapped-fallback" } }, "not": { "anyOf": [{ "required": ["reasonCode"] }, { "required": ["unknown"] }] } },
+        { "required": ["state", "selector", "effort", "unavailable", "evidence", "reasonCode"], "properties": { "state": { "const": "off" }, "unavailable": { "const": "defer" }, "reasonCode": { "const": "profile-disabled" } }, "not": { "anyOf": [{ "required": ["fallback"] }, { "required": ["unknown"] }] } },
+        { "required": ["state", "unavailable", "reasonCode"], "properties": { "state": { "const": "off" }, "unavailable": { "const": "defer" }, "reasonCode": { "const": "profile-disabled" } }, "not": { "anyOf": [{ "required": ["selector"] }, { "required": ["effort"] }, { "required": ["evidence"] }, { "required": ["fallback"] }, { "required": ["unknown"] }] } },
+        { "required": ["state", "unavailable", "reasonCode"], "properties": { "state": { "const": "unavailable" }, "unavailable": { "const": "defer" } }, "not": { "anyOf": [{ "required": ["selector"] }, { "required": ["effort"] }, { "required": ["evidence"] }, { "required": ["fallback"] }, { "required": ["unknown"] }] } },
+        { "required": ["state", "unavailable", "unknown"], "properties": { "state": { "const": "unknown" }, "unavailable": { "const": "defer" } }, "not": { "anyOf": [{ "required": ["selector"] }, { "required": ["effort"] }, { "required": ["evidence"] }, { "required": ["reasonCode"] }, { "required": ["fallback"] }] } }
+      ]
+    },
+    "codexCell": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "state": { "enum": ["default", "opt-in", "off", "unavailable", "unknown"] },
+        "selector": { "$ref": "#/$defs/selectorCodex" },
+        "effort": { "enum": ["xhigh", "max"] },
+        "unavailable": { "enum": ["defer", "mapped-fallback"] },
+        "evidence": { "const": "dispatch-receipt" },
+        "reasonCode": { "enum": ["profile-disabled", "no-approved-native-capability"] },
+        "fallback": { "$ref": "#/$defs/fallbackCodex" },
+        "unknown": { "$ref": "#/$defs/unknown" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "selector": { "properties": { "value": { "const": "gpt-5.6-terra" } }, "required": ["value"] } }, "required": ["selector"] },
+          "then": { "properties": { "effort": { "const": "xhigh" } } }
+        }
+      ],
+      "oneOf": [
+        { "required": ["state", "selector", "effort", "unavailable", "evidence"], "properties": { "state": { "enum": ["default", "opt-in"] }, "unavailable": { "const": "defer" } }, "not": { "anyOf": [{ "required": ["reasonCode"] }, { "required": ["fallback"] }, { "required": ["unknown"] }] } },
+        { "required": ["state", "selector", "effort", "unavailable", "evidence", "fallback"], "properties": { "state": { "enum": ["default", "opt-in"] }, "unavailable": { "const": "mapped-fallback" } }, "not": { "anyOf": [{ "required": ["reasonCode"] }, { "required": ["unknown"] }] } },
+        { "required": ["state", "selector", "effort", "unavailable", "evidence", "reasonCode"], "properties": { "state": { "const": "off" }, "unavailable": { "const": "defer" }, "reasonCode": { "const": "profile-disabled" } }, "not": { "anyOf": [{ "required": ["fallback"] }, { "required": ["unknown"] }] } },
+        { "required": ["state", "unavailable", "reasonCode"], "properties": { "state": { "const": "off" }, "unavailable": { "const": "defer" }, "reasonCode": { "const": "profile-disabled" } }, "not": { "anyOf": [{ "required": ["selector"] }, { "required": ["effort"] }, { "required": ["evidence"] }, { "required": ["fallback"] }, { "required": ["unknown"] }] } },
+        { "required": ["state", "unavailable", "reasonCode"], "properties": { "state": { "const": "unavailable" }, "unavailable": { "const": "defer" } }, "not": { "anyOf": [{ "required": ["selector"] }, { "required": ["effort"] }, { "required": ["evidence"] }, { "required": ["fallback"] }, { "required": ["unknown"] }] } },
+        { "required": ["state", "unavailable", "unknown"], "properties": { "state": { "const": "unknown" }, "unavailable": { "const": "defer" } }, "not": { "anyOf": [{ "required": ["selector"] }, { "required": ["effort"] }, { "required": ["evidence"] }, { "required": ["reasonCode"] }, { "required": ["fallback"] }] } }
+      ]
+    },
+    "codexAdvisoryCell": {
+      "type": "object",
+      "required": ["state", "unavailable", "reasonCode"],
+      "additionalProperties": false,
+      "properties": {
+        "state": { "const": "unavailable" },
+        "unavailable": { "const": "defer" },
+        "reasonCode": { "const": "no-approved-native-capability" }
+      }
+    },
+    "runnerPair": {
+      "type": "object",
+      "required": ["claude", "codex"],
+      "additionalProperties": false,
+      "properties": {
+        "claude": { "$ref": "#/$defs/claudeCell" },
+        "codex": { "$ref": "#/$defs/codexCell" }
+      }
+    },
+    "advisoryRunnerPair": {
+      "type": "object",
+      "required": ["claude", "codex"],
+      "additionalProperties": false,
+      "properties": {
+        "claude": { "$ref": "#/$defs/claudeAdvisoryCell" },
+        "codex": { "$ref": "#/$defs/codexAdvisoryCell" }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "required": ["design_phase", "execution_phase", "advisory"],
+      "additionalProperties": false,
+      "properties": {
+        "design_phase": { "$ref": "#/$defs/runnerPair" },
+        "execution_phase": { "$ref": "#/$defs/runnerPair" },
+        "advisory": { "$ref": "#/$defs/advisoryRunnerPair" }
+      }
+    },
+    "duty": { "$ref": "#/$defs/runnerPair" },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "environments": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["adapter", "healthcheck", "rollback"],
+            "additionalProperties": false,
+            "properties": {
+              "adapter": { "type": "string" },
+              "target": { "type": "string" },
+              "healthcheck": { "type": "string" },
+              "rollback": { "type": "string" },
+              "promotion": { "const": "human-gate" }
+            }
+          }
+        },
+        "adapters": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "required": ["executor", "credentials"],
+            "additionalProperties": false,
+            "properties": {
+              "executor": { "enum": ["ci", "local"] },
+              "trigger": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": { "refs": { "type": "array", "items": { "type": "string" } } }
+              },
+              "command": { "type": "string" },
+              "deploy": { "type": "string" },
+              "credentials": { "enum": ["oidc", "ci-secret", "external"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

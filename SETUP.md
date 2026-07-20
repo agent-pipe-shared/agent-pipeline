@@ -1,275 +1,296 @@
-# Setup
+# Set up Agent-Pipeline
 
-> _A German version follows below · Eine deutsche Fassung folgt weiter unten._
+Agent-Pipeline gives an AI-assisted project a repeatable way to move from an
+idea to a reviewable change: clarify intent, plan, implement in bounded tasks,
+run deterministic checks, review independently, and leave durable evidence.
+It is a project operating model, not an application framework.
 
-How to adopt this repo as the Agent-Pipeline for your own projects: clone it,
-personalize it, bind the plugin, start a session.
+This guide has two jobs:
 
-## Prerequisites
+1. prepare a copy of **this pipeline repository** as your shared source; and
+2. activate and calibrate the pipeline in each repository that will use it.
 
-- **Node.js >= 24** — `setup.mjs` is dependency-free (Node builtins only, no `npm install` step).
-- **git**
-- **Claude Code**
-- Optional: **`gh`** or **`glab`**. Credentials, account state and absolute paths are machine-local; do not put them in Public Core. The generic public marketplace binding is compiled by setup.
+Start with the top-level [README](README.md) for the value proposition and
+terminology. Read [`PIPELINE_FLOW.md`](PIPELINE_FLOW.md) for the maintained
+end-to-end flow; this page only explains installation and adoption.
 
-## Steps
+## Before you start
 
-### 1. Clone your own copy
+- Node.js 24 or newer and Git are required for the included scripts.
+- Keep the pipeline source and each governed repository under version control.
+- Treat credentials, account mappings, local paths, and private marketplace
+  details as machine-local configuration. Do not commit them into the pipeline
+  source, a generated projection, or a project calibration.
 
-Fork, mirror, or otherwise create your own copy of this repo under your own GitHub org/user or GitLab group. That copy becomes the one canonical source your projects bind to as a plugin.
+### Runner support, stated precisely
 
-### 2. Run `node setup.mjs`
+The methodology (roles, specifications, evidence, review separation, and
+handover) is runner-neutral. The current V3 authority contains registered
+routes for Claude and Codex duties, but a requested route is not proof that a
+host used that model.
 
-From the repo root:
+Claude Code is the supported full-enforcement runtime: its plugin and hooks can
+enforce configured guards and lifecycle checks. On Codex or another runtime,
+use the same methodology only where that host exposes the needed integration;
+do not assume Claude hooks, plugin installation, or automatic guard enforcement
+exists there. See [`docs/runtime-boundary.md`](docs/runtime-boundary.md) for the
+exact boundary and manual responsibilities.
 
+### Codex local agent activity troubleshooting
+
+Codex local subagent activity depends on its persistent local app-server daemon.
+If agent threads no longer appear, or a session unexpectedly behaves as if no
+durable local execution were available, check the daemon before changing a
+pipeline plan or treating the incident as a repository failure:
+
+```sh
+node plugins/pipeline-core/scripts/codex-app-server-health.mjs
 ```
+
+`CAS-READY` means the daemon returned a current closed version observation. It
+does not prove that a model child was launched or that a host provides a
+background wakeup. Any other `CAS-*` result is a local Codex-host incident,
+with an exact code and attended operator guidance. The bounded recovery makes
+one fixed daemon restart and then requires a new healthy observation:
+
+```sh
+node plugins/pipeline-core/scripts/codex-app-server-health.mjs --recover
+```
+
+The recovery never loops, launches no model, and does not change repository
+state. If it fails, run `codex doctor` in an attended local Codex session and
+retain the `CAS-*` result in the handover; do not claim an active worker.
+
+## A. Prepare your pipeline source
+
+Clone or fork this repository into the organisation that will maintain the
+shared pipeline. Keep that clone as a versioned product; projects should bind
+to it rather than copy its rules into every repository.
+
+### Activate or upgrade the V3 authority
+
+Run these commands **only in a pipeline source checkout that contains
+`pipeline.user.yaml`**. They are for an existing V0/V1/V2 authority or a V3
+projection that needs explicit reconciliation; they are not a setup command for
+an arbitrary application repository.
+
+```sh
+node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"
+node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
+node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate
+```
+
+The sequence is intentional:
+
+1. `inspect` reads the present authority and any recoverable transaction state.
+2. `plan` shows the exact V3-owned runtime targets and byte changes. Review it
+   before writing anything.
+3. `apply --activate` is the only write step. Its CLI invocation creates and
+   authenticates a fresh plan, refuses source or target drift from that plan,
+   writes the declared runtime targets first, and commits `pipeline.user.yaml`
+   last.
+
+Stop unless `inspect` reports `ready` and `plan` reports `ready` or `noop`.
+Do not hand-edit generated runtime targets or use
+`setup.mjs --force` to bypass this boundary; `--force` cannot authorize a V3
+authority write.
+
+After activation, perform a read-only readback:
+
+```sh
 node setup.mjs
 ```
 
-Interactive mode asks public setup intent, runtime, language, subscription tier and autonomy. Personal coordinates are not collected:
+Success means the V3 source and its owned runtime projections agree, and the
+command performed no writes.
 
-| Question | Values | Feeds |
-|---|---|---|
-| Runtime | `claude-code` (full hook/gate enforcement) or `other` (methodology only) | `agent_runtime` |
-| Setup intent | `consumer` or `maintainer` | `setup.intent` |
-| Language | human-facing (commits, reviews, new docs) and agent-facing (roles, guardrails, skills), each `de`/`en` | `language` |
-| Subscription tier | `pro`, `max`, or `api`/own — picks a model preset per work method and dispatch tier | `worktypes`, `models` |
-| Autonomy preset | `conservative` (gated push, feature branches) or `autonomous` (standing-approved push, direct-to-main, advisor on) | `autonomy` |
+### Choose advisor export consent explicitly
 
-`max` is the recommended default preset: an Opus orchestrator (routed per work method — see below) plus a Sonnet three-tier dispatch palette (implement / mechanic / deep) and Sonnet review. `api`/own starts from the same Max preset — edit the model names directly in `pipeline.user.yaml` afterwards and re-run setup.
+Advisory is optional at the repository boundary. A missing
+`advisor_export` field and `consent: declined` are both valid Advisory-off
+states: bootstrap performs no advisor probe, child launch, repository export,
+or receipt creation. Existing V3 repositories are never silently opted in.
+The read-only `node setup.mjs` check prints the configuration command when
+consent is missing or declined but does not write it.
 
-**Route models per work method?** → `pipeline.user.yaml` → `worktypes`. That block is THE single place to set which model/effort/advisor runs for each of the three session profiles (design-first, advisor, speed) — see the comments in the file itself.
+To review the disclosure and record a repository-owner decision, run:
 
-Before any write, create the ignored Private Overlay `.pipeline/private-overlay.yaml` with only the immutable Public-Core reference:
-
-```
-shared:
-  sha: <exact-40-hex-checked-out-sha>
+```sh
+node setup.mjs --configure-advisor-export
 ```
 
-The lock must exactly match `git rev-parse HEAD`; missing, abbreviated or mismatched locks fail before source or runtime mutation. Keep credentials, account state and paths separately in ignored machine-local state; setup never reads or projects them. Setup then writes `pipeline.user.yaml`, compiles the runtime configs, and projects the generic public marketplace binding.
+The prompt explains that approval exports one advisory question plus the
+allowlisted repository candidate material needed by the configured
+same-runner advisor. It does not authorize secrets, credentials, unrelated
+paths, raw question/answer persistence, or a runner/model substitution. The
+prompt defaults to decline and atomically records either `approved` or
+`declined` in `pipeline.user.yaml`. Re-run the same command to change that
+public-safe repository decision.
 
-**Non-interactive path:** `node setup.mjs --defaults` writes the conservative defaults with no prompts — useful for a first dry run or a CI check.
+With approval, Claude keeps its registered Fable → Opus → same-runner consult
+order and Read/Grep/Glob consult tools. Codex uses only the exact selected
+`network-open/read-only` Sol transport, whose launch payload is
+Read/Grep/Glob/Bash. The checkout remains read-only and coordinator scratch is
+the sole writable root. No selected transport, no child, profile drift, wrong
+identity, or incomplete stdio/cleanup is a non-success; an unbound host Bash
+or consult is never a fallback.
 
-**Changed your mind later?** Edit `pipeline.user.yaml` by hand and run `node setup.mjs` again — it's drift-safe: cleanly-recompilable files are overwritten freely, but a compiled file you hand-edited yourself (without touching `pipeline.user.yaml`) triggers a confirmation before being overwritten (non-interactive mode never overwrites it at all).
+### Missing prerequisite guidance
 
-### 3. Bind the plugin
+Normal `node setup.mjs` now runs the same read-only toolchain check after V3
+source/runtime validation. It prints every configured tool with its observed
+version and returns the manifest security-gate exit code. The standalone form
+remains available:
 
-The Public-Core `.claude/settings.json` enables the plugin and, after setup, carries the generic public `agent-pipeline/agent-pipeline` marketplace binding. No owner-, account-, credential-, or machine-specific coordinates are committed. Install the plugin at project scope:
-
+```sh
+node plugins/pipeline-core/scripts/toolchain-preflight.mjs --root "$PWD"
 ```
+
+Each missing configured prerequisite reports the claim that remains blocked,
+a copyable platform-appropriate `installCommand`, and
+`installAttempted: false`. Installer prerequisites are part of that command:
+on Ubuntu a missing `pipx` yields
+`sudo apt-get update && sudo apt-get install -y pipx && pipx install semgrep`,
+while an available `pipx` yields only `pipx install semgrep`. Go-backed commands
+likewise bootstrap Go only when it is absent. npm is never substituted for
+these non-npm scanners. System binaries plus the standard per-user
+`~/.local/bin` and `~/go/bin` locations are checked without trusting arbitrary
+PATH ordering. Semgrep receives bounded temporary settings/log/cache paths so
+its normal home-directory writes cannot be misreported as a missing install.
+Run a suggested command only after reviewing it under your own host/package-
+management policy, then repeat setup or the standalone preflight.
+
+### Transaction and rollback boundary
+
+The migration records preimages before activation. If an activation fails or is
+interrupted, the next `inspect`, `plan`, or `apply` attempts recovery from that
+record and restores the recorded preimages when safe. Do not delete a pending
+transaction directory or repair its files by hand.
+
+That recovery is deliberately narrow: it protects an incomplete transaction; it
+does **not** make a completed activation a reversible toggle. To change a
+completed authority, restore a reviewed version-controlled source in a separate
+working copy or make the corrected source change, then run a new
+inspect → plan → explicit activation cycle and read it back with `node setup.mjs`.
+
+## B. Activate the pipeline in one project repository
+
+Repeat this section for every application or service repository you want to
+govern. A governed project does not inherit your local account or credentials;
+it commits only its portable calibration and its project rules.
+
+### 1. Bind the plugin at project scope (Claude Code)
+
+In the project repository, add the marketplace that hosts your pipeline source
+and install the plugin at project scope:
+
+```sh
+claude plugin marketplace add <owner>/<pipeline-repo> --scope project
 claude plugin install pipeline-core@agent-pipeline --scope project
 ```
 
-`--scope project` matters: these subcommands default to `--scope user`, but the binding belongs at project scope. Verify with `claude plugin list --json` — it should show `pipeline-core@agent-pipeline` installed and enabled.
+`--scope project` keeps the binding with the repository rather than with one
+developer's user profile. Confirm the installation with `claude plugin list
+--json`. To update a Claude Code binding later, update the marketplace, update
+the same project-scoped plugin, then reload the running host session:
 
-**Keeping the plugin current.** Project scope is the only canonical install *and* update scope — an extra user-scope install is never a shortcut, just a second, staler copy with its own update path. Refresh with this three-step ritual, always in this order:
-
-```
+```sh
 claude plugin marketplace update agent-pipeline
 claude plugin update pipeline-core@agent-pipeline --scope project
 /reload-plugins
 ```
 
-`/reload-plugins` is the step that actually reloads an already-running session — the two update commands alone don't.
+For a non-Claude runtime, do not copy these commands or claim that its hooks
+are installed. Use that runtime's supported integration, then follow the
+methodology and manual controls described in the runtime-boundary document.
 
-**Native auto-update toggle (`/plugin → Marketplaces`) — optional, per machine, not committable.** It's a convenience switch, not a replacement for the ritual above, with one caveat: background updates need `GITHUB_TOKEN`/`GH_TOKEN` in the environment for a **private** marketplace repo, or they fail silently at startup — no error, just a stale state left behind. Against the **public** upstream marketplace repo the toggle needs no token. If you bind the pipeline to your own **private** fork or repo instead, the token caveat applies there. `/reload-plugins` stays a manual step either way.
+### 2. Add the small, committed project calibration
 
-### 4. Start a session
+Copy and adapt these templates in the project repository:
 
-Open a Claude Code session in the repo. A `SessionStart` hook surfaces a reminder — *run `/pipeline-core:pipeline-start` before any work* — but the reminder itself checks nothing. Running `/pipeline-core:pipeline-start` performs the actual bootstrap: it confirms ruleset state, project calibration, and the handover file before work begins.
-
-Before your first big feature, a quick look at [`docs/design/README.md`](docs/design/README.md) pays off — a self-service guide for brainstorming a solid requirement before it enters the pipeline (optional, advisory).
-
-## What setup wrote
-
-| File | Compiled from (`pipeline.user.yaml`) | Read by |
-|---|---|---|
-| `.claude/settings.json` | `autonomy` only where applicable | Claude Code itself — plugin enablement, generic public marketplace binding, permissions, status line; no owner/account/machine coordinates |
-| `.claude/pipeline.json` | `autonomy`, `gates` | project calibration — the bootstrap check and the `pipeline-start`/`close-block` skills |
-| `.claude/pipeline.yaml` | `worktypes`, `models`, `gates`, `autonomy` | the declarative manifest layer — the PreToolUse guard hooks (`guard-devplan`, `guard-push`), the `stop-suggest` Stop-event hook (next-phase suggestion + context-budget warnings), and model routing; validated by `harness/scripts/validate-manifest.mjs` |
-
-Every compiled file carries a `GENERATED from pipeline.user.yaml` marker so re-runs can tell a stale compile from a real hand-edit.
-Before setup writes any of these files, the complete generated manifest passes the same
-parse, schema, and semantic validation used by the runtime validator. A failed preflight
-leaves both `pipeline.user.yaml` and all runtime projections unchanged.
-
-## Troubleshooting
-
-**"Setup not complete" reminder at session start.** If you open a session before finishing setup, you'll see something like:
-
-```
-Setup not complete — run `node setup.mjs` (see SETUP.md).
+```sh
+cp <pipeline-source>/templates/pipeline.json.example .claude/pipeline.json
+cp <pipeline-source>/templates/CLAUDE.project.md CLAUDE.md
 ```
 
-This fires in exactly two cases: `pipeline.user.yaml` doesn't exist yet (a fresh clone), or it still carries `setup.intent: unconfigured`. The check never blocks; the immutable Private-Overlay SHA preflight is the fail-closed setup gate.
+`pipeline.json` names the project, its **one** `verify` command, worktree and
+branch model, autonomy, stakes, constraints, handover, and rollback procedure.
+Make `verify` the one deterministic command every actor and CI job means by
+“green” (for example, format → lint → typecheck → tests → build). Keep
+`CLAUDE.md` short: it is the stable project map, not a session log. The handover
+file is the single source for current state.
 
-<!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation (redundant, wastes context). The authoritative content is the English above. Convention: CLAUDE.md (Language). -->
+Put hard project denies and permission boundaries in committed
+`.claude/settings.json` and, where used, `.claude/guard-config.json` — not in
+`pipeline.json`. Start conservatively: read and plan first, then grant only the
+autonomy your team is prepared to supervise.
 
----
+### 3. Optional manifest, governance, and ritual extensions
 
-# Setup (Deutsch)
+Use [`templates/pipeline.yaml.example`](templates/pipeline.yaml.example) only
+when your project directly authors the optional declarative manifest. It can
+declare gates, profiles, governance paths, and an optional release tail. Do
+not maintain a directly authored manifest alongside a compiler-managed V3
+projection; choose the ownership model documented in the template.
 
-So übernimmst du dieses Repo als Agent-Pipeline für deine eigenen Projekte:
-klonen, personalisieren, Plugin binden, Session starten.
+For team or company rules, copy the generic examples under
+[`governance/examples/`](governance/examples/README.md) into project-owned
+paths and point the manifest at them:
 
-## Voraussetzungen
+- **Guidelines** are advisory design and style principles. A deviation may be
+  valid, but it must be named and justified.
+- **Policies** are binding controls. Machine-checkable policies can fail a
+  gate; human-checkable policies become an explicit review obligation.
 
-- **Node.js >= 24** — `setup.mjs` ist abhängigkeitsfrei (nur Node-Bordmittel,
-  kein `npm install`-Schritt).
-- **git**
-- **Claude Code**
-- Optional: **`gh`** (GitHub-CLI) oder **`glab`** (GitLab-CLI).
-  Zugangsdaten, Account-Status und absolute Pfade bleiben maschinenlokal; sie
-  gehören nicht in den Public Core. Das generische öffentliche Marketplace-
-  Binding wird von Setup kompiliert.
+The calibration template also shows `ritualExtensions`. They add project-owned
+steps such as a changelog sync to named lifecycle points without forking the
+core plugin. Keep each extension deterministic, versioned, and safe to run in
+the stated lifecycle phase; a failed extension stops that ritual and must be
+fixed or deliberately removed.
 
-## Schritte
+### 4. Bootstrap the first working session
 
-### 1. Eigene Kopie klonen
+Open the project in Claude Code and run:
 
-Fork, Mirror oder auf andere Weise eine eigene Kopie dieses Repos unter deiner
-eigenen GitHub-Org/deinem User bzw. deiner GitLab-Gruppe anlegen. Diese Kopie
-wird zur einzigen kanonischen Quelle, an die sich deine Projekte als Plugin
-binden.
-
-### 2. `node setup.mjs` ausführen
-
-Im Repo-Root:
-
-```
-node setup.mjs
-```
-
-Der interaktive Modus fragt nach öffentlicher Setup-Absicht, Runtime, Sprache,
-Abo-Stufe und Autonomie. Persönliche Koordinaten werden nicht erhoben:
-
-| Frage | Werte | Fließt in |
-|---|---|---|
-| Runtime | `claude-code` (volles Hook-/Gate-Enforcement) oder `other` (nur Methodik) | `agent_runtime` |
-| Setup-Absicht | `consumer` oder `maintainer` | `setup.intent` |
-| Sprache | human-facing (Commits, Reviews, neue Docs) und agent-facing (Rollen, Guardrails, Skills), je `de`/`en` | `language` |
-| Abo-Stufe | `pro`, `max` oder `api`/eigene — legt ein Modell-Preset je Arbeitsmethode und Dispatch-Stufe fest | `worktypes`, `models` |
-| Autonomie-Preset | `konservativ` (gated Push, Feature-Branches) oder `autonom` (standing-approved Push, direkt auf main, Advisor an) | `autonomy` |
-
-`max` ist das empfohlene Default-Preset: ein Opus-Orchestrator (geroutet je
-Arbeitsmethode — siehe unten) plus eine Sonnet-Dreistufer-Dispatch-Palette
-(Implementierung / Mechanik / Deep) sowie Sonnet-Review. `api`/eigene startet
-vom selben Max-Preset — trage die Modellnamen danach direkt in
-`pipeline.user.yaml` ein und führe Setup erneut aus.
-
-**Modelle je Arbeitsmethode routen?** → `pipeline.user.yaml` → `worktypes`.
-Dieser Block ist DIE eine Stelle, an der du Modell/Effort/Advisor für jedes
-der drei Session-Profile (Design-first, Advisor, Speed) festlegst — siehe die
-Kommentare direkt in der Datei.
-
-Vor jedem Write legst du das ignorierte Private Overlay
-`.pipeline/private-overlay.yaml` an. Es enthält nur die unveränderliche
-Public-Core-Referenz:
-
-```
-shared:
-  sha: <exakter-geprüfter-40-hex-SHA>
+```text
+/pipeline-core:pipeline-start
 ```
 
-Der Lock muss exakt `git rev-parse HEAD` entsprechen; fehlende, abgekürzte oder
-abweichende Locks schlagen vor Source- oder Runtime-Mutationen fehl. Zugangsdaten,
-Account-Status und Pfade bleiben separat im ignorierten maschinenlokalen Zustand;
-Setup liest oder projiziert sie nicht. Danach schreibt Setup `pipeline.user.yaml`,
-kompiliert die Laufzeit-Configs und projiziert das generische öffentliche
-Marketplace-Binding.
+The bootstrap is the auditable session entry. It checks the installed ruleset,
+the project calibration, current handover, and verify availability before work
+begins. For a material feature, it also follows the V3 profile and advisory
+rules before writable work. A reminder hook is not a substitute for the
+bootstrap itself.
 
-**Nicht-interaktiver Weg:** `node setup.mjs --defaults` schreibt die
-konservativen Defaults ohne Rückfragen — nützlich für einen ersten Trockenlauf
-oder eine CI-Prüfung.
+## C. Bring an existing repository under the pipeline
 
-**Später umentschieden?** `pipeline.user.yaml` von Hand bearbeiten und
-`node setup.mjs` erneut ausführen — es ist driftsicher: sauber neu kompilierbare
-Dateien werden frei überschrieben, aber eine von Hand bearbeitete kompilierte
-Datei (ohne Änderung an `pipeline.user.yaml`) löst vor dem Überschreiben eine
-Rückfrage aus (der nicht-interaktive Modus überschreibt sie nie).
+Do this on a normal change branch and adopt one control at a time:
 
-### 3. Plugin binden
+1. Read the project, identify its existing test/build commands, branch policy,
+   sensitive paths, and current documentation location.
+2. Bind the plugin (where Claude Code is used) and add the calibration plus a
+   lean `CLAUDE.md` from the templates.
+3. Create or consolidate the one `verify` command. Run it successfully before
+   treating it as the delivery gate.
+4. Add a handover file and name it in the calibration. Move current state there
+   instead of maintaining several status copies.
+5. Add project-specific denies, risk zones, and constraints. Enable governance
+   policies only after their paths and checks are real.
+6. Pilot the workflow read-mostly: bootstrap, write a small spec, run the
+   deterministic checks, and request an independent review. Expand autonomy
+   only when the evidence and operating cost are understood.
 
-Die Public-Core-`.claude/settings.json` aktiviert das Plugin und enthält nach
-Setup das generische öffentliche Marketplace-Binding
-`agent-pipeline/agent-pipeline`. Owner-, Account-, Zugangsdaten- oder
-maschinenbezogene Koordinaten werden nicht committed. Installiere das Plugin im
-Projekt-Scope:
+Migration changes your project’s process, so review those changes like any
+other architectural change. Do not paste a pipeline source’s
+`pipeline.user.yaml` into an application repository, and do not make a legacy
+authority look current by copying generated runtime files.
 
-```
-claude plugin install pipeline-core@agent-pipeline --scope project
-```
+## Where to go next
 
-`--scope project` ist wichtig: diese Subkommandos verwenden standardmäßig
-`--scope user`, die Bindung gehört aber in den Projekt-Scope. Prüfen mit
-`claude plugin list --json` — es sollte `pipeline-core@agent-pipeline` als
-installiert und aktiviert zeigen.
-
-**Plugin aktuell halten.** Project-Scope ist der einzige kanonische Install-
-*und* Update-Scope — ein zusätzlicher User-Scope-Install ist nie eine
-Abkürzung, sondern nur eine zweite, veraltende Kopie mit eigenem Update-Pfad.
-Refresh über dieses Drei-Schritte-Ritual, immer in dieser Reihenfolge:
-
-```
-claude plugin marketplace update agent-pipeline
-claude plugin update pipeline-core@agent-pipeline --scope project
-/reload-plugins
-```
-
-`/reload-plugins` ist der Schritt, der eine bereits laufende Session
-tatsächlich neu lädt — die beiden Update-Kommandos allein tun das nicht.
-
-**Nativer Auto-Update-Toggle (`/plugin → Marketplaces`) — optional, pro
-Maschine, nicht committbar.** Er ist ein Komfort-Schalter, kein Ersatz für
-das Ritual oben, mit einem Vorbehalt: Hintergrund-Updates brauchen
-`GITHUB_TOKEN`/`GH_TOKEN` in der Umgebung für ein **privates**
-Marketplace-Repo, sonst scheitern sie still beim Start — kein Fehlerhinweis,
-einfach ein veralteter Stand. Gegen das **öffentliche** Upstream-Marketplace-Repo
-braucht der Toggle keinen Token. Bindest du die Pipeline stattdessen an deinen
-eigenen **privaten** Fork bzw. ein privates Repo, greift der Token-Vorbehalt
-dort. `/reload-plugins` bleibt so oder so ein manueller Schritt.
-
-### 4. Session starten
-
-Eine Claude-Code-Session im Repo öffnen. Beim Sitzungsstart blendet ein
-`SessionStart`-Hook eine Erinnerung ein — *`/pipeline-core:pipeline-start` vor jeder
-Arbeit ausführen* —, die Erinnerung selbst prüft aber nichts. Erst wenn du
-`/pipeline-core:pipeline-start` ausführst, läuft der eigentliche Bootstrap: Der Skill
-bestätigt Regelwerk-Stand, Projekt-Kalibrierung und Handover-Datei, bevor die Arbeit
-beginnt.
-
-Vor dem ersten großen Feature lohnt ein kurzer Blick in
-[`docs/design/README.md`](docs/design/README.md) — der Selbstbedienungs-Guide
-zum Brainstorming einer soliden Anforderung, bevor sie in die Pipeline geht
-(optional, empfohlen).
-
-## Was Setup geschrieben hat
-
-| Datei | Kompiliert aus (`pipeline.user.yaml`) | Gelesen von |
-|---|---|---|
-| `.claude/settings.json` | gegebenenfalls nur `autonomy` | Claude Code selbst — Plugin-Aktivierung, generisches öffentliches Marketplace-Binding, Permissions, Status-Zeile; keine Owner-, Account- oder Maschinenkoordinaten |
-| `.claude/pipeline.json` | `autonomy`, `gates` | Projekt-Kalibrierung — der Bootstrap-Check sowie die Skills `pipeline-start`/`close-block` |
-| `.claude/pipeline.yaml` | `worktypes`, `models`, `gates`, `autonomy` | die deklarative Manifest-Schicht — die PreToolUse-Guard-Hooks (`guard-devplan`, `guard-push`), der `stop-suggest`-Stop-Hook (Vorschlag der nächsten Phase + Kontext-Budget-Warnungen) sowie Modell-Routing; validiert über `harness/scripts/validate-manifest.mjs` |
-
-Jede kompilierte Datei trägt einen `GENERATED from pipeline.user.yaml`-Marker,
-damit ein erneuter Lauf einen veralteten Kompilat-Stand von einem echten
-Hand-Edit unterscheiden kann.
-
-## Fehlerbehebung
-
-**Hinweis „Setup nicht abgeschlossen" beim Sitzungsstart.** Startest du eine
-Session vor Abschluss des Setups, erscheint etwa:
-
-```
-Setup nicht abgeschlossen — `node setup.mjs` ausführen (siehe SETUP.md).
-```
-
-Das passiert in genau zwei Fällen: `pipeline.user.yaml` existiert noch nicht
-(frischer Klon), oder sie trägt noch `setup.intent: unconfigured`. Der Check
-blockiert die Session nie; der unveränderliche Private-Overlay-SHA-Preflight ist
-das fail-closed Setup-Gate.
-
----
-
-Die deutsche Fassung ist eine Übersetzung des englischen Originals.
+- [README](README.md) — why the pipeline exists and its core capabilities.
+- [PIPELINE_FLOW.md](PIPELINE_FLOW.md) — the maintained V3 flow and boundaries.
+- [Operating Model](docs/operating-model.md) — normative roles, gates, and
+  lifecycle rules.
+- [Runtime boundary](docs/runtime-boundary.md) — what is enforced on Claude
+  Code and what remains manual elsewhere.
+- [Documentation map](docs/README.md) — focused reference links.

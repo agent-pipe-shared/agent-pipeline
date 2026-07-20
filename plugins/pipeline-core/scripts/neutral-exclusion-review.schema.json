@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.neutral-exclusion-review.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "planDigest", "sourceEndpoint", "publicEndpoint", "excluded", "reviewerRoute", "assurance", "candidateTree", "verdict", "findings"],
+  "properties": {
+    "schema": { "const": "pipeline.neutral-exclusion-review.v1" },
+    "planDigest": { "$ref": "#/$defs/sha256" },
+    "sourceEndpoint": { "$ref": "#/$defs/oid" },
+    "publicEndpoint": { "$ref": "#/$defs/oid" },
+    "excluded": { "type": "array", "items": { "$ref": "#/$defs/exclusion" } },
+    "reviewerRoute": { "type": "string", "minLength": 1 },
+    "assurance": { "enum": ["technical-isolation", "contractual-read-only", "prompt-confined"] },
+    "candidateTree": { "$ref": "#/$defs/oid" },
+    "verdict": { "enum": ["PASS", "FAIL"] },
+    "findings": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "oid": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+    "exclusion": { "type": "object", "additionalProperties": false, "required": ["path", "reason"], "properties": { "path": { "type": "string", "minLength": 1 }, "reason": { "type": "string", "minLength": 3, "maxLength": 240 } } }
+  }
+}

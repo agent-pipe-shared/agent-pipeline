@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.release-version-decision.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "decisionId", "private", "neutralPublic", "targetVersion", "targetTag", "observedAt"],
+  "properties": {
+    "schema": { "const": "pipeline.release-version-decision.v1" },
+    "decisionId": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "private": { "$ref": "#/$defs/channel" },
+    "neutralPublic": { "$ref": "#/$defs/channel" },
+    "targetVersion": { "$ref": "#/$defs/stableVersion" },
+    "targetTag": { "type": "string", "pattern": "^v(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$" },
+    "observedAt": { "type": "string", "format": "date-time" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "oid": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+    "stableVersion": { "type": "string", "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$" },
+    "channel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repositoryFingerprint", "ref", "commit", "tree", "highestStableTag", "highestStableVersion", "peeledCommit", "fetchedAt"],
+      "properties": {
+        "repositoryFingerprint": { "$ref": "#/$defs/sha256" },
+        "ref": { "type": "string", "pattern": "^refs/(?:heads|tags)/[A-Za-z0-9._/-]+$" },
+        "commit": { "$ref": "#/$defs/oid" },
+        "tree": { "$ref": "#/$defs/oid" },
+        "highestStableTag": { "type": "string", "pattern": "^v(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$" },
+        "highestStableVersion": { "$ref": "#/$defs/stableVersion" },
+        "peeledCommit": { "$ref": "#/$defs/oid" },
+        "fetchedAt": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

@@ -1,128 +1,317 @@
-# pipeline.user.yaml — your personal Pipeline profile.
-# The ONE file that makes the Pipeline "yours". The methodology core stays generic.
-#
-# Change it → re-run `node setup.mjs` (recompiles the runtime configs:
-# .claude/settings.json, .claude/pipeline.json, .claude/pipeline.yaml). This file is
-# the SOURCE of intent — the three compiled files are runtime-canonical and each
-# carries a "GENERATED from pipeline.user.yaml" header; hand-edits THERE are detected
-# as drift on the next `setup.mjs` run and overwritten only after confirmation
-# (layer model).
-#
-# This is the committed TEMPLATE state with conservative but working defaults
-# (a new colleague starts safe AND immediately functional). The SessionStart hook
-# `setup-check.mjs` recognizes this unconfigured state. Personal coordinates and
-# credentials belong only in ignored machine-local mapping, never in Public Core.
-
-setup:
-  intent: unconfigured                  # unconfigured | consumer | maintainer
-
-language:
-  human_facing: en                  # what the Pipeline PRODUCES: commits, reviews, new docs (de|en)
-  agent_facing: en                  # roles/guardrails/skills (recommended: en)
-  # Note: the SHIPPED documentation is de (human) / en (agent).
-
-agent_runtime: claude-code          # claude-code (full enforcement) | other (methodology only → docs/runtime-boundary.md)
-
-# setup.mjs asks your subscription tier and writes matching presets for both blocks
-# below (worktypes = orchestrator/session-profile routing, models = dispatch-tier routing):
-#   Pro:  all sonnet, effort-tiered (methodology fully usable)
-#   Max:  opus orchestrator + sonnet dispatch tiers (recommended, default below)
-#   API/custom: enter names freely (setup.mjs pre-fills with the Max preset as a starting point)
-#
-# THE place to route models per work method (= the three session profiles: design-first,
-# advisor, speed). Bugfix rule: a mini-scoped bugfix runs as `mini`; anything larger runs
-# as `feature` (QG-07 repro-first applies either way).
-worktypes:
-  design:                           # profile design-first -- features with a real design phase
-    design_phase:
-      model: opus
-      effort: high   # orchestrator until plan approval
-    execution_phase:
-      model: opus
-      effort: high # orchestrator after approval
-    advisor: "off"
-  feature:                          # profile advisor -- the everyday method
-    design_phase:
-      model: opus
-      effort: high  # Opus designs; Sonnet executes below (phases differ)
-    execution_phase:
-      model: sonnet
-      effort: high
-    advisor: opus # "off" | a model name (autonomous preset sets a model here)
-  mini:                             # profile speed -- mini-feature / hotfix
-    design_phase:
-      model: sonnet
-      effort: high
-    execution_phase:
-      model: sonnet
-      effort: high
-    advisor: opus    # fixed pairing (small model orchestrates, bigger advisor watches)
-
-models:                             # dispatch tiers only (MP-27: mechanic/implement/deep, plus critic's review)
-  implement:
-    model: sonnet
-    effort: medium
-  mechanic:
-    model: sonnet
-    effort: low
-  deep:
-    model: sonnet
-    effort: xhigh
-  review:
-    model: sonnet
-    effort: max
-
+agent_runtime: "claude-code"
 autonomy:
-  push_policy: gated                # gated | standing-approved
-  branch_model: feature-branch      # feature-branch | direct-main
+  branch_model: "feature-branch"
+  push_policy: "gated"
   wip_limit: 1
-
+critic_export:
+  mode: "allowlisted"
+  rules:
+    -
+      assuranceClass: "claude-native-bare-read-only"
+      dataClass: "repository-candidate"
+      packetBoundary: "candidate-diff-and-allowlisted-references"
+      packetSchema: "pipeline.critic-candidate-packet.v1"
+      provider: "anthropic"
+    -
+      assuranceClass: "functional-equivalent-read-only; OS isolation not asserted"
+      dataClass: "repository-candidate"
+      packetBoundary: "candidate-diff-and-allowlisted-references"
+      packetSchema: "pipeline.critic-candidate-packet.v1"
+      provider: "anthropic"
+    -
+      assuranceClass: "functional-equivalent-read-only; OS isolation not asserted"
+      dataClass: "repository-candidate"
+      packetBoundary: "candidate-diff-and-allowlisted-references"
+      packetSchema: "pipeline.critic-candidate-packet.v1"
+      provider: "openai"
+  schema: "pipeline.critic-export-policy.v1"
 gates:
-  dev_plan: blocking                # blocking | warn | off
-  push: blocking
-  security: blocking
   claude_md_max_lines: 200
-
-# OPTIONAL — omit entirely for zero added behavior (anti-bloat guarantee, ADR-0033/0034).
-# Release/Promotion phase (optional SDLC tail phase): uncomment and adapt only for a project
-# that actually deploys; see docs/deploy/README.md for the full guide. Two-environment
-# vercel-preview/vercel-prod starter shape (fields ground-truthed in
-# plugins/pipeline-core/scripts/pipeline-manifest.schema.json's `release` property):
-#
-# release:
-#   environments:
-#     test:
-#       adapter: vercel-preview       # must reference a declared adapter (integrity check)
-#       healthcheck: <command-or-workflow-ref>
-#       rollback: <procedure-ref>     # MANDATORY per environment
-#     prod:
-#       adapter: vercel-prod
-#       healthcheck: <command-or-workflow-ref>
-#       rollback: <procedure-ref>
-#       promotion: human-gate         # fixed value in v1
-#   adapters:
-#     vercel-preview:
-#       executor: ci                  # ci | local -- the swappable driver
-#       deploy: <workflow-ref>        # test-env deploy (merge-triggered), no release refs
-#       credentials: oidc             # oidc | ci-secret | external -- never inline values
-#     vercel-prod:
-#       executor: ci
-#       trigger:
-#         refs:
-#           - refs/tags/v*            # ci executor: release-triggering ref patterns
-#       deploy: <workflow-ref>        # local executor: a command reference instead
-#       credentials: oidc
-
-# -----------------------------------------------------------------------------------------
-# Advanced/autonomous example (NOT active — for orientation only; setup.mjs writes these
-# values automatically when you choose "Autonomous" for the autonomy preset):
-#
-# autonomy:
-#   push_policy:  standing-approved
-#   branch_model: direct-main
-#   wip_limit: 1
-#
-# worktypes:
-#   feature:
-#     advisor: opus
-# -----------------------------------------------------------------------------------------
+  dev_plan: "blocking"
+  push: "blocking"
+  security: "blocking"
+language:
+  agent_facing: "en"
+  human_facing: "en"
+roles:
+  po:
+    display_label: "PO"
+routing:
+  duties:
+    advisory:
+      claude:
+        adapter: "native-fable"
+        effort: "not-applicable"
+        evidence: "advisory-receipt"
+        fallbacks:
+          -
+            adapter: "native-opus"
+            effort: "not-applicable"
+            runner: "claude"
+            selector:
+              kind: "alias"
+              value: "opus"
+            when: "native-fable-repeated-failure"
+          -
+            adapter: "consult"
+            isolation: "fresh-read-only"
+            runner: "claude"
+            selector:
+              kind: "alias"
+              value: "fable"
+            when: "native-adapters-unavailable"
+        selector:
+          kind: "alias"
+          value: "fable"
+        state: "default"
+      codex:
+        adapter: "consult"
+        effort: "not-applicable"
+        evidence: "advisory-receipt"
+        isolation: "fresh-read-only"
+        runner: "codex"
+        selector:
+          kind: "model-id"
+          value: "gpt-5.6-sol"
+        state: "default"
+      eligibility:
+        epic: "required"
+        feature: "required"
+        mini: "disabled"
+      receipt: "pipeline.advisory-receipt.v1"
+    critic_high_risk:
+      claude:
+        effort: "max"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "alias"
+          value: "fable"
+        state: "default"
+        unavailable: "defer"
+      codex:
+        effort: "max"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "model-id"
+          value: "gpt-5.6-sol"
+        state: "default"
+        unavailable: "defer"
+    critic_normal:
+      claude:
+        effort: "max"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "alias"
+          value: "sonnet"
+        state: "default"
+        unavailable: "defer"
+      codex:
+        effort: "xhigh"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "model-id"
+          value: "gpt-5.6-sol"
+        state: "default"
+        unavailable: "defer"
+    deep:
+      claude:
+        effort: "xhigh"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "alias"
+          value: "sonnet"
+        state: "opt-in"
+        unavailable: "defer"
+      codex:
+        effort: "xhigh"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "model-id"
+          value: "gpt-5.6-terra"
+        state: "opt-in"
+        unavailable: "defer"
+    implement:
+      claude:
+        effort: "medium"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "alias"
+          value: "sonnet"
+        state: "default"
+        unavailable: "defer"
+      codex:
+        effort: "xhigh"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "model-id"
+          value: "gpt-5.6-terra"
+        state: "default"
+        unavailable: "defer"
+    mechanic:
+      claude:
+        effort: "low"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "alias"
+          value: "sonnet"
+        state: "opt-in"
+        unavailable: "defer"
+      codex:
+        effort: "xhigh"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "model-id"
+          value: "gpt-5.6-terra"
+        state: "opt-in"
+        unavailable: "defer"
+    readiness:
+      claude:
+        effort: "xhigh"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "alias"
+          value: "fable"
+        state: "default"
+        unavailable: "defer"
+      codex:
+        effort: "xhigh"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "model-id"
+          value: "gpt-5.6-sol"
+        state: "default"
+        unavailable: "defer"
+    test_author:
+      claude:
+        effort: "xhigh"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "alias"
+          value: "sonnet"
+        state: "opt-in"
+        unavailable: "defer"
+      codex:
+        effort: "xhigh"
+        evidence: "dispatch-receipt"
+        selector:
+          kind: "model-id"
+          value: "gpt-5.6-terra"
+        state: "opt-in"
+        unavailable: "defer"
+  profiles:
+    epic:
+      design_phase:
+        claude:
+          effort: "high"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "alias"
+            value: "opus"
+          state: "default"
+          unavailable: "defer"
+        codex:
+          effort: "xhigh"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "model-id"
+            value: "gpt-5.6-sol"
+          state: "default"
+          unavailable: "defer"
+      execution_phase:
+        claude:
+          effort: "high"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "alias"
+            value: "opus"
+          state: "default"
+          unavailable: "defer"
+        codex:
+          effort: "xhigh"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "model-id"
+            value: "gpt-5.6-sol"
+          state: "default"
+          unavailable: "defer"
+    feature:
+      design_phase:
+        claude:
+          effort: "high"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "alias"
+            value: "opus"
+          state: "default"
+          unavailable: "defer"
+        codex:
+          effort: "xhigh"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "model-id"
+            value: "gpt-5.6-sol"
+          state: "default"
+          unavailable: "defer"
+      execution_phase:
+        claude:
+          effort: "high"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "alias"
+            value: "sonnet"
+          state: "default"
+          unavailable: "defer"
+        codex:
+          effort: "xhigh"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "model-id"
+            value: "gpt-5.6-terra"
+          state: "default"
+          unavailable: "defer"
+    mini:
+      design_phase:
+        claude:
+          effort: "high"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "alias"
+            value: "sonnet"
+          state: "default"
+          unavailable: "defer"
+        codex:
+          effort: "xhigh"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "model-id"
+            value: "gpt-5.6-terra"
+          state: "default"
+          unavailable: "defer"
+      execution_phase:
+        claude:
+          effort: "high"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "alias"
+            value: "sonnet"
+          state: "default"
+          unavailable: "defer"
+        codex:
+          effort: "xhigh"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "model-id"
+            value: "gpt-5.6-terra"
+          state: "default"
+          unavailable: "defer"
+runners:
+  default: "claude"
+  enabled:
+    - "claude"
+    - "codex"
+schema: "pipeline.user.v3"
+session:
+  keep_awake: false
+usage:
+  common_projection: "pipeline.runner-usage.v1"
+  raw_persistence: "none"
