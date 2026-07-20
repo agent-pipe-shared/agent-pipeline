@@ -27,6 +27,15 @@ observation/document governance
   Gitleaks fixtures, neutral plugin identity, and the final transfer-completeness
   backlog. The machine-local PO receipt remains outside portable Verify; its
   fail-closed unit/runtime contract remains covered.
+- The normative Sentinel Epic authority has been recovered into
+  [specs/2026-07-19-sprint-sentinel-epic/](../specs/2026-07-19-sprint-sentinel-epic/):
+  the Public-safe PRD, technical Spec, backlog acceptance matrix,
+  Public/Private reconciliation design, and recovery record. SNT-A remains a
+  completed prerequisite slice; it is not the Sentinel Epic close.
+- A retention defect is recorded in
+  [backlog/items/2026-07-20-spec-retention-on-close.md](../backlog/items/2026-07-20-spec-retention-on-close.md).
+  Close/transfer must preserve normative PRD/Spec authority or fail closed with
+  an explicit durable destination and PO disposition.
 - Public remote heads are reduced to unchanged `main` and
   `feat/v3-public-core-foundation`. Anonymous obsolete lines have public
   recovery tags; histories with non-neutral authorship remain offline only and
@@ -104,6 +113,9 @@ observation/document governance
 - Start a new Codex thread and run the full `pipeline-start` bootstrap before
   trusting the refreshed bridge. Then publish the fourteen queued observations
   through the GitHub Issue Form/skill after capability and target readback.
+- Open the separate GitHub Observation Publication feature for the fourteen
+  queued observations. Do not reopen SNT-A and do not treat publication as
+  Sentinel Epic completion.
 - Continue the remaining Sentinel go-live package only after SNT-A, including
   native/generic validator A/B evidence. SNT-A completion alone is not a
   release or go-live readiness claim.

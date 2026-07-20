@@ -6,8 +6,9 @@ been pushed and the plugin marketplace has been refreshed:
 ```text
 Run the mandatory pipeline-core:pipeline-start bootstrap first. Use the current
 PO decision for this session: Luna/medium, German-facing, keep-awake as
-configured by the private project authority. Read docs/state.md and the SNT-A
-backlog item, then verify that the installed plugin cachebuster is
+configured by the private project authority. Read docs/state.md, the recovered
+normative Sentinel Epic authority in specs/2026-07-19-sprint-sentinel-epic/,
+and the SNT-A backlog item, then verify that the installed plugin cachebuster is
 0.2.0+codex.20260720163405 and that the source/cache manifest and Public branch
 commit/tree match the private overlay lock. Do not claim an observed effective
 model identity.
