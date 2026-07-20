@@ -1,0 +1,25 @@
+{
+  "schema": "pipeline.spec-retention-archive.v1",
+  "id": "sprint-sentinel-epic",
+  "sourcePaths": {
+    "prd": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+    "spec": "specs/2026-07-19-sprint-sentinel-epic/spec.md",
+    "acceptance": "specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md",
+    "design": "specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md",
+    "recovery": "specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md"
+  },
+  "archivePaths": {
+    "prd": "docs/spec-archive/2026-07-20-sentinel-recovery/prd_sentinel-epic.md",
+    "spec": "docs/spec-archive/2026-07-20-sentinel-recovery/spec.md",
+    "acceptance": "docs/spec-archive/2026-07-20-sentinel-recovery/backlog-acceptance-matrix.md",
+    "design": "docs/spec-archive/2026-07-20-sentinel-recovery/public-private-reconciliation-design.md",
+    "recovery": "docs/spec-archive/2026-07-20-sentinel-recovery/RECOVERY.md"
+  },
+  "sha256": {
+    "prd": "dddcf8c1809abc32ed5ea67b6e0d7adae3bb6595d9314af05e01ef2e08fe1e82",
+    "spec": "a4a8684d427d38bc216987bbd8497ae14f7913e340a0c449f3bb79c1c244f785",
+    "acceptance": "48f26218ef9c7571b4cde9549c2855904e1ccca486a78eece3ab0361a3d11bf5",
+    "design": "48698f4bc1717932b1f031b6936e7201cc1d3201e6e56d28a50b2891023f0e7f",
+    "recovery": "dbac9bafece60f965e7f1aa6c5d4b28665474678ce4be78591ca78f506b2a840"
+  }
+}

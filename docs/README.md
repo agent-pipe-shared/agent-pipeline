@@ -13,6 +13,8 @@ The maintained references are:
   versus Claude Code enforcement.
 - [`observation-intake.md`](observation-intake.md) — public observation intake,
   privacy routing, triage, and backlog-link governance.
+- [`github-issue-operations.md`](github-issue-operations.md) — project-scoped
+  GitHub login, target selection, issue operations, and safety boundaries.
 - [`design/README.md`](design/README.md) — optional design pre-stage.
 - [`deploy/README.md`](deploy/README.md) — optional release/promotion adapter.
 - [`adr/`](adr/) — durable decisions and rationale.

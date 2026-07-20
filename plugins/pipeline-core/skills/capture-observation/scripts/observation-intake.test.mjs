@@ -371,6 +371,9 @@ test("governance keeps the Issue canonical and backlog promotion explicit", () =
 
   assert.match(governance, /GitHub Issues are the repository-global, branch-independent single source of\s+truth/);
   assert.match(governance, /`observation` → `triage` → `confirmed` → optional `known-error` → `backlog-link`/);
+  assert.match(governance, /Queue and backlog validation/);
+  assert.match(governance, /matching backlog item/);
+  assert.match(governance, /partial batch/);
   assert.match(governance, /link Issue and backlog item in both directions/);
   assert.match(governance, /Promotion is never\s+automatic/);
   assert.match(governance, /private vulnerability reporting/);
@@ -381,6 +384,9 @@ test("governance keeps the Issue canonical and backlog promotion explicit", () =
   assert.match(governance, /Check every inbound link, the\s+current V3 authority/);
   assert.match(governance, /retention, redirect, migration, or scheduled\s+removal lifecycle/);
   assert.match(skill, /applies only the two fixed\s+labels `kind:observation` and `triage:needs-review`/);
+  assert.match(skill, /validate every candidate against the current public `docs\/state\.md` observation queue/);
+  assert.match(skill, /explicit publish confirmation for this exact preview or exact batch/);
+  assert.match(skill, /partial publication explicitly/);
   assert.match(skill, /controlled skill path may apply its verified area label at creation/);
   assert.match(skill, /docs\/observation-intake\.md/);
   assert.match(backlog, /Public unconfirmed\s+behavior observations use a GitHub Issue as their single source/);

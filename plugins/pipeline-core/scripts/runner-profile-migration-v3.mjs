@@ -12,6 +12,7 @@ import {
   planPendingTransactionRecoveryV3,
   planRunnerProfileMigrationV3,
 } from "../lib/runner-profile-migration-v3.mjs";
+import { RECOVERY_PREVIEW_ACK_SCHEMA } from "../lib/recovery-preview-attestation.mjs";
 
 const PREVIEW_FD = 2;
 const MAX_PREVIEW_BYTES = 64 * 1024;
@@ -108,10 +109,18 @@ export function main(args = process.argv.slice(2), {
   if (options.help) { write(`${usage()}\n`); return 0; }
   if (options.error) { write(`${usage()}\n${options.error}\n`); return 2; }
   let output;
-  const emitPreview = (preview) => {
+  const emitPreview = (preview, invocation) => {
     const chunk = `${JSON.stringify(preview, null, 2)}\n`;
     if (writePreview) writePreview(chunk);
     else writePreviewFullySync(chunk, previewWriteSync);
+    if (!invocation) return undefined;
+    return {
+      schema: RECOVERY_PREVIEW_ACK_SCHEMA,
+      invocationId: invocation.invocationId,
+      previewDigest: invocation.previewDigest,
+      acknowledgementId: `cli-${invocation.invocationId}`,
+      delivery: "delivered",
+    };
   };
   if (options.command === "inspect") output = inspectRunnerProfileMigrationV3({ rootDir: options.root });
   else {

@@ -111,6 +111,15 @@ function durableSnapshot(root) {
     codexAgentsDirectory: existsSync(join(root, ".codex/agents")),
   };
 }
+function previewAck(invocation, acknowledgementId = `ack-${invocation.invocationId}`) {
+  return {
+    schema: "pipeline.recovery-preview-ack.v1",
+    invocationId: invocation.invocationId,
+    previewDigest: invocation.previewDigest,
+    acknowledgementId,
+    delivery: "delivered",
+  };
+}
 function runCli(args) {
   let output = ""; let preview = "";
   const status = migrationCli(args, {
@@ -192,13 +201,15 @@ record("direct APIs preserve a pending journal until an authenticated delivered-
     assert.equal(applyPendingTransactionRecoveryV3(recoveryPlan, { rootDir: root, activate: true }).status, "authorization-required", "activation boolean is not a recovery authorization");
     assert.deepEqual(durableSnapshot(root), pending);
     assert.equal(authorizePendingTransactionRecoveryV3(recoveryPlan).status, "preview-required");
+    assert.equal(authorizePendingTransactionRecoveryV3(recoveryPlan, { deliverPreview: () => undefined }).status, "preview-failed", "a no-op preview callback cannot authorize recovery");
     assert.deepEqual(durableSnapshot(root), pending);
 
     let deliveredPreview;
     const authorization = authorizePendingTransactionRecoveryV3(recoveryPlan, {
-      deliverPreview: (preview) => {
+      deliverPreview: (preview, invocation) => {
         deliveredPreview = preview;
         assert.deepEqual(durableSnapshot(root), pending, "delivery completes before a recovery mutation");
+        return previewAck(invocation);
       },
     });
     assert.equal(authorization.status, "authorized");
@@ -225,7 +236,7 @@ record("stale, wrong-plan, and replayed recovery authorizations fail closed", ()
   const staleRoot = pendingRoot(); const wrongRoot = pendingRoot(); const replayRoot = pendingRoot();
   try {
     const stalePlan = planPendingTransactionRecoveryV3({ rootDir: staleRoot });
-    const staleAuthorization = authorizePendingTransactionRecoveryV3(stalePlan, { deliverPreview: () => {} });
+    const staleAuthorization = authorizePendingTransactionRecoveryV3(stalePlan, { deliverPreview: (_preview, invocation) => previewAck(invocation, "ack-stale") });
     const staleJournal = join(staleRoot, ".pipeline-runner-profile-migration-v3/journal.json");
     writeFileSync(staleJournal, `${readFileSync(staleJournal, "utf8")} `);
     const staleBytes = durableSnapshot(staleRoot);
@@ -236,7 +247,7 @@ record("stale, wrong-plan, and replayed recovery authorizations fail closed", ()
     assert.deepEqual(durableSnapshot(staleRoot), staleBytes, "stale authorization performs no recovery mutation");
 
     const wrongPlanA = planPendingTransactionRecoveryV3({ rootDir: wrongRoot });
-    const wrongAuthorization = authorizePendingTransactionRecoveryV3(wrongPlanA, { deliverPreview: () => {} });
+    const wrongAuthorization = authorizePendingTransactionRecoveryV3(wrongPlanA, { deliverPreview: (_preview, invocation) => previewAck(invocation, "ack-wrong") });
     const otherRoot = pendingRoot();
     try {
       const wrongPlanB = planPendingTransactionRecoveryV3({ rootDir: otherRoot });
@@ -250,7 +261,7 @@ record("stale, wrong-plan, and replayed recovery authorizations fail closed", ()
     } finally { rmSync(otherRoot, { recursive: true, force: true }); }
 
     const replayPlan = planPendingTransactionRecoveryV3({ rootDir: replayRoot });
-    const replayAuthorization = authorizePendingTransactionRecoveryV3(replayPlan, { deliverPreview: () => {} });
+    const replayAuthorization = authorizePendingTransactionRecoveryV3(replayPlan, { deliverPreview: (_preview, invocation) => previewAck(invocation, "ack-replay") });
     assert.equal(applyPendingTransactionRecoveryV3(replayPlan, {
       rootDir: replayRoot,
       authorization: replayAuthorization,
@@ -422,7 +433,7 @@ record("legacy additions roll back files and created directories after interrupt
     assert.equal(applied.status, "interrupted");
     assert.equal(existsSync(join(root, ".codex")), true);
     const recoveryPlan = planPendingTransactionRecoveryV3({ rootDir: root });
-    const authorization = authorizePendingTransactionRecoveryV3(recoveryPlan, { deliverPreview: () => {} });
+    const authorization = authorizePendingTransactionRecoveryV3(recoveryPlan, { deliverPreview: (_preview, invocation) => previewAck(invocation, "ack-legacy") });
     assert.equal(applyPendingTransactionRecoveryV3(recoveryPlan, { rootDir: root, authorization }).status, "recovered");
     assert.equal(inspectRunnerProfileMigrationV3({ rootDir: root }).status, "ready");
     assert.deepEqual(snapshot(root), before);

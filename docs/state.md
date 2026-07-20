@@ -36,6 +36,15 @@ observation/document governance
   [backlog/items/2026-07-20-spec-retention-on-close.md](../backlog/items/2026-07-20-spec-retention-on-close.md).
   Close/transfer must preserve normative PRD/Spec authority or fail closed with
   an explicit durable destination and PO disposition.
+- The retention guard is now executable through
+  [`governance/spec-retention.json`](../governance/spec-retention.json): the
+  active Sentinel authority is byte-bound to
+  [`docs/spec-archive/2026-07-20-sentinel-recovery/`](spec-archive/2026-07-20-sentinel-recovery/)
+  and checked by `close.pre`. The archive contains only the Public-safe
+  authority files, not private runtime evidence.
+  The handover links the active
+  [`prd_sentinel-epic.md`](../specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md)
+  and [`spec.md`](../specs/2026-07-19-sprint-sentinel-epic/spec.md) directly.
 - Public remote heads are reduced to unchanged `main` and
   `feat/v3-public-core-foundation`. Anonymous obsolete lines have public
   recovery tags; histories with non-neutral authorship remain offline only and
@@ -76,6 +85,18 @@ observation/document governance
 - Recovery-preview callback attestation, evidence-bound review retries,
   private-overlay activation, and target-bound cross-repository override
   ledgers are explicit Public backlog designs, not completed runtime claims.
+- A focused Public recovery-preview attestation candidate now exists at
+  [`plugins/pipeline-core/lib/recovery-preview-attestation.mjs`](../plugins/pipeline-core/lib/recovery-preview-attestation.mjs)
+  with fail-closed coverage for absent, empty, throwing, async, malformed,
+  replayed, invocation-mismatched, and digest-mismatched acknowledgements.
+  Its focused Spec-retention companion checks are now additively registered in
+  the central Verify suite under the explicit TP-3 exception; no completion or
+  go-live claim is made.
+- Repository freshness now reads the source checkout's effective
+  `core.sshCommand` through Git and binds the same transport context to the
+  disposable bare fetch and the exact-OID fallback. The source checkout remains
+  read-only; absent or unsafe transport configuration remains a typed
+  fail-closed `unknown` result.
 - TP-3 and TP-5 were temporarily removed only under explicit PO authorization
   for this bounded work, then restored exactly before final verification.
 - For the current Sentinel/governance block the PO additionally authorized
@@ -99,6 +120,12 @@ observation/document governance
   completed with exit 0 and exact machine-written Verify/Security evidence
   through the approved host boundary after a sandbox-only `EPERM` attempt.
   Documentation-only close mutations require the exact final Verify tail.
+- Session PO authorizations for this Sentinel continuation: the bounded TP-3
+  exception may be used for additive Verify registrations and restored after
+  each edit; after all required gates and exact remote readback are green, the
+  committed Public-Core result may be pushed to the currently checked-out
+  feature branch. This does not authorize `main`, tags, private remotes, or a
+  push of an unverified/partial candidate.
 
 ## Open items and next block
 

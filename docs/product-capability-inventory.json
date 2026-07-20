@@ -793,6 +793,12 @@
       "member": "post-compact-reground-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "recovery-preview-attestation-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1099,6 +1105,18 @@
       "member": "observation-governance-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:spec-retention-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "spec-retention-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:spec-retention-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "spec-retention-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-gate-profile-publisher-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1344,6 +1362,7 @@
         "verify-phase:harness/scripts/verify.mjs:private-overlay-runtime-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:product-capability-inventory-tests",
         "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
+        "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",
         "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",
         "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
         "verify-phase:harness/scripts/verify.mjs:review-economy-tests",
@@ -1372,6 +1391,8 @@
         "verify-phase:harness/scripts/verify.mjs:setup-check-tests",
         "verify-phase:harness/scripts/verify.mjs:setup-tests",
         "verify-phase:harness/scripts/verify.mjs:spec-readiness-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:spec-retention-check",
+        "verify-phase:harness/scripts/verify.mjs:spec-retention-tests",
         "verify-phase:harness/scripts/verify.mjs:staleness-check-tests",
         "verify-phase:harness/scripts/verify.mjs:state-budget-check",
         "verify-phase:harness/scripts/verify.mjs:state-budget-tests",
