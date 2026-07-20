@@ -37,6 +37,25 @@ source review.
 | Cached plugin bytes are stale or an update is applied from the wrong scope. | Bootstrap staleness detection derives the remote from the committed binding. Project scope is the only canonical update target. The supported sequence is `claude plugin marketplace update agent-pipeline`, `claude plugin update pipeline-core@agent-pipeline --scope project`, then `/reload-plugins`. | A cache can remain stale while offline or until the operator performs the sequence; reload does not retroactively change an already-running session. |
 | A user-scope registration, local cache, or runtime selection shadows the project binding. | Do not create a second user-scope installation; inspect the selected plugin/cache state during bootstrap and treat a mismatched or unavailable state as non-current rather than as success. | Local client behavior and cache integrity are outside this repository's enforcement boundary. |
 | Credentials or network traffic are exposed while fetching a private fork. | The public upstream needs no private-repository credential claim; private forks require operator-managed credentials and keep the documented detect-and-prompt update posture. | This document does not govern GitHub credential helpers, tokens, workstation compromise, or network transport beyond the client and provider controls. |
+| A slim private overlay smuggles identity, credential, machine-local, receipt, cache, evidence, or runtime material into the Public-Core activation context. | Activation admits only Markdown below four closed namespaces, rejects unsafe topology, and checks every path segment after Unicode compatibility normalization, case folding, separator splitting, and CamelCase splitting. Password, API-key, and private-key labels are prohibited. File content also rejects assignment-shaped secret labels and PEM private-key blocks before an authenticated batch can be consumed. Evidence contains only digests and counts. | This deterministic filter is a fail-closed boundary, not a general DLP or secret scanner. Deliberately obfuscated or otherwise unrecognized material can evade lexical checks, while assignment-shaped examples can be false positives. Credentials and machine-local authority must remain outside the overlay and still require the repository security scan and human review. |
+
+## Private-overlay activation boundary
+
+The overlay is an untrusted input to the installed Public Core even when its
+Git repository and `core.lock.json` are privately controlled. The lock binds a
+reviewed Public source commit/tree and one installed plugin manifest, but it
+does not attest the overlay content. Admission therefore validates the exact
+filesystem snapshot independently, and the authenticated in-process result is
+single-use. A copied evidence object, changed input, replay, or later readback
+mismatch cannot authorize activation.
+
+Secret-material rejection intentionally examines both names and content. Name
+classification is invariant across ordinary case, `_`, `.`, hyphen-like
+Unicode separators, and CamelCase spellings. Content classification is narrow
+and deterministic: named secret assignments and PEM private-key blocks are
+rejected, while ordinary prose about keeping credentials outside the overlay
+is allowed. Operators must rewrite assignment-shaped examples as prose rather
+than weaken this admission boundary.
 
 ## Update boundary
 

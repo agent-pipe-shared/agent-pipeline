@@ -55,7 +55,10 @@ Implement a portable Public-Core activation adapter that:
   private values, raw content, or local paths; and
 - has deterministic positive tests plus negative tests for every rejection
   boundary, including missing inputs, mismatches, symlinks, traversal, and
-  prohibited private-runtime material.
+  prohibited private-runtime material; and
+- exposes a bounded recovery and rollback procedure for interrupted, partial,
+  and completed activation without deleting shared plugin state or claiming
+  that a completed activation is an atomic reversible toggle.
 
 Until those tests and exact-candidate verification are green, `pipeline-start`
 must remain fail-closed for the slim overlay and must not claim bootstrap,
@@ -99,3 +102,30 @@ evidence before implementation or any readiness claim.
 - Completion of SNT-A removes only the private-overlay activation prerequisite.
   It does not by itself satisfy the separate Sentinel go-live, legal,
   publication, documentation, or full project-calibration gates.
+
+## Rollback and recovery acceptance boundary
+
+Before activation, record the reviewed overlay commit and the exact Public
+commit/tree, plugin version, manifest digest, and plan digest shown by
+`inspect`/`plan`. Recovery is then bounded as follows:
+
+1. If projection is interrupted or reports recovery required, stop and rerun
+   `inspect` or `plan`. The V3 migration journal restores only its recorded
+   preimages when their filesystem identity still matches. Do not delete or
+   edit the pending transaction directory.
+2. If activation reports `partial`, do not claim activation and do not remove
+   the machine-local receipt or shared plugin cache. Correct the named failure,
+   obtain a fresh admission and plan digest, activate that exact plan, and
+   require a fresh combined status/readback.
+3. To reverse a completed activation, restore or revert the version-controlled
+   overlay inputs to the recorded reviewed commit, reinstall the previously
+   pinned Public plugin if its binding changed, and run a new
+   `inspect` → `plan` → explicit `activate` → `status` cycle. The new
+   cycle replaces the receipt only after projection succeeds.
+
+The permitted write/restore set is limited to the pipeline-owned runtime and
+source targets enumerated by the reviewed plan plus the repository-local
+machine receipt. The procedure never authorizes broad deletion under `/tmp`,
+the Git common directory, the client plugin cache, or unrelated project files.
+If an observed target no longer matches its recorded preimage, automated
+rollback must stop for manual review rather than overwrite the external change.

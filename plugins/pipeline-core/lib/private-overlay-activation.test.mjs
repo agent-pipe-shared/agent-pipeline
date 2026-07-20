@@ -202,6 +202,50 @@ for (const [name, mutate, expected] of [
   finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+for (const name of [
+  "PASSWORD.md",
+  "dbPassword.md",
+  "ApiKey.md",
+  "api-key.md",
+  "api_key.md",
+  "api‑KEY.md",
+  "privateKey.md",
+  "private-key.md",
+  "PRIVATE.KEY.md",
+  "private—key.md",
+]) test(`rejects normalized prohibited path segment ${name}`, () => {
+  const root = fixture();
+  try {
+    writeFileSync(join(root, ".agent-pipeline", "extensions", name), "neutral text\n");
+    assert.equal(reason(validate(root)), "SNT-A-PROHIBITED-MATERIAL");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+for (const [name, content] of [
+  ["named password assignment", "password = fixture-value\n"],
+  ["normalized API key assignment", "API_KEY: fixture-value\n"],
+  ["camel-case private key assignment", "privateKey = external-reference\n"],
+  ["PEM private-key material", "-----BEGIN OPENSSH PRIVATE KEY-----\nfixture\n-----END OPENSSH PRIVATE KEY-----\n"],
+]) test(`rejects prohibited content: ${name}`, () => {
+  const root = fixture();
+  try {
+    writeFileSync(join(root, ".agent-pipeline", "extensions", "neutral.md"), content);
+    assert.equal(reason(validate(root)), "SNT-A-PROHIBITED-MATERIAL");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("accepts safe prose and non-secret words that merely contain similar substrings", () => {
+  const root = fixture();
+  try {
+    writeFileSync(
+      join(root, ".agent-pipeline", "extensions", "access-control.md"),
+      "Authentication material stays outside the overlay. Passwords must never be persisted. API keys and private keys remain in an external secret store.\n",
+    );
+    writeFileSync(join(root, ".agent-pipeline", "templates", "passwordless-keynote.md"), "Use delegated authentication.\n");
+    assert.equal(validate(root).status, "ready");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 for (const [field, value, expected] of [
   ["repository", "https://example.invalid/public/other.git", "SNT-A-REPOSITORY-MISMATCH"],
   ["branch", "feature/other", "SNT-A-BRANCH-MISMATCH"],
