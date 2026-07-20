@@ -3,12 +3,19 @@
 ## V3 foundation transfer — 2026-07-20
 
 The V3 Public Core transfer is recorded under an explicit PO course exception.
-It is a transfer disposition, not a Critic PASS and not a release approval.
+That earlier exception was not and is not a Critic PASS. It remains a transfer
+disposition, not a review verdict or release approval.
 No push was performed.
+
+The public marketplace URL, its self-application assertions, the current
+PO-language failure text, the standing-approved push-gate assertion, the public
+inventory baseline, and the three reproduced documentation links were
+reconciled on 2026-07-20. The inventory baseline now resolves to the committed
+Public V3 Foundation candidate.
 
 | Issue | Scope | Required follow-up |
 | --- | --- | --- |
-| Recovery-preview callback attestation can accept a no-op callback in the migration library. | V3 migration recovery path | Bind the preview callback to a non-empty, attested delivery before treating a recovery result as successful. |
-| Formal review/dispatch aborts can force broad repeat runs without a new domain finding. | Review workflow | Implement a narrower, evidence-bound retry path and retain prior valid receipts. |
-| The full verification aggregate contains legacy/self-application assumptions that do not yet hold for the fresh Public-Core branch. | Public verification packaging | Reconcile the aggregate's root assets, PO receipt precondition, runtime-profile expectations, and fixture handling. |
-| Gitleaks reports seven high-severity generic-key matches in test fixtures. | Security verification | Review each fixture, remove any real secret, and otherwise use a narrowly justified false-positive treatment. |
+| Recovery-preview callback attestation can accept a no-op callback in the migration library. | V3 migration recovery path | Prioritized design item: [attest recovery-preview callback delivery](../backlog/items/2026-07-20-recovery-preview-callback-attestation.md). |
+| Formal review/dispatch aborts can force broad repeat runs without a new domain finding. | Review workflow | Prioritized design item: [bound review retries to valid evidence](../backlog/items/2026-07-20-evidence-bound-review-retry-economics.md). |
+| The portable verification aggregate still invokes the machine-local PO-gate-authority CLI. | Public verification packaging | Remove only that aggregate entry, retain the CLI's unit/runtime fail-closed behavior, and then remove its inventory verify-phase mapping. The protected verifier was not bypassed during this stabilization. |
+| Direct-history Gitleaks reports exactly three `generic-api-key` findings, all deterministic idempotency fixtures in `harness/scripts/pipeline-state.test.mjs`; the earlier count of seven is obsolete. | Security verification | Replace the three secret-like fixture strings with non-secret deterministic identifiers, remove only their obsolete exact suppressions, and require a clean direct-history rescan. The protected test was not bypassed and no broad suppression was added. |
