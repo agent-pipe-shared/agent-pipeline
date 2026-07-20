@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "212d7f444e8de3ddad65c965a74922205b594360df7d3116befbaf248fcd15de"
+    "transitionHead": "48cf4e306cfb8192c1af05b85dce70d42bb844f61f4494e83bd522af6a0614b3"
   },
   "counts": {
     "open": 10,
-    "in_progress": 3,
-    "closed": 0
+    "in_progress": 2,
+    "closed": 1
   },
   "items": [
     {
@@ -101,11 +101,15 @@
     },
     {
       "id": "pipeline.source-available-commercial-licensing",
-      "status": "in_progress",
+      "status": "closed",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
-      "source": "Sentinel SNT-1 licensing gate recovered during Public Core transfer"
+      "source": "Sentinel SNT-1 licensing gate recovered during Public Core transfer",
+      "closedAt": "2026-07-21",
+      "closureRepository": "self",
+      "closureCommit": "a798db6d45f2fc113f66d01400d7ea70fcef9427",
+      "closureEvidence": "backlog/evidence/2026-07-21-source-available-commercial-licensing.md"
     },
     {
       "id": "pipeline.spec-retention-on-close",
