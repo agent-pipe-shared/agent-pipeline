@@ -32,10 +32,11 @@ marketplace coordinate in `.claude/settings.json`, changed from
 with its `extraKnownMarketplaces.agent-pipeline` and enabled
 `pipeline-core@agent-pipeline` binding. It also includes the portable Verify
 aggregate change: `harness/scripts/verify.mjs` no longer runs
-`po-gate-authority-check`, and `docs/product-capability-inventory.json` no
-longer lists that Verify phase or its ownership mapping. The CLI's separate
-unit/runtime fail-closed behavior remains in scope and is not represented as
-removed.
+`po-gate-authority-check`, so the machine-local CLI remains excluded from
+portable Verify. The portable `po-gate-authority-fixture-tests` Verify phase
+retains isolated fail-closed fixture coverage, and
+`docs/product-capability-inventory.json` records that coverage rather than the
+excluded CLI.
 
 The security rollback scope includes the three scanner-safe fixture identifier
 changes in `harness/scripts/pipeline-state.test.mjs` and only these Gitleaks
