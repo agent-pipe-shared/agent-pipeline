@@ -4,7 +4,7 @@
 noch keine starke Produktivaktivierung
 
 **Bezugsvertrag:**
-[Spec BTM-F1](../specs/2026-07-18-sprint-batman-epic/spec_btm-f1-boundary.md)
+[ADR-0037 — Batman bounded assurance](adr/0037-batman-bounded-assurance.md#decision)
 
 ## Aussagegrenze
 

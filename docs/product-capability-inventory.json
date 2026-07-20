@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.product-capability-inventory.v1",
   "sourceBaseline": {
-    "commit": "43551e40561a59ff0cb0eb063413866e5f8df471",
-    "tree": "24875588cfb72c38e5032f5a9e43b447c291ba42"
+    "commit": "89c3c2ebf73d2b8cd3b43ee0ea463d2819c5f49f",
+    "tree": "d8f434afea67c2c852061e84b5bd665e1a9607fd"
   },
   "criticReceiptSha256": "PENDING_SANCTIONED_CRITIC_RECEIPT",
   "surfaces": [

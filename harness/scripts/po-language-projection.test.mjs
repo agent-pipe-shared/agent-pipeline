@@ -57,12 +57,12 @@ check("committed runtime language agrees with the committed user source", () => 
   const runtime = parseYaml(readFileSync(join(root, ".claude", "pipeline.yaml"), "utf8"));
   assert.deepEqual(resolveHumanFacingLanguage(runtime), { ok: true, value: source.language.human_facing });
 });
-check("validated source/runtime conflict rejects with a setup correction", () => {
+check("validated source/runtime conflict rejects before PO-facing authoring", () => {
   const source = renderUserYaml({ ...buildDefaultAnswers(), language: { human_facing: "de", agent_facing: "en" } });
   const runtime = renderPipelineYaml({ ...buildDefaultAnswers(), language: { human_facing: "en", agent_facing: "en" } }, "projection-conflict");
   const result = validatePoFacingLanguageProjection(source, runtime, root);
   assert.equal(result.ok, false);
-  assert.match(result.reason, /re-run setup/);
+  assert.equal(result.reason, "pipeline.user.yaml is invalid; correct it before PO-facing authoring");
 });
 const consumers = [
   "templates/prd.md",

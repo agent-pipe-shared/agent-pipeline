@@ -25,7 +25,7 @@ Every item carries exactly one type in the frontmatter field `type`:
 
 - One item = one file under `backlog/items/`, naming scheme `YYYY-MM-DD-short-german-slug.md` (date = `created`, not a due date).
 - Structure and mandatory frontmatter: [`backlog/items/TEMPLATE.md`](items/TEMPLATE.md) — required fields `type` / `status` / `created` / `source`; optional fields (e.g. `due` for scheduled follow-ups) are marked as such in the template.
-- Items are **never deleted**, only progressed in status (append-only, like HISTORY files, cf. [`docs/operating-model.md` §6](../docs/operating-model.md#6-baton-pass--handover)) — rejected or completed items stay in place with their rationale.
+- Items are **never deleted**, only progressed in status (append-only evidence; cf. [`docs/operating-model.md` §6](../docs/operating-model.md#6-evidence-review-and-recovery)) — rejected or completed items stay in place with their rationale.
 
 ### Status lifecycle
 
