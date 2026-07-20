@@ -49,6 +49,8 @@ security:
     semgrep:
       enabled: true
       rules_dir: governance/examples/policies/semgrep
+    license-check:
+      enabled: true
 
 modelRouting:
   # Generated V3 Claude compatibility projection; pipeline.user.v3 is the only routing authority.

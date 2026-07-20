@@ -14,14 +14,10 @@ repository state records that approval.
   refs, recovery, and public claims)
 - Starting commit: `e2255dbb18d5b10f5b3d8618546b5b2e509025c2`
 - Starting tree: `4ed130ded05b77599d8a1d5cd3210c858bbba835`
-- Inherited Hawkeye PRD SHA-256:
-  `e6f52fd9feca944cbfb74d252804f624fe6491ac8ed5c564601566060e446c56`
-- Inherited Hawkeye technical Spec SHA-256:
-  `40037b9c639c562f5c17fc73d552fcbd3bc4163dd4b128c54f244ed5cee8215c`
-- Inherited Hawkeye implementation-slices SHA-256:
-  `0797a824800e0618c87b3a2fb88df014d19cdb666dcdc2d84c7ea2e8ee49ab9c`
-- Design-phase control-contract SHA-256:
-  `08fcf257129317232edcc8c1237499712513f2494a4d6a5b1f23e9c7bb66cf2f`
+- Inherited Hawkeye material remains outside the Public authority; private
+  provenance values are not copied into the Public Core.
+- Design-phase control-contract fingerprint is retained in the private
+  provenance record; the raw value is not copied into the Public Core.
 
 The complete contracts in
 `specs/2026-07-19-sprint-hawkeye-epic/prd_hawkeye-epic.md`,
@@ -79,9 +75,8 @@ unless the PO records another explicit exception.
 ## 2a. Approved public-core/private-consumer reconciliation amendment
 
 The PO approved the complete neighboring
-`public-private-reconciliation-design.md` on 2026-07-20 with SHA-256
-`9c07cb392f550ef34380676f9f86fe0f4b53a82349d94b0a96858a9ad09238bd`.
-It is an additive Sentinel implementation authority and changes the delivery
+`public-private-reconciliation-design.md` on 2026-07-20. Its exact bytes are
+bound by the Public retention manifest. It is an additive Sentinel implementation authority and changes the delivery
 topology without dropping any existing Sentinel, Hawkeye, evidence, privacy,
 licensing, Critic, release, or recovery obligation.
 

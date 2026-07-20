@@ -250,7 +250,7 @@ what's always portable and what's Claude-Code-specific.
 - [`docs/operating-model.md`](docs/operating-model.md) — the full normative
   document: roles, SDLC, review system, session lifecycle, handover, project
   calibration.
-- [`LICENSE`](LICENSE) (code, Apache-2.0) · [`LICENSE-DOCS`](LICENSE-DOCS) (docs & prose, CC-BY-4.0).
+- [`LICENSE`](LICENSE) and [`LICENSE-DOCS`](LICENSE-DOCS) use the source-available Sustainable Use License 1.0 (SUL-1.0); see [`docs/licensing.md`](docs/licensing.md).
 
 ## Acknowledgments
 
@@ -539,7 +539,7 @@ Claude-Code-spezifisch ist.
 - [`docs/operating-model.md`](docs/operating-model.md) — das vollständige
   normative Dokument: Rollen, SDLC, Review-System, Session-Lifecycle, Handover,
   Projekt-Kalibrierung.
-- [`LICENSE`](LICENSE) (Code, Apache-2.0) · [`LICENSE-DOCS`](LICENSE-DOCS) (Doku & Prosa, CC-BY-4.0).
+- [`LICENSE`](LICENSE) und [`LICENSE-DOCS`](LICENSE-DOCS) verwenden die source-available Sustainable Use License 1.0 (SUL-1.0); siehe [`docs/licensing.md`](docs/licensing.md).
 
 ## Danksagung
 

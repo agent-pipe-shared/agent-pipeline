@@ -1,8 +1,18 @@
 Agent-Pipeline
-Copyright 2026 The Agent-Pipeline Contributors
 
-This product includes software developed by The Agent-Pipeline Contributors.
+Copyright (c) 2026 agent-pipe-shared and contributors.
 
-Licensed under the Apache License, Version 2.0 (the "License") for code,
-and under Creative Commons Attribution 4.0 International (CC-BY-4.0) for
-documentation and prose. See LICENSE and LICENSE-DOCS.
+This source-available repository is licensed under Sustainable Use License
+Version 1.0 (SUL-1.0). Preserve this notice and the LICENSE file in copies.
+
+Commercial licensing
+
+Commercial exploitation, including sale, paid distribution, hosting,
+managed-service value substantially derived from Agent-Pipeline, white-label
+use, or embedding the Pipeline as a paid product, requires a separate
+commercial license. Commercial-license intake is handled through the
+repository maintainers:
+
+https://github.com/agent-pipe-shared/agent-pipeline/issues
+
+Prices and contract terms are not defined in this repository.

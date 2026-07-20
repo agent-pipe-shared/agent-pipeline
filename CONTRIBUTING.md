@@ -67,11 +67,17 @@ your commit message. Pull requests with unsigned commits will not be merged.
 
 By submitting a contribution, you agree that:
 
-- Code contributions are licensed under **Apache License 2.0** (see
+- Code contributions are licensed under the **Sustainable Use License 1.0
+  (SUL-1.0)** (see
   [`LICENSE`](LICENSE)).
-- Documentation and prose contributions are licensed under **Creative
-  Commons Attribution 4.0 International (CC-BY-4.0)** (see
+- Documentation and prose contributions use the same **Sustainable Use License
+  1.0 (SUL-1.0)** (see
   [`LICENSE-DOCS`](LICENSE-DOCS)).
+
+This is source-available licensing, not OSI Open Source. Internal business use
+is permitted; free non-commercial redistribution is permitted with notices;
+commercial exploitation requires a separate commercial license. Contributors
+must have the right to submit their contribution under these terms.
 
 ## Code of Conduct
 

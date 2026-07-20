@@ -23,7 +23,7 @@ function makeSelection(overrides = {}) {
   const value = {
     schema: "pipeline.codex-sandbox-selection.v1", selectionId: SELECTION_ID, repoFingerprint: D, duty: "readiness",
     dispatch: { queueRevision: 2, candidateCommit: "c".repeat(40), candidateTree: "d".repeat(40), referenceSetSha256: "e".repeat(64), requestSha256 },
-    toolchain: { cliVersion: "0.144.6", cliSha256: "0".repeat(64), sandboxHelperSha256: "1".repeat(64), selectionSchemaSha256: "2".repeat(64) },
+    toolchain: { cliVersion: "0.144.6", cliSha256: "0".repeat(64), observedHelperSha256: "1".repeat(64), selectionSchemaSha256: "2".repeat(64) },
     host: { platformClass: "linux-wsl2", kernel: { sysname: "Linux", release: "6", machine: "x86_64" }, filesystemClass: "wsl2-native", bootIdSha256: "3".repeat(64) },
     profile: { id: "codex-critic-intermediate.v1", sha256: "4".repeat(64), base: ":read-only", network: { enabled: true }, writableRootClass: "coordinator-scratch-only", scratchRootSha256: "5".repeat(64) },
     preflight: { receiptSha256: "6".repeat(64), eligibility: "intermediate", terminalCode: "eligible", observedAt: "2026-07-19T00:00:00.000Z" },
@@ -49,13 +49,13 @@ function currentHostEvidence() {
   const entry = policy.entries.find((candidate) => candidate.filesystemClass === "wsl-native");
   const receipt = {
     schema: "pipeline.codex-sandbox-preflight.v1", cli: { version: entry.cliVersion, artifactSha256: entry.releasedArtifactSha256 },
-    sandboxHelper: { artifactSha256: "1".repeat(64), sameArtifactAsCli: false }, platform: { os: "linux", kernelClass: entry.kernelClass, filesystemClass: entry.filesystemClass },
+    sandboxTransport: { selection: "codex-cli-owned" }, observedHelper: { role: "diagnostic-only", artifactSha256: "1".repeat(64) }, platform: { os: "linux", kernelClass: entry.kernelClass, filesystemClass: entry.filesystemClass },
     profile: { id: entry.permissionProfileId, rawSha256: entry.permissionProfileSha256, compiledStateSha256: "2".repeat(64) }, networkEnabled: true,
     vectors: { allowedRead: true, externalReadDenied: true, sensitiveReadDenied: true, writeDenied: true, scratchWriteAllowed: true, networkDenied: false, childStdioEquivalent: true, stdinEofEquivalent: true, childExitEquivalent: true, appServerInitEquivalent: true, lifecycleComplete: true },
     canaries: { count: 1, manifestSha256: "3".repeat(64), unchanged: true }, eventChainSha256: "4".repeat(64), durationMs: 1, eligibility: "intermediate", terminalCode: "ok",
   };
   return {
-    cliVersion: entry.cliVersion, cliSha256: entry.releasedArtifactSha256, sandboxHelperSha256: "1".repeat(64), selectionSchemaSha256: SELECTION_SCHEMA_SHA256,
+    cliVersion: entry.cliVersion, cliSha256: entry.releasedArtifactSha256, observedHelperSha256: "1".repeat(64), selectionSchemaSha256: SELECTION_SCHEMA_SHA256,
     platformClass: "linux-wsl2", kernel: { sysname: "Linux", release: "6", machine: "x86_64" }, filesystemClass: "wsl2-native", bootIdSha256: sha("boot"),
     compatibilityObservation: {
       runnerId: "codex", cliVersion: entry.cliVersion, releasedArtifactSha256: entry.releasedArtifactSha256, kernelClass: entry.kernelClass, filesystemClass: entry.filesystemClass,

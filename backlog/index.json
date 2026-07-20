@@ -3,11 +3,11 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "6e9075a5b7f188a54ffdcd5de2ae897f664a01e32c6da64b16d6cf8336b64f18"
+    "transitionHead": "212d7f444e8de3ddad65c965a74922205b594360df7d3116befbaf248fcd15de"
   },
   "counts": {
     "open": 10,
-    "in_progress": 2,
+    "in_progress": 3,
     "closed": 0
   },
   "items": [
@@ -98,6 +98,14 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Public transfer completeness review of remaining Sentinel go-live obligations"
+    },
+    {
+      "id": "pipeline.source-available-commercial-licensing",
+      "status": "in_progress",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-20",
+      "source": "Sentinel SNT-1 licensing gate recovered during Public Core transfer"
     },
     {
       "id": "pipeline.spec-retention-on-close",
