@@ -19,7 +19,7 @@ export const BACKLOG_TYPES = Object.freeze(["workflow-improvement", "tooling-rad
 const FORWARD_TRANSITIONS = Object.freeze({ open: "in_progress", in_progress: "closed" });
 
 const ITEM_REQUIRED = Object.freeze(["schema", "id", "type", "owner", "status", "created", "source"]);
-const ITEM_OPTIONAL = Object.freeze(["tracking", "closed_at", "closure_repository", "closure_commit", "closure_evidence", "closure_readback"]);
+const ITEM_OPTIONAL = Object.freeze(["tracking", "due", "expires", "closed_at", "closure_repository", "closure_commit", "closure_evidence", "closure_readback"]);
 const ITEM_KEYS = new Set([...ITEM_REQUIRED, ...ITEM_OPTIONAL]);
 const ITEM_ID = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/u;
 const OWNER = /^(?:pipeline|project:[a-z][a-z0-9]*(?:-[a-z0-9]+)*)$/u;
@@ -125,6 +125,7 @@ export function validateBacklogItem(item) {
   if (!validDate(asString(metadata.created))) errors.push(`${path}: created must be an ISO calendar date`);
   if (asString(metadata.source).trim().length === 0) errors.push(`${path}: source must be non-empty`);
   if (own(metadata, "tracking") && asString(metadata.tracking).trim().length === 0) errors.push(`${path}: tracking must be non-empty when present`);
+  for (const key of ["due", "expires"]) if (own(metadata, key) && !validDate(asString(metadata[key]))) errors.push(`${path}: ${key} must be an ISO calendar date`);
 
   const closureKeys = ["closed_at", "closure_repository", "closure_commit", "closure_evidence", "closure_readback"];
   if (metadata.status === "closed") {

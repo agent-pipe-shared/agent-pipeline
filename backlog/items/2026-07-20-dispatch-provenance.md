@@ -1,11 +1,13 @@
 ---
-type: workflow-improvement
-status: new
-created: 2026-07-20
-owner: Pipeline Elephant
-due: 2026-07-27
-expires: 2026-08-03
-source: Public V3 Foundation stabilization close authorship check: delivered Goldfish work packages lacked required public Dispatch trailers
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.dispatch-provenance"
+type: "workflow-improvement"
+owner: "pipeline"
+status: "open"
+created: "2026-07-20"
+source: "Public V3 Foundation stabilization close authorship check: delivered Goldfish work packages lacked required public Dispatch trailers"
+due: "2026-07-27"
+expires: "2026-08-03"
 ---
 
 # Preserve dispatch provenance for delivered work packages

@@ -1,27 +1,30 @@
 ---
-type: defect
-status: new
-created: 2026-07-20
-source: Public V3 Foundation stabilization review of the migration recovery boundary
-owner: Pipeline Elephant
-due: 2026-07-27
-expires: 2026-08-03
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.recovery-preview-callback-attestation"
+type: "defect"
+owner: "pipeline"
+status: "open"
+created: "2026-07-20"
+source: "Public V3 Foundation stabilization review of the migration recovery boundary"
+due: "2026-07-27"
+expires: "2026-08-03"
 ---
 
 # Attest recovery-preview callback delivery
 
 ## Description
 
-The migration recovery path can currently accept a callback that returns without
-demonstrating that the recovery preview was delivered. A no-op callback can
-therefore look indistinguishable from a completed preview handoff, which makes a
-successful recovery result stronger than the available evidence.
+The migration recovery path previously accepted a callback that returned without
+demonstrating that the recovery preview was delivered. The current Public
+candidate adds a structured acknowledgement, but the item remains open until
+that candidate has independent review and a sanctioned backlog transition.
 
 ## Triggering situation
 
-The Public V3 Foundation stabilization on 2026-07-20 confirmed the open boundary
-already listed in `docs/known-issues.md`: callback presence alone does not attest
-delivery of the preview.
+The Public V3 Foundation stabilization on 2026-07-20 confirmed the boundary
+listed in `docs/known-issues.md`: callback presence alone did not attest delivery
+of the preview. The first implementation candidate is now present in the
+Public Core; this record remains the review/transition authority.
 
 ## Affected artifact
 
@@ -52,7 +55,8 @@ implementation package. Target review date: **2026-07-27**.
 
 ## Ownership and expiry
 
-The next Pipeline Elephant owns triage and an accepted implementation package.
+The next Pipeline Elephant owns triage, independent review, and the accepted
+implementation package.
 The triage due date is **2026-07-27**. If no decision is recorded by
 **2026-08-03**, this item expires and must be renewed with current evidence
 before further implementation or prioritization.

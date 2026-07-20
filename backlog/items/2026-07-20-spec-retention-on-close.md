@@ -1,11 +1,13 @@
 ---
-type: defect
-status: open
-created: 2026-07-20
-source: Sentinel recovery audit after Public close/transfer
-owner: Pipeline Elephant
-due: 2026-07-27
-expires: 2026-08-03
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.spec-retention-on-close"
+type: "defect"
+owner: "pipeline"
+status: "open"
+created: "2026-07-20"
+source: "Sentinel recovery audit after Public close/transfer"
+due: "2026-07-27"
+expires: "2026-08-03"
 ---
 
 # Preserve normative PRD and Spec artifacts across Close and transfer

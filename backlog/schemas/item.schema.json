@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.backlog-item.v1",
+  "type": "object",
+  "required": ["schema", "id", "type", "owner", "status", "created", "source"],
+  "properties": {
+    "schema": { "const": "pipeline.backlog-item.v1" },
+    "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$" },
+    "type": { "enum": ["workflow-improvement", "tooling-radar", "defect", "idea"] },
+    "owner": { "type": "string" },
+    "status": { "enum": ["open", "in_progress", "closed"] },
+    "created": { "type": "string", "format": "date" },
+    "source": { "type": "string", "minLength": 1 },
+    "tracking": { "type": "string" },
+    "due": { "type": "string", "format": "date" },
+    "expires": { "type": "string", "format": "date" },
+    "closed_at": { "type": "string", "format": "date" },
+    "closure_repository": { "type": "string" },
+    "closure_commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "closure_evidence": { "type": "string" },
+    "closure_readback": { "type": "string" }
+  },
+  "additionalProperties": false
+}

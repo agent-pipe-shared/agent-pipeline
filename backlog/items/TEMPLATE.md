@@ -1,6 +1,9 @@
 ---
+schema: pipeline.backlog-item.v1
+id: pipeline.{{short-english-slug}}
 type: {{workflow-improvement|tooling-radar|defect|idea}}
-status: new
+owner: pipeline
+status: open
 created: {{YYYY-MM-DD}}
 source: {{origin — retro question / radar run / critic finding / manual observation, with a concrete reference (file, ADR, session date)}}
 due: {{OPTIONAL — YYYY-MM-DD, only for time-triggered items such as ADR resubmissions; delete this line entirely if not applicable}}
@@ -21,7 +24,8 @@ USAGE
    (date = created, not a due date).
 2. Fill every {{PLACEHOLDER}} in the frontmatter above and the sections below.
    Delete the `due:` line entirely if the item has no time trigger.
-3. Leave `status: new` and the Triage section empty — both are filled by the
+3. Leave `status: open` and the Triage section empty — active work is moved to
+   `in_progress` only through the sanctioned ledger writer; the
    Elephant of the next Pipeline session (backlog/README.md, triage rules).
    An item never deletes itself out of the backlog; rejected/deferred items
    stay with their reasoning attached.

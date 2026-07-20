@@ -1,10 +1,12 @@
 ---
-type: workflow-improvement
-status: accepted
-created: 2026-07-20
-source: PO-approved parallel Sentinel work and Critic scope correction
-owner: Pipeline Elephant
-due: 2026-07-20
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.observation-intake-document-governance"
+type: "workflow-improvement"
+owner: "pipeline"
+status: "in_progress"
+created: "2026-07-20"
+source: "PO-approved parallel Sentinel work and Critic scope correction"
+due: "2026-07-20"
 ---
 
 # Establish canonical observation intake and document governance

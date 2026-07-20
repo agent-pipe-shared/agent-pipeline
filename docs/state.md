@@ -5,8 +5,8 @@
 
 **Last updated:** 2026-07-20
 **Project status:** ACTIVE
-**Current block:** Sentinel SNT-A private-overlay activation bridge and global
-observation/document governance
+**Current block:** Sentinel continuation after closed SNT-A: recovery/retention
+gates, canonical backlog reconciliation, and remaining go-live evidence
 **Repair baseline:** `89c3c2ebf73d2b8cd3b43ee0ea463d2819c5f49f`
 **Release version:** `0.2.0`
 
@@ -97,6 +97,15 @@ observation/document governance
   disposable bare fetch and the exact-OID fallback. The source checkout remains
   read-only; absent or unsafe transport configuration remains a typed
   fail-closed `unknown` result.
+- The project-scoped GitHub Issue capability is now a separate Public skill with
+  target/operation/field validation, exact mutation previews, local `gh`
+  credential boundaries, and readback verification. It does not widen the
+  fixed Public observation target or permit delete, transfer, settings, or
+  permission mutations.
+- The canonical backlog checker now reports legacy/unshaped backlog input
+  fail-closed without crashing. The repository still lacks the canonical
+  backlog schemas, transition ledger, and projections; SNT-7 remains open and
+  no backlog status transition is inferred from this diagnostic repair.
 - TP-3 and TP-5 were temporarily removed only under explicit PO authorization
   for this bounded work, then restored exactly before final verification.
 - For the current Sentinel/governance block the PO additionally authorized
@@ -140,15 +149,19 @@ observation/document governance
 - Start a new Codex thread and run the full `pipeline-start` bootstrap before
   trusting the refreshed bridge. Then publish the fourteen queued observations
   through the GitHub Issue Form/skill after capability and target readback.
+- The legacy backlog records were migrated through the explicit
+  `migrate-backlog-state.mjs --write` path. The canonical ledger and generated
+  `STATUS.md`/`index.json` now validate; all twelve records remain open or
+  in-progress and require their own evidence before any closure transition.
 - Open the separate GitHub Observation Publication feature for the fourteen
   queued observations. Do not reopen SNT-A and do not treat publication as
   Sentinel Epic completion.
 - Continue the remaining Sentinel go-live package only after SNT-A, including
   native/generic validator A/B evidence. SNT-A completion alone is not a
   release or go-live readiness claim.
-- Triage recovery-preview callback attestation, evidence-bound review retry
-  economics, and target-bound override-ledger placement under their recorded
-  owners and expiry dates.
+- Obtain independent review for the recovery-preview candidate, then triage
+  evidence-bound review retry economics and target-bound override-ledger
+  placement under their recorded owners and expiry dates.
 - The monthly tooling-radar item is absent for the current month and is overdue;
   dispatch a fresh Public tooling-radar review in the next block.
 

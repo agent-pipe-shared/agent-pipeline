@@ -1,11 +1,13 @@
 ---
-type: workflow-improvement
-status: new
-created: 2026-07-20
-owner: Pipeline Elephant
-due: 2026-07-27
-expires: 2026-08-03
-source: Public V3 Foundation stabilization close retro: an independent Critic run was discarded after an out-of-band coordinator status message reached its context
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.critic-context-isolation"
+type: "workflow-improvement"
+owner: "pipeline"
+status: "open"
+created: "2026-07-20"
+source: "Public V3 Foundation stabilization close retro: an independent Critic run was discarded after an out-of-band coordinator status message reached its context"
+due: "2026-07-27"
+expires: "2026-08-03"
 ---
 
 # Keep independent Critic contexts isolated from coordinator status traffic

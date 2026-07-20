@@ -1087,10 +1087,28 @@
       "member": "capture-observation"
     },
     {
+      "surfaceId": "skill:plugins/pipeline-core/skills/github-issue-operations/SKILL.md:github-issue-operations",
+      "kind": "skill",
+      "path": "plugins/pipeline-core/skills/github-issue-operations/SKILL.md",
+      "member": "github-issue-operations"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:capture-observation-intake-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "capture-observation-intake-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:github-issue-operations-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "github-issue-operations-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:migrate-backlog-state-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "migrate-backlog-state-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-private-overlay-activation-tests",
@@ -1330,6 +1348,7 @@
         "verify-phase:harness/scripts/verify.mjs:error-register-check",
         "verify-phase:harness/scripts/verify.mjs:error-register-tests",
         "verify-phase:harness/scripts/verify.mjs:git-cmd-tests",
+        "verify-phase:harness/scripts/verify.mjs:github-issue-operations-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
@@ -1339,6 +1358,7 @@
         "verify-phase:harness/scripts/verify.mjs:language-canon-check",
         "verify-phase:harness/scripts/verify.mjs:language-canon-tests",
         "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
+        "verify-phase:harness/scripts/verify.mjs:migrate-backlog-state-tests",
         "verify-phase:harness/scripts/verify.mjs:no-autoupdate-key-tests",
         "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
         "verify-phase:harness/scripts/verify.mjs:p3b-runner-conformance-tests",
@@ -1673,6 +1693,7 @@
         "skill:plugins/pipeline-core/skills/close-feature/SKILL.md:close-feature",
         "skill:plugins/pipeline-core/skills/conventional-commit/SKILL.md:conventional-commit",
         "skill:plugins/pipeline-core/skills/critic-review/SKILL.md:critic-review",
+        "skill:plugins/pipeline-core/skills/github-issue-operations/SKILL.md:github-issue-operations",
         "skill:plugins/pipeline-core/skills/pipeline-start/SKILL.md:pipeline-start"
       ],
       "runners": [
@@ -1708,9 +1729,11 @@
         "plugins/pipeline-core/skills/close-feature/SKILL.md",
         "plugins/pipeline-core/skills/conventional-commit/SKILL.md",
         "plugins/pipeline-core/skills/critic-review/SKILL.md",
+        "plugins/pipeline-core/skills/github-issue-operations/SKILL.md",
         "plugins/pipeline-core/skills/pipeline-start/SKILL.md"
       ],
       "testEvidence": [
+        "plugins/pipeline-core/scripts/github-issue-operations.test.mjs",
         "plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs"
       ],
       "targets": [
