@@ -16,7 +16,7 @@
     "recovery": "docs/spec-archive/2026-07-20-sentinel-recovery/RECOVERY.md"
   },
   "sha256": {
-    "prd": "dddcf8c1809abc32ed5ea67b6e0d7adae3bb6595d9314af05e01ef2e08fe1e82",
+    "prd": "2b4c722de508cb9424b3fb83c6308602dd20e7e67ce240740c51deeb58541136",
     "spec": "b062db2aa1271bd4b1be32efa16e74aaa7ccfafcba3ebfde4888d77d527819ac",
     "acceptance": "48f26218ef9c7571b4cde9549c2855904e1ccca486a78eece3ab0361a3d11bf5",
     "design": "48698f4bc1717932b1f031b6936e7201cc1d3201e6e56d28a50b2891023f0e7f",
