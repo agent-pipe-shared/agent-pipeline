@@ -43,7 +43,7 @@ suppression changes: the three removed worktree fingerprints at lines 1468,
 1593, and 1641; the three immutable-history fingerprints for commit
 `89c3c2ebf73d2b8cd3b43ee0ea463d2819c5f49f` at lines 1601, 1726, and 1774; and
 the three equivalent immutable-history fingerprints for commit
-`49bd5c5956a8a3a092ef5fff9d6718168e54c973` at those same lines. No path-wide
+`5add084a1be90f0ec780c07d671d68927eeac634` at those same lines. No path-wide
 or rule-wide Gitleaks suppression was added. There is no schema, data, or
 runtime migration, so no migration or downgrade step is required.
 
