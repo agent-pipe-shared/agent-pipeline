@@ -3,14 +3,22 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "48cf4e306cfb8192c1af05b85dce70d42bb844f61f4494e83bd522af6a0614b3"
+    "transitionHead": "08624bcb18ed9e82f730df0db456578cabfd17984fe8793bca85a3eb0f91b91c"
   },
   "counts": {
-    "open": 10,
+    "open": 11,
     "in_progress": 2,
     "closed": 1
   },
   "items": [
+    {
+      "id": "pipeline.close-spec-retention-and-consent",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-21",
+      "source": "2026-07-21 full-close retro: Spec-retention authority drift and durable advisor-export consent readback"
+    },
     {
       "id": "pipeline.closed-input-channel-review-economics",
       "status": "open",
