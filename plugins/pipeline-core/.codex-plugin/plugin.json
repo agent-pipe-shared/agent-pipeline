@@ -4,13 +4,13 @@
   "description": "Provider-aware Agent-Pipeline operating model with session skills, independent review, and command safety hooks.",
   "hooks": "./hooks/codex-hooks.json",
   "author": {
-    "name": "roaspeci"
+    "name": "agent-pipeline"
   },
   "interface": {
     "displayName": "Agent Pipeline Core",
     "shortDescription": "Safe agentic delivery workflows for Codex.",
     "longDescription": "Loads the Agent-Pipeline operating model, role skills, review workflow, and command safety hooks for Codex projects.",
-    "developerName": "roaspeci",
+    "developerName": "agent-pipeline",
     "category": "Developer Tools",
     "capabilities": [
       "Skills",
