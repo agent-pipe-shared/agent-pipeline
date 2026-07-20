@@ -340,6 +340,29 @@ export function validatePoGateAuthorityForRepository({
   return validatePoGateAuthority({ ...topology, expectedPlanSha256, expectedSpecSha256 });
 }
 
+/**
+ * Validate only the machine-local PO profile receipt and its canonical primary
+ * source/runtime projection. Feature state, PRDs and approval state are
+ * deliberately outside this readback boundary.
+ */
+export function validatePoGateProfileForRepository({ repoRoot } = {}, deps = {}) {
+  let topology;
+  try {
+    topology = deps.topology ?? resolvePoGateRepositoryTopology(repoRoot, deps);
+  } catch {
+    return fail("PO-PROFILE-AUTHORITY-UNAVAILABLE", "Repository topology or profile inputs are unavailable.", PROFILE_REPAIR);
+  }
+  let profile;
+  try {
+    profile = validatePoGateProfileSnapshot(topology);
+  } catch {
+    return fail("PO-PROFILE-AUTHORITY-UNAVAILABLE", "Repository topology or profile inputs are unavailable.", PROFILE_REPAIR);
+  }
+  return profile.ok
+    ? { ok: true, code: "PO-PROFILE-AUTHORITY-VALID", value: profile.value }
+    : profile;
+}
+
 function loadReceipt(gitCommonDir) {
   const common = assertPhysicalDirectory(gitCommonDir);
   const path = poGateProfileReceiptPath(common);
@@ -368,6 +391,72 @@ function readProjection(root) {
     sourceSha256: sha256(sourceBytes),
     runtimeSha256: sha256(runtimeBytes),
     humanFacing: configuredLanguage(sourceBytes, runtimeBytes),
+  };
+}
+
+function validatePoGateProfileSnapshot({ repoRoot, gitCommonDir, primaryRoot, registeredWorktreeRoots }) {
+  let current;
+  let common;
+  let primary;
+  try {
+    current = assertPhysicalDirectory(repoRoot);
+    common = assertPhysicalDirectory(gitCommonDir);
+    primary = assertPhysicalDirectory(primaryRoot);
+  } catch {
+    return fail("PO-GATE-WORKTREE-INVALID", "The repository topology is not physical and canonical.", PROFILE_REPAIR);
+  }
+  if (
+    !Array.isArray(registeredWorktreeRoots)
+    || registeredWorktreeRoots.some((root) => normalizeAbsolute(root) === null)
+    || !registeredWorktreeRoots.includes(current)
+    || registeredWorktreeRoots[0] !== primary
+  ) {
+    return fail("PO-GATE-WORKTREE-UNREGISTERED", "The current or primary checkout is not the registered Git worktree authority.", PROFILE_REPAIR);
+  }
+
+  let loaded;
+  try {
+    loaded = loadReceipt(common);
+  } catch {
+    return fail("PO-PROFILE-RECEIPT-INVALID", "The common PO profile receipt is missing, unsafe, noncanonical or malformed.", PROFILE_REPAIR);
+  }
+  const { receipt, raw: receiptRaw } = loaded;
+  let expectedFingerprint;
+  try {
+    expectedFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: common, primaryRoot: primary });
+  } catch {
+    return fail("PO-PROFILE-RECEIPT-INVALID", "The repository fingerprint cannot be derived safely.", PROFILE_REPAIR);
+  }
+  if (receipt.repositoryFingerprint !== expectedFingerprint || receipt.canonicalPrimaryRoot !== primary) {
+    return fail("PO-PROFILE-RECEIPT-STALE", "The common PO profile receipt does not bind the current primary checkout.", PROFILE_REPAIR);
+  }
+
+  let primaryProjection;
+  try {
+    primaryProjection = readProjection(primary);
+  } catch {
+    return fail("PO-PROFILE-RECEIPT-STALE", "The canonical primary profile cannot be read safely.", PROFILE_REPAIR);
+  }
+  if (
+    primaryProjection.humanFacing === null
+    || primaryProjection.humanFacing !== receipt.humanFacing
+    || primaryProjection.sourceSha256 !== receipt.sourceSha256
+    || primaryProjection.runtimeSha256 !== receipt.runtimeSha256
+  ) {
+    return fail("PO-PROFILE-RECEIPT-STALE", "The common PO profile receipt no longer matches the canonical primary profile.", PROFILE_REPAIR);
+  }
+
+  return {
+    ok: true,
+    current,
+    value: {
+      schema: PO_GATE_AUTHORITY_EVIDENCE_SCHEMA,
+      humanFacing: receipt.humanFacing,
+      sourceSha256: primaryProjection.sourceSha256,
+      runtimeSha256: primaryProjection.runtimeSha256,
+      receiptSha256: sha256(receiptRaw),
+      repositoryFingerprint: receipt.repositoryFingerprint,
+    },
   };
 }
 
@@ -467,59 +556,9 @@ export function validatePoGateAuthority({
   expectedPlanSha256 = undefined,
   expectedSpecSha256 = undefined,
 }) {
-  let current;
-  let common;
-  let primary;
-  try {
-    current = assertPhysicalDirectory(repoRoot);
-    common = assertPhysicalDirectory(gitCommonDir);
-    primary = assertPhysicalDirectory(primaryRoot);
-  } catch {
-    return fail("PO-GATE-WORKTREE-INVALID", "The repository topology is not physical and canonical.", PROFILE_REPAIR);
-  }
-  if (
-    !Array.isArray(registeredWorktreeRoots)
-    || registeredWorktreeRoots.some((root) => normalizeAbsolute(root) === null)
-    || !registeredWorktreeRoots.includes(current)
-    || registeredWorktreeRoots[0] !== primary
-  ) {
-    return fail("PO-GATE-WORKTREE-UNREGISTERED", "The current or primary checkout is not the registered Git worktree authority.", PROFILE_REPAIR);
-  }
-
-  let loaded;
-  try {
-    loaded = loadReceipt(common);
-  } catch {
-    return fail("PO-PROFILE-RECEIPT-INVALID", "The common PO profile receipt is missing, unsafe, noncanonical or malformed.", PROFILE_REPAIR);
-  }
-  const { receipt, raw: receiptRaw } = loaded;
-  let expectedFingerprint;
-  try {
-    expectedFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: common, primaryRoot: primary });
-  } catch {
-    return fail("PO-PROFILE-RECEIPT-INVALID", "The repository fingerprint cannot be derived safely.", PROFILE_REPAIR);
-  }
-  if (
-    receipt.repositoryFingerprint !== expectedFingerprint
-    || receipt.canonicalPrimaryRoot !== primary
-  ) {
-    return fail("PO-PROFILE-RECEIPT-STALE", "The common PO profile receipt does not bind the current primary checkout.", PROFILE_REPAIR);
-  }
-
-  let primaryProjection;
-  try {
-    primaryProjection = readProjection(primary);
-  } catch {
-    return fail("PO-PROFILE-RECEIPT-STALE", "The canonical primary profile cannot be read safely.", PROFILE_REPAIR);
-  }
-  if (
-    primaryProjection.humanFacing === null
-    || primaryProjection.humanFacing !== receipt.humanFacing
-    || primaryProjection.sourceSha256 !== receipt.sourceSha256
-    || primaryProjection.runtimeSha256 !== receipt.runtimeSha256
-  ) {
-    return fail("PO-PROFILE-RECEIPT-STALE", "The common PO profile receipt no longer matches the canonical primary profile.", PROFILE_REPAIR);
-  }
+  const profile = validatePoGateProfileSnapshot({ repoRoot, gitCommonDir, primaryRoot, registeredWorktreeRoots });
+  if (!profile.ok) return profile;
+  const { current, value: profileEvidence } = profile;
 
   let active;
   try {
@@ -530,21 +569,13 @@ export function validatePoGateAuthority({
   if (active.status === "invalid") {
     return fail("PO-GATE-ACTIVE-FEATURE-INVALID", "The active feature and planPath are missing or unsafe.", PRD_REPAIR);
   }
-  const profileEvidence = {
-    schema: PO_GATE_AUTHORITY_EVIDENCE_SCHEMA,
-    humanFacing: receipt.humanFacing,
-    sourceSha256: primaryProjection.sourceSha256,
-    runtimeSha256: primaryProjection.runtimeSha256,
-    receiptSha256: sha256(receiptRaw),
-    repositoryFingerprint: receipt.repositoryFingerprint,
-  };
   if (active.status === "absent") {
     if (expectedPlanSha256 !== undefined || expectedSpecSha256 !== undefined) {
       return fail("PO-GATE-PLAN-DIGEST-STALE", "The active PRD authority no longer exists.", PRD_REPAIR);
     }
     return { ok: true, code: "PO-GATE-AUTHORITY-VALID", value: profileEvidence };
   }
-  const prd = prdAuthority(current, active, receipt.humanFacing);
+  const prd = prdAuthority(current, active, profileEvidence.humanFacing);
   if (!prd.ok) return prd;
   if (expectedPlanSha256 !== undefined && (!SHA256.test(expectedPlanSha256) || expectedPlanSha256 !== prd.planSha256)) {
     return fail("PO-GATE-PLAN-DIGEST-STALE", "The active PRD changed after the authority snapshot was taken.", PRD_REPAIR);

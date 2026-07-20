@@ -586,6 +586,66 @@ record("current V3 with any missing runtime target remains fail-closed", () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+record("slim valid V3 runtime initialization is explicit, read-only at plan, and atomically applicable", () => {
+  const source = yaml(v3Intent());
+  const root = fixture(source);
+  try {
+    rmSync(join(root, ".claude"), { recursive: true, force: true });
+    rmSync(join(root, ".codex"), { recursive: true, force: true });
+    const before = snapshot(root);
+
+    const defaultPlan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(defaultPlan.status, "invalid-baseline", "missing V3 runtime stays closed without the opt-in");
+    assert.deepEqual(snapshot(root), before);
+    assert.equal(existsSync(join(root, ".claude")), false);
+    assert.equal(existsSync(join(root, ".codex")), false);
+
+    const plan = planRunnerProfileMigrationV3({
+      rootDir: root,
+      initializeMissingRuntimeForSlimV3: true,
+    });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.sourceKind, "v3");
+    assert.ok(plan.targets.filter((target) => target.kind === "runtime").every((target) => (
+      target.before.status === "absent"
+      && target.before.sha256 === null
+      && target.before.byteLength === 0
+    )));
+    assert.deepEqual(snapshot(root), before, "planning must not create or alter runtime targets");
+    assert.equal(existsSync(join(root, ".claude")), false);
+    assert.equal(existsSync(join(root, ".codex")), false);
+    assert.equal(existsSync(join(root, ".pipeline-runner-profile-migration-v3")), false);
+
+    const applied = applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true });
+    assert.equal(applied.status, "applied");
+    assert.ok(runtimePaths.every((path) => existsSync(join(root, path))));
+    assert.equal(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), source);
+    assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /language:\n  human_facing: de\n/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+record("slim V3 initialization never replaces a present malformed runtime baseline", () => {
+  const root = fixture(yaml(v3Intent()));
+  try {
+    rmSync(join(root, ".claude"), { recursive: true, force: true });
+    rmSync(join(root, ".codex"), { recursive: true, force: true });
+    const malformed = "language:\n  human_facing: en\nmodelRouting: malformed\n";
+    write(root, ".claude/pipeline.yaml", malformed);
+    const before = snapshot(root);
+
+    const plan = planRunnerProfileMigrationV3({
+      rootDir: root,
+      initializeMissingRuntimeForSlimV3: true,
+    });
+    assert.equal(plan.status, "invalid-baseline");
+    assert.equal(plan.targets.length, 0);
+    assert.equal(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), malformed);
+    assert.deepEqual(snapshot(root), before);
+    assert.equal(existsSync(join(root, ".codex")), false);
+    assert.equal(existsSync(join(root, ".pipeline-runner-profile-migration-v3")), false);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 record("legacy compatibility remains closed to malformed and unknown aliases", () => {
   const legacy = publicLegacyIntent();
   legacy.models.implement.model = "sonnet-latest";

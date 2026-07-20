@@ -1,0 +1,171 @@
+{
+  "schema": "pipeline.observation-doc-governance.v1",
+  "canonicalIssue": {
+    "scope": "repository-global",
+    "branchIndependent": true,
+    "initialFormLabels": [
+      "kind:observation",
+      "triage:needs-review"
+    ],
+    "controlledAreaLabelAllowed": true,
+    "securityRoute": "private-vulnerability-reporting"
+  },
+  "lifecycle": {
+    "states": [
+      "observation",
+      "triage",
+      "confirmed",
+      "known-error",
+      "backlog-link"
+    ],
+    "transitions": {
+      "observation": [
+        "triage"
+      ],
+      "triage": [
+        "confirmed"
+      ],
+      "confirmed": [
+        "known-error",
+        "backlog-link"
+      ],
+      "known-error": [
+        "backlog-link"
+      ],
+      "backlog-link": []
+    }
+  },
+  "backlog": {
+    "promotion": "explicit-after-triage",
+    "requiresStablePublicBranch": true,
+    "reciprocalLinksRequired": true,
+    "automaticPromotion": false
+  },
+  "privateOverlay": {
+    "allowedContent": [
+      "private-deltas",
+      "public-issue-links",
+      "public-backlog-links"
+    ],
+    "mayReplacePublicIssue": false,
+    "mayDuplicatePublicObservation": false
+  },
+  "documentation": {
+    "audiences": [
+      "public-user",
+      "maintainer",
+      "machine"
+    ],
+    "lifecycles": [
+      "maintained",
+      "normative-record",
+      "compatibility-redirect",
+      "review-candidate"
+    ],
+    "inventory": [
+      {
+        "audience": "public-user",
+        "lifecycle": "maintained",
+        "paths": [
+          "docs/README.md",
+          "docs/deploy/README.md",
+          "docs/design/README.md",
+          "docs/design/design-facilitator-prompt.md",
+          "docs/design/export-template.md",
+          "docs/observation-intake.md",
+          "docs/operating-model.md",
+          "docs/runtime-boundary.md"
+        ]
+      },
+      {
+        "audience": "public-user",
+        "lifecycle": "compatibility-redirect",
+        "paths": [
+          "docs/migration.md",
+          "docs/overview.md",
+          "docs/usage.md"
+        ]
+      },
+      {
+        "audience": "public-user",
+        "lifecycle": "review-candidate",
+        "paths": [
+          "docs/design-decisions.md"
+        ]
+      },
+      {
+        "audience": "maintainer",
+        "lifecycle": "maintained",
+        "paths": [
+          "docs/critic-isolation-threat-model.md",
+          "docs/marketplace-supply-chain-threat-model.md",
+          "docs/state.md"
+        ]
+      },
+      {
+        "audience": "maintainer",
+        "lifecycle": "normative-record",
+        "paths": [
+          "docs/adr/0001-distribution-plugin-marketplace.md",
+          "docs/adr/0002-versioning-sha-then-semver.md",
+          "docs/adr/0003-role-implementation-subagents.md",
+          "docs/adr/0004-spec-rigor-tiers-ears.md",
+          "docs/adr/0005-quality-gates-dod.md",
+          "docs/adr/0006-model-effort-policy.md",
+          "docs/adr/0007-workflows-ultracode-opt-in.md",
+          "docs/adr/0008-permissions-worktree-policy.md",
+          "docs/adr/0009-session-hygiene-lifecycle.md",
+          "docs/adr/0010-session-bootstrap.md",
+          "docs/adr/0011-language-policy.md",
+          "docs/adr/0012-handover-canonicalization.md",
+          "docs/adr/0013-git-guard-union.md",
+          "docs/adr/0014-critic-contract.md",
+          "docs/adr/0015-self-application.md",
+          "docs/adr/0016-git-hosting-github.md",
+          "docs/adr/0017-push-policy-standing-approval.md",
+          "docs/adr/0018-retro-process-elephant-authored.md",
+          "docs/adr/0019-project-scoping-one-repo-one-elephant.md",
+          "docs/adr/0020-el01-enforcement-goldfish-duty.md",
+          "docs/adr/0021-prd-po-gate.md",
+          "docs/adr/0022-light-profile-xhigh-default.md",
+          "docs/adr/0023-elephant-context-diet.md",
+          "docs/adr/0024-critic-staffing-data-based.md",
+          "docs/adr/0025-haiku-research-fetcher.md",
+          "docs/adr/0026-role-split-elephant-goldfish-critic.md",
+          "docs/adr/0027-gate-philosophy.md",
+          "docs/adr/0028-manifest-approach.md",
+          "docs/adr/0029-file-handoffs-status.md",
+          "docs/adr/0030-governance-layer.md",
+          "docs/adr/0031-model-routing-manifest.md",
+          "docs/adr/0032-project-doc-structure.md",
+          "docs/adr/0033-release-promotion-phase.md",
+          "docs/adr/0034-deploy-precedence-central-vs-project.md",
+          "docs/adr/0035-codex-native-normal-critic.md",
+          "docs/adr/0036-runner-honest-profiles-v2.md",
+          "docs/adr/0037-batman-bounded-assurance.md",
+          "docs/adr/0038-runner-neutral-advisory-v3.md",
+          "docs/adr/0039-hawkeye-lifecycle-boundaries.md",
+          "docs/adr/0040-advisor-consent-and-readonly-bash.md",
+          "docs/adr/0041-po-authorized-codex-functional-equivalent.md",
+          "docs/adr/0042-global-observation-and-document-governance.md",
+          "docs/adr/README.md"
+        ]
+      },
+      {
+        "audience": "maintainer",
+        "lifecycle": "review-candidate",
+        "paths": [
+          "docs/codex-isolated-critic-foundation.md",
+          "docs/known-issues.md"
+        ]
+      },
+      {
+        "audience": "machine",
+        "lifecycle": "maintained",
+        "paths": [
+          "docs/product-capability-inventory.json"
+        ]
+      }
+    ]
+  }
+}

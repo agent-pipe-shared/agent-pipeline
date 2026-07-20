@@ -204,6 +204,55 @@ For a non-Claude runtime, do not copy these commands or claim that its hooks
 are installed. Use that runtime's supported integration, then follow the
 methodology and manual controls described in the runtime-boundary document.
 
+### 1a. Bind or refresh the plugin in Codex
+
+Codex uses its own marketplace and install commands. Add the approved Git
+source once, refresh its snapshot when the approved ref advances, and install
+the plugin from the marketplace name declared by that source:
+
+```sh
+codex plugin marketplace add <owner>/<pipeline-repo> --ref <approved-ref>
+codex plugin marketplace upgrade agent-pipeline
+codex plugin add pipeline-core@agent-pipeline
+codex plugin list --marketplace agent-pipeline --json
+```
+
+The final command must report exactly one installed and enabled
+`pipeline-core@agent-pipeline`. A Git marketplace snapshot is not the running
+plugin: start a new Codex thread after installation or refresh so the host
+loads that exact version. Do not hand-edit Codex marketplace or cache files.
+
+### 1b. Activate a slim private overlay
+
+A slim private overlay contains project configuration and allowlisted inputs,
+not a copied setup program or verification harness. Its project root must have:
+
+- a valid `pipeline.user.yaml` with `schema: pipeline.user.v3`;
+- `.agent-pipeline/core.lock.json` pinned to the approved Public repository,
+  branch, commit, tree, plugin version, and manifest digest; and
+- only declared Markdown inputs below `.agent-pipeline/policies/`,
+  `guidelines/`, `templates/`, and `extensions/`.
+
+In the new Codex thread, open the overlay root and invoke
+`pipeline-core:pipeline-start`. The installed skill resolves its own plugin
+root, compares the configured marketplace source with the installed cache, and
+runs the read-only private-overlay status bridge. It has three relevant
+outcomes:
+
+- `rejected`: stop and repair the reported identity or input boundary;
+- `activation-required`: review the sanitized plan digest and explicitly
+  authorize the activation step; or
+- `activated`: the runtime projection, machine-local PO-profile receipt, and
+  authenticated private-input consumption all read back against the same
+  candidate.
+
+Activation is never implicit during bootstrap. Do not hand-edit generated
+runtime projections, copy a receipt, substitute a project-local `setup.mjs`,
+or treat an overlay-local harness as Public-plugin identity evidence. After an
+explicit activation, rerun `pipeline-core:pipeline-start`; project calibration,
+handover, Verify, and feature-state checks remain separate and may still fail
+closed even when the overlay bridge is activated.
+
 ### 2. Add the small, committed project calibration
 
 Copy and adapt these templates in the project repository:

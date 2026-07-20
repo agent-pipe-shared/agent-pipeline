@@ -13,6 +13,7 @@ Role variants: Elephant = full · Goldfish/Critic = compact (`harness/session-bo
 - [ ] 3b Role prohibitions (Elephant) loaded — EL-01/02/03/04/16/18/19 (`harness/session-bootstrap.md` Step 1d) + third confirmation line
 - [ ] 4 Staleness check vs. marketplace remote (URL from committed `.claude/settings.json`)
 - [ ] 5 Calibration `.claude/pipeline.json` exists + read; project denies present in `.claude/settings.json`/guard config
+- [ ] 5b Agent-Pipeline source checkout only: observation/document governance checker green; missing/drifted policy, form, or `docs/` inventory = F6, no write confirmation
 - [ ] 6 Handover/state file read completely (single source of truth); warn on handover drift
 - [ ] 7 verify script exists + callable (`{{VERIFY_COMMAND}}` from calibration) — existence check, no full run
 - [ ] 8 Confirmation line in the exact format + model/effort extra line (session-bootstrap §6.1)

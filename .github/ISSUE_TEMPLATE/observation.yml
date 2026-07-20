@@ -1,0 +1,160 @@
+name: Observation or known-error candidate
+description: Report unconfirmed behavior for privacy-aware triage
+title: "[Observation] "
+labels:
+  - kind:observation
+  - triage:needs-review
+body:
+  - type: markdown
+    attributes:
+      value: "This issue is public. Do not include secrets, credentials, private repository coordinates, usernames, hostnames, email addresses, home paths, private network addresses, raw logs, prompts, or chat transcripts. Use unknown when a value cannot be shared safely."
+  - type: markdown
+    attributes:
+      value: "Possible vulnerability, permission bypass, unintended write, secret exposure, or scope escape? Stop here and use [private vulnerability reporting](https://github.com/agent-pipe-shared/agent-pipeline/security/advisories/new) instead."
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Select the closest public product area; triage may refine it. For docs, inventory the full docs surface and its inbound links before proposing deletion.
+      options:
+        - advisory
+        - afk
+        - bootstrap
+        - docs
+        - guardrails
+        - lifecycle
+        - review
+        - routing
+        - runners
+        - sandbox
+        - telemetry
+        - tooling
+        - verify
+        - other
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Describe only what you directly observed; do not infer a root cause.
+      placeholder: A concise, sanitized description of the observed behavior.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      description: Describe the public contract or outcome you expected.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+      description: Give the smallest sanitized reproduction. Omit private paths, repositories, inputs, and logs.
+    validations:
+      required: true
+  - type: dropdown
+    id: frequency
+    attributes:
+      label: Frequency
+      options:
+        - always
+        - frequent
+        - intermittent
+        - once
+        - unknown
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: "### Observed environment"
+  - type: dropdown
+    id: runner
+    attributes:
+      label: Runner
+      description: Select only the runner you directly observed.
+      options:
+        - claude-code
+        - codex
+        - other
+        - unknown
+    validations:
+      required: true
+  - type: input
+    id: plugin_version
+    attributes:
+      label: Plugin version
+      description: Enter a public version token, or unknown.
+      placeholder: unknown
+    validations:
+      required: true
+  - type: input
+    id: pipeline_version
+    attributes:
+      label: Pipeline version
+      description: Enter a public version token, or unknown.
+      placeholder: unknown
+    validations:
+      required: true
+  - type: input
+    id: candidate
+    attributes:
+      label: Public candidate
+      description: Enter the public Git commit SHA you observed, or unknown.
+      placeholder: unknown
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      description: Select only a coarse OS class; do not include a hostname or user identity.
+      options:
+        - linux
+        - macos
+        - windows
+        - wsl
+        - other
+        - unknown
+    validations:
+      required: true
+  - type: input
+    id: capability
+    attributes:
+      label: Capability status
+      description: Enter a directly observed typed capability status, or unknown; route selection is not capability evidence.
+      placeholder: unknown
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: Provide the smallest public-safe excerpt or typed result. Do not paste raw logs. For docs, record both audience (public-user, maintainer, machine) and lifecycle (maintained, normative-record, compatibility-redirect, review-candidate).
+      placeholder: Typed or summarized evidence; sensitive detail omitted.
+    validations:
+      required: true
+  - type: textarea
+    id: source_backlog_links
+    attributes:
+      label: Source backlog links
+      description: Add public GitHub links only, one per line, or write None identified.
+      placeholder: None identified.
+    validations:
+      required: true
+  - type: checkboxes
+    id: security_confirmation
+    attributes:
+      label: Security routing
+      options:
+        - label: I confirm this report does not describe a possible vulnerability, permission bypass, unintended write, secret exposure, or scope escape.
+          required: true
+  - type: checkboxes
+    id: privacy_confirmation
+    attributes:
+      label: Privacy review
+      options:
+        - label: I confirm the report is sanitized for a public issue and contains no secrets, private coordinates, raw logs, prompts, or chat transcripts.
+          required: true

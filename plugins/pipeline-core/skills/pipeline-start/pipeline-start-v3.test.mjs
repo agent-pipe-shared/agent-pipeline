@@ -22,6 +22,38 @@ const cases = [
     assert.match(skill, /Do not use V1\/V2/u);
     assert.match(skill, /print \*\*no confirmation line\*\*/u);
   }],
+  ["Codex locked projects use only the loaded plugin status wrapper", () => {
+    assert.match(skill, /\.agent-pipeline\/core\.lock\.json/u);
+    assert.match(skill, /currently loaded `pipeline-core` plugin/u);
+    assert.match(skill, /node "\$\{PIPELINE_PLUGIN_ROOT\}\/scripts\/codex-private-overlay-activation\.mjs" status --project-root "\$PWD"/u);
+    assert.match(skill, /node "\$\{PIPELINE_PLUGIN_ROOT\}\/scripts\/codex-private-overlay-activation\.mjs" load-context --project-root "\$PWD"/u);
+    assert.match(skill, /Never select a wrapper under `\$PWD`/u);
+    assert.match(skill, /Do not run project-local\s+`setup\.mjs`, a local harness,[\s\S]*as an SNT-A\s+identity\/admission substitute/u);
+    assert.match(skill, /When `\.agent-pipeline\/core\.lock\.json` is absent,[\s\S]*ordinary public-project/u);
+  }],
+  ["private-overlay status outcomes are explicit and mutation-free", () => {
+    assert.match(skill, /`activation-required`:[\s\S]*STOP before Step 1b and print no confirmation\s+line/u);
+    assert.match(skill, /Report the returned reason and `planSha256`; perform no mutation/u);
+    assert.match(skill, /do not invoke `activate`/u);
+    assert.match(skill, /`rejected`, a non-zero exit, malformed output,[\s\S]*FAIL CLOSED/u);
+    assert.match(skill, /`activated`: this is the only activation status/u);
+  }],
+  ["activated status requires the bounded operational context envelope", () => {
+    assert.match(skill, /sanitized status alone is never private context/u);
+    assert.match(skill, /pipeline\.private-overlay-operational-context\.v1/u);
+    assert.match(skill, /status `context-loaded`/u);
+    assert.match(skill, /same `planSha256` as the activated readback/u);
+    assert.match(skill, /not private filenames/u);
+    assert.match(skill, /Do not echo,[\s\S]*persist,[\s\S]*export/u);
+    assert.match(skill, /SNT-A-CODEX-CONTEXT-TRANSFER-UNAVAILABLE/u);
+    assert.match(skill, /Only `activated` plus schema-valid `context-loaded` may continue/u);
+    assert.match(skill, /Do not infer or reconstruct the\s+private inputs from the project checkout, status stdout, setup, or harness/u);
+  }],
+  ["SNT-A admission does not replace project F4 checks", () => {
+    assert.match(skill, /replaces only SNT-A identity, admission,[\s\S]*private-input authentication/u);
+    assert.match(skill, /does \*\*not\*\* satisfy or replace\s+the project-specific Step 3 calibration\/denies, Step 4 handover, or Step 5\s+verify checks/u);
+    assert.match(skill, /retain their F4 behavior/u);
+  }],
   ["work profiles are epic feature mini and advisory is not a profile", () => {
     assert.match(skill, /`epic`, `feature`, or `mini`/u);
     assert.match(skill, /`advisor` and `design-first` are no longer profiles/u);
@@ -96,6 +128,14 @@ const cases = [
     assert.match(skill, /security\/release\/public-baseline claims/u);
     assert.match(skill, /execution_environment`, `probe_timeout`, and `probe_error`/u);
     assert.match(skill, /never recommend\s+reinstalling/u);
+  }],
+  ["self-application observation governance fails closed before writes", () => {
+    assert.match(skill, /Observation\/document governance \(Agent-Pipeline checkout only\)/u);
+    assert.match(skill, /node harness\/scripts\/check-observation-governance\.mjs/u);
+    assert.match(skill, /unclassified `docs\/` artifact/u);
+    assert.match(skill, /case \*\*F6\*\*/u);
+    assert.match(skill, /no Issue, label, backlog item, or network request/u);
+    assert.match(skill, /no writing, dispatch, confirmation line/u);
   }],
 ];
 

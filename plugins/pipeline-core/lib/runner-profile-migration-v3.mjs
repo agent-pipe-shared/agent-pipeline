@@ -70,6 +70,19 @@ const LEGACY_V3_RUNTIME_SEEDS = Object.freeze({
   ".codex/agents/implementor.toml": 'model = ""\nmodel_reasoning_effort = ""\n',
   ".codex/agents/critic.toml": 'model = ""\nmodel_reasoning_effort = ""\n',
 });
+// A slim private overlay can carry the complete, already-valid V3 source while
+// deliberately omitting every ignored runtime projection. These in-memory
+// baselines contain only the syntax needed by the byte-preserving renderer.
+// They are opt-in at planning, are never used for a present target, and the
+// resulting authenticated plan still records every seeded preimage as absent.
+const SLIM_V3_RUNTIME_SEEDS = Object.freeze({
+  ".claude/settings.json": "{}\n",
+  ".claude/pipeline.json": "{}\n",
+  ".claude/pipeline.yaml": "language:\n  human_facing: en\nmodelRouting:\n  legacy:\n    model: legacy\n    effort: low\n",
+  ".codex/config.toml": "",
+  ".codex/agents/implementor.toml": 'model = ""\nmodel_reasoning_effort = ""\n',
+  ".codex/agents/critic.toml": 'model = ""\nmodel_reasoning_effort = ""\n',
+});
 
 class IntentionalMigrationInterruption extends Error {
   constructor(target) { super(`intentional interruption after ${target}`); this.name = "IntentionalMigrationInterruption"; }
@@ -146,14 +159,17 @@ function runtimePaths() {
   if (paths.some((path) => typeof path !== "string" || !SAFE_RELATIVE.test(path)) || new Set(paths).size !== paths.length) throw new Error("V3 runtime ownership manifest has unsafe or duplicate targets");
   return paths;
 }
-function runtimeBaselines(root, deps, sourceKind) {
+function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForSlimV3 = false } = {}) {
   const legacy = ["v0", "v1", "v2"].includes(sourceKind);
+  const initializeSlimV3 = sourceKind === "v3" && initializeMissingRuntimeForSlimV3 === true;
   const baselines = {};
   const seeded = new Set();
   for (const relative of runtimePaths()) {
     const target = assertNoSymlink(root, relative, deps);
     if (!deps.existsSync(target)) {
-      const seed = legacy ? LEGACY_V3_RUNTIME_SEEDS[relative] : undefined;
+      const seed = legacy
+        ? LEGACY_V3_RUNTIME_SEEDS[relative]
+        : initializeSlimV3 ? SLIM_V3_RUNTIME_SEEDS[relative] : undefined;
       if (typeof seed !== "string") throw new Error(`declared runtime baseline is missing: ${relative}`);
       baselines[relative] = { status: "present", bytes: seed };
       seeded.add(relative);
@@ -377,7 +393,11 @@ function publicTarget(target) {
   };
 }
 
-export function planRunnerProfileMigrationV3({ rootDir = process.cwd(), deps: overrides = {} } = {}) {
+export function planRunnerProfileMigrationV3({
+  rootDir = process.cwd(),
+  deps: overrides = {},
+  initializeMissingRuntimeForSlimV3 = false,
+} = {}) {
   const deps = dependencies(overrides);
   let root;
   try { root = safeRoot(rootDir, deps); } catch (error) { return result("invalid-root", [diagnostic("$.root", "unsafe_root", error.message, "supply one real project directory")], { targets: [], changes: [] }); }
@@ -390,7 +410,7 @@ export function planRunnerProfileMigrationV3({ rootDir = process.cwd(), deps: ov
   if (!validation.ok) return result("invalid-intent", validation.errors, { root, sourceKind: classified.kind, targets: [], changes: [] });
   let projection; let seeded;
   try {
-    const runtime = runtimeBaselines(root, deps, classified.kind);
+    const runtime = runtimeBaselines(root, deps, classified.kind, { initializeMissingRuntimeForSlimV3 });
     seeded = runtime.seeded;
     projection = planRuntimeProjectionV3(classified.intent, { source: SOURCE_FILE, baselines: runtime.baselines });
   } catch (error) {

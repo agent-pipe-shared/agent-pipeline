@@ -11,6 +11,8 @@ The maintained references are:
 - [`operating-model.md`](operating-model.md) — normative operating model.
 - [`runtime-boundary.md`](runtime-boundary.md) — runner-neutral methodology
   versus Claude Code enforcement.
+- [`observation-intake.md`](observation-intake.md) — public observation intake,
+  privacy routing, triage, and backlog-link governance.
 - [`design/README.md`](design/README.md) — optional design pre-stage.
 - [`deploy/README.md`](deploy/README.md) — optional release/promotion adapter.
 - [`adr/`](adr/) — durable decisions and rationale.

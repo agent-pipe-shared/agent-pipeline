@@ -235,4 +235,5 @@ test("current repository integration passes and excludes the instruction path", 
   const result = checkRepository(REPO);
   assert.deepEqual(result.findings, []);
   assert(result.stats.markdownFiles > 100);
+  assert.equal(result.stats.observationGovernance, "checked");
 });
