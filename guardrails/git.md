@@ -11,10 +11,10 @@ Rule IDs: `GIT-xx`.
 
 ---
 
-## GIT-01 — Commit message format: Conventional Commits, German
+## GIT-01 — Commit message format: Conventional Commits, English
 
 - **MUST** write commit messages as Conventional Commits: `type(scope): summary` with `type` ∈ {feat, fix, docs, refactor, test, chore, build, ci, perf, style}; body explains the WHY (cause → effect), not a file list.
-- **MUST** write commit messages in German — commit messages are PO-facing artifacts (the PO is the primary reader of `git log`), per ADR-0011's primary-reader rule (commit messages are classified PO-facing, superseding an earlier agent-facing classification). The Conventional-Commits format core above (`type(scope): summary`, the type vocabulary, and the GIT-03 trailers) is unaffected and stays non-negotiable. Agent↔agent artifacts (Goldfish briefings, Critic reports, specs, agent-facing canon/templates) remain English under the same primary-reader rule — unchanged.
+- **MUST** write Public Core commit messages in English, per ADR-0011's English-canonical public boundary. The Conventional-Commits format core above (`type(scope): summary`, the type vocabulary, and the GIT-03 trailers) is unaffected and stays non-negotiable. A private overlay may use its configured operator-facing language for its own local history; that configuration never changes Public Core history.
 - **SHOULD** carry verification status and decision authorship in the body where applicable — e.g. `Verified: live on device` / `Decision: the PO`. Use the three-valued vocabulary where verification is partial: verified / open / not testable. Field labels (`Verified:`, `Decision:`) and the three-valued status tokens stay ENGLISH (parseable audit trail); free-text values follow the project human-facing language (default English). Example: `Verified: verify green 109/109`.
 - A project calibration MAY define an additional message prefix convention on top; the Conventional-Commits core and the trailers (GIT-03) are non-negotiable.
 - **Why:** A uniform, parseable history is the cheapest audit trail the pipeline has; the WHY-body is the only place future sessions find intent without replaying chats.

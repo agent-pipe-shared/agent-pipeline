@@ -42,7 +42,7 @@ HARD RULES FOR THE RESULTING FILE (checkable)
 - Layout: {{KEY_DIRECTORIES e.g. "app/ routes · lib/ domain · prisma/ schema"}}
 - Conventions: {{CORE_CONVENTIONS e.g. "named exports; server components by default"}}
 - Test/build: {{TOOLCHAIN_FACTS e.g. "vitest; pnpm build must pass before push"}}
-- Language: code/comments English; commits + human docs German (ADR-0011).
+- Language: code/comments, commits, and public human docs English (ADR-0011); a private overlay may configure its operator-facing language.
 - {{OPTIONAL_FACT_LINES — delete unused lines; never exceed 10 total}}
 
 <!-- Block 2 — Pipeline binding. Declares which rule set governs this repo. -->
