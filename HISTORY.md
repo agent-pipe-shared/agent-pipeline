@@ -1,5 +1,38 @@
 # History
 
+## 2026-07-21 — Public-Core quickfixes and PO disposition
+
+- Corrected the WSL/externally configured SSH transport handling in Public-Core
+  freshness probes and kept the exact transport context for the direct-OID
+  fallback; failed or uncertain transport resolution remains `unknown`.
+- Removed the incompatible explicit Codex sandbox-helper injection while
+  retaining `sandboxCwd`, network-enabled read-only permissions, and the
+  fail-closed intermediate assurance boundary. The real CLI/helper A/B and
+  Public-Core regression suites pass.
+- Persisted repository-scoped advisor-export consent as an explicit approved
+  source value with bounded setup readback and no raw export material.
+- Recorded the PO's SUL-1.0 licensing decision and closed the commercial-license
+  backlog item. No custom lawyer-reviewed two-user license is claimed.
+- Refreshed the Public plugin cachebuster to
+  `0.2.0+codex.20260720222336`. The configured local marketplace snapshot still
+  exposes the preceding version until the pushed feature branch is refreshed.
+- Close-pre found that the recovered Sentinel PRD archive was stale after the
+  approved authority correction; the archive was refreshed byte-for-byte and
+  its manifest digest was updated.
+- Full Verify and Security passed with exit 0 before the close metadata commit.
+
+### Lessons
+
+- Authority corrections must refresh every retained byte-bound copy before a
+  delivery tail; a close-pre digest check is the right fail-closed boundary.
+- Durable consent needs an explicit safe status readback so setup can prove the
+  policy state without exposing the data that policy permits.
+
+### Open / next
+
+See the canonical [handover](docs/state.md) for the remaining Sentinel backlog,
+plugin refresh/new-thread bootstrap, and the exact feature-branch delivery tail.
+
 ## 2026-07-20 — Public V3 repository normalization and overlay boundary
 
 - Finalized the Public V3 Foundation candidate, anonymized the Codex plugin

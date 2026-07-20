@@ -3,10 +3,11 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-07-20
+**Last updated:** 2026-07-21
 **Project status:** ACTIVE
-**Current block:** Sentinel continuation after closed SNT-A: recovery/retention
-gates, canonical backlog reconciliation, and remaining go-live evidence
+**Current block:** Sentinel continuation after closed SNT-A: Public-Core
+freshness/sandbox quickfixes, durable advisor-export consent, PO licensing
+disposition, plugin registration, and final feature-branch delivery
 **Repair baseline:** `89c3c2ebf73d2b8cd3b43ee0ea463d2819c5f49f`
 **Release version:** `0.2.0`
 
@@ -55,8 +56,18 @@ gates, canonical backlog reconciliation, and remaining go-live evidence
   authority or a completion claim.
 - The preceding session loaded Public plugin version
   `0.2.0+codex.20260720195249`; this block registers the new cachebusted
-  candidate `0.2.0+codex.20260721001633`. A fresh Codex thread, cache refresh,
-  and full bootstrap remain required before runtime evidence may trust it.
+  candidate `0.2.0+codex.20260720222336`. The configured local marketplace
+  snapshot still read back the preceding version because this candidate is not
+  pushed yet; after branch refresh, a fresh Codex thread, cache refresh, and
+  full bootstrap remain required before runtime evidence may trust it.
+- Advisor export consent is durably recorded as repository-scoped `approved` in
+  `pipeline.user.yaml`. Setup reports only the bounded approval/disabled state;
+  it never prints raw questions, answers, credentials, paths, or environment
+  details. The approved export remains one-question and allowlist-bound.
+- The PO confirmed SUL-1.0 as the best-fit standard source-available license and
+  accepted that no custom lawyer-reviewed two-user license is being offered.
+  The commercial boundary and this disposition are recorded in the Public
+  license evidence; release and hosted/commercial rights remain separate gates.
 - SNT-A1 through SNT-A4 are implemented. Focused tests and Full Verify passed
   at candidate `f7e76063c9e15b136fbd8344dcd54a12c1bd0d36` (tree
   `375601dcfd4f23aa0669e39d2e652aca10381d46`). The independent SNT-A Critic
@@ -128,6 +139,9 @@ gates, canonical backlog reconciliation, and remaining go-live evidence
   completed with exit 0 and exact machine-written Verify/Security evidence
   through the approved host boundary after a sandbox-only `EPERM` attempt.
   Documentation-only close mutations require the exact final Verify tail.
+- The pre-close candidate `cb8219464937cfc4cb7ff50e2bf5579bfa78f6b5` passed the
+  full Verify and Security gates with exit 0. Close metadata and the final
+  exact-candidate Verify/readback are the remaining delivery-tail steps.
 - Session PO authorizations for this Sentinel continuation: the bounded TP-3
   exception may be used for additive Verify registrations and restored after
   each edit; after all required gates and exact remote readback are green, the
@@ -150,8 +164,9 @@ gates, canonical backlog reconciliation, and remaining go-live evidence
   through the GitHub Issue Form/skill after capability and target readback.
 - The legacy backlog records were migrated through the explicit
   `migrate-backlog-state.mjs --write` path. The canonical ledger and generated
-  `STATUS.md`/`index.json` now validate; all twelve records remain open or
-  in-progress and require their own evidence before any closure transition.
+  `STATUS.md`/`index.json` now validate with eleven open items, two
+  in-progress items, and the PO-closed license item. Each remaining item
+  requires its own evidence before a closure transition.
 - Open the separate GitHub Observation Publication feature for the fourteen
   queued observations. Do not reopen SNT-A and do not treat publication as
   Sentinel Epic completion.
@@ -163,6 +178,9 @@ gates, canonical backlog reconciliation, and remaining go-live evidence
   placement under their recorded owners and expiry dates.
 - The monthly tooling-radar item is absent for the current month and is overdue;
   dispatch a fresh Public tooling-radar review in the next block.
+- The close retro added
+  [`pipeline.close-spec-retention-and-consent`](../backlog/items/2026-07-21-close-spec-retention-and-consent.md): make the final retention
+  digest and consent-status readback explicit before delivery.
 
 ## Observation publication queue
 

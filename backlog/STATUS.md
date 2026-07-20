@@ -5,6 +5,7 @@
 
 | ID | Status | Type | Owner | Created | Tracking |
 | --- | --- | --- | --- | --- | --- |
+| pipeline.close-spec-retention-and-consent | open | workflow-improvement | pipeline | 2026-07-21 | — |
 | pipeline.closed-input-channel-review-economics | open | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.critic-context-isolation | open | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.cross-repository-override-ledger-binding | open | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -21,6 +22,6 @@
 
 ## Counts
 
-- open: 10
+- open: 11
 - in_progress: 2
 - closed: 1

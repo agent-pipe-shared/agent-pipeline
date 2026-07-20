@@ -14,7 +14,7 @@ docs/spec-archive/2026-07-20-sentinel-recovery/. Read the SNT-A backlog item,
 including specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md and
 specs/2026-07-19-sprint-sentinel-epic/spec.md directly,
 then verify that the installed plugin cachebuster is
-0.2.0+codex.20260721001633 and that the source/cache manifest and Public branch
+0.2.0+codex.20260720222336 and that the source/cache manifest and Public branch
 commit/tree match the private overlay lock. Do not claim an observed effective
 model identity.
 
