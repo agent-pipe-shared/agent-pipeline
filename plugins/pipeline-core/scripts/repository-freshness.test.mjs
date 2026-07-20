@@ -146,14 +146,71 @@ check("detached and no-upstream do not fetch", () => {
   expect(noUpstreamResult.status === "no-upstream" && noUpstreamResult.fetchAttempted === false, "no-upstream classification wrong");
 });
 
-check("fetch failure is sanitized unknown, never fresh", () => {
+check("configured core.sshCommand is passed to temporary fetch without changing source", () => {
+  const { checkout } = fixture("ssh-config");
+  const transport = `ssh -o \"ProxyCommand=echo safe; exit 0\" -i \"/tmp/key with spaces\"`;
+  git(checkout, "config", "core.sshCommand", transport);
+  const before = snapshot(checkout);
+  const calls = [];
+  const inspected = inspectRepositoryFreshness(checkout, {
+    runFetch: (args, options) => {
+      calls.push(args);
+      return spawnSync("git", args, options);
+    },
+  });
+  expect(inspected.result.status === "equal", `status=${inspected.result.status}`);
+  expect(calls.length === 1, `fetch calls=${calls.length}`);
+  const index = calls[0].indexOf(`core.sshCommand=${transport}`);
+  expect(index > 0 && calls[0][index - 1] === "-c", "transport must be one Git config argv value");
+  expect(calls[0].filter((arg) => arg === transport).length === 0, "transport was split into argv fragments");
+  expect(JSON.stringify(snapshot(checkout)) === JSON.stringify(before), "source checkout changed");
+});
+
+check("no configured core.sshCommand preserves the inherited transport environment", () => {
+  const { checkout } = fixture("no-ssh-config");
+  let args = null;
+  const result = inspectRepositoryFreshness(checkout, {
+    runFetch: (fetchArgs, options) => {
+      args = fetchArgs;
+      return spawnSync("git", fetchArgs, options);
+    },
+  }).result;
+  expect(result.status === "equal", `status=${result.status}`);
+  expect(!args.some((arg) => arg.startsWith("core.sshCommand=")), "unexpected transport override");
+});
+
+check("fetch failure with configured transport is sanitized unknown, never fresh", () => {
   const { checkout } = fixture("offline");
   git(checkout, "remote", "set-url", "origin", "/definitely/missing/private-url");
+  git(checkout, "config", "core.sshCommand", `ssh -o \"IdentityFile=/tmp/key with spaces\"`);
   const inspected = inspectRepositoryFreshness(checkout);
   expect(inspected.exitCode === 0 && inspected.result.status === "unknown", "unknown classification wrong");
   expect(inspected.result.reason === "fetch-failed", `reason=${inspected.result.reason}`);
   expect(!JSON.stringify(inspected.result).includes("/definitely"), "remote URL leaked");
   expect(inspected.result.fetchAttempted === true, "fetchAttempted must be true");
+});
+
+check("direct OID fallback uses the configured transport and only exact equality is fresh", () => {
+  const { checkout } = fixture("direct-oid");
+  const transport = `ssh -o \"ProxyCommand=echo safe; exit 0\" -i \"/tmp/key with spaces\"`;
+  git(checkout, "config", "core.sshCommand", transport);
+  git(checkout, "remote", "set-url", "origin", "/definitely/missing/private-url");
+  const head = git(checkout, "rev-parse", "HEAD");
+  let directArgs = null;
+  const equal = inspectRepositoryFreshness(checkout, {
+    runDirect: (args) => {
+      directArgs = args;
+      return { status: 0, stdout: `${head}\trefs/heads/main\n` };
+    },
+  }).result;
+  expect(equal.status === "equal" && equal.reason === "direct-oid-equality-fallback", `status/reason=${equal.status}/${equal.reason}`);
+  expect(directArgs.includes(`core.sshCommand=${transport}`), "direct fallback omitted configured transport");
+  expect(directArgs.filter((arg) => arg === `core.sshCommand=${transport}`).length === 1, "direct fallback split transport");
+
+  const mismatch = inspectRepositoryFreshness(checkout, {
+    runDirect: () => ({ status: 0, stdout: `${"b".repeat(40)}\trefs/heads/main\n` }),
+  }).result;
+  expect(mismatch.status === "unknown" && mismatch.reason === "fetch-failed", `mismatch=${mismatch.status}/${mismatch.reason}`);
 });
 
 check("unavailable configured remote is unknown without a false fetch claim", () => {

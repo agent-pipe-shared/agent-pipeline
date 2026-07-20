@@ -26,6 +26,24 @@ function defaultFetch(args, options) {
   return spawnSync("git", args, options);
 }
 
+function defaultDirect(args, options) {
+  return spawnSync("git", args, options);
+}
+
+function sourceTransport(repo) {
+  // Ask Git for the effective checkout config rather than parsing .git/config.
+  // Passing the value back through Git's -c argv form preserves Git's own
+  // command parsing for quoted/multi-argument ssh commands and avoids shell
+  // concatenation. An absent key deliberately leaves GIT_SSH_COMMAND and the
+  // rest of the inherited environment untouched.
+  const configured = git(repo, ["config", "--get", "core.sshCommand"]);
+  if (configured.status === 1 && !configured.stderr) return { ok: true, configArgs: [] };
+  if (configured.status !== 0 || typeof configured.stdout !== "string") return { ok: false };
+  const value = configured.stdout.replace(/\r?\n$/u, "");
+  if (!value || /[\r\n]/u.test(value)) return { ok: false };
+  return { ok: true, configArgs: ["-c", `core.sshCommand=${value}`] };
+}
+
 function outputBase(status, fields = {}) {
   return {
     schema: SCHEMA,
@@ -75,6 +93,7 @@ export function inspectRepositoryFreshness(
   {
     fetchTimeoutMs = FETCH_TIMEOUT_MS,
     runFetch = defaultFetch,
+    runDirect = defaultDirect,
   } = {},
 ) {
   const repo = resolve(repoPath);
@@ -123,6 +142,10 @@ export function inspectRepositoryFreshness(
       GIT_ALTERNATE_OBJECT_DIRECTORIES: objectPath,
       GIT_TERMINAL_PROMPT: "0",
     };
+    const transport = sourceTransport(repo);
+    if (!transport.ok) {
+      return { exitCode: 0, result: outputBase("unknown", { head, branch, upstream, reason: "transport-unavailable" }) };
+    }
     const localRef = spawnSync("git", ["--git-dir", temp, "update-ref", "refs/freshness/local", head], {
       encoding: "utf8",
       timeout: 5000,
@@ -134,6 +157,7 @@ export function inspectRepositoryFreshness(
       [
         "--git-dir",
         temp,
+        ...transport.configArgs,
         "-c",
         "maintenance.auto=false",
         "fetch",
@@ -152,7 +176,7 @@ export function inspectRepositoryFreshness(
       // OID equality is still safe evidence of freshness; any mismatch or
       // failed probe remains unknown and therefore write-blocking.
       if (runFetch === defaultFetch) {
-        const direct = spawnSync("git", ["ls-remote", remoteUrl, `refs/heads/${upstreamBranch}`], {
+        const direct = runDirect([...transport.configArgs, "ls-remote", remoteUrl, `refs/heads/${upstreamBranch}`], {
           encoding: "utf8",
           timeout: fetchTimeoutMs,
           env,
