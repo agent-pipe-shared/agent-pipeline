@@ -1,4 +1,4 @@
-<!-- po-language: de -->
+<!-- po-language: en -->
 
 # PRD — Sprint Sentinel: Backlog-Wahrheit und Go-live
 
@@ -9,7 +9,7 @@
 > Public-Core-/Private-Consumer-Reconciliation. AFK-Aktivierung, Push, Tag und
 > Release bleiben bis zu ihren jeweiligen Gates gesperrt.
 
-<!-- technical-spec-sha256: a4a8684d427d38bc216987bbd8497ae14f7913e340a0c449f3bb79c1c244f785 -->
+<!-- technical-spec-sha256: b062db2aa1271bd4b1be32efa16e74aaa7ccfafcba3ebfde4888d77d527819ac -->
 <!-- public-private-reconciliation-design-sha256: 48698f4bc1717932b1f031b6936e7201cc1d3201e6e56d28a50b2891023f0e7f -->
 
 Die technische Freigabebindung gilt exakt für die benachbarte

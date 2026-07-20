@@ -53,11 +53,10 @@ gates, canonical backlog reconciliation, and remaining go-live evidence
   audited without finding a missing Public implementation file. Remaining
   Sentinel go-live work is explicit Public backlog, not an imported private
   authority or a completion claim.
-- The running session initially loaded Public plugin version
-  `0.2.0+codex.20260720132741`; the cachebusted candidate
-  `0.2.0+codex.20260720163405` is now installed and enabled. A new Codex
-  thread and full bootstrap remain required before runtime evidence may trust
-  the refreshed plugin.
+- The preceding session loaded Public plugin version
+  `0.2.0+codex.20260720195249`; this block registers the new cachebusted
+  candidate `0.2.0+codex.20260721001633`. A fresh Codex thread, cache refresh,
+  and full bootstrap remain required before runtime evidence may trust it.
 - SNT-A1 through SNT-A4 are implemented. Focused tests and Full Verify passed
   at candidate `f7e76063c9e15b136fbd8344dcd54a12c1bd0d36` (tree
   `375601dcfd4f23aa0669e39d2e652aca10381d46`). The independent SNT-A Critic
