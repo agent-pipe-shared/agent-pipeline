@@ -134,6 +134,33 @@ Feature-/Go-Live-Vertrag.
 PO-Gate und Wiedereinstieg stehen ausschließlich im kanonischen
 [Handover](docs/state.md).
 
+## 2026-07-20 — SNT-A-Brücke und Beobachtungsaufnahme geschlossen
+
+- SNT-A1 bis SNT-A4 wurden im Public Core implementiert, exact-candidate
+  verifiziert und unabhängig kritisch geprüft. Der cachebustete Pluginstand ist
+  `0.2.0+codex.20260720163405`; Veröffentlichung, Reinstall und private
+  Aktivierung bleiben der nächsten Session vorbehalten.
+- Die globale Beobachtungsaufnahme ist als branch-unabhängige GitHub-Issue-
+  Quelle dokumentiert. Der bounded Privacy-Review des letzten Korrektur-Deltas
+  ist **DATA-PRIVACY PASS**; 19/19 fokussierte Tests sind grün.
+- Der Close aktualisiert den kanonischen Handover und hinterlässt einen
+  kopierbaren Setup-Prompt für die nächste Bridge-Session.
+
+### Lessons
+
+- Öffentliche Intake-Grenzen sollten zuerst geschlossene strukturierte Kanäle
+  mit fail-closed Freitext-Ablehnung verwenden; Variantenparser werden nur für
+  konkret akzeptierte Eingaben ergänzt.
+- Die wiederholten Critics wurden auf Korrektur-Deltas begrenzt. Eine weitere
+  Vollprüfung ist nach einem abgeschlossenen Delta nicht erforderlich.
+
+### Open / next
+
+Siehe den kanonischen [Handover](docs/state.md) und den
+[Setup-Prompt](docs/next-session-setup-prompt.md). Die nächste Session muss
+Plugin-Refresh, Lock-Update, explizite Aktivierung, Readback und danach die
+Issue-Publikation durchführen.
+
 ## 2026-07-19 — Batman und Runner-V3-Cutover geschlossen
 
 - Batman liefert die bestätigten Epic-/Feature-/Mini-Profile, runner-neutrale

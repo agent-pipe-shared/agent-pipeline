@@ -35,20 +35,21 @@ observation/document governance
   audited without finding a missing Public implementation file. Remaining
   Sentinel go-live work is explicit Public backlog, not an imported private
   authority or a completion claim.
-- The running session loaded Public plugin version
-  `0.2.0+codex.20260720132741`. SNT-A changes in this block are local candidate
-  work and are not active in that loaded plugin. A cachebuster, exact-candidate
-  reinstall and new Codex thread are required before bootstrap evidence can use
-  them.
-- The staged SNT-A candidate carries cachebuster version
-  `0.2.0+codex.20260720163405`; this is a candidate identity only until the
-  Public commit/push, marketplace refresh, installed-cache equality and new-
-  thread readback all succeed.
-- SNT-A1 through SNT-A3 are implemented with focused fail-closed tests. SNT-A4
-  is closing the explicit bounded private-context transfer and locked-project
-  `pipeline-start` integration. Aggregate Verify, an independent Critic,
-  Public publication/readback, private lock update, explicit activation and a
-  post-reload bootstrap remain required before SNT-A can close.
+- The running session initially loaded Public plugin version
+  `0.2.0+codex.20260720132741`; the candidate carries cachebuster
+  `0.2.0+codex.20260720163405`. A marketplace refresh, exact-candidate
+  reinstall and new Codex thread remain required before bootstrap evidence may
+  trust the candidate.
+- SNT-A1 through SNT-A4 are implemented. Focused tests and Full Verify passed
+  at candidate `f7e76063c9e15b136fbd8344dcd54a12c1bd0d36` (tree
+  `375601dcfd4f23aa0669e39d2e652aca10381d46`). The independent SNT-A Critic
+  and bounded observation privacy delta review both passed under the documented
+  functional-equivalent read-only assurance.
+- Public Issue intake privacy is signed off: SCP-style references fail closed
+  and structured GitHub references are canonical, same-target and free of
+  query, fragment and percent encoding. The 19/19 focused evidence is
+  candidate-bound. Issue publication is a next-session action requiring
+  GitHub capability readback; observations remain unverified.
 - The SNT-A contract observes the selected Git marketplace source and flattened
   installed cache independently, requires byte equality, validates the slim
   overlay lock and closed Markdown namespaces, writes only through a reviewed
@@ -56,9 +57,10 @@ observation/document governance
   keeps private values out of machine evidence. No private repository
   coordinate, identity, path, secret, receipt, or runtime value is recorded
   here.
-- This implementation session runs under a PO-authorized temporary Codex
-  Sol/high route exception. Terra/high remains the intended execution route;
-  no current-session evidence may claim that Terra was observed.
+- The PO changed remaining and follow-up work to Luna/medium after the weekly
+  high-profile limit was exhausted. No evidence here claims an observed
+  effective model identity. Earlier Sol/Terra route decisions are configuration
+  decisions, not runtime evidence.
 - The generic plugin validator still rejects the manifest `hooks` extension and
   two deliberate non-model-invocable workflow skills. Passing Public parity
   classifier tests is not native validator admission evidence.
@@ -77,29 +79,30 @@ observation/document governance
   commits carry factual `Dispatch:` task lines and anonymous `AI-Assisted: true`
   markers. This does not claim retroactively created dispatch records; the
   preventive provenance backlog remains open.
+- Close authorship incident (EL-01): the later privacy/governance correction
+  commits were authored by the Elephant outside the stage-0 fast path. They are
+  disclosed in this handover and telemetry; no dispatch provenance is invented.
 - One PO-confirmed GG-03 override authorized only a normal private-overlay
   `main` fast-forward. Its audit record remains private and local. The residue
   check caught that cross-repository ledger placement initially selected the
   coordinator checkout; no such entry was staged or committed Public.
-- Full Verify at pre-close candidate `d85cae378755b2ab152d7ab619f69129b2fbf6fb`
-  completed with 101 steps, exit 0, and exact machine-written Verify/Security
-  evidence through the approved host boundary after a sandbox-only `EPERM`
-  attempt. The exact post-close candidate still requires the same gates and a
-  fresh independent Critic before delivery.
+- Full Verify at candidate `f7e76063c9e15b136fbd8344dcd54a12c1bd0d36`
+  completed with exit 0 and exact machine-written Verify/Security evidence
+  through the approved host boundary after a sandbox-only `EPERM` attempt.
+  Documentation-only close mutations require the exact final Verify tail.
 
 ## Open items and next block
 
-- Admit delivery only after Full Verify, Security, privacy checks, and a fresh
-  independent Critic bind the exact post-close candidate. The earlier PO course
-  exception is never a Critic PASS.
-- Push only that exact candidate to
-  `origin/feat/v3-public-core-foundation` and require exact remote readback. Do
-  not push, merge, tag, or otherwise change Public `origin/main`.
-- Complete SNT-A in this order: authenticated context transfer and
-  `pipeline-start` integration; aggregate Verify registration; installed-cache
-  and slim-overlay E2E; independent Critic; exact Public candidate
-  commit/push/readback; plugin cachebuster/reinstall; overlay lock update;
-  explicit plan/activate/readback; then `close-block` and a new Codex thread.
+- Commit and push this exact close candidate to
+  `origin/feat/v3-public-core-foundation`, then require exact remote readback.
+  Do not push, merge, tag, or otherwise change Public `origin/main`.
+- Refresh/reinstall the cachebusted plugin, update the private overlay lock to
+  the fetched Public commit/tree/manifest digest, and run the explicit
+  `inspect` → `plan` → `activate` → `status`/`load-context` readback in the
+  private overlay. Keep private values and receipts out of this Public state.
+- Start a new Codex thread and run the full `pipeline-start` bootstrap before
+  trusting the refreshed bridge. Then publish the fourteen queued observations
+  through the GitHub Issue Form/skill after capability and target readback.
 - Continue the remaining Sentinel go-live package only after SNT-A, including
   native/generic validator A/B evidence. SNT-A completion alone is not a
   release or go-live readiness claim.
@@ -141,8 +144,12 @@ capability readback.
 12. The obsolete “new block review” ritual can still surface although bootstrap
     replaced it.
 13. Legacy user-doc redirects and possibly internal/obsolete `docs/` files are
-    still presented as V3 user-facing material. Triage requires a complete
-    audience/lifecycle inventory and link/authority review before deletion.
+   still presented as V3 user-facing material. Triage requires a complete
+   audience/lifecycle inventory and link/authority review before deletion.
+14. The primary README mixes runner-specific lifecycle wording, historical
+   links, a Claude-first runtime framing, and detailed Codex sandbox material;
+   triage should restore a runner-neutral onboarding flow and move deep runtime
+   detail to the operating model.
 
 The intake implementation consists of a closed repository Issue Form, the
 `capture-observation` skill, privacy/security routing, duplicate search,
@@ -159,7 +166,8 @@ to be created on GitHub before publication.
    gates if its OID differs from the local exact candidate.
 5. Keep slim private overlays fail-closed until the SNT-A candidate is
    independently reviewed, reinstalled, explicitly activated and read back in
-   the new session.
+   the new session. In the private overlay use `inspect`, `plan`, explicit
+   `activate`, then `status` and `load-context`.
 
 ## Recovery
 

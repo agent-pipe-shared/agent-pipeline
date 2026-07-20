@@ -91,14 +91,15 @@ evidence before implementation or any readiness claim.
 
 ## Implementation checkpoint — 2026-07-20
 
-- SNT-A1 through SNT-A3 are implemented locally with focused positive and
-  fail-closed tests; they are not yet a published or activated candidate.
-- SNT-A4 integration, aggregate Verify registration, installed-cache/slim-
-  overlay end-to-end evidence, independent Critic review, exact-candidate
-  publication, reinstall, and activation readback remain required.
-- The current implementation session uses a PO-authorized temporary Codex
-  Sol/high route exception. The intended execution route remains Terra/high;
-  no evidence from this session may claim that Terra was observed.
+- SNT-A1 through SNT-A4 are implemented with focused fail-closed tests,
+  aggregate Verify registration, and installed-cache/slim-overlay E2E coverage.
+- Exact candidate `f7e76063c9e15b136fbd8344dcd54a12c1bd0d36` passed Full Verify;
+  the independent bounded Critic passed. Public publication/readback,
+  cachebusted reinstall, private lock update and explicit activation remain
+  post-close setup actions for the next session.
+- Remaining work is assigned to Luna/medium by the PO after the weekly
+  high-profile limit was exhausted. No effective runtime model identity is
+  claimed by this record.
 - Completion of SNT-A removes only the private-overlay activation prerequisite.
   It does not by itself satisfy the separate Sentinel go-live, legal,
   publication, documentation, or full project-calibration gates.
