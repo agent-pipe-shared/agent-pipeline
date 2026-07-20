@@ -5,7 +5,8 @@
 The V3 Public Core transfer is recorded under an explicit PO course exception.
 That earlier exception was not and is not a Critic PASS. It remains a transfer
 disposition, not a review verdict or release approval.
-No push was performed.
+The stabilized candidate is published only on
+`feat/v3-public-core-foundation`; Public `main` remains unchanged.
 
 The public marketplace URL, its self-application assertions, the current
 PO-language failure text, the standing-approved push-gate assertion, the public
@@ -18,6 +19,8 @@ Public V3 Foundation candidate.
 | Recovery-preview callback attestation can accept a no-op callback in the migration library. | V3 migration recovery path | Prioritized design item: [attest recovery-preview callback delivery](../backlog/items/2026-07-20-recovery-preview-callback-attestation.md). |
 | Formal review/dispatch aborts can force broad repeat runs without a new domain finding. | Review workflow | Prioritized design item: [bound review retries to valid evidence](../backlog/items/2026-07-20-evidence-bound-review-retry-economics.md). |
 | The installed plugin can read project-root `pipeline.user.yaml`, but `pipeline-start` does not yet validate the private-overlay core lock or load its allowlisted extension namespaces; a slim overlay has no local setup or harness fallback. | Private-overlay activation | Fail closed with no bootstrap or go-live readiness claim until the Public [private-overlay activation bridge](../backlog/items/2026-07-20-private-overlay-activation-bridge.md) is implemented and verified. |
+| The generic plugin validator rejects the committed manifest `hooks` extension and requires `disable-model-invocation: false` for `close-block` and `critic-review`; the Public parity tests passing is not native validator admission evidence. | Plugin admission parity | Complete the same-candidate native/generic A/B evidence required by [Sentinel go-live completion](../backlog/items/2026-07-20-sentinel-go-live-completion.md) before release admission. |
+| A cross-repository guarded operation can bind its one-time override ledger to the coordinator checkout rather than the command's target repository. | Guard override audit boundary | Keep cross-repository audit data out of Public history and implement the [target-bound override ledger](../backlog/items/2026-07-20-cross-repository-override-ledger-binding.md). |
 
 ## Rollback path
 
