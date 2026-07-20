@@ -158,8 +158,8 @@ PO-Gate und Wiedereinstieg stehen ausschließlich im kanonischen
 
 Siehe den kanonischen [Handover](docs/state.md) und den
 [Setup-Prompt](docs/next-session-setup-prompt.md). Die nächste Session muss
-Plugin-Refresh, Lock-Update, explizite Aktivierung, Readback und danach die
-Issue-Publikation durchführen.
+die bereits installierte Bridge bootstrappen, explizit aktivieren, den
+Readback durchführen und danach die Issue-Publikation starten.
 
 ## 2026-07-19 — Batman und Runner-V3-Cutover geschlossen
 

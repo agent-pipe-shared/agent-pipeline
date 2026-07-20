@@ -36,10 +36,10 @@ observation/document governance
   Sentinel go-live work is explicit Public backlog, not an imported private
   authority or a completion claim.
 - The running session initially loaded Public plugin version
-  `0.2.0+codex.20260720132741`; the candidate carries cachebuster
-  `0.2.0+codex.20260720163405`. A marketplace refresh, exact-candidate
-  reinstall and new Codex thread remain required before bootstrap evidence may
-  trust the candidate.
+  `0.2.0+codex.20260720132741`; the cachebusted candidate
+  `0.2.0+codex.20260720163405` is now installed and enabled. A new Codex
+  thread and full bootstrap remain required before runtime evidence may trust
+  the refreshed plugin.
 - SNT-A1 through SNT-A4 are implemented. Focused tests and Full Verify passed
   at candidate `f7e76063c9e15b136fbd8344dcd54a12c1bd0d36` (tree
   `375601dcfd4f23aa0669e39d2e652aca10381d46`). The independent SNT-A Critic
@@ -93,13 +93,13 @@ observation/document governance
 
 ## Open items and next block
 
-- Commit and push this exact close candidate to
-  `origin/feat/v3-public-core-foundation`, then require exact remote readback.
-  Do not push, merge, tag, or otherwise change Public `origin/main`.
-- Refresh/reinstall the cachebusted plugin, update the private overlay lock to
-  the fetched Public commit/tree/manifest digest, and run the explicit
-  `inspect` → `plan` → `activate` → `status`/`load-context` readback in the
-  private overlay. Keep private values and receipts out of this Public state.
+- Exact close candidate `17115fe07e7e455635c055771110dde7b0fc54e9` is pushed to
+  `origin/feat/v3-public-core-foundation` and fetched back with matching OID.
+  Public `origin/main` was not changed.
+- The private overlay lock is updated and pushed to its normal `main`; the
+  next session must run the explicit `inspect` → `plan` → `activate` →
+  `status`/`load-context` readback. Keep private values and receipts out of
+  this Public state.
 - Start a new Codex thread and run the full `pipeline-start` bootstrap before
   trusting the refreshed bridge. Then publish the fourteen queued observations
   through the GitHub Issue Form/skill after capability and target readback.
