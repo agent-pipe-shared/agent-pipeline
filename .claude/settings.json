@@ -7,7 +7,7 @@
     "agent-pipeline": {
       "source": {
         "source": "github",
-        "repo": "agent-pipeline/agent-pipeline"
+        "repo": "agent-pipe-shared/agent-pipeline"
       }
     }
   },
