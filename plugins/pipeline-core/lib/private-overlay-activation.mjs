@@ -41,10 +41,10 @@ const PROHIBITED_WORDS = new Set([
 ]);
 const PROHIBITED_SECRET_WORDS = new Set([
   "secret", "secrets", "credential", "credentials", "token", "tokens",
-  "password", "passwords", "passwd", "passphrase",
+  "password", "passwords", "passwd", "passphrase", "passphrases",
 ]);
 const PROHIBITED_COMPOUNDS = new Set([
-  "apikey", "privatekey", "password", "passwords", "passphrase",
+  "apikey", "privatekey", "password", "passwords", "passphrase", "passphrases",
 ]);
 const PRIVATE_KEY_BLOCK = /-----BEGIN(?: [A-Z0-9][A-Z0-9 -]{0,64})? PRIVATE KEY-----/u;
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
@@ -319,7 +319,7 @@ function hasProhibitedWords(words, { secretOnly = false } = {}) {
     if (PROHIBITED_COMPOUNDS.has(pair)) return true;
   }
   return words.some((word) => PROHIBITED_COMPOUNDS.has(word)
-    || /^(?:[\p{L}\p{N}]*(?:passwords?|passwd|passphrase|apikey|privatekey))$/u.test(word));
+    || /^(?:[\p{L}\p{N}]*(?:passwords?|passwd|passphrases?|apikey|privatekey))$/u.test(word));
 }
 
 function prohibitedSegment(segment) {
