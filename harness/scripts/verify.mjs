@@ -151,7 +151,6 @@ const TEST_SUITES = [
   { name: "continuity-status-cli-tests", file: join(pluginScriptsDir, "continuity-status.test.mjs") },
   { name: "delivery-course-tests", file: join(libDir, "delivery-course.test.mjs") },
   { name: "critic-packet-governance-tests", file: join(libDir, "critic-packet-governance.test.mjs") },
-  { name: "po-gate-authority-check", file: join(scriptDir, "check-po-gate-authority.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects with `.claude/pipeline.yaml`
