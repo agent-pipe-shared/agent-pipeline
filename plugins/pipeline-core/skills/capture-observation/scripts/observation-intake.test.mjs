@@ -183,6 +183,10 @@ test("alternative genuine GitHub repository coordinates remain target-bound", ()
     "https://github.com:443/private-overlay/agent-pipeline/issues/41",
     "https://api.github.com/repos/private-overlay/agent-pipeline/issues/41",
     "https://raw.githubusercontent.com/private-overlay/agent-pipeline/main/file.md",
+    "https://media.githubusercontent.com/private-overlay/agent-pipeline/main/file.md",
+    "https://codeload.github.com/private-overlay/agent-pipeline/zip/refs/heads/main",
+    "https://github.dev/private-overlay/agent-pipeline",
+    "https://github.com./private-overlay/agent-pipeline/issues/41",
     "ssh://git@github.com/private-overlay/agent-pipeline.git",
     "git@github.com:private-overlay/agent-pipeline.git",
   ]) {
@@ -199,6 +203,10 @@ test("alternative genuine GitHub repository coordinates remain target-bound", ()
     "https://github.com:443/agent-pipe-shared/agent-pipeline/issues/12",
     "https://api.github.com/repos/agent-pipe-shared/agent-pipeline/issues/12",
     "https://raw.githubusercontent.com/agent-pipe-shared/agent-pipeline/main/README.md",
+    "https://media.githubusercontent.com/agent-pipe-shared/agent-pipeline/main/README.md",
+    "https://codeload.github.com/agent-pipe-shared/agent-pipeline/zip/refs/heads/main",
+    "https://github.dev/agent-pipe-shared/agent-pipeline",
+    "ssh://git@github.com/agent-pipe-shared/agent-pipeline.git",
   ]) {
     const output = prepareObservation(validInput({ evidence: `Related report: ${reference}` }), {
       publicRepository: PUBLIC_REPOSITORY,

@@ -57,13 +57,8 @@ const PUBLIC_CAPABILITY = /^(?:unknown|[A-Za-z0-9][A-Za-z0-9 ._:/+-]{0,119})$/;
 const CANDIDATE = /^(?:unknown|[0-9a-f]{7,40})$/;
 const SOURCE_LINK = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(?:blob|issues|pull)\/.+$/;
 const PUBLIC_REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
-const GITHUB_REPOSITORY_REFERENCES = Object.freeze([
-  /(?:https?|git):\/\/(?:www\.)?github\.com(?::\d{1,5})?\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?=[\/#?\s]|$)/gi,
-  /https?:\/\/api\.github\.com(?::\d{1,5})?\/repos\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?=[\/#?\s]|$)/gi,
-  /https?:\/\/raw\.githubusercontent\.com(?::\d{1,5})?\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?=[\/#?\s]|$)/gi,
-  /ssh:\/\/git@github\.com(?::\d{1,5})?\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?=[\/#?\s]|$)/gi,
-  /git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?=[\/#?\s]|$)/gi,
-]);
+const URI_REFERENCE = /\b(?:https?|git|ssh):\/\/[^\s<>"'`]+/giu;
+const GITHUB_SCP_REFERENCE = /git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?=[\/#?\s]|$)/giu;
 
 const SECRET_PATTERNS = Object.freeze([
   /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/i,
@@ -134,8 +129,33 @@ function allStrings(value) {
 }
 
 function githubRepositories(value) {
-  return GITHUB_REPOSITORY_REFERENCES.flatMap((pattern) => [...value.matchAll(pattern)])
-    .map((match) => `${match[1]}/${match[2].replace(/\.git$/i, "")}`.toLowerCase());
+  const repositories = [...value.matchAll(GITHUB_SCP_REFERENCE)]
+    .map((match) => `${match[1]}/${match[2].replace(/\.git$/iu, "")}`.toLowerCase());
+  for (const match of value.matchAll(URI_REFERENCE)) {
+    let parsed;
+    try {
+      parsed = new URL(match[0]);
+    } catch {
+      continue;
+    }
+    const host = parsed.hostname.toLowerCase().replace(/\.+$/u, "");
+    const firstParty = host === "github.com" || host.endsWith(".github.com")
+      || host === "githubusercontent.com" || host.endsWith(".githubusercontent.com")
+      || host === "github.dev";
+    if (!firstParty) continue;
+    const segments = parsed.pathname.split("/").filter(Boolean);
+    const offset = (host === "api.github.com" || host === "uploads.github.com")
+      && segments[0]?.toLowerCase() === "repos" ? 1 : 0;
+    const owner = segments[offset];
+    const repository = segments[offset + 1]?.replace(/\.git$/iu, "");
+    if (!owner || !repository || !/^[A-Za-z0-9_.-]+$/u.test(owner)
+      || !/^[A-Za-z0-9_.-]+$/u.test(repository)) {
+      repositories.push(null);
+    } else {
+      repositories.push(`${owner}/${repository}`.toLowerCase());
+    }
+  }
+  return repositories;
 }
 
 function repositoryReferenceStatus(input, publicRepository) {
@@ -145,7 +165,7 @@ function repositoryReferenceStatus(input, publicRepository) {
     return result("setup-required", { reason: "public-repository-unresolved" });
   }
   const expected = publicRepository.toLowerCase();
-  if (repositories.some((repository) => repository !== expected)) {
+  if (repositories.some((repository) => repository === null || repository !== expected)) {
     return result("privacy-rejected", { reason: "repository-reference-outside-public-target" });
   }
   return null;
