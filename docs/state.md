@@ -29,10 +29,11 @@
   explicit public backlog designs, not completed runtime claims.
 - TP-3 and TP-5 were temporarily removed only under explicit PO authorization
   for this bounded work, then restored exactly before final verification.
-- Authorship incident: the delivered implementation commits are attributable to
-  the dispatched Goldfish work packages, but their public commit messages lack
-  the required `Dispatch:` trailer. The missing provenance metadata is recorded
-  as an open process correction, not inferred or reconstructed after the fact.
+- Authorship correction: the seven unpublished Goldfish implementation commits
+  were reworded with factual `Dispatch:` task identifiers and anonymous
+  `AI-Assisted: true` markers. This corrects commit-level provenance without
+  claiming a retroactively created dispatch record; the related public backlog
+  items remain preventive process follow-ups.
 - Full Verify at pre-close candidate `6b423d1d66ff2e59b6d1cbc7781ffc890006ae84`
   completed with exit 0 and machine-written Verify/Security evidence. A final
   exact-candidate Verify and independent Critic review remain required after

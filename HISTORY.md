@@ -14,9 +14,11 @@
   stale public-language guidance and ADR-0011. The rollback path and the
   English-canonical Public Core boundary were corrected; a final fresh Critic
   review remains required for the exact close candidate.
-- The close authorship check found missing public `Dispatch:` trailers on
-  Goldfish delivery commits. The gap is recorded as a process incident and a
-  public backlog correction; it is not repaired by inventing provenance.
+- The seven formerly missing `Dispatch:` trailers on unpublished Goldfish
+  delivery commits were corrected by rewording them with factual task
+  identifiers and anonymous `AI-Assisted: true` markers. No retroactively
+  created dispatch record is claimed; the public backlog items remain
+  preventive process follow-ups.
 - A separate clean P2.6 worktree was verified as fully synchronized, preserved
   as a Git bundle and source archive, then removed without force. Its branch and
   remote ref remain outside this stabilization block.
