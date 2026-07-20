@@ -17,6 +17,7 @@ Public V3 Foundation candidate.
 | --- | --- | --- |
 | Recovery-preview callback attestation can accept a no-op callback in the migration library. | V3 migration recovery path | Prioritized design item: [attest recovery-preview callback delivery](../backlog/items/2026-07-20-recovery-preview-callback-attestation.md). |
 | Formal review/dispatch aborts can force broad repeat runs without a new domain finding. | Review workflow | Prioritized design item: [bound review retries to valid evidence](../backlog/items/2026-07-20-evidence-bound-review-retry-economics.md). |
+| The installed plugin can read project-root `pipeline.user.yaml`, but `pipeline-start` does not yet validate the private-overlay core lock or load its allowlisted extension namespaces; a slim overlay has no local setup or harness fallback. | Private-overlay activation | Fail closed with no bootstrap or go-live readiness claim until the Public [private-overlay activation bridge](../backlog/items/2026-07-20-private-overlay-activation-bridge.md) is implemented and verified. |
 
 ## Rollback path
 

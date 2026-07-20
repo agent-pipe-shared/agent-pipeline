@@ -55,6 +55,10 @@ and
 Those items retain their own priority, ownership, acceptance, and expiry
 boundaries.
 
+The Public go-live path also depends on the portable
+[`2026-07-20-private-overlay-activation-bridge.md`](./2026-07-20-private-overlay-activation-bridge.md)
+before a slim overlay can make any bootstrap or readiness claim.
+
 Private renderer behavior, private policy, project-specific configuration, and
 machine or runtime content are explicitly out of scope. Public implementation
 may retain neutral extension points and portable interfaces, but no private
