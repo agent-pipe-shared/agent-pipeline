@@ -1,0 +1,1 @@
+{"type":"assistant","sessionId":"thread-claude-001","message":{"id":"turn-claude-001","usage":{"input_tokens":0,"output_tokens":11,"cache_creation_input_tokens":4,"cache_read_input_tokens":0,"cache_creation":{"ephemeral_5m_input_tokens":2,"ephemeral_1h_input_tokens":2}}}}

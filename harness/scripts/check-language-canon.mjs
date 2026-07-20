@@ -1,25 +1,17 @@
 #!/usr/bin/env node
 /**
- * Narrow P4 contract: ADR-0011 permits one marked German reader aid only on
- * the four named English-canonical public front doors. This is deliberately
- * not a general language checker or a repository-wide documentation scan.
+ * Hawkeye user-document language boundary. English is authoritative; exactly
+ * three maintained user documents carry a complete German reader copy below a
+ * bounded marker. Redirects and task guides remain English-only so they never
+ * become a second maintained translation surface.
  */
-import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { readFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { extractMarkdownLinks } from "./check-doc-contracts.mjs";
 
-const readerAid = "> _A German version follows below · Eine deutsche Fassung folgt weiter unten._";
 const deReferenceMarker = "DE-REFERENCE-BELOW";
-const frontDoors = ["README.md", "SETUP.md", "docs/overview.md", "docs/usage.md"];
-const docsReadme = "docs/README.md";
-const removedForms = [readerAid, deReferenceMarker, "Die deutsche Fassung ist eine Übersetzung des englischen Originals."];
-const germanReferenceTargets = new Map([
-  ["README.md", "docs/deploy/README.md"],
-  ["SETUP.md", "docs/design/README.md"],
-  ["docs/overview.md", "../README.md"],
-  ["docs/usage.md", "../SETUP.md"],
-]);
+const bilingualFrontDoors = ["README.md", "PIPELINE_FLOW.md", "docs/operating-model.md"];
+const englishOnlyUserDocs = ["SETUP.md", "docs/README.md", "docs/overview.md", "docs/usage.md", "docs/migration.md"];
 
 function occurrences(text, value) {
   return text.split(value).length - 1;
@@ -27,23 +19,22 @@ function occurrences(text, value) {
 
 export function auditLanguageCanon(root) {
   const findings = [];
-  for (const path of frontDoors) {
+  for (const path of bilingualFrontDoors) {
     const text = readFileSync(join(root, path), "utf8");
-    const readerAidAt = text.indexOf(readerAid);
     const markerAt = text.indexOf(deReferenceMarker);
-    if (occurrences(text, readerAid) !== 1) findings.push(`${path}: expected exactly one ADR-0011 German reader aid`);
-    if (occurrences(text, deReferenceMarker) !== 1) findings.push(`${path}: expected exactly one DE-REFERENCE-BELOW marker`);
-    if (!text.startsWith("# ")) findings.push(`${path}: expected English-first front-door heading`);
-    if (readerAidAt < 0 || markerAt <= readerAidAt) findings.push(`${path}: expected reader aid before the post-English-body marker`);
-    const target = germanReferenceTargets.get(path);
-    const link = extractMarkdownLinks(text).find((entry) => entry.destination === target && entry.line > text.slice(0, markerAt).split("\n").length);
-    if (!link) findings.push(`${path}: German reader-aid reference lacks its fixed local link target ${target}`);
-    else if (!existsSync(resolve(root, dirname(path), target))) findings.push(`${path}: German reader-aid local link target is missing`);
+    if (!text.startsWith("# ")) findings.push(`${path}: expected an English-first front-door heading`);
+    if (occurrences(text, deReferenceMarker) !== 1) {
+      findings.push(`${path}: expected exactly one DE-REFERENCE-BELOW marker`);
+      continue;
+    }
+    const before = text.slice(0, markerAt).trim();
+    const after = text.slice(markerAt + deReferenceMarker.length).replace(/^[^\n]*\n/, "").trim();
+    if (!before.includes("\n")) findings.push(`${path}: English authority body is missing before the German marker`);
+    if (!after.startsWith("# ")) findings.push(`${path}: complete German reader copy must begin after the marker`);
   }
-
-  const docsText = readFileSync(join(root, docsReadme), "utf8");
-  for (const form of removedForms) {
-    if (docsText.includes(form)) findings.push(`${docsReadme}: unapproved German reader-aid form remains`);
+  for (const path of englishOnlyUserDocs) {
+    const text = readFileSync(join(root, path), "utf8");
+    if (text.includes(deReferenceMarker)) findings.push(`${path}: English-only user document contains a German reference marker`);
   }
   return findings;
 }
@@ -56,5 +47,5 @@ if (invokedPath) {
     process.stderr.write(`${findings.join("\n")}\n`);
     process.exit(1);
   }
-  process.stdout.write(`language-canon: ${frontDoors.length} front doors; ${docsReadme} clear\n`);
+  process.stdout.write(`language-canon: ${bilingualFrontDoors.length} bilingual front doors; ${englishOnlyUserDocs.length} English-only user documents clear\n`);
 }

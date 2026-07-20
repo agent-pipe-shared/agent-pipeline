@@ -12,11 +12,28 @@
       "manifestAliases": {
         "sonnet": "sonnet-5"
       },
+      "directSelectors": {
+        "design": { "kind": "alias", "value": "opus", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
+        "implement": { "kind": "alias", "value": "sonnet", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
+        "mechanic": { "kind": "alias", "value": "sonnet", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
+        "deep": { "kind": "alias", "value": "sonnet", "resolutionStatus": "runner-alias", "resolutionEvidence": null },
+        "review": { "kind": "alias", "value": "sonnet", "resolutionStatus": "runner-alias", "resolutionEvidence": null }
+      },
       "effortMode": "identity"
     },
     "codex": {
+      "capabilities": {
+        "review": "gpt-5.6-sol"
+      },
       "aliases": {
         "fable": "gpt-5.6-sol"
+      },
+      "directSelectors": {
+        "design": { "kind": "model-id", "value": "gpt-5.6-sol", "resolutionStatus": "observed-model-id", "resolutionEvidence": "project-codex-binding" },
+        "review": { "kind": "model-id", "value": "gpt-5.6-sol", "resolutionStatus": "observed-model-id", "resolutionEvidence": "project-codex-binding" },
+        "implement": { "kind": "alias", "value": "terra", "resolutionStatus": "unresolved-alias", "resolutionEvidence": null },
+        "mechanic": { "kind": "alias", "value": "terra", "resolutionStatus": "unresolved-alias", "resolutionEvidence": null },
+        "deep": { "kind": "alias", "value": "terra", "resolutionStatus": "unresolved-alias", "resolutionEvidence": null }
       },
       "effortMode": "identity"
     }

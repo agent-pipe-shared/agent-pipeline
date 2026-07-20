@@ -73,6 +73,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { loadManifestSafe, gateConfig } from "../../plugins/pipeline-core/lib/manifest.mjs";
+import { resolveSystemExecutable } from "./security-readiness/tool-identity.mjs";
 
 import * as gitleaksAdapter from "./security-adapters/gitleaks.mjs";
 import * as osvScannerAdapter from "./security-adapters/osv-scanner.mjs";
@@ -80,6 +81,7 @@ import * as semgrepAdapter from "./security-adapters/semgrep.mjs";
 import * as licenseCheckAdapter from "./security-adapters/license-check.mjs";
 
 const DEFAULT_TIMEOUT_MS = 60000;
+const PREFLIGHT_TIMEOUT_MS = 5000;
 const DEFAULT_BLOCK_ON = ["critical", "high"];
 const DEFAULT_GOVERNANCE_POLICIES_PATH = "governance/examples/policies";
 const DEFAULT_GATE_MODE = "blocking";
@@ -161,6 +163,69 @@ function resolveCommit(rootDir) {
   return "unknown";
 }
 
+function childProcessError({ tool, error, timeoutMs }) {
+  if (error?.code === "EPERM" || error?.code === "EACCES") {
+    return {
+      status: "ERROR",
+      classification: "execution_environment",
+      reason: `${tool} could not start a Node child process (${error.code}). Run Codex CLI/headless verification in the approved host context; do not report this as a missing scanner or finding.`,
+    };
+  }
+  if (error?.code === "ETIMEDOUT") {
+    return {
+      status: "ERROR",
+      classification: "execution_environment",
+      reason: `${tool} child-process preflight timed out after ${timeoutMs}ms`,
+    };
+  }
+  return {
+    status: "ERROR",
+    classification: "execution_environment",
+    reason: `${tool} could not start a Node child process: ${error?.message ?? "unknown error"}`,
+  };
+}
+
+/**
+ * Proves that this Node process can launch one fixed, non-project child process.
+ * The scan never invokes project scripts: scanner binaries and arguments are fixed
+ * by adapters, and this preflight always uses the absolute Node executable with
+ * `shell: false`.
+ */
+export function runChildProcessPreflight({ rootDir, timeoutMs = DEFAULT_TIMEOUT_MS, spawnFn = spawnSync } = {}) {
+  const boundedTimeoutMs = Math.min(timeoutMs, PREFLIGHT_TIMEOUT_MS);
+  let result;
+  try {
+    result = spawnFn(process.execPath, ["-e", "process.exit(0)"], {
+      cwd: rootDir,
+      encoding: "utf8",
+      timeout: boundedTimeoutMs,
+      shell: false,
+    });
+  } catch (error) {
+    return childProcessError({ tool: "security scan", error, timeoutMs: boundedTimeoutMs });
+  }
+  if (result?.error) return childProcessError({ tool: "security scan", error: result.error, timeoutMs: boundedTimeoutMs });
+  if (result?.status !== 0) {
+    return {
+      status: "ERROR",
+      classification: "execution_environment",
+      reason: `security scan child-process preflight exited ${result?.status ?? "unknown"}`,
+    };
+  }
+  return { status: "PASS", classification: "success" };
+}
+
+function scannerEntry(adapter, result) {
+  const entry = {
+    tool: adapter.name,
+    status: result.status,
+    classification: result.classification ?? (result.status === "PASS" ? "success" : result.status === "FINDINGS" ? "findings" : "scanner_error"),
+    findingCount: result.findings.length,
+  };
+  if (result.reason) entry.reason = result.reason;
+  return entry;
+}
+
 // ---------------------------------------------------------------------------------------------
 // Orchestration core (exported: the CLI's own main() is a thin wrapper around this).
 // ---------------------------------------------------------------------------------------------
@@ -184,26 +249,44 @@ export async function runSecurityScan({ rootDir, timeoutMs = DEFAULT_TIMEOUT_MS,
 
   const scanners = [];
   const findings = [];
+  const childProcessPreflight = runChildProcessPreflight({ rootDir, timeoutMs, spawnFn });
 
   for (const { key, adapter } of SCANNER_DEFS) {
     if (!isScannerEnabled(manifest, key)) continue;
 
     let entry;
     try {
-      const inst = adapter.isInstalled(env);
+      // The license check does not spawn a process and remains usable when the
+      // environment cannot start children. Every binary-backed scanner is
+      // classified as an execution-environment failure before PATH discovery,
+      // so a sandbox EPERM can never masquerade as a missing binary.
+      if (key !== "license-check" && childProcessPreflight.status !== "PASS") {
+        entry = {
+          tool: adapter.name,
+          status: "ERROR",
+          classification: "execution_environment",
+          findingCount: 0,
+          reason: childProcessPreflight.reason,
+        };
+      } else {
+      let inst = adapter.isInstalled(env);
+      if (!inst.installed && key !== "license-check" && typeof env?.HOME === "string" && env.HOME.length > 0) {
+        const standardPath = resolveSystemExecutable(key, { platform: process.platform, homeDir: env.HOME });
+        if (standardPath !== null) inst = { installed: true, path: standardPath };
+      }
       if (!inst.installed) {
-        entry = { tool: adapter.name, status: "SKIPPED", findingCount: 0, reason: inst.reason };
+        entry = { tool: adapter.name, status: "SKIPPED", classification: "binary_missing", findingCount: 0, reason: inst.reason };
       } else {
         const adapterConfig = { ...buildAdapterConfig(key, { rootDir, manifest, policiesPathAbs }), binaryPath: inst.path };
         const runArgs = { rootDir, config: adapterConfig, timeoutMs, env };
         if (spawnFn) runArgs.spawnFn = spawnFn;
         const result = await adapter.run(runArgs);
-        entry = { tool: adapter.name, status: result.status, findingCount: result.findings.length };
-        if (result.reason) entry.reason = result.reason;
+        entry = scannerEntry(adapter, result);
         findings.push(...result.findings);
       }
+      }
     } catch (err) {
-      entry = { tool: adapter.name, status: "ERROR", findingCount: 0, reason: `adapter threw: ${err.message}` };
+      entry = { tool: adapter.name, status: "ERROR", classification: "scanner_error", findingCount: 0, reason: `adapter threw: ${err.message}` };
     }
     scanners.push(entry);
   }
@@ -231,6 +314,7 @@ export async function runSecurityScan({ rootDir, timeoutMs = DEFAULT_TIMEOUT_MS,
     commit: resolveCommit(rootDir),
     finishedAt: new Date().toISOString(),
     thresholds: { block_on: blockOn },
+    execution: { childProcessPreflight },
     scanners,
     findings,
     exitCode,
@@ -261,7 +345,7 @@ function statusLabel(status) {
 function printSummary(evidence) {
   for (const s of evidence.scanners) {
     const reasonSuffix = s.reason ? ` -- ${s.reason}` : "";
-    console.log(`${s.tool}: ${statusLabel(s.status)} (${s.findingCount} findings)${reasonSuffix}`);
+    console.log(`${s.tool}: ${statusLabel(s.status)} [${s.classification}] (${s.findingCount} findings)${reasonSuffix}`);
   }
   const verdict = evidence.exitCode === 0 ? "CLEAN" : evidence.exitCode === 1 ? "WARNING" : "BLOCKING";
   console.log(`\nVerdict: ${verdict} (thresholds: ${evidence.thresholds.block_on.join(", ")}) -> exit ${evidence.exitCode}`);

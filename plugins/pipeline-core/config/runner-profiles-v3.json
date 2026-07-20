@@ -1,0 +1,118 @@
+{
+  "schema": "pipeline.runner-profiles.v3",
+  "runners": ["claude", "codex"],
+  "phases": ["design_phase", "execution_phase"],
+  "profiles": {
+    "epic": {
+      "design_phase": {
+        "claude": { "state": "default", "selector": { "kind": "alias", "value": "opus" }, "effort": "high", "unavailable": "defer", "evidence": "dispatch-receipt" },
+        "codex": { "state": "default", "selector": { "kind": "model-id", "value": "gpt-5.6-sol" }, "effort": "xhigh", "unavailable": "defer", "evidence": "dispatch-receipt" }
+      },
+      "execution_phase": {
+        "claude": { "state": "default", "selector": { "kind": "alias", "value": "opus" }, "effort": "high", "unavailable": "defer", "evidence": "dispatch-receipt" },
+        "codex": { "state": "default", "selector": { "kind": "model-id", "value": "gpt-5.6-sol" }, "effort": "xhigh", "unavailable": "defer", "evidence": "dispatch-receipt" }
+      }
+    },
+    "feature": {
+      "design_phase": {
+        "claude": { "state": "default", "selector": { "kind": "alias", "value": "opus" }, "effort": "high", "unavailable": "defer", "evidence": "dispatch-receipt" },
+        "codex": { "state": "default", "selector": { "kind": "model-id", "value": "gpt-5.6-sol" }, "effort": "xhigh", "unavailable": "defer", "evidence": "dispatch-receipt" }
+      },
+      "execution_phase": {
+        "claude": { "state": "default", "selector": { "kind": "alias", "value": "sonnet" }, "effort": "high", "unavailable": "defer", "evidence": "dispatch-receipt" },
+        "codex": { "state": "default", "selector": { "kind": "model-id", "value": "gpt-5.6-terra" }, "effort": "xhigh", "unavailable": "defer", "evidence": "dispatch-receipt" }
+      }
+    },
+    "mini": {
+      "design_phase": {
+        "claude": { "state": "default", "selector": { "kind": "alias", "value": "sonnet" }, "effort": "high", "unavailable": "defer", "evidence": "dispatch-receipt" },
+        "codex": { "state": "default", "selector": { "kind": "model-id", "value": "gpt-5.6-terra" }, "effort": "xhigh", "unavailable": "defer", "evidence": "dispatch-receipt" }
+      },
+      "execution_phase": {
+        "claude": { "state": "default", "selector": { "kind": "alias", "value": "sonnet" }, "effort": "high", "unavailable": "defer", "evidence": "dispatch-receipt" },
+        "codex": { "state": "default", "selector": { "kind": "model-id", "value": "gpt-5.6-terra" }, "effort": "xhigh", "unavailable": "defer", "evidence": "dispatch-receipt" }
+      }
+    }
+  },
+  "duties": {
+    "implement": {
+      "claude": { "state": "default", "selector": { "kind": "alias", "value": "sonnet" }, "effort": "medium", "unavailable": "defer", "evidence": "dispatch-receipt" },
+      "codex": { "state": "default", "selector": { "kind": "model-id", "value": "gpt-5.6-terra" }, "effort": "xhigh", "unavailable": "defer", "evidence": "dispatch-receipt" }
+    },
+    "mechanic": {
+      "claude": { "state": "opt-in", "selector": { "kind": "alias", "value": "sonnet" }, "effort": "low", "unavailable": "defer", "evidence": "dispatch-receipt" },
+      "codex": { "state": "opt-in", "selector": { "kind": "model-id", "value": "gpt-5.6-terra" }, "effort": "xhigh", "unavailable": "defer", "evidence": "dispatch-receipt" }
+    },
+    "deep": {
+      "claude": { "state": "opt-in", "selector": { "kind": "alias", "value": "sonnet" }, "effort": "xhigh", "unavailable": "defer", "evidence": "dispatch-receipt" },
+      "codex": { "state": "opt-in", "selector": { "kind": "model-id", "value": "gpt-5.6-terra" }, "effort": "xhigh", "unavailable": "defer", "evidence": "dispatch-receipt" }
+    },
+    "test_author": {
+      "claude": { "state": "opt-in", "selector": { "kind": "alias", "value": "sonnet" }, "effort": "xhigh", "unavailable": "defer", "evidence": "dispatch-receipt" },
+      "codex": { "state": "opt-in", "selector": { "kind": "model-id", "value": "gpt-5.6-terra" }, "effort": "xhigh", "unavailable": "defer", "evidence": "dispatch-receipt" }
+    },
+    "critic_normal": {
+      "claude": { "state": "default", "selector": { "kind": "alias", "value": "sonnet" }, "effort": "max", "unavailable": "defer", "evidence": "dispatch-receipt" },
+      "codex": { "state": "default", "selector": { "kind": "model-id", "value": "gpt-5.6-sol" }, "effort": "xhigh", "unavailable": "defer", "evidence": "dispatch-receipt" }
+    },
+    "critic_high_risk": {
+      "claude": { "state": "default", "selector": { "kind": "alias", "value": "fable" }, "effort": "max", "unavailable": "defer", "evidence": "dispatch-receipt" },
+      "codex": { "state": "default", "selector": { "kind": "model-id", "value": "gpt-5.6-sol" }, "effort": "max", "unavailable": "defer", "evidence": "dispatch-receipt" }
+    },
+    "readiness": {
+      "claude": { "state": "default", "selector": { "kind": "alias", "value": "fable" }, "effort": "xhigh", "unavailable": "defer", "evidence": "dispatch-receipt" },
+      "codex": { "state": "default", "selector": { "kind": "model-id", "value": "gpt-5.6-sol" }, "effort": "xhigh", "unavailable": "defer", "evidence": "dispatch-receipt" }
+    },
+    "advisory": {
+      "eligibility": { "epic": "required", "feature": "required", "mini": "disabled" },
+      "receipt": "pipeline.advisory-receipt.v1",
+      "claude": {
+        "state": "default",
+        "adapter": "native-fable",
+        "selector": { "kind": "alias", "value": "fable" },
+        "effort": "not-applicable",
+        "evidence": "advisory-receipt",
+        "fallbacks": [
+          { "adapter": "native-opus", "runner": "claude", "selector": { "kind": "alias", "value": "opus" }, "effort": "not-applicable", "when": "native-fable-repeated-failure" },
+          { "adapter": "consult", "runner": "claude", "selector": { "kind": "alias", "value": "fable" }, "isolation": "fresh-read-only", "when": "native-adapters-unavailable" }
+        ]
+      },
+      "codex": {
+        "state": "default",
+        "adapter": "consult",
+        "runner": "codex",
+        "selector": { "kind": "model-id", "value": "gpt-5.6-sol" },
+        "effort": "not-applicable",
+        "isolation": "fresh-read-only",
+        "evidence": "advisory-receipt"
+      }
+    }
+  },
+  "criticExportPolicy": {
+    "schema": "pipeline.critic-export-policy.v1",
+    "mode": "allowlisted",
+    "rules": [
+      {
+        "dataClass": "repository-candidate",
+        "provider": "anthropic",
+        "packetSchema": "pipeline.critic-candidate-packet.v1",
+        "packetBoundary": "candidate-diff-and-allowlisted-references",
+        "assuranceClass": "claude-native-bare-read-only"
+      },
+      {
+        "dataClass": "repository-candidate",
+        "provider": "anthropic",
+        "packetSchema": "pipeline.critic-candidate-packet.v1",
+        "packetBoundary": "candidate-diff-and-allowlisted-references",
+        "assuranceClass": "functional-equivalent-read-only; OS isolation not asserted"
+      },
+      {
+        "dataClass": "repository-candidate",
+        "provider": "openai",
+        "packetSchema": "pipeline.critic-candidate-packet.v1",
+        "packetBoundary": "candidate-diff-and-allowlisted-references",
+        "assuranceClass": "functional-equivalent-read-only; OS isolation not asserted"
+      }
+    ]
+  }
+}

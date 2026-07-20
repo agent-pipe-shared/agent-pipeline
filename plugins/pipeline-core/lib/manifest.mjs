@@ -12,7 +12,7 @@
  * with .claude/pipeline.json (project/verify/handover/autonomy/branchModel/verification/
  * wipLimit/worktree/claudeMdMaxLines/stakes/constraints/ritualExtensions -- calibration
  * concerns) vs. this manifest's fields (schema/phases/gates/security/modelRouting/
- * profiles/governance/flags -- declarative pipeline-shape concerns): disjoint sets,
+ * criticExport/profiles/governance/flags -- declarative pipeline-shape concerns): disjoint sets,
  * pipeline.json is untouched by this delivery.
  *
  * THREE-STAGE VALIDATION PIPELINE
@@ -57,6 +57,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { loadDocumentHooksPolicy, validateDocumentHooksRuntimeReadback } from "./document-hooks.mjs";
 import { parseYaml, YamlLiteError } from "./yaml-lite.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 
@@ -612,6 +613,38 @@ function checkSemantics(manifest, rootDir, now) {
   checkProfiles(manifest, errors);
   checkPhases(manifest, errors);
   checkReleaseIntegrity(manifest, errors, warnings);
+
+  const documentPolicy = loadDocumentHooksPolicy(rootDir, manifest);
+  const hasDocumentRuntime = Object.hasOwn(manifest, "documentHooks");
+  if (documentPolicy.status === "invalid") {
+    errors.push({
+      rule: "document-hooks-policy",
+      subject: "governance.policies_path/document-hooks.yaml",
+      message: `Document-hooks Policy is invalid (${documentPolicy.code}); no runtime projection is trusted.`,
+    });
+  } else if (documentPolicy.status === "absent" && hasDocumentRuntime) {
+    errors.push({
+      rule: "document-hooks-runtime",
+      subject: "documentHooks",
+      message: "Document-hooks runtime exists without the fixed repository Policy at governance.policies_path/document-hooks.yaml.",
+    });
+  } else if (documentPolicy.status === "ok" && !hasDocumentRuntime) {
+    errors.push({
+      rule: "document-hooks-runtime",
+      subject: "documentHooks",
+      message: "Document-hooks Policy is configured but its sanctioned runtime projection is absent.",
+    });
+  } else if (documentPolicy.status === "ok") {
+    try {
+      validateDocumentHooksRuntimeReadback(manifest.documentHooks, documentPolicy.runtime);
+    } catch {
+      errors.push({
+        rule: "document-hooks-runtime",
+        subject: "documentHooks",
+        message: "Document-hooks runtime is invalid or differs from the exact repository Policy bytes.",
+      });
+    }
+  }
 
   if (manifest.release) {
     const lockResult = loadPolicyLock(rootDir);

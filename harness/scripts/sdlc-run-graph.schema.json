@@ -1,0 +1,514 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.invalid/schemas/sdlc-run-graph.schema.json",
+  "title": "Backward-readable SDLC run graph and close evidence",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "externalEvidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "sha256"],
+        "properties": {
+          "id": { "type": "string" },
+          "sha256": { "type": "string" }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/$defs/resultV1" },
+    { "$ref": "#/$defs/resultV2" }
+  ],
+  "$defs": {
+    "resultV1": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["sdlcRunGraph", "sdlcRunGraphProjection", "phase26InvariantEvidence", "packageResults", "finalIntegrations", "decisionBriefs", "courseDecisionIntents", "courseDecisionReceipts", "externalEvidence"],
+      "properties": {
+        "sdlcRunGraph": { "$ref": "#/$defs/graph" },
+        "sdlcRunGraphProjection": { "$ref": "#/$defs/projection" },
+        "phase26InvariantEvidence": { "$ref": "#/$defs/invariantEvidence" },
+        "packageResults": { "type": "array" },
+        "finalIntegrations": { "type": "array" },
+        "decisionBriefs": { "type": "array" },
+        "courseDecisionIntents": { "type": "array" },
+        "courseDecisionReceipts": { "type": "array" },
+        "externalEvidence": { "type": "array", "items": { "$ref": "#/$defs/evidence" } }
+      }
+    },
+    "resultV2": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["status", "statusProjections", "sdlcRunGraph", "packageResults", "finalDeliveryEvidence", "packageBindings"],
+      "properties": {
+        "status": { "enum": ["candidate-handoff", "phase-close"] },
+        "statusProjections": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "items": { "$ref": "#/$defs/statusProjectionV2" },
+          "allOf": [
+            { "contains": { "properties": { "projection": { "const": "result" } } }, "minContains": 1, "maxContains": 1 },
+            { "contains": { "properties": { "projection": { "const": "state" } } }, "minContains": 1, "maxContains": 1 },
+            { "contains": { "properties": { "projection": { "const": "human" } } }, "minContains": 1, "maxContains": 1 },
+            { "contains": { "properties": { "projection": { "const": "package" } } }, "minContains": 1, "maxContains": 1 },
+            { "contains": { "properties": { "projection": { "const": "handoff" } } }, "minContains": 1, "maxContains": 1 }
+          ]
+        },
+        "sdlcRunGraph": { "$ref": "#/$defs/graphV2" },
+        "packageResults": {
+          "type": "array", "minItems": 1, "maxItems": 512,
+          "items": { "$ref": "#/$defs/packageResultV2" }
+        },
+        "finalDeliveryEvidence": { "$ref": "#/$defs/finalDeliveryEvidenceV2" },
+        "packageBindings": {
+          "type": "array", "minItems": 1, "maxItems": 512,
+          "items": { "$ref": "#/$defs/packageBindingV2" }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "required": ["sdlcRunGraph"],
+            "properties": {
+              "sdlcRunGraph": {
+                "required": ["completionClaim"],
+                "properties": { "completionClaim": { "const": "phase-close" } }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "packageResults": {
+                "items": {
+                  "allOf": [
+                    { "$ref": "#/$defs/packageResultV2" },
+                    {
+                      "required": ["delivery"],
+                      "properties": { "delivery": { "$ref": "#/$defs/successfulDeliveryV2" } }
+                    }
+                  ]
+                }
+              }
+            }
+          }
+        }
+      ]
+    },
+    "safeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "family": {
+      "enum": [
+        "initial-full-critic", "critic-correction", "delta-regate",
+        "product-retry", "environment-failover", "scope-course-stop",
+        "package-push-fetch-back"
+      ]
+    },
+    "edgeKind": { "enum": ["event", "back-edge", "reroute", "gate"] },
+    "sourceRef": {
+      "type": "object", "additionalProperties": false,
+      "required": ["collection", "id", "sha256"],
+      "properties": {
+        "collection": { "enum": ["packageResults", "finalIntegrations", "decisionBriefs", "courseDecisionIntents", "courseDecisionReceipts", "externalEvidence"] },
+        "id": { "$ref": "#/$defs/safeId" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "event": {
+      "type": "object", "additionalProperties": false,
+      "required": ["eventId", "sequence", "eventType", "outcome", "packageId", "actionId", "originChainId", "boundedFamily", "decisionBriefId", "sourceRefs"],
+      "properties": {
+        "eventId": { "$ref": "#/$defs/safeId" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "eventType": { "enum": ["start", "work", "critic", "correction", "verify", "retry", "failover", "gate", "po-decision", "push-fetch-back", "handoff", "close"] },
+        "outcome": { "enum": ["succeeded", "failed", "stopped", "deferred", "superseded"] },
+        "packageId": { "$ref": "#/$defs/safeId" },
+        "actionId": { "$ref": "#/$defs/safeId" },
+        "originChainId": { "$ref": "#/$defs/safeId" },
+        "boundedFamily": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/family" }] },
+        "decisionBriefId": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] },
+        "sourceRefs": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/sourceRef" } }
+      }
+    },
+    "edge": {
+      "type": "object", "additionalProperties": false,
+      "required": ["edgeId", "fromEventId", "toEventId", "kind", "boundedFamily", "loopStableId", "sourceRefs"],
+      "properties": {
+        "edgeId": { "$ref": "#/$defs/safeId" },
+        "fromEventId": { "$ref": "#/$defs/safeId" },
+        "toEventId": { "$ref": "#/$defs/safeId" },
+        "kind": { "$ref": "#/$defs/edgeKind" },
+        "boundedFamily": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/family" }] },
+        "loopStableId": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] },
+        "sourceRefs": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/sourceRef" } }
+      }
+    },
+    "familyInventory": {
+      "type": "object", "additionalProperties": false,
+      "required": ["family", "kind", "count", "disposition"],
+      "properties": {
+        "family": { "$ref": "#/$defs/family" },
+        "kind": { "$ref": "#/$defs/edgeKind" },
+        "count": { "type": "integer", "minimum": 0 },
+        "disposition": { "enum": ["executed", "not-triggered"] }
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "sha256"],
+      "properties": { "id": { "$ref": "#/$defs/safeId" }, "sha256": { "$ref": "#/$defs/sha256" } }
+    },
+    "attemptResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["attemptId", "resultSha256"],
+      "properties": { "attemptId": { "$ref": "#/$defs/safeId" }, "resultSha256": { "$ref": "#/$defs/sha256" } }
+    },
+    "loop": {
+      "type": "object", "additionalProperties": false,
+      "required": ["stableId", "family", "packageId", "actionId", "originChainId", "triggerEvidence", "attemptResultDigests", "normalizedFailureSignature", "similarityGroupId", "observedCount", "configuredLimit", "outcome", "exitReason", "decisionBriefId"],
+      "properties": {
+        "stableId": { "$ref": "#/$defs/safeId" },
+        "family": { "enum": ["critic-correction", "delta-regate", "product-retry"] },
+        "packageId": { "$ref": "#/$defs/safeId" },
+        "actionId": { "$ref": "#/$defs/safeId" },
+        "originChainId": { "$ref": "#/$defs/safeId" },
+        "triggerEvidence": { "type": "array", "minItems": 1, "maxItems": 32, "items": { "$ref": "#/$defs/evidence" } },
+        "attemptResultDigests": { "type": "array", "minItems": 1, "maxItems": 16, "items": { "$ref": "#/$defs/attemptResult" } },
+        "normalizedFailureSignature": { "$ref": "#/$defs/sha256" },
+        "similarityGroupId": { "$ref": "#/$defs/safeId" },
+        "observedCount": { "type": "integer", "minimum": 1 },
+        "configuredLimit": { "type": "integer", "minimum": 1 },
+        "outcome": { "enum": ["succeeded", "failed", "stopped", "deferred"] },
+        "exitReason": { "enum": ["corrected", "regate-pass", "retry-pass", "retry-failed", "budget-exhausted", "po-stop", "po-defer"] },
+        "decisionBriefId": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] }
+      }
+    },
+    "graph": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "featureId", "graphCutoffEventId", "sourceEventSetSha256", "completionClaim", "events", "edges", "boundedFamilies", "loopRecords"],
+      "properties": {
+        "schemaVersion": { "const": "pipeline.sdlc-run-graph.v1" },
+        "featureId": { "$ref": "#/$defs/safeId" },
+        "graphCutoffEventId": { "$ref": "#/$defs/safeId" },
+        "sourceEventSetSha256": { "$ref": "#/$defs/sha256" },
+        "completionClaim": { "enum": ["candidate-handoff", "phase-close"] },
+        "events": { "type": "array", "minItems": 1, "maxItems": 512, "items": { "$ref": "#/$defs/event" } },
+        "edges": { "type": "array", "maxItems": 1024, "items": { "$ref": "#/$defs/edge" } },
+        "boundedFamilies": { "type": "array", "minItems": 7, "maxItems": 7, "items": { "$ref": "#/$defs/familyInventory" } },
+        "loopRecords": { "type": "array", "maxItems": 128, "items": { "$ref": "#/$defs/loop" } }
+      }
+    },
+    "gitObjectIdV2": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+    "stageV2": {
+      "enum": [
+        "work", "stage-verify", "critic", "correction", "delta-regate",
+        "intent", "state-cas", "final-verify", "delivery", "fetch-back",
+        "close", "course", "failover"
+      ]
+    },
+    "outcomeV2": { "enum": ["succeeded", "failed", "stopped", "deferred", "superseded"] },
+    "eventV2": {
+      "type": "object", "additionalProperties": false,
+      "required": ["eventId", "cycleId", "sequence", "packageId", "actionId", "stage", "sourceEvidenceIds", "outcome"],
+      "properties": {
+        "eventId": { "$ref": "#/$defs/safeId" },
+        "cycleId": { "$ref": "#/$defs/safeId" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "packageId": { "$ref": "#/$defs/safeId" },
+        "actionId": { "$ref": "#/$defs/safeId" },
+        "stage": { "$ref": "#/$defs/stageV2" },
+        "sourceEvidenceIds": {
+          "type": "array", "minItems": 1, "maxItems": 64, "uniqueItems": true,
+          "items": { "$ref": "#/$defs/safeId" }
+        },
+        "candidateCommit": { "$ref": "#/$defs/gitObjectIdV2" },
+        "tree": { "$ref": "#/$defs/gitObjectIdV2" },
+        "faultDomain": { "enum": ["product", "execution-environment", "unknown"] },
+        "failureSignature": { "$ref": "#/$defs/sha256" },
+        "outcome": { "$ref": "#/$defs/outcomeV2" }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "stage": { "enum": ["work", "stage-verify", "critic", "correction", "delta-regate", "intent", "state-cas", "final-verify", "delivery", "fetch-back", "close"] } } },
+          "then": { "required": ["candidateCommit", "tree"] }
+        },
+        {
+          "if": { "anyOf": [{ "required": ["faultDomain"] }, { "required": ["failureSignature"] }] },
+          "then": { "required": ["faultDomain", "failureSignature"] }
+        },
+        {
+          "if": {
+            "anyOf": [
+              { "properties": { "outcome": { "const": "failed" } } },
+              { "properties": { "stage": { "const": "failover" } } }
+            ]
+          },
+          "then": { "required": ["faultDomain", "failureSignature"] }
+        },
+        {
+          "if": { "properties": { "stage": { "const": "failover" } } },
+          "then": { "properties": { "faultDomain": { "const": "execution-environment" } } }
+        },
+        {
+          "if": { "required": ["faultDomain", "failureSignature"] },
+          "then": {
+            "anyOf": [
+              { "properties": { "outcome": { "const": "failed" } } },
+              { "properties": { "stage": { "enum": ["course", "failover"] } } }
+            ]
+          }
+        }
+      ]
+    },
+    "cycleV2": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cycleId", "packageId", "sequence", "eventIds"],
+      "properties": {
+        "cycleId": { "$ref": "#/$defs/safeId" },
+        "packageId": { "$ref": "#/$defs/safeId" },
+        "sequence": { "type": "integer", "minimum": 0 },
+        "eventIds": {
+          "type": "array", "minItems": 1, "maxItems": 4096, "uniqueItems": true,
+          "items": { "$ref": "#/$defs/safeId" }
+        }
+      }
+    },
+    "loopAggregateV2": {
+      "type": "object", "additionalProperties": false,
+      "required": ["family", "count", "bound"],
+      "properties": {
+        "family": { "enum": ["critic-correction", "delta-regate", "product-retry", "environment-failover"] },
+        "count": { "type": "integer", "minimum": 0 },
+        "bound": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "graphV2": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schemaVersion", "featureId", "completionClaim", "cycles", "events", "loopAggregates"],
+      "properties": {
+        "schemaVersion": { "const": "pipeline.sdlc-run-graph.v2" },
+        "featureId": { "$ref": "#/$defs/safeId" },
+        "completionClaim": { "enum": ["candidate-handoff", "phase-close"] },
+        "cycles": { "type": "array", "minItems": 1, "maxItems": 512, "items": { "$ref": "#/$defs/cycleV2" } },
+        "events": { "type": "array", "minItems": 1, "maxItems": 4096, "items": { "$ref": "#/$defs/eventV2" } },
+        "loopAggregates": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "prefixItems": [
+            {
+              "allOf": [
+                { "$ref": "#/$defs/loopAggregateV2" },
+                { "properties": { "family": { "const": "critic-correction" }, "count": { "maximum": 3 }, "bound": { "const": 3 } } }
+              ]
+            },
+            {
+              "allOf": [
+                { "$ref": "#/$defs/loopAggregateV2" },
+                { "properties": { "family": { "const": "delta-regate" }, "count": { "maximum": 3 }, "bound": { "const": 3 } } }
+              ]
+            },
+            {
+              "allOf": [
+                { "$ref": "#/$defs/loopAggregateV2" },
+                { "properties": { "family": { "const": "product-retry" }, "count": { "maximum": 1 }, "bound": { "const": 1 } } }
+              ]
+            },
+            {
+              "allOf": [
+                { "$ref": "#/$defs/loopAggregateV2" },
+                { "properties": { "family": { "const": "environment-failover" }, "count": { "maximum": 1 }, "bound": { "const": 1 } } }
+              ]
+            }
+          ],
+          "items": false
+        }
+      }
+    },
+    "statusProjectionV2": {
+      "type": "object", "additionalProperties": false,
+      "required": ["projection", "status", "sourceEvidenceId", "sha256"],
+      "properties": {
+        "projection": { "enum": ["result", "state", "human", "package", "handoff"] },
+        "status": { "enum": ["candidate-handoff", "phase-close"] },
+        "sourceEvidenceId": { "$ref": "#/$defs/safeId" },
+        "sha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "correctionRecordV2": {
+      "type": "object", "additionalProperties": true,
+      "required": ["correctionId", "actionId"],
+      "properties": {
+        "correctionId": { "$ref": "#/$defs/safeId" },
+        "actionId": { "$ref": "#/$defs/safeId" }
+      }
+    },
+    "deltaReceiptV2": {
+      "type": "object", "additionalProperties": true,
+      "required": ["receiptId", "actionId"],
+      "properties": {
+        "receiptId": { "$ref": "#/$defs/safeId" },
+        "actionId": { "$ref": "#/$defs/safeId" }
+      }
+    },
+    "successfulDeliveryV2": {
+      "type": "object", "additionalProperties": false,
+      "required": ["outcome", "deliveryReceiptId", "fetchBackReceiptId", "pushedOid", "fetchedOid"],
+      "properties": {
+        "outcome": { "const": "succeeded" },
+        "deliveryReceiptId": { "$ref": "#/$defs/safeId" },
+        "fetchBackReceiptId": { "$ref": "#/$defs/safeId" },
+        "pushedOid": { "$ref": "#/$defs/gitObjectIdV2" },
+        "fetchedOid": { "$ref": "#/$defs/gitObjectIdV2" }
+      }
+    },
+    "unsuccessfulDeliveryV2": {
+      "type": "object", "additionalProperties": true,
+      "required": ["outcome"],
+      "properties": {
+        "outcome": { "enum": ["failed", "stopped", "deferred", "superseded"] }
+      }
+    },
+    "packageResultV2": {
+      "type": "object", "additionalProperties": true,
+      "required": ["id", "actionId", "resultEvidenceId", "candidateCommit", "correctionRecords", "deltaReceipts"],
+      "properties": {
+        "id": { "$ref": "#/$defs/safeId" },
+        "actionId": { "$ref": "#/$defs/safeId" },
+        "resultEvidenceId": { "$ref": "#/$defs/safeId" },
+        "candidateCommit": { "$ref": "#/$defs/gitObjectIdV2" },
+        "correctionRecords": {
+          "type": "array", "maxItems": 3,
+          "items": { "$ref": "#/$defs/correctionRecordV2" }
+        },
+        "deltaReceipts": {
+          "type": "array", "maxItems": 3,
+          "items": { "$ref": "#/$defs/deltaReceiptV2" }
+        },
+        "delivery": {
+          "oneOf": [
+            { "$ref": "#/$defs/successfulDeliveryV2" },
+            { "$ref": "#/$defs/unsuccessfulDeliveryV2" }
+          ]
+        }
+      }
+    },
+    "finalDeliveryEvidenceV2": {
+      "type": "object", "additionalProperties": false,
+      "required": ["finalDeliveryEvidenceId", "candidateCommit", "tree", "verifyCommand", "verifyResultDigest", "privacyDisposition", "securityDisposition", "approvedTarget", "pushedOid", "fetchedOid"],
+      "properties": {
+        "finalDeliveryEvidenceId": { "$ref": "#/$defs/safeId" },
+        "candidateCommit": { "$ref": "#/$defs/gitObjectIdV2" },
+        "tree": { "$ref": "#/$defs/gitObjectIdV2" },
+        "verifyCommand": { "type": "string", "minLength": 1, "maxLength": 1024 },
+        "verifyResultDigest": { "$ref": "#/$defs/sha256" },
+        "privacyDisposition": { "$ref": "#/$defs/safeId" },
+        "securityDisposition": { "$ref": "#/$defs/safeId" },
+        "approvedTarget": { "type": "string", "minLength": 1, "maxLength": 256, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$" },
+        "pushedOid": { "$ref": "#/$defs/gitObjectIdV2" },
+        "fetchedOid": { "$ref": "#/$defs/gitObjectIdV2" }
+      }
+    },
+    "packageBindingV2": {
+      "type": "object", "additionalProperties": false,
+      "required": ["packageId", "packageSha256", "terminalCycleId", "terminalEventId", "finalDeliveryEvidenceId"],
+      "properties": {
+        "packageId": { "$ref": "#/$defs/safeId" },
+        "packageSha256": { "$ref": "#/$defs/sha256" },
+        "terminalCycleId": { "$ref": "#/$defs/safeId" },
+        "terminalEventId": { "$ref": "#/$defs/safeId" },
+        "finalDeliveryEvidenceId": { "$ref": "#/$defs/safeId" }
+      }
+    },
+    "projection": {
+      "type": "object", "additionalProperties": false,
+      "required": ["generatorVersion", "graphSha256", "mermaidSha256"],
+      "properties": {
+        "generatorVersion": { "const": "pipeline-sdlc-mermaid.v1" },
+        "graphSha256": { "$ref": "#/$defs/sha256" },
+        "mermaidSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "measurement": {
+      "type": "object", "additionalProperties": false,
+      "required": ["sampleCount", "samplesMs", "p95Ms", "limitMs"],
+      "properties": {
+        "sampleCount": { "type": "integer", "minimum": 5, "maximum": 50 },
+        "samplesMs": { "type": "array", "minItems": 5, "maxItems": 50, "items": { "type": "integer", "minimum": 0 } },
+        "p95Ms": { "type": "integer", "minimum": 0 },
+        "limitMs": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "invariantEvidence": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "packageId", "earlySmoke", "scope", "performance", "executionRouting", "legacyLedgerExemptions"],
+      "properties": {
+        "schema": { "const": "pipeline.phase26-invariant-evidence.v1" },
+        "packageId": { "const": "P2.6-P5" },
+        "earlySmoke": {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "namedCapabilityId", "elapsedFromImplementationStartMs", "cumulativeLiveMs", "plannedPathCount", "changedPathCountBeforeSmoke", "evidenceId", "evidenceSha256"],
+          "properties": {
+            "status": { "const": "pass" }, "namedCapabilityId": { "$ref": "#/$defs/safeId" },
+            "elapsedFromImplementationStartMs": { "type": "integer", "minimum": 0, "maximum": 3600000 },
+            "cumulativeLiveMs": { "type": "integer", "minimum": 0, "maximum": 900000 },
+            "plannedPathCount": { "type": "integer", "minimum": 1 },
+            "changedPathCountBeforeSmoke": { "type": "integer", "minimum": 0 },
+            "evidenceId": { "$ref": "#/$defs/safeId" },
+            "evidenceSha256": { "$ref": "#/$defs/sha256" }
+          }
+        },
+        "scope": {
+          "type": "object", "additionalProperties": false,
+          "required": ["plannedPathCount", "actualPathCount", "plannedAcceptanceCriteriaCount", "actualAcceptanceCriteriaCount", "newTrustBoundaries", "deltaDisposition", "decisionBriefId"],
+          "properties": {
+            "plannedPathCount": { "type": "integer", "minimum": 1 }, "actualPathCount": { "type": "integer", "minimum": 0 },
+            "plannedAcceptanceCriteriaCount": { "type": "integer", "minimum": 1 }, "actualAcceptanceCriteriaCount": { "type": "integer", "minimum": 0 },
+            "newTrustBoundaries": { "type": "array", "maxItems": 32, "uniqueItems": true, "items": { "$ref": "#/$defs/safeId" } },
+            "deltaDisposition": { "enum": ["not-required", "approved"] },
+            "decisionBriefId": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] }
+          }
+        },
+        "performance": {
+          "type": "object", "additionalProperties": false,
+          "required": ["method", "targetedVerify", "fullVerify", "ledgerWriter"],
+          "properties": {
+            "method": { "const": "repeated-monotonic-wall-clock-ms.v1" },
+            "targetedVerify": { "$ref": "#/$defs/measurement" },
+            "fullVerify": { "$ref": "#/$defs/measurement" },
+            "ledgerWriter": { "$ref": "#/$defs/measurement" }
+          }
+        },
+        "executionRouting": {
+          "type": "object", "additionalProperties": false,
+          "required": ["status", "requestedDuty", "requiredSelector", "requiredEffort", "routeReceiptEvidenceId", "routeReceiptEvidenceSha256", "phase3Disposition"],
+          "properties": {
+            "status": { "enum": ["attested", "unattested-nonconformance"] },
+            "requestedDuty": { "const": "codex_implementation" },
+            "requiredSelector": { "const": "terra" },
+            "requiredEffort": { "const": "xhigh" },
+            "routeReceiptEvidenceId": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/safeId" }] },
+            "routeReceiptEvidenceSha256": { "oneOf": [{ "type": "null" }, { "$ref": "#/$defs/sha256" }] },
+            "phase3Disposition": { "enum": ["none", "mandatory-dispatch-attestation"] }
+          }
+        },
+        "legacyLedgerExemptions": {
+          "type": "array",
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["packageId", "packageSha256", "historicResultCommit", "reason"],
+            "properties": {
+              "packageId": { "$ref": "#/$defs/safeId" },
+              "packageSha256": { "$ref": "#/$defs/sha256" },
+              "historicResultCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+              "reason": { "const": "pre-p5-result-schema" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

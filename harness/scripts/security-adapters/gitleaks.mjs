@@ -70,6 +70,25 @@ export function isInstalled(env = process.env) {
   return resolveBinary(env);
 }
 
+function spawnFailure(error) {
+  if (error?.code === "EPERM" || error?.code === "EACCES") {
+    return {
+      status: "ERROR",
+      classification: "execution_environment",
+      findings: [],
+      raw: null,
+      reason: `gitleaks could not start (${error.code}): execution environment blocks Node child processes; this is not a missing scanner or finding`,
+    };
+  }
+  return {
+    status: "ERROR",
+    classification: "scanner_error",
+    findings: [],
+    raw: null,
+    reason: `spawn error: ${error?.message ?? "unknown error"}`,
+  };
+}
+
 function cleanupTmp(tmpDir) {
   try {
     rmSync(tmpDir, { recursive: true, force: true });
@@ -83,19 +102,19 @@ function cleanupTmp(tmpDir) {
  * resolution; otherwise resolves via `env` (defaults to process.env). `spawnFn` defaults to
  * node:child_process's real spawnSync -- injectable so tests can point it at a fixture
  * "binary" (see security-scan.test.mjs) while production always uses the real spawnSync
- * with `shell` left at its default `false` (a real gitleaks binary never needs a shell).
+ * with explicit `shell: false` (a real gitleaks binary never needs a shell).
  */
 export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeoutMs = 60000, env = process.env }) {
   const resolved = config.binaryPath ? { installed: true, path: config.binaryPath } : resolveBinary(env);
   if (!resolved.installed) {
-    return { status: "SKIPPED", findings: [], raw: null, reason: resolved.reason };
+    return { status: "SKIPPED", classification: "binary_missing", findings: [], raw: null, reason: resolved.reason };
   }
 
   let tmpDir;
   try {
     tmpDir = mkdtempSync(pathJoin(tmpdir(), "pipeline-gitleaks-"));
   } catch (err) {
-    return { status: "ERROR", findings: [], raw: null, reason: `could not create temp report dir: ${err.message}` };
+    return { status: "ERROR", classification: "scanner_error", findings: [], raw: null, reason: `could not create temp report dir: ${err.message}` };
   }
   const reportPath = pathJoin(tmpDir, "report.json");
 
@@ -114,24 +133,25 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
 
   let res;
   try {
-    res = spawnFn(resolved.path, args, { cwd: rootDir, encoding: "utf8", timeout: timeoutMs });
+    res = spawnFn(resolved.path, args, { cwd: rootDir, encoding: "utf8", timeout: timeoutMs, shell: false });
   } catch (err) {
     cleanupTmp(tmpDir);
-    return { status: "ERROR", findings: [], raw: null, reason: `spawn threw: ${err.message}` };
+    return spawnFailure(err);
   }
 
   if (res.error && res.error.code === "ETIMEDOUT") {
     cleanupTmp(tmpDir);
-    return { status: "ERROR", findings: [], raw: null, reason: `gitleaks timed out after ${timeoutMs}ms` };
+    return { status: "ERROR", classification: "scanner_error", findings: [], raw: null, reason: `gitleaks timed out after ${timeoutMs}ms` };
   }
   if (res.error) {
     cleanupTmp(tmpDir);
-    return { status: "ERROR", findings: [], raw: null, reason: `spawn error: ${res.error.message}` };
+    return spawnFailure(res.error);
   }
   if (res.status !== 0) {
     cleanupTmp(tmpDir);
     return {
       status: "ERROR",
+      classification: "scanner_error",
       findings: [],
       raw: res.stdout ?? null,
       reason: `gitleaks exited ${res.status} (expected 0 due to --exit-code 0): ${(res.stderr || "").trim().slice(0, 500)}`,
@@ -143,7 +163,7 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
     raw = readFileSync(reportPath, "utf8");
   } catch (err) {
     cleanupTmp(tmpDir);
-    return { status: "ERROR", findings: [], raw: null, reason: `report file not readable: ${err.message}` };
+    return { status: "ERROR", classification: "scanner_error", findings: [], raw: null, reason: `report file not readable: ${err.message}` };
   }
 
   let parsed;
@@ -151,12 +171,22 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
     parsed = JSON.parse(raw);
   } catch (err) {
     cleanupTmp(tmpDir);
-    return { status: "ERROR", findings: [], raw, reason: `unparseable gitleaks report JSON: ${err.message}` };
+    return { status: "ERROR", classification: "scanner_error", findings: [], raw, reason: `unparseable gitleaks report JSON: ${err.message}` };
+  }
+
+  if (!Array.isArray(parsed)) {
+    cleanupTmp(tmpDir);
+    return {
+      status: "ERROR",
+      classification: "scanner_error",
+      findings: [],
+      raw,
+      reason: "unexpected gitleaks report JSON shape (expected top-level array)",
+    };
   }
   cleanupTmp(tmpDir);
 
-  const findingsArr = Array.isArray(parsed) ? parsed : [];
-  const findings = findingsArr.map((f) => ({
+  const findings = parsed.map((f) => ({
     tool: name,
     severity: "high", // fixed mapping -- see header (gitleaks has no native severity field)
     rule: f?.RuleID ?? f?.rule ?? "unknown-rule",
@@ -165,5 +195,5 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
     msg: f?.Description ?? f?.description ?? f?.Message ?? "secret detected",
   }));
 
-  return { status: findings.length > 0 ? "FINDINGS" : "PASS", findings, raw };
+  return { status: findings.length > 0 ? "FINDINGS" : "PASS", classification: findings.length > 0 ? "findings" : "success", findings, raw };
 }

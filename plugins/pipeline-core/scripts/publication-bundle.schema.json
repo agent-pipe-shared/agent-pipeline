@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.publication-channel.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "channel", "transactionId", "revision", "priorStateSha256", "phase",
+    "repositoryFingerprint", "sourceCommit", "sourceTree", "remoteFingerprint", "remoteName",
+    "destinationRef", "remotePreimageOid", "candidateOid", "candidateTree", "ancestry",
+    "identityProbe", "verifyEvidence", "securityEvidence", "neutralEvidence", "approval",
+    "pushIntent", "observation", "readback", "reason", "receiptDigest"
+  ],
+  "properties": {
+    "schema": { "const": "pipeline.publication-channel.v1" },
+    "channel": { "enum": ["private", "neutral-public"] },
+    "transactionId": { "type": "string", "pattern": "^[A-Za-z0-9._:@/-]{1,200}$" },
+    "revision": { "type": "integer", "minimum": 0 },
+    "priorStateSha256": { "$ref": "#/$defs/nullableSha256" },
+    "phase": { "enum": ["prepared", "approved", "push-authorized", "pushed-observed", "readback-running", "closed", "reapproval-required", "blocked-recovery"] },
+    "repositoryFingerprint": { "$ref": "#/$defs/sha256" },
+    "sourceCommit": { "$ref": "#/$defs/oid" },
+    "sourceTree": { "$ref": "#/$defs/oid" },
+    "remoteFingerprint": { "$ref": "#/$defs/sha256" },
+    "remoteName": { "type": "string", "pattern": "^[A-Za-z0-9._:@/-]{1,200}$" },
+    "destinationRef": { "type": "string", "pattern": "^refs/heads/[A-Za-z0-9._/-]+$" },
+    "remotePreimageOid": { "oneOf": [{ "$ref": "#/$defs/oid" }, { "type": "null" }] },
+    "candidateOid": { "$ref": "#/$defs/oid" },
+    "candidateTree": { "$ref": "#/$defs/oid" },
+    "ancestry": { "$ref": "#/$defs/ancestry" },
+    "identityProbe": { "$ref": "#/$defs/evidence" },
+    "verifyEvidence": { "$ref": "#/$defs/evidence" },
+    "securityEvidence": { "$ref": "#/$defs/evidence" },
+    "neutralEvidence": { "oneOf": [{ "$ref": "#/$defs/neutralEvidence" }, { "type": "null" }] },
+    "approval": { "oneOf": [{ "$ref": "#/$defs/approval" }, { "type": "null" }] },
+    "pushIntent": { "oneOf": [{ "$ref": "#/$defs/pushIntent" }, { "type": "null" }] },
+    "observation": { "oneOf": [{ "$ref": "#/$defs/observation" }, { "type": "null" }] },
+    "readback": { "oneOf": [{ "$ref": "#/$defs/readback" }, { "type": "null" }] },
+    "reason": { "type": ["string", "null"] },
+    "receiptDigest": { "$ref": "#/$defs/nullableSha256" }
+  },
+  "allOf": [
+    { "if": { "properties": { "channel": { "const": "private" } } }, "then": { "properties": { "neutralEvidence": { "type": "null" } } } },
+    { "if": { "properties": { "channel": { "const": "neutral-public" } } }, "then": { "properties": { "neutralEvidence": { "$ref": "#/$defs/neutralEvidence" } } } },
+    { "if": { "properties": { "phase": { "const": "closed" } } }, "then": { "properties": { "receiptDigest": { "$ref": "#/$defs/sha256" } } }, "else": { "properties": { "receiptDigest": { "type": "null" } } } }
+  ],
+  "$defs": {
+    "oid": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "nullableSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+    "ancestry": { "type": "object", "additionalProperties": false, "required": ["baseOid", "candidateOid", "descends"], "properties": { "baseOid": { "oneOf": [{ "$ref": "#/$defs/oid" }, { "type": "null" }] }, "candidateOid": { "$ref": "#/$defs/oid" }, "descends": { "const": true } } },
+    "evidence": { "type": "object", "additionalProperties": false, "required": ["path", "rawDigest", "commit", "tree"], "properties": { "path": { "type": "string", "minLength": 1 }, "rawDigest": { "$ref": "#/$defs/sha256" }, "commit": { "$ref": "#/$defs/oid" }, "tree": { "$ref": "#/$defs/oid" } } },
+    "neutralEvidence": { "type": "object", "additionalProperties": false, "required": ["planDigest", "reviewDigest", "leakageDigest", "metadataDigest", "endpointProbeDigest", "candidateCommit", "candidateTree"], "properties": { "planDigest": { "$ref": "#/$defs/sha256" }, "reviewDigest": { "$ref": "#/$defs/sha256" }, "leakageDigest": { "$ref": "#/$defs/sha256" }, "metadataDigest": { "$ref": "#/$defs/sha256" }, "endpointProbeDigest": { "$ref": "#/$defs/sha256" }, "candidateCommit": { "$ref": "#/$defs/oid" }, "candidateTree": { "$ref": "#/$defs/oid" } } },
+    "approval": { "type": "object", "additionalProperties": false, "required": ["id", "attribution", "approvedAt", "expiresAt", "tupleDigest", "consumedAt"], "properties": { "id": { "type": "string" }, "attribution": { "type": "string" }, "approvedAt": { "type": "integer" }, "expiresAt": { "type": "integer" }, "tupleDigest": { "$ref": "#/$defs/sha256" }, "consumedAt": { "type": ["integer", "null"] } } },
+    "pushIntent": { "type": "object", "additionalProperties": false, "required": ["command", "authorizedAt", "approvalId", "tupleDigest"], "properties": { "command": { "type": "array", "items": { "type": "string" } }, "authorizedAt": { "type": "integer" }, "approvalId": { "type": "string" }, "tupleDigest": { "$ref": "#/$defs/sha256" } } },
+    "observation": { "type": "object", "additionalProperties": false, "required": ["status", "outcome", "oid", "observedAt"], "properties": { "status": { "enum": ["observed", "unknown", "authentication", "multiple"] }, "outcome": { "enum": ["candidate", "preimage", "conflict", "uncertain"] }, "oid": { "oneOf": [{ "$ref": "#/$defs/oid" }, { "type": "null" }] }, "observedAt": { "type": "integer" } } },
+    "readback": { "type": "object", "additionalProperties": false, "required": ["repositoryKind", "alternatesDisabled", "destinationRef", "oid", "tree", "completedAt"], "properties": { "repositoryKind": { "const": "fresh-disposable" }, "alternatesDisabled": { "const": true }, "destinationRef": { "type": "string" }, "oid": { "oneOf": [{ "$ref": "#/$defs/oid" }, { "type": "null" }] }, "tree": { "oneOf": [{ "$ref": "#/$defs/oid" }, { "type": "null" }] }, "completedAt": { "type": ["integer", "null"] } } }
+  }
+}

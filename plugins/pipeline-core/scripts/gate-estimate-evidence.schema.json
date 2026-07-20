@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.gate-estimate-evidence.v1",
+  "type": "object",
+  "required": ["schema", "featureId", "gate", "observedAt", "basis", "note"],
+  "properties": {
+    "schema": { "const": "pipeline.gate-estimate-evidence.v1" },
+    "featureId": { "type": "string" },
+    "gate": { "enum": ["prd", "security", "merge"] },
+    "observedAt": { "type": "string" },
+    "basis": { "type": "array", "minItems": 1, "items": { "type": "object" } },
+    "note": { "type": "string", "maxLength": 2000 }
+  },
+  "additionalProperties": false
+}

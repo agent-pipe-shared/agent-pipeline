@@ -6,8 +6,9 @@
 
 - [ ] Stage 1 green: verify passed + evidence artifact exists (no Critic on red builds)
 - [ ] Trigger row determined (`harness/review-protocol.md` §2.1) and recorded for the gate decision
+- [ ] Ownership annotation reconciled against the caller-held authoritative mandatory-check inventory: deterministic verify / semantic Critic / trajectory Critic / human risk; any exact assertion-fingerprint overlap is reported, never used to remove a check
 - [ ] Model per row: the review-tier model standard · escalate to a higher-capability model for risk class high or any architecture/guardrail/security diff (MP-07)
-- [ ] Isolation: A/G/S diff → `--bare` + JSON-schema verdict MANDATORY; otherwise read-only subagent
+- [ ] Isolation: A/G/S/T1 → selected runner's usable native isolation + JSON-schema-shaped verdict. If that isolation is technically unavailable or unusable in the current host setup, use the standing PO-authorized functional equivalent: **one** fresh independently briefed Critic, no chat/history or implementer reasoning, refs-only bounded input, strict read-only/no-write/no-subdelegation, fixed candidate commit/diff, higher-capability route, and literal assurance `functional-equivalent-read-only; OS isolation not asserted`. Never silently substitute another runner; inability to provide this contract → PO course gate.
 - [ ] Dispatch contains ONLY paths/refs + metadata: spec path, diff ref, guardrail paths, evidence path, rigor/risk, trigger row, regelwerk SHA — no justifications, no chat history, no prior verdicts
 - [ ] Uncommitted review target (B6): exact reviewed diff archived as an evidence artifact BEFORE dispatch (`git diff` snapshot, path named in the dispatch) — reviews stay reproducible and A/B-testable
 
@@ -15,6 +16,7 @@
 
 - [ ] Construct your input YOURSELF: run `git diff`, read spec + guardrails + evidence — nothing else
 - [ ] Read-only bootstrap confirmed (write tools absent; else abort)
+- [ ] T1 assurance recorded: runner-native evidence, or exactly `functional-equivalent-read-only; OS isolation not asserted`; no OS-isolation or effective-model-identity claim
 - [ ] Search harshly, report honestly — findings only with evidence
 - [ ] Per finding: Gap · Risk (blocker/major/minor) · Evidence `file:line` · Spec/guardrail ref
 - [ ] Trajectory section: were claimed checks actually executed per evidence (command + commit state + exit code)?
@@ -33,6 +35,7 @@
 - [ ] Findings failing the evidence bar or skip rule rejected with a short note
 - [ ] EVERY blocker/major dispositioned: fix (fresh rework dispatch) / reject with justification / escalate to the PO
 - [ ] Before re-dispatch: harness checklist first — briefing? context? tools/permissions? hooks? (G2/P1)
-- [ ] Rework = new dispatch, fresh context, refined briefing; max 2 cycles, then the PO (mandatory)
+- [ ] Rework = fresh local dispatch, fresh context, refined briefing; max 3 local cycles, and open the PO course gate only when a further correction would exceed that budget (>3)
 - [ ] Re-review after rework by a NEW fresh Critic where triggers still apply — never reuse a Critic context
 - [ ] Gate decision recorded: trigger row, dispositions, cycle count; telemetry line for the Critic run
+- [ ] Shadow metrics, when available, bind this gate/cycle to exact candidate and tool/runner/schema versions; unavailable values are `unknown`, never zero, and do not change the verdict

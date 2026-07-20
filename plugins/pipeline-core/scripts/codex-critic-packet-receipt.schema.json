@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.codex-critic-receipt.v1",
+  "type": "object",
+  "required": ["schema", "packetId", "packetDigest", "candidate", "route", "assurance", "residualRisks", "liveness", "verdict", "reviewPass"],
+  "properties": {
+    "schema": { "const": "pipeline.codex-critic-receipt.v1" },
+    "packetId": { "type": "string" },
+    "packetDigest": { "type": "string" },
+    "candidate": { "type": "object" },
+    "route": { "type": "object" },
+    "assurance": { "const": "functional-equivalent-read-only; OS isolation not asserted" },
+    "residualRisks": { "type": "array", "items": { "type": "string" } },
+    "liveness": { "type": "object" },
+    "verdict": { "type": "object" },
+    "reviewPass": { "type": "boolean" }
+  },
+  "additionalProperties": false
+}

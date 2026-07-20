@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.publication-close-journal.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "lifecycleId", "revision", "priorStateSha256", "phase", "candidateOid", "candidateTree", "authority", "effects"],
+  "properties": {
+    "schema": { "const": "pipeline.publication-close-journal.v1" },
+    "lifecycleId": { "type": "string", "pattern": "^[A-Za-z0-9._-]{1,100}$" },
+    "revision": { "type": "integer", "minimum": 0 },
+    "priorStateSha256": { "$ref": "#/$defs/nullableSha256" },
+    "phase": { "enum": ["pending", "implementation-result-bound", "feature-closed", "backlog-closed", "close-block-committed", "final-verify-green", "delivery-authorized"] },
+    "candidateOid": { "$ref": "#/$defs/oid" }, "candidateTree": { "$ref": "#/$defs/oid" },
+    "authority": { "$ref": "#/$defs/authority" }, "effects": { "type": "array", "maxItems": 6, "items": { "$ref": "#/$defs/effect" } }
+  },
+  "$defs": {
+    "oid": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" }, "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "nullableSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+    "authority": { "type": "object", "additionalProperties": false, "required": ["implementationResultDigest", "prdDigest", "specDigests", "verifyDigest", "criticDigest", "d2ReceiptDigest", "privateIntentDigest", "publicIntentDigest"], "properties": { "implementationResultDigest": { "$ref": "#/$defs/sha256" }, "prdDigest": { "$ref": "#/$defs/sha256" }, "specDigests": { "type": "array", "minItems": 6, "maxItems": 6, "items": { "$ref": "#/$defs/sha256" } }, "verifyDigest": { "$ref": "#/$defs/sha256" }, "criticDigest": { "$ref": "#/$defs/sha256" }, "d2ReceiptDigest": { "$ref": "#/$defs/sha256" }, "privateIntentDigest": { "$ref": "#/$defs/sha256" }, "publicIntentDigest": { "$ref": "#/$defs/sha256" } } },
+    "effect": { "type": "object", "additionalProperties": false, "required": ["phase", "inputDigest", "observedDigest"], "properties": { "phase": { "enum": ["implementation-result-bound", "feature-closed", "backlog-closed", "close-block-committed", "final-verify-green", "delivery-authorized"] }, "inputDigest": { "$ref": "#/$defs/sha256" }, "observedDigest": { "$ref": "#/$defs/sha256" } } }
+  }
+}

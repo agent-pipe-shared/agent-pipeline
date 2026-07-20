@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.internal/schemas/codex-isolated-critic-journal.schema.json",
+  "title": "Isolated Codex Critic replay journal",
+  "type": "object",
+  "required": ["schema", "revision", "priorRawSha256", "request", "requestSha256", "phase", "events", "streams", "verdict", "cleanup", "terminal", "createdAtMs", "updatedAtMs"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.codex-isolated-critic-journal.v1"] },
+    "revision": { "type": "integer", "minimum": 0 },
+    "priorRawSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+    "request": { "$ref": "codex-isolated-critic-request.schema.json" },
+    "requestSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "phase": { "type": "string", "enum": ["prepared", "sandbox-started", "thread-started", "turn-started", "semantic-progress", "verdict-received", "validated", "cleanup", "complete"] },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["sequence", "type", "observedAtMs", "previousHash", "body", "eventHash"],
+        "additionalProperties": false,
+        "properties": {
+          "sequence": { "type": "integer", "minimum": 1 },
+          "type": { "type": "string", "enum": ["prepared", "sandbox-started", "thread-started", "turn-started", "semantic-progress", "verdict-received", "validated", "cleanup", "complete"] },
+          "observedAtMs": { "type": "integer", "minimum": 0 },
+          "previousHash": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+          "body": { "type": "object" },
+          "eventHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        },
+        "allOf": [
+          { "if": { "properties": { "type": { "const": "prepared" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/preparedBody" } } } },
+          { "if": { "properties": { "type": { "enum": ["sandbox-started", "thread-started", "turn-started"] } } }, "then": { "properties": { "body": { "$ref": "#/$defs/lifecycleBody" } } } },
+          { "if": { "properties": { "type": { "const": "semantic-progress" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/semanticBody" } } } },
+          { "if": { "properties": { "type": { "const": "verdict-received" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/verdictReceivedBody" } } } },
+          { "if": { "properties": { "type": { "const": "validated" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/validatedBody" } } } },
+          { "if": { "properties": { "type": { "const": "cleanup" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/cleanupBody" } } } },
+          { "if": { "properties": { "type": { "const": "complete" } } }, "then": { "properties": { "body": { "$ref": "#/$defs/terminalBody" } } } }
+        ]
+      }
+    },
+    "streams": {
+      "type": "object",
+      "required": ["stdoutBytes", "stderrBytes", "stdoutLastChunk", "stderrLastChunk"],
+      "additionalProperties": false,
+      "properties": {
+        "stdoutBytes": { "type": "integer", "minimum": 0, "maximum": 1048576 },
+        "stderrBytes": { "type": "integer", "minimum": 0, "maximum": 1048576 },
+        "stdoutLastChunk": {
+          "oneOf": [
+            { "$ref": "#/$defs/outputChunk" },
+            { "type": "null" }
+          ]
+        },
+        "stderrLastChunk": {
+          "oneOf": [
+            { "$ref": "#/$defs/outputChunk" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "verdict": {
+      "type": "object",
+      "required": ["status", "rawSha256", "size", "reviewPass"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string", "enum": ["absent", "bytes-observed", "received", "validated"] },
+        "rawSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "size": { "type": "integer", "minimum": 0, "maximum": 1048576 },
+        "reviewPass": { "type": ["boolean", "null"] }
+      }
+    },
+    "cleanup": {
+      "oneOf": [
+        { "$ref": "#/$defs/cleanupBody" },
+        { "type": "null" }
+      ]
+    },
+    "terminal": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["code"],
+          "additionalProperties": false,
+          "properties": {
+            "code": { "$ref": "#/$defs/terminalCode" }
+          }
+        },
+        { "type": "null" }
+      ]
+    },
+    "createdAtMs": { "type": "integer", "minimum": 0 },
+    "updatedAtMs": { "type": "integer", "minimum": 0 }
+  },
+  "$defs": {
+    "digest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "phaseBeforeCleanup": { "type": "string", "enum": ["prepared", "sandbox-started", "thread-started", "turn-started", "semantic-progress", "verdict-received", "validated"] },
+    "cleanupStatus": { "type": "string", "enum": ["not-needed", "attempted-complete", "attempted-failed", "refused-not-owned"] },
+    "terminalCode": { "type": "string", "enum": ["verdict-success", "verdict-schema-error", "permission-denial", "sandbox-setup-error", "child-stdio-error", "lifecycle-stall", "timeout", "coordinator-cleanup"] },
+    "outputChunk": {
+      "type": "object",
+      "required": ["startOffset", "byteLength", "rawSha256"],
+      "additionalProperties": false,
+      "properties": {
+        "startOffset": { "type": "integer", "minimum": 0 },
+        "byteLength": { "type": "integer", "minimum": 1, "maximum": 1048576 },
+        "rawSha256": { "$ref": "#/$defs/digest" }
+      }
+    },
+    "preparedBody": {
+      "type": "object",
+      "required": ["requestSha256"],
+      "additionalProperties": false,
+      "properties": { "requestSha256": { "$ref": "#/$defs/digest" } }
+    },
+    "lifecycleBody": {
+      "type": "object",
+      "required": ["evidenceSha256"],
+      "additionalProperties": false,
+      "properties": { "evidenceSha256": { "$ref": "#/$defs/digest" } }
+    },
+    "semanticBody": {
+      "type": "object",
+      "required": ["kind", "contentSha256", "byteLength"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["lifecycle", "evidence", "verdict-frame"] },
+        "contentSha256": { "$ref": "#/$defs/digest" },
+        "byteLength": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "verdictReceivedBody": {
+      "type": "object",
+      "required": ["verdictSha256", "size", "parseable"],
+      "additionalProperties": false,
+      "properties": {
+        "verdictSha256": { "$ref": "#/$defs/digest" },
+        "size": { "type": "integer", "minimum": 1, "maximum": 1048576 },
+        "parseable": { "type": "boolean" }
+      }
+    },
+    "validatedBody": {
+      "type": "object",
+      "required": ["verdictSha256", "reviewPass"],
+      "additionalProperties": false,
+      "properties": {
+        "verdictSha256": { "$ref": "#/$defs/digest" },
+        "reviewPass": { "type": "boolean" }
+      }
+    },
+    "cleanupBody": {
+      "type": "object",
+      "required": ["status", "ownershipMatched", "preCleanupPhase"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "$ref": "#/$defs/cleanupStatus" },
+        "ownershipMatched": { "type": "boolean" },
+        "preCleanupPhase": { "$ref": "#/$defs/phaseBeforeCleanup" }
+      }
+    },
+    "terminalBody": {
+      "type": "object",
+      "required": ["terminalCode"],
+      "additionalProperties": false,
+      "properties": { "terminalCode": { "$ref": "#/$defs/terminalCode" } }
+    }
+  }
+}

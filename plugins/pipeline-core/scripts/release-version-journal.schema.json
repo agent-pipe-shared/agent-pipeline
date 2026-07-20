@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.release-version-journal.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "repoFingerprint", "kind", "recordId", "recordPath", "recordBytesBase64", "recordSha256", "phase", "createdAt"],
+  "properties": {
+    "schema": { "const": "pipeline.release-version-journal.v1" },
+    "repoFingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "kind": { "const": "plan" },
+    "recordId": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "recordPath": { "type": "string", "minLength": 1 },
+    "recordBytesBase64": { "type": "string", "minLength": 1 },
+    "recordSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "phase": { "enum": ["prepared", "record-durable", "complete"] },
+    "createdAt": { "type": "string", "format": "date-time" }
+  }
+}

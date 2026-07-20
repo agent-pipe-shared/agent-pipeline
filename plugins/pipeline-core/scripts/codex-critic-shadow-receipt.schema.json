@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.codex-critic-shadow-receipt.v1",
+  "title": "Same-packet Codex Critic shadow comparison",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "shadowId", "packetSetSha256", "cases", "canaries", "gateEligible", "productionCriticGateSatisfied", "emittedAtMs"],
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.codex-critic-shadow-receipt.v1"] },
+    "shadowId": { "type": "string" },
+    "packetSetSha256": { "type": "string" },
+    "cases": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "packetSha256", "currentReceiptSha256", "sandboxReceiptSha256", "divergence", "currentPass", "sandboxPass"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["positive", "seeded-negative"] },
+          "packetSha256": { "type": "string" },
+          "currentReceiptSha256": { "type": "string" },
+          "sandboxReceiptSha256": { "type": "string" },
+          "divergence": { "type": "string", "enum": ["equivalent", "expected-wording", "finding-severity", "finding-set", "invalid-result"] },
+          "currentPass": { "type": ["boolean", "null"] },
+          "sandboxPass": { "type": ["boolean", "null"] }
+        }
+      }
+    },
+    "canaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["manifestSha256", "unchanged"],
+      "properties": {
+        "manifestSha256": { "type": "string" },
+        "unchanged": { "type": "boolean" }
+      }
+    },
+    "gateEligible": { "type": "boolean" },
+    "productionCriticGateSatisfied": { "type": "boolean", "enum": [false] },
+    "emittedAtMs": { "type": "integer" }
+  }
+}

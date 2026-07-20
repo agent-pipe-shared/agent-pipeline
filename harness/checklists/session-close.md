@@ -8,6 +8,10 @@
 - [ ] DoD status assigned per task: done / 🟡 not-human-verified / blocked (`harness/definition-of-done.md` §3)
 - [ ] Open 🟡 and blocked items listed in the handover — nothing silently dropped
 - [ ] Every blocker/major Critic finding dispositioned; mandatory-trigger tasks have a findings report before merge
+- [ ] Stage-1 Verify is green before semantic Critic review; its command/result digests and candidate OID/tree are retained as closed evidence
+- [ ] Result-first close intent binds the current authority, graph and package-binding digests before the expected-revision State CAS; replay a crash window with the same intent bytes/receipt identity (State CAS is the logical commit point, not cross-file atomicity)
+- [ ] After the last tracked candidate mutation, the same full Verify is green on the exact post-transition commit/tree; any later tracked mutation marks it stale and blocks delivery
+- [ ] Delivery and fetch-back are a no-mutation tail: pushed and fetched OIDs are the exact verified candidate OID, and lifecycle close occurs only after exact readback
 - [ ] **Deployment-asymmetry check (NEW):** if this block touched a hook/statusline/plugin-cache file, deployment is VERIFIED on this machine (plugin re-installed/updated + `/reload-plugins`), not just committed — statusline (working tree, live on save) and hooks (plugin cache, install-gated) deploy at different speeds, so a commit alone does not make a hook/statusline change live
 
 ## Single-source sync
@@ -18,6 +22,7 @@
 - [ ] CLAUDE.md length gate green: ≤ {{CLAUDE_MD_MAX_LINES}} — growing means consolidating, moving to skills/hooks, or deleting
 - [ ] Memory is mirror only — contradictions corrected in favor of the repo
 - [ ] Authorship check (sub-step 6b — before Learn + measure): session's production diffs enumerated (`git log`/diff stat over the session range); mandatory question answered — "Whose are this session's production diffs?" — every diff maps to a Goldfish/Critic dispatch or the OM §3.3 stage-0 fast path; Elephant-authored diff outside stage-0 → INCIDENT (flag to the PO, note in handover + telemetry), never a retro discussion point
+- [ ] If `publicPushIdentity.mode: required`: final exact-commit Verify plus required privacy/security evidence is green; `ssh -T <sshHostAlias>` readback names the calibrated dedicated account; only the explicit approved feature branch was pushed; a fresh/disposable fetch-back equals the pushed OID. Any failure is recorded as unfinished/blocked — never substitute a main merge, tag, release, force-push or deletion.
 
 ## Learn + measure
 
@@ -32,5 +37,6 @@
 ## Hygiene + handover to the next session
 
 - [ ] Stale worktrees cleaned or listed (WIP rule)
+- [ ] Current-session descriptor (when present) was used to drain only registered resources; the redacted hygiene receipt is green. Missing/changed descriptor, manifest residue, dirty owned worktree or noncanonical placement leaves close unfinished — never substitute prefix-based deletion.
 - [ ] `/context` checked; at ~70–80 % or a natural boundary → planned session cut (next session bootstraps from the handover)
 - [ ] Commits: conventional, small, atomic; agent-authored commits carry `AI-Assisted: true`; no provider/model co-author, session URL/ID, account correlation, secrets, or machine-specific absolute paths

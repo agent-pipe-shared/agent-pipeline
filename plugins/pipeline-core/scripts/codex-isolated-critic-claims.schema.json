@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.codex-isolated-critic-claims.v1",
+  "title": "Codex isolated Critic claim evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "briefingBounded",
+    "inputConfined",
+    "technicallyIsolatedReadOnly",
+    "verdictIntegrity"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.codex-isolated-critic-claims.v1"
+    },
+    "briefingBounded": {
+      "$ref": "#/$defs/claim"
+    },
+    "inputConfined": {
+      "$ref": "#/$defs/claim"
+    },
+    "technicallyIsolatedReadOnly": {
+      "$ref": "#/$defs/claim"
+    },
+    "verdictIntegrity": {
+      "$ref": "#/$defs/claim"
+    }
+  },
+  "$defs": {
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "locator",
+        "rawSha256"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "briefing",
+            "candidate-diff",
+            "constraint",
+            "guardrail",
+            "input-manifest",
+            "sandbox-preflight",
+            "canary",
+            "lifecycle",
+            "receipt",
+            "verdict"
+          ]
+        },
+        "locator": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512,
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._/:#-]*$"
+        },
+        "rawSha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "claim": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "state",
+        "evidence"
+      ],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": [
+            "proven",
+            "disproven",
+            "not-proven"
+          ]
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/evidence"
+          },
+          "uniqueItems": true
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "not-proven"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "evidence": {
+                "maxItems": 0
+              }
+            }
+          },
+          "else": {
+            "properties": {
+              "evidence": {
+                "minItems": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

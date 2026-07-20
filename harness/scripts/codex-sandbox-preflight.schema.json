@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.codex-sandbox-preflight.v1",
+  "title": "Sanitized Codex sandbox preflight receipt",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "cli", "sandboxHelper", "platform", "profile", "networkEnabled", "vectors", "canaries", "eventChainSha256", "durationMs", "eligibility", "terminalCode"],
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.codex-sandbox-preflight.v1"] },
+    "cli": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["version", "artifactSha256"],
+      "properties": {
+        "version": { "type": "string" },
+        "artifactSha256": { "type": "string" }
+      }
+    },
+    "sandboxHelper": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifactSha256", "sameArtifactAsCli"],
+      "properties": {
+        "artifactSha256": { "type": "string" },
+        "sameArtifactAsCli": { "type": "boolean" }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["os", "kernelClass", "filesystemClass"],
+      "properties": {
+        "os": { "type": "string", "enum": ["linux"] },
+        "kernelClass": { "type": "string" },
+        "filesystemClass": { "type": "string", "enum": ["native-linux", "wsl-native", "drvfs"] }
+      }
+    },
+    "profile": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "rawSha256", "compiledStateSha256"],
+      "properties": {
+        "id": { "type": "string" },
+        "rawSha256": { "type": "string" },
+        "compiledStateSha256": { "type": "string" }
+      }
+    },
+    "networkEnabled": { "type": "boolean" },
+    "vectors": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allowedRead", "externalReadDenied", "sensitiveReadDenied", "writeDenied", "scratchWriteAllowed", "networkDenied", "childStdioEquivalent", "stdinEofEquivalent", "childExitEquivalent", "appServerInitEquivalent", "lifecycleComplete"],
+      "properties": {
+        "allowedRead": { "type": "boolean" },
+        "externalReadDenied": { "type": "boolean" },
+        "sensitiveReadDenied": { "type": "boolean" },
+        "writeDenied": { "type": "boolean" },
+        "scratchWriteAllowed": { "type": "boolean" },
+        "networkDenied": { "type": "boolean" },
+        "childStdioEquivalent": { "type": "boolean" },
+        "stdinEofEquivalent": { "type": "boolean" },
+        "childExitEquivalent": { "type": "boolean" },
+        "appServerInitEquivalent": { "type": "boolean" },
+        "lifecycleComplete": { "type": "boolean" }
+      }
+    },
+    "canaries": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["count", "manifestSha256", "unchanged"],
+      "properties": {
+        "count": { "type": "integer" },
+        "manifestSha256": { "type": "string" },
+        "unchanged": { "type": "boolean" }
+      }
+    },
+    "eventChainSha256": { "type": "string" },
+    "durationMs": { "type": "integer" },
+    "eligibility": { "type": "string", "enum": ["strong", "intermediate", "diagnostic", "none"] },
+    "terminalCode": { "type": "string", "enum": ["ok", "profile-error", "platform-unknown", "permission-mismatch", "network-mismatch", "child-stdio-error", "first-event-timeout", "lifecycle-stall", "total-timeout", "output-truncated", "cleanup-not-owned", "cleanup-failed", "canary-drift", "internal-error"] }
+  }
+}

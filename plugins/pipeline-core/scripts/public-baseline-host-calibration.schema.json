@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.public-baseline-host-calibration.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "status", "receiptPath", "rawDigest", "node", "git", "platform", "filesystem", "controlsDigest"],
+  "properties": {
+    "schema": { "const": "pipeline.public-baseline-host-calibration.v1" }, "status": { "enum": ["ready", "blocked"] },
+    "receiptPath": { "type": "string", "minLength": 1 }, "rawDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "node": { "type": "string", "minLength": 1 }, "git": { "type": "string", "minLength": 1 }, "platform": { "type": "string", "minLength": 1 }, "filesystem": { "type": "string", "minLength": 1 },
+    "controlsDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+  }
+}

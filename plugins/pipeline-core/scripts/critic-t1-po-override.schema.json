@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.critic-t1-po-override.v1",
+  "title": "Candidate-bound PO override for one T1 review",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "overrideId", "scope", "route", "primary", "fallback", "prohibitions", "approval", "status", "consumption"],
+  "properties": {
+    "schema": { "const": "pipeline.critic-t1-po-override.v1" },
+    "overrideId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$" },
+    "scope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["featureId", "candidateCommit", "candidateTree", "candidateDiffSha256", "packetSha256", "singleCandidateSingleReview"],
+      "properties": {
+        "featureId": { "const": "sprint-batman-epic" },
+        "candidateCommit": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+        "candidateTree": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+        "candidateDiffSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "packetSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "singleCandidateSingleReview": { "const": true }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["runnerId", "dutyId", "selectorKind", "selectorValue", "effort", "freshContext", "packetOnly"],
+      "properties": {
+        "runnerId": { "const": "codex" },
+        "dutyId": { "const": "critic_high_risk" },
+        "selectorKind": { "const": "model-id" },
+        "selectorValue": { "const": "gpt-5.6-sol" },
+        "effort": { "const": "max" },
+        "freshContext": { "const": true },
+        "packetOnly": { "const": true }
+      }
+    },
+    "primary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class", "literal", "preflightReceiptSha256", "compatibilityProjectionSha256", "compatibilityState", "availability", "terminalCode", "strongIsolationAsserted"],
+      "properties": {
+        "class": { "const": "sandbox-read-only-except-coordinator-scratch-network-open" },
+        "literal": { "const": "sandbox-read-only-except-coordinator-scratch; input/network isolation not asserted" },
+        "preflightReceiptSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "compatibilityProjectionSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "compatibilityState": { "enum": ["intermediate-preflight-eligible", "diagnostic-only"] },
+        "availability": { "enum": ["eligible", "unavailable"] },
+        "terminalCode": { "enum": ["ok", "binary-missing", "child-stdio-error", "permission-denial", "sandbox-setup-error", "unsupported-profile"] },
+        "strongIsolationAsserted": { "const": false }
+      }
+    },
+    "fallback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class", "literal", "maxAttempts", "sameRunnerOnly", "allowedPreVerdictCodes"],
+      "properties": {
+        "class": { "const": "contractual-read-only" },
+        "literal": { "const": "functional-equivalent-read-only; OS isolation not asserted" },
+        "maxAttempts": { "const": 1 },
+        "sameRunnerOnly": { "const": true },
+        "allowedPreVerdictCodes": {
+          "const": ["binary-missing", "child-stdio-error", "permission-denial", "sandbox-setup-error", "unsupported-profile"]
+        }
+      }
+    },
+    "prohibitions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["dangerFullAccessProhibited", "crossRunnerSubstitutionProhibited", "strongIsolationClaimProhibited", "standingExceptionProhibited"],
+      "properties": {
+        "dangerFullAccessProhibited": { "const": true },
+        "crossRunnerSubstitutionProhibited": { "const": true },
+        "strongIsolationClaimProhibited": { "const": true },
+        "standingExceptionProhibited": { "const": true }
+      }
+    },
+    "approval": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decisionId", "attributedTo", "attributionOnly", "recordedAtMs"],
+      "properties": {
+        "decisionId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$" },
+        "attributedTo": { "const": "PO" },
+        "attributionOnly": { "const": true },
+        "recordedAtMs": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "status": { "enum": ["authorized", "consumed"] },
+    "consumption": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["lane", "fallbackAttempts", "verdictStatus", "verdictSha256", "receiptSha256", "consumedAtMs"],
+      "properties": {
+        "lane": { "enum": ["intermediate", "functional-equivalent"] },
+        "fallbackAttempts": { "type": "integer", "minimum": 0, "maximum": 1 },
+        "verdictStatus": { "enum": ["pass", "fail", "no-usable-review"] },
+        "verdictSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "receiptSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "consumedAtMs": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

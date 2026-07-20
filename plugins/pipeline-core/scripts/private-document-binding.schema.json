@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.private-document-binding.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "repoFingerprint", "bindingId", "classId", "policySha256", "triggerPatterns", "adapterId", "privateRoot", "dataPath", "templatePath", "outputDirectory", "hmacKeyBase64", "createdBy", "createdAt"],
+  "properties": {
+    "schema": { "const": "pipeline.private-document-binding.v1" },
+    "repoFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "bindingId": { "type": "string", "pattern": "^dh_[a-z2-7]{25}[aeimquy4]$" },
+    "classId": { "enum": ["authorization", "operations", "emergency", "privacy"] },
+    "policySha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "triggerPatterns": { "type": "array", "minItems": 1, "maxItems": 128, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "maxLength": 256 } },
+    "adapterId": { "type": "string", "pattern": "^da_[a-z2-7]{25}[aeimquy4]$" },
+    "privateRoot": { "type": "string", "minLength": 1 },
+    "dataPath": { "type": "string", "minLength": 1 },
+    "templatePath": { "type": "string", "minLength": 1 },
+    "outputDirectory": { "type": "string", "minLength": 1 },
+    "hmacKeyBase64": { "type": "string", "pattern": "^[A-Za-z0-9+/]{43}=$" },
+    "createdBy": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "createdAt": { "type": "string", "format": "date-time" }
+  }
+}

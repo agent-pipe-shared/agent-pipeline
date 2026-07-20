@@ -1,0 +1,9 @@
+{
+  "schema": "pipeline.gate-estimate-phase-map.v1",
+  "phases": {
+    "design": "prd",
+    "implementation": "security",
+    "security-scan": "merge",
+    "ui-design": "merge"
+  }
+}

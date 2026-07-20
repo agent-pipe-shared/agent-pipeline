@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.route-receipt.v1",
+  "title": "Provider-neutral dispatch route receipt",
+  "type": "object",
+  "required": ["schema", "dispatchId", "queueRevision", "candidateCommit", "candidateTree", "resultSha256", "requestedDuty", "requestedWorktype", "requestedRunner", "requestedProvider", "requestedSelector", "requestedEffort", "effectiveDuty", "effectiveWorktype", "effectiveRunner", "effectiveSelector", "effectiveProvider", "effectiveModelId", "effectiveEffort", "resolutionEvidence", "attestationAvailable", "effectiveRouteStatus"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.route-receipt.v1"] },
+    "dispatchId": { "type": "string" },
+    "queueRevision": { "type": "number" },
+    "candidateCommit": { "type": "string" },
+    "candidateTree": { "type": "string" },
+    "resultSha256": { "type": "string" },
+    "requestedDuty": { "type": "string" },
+    "requestedWorktype": { "type": ["string", "null"] },
+    "requestedRunner": { "type": "string", "enum": ["claude", "codex"] },
+    "requestedProvider": { "type": "string", "enum": ["anthropic", "openai"] },
+    "requestedSelector": {
+      "type": "object",
+      "required": ["kind", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["alias", "model-id"] },
+        "value": { "type": "string" }
+      }
+    },
+    "requestedEffort": { "type": "string", "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] },
+    "effectiveDuty": { "type": "string" },
+    "effectiveWorktype": { "type": ["string", "null"] },
+    "effectiveRunner": { "type": "string", "enum": ["claude", "codex"] },
+    "effectiveSelector": {
+      "type": "object",
+      "required": ["kind", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["model-id"] },
+        "value": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$" }
+      }
+    },
+    "effectiveProvider": { "type": "string", "enum": ["anthropic", "openai"] },
+    "effectiveModelId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$" },
+    "effectiveEffort": { "type": "string", "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] },
+    "resolutionEvidence": {
+      "type": ["object", "null"],
+      "required": ["source", "sha256"],
+      "additionalProperties": false,
+      "properties": {
+        "source": { "type": "string", "enum": ["host", "cli"] },
+        "sha256": { "type": "string" }
+      }
+    },
+    "attestationAvailable": { "type": "boolean" },
+    "effectiveRouteStatus": { "type": "string", "enum": ["attested", "unresolved-alias", "unavailable"] }
+  }
+}

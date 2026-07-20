@@ -1,0 +1,185 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.internal/schemas/codex-critic-receipt.schema.json",
+  "title": "Codex native-host normal Critic receipt",
+  "type": "object",
+  "required": [
+    "schema",
+    "taskId",
+    "dispatchId",
+    "candidate",
+    "route",
+    "review",
+    "liveness",
+    "bindings",
+    "state",
+    "assurance",
+    "residualRisks",
+    "verdict",
+    "reviewPass"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.codex-critic-host-receipt.v1"] },
+    "taskId": { "type": "string" },
+    "dispatchId": { "type": "string" },
+    "candidate": {
+      "type": "object",
+      "required": ["base", "commit", "tree"],
+      "additionalProperties": false,
+      "properties": {
+        "base": { "type": "string" },
+        "commit": { "type": "string" },
+        "tree": { "type": "string" }
+      }
+    },
+    "route": {
+      "type": "object",
+      "required": ["duty", "runner", "alias", "requestedModel", "requestedEffort", "mayDelegate", "coordinatorConfirmed", "providerAttested"],
+      "additionalProperties": false,
+      "properties": {
+        "duty": { "type": "string" },
+        "runner": { "type": "string" },
+        "alias": { "type": "string" },
+        "requestedModel": { "type": "string" },
+        "requestedEffort": { "type": "string" },
+        "mayDelegate": { "type": "boolean", "enum": [false] },
+        "coordinatorConfirmed": { "type": "boolean" },
+        "providerAttested": { "type": "boolean", "enum": [false] }
+      }
+    },
+    "review": {
+      "type": "object",
+      "required": ["mode", "admissionCode", "affectedInvariantIds"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "type": "string", "enum": ["full", "delta"] },
+        "admissionCode": { "type": "string" },
+        "affectedInvariantIds": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "liveness": {
+      "type": "object",
+      "required": ["agentIdHash", "taskName", "completedElapsedMs", "recoveryCount", "evidenceEvents"],
+      "additionalProperties": false,
+      "properties": {
+        "agentIdHash": { "type": "string" },
+        "taskName": { "type": "string" },
+        "completedElapsedMs": { "type": "number" },
+        "recoveryCount": { "type": "number" },
+        "evidenceEvents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "elapsedMs", "evidenceSha256", "progress"],
+            "additionalProperties": false,
+            "properties": {
+              "kind": { "type": "string", "enum": ["review-started", "evidence-inspected", "analysis-progress", "recovery-started", "review-completed"] },
+              "elapsedMs": { "type": "number" },
+              "evidenceSha256": { "type": "string" },
+              "progress": {
+                "type": "object",
+                "required": ["boundTreeChanges", "verifiedOutputBytes", "traceBytes", "completedTestSteps", "deliveredResultBytes"],
+                "additionalProperties": false,
+                "properties": {
+                  "boundTreeChanges": { "type": "number" },
+                  "verifiedOutputBytes": { "type": "number" },
+                  "traceBytes": { "type": "number" },
+                  "completedTestSteps": { "type": "number" },
+                  "deliveredResultBytes": { "type": "number" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "bindings": {
+      "type": "object",
+      "required": ["preparedSha256", "requestSha256", "referenceSetSha256", "resultSha256", "reviewFingerprintBefore", "reviewFingerprintAfter", "roleContractSha256", "promptContractSha256", "verdictSchemaSha256", "hostReturnSchemaSha256", "executionSetSha256", "routingProvenance"],
+      "additionalProperties": false,
+      "properties": {
+        "preparedSha256": { "type": "string" },
+        "requestSha256": { "type": "string" },
+        "referenceSetSha256": { "type": "string" },
+        "resultSha256": { "type": "string" },
+        "reviewFingerprintBefore": { "type": "string" },
+        "reviewFingerprintAfter": { "type": "string" },
+        "roleContractSha256": { "type": "string" },
+        "promptContractSha256": { "type": "string" },
+        "verdictSchemaSha256": { "type": "string" },
+        "hostReturnSchemaSha256": { "type": "string" },
+        "executionSetSha256": { "type": "string" },
+        "routingProvenance": { "type": "string" }
+      }
+    },
+    "state": {
+      "type": "object",
+      "required": ["before", "after", "mutationObserved"],
+      "additionalProperties": false,
+      "properties": {
+        "before": { "type": "object", "additionalProperties": { "type": "string" } },
+        "after": { "type": "object", "additionalProperties": { "type": "string" } },
+        "mutationObserved": { "type": "boolean", "enum": [false] }
+      }
+    },
+    "assurance": {
+      "type": "string",
+      "enum": [
+        "normal-contractual-read-only; OS isolation not asserted",
+        "functional-equivalent-read-only; OS isolation not asserted"
+      ]
+    },
+    "residualRisks": { "type": "array", "items": { "type": "string" } },
+    "verdict": {
+      "type": "object",
+      "required": ["findings", "deliberatelyNotFlaggedSha256", "trajectoryVerdict", "trajectoryEvidenceSha256", "briefingViolationCount", "briefingViolationsSha256", "pass"],
+      "additionalProperties": false,
+      "properties": {
+        "findings": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["severity", "evidence", "specRef", "detailSha256"],
+            "additionalProperties": false,
+            "properties": {
+              "severity": { "type": "string", "enum": ["blocker", "major", "minor"] },
+              "evidence": {
+                "type": "object",
+                "required": ["path", "startLine", "endLine"],
+                "additionalProperties": false,
+                "properties": {
+                  "path": { "type": "string" },
+                  "startLine": { "type": "number" },
+                  "endLine": { "type": "number" }
+                }
+              },
+              "specRef": { "type": "string" },
+              "detailSha256": { "type": "string" }
+            }
+          }
+        },
+        "deliberatelyNotFlaggedSha256": { "type": "string" },
+        "trajectoryVerdict": { "type": "string", "enum": ["consistent", "inconsistent", "not verifiable"] },
+        "trajectoryEvidenceSha256": { "type": "string" },
+        "briefingViolationCount": { "type": "number" },
+        "briefingViolationsSha256": { "type": "string" },
+        "pass": { "type": "boolean" }
+      }
+    },
+    "reviewPass": { "type": "boolean" },
+    "normalLaneAuthorization": {
+      "type": "object",
+      "required": ["kind", "authority", "riskId", "scope", "evidenceSha256", "candidateCommit"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["named-po-waiver"] },
+        "authority": { "type": "string", "enum": ["PO"] },
+        "riskId": { "type": "string" },
+        "scope": { "type": "string" },
+        "evidenceSha256": { "type": "string" },
+        "candidateCommit": { "type": "string" }
+      }
+    }
+  }
+}

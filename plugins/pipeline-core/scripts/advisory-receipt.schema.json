@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.advisory-receipt.v1",
+  "title": "Runner-neutral advisory receipt",
+  "description": "A sanitized receipt for a native or consult advisory invocation. It deliberately carries only SHA-256 bindings for the question and answer, never their raw content.",
+  "type": "object",
+  "required": ["schema", "receiptId", "dispatch", "duty", "profile", "configuredRoute", "adapter", "observed", "questionSha256", "answerSha256", "fallback", "emittedAtMs"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "pipeline.advisory-receipt.v1" },
+    "receiptId": { "$ref": "#/$defs/id" },
+    "dispatch": {
+      "type": "object",
+      "required": ["dispatchId", "queueRevision", "candidateCommit", "candidateTree"],
+      "additionalProperties": false,
+      "properties": {
+        "dispatchId": { "$ref": "#/$defs/id" },
+        "queueRevision": { "type": "number", "minimum": 0 },
+        "candidateCommit": { "$ref": "#/$defs/gitObject" },
+        "candidateTree": { "$ref": "#/$defs/gitObject" }
+      }
+    },
+    "duty": { "const": "advisory" },
+    "profile": { "enum": ["epic", "feature", "mini"] },
+    "configuredRoute": {
+      "type": "object",
+      "required": ["runner", "selector", "effort"],
+      "additionalProperties": false,
+      "properties": {
+        "runner": { "enum": ["claude", "codex"] },
+        "selector": {
+          "type": "object",
+          "required": ["kind", "value"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["alias", "model-id"] },
+            "value": { "$ref": "#/$defs/modelId" }
+          }
+        },
+        "effort": { "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] }
+      }
+    },
+    "adapter": { "enum": ["native", "consult"] },
+    "observed": {
+      "type": "object",
+      "required": ["status", "identity"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "enum": ["answered", "unavailable", "failed", "timed-out", "permission-denied"] },
+        "identity": {
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["provider", "modelId", "effort"],
+              "additionalProperties": false,
+              "properties": {
+                "provider": { "enum": ["anthropic", "openai"] },
+                "modelId": { "$ref": "#/$defs/modelId" },
+                "effort": { "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] }
+              }
+            }
+          ]
+        }
+      }
+    },
+    "questionSha256": { "$ref": "#/$defs/sha256" },
+    "answerSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+    "fallback": {
+      "type": "object",
+      "required": ["reason", "redactedErrorClass"],
+      "additionalProperties": false,
+      "properties": {
+        "reason": {
+          "enum": [
+            "none",
+            "native-unavailable",
+            "native-failed",
+            "native-timeout",
+            "native-permission-denied",
+            "consult-unavailable",
+            "consult-failed",
+            "consult-timeout",
+            "consult-permission-denied"
+          ]
+        },
+        "redactedErrorClass": { "enum": [null, "unavailable", "failure", "timeout", "permission-denied", "protocol", "transport"] }
+      }
+    },
+    "emittedAtMs": { "type": "number", "minimum": 0 }
+  },
+  "$defs": {
+    "id": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+    "modelId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$" },
+    "gitObject": { "type": "string", "pattern": "^[a-f0-9]{40,64}$" },
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.codex-critic-return.v1",
+  "type": "object",
+  "required": ["schema", "packetId", "packetDigest", "taskName", "forkTurns", "delegated", "assurance", "providerAttested", "dispatchObservation", "liveness", "verdict"],
+  "properties": {
+    "schema": { "const": "pipeline.codex-critic-return.v1" },
+    "packetId": { "type": "string" },
+    "packetDigest": { "type": "string" },
+    "taskName": { "type": "string" },
+    "forkTurns": { "const": "none" },
+    "delegated": { "const": false },
+    "assurance": { "const": "functional-equivalent-read-only; OS isolation not asserted" },
+    "providerAttested": { "const": false },
+    "dispatchObservation": { "type": ["object", "null"] },
+    "liveness": { "type": "object" },
+    "verdict": { "type": "object" }
+  },
+  "additionalProperties": false
+}

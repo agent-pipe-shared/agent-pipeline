@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.codex-sandbox-compatibility-receipt.v1",
+  "title": "Local Codex sandbox compatibility projection",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "policySha256", "entryId", "runnerId", "primaryLaneId", "fallbackLaneId", "state", "bootId", "observedAtMs", "evidence", "activationReceiptSha256", "routePostimageSha256"],
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.codex-sandbox-compatibility-receipt.v1"] },
+    "policySha256": { "type": "string" },
+    "entryId": { "type": "string" },
+    "runnerId": { "type": "string" },
+    "primaryLaneId": { "type": "string" },
+    "fallbackLaneId": { "type": "string" },
+    "state": { "type": "string", "enum": ["unsupported", "diagnostic-only", "intermediate-preflight-candidate", "intermediate-preflight-eligible", "intermediate-shadow-eligible", "intermediate-production-eligible", "strong-preflight-eligible", "strong-shadow-eligible", "strong-production-eligible"] },
+    "bootId": { "type": "string" },
+    "observedAtMs": { "type": "integer" },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["preflightSha256", "runnerReceiptSha256", "shadowReceiptSha256"],
+      "properties": {
+        "preflightSha256": { "type": ["string", "null"] },
+        "runnerReceiptSha256": { "type": ["string", "null"] },
+        "shadowReceiptSha256": { "type": ["string", "null"] }
+      }
+    },
+    "activationReceiptSha256": { "type": ["string", "null"] },
+    "routePostimageSha256": { "type": ["string", "null"] }
+  }
+}

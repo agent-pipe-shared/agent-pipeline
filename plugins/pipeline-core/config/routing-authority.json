@@ -1,7 +1,44 @@
 {
-  "schema": "pipeline.routing-authority.v0",
+  "schema": "pipeline.routing-authority.v1",
   "advisorProjectionEffort": "not-applicable",
-  "presets": {
+  "directDefaults": {
+    "claude": {
+      "worktypes": {
+        "design": {
+          "design_phase": { "capability": "design", "effort": "high" },
+          "execution_phase": { "capability": "design", "effort": "high" },
+          "advisor": null
+        },
+        "feature": {
+          "design_phase": { "capability": "design", "effort": "high" },
+          "execution_phase": { "capability": "implement", "effort": "high" },
+          "advisor": { "capability": "design", "effort": "not-applicable" }
+        },
+        "mini": {
+          "design_phase": { "capability": "implement", "effort": "high" },
+          "execution_phase": { "capability": "implement", "effort": "high" },
+          "advisor": { "capability": "design", "effort": "not-applicable" }
+        }
+      },
+      "duties": {
+        "implement": { "capability": "implement", "effort": "medium" },
+        "mechanic": { "capability": "mechanic", "effort": "low" },
+        "deep": { "capability": "deep", "effort": "xhigh" },
+        "review": { "capability": "review", "effort": "max" }
+      }
+    },
+    "codex": {
+      "duties": {
+        "codex_design": { "capability": "design", "effort": "xhigh" },
+        "codex_independent_critic": { "capability": "review", "effort": "xhigh" },
+        "codex_implementation": { "capability": "implement", "effort": "xhigh" },
+        "codex_goldfish": { "capability": "implement", "effort": "xhigh" },
+        "codex_mechanic": { "capability": "mechanic", "effort": "xhigh" },
+        "codex_deep": { "capability": "deep", "effort": "xhigh" }
+      }
+    }
+  },
+  "legacyMigrationPresets": {
     "max": {
       "worktypes": {
         "design": {
@@ -68,6 +105,14 @@
       "ceremonyOnly": true,
       "allowedRoutes": ["mechanic", "implement"],
       "forbiddenClasses": ["high-risk", "architecture", "guardrail", "security"]
+    }
+  },
+  "hostDuties": {
+    "criticNormal": {
+      "capability": "review",
+      "effort": "xhigh",
+      "dispatch": "host-native",
+      "assurance": "contractual-read-only-with-post-state-detection"
     }
   }
 }

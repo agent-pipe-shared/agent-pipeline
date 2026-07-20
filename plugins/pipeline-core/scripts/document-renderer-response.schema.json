@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.document-renderer-response.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "requestId", "status", "rendererSha256", "outputSha256", "errorClass"],
+  "properties": {
+    "schema": { "const": "pipeline.document-renderer-response.v1" },
+    "requestId": { "type": "string", "pattern": "^drq_[a-z2-7]{25}[aeimquy4]$" },
+    "status": { "enum": ["rendered", "failed"] },
+    "rendererSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "outputSha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "errorClass": { "type": ["string", "null"], "enum": [null, "data-invalid", "template-invalid", "render-failed", "output-invalid", "timeout"] }
+  }
+}

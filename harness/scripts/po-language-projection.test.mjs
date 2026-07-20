@@ -74,9 +74,14 @@ const consumers = [
 for (const path of consumers) {
   check(`${path} uses the compiled runtime language and the single PRD authority`, () => {
     const text = readFileSync(join(root, path), "utf8");
-    assert.match(text, /language\.human_facing/);
+    if (path === "templates/prd.md") {
+      assert.match(text, /check-po-gate-authority\.mjs/);
+      assert.match(text, /<!-- po-language: (?:de|en) -->/);
+    } else {
+      assert.match(text, /language\.human_facing|check-po-gate-authority\.mjs/);
+    }
     assert.match(text, /freigegeben/);
-    assert.match(text, /second implementation approval|zweite Implementierungsfreigabe|zweiten Implementierungsfreigabe/);
+    assert.match(text, /first implementation dispatch|ersten Implementierungs-Dispatch/);
   });
 }
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);

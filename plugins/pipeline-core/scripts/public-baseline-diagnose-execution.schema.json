@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.public-baseline-process-run.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "caps", "fullVerify", "focused", "confirmationAttempted", "requiredToolsReady", "runDigest"],
+  "properties": {
+    "schema": { "const": "pipeline.public-baseline-process-run.v1" },
+    "caps": { "$ref": "#/$defs/caps" },
+    "fullVerify": { "$ref": "#/$defs/commandReceipt" },
+    "focused": { "oneOf": [{ "$ref": "#/$defs/commandReceipt" }, { "type": "null" }] },
+    "confirmationAttempted": { "type": "boolean" },
+    "requiredToolsReady": { "type": "boolean" },
+    "runDigest": { "$ref": "#/$defs/sha256" }
+  },
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "nullableSha256": { "oneOf": [{ "$ref": "#/$defs/sha256" }, { "type": "null" }] },
+    "caps": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["firstStepMs", "noProgressMs", "outerMs", "terminateGraceMs", "maxOutputTailBytes", "maxEvents", "maxSemanticLineBytes"],
+      "properties": {
+        "firstStepMs": { "const": 60000 },
+        "noProgressMs": { "const": 180000 },
+        "outerMs": { "const": 900000 },
+        "terminateGraceMs": { "const": 2000 },
+        "maxOutputTailBytes": { "const": 32768 },
+        "maxEvents": { "const": 4096 },
+        "maxSemanticLineBytes": { "const": 8192 }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sequence", "type", "elapsedMs", "stepDigest", "stream", "contentDigest", "byteLength"],
+      "properties": {
+        "sequence": { "type": "integer", "minimum": 1 },
+        "type": { "enum": ["process-start", "step-start", "step-progress", "step-end", "process-end", "process-stop"] },
+        "elapsedMs": { "type": "integer", "minimum": 0 },
+        "stepDigest": { "$ref": "#/$defs/nullableSha256" },
+        "stream": { "enum": [null, "stdout", "stderr"] },
+        "contentDigest": { "$ref": "#/$defs/nullableSha256" },
+        "byteLength": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "commandReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "commandDigest", "status", "startedAt", "endedAt", "durationMs", "events", "exitCode", "signal", "spawnError", "productStepStarted", "failureSignatureDigest", "outputTailDigest", "receiptDigest"],
+      "properties": {
+        "kind": { "enum": ["full-verify", "focused"] },
+        "commandDigest": { "$ref": "#/$defs/sha256" },
+        "status": { "enum": ["completed", "first-step-timeout", "no-progress-timeout", "outer-timeout", "event-overflow", "spawn-error"] },
+        "startedAt": { "type": "integer", "minimum": 0 },
+        "endedAt": { "type": "integer", "minimum": 0 },
+        "durationMs": { "type": "integer", "minimum": 0 },
+        "events": { "type": "array", "minItems": 2, "maxItems": 4096, "items": { "$ref": "#/$defs/event" } },
+        "exitCode": { "oneOf": [{ "type": "integer", "minimum": 0 }, { "type": "null" }] },
+        "signal": { "enum": [null, "SIGTERM", "SIGKILL", "OTHER"] },
+        "spawnError": { "enum": [null, "binary-unavailable", "permission-denied", "resource-exhausted", "unknown"] },
+        "productStepStarted": { "type": "boolean" },
+        "failureSignatureDigest": { "$ref": "#/$defs/nullableSha256" },
+        "outputTailDigest": { "$ref": "#/$defs/sha256" },
+        "receiptDigest": { "$ref": "#/$defs/sha256" }
+      }
+    }
+  }
+}

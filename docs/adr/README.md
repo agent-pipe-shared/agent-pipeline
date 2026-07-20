@@ -46,6 +46,13 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0032](0032-project-doc-structure.md) | Project documentation structure — release traceability, SBOM convention, living architecture document (GREENFIELD) | accepted | 2026-07-07 |
 | [0033](0033-release-promotion-phase.md) | Release/Promotion phase — optional, adapter-based SDLC tail phase | accepted | 2026-07-11 |
 | [0034](0034-deploy-precedence-central-vs-project.md) | Precedence — central deploy policy vs. project manifest, a new axis | accepted | 2026-07-11 |
+| [0035](0035-codex-native-normal-critic.md) | Codex normal Critic through a native host boundary | accepted | 2026-07-15 |
+| [0036](0036-runner-honest-profiles-v2.md) | Runner-honest profiles and usage contracts v2 | accepted | 2026-07-17 |
+| [0037](0037-batman-bounded-assurance.md) | Batman bounded assurance, static Verify extension and typed delivery | accepted | 2026-07-18 |
+| [0038](0038-runner-neutral-advisory-v3.md) | Runner-neutral advisory duty v3 | accepted | 2026-07-19 |
+| [0039](0039-hawkeye-lifecycle-boundaries.md) | Hawkeye lifecycle boundaries for session power and regulated documents | proposed | 2026-07-19 |
+| [0040](0040-advisor-consent-and-readonly-bash.md) | Explicit advisor export consent and sandbox-bound Bash | accepted; partially superseded by 0041 | 2026-07-19 |
+| [0041](0041-po-authorized-codex-functional-equivalent.md) | PO-authorized Codex functional-equivalent gate pass | accepted | 2026-07-20 |
 
 ### Resubmissions
 
@@ -107,6 +114,13 @@ Architecture Decision Records der Agent-Pipeline. Die ADRs formalisieren das kan
 | [0032](0032-project-doc-structure.md) | Projekt-Doku-Struktur — Release-Traceability, SBOM-Konvention, lebendes Architektur-Dokument (GREENFIELD) | akzeptiert | 2026-07-07 |
 | [0033](0033-release-promotion-phase.md) | Release/Promotion-Phase — optionale, adapter-basierte SDLC-Tail-Phase | akzeptiert | 2026-07-11 |
 | [0034](0034-deploy-precedence-central-vs-project.md) | Präzedenz — zentrale Deploy-Policy vs. Projekt-Manifest, eine neue Achse | akzeptiert | 2026-07-11 |
+| [0035](0035-codex-native-normal-critic.md) | Normaler Codex-Critic über eine native Host-Grenze | akzeptiert | 2026-07-15 |
+| [0036](0036-runner-honest-profiles-v2.md) | Runner-ehrliche Profile und Usage-Verträge v2 | akzeptiert | 2026-07-17 |
+| [0037](0037-batman-bounded-assurance.md) | Batman — begrenzte Absicherung, statische Verify-Erweiterung und typisierte Auslieferung | akzeptiert | 2026-07-18 |
+| [0038](0038-runner-neutral-advisory-v3.md) | Runner-neutrale Advisory-Duty v3 | akzeptiert | 2026-07-19 |
+| [0039](0039-hawkeye-lifecycle-boundaries.md) | Hawkeye-Lifecycle-Grenzen für Wachhalten und regulierte Dokumente | vorgeschlagen | 2026-07-19 |
+| [0040](0040-advisor-consent-and-readonly-bash.md) | Explizite Advisor-Exportfreigabe und Sandbox-gebundenes Bash | akzeptiert; teilweise durch 0041 ersetzt | 2026-07-19 |
+| [0041](0041-po-authorized-codex-functional-equivalent.md) | PO-autorisierter Codex-Funktionsäquivalenz-Pass für Gates | akzeptiert | 2026-07-20 |
 
 ## Wiedervorlagen
 

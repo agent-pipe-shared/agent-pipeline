@@ -1,0 +1,355 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.runner-usage.v1",
+  "title": "Runner-native raw usage with an honest common projection",
+  "type": "object",
+  "required": ["schema", "runner", "source", "scope", "route", "raw", "common"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "const": "pipeline.runner-usage.v1" },
+    "runner": { "enum": ["claude", "codex"] },
+    "source": { "type": "object" },
+    "scope": { "type": "object" },
+    "route": { "type": "object" },
+    "raw": { "$ref": "#/$defs/rawUsageObject" },
+    "common": {
+      "type": "object",
+      "required": ["inputTokens", "outputTokens", "cachedInputTokens", "cacheCreationInputTokens", "cacheReadInputTokens", "reasoningOutputTokens", "billedCost", "estimatedCost"],
+      "additionalProperties": false,
+      "properties": {
+        "inputTokens": { "$ref": "#/$defs/measuredMetric" },
+        "outputTokens": { "$ref": "#/$defs/measuredMetric" },
+        "cachedInputTokens": { "$ref": "#/$defs/measuredMetric" },
+        "cacheCreationInputTokens": { "$ref": "#/$defs/measuredMetric" },
+        "cacheReadInputTokens": { "$ref": "#/$defs/measuredMetric" },
+        "reasoningOutputTokens": { "$ref": "#/$defs/measuredMetric" },
+        "billedCost": { "$ref": "#/$defs/billedMetric" },
+        "estimatedCost": { "$ref": "#/$defs/estimatedMetric" }
+      }
+    }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "runner": { "const": "claude" },
+        "source": { "$ref": "#/$defs/claudeTurnSource" },
+        "scope": { "$ref": "#/$defs/turnScope" },
+        "route": { "$ref": "#/$defs/claudeRoute" }
+      }
+    },
+    {
+      "properties": {
+        "runner": { "const": "claude" },
+        "source": { "$ref": "#/$defs/claudeSessionSource" },
+        "scope": { "$ref": "#/$defs/sessionScope" },
+        "route": { "$ref": "#/$defs/claudeRoute" }
+      }
+    },
+    {
+      "properties": {
+        "runner": { "const": "codex" },
+        "source": { "$ref": "#/$defs/codexTurnSource" },
+        "scope": { "$ref": "#/$defs/turnScope" },
+        "route": { "$ref": "#/$defs/codexRoute" }
+      }
+    },
+    {
+      "properties": {
+        "runner": { "const": "codex" },
+        "source": { "$ref": "#/$defs/workspaceAggregateSource" },
+        "scope": { "$ref": "#/$defs/workspaceAggregateScope" },
+        "route": { "$ref": "#/$defs/unboundRoute" }
+      }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "claudeTurnSource": {
+      "type": "object",
+      "required": ["kind", "version", "eventSha256", "threadId", "turnId"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "claude-transcript-usage" },
+        "version": { "type": "string", "minLength": 1 },
+        "eventSha256": { "$ref": "#/$defs/sha256" },
+        "threadId": { "type": "string", "minLength": 1 },
+        "turnId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "claudeSessionSource": {
+      "type": "object",
+      "required": ["kind", "version", "eventSha256", "threadId"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "claude-transcript-usage" },
+        "version": { "type": "string", "minLength": 1 },
+        "eventSha256": { "$ref": "#/$defs/sha256" },
+        "threadId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "codexTurnSource": {
+      "type": "object",
+      "required": ["kind", "version", "eventSha256", "threadId", "turnId"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "codex-turn-completed-usage" },
+        "version": { "type": "string", "minLength": 1 },
+        "eventSha256": { "$ref": "#/$defs/sha256" },
+        "threadId": { "type": "string", "minLength": 1 },
+        "turnId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "workspaceAggregateSource": {
+      "type": "object",
+      "required": ["kind", "version", "eventSha256"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "workspace-analytics-export" },
+        "version": { "type": "string", "minLength": 1 },
+        "eventSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "turnScope": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "turn" },
+        "dispatchId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "sessionScope": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "session" },
+        "dispatchId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "workspaceAggregateScope": {
+      "type": "object",
+      "required": ["kind"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "workspace-account-aggregate" }
+      }
+    },
+    "claudeSelector": {
+      "type": "object",
+      "required": ["kind", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "const": "alias" },
+        "value": { "enum": ["fable", "opus", "sonnet"] }
+      }
+    },
+    "codexSelector": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["kind", "value"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "model-id" }, "value": { "const": "gpt-5.6-sol" } }
+        },
+        {
+          "type": "object",
+          "required": ["kind", "value"],
+          "additionalProperties": false,
+          "properties": { "kind": { "const": "model-id" }, "value": { "const": "gpt-5.6-terra" } }
+        }
+      ]
+    },
+    "requestedClaude": {
+      "type": "object",
+      "required": ["selector", "effort"],
+      "additionalProperties": false,
+      "properties": {
+        "selector": { "$ref": "#/$defs/claudeSelector" },
+        "effort": { "enum": ["low", "medium", "high", "xhigh", "max", "not-applicable"] }
+      }
+    },
+    "requestedCodex": {
+      "type": "object",
+      "required": ["selector", "effort"],
+      "additionalProperties": false,
+      "properties": {
+        "selector": { "$ref": "#/$defs/codexSelector" },
+        "effort": { "enum": ["xhigh", "max"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "selector": { "properties": { "value": { "const": "gpt-5.6-terra" } }, "required": ["value"] } }, "required": ["selector"] },
+          "then": { "properties": { "effort": { "const": "xhigh" } } }
+        }
+      ]
+    },
+    "receiptReference": {
+      "type": "object",
+      "required": ["schema", "repoRelativePath", "sha256", "resultSha256", "routeEvidenceSha256"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "const": "pipeline.route-receipt.v1" },
+        "repoRelativePath": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.(?:/|$)).+$" },
+        "sha256": { "$ref": "#/$defs/sha256" },
+        "resultSha256": { "$ref": "#/$defs/sha256" },
+        "routeEvidenceSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "effective": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["status", "modelId"],
+          "additionalProperties": false,
+          "properties": {
+            "status": { "const": "observed" },
+            "modelId": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$" }
+          }
+        },
+        {
+          "type": "object",
+          "required": ["status", "reasonCode"],
+          "additionalProperties": false,
+          "properties": {
+            "status": { "const": "unknown" },
+            "reasonCode": { "const": "effective-model-not-observed" }
+          }
+        }
+      ]
+    },
+    "boundClaudeRoute": {
+      "type": "object",
+      "required": ["status", "requested", "binding", "receipt", "effective"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "const": "bound" },
+        "requested": { "$ref": "#/$defs/requestedClaude" },
+        "binding": { "$ref": "usage-route-binding.schema.json" },
+        "receipt": { "$ref": "#/$defs/receiptReference" },
+        "effective": { "$ref": "#/$defs/effective" }
+      }
+    },
+    "boundCodexRoute": {
+      "type": "object",
+      "required": ["status", "requested", "binding", "receipt", "effective"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "const": "bound" },
+        "requested": { "$ref": "#/$defs/requestedCodex" },
+        "binding": { "$ref": "usage-route-binding.schema.json" },
+        "receipt": { "$ref": "#/$defs/receiptReference" },
+        "effective": { "$ref": "#/$defs/effective" }
+      }
+    },
+    "unboundRoute": {
+      "type": "object",
+      "required": ["status", "effective"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "const": "unbound" },
+        "effective": {
+          "type": "object",
+          "required": ["status", "reasonCode"],
+          "additionalProperties": false,
+          "properties": {
+            "status": { "const": "unknown" },
+            "reasonCode": { "enum": ["dispatch-context-missing", "receipt-missing", "receipt-invalid", "binding-mismatch"] }
+          }
+        }
+      }
+    },
+    "claudeRoute": { "oneOf": [{ "$ref": "#/$defs/boundClaudeRoute" }, { "$ref": "#/$defs/unboundRoute" }] },
+    "codexRoute": { "oneOf": [{ "$ref": "#/$defs/boundCodexRoute" }, { "$ref": "#/$defs/unboundRoute" }] },
+    "rawUsageNode": {
+      "oneOf": [
+        { "type": "number", "minimum": 0 },
+        {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/rawUsageNode" }
+        }
+      ]
+    },
+    "rawUsageObject": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": { "$ref": "#/$defs/rawUsageNode" }
+    },
+    "observedCell": {
+      "type": "object",
+      "required": ["status", "value", "sourceField", "comparison"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "const": "observed" },
+        "value": { "type": "number", "minimum": 0 },
+        "sourceField": { "type": "string", "minLength": 1 },
+        "comparison": { "enum": ["same-runner-only", "none"] }
+      }
+    },
+    "estimatedCell": {
+      "type": "object",
+      "required": ["status", "value", "source", "asOf", "formula", "currency", "comparison"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "const": "estimated" },
+        "value": { "type": "number", "minimum": 0 },
+        "source": { "type": "string", "minLength": 1 },
+        "asOf": { "type": "string", "format": "date", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$" },
+        "formula": { "type": "string", "minLength": 1 },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+        "comparison": { "enum": ["same-runner-only", "none"] }
+      }
+    },
+    "unknownCell": {
+      "type": "object",
+      "required": ["status", "reasonCode"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "const": "unknown" },
+        "reasonCode": { "enum": ["source-omitted", "scope-unbound", "receipt-missing", "billing-unavailable", "semantics-unproven"] }
+      }
+    },
+    "unavailableCell": {
+      "type": "object",
+      "required": ["status", "reasonCode"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "const": "unavailable" },
+        "reasonCode": { "const": "runner-does-not-emit" }
+      }
+    },
+    "inapplicableCell": {
+      "type": "object",
+      "required": ["status", "reasonCode"],
+      "additionalProperties": false,
+      "properties": {
+        "status": { "const": "inapplicable" },
+        "reasonCode": { "const": "metric-not-defined-for-scope" }
+      }
+    },
+    "measuredMetric": {
+      "oneOf": [
+        { "$ref": "#/$defs/observedCell" },
+        { "$ref": "#/$defs/unknownCell" },
+        { "$ref": "#/$defs/unavailableCell" },
+        { "$ref": "#/$defs/inapplicableCell" }
+      ]
+    },
+    "billedMetric": {
+      "oneOf": [
+        { "$ref": "#/$defs/observedCell" },
+        { "$ref": "#/$defs/unknownCell" },
+        { "$ref": "#/$defs/unavailableCell" }
+      ]
+    },
+    "estimatedMetric": {
+      "oneOf": [
+        { "$ref": "#/$defs/estimatedCell" },
+        { "$ref": "#/$defs/unknownCell" },
+        { "$ref": "#/$defs/unavailableCell" },
+        { "$ref": "#/$defs/inapplicableCell" }
+      ]
+    }
+  }
+}

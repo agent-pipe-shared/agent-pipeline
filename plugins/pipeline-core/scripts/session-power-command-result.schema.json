@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.session-power-command-result.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "operation", "sessionId", "status", "revision", "failureClass", "observedAt"],
+  "properties": {
+    "schema": { "const": "pipeline.session-power-command-result.v1" },
+    "operation": { "enum": ["start", "status", "recover", "stop"] },
+    "sessionId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$" },
+    "status": { "enum": ["disabled", "unavailable", "starting", "active", "cleanup-pending", "stopped"] },
+    "revision": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "failureClass": { "type": ["string", "null"], "enum": [null, "platform-unsupported", "tool-missing", "startup-failed", "identity-mismatch", "record-corrupt", "lease-ambiguous", "stop-timeout"] },
+    "observedAt": { "type": "string", "format": "date-time" }
+  }
+}

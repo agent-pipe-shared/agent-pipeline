@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.internal/schemas/codex-isolated-critic-request.schema.json",
+  "title": "Default-off isolated Codex Critic request",
+  "type": "object",
+  "required": ["schema", "dispatchNonce", "attemptNonce", "candidate", "inputs", "inputSetSha256", "permissionProfile", "cli", "platform", "preflight", "verdictSchemaSha256", "budgets", "process", "createdAtMs"],
+  "additionalProperties": false,
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.codex-isolated-critic-request.v1"] },
+    "dispatchNonce": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+    "attemptNonce": { "type": "string", "pattern": "^[0-9a-f]{32}$" },
+    "candidate": {
+      "type": "object",
+      "required": ["commit", "tree", "diffSha256"],
+      "additionalProperties": false,
+      "properties": {
+        "commit": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+        "tree": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+        "diffSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "inputs": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["kind", "path", "rawSha256", "size"],
+        "additionalProperties": false,
+        "properties": {
+          "kind": { "type": "string", "enum": ["spec", "candidate-diff", "guardrail", "constraint", "evidence"] },
+          "path": { "type": "string" },
+          "rawSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "size": { "type": "integer", "minimum": 0, "maximum": 1048576 }
+        }
+      }
+    },
+    "inputSetSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "permissionProfile": {
+      "type": "object",
+      "required": ["id", "rawSha256"],
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "rawSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "cli": {
+      "type": "object",
+      "required": ["version", "compatibilityClass"],
+      "additionalProperties": false,
+      "properties": {
+        "version": { "type": "string" },
+        "compatibilityClass": { "type": "string" }
+      }
+    },
+    "platform": {
+      "type": "object",
+      "required": ["os", "kernelClass", "filesystemClass"],
+      "additionalProperties": false,
+      "properties": {
+        "os": { "type": "string", "enum": ["linux"] },
+        "kernelClass": { "type": "string" },
+        "filesystemClass": { "type": "string", "enum": ["native-linux", "wsl-native", "drvfs"] }
+      }
+    },
+    "preflight": {
+      "type": "object",
+      "required": ["schema", "rawSha256"],
+      "additionalProperties": false,
+      "properties": {
+        "schema": { "type": "string", "enum": ["pipeline.codex-sandbox-preflight.v1"] },
+        "rawSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "verdictSchemaSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "budgets": {
+      "type": "object",
+      "required": ["firstEvidenceMs", "semanticLeaseMs", "totalMs", "maxStdoutBytes", "maxStderrBytes"],
+      "additionalProperties": false,
+      "properties": {
+        "firstEvidenceMs": { "type": "integer", "enum": [60000] },
+        "semanticLeaseMs": { "type": "integer", "enum": [180000] },
+        "totalMs": { "type": "integer", "enum": [480000] },
+        "maxStdoutBytes": { "type": "integer", "enum": [1048576] },
+        "maxStderrBytes": { "type": "integer", "enum": [1048576] }
+      }
+    },
+    "process": {
+      "type": "object",
+      "required": ["hostBootId", "pid", "processStartId", "pgid", "coordinatorNonce"],
+      "additionalProperties": false,
+      "properties": {
+        "hostBootId": { "type": "string" },
+        "pid": { "type": "integer", "minimum": 1 },
+        "processStartId": { "type": "string" },
+        "pgid": { "type": "integer", "minimum": 1 },
+        "coordinatorNonce": { "type": "string", "pattern": "^[0-9a-f]{32}$" }
+      }
+    },
+    "createdAtMs": { "type": "integer", "minimum": 0 }
+  }
+}

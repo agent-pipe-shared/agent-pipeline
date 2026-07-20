@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.public-path-manifest.v1",
+  "type": "array",
+  "items": {
+    "oneOf": [
+      { "$ref": "#/$defs/add" }, { "$ref": "#/$defs/modify" },
+      { "$ref": "#/$defs/delete" }, { "$ref": "#/$defs/rename" }
+    ]
+  },
+  "$defs": {
+    "mode": { "enum": ["100644", "100755"] },
+    "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+    "add": { "type": "object", "additionalProperties": false, "required": ["operation", "path", "newMode", "sourceSha256", "publicSha256"], "properties": { "operation": { "const": "add" }, "path": { "type": "string" }, "newMode": { "$ref": "#/$defs/mode" }, "sourceSha256": { "$ref": "#/$defs/sha256" }, "publicSha256": { "$ref": "#/$defs/sha256" } } },
+    "modify": { "type": "object", "additionalProperties": false, "required": ["operation", "path", "oldMode", "newMode", "oldPublicSha256", "sourceSha256", "publicSha256"], "properties": { "operation": { "const": "modify" }, "path": { "type": "string" }, "oldMode": { "$ref": "#/$defs/mode" }, "newMode": { "$ref": "#/$defs/mode" }, "oldPublicSha256": { "$ref": "#/$defs/sha256" }, "sourceSha256": { "$ref": "#/$defs/sha256" }, "publicSha256": { "$ref": "#/$defs/sha256" } } },
+    "delete": { "type": "object", "additionalProperties": false, "required": ["operation", "path", "oldMode", "oldPublicSha256"], "properties": { "operation": { "const": "delete" }, "path": { "type": "string" }, "oldMode": { "$ref": "#/$defs/mode" }, "oldPublicSha256": { "$ref": "#/$defs/sha256" } } },
+    "rename": { "type": "object", "additionalProperties": false, "required": ["operation", "oldPath", "newPath", "oldMode", "newMode", "oldPublicSha256", "sourceSha256", "publicSha256"], "properties": { "operation": { "const": "rename" }, "oldPath": { "type": "string" }, "newPath": { "type": "string" }, "oldMode": { "$ref": "#/$defs/mode" }, "newMode": { "$ref": "#/$defs/mode" }, "oldPublicSha256": { "$ref": "#/$defs/sha256" }, "sourceSha256": { "$ref": "#/$defs/sha256" }, "publicSha256": { "$ref": "#/$defs/sha256" } } }
+  }
+}

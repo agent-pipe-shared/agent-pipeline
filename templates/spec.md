@@ -63,6 +63,28 @@ matters now. No solution language here.}}
 data flow, integration points. One diagram (mermaid/ASCII) where it clarifies.
 This is the "how" at architecture altitude — file-level detail belongs in §4.}}
 
+### 2a. Stateful guard/control pre-readiness checklist (conditional, mandatory)
+
+{{Complete this section before the first independent readiness dispatch WHEN the
+design adds or changes a stateful guard/control: durable control state,
+authority/replay semantics, recovery, or a mutation/enforcement boundary. State
+the following explicitly; "handled by the implementation" is not an answer.}}
+
+- Authority issuer and replay rule.
+- Durable storage and atomicity boundary.
+- Complete resource/phase crash-state matrix.
+- Exact mutation point and kernel/controller enforcement point.
+- Bootstrap and self-update transition.
+- Binary candidate/evidence binding.
+- Exact pre- and post-mutation bytes.
+- Sole recovery authority.
+- Self-reference audit (what mutable material cannot authenticate itself).
+
+{{This is a documentation/readiness contract only: it does not claim a new
+runtime enforcement mechanism and it is additive to, never a replacement for,
+the EL-07 independent readiness check. Delete this section only when the
+conditional trigger does not apply.}}
+
 ### 3. Alternatives (mandatory from level 1)
 
 {{Everything considered and rejected, with the reason. These entries are
@@ -104,8 +126,21 @@ SYSTEM SHALL …".}}
   exit code (never model-written prose — operating-model §4.1, P4).
 - Critic trigger per operating-model §4.2 matrix; for level 2 the Critic is
   mandatory. Architecture/guardrail/security diffs additionally require the
-  higher-capability review model at max + `--bare` isolation (canonical trigger
-  wording: operating-model §4.2 — the German text is authoritative).
+  higher-capability review tier with the selected runner's usable native
+  isolation. `claude -p --bare` remains a Claude runner adapter, not a global
+  critical-review mechanism. If that isolation is technically unavailable or
+  unusable in the current host setup, use the standing PO-authorized functional
+  equivalent: **one** fresh independently briefed Critic subagent with no
+  chat/history or implementer reasoning, refs-only bounded input, strict
+  read-only/no-write/no-subdelegation instruction, fixed candidate commit and
+  diff, higher-capability route, JSON-schema-shaped verdict, and the literal
+  assurance `functional-equivalent-read-only; OS isolation not asserted`. This
+  is a standing authorization, not a per-candidate waiver: it preserves every
+  T1 trigger, higher-capability escalation, evidence, independence, and
+  finding-disposition requirement. The contractual read-only equivalent never
+  claims OS isolation or effective provider model identity; if even it cannot
+  be provided, stop at a PO course gate (canonical trigger wording:
+  operating-model §4.2 — the German text is authoritative).
 - Level 2 only: spec updated BEFORE merge on any implementation deviation.
 - Canonical DoD checklist: `harness/definition-of-done.md` §2 (copy the block,
   strike items per the rigor matrix §4 there).

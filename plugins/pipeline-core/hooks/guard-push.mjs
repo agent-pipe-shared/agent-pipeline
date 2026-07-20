@@ -204,7 +204,7 @@ function parsePushBinding(rawCmd) {
   if (rootResult.status !== 0 || !rootResult.stdout?.trim()) {
     return { ok: false, reason: "push repository cannot be resolved to a non-bare worktree" };
   }
-  return { ok: true, projectDir: rootResult.stdout.trim(), source, remote, refspec };
+  return { ok: true, projectDir: rootResult.stdout.trim(), source, destination, remote, refspec };
 }
 
 function splitShellSegments(rawCmd) {
@@ -317,6 +317,184 @@ function resolveSourceCommit(binding) {
   return result.stdout.trim();
 }
 
+// ---- specialized anonymous Shared-push calibration ----------------------------------
+// Generic projects do not carry this calibration and therefore retain the normal
+// evidence/approval gate unchanged.  Self-application enables it deliberately in
+// .claude/pipeline.json; it is a repository-local expected identity, never a global
+// git default or a private account profile.
+const PUBLIC_PUSH_IDENTITY_SCHEMA = "pipeline.public-push-identity.v1";
+const TRAILER_DENY = /^(?:co-authored-by|signed-off-by|reviewed-by|assisted-by|provider|model|session|run|trace|private(?:-account)?|account|operator|machine|host|workspace|worktree)\s*:/im;
+const EMAIL_IN_MESSAGE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
+const PRIVATE_CORRELATION_IN_MESSAGE = /\b(?:provider|model|session|account|operator|codex|claude|openai|anthropic|gpt(?:[-\s]?[a-z0-9.]+)?|gemini|machine|host|workspace|worktree|correlation|trace(?:[-\s]?id)?|run[-\s]?id)\b/i;
+const PRIVATE_URL_IN_MESSAGE = /\b[a-z][a-z0-9+.-]*:\S+|\b[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[^\s]+/i;
+const MACHINE_ABSOLUTE_PATH_IN_MESSAGE = /(?:^|[^A-Za-z0-9._-])(?:\/[A-Za-z0-9._-]+(?:\/|$)|[A-Za-z]:[\\/]|\\\\[^\\\s]+[\\/])/m;
+const SECRET_LIKE_VALUE_IN_MESSAGE = /\b(?:gh[pousr]_[A-Za-z0-9_]{12,}|github_pat_[A-Za-z0-9_]{12,}|sk-[A-Za-z0-9_-]{12,}|AKIA[0-9A-Z]{12,})\b/;
+
+function localGitConfig(binding, key) {
+  const result = spawnSync("git", ["-C", binding.projectDir, "config", "--local", "--get", key], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  return result.status === 0 ? result.stdout.trim() : null;
+}
+
+function effectiveGitConfig(binding, key) {
+  const result = spawnSync("git", ["-C", binding.projectDir, "config", "--get", key], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  return result.status === 0 ? result.stdout.trim() : null;
+}
+
+function effectivePushUrls(binding) {
+  const result = spawnSync("git", ["-C", binding.projectDir, "remote", "get-url", "--push", "--all", binding.remote], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  return result.status === 0 ? result.stdout.split("\n").filter(Boolean) : [];
+}
+
+function readPublicPushIdentity(binding) {
+  const path = join(binding.projectDir, ".claude", "pipeline.json");
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(path, "utf8"));
+  } catch {
+    return { enabled: false };
+  }
+  const identity = parsed?.publicPushIdentity;
+  if (identity === undefined) return { enabled: false };
+  if (!identity || typeof identity !== "object" || Array.isArray(identity)) return { enabled: true, error: "publicPushIdentity calibration is malformed" };
+  const required = ["schema", "mode", "repositoryOwner", "repositoryName", "remoteName", "approvedFeatureBranch", "sshHostAlias", "sshAccount", "authorName", "authorEmail"];
+  if (required.some((key) => typeof identity[key] !== "string" || identity[key].length === 0)) {
+    return { enabled: true, error: "publicPushIdentity calibration is incomplete" };
+  }
+  if (identity.schema !== PUBLIC_PUSH_IDENTITY_SCHEMA || identity.mode !== "required") {
+    return { enabled: true, error: "publicPushIdentity calibration is not a required v1 anonymous-public binding" };
+  }
+  return { enabled: true, identity };
+}
+
+function remoteCoordinates(remoteUrl) {
+  // Self-application deliberately uses an SSH host alias.  HTTPS, a generic GitHub
+  // hostname, and scp/URL variants cannot prove the selected dedicated key path.
+  const match = /^git@([A-Za-z0-9.-]+):([^/\s]+)\/([^/\s]+?)(?:\.git)?$/.exec(remoteUrl ?? "");
+  return match ? { host: match[1], owner: match[2], repository: match[3] } : null;
+}
+
+function anonymousRange(binding, sourceCommit, expected) {
+  if (!binding.destination || binding.destination !== `refs/heads/${expected.approvedFeatureBranch}`) {
+    return { ok: false, reason: "anonymous-public pushes require an explicit refs/heads/<feature-branch> destination" };
+  }
+  const branch = expected.approvedFeatureBranch;
+  if (!/^[A-Za-z0-9._/-]+$/.test(branch) || branch === "main") return { ok: false, reason: "anonymous-public destination branch is malformed" };
+  const trackingRef = `refs/remotes/${binding.remote}/${branch}`;
+  const base = spawnSync("git", ["-C", binding.projectDir, "rev-parse", "--verify", "--end-of-options", trackingRef], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  const baseCommit = base.status === 0 ? base.stdout.trim() : null;
+  if (!baseCommit || !/^[0-9a-f]{40,64}$/i.test(baseCommit)) {
+    return { ok: false, reason: "anonymous-public range lacks the fetched destination tracking ref" };
+  }
+  const ancestry = spawnSync("git", ["-C", binding.projectDir, "merge-base", "--is-ancestor", baseCommit, sourceCommit], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  if (ancestry.status !== 0) return { ok: false, reason: "anonymous-public destination is not an ancestor of the pushed source" };
+  const commits = spawnSync("git", ["-C", binding.projectDir, "rev-list", "--reverse", `${baseCommit}..${sourceCommit}`], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  if (commits.status !== 0) return { ok: false, reason: "anonymous-public commit range cannot be read" };
+  const commitIds = commits.stdout.split("\n").filter(Boolean);
+  if (commitIds.length === 0) return { ok: false, reason: "anonymous-public push contains no newly reachable commit" };
+  const entries = [];
+  for (const commit of commitIds) {
+    const object = spawnSync("git", ["-C", binding.projectDir, "cat-file", "-p", commit], { encoding: "utf8", timeout: 5000 });
+    const signature = spawnSync("git", ["-C", binding.projectDir, "log", "-1", "--format=%G?", "--no-notes", commit], { encoding: "utf8", timeout: 5000 });
+    if (object.status !== 0 || signature.status !== 0) return { ok: false, reason: "anonymous-public commit range cannot be decoded" };
+    const bodyAt = object.stdout.indexOf("\n\n");
+    const headers = bodyAt === -1 ? object.stdout : object.stdout.slice(0, bodyAt);
+    const message = bodyAt === -1 ? "" : object.stdout.slice(bodyAt + 2);
+    const author = /^author (.*) <([^>\n]+)> \d+ [+-]\d{4}$/m.exec(headers);
+    const committer = /^committer (.*) <([^>\n]+)> \d+ [+-]\d{4}$/m.exec(headers);
+    if (!author || !committer) return { ok: false, reason: "anonymous-public commit identity headers cannot be decoded" };
+    entries.push({
+      commit,
+      authorName: author[1],
+      authorEmail: author[2],
+      committerName: committer[1],
+      committerEmail: committer[2],
+      signature: signature.stdout.trim(),
+      message,
+    });
+  }
+  return { ok: true, entries };
+}
+
+function authenticatedSshAccount(identity) {
+  // `ssh -T` intentionally returns exit 1 after successful GitHub public-key
+  // authentication because GitHub exposes no shell.  The bounded greeting is
+  // the account evidence; a configured host alias alone only proves selection.
+  const result = spawnSync(
+    "ssh",
+    ["-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", identity.sshHostAlias],
+    { encoding: "utf8", timeout: 7000 },
+  );
+  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  return output.includes(`Hi ${identity.sshAccount}!`)
+    ? { ok: true }
+    : { ok: false, reason: "anonymous-public SSH account evidence does not name the calibrated dedicated account" };
+}
+
+function checkAnonymousPublicPush(binding, sourceCommit) {
+  const calibration = readPublicPushIdentity(binding);
+  if (!calibration.enabled) return [];
+  if (calibration.error) return [calibration.error];
+  const expected = calibration.identity;
+  const failures = [];
+  const expectedConfig = {
+    "user.useConfigOnly": "true",
+    "commit.gpgSign": "false",
+    "user.name": expected.authorName,
+    "user.email": expected.authorEmail,
+  };
+  for (const [key, value] of Object.entries(expectedConfig)) {
+    if (localGitConfig(binding, key) !== value) failures.push(`anonymous-public local ${key} must equal its calibrated value`);
+  }
+  if (binding.remote !== expected.remoteName) failures.push("anonymous-public push must use the calibrated remote name");
+  const remote = remoteCoordinates(localGitConfig(binding, `remote.${binding.remote}.url`));
+  if (!remote || remote.host !== expected.sshHostAlias || remote.owner !== expected.repositoryOwner || remote.repository !== expected.repositoryName) {
+    failures.push("anonymous-public remote must bind the calibrated SSH host alias and repository owner");
+  }
+  const expectedPushUrl = `git@${expected.sshHostAlias}:${expected.repositoryOwner}/${expected.repositoryName}.git`;
+  const effectiveUrls = effectivePushUrls(binding);
+  if (effectiveUrls.length !== 1 || effectiveUrls[0] !== expectedPushUrl) {
+    failures.push("anonymous-public effective push URL must be exactly the calibrated SSH endpoint");
+  }
+  if (process.env.GIT_SSH || process.env.GIT_SSH_COMMAND || effectiveGitConfig(binding, "core.sshCommand")) {
+    failures.push("anonymous-public transport must not override the calibrated SSH host-alias path");
+  }
+  if (expected.sshAccount !== expected.repositoryOwner) failures.push("anonymous-public calibration must bind the dedicated SSH account to the repository owner");
+  const ssh = authenticatedSshAccount(expected);
+  if (!ssh.ok) failures.push(ssh.reason);
+  const range = anonymousRange(binding, sourceCommit, expected);
+  if (!range.ok) return [...failures, range.reason];
+  for (const { commit, authorName, authorEmail, committerName, committerEmail, signature, message } of range.entries) {
+    if (authorName !== expected.authorName || authorEmail !== expected.authorEmail) failures.push(`anonymous-public commit ${commit} has a non-neutral Author identity`);
+    if (committerName !== expected.authorName || committerEmail !== expected.authorEmail) failures.push(`anonymous-public commit ${commit} has a non-neutral Committer identity`);
+    if (signature !== "N") failures.push(`anonymous-public commit ${commit} carries a signature`);
+    if (TRAILER_DENY.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries a forbidden personal/provider/private trailer`);
+    if (EMAIL_IN_MESSAGE.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries an email address in its message`);
+    if (PRIVATE_CORRELATION_IN_MESSAGE.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries forbidden private correlation metadata`);
+    if (PRIVATE_URL_IN_MESSAGE.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries a non-canonical URL`);
+    if (MACHINE_ABSOLUTE_PATH_IN_MESSAGE.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries a machine-specific absolute path`);
+    if (SECRET_LIKE_VALUE_IN_MESSAGE.test(message ?? "")) failures.push(`anonymous-public commit ${commit} carries a credential-shaped value`);
+  }
+  return failures;
+}
+
 const pushBinding = parsePushBinding(cmd);
 function fallbackProjectDir() {
   const candidate = process.env.CLAUDE_PROJECT_DIR || process.cwd();
@@ -338,6 +516,167 @@ if (!pushBinding.ok && !declaredProjectDir && declaresCrossRepositoryPush(cmd)) 
   emit(2, ["BLOCKED (guard-push, plugin pipeline-core): push target is not unambiguous; cross-repository target cannot be resolved safely."]);
 }
 const projectDir = declaredProjectDir ?? fallbackProjectDir();
+
+// ---- Batman E1/E3: typed local publication authority ---------------------------------
+//
+// This is deliberately a READ-ONLY consumer.  `pipeline-state` is the sole writer
+// for the local authorization and records the compact projection below in the normal
+// tracked state file.  The full channel state stays in the local State-Writer-managed
+// store; this projection contains no endpoint, identity, evidence path, or secret.
+//
+// A present `state.publication` is an explicit publication mode marker.  It therefore
+// changes the default from the ordinary Push-Gate's configurable approval (including
+// standing approval) to a closed, one-shot command grammar.  A malformed marker must
+// not silently downgrade a delivery attempt into an ordinary push.
+const PUBLICATION_PROJECTION_SCHEMA = "pipeline.publication-projection.v1";
+const PUBLICATION_AUTHORITY_REFERENCE_SCHEMA = "pipeline.publication-authority-reference.v1";
+const PUBLICATION_AUTHORIZATION_SCHEMA = "pipeline.publication-authorization.v1";
+const PUBLICATION_CHANNELS = new Set(["private", "neutral-public"]);
+const PUBLICATION_ID = /^[A-Za-z0-9._:@/-]{1,200}$/;
+const PUBLICATION_OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
+const PUBLICATION_DIGEST = /^[0-9a-f]{64}$/;
+const PUBLICATION_DESTINATION = /^refs\/heads\/[A-Za-z0-9._/-]+$/;
+
+function exactObjectKeys(value, keys) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const actual = Object.keys(value).sort();
+  const expected = [...keys].sort();
+  return actual.length === expected.length && actual.every((key, index) => key === expected[index]);
+}
+
+/**
+ * Read the minimal public-to-guard projection.  The reader never repairs, consumes,
+ * or otherwise mutates state: a successful writer CAS has already consumed the
+ * approval before this hook can observe `push-authorized`.
+ */
+function readPublicationMode(dir) {
+  const statePath = join(dir, ".claude", "pipeline-state.json");
+  let raw;
+  try {
+    raw = readFileSync(statePath, "utf8");
+  } catch {
+    return { active: false };
+  }
+  let state;
+  try {
+    state = JSON.parse(raw);
+  } catch {
+    // A torn/corrupt State could have lost the only parseable indication that a
+    // one-shot publication authorization was live.  Falling through to standing
+    // approval would turn that uncertainty into an authorization bypass.
+    return { active: true, error: "pipeline State is malformed; publication authority cannot be excluded" };
+  }
+  if (!Object.hasOwn(state, "publication")) return { active: false };
+  const authority = state.publication;
+  if (!exactObjectKeys(authority, ["schema", "channels", "authorizedPushes"])
+    || authority.schema !== PUBLICATION_PROJECTION_SCHEMA
+    || !exactObjectKeys(authority.channels, ["private", "neutral-public"])
+    || !Array.isArray(authority.authorizedPushes)) {
+    return { active: true, error: "publication authority marker is malformed" };
+  }
+  return { active: true, channels: authority.channels, authorizations: authority.authorizedPushes };
+}
+
+function publicationReferenceMatches(value, authorization) {
+  if (!exactObjectKeys(value, ["schema", "transactionId", "channel", "phase", "candidateOid", "candidateTree", "destinationRef", "projectionRawSha256", "publicationStateSha256", "receiptDigest"])
+    || value.schema !== PUBLICATION_AUTHORITY_REFERENCE_SCHEMA
+    || value.transactionId !== authorization.transactionId
+    || value.channel !== authorization.channel
+    || value.phase !== "push-authorized"
+    || value.publicationStateSha256 !== authorization.stateDigest
+    || !PUBLICATION_OID.test(value.candidateOid ?? "")
+    || !PUBLICATION_OID.test(value.candidateTree ?? "")
+    || !PUBLICATION_DESTINATION.test(value.destinationRef ?? "")
+    || value.destinationRef.includes("..")
+    || !PUBLICATION_DIGEST.test(value.projectionRawSha256 ?? "")
+    || value.receiptDigest !== null) return false;
+  return authorization.command[4] === `${value.candidateOid}:${value.destinationRef}`;
+}
+
+function validatePublicationAuthorization(value) {
+  if (!exactObjectKeys(value, ["schema", "channel", "transactionId", "revision", "stateDigest", "command", "authorization", "status"])
+    || value.schema !== PUBLICATION_AUTHORIZATION_SCHEMA
+    || !PUBLICATION_CHANNELS.has(value.channel)
+    || !PUBLICATION_ID.test(value.transactionId ?? "")
+    || !Number.isInteger(value.revision) || value.revision < 2
+    || !PUBLICATION_DIGEST.test(value.stateDigest ?? "")
+    || value.status !== "push-authorized") {
+    return { ok: false, reason: "typed authorization shape is invalid" };
+  }
+  if (!Array.isArray(value.command) || value.command.length !== 5
+    || value.command[0] !== "git" || value.command[1] !== "push"
+    || value.command[2] !== "--porcelain"
+    || !PUBLICATION_ID.test(value.command[3] ?? "")) {
+    return { ok: false, reason: "typed authorization command is invalid" };
+  }
+  const refspec = value.command[4];
+  const match = /^([0-9a-f]{40}|[0-9a-f]{64}):(refs\/heads\/[A-Za-z0-9._/-]+)$/.exec(refspec ?? "");
+  if (!match || !PUBLICATION_OID.test(match[1]) || !PUBLICATION_DESTINATION.test(match[2]) || match[2].includes("..")) {
+    return { ok: false, reason: "typed authorization refspec is invalid" };
+  }
+  if (!exactObjectKeys(value.authorization, ["approvalId", "consumedAt", "tupleDigest"])
+    || !PUBLICATION_ID.test(value.authorization.approvalId ?? "")
+    || !Number.isSafeInteger(value.authorization.consumedAt)
+    || !PUBLICATION_DIGEST.test(value.authorization.tupleDigest ?? "")) {
+    return { ok: false, reason: "typed authorization consumption is invalid" };
+  }
+  return { ok: true };
+}
+
+/** Return the semantic argv of the sole accepted publication push grammar. */
+function publicationCommandFromInvocation(rawCmd, binding) {
+  if (!binding?.ok) return { ok: false, reason: binding?.reason ?? "push target is not unambiguous" };
+  const tokens = tokenizeArgv(rawCmd);
+  let index = 1;
+  if (tokens[0] !== "git") return { ok: false, reason: "publication push must invoke lowercase git directly" };
+  if (tokens[index] === "-C") {
+    if (!tokens[index + 1]) return { ok: false, reason: "publication git -C lacks its bound root" };
+    index += 2;
+  }
+  const actual = [tokens[0], ...tokens.slice(index)];
+  if (actual.length !== 5 || actual[1] !== "push" || actual[2] !== "--porcelain") {
+    return { ok: false, reason: "publication push must be exactly git [-C <bound-root>] push --porcelain <remote> <candidate>:<full-ref>" };
+  }
+  if (actual[3] !== binding.remote || actual[4] !== binding.refspec) {
+    return { ok: false, reason: "publication push parser binding drift" };
+  }
+  return { ok: true, command: actual };
+}
+
+function enforcePublicationAuthorization(mode, rawCmd, binding) {
+  if (!mode.active) return;
+  if (mode.error) {
+    emit(2, [`BLOCKED (guard-push publication mode): ${mode.error}; ordinary/standing push approval is not a fallback.`]);
+  }
+  const invocation = publicationCommandFromInvocation(rawCmd, binding);
+  if (!invocation.ok) {
+    emit(2, [
+      `BLOCKED (guard-push publication mode): ${invocation.reason}.`,
+      "Generic, standing, or differently shaped push approval cannot authorize a publication delivery.",
+    ]);
+  }
+  const valid = [];
+  for (const authorization of mode.authorizations) {
+    const checked = validatePublicationAuthorization(authorization);
+    if (!checked.ok) {
+      emit(2, [`BLOCKED (guard-push publication mode): ${checked.reason}; typed authorization is fail-closed.`]);
+    }
+    const reference = mode.channels[authorization.channel];
+    if (!publicationReferenceMatches(reference, authorization)) {
+      emit(2, ["BLOCKED (guard-push publication mode): authorization is not bound to its redacted channel reference."]);
+    }
+    if (JSON.stringify(authorization.command) === JSON.stringify(invocation.command)) valid.push(authorization);
+  }
+  if (valid.length !== 1) {
+    emit(2, [
+      `BLOCKED (guard-push publication mode): exact typed authorization count is ${valid.length} (expected 1).`,
+      "Generic, standing, or stale authorization cannot authorize this publication push.",
+    ]);
+  }
+}
+
+const publicationMode = readPublicationMode(projectDir);
+enforcePublicationAuthorization(publicationMode, cmd, pushBinding);
 
 // =====================================================================================
 // DEPLOY BRANCH helpers. Pure/defensive helpers first, `runDeployBranch` (the entry
@@ -765,6 +1104,11 @@ const securityGate = gateConfig(manifest, "security");
 if (securityGate && securityGate.mode !== "off") {
   failures.push(...checkEvidenceFreshness("evidence/security-latest.json"));
 }
+
+// (b.1) self-application-only anonymous public range and dedicated authenticated
+// SSH-account evidence. The close ritual repeats this preflight immediately before
+// the actual network operation, then fetches the pushed ref from a fresh repository.
+failures.push(...checkAnonymousPublicPush(pushBinding, sourceCommit));
 
 // (c) approval.
 if (pushGate.approval === "standing-approved") {

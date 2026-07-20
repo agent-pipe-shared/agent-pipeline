@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.codex-sandbox-compatibility-policy.v1",
+  "title": "Closed Codex sandbox compatibility policy",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "maxEvidenceAgeMs", "fallback", "entries"],
+  "properties": {
+    "schema": { "type": "string", "enum": ["pipeline.codex-sandbox-compatibility-policy.v1"] },
+    "maxEvidenceAgeMs": { "type": "integer" },
+    "fallback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["laneId", "runnerId", "assuranceLiteral", "allowedFailureCodes"],
+      "properties": {
+        "laneId": { "type": "string" },
+        "runnerId": { "type": "string" },
+        "assuranceLiteral": { "type": "string", "enum": ["functional-equivalent-read-only; OS isolation not asserted"] },
+        "allowedFailureCodes": { "type": "array", "items": { "type": "string", "enum": ["binary-missing", "unsupported-profile", "sandbox-setup-error", "permission-denial", "child-stdio-error"] } }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "runnerId", "primaryLaneId", "fallbackLaneId", "cliVersion", "releasedArtifactSha256", "kernelClass", "filesystemClass", "permissionProfileId", "permissionProfileSha256", "preflightSchemaSha256", "networkEnabled", "initialState"],
+        "properties": {
+          "id": { "type": "string" },
+          "runnerId": { "type": "string" },
+          "primaryLaneId": { "type": "string" },
+          "fallbackLaneId": { "type": "string" },
+          "cliVersion": { "type": "string" },
+          "releasedArtifactSha256": { "type": "string" },
+          "kernelClass": { "type": "string" },
+          "filesystemClass": { "type": "string", "enum": ["native-linux", "wsl-native", "drvfs"] },
+          "permissionProfileId": { "type": "string" },
+          "permissionProfileSha256": { "type": "string" },
+          "preflightSchemaSha256": { "type": "string" },
+          "networkEnabled": { "type": "boolean" },
+          "initialState": { "type": "string", "enum": ["diagnostic-only", "intermediate-preflight-candidate"] }
+        }
+      }
+    }
+  }
+}

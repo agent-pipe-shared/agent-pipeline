@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.document-lifecycle.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "policyStatus", "policySha256", "baseCommit", "baseTree", "candidateCommit", "candidateTree", "diffSha256", "classes"],
+  "properties": {
+    "schema": { "const": "pipeline.document-lifecycle.v1" },
+    "policyStatus": { "enum": ["absent", "configured"] },
+    "policySha256": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+    "baseCommit": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+    "baseTree": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+    "candidateCommit": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+    "candidateTree": { "type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$" },
+    "diffSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "classes": {
+      "type": "array",
+      "maxItems": 96,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["classId", "bindingId", "mode", "event", "disposition", "status", "receiptId", "commitment", "failureClass"],
+        "properties": {
+          "classId": { "enum": ["authorization", "operations", "emergency", "privacy"] },
+          "bindingId": { "type": "string", "pattern": "^dh_[a-z2-7]{25}[aeimquy4]$" },
+          "mode": { "enum": ["advisory", "mandatory"] },
+          "event": { "enum": ["design-impact", "verify", "close"] },
+          "disposition": { "enum": ["affected", "unaffected-with-reason", "not-applicable"] },
+          "status": { "enum": ["complete", "unavailable", "review-pending", "error", "abandoned"] },
+          "receiptId": { "type": ["string", "null"], "pattern": "^dhr_[a-z2-7]{25}[aeimquy4]$" },
+          "commitment": { "type": ["string", "null"], "pattern": "^[a-f0-9]{64}$" },
+          "failureClass": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

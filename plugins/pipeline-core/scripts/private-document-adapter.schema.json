@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.private-document-adapter.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "repoFingerprint", "adapterId", "executablePath", "executableSha256", "protocol", "registeredBy", "registeredAt"],
+  "properties": {
+    "schema": { "const": "pipeline.private-document-adapter.v1" },
+    "repoFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "adapterId": { "type": "string", "pattern": "^da_[a-z2-7]{25}[aeimquy4]$" },
+    "executablePath": { "type": "string", "minLength": 1 },
+    "executableSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "protocol": { "const": "pipeline.document-renderer-stdio.v1" },
+    "registeredBy": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "registeredAt": { "type": "string", "format": "date-time" }
+  }
+}

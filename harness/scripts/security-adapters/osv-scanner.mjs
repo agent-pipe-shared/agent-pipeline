@@ -7,7 +7,8 @@
  * header first for the shared resolveBinary()/config.binaryPath/env-param rationale --
  * identical pattern here, not re-explained).
  *
- * INVOCATION: `osv-scanner scan source --format json -r <root>`.
+ * INVOCATION: `osv-scanner --version` then `osv-scanner scan source --format json -r <root>`.
+ * Only OSV-Scanner major version 2 is compatible with the v2 scan syntax.
  * osv-scanner prints its JSON report to STDOUT (unlike gitleaks, no report-path file).
  * Exit-code contract (load-bearing): 0 (clean) and 1 (findings present)
  * are BOTH valid completed runs -- osv-scanner uses exit 1 as its normal "vulnerabilities
@@ -19,16 +20,13 @@
  * reported as SKIPPED (with an honest reason) instead of ERROR. Any OTHER exit 128 (or any
  * other unexpected exit code) stays ERROR unchanged (fail-closed).
  *
- * OUTPUT SHAPE (defensive, OPEN ITEM for real-tool validation): osv-scanner's CLI has
- * had at least one shape
- * change across major versions ("old" vs "new" CLI). This adapter expects the common,
- * long-stable shape `{ results: [ { source: {...}, packages: [ { package: {...},
- * vulnerabilities: [...], groups: [...] } ] } ] }` and walks it defensively (every level
- * guarded with Array.isArray/optional chaining, the whole extraction wrapped in try/catch)
- * so an unexpected nesting degrades to ERROR ("osv-scanner output shape not recognized")
- * rather than crashing or silently reporting zero findings. NOT verified against a real
- * osv-scanner binary yet -- real-tool validation must confirm this shape against the
- * actual installed version before this adapter is trusted end-to-end.
+ * OUTPUT CONTRACT (fail-closed): after the major-v2 probe, this adapter accepts only a
+ * JSON object shaped as `{ results: [ { source: { path }, packages: [ { package: { name,
+ * version }, vulnerabilities: [...], groups: [...] } ] } ] }`. Every named container and
+ * every vulnerability ID is validated before extraction; additional fields remain allowed
+ * because they are not part of the adapter boundary. Empty `results` and empty package,
+ * vulnerability, or group arrays are valid. Any missing or wrongly typed required member is
+ * an ERROR, never a clean result or a partial finding set.
  *
  * SEVERITY MAPPING (per vulnerability, `mapOsvSeverity()`):
  *   1. `vuln.database_specific.severity` (string, e.g. "CRITICAL"/"HIGH"/"MEDIUM"/"LOW",
@@ -74,6 +72,70 @@ export function isInstalled(env = process.env) {
   return resolveBinary(env);
 }
 
+function spawnFailure(error) {
+  if (error?.code === "EPERM" || error?.code === "EACCES") {
+    return {
+      status: "ERROR",
+      classification: "execution_environment",
+      findings: [],
+      raw: null,
+      reason: `osv-scanner could not start (${error.code}): execution environment blocks Node child processes; this is not a missing scanner or finding`,
+    };
+  }
+  return {
+    status: "ERROR",
+    classification: "scanner_error",
+    findings: [],
+    raw: null,
+    reason: `spawn error: ${error?.message ?? "unknown error"}`,
+  };
+}
+
+function versionMajor(stdout) {
+  const match = String(stdout ?? "").match(/(?:^|[^0-9])v?(\d+)\.(\d+)\.(\d+)(?:$|[^0-9])/);
+  return match ? Number(match[1]) : null;
+}
+
+function checkV2({ binaryPath, rootDir, spawnFn, timeoutMs }) {
+  let result;
+  try {
+    result = spawnFn(binaryPath, ["--version"], { cwd: rootDir, encoding: "utf8", timeout: timeoutMs, shell: false });
+  } catch (error) {
+    return spawnFailure(error);
+  }
+  if (result.error?.code === "ETIMEDOUT") {
+    return {
+      status: "ERROR",
+      classification: "scanner_error",
+      findings: [],
+      raw: null,
+      reason: `osv-scanner version probe timed out after ${timeoutMs}ms`,
+    };
+  }
+  if (result.error) return spawnFailure(result.error);
+  if (result.status !== 0) {
+    return {
+      status: "ERROR",
+      classification: "scanner_error",
+      findings: [],
+      raw: result.stdout ?? null,
+      reason: `osv-scanner version probe exited ${result.status ?? "unknown"}: ${(result.stderr || "").trim().slice(0, 500)}`,
+    };
+  }
+  const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
+  const major = versionMajor(output);
+  if (major !== 2) {
+    return {
+      status: "ERROR",
+      classification: "incompatible_major",
+      findings: [],
+      raw: output,
+      reason: `osv-scanner major version ${major ?? "unknown"} is incompatible; install OSV-Scanner v2`,
+    };
+  }
+  return null;
+}
+
 function mapOsvSeverity(vuln) {
   const dbSev = vuln?.database_specific?.severity;
   if (typeof dbSev === "string") {
@@ -93,24 +155,62 @@ function mapOsvSeverity(vuln) {
   return "high"; // intentional fallback
 }
 
+function isRecord(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isNonEmptyString(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function validateV2Output(parsed) {
+  if (!isRecord(parsed)) return "top-level JSON value must be an object";
+  if (!Array.isArray(parsed.results)) return "results must be an array";
+
+  for (let resultIndex = 0; resultIndex < parsed.results.length; resultIndex++) {
+    const result = parsed.results[resultIndex];
+    const resultPath = `results[${resultIndex}]`;
+    if (!isRecord(result)) return `${resultPath} must be an object`;
+    if (!isRecord(result.source)) return `${resultPath}.source must be an object`;
+    if (!isNonEmptyString(result.source.path)) return `${resultPath}.source.path must be a non-empty string`;
+    if (!Array.isArray(result.packages)) return `${resultPath}.packages must be an array`;
+
+    for (let packageIndex = 0; packageIndex < result.packages.length; packageIndex++) {
+      const packageEntry = result.packages[packageIndex];
+      const packagePath = `${resultPath}.packages[${packageIndex}]`;
+      if (!isRecord(packageEntry)) return `${packagePath} must be an object`;
+      if (!isRecord(packageEntry.package)) return `${packagePath}.package must be an object`;
+      if (!isNonEmptyString(packageEntry.package.name)) return `${packagePath}.package.name must be a non-empty string`;
+      if (!isNonEmptyString(packageEntry.package.version)) return `${packagePath}.package.version must be a non-empty string`;
+      if (!Array.isArray(packageEntry.vulnerabilities)) return `${packagePath}.vulnerabilities must be an array`;
+      if (!Array.isArray(packageEntry.groups)) return `${packagePath}.groups must be an array`;
+
+      for (let groupIndex = 0; groupIndex < packageEntry.groups.length; groupIndex++) {
+        if (!isRecord(packageEntry.groups[groupIndex])) return `${packagePath}.groups[${groupIndex}] must be an object`;
+      }
+      for (let vulnerabilityIndex = 0; vulnerabilityIndex < packageEntry.vulnerabilities.length; vulnerabilityIndex++) {
+        const vulnerability = packageEntry.vulnerabilities[vulnerabilityIndex];
+        const vulnerabilityPath = `${packagePath}.vulnerabilities[${vulnerabilityIndex}]`;
+        if (!isRecord(vulnerability)) return `${vulnerabilityPath} must be an object`;
+        if (!isNonEmptyString(vulnerability.id)) return `${vulnerabilityPath}.id must be a non-empty string`;
+      }
+    }
+  }
+  return null;
+}
+
 function extractFindings(parsed) {
   const findings = [];
-  const results = Array.isArray(parsed?.results) ? parsed.results : [];
-  for (const result of results) {
-    const sourcePath = result?.source?.path;
-    const packages = Array.isArray(result?.packages) ? result.packages : [];
-    for (const pkgEntry of packages) {
-      const pkgName = pkgEntry?.package?.name ?? "unknown-package";
-      const pkgVersion = pkgEntry?.package?.version;
-      const vulns = Array.isArray(pkgEntry?.vulnerabilities) ? pkgEntry.vulnerabilities : [];
-      for (const vuln of vulns) {
+  for (const result of parsed.results) {
+    for (const packageEntry of result.packages) {
+      for (const vulnerability of packageEntry.vulnerabilities) {
         findings.push({
           tool: name,
-          severity: mapOsvSeverity(vuln),
-          rule: vuln?.id ?? "unknown-osv-id",
-          path: sourcePath ?? (pkgVersion ? `${pkgName}@${pkgVersion}` : pkgName),
+          severity: mapOsvSeverity(vulnerability),
+          rule: vulnerability.id,
+          path: result.source.path,
           line: null,
-          msg: vuln?.summary ?? vuln?.details ?? vuln?.id ?? "vulnerability detected",
+          msg: vulnerability.summary ?? vulnerability.details ?? vulnerability.id,
         });
       }
     }
@@ -121,23 +221,26 @@ function extractFindings(parsed) {
 export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeoutMs = 60000, env = process.env }) {
   const resolved = config.binaryPath ? { installed: true, path: config.binaryPath } : resolveBinary(env);
   if (!resolved.installed) {
-    return { status: "SKIPPED", findings: [], raw: null, reason: resolved.reason };
+    return { status: "SKIPPED", classification: "binary_missing", findings: [], raw: null, reason: resolved.reason };
   }
+
+  const v2Failure = checkV2({ binaryPath: resolved.path, rootDir, spawnFn, timeoutMs });
+  if (v2Failure) return v2Failure;
 
   const args = ["scan", "source", "--format", "json", "-r", rootDir];
 
   let res;
   try {
-    res = spawnFn(resolved.path, args, { cwd: rootDir, encoding: "utf8", timeout: timeoutMs });
+    res = spawnFn(resolved.path, args, { cwd: rootDir, encoding: "utf8", timeout: timeoutMs, shell: false });
   } catch (err) {
-    return { status: "ERROR", findings: [], raw: null, reason: `spawn threw: ${err.message}` };
+    return spawnFailure(err);
   }
 
   if (res.error && res.error.code === "ETIMEDOUT") {
-    return { status: "ERROR", findings: [], raw: null, reason: `osv-scanner timed out after ${timeoutMs}ms` };
+    return { status: "ERROR", classification: "scanner_error", findings: [], raw: null, reason: `osv-scanner timed out after ${timeoutMs}ms` };
   }
   if (res.error) {
-    return { status: "ERROR", findings: [], raw: null, reason: `spawn error: ${res.error.message}` };
+    return spawnFailure(res.error);
   }
 
   // Exit-code contract: ONLY 0 and 1 are valid completed runs.
@@ -152,6 +255,7 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
     if (res.status === 128 && combinedOutput.includes("No package sources found")) {
       return {
         status: "SKIPPED",
+        classification: "success",
         findings: [],
         raw: res.stdout ?? null,
         reason: "no package sources in project (osv-scanner: \"No package sources found\", exit 128)",
@@ -159,6 +263,7 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
     }
     return {
       status: "ERROR",
+      classification: "scanner_error",
       findings: [],
       raw: res.stdout ?? null,
       reason: `osv-scanner exited ${res.status} (only 0/1 are valid runs): ${(res.stderr || "").trim().slice(0, 500)}`,
@@ -172,9 +277,21 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
   } catch (err) {
     return {
       status: "ERROR",
+      classification: "scanner_error",
       findings: [],
       raw: stdout,
       reason: `unparseable osv-scanner JSON output (exit ${res.status}): ${err.message}`,
+    };
+  }
+
+  const shapeError = validateV2Output(parsed);
+  if (shapeError) {
+    return {
+      status: "ERROR",
+      classification: "scanner_error",
+      findings: [],
+      raw: stdout,
+      reason: `unexpected osv-scanner v2 JSON shape (${shapeError}), exit ${res.status}`,
     };
   }
 
@@ -182,8 +299,8 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
   try {
     findings = extractFindings(parsed);
   } catch (err) {
-    return { status: "ERROR", findings: [], raw: stdout, reason: `osv-scanner output shape not recognized: ${err.message}` };
+    return { status: "ERROR", classification: "scanner_error", findings: [], raw: stdout, reason: `osv-scanner output shape not recognized: ${err.message}` };
   }
 
-  return { status: findings.length > 0 ? "FINDINGS" : "PASS", findings, raw: stdout };
+  return { status: findings.length > 0 ? "FINDINGS" : "PASS", classification: findings.length > 0 ? "findings" : "success", findings, raw: stdout };
 }

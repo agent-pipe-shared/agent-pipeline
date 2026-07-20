@@ -11,7 +11,7 @@
  * cases have a real, deterministic commit sha to compare against.
  */
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -51,6 +51,54 @@ function writeEvidence(dir, relPath, obj) {
   const full = join(dir, relPath);
   mkdirSync(join(full, ".."), { recursive: true });
   writeFileSync(full, typeof obj === "string" ? obj : JSON.stringify(obj));
+}
+
+function configureAnonymousPublicPush(dir, branch = "feat/v0.3-phase2.6-multi-cli") {
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(
+    join(dir, ".claude", "pipeline.json"),
+    JSON.stringify({
+      publicPushIdentity: {
+        schema: "pipeline.public-push-identity.v1",
+        mode: "required",
+        repositoryOwner: "agent-pipe-shared",
+        repositoryName: "agent-pipeline",
+        remoteName: "origin",
+        approvedFeatureBranch: branch,
+        sshHostAlias: "github-share",
+        sshAccount: "agent-pipe-shared",
+        authorName: "The Agent-Pipeline Contributors",
+        authorEmail: "301875187+agent-pipe-shared@users.noreply.github.com",
+      },
+    }),
+  );
+  gitAt(dir, "config", "--local", "user.useConfigOnly", "true");
+  gitAt(dir, "config", "--local", "commit.gpgSign", "false");
+  gitAt(dir, "config", "--local", "user.name", "The Agent-Pipeline Contributors");
+  gitAt(dir, "config", "--local", "user.email", "301875187+agent-pipe-shared@users.noreply.github.com");
+  gitAt(dir, "config", "--local", "remote.origin.url", "git@github-share:agent-pipe-shared/agent-pipeline.git");
+  const base = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  gitAt(dir, "update-ref", `refs/remotes/origin/${branch}`, base);
+}
+
+function anonymousCommit(dir, name = "anonymous.txt", message = "anonymous feature") {
+  writeFileSync(join(dir, name), `${message}\n`);
+  gitAt(dir, "add", name);
+  gitAt(dir, "commit", "-q", "-m", message);
+  return gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+}
+
+function prepareAnonymousPublicPush(dir, branch = "feat/v0.3-phase2.6-multi-cli") {
+  configureAnonymousPublicPush(dir, branch);
+  const head = anonymousCommit(dir);
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  const bin = join(dir, "fake-ssh-bin");
+  mkdirSync(bin, { recursive: true });
+  const fakeSsh = join(bin, "ssh");
+  writeFileSync(fakeSsh, "#!/bin/sh\necho \"Hi ${FAKE_SSH_ACCOUNT:-agent-pipe-shared}! You've successfully authenticated, but GitHub does not provide shell access.\"\nexit 1\n");
+  chmodSync(fakeSsh, 0o755);
+  return { head, command: `git push origin HEAD:refs/heads/${branch}`, env: { PATH: `${bin}:${process.env.PATH}` } };
 }
 
 function runGuard(command, dir, { cwd = dir, projectDir = dir, env = {} } = {}) {
@@ -758,6 +806,206 @@ function deployApprovalState(forArtifact, forEnvironment) {
     WARN,
     { stderrIncludes: ["is semantically invalid", "release section present"] },
   );
+}
+
+// ---- PG26 anonymous-public self-application range -----------------------------------------------
+{
+  const { dir } = freshRepo("anonymous-public-green");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  check("PG26a allow  calibrated anonymous feature-branch range", command, dir, ALLOW, { stderrEmpty: true, env });
+}
+{
+  const { dir } = freshRepo("anonymous-public-personal-author");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  gitAt(dir, "config", "--local", "user.name", "Personal Name");
+  gitAt(dir, "config", "--local", "user.email", "personal@example.invalid");
+  anonymousCommit(dir, "personal.txt", "personal author");
+  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26b block  personal Author or Committer in the newly reachable range", command, dir, BLOCK, {
+    stderrIncludes: ["non-neutral Author identity", "non-neutral Committer identity"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-trailer");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "trailer.txt", "privacy\n\nCo-authored-by: Personal <personal@example.invalid>");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26c block  personal/provider trailers and mail in the new range", command, dir, BLOCK, {
+    stderrIncludes: ["forbidden personal/provider/private trailer", "email address"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-private-coordinate");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "private.txt", "privacy\n\nPrivate-Account: account-123");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26d block  private-account trailer in the new range", command, dir, BLOCK, {
+    stderrIncludes: ["forbidden personal/provider/private trailer"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-wrong-ssh");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  gitAt(dir, "config", "--local", "remote.origin.url", "git@github.com:agent-pipe-shared/agent-pipeline.git");
+  check("PG26e block  a generic or wrong SSH identity path", command, dir, BLOCK, {
+    stderrIncludes: ["calibrated SSH host alias"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-signing");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  gitAt(dir, "config", "--local", "commit.gpgSign", "true");
+  check("PG26f block  signing-enabled local configuration", command, dir, BLOCK, {
+    stderrIncludes: ["commit.gpgSign"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-unfetched-destination");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  gitAt(dir, "update-ref", "-d", "refs/remotes/origin/feat/v0.3-phase2.6-multi-cli");
+  check("PG26g block  missing fetched destination range evidence", command, dir, BLOCK, {
+    stderrIncludes: ["fetched destination tracking ref"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-wrong-account");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  check("PG26h block  SSH account evidence from a different account", command, dir, BLOCK, {
+    stderrIncludes: ["SSH account evidence"],
+    env: { ...env, FAKE_SSH_ACCOUNT: "wrong-account" },
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-pushurl");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  gitAt(dir, "config", "--local", "remote.origin.pushurl", "git@wrong-host:wrong-owner/wrong-repo.git");
+  check("PG26i block  pushurl cannot bypass the calibrated public remote", command, dir, BLOCK, {
+    stderrIncludes: ["effective push URL"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-main");
+  const { env } = prepareAnonymousPublicPush(dir);
+  check("PG26j block  main is never an anonymous-public delivery destination", "git push origin HEAD:refs/heads/main", dir, BLOCK, {
+    stderrIncludes: ["explicit refs/heads/<feature-branch> destination"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-metadata");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "metadata.txt", "privacy\n\nProvider: neutral\nModel: generic\nSession: opaque");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26k block  provider/model/session correlation metadata", command, dir, BLOCK, {
+    stderrIncludes: ["forbidden private correlation metadata"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-private-url-path");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "url.txt", "privacy\n\nSee https://private.example.invalid/session/opaque from /home/operator/worktree");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26l block  private URLs and machine paths in the complete range", command, dir, BLOCK, {
+    stderrIncludes: ["non-canonical URL", "machine-specific absolute path"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-secret-shape");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "secret.txt", "privacy ghp_0123456789abcdef");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26m block  credential-shaped metadata in the complete range", command, dir, BLOCK, {
+    stderrIncludes: ["credential-shaped value"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-global-pushurl");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const globalConfig = join(dir, "global.gitconfig");
+  writeFileSync(globalConfig, "[remote \"origin\"]\n\tpushurl = git@wrong-host:wrong-owner/wrong-repo.git\n");
+  check("PG26n block  global pushurl cannot bypass the calibrated public remote", command, dir, BLOCK, {
+    stderrIncludes: ["effective push URL"],
+    env: { ...env, GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: "1" },
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-push-instead-of");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const globalConfig = join(dir, "global.gitconfig");
+  writeFileSync(globalConfig, "[url \"git@wrong-host:wrong-owner/\"]\n\tpushInsteadOf = git@github-share:agent-pipe-shared/\n");
+  check("PG26o block  pushInsteadOf cannot rewrite the calibrated public endpoint", command, dir, BLOCK, {
+    stderrIncludes: ["effective push URL"],
+    env: { ...env, GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: "1" },
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-free-text-correlation");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "correlation.txt", "privacy session opaque-123 for account operator42");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26p block  free-text session and account correlation", command, dir, BLOCK, {
+    stderrIncludes: ["forbidden private correlation metadata"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-non-http-private-coordinates");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "coordinates.txt", "privacy ssh://private.example.invalid/repo \\\\host\\share /root/worktree");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26q block  SSH URLs, UNC paths and root paths", command, dir, BLOCK, {
+    stderrIncludes: ["non-canonical URL", "machine-specific absolute path"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-field-separator");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "separator.txt", "privacy\x1fSession: opaque");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26r block  field-separator metadata cannot escape range privacy", command, dir, BLOCK, {
+    stderrIncludes: ["forbidden private correlation metadata"],
+    env,
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-transport-env");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  check("PG26s block  GIT_SSH_COMMAND cannot diverge from the account probe", command, dir, BLOCK, {
+    stderrIncludes: ["transport must not override"],
+    env: { ...env, GIT_SSH_COMMAND: "ssh -i wrong-key" },
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-transport-config");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const globalConfig = join(dir, "global.gitconfig");
+  writeFileSync(globalConfig, "[core]\n\tsshCommand = ssh -i wrong-key\n");
+  check("PG26t block  core.sshCommand cannot diverge from the account probe", command, dir, BLOCK, {
+    stderrIncludes: ["transport must not override"],
+    env: { ...env, GIT_CONFIG_GLOBAL: globalConfig, GIT_CONFIG_NOSYSTEM: "1" },
+  });
+}
+{
+  const { dir } = freshRepo("anonymous-public-embedded-private-coordinates");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const head = anonymousCommit(dir, "embedded.txt", "privacy file:/etc/passwd cwd=/root/private alice@10.0.0.1:/srv/repo");
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check("PG26u block  embedded file URI, root path and general SCP coordinate", command, dir, BLOCK, {
+    stderrIncludes: ["non-canonical URL", "machine-specific absolute path"],
+    env,
+  });
 }
 
 // ---- Cleanup ----------------------------------------------------------------------------
