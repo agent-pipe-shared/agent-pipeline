@@ -60,8 +60,9 @@ Revisit only when a runner adds a newly attested native advisory capability or
 when the receipt/fallback trust boundary materially changes. Such a change
 requires a new versioned decision and migration.
 
-Details and acceptance boundaries are fixed by the
-[migration design](../../specs/2026-07-18-runner-v2-advisory-migration/migration-design.md).
+The public details and acceptance boundary are fixed by the
+[decision above](#decision); no separate private migration design is required
+to interpret this ADR.
 
 <!-- DE-REFERENCE-BELOW | agents: skip everything below this line; it is a full German reference translation. -->
 

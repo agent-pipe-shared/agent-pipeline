@@ -240,9 +240,9 @@ ok(
 {
   const dir = fixtureDir("settings-github");
   const settingsPath = join(dir, "settings.json");
-  writeJson(settingsPath, { extraKnownMarketplaces: { "agent-pipeline": { source: { source: "github", repo: "agent-pipe-shared/agent-pipeline" } } } });
+  writeJson(settingsPath, { extraKnownMarketplaces: { "agent-pipeline": { source: { source: "github", repo: "agent-pipeline/agent-pipeline" } } } });
   const url = resolveMarketplaceUrl({ settingsPath });
-  ok("resolveMarketplaceUrl builds https URL from github source", url === "https://github.com/agent-pipe-shared/agent-pipeline.git", url);
+  ok("resolveMarketplaceUrl builds https URL from github source", url === "https://github.com/agent-pipeline/agent-pipeline.git", url);
 }
 
 {
@@ -305,7 +305,7 @@ ok(
   const url = resolveMarketplaceUrl({ settingsPath: REAL_REPO_SETTINGS });
   ok(
     "resolveMarketplaceUrl matches this repo's real .claude/settings.json",
-    url === "https://github.com/agent-pipe-shared/agent-pipeline.git",
+    url === "https://github.com/agent-pipeline/agent-pipeline.git",
     url,
   );
 }

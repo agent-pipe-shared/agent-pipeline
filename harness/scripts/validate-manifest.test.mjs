@@ -1345,7 +1345,7 @@ writeFileSync(
   const push = gateConfig(manifest, "push");
   record(
     "gateConfig KNOWN  gateConfig(manifest, \"push\") returns this repo's committed push-gate config",
-    push && push.mode === "blocking" && push.type === "human" && push.approval === "required",
+    push && push.mode === "blocking" && push.type === "human" && push.approval === "standing-approved",
     `push=${JSON.stringify(push)}`,
   );
   const missing = gateConfig(manifest, "does-not-exist");
