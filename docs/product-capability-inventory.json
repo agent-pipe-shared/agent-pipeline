@@ -1073,6 +1073,72 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "worktree-lifecycle-tests"
+    },
+    {
+      "surfaceId": "skill:plugins/pipeline-core/skills/capture-observation/SKILL.md:capture-observation",
+      "kind": "skill",
+      "path": "plugins/pipeline-core/skills/capture-observation/SKILL.md",
+      "member": "capture-observation"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:capture-observation-intake-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "capture-observation-intake-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-private-overlay-activation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-private-overlay-activation-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "observation-governance-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-gate-profile-publisher-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "po-gate-profile-publisher-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-cli-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "private-overlay-activation-cli-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-e2e-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "private-overlay-activation-e2e-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "private-overlay-activation-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-overlay-bootstrap-status-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "private-overlay-bootstrap-status-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:private-overlay-runtime-projection-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "private-overlay-runtime-projection-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "public-core-observation-tests"
     }
   ],
   "capabilities": [
@@ -1216,11 +1282,13 @@
         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:backlog-state-tests",
         "verify-phase:harness/scripts/verify.mjs:bootstrap-env-check-tests",
+        "verify-phase:harness/scripts/verify.mjs:capture-observation-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:check-ownership-tests",
         "verify-phase:harness/scripts/verify.mjs:claude-critic-host-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-app-server-health-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-critic-host-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-plugin-validator-parity-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-private-overlay-activation-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-compatibility-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-runtime-tests",
@@ -1254,6 +1322,7 @@
         "verify-phase:harness/scripts/verify.mjs:language-canon-tests",
         "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
         "verify-phase:harness/scripts/verify.mjs:no-autoupdate-key-tests",
+        "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
         "verify-phase:harness/scripts/verify.mjs:p3b-runner-conformance-tests",
         "verify-phase:harness/scripts/verify.mjs:parallel-dispatch-planner-tests",
         "verify-phase:harness/scripts/verify.mjs:phase26-invariants-check",
@@ -1263,11 +1332,18 @@
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
         "verify-phase:harness/scripts/verify.mjs:po-gate-authority-fixture-tests",
+        "verify-phase:harness/scripts/verify.mjs:po-gate-profile-publisher-tests",
         "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
         "verify-phase:harness/scripts/verify.mjs:po-language-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:post-compact-reground-tests",
         "verify-phase:harness/scripts/verify.mjs:private-document-binding-tests",
+        "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-e2e-tests",
+        "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-tests",
+        "verify-phase:harness/scripts/verify.mjs:private-overlay-bootstrap-status-tests",
+        "verify-phase:harness/scripts/verify.mjs:private-overlay-runtime-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:product-capability-inventory-tests",
+        "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
         "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",
         "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",
         "verify-phase:harness/scripts/verify.mjs:review-economy-tests",
@@ -1567,10 +1643,11 @@
       "id": "session-and-delivery-skills",
       "publicName": "Session and delivery skills",
       "problem": "Recurring delivery rituals are easy to omit or apply inconsistently.",
-      "benefit": "Installable skills provide bounded bootstrap, advisory, review, close, and commit-message workflows.",
+      "benefit": "Installable skills provide bounded bootstrap, advisory, observation intake, review, close, and commit-message workflows.",
       "status": "shipped",
       "surfaceIds": [
         "skill:plugins/pipeline-core/skills/advisor-consult/SKILL.md:advisor-consult",
+        "skill:plugins/pipeline-core/skills/capture-observation/SKILL.md:capture-observation",
         "skill:plugins/pipeline-core/skills/close-block/SKILL.md:close-block",
         "skill:plugins/pipeline-core/skills/close-feature/SKILL.md:close-feature",
         "skill:plugins/pipeline-core/skills/conventional-commit/SKILL.md:conventional-commit",
@@ -1605,6 +1682,7 @@
       ],
       "productionEvidence": [
         "plugins/pipeline-core/skills/advisor-consult/SKILL.md",
+        "plugins/pipeline-core/skills/capture-observation/SKILL.md",
         "plugins/pipeline-core/skills/close-block/SKILL.md",
         "plugins/pipeline-core/skills/close-feature/SKILL.md",
         "plugins/pipeline-core/skills/conventional-commit/SKILL.md",
@@ -1660,9 +1738,18 @@
         "pipeline-core plugin"
       ],
       "productionEvidence": [
+        "plugins/pipeline-core/lib/private-overlay-activation.mjs",
+        "plugins/pipeline-core/lib/private-overlay-bootstrap-status.mjs",
+        "plugins/pipeline-core/lib/private-overlay-runtime-projection.mjs",
+        "plugins/pipeline-core/lib/public-core-observation.mjs",
+        "plugins/pipeline-core/scripts/codex-private-overlay-activation.mjs",
+        "plugins/pipeline-core/scripts/private-overlay-activation.mjs",
+        "plugins/pipeline-core/skills/pipeline-start/SKILL.md",
         "setup.mjs"
       ],
       "testEvidence": [
+        "plugins/pipeline-core/scripts/private-overlay-activation.e2e.test.mjs",
+        "plugins/pipeline-core/skills/pipeline-start/pipeline-start-v3.test.mjs",
         "setup.test.mjs"
       ],
       "targets": [

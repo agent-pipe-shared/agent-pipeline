@@ -56,6 +56,8 @@ const PUBLIC_VERSION = /^(?:unknown|[A-Za-z0-9][A-Za-z0-9._+-]{0,79})$/;
 const PUBLIC_CAPABILITY = /^(?:unknown|[A-Za-z0-9][A-Za-z0-9 ._:/+-]{0,119})$/;
 const CANDIDATE = /^(?:unknown|[0-9a-f]{7,40})$/;
 const SOURCE_LINK = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(?:blob|issues|pull)\/.+$/;
+const PUBLIC_REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
+const GITHUB_REPOSITORY_URL = /https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?=[\/#?\s]|$)/gi;
 
 const SECRET_PATTERNS = Object.freeze([
   /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/i,
@@ -123,6 +125,24 @@ function allStrings(value) {
   if (Array.isArray(value)) return value.flatMap(allStrings);
   if (value && typeof value === "object") return Object.values(value).flatMap(allStrings);
   return [];
+}
+
+function githubRepositories(value) {
+  return [...value.matchAll(GITHUB_REPOSITORY_URL)]
+    .map((match) => `${match[1]}/${match[2].replace(/\.git$/i, "")}`.toLowerCase());
+}
+
+function repositoryReferenceStatus(input, publicRepository) {
+  const repositories = allStrings(input).flatMap(githubRepositories);
+  if (repositories.length === 0) return null;
+  if (typeof publicRepository !== "string" || !PUBLIC_REPOSITORY.test(publicRepository)) {
+    return result("setup-required", { reason: "public-repository-unresolved" });
+  }
+  const expected = publicRepository.toLowerCase();
+  if (repositories.some((repository) => repository !== expected)) {
+    return result("privacy-rejected", { reason: "repository-reference-outside-public-target" });
+  }
+  return null;
 }
 
 function rejectionReason(input) {
@@ -265,7 +285,7 @@ export function renderCanonicalBody(input) {
   ].join("\n");
 }
 
-export function prepareObservation(untrustedInput) {
+export function prepareObservation(untrustedInput, { publicRepository } = {}) {
   let input;
   try {
     input = validateInput(untrustedInput);
@@ -279,6 +299,9 @@ export function prepareObservation(untrustedInput) {
 
   const rejection = rejectionReason(input);
   if (rejection) return result("privacy-rejected", { reason: rejection });
+
+  const repositoryStatus = repositoryReferenceStatus(input, publicRepository);
+  if (repositoryStatus) return repositoryStatus;
 
   const labelStatus = evaluateInitialLabels(input.area, input.availableLabels);
   if (labelStatus.status !== "ready") return labelStatus;
@@ -304,9 +327,20 @@ export function prepareObservation(untrustedInput) {
 
 async function readInput(argv, readFileFn) {
   if (argv.length === 1 && argv[0] === "--schema") return { printSchema: true };
-  if (argv.length > 1) throw new TypeError("usage: observation-intake.mjs [INPUT.json] | --schema");
-  const bytes = argv[0] ? await readFileFn(argv[0], "utf8") : await readFileFn(0, "utf8");
-  return { input: JSON.parse(bytes) };
+  let publicRepository;
+  let inputPath;
+  for (let index = 0; index < argv.length; index += 1) {
+    if (argv[index] === "--repository" && index + 1 < argv.length && publicRepository === undefined) {
+      publicRepository = argv[index + 1];
+      index += 1;
+    } else if (inputPath === undefined) {
+      inputPath = argv[index];
+    } else {
+      throw new TypeError("usage: observation-intake.mjs [--repository owner/repo] [INPUT.json] | --schema");
+    }
+  }
+  const bytes = inputPath ? await readFileFn(inputPath, "utf8") : await readFileFn(0, "utf8");
+  return { input: JSON.parse(bytes), publicRepository };
 }
 
 export async function runCli(argv, {
@@ -319,7 +353,7 @@ export async function runCli(argv, {
       writeStdout(serialized(INPUT_SCHEMA));
       return 0;
     }
-    const output = prepareObservation(command.input);
+    const output = prepareObservation(command.input, { publicRepository: command.publicRepository });
     writeStdout(serialized(output));
     return output.status === "ready" ? 0 : 2;
   } catch {
