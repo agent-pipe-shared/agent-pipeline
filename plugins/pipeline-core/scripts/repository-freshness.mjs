@@ -22,6 +22,10 @@ function git(repo, args, options = {}) {
   });
 }
 
+function defaultFetch(args, options) {
+  return spawnSync("git", args, options);
+}
+
 function outputBase(status, fields = {}) {
   return {
     schema: SCHEMA,
@@ -70,7 +74,7 @@ export function inspectRepositoryFreshness(
   repoPath,
   {
     fetchTimeoutMs = FETCH_TIMEOUT_MS,
-    runFetch = (args, options) => spawnSync("git", args, options),
+    runFetch = defaultFetch,
   } = {},
 ) {
   const repo = resolve(repoPath);
@@ -143,6 +147,33 @@ export function inspectRepositoryFreshness(
       { encoding: "utf8", timeout: fetchTimeoutMs, env },
     );
     if (fetch.status !== 0) {
+      // Some WSL/SSH setups authenticate direct remote reads but reject the
+      // temporary bare-repository fetch used for ancestry comparison. An exact
+      // OID equality is still safe evidence of freshness; any mismatch or
+      // failed probe remains unknown and therefore write-blocking.
+      if (runFetch === defaultFetch) {
+        const direct = spawnSync("git", ["ls-remote", remoteUrl, `refs/heads/${upstreamBranch}`], {
+          encoding: "utf8",
+          timeout: fetchTimeoutMs,
+          env,
+        });
+        const directHead = direct.stdout?.trim().split(/\s+/u)[0];
+        if (direct.status === 0 && fullOid(directHead) && directHead === head) {
+          return {
+            exitCode: 0,
+            result: outputBase("equal", {
+              head,
+              branch,
+              upstream,
+              remoteHead: directHead,
+              ahead: 0,
+              behind: 0,
+              fetchAttempted: true,
+              reason: "direct-oid-equality-fallback",
+            }),
+          };
+        }
+      }
       const reason = fetch.error?.code === "ETIMEDOUT" || fetch.signal ? "timeout" : "fetch-failed";
       return { exitCode: 0, result: outputBase("unknown", { head, branch, upstream, fetchAttempted: true, reason }) };
     }
