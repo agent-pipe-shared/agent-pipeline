@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.recovery-preview-attestation.v1",
+  "oneOf": [
+    {
+      "title": "Recovery preview invocation",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "invocationId", "previewDigest"],
+      "properties": {
+        "schema": { "const": "pipeline.recovery-preview.v1" },
+        "invocationId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$" },
+        "previewDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    },
+    {
+      "title": "Recovery preview acknowledgement",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "invocationId", "previewDigest", "acknowledgementId", "delivery"],
+      "properties": {
+        "schema": { "const": "pipeline.recovery-preview-ack.v1" },
+        "invocationId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$" },
+        "previewDigest": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "acknowledgementId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,99}$" },
+        "delivery": { "const": "delivered" }
+      }
+    }
+  ]
+}

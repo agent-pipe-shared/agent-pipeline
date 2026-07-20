@@ -21,6 +21,36 @@ vulnerability, permission bypass, unintended write, secret exposure, or scope
 escape goes to [private vulnerability reporting](../SECURITY.md), with no
 public observation created.
 
+### Queue and backlog validation
+
+Before publication, the skill validates each candidate against the current
+public observation queue in [`docs/state.md`](state.md) and the relevant
+public backlog items, specs, ADRs, and governed documentation. The validation
+record has one of three dispositions:
+
+- **matching backlog item:** the observation is related to an existing delivery
+  contract; the public GitHub blob link may be included in `sourceBacklogLinks`;
+- **related but not equivalent:** an existing item provides context but does not
+  own the observation; the issue must not imply that the backlog item confirms
+  the behavior; or
+- **no matching backlog item:** the issue remains a standalone observation and
+  uses `None identified.` for source links.
+
+The check must confirm that the queue entry exists, the actual/expected/
+reproduction details are supported by public records or direct observation,
+and every public source link resolves to the selected repository. Local paths,
+private evidence, and unverified root-cause explanations stay in the local
+validation context and are never copied into the issue. A missing queue entry,
+unsupported detail, stale source link, or unresolved security disposition
+blocks publication.
+
+For a batch, prepare and display one canonical preview per candidate, including
+its validation disposition and duplicate candidates. Publication requires an
+explicit confirmation of that exact batch. Each issue is created separately
+and read back separately; a partial batch must be reported as partial and never
+presented as complete. The issue number/URL readback map can then be used for
+later explicit triage or reciprocal backlog links.
+
 ## Lifecycle
 
 `observation` → `triage` → `confirmed` → optional `known-error` → `backlog-link`

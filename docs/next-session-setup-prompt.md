@@ -8,7 +8,12 @@ Run the mandatory pipeline-core:pipeline-start bootstrap first. Use the current
 PO decision for this session: Luna/medium, German-facing, keep-awake as
 configured by the private project authority. Read docs/state.md, the recovered
 normative Sentinel Epic authority in specs/2026-07-19-sprint-sentinel-epic/,
-and the SNT-A backlog item, then verify that the installed plugin cachebuster is
+including the Public-safe PRD, Spec, acceptance matrix, reconciliation design,
+and recovery record, plus the byte-bound archive manifest in
+docs/spec-archive/2026-07-20-sentinel-recovery/. Read the SNT-A backlog item,
+including specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md and
+specs/2026-07-19-sprint-sentinel-epic/spec.md directly,
+then verify that the installed plugin cachebuster is
 0.2.0+codex.20260720163405 and that the source/cache manifest and Public branch
 commit/tree match the private overlay lock. Do not claim an observed effective
 model identity.

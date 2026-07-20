@@ -72,6 +72,7 @@
           "docs/design/README.md",
           "docs/design/design-facilitator-prompt.md",
           "docs/design/export-template.md",
+          "docs/github-issue-operations.md",
           "docs/observation-intake.md",
           "docs/operating-model.md",
           "docs/runtime-boundary.md"
@@ -154,6 +155,17 @@
       },
       {
         "audience": "maintainer",
+        "lifecycle": "normative-record",
+        "paths": [
+          "docs/spec-archive/2026-07-20-sentinel-recovery/RECOVERY.md",
+          "docs/spec-archive/2026-07-20-sentinel-recovery/backlog-acceptance-matrix.md",
+          "docs/spec-archive/2026-07-20-sentinel-recovery/prd_sentinel-epic.md",
+          "docs/spec-archive/2026-07-20-sentinel-recovery/public-private-reconciliation-design.md",
+          "docs/spec-archive/2026-07-20-sentinel-recovery/spec.md"
+        ]
+      },
+      {
+        "audience": "maintainer",
         "lifecycle": "review-candidate",
         "paths": [
           "docs/codex-isolated-critic-foundation.md",
@@ -164,7 +176,8 @@
         "audience": "machine",
         "lifecycle": "maintained",
         "paths": [
-          "docs/product-capability-inventory.json"
+          "docs/product-capability-inventory.json",
+          "docs/spec-archive/2026-07-20-sentinel-recovery/manifest.json"
         ]
       }
     ]

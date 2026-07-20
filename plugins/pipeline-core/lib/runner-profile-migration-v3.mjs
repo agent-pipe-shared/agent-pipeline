@@ -36,6 +36,10 @@ import {
   loadRuntimeProjectionV3OwnedKeys,
   planRuntimeProjectionV3,
 } from "./runtime-projection-v3.mjs";
+import {
+  attestRecoveryPreviewDelivery,
+  createRecoveryPreviewInvocation,
+} from "./recovery-preview-attestation.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 
 const SOURCE_FILE = "pipeline.user.yaml";
@@ -743,18 +747,31 @@ function recoveryPreWritePreview(plan) {
 export function authorizePendingTransactionRecoveryV3(plan, { deliverPreview } = {}) {
   const state = authenticatedRecovery(plan);
   if (!state || state.status !== "ready") return recoveryResult("invalid-plan", [diagnostic("$", "invalid_plan", "recovery authorization accepts only an unchanged in-process V3 recovery plan", "plan recovery again")]);
-  if (typeof deliverPreview !== "function") return recoveryResult("preview-required", [diagnostic("$.preWritePreview", "preview_required", "recovery requires caller-delivered pre-write preview", "deliver the complete recovery preview before requesting authorization")]);
+  if (typeof deliverPreview !== "function") return recoveryResult("preview-required", [diagnostic("$.preWritePreview", "preview_required", "recovery requires caller-delivered pre-write preview acknowledgement", "deliver the complete recovery preview and return its exact acknowledgement")]);
   const preview = recoveryPreWritePreview(plan);
-  try { deliverPreview(clone(preview)); }
-  catch {
-    return recoveryResult("preview-failed", [diagnostic("$.preWritePreview", "preview_write_failed", "pre-write preview channel failed before recovery", "restore the separate preview channel and plan recovery again")]);
+  const previewSha256 = sha256(JSON.stringify(stable(preview)));
+  const invocation = createRecoveryPreviewInvocation({
+    invocationId: `recovery-${state.journalSha256}`,
+    previewDigest: previewSha256,
+  });
+  const delivery = attestRecoveryPreviewDelivery({
+    invocation,
+    callback: (binding) => deliverPreview(clone(preview), binding),
+  });
+  if (!delivery.ok) {
+    return recoveryResult("preview-failed", [diagnostic(
+      "$.preWritePreview",
+      delivery.code.toLowerCase(),
+      "pre-write preview channel failed before recovery",
+      "deliver the complete preview and return a matching acknowledgement before recovery",
+    )]);
   }
   if (authenticatedRecovery(plan) !== state) return recoveryResult("invalid-plan", [diagnostic("$", "invalid_plan", "recovery plan changed during preview delivery", "plan recovery again")]);
   const authorization = {
     schema: RECOVERY_AUTHORIZATION_SCHEMA,
     status: "authorized",
     journalSha256: state.journalSha256,
-    previewSha256: sha256(JSON.stringify(stable(preview))),
+    previewSha256,
   };
   AUTHENTICATED_RECOVERY_AUTHORIZATIONS.set(authorization, {
     signature: publicSignature(authorization), plan, recoveryState: state,

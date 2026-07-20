@@ -17,7 +17,8 @@
   "ritualExtensions": {
     "$comment": "Real A12 extension (not fictional): close.pre runs the CLAUDE.md length gate before every close of this repo.",
     "close.pre": [
-      "node harness/scripts/check-claude-md-lines.mjs"
+      "node harness/scripts/check-claude-md-lines.mjs",
+      "node plugins/pipeline-core/scripts/check-spec-retention.mjs"
     ]
   },
   "humanRoles": {
