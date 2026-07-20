@@ -1,11 +1,13 @@
 ---
-type: workflow-improvement
-status: new
-created: 2026-07-20
-source: Public V3 Foundation stabilization review of formal review and dispatch retries
-owner: Pipeline Elephant
-due: 2026-08-03
-expires: 2026-08-10
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.evidence-bound-review-retry-economics"
+type: "workflow-improvement"
+owner: "pipeline"
+status: "open"
+created: "2026-07-20"
+source: "Public V3 Foundation stabilization review of formal review and dispatch retries"
+due: "2026-08-03"
+expires: "2026-08-10"
 ---
 
 # Bound review retries to valid evidence

@@ -1,0 +1,111 @@
+{
+  "schema": "pipeline.backlog-index.v1",
+  "generatedFrom": {
+    "items": "backlog/items/*.md",
+    "ledger": "backlog/transitions.ndjson",
+    "transitionHead": "6e9075a5b7f188a54ffdcd5de2ae897f664a01e32c6da64b16d6cf8336b64f18"
+  },
+  "counts": {
+    "open": 10,
+    "in_progress": 2,
+    "closed": 0
+  },
+  "items": [
+    {
+      "id": "pipeline.closed-input-channel-review-economics",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-20",
+      "source": "close retro; bounded privacy correction review"
+    },
+    {
+      "id": "pipeline.critic-context-isolation",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-20",
+      "source": "Public V3 Foundation stabilization close retro: an independent Critic run was discarded after an out-of-band coordinator status message reached its context"
+    },
+    {
+      "id": "pipeline.cross-repository-override-ledger-binding",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-20",
+      "source": "Public V3 Foundation close residue review"
+    },
+    {
+      "id": "pipeline.dispatch-provenance",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-20",
+      "source": "Public V3 Foundation stabilization close authorship check: delivered Goldfish work packages lacked required public Dispatch trailers"
+    },
+    {
+      "id": "pipeline.evidence-bound-review-retry-economics",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-20",
+      "source": "Public V3 Foundation stabilization review of formal review and dispatch retries"
+    },
+    {
+      "id": "pipeline.multi-cli-efficiency-pilots",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-20",
+      "source": "Public transfer completeness review of post-v0.3 Multi-CLI design and measurement work"
+    },
+    {
+      "id": "pipeline.observation-intake-document-governance",
+      "status": "in_progress",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-20",
+      "source": "PO-approved parallel Sentinel work and Critic scope correction"
+    },
+    {
+      "id": "pipeline.private-overlay-activation-bridge",
+      "status": "in_progress",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-20",
+      "source": "Public review of the slim private-overlay consumer activation boundary"
+    },
+    {
+      "id": "pipeline.project-scoped-github-issue-operations",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-20",
+      "source": "user-requested feature expansion after the first public observation publication"
+    },
+    {
+      "id": "pipeline.recovery-preview-callback-attestation",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-20",
+      "source": "Public V3 Foundation stabilization review of the migration recovery boundary"
+    },
+    {
+      "id": "pipeline.sentinel-go-live-completion",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-20",
+      "source": "Public transfer completeness review of remaining Sentinel go-live obligations"
+    },
+    {
+      "id": "pipeline.spec-retention-on-close",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-20",
+      "source": "Sentinel recovery audit after Public close/transfer"
+    }
+  ]
+}

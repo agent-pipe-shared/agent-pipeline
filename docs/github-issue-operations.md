@@ -1,5 +1,10 @@
 # Project-scoped GitHub Issue operations
 
+The matching pipeline skill is
+[`github-issue-operations`](../plugins/pipeline-core/skills/github-issue-operations/SKILL.md).
+It is the safe execution contract; this page is the operator setup and command
+reference.
+
 This guide describes the safe user setup for letting Agent-Pipeline work with
 Issues in a consuming project, such as a web application. It covers the
 authentication and command contract currently available to the project. The

@@ -135,6 +135,8 @@ const TEST_SUITES = [
   { name: "agents-adapter-migration-check", file: join(scriptDir, "check-agents-adapter-migration.mjs") },
   { name: "validate-manifest-tests", file: join(scriptDir, "validate-manifest.test.mjs") },
   { name: "capture-observation-intake-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "capture-observation", "scripts", "observation-intake.test.mjs") },
+  { name: "github-issue-operations-tests", file: join(pluginScriptsDir, "github-issue-operations.test.mjs") },
+  { name: "migrate-backlog-state-tests", file: join(pluginScriptsDir, "migrate-backlog-state.test.mjs") },
   { name: "spec-retention-tests", file: join(pluginScriptsDir, "check-spec-retention.test.mjs") },
   { name: "spec-retention-check", file: join(pluginScriptsDir, "check-spec-retention.mjs") },
   { name: "observation-governance-tests", file: join(scriptDir, "check-observation-governance.test.mjs") },

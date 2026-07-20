@@ -1,11 +1,13 @@
 ---
-type: workflow-improvement
-status: new
-created: 2026-07-20
-source: Public transfer completeness review of post-v0.3 Multi-CLI design and measurement work
-owner: Pipeline Elephant
-due: 2026-08-10
-expires: 2026-08-17
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.multi-cli-efficiency-pilots"
+type: "workflow-improvement"
+owner: "pipeline"
+status: "open"
+created: "2026-07-20"
+source: "Public transfer completeness review of post-v0.3 Multi-CLI design and measurement work"
+due: "2026-08-10"
+expires: "2026-08-17"
 ---
 
 # Measure post-v0.3 Multi-CLI efficiency pilots

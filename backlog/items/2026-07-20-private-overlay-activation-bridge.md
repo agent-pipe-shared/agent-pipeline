@@ -1,11 +1,13 @@
 ---
-type: workflow-improvement
-status: in-progress
-created: 2026-07-20
-source: Public review of the slim private-overlay consumer activation boundary
-owner: Pipeline Elephant
-due: 2026-08-10
-expires: 2026-08-17
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.private-overlay-activation-bridge"
+type: "workflow-improvement"
+owner: "pipeline"
+status: "in_progress"
+created: "2026-07-20"
+source: "Public review of the slim private-overlay consumer activation boundary"
+due: "2026-08-10"
+expires: "2026-08-17"
 ---
 
 # Activate pinned private overlays through the Public Core

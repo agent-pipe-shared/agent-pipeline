@@ -1,11 +1,13 @@
 ---
-type: workflow-improvement
-status: new
-created: 2026-07-20
-source: Public transfer completeness review of remaining Sentinel go-live obligations
-owner: Pipeline Elephant
-due: 2026-08-10
-expires: 2026-08-17
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.sentinel-go-live-completion"
+type: "workflow-improvement"
+owner: "pipeline"
+status: "open"
+created: "2026-07-20"
+source: "Public transfer completeness review of remaining Sentinel go-live obligations"
+due: "2026-08-10"
+expires: "2026-08-17"
 ---
 
 # Complete the Sentinel Public go-live boundary

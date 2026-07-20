@@ -155,7 +155,11 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true } = {
     if (text === null) continue;
     const parsed = parseBacklogItem(text, { path: repoPath });
     findings.push(...parsed.errors);
-    if (parsed.item) items.push(parsed.item);
+    // Keep invalid records out of downstream projections and ledger joins. The
+    // parser has already recorded their exact findings; attempting to sort or
+    // project an item without a canonical id would otherwise throw and hide the
+    // fail-closed backlog diagnosis behind a TypeError.
+    if (parsed.item && parsed.ok) items.push(parsed.item);
   }
 
   const ledgerText = readText(join(root, LEDGER_PATH), findings, LEDGER_PATH);
@@ -174,7 +178,7 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true } = {
     }
   }
 
-  const projection = projectBacklog(items, ledger.events);
+  const projection = findings.length === 0 ? projectBacklog(items, ledger.events) : null;
   return { ok: findings.length === 0, findings, items, events: ledger.events, projection };
 }
 

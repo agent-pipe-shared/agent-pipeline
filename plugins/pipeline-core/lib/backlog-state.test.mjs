@@ -179,6 +179,15 @@ function fixtureRoot() {
 }
 {
   const root = fixtureRoot();
+  write(root, "backlog/items/legacy.md", "---\ntype: defect\nstatus: new\ncreated: 2026-07-17\nsource: legacy record\nowner: Pipeline Elephant\n---\n\n# Legacy\n");
+  const result = checkBacklogState(root, { checkCommit: false });
+  check("BS06b invalid legacy frontmatter fails closed without crashing the projection path",
+    !result.ok && result.findings.some((finding) => finding.includes("missing required field schema"))
+      && result.findings.some((finding) => finding.includes("missing required field id"))
+      && result.projection === null, result.findings.join("; "));
+}
+{
+  const root = fixtureRoot();
   const open = item();
   const initial = event();
   write(root, "backlog/items/example.md", renderBacklogItem(open));

@@ -1,11 +1,13 @@
 ---
-type: workflow-improvement
-status: new
-created: 2026-07-20
-source: close retro; bounded privacy correction review
-owner: Pipeline Elephant
-due: 2026-08-10
-expires: 2026-08-17
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.closed-input-channel-review-economics"
+type: "workflow-improvement"
+owner: "pipeline"
+status: "open"
+created: "2026-07-20"
+source: "close retro; bounded privacy correction review"
+due: "2026-08-10"
+expires: "2026-08-17"
 ---
 
 # Prefer closed input channels before variant hardening

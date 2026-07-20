@@ -1,11 +1,13 @@
 ---
-type: workflow-improvement
-status: new
-created: 2026-07-20
-source: Public V3 Foundation close residue review
-owner: Pipeline Elephant
-due: 2026-07-27
-expires: 2026-08-03
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.cross-repository-override-ledger-binding"
+type: "workflow-improvement"
+owner: "pipeline"
+status: "open"
+created: "2026-07-20"
+source: "Public V3 Foundation close residue review"
+due: "2026-07-27"
+expires: "2026-08-03"
 ---
 
 # Bind guard-override audit storage to the target repository

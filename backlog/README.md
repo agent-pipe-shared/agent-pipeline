@@ -31,24 +31,29 @@ Every item carries exactly one type in the frontmatter field `type`:
 ## Storage & format
 
 - One item = one file under `backlog/items/`, naming scheme `YYYY-MM-DD-short-english-slug.md` (date = `created`, not a due date).
-- Structure and mandatory frontmatter: [`backlog/items/TEMPLATE.md`](items/TEMPLATE.md) — required fields `type` / `status` / `created` / `source`; optional fields (e.g. `due` for scheduled follow-ups) are marked as such in the template.
+- Structure and mandatory frontmatter: [`backlog/items/TEMPLATE.md`](items/TEMPLATE.md) — canonical items require `schema` / `id` / `type` / `owner` / `status` / `created` / `source`; `tracking`, `due`, and `expires` are optional scheduling fields.
 - Items are **never deleted**, only progressed in status (append-only evidence; cf. [`docs/operating-model.md` §6](../docs/operating-model.md#6-evidence-review-and-recovery)) — rejected or completed items stay in place with their rationale.
 
 ### Status lifecycle
 
-`new` → (`accepted` | `deferred` | `rejected`) → `done` (only after `accepted`)
+`open` → `in_progress` → `closed`
 
-- **new** — created, not yet triaged.
-- **accepted** — accepted, assigned to a phase/release (noted in the item).
-- **deferred** — deferred, with a condition/point in time for the next review.
-- **rejected** — rejected, rationale is mandatory and stays in the item.
-- **done** — implemented; reference to the implementing commit/ADR/PR added.
+- **open** — created or triaged but not currently being implemented.
+- **in_progress** — accepted and assigned to active work; the reason and
+  evidence remain in the append-only transition ledger.
+- **closed** — implemented with closure evidence and the sanctioned ledger
+  transition; a baseline migration never creates this state.
+
+The 2026-07-20 migration mapped legacy `new`/`open` to `open` and
+`accepted`/`in-progress` to `in_progress`. It preserved bodies and scheduling
+fields and recorded only baseline evidence; it did not infer acceptance,
+implementation, or closure.
 
 ## Triage rules
 
 Per [`docs/operating-model.md` §7](../docs/operating-model.md#7-feedback-loop): triage is owned by the **Elephant of the next pipeline session** (not the Goldfish who created the item — separation of proposal and decision).
 
-1. Review all items with `status: new` (at a natural session/phase boundary, not mid-execution).
+1. Review all items with `status: open` (at a natural session/phase boundary, not mid-execution).
 2. Decide per item: **accept** (note phase/release in the item) / **reject** (rationale in the item, `status: rejected`) / **defer** (`status: deferred`, state the condition).
 3. Merge duplicates: the newer item points to the older one (`merged-into: <filename>`), `status: rejected` with rationale "duplicate of …".
 4. When scope is unclear (architecture/guardrail impact, cost, irreversibility): the PO decides, not the Elephant alone (operating-model §2.1).
