@@ -33,7 +33,18 @@ const SHA256 = /^[0-9a-f]{64}$/u;
 const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 const PLUGIN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
 const PLUGIN_VERSION = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$/u;
-const PROHIBITED = /(?:^|[._-])(?:identity|identities|personal|person|owner|username|email|secret|secrets|credential|credentials|token|tokens|machine|host|receipt|receipts|cache|evidence|runtime)(?:[._-]|$)/iu;
+const PROHIBITED_WORDS = new Set([
+  "identity", "identities", "personal", "person", "owner", "username", "email",
+  "secret", "secrets", "credential", "credentials", "token", "tokens",
+  "password", "passwords", "passwd", "passphrase", "machine", "host", "receipt",
+  "receipts", "cache", "evidence", "runtime",
+]);
+const PROHIBITED_SECRET_WORDS = new Set([
+  "secret", "secrets", "credential", "credentials", "token", "tokens",
+  "password", "passwords", "passwd", "passphrase",
+]);
+const PROHIBITED_COMPOUNDS = new Set(["apikey", "privatekey"]);
+const PRIVATE_KEY_BLOCK = /-----BEGIN(?: [A-Z0-9][A-Z0-9 -]{0,64})? PRIVATE KEY-----/u;
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 const AUTHENTICATED_ADMISSIONS = new WeakMap();
 
@@ -291,8 +302,36 @@ function lexical(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+function normalizedWords(value) {
+  const separated = value.normalize("NFKC")
+    .replace(/([\p{Ll}\p{N}])(\p{Lu})/gu, "$1 $2")
+    .replace(/(\p{Lu})(\p{Lu}\p{Ll})/gu, "$1 $2");
+  return separated.toLocaleLowerCase("en-US").split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+
+function hasProhibitedWords(words, { secretOnly = false } = {}) {
+  const forbidden = secretOnly ? PROHIBITED_SECRET_WORDS : PROHIBITED_WORDS;
+  if (words.some((word) => forbidden.has(word))) return true;
+  for (let index = 0; index < words.length - 1; index += 1) {
+    const pair = `${words[index]}${words[index + 1]}`;
+    if (PROHIBITED_COMPOUNDS.has(pair)) return true;
+  }
+  return words.some((word) => PROHIBITED_COMPOUNDS.has(word)
+    || /^(?:[\p{L}\p{N}]*(?:passwords?|passwd|passphrase|apikey|privatekey))$/u.test(word));
+}
+
 function prohibitedSegment(segment) {
-  return PROHIBITED.test(segment);
+  return hasProhibitedWords(normalizedWords(segment));
+}
+
+function prohibitedContent(text) {
+  const normalized = text.normalize("NFKC");
+  if (PRIVATE_KEY_BLOCK.test(normalized.toUpperCase())) return true;
+  for (const line of normalized.split(/\r?\n/u)) {
+    const assignment = line.match(/^\s*(?:[-*+]\s+)?(?:export\s+)?(.{1,160}?)\s*[:=]\s*\S.*$/iu);
+    if (assignment && hasProhibitedWords(normalizedWords(assignment[1]), { secretOnly: true })) return true;
+  }
+  return false;
 }
 
 function enumerateClass(root, className, afterOpen) {
@@ -323,6 +362,7 @@ function enumerateClass(root, className, afterOpen) {
         if (!name.endsWith(".md")) fail("SNT-A-INPUT-EXTENSION");
         const bytes = stablePhysicalRead(root, relative, afterOpen);
         const text = decode(bytes, "SNT-A-INPUT-NON-UTF8");
+        if (prohibitedContent(text)) fail("SNT-A-PROHIBITED-MATERIAL");
         admitted.push({ className, privateName: parts.join("/"), sha256: sha256(bytes), byteLength: bytes.length, text });
       } else fail("SNT-A-NONREGULAR-INPUT");
       assertDirectoryIdentity(directory, directoryIdentity);
