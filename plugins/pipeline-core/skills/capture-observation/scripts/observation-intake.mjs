@@ -57,7 +57,13 @@ const PUBLIC_CAPABILITY = /^(?:unknown|[A-Za-z0-9][A-Za-z0-9 ._:/+-]{0,119})$/;
 const CANDIDATE = /^(?:unknown|[0-9a-f]{7,40})$/;
 const SOURCE_LINK = /^https:\/\/github\.com\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+\/(?:blob|issues|pull)\/.+$/;
 const PUBLIC_REPOSITORY = /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/;
-const GITHUB_REPOSITORY_URL = /https:\/\/github\.com\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?=[\/#?\s]|$)/gi;
+const GITHUB_REPOSITORY_REFERENCES = Object.freeze([
+  /(?:https?|git):\/\/(?:www\.)?github\.com(?::\d{1,5})?\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?=[\/#?\s]|$)/gi,
+  /https?:\/\/api\.github\.com(?::\d{1,5})?\/repos\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?=[\/#?\s]|$)/gi,
+  /https?:\/\/raw\.githubusercontent\.com(?::\d{1,5})?\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?=[\/#?\s]|$)/gi,
+  /ssh:\/\/git@github\.com(?::\d{1,5})?\/([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?=[\/#?\s]|$)/gi,
+  /git@github\.com:([A-Za-z0-9_.-]+)\/([A-Za-z0-9_.-]+)(?=[\/#?\s]|$)/gi,
+]);
 
 const SECRET_PATTERNS = Object.freeze([
   /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/i,
@@ -128,7 +134,7 @@ function allStrings(value) {
 }
 
 function githubRepositories(value) {
-  return [...value.matchAll(GITHUB_REPOSITORY_URL)]
+  return GITHUB_REPOSITORY_REFERENCES.flatMap((pattern) => [...value.matchAll(pattern)])
     .map((match) => `${match[1]}/${match[2].replace(/\.git$/i, "")}`.toLowerCase());
 }
 
