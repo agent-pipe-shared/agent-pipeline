@@ -22,8 +22,8 @@ The machine-local PO-gate-authority CLI has been removed from the portable
 Verify aggregate while its unit/runtime fail-closed behavior remains intact.
 The three deterministic secret-like fixture strings were replaced with
 non-secret identifiers. Their obsolete worktree suppressions were replaced by
-the three exact commit-bound fingerprints required for the immutable candidate
-history; no path-wide or rule-wide Gitleaks suppression was added.
+only the exact commit-bound fingerprints required for immutable history; no
+path-wide or rule-wide Gitleaks suppression was added.
 
 TP-3 and TP-5 were temporarily removed under explicit PO authorization solely
 for these briefed edits. The main session owns restoring both entries exactly
