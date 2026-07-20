@@ -17,6 +17,9 @@ const ack = (overrides = {}) => ({
   delivery: "delivered",
   ...overrides,
 });
+const waitFor = (milliseconds) => {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, milliseconds);
+};
 
 test("accepts one exact acknowledgement and returns the consumed-id postimage", () => {
   const result = attestRecoveryPreviewDelivery({ invocation: INVOCATION, callback: () => ack() });
@@ -35,6 +38,43 @@ test("missing, empty, and throwing callbacks never claim delivery", () => {
 test("async callbacks are rejected rather than treated as delivered", () => {
   const result = attestRecoveryPreviewDelivery({ invocation: INVOCATION, callback: async () => ack() });
   assert.deepEqual(result, { ok: false, code: "RP-CALLBACK-ASYNC", delivered: false });
+});
+
+test("a callback that completes within the configured bound is accepted", () => {
+  const result = attestRecoveryPreviewDelivery({
+    invocation: INVOCATION,
+    callback: () => ack(),
+    callbackTimeoutMs: 1000,
+  });
+  assert.equal(result.code, "RP-DELIVERY-ATTESTED");
+});
+
+test("a callback that exceeds the configured bound is rejected without timing details", () => {
+  const result = attestRecoveryPreviewDelivery({
+    invocation: INVOCATION,
+    callback: () => {
+      waitFor(10);
+      return ack();
+    },
+    callbackTimeoutMs: 1,
+  });
+  assert.deepEqual(result, { ok: false, code: "RP-CALLBACK-TIMEOUT", delivered: false });
+});
+
+test("callback timeout bounds are closed and invalid values do not invoke the callback", () => {
+  let invoked = false;
+  for (const callbackTimeoutMs of [-1, 60001, 1.5, Infinity, "1", null]) {
+    const result = attestRecoveryPreviewDelivery({
+      invocation: INVOCATION,
+      callback: () => {
+        invoked = true;
+        return ack();
+      },
+      callbackTimeoutMs,
+    });
+    assert.deepEqual(result, { ok: false, code: "RP-CALLBACK-TIMEOUT-INVALID", delivered: false });
+  }
+  assert.equal(invoked, false);
 });
 
 test("malformed acknowledgements fail closed", () => {

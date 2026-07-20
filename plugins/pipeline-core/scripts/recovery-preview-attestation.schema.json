@@ -1,6 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "pipeline.recovery-preview-attestation.v1",
+  "$comment": "attestRecoveryPreviewDelivery accepts optional callbackTimeoutMs as a synchronous callback bound: an integer from 0 through 60000 milliseconds, defaulting to 1000. The callback is measured with a monotonic clock; timeout results expose only RP-CALLBACK-TIMEOUT and never timing details, callback errors, paths, or private values. Promise callbacks remain non-success.",
   "oneOf": [
     {
       "title": "Recovery preview invocation",
