@@ -35,10 +35,6 @@ evidence/
 # Local environment overrides (never commit secrets)
 .env
 
-# Session-scoped pipeline state, regenerated per run
-.claude/pipeline-state.json
-pipeline-state.json
-
 # Machine-generated append-only logs — EXCEPT the guard-override ledger, which
 # guardrails/git.md keeps committed as the durable audit trail (so negate it here).
 *.jsonl
