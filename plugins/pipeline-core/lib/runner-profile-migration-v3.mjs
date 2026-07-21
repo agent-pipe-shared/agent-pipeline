@@ -43,6 +43,7 @@ import {
 import { parseYaml } from "./yaml-lite.mjs";
 
 const SOURCE_FILE = "pipeline.user.yaml";
+const AUTHORITY_LOCK_FILE = ".agent-pipeline/core.lock.json";
 const TXN_DIR = ".pipeline-runner-profile-migration-v3";
 const LOCK_DIR = ".pipeline-runner-profile-migration-v3.lock";
 const JOURNAL_FILE = "journal.json";
@@ -53,6 +54,10 @@ const RECOVERY_PLAN_SCHEMA = "pipeline.runner-profile-migration-recovery-plan.v3
 const RECOVERY_AUTHORIZATION_SCHEMA = "pipeline.runner-profile-migration-recovery-authorization.v3";
 const PREWRITE_PREVIEW_SCHEMA = "pipeline.runner-profile-migration-prewrite-preview.v3";
 const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
+const SHA256 = /^[0-9a-f]{64}$/u;
+const OID = /^[0-9a-f]{40}$/u;
+const PLUGIN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
+const PLUGIN_VERSION = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$/u;
 const AUTHENTICATED_PLANS = new WeakMap();
 const AUTHENTICATED_RECOVERY_PLANS = new WeakMap();
 const AUTHENTICATED_RECOVERY_AUTHORIZATIONS = new WeakMap();
@@ -125,6 +130,26 @@ function dependencies(overrides = {}) {
     readFileSync, realpathSync, renameSync, rmdirSync, rmSync, unlinkSync,
     writeFileSync, process: globalThis.process, ...overrides,
   };
+}
+
+function exactObject(value, keys) {
+  return isObject(value) && Object.keys(value).sort().join("\0") === [...keys].sort().join("\0");
+}
+function validAuthorityLockBytes(bytes) {
+  let lock;
+  try { lock = JSON.parse(bytes); } catch { return false; }
+  if (!exactObject(lock, ["$schema", "source", "plugin"])
+    || lock.$schema !== "pipeline.core-lock.v1"
+    || !exactObject(lock.source, ["repository", "branch", "commit", "tree"])
+    || !exactObject(lock.plugin, ["name", "version", "manifest_sha256"])) return false;
+  if (typeof lock.source.repository !== "string" || typeof lock.source.branch !== "string"
+    || !OID.test(lock.source.commit) || !OID.test(lock.source.tree)
+    || !PLUGIN_NAME.test(lock.plugin.name) || !PLUGIN_VERSION.test(lock.plugin.version)
+    || !SHA256.test(lock.plugin.manifest_sha256)) return false;
+  try {
+    const repository = new URL(lock.source.repository);
+    return repository.protocol === "https:" && repository.username === "" && repository.password === "" && repository.search === "" && repository.hash === "";
+  } catch { return false; }
 }
 
 function safeRoot(rootDir, deps) {
@@ -236,25 +261,26 @@ function v3IntentFromV2(v2) {
   };
 }
 
-const LEGACY_V3_CRITIC_NORMAL_CODEX = Object.freeze({
-  state: "default",
-  selector: Object.freeze({ kind: "model-id", value: "gpt-5.6-terra" }),
-  effort: "xhigh",
-  unavailable: "defer",
-  evidence: "dispatch-receipt",
-});
-
 function refreshKnownV3RegistryDelta(parsed) {
   const registry = loadRunnerProfilesV3Registry();
   const candidate = clone(parsed);
   const compatibilityDeltas = [];
-  if (same(parsed?.routing?.duties?.critic_normal?.codex, LEGACY_V3_CRITIC_NORMAL_CODEX)) {
-    candidate.routing.duties.critic_normal.codex = clone(registry.duties.critic_normal.codex);
+
+  // Routing is a closed Public-Core authority, not a set of independently
+  // configurable model preferences.  A Core update can therefore only refresh
+  // it as one whole registry.  Keeping a one-route compatibility exception here
+  // previously let a lock update drift from the rest of the frozen contract.
+  const refreshedRouting = {
+    profiles: clone(registry.profiles),
+    duties: clone(registry.duties),
+  };
+  if (!same(parsed?.routing, refreshedRouting)) {
+    candidate.routing = refreshedRouting;
     compatibilityDeltas.push({
-      name: "normal-critic-adr-0035-route-repair",
-      path: "routing.duties.critic_normal.codex",
-      from: "gpt-5.6-terra/xhigh",
-      to: "gpt-5.6-sol/xhigh",
+      name: "closed-v3-routing-registry-refresh",
+      path: "routing",
+      from: "previous-public-core-registry",
+      to: "current-public-core-registry",
     });
   }
   if (!Object.hasOwn(parsed, "critic_export")) {
@@ -389,6 +415,14 @@ function preWriteMetadata(target) {
       ownerMode: "source-authority",
     };
   }
+  if (target.kind === "authority-lock") {
+    return {
+      dataClass: "public-core-authority-lock",
+      logicalTargetRoot: ".agent-pipeline",
+      trackingStatus: "repository-policy-dependent",
+      ownerMode: "authority-update-only",
+    };
+  }
   const manifestTarget = loadRuntimeProjectionV3OwnedKeys().targets.find((entry) => entry.path === target.path);
   if (!manifestTarget) throw new Error(`V3 pre-write metadata has no declared runtime target: ${target.path}`);
   return {
@@ -415,6 +449,7 @@ export function planRunnerProfileMigrationV3({
   rootDir = process.cwd(),
   deps: overrides = {},
   initializeMissingRuntimeForSlimV3 = false,
+  authorityLockBytes = undefined,
 } = {}) {
   const deps = dependencies(overrides);
   let root;
@@ -435,6 +470,9 @@ export function planRunnerProfileMigrationV3({
     return result("invalid-baseline", [diagnostic("$.runtime", "baseline_read", error.message, "repair declared V3 runtime targets")], { root, sourceKind: classified.kind, targets: [], changes: [] });
   }
   if (projection.status !== "ready") return result(projection.status, projection.diagnostics ?? [], { root, sourceKind: classified.kind, targets: [], changes: [], decisionConflicts: projection.decisionConflicts });
+  if (authorityLockBytes !== undefined && (typeof authorityLockBytes !== "string" || !validAuthorityLockBytes(authorityLockBytes))) {
+    return result("invalid-authority-lock", [diagnostic("$.authorityLock", "invalid_authority_lock", "authority lock update is not one accepted core.lock.json", "supply one rendered core.lock.json from the authenticated authority update")], { root, sourceKind: classified.kind, targets: [], changes: [] });
+  }
   const renderedSource = classified.kind === "v3" ? classified.source.bytes : renderYaml(classified.intent);
   const internal = projection.targets.map((target) => ({
     path: target.path,
@@ -445,6 +483,20 @@ export function planRunnerProfileMigrationV3({
       : target.before,
     after: { status: target.after.status, sha256: target.after.sha256, byteLength: target.after.byteLength },
   })).sort((left, right) => left.path.localeCompare(right.path));
+  if (authorityLockBytes !== undefined) {
+    const lockPath = assertNoSymlink(root, AUTHORITY_LOCK_FILE, deps);
+    const before = digestPath(lockPath, deps);
+    if (before.status !== "present") {
+      return result("invalid-authority-lock", [diagnostic("$.authorityLock", "authority_lock_missing", "private overlay authority lock is missing", "restore .agent-pipeline/core.lock.json before the authority update")], { root, sourceKind: classified.kind, targets: [], changes: [] });
+    }
+    internal.push({
+      path: AUTHORITY_LOCK_FILE,
+      kind: "authority-lock",
+      bytes: authorityLockBytes,
+      before,
+      after: { status: "present", sha256: sha256(authorityLockBytes), byteLength: Buffer.byteLength(authorityLockBytes, "utf8") },
+    });
+  }
   internal.push({ path: SOURCE_FILE, kind: "source", bytes: renderedSource, before: { status: "present", sha256: sha256(classified.source.bytes), byteLength: Buffer.byteLength(classified.source.bytes, "utf8") }, after: { status: "present", sha256: sha256(renderedSource), byteLength: Buffer.byteLength(renderedSource, "utf8") } });
   const targets = internal.map(publicTarget);
   const changes = targets.filter((target) => target.changed);
@@ -511,9 +563,10 @@ function validateDirectoryBoundary(directories, targets) {
 }
 function validateTargetBoundary(entries) {
   const expected = runtimePaths().sort((a, b) => a.localeCompare(b));
-  if (!Array.isArray(entries) || entries.length !== expected.length + 1) throw new Error("V3 transaction has an incomplete target boundary");
+  const hasAuthorityLock = entries?.at(-2)?.path === AUTHORITY_LOCK_FILE && entries?.at(-2)?.kind === "authority-lock";
+  if (!Array.isArray(entries) || entries.length !== expected.length + 1 + (hasAuthorityLock ? 1 : 0)) throw new Error("V3 transaction has an incomplete target boundary");
   if (entries.at(-1)?.path !== SOURCE_FILE || entries.at(-1)?.kind !== "source") throw new Error("V3 transaction does not commit source last");
-  const runtime = entries.slice(0, -1);
+  const runtime = entries.slice(0, hasAuthorityLock ? -2 : -1);
   if (runtime.some((entry, index) => entry.kind !== "runtime" || entry.path !== expected[index])) throw new Error("V3 transaction differs from the owned runtime boundary");
 }
 function imageMatches(actual, expected) {

@@ -175,6 +175,85 @@ record("apply requires explicit activation and an unchanged in-process digest-on
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+record("a V3 authority update refreshes every frozen routing mapping as one registry", () => {
+  const source = v3Intent();
+  const routes = [
+    source.routing.profiles.epic.design_phase.claude,
+    source.routing.profiles.epic.execution_phase.claude,
+    source.routing.profiles.epic.execution_phase.codex,
+    source.routing.profiles.feature.design_phase.codex,
+    source.routing.profiles.feature.execution_phase.claude,
+    source.routing.profiles.feature.execution_phase.codex,
+    source.routing.profiles.mini.design_phase.codex,
+    source.routing.profiles.mini.execution_phase.claude,
+    source.routing.profiles.mini.execution_phase.codex,
+    source.routing.duties.implement.codex,
+    source.routing.duties.mechanic.codex,
+    source.routing.duties.deep.claude,
+    source.routing.duties.deep.codex,
+    source.routing.duties.test_author.claude,
+    source.routing.duties.test_author.codex,
+    source.routing.duties.critic_normal.claude,
+    source.routing.duties.critic_normal.codex,
+    source.routing.duties.critic_high_risk.claude,
+    source.routing.duties.readiness.claude,
+    source.routing.duties.readiness.codex,
+    source.routing.duties.advisory.codex,
+  ];
+  for (const route of routes) {
+    route.effort = "low";
+    if (route.selector?.kind === "model-id") route.selector.value = "gpt-5.6-terra";
+  }
+  source.routing.duties.advisory.claude.fallbacks.pop();
+  const root = fixture(yaml(source));
+  try {
+    const inspection = inspectRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(inspection.status, "ready");
+    assert.equal(inspection.sourceKind, "v3-refresh");
+    assert.deepEqual(inspection.compatibilityDeltas, [{
+      name: "closed-v3-routing-registry-refresh",
+      path: "routing",
+      from: "previous-public-core-registry",
+      to: "current-public-core-registry",
+    }]);
+    const plan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.sourceKind, "v3-refresh");
+    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+    const refreshed = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
+    const registry = loadRunnerProfilesV3Registry();
+    assert.deepEqual(refreshed.routing, { profiles: registry.profiles, duties: registry.duties });
+    assert.equal(validatePipelineUserV3(refreshed).ok, true);
+    assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+record("an authority lock and the full V3 registry refresh share one recoverable transaction", () => {
+  const source = v3Intent();
+  source.routing.duties.implement.codex.effort = "low";
+  const root = fixture(yaml(source));
+  const lock = (commit) => `${JSON.stringify({
+    $schema: "pipeline.core-lock.v1",
+    source: { repository: "https://github.com/example/pipeline.git", branch: "main", commit, tree: "b".repeat(40) },
+    plugin: { name: "pipeline-core", version: "0.2.0+test", manifest_sha256: "c".repeat(64) },
+  })}\n`;
+  const oldLock = lock("a".repeat(40));
+  const newLock = lock("d".repeat(40));
+  write(root, ".agent-pipeline/core.lock.json", oldLock);
+  try {
+    const plan = planRunnerProfileMigrationV3({ rootDir: root, authorityLockBytes: newLock });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.targets.at(-2).path, ".agent-pipeline/core.lock.json");
+    assert.equal(plan.targets.at(-2).kind, "authority-lock");
+    assert.equal(plan.targets.at(-1).path, "pipeline.user.yaml");
+    assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+    assert.equal(readFileSync(join(root, ".agent-pipeline/core.lock.json"), "utf8"), newLock);
+    assert.equal(validatePipelineUserV3(parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"))).ok, true);
+    assert.equal(planRunnerProfileMigrationV3({ rootDir: root, authorityLockBytes: newLock }).status, "noop");
+    assert.equal(planRunnerProfileMigrationV3({ rootDir: root, authorityLockBytes: "{}\n" }).status, "invalid-authority-lock");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 record("direct APIs preserve a pending journal until an authenticated delivered-preview authorization recovers it", () => {
   const root = fixture(yaml(v2Intent()));
   try {
