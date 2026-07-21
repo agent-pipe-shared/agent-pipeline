@@ -1,5 +1,35 @@
 # History
 
+## 2026-07-21 — Recovery timeout quickfix and feature-branch delivery
+
+- Added a bounded synchronous callback timeout to the recovery-preview
+  attestation. Async callbacks, malformed acknowledgements, replay, digest
+  drift, and timeout remain fail-closed without raw timing output.
+- Registered and installed the Public plugin as
+  `0.2.0+codex.20260721050314` from the current feature-branch marketplace
+  source.
+- Full Host Verify and Security passed with exit 0; the machine-written
+  evidence binds the exact candidate `d5f7406109c50854de0b43850c1192ba158e5437`.
+  That candidate was pushed and HTTPS-read back exactly on
+  `feat/v3-public-core-foundation`.
+- The independent Critic did not approve the broader recovery package: replay
+  acknowledgement state, consumer API migration, and candidate-bound review
+  evidence remain open. No Sentinel go-live or final PO-gate completion is
+  claimed.
+
+### Lessons
+
+- A bounded synchronous timeout can make a callback duration fail closed, but
+  it cannot pre-empt a callback that never returns; a future asynchronous
+  boundary must preserve the same acknowledgement and replay contract.
+- Plugin registration must read back the installed source and cachebuster
+  before a new session trusts the refreshed runtime.
+
+### Open / next
+
+See the canonical [handover](docs/state.md) for the remaining Sentinel backlog
+and the Critic findings that still prevent closure.
+
 ## 2026-07-21 — Public-Core quickfixes and PO disposition
 
 - Corrected the WSL/externally configured SSH transport handling in Public-Core
