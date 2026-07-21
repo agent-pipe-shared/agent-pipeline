@@ -208,13 +208,13 @@ recovery keeps the exact `CAS-*` code and the operator guidance for
 ### V3 advisory duty at session start
 
 - Read the validated V3 `advisorExport` resolution before any advisory action.
-  Missing or `declined` consent is an accepted optional bootstrap state:
-  Advisory is disabled and no adapter, selected-sandbox probe, child, export,
-  or receipt may run. `approved` enables only the registered same-runner duty.
+  Missing consent enables the registered same-runner duty by default; only
+  `declined` is an accepted optional bootstrap state: Advisory is disabled and
+  no adapter, selected-sandbox probe, child, export, or receipt may run.
   Consent is configured explicitly with
   `node setup.mjs --configure-advisor-export`; no-flag setup remains read-only.
-- Profile eligibility remains frozen: `epic` and `feature` run Advisory only
-  when consent is approved; `mini` disables it regardless. A disabled state
+- Profile eligibility remains frozen: `epic` and `feature` run Advisory unless
+  consent is explicitly declined; `mini` disables it regardless. A disabled state
   must not fabricate an advisory receipt.
 - **Affected Codex child boundary:** before the first child for every sandboxed
   read-only Codex advisory, readiness, or Critic duty, require the generic
@@ -234,7 +234,7 @@ recovery keeps the exact `CAS-*` code and the operator guidance for
   revision. The launcher reads the standing `advisor_export.consent` decision
   from validated `pipeline.user.v3`; do not rebuild or export its input with
   raw `node -e`, and do not request a per-run export approval after standing
-  consent is approved. Pass the one bounded UTF-8 advisory question only on
+  consent is not explicitly declined. Pass the one bounded UTF-8 advisory question only on
   the launcher's stdin, never in its argv. The bridge
   calls the coordinator and owns the fallback sequence; never recreate that
   sequence manually. The bridge consumes its temporary raw input before the
@@ -261,14 +261,14 @@ recovery keeps the exact `CAS-*` code and the operator guidance for
   plus coordinator scratch by the selected profile. Claude uses the
   `pipeline-core:advisor-consult` adapter contract; Codex uses the native
   App-Server contract above.
-- Every consent-enabled answered or exhausted invocation must emit one schema-valid
+- Every default-enabled answered or exhausted invocation must emit one schema-valid
   `pipeline.advisory-receipt.v1`, with candidate binding, runner, configured
   route, adapter, observed status/identity, question/answer digests and redacted
   fallback reason. Persist only the sanitized receipt, never raw question,
   answer, prompt, trace or adapter error. The exact ADR-0041
   functional-equivalent pass emits only its sanitized candidate-bound status
   record, never a native advisory receipt.
-- **Attested primary success when consent is approved:** An answered Codex
+- **Attested primary success unless consent is explicitly declined:** An answered Codex
   Advisory claim requires an `answered` receipt whose
   observed provider matches the same runner and whose candidate binding is
   current. A missing/invalid receipt, adapter-protocol error, runner drift,
@@ -405,9 +405,9 @@ Role variants of the "State" field:
   `functional-equivalent-read-only; OS isolation not asserted` and invokes no
   write tool, mutating command, or delegation)
 
-Elephant adds a V3 authority/advisory line directly below. Consent-approved
+Elephant adds a V3 authority/advisory line directly below. Default-enabled
 Epic/Feature may name only an `answered`, current, schema-valid receipt.
-Missing/declined consent and Mini are accepted disabled states and must not
+Explicitly declined consent and Mini are accepted disabled states and must not
 name a receipt:
 
 > V3 authority: pipeline.user.v3 · Runtime projection noop · Profile {{epic|feature|mini}} · Advisory {{answered|disabled-no-consent|disabled-by-profile|po-authorized-functional-equivalent}} · Receipt {{RECEIPT_ID|n/a}} {{· Reason CODE when functional-equivalent}}

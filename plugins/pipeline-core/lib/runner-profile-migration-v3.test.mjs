@@ -155,7 +155,7 @@ record("v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable
     assert.equal(intent.routing.duties.advisory.claude.adapter, "native-fable");
     assert.equal(intent.routing.duties.advisory.codex.adapter, "consult");
     assert.equal(intent.advisor_export, undefined);
-    assert.deepEqual(validatePipelineUserV3(intent).advisoryExport, { consent: "missing", enabled: false });
+    assert.deepEqual(validatePipelineUserV3(intent).advisoryExport, { consent: "missing", enabled: true });
     assert.deepEqual(intent.roles, { po: { display_label: "PO" } });
     assert.deepEqual(intent.session, { keep_awake: false });
     assert.deepEqual(JSON.parse(readFileSync(join(root, ".claude/pipeline.json"), "utf8")).humanRoles, { po: { displayLabel: "PO" } });
@@ -631,6 +631,17 @@ record("slim valid V3 runtime initialization is explicit, read-only at plan, and
     assert.equal(applied.status, "applied");
     assert.ok(runtimePaths.every((path) => existsSync(join(root, path))));
     assert.equal(readFileSync(join(root, "pipeline.user.yaml"), "utf8"), source);
+    assert.deepEqual(JSON.parse(readFileSync(join(root, ".claude/pipeline.json"), "utf8")), {
+      project: "agent-pipeline-private-overlay",
+      verify: "git diff --check HEAD",
+      handover: "docs/state.md",
+      autonomy: "gated",
+      branchModel: "feature-branch",
+      worktree: "optional",
+      stakes: "private-overlay",
+      constraints: ["Public Core owns the runtime projection; private overlay policy may add constraints."],
+      humanRoles: { po: { displayLabel: "PO" } },
+    });
     assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /language:\n  human_facing: de\n/u);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -744,9 +755,10 @@ record("authenticated noop apply remains bound to source, runtime digests, and r
   }
 });
 
-record("known V3 Critic route and legacy runnerRoutes refresh through sanctioned re-apply", () => {
+record("legacy V3 Critic route and runnerRoutes refresh through sanctioned re-apply", () => {
   const intent = v3Intent();
   intent.routing.duties.critic_normal.codex.selector.value = "gpt-5.6-terra";
+  intent.routing.duties.critic_normal.codex.effort = "xhigh";
   delete intent.critic_export;
   const root = fixture(yaml(intent));
   try {
@@ -755,9 +767,10 @@ record("known V3 Critic route and legacy runnerRoutes refresh through sanctioned
     assert.equal(plan.sourceKind, "v3-refresh");
     assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
     const refreshed = parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8"));
-    assert.equal(refreshed.routing.duties.critic_normal.codex.selector.value, "gpt-5.6-sol");
+    assert.equal(refreshed.routing.duties.critic_normal.codex.selector.value, "gpt-5.6-terra");
+    assert.equal(refreshed.routing.duties.critic_normal.codex.effort, "high");
     assert.equal(refreshed.critic_export.schema, "pipeline.critic-export-policy.v1");
-    assert.match(readFileSync(join(root, ".codex/agents/critic.toml"), "utf8"), /model = "gpt-5\.6-sol"/u);
+    assert.match(readFileSync(join(root, ".codex/agents/critic.toml"), "utf8"), /model = "gpt-5\.6-terra"/u);
     assert.doesNotMatch(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /runnerRoutes|worktype_mini_advisor/u);
     assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /criticExport:\n  policy: pipeline\.critic-export-policy\.v1/u);
     assert.equal(planRunnerProfileMigrationV3({ rootDir: root }).status, "noop");

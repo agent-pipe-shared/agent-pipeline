@@ -14,8 +14,8 @@ const DISPATCH = Object.freeze({
   candidateTree: "b".repeat(40),
 });
 
-function identity(provider, modelId) {
-  return { provider, modelId, effort: "not-applicable" };
+function identity(provider, modelId, effort = "not-applicable") {
+  return { provider, modelId, effort };
 }
 
 function options(overrides = {}) {
@@ -24,13 +24,13 @@ function options(overrides = {}) {
     makeReceiptId: () => "advisory-receipt-01",
     advisorExport: { consent: "approved" },
     invokeNative: async () => ({ status: "answered", answer: "native answer", identity: identity("anthropic", "claude-fable") }),
-    invokeConsult: async () => ({ status: "answered", answer: "consult answer", identity: identity("openai", "gpt-5.6-sol") }),
+    invokeConsult: async () => ({ status: "answered", answer: "consult answer", identity: identity("openai", "gpt-5.6-sol", "max") }),
     ...overrides,
   };
 }
 
-test("missing or declined advisor export consent disables advisory before dispatch", async () => {
-  for (const advisorExport of [null, { consent: "declined" }]) {
+test("only an explicit declined advisor export consent disables advisory before dispatch", async () => {
+  for (const advisorExport of [{ consent: "declined" }]) {
     let calls = 0;
     const result = await coordinateAdvisory({ profile: "epic", runner: "codex", question: "Must this stay local?", dispatch: DISPATCH }, options({
       advisorExport,
@@ -48,10 +48,11 @@ test("missing or declined advisor export consent disables advisory before dispat
 test("Codex uses Sol consult-primary with fresh hard-read-only one-question context", async () => {
   const calls = [];
   const result = await coordinateAdvisory({ profile: "epic", runner: "codex", question: "Which boundary is safest?", dispatch: DISPATCH }, options({
+    advisorExport: null,
     invokeNative: async () => { throw new Error("native Codex advisory must not run"); },
     invokeConsult: async (call) => {
       calls.push(call);
-      return { status: "answered", answer: "keep the boundary", identity: identity("openai", "gpt-5.6-sol") };
+      return { status: "answered", answer: "keep the boundary", identity: identity("openai", "gpt-5.6-sol", "max") };
     },
   }));
 
@@ -64,7 +65,7 @@ test("Codex uses Sol consult-primary with fresh hard-read-only one-question cont
     runner: "codex",
     model: "gpt-5.6-sol",
     selector: { kind: "model-id", value: "gpt-5.6-sol" },
-    effort: "not-applicable",
+    effort: "max",
     question: "Which boundary is safest?",
     dispatch: DISPATCH,
     oneQuestion: true,
@@ -108,7 +109,7 @@ test("Claude falls through failed native adapters only to a fresh read-only Clau
     invokeNative: async () => ({ status: "timed-out" }),
     invokeConsult: async (call) => {
       consultCalls.push(call);
-      return { status: "answered", answer: "shadow first", identity: identity("anthropic", "claude-fable") };
+      return { status: "answered", answer: "shadow first", identity: identity("anthropic", "claude-fable", "max") };
     },
   }));
 
@@ -116,6 +117,7 @@ test("Claude falls through failed native adapters only to a fresh read-only Clau
   assert.equal(consultCalls.length, 1);
   assert.equal(consultCalls[0].runner, "claude");
   assert.equal(consultCalls[0].model, "fable");
+  assert.equal(consultCalls[0].effort, "max");
   assert.equal(consultCalls[0].freshContext, true);
   assert.deepEqual(consultCalls[0].tools, ["Read", "Grep", "Glob"]);
   assert.equal(result.receipt.adapter, "consult");
@@ -127,7 +129,7 @@ test("receipt persists only content digests while the runtime answer remains sep
   const question = "Should raw context be retained?";
   const answer = "No raw content in receipts.";
   const result = await coordinateAdvisory({ profile: "epic", runner: "codex", question, dispatch: DISPATCH }, options({
-    invokeConsult: async () => ({ status: "answered", answer, identity: identity("openai", "gpt-5.6-sol") }),
+    invokeConsult: async () => ({ status: "answered", answer, identity: identity("openai", "gpt-5.6-sol", "max") }),
   }));
   const serialized = JSON.stringify(result.receipt);
   assert.equal(serialized.includes(question), false);
@@ -172,7 +174,7 @@ test("wrong-provider identity and adapter exceptions fail closed with sanitized 
 
 test("same-provider model drift fails closed against the configured route", async () => {
   const drift = await coordinateAdvisory({ profile: "epic", runner: "codex", question: "Can the model drift?", dispatch: DISPATCH }, options({
-    invokeConsult: async () => ({ status: "answered", answer: "wrong model", identity: identity("openai", "gpt-5.6-terra") }),
+    invokeConsult: async () => ({ status: "answered", answer: "wrong model", identity: identity("openai", "gpt-5.6-terra", "max") }),
   }));
   assert.equal(drift.ok, false);
   assert.equal(drift.code, "adapter_protocol");
@@ -182,7 +184,7 @@ test("same-provider model drift fails closed against the configured route", asyn
 
 test("observed effort drift fails closed against the configured route", async () => {
   const drift = await coordinateAdvisory({ profile: "feature", runner: "codex", question: "Can effort drift?", dispatch: DISPATCH }, options({
-    invokeConsult: async () => ({ status: "answered", answer: "wrong effort", identity: { provider: "openai", modelId: "gpt-5.6-sol", effort: "max" } }),
+    invokeConsult: async () => ({ status: "answered", answer: "wrong effort", identity: { provider: "openai", modelId: "gpt-5.6-sol", effort: "not-applicable" } }),
   }));
   assert.equal(drift.ok, false);
   assert.equal(drift.code, "adapter_protocol");
@@ -218,7 +220,7 @@ test("Codex forwards the exact selector-bound request without changing its Sol r
   }, options({
     invokeConsult: async (call) => {
       calls.push(call);
-      return { status: "answered", answer: "yes", identity: identity("openai", "gpt-5.6-sol") };
+      return { status: "answered", answer: "yes", identity: identity("openai", "gpt-5.6-sol", "max") };
     },
   }));
 

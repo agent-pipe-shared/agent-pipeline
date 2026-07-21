@@ -81,7 +81,21 @@ const LEGACY_V3_RUNTIME_SEEDS = Object.freeze({
 // resulting authenticated plan still records every seeded preimage as absent.
 const SLIM_V3_RUNTIME_SEEDS = Object.freeze({
   ".claude/settings.json": "{}\n",
-  ".claude/pipeline.json": "{}\n",
+  // A private overlay is itself a governed project.  Seed the complete
+  // portable calibration so a freshly activated overlay satisfies the same
+  // F4 bootstrap contract on every machine.  The V3 renderer owns only
+  // humanRoles.po.displayLabel and preserves these calibration keys on later
+  // refreshes.
+  ".claude/pipeline.json": `${JSON.stringify({
+    project: "agent-pipeline-private-overlay",
+    verify: "git diff --check HEAD",
+    handover: "docs/state.md",
+    autonomy: "gated",
+    branchModel: "feature-branch",
+    worktree: "optional",
+    stakes: "private-overlay",
+    constraints: ["Public Core owns the runtime projection; private overlay policy may add constraints."],
+  }, null, 2)}\n`,
   ".claude/pipeline.yaml": "language:\n  human_facing: en\nmodelRouting:\n  legacy:\n    model: legacy\n    effort: low\n",
   ".codex/config.toml": "",
   ".codex/agents/implementor.toml": 'model = ""\nmodel_reasoning_effort = ""\n',

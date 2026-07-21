@@ -1,5 +1,3 @@
-advisor_export:
-  consent: "approved"
 agent_runtime: "claude-code"
 autonomy:
   branch_model: "feature-branch"
@@ -56,6 +54,7 @@ routing:
             when: "native-fable-repeated-failure"
           -
             adapter: "consult"
+            effort: "max"
             isolation: "fresh-read-only"
             runner: "claude"
             selector:
@@ -68,7 +67,7 @@ routing:
         state: "default"
       codex:
         adapter: "consult"
-        effort: "not-applicable"
+        effort: "max"
         evidence: "advisory-receipt"
         isolation: "fresh-read-only"
         runner: "codex"
@@ -87,7 +86,7 @@ routing:
         evidence: "dispatch-receipt"
         selector:
           kind: "alias"
-          value: "fable"
+          value: "opus"
         state: "default"
         unavailable: "defer"
       codex:
@@ -100,7 +99,7 @@ routing:
         unavailable: "defer"
     critic_normal:
       claude:
-        effort: "max"
+        effort: "high"
         evidence: "dispatch-receipt"
         selector:
           kind: "alias"
@@ -108,16 +107,16 @@ routing:
         state: "default"
         unavailable: "defer"
       codex:
-        effort: "xhigh"
+        effort: "high"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gpt-5.6-sol"
+          value: "gpt-5.6-terra"
         state: "default"
         unavailable: "defer"
     deep:
       claude:
-        effort: "xhigh"
+        effort: "high"
         evidence: "dispatch-receipt"
         selector:
           kind: "alias"
@@ -125,7 +124,7 @@ routing:
         state: "opt-in"
         unavailable: "defer"
       codex:
-        effort: "xhigh"
+        effort: "high"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
@@ -142,11 +141,11 @@ routing:
         state: "default"
         unavailable: "defer"
       codex:
-        effort: "xhigh"
+        effort: "medium"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gpt-5.6-terra"
+          value: "gpt-5.6-luna"
         state: "default"
         unavailable: "defer"
     mechanic:
@@ -159,33 +158,33 @@ routing:
         state: "opt-in"
         unavailable: "defer"
       codex:
-        effort: "xhigh"
+        effort: "low"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gpt-5.6-terra"
+          value: "gpt-5.6-luna"
         state: "opt-in"
         unavailable: "defer"
     readiness:
       claude:
-        effort: "xhigh"
+        effort: "high"
         evidence: "dispatch-receipt"
         selector:
           kind: "alias"
-          value: "fable"
+          value: "sonnet"
         state: "default"
         unavailable: "defer"
       codex:
-        effort: "xhigh"
+        effort: "high"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
-          value: "gpt-5.6-sol"
+          value: "gpt-5.6-terra"
         state: "default"
         unavailable: "defer"
     test_author:
       claude:
-        effort: "xhigh"
+        effort: "high"
         evidence: "dispatch-receipt"
         selector:
           kind: "alias"
@@ -193,7 +192,7 @@ routing:
         state: "opt-in"
         unavailable: "defer"
       codex:
-        effort: "xhigh"
+        effort: "high"
         evidence: "dispatch-receipt"
         selector:
           kind: "model-id"
@@ -204,42 +203,7 @@ routing:
     epic:
       design_phase:
         claude:
-          effort: "high"
-          evidence: "dispatch-receipt"
-          selector:
-            kind: "alias"
-            value: "opus"
-          state: "default"
-          unavailable: "defer"
-        codex:
           effort: "xhigh"
-          evidence: "dispatch-receipt"
-          selector:
-            kind: "model-id"
-            value: "gpt-5.6-sol"
-          state: "default"
-          unavailable: "defer"
-      execution_phase:
-        claude:
-          effort: "high"
-          evidence: "dispatch-receipt"
-          selector:
-            kind: "alias"
-            value: "opus"
-          state: "default"
-          unavailable: "defer"
-        codex:
-          effort: "xhigh"
-          evidence: "dispatch-receipt"
-          selector:
-            kind: "model-id"
-            value: "gpt-5.6-sol"
-          state: "default"
-          unavailable: "defer"
-    feature:
-      design_phase:
-        claude:
-          effort: "high"
           evidence: "dispatch-receipt"
           selector:
             kind: "alias"
@@ -264,7 +228,42 @@ routing:
           state: "default"
           unavailable: "defer"
         codex:
-          effort: "xhigh"
+          effort: "high"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "model-id"
+            value: "gpt-5.6-terra"
+          state: "default"
+          unavailable: "defer"
+    feature:
+      design_phase:
+        claude:
+          effort: "high"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "alias"
+            value: "opus"
+          state: "default"
+          unavailable: "defer"
+        codex:
+          effort: "high"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "model-id"
+            value: "gpt-5.6-sol"
+          state: "default"
+          unavailable: "defer"
+      execution_phase:
+        claude:
+          effort: "medium"
+          evidence: "dispatch-receipt"
+          selector:
+            kind: "alias"
+            value: "sonnet"
+          state: "default"
+          unavailable: "defer"
+        codex:
+          effort: "medium"
           evidence: "dispatch-receipt"
           selector:
             kind: "model-id"
@@ -282,7 +281,7 @@ routing:
           state: "default"
           unavailable: "defer"
         codex:
-          effort: "xhigh"
+          effort: "high"
           evidence: "dispatch-receipt"
           selector:
             kind: "model-id"
@@ -291,7 +290,7 @@ routing:
           unavailable: "defer"
       execution_phase:
         claude:
-          effort: "high"
+          effort: "medium"
           evidence: "dispatch-receipt"
           selector:
             kind: "alias"
@@ -299,7 +298,7 @@ routing:
           state: "default"
           unavailable: "defer"
         codex:
-          effort: "xhigh"
+          effort: "medium"
           evidence: "dispatch-receipt"
           selector:
             kind: "model-id"

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 
-/** Closed bootstrap launcher: standing V3 consent -> one native Codex advisory. */
+/** Closed bootstrap launcher: V3 opt-out authority -> one native Codex advisory. */
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -68,7 +68,7 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
   const repoRoot = realpathSync(dependencies.repoRoot ?? process.cwd());
   const source = parseYaml(readFileSync(join(repoRoot, "pipeline.user.yaml"), "utf8"));
   const authority = validatePipelineUserV3(source, { source: "pipeline.user.yaml" });
-  if (!authority.ok || authority.advisoryExport?.consent !== "approved") throw new Error("standing pipeline.user.v3 advisor_export consent is not approved");
+  if (!authority.ok || authority.advisoryExport?.enabled !== true) throw new Error("pipeline.user.v3 advisor_export is explicitly declined");
   const topology = (dependencies.resolveTopologyFn ?? resolvePoGateRepositoryTopology)(repoRoot);
   const repoFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: topology.gitCommonDir, primaryRoot: topology.primaryRoot });
   const questionBytes = await (dependencies.readQuestionBytesFn ?? readQuestionBytes)(process.stdin);
@@ -93,7 +93,7 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
       runner: "codex",
       question,
       dispatch: { dispatchId: args.dispatchId, queueRevision: args.queueRevision, candidateCommit, candidateTree },
-      advisorExport: { consent: "approved" },
+      advisorExport: source.advisor_export ?? null,
       sandboxContext: { repoFingerprint, referenceSetSha256: sha256(JSON.stringify([...new Set(args.references)].sort())) },
       sandboxRuntime: { schema: "pipeline.codex-sandbox-runtime.v1", repoRoot, codexPath, observedHelperPath, sessionCleanup: { sessionId: args.sessionId, descriptorSha256: args.descriptorSha256 } },
     };

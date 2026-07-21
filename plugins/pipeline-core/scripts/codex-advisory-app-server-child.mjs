@@ -7,6 +7,7 @@ import { spawn } from "node:child_process";
 const MAX_BYTES = 8 * 1024 * 1024;
 const MODEL = "gpt-5.6-sol";
 const PROVIDER = "openai";
+const EFFORT = "max";
 
 function write(value) { process.stdout.write(`${JSON.stringify(value)}\n`); }
 function fail(code) { write({ schema: "pipeline.codex-advisory-app-server-child.v1", ok: false, code }); process.exitCode = 2; }
@@ -98,6 +99,7 @@ if (!process.exitCode) {
         threadId,
         input: [{ type: "text", text: request.question }],
         model: MODEL,
+        effort: EFFORT,
         approvalPolicy: "never",
         sandboxPolicy: { type: "externalSandbox", networkAccess: "enabled" },
         cwd: request.cwd,
@@ -147,7 +149,7 @@ if (!process.exitCode) {
     ok,
     code: ok ? "answered" : writeAttempt ? "write-attempt" : protocolError ? "protocol-error" : "child-exit-error",
     answer: ok ? answer : null,
-    observed: { provider: ok ? PROVIDER : null, model: ok ? MODEL : null, initialized, threadStarted: threadId !== null, turnStarted: turnId !== null, turnCompleted, stdinEnded: child.stdin.writableEnded, exitCode: close.code, signal: close.signal, cleanup: close.spawnError === null && close.signal === null ? "complete" : "incomplete" },
+    observed: { provider: ok ? PROVIDER : null, model: ok ? MODEL : null, effort: ok ? EFFORT : null, initialized, threadStarted: threadId !== null, turnStarted: turnId !== null, turnCompleted, stdinEnded: child.stdin.writableEnded, exitCode: close.code, signal: close.signal, cleanup: close.spawnError === null && close.signal === null ? "complete" : "incomplete" },
   });
   process.exitCode = ok ? 0 : 2;
 }

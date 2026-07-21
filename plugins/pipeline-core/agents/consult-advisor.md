@@ -1,7 +1,7 @@
 ---
 name: consult-advisor
 description: "Consent-gated fresh read-only advisor. Codex uses the selected-sandbox Sol route with Read/Grep/Glob/Bash; Claude retains the registered Read/Grep/Glob consult fallback. Exactly one question, fresh context, no memory, mutation, gate decision or auto-application."
-effort: high
+effort: max
 maxTurns: 10
 tools: Read, Grep, Glob
 # Claude hard read-only: Write/Edit/Bash are absent by construction. The exact

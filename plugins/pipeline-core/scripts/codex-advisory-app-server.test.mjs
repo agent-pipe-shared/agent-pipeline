@@ -37,7 +37,7 @@ function fakeSpawn(result, terminal = { code: 0, signal: null }) {
 function answered(overrides = {}) {
   return {
     schema: "pipeline.codex-advisory-app-server-child.v1", ok: true, code: "answered", answer: "Use the closed launcher.",
-    observed: { provider: "openai", model: "gpt-5.6-sol", initialized: true, threadStarted: true, turnStarted: true, turnCompleted: true, stdinEnded: true, exitCode: 0, signal: null, cleanup: "complete" },
+    observed: { provider: "openai", model: "gpt-5.6-sol", effort: "max", initialized: true, threadStarted: true, turnStarted: true, turnCompleted: true, stdinEnded: true, exitCode: 0, signal: null, cleanup: "complete" },
     ...overrides,
   };
 }
@@ -48,13 +48,14 @@ test("native adapter accepts only a complete openai/gpt-5.6-sol App-Server turn 
     spawnFn: fakeSpawn(answered()),
   });
   assert.equal(result.status, "answered");
-  assert.deepEqual(result.identity, { provider: "openai", modelId: "gpt-5.6-sol", effort: "not-applicable" });
+  assert.deepEqual(result.identity, { provider: "openai", modelId: "gpt-5.6-sol", effort: "max" });
   assert.equal(result.sandboxExecution.terminal.cleanupStatus, "complete");
 });
 
 test("wrong model, protocol failure, write attempt, incomplete stdio/exit or cleanup never becomes success", async () => {
   for (const result of [
     answered({ observed: { ...answered().observed, model: "gpt-5.6-terra" } }),
+    answered({ observed: { ...answered().observed, effort: "high" } }),
     { ...answered(), ok: false, code: "protocol-error", answer: null },
     { ...answered(), ok: false, code: "write-attempt", answer: null },
     answered({ observed: { ...answered().observed, stdinEnded: false } }),

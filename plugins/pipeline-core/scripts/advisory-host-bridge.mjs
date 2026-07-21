@@ -261,10 +261,10 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
     let result;
     let execution = null;
     const advisorExport = input?.advisorExport;
-    const approvedExport = advisorExport && typeof advisorExport === "object" && !Array.isArray(advisorExport)
-      && Object.keys(advisorExport).length === 1 && advisorExport.consent === "approved";
-    if (!approvedExport) {
-      // Missing/declined authority is a normal optional state. The
+    const advisoryDisabled = advisorExport && typeof advisorExport === "object" && !Array.isArray(advisorExport)
+      && Object.keys(advisorExport).length === 1 && advisorExport.consent === "declined";
+    if (advisoryDisabled) {
+      // An explicit decline is a normal optional state. The
       // coordinator returns the typed disabled result before any adapter,
       // selected-sandbox probe, child, export, or receipt.
       result = await coordinateAdvisory(input, { advisorExport });

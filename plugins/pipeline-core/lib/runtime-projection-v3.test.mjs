@@ -163,9 +163,9 @@ test("V3 planning is deterministic, read-only, and byte-preserving", () => {
     assert.deepEqual(second, first);
     assert.ok(first.targets.every((entry) => entry.unowned.preserved));
     assert.deepEqual(Object.fromEntries(targetPaths.map((path) => [path, readFileSync(join(root, path), "utf8")])), before);
-    assert.match(target(first, ".codex/agents/implementor.toml").after.bytes, /model = "gpt-5\.6-terra"/u);
-    assert.match(target(first, ".codex/agents/critic.toml").after.bytes, /model = "gpt-5\.6-sol"/u);
-    assert.equal(target(first, ".codex/agents/critic.toml").route.requested.effort, "xhigh");
+    assert.match(target(first, ".codex/agents/implementor.toml").after.bytes, /model = "gpt-5\.6-luna"/u);
+    assert.match(target(first, ".codex/agents/critic.toml").after.bytes, /model = "gpt-5\.6-terra"/u);
+    assert.equal(target(first, ".codex/agents/critic.toml").route.requested.effort, "high");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

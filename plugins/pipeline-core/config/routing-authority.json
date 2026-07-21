@@ -98,7 +98,7 @@
     "plugins/pipeline-core/agents/plan-verifier.md": { "capability": "review", "effort": "high" }
   },
   "dispatchBoundAgents": {
-    "plugins/pipeline-core/agents/consult-advisor.md": { "model": null, "effort": "high" }
+    "plugins/pipeline-core/agents/consult-advisor.md": { "model": null, "effort": "max" }
   },
   "dispatchProfiles": {
     "light": {
