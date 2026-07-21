@@ -62,6 +62,14 @@ The triage due date is **2026-08-03**. If no decision is recorded by
 **2026-08-10**, this item expires and must be renewed with current evidence
 before further implementation or prioritization.
 
+## Close-retro addendum — 2026-07-21
+
+The recovery-preview quickfix showed that a synchronous duration check can
+fail closed after a callback returns, but cannot pre-empt a callback that never
+returns. Future retry and recovery evidence must therefore bind the execution
+boundary explicitly and distinguish bounded completion from an unavailable or
+interrupted transport.
+
 ## Triage (filled in by the Elephant of the next Pipeline session)
 
 - **Decision:**

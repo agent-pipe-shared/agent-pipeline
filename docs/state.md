@@ -55,11 +55,13 @@ disposition, plugin registration, and final feature-branch delivery
   Sentinel go-live work is explicit Public backlog, not an imported private
   authority or a completion claim.
 - The preceding session loaded Public plugin version
-  `0.2.0+codex.20260720195249`; this block registered the cachebusted
-  candidate `0.2.0+codex.20260720222336`. The feature branch and its remote
-  fetch-back now read back the exact candidate, and the local marketplace was
-  refreshed and reinstalled to that version. A fresh Codex thread must still
-  run the full bootstrap before runtime evidence may trust a future refresh.
+  `0.2.0+codex.20260720222336`; this block registered
+  `0.2.0+codex.20260721050314` from the current feature-branch worktree. The
+  local marketplace was replaced with that source and the plugin read back at
+  the new version. The exact candidate `d5f7406109c50854de0b43850c1192ba158e5437`
+  is pushed and HTTPS-read back on `feat/v3-public-core-foundation`. A fresh
+  Codex thread must still run the full bootstrap before runtime evidence may
+  trust the refresh.
 - Advisor export consent is durably recorded as repository-scoped `approved` in
   `pipeline.user.yaml`. Setup reports only the bounded approval/disabled state;
   it never prints raw questions, answers, credentials, paths, or environment
@@ -105,9 +107,13 @@ disposition, plugin registration, and final feature-branch delivery
   [`plugins/pipeline-core/lib/recovery-preview-attestation.mjs`](../plugins/pipeline-core/lib/recovery-preview-attestation.mjs)
   with fail-closed coverage for absent, empty, throwing, async, malformed,
   replayed, invocation-mismatched, and digest-mismatched acknowledgements.
-  Its focused Spec-retention companion checks are now additively registered in
-  the central Verify suite under the explicit TP-3 exception; no completion or
-  go-live claim is made.
+  The callback now has a bounded synchronous timeout and typed
+  `RP-CALLBACK-TIMEOUT` failure coverage. Its focused Spec-retention companion
+  checks are additively registered in the central Verify suite under the
+  explicit TP-3 exception; no completion or go-live claim is made. The
+  independent Critic still failed the broader recovery package for replay
+  acknowledgement/API migration and candidate-bound evidence concerns; those
+  findings remain open and the item is not closed.
 - Repository freshness now reads the source checkout's effective
   `core.sshCommand` through Git and binds the same transport context to the
   disposable bare fetch and the exact-OID fallback. The source checkout remains
@@ -150,6 +156,11 @@ disposition, plugin registration, and final feature-branch delivery
   `cb9de1ca5c2d0a7403cd55743ff47a7c19cf83dd` and its exact remote fetch-back
   are complete; this handover therefore records residual Sentinel work rather
   than an unfinished delivery tail.
+- The final recovery-timeout candidate `d5f7406109c50854de0b43850c1192ba158e5437`
+  passed the full Host Verify and Security gates with exit 0. The exact
+  evidence files bind that commit; the feature branch was pushed and fetched
+  back at the same OID. This is delivery evidence for the quickfix, not a
+  Sentinel go-live or PO-gate completion claim.
 - Session PO authorizations for this Sentinel continuation: the bounded TP-3
   exception may be used for additive Verify registrations and restored after
   each edit; after all required gates and exact remote readback are green, the
@@ -182,6 +193,7 @@ disposition, plugin registration, and final feature-branch delivery
   native/generic validator A/B evidence. SNT-A completion alone is not a
   release or go-live readiness claim.
 - Obtain independent review for the recovery-preview candidate, then triage
+  the Critic's replay/API/evidence findings before closing it. Then triage
   evidence-bound review retry economics and target-bound override-ledger
   placement under their recorded owners and expiry dates.
 - The monthly tooling-radar item is absent for the current month and is overdue;
