@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 
+import { spawnSync } from "node:child_process";
+import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { validateScopedVerifyRegistration } from "./scoped-verify-registration.mjs";
 
 let passed = 0;
@@ -121,6 +126,38 @@ check("SVR23 a duplicate suite name fails closed", rejects(entry({
 check("SVR24 a duplicate suite file fails closed", rejects(entry({
   suites: [{ ...SUITE }, { name: "another-suite", file: SUITE.file }],
 })));
+
+function scopedRegistrationFailureFixture() {
+  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "scoped-verify-registration-"));
+  const writer = join(fixtureRoot, "harness", "scripts", "verify.mjs");
+  const registration = join(fixtureRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs");
+  const prd = join(fixtureRoot, PRD_PATH);
+  const evidencePath = join(fixtureRoot, "evidence", "verify-latest.json");
+
+  try {
+    mkdirSync(dirname(writer), { recursive: true });
+    mkdirSync(dirname(registration), { recursive: true });
+    mkdirSync(dirname(prd), { recursive: true });
+    copyFileSync(join(repoRoot, "harness", "scripts", "verify.mjs"), writer);
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs"), registration);
+    copyFileSync(join(repoRoot, PRD_PATH), prd);
+
+    const result = spawnSync(process.execPath, [writer], { cwd: fixtureRoot, encoding: "utf8" });
+    if (result.status === 0 || !existsSync(evidencePath)) return false;
+    const evidence = JSON.parse(readFileSync(evidencePath, "utf8"));
+    return evidence.exitCode !== 0
+      && evidence.steps.length === 1
+      && evidence.steps[0].name === "scoped-verify-registration"
+      && evidence.steps[0].exitCode === 1;
+  } catch {
+    return false;
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+}
+
+check("SVR25 Verify writes only the failed scoped-registration evidence when its registered target is absent", scopedRegistrationFailureFixture());
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exitCode = failed === 0 ? 0 : 1;
