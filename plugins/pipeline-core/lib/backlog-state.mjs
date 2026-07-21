@@ -13,6 +13,7 @@ import { createHash } from "node:crypto";
 export const ITEM_SCHEMA = "pipeline.backlog-item.v1";
 export const TRANSITION_SCHEMA = "pipeline.backlog-transition.v1";
 export const INDEX_SCHEMA = "pipeline.backlog-index.v1";
+export const SENTINEL_RECOVERY_CATALOG_SCHEMA = "pipeline.sentinel-backlog-recovery.v1";
 export const PROJECT_CLOSURE_READBACK_SCHEMA = "pipeline.project-closure-readback.v1";
 export const BACKLOG_STATUSES = Object.freeze(["open", "in_progress", "closed"]);
 export const BACKLOG_TYPES = Object.freeze(["workflow-improvement", "tooling-radar", "defect", "idea"]);
@@ -29,6 +30,25 @@ const OID = /^[a-f0-9]{40}$/u;
 const SAFE_REPOSITORY_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+$/u;
 const HASH = /^[a-f0-9]{64}$/u;
 const PROJECT_CLOSURE_READBACK_KEYS = new Set(["schema", "repository", "commit", "readbackCommit"]);
+const SENTINEL_RECOVERY_CATALOG_KEYS = new Set(["schema", "source", "recoveredAt", "items"]);
+const SENTINEL_RECOVERY_ITEM_KEYS = new Set(["id", "status", "type"]);
+const SENTINEL_RECOVERY_IDS = Object.freeze([
+  "pipeline.afk-assumption-mode",
+  "pipeline.canonical-worktree-lifecycle",
+  "pipeline.codex-plugin-validator-host-parity",
+  "pipeline.codex-sandbox-critic-longterm",
+  "pipeline.documentation-information-architecture",
+  "pipeline.dual-channel-publication",
+  "pipeline.execution-model-switchback",
+  "pipeline.nonblocking-interaction-continuity",
+  "pipeline.po-gate-worktree-authority",
+  "pipeline.push-guard-worktree-target",
+  "pipeline.regulated-document-hooks",
+  "pipeline.session-keep-awake",
+  "pipeline.stateful-design-contract-template",
+  "pipeline.t1-governance-path-preflight",
+  "pipeline.verify-gate-scoped-registration",
+]);
 
 function own(object, key) {
   return Object.prototype.hasOwnProperty.call(object, key);
@@ -172,6 +192,45 @@ export function validateProjectClosureReadback(receipt, { repository, configured
   if (typeof repository === "string" && receipt.repository !== repository) errors.push("repository does not match closure_repository");
   if (typeof configuredRepository === "string" && receipt.repository !== configuredRepository) errors.push("repository does not match configured item project binding");
   if (typeof commit === "string" && receipt.commit !== commit) errors.push("commit does not match closure_commit");
+  return errors;
+}
+
+/**
+ * Validate the deliberately small public Sentinel recovery catalog.  It is an
+ * inventory of historical baseline states, never a source of completion or
+ * closure evidence.
+ */
+export function validateSentinelRecoveryCatalog(catalog) {
+  const errors = [];
+  if (!isPlainObject(catalog)) return ["recovery catalog must be a JSON object"];
+  for (const key of ["schema", "source", "recoveredAt", "items"]) {
+    if (!own(catalog, key)) errors.push(`recovery catalog is missing ${key}`);
+  }
+  for (const key of Object.keys(catalog)) if (!SENTINEL_RECOVERY_CATALOG_KEYS.has(key)) errors.push(`recovery catalog has unsupported field ${key}`);
+  if (catalog.schema !== SENTINEL_RECOVERY_CATALOG_SCHEMA) errors.push(`recovery catalog schema must equal ${SENTINEL_RECOVERY_CATALOG_SCHEMA}`);
+  if (typeof catalog.source !== "string" || !SAFE_REPOSITORY_PATH.test(catalog.source)) errors.push("recovery catalog source must be a safe repository-relative path");
+  if (!validDate(asString(catalog.recoveredAt))) errors.push("recovery catalog recoveredAt must be an ISO calendar date");
+  if (!Array.isArray(catalog.items) || catalog.items.length === 0) errors.push("recovery catalog items must be a non-empty array");
+  if (!Array.isArray(catalog.items)) return errors;
+  const ids = new Set();
+  for (const [index, entry] of catalog.items.entries()) {
+    const label = `recovery catalog item ${index + 1}`;
+    if (!isPlainObject(entry)) {
+      errors.push(`${label} must be an object`);
+      continue;
+    }
+    for (const key of ["id", "status", "type"]) if (!own(entry, key)) errors.push(`${label} is missing ${key}`);
+    for (const key of Object.keys(entry)) if (!SENTINEL_RECOVERY_ITEM_KEYS.has(key)) errors.push(`${label} has unsupported field ${key}`);
+    if (!ITEM_ID.test(asString(entry.id))) errors.push(`${label} id must be a lowercase stable identifier`);
+    else if (ids.has(entry.id)) errors.push(`${label} duplicates id ${entry.id}`);
+    else ids.add(entry.id);
+    if (!BACKLOG_STATUSES.includes(entry.status)) errors.push(`${label} status must be open, in_progress, or closed`);
+    else if (entry.status === "closed") errors.push(`${label} must not claim closed status during recovery`);
+    if (!BACKLOG_TYPES.includes(entry.type)) errors.push(`${label} type is not in the canonical item taxonomy`);
+  }
+  const expected = new Set(SENTINEL_RECOVERY_IDS);
+  for (const id of expected) if (!ids.has(id)) errors.push(`recovery catalog is missing required Sentinel id ${id}`);
+  for (const id of ids) if (!expected.has(id)) errors.push(`recovery catalog contains unsupported Sentinel id ${id}`);
   return errors;
 }
 
