@@ -42,6 +42,7 @@ import { spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { validateScopedVerifyRegistration } from "../../plugins/pipeline-core/lib/scoped-verify-registration.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, "..", "..");
@@ -51,6 +52,12 @@ const hooksDir = join(repoRoot, "plugins", "pipeline-core", "hooks");
 
 const libDir = join(repoRoot, "plugins", "pipeline-core", "lib");
 const pluginScriptsDir = join(repoRoot, "plugins", "pipeline-core", "scripts");
+
+function scopedVerifySuites(registration) {
+  const validation = validateScopedVerifyRegistration(registration);
+  if (!validation.ok) throw new Error(`Invalid scoped Verify registration: ${validation.code}`);
+  return validation.value.suites.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
+}
 
 const TEST_SUITES = [
   { name: "setup-tests", file: join(repoRoot, "setup.test.mjs") },
@@ -167,6 +174,20 @@ const TEST_SUITES = [
   { name: "continuity-status-cli-tests", file: join(pluginScriptsDir, "continuity-status.test.mjs") },
   { name: "delivery-course-tests", file: join(libDir, "delivery-course.test.mjs") },
   { name: "critic-packet-governance-tests", file: join(libDir, "critic-packet-governance.test.mjs") },
+  ...scopedVerifySuites({
+    schema: "pipeline.scoped-verify-registration.v1",
+    taskId: "pipeline.verify-gate-scoped-registration",
+    authority: {
+      prd: {
+        path: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+        sha256: "2b4c722de508cb9424b3fb83c6308602dd20e7e67ce240740c51deeb58541136",
+      },
+    },
+    suites: [{
+      name: "scoped-verify-registration-tests",
+      file: "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs",
+    }],
+  }),
 ];
 
 // Manifest-gated phase steps: see header — only projects with `.claude/pipeline.yaml`
