@@ -167,6 +167,18 @@ disposition, plugin registration, and final feature-branch delivery
   committed Public-Core result may be pushed to the currently checked-out
   feature branch. This does not authorize `main`, tags, private remotes, or a
   push of an unverified/partial candidate.
+- **PO-Autorisierung, 2026-07-21 (diese Sentinel-Fortsetzung):** Nach dem
+  erfolgreichen initialen Verify sowie den zwei zuvor vorliegenden
+  Verify-/Review-/Test-Evidenzpunkten dürfen nachfolgende Kandidateniterationen
+  Diff-Prüfungen und die unmittelbar betroffenen Gates verwenden, statt Full
+  Verify jeweils erneut auszuführen. Jede Scope-Erweiterung oder Änderung einer
+  Security-Oberfläche erfordert weiterhin die vollständigen Gates.
+- **PO-Autorisierung, 2026-07-21 (temporäre Schutzaufhebung):** TP-1 bis TP-5
+  dürfen in dieser Sitzung nur während der Bearbeitung ihrer jeweils exakt
+  geschützten Dateien vorübergehend aufgehoben werden. Jeder aufgehobene Eintrag
+  ist vor Staging, Commit oder Push wiederherzustellen. Dies autorisiert weder
+  einen `main`-Merge noch einen Statusübergang oder einen weitergehenden
+  Guard-Bypass.
 
 ## Open items and next block
 
