@@ -102,17 +102,23 @@ check("SVR16 non-test suite targets fail closed", rejects(entry({
 check("SVR17 missing .test.mjs targets relative to the repository root fail closed", rejects(entry({
   suites: [{ ...SUITE, file: "plugins/pipeline-core/lib/missing-scoped-verify-target.test.mjs" }],
 })));
+check("SVR18 only the static SNT-7 suite name and existing test target are accepted", rejects(entry({
+  suites: [{
+    name: "runner-profile-migration-v2-tests",
+    file: "plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs",
+  }],
+})));
 
 const { name: suiteName, ...suiteWithoutName } = SUITE;
 const { file: suiteFile, ...suiteWithoutFile } = SUITE;
-check("SVR18 missing suite name fails closed", rejects(entry({ suites: [suiteWithoutName] })));
-check("SVR19 missing suite file target fails closed", rejects(entry({ suites: [suiteWithoutFile] })));
-check("SVR20 extra suite keys fail closed", rejects(entry({ suites: [{ ...SUITE, enabled: true }] })));
-check("SVR21 an empty suite list fails closed", rejects(entry({ suites: [] })));
-check("SVR22 a duplicate suite name fails closed", rejects(entry({
+check("SVR19 missing suite name fails closed", rejects(entry({ suites: [suiteWithoutName] })));
+check("SVR20 missing suite file target fails closed", rejects(entry({ suites: [suiteWithoutFile] })));
+check("SVR21 extra suite keys fail closed", rejects(entry({ suites: [{ ...SUITE, enabled: true }] })));
+check("SVR22 an empty suite list fails closed", rejects(entry({ suites: [] })));
+check("SVR23 a duplicate suite name fails closed", rejects(entry({
   suites: [{ ...SUITE }, { ...SUITE, file: "plugins/pipeline-core/lib/another.test.mjs" }],
 })));
-check("SVR23 a duplicate suite file fails closed", rejects(entry({
+check("SVR24 a duplicate suite file fails closed", rejects(entry({
   suites: [{ ...SUITE }, { name: "another-suite", file: SUITE.file }],
 })));
 
