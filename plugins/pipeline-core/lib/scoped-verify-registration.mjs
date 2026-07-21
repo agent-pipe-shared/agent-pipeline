@@ -17,7 +17,8 @@ export const SCOPED_VERIFY_REGISTRATION_PRD_SHA256 = "2b4c722de508cb9424b3fb83c6
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const SHA256 = /^[a-f0-9]{64}$/u;
-const SUITE_NAME = /^[a-z][a-z0-9]*(?:-[a-z0-9]+)*-tests$/u;
+const SCOPED_SUITE_NAME = "scoped-verify-registration-tests";
+const SCOPED_SUITE_FILE = "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs";
 
 function exactKeys(value, keys) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
@@ -55,23 +56,16 @@ export function validateScopedVerifyRegistration(entry) {
     return rejected("SVR-PRD-FILE");
   }
   if (!Array.isArray(entry.suites) || entry.suites.length !== 1) return rejected("SVR-SUITES");
-  const names = new Set();
-  const files = new Set();
-  const suites = [];
-  for (const suite of entry.suites) {
-    if (!exactKeys(suite, ["name", "file"]) || typeof suite.name !== "string" || !SUITE_NAME.test(suite.name)
-      || typeof suite.file !== "string" || !suite.file.endsWith(".test.mjs")) return rejected("SVR-SUITE-SHAPE");
-    if (names.has(suite.name) || files.has(suite.file)) return rejected("SVR-SUITE-DUPLICATE");
-    const target = safeRelativeFile(suite.file);
-    if (!target) return rejected("SVR-SUITE-PATH");
-    try {
-      if (!lstatSync(target).isFile()) return rejected("SVR-SUITE-FILE");
-    } catch {
-      return rejected("SVR-SUITE-FILE");
-    }
-    names.add(suite.name);
-    files.add(suite.file);
-    suites.push(Object.freeze({ name: suite.name, file: suite.file }));
+  const [suite] = entry.suites;
+  if (!exactKeys(suite, ["name", "file"]) || suite.name !== SCOPED_SUITE_NAME || suite.file !== SCOPED_SUITE_FILE) {
+    return rejected("SVR-SUITE-BINDING");
   }
-  return Object.freeze({ ok: true, value: Object.freeze({ suites: Object.freeze(suites) }) });
+  const target = safeRelativeFile(suite.file);
+  if (!target) return rejected("SVR-SUITE-PATH");
+  try {
+    if (!lstatSync(target).isFile()) return rejected("SVR-SUITE-FILE");
+  } catch {
+    return rejected("SVR-SUITE-FILE");
+  }
+  return Object.freeze({ ok: true });
 }
