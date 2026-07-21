@@ -52,12 +52,21 @@ const hooksDir = join(repoRoot, "plugins", "pipeline-core", "hooks");
 
 const libDir = join(repoRoot, "plugins", "pipeline-core", "lib");
 const pluginScriptsDir = join(repoRoot, "plugins", "pipeline-core", "scripts");
-
-function scopedVerifySuites(registration) {
-  const validation = validateScopedVerifyRegistration(registration);
-  if (!validation.ok) throw new Error(`Invalid scoped Verify registration: ${validation.code}`);
-  return validation.value.suites.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
-}
+const SCOPED_VERIFY_SUITE = Object.freeze({
+  name: "scoped-verify-registration-tests",
+  file: "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs",
+});
+const SCOPED_VERIFY_REGISTRATION = Object.freeze({
+  schema: "pipeline.scoped-verify-registration.v1",
+  taskId: "pipeline.verify-gate-scoped-registration",
+  authority: Object.freeze({
+    prd: Object.freeze({
+      path: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      sha256: "2b4c722de508cb9424b3fb83c6308602dd20e7e67ce240740c51deeb58541136",
+    }),
+  }),
+  suites: Object.freeze([SCOPED_VERIFY_SUITE]),
+});
 
 const TEST_SUITES = [
   { name: "setup-tests", file: join(repoRoot, "setup.test.mjs") },
@@ -174,20 +183,6 @@ const TEST_SUITES = [
   { name: "continuity-status-cli-tests", file: join(pluginScriptsDir, "continuity-status.test.mjs") },
   { name: "delivery-course-tests", file: join(libDir, "delivery-course.test.mjs") },
   { name: "critic-packet-governance-tests", file: join(libDir, "critic-packet-governance.test.mjs") },
-  ...scopedVerifySuites({
-    schema: "pipeline.scoped-verify-registration.v1",
-    taskId: "pipeline.verify-gate-scoped-registration",
-    authority: {
-      prd: {
-        path: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-        sha256: "2b4c722de508cb9424b3fb83c6308602dd20e7e67ce240740c51deeb58541136",
-      },
-    },
-    suites: [{
-      name: "scoped-verify-registration-tests",
-      file: "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs",
-    }],
-  }),
 ];
 
 // Manifest-gated phase steps: see header — only projects with `.claude/pipeline.yaml`
@@ -211,13 +206,20 @@ const PHASE_STEPS =
       ];
 
 const steps = [];
-for (const suite of [...TEST_SUITES, ...PHASE_STEPS]) {
-  console.log(`\n=== ${suite.name} (${suite.file}) ===`);
-  const res = spawnSync(process.execPath, [suite.file, ...(suite.args ?? [])], { encoding: "utf8", cwd: repoRoot });
-  if (res.stdout) process.stdout.write(res.stdout);
-  if (res.stderr) process.stderr.write(res.stderr);
-  const exitCode = res.status ?? 1;
-  steps.push({ name: suite.name, exitCode });
+const scopedRegistration = validateScopedVerifyRegistration(SCOPED_VERIFY_REGISTRATION);
+if (!scopedRegistration.ok) {
+  console.error(`Invalid scoped Verify registration: ${scopedRegistration.code}`);
+  steps.push({ name: "scoped-verify-registration", exitCode: 1 });
+} else {
+  const scopedTest = { name: SCOPED_VERIFY_SUITE.name, file: join(repoRoot, SCOPED_VERIFY_SUITE.file) };
+  for (const suite of [...TEST_SUITES, scopedTest, ...PHASE_STEPS]) {
+    console.log(`\n=== ${suite.name} (${suite.file}) ===`);
+    const res = spawnSync(process.execPath, [suite.file, ...(suite.args ?? [])], { encoding: "utf8", cwd: repoRoot });
+    if (res.stdout) process.stdout.write(res.stdout);
+    if (res.stderr) process.stderr.write(res.stderr);
+    const exitCode = res.status ?? 1;
+    steps.push({ name: suite.name, exitCode });
+  }
 }
 
 const overallExitCode = steps.find((s) => s.exitCode !== 0)?.exitCode ?? 0;
