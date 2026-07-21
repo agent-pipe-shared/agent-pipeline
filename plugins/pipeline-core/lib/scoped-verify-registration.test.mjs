@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { spawnSync } from "node:child_process";
-import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -158,6 +158,45 @@ function scopedRegistrationFailureFixture() {
 }
 
 check("SVR25 Verify writes only the failed scoped-registration evidence when its registered target is absent", scopedRegistrationFailureFixture());
+
+function prdDriftFixture() {
+  const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
+  const fixtureRoot = mkdtempSync(join(tmpdir(), "scoped-verify-registration-prd-drift-"));
+  const registration = join(fixtureRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs");
+  const suiteTarget = join(fixtureRoot, SUITE.file);
+  const prd = join(fixtureRoot, PRD_PATH);
+  const child = join(fixtureRoot, "validate-prd-drift.mjs");
+
+  try {
+    mkdirSync(dirname(registration), { recursive: true });
+    mkdirSync(dirname(suiteTarget), { recursive: true });
+    mkdirSync(dirname(prd), { recursive: true });
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs"), registration);
+    copyFileSync(join(repoRoot, SUITE.file), suiteTarget);
+    copyFileSync(join(repoRoot, PRD_PATH), prd);
+    writeFileSync(prd, `${readFileSync(prd, "utf8")}\nfixture tamper\n`);
+    writeFileSync(child, `
+import assert from "node:assert/strict";
+import { validateScopedVerifyRegistration } from "./plugins/pipeline-core/lib/scoped-verify-registration.mjs";
+const result = validateScopedVerifyRegistration({
+  schema: "pipeline.scoped-verify-registration.v1",
+  taskId: "pipeline.verify-gate-scoped-registration",
+  authority: { prd: { path: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md", sha256: "2b4c722de508cb9424b3fb83c6308602dd20e7e67ce240740c51deeb58541136" } },
+  suites: [{ name: "scoped-verify-registration-tests", file: "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs" }],
+});
+assert.deepEqual(result, { ok: false, code: "SVR-PRD-DRIFT" });
+`);
+
+    const result = spawnSync(process.execPath, [child], { cwd: fixtureRoot, encoding: "utf8" });
+    return result.status === 0 && result.stderr === "";
+  } catch {
+    return false;
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true });
+  }
+}
+
+check("SVR26 detects a tampered canonical PRD from the validator fixture root", prdDriftFixture());
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exitCode = failed === 0 ? 0 : 1;
