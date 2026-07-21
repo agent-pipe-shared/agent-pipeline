@@ -105,17 +105,17 @@ function ok(id, condition, detail) {
   const declined = renderAdvisorExportConsent(withoutConsent, "declined");
   const approved = renderAdvisorExportConsent(declined, "approved");
   ok(
-    "advisor export consent: byte-bounded patch supports conservative absence, decline, and approval",
+    "advisor export consent: byte-bounded patch supports enabled-default absence, decline, and approval",
     !withoutConsent.includes("advisor_export:")
       && parseYaml(declined).advisor_export?.consent === "declined"
       && parseYaml(approved).advisor_export?.consent === "approved"
       && approved.replace(/advisor_export:\n  consent: "approved"\n/u, "") === withoutConsent,
   );
   ok(
-    "advisor export consent: disclosure names exported data and default decline with a copyable setup command",
+    "advisor export consent: disclosure names exported data and explicit opt-out with a copyable setup command",
     ADVISOR_EXPORT_DISCLOSURE.includes("one advisory question")
       && ADVISOR_EXPORT_DISCLOSURE.includes("allowlisted repository candidate material")
-      && ADVISOR_EXPORT_DISCLOSURE.includes("default is decline")
+      && ADVISOR_EXPORT_DISCLOSURE.includes("enabled by default")
       && ADVISOR_EXPORT_CONFIGURATION_COMMAND === "node setup.mjs --configure-advisor-export",
   );
   ok(
@@ -144,9 +144,9 @@ function ok(id, condition, detail) {
     writeAdvisorExportConsentAtomic: (path, bytes) => writeFileSync(path, bytes),
   });
   ok(
-    "run: no-flag V3 check stays read-only and explicit consent prompt defaults to decline",
+    "run: no-flag V3 check stays read-only and explicit opt-out prompt keeps advisory enabled by default",
     readonlyCode === 0 && configuredCode === 0 && before === source && afterReadonly === before
-      && parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8")).advisor_export?.consent === "declined",
+      && parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8")).advisor_export?.consent === "approved",
   );
   rmSync(root, { recursive: true, force: true });
 }

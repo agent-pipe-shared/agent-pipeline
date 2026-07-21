@@ -51,7 +51,7 @@ export async function invokeCodexAdvisoryAppServer(payload, dependencies = {}) {
   }
   const success = terminal.code === 0 && terminal.signal === null && terminal.error === null
     && result?.schema === "pipeline.codex-advisory-app-server-child.v1" && result.ok === true
-    && result.code === "answered" && result.observed?.provider === PROVIDER && result.observed?.model === MODEL
+    && result.code === "answered" && result.observed?.provider === PROVIDER && result.observed?.model === MODEL && result.observed?.effort === "max"
     && result.observed?.initialized === true && result.observed?.threadStarted === true
     && result.observed?.turnStarted === true && result.observed?.turnCompleted === true
     && result.observed?.stdinEnded === true && result.observed?.exitCode === 0
@@ -61,7 +61,7 @@ export async function invokeCodexAdvisoryAppServer(payload, dependencies = {}) {
   return {
     status: "answered",
     answer: result.answer,
-    identity: { provider: PROVIDER, modelId: MODEL, effort: "not-applicable" },
+    identity: { provider: PROVIDER, modelId: MODEL, effort: "max" },
     sandboxExecution: {
       schema: "pipeline.codex-sandbox-host-execution.v1",
       selectionId: selected.selectionId,

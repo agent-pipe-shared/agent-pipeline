@@ -232,9 +232,9 @@ export async function coordinateAdvisory(input, {
     return { ok: false, code: "route_contract_invalid", answer: null, receipt: null, attempts: [] };
   }
 
-  const approvedExport = advisorExport && typeof advisorExport === "object" && !Array.isArray(advisorExport)
-    && Object.keys(advisorExport).length === 1 && advisorExport.consent === "approved";
-  if (!approvedExport) {
+  const advisoryDisabled = advisorExport && typeof advisorExport === "object" && !Array.isArray(advisorExport)
+    && Object.keys(advisorExport).length === 1 && advisorExport.consent === "declined";
+  if (advisoryDisabled) {
     return { ok: false, code: "advisory_disabled_no_consent", answer: null, receipt: null, attempts: [] };
   }
 

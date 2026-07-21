@@ -64,10 +64,10 @@ const cases = [
     assert.match(skill, /Ask only when[\s\S]*genuinely\s+ambiguous/u);
     assert.doesNotMatch(skill, /profile question repeats at EVERY bootstrap/u);
   }],
-  ["Epic and Feature advisory is consent-gated while Mini disables it", () => {
-    assert.match(skill, /Missing or `declined` consent is an accepted optional bootstrap state/u);
-    assert.match(skill, /`epic` and `feature` run Advisory only[\s\S]*`mini` disables it/u);
-    assert.match(skill, /Advisory is disabled and no adapter, selected-sandbox probe, child, export,[\s\S]*receipt may run/u);
+  ["Epic and Feature advisory defaults on while Mini disables it", () => {
+    assert.match(skill, /Missing consent enables the registered same-runner duty by default/u);
+    assert.match(skill, /`epic` and `feature` run Advisory unless[\s\S]*`mini` disables it/u);
+    assert.match(skill, /Advisory is disabled and\s+no adapter, selected-sandbox probe, child, export,[\s\S]*receipt may run/u);
     assert.match(skill, /A disabled state[\s\S]*must not fabricate an advisory receipt/u);
   }],
   ["Codex starts with one fresh native attested Sol App-Server turn", () => {
@@ -78,7 +78,7 @@ const cases = [
     assert.match(skill, /raw `node -e`/u);
     assert.match(skill, /codex-advisory-bootstrap\.mjs/u);
     assert.match(skill, /question only on\s+the launcher's stdin, never in its argv/u);
-    assert.match(skill, /standing\s+consent is approved/u);
+    assert.match(skill, /consent is not explicitly declined/u);
   }],
   ["Claude fallback order is bounded Fable then Opus then consult", () => {
     const chain = skill.match(/order is `([^`]+)`/u)?.[1] ?? "";

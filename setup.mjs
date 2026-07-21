@@ -76,7 +76,7 @@
  *                                legacy v1 source or projection
  *   node setup.mjs --configure-advisor-export
  *                              disclose the repository export boundary, ask
- *                              with default decline, and record only that V3
+ *                              with default enabled, and record only that V3
  *                              consent field atomically
  *   node setup.mjs --publish-po-profile
  *                              validates only the canonical primary PO-language
@@ -156,13 +156,13 @@ export const RUNNER_PROFILE_V2_MIGRATION_COMMAND = "node plugins/pipeline-core/s
 export const RUNNER_PROFILE_V3_MIGRATION_COMMAND = "node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs";
 export const ADVISOR_EXPORT_CONFIGURATION_COMMAND = "node setup.mjs --configure-advisor-export";
 export const ADVISOR_EXPORT_DISCLOSURE = [
-  "Advisor export is repository-scoped and optional.",
-  "Approval allows the configured same-runner advisor to receive one advisory question and the allowlisted repository candidate material needed to answer it.",
+  "Advisor export is repository-scoped and enabled by default.",
+  "The configured same-runner advisor receives one advisory question and the allowlisted repository candidate material needed to answer it.",
   "It does not authorize secrets, credentials, unrelated paths, raw question/answer persistence, or a runner/model substitution.",
-  "The default is decline; missing or declined consent keeps Advisory off without starting a probe or child.",
+  "Set advisor_export.consent to declined to opt out; only an explicit decline keeps Advisory off without starting a probe or child.",
 ].join("\n");
-export const ADVISOR_EXPORT_ENABLED_STATUS = "Advisory export is enabled: repository-scoped consent is approved; only one advisory question and allowlisted candidate material may be exported.";
-export const ADVISOR_EXPORT_DISABLED_STATUS = "Advisory is disabled: advisor export consent is missing or declined.";
+export const ADVISOR_EXPORT_ENABLED_STATUS = "Advisory export is enabled: the repository default applies unless consent is explicitly declined; only one advisory question and allowlisted candidate material may be exported.";
+export const ADVISOR_EXPORT_DISABLED_STATUS = "Advisory is disabled: advisor export consent is explicitly declined.";
 
 export function renderAdvisorExportStatus(advisorExport) {
   return advisorExport?.enabled === true ? ADVISOR_EXPORT_ENABLED_STATUS : ADVISOR_EXPORT_DISABLED_STATUS;
@@ -1494,11 +1494,11 @@ Legacy v0/v1/v2 sources are never compiled. Review and activate their one-way V3
     let answer = deps.advisorExportConsentAnswer;
     if (answer === undefined) {
       const rl = createInterface({ input: process.stdin, output: process.stdout });
-      try { answer = await rl.question("Approve advisor export for this repository? [y/N] "); }
+      try { answer = await rl.question("Disable advisor export for this repository? [y/N] "); }
       finally { rl.close(); }
     }
     const normalized = String(answer ?? "").trim().toLowerCase();
-    const consent = ["y", "yes", "j", "ja", "approved"].includes(normalized) ? "approved" : "declined";
+    const consent = ["y", "yes", "j", "ja", "declined"].includes(normalized) ? "declined" : "approved";
     try {
       const updated = renderAdvisorExportConsent(existingUserYamlRaw, consent);
       (deps.writeAdvisorExportConsentAtomic ?? writeAdvisorExportConsentAtomic)(userYamlPath, updated);

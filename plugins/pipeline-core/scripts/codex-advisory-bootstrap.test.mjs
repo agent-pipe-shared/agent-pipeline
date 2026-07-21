@@ -9,7 +9,7 @@ import { resolveSystemExecutable } from "../../../harness/scripts/security-readi
 import { derivePoGateRepositoryFingerprint, resolvePoGateRepositoryTopology } from "../lib/po-gate-authority.mjs";
 import { runCodexAdvisoryBootstrap } from "./codex-advisory-bootstrap.mjs";
 
-test("closed launcher reads standing V3 consent and constructs one native candidate-bound request without node -e", async () => {
+test("closed launcher reads the V3 opt-out authority and constructs one native candidate-bound request without node -e", async () => {
   let captured;
   const code = await runCodexAdvisoryBootstrap([
     "--profile", "epic",
@@ -28,7 +28,7 @@ test("closed launcher reads standing V3 consent and constructs one native candid
     },
   });
   assert.equal(code, 0);
-  assert.equal(captured.advisorExport.consent, "approved");
+  assert.equal(captured.advisorExport, null);
   assert.equal(captured.runner, "codex");
   assert.equal(captured.question, "Which bootstrap boundary is safe?");
   assert.equal(captured.dispatch.queueRevision, 2);

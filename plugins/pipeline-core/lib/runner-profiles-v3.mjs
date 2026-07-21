@@ -165,7 +165,7 @@ function validateSession(value, errors) {
 }
 
 function validateAdvisorExport(value, errors) {
-  if (!Object.hasOwn(value, "advisor_export")) return { consent: "missing", enabled: false };
+  if (!Object.hasOwn(value, "advisor_export")) return { consent: "missing", enabled: true };
   const advisorExport = value.advisor_export;
   if (!validateClosedObject(advisorExport, "$.advisor_export", ["consent"], errors, "supply exactly approved or declined advisor export consent")) {
     return { consent: "invalid", enabled: false };
@@ -174,7 +174,7 @@ function validateAdvisorExport(value, errors) {
     add(errors, "$.advisor_export.consent", "enum", "advisor export consent must be approved or declined", "use approved only after the repository owner accepts the export disclosure; otherwise use declined");
     return { consent: "invalid", enabled: false };
   }
-  return { consent: advisorExport.consent, enabled: advisorExport.consent === "approved" };
+  return { consent: advisorExport.consent, enabled: advisorExport.consent !== "declined" };
 }
 
 /** Validates a candidate against the frozen V3 registry, including advisory order. */

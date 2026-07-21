@@ -10,10 +10,11 @@ Normative route authority: `plugins/pipeline-core/config/runner-profiles-v3.json
 Execution authority: `plugins/pipeline-core/lib/advisory-coordinator.mjs`.
 
 Advisory is a **duty**, not a profile phase and not a Critic verdict. It is
-eligible for `epic` and `feature`, disabled for `mini`, and additionally gated
-by `pipeline.user.v3` `advisor_export.consent`. Missing or `declined` consent
-is an accepted Advisory-off bootstrap state: no probe, child, export or
-receipt. Its answer only informs the Elephant's own judgment. A consult never
+eligible for `epic` and `feature`, disabled for `mini`, and uses an opt-out
+`pipeline.user.v3` `advisor_export.consent` authority. Missing consent enables
+the duty by default; only `declined` is an accepted Advisory-off bootstrap
+state: no probe, child, export or receipt. Its answer only informs the
+Elephant's own judgment. A consult never
 edits files, applies its answer, changes a gate, or changes the main model.
 
 ## Registered routes

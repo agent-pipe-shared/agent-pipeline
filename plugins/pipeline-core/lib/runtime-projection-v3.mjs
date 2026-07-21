@@ -3,11 +3,10 @@
 /**
  * Read-only V3 runtime projection planning.
  *
- * V3 keeps the byte-preserving V2 rendering kernel for the unchanged runtime
- * targets, but validates V3 first and compiles the runner-neutral advisory
- * duty explicitly. The compatibility conversion is fail-closed: any future
- * non-advisory V3 route that the frozen V2 kernel cannot represent is rejected
- * instead of being silently projected with an older route.
+ * V3 keeps the byte-preserving V2 rendering kernel only for the target-byte
+ * mechanics. V3 validates and renders every V3-owned route itself, so the
+ * frozen V2 routing registry never substitutes for or rejects a registered V3
+ * route.
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
@@ -119,26 +118,11 @@ function v2CompatibilityIntent(intent) {
     ...compatibilityIntent,
     schema: "pipeline.user.v2",
     routing: {
-      profiles: {
-        design: {
-          design_phase: clone(intent.routing.profiles.epic.design_phase),
-          execution_phase: clone(intent.routing.profiles.epic.execution_phase),
-          advisory: clone(v2.profiles.design.advisory),
-        },
-        feature: {
-          design_phase: clone(intent.routing.profiles.feature.design_phase),
-          execution_phase: clone(intent.routing.profiles.feature.execution_phase),
-          advisory: clone(v2.profiles.feature.advisory),
-        },
-        mini: {
-          design_phase: clone(intent.routing.profiles.mini.design_phase),
-          execution_phase: clone(intent.routing.profiles.mini.execution_phase),
-          advisory: clone(v2.profiles.mini.advisory),
-        },
-      },
+      // The V2 routes are a valid carrier only.  `replaceClaudeTarget` and
+      // `replaceCodexAgentTarget` below render the V3 profile and duty cells.
+      profiles: clone(v2.profiles),
       // V2 is only the byte-preserving parse/render kernel. Keep its frozen
-      // duty cells here and explicitly project every V3-owned duty below; this
-      // prevents an old V2 route from vetoing or silently replacing a V3 route.
+      // duty cells here and explicitly project every V3-owned duty below.
       duties: clone(v2.duties),
     },
   };

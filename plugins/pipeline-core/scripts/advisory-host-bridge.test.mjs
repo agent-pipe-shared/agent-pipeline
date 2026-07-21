@@ -22,7 +22,7 @@ function answeredAdapter(answer, modelId = "gpt-5.6-sol") {
   return async (payload) => {
     const selected = payload.sandboxTransport;
     return {
-      status: "answered", answer, identity: { provider: "openai", modelId, effort: "not-applicable" },
+      status: "answered", answer, identity: { provider: "openai", modelId, effort: "max" },
       sandboxExecution: {
         schema: "pipeline.codex-sandbox-host-execution.v1", selectionId: selected.selectionId, selectionSha256: selected.selectionSha256,
         repoFingerprint: selected.repoFingerprint, duty: "advisory", dispatch: selected.dispatch,
@@ -110,6 +110,7 @@ test("Codex advisory reads a persisted selected transport before the adapter and
     assert.equal(consultPayload.subagentType, "consult-advisor");
     assert.equal(consultPayload.runner, "codex");
     assert.equal(consultPayload.model, "gpt-5.6-sol");
+    assert.equal(consultPayload.effort, "max");
     assert.deepEqual(consultPayload.dispatch, DISPATCH);
     assert.equal(consultPayload.oneQuestion, true);
     assert.equal(consultPayload.freshContext, true);
@@ -186,7 +187,7 @@ test("selected transport discovery failure cannot fall back to an unbound host c
         return {
           status: "answered",
           answer: "Yes, through the registered fresh Sol consult.",
-          identity: { provider: "openai", modelId: "gpt-5.6-sol", effort: "not-applicable" },
+          identity: { provider: "openai", modelId: "gpt-5.6-sol", effort: "max" },
         };
       },
     });
@@ -215,7 +216,7 @@ test("an adapter result without selected-child execution evidence cannot manufac
   try {
     const result = await runCodexAdvisoryWithHostFallback(input("Proof?"), async () => {
       calls += 1;
-      return { status: "answered", answer: "unbound", identity: { provider: "openai", modelId: "gpt-5.6-sol", effort: "not-applicable" } };
+      return { status: "answered", answer: "unbound", identity: { provider: "openai", modelId: "gpt-5.6-sol", effort: "max" } };
     }, transport);
     assert.equal(result.advisoryResult.ok, false);
     assert.equal(result.advisoryResult.code, "sandbox_execution_unattested");
@@ -234,7 +235,7 @@ test("a selected-sandbox no-child remains non-success without an unbound host co
       return {
         status: "answered",
         answer: "The fallback remains a fresh Sol consult.",
-        identity: { provider: "openai", modelId: "gpt-5.6-sol", effort: "not-applicable" },
+        identity: { provider: "openai", modelId: "gpt-5.6-sol", effort: "max" },
       };
     }, transport);
     assert.equal(result.advisoryResult.ok, false);

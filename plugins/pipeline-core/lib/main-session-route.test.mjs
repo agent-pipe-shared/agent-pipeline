@@ -17,7 +17,7 @@ function observed(overrides = {}) {
     eventId: "main-session-route-01",
     runner: "codex",
     modelId: "gpt-5.6-terra",
-    effort: "xhigh",
+    effort: "medium",
     ...overrides,
   };
 }
@@ -27,7 +27,7 @@ const cases = [
     const result = reconcileMainSessionRoute({ ...route, observed: observed() });
     assert.equal(result.code, "MSR-ALIGNED");
     assert.deepEqual(result.desired, {
-      runner: "codex", selector: { kind: "model-id", value: "gpt-5.6-terra" }, effort: "xhigh",
+      runner: "codex", selector: { kind: "model-id", value: "gpt-5.6-terra" }, effort: "medium",
     });
     assert.equal(result.action, null);
   }],

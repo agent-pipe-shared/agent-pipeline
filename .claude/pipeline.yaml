@@ -57,9 +57,9 @@ modelRouting:
   # Requested selectors are not advisor-receipt, route-receipt, or effective-model evidence.
   elephant_epic_design:
     model: opus
-    effort: high
+    effort: xhigh
   elephant_epic_execution:
-    model: opus
+    model: sonnet-5
     effort: high
   advisor_epic:
     model: fable
@@ -69,7 +69,7 @@ modelRouting:
     effort: high
   elephant_feature_execution:
     model: sonnet-5
-    effort: high
+    effort: medium
   advisor_feature:
     model: fable
     effort: not-applicable
@@ -78,7 +78,7 @@ modelRouting:
     effort: high
   elephant_mini_execution:
     model: sonnet-5
-    effort: high
+    effort: medium
   goldfish:
     model: sonnet-5
     effort: medium
@@ -87,10 +87,10 @@ modelRouting:
     effort: low
   goldfish_deep:
     model: sonnet-5
-    effort: xhigh
+    effort: high
   critic:
     model: sonnet-5
-    effort: max
+    effort: high
 
 criticExport:
   policy: pipeline.critic-export-policy.v1
