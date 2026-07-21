@@ -3,14 +3,32 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "08624bcb18ed9e82f730df0db456578cabfd17984fe8793bca85a3eb0f91b91c"
+    "transitionHead": "fdb7baa3832fc84300e8da293070b30469ba7186dd3814cf6954c01391624f64"
   },
   "counts": {
-    "open": 11,
-    "in_progress": 2,
+    "open": 25,
+    "in_progress": 3,
     "closed": 1
   },
   "items": [
+    {
+      "id": "pipeline.afk-assumption-mode",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-19",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.canonical-worktree-lifecycle",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-19",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "tracking": "Sentinel recovery baseline; no completion claim."
+    },
     {
       "id": "pipeline.close-spec-retention-and-consent",
       "status": "open",
@@ -26,6 +44,24 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "close retro; bounded privacy correction review"
+    },
+    {
+      "id": "pipeline.codex-plugin-validator-host-parity",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-19",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.codex-sandbox-critic-longterm",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-19",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
       "id": "pipeline.critic-context-isolation",
@@ -52,12 +88,39 @@
       "source": "Public V3 Foundation stabilization close authorship check: delivered Goldfish work packages lacked required public Dispatch trailers"
     },
     {
+      "id": "pipeline.documentation-information-architecture",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-19",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.dual-channel-publication",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-19",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
       "id": "pipeline.evidence-bound-review-retry-economics",
       "status": "open",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Public V3 Foundation stabilization review of formal review and dispatch retries"
+    },
+    {
+      "id": "pipeline.execution-model-switchback",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-19",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
       "id": "pipeline.multi-cli-efficiency-pilots",
@@ -68,12 +131,30 @@
       "source": "Public transfer completeness review of post-v0.3 Multi-CLI design and measurement work"
     },
     {
+      "id": "pipeline.nonblocking-interaction-continuity",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-19",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
       "id": "pipeline.observation-intake-document-governance",
       "status": "in_progress",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "PO-approved parallel Sentinel work and Critic scope correction"
+    },
+    {
+      "id": "pipeline.po-gate-worktree-authority",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-19",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
       "id": "pipeline.private-overlay-activation-bridge",
@@ -92,6 +173,15 @@
       "source": "user-requested feature expansion after the first public observation publication"
     },
     {
+      "id": "pipeline.push-guard-worktree-target",
+      "status": "in_progress",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-19",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
       "id": "pipeline.recovery-preview-callback-attestation",
       "status": "open",
       "type": "defect",
@@ -100,12 +190,30 @@
       "source": "Public V3 Foundation stabilization review of the migration recovery boundary"
     },
     {
+      "id": "pipeline.regulated-document-hooks",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-19",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
       "id": "pipeline.sentinel-go-live-completion",
       "status": "open",
       "type": "workflow-improvement",
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Public transfer completeness review of remaining Sentinel go-live obligations"
+    },
+    {
+      "id": "pipeline.session-keep-awake",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-19",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "tracking": "Sentinel recovery baseline; no completion claim."
     },
     {
       "id": "pipeline.source-available-commercial-licensing",
@@ -126,6 +234,33 @@
       "owner": "pipeline",
       "created": "2026-07-20",
       "source": "Sentinel recovery audit after Public close/transfer"
+    },
+    {
+      "id": "pipeline.stateful-design-contract-template",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-19",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.t1-governance-path-preflight",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-19",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.verify-gate-scoped-registration",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-19",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "tracking": "Sentinel recovery baseline; no completion claim."
     }
   ]
 }

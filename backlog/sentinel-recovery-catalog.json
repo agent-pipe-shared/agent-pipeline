@@ -1,0 +1,22 @@
+{
+  "schema": "pipeline.sentinel-backlog-recovery.v1",
+  "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+  "recoveredAt": "2026-07-19",
+  "items": [
+    { "id": "pipeline.afk-assumption-mode", "status": "open", "type": "workflow-improvement" },
+    { "id": "pipeline.canonical-worktree-lifecycle", "status": "open", "type": "defect" },
+    { "id": "pipeline.codex-plugin-validator-host-parity", "status": "open", "type": "workflow-improvement" },
+    { "id": "pipeline.codex-sandbox-critic-longterm", "status": "open", "type": "defect" },
+    { "id": "pipeline.documentation-information-architecture", "status": "open", "type": "workflow-improvement" },
+    { "id": "pipeline.dual-channel-publication", "status": "open", "type": "workflow-improvement" },
+    { "id": "pipeline.execution-model-switchback", "status": "open", "type": "workflow-improvement" },
+    { "id": "pipeline.nonblocking-interaction-continuity", "status": "open", "type": "defect" },
+    { "id": "pipeline.po-gate-worktree-authority", "status": "open", "type": "defect" },
+    { "id": "pipeline.push-guard-worktree-target", "status": "in_progress", "type": "defect" },
+    { "id": "pipeline.regulated-document-hooks", "status": "open", "type": "workflow-improvement" },
+    { "id": "pipeline.session-keep-awake", "status": "open", "type": "workflow-improvement" },
+    { "id": "pipeline.stateful-design-contract-template", "status": "open", "type": "workflow-improvement" },
+    { "id": "pipeline.t1-governance-path-preflight", "status": "open", "type": "workflow-improvement" },
+    { "id": "pipeline.verify-gate-scoped-registration", "status": "open", "type": "workflow-improvement" }
+  ]
+}

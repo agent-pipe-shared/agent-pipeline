@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -17,9 +17,17 @@ import {
   transitionHash,
   validateBacklogItem,
   validateProjectClosureReadback,
+  validateSentinelRecoveryCatalog,
   validateTransitionLedger,
 } from "./backlog-state.mjs";
-import { applyBacklogTransition, checkBacklogState, recoverBacklogTransaction, writeBacklogProjections } from "../scripts/check-backlog-state.mjs";
+import {
+  applyBacklogTransition,
+  applySentinelBacklogRecovery,
+  checkBacklogState,
+  planSentinelBacklogRecovery,
+  recoverBacklogTransaction,
+  writeBacklogProjections,
+} from "../scripts/check-backlog-state.mjs";
 
 let passed = 0;
 let failed = 0;
@@ -79,6 +87,42 @@ function fixtureRoot() {
   write(root, "backlog/schemas/item.schema.json", JSON.stringify({ $id: "pipeline.backlog-item.v1" }));
   write(root, "backlog/schemas/transition.schema.json", JSON.stringify({ $id: "pipeline.backlog-transition.v1" }));
   write(root, "backlog/schemas/index.schema.json", JSON.stringify({ $id: "pipeline.backlog-index.v1" }));
+  return root;
+}
+function sentinelCatalog(overrides = {}) {
+  return {
+    schema: "pipeline.sentinel-backlog-recovery.v1",
+    source: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+    recoveredAt: "2026-07-19",
+    items: [
+      ["afk-assumption-mode", "open", "workflow-improvement"],
+      ["canonical-worktree-lifecycle", "open", "defect"],
+      ["codex-plugin-validator-host-parity", "open", "workflow-improvement"],
+      ["codex-sandbox-critic-longterm", "open", "defect"],
+      ["documentation-information-architecture", "open", "workflow-improvement"],
+      ["dual-channel-publication", "open", "workflow-improvement"],
+      ["execution-model-switchback", "open", "workflow-improvement"],
+      ["nonblocking-interaction-continuity", "open", "defect"],
+      ["po-gate-worktree-authority", "open", "defect"],
+      ["push-guard-worktree-target", "in_progress", "defect"],
+      ["regulated-document-hooks", "open", "workflow-improvement"],
+      ["session-keep-awake", "open", "workflow-improvement"],
+      ["stateful-design-contract-template", "open", "workflow-improvement"],
+      ["t1-governance-path-preflight", "open", "workflow-improvement"],
+      ["verify-gate-scoped-registration", "open", "workflow-improvement"],
+    ].map(([id, status, type]) => ({ id: `pipeline.${id}`, status, type })),
+    ...overrides,
+  };
+}
+function recoveryFixture(catalog = sentinelCatalog()) {
+  const root = fixtureRoot();
+  const open = item();
+  const initial = event();
+  write(root, "backlog/items/example.md", renderBacklogItem(open));
+  write(root, "backlog/transitions.ndjson", `${canonicalJson(initial)}\n`);
+  write(root, "backlog/schemas/sentinel-recovery.schema.json", JSON.stringify({ $id: "pipeline.sentinel-backlog-recovery.v1" }));
+  write(root, "backlog/sentinel-recovery-catalog.json", `${JSON.stringify(catalog)}\n`);
+  writeBacklogProjections(root, { checkCommit: false });
   return root;
 }
 
@@ -176,6 +220,57 @@ function fixtureRoot() {
     written.ok && written.wrote && valid.ok
       && drift.findings.some((finding) => finding.includes("STATUS.md projection drift"))
       && readFileSync(join(root, "backlog/index.json"), "utf8").includes("pipeline.backlog-index.v1"), drift.findings.join("; "));
+}
+{
+  const root = recoveryFixture();
+  const beforeLedger = readFileSync(join(root, "backlog/transitions.ndjson"), "utf8");
+  const preview = planSentinelBacklogRecovery(root, { checkCommit: false, evidenceCommit: "a".repeat(40) });
+  const afterPreviewLedger = readFileSync(join(root, "backlog/transitions.ndjson"), "utf8");
+  const applied = applySentinelBacklogRecovery(root, { checkCommit: false, evidenceCommit: "a".repeat(40) });
+  const after = checkBacklogState(root, { checkCommit: false });
+  const duplicate = planSentinelBacklogRecovery(root, { checkCommit: false, evidenceCommit: "a".repeat(40) });
+  const events = parseTransitionLedger(readFileSync(join(root, "backlog/transitions.ndjson"), "utf8")).events;
+  check("BS08b Sentinel recovery previews by default and atomically imports only public baseline states",
+    preview.ok && !preview.wrote && afterPreviewLedger === beforeLedger
+      && applied.ok && applied.wrote && after.ok && events.length === 16
+      && events.slice(1).every((entry) => entry.from === null && entry.to !== "closed" && entry.evidence.kind === "sentinel-backlog-recovery")
+      && after.items.filter((entry) => entry.metadata.id.startsWith("pipeline.") && entry.metadata.id !== "pipeline.example").length === 15
+      && preview.catalog.items.every((entry) => after.items.find((item) => item.metadata.id === entry.id)?.metadata.type === entry.type)
+      && !duplicate.ok && duplicate.findings.some((finding) => finding.includes("already exists in the current backlog")), [...after.findings, ...duplicate.findings].join("; "));
+}
+{
+  const duplicate = sentinelCatalog({ items: [...sentinelCatalog().items, sentinelCatalog().items[0]] });
+  const unknown = { ...sentinelCatalog(), unreviewed: true };
+  const closed = sentinelCatalog({ items: sentinelCatalog().items.map((entry, index) => index === 0 ? { ...entry, status: "closed" } : entry) });
+  const empty = sentinelCatalog({ items: [] });
+  const root = recoveryFixture(closed);
+  const blocked = planSentinelBacklogRecovery(root, { checkCommit: false, evidenceCommit: "a".repeat(40) });
+  check("BS08c Sentinel recovery rejects empty, closed, duplicate, and unknown catalog data fail-closed",
+    validateSentinelRecoveryCatalog(duplicate).some((finding) => finding.includes("duplicates id"))
+      && validateSentinelRecoveryCatalog(unknown).some((finding) => finding.includes("unsupported field unreviewed"))
+      && validateSentinelRecoveryCatalog(empty).some((finding) => finding.includes("non-empty array"))
+      && !blocked.ok && blocked.findings.some((finding) => finding.includes("must not claim closed status")), blocked.findings.join("; "));
+}
+{
+  const root = recoveryFixture();
+  const ledgerBefore = readFileSync(join(root, "backlog/transitions.ndjson"), "utf8");
+  const statusBefore = readFileSync(join(root, "backlog/STATUS.md"), "utf8");
+  let writes = 0;
+  const interrupted = applySentinelBacklogRecovery(root, {
+    checkCommit: false,
+    evidenceCommit: "a".repeat(40),
+    atomicWrite(path, content) {
+      writeFileSync(path, content);
+      writes += 1;
+      if (writes === 2) throw new Error("simulated interruption");
+    },
+  });
+  check("BS08d Sentinel recovery interruption restores preexisting state and removes newly created item files",
+    !interrupted.ok && readFileSync(join(root, "backlog/transitions.ndjson"), "utf8") === ledgerBefore
+      && readFileSync(join(root, "backlog/STATUS.md"), "utf8") === statusBefore
+      && !existsSync(join(root, "backlog/.state-transaction.json"))
+      && !existsSync(join(root, "backlog/items/2026-07-19-afk-assumption-mode.md"))
+      && checkBacklogState(root, { checkCommit: false }).ok, interrupted.findings.join("; "));
 }
 {
   const root = fixtureRoot();
