@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -312,6 +312,19 @@ test("V3 malformed owned runtime baseline fails closed", () => {
     const plan = planRuntimeProjectionV3(completeIntent(), { baselines: readRuntimeProjectionV3Baselines(root) });
     assert.equal(plan.status, "invalid-baseline");
     assert.deepEqual(plan.targets, []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("V3 baseline reader shares the V2 physical containment contract and preserves a missing valid target", () => {
+  const root = fixtureRoot();
+  try {
+    unlinkSync(join(root, ".claude/pipeline.json"));
+    const baselines = readRuntimeProjectionV3Baselines(root);
+    assert.equal(baselines[".claude/pipeline.json"].status, "absent");
+    assert.equal(baselines[".claude/pipeline.yaml"].status, "present");
+    assert.equal(baselines[".codex/config.toml"].status, "present");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

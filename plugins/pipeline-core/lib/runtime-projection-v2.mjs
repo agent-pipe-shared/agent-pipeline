@@ -11,7 +11,7 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -26,6 +26,7 @@ const CONFIG_DIR = join(HERE, "..", "config");
 const OWNED_KEYS_PATH = join(CONFIG_DIR, "runtime-projection-v2-owned-keys.json");
 const OWNED_KEYS_SCHEMA = "pipeline.runtime-projection-owned-keys.v2";
 const EFFECTIVE_MODEL_UNKNOWN = "effective-model-not-observed";
+const HOST_PATH = Object.freeze({ isAbsolute, relative, resolve, sep });
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
@@ -72,6 +73,27 @@ const FROZEN_OWNED_KEYS = frozen(JSON.parse(readFileSync(OWNED_KEYS_PATH, "utf8"
 const FROZEN_OWNED_KEYS_CANONICAL_JSON = JSON.stringify(stableValue(FROZEN_OWNED_KEYS));
 
 export const RUNTIME_PROJECTION_V2_OWNED_KEYS_PATH = OWNED_KEYS_PATH;
+
+/**
+ * Return whether an absolute host filesystem candidate is physically contained
+ * by a host filesystem root. This deliberately accepts a `node:path`-shaped
+ * dependency for Windows semantic tests; it must not be reused for normalized
+ * repository-relative slash-path contracts.
+ */
+export function isPhysicalPathContained(rootDir, candidatePath, { pathApi = HOST_PATH, allowRoot = false } = {}) {
+  if (typeof rootDir !== "string" || typeof candidatePath !== "string") return false;
+  try {
+    const root = pathApi.resolve(rootDir);
+    const candidate = pathApi.resolve(candidatePath);
+    const descendant = pathApi.relative(root, candidate);
+    if (descendant === "") return allowRoot;
+    return !pathApi.isAbsolute(descendant)
+      && descendant !== ".."
+      && !descendant.startsWith(`..${pathApi.sep}`);
+  } catch {
+    return false;
+  }
+}
 
 /** Returns a caller-safe copy of I2's explicit target/key boundary. */
 export function loadRuntimeProjectionV2OwnedKeys(path = OWNED_KEYS_PATH) {
@@ -557,7 +579,7 @@ export function readRuntimeProjectionV2Baselines(rootDir) {
   const baselines = {};
   for (const target of FROZEN_OWNED_KEYS.targets) {
     const path = resolve(root, target.path);
-    if (!path.startsWith(`${root}/`) && path !== root) {
+    if (!isPhysicalPathContained(root, path)) {
       throw new Error(`Unsafe owned target path: ${target.path}`);
     }
     baselines[target.path] = existsSync(path)

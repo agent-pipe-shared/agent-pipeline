@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 
 import { loadRunnerProfilesV2Registry } from "./runner-profiles-v2.mjs";
 import {
+  isPhysicalPathContained,
   planRuntimeProjectionV2,
   readRuntimeProjectionV2Baselines,
 } from "./runtime-projection-v2.mjs";
@@ -672,7 +673,7 @@ export function readRuntimeProjectionV3Baselines(rootDir) {
   if (!target) throw new Error("V3 human-role calibration target is missing");
   const root = resolve(rootDir);
   const path = resolve(root, target.path);
-  if (!path.startsWith(`${root}/`) && path !== root) throw new Error(`Unsafe owned target path: ${target.path}`);
+  if (!isPhysicalPathContained(root, path)) throw new Error(`Unsafe owned target path: ${target.path}`);
   baselines[target.path] = existsSync(path)
     ? { status: "present", bytes: readFileSync(path, "utf8") }
     : { status: "absent" };
