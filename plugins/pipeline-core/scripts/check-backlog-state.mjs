@@ -351,6 +351,85 @@ export function applySentinelBacklogRecovery(root = DEFAULT_ROOT, options = {}) 
     : { ...planned, ok: false, findings: transaction.findings, wrote: false };
 }
 
+function validateSentinelScopeExtension(input) {
+  const errors = [];
+  if (!input || typeof input !== "object" || Array.isArray(input)) return ["scope extension must be an object"];
+  const expected = ["schema", "source", "admittedAt", "items"].sort();
+  const actual = Object.keys(input).sort();
+  if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) errors.push("scope extension has unsupported or missing fields");
+  if (input.schema !== "pipeline.sentinel-scope-extension.v1") errors.push("scope extension schema is invalid");
+  if (typeof input.source !== "string" || !/^[A-Za-z0-9._/-]+$/.test(input.source)) errors.push("scope extension source must be a safe repository-relative path");
+  if (typeof input.admittedAt !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(input.admittedAt)) errors.push("scope extension admittedAt must be an ISO calendar date");
+  if (!Array.isArray(input.items) || input.items.length === 0) errors.push("scope extension items must be a non-empty array");
+  const ids = new Set();
+  for (const entry of input.items ?? []) {
+    if (!entry || typeof entry !== "object" || Array.isArray(entry) || Object.keys(entry).sort().join(",") !== "id,status,type") {
+      errors.push("scope extension item has unsupported or missing fields");
+      continue;
+    }
+    if (typeof entry.id !== "string" || !/^pipeline\.[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/.test(entry.id)) errors.push("scope extension item id is invalid");
+    if (!['open', 'in_progress'].includes(entry.status)) errors.push("scope extension item must not claim closed status");
+    if (!['workflow-improvement', 'tooling-radar', 'defect', 'idea'].includes(entry.type)) errors.push("scope extension item type is invalid");
+    if (ids.has(entry.id)) errors.push(`scope extension duplicates id ${entry.id}`);
+    ids.add(entry.id);
+  }
+  return errors;
+}
+
+function scopeExtensionItem(entry, input) {
+  return {
+    path: `backlog/items/${input.admittedAt}-${entry.id.slice("pipeline.".length)}.md`,
+    metadata: {
+      schema: ITEM_SCHEMA,
+      id: entry.id,
+      type: entry.type,
+      owner: "pipeline",
+      status: entry.status,
+      created: input.admittedAt,
+      source: input.source,
+      tracking: "PO-approved Sentinel scope extension; no implementation or closure claim.",
+    },
+    body: `\n# ${entry.id}\n\nThis public record admits a PO-approved Sentinel scope extension. It records scope and status only; it does not claim implementation, verification, or closure.\n`,
+  };
+}
+
+/** Plan an explicit, append-only Sentinel scope extension without changing the working tree. */
+export function planSentinelScopeExtension(root = DEFAULT_ROOT, input, { evidenceCommit = null, checkCommit = true } = {}) {
+  const current = checkBacklogState(root, { checkCommit });
+  const findings = [...current.findings, ...validateSentinelScopeExtension(input)];
+  const commit = evidenceCommit ?? (() => {
+    const result = spawnSync("git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" });
+    return result.status === 0 ? result.stdout.trim() : null;
+  })();
+  if (typeof commit !== "string" || !/^[a-f0-9]{40}$/.test(commit) || (checkCommit && !localCommitExists(root, commit))) findings.push("Sentinel scope extension requires a reachable local evidence commit");
+  const currentIds = new Set(current.items.map((item) => item.metadata.id));
+  for (const entry of input?.items ?? []) if (currentIds.has(entry.id)) findings.push(`scope extension id already exists in the current backlog: ${entry.id}`);
+  if (findings.length > 0) return { ...current, ok: false, findings, wrote: false, targets: [] };
+  const additions = input.items.map((entry) => scopeExtensionItem(entry, input));
+  const items = [...current.items, ...additions];
+  const events = [...current.events];
+  let previousHash = events.at(-1)?.entryHash ?? null;
+  for (const entry of input.items) {
+    const event = { schema: TRANSITION_SCHEMA, sequence: events.length + 1, id: entry.id, from: null, to: entry.status, at: input.admittedAt, actor: "sentinel-scope-extension", reason: "Record the PO-approved Sentinel scope extension; no implementation or closure is claimed.", evidence: { kind: "sentinel-scope-extension", commit, reference: input.source }, previousHash, entryHash: "" };
+    event.entryHash = transitionHash(event);
+    events.push(event);
+    previousHash = event.entryHash;
+  }
+  findings.push(...validateTransitionLedger(events, items, { commitExists: checkCommit ? (oid) => localCommitExists(root, oid) : null }));
+  const projection = findings.length === 0 ? projectBacklog(items, events) : null;
+  if (!projection) return { ...current, ok: false, findings, wrote: false, targets: [] };
+  const targets = [...additions.map((item) => ({ path: item.path, after: renderBacklogItem(item) })), { path: LEDGER_PATH, after: `${events.map((event) => JSON.stringify(event)).join("\n")}\n` }, { path: STATUS_PATH, after: projection.statusText }, { path: INDEX_PATH, after: projection.indexText }];
+  return { ...current, ok: true, findings: [], items, events, projection, targets, wrote: false };
+}
+
+/** Apply one explicit Sentinel scope extension through the same recoverable transaction writer. */
+export function applySentinelScopeExtension(root = DEFAULT_ROOT, input, options = {}) {
+  const planned = planSentinelScopeExtension(root, input, options);
+  if (!planned.ok) return { ...planned, wrote: false };
+  const transaction = writeBacklogTransaction(root, planned.targets, options);
+  return transaction.ok ? { ...planned, ok: true, findings: [], wrote: true } : { ...planned, ok: false, findings: transaction.findings, wrote: false };
+}
+
 /**
  * Sanctioned status writer. It prepares all four derived files first, stores a
  * durable preimage journal, atomically replaces each individual file, and
