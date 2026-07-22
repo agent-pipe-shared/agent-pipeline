@@ -8,7 +8,7 @@ import { checkSpecRetention, ARCHIVE_SCHEMA, INVENTORY_SCHEMA } from "./check-sp
 const roots = [];
 let passed = 0;
 let failed = 0;
-const authorityKeys = ["prd", "spec", "acceptance", "design", "recovery"];
+const authorityKeys = ["prd", "spec", "acceptance", "design", "recovery", "platformSupport", "windowsBlockers"];
 function check(name, condition, detail = "") {
   if (condition) { passed += 1; console.log(`PASS ${name}`); }
   else { failed += 1; console.error(`FAIL ${name}${detail ? `: ${detail}` : ""}`); }
@@ -28,6 +28,8 @@ function fixture() {
     acceptance: "specs/sentinel/acceptance.md",
     design: "specs/sentinel/design.md",
     recovery: "specs/sentinel/RECOVERY.md",
+    platformSupport: "specs/sentinel/platform-support-contract.md",
+    windowsBlockers: "specs/sentinel/windows-blockers-scope.md",
   };
   const archivePaths = Object.fromEntries(authorityKeys.map((key) => [key, `docs/spec-archive/sentinel/${key}.bin`]));
   for (const key of authorityKeys) {

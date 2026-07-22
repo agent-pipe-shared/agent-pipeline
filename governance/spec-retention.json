@@ -8,7 +8,9 @@
         "spec": "specs/2026-07-19-sprint-sentinel-epic/spec.md",
         "acceptance": "specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md",
         "design": "specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md",
-        "recovery": "specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md"
+        "recovery": "specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md",
+        "platformSupport": "specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md",
+        "windowsBlockers": "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md"
       },
       "archiveManifest": "docs/spec-archive/2026-07-20-sentinel-recovery/manifest.json",
       "handoverPath": "docs/state.md",

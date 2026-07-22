@@ -6,20 +6,26 @@
     "spec": "specs/2026-07-19-sprint-sentinel-epic/spec.md",
     "acceptance": "specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md",
     "design": "specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md",
-    "recovery": "specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md"
+    "recovery": "specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md",
+    "platformSupport": "specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md",
+    "windowsBlockers": "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md"
   },
   "archivePaths": {
     "prd": "docs/spec-archive/2026-07-20-sentinel-recovery/prd_sentinel-epic.md",
     "spec": "docs/spec-archive/2026-07-20-sentinel-recovery/spec.md",
     "acceptance": "docs/spec-archive/2026-07-20-sentinel-recovery/backlog-acceptance-matrix.md",
     "design": "docs/spec-archive/2026-07-20-sentinel-recovery/public-private-reconciliation-design.md",
-    "recovery": "docs/spec-archive/2026-07-20-sentinel-recovery/RECOVERY.md"
+    "recovery": "docs/spec-archive/2026-07-20-sentinel-recovery/RECOVERY.md",
+    "platformSupport": "docs/spec-archive/2026-07-20-sentinel-recovery/platform-support-contract.md",
+    "windowsBlockers": "docs/spec-archive/2026-07-20-sentinel-recovery/windows-blockers-scope.md"
   },
   "sha256": {
     "prd": "5ea81bc13e51469bf17b7e7ca54bd9641b70b87f8d80b963673c884e0a0b8b91",
     "spec": "aaec0b6411626b3f1988dbd2f5db16b2870c9aaed07e5edd3ed1e1e735c43b9b",
     "acceptance": "1830dc015550314caf2ac5e3942d7523e7d514824737e67f57027f53964034c9",
     "design": "3b4cee9f23a5db1ea7318ce86a1190d1ec868561b55a7ee9b30994ff0d073075",
-    "recovery": "dbac9bafece60f965e7f1aa6c5d4b28665474678ce4be78591ca78f506b2a840"
+    "recovery": "dbac9bafece60f965e7f1aa6c5d4b28665474678ce4be78591ca78f506b2a840",
+    "platformSupport": "a541b1a3ecb0109ca69e52c1e1e3c47d758bea5028fd8d65e92e524e7a8fd83a",
+    "windowsBlockers": "0752415e7916b4db41b8c257339953a31924c68392d644e6c7b07993e08ecca0"
   }
 }

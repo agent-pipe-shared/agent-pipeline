@@ -18,7 +18,7 @@ const HERE = new URL(".", import.meta.url);
 export const DEFAULT_ROOT = resolve(fileURLToPath(new URL("../../../", HERE)));
 export const INVENTORY_SCHEMA = "pipeline.spec-retention.v1";
 export const ARCHIVE_SCHEMA = "pipeline.spec-retention-archive.v1";
-const AUTHORITY_KEYS = ["prd", "spec", "acceptance", "design", "recovery"];
+const AUTHORITY_KEYS = ["prd", "spec", "acceptance", "design", "recovery", "platformSupport", "windowsBlockers"];
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
