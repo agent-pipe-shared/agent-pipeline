@@ -37,7 +37,7 @@ function fixture() {
     write(root, archivePaths[key], `${key} authority\n`);
   }
   write(root, "docs/state.md", Object.values(sourcePaths).join("\n"));
-  write(root, "docs/next-session.md", `${sourcePaths.prd}\n${sourcePaths.spec}\n`);
+  write(root, "docs/next-session.md", `${Object.values(sourcePaths).join("\n")}\n`);
   const manifest = {
     schema: ARCHIVE_SCHEMA,
     id: "sentinel",
@@ -74,7 +74,7 @@ function fixture() {
   const subject = fixture();
   writeFileSync(join(subject.root, "docs/next-session.md"), `${subject.sourcePaths.prd}\n`);
   const result = checkSpecRetention(subject.root);
-  check("SR04 requires the next-session entry point to link both PRD and Spec", !result.ok && result.findings.some((finding) => finding.includes("nextSessionPath must link")), result.findings.join("; "));
+  check("SR04 requires the next-session entry point to link every active authority", !result.ok && result.findings.some((finding) => finding.includes("nextSessionPath must link")), result.findings.join("; "));
 }
 {
   const subject = fixture();

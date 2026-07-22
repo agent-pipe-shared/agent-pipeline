@@ -70,7 +70,7 @@ function checkLinks(root, entry, sourcePaths, findings) {
     const bytes = readBytes(root, path, findings, `${entry.id}.${key}`);
     if (bytes === null) continue;
     const text = bytes.toString("utf8");
-    for (const keyName of ["prd", "spec"]) {
+    for (const keyName of AUTHORITY_KEYS) {
       if (!text.includes(sourcePaths[keyName])) {
         findings.push(`${entry.id}.${key} must link ${sourcePaths[keyName]}`);
       }

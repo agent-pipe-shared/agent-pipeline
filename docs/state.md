@@ -44,8 +44,14 @@ disposition, plugin registration, and final feature-branch delivery
   and checked by `close.pre`. The archive contains only the Public-safe
   authority files, not private runtime evidence.
   The handover links the active
-  [`prd_sentinel-epic.md`](../specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md)
-  and [`spec.md`](../specs/2026-07-19-sprint-sentinel-epic/spec.md) directly.
+  [`prd_sentinel-epic.md`](../specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md),
+  [`spec.md`](../specs/2026-07-19-sprint-sentinel-epic/spec.md),
+  [`backlog-acceptance-matrix.md`](../specs/2026-07-19-sprint-sentinel-epic/backlog-acceptance-matrix.md),
+  [`public-private-reconciliation-design.md`](../specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md),
+  [`RECOVERY.md`](../specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md),
+  [`platform-support-contract.md`](../specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md)
+  and [`windows-blockers-scope.md`](../specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md)
+  directly.
 - Public remote heads are reduced to unchanged `main` and
   `feat/v3-public-core-foundation`. Anonymous obsolete lines have public
   recovery tags; histories with non-neutral authorship remain offline only and
