@@ -460,8 +460,9 @@ export function checkRepository(rootInput, options = {}) {
   }
 
   const trackedStatefulDesignSurfaces = STATEFUL_DESIGN_SURFACES.filter((path) => trackedPaths.has(path));
+  const pipelineRepository = trackedPaths.has(".claude/pipeline.yaml");
   let statefulDesignContracts = "not-applicable";
-  if (trackedStatefulDesignSurfaces.length > 0) {
+  if (pipelineRepository || trackedStatefulDesignSurfaces.length > 0) {
     statefulDesignContracts = "checked";
     const surfaces = {};
     for (const path of trackedStatefulDesignSurfaces) {
