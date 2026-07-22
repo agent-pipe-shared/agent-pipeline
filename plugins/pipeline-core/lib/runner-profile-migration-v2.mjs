@@ -216,13 +216,29 @@ function sourceInfo(root, deps) {
 }
 
 function fsyncFile(path, deps) {
-  const fd = deps.openSync(path, "r");
+  // Open read-write ("r+"), not read-only ("r"): a Windows file handle opened O_RDONLY has no
+  // write-back to flush, so FlushFileBuffers (fsync) fails closed with EPERM even though the
+  // handle is only used to sync the data this module itself just wrote. "r+" is the correct,
+  // portable mode for "sync a file I own" and behaves identically to "r" for fsync on POSIX.
+  const fd = deps.openSync(path, "r+");
   try { deps.fsyncSync(fd); } finally { deps.closeSync(fd); }
 }
 
 function fsyncDirectory(path, deps) {
   const fd = deps.openSync(path, "r");
-  try { deps.fsyncSync(fd); } finally { deps.closeSync(fd); }
+  try {
+    deps.fsyncSync(fd);
+  } catch (error) {
+    // Windows has no directory-handle fsync semantics: opening a directory read-only and
+    // syncing it fails closed with EPERM/EINVAL/etc even though the prior file rename/fsync
+    // already durably committed the data. Treat directory sync as best-effort on win32 only;
+    // regular-file fsync (fsyncFile above) remains hard on every platform.
+    if (process.platform !== "win32" || !["EPERM", "EINVAL", "EISDIR", "EACCES", "ENOTSUP"].includes(error.code)) {
+      throw error;
+    }
+  } finally {
+    deps.closeSync(fd);
+  }
 }
 
 function writeDurable(path, bytes, deps) {

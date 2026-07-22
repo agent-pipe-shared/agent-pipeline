@@ -380,7 +380,7 @@ record("a handled durable exclusive-commit error rolls every target back", () =>
       activate: true,
       deps: {
         linkSync: (from, to) => {
-          if (String(from).includes(".pipeline-runner-profile-migration-v3/stage-")) {
+          if (String(from).replaceAll("\\", "/").includes(".pipeline-runner-profile-migration-v3/stage-")) {
             stageLinks += 1;
             if (stageLinks === 2 && !injected) { injected = true; throw Object.assign(new Error("injected link failure"), { code: "EIO" }); }
           }
@@ -549,7 +549,7 @@ record("a parent appearing after prepare remains external and survives safe roll
       deps: {
         writeFileSync: (path, bytes, options) => {
           const result = writeFileSync(path, bytes, options);
-          if (!raced && String(path).endsWith("/.pipeline-runner-profile-migration-v3/journal.json")) {
+          if (!raced && String(path).replaceAll("\\", "/").endsWith("/.pipeline-runner-profile-migration-v3/journal.json")) {
             const journal = JSON.parse(String(bytes));
             if (journal.state === "prepared") {
               mkdirSync(join(root, ".codex"));
@@ -617,7 +617,7 @@ record("exclusive absent-target commit closes the race after its final preimage 
       activate: true,
       deps: {
         linkSync: (from, to) => {
-          if (!raced && to === target && String(from).includes(".pipeline-runner-profile-migration-v3/stage-")) {
+          if (!raced && to === target && String(from).replaceAll("\\", "/").includes(".pipeline-runner-profile-migration-v3/stage-")) {
             writeFileSync(target, external);
             raced = true;
           }
@@ -646,7 +646,7 @@ record("existing-target displacement verifies the exact bytes moved at the commi
       activate: true,
       deps: {
         renameSync: (from, to) => {
-          if (!raced && from === target && String(to).includes(".pipeline-runner-profile-migration-v3/displaced-")) {
+          if (!raced && from === target && String(to).replaceAll("\\", "/").includes(".pipeline-runner-profile-migration-v3/displaced-")) {
             writeFileSync(target, external);
             raced = true;
           }
@@ -792,7 +792,9 @@ record("a one-key V3 refresh preserves the complete boundary without renaming un
       activate: true,
       deps: {
         linkSync: (from, to) => {
-          if (String(from).includes(".pipeline-runner-profile-migration-v3/stage-")) committedTargets.push(String(to));
+          // Native join() uses the host separator; the staging-path marker itself is
+          // a portable literal, so normalize before the substring check.
+          if (String(from).replaceAll("\\", "/").includes(".pipeline-runner-profile-migration-v3/stage-")) committedTargets.push(String(to));
           return linkSync(from, to);
         },
       },
@@ -1054,7 +1056,14 @@ record("CLI completes bounded short writes for pending recovery before touching 
           assert.deepEqual(durableSnapshot(root), pending, "each recovery-preview short write precedes recovery mutation");
           callsWithPendingJournal += 1;
         } else callsAfterRecovery += 1;
-        return Math.min(7, length);
+        // A short-write step well below the ~5.4KB preview payload: still
+        // forces multiple bounded-completion iterations (the behavior under
+        // test) while capping them at roughly 3-4 instead of ~57, since each
+        // iteration re-runs the expensive recursive durableSnapshot() and a
+        // long chain of those risked tripping the real production 1000ms
+        // callback-timeout liveness bound under load on native filesystem I/O
+        // (observed as a flaky failure during a full verify run).
+        return Math.min(1800, length);
       },
     });
     assert.equal(status, 0);

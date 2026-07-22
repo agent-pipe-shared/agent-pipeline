@@ -506,8 +506,33 @@ export function planRunnerProfileMigrationV3({
   }), internal);
 }
 
-function fsyncFile(path, deps) { const fd = deps.openSync(path, "r"); try { deps.fsyncSync(fd); } finally { deps.closeSync(fd); } }
-function fsyncDirectory(path, deps) { const fd = deps.openSync(path, "r"); try { deps.fsyncSync(fd); } finally { deps.closeSync(fd); } }
+// "r+", not "r": a Windows handle opened read-only has no write-back to flush, so
+// fsync fails closed with EPERM even though this handle only syncs bytes this
+// process just wrote. "r+" is correct and portable; behaves like "r" on POSIX.
+function fsyncFile(path, deps) { const fd = deps.openSync(path, "r+"); try { deps.fsyncSync(fd); } finally { deps.closeSync(fd); } }
+function unsupportedDirectoryDurability(error) {
+  return process.platform === "win32"
+    && (error?.code === "EPERM" || error?.code === "EINVAL"
+      || error?.code === "EISDIR" || error?.code === "EACCES"
+      || error?.code === "ENOTSUP");
+}
+function fsyncDirectory(path, deps) {
+  let fd;
+  try {
+    fd = deps.openSync(path, "r");
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
+  }
+  try {
+    deps.fsyncSync(fd);
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
+  } finally {
+    deps.closeSync(fd);
+  }
+}
 function writeDurable(path, bytes, deps) { deps.writeFileSync(path, bytes, { encoding: "utf8", mode: 0o600 }); fsyncFile(path, deps); }
 function transactionPaths(root) { const transaction = safePath(root, TXN_DIR); return { transaction, lock: safePath(root, LOCK_DIR), journal: join(transaction, JOURNAL_FILE) }; }
 function remove(path, deps) { if (deps.existsSync(path)) deps.rmSync(path, { recursive: true, force: true }); }
