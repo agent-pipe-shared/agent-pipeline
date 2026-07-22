@@ -9,11 +9,12 @@
 import assert from "node:assert/strict";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 
 import { main as planRuntimeProjectionV2Cli } from "../scripts/plan-runtime-projection-v2.mjs";
 import { loadRunnerProfilesV2Registry } from "./runner-profiles-v2.mjs";
 import {
+  isPhysicalPathContained,
   loadRuntimeProjectionV2OwnedKeys,
   planRuntimeProjectionV2,
   readRuntimeProjectionV2Baselines,
@@ -130,6 +131,44 @@ function record(name, run) {
 function runTable(group, cases, run) {
   for (const testCase of cases) record(`${group}: ${testCase.name}`, () => run(testCase));
 }
+
+record("physical containment: host paths use path semantics and reject escapes", () => {
+  const cases = [
+    { name: "POSIX descendant", root: "/repo", candidate: "/repo/.claude/pipeline.yaml", expected: true },
+    { name: "POSIX root requires explicit permission", root: "/repo", candidate: "/repo", expected: false },
+    { name: "POSIX traversal", root: "/repo", candidate: "/repo/../outside", expected: false },
+    { name: "POSIX sibling prefix", root: "/repo", candidate: "/repo-other/.claude/pipeline.yaml", expected: false },
+  ];
+  for (const testCase of cases) {
+    assert.equal(isPhysicalPathContained(testCase.root, testCase.candidate), testCase.expected, testCase.name);
+  }
+  assert.equal(isPhysicalPathContained("/repo", "/repo", { allowRoot: true }), true);
+
+  const windowsCases = [
+    { name: "drive descendant", root: "C:\\repo", candidate: "C:\\repo\\.claude\\pipeline.yaml", expected: true },
+    { name: "mixed separator descendant", root: "C:\\repo", candidate: "C:/repo/.claude\\pipeline.yaml", expected: true },
+    { name: "drive traversal", root: "C:\\repo", candidate: "C:\\repo\\..\\outside", expected: false },
+    { name: "drive sibling prefix", root: "C:\\repo", candidate: "C:\\repo-other\\.claude\\pipeline.yaml", expected: false },
+    { name: "different drive", root: "C:\\repo", candidate: "D:\\repo\\.claude\\pipeline.yaml", expected: false },
+    { name: "UNC descendant", root: "\\\\server\\share\\repo", candidate: "\\\\server\\share\\repo\\.claude\\pipeline.yaml", expected: true },
+    { name: "incompatible UNC share", root: "\\\\server\\share\\repo", candidate: "\\\\server\\other\\repo\\.claude\\pipeline.yaml", expected: false },
+  ];
+  for (const testCase of windowsCases) {
+    assert.equal(isPhysicalPathContained(testCase.root, testCase.candidate, { pathApi: win32 }), testCase.expected, testCase.name);
+  }
+});
+
+record("baseline reader: a missing valid V2 target remains an explicit absent baseline", () => {
+  const root = fixtureRoot();
+  try {
+    unlinkSync(join(root, ".codex/config.toml"));
+    const baselines = readRuntimeProjectionV2Baselines(root);
+    assert.equal(baselines[".codex/config.toml"].status, "absent");
+    assert.equal(baselines[".claude/pipeline.yaml"].status, "present");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
 
 record("compiler: valid intent produces a deterministic, byte-preserving ready plan", () => {
   const root = fixtureRoot();
