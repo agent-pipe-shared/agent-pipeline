@@ -18,6 +18,23 @@ const SCRIPT = fileURLToPath(new URL("./check-doc-contracts.mjs", import.meta.ur
 const REPO = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const roots = [];
 
+function linkFixtureDirectory(target, path) {
+  symlinkSync(target, path, process.platform === "win32" ? "junction" : "dir");
+}
+
+function linkFixtureFileOrClassifyUnavailable(t, target, path) {
+  try {
+    symlinkSync(target, path, "file");
+    return true;
+  } catch (error) {
+    if (process.platform === "win32" && error?.code === "EPERM") {
+      t.skip("native Windows standard account cannot create file-symlink security fixtures without Developer Mode");
+      return false;
+    }
+    throw error;
+  }
+}
+
 const STATEFUL_DESIGN_CONTRACTS = [
   {
     id: "authority-issuer-replay",
@@ -190,7 +207,7 @@ test("excluded instruction path is filtered before every source and target read"
 
 test("internal symlink aliases cannot bypass the excluded instruction path", () => {
   const { root } = fixture({ "README.md": "# Home\n\n[Excluded](alias/AGENTS.md)\n", "AGENTS.md": Buffer.from([0xff, 0xfe]) });
-  symlinkSync(".", join(root, "alias"));
+  linkFixtureDirectory(root, join(root, "alias"));
   const reads = [];
   const readText = (file) => {
     const rel = relative(root, file).split("\\").join("/");
@@ -228,12 +245,12 @@ test("invalid UTF-8 and injected reads fail closed", () => {
   assert.match(injectedResult.findings.join("\n"), /simulated read failure/);
 });
 
-test("symlink targets escaping the repository fail closed", () => {
+test("symlink targets escaping the repository fail closed", (t) => {
   const { root } = fixture({ "README.md": "# Home\n\n[Outside](outside.md)\n" });
   const external = mkdtempSync(join(tmpdir(), "doc-contracts-outside-"));
   roots.push(external);
   writeFileSync(join(external, "target.md"), "# Outside\n");
-  symlinkSync(join(external, "target.md"), join(root, "outside.md"));
+  if (!linkFixtureFileOrClassifyUnavailable(t, join(external, "target.md"), join(root, "outside.md"))) return;
   assert.match(
     runFixture(root, { trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md", "outside.md"] }).findings.join("\n"),
     /symlink target escapes repository root/,
@@ -254,11 +271,11 @@ test("malformed, duplicate, and invalid handover calibration fail", () => {
   }
 });
 
-test("handover must be tracked regular Markdown and not a symlink", () => {
+test("handover must be tracked regular Markdown and not a symlink", (t) => {
   const first = fixture();
   assert.match(runFixture(first.root, { trackedPaths: [".claude/pipeline.json", "CLAUDE.md", "README.md"] }).findings.join("\n"), /not tracked/);
   const second = fixture({ "docs/state.md": null, "docs/real.md": "# State\n" });
-  symlinkSync("real.md", join(second.root, "docs/state.md"));
+  if (!linkFixtureFileOrClassifyUnavailable(t, "real.md", join(second.root, "docs/state.md"))) return;
   assert.match(runFixture(second.root).findings.join("\n"), /symlink is not allowed/);
 });
 
