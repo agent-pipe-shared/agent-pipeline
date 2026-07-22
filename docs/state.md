@@ -3,7 +3,7 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-07-21
+**Last updated:** 2026-07-22
 **Project status:** ACTIVE
 **Current block:** Sentinel continuation after closed SNT-A: Public-Core
 freshness/sandbox quickfixes, durable advisor-export consent, PO licensing
@@ -181,6 +181,51 @@ disposition, plugin registration, and final feature-branch delivery
   Guard-Bypass.
 
 ## Open items and next block
+
+### Current Sentinel continuation — exact handover
+
+- Remote `origin/feat/v3-public-core-foundation` is `3d1340a405bff7677552345996a92deb3eaee4ed`.
+  The implementation base before this handover record was
+  `41407e2a65781247bdb50b68e76734d68ea3c25c`; the working tree also contains
+  **uncommitted** Critic repairs. Do not push the dirty state.
+- Already local and committed after the remote: the PO post-go-live Sprint ADR
+  and privacy correction; static SNT-7 Verify allowlist; target-worktree
+  Push-Guard repair; the five Windows blocker records; the sanctioned scope
+  extension writer; #33 physical path containment; and the 21-item Sentinel
+  projection. No Sentinel item was closed by these commits.
+- The five live-read Sentinel Windows blockers are canonically `open` in
+  ledger sequences 32–36: #33 containment, #34 directory durability, #35
+  private-state assurance, #36 Windows Verify reproducibility, and #37 trusted
+  tool resolution. Their scope/ordering is
+  `specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md`.
+- #33 implementation is in local commit `fbe7162` and has focused V2 20/20
+  and V3 17/17 evidence. Its required native-Windows `setup.mjs` no-op/read
+  evidence is absent; it remains open. #37 has only a read-only audit: the
+  next safe package is one canonical trusted-tool resolver, with PO/Human
+  policy decisions still needed for allowed Windows roots, wrappers, #25
+  machine-local selection, and native-Windows evidence.
+- Full Verify and Security were green at `41407e2`; the independent Critic
+  then failed on stale PRD→Spec binding, an over-broad scope writer, an
+  inaccurate #33 matrix row, and missing rollback/owner/expiry projection.
+  Those repairs are currently dirty and must be completed, focused-tested,
+  committed, then Full-Verified, Critic-reviewed, pushed from the persistent
+  target worktree and fetch-backed before any delivery claim.
+- The last in-session Codex app-server probe returned
+  `CAS-EXECUTION-UNAVAILABLE` / `EPERM`: it could not execute the daemon
+  version probe. This is not evidence that the daemon is dead. A new session
+  must run `pipeline-start` Elephant first, including the healthcheck, and if
+  it hangs report its last output rather than modifying product files.
+- The primary checkout is detached and may differ from the feature worktree.
+  The persistent target worktree is
+  `branch/feat/v3-public-core-foundation`; run candidate Verify, Critic
+  evidence discovery, push and fetch-back there. The local PreTool host can
+  load an installed plugin copy; use the explicit tested form
+  `git -C <target-worktree> push ...` when the host does not receive the
+  tool-workdir, never a generic push.
+- Session PO exceptions remain: after initial evidence, later narrow diff
+  checks may replace redundant loops; scope/security changes still require
+  full gates. TP-1–TP-5 may be lifted only while editing the exact protected
+  file and must be restored before staging/commit/push. Both are restored now.
 
 - The SNT-A implementation candidate `17115fe07e7e455635c055771110dde7b0fc54e9`
   and the subsequent documentation-only close commit are pushed to
