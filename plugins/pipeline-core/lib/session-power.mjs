@@ -448,8 +448,17 @@ export function fixedAdapterLaunch({ platform = process.platform, nodePath = pro
   if (!isAbsolute(nodePath) || !isAbsolute(helperPath) || !pid(controllerPid) || !closedString(controllerStart)) {
     fail("SP-ADAPTER", "fixed adapter inputs are invalid");
   }
-  const absoluteNode = resolve(nodePath);
-  const absoluteHelper = resolve(helperPath);
+  // `platform` selects a target adapter shape and may deliberately differ from the
+  // real host (production always matches; tests simulate the other three targets
+  // from one host to exercise every argv shape). node:path's resolve/isAbsolute are
+  // host-platform-bound: on win32 resolving an already-absolute POSIX-style path
+  // (e.g. "/usr/bin/node" for a simulated Linux target) prepends the current drive
+  // instead of leaving it untouched. isAbsolute() above already validated both
+  // inputs; only re-resolve through the host path module for a real same-platform
+  // invocation, never for a simulated foreign-platform one.
+  const sameHost = platform === process.platform;
+  const absoluteNode = sameHost ? resolve(nodePath) : nodePath;
+  const absoluteHelper = sameHost ? resolve(helperPath) : helperPath;
   if (platform === "linux") return {
     adapterId: "linux-systemd-inhibit-v1",
     command: "/usr/bin/systemd-inhibit",
