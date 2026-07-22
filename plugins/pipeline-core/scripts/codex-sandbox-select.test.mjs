@@ -40,8 +40,18 @@ function observed() {
   };
 }
 async function store() {
-  const root = await mkdtemp(join(tmpdir(), "hawkeye-sandbox-store-"));
-  return { root, store: createSandboxSelectionStore({ root, now: () => new Date(NOW).toISOString() }) };
+  // The store root itself must not pre-exist: createSandboxSelectionStore()
+  // hardens a freshly created private directory (Windows DACL + owner) but
+  // only *assesses* one that already existed, and a directory produced
+  // directly by mkdtemp() inherits the OS temp folder's ACL (multiple
+  // principals), which native-Windows assurance correctly rejects as
+  // insecure. Route through a throwaway container so the actual store root
+  // is minted fresh by production code. POSIX behavior is unaffected: the
+  // subdirectory is created the same way privateDirectory() always creates
+  // missing directories.
+  const container = await mkdtemp(join(tmpdir(), "hawkeye-sandbox-store-"));
+  const root = join(container, "store");
+  return { root, container, store: createSandboxSelectionStore({ root, now: () => new Date(NOW).toISOString() }) };
 }
 
 test("request digest has the sandbox-request domain and excludes user prose", () => {
@@ -59,27 +69,41 @@ test("repository selection storage is derived only from the exact Git common dir
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
-test("private sandbox storage rejects a symlinked root or exact-ID record", async () => {
-  const root = await mkdtemp(join(tmpdir(), "hawkeye-private-store-"));
-  const alias = `${root}-alias`;
+test("private sandbox storage rejects a symlinked root or exact-ID record", async (t) => {
+  const container = await mkdtemp(join(tmpdir(), "hawkeye-private-store-"));
+  // The actual store root must not pre-exist (see store() above for why);
+  // use a throwaway existing directory only as the symlink target/alias.
+  const root = join(container, "store");
+  const alias = `${container}-alias`;
+  let symlinkSupported = true;
   try {
-    await symlink(root, alias);
-    assert.throws(() => createSandboxSelectionStore({ root: alias }), /physical directory/);
-    await unlink(alias);
+    try {
+      await symlink(container, alias);
+    } catch (error) {
+      if (error?.code !== "EPERM") throw error;
+      symlinkSupported = false; // native Windows without Developer Mode/admin: no unprivileged symlinks
+      t.diagnostic("symlink capability unavailable (EPERM); skipping symlink-specific assertions only");
+    }
+    if (symlinkSupported) {
+      assert.throws(() => createSandboxSelectionStore({ root: alias }), /physical directory/);
+      await unlink(alias);
+    }
     const state = createSandboxSelectionStore({ root, now: () => new Date(NOW).toISOString() });
     const result = await selectCodexSandbox(request(), {
       now: () => NOW, observeHost: async () => observed(), runPreflight: async () => ({ eligibility: "intermediate", terminalCode: "eligible", receiptSha256: "6".repeat(64) }),
       createCoordinatorScratch: async () => ({ sha256: "7".repeat(64) }), readbackProfile: async ({ profile }) => profile,
       persist: (selection, compatibility) => state.writeSelection(selection, compatibility),
     });
-    const selectedPath = join(root, "selections", `${result.selectionId}.json`);
-    const redirect = join(root, "redirect.json");
-    await writeFile(redirect, "{}\n", { mode: 0o600 });
-    await chmod(redirect, 0o600);
-    await unlink(selectedPath);
-    await symlink(redirect, selectedPath);
-    assert.throws(() => state.readSelection(result.selectionId), /single-link regular file/);
-  } finally { await rm(alias, { force: true }); await rm(root, { recursive: true, force: true }); }
+    if (symlinkSupported) {
+      const selectedPath = join(root, "selections", `${result.selectionId}.json`);
+      const redirect = join(root, "redirect.json");
+      await writeFile(redirect, "{}\n", { mode: 0o600 });
+      await chmod(redirect, 0o600);
+      await unlink(selectedPath);
+      await symlink(redirect, selectedPath);
+      assert.throws(() => state.readSelection(result.selectionId), /single-link regular file/);
+    }
+  } finally { await rm(alias, { force: true }); await rm(container, { recursive: true, force: true }); }
 });
 
 test("only the committed current compatibility projection can persist a selected network-open transport", async () => {
@@ -106,7 +130,7 @@ test("only the committed current compatibility projection can persist a selected
       sandboxStateSha256: scratch.sandboxStateSha256, profileRawSha256: scratch.profileRawSha256,
     });
     assert.match(sandboxSelectionDigest(result), /^[a-f0-9]{64}$/u);
-  } finally { await rm(scratchRoot, { recursive: true, force: true }); await rm(state.root, { recursive: true, force: true }); }
+  } finally { await rm(scratchRoot, { recursive: true, force: true }); await rm(state.container, { recursive: true, force: true }); }
 });
 
 test("an exact sandbox request replays the first persisted selection instead of minting another ID", async () => {
@@ -126,7 +150,7 @@ test("an exact sandbox request replays the first persisted selection instead of 
     assert.equal(replay.selectionId, first.selectionId);
     assert.equal(sandboxSelectionDigest(replay), sandboxSelectionDigest(first));
     assert.equal(state.store.readRequest(buildSandboxRequest(request()).requestSha256).selectionId, first.selectionId);
-  } finally { await rm(state.root, { recursive: true, force: true }); }
+  } finally { await rm(state.container, { recursive: true, force: true }); }
 });
 
 test("a dead cross-process request lock is reclaimed before an exact request is admitted", async () => {
@@ -141,7 +165,7 @@ test("a dead cross-process request lock is reclaimed before an exact request is 
       persist: (selection, compatibility) => state.store.writeSelection(selection, compatibility),
     });
     assert.equal(result.status, "selected");
-  } finally { await rm(state.root, { recursive: true, force: true }); }
+  } finally { await rm(state.container, { recursive: true, force: true }); }
 });
 
 test("an index published before its selection is inert until write recovery owns it", async () => {
@@ -153,7 +177,7 @@ test("an index published before its selection is inert until write recovery owns
       selectionId: "css_aaaaaaaaaaaaaaaaaaaaaaaaae", selectionSha256: "f".repeat(64),
     }), { mode: 0o600 });
     assert.equal(state.store.readRequest(requestSha256), null);
-  } finally { await rm(state.root, { recursive: true, force: true }); }
+  } finally { await rm(state.container, { recursive: true, force: true }); }
 });
 
 test("missing current projection persists only a typed unavailable no-child selection", async () => {
@@ -163,7 +187,7 @@ test("missing current projection persists only a typed unavailable no-child sele
     assert.equal(result.status, "unavailable");
     assert.equal(result.failureClass, "policy-drift");
     assert.equal(validateSandboxSelection(result), result);
-  } finally { await rm(state.root, { recursive: true, force: true }); }
+  } finally { await rm(state.container, { recursive: true, force: true }); }
 });
 
 test("post-compatibility failures retain the factual preflight and scratch evidence", async () => {
@@ -182,7 +206,7 @@ test("post-compatibility failures retain the factual preflight and scratch evide
     assert.match(result.compatibilityReceiptSha256, /^[a-f0-9]{64}$/u);
     assert.equal(result.preflight.receiptSha256, "6".repeat(64));
     assert.equal(result.profile.scratchRootSha256, "7".repeat(64));
-  } finally { await rm(state.root, { recursive: true, force: true }); }
+  } finally { await rm(state.container, { recursive: true, force: true }); }
 });
 
 test("host observation and preflight exceptions persist typed no-child selections", async () => {
@@ -211,7 +235,7 @@ test("host observation and preflight exceptions persist typed no-child selection
     assert.match(preflightFailure.compatibilityReceiptSha256, /^[a-f0-9]{64}$/u);
     assert.equal(preflightFailure.preflight.terminalCode, "host-error");
     assert.match(preflightFailure.preflight.receiptSha256, /^[a-f0-9]{64}$/u);
-  } finally { await rm(state.root, { recursive: true, force: true }); }
+  } finally { await rm(state.container, { recursive: true, force: true }); }
 });
 
 test("an unavailable exact request conflicts rather than erasing its immutable receipt identity", async () => {
@@ -229,7 +253,7 @@ test("an unavailable exact request conflicts rather than erasing its immutable r
       persist: (selection, compatibility) => state.store.writeSelection(selection, compatibility),
     }), /sandbox request replay conflicts/);
     assert.equal(state.store.readSelection(unavailable.selectionId).selectionId, unavailable.selectionId);
-  } finally { await rm(state.root, { recursive: true, force: true }); }
+  } finally { await rm(state.container, { recursive: true, force: true }); }
 });
 
 test("a selected exact request conflicts on host drift instead of minting a replacement selection", async () => {
@@ -250,7 +274,7 @@ test("a selected exact request conflicts on host drift instead of minting a repl
     }), /sandbox request replay conflicts/);
     assert.equal(selected.status, "selected");
     assert.equal(state.store.readSelection(selected.selectionId).selectionId, selected.selectionId);
-  } finally { await rm(state.root, { recursive: true, force: true }); }
+  } finally { await rm(state.container, { recursive: true, force: true }); }
 });
 
 test("a dead execution lock in selected phase blocks a replay before another child can launch", async () => {
@@ -266,5 +290,5 @@ test("a dead execution lock in selected phase blocks a replay before another chi
     let launched = false;
     await assert.rejects(state.store.runSerialized(result.selectionId, async () => { launched = true; }), /prior sandbox launch outcome is indeterminate/);
     assert.equal(launched, false);
-  } finally { await rm(state.root, { recursive: true, force: true }); }
+  } finally { await rm(state.container, { recursive: true, force: true }); }
 });

@@ -14,6 +14,7 @@ import {
   prepareCandidatePacket,
   recordCandidateResult,
 } from "./critic-packet-preflight.mjs";
+import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
 let passed = 0;
 async function check(name, fn) {
@@ -45,6 +46,10 @@ function fixture() {
   mkdirSync(control, { recursive: true, mode: 0o700 });
   chmodSync(join(root, common, "agent-pipeline"), 0o700);
   chmodSync(control, 0o700);
+  if (process.platform === "win32") {
+    hardenWindowsPrivateDirectory(join(root, common, "agent-pipeline"));
+    hardenWindowsPrivateDirectory(control);
+  }
   return { root, control, base, candidate };
 }
 function options(f, packetId = "1".repeat(32)) {

@@ -1114,7 +1114,19 @@ function ensurePhysicalPrivateDirectory(commonDir, relativeDirectory) {
 
 function fsyncDirectory(path) {
   const descriptor = openSync(path, constants.O_RDONLY);
-  try { fsyncSync(descriptor); } finally { closeSync(descriptor); }
+  try {
+    fsyncSync(descriptor);
+  } catch (error) {
+    // Windows has no directory-handle fsync semantics: opening a directory read-only and
+    // syncing it fails closed with EPERM/EINVAL/etc even though the prior file rename/fsync
+    // already durably committed the data. Treat directory sync as best-effort on win32 only;
+    // regular-file fsync elsewhere in this module remains hard on every platform.
+    if (process.platform !== "win32" || !["EPERM", "EINVAL", "EISDIR", "EACCES", "ENOTSUP"].includes(error.code)) {
+      throw error;
+    }
+  } finally {
+    closeSync(descriptor);
+  }
 }
 
 /**
