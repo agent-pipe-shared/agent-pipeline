@@ -56,6 +56,10 @@ disposition, plugin registration, and final feature-branch delivery
   [`non-windows-close-preparation.md`](../specs/2026-07-19-sprint-sentinel-epic/non-windows-close-preparation.md).
   It separates local AC/evidence work from real host, Human and remote gates;
   it neither changes a backlog status nor authorizes a transition.
+- The current Codex host is native WSL2 for `wsl-native` evidence; `wsl-drvfs`
+  remains a separate unobserved surface. The PO accepts unavailable native
+  macOS evidence for the Sentinel-close disposition only, with review by
+  2026-08-31; this does not claim macOS support or waive other platform gates.
 - Public remote heads are reduced to unchanged `main` and
   `feat/v3-public-core-foundation`. Anonymous obsolete lines have public
   recovery tags; histories with non-neutral authorship remain offline only and

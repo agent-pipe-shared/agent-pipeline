@@ -20,12 +20,12 @@
     "windowsBlockers": "docs/spec-archive/2026-07-20-sentinel-recovery/windows-blockers-scope.md"
   },
   "sha256": {
-    "prd": "dc9dcacf4d646af3031f03daf887bf986c4d0bb277634534c27a77a56da68a66",
+    "prd": "4050a582393643b38d61ee0b04bb011a013a5eda0f47de56f4425e4bddeae4bd",
     "spec": "aaec0b6411626b3f1988dbd2f5db16b2870c9aaed07e5edd3ed1e1e735c43b9b",
     "acceptance": "da06ce162e77d5e8d10d5fe50cca22060e987838bfced83a5e54e16521168707",
     "design": "3b4cee9f23a5db1ea7318ce86a1190d1ec868561b55a7ee9b30994ff0d073075",
     "recovery": "dbac9bafece60f965e7f1aa6c5d4b28665474678ce4be78591ca78f506b2a840",
-    "platformSupport": "f49a4e59c968139fe0a09c22e99905fb9a1b6d30354966ffd2f36b39e3501782",
+    "platformSupport": "1f9248c9719b0f53a572501a27b6e799f79d8c1b5d5187539c6249d253c4091e",
     "windowsBlockers": "0752415e7916b4db41b8c257339953a31924c68392d644e6c7b07993e08ecca0"
   }
 }

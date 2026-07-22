@@ -11,7 +11,7 @@
 
 <!-- technical-spec-sha256: aaec0b6411626b3f1988dbd2f5db16b2870c9aaed07e5edd3ed1e1e735c43b9b -->
 <!-- public-private-reconciliation-design-sha256: 48698f4bc1717932b1f031b6936e7201cc1d3201e6e56d28a50b2891023f0e7f -->
-<!-- platform-support-contract-sha256: f49a4e59c968139fe0a09c22e99905fb9a1b6d30354966ffd2f36b39e3501782 -->
+<!-- platform-support-contract-sha256: 1f9248c9719b0f53a572501a27b6e799f79d8c1b5d5187539c6249d253c4091e -->
 
 Die technische Freigabebindung gilt exakt für die benachbarte
 [spec.md](spec.md). Sie übernimmt zusätzlich die vollständigen, per SHA-256

@@ -65,8 +65,8 @@ claim that every current capability is supported on every class.
 | --- | --- |
 | Windows | `#33` is canonically closed; `#34`–`#37` remain open. No `supported` claim follows for capabilities affected by those open records. |
 | Linux | Existing controls may be `conditionally-supported` only per capability and its stated prerequisites. |
-| WSL | Without an explicit variant and native same-surface observation, status is `ambiguous`. |
-| macOS | A capability without native proof is `unavailable`; a mocked path is not native support. |
+| WSL | The current Codex WSL2 host is an available `wsl-native` evidence surface; every candidate still needs its own native evidence. `wsl-drvfs` remains `ambiguous` until separately observed. |
+| macOS | A capability without native proof is `unavailable`; a mocked path is not native support. The PO exception below may close Sentinel scope but never creates a support claim. |
 
 ## Evidence and closure criteria
 
@@ -88,6 +88,17 @@ one capability surface must jointly provide:
 
 Evidence is not portable between target classes. A missing class is visible as
 a typed negative status, never silently covered by another host.
+
+## PO exception for unavailable macOS evidence
+
+The PO accepted on 2026-07-22 that unavailable native macOS evidence does not
+block the Sentinel-close disposition. The exception is limited to macOS, the
+current Sentinel scope, and the absence of a native host; it does not satisfy
+any `supported` or `conditionally-supported` criterion, change the `unavailable`
+status, waive a Windows/Linux/WSL requirement, or authorize a release claim.
+The PO owns the exception. It must be reviewed by 2026-08-31 or explicitly
+extended by the PO; a newly available native macOS host ends the evidence
+exception for subsequent candidates.
 
 ## Change and migration rule
 

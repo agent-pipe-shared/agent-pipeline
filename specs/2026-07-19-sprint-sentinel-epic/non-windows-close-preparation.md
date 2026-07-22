@@ -22,6 +22,19 @@ Security-Evidenz und ein frischer unabhängiger Critic. Danach bleibt der
 jeweilige sanktionierte Writer der einzige Übergangspfad. Grüne Tests erzeugen
 keinen Statuswechsel.
 
+## PO-Plattformdisposition
+
+Der aktuelle Codex-Host ist WSL2 und liefert die native Oberfläche
+`wsl-native`; ihre Evidenz wird durch den Sentinel Elephant auf dem jeweiligen
+Kandidaten erzeugt. `wsl-drvfs` bleibt davon getrennt und ohne eigenen Nachweis
+typisiert offen.
+
+Der PO akzeptiert seit 2026-07-22 das Fehlen eines nativen macOS-Hosts für den
+Sentinel-Close als begrenzte Ausnahme. Sie schließt nur dieses Evidenzrestgate,
+behauptet keinen macOS-Support und ersetzt keine Windows-, Linux- oder
+WSL-Evidenz. Owner ist der PO; Review oder ausdrückliche Verlängerung bis
+2026-08-31.
+
 ## Lokal vorbereitbare Kontrolllinien
 
 | Item | Vorbereitete lokale Arbeit | Danach zwingend verbleibendes Gate |
