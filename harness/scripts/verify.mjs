@@ -52,10 +52,20 @@ const hooksDir = join(repoRoot, "plugins", "pipeline-core", "hooks");
 
 const libDir = join(repoRoot, "plugins", "pipeline-core", "lib");
 const pluginScriptsDir = join(repoRoot, "plugins", "pipeline-core", "scripts");
-const SCOPED_VERIFY_SUITE = Object.freeze({
-  name: "scoped-verify-registration-tests",
-  file: "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs",
-});
+const SCOPED_VERIFY_SUITES = Object.freeze([
+  Object.freeze({
+    name: "scoped-verify-registration-tests",
+    file: "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs",
+  }),
+  Object.freeze({
+    name: "workflow-preflight-tests",
+    file: "plugins/pipeline-core/lib/workflow-preflight.test.mjs",
+  }),
+  Object.freeze({
+    name: "interaction-continuity-tests",
+    file: "plugins/pipeline-core/lib/interaction-continuity.test.mjs",
+  }),
+]);
 const SCOPED_VERIFY_REGISTRATION = Object.freeze({
   schema: "pipeline.scoped-verify-registration.v1",
   taskId: "pipeline.verify-gate-scoped-registration",
@@ -65,7 +75,7 @@ const SCOPED_VERIFY_REGISTRATION = Object.freeze({
       sha256: "2b4c722de508cb9424b3fb83c6308602dd20e7e67ce240740c51deeb58541136",
     }),
   }),
-  suites: Object.freeze([SCOPED_VERIFY_SUITE]),
+  suites: SCOPED_VERIFY_SUITES,
 });
 
 const TEST_SUITES = [
@@ -211,8 +221,8 @@ if (!scopedRegistration.ok) {
   console.error(`Invalid scoped Verify registration: ${scopedRegistration.code}`);
   steps.push({ name: "scoped-verify-registration", exitCode: 1 });
 } else {
-  const scopedTest = { name: SCOPED_VERIFY_SUITE.name, file: join(repoRoot, SCOPED_VERIFY_SUITE.file) };
-  for (const suite of [...TEST_SUITES, scopedTest, ...PHASE_STEPS]) {
+  const scopedTests = SCOPED_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
+  for (const suite of [...TEST_SUITES, ...scopedTests, ...PHASE_STEPS]) {
     console.log(`\n=== ${suite.name} (${suite.file}) ===`);
     const res = spawnSync(process.execPath, [suite.file, ...(suite.args ?? [])], { encoding: "utf8", cwd: repoRoot });
     if (res.stdout) process.stdout.write(res.stdout);
