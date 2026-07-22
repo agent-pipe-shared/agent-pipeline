@@ -8,6 +8,12 @@ ausführbare Reihenfolge für die fünfzehn nicht-Windows-spezifischen offenen
 Records. Es bleibt hinter deren kanonischen ACs, dem Backlog-Writer und allen
 Human-/Remote-Gates zurück.
 
+**Owner und Ablauf aufgeschobener Gates:** Der Sentinel Elephant hält die
+Evidenzpakete zusammen; der PO ist Entscheider für Human-, Release- und
+Remote-Gates. Jeder unten nicht simulierte Host-, Human- oder Remote-Nachweis
+wird spätestens am **2026-08-31** erneut geprüft oder vom PO ausdrücklich
+verlängert. Das Ablaufdatum ist eine Review-Grenze, keine Freigabe.
+
 ## Gemeinsame Kandidatenregel
 
 Jedes lokale Paket endet erst mit denselben vier maschinellen Nachweisen auf
@@ -30,12 +36,12 @@ keinen Statuswechsel.
 
 ## Host- oder Sitzungsattestierungen
 
-| Item | Lokale Vorbereitung | Nicht simulierbares Restgate |
+| Item | Lokale Vorbereitung | Nicht simulierbares Restgate | Owner / Ablauf |
 | --- | --- | --- |
-| `pipeline.codex-plugin-validator-host-parity` | Identische Fixture-, Versions- und Command-Protokolle für native/generische Validatoren vorbereiten. | Native-vs.-Generic-A/B auf demselben Host. |
-| `pipeline.codex-sandbox-critic-longterm` | Fail-closed Host-, Preflight-, Select- und Runtime-Contracts weiter prüfen. | Starke input-confined/network-denied-Lane einschließlich Upstream-/Shadow-/PO-Nachweis. |
-| `pipeline.execution-model-switchback` | Route- und Post-Compact-Driftfälle in einem Attestierungsprotokoll vorbereiten. | Echte Main-Session-Attestierung und Drift-Return-Request. |
-| `pipeline.push-guard-worktree-target` | Ziel-Worktree, explizite Refspec, Guard-Nachweis und Fetch-back-Protokoll vorbereiten. | Regulärer, autorisierter Ziel-Worktree-Push und Readback. |
+| `pipeline.codex-plugin-validator-host-parity` | Identische Fixture-, Versions- und Command-Protokolle für native/generische Validatoren vorbereiten. | Native-vs.-Generic-A/B auf demselben Host. | Sentinel Elephant / 2026-08-31 |
+| `pipeline.codex-sandbox-critic-longterm` | Fail-closed Host-, Preflight-, Select- und Runtime-Contracts weiter prüfen. | Starke input-confined/network-denied-Lane einschließlich Upstream-/Shadow-/PO-Nachweis. | Sentinel Elephant + PO / 2026-08-31 |
+| `pipeline.execution-model-switchback` | Route- und Post-Compact-Driftfälle in einem Attestierungsprotokoll vorbereiten. | Echte Main-Session-Attestierung und Drift-Return-Request. | Sentinel Elephant / 2026-08-31 |
+| `pipeline.push-guard-worktree-target` | Ziel-Worktree, explizite Refspec, Guard-Nachweis und Fetch-back-Protokoll vorbereiten. | Regulärer, autorisierter Ziel-Worktree-Push und Readback. | Sentinel Elephant + PO / 2026-08-31 |
 
 ## HAW-E-gebundene Arbeit
 
@@ -43,22 +49,26 @@ Diese drei Items dürfen nur mit einem gemeinsamen Result und exakt einem
 Hawkeye-Batch transitionieren. Lokale Vorbereitung darf die Batch-Grenze nie
 aufweichen.
 
-| Item | Lokale Vorbereitung | Gemeinsames Restgate |
+| Item | Lokale Vorbereitung | Gemeinsames Restgate | Owner / Ablauf |
 | --- | --- | --- |
-| `pipeline.documentation-information-architecture` | Capability-/Language-/Link-Inventare, Operator-Journeys und Critic-Receipt-Bindung aktualisieren. | HAW-E-Result, EN/DE-Abnahme und Drei-Item-Batch. |
-| `pipeline.regulated-document-hooks` | Jede mandatory `(bindingId,event)`-Kette bis Receipt/Review/Rationale als AC-Matrix vorbereiten. | HAW-C-Vertikale und HAW-E-Batch. |
-| `pipeline.session-keep-awake` | Lease-, Cleanup- und Plattformfixture-Matrix sowie Nutzerdokumentation vorbereiten. | Native Plattformattestierungen und HAW-E-Batch. |
+| `pipeline.documentation-information-architecture` | Capability-/Language-/Link-Inventare, Operator-Journeys und Critic-Receipt-Bindung aktualisieren. | HAW-E-Result, EN/DE-Abnahme und Drei-Item-Batch. | Sentinel Elephant + PO / 2026-08-31 |
+| `pipeline.regulated-document-hooks` | Jede mandatory `(bindingId,event)`-Kette bis Receipt/Review/Rationale als AC-Matrix vorbereiten. | HAW-C-Vertikale und HAW-E-Batch. | Sentinel Elephant + PO / 2026-08-31 |
+| `pipeline.session-keep-awake` | Lease-, Cleanup- und Plattformfixture-Matrix sowie Nutzerdokumentation vorbereiten. | Native Plattformattestierungen und HAW-E-Batch. | Sentinel Elephant + PO / 2026-08-31 |
 
 `pipeline.dual-channel-publication` ist ebenfalls HAW-E-relevant, aber kein
 Teil des Drei-Item-Backlog-Batchs: Release-Baseline, gemeinsame Autorisierung,
 vier Remote-Effekte und Fetch-back bleiben reale, nicht lokal ersetzbare
-Nachweise.
+Nachweise. Owner ist der Sentinel Elephant mit PO-Entscheid; Ablauf ist
+2026-08-31.
 
 ## Bereits geschlossene und explizit ausgeschlossene Linien
 
 `pipeline.source-available-commercial-licensing` ist bereits kanonisch
-geschlossen und wird nicht erneut bearbeitet. Die Windows-Records `#34`–`#37`
-bleiben im gebundenen Windows-Scope; Docker ist kein Ersatz für native
+geschlossen: `backlog/transitions.ndjson` Sequenz 15, die Closure
+`backlog/evidence/2026-07-21-source-available-commercial-licensing.md` und
+die Zeile in `backlog-acceptance-matrix.md` sind die maßgebliche Evidenz. Es
+wird nicht erneut bearbeitet. Die Windows-Records `#34`–`#37` bleiben im
+gebundenen Windows-Scope; Docker ist kein Ersatz für native
 Windows-, Linux-, WSL- oder macOS-Evidenz.
 
 ## Ausführungsreihenfolge nach dem Windows-Merge
