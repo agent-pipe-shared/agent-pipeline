@@ -312,6 +312,20 @@ test("stateful design checklist is complete on both required documentation surfa
 });
 
 const statefulDesignBaseTrackedPaths = [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md"];
+
+test("pipeline-shaped repositories require both stateful-design surfaces even when neither is tracked", () => {
+  const { root } = fixture({ ".claude/pipeline.yaml": "schema: pipeline.manifest.v0\n" });
+  const result = runFixture(root, { trackedPaths: [...statefulDesignBaseTrackedPaths, ".claude/pipeline.yaml"] });
+  assert.deepEqual(
+    result.findings.filter((finding) => finding.endsWith(": required-surface-missing")),
+    [
+      "stateful-design-contract: roles/elephant.md: required-surface-missing",
+      "stateful-design-contract: templates/spec.md: required-surface-missing",
+    ],
+  );
+  assert.equal(result.stats.statefulDesignContracts, "checked");
+});
+
 for (const [presentSurface, missingSurface, phraseKey] of [
   ["templates/spec.md", "roles/elephant.md", "template"],
   ["roles/elephant.md", "templates/spec.md", "elephant"],
