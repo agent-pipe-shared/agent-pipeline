@@ -1049,6 +1049,47 @@ if (!sourceCommit) {
   emit(2, ["BLOCKED (guard-push, plugin pipeline-core): the explicit push source does not resolve to one commit."]);
 }
 
+/**
+ * The hook host can run from the primary checkout even when the shell command
+ * originates in a linked worktree.  An explicit attached branch is therefore
+ * authoritative for evidence location: resolve it through Git's own worktree
+ * registry and only use the matching worktree when it still resolves to the
+ * exact pushed commit.  Detached/OID sources retain the bound command project.
+ */
+function resolveEvidenceProject(binding, commit) {
+  const symbolic = spawnSync("git", ["-C", binding.projectDir, "rev-parse", "--symbolic-full-name", "--verify", "--end-of-options", binding.source], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  const sourceRef = symbolic.status === 0 ? symbolic.stdout?.trim() : "";
+  if (!sourceRef.startsWith("refs/heads/")) return binding.projectDir;
+
+  const listed = spawnSync("git", ["-C", binding.projectDir, "worktree", "list", "--porcelain"], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  if (listed.status !== 0) return binding.projectDir;
+
+  let worktree = null;
+  for (const block of listed.stdout.split("\n\n")) {
+    const lines = block.split("\n");
+    const path = lines.find((line) => line.startsWith("worktree "))?.slice("worktree ".length);
+    const branch = lines.find((line) => line.startsWith("branch "))?.slice("branch ".length);
+    if (path && branch === sourceRef) {
+      worktree = path;
+      break;
+    }
+  }
+  if (!worktree) return binding.projectDir;
+  const head = spawnSync("git", ["-C", worktree, "rev-parse", "--verify", "--end-of-options", "HEAD^{commit}"], {
+    encoding: "utf8",
+    timeout: 5000,
+  });
+  return head.status === 0 && head.stdout?.trim() === commit ? worktree : binding.projectDir;
+}
+
+const evidenceProjectDir = resolveEvidenceProject(pushBinding, sourceCommit);
+
 if (!pushGate || pushGate.mode === "off") {
   // Fall-matrix case B with NO active push gate: still surface the semantic-invalidity
   // WARN instead of exiting silently (pre-existing behavior emitted WARN for any push on
@@ -1060,7 +1101,7 @@ if (!pushGate || pushGate.mode === "off") {
 
 /** Reads + JSON-parses an evidence file; returns {ok:true, data} | {ok:false, reason}. */
 function readEvidence(relPath) {
-  const p = join(projectDir, relPath);
+  const p = join(evidenceProjectDir, relPath);
   let raw;
   try {
     raw = readFileSync(p, "utf8");
