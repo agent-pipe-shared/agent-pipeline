@@ -26,6 +26,7 @@ import {
   serializePoGateProfileReceipt,
   validatePoGateLanguageProjection,
 } from "./po-gate-authority.mjs";
+import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 
 const DEPENDENCY_KEYS = Object.freeze(["io", "now", "randomUUID", "resolveTopology"]);
 const IO_KEYS = Object.freeze([
@@ -103,10 +104,15 @@ function ensurePhysicalPrivateDirectory(commonDir, relativeDirectory, io) {
   let cursor = common;
   for (const component of relativeDirectory.split(/[\\/]/u).filter(Boolean)) {
     cursor = join(cursor, component);
-    if (!io.existsSync(cursor)) io.mkdirSync(cursor, { mode: 0o700 });
+    const existed = io.existsSync(cursor);
+    if (!existed) io.mkdirSync(cursor, { mode: 0o700 });
     const info = io.lstatSync(cursor);
     if (!info.isDirectory() || info.isSymbolicLink() || io.realpathSync(cursor) !== cursor) {
       throw new Error("unsafe local receipt directory");
+    }
+    if (process.platform === "win32") {
+      const state = existed ? assessWindowsPrivatePath(cursor) : hardenWindowsPrivateDirectory(cursor);
+      if (state.status !== "secure") throw new Error("Windows receipt directory assurance unavailable");
     }
   }
   if (!isInside(common, cursor)) throw new Error("receipt directory escaped Git common directory");
@@ -203,6 +209,9 @@ export function publishPoGateProfileReceipt({
     deps.io.renameSync(temporary, target);
     temporary = null;
     published = true;
+    if (process.platform === "win32" && assessWindowsPrivatePath(target).status !== "secure") {
+      throw new Error("Windows receipt file assurance unavailable");
+    }
     syncDirectory(parent, deps.io);
     return {
       ok: true,
