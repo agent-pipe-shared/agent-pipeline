@@ -327,6 +327,26 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   });
 }
 {
+  const primary = freshRepo("source-worktree-evidence");
+  const targetDir = join(primary.dir, "target-worktree");
+  gitAt(primary.dir, "worktree", "add", "-q", "-b", "target", targetDir);
+  writeFileSync(join(targetDir, "target.txt"), "target\n");
+  gitAt(targetDir, "add", "target.txt");
+  gitAt(targetDir, "commit", "-q", "-m", "target evidence");
+  const targetHead = gitAt(targetDir, "rev-parse", "HEAD").stdout.trim();
+  writeManifest(primary.dir, manifestPush({ approval: "standing-approved" }));
+  writeManifest(targetDir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(primary.dir, "evidence/verify-latest.json", { exitCode: 0, commit: primary.head });
+  writeEvidence(targetDir, "evidence/verify-latest.json", { exitCode: 0, commit: targetHead });
+  check(
+    "PG17bb allow  explicit attached source branch resolves evidence from its target worktree",
+    "git push origin refs/heads/target:refs/heads/target",
+    primary.dir,
+    ALLOW,
+    { stderrEmpty: true },
+  );
+}
+{
   const { dir, head: verifiedOid } = freshRepo("source-oid");
   gitAt(dir, "branch", "verified", verifiedOid);
   writeFileSync(join(dir, "later.txt"), "later\n");
