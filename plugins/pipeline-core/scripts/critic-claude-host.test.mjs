@@ -7,6 +7,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { prepareCandidatePacket } from "./critic-packet-preflight.mjs";
+import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { buildNativeBareArgv, preflightNativeBare, runNativeBare, NativeBareError } from "./critic-native-bare.mjs";
 import {
   CLAUDE_FALLBACK_ASSURANCE,
@@ -36,6 +37,9 @@ function repository() {
   mkdirSync(join(root, "specs")); writeFileSync(join(root, "specs", "work.md"), "base\n"); git(root, ["add", "."]); git(root, ["commit", "--quiet", "-m", "base"]); const base = git(root, ["rev-parse", "HEAD"]);
   writeFileSync(join(root, "specs", "work.md"), "candidate\n"); git(root, ["add", "."]); git(root, ["commit", "--quiet", "-m", "candidate"]); const candidate = git(root, ["rev-parse", "HEAD"]);
   const control = join(root, git(root, ["rev-parse", "--git-common-dir"]), "agent-pipeline", "critic-packets"); mkdirSync(control, { recursive: true, mode: 0o700 }); chmodSync(join(control, ".."), 0o700); chmodSync(control, 0o700);
+  // On native Windows, mkdir/chmod cannot establish the owner-only DACL the control
+  // root contract requires; harden it the way a real caller's private root would be (no-op on POSIX).
+  if (process.platform === "win32") hardenWindowsPrivateDirectory(control);
   const prepared = prepareCandidatePacket({ repoRoot: root, controlRoot: control, packetId: "7".repeat(32), taskId: "batman-claude", projectId: "pipeline", baseCommit: base, candidateCommit: candidate, rulesetOid: candidate,
     route: { routeId: "claude-critic", runner: "claude", adapter: "claude-host", provider: "anthropic", modelTier: "sonnet", effortTier: "max", assurance: "native-preferred", projectionDigest: "8".repeat(64) }, references: [{ kind: "spec", path: "specs/work.md" }] },
   { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 15) });

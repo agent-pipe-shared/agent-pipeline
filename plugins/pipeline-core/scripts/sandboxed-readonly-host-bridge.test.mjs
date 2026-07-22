@@ -11,6 +11,16 @@ import test from "node:test";
 import { canonicalJson, compatibilityReceiptDigest, loadCompatibilityPolicy } from "../lib/codex-sandbox-compatibility.mjs";
 import { buildSandboxRequest, createSandboxSelectionStore, sandboxSelectionDigest, SELECTION_SCHEMA_SHA256 } from "./codex-sandbox-select.mjs";
 import { executeSandboxedReadonlyDuty, recoverSandboxJournal, runSandboxedReadonlyHostBridge, showSandboxSelection } from "./sandboxed-readonly-host-bridge.mjs";
+import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
+
+// On native Windows a fresh mkdtemp dir inherits SYSTEM/Administrators ACEs, so the
+// sandbox store correctly refuses it as insecure. A real caller supplies a hardened
+// private root; harden every fixture root to match that contract (no-op on POSIX).
+async function hardenedMkdtemp(prefix) {
+  const root = await mkdtemp(prefix);
+  if (process.platform === "win32") hardenWindowsPrivateDirectory(root);
+  return root;
+}
 
 const D = "a".repeat(64);
 const SELECTION_ID = "css_aaaaaaaaaaaaaaaaaaaaaaaaae";
@@ -166,7 +176,7 @@ test("a successful child is resealed after finalization, including when a wrappe
 });
 
 test("generic production composition persists the selector record, ignores caller selection authority, then journals execution and duty binding", async () => {
-  const root = await mkdtemp(join(tmpdir(), "hawkeye-generic-"));
+  const root = await hardenedMkdtemp(join(tmpdir(), "hawkeye-generic-"));
   try {
     const receiptSession = { sessionId: "session-hawkeye", descriptorSha256: "9".repeat(64) };
     let closure = { status: "active", closedAt: null };
@@ -218,7 +228,7 @@ test("generic production composition persists the selector record, ignores calle
 });
 
 test("concurrent exact replays share one selection and one started child", async () => {
-  const root = await mkdtemp(join(tmpdir(), "hawkeye-replay-"));
+  const root = await hardenedMkdtemp(join(tmpdir(), "hawkeye-replay-"));
   try {
     const store = createSandboxSelectionStore({ root, now: () => "2026-07-19T00:00:00.000Z" });
     let launches = 0;
@@ -249,7 +259,7 @@ test("concurrent exact replays share one selection and one started child", async
 });
 
 test("journal recovery and retention are exact-ID only and reject third states", async () => {
-  const root = await mkdtemp(join(tmpdir(), "hawkeye-journal-"));
+  const root = await hardenedMkdtemp(join(tmpdir(), "hawkeye-journal-"));
   try {
     const receiptSession = { sessionId: "session-recovery", descriptorSha256: "9".repeat(64) };
     const store = createSandboxSelectionStore({ root, now: () => "2026-07-19T00:00:00.000Z", receiptSession });
@@ -273,7 +283,7 @@ test("journal recovery and retention are exact-ID only and reject third states",
 });
 
 test("an error duty receipt is retained as execution evidence but can never become a usable bound review", async () => {
-  const root = await mkdtemp(join(tmpdir(), "hawkeye-error-receipt-"));
+  const root = await hardenedMkdtemp(join(tmpdir(), "hawkeye-error-receipt-"));
   try {
     const store = createSandboxSelectionStore({ root, now: () => "2026-07-19T00:00:00.000Z" });
     const result = await executeSandboxedReadonlyDuty({

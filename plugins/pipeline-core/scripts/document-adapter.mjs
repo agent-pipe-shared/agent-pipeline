@@ -50,7 +50,12 @@ function assertExecutable(path) {
   let info;
   try { info = lstatSync(path); }
   catch { fail("DA-EXECUTABLE", "adapter executable is unavailable"); }
-  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || (info.mode & 0o111) === 0) {
+  // POSIX exposes an executable-bit mode; Windows has no such mode semantics (every
+  // regular file reports the same synthetic mode regardless of real executability),
+  // so the bit check applies only off win32. Single-link/regular/physical remain hard
+  // on every platform.
+  const posixNotExecutable = process.platform !== "win32" && (info.mode & 0o111) === 0;
+  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || posixNotExecutable) {
     fail("DA-EXECUTABLE", "adapter executable must be an executable single-link regular file");
   }
   try {

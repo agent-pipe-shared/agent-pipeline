@@ -8,6 +8,15 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
+let symlinkCapable = true;
+{
+  const probeDir = mkdtempSync(join(tmpdir(), "document-hooks-symlink-probe-"));
+  try { writeFileSync(join(probeDir, "target"), "x"); symlinkSync(join(probeDir, "target"), join(probeDir, "link")); }
+  catch { symlinkCapable = false; }
+  finally { rmSync(probeDir, { recursive: true, force: true }); }
+  if (!symlinkCapable) process.stdout.write("[capability: symlink unavailable] skipping symlink-specific checks\n");
+}
+
 import {
   DOCUMENT_HOOKS_POLICY_SCHEMA,
   DOCUMENT_HOOKS_RUNTIME_SCHEMA,
@@ -268,7 +277,7 @@ test("fixed repo loader is absent/no-op or configured and performs no writes", (
   }
 });
 
-test("fixed repo loader returns typed invalid for malformed or escaping Policy paths", () => {
+test("fixed repo loader returns typed invalid for malformed or escaping Policy paths", { skip: !symlinkCapable && "symlink unavailable" }, () => {
   const root = mkdtempSync(join(tmpdir(), "document-hooks-root-"));
   const outside = mkdtempSync(join(tmpdir(), "document-hooks-outside-"));
   try {
