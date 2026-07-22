@@ -3,27 +3,16 @@ import { lstatSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { posix as posixPath, win32 as winPath } from "node:path";
 
-function windowsEnvironmentDirectory(environment, names, fallback) {
-  for (const name of names) {
-    const value = environment?.[name];
-    if (typeof value === "string" && winPath.isAbsolute(value)) return value;
-  }
-  return fallback;
-}
+/** Fixed Windows roots; environment data must never expand the trust boundary. */
+export const WINDOWS_SYSTEM_TOOL_ROOTS = Object.freeze([
+  "C:\\Program Files\\Git\\cmd",
+  "C:\\Program Files\\Git\\bin",
+  "C:\\Program Files\\Git\\mingw64\\bin",
+  "C:\\Windows\\System32",
+]);
 
-/** Derives the fixed Windows system roots without consulting PATH or user-home variables. */
-export function windowsSystemToolRoots(environment = process.env) {
-  const programFiles = windowsEnvironmentDirectory(environment, ["ProgramFiles", "PROGRAMFILES"], "C:\\Program Files");
-  const systemRoot = windowsEnvironmentDirectory(environment, ["SystemRoot", "SYSTEMROOT", "WINDIR"], "C:\\Windows");
-  return Object.freeze([
-    winPath.join(programFiles, "Git", "cmd"),
-    winPath.join(programFiles, "Git", "bin"),
-    winPath.join(programFiles, "Git", "mingw64", "bin"),
-    winPath.join(systemRoot, "System32"),
-  ]);
-}
-
-export const WINDOWS_SYSTEM_TOOL_ROOTS = windowsSystemToolRoots();
+/** Returns the immutable Windows executable allowlist. */
+export function windowsSystemToolRoots() { return WINDOWS_SYSTEM_TOOL_ROOTS; }
 
 function missing(error) { return error?.code === "ENOENT" || error?.code === "ENOTDIR"; }
 function normalWinPath(value) { return String(value).replaceAll("/", "\\").replace(/\\+$/u, "").toLowerCase(); }
@@ -33,7 +22,7 @@ function windowsCandidate(name) { return name.toLowerCase().endsWith(".exe") ? n
 /** Validates a candidate selected by a caller through the same authority. */
 export function assessTrustedExecutablePath(path, options = {}) {
   const platform = options.platform ?? process.platform;
-  const windowsRoots = options.windowsRoots ?? windowsSystemToolRoots(options.env);
+  const windowsRoots = options.windowsRoots ?? WINDOWS_SYSTEM_TOOL_ROOTS;
   const fsOps = options.fsOps ?? { lstatSync, realpathSync };
   if (typeof path !== "string" || path.length === 0) return { ok: false, status: "probe_error" };
   if (platform === "win32" && (!path.toLowerCase().endsWith(".exe") || !withinWindowsRoots(path, windowsRoots))) return { ok: false, status: "untrusted_path" };
@@ -48,7 +37,7 @@ export function assessTrustedExecutablePath(path, options = {}) {
 /** Resolves a Pipeline tool without consulting PATH and retains rejection provenance. */
 export function resolveTrustedSystemExecutable(name, options = {}) {
   const platform = options.platform ?? process.platform;
-  const windowsRoots = options.windowsRoots ?? windowsSystemToolRoots(options.env);
+  const windowsRoots = options.windowsRoots ?? WINDOWS_SYSTEM_TOOL_ROOTS;
   const fsOps = options.fsOps ?? { lstatSync, realpathSync };
   // A mocked foreign-platform resolution must not inherit this host's home directory.
   const homeDir = options.homeDir ?? (platform === process.platform && platform !== "win32" ? homedir() : undefined);
