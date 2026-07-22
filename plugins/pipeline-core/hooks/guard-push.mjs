@@ -1062,13 +1062,20 @@ function resolveEvidenceProject(binding, commit) {
     timeout: 5000,
   });
   const sourceRef = symbolic.status === 0 ? symbolic.stdout?.trim() : "";
-  if (!sourceRef.startsWith("refs/heads/")) return binding.projectDir;
+  // Only a fully-qualified branch source explicitly requests the attached-worktree
+  // evidence binding.  Short branch names retain their historical bound-project
+  // semantics alongside detached and OID sources.
+  if (!binding.source.startsWith("refs/heads/") || !sourceRef.startsWith("refs/heads/")) {
+    return { ok: true, projectDir: binding.projectDir };
+  }
 
   const listed = spawnSync("git", ["-C", binding.projectDir, "worktree", "list", "--porcelain"], {
     encoding: "utf8",
     timeout: 5000,
   });
-  if (listed.status !== 0) return binding.projectDir;
+  if (listed.status !== 0) {
+    return { ok: false, reason: "the explicit source branch worktree registry cannot be resolved" };
+  }
 
   let worktree = null;
   for (const block of listed.stdout.split("\n\n")) {
@@ -1080,15 +1087,24 @@ function resolveEvidenceProject(binding, commit) {
       break;
     }
   }
-  if (!worktree) return binding.projectDir;
+  if (!worktree) {
+    return { ok: false, reason: "the explicit source branch has no matching attached worktree" };
+  }
   const head = spawnSync("git", ["-C", worktree, "rev-parse", "--verify", "--end-of-options", "HEAD^{commit}"], {
     encoding: "utf8",
     timeout: 5000,
   });
-  return head.status === 0 && head.stdout?.trim() === commit ? worktree : binding.projectDir;
+  if (head.status !== 0 || head.stdout?.trim() !== commit) {
+    return { ok: false, reason: "the explicit source branch worktree does not resolve to the pushed source commit" };
+  }
+  return { ok: true, projectDir: worktree };
 }
 
-const evidenceProjectDir = resolveEvidenceProject(pushBinding, sourceCommit);
+const evidenceProject = resolveEvidenceProject(pushBinding, sourceCommit);
+if (!evidenceProject.ok) {
+  emit(2, [`BLOCKED (guard-push, plugin pipeline-core): ${evidenceProject.reason}.`]);
+}
+const evidenceProjectDir = evidenceProject.projectDir;
 
 if (!pushGate || pushGate.mode === "off") {
   // Fall-matrix case B with NO active push gate: still surface the semantic-invalidity
