@@ -165,7 +165,10 @@
           "docs/spec-archive/2026-07-20-sentinel-recovery/platform-support-contract.md",
           "docs/spec-archive/2026-07-20-sentinel-recovery/prd_sentinel-epic.md",
           "docs/spec-archive/2026-07-20-sentinel-recovery/public-private-reconciliation-design.md",
-          "docs/spec-archive/2026-07-20-sentinel-recovery/spec.md"
+          "docs/spec-archive/2026-07-20-sentinel-recovery/spec.md",
+          "docs/spec-archive/2026-07-20-sentinel-recovery/windows-advisory-receipt-assurance-ac-matrix.md",
+          "docs/spec-archive/2026-07-20-sentinel-recovery/windows-blockers-scope.md",
+          "docs/spec-archive/2026-07-20-sentinel-recovery/windows-trusted-tool-resolution-ac-matrix.md"
         ]
       },
       {
