@@ -25,6 +25,7 @@ import {
 } from "./codex-critic-host.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
 let passed = 0;
 const RULESET_PATHS = [
@@ -44,6 +45,14 @@ const RULESET_PATHS = [
   "plugins/pipeline-core/scripts/codex-critic-receipt.schema.json",
   "plugins/pipeline-core/scripts/critic-verdict.schema.json",
 ];
+let symlinkCapable = true;
+{
+  const probeDir = mkdtempSync(join(tmpdir(), "codex-critic-host-symlink-probe-"));
+  try { writeFileSync(join(probeDir, "target"), "x"); symlinkSync(join(probeDir, "target"), join(probeDir, "link")); }
+  catch { symlinkCapable = false; }
+  finally { rmSync(probeDir, { recursive: true, force: true }); }
+  if (!symlinkCapable) process.stdout.write("[capability: symlink unavailable] skipping symlink-specific checks\n");
+}
 function check(name, fn) {
   fn();
   passed += 1;
@@ -130,6 +139,11 @@ function createCandidate(root) {
     writeFileSync(target, readFileSync(join(DEFAULT_PIPELINE_ROOT, path)));
   }
   run("git", ["init", "-q"], root);
+  // Pin EOL handling for this fixture repo regardless of the host's system-level
+  // core.autocrlf (Git for Windows commonly defaults it to true): otherwise a
+  // native-Windows checkout of these text files diverges from their committed
+  // bytes and later `git status`/`git clone` calls observe a false "dirty" state.
+  run("git", ["config", "core.autocrlf", "false"], root);
   run("git", ["config", "user.name", "Fixture"], root);
   run("git", ["config", "user.email", "fixture@example.invalid"], root);
   run("git", ["add", ".gitignore", ".claude/pipeline.json", "verify.mjs", "specs/review.md", "policies/guard.md", ...RULESET_PATHS], root);
@@ -158,6 +172,7 @@ function createObserver(root) {
   writeFileSync(join(root, "tracked.txt"), "tracked\n");
   writeFileSync(join(root, "ignored", "state.txt"), "initial\n");
   run("git", ["init", "-q"], root);
+  run("git", ["config", "core.autocrlf", "false"], root);
   run("git", ["config", "user.name", "Fixture"], root);
   run("git", ["config", "user.email", "fixture@example.invalid"], root);
   run("git", ["add", ".gitignore", "tracked.txt"], root);
@@ -302,13 +317,20 @@ check("observer must be named and absolute", () => assert.throws(() => parseObse
 
 const root = mkdtempSync(join(tmpdir(), "codex-critic-host-test-"));
 chmodSync(root, 0o700);
+// On native Windows chmod cannot establish the owner-only DACL the control-dir
+// contract requires; harden it the way a real caller's control-dir would be.
+if (process.platform === "win32") hardenWindowsPrivateDirectory(root);
 const repo = join(root, "candidate");
 mkdirSync(repo);
 const candidate = createCandidate(repo);
 const privateObserver = createObserver(join(root, "private-observer"));
 const sharedObserver = createObserver(join(root, "shared-observer"));
 const rulesetRoot = join(root, "ruleset");
-run("git", ["clone", "-q", repo, rulesetRoot], root);
+// -c must be passed to `clone` itself (not set afterward): the checkout that
+// establishes the clone's working tree happens during this call, and Git for
+// Windows commonly defaults core.autocrlf to true at the system config level.
+run("git", ["-c", "core.autocrlf=false", "clone", "-q", repo, rulesetRoot], root);
+run("git", ["config", "core.autocrlf", "false"], rulesetRoot);
 const ruleset = run("git", ["rev-parse", "HEAD"], rulesetRoot);
 const request = requestFor(candidate, ruleset);
 const legacyRequest = {
@@ -417,7 +439,7 @@ check("candidate and ruleset roots must be separate", () => {
     observers,
   }), /must be separate/);
 });
-check("control outputs cannot cross a symlinked parent", () => {
+if (symlinkCapable) check("control outputs cannot cross a symlinked parent", () => {
   mkdirSync(join(root, "outside"));
   symlinkSync(join(root, "outside"), join(root, "link"));
   assert.throws(() => prepareNativeCritic({
@@ -522,7 +544,9 @@ check("prepare emits fixed native Sol/xhigh route", () => {
   assert.deepEqual(prepared.request.normal_lane_authorization, legacyRequest.normal_lane_authorization);
 });
 check("prepared packet is private and no observer path leaks", () => {
-  assert.equal(statSync(preparedPath).mode & 0o777, 0o600);
+  // Native Windows mode is a synthetic constant, not real POSIX permission bits; the
+  // production write path enforces the equivalent owner-DACL assurance separately.
+  if (process.platform !== "win32") assert.equal(statSync(preparedPath).mode & 0o777, 0o600);
   assert.equal(readFileSync(preparedPath, "utf8").includes(repo), false);
 });
 check("disposable checkout has no remote and exact candidate", () => {
@@ -899,7 +923,7 @@ check("finalize transaction paths must be pairwise distinct", () => {
     observers,
   }), /pairwise distinct/);
 });
-check("leaf-symlinked host return is rejected", () => {
+if (symlinkCapable) check("leaf-symlinked host return is rejected", () => {
   const alternate = join(root, "alternate-return.json");
   writeJson(alternate, validReturn);
   rmSync(returnPath);
@@ -952,7 +976,11 @@ check("raw Git index-only mutation blocks finalize", () => {
   writeFileSync(indexPath, mutated);
   assert.notEqual(captureRepositoryFingerprint(indexObserver).sha256, before);
 });
-check("Git index mode-only mutation changes the administrative fingerprint", () => {
+// chmod cannot produce a real permission change on native Windows (mode is a
+// synthetic constant there), so this POSIX mode-mutation premise has no Windows
+// equivalent to exercise; the fingerprint's Windows-relevant inputs are covered
+// by the other mutation-probe checks in this file.
+if (process.platform !== "win32") check("Git index mode-only mutation changes the administrative fingerprint", () => {
   const indexObserver = createObserver(join(root, "index-mode-observer"));
   const indexPath = join(indexObserver, ".git", "index");
   const before = captureRepositoryFingerprint(indexObserver).sha256;
@@ -974,7 +1002,7 @@ check("reserved AGENTS.md directories fail closed without opening their contents
   rmSync(reservedDirectory, { recursive: true });
   assert.equal(captureRepositoryFingerprint(sharedObserver).sha256, prepared.bindings.protectedBefore["observer.shared"]);
 });
-check("symlinked Git index is rejected instead of dereferenced", () => {
+if (symlinkCapable) check("symlinked Git index is rejected instead of dereferenced", () => {
   const indexObserver = createObserver(join(root, "index-symlink-observer"));
   const indexPath = join(indexObserver, ".git", "index");
   renameSync(indexPath, `${indexPath}.backing`);
