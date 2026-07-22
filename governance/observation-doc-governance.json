@@ -102,6 +102,7 @@
           "docs/critic-isolation-threat-model.md",
           "docs/marketplace-supply-chain-threat-model.md",
           "docs/next-session-setup-prompt.md",
+          "docs/sentinel-scope-extension-threat-model.md",
           "docs/state.md"
         ]
       },

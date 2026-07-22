@@ -351,6 +351,16 @@ export function applySentinelBacklogRecovery(root = DEFAULT_ROOT, options = {}) 
     : { ...planned, ok: false, findings: transaction.findings, wrote: false };
 }
 
+const SENTINEL_WINDOWS_SCOPE_SOURCE = "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md";
+const SENTINEL_WINDOWS_SCOPE_DATE = "2026-07-22";
+const SENTINEL_WINDOWS_SCOPE_IDS = Object.freeze([
+  "pipeline.windows-runtime-baseline-containment",
+  "pipeline.windows-directory-durability",
+  "pipeline.windows-private-state-assurance",
+  "pipeline.windows-verify-reproducibility",
+  "pipeline.windows-trusted-tool-resolution",
+]);
+
 function validateSentinelScopeExtension(input) {
   const errors = [];
   if (!input || typeof input !== "object" || Array.isArray(input)) return ["scope extension must be an object"];
@@ -358,21 +368,23 @@ function validateSentinelScopeExtension(input) {
   const actual = Object.keys(input).sort();
   if (actual.length !== expected.length || actual.some((key, index) => key !== expected[index])) errors.push("scope extension has unsupported or missing fields");
   if (input.schema !== "pipeline.sentinel-scope-extension.v1") errors.push("scope extension schema is invalid");
-  if (typeof input.source !== "string" || !/^[A-Za-z0-9._/-]+$/.test(input.source)) errors.push("scope extension source must be a safe repository-relative path");
-  if (typeof input.admittedAt !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(input.admittedAt)) errors.push("scope extension admittedAt must be an ISO calendar date");
-  if (!Array.isArray(input.items) || input.items.length === 0) errors.push("scope extension items must be a non-empty array");
+  if (input.source !== SENTINEL_WINDOWS_SCOPE_SOURCE) errors.push("scope extension source must equal the PO-approved Windows scope authority");
+  if (input.admittedAt !== SENTINEL_WINDOWS_SCOPE_DATE) errors.push("scope extension admittedAt must equal the PO-approved Windows scope date");
+  const items = Array.isArray(input.items) ? input.items : [];
+  if (items.length !== SENTINEL_WINDOWS_SCOPE_IDS.length) errors.push("scope extension items must be the exact PO-approved Windows set");
   const ids = new Set();
-  for (const entry of input.items ?? []) {
+  for (const entry of items) {
     if (!entry || typeof entry !== "object" || Array.isArray(entry) || Object.keys(entry).sort().join(",") !== "id,status,type") {
       errors.push("scope extension item has unsupported or missing fields");
       continue;
     }
-    if (typeof entry.id !== "string" || !/^pipeline\.[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/.test(entry.id)) errors.push("scope extension item id is invalid");
-    if (!['open', 'in_progress'].includes(entry.status)) errors.push("scope extension item must not claim closed status");
-    if (!['workflow-improvement', 'tooling-radar', 'defect', 'idea'].includes(entry.type)) errors.push("scope extension item type is invalid");
+    if (!SENTINEL_WINDOWS_SCOPE_IDS.includes(entry.id)) errors.push("scope extension item id is not PO-approved");
+    if (entry.status !== "open") errors.push("scope extension item must initialize exactly open");
+    if (entry.type !== "defect") errors.push("scope extension item type must equal defect");
     if (ids.has(entry.id)) errors.push(`scope extension duplicates id ${entry.id}`);
     ids.add(entry.id);
   }
+  if (items.map((entry) => entry?.id).join("\n") !== SENTINEL_WINDOWS_SCOPE_IDS.join("\n")) errors.push("scope extension item order must equal the PO-approved Windows scope");
   return errors;
 }
 
@@ -403,13 +415,14 @@ export function planSentinelScopeExtension(root = DEFAULT_ROOT, input, { evidenc
   })();
   if (typeof commit !== "string" || !/^[a-f0-9]{40}$/.test(commit) || (checkCommit && !localCommitExists(root, commit))) findings.push("Sentinel scope extension requires a reachable local evidence commit");
   const currentIds = new Set(current.items.map((item) => item.metadata.id));
-  for (const entry of input?.items ?? []) if (currentIds.has(entry.id)) findings.push(`scope extension id already exists in the current backlog: ${entry.id}`);
+  const extensionItems = Array.isArray(input?.items) ? input.items : [];
+  for (const entry of extensionItems) if (entry && typeof entry === "object" && currentIds.has(entry.id)) findings.push(`scope extension id already exists in the current backlog: ${entry.id}`);
   if (findings.length > 0) return { ...current, ok: false, findings, wrote: false, targets: [] };
-  const additions = input.items.map((entry) => scopeExtensionItem(entry, input));
+  const additions = extensionItems.map((entry) => scopeExtensionItem(entry, input));
   const items = [...current.items, ...additions];
   const events = [...current.events];
   let previousHash = events.at(-1)?.entryHash ?? null;
-  for (const entry of input.items) {
+  for (const entry of extensionItems) {
     const event = { schema: TRANSITION_SCHEMA, sequence: events.length + 1, id: entry.id, from: null, to: entry.status, at: input.admittedAt, actor: "sentinel-scope-extension", reason: "Record the PO-approved Sentinel scope extension; no implementation or closure is claimed.", evidence: { kind: "sentinel-scope-extension", commit, reference: input.source }, previousHash, entryHash: "" };
     event.entryHash = transitionHash(event);
     events.push(event);

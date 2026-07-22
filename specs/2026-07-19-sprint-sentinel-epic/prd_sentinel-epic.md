@@ -9,7 +9,7 @@
 > Public-Core-/Private-Consumer-Reconciliation. AFK-Aktivierung, Push, Tag und
 > Release bleiben bis zu ihren jeweiligen Gates gesperrt.
 
-<!-- technical-spec-sha256: b062db2aa1271bd4b1be32efa16e74aaa7ccfafcba3ebfde4888d77d527819ac -->
+<!-- technical-spec-sha256: aaec0b6411626b3f1988dbd2f5db16b2870c9aaed07e5edd3ed1e1e735c43b9b -->
 <!-- public-private-reconciliation-design-sha256: 48698f4bc1717932b1f031b6936e7201cc1d3201e6e56d28a50b2891023f0e7f -->
 
 Die technische Freigabebindung gilt exakt für die benachbarte
