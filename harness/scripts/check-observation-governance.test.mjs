@@ -3,6 +3,7 @@
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import test from "node:test";
 
@@ -13,7 +14,7 @@ import {
   discoverDocumentation,
 } from "./check-observation-governance.mjs";
 
-const REPO = resolve(new URL("../..", import.meta.url).pathname);
+const REPO = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 
 function policy() {
   return JSON.parse(readFileSync(resolve(REPO, POLICY_PATH), "utf8"));

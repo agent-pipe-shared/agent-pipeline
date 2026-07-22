@@ -14,6 +14,7 @@ import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 function loopback() {
   const server = createServer((socket) => socket.end());
@@ -60,7 +61,7 @@ setInterval(()=>{},1000);
     networkPort: address.port,
   })).toString("base64url");
   const payloadUrl = new URL("./fixtures/codex-sandbox-preflight-payload.mjs", import.meta.url);
-  const control = spawnSync(process.execPath, [payloadUrl.pathname, request], { input: "INPUT", encoding: "utf8", shell: false });
+  const control = spawnSync(process.execPath, [fileURLToPath(payloadUrl), request], { input: "INPUT", encoding: "utf8", shell: false });
   assert.equal(control.status, 0);
   const lines = control.stdout.trim().split("\n").map((line) => JSON.parse(line));
   assert.equal(lines[0].type, "started");
