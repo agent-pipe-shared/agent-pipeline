@@ -78,8 +78,11 @@ function defaultReadText(file) {
 export function checkStatefulDesignContracts(surfaces) {
   const findings = [];
   for (const [surfaceIndex, surface] of STATEFUL_DESIGN_SURFACES.entries()) {
+    const text = surfaces[surface];
+    if (typeof text !== "string") continue;
+    const operativeText = stripFencedCode(text).replace(/<!--[\s\S]*?-->/g, "");
     for (const contract of STATEFUL_DESIGN_CONTRACTS) {
-      if (!surfaces[surface].includes(contract.phrases[surfaceIndex])) {
+      if (!operativeText.includes(contract.phrases[surfaceIndex])) {
         findings.push(`stateful-design-contract: ${surface}: ${contract.id}`);
       }
     }
@@ -456,24 +459,26 @@ export function checkRepository(rootInput, options = {}) {
     findings.push(`authority: ${error.message}`);
   }
 
+  const trackedStatefulDesignSurfaces = STATEFUL_DESIGN_SURFACES.filter((path) => trackedPaths.has(path));
   let statefulDesignContracts = "not-applicable";
-  if (STATEFUL_DESIGN_SURFACES.every((path) => trackedPaths.has(path))) {
+  if (trackedStatefulDesignSurfaces.length > 0) {
+    statefulDesignContracts = "checked";
     const surfaces = {};
-    let available = true;
-    for (const path of STATEFUL_DESIGN_SURFACES) {
+    for (const path of trackedStatefulDesignSurfaces) {
       try {
         const text = readRepoText(path);
         if (text === null) throw new Error("surface is excluded");
         surfaces[path] = text;
       } catch {
-        available = false;
-        break;
+        findings.push(`stateful-design-contract: ${path}: required-surface-unavailable`);
       }
     }
-    if (available) {
-      statefulDesignContracts = "checked";
-      findings.push(...checkStatefulDesignContracts(surfaces));
+    for (const path of STATEFUL_DESIGN_SURFACES) {
+      if (!trackedPaths.has(path)) {
+        findings.push(`stateful-design-contract: ${path}: required-surface-missing`);
+      }
     }
+    findings.push(...checkStatefulDesignContracts(surfaces));
   }
 
   const observationGovernance = checkObservationGovernance(root, { optionalWhenAbsent: true });
