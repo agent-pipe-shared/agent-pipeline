@@ -24,6 +24,61 @@ import {
 import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
 
 const REGISTRY = loadRunnerProfilesV3Registry();
+
+/**
+ * Native Windows requires SeCreateSymbolicLinkPrivilege (Developer Mode or an
+ * elevated process) to create a filesystem symlink; without it symlinkSync
+ * throws EPERM. Probe the real capability once (never assume by platform) so
+ * symlink-specific assertions can be skipped -- visibly, and only when the
+ * host genuinely cannot create one -- while every non-symlink assertion in
+ * this suite keeps running unconditionally.
+ */
+function probeSymlinkCapability() {
+  const probeDir = mkdtempSync(join(tmpdir(), "snt-a-symlink-probe-"));
+  try {
+    const target = join(probeDir, "target");
+    const link = join(probeDir, "link");
+    writeFileSync(target, "probe");
+    symlinkSync(target, link);
+    return true;
+  } catch (error) {
+    if (error && (error.code === "EPERM" || error.code === "UNKNOWN")) return false;
+    throw error;
+  } finally {
+    rmSync(probeDir, { recursive: true, force: true });
+  }
+}
+const SYMLINKS_AVAILABLE = probeSymlinkCapability();
+
+/**
+ * Native Windows chmodSync does not expose POSIX group/other permission bits;
+ * flipping one is a silent no-op there, so a test that relies on observing a
+ * mode-bit flip as a directory-identity mutation needs the same capability
+ * probe treatment as symlinks, rather than assuming by platform.
+ */
+function probeChmodModeCapability() {
+  const probeDir = mkdtempSync(join(tmpdir(), "snt-a-chmod-probe-"));
+  try {
+    const before = statSync(probeDir).mode & 0o777;
+    chmodSync(probeDir, before ^ 0o040);
+    return (statSync(probeDir).mode & 0o777) !== before;
+  } finally {
+    rmSync(probeDir, { recursive: true, force: true });
+  }
+}
+const CHMOD_MODE_AVAILABLE = probeChmodModeCapability();
+
+class SkipSignal extends Error {}
+function skipUnlessSymlinksAvailable() {
+  if (!SYMLINKS_AVAILABLE) {
+    throw new SkipSignal("no filesystem symlink capability on this host (Windows Developer Mode / elevation required)");
+  }
+}
+function skipUnlessChmodModeAvailable() {
+  if (!CHMOD_MODE_AVAILABLE) {
+    throw new SkipSignal("no observable POSIX mode-bit chmod capability on this host");
+  }
+}
 const CANDIDATE = Object.freeze({
   repository: "https://example.invalid/public/core.git",
   branch: "feature/neutral-candidate",
@@ -278,6 +333,7 @@ for (const [field, value, expected] of [
 });
 
 test("rejects symlinked source, lock, namespace, nested file, and root", () => {
+  skipUnlessSymlinksAvailable();
   for (const target of ["source", "lock", "namespace", "nested", "root"]) {
     const root = fixture();
     const external = mkdtempSync(join(tmpdir(), "snt-a-external-"));
@@ -360,6 +416,7 @@ test("rejects a file identity swap between descriptor snapshots", () => {
 });
 
 test("rejects enumerated directory identity drift after readdir", () => {
+  skipUnlessChmodModeAvailable();
   const root = fixture();
   const policies = join(root, ".agent-pipeline", "policies");
   let calls = 0;
@@ -406,6 +463,7 @@ test("rejects traversal-shaped overlay root", () => {
 });
 
 test("rejects a symlinked .agent-pipeline component", () => {
+  skipUnlessSymlinksAvailable();
   const root = fixture();
   const external = mkdtempSync(join(tmpdir(), "snt-a-component-"));
   try {
@@ -516,14 +574,20 @@ test("non-Markdown and malformed UTF-8 inputs reject before any batch can be con
 });
 
 let passed = 0;
+let skipped = 0;
 for (const [name, run] of cases) {
   try {
     run();
     passed += 1;
     console.log(`PASS ${name}`);
   } catch (error) {
-    console.error(`FAIL ${name} -- ${error.stack ?? error.message}`);
+    if (error instanceof SkipSignal) {
+      skipped += 1;
+      console.log(`SKIP ${name} -- ${error.message}`);
+    } else {
+      console.error(`FAIL ${name} -- ${error.stack ?? error.message}`);
+    }
   }
 }
-console.log(`\nprivate overlay activation: ${passed}/${cases.length} checks passed.`);
-process.exit(passed === cases.length ? 0 : 1);
+console.log(`\nprivate overlay activation: ${passed}/${cases.length} checks passed${skipped > 0 ? `, ${skipped} skipped (host filesystem capability gaps)` : ""}.`);
+process.exit(passed + skipped === cases.length ? 0 : 1);
