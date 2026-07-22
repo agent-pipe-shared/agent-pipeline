@@ -285,6 +285,28 @@ Wiedereinstieg stehen im kanonischen [Handover](docs/state.md).
 See the canonical [handover](docs/state.md); it is the sole source of current
 and next-state information.
 
+## 2026-07-22 — Sentinel platform preparation handover
+
+- Recorded the native WSL2/`wsl-native` evidence surface and a strictly
+  non-supporting PO exception for unavailable macOS evidence.
+- Rebound the closed SNT-7 Verify registration after the approved PRD digest
+  change. Full Verify (122 steps) and Security passed on `0e7d2f3`.
+- The substantive Windows repair set remains deliberately uncommitted in the
+  Claude-owned Windows worktree; no Windows commit, push, merge, closure or
+  support claim is made by this branch.
+
+### Lessons
+
+- Platform support must be proven separately for filesystem and privilege
+  surfaces; a successful Unix-like host run cannot establish Windows support.
+- A PO exception can close a scoped Sentinel evidence gate only when it remains
+  explicit, owned, review-dated and separate from a product support claim.
+
+### Open / next
+
+See the canonical [handover](docs/state.md); it is the sole source of current
+and next-state information.
+
 ## 2026-07-18 — Storm publication remediation started
 
 - Verified the two local GitHub identities and bound the calibrated public alias

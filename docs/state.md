@@ -198,6 +198,33 @@ disposition, plugin registration, and final feature-branch delivery
 
 ### Current Sentinel continuation — exact handover
 
+- The separate preparation branch is `feat/sentinel-platform-support-contract`.
+  Its unpushed preparation chain starts after
+  `bf70bb06823da777d757e8c178fe5042d96ba335` and binds the WSL/macOS
+  disposition, rebinds the closed SNT-7 Verify registration to the changed PRD
+  digest, and records this handover. Full Verify (122 steps) and Security both
+  exited 0 on the pre-handover candidate `0e7d2f3`.
+- This Codex host is classified as `wsl2` / `wsl-native`; that is native WSL
+  evidence only. `wsl-drvfs` remains separate and unobserved. The PO accepts
+  unavailable native macOS evidence for the Sentinel-close disposition only;
+  macOS remains `unavailable`, is not a support claim, and the exception is
+  reviewed or extended by 2026-08-31.
+- The Windows worktree `D:\Dev\agent-pipeline-share` is intentionally dirty and
+  remains owned by the Claude/Windows session. It now contains the native
+  compatibility repair set, including the two PO-authorized `TP-5` changes to
+  `pipeline-state.test.mjs` (symlink capability and PO-gate receipt-directory
+  hardening). TP-5 was restored after each edit. Do not reset, commit, push,
+  or merge that worktree here; wait for the Windows session's final candidate
+  OID and its native evidence.
+- Next session: run `pipeline-start` as Elephant, read this handover, then wait
+  for the Windows candidate. Fetch it only after its authorized public commit
+  and push are reported; integrate on a dedicated candidate, regenerate Full
+  Verify/Security, obtain fresh Critic evidence, then decide the merge/PR.
+- **EL-01 incident, 2026-07-22:** the preparation commits `f4a6d7b` and
+  `0e7d2f3` were authored directly by this Elephant session outside the
+  stage-0 fast path and have no Goldfish dispatch records. They are retained
+  only as an unmerged preparation branch; a fresh independent Critic is
+  required before any merge or delivery decision.
 - Remote `origin/feat/v3-public-core-foundation` is `3d1340a405bff7677552345996a92deb3eaee4ed`.
   The implementation base before this handover record was
   `41407e2a65781247bdb50b68e76734d68ea3c25c`; the working tree also contains
@@ -272,6 +299,10 @@ disposition, plugin registration, and final feature-branch delivery
 - The close retro added
   [`pipeline.close-spec-retention-and-consent`](../backlog/items/2026-07-21-close-spec-retention-and-consent.md): make the final retention
   digest and consent-status readback explicit before delivery.
+- Close retro (2026-07-22): the existing `pipeline.windows-verify-reproducibility`
+  work item remains the consolidated improvement record for platform-specific
+  path, filesystem and privilege assumptions; no duplicate backlog item was
+  created.
 
 ## Observation publication queue
 

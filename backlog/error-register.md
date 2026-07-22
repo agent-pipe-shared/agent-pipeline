@@ -14,6 +14,7 @@ The only allowed table form is:
 | Cross-repository guard overrides can bind audit storage to the coordinator checkout instead of the target repository. | tooling | new |
 | Open-ended reference-variant hardening can expand review scope and delay delivery. | process | recurring -> mechanism: prefer closed structured channels with fail-closed validation before adding free-text variant parsers |
 | Retained public authority copies can drift from active bytes after an approved correction. | quality | new |
+| Platform-specific filesystem and privilege assumptions can make a declared host surface unusable. | tooling | new |
 
 Use one concise, generic class per distinct root cause. Similar classes are
 merged; the board holds at most approximately 30 classes. `new` is allowed for
