@@ -33,6 +33,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import { createInterface } from "node:readline";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -310,7 +311,12 @@ function assertOutsideRoots(path, roots, label) {
 function assertControlRoot(path, protectedRoots) {
   const lexical = lstatSync(path);
   if (lexical.isSymbolicLink() || !lexical.isDirectory()) fail("control-dir must be a real directory");
-  if ((lexical.mode & 0o077) !== 0) fail("control-dir must not be accessible to group or other users");
+  // POSIX mode bits express group/other exclusivity directly; native Windows has no
+  // such mode semantics, so the equivalent assurance there is the shared owner-DACL
+  // check.
+  const posixModeViolation = process.platform !== "win32" && (lexical.mode & 0o077) !== 0;
+  const windowsInsecure = process.platform === "win32" && assessWindowsPrivatePath(path).status !== "secure";
+  if (posixModeViolation || windowsInsecure) fail("control-dir must not be accessible to group or other users");
   return assertOutsideRoots(realpathSync(path), protectedRoots, "control-dir");
 }
 
@@ -404,7 +410,13 @@ function gitText(repoRoot, args) {
 
 function assertGitRepository(path, label) {
   const root = realpathSync(path);
-  if (gitText(root, ["rev-parse", "--show-toplevel"]) !== root) fail(`${label} is not a repository root`);
+  // Git always emits --show-toplevel with "/" separators, even on native Windows
+  // (Git for Windows convention), while realpathSync returns the host's own
+  // separator. Canonicalize only that fixed separator convention before comparing;
+  // never relax the equality check itself, and leave POSIX byte-for-byte unchanged.
+  const toplevel = gitText(root, ["rev-parse", "--show-toplevel"]);
+  const comparable = process.platform === "win32" ? toplevel.replaceAll("/", sep) : toplevel;
+  if (comparable !== root) fail(`${label} is not a repository root`);
   return root;
 }
 
@@ -991,13 +1003,15 @@ function atomicWriteExclusive(path, value) {
   const temporary = `${path}.${process.pid}.${nodeRandomBytes(8).toString("hex")}.tmp`;
   try {
     writeFileSync(temporary, canonicalJson(value), { flag: "wx", mode: 0o600 });
-    const file = openSync(temporary, "r");
+    // "r+", not "r": a Windows handle opened read-only has no write-back to flush, so
+    // fsync fails closed with EPERM even though this handle only syncs bytes this
+    // process just wrote. "r+" is correct and portable; behaves like "r" on POSIX.
+    const file = openSync(temporary, "r+");
     try { fsyncSync(file); } finally { closeSync(file); }
     linkSync(temporary, path);
     chmodSync(path, 0o600);
     unlinkSync(temporary);
-    const directory = openSync(dirname(path), "r");
-    try { fsyncSync(directory); } finally { closeSync(directory); }
+    fsyncDirectory(dirname(path));
     return { path, sha256: sha256(readFileSync(path)) };
   } catch (error) {
     try { if (existsSync(temporary)) unlinkSync(temporary); } catch { /* preserve original error */ }
@@ -1005,9 +1019,32 @@ function atomicWriteExclusive(path, value) {
   }
 }
 
+function unsupportedDirectoryDurability(error) {
+  return process.platform === "win32"
+    && (error?.code === "EPERM" || error?.code === "EINVAL"
+      || error?.code === "EISDIR" || error?.code === "EACCES"
+      || error?.code === "ENOTSUP");
+}
 function fsyncDirectory(path) {
-  const directory = openSync(path, "r");
-  try { fsyncSync(directory); } finally { closeSync(directory); }
+  // Directory durability is a hard POSIX flush; native Windows raises EPERM/EINVAL
+  // on directory handles. Regular-file fsync (above) is the hard guarantee; parent-
+  // directory durability is best-effort on Windows and its typed-unavailable outcome
+  // is not a failure.
+  let fd;
+  try {
+    fd = openSync(path, "r");
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
+  }
+  try {
+    fsyncSync(fd);
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
+  } finally {
+    closeSync(fd);
+  }
 }
 
 function stageExactFile(path, value) {
