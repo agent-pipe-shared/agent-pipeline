@@ -152,7 +152,16 @@ function validateObserved(selectedCandidate, installedPlugin) {
 
 function physicalRoot(overlayRoot) {
   if (typeof overlayRoot !== "string" || overlayRoot.length === 0 || overlayRoot.includes("\0")) fail("SNT-A-ROOT-INVALID");
-  if (overlayRoot.includes("\\") || overlayRoot.split("/").some((segment) => segment === "." || segment === "..")) fail("SNT-A-PATH-ESCAPE");
+  // On POSIX, "\" is an ordinary filename character, never a separator, so any
+  // backslash in an overlay root is rejected outright as separator-confusion
+  // shaped input. On native Windows "\" is the platform separator itself (every
+  // real absolute path contains it), so the same literal ban would reject every
+  // legitimate root. Windows instead splits on both separators and rejects only
+  // genuine "." / ".." traversal segments -- the same acceptance boundary the
+  // POSIX branch enforces, expressed in the native separator alphabet.
+  const traversalSegments = process.platform === "win32" ? overlayRoot.split(/[\\/]/u) : overlayRoot.split("/");
+  if ((process.platform !== "win32" && overlayRoot.includes("\\"))
+    || traversalSegments.some((segment) => segment === "." || segment === "..")) fail("SNT-A-PATH-ESCAPE");
   const requested = resolve(overlayRoot);
   let info;
   try {
