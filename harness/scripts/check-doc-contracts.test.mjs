@@ -378,6 +378,68 @@ for (const [context, conceal] of [
   }
 }
 
+const statefulDesignOperativeSections = [
+  {
+    surface: "templates/spec.md",
+    phraseKey: "template",
+    start: "### 2a. Stateful guard/control pre-readiness checklist (conditional, mandatory)",
+    end: "### 3. Alternatives (mandatory from level 1)",
+    rejectedExample: "### Rejected example (non-operative stateful checklist)",
+  },
+  {
+    surface: "roles/elephant.md",
+    phraseKey: "elephant",
+    start: "### EL-07 (MUST) — Spec-readiness check before implementation",
+    end: "### EL-19 (MUST) — PO gate (PRD) before implementation",
+    rejectedExample: "## Rejected example (non-operative stateful checklist)",
+  },
+];
+
+function moveStatefulPhrasesToRejectedExample(text, section) {
+  const start = text.indexOf(section.start);
+  const end = text.indexOf(section.end, start);
+  assert(start >= 0, `${section.surface} fixture must contain its operative section start`);
+  assert(end > start, `${section.surface} fixture must contain its operative section end`);
+
+  let operative = text.slice(start, end);
+  const phrases = STATEFUL_DESIGN_CONTRACTS.map((contract) => contract[section.phraseKey]);
+  for (const phrase of phrases) {
+    assert(operative.includes(phrase), `${section.surface} operative section must contain ${phrase}`);
+    operative = operative.replaceAll(phrase, `[moved to rejected example]`);
+  }
+
+  const rejectedExample = `\n${section.rejectedExample}\n\nThis visible prose is a rejected example, not an operative requirement.\n\n${phrases.map((phrase) => `- ${phrase}`).join("\n")}\n`;
+  return {
+    text: `${text.slice(0, start)}${operative}${text.slice(end)}${rejectedExample}`,
+    rejectedExample,
+  };
+}
+
+for (const section of statefulDesignOperativeSections) {
+  test(`stateful-design phrases moved from the operative section fail on ${section.surface}`, () => {
+    let rejectedExample = "";
+    const result = checkRepository(REPO, {
+      readText(file) {
+        const text = readFileSync(file, "utf8");
+        if (relative(REPO, file).split("\\").join("/") !== section.surface) return text;
+        const moved = moveStatefulPhrasesToRejectedExample(text, section);
+        rejectedExample = moved.rejectedExample;
+        return moved.text;
+      },
+    });
+
+    for (const requirement of STATEFUL_DESIGN_CONTRACTS) {
+      const phrase = requirement[section.phraseKey];
+      assert(rejectedExample.includes(phrase), `${section.surface} must leave ${requirement.id} visible outside its operative section`);
+      assert(!rejectedExample.includes("<!--") && !rejectedExample.includes("```"), "the rejected example must remain ordinary Markdown");
+      assert(
+        result.findings.includes(`stateful-design-contract: ${section.surface}: ${requirement.id}`),
+        `${section.surface} must reject ${requirement.id} when it appears only in a non-operative rejected example; got: ${result.findings.join(" | ")}`,
+      );
+    }
+  });
+}
+
 test("current repository integration passes and excludes the instruction path", () => {
   const result = checkRepository(REPO);
   assert.deepEqual(result.findings, []);
