@@ -7,6 +7,11 @@
 `agent-pipe-shared/agent-pipeline`.  Die Aufnahme erzeugt weder einen
 Issue-Edit noch eine Closure- oder Go-live-Behauptung.
 
+**Verantwortung und Review:** Der Sentinel Elephant verantwortet die fünf
+Records; der PO-/Human-Review der noch fehlenden nativen Windows-Host-Evidenz,
+zulässigen Tool-Roots und Wrapper-Policy ist spätestens am **2026-08-31**
+erneut vorzulegen. Das ist eine Ablaufgrenze, keine stillschweigende Freigabe.
+
 ## Zweck und Grenzen
 
 Diese fünf Blocker erweitern Sentinel um den nativen Windows-Pfad, der vor dem
@@ -37,6 +42,15 @@ geschlossen oder umdefiniert.
 Jedes Paket benötigt vor Code eine eigene AC-Matrix, fokussierte Tests, die
 registrierte Aggregate-Verify-Evidenz, Security-Evidenz und einen unabhängigen
 Critic. Keine Zeile darf allein aufgrund dieses Scope-Dokuments transitionieren.
+
+## Rollback
+
+Die Scope-Aufnahme wird nur durch normale Revert-Commits der Writer-, Ledger-
+und Projektions-Commits zurückgenommen; keine Evidence-Datei, kein Status und
+kein Ledger-Eintrag wird von Hand gelöscht oder umgeschrieben. Ein Revert
+erfordert anschließend `check-backlog-state` und Full Verify auf dem neuen
+Kandidaten. Bereits vorhandene native Windows-Host-Evidenz oder externe Issues
+werden dadurch nicht umgedeutet.
 
 ## Aufnahme-Evidenz
 

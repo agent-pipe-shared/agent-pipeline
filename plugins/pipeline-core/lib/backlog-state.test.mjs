@@ -258,9 +258,15 @@ function recoveryFixture(catalog = sentinelCatalog()) {
   applySentinelBacklogRecovery(root, { checkCommit: false, evidenceCommit: "a".repeat(40) });
   const extension = {
     schema: "pipeline.sentinel-scope-extension.v1",
-    source: "specs/sentinel-windows-blockers.md",
+    source: "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md",
     admittedAt: "2026-07-22",
-    items: [{ id: "pipeline.windows-runtime-baseline-containment", status: "open", type: "defect" }],
+    items: [
+      { id: "pipeline.windows-runtime-baseline-containment", status: "open", type: "defect" },
+      { id: "pipeline.windows-directory-durability", status: "open", type: "defect" },
+      { id: "pipeline.windows-private-state-assurance", status: "open", type: "defect" },
+      { id: "pipeline.windows-verify-reproducibility", status: "open", type: "defect" },
+      { id: "pipeline.windows-trusted-tool-resolution", status: "open", type: "defect" },
+    ],
   };
   write(root, "backlog/sentinel-scope-extension-2026-07-22.json", `${JSON.stringify(extension)}\n`);
   const options = {
@@ -275,6 +281,36 @@ function recoveryFixture(catalog = sentinelCatalog()) {
       && added?.actor === "sentinel-scope-extension" && added?.evidence?.kind === "sentinel-scope-extension"
       && added?.reason === "Record the PO-approved Sentinel scope extension; no implementation or closure is claimed."
       && checkBacklogState(root, { checkCommit: false }).ok, applied.findings.join("; "));
+}
+{
+  const root = recoveryFixture();
+  applySentinelBacklogRecovery(root, { checkCommit: false, evidenceCommit: "a".repeat(40) });
+  const extension = {
+    schema: "pipeline.sentinel-scope-extension.v1",
+    source: "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md",
+    admittedAt: "2026-07-22",
+    items: [
+      { id: "pipeline.windows-runtime-baseline-containment", status: "open", type: "defect" },
+      { id: "pipeline.windows-directory-durability", status: "open", type: "defect" },
+      { id: "pipeline.windows-private-state-assurance", status: "open", type: "defect" },
+      { id: "pipeline.windows-verify-reproducibility", status: "open", type: "defect" },
+      { id: "pipeline.windows-trusted-tool-resolution", status: "open", type: "defect" },
+    ],
+  };
+  const options = { checkCommit: false, evidenceCommit: "a".repeat(40) };
+  const rejected = [
+    { ...extension, source: "specs/other.md" },
+    { ...extension, admittedAt: "2026-07-23" },
+    { ...extension, items: [{ ...extension.items[0], id: "pipeline.unapproved" }, ...extension.items.slice(1)] },
+    { ...extension, items: [{ ...extension.items[0], status: "in_progress" }, ...extension.items.slice(1)] },
+    { ...extension, items: [{ ...extension.items[0], type: "idea" }, ...extension.items.slice(1)] },
+    { ...extension, items: [...extension.items].reverse() },
+    { ...extension, items: {} },
+    { ...extension, items: "not-an-array" },
+    { ...extension, items: [null, ...extension.items.slice(1)] },
+  ].map((candidate) => planSentinelScopeExtension(root, candidate, options));
+  check("BS08ccc Sentinel scope extension rejects every non-approved authority binding",
+    rejected.every((result) => !result.ok), rejected.flatMap((result) => result.findings).join("; "));
 }
 {
   const root = recoveryFixture();
