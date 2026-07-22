@@ -1,24 +1,11 @@
 // SPDX-License-Identifier: Apache-2.0
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readFileSync, realpathSync, statSync } from "node:fs";
-import { homedir } from "node:os";
-import { delimiter, join } from "node:path";
+import { delimiter } from "node:path";
 import { spawnSync as nodeSpawnSync } from "node:child_process";
+export { assessTrustedExecutablePath, resolveSystemExecutable, resolveTrustedSystemExecutable } from "../lib/trusted-tool-resolution.mjs";
 
 export function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
-export function resolveSystemExecutable(name, { platform = process.platform, homeDir = homedir() } = {}) {
-  const paths = platform === "win32"
-    ? ["C:\\Program Files\\Git\\cmd", "C:\\Program Files\\Git\\bin", "C:\\Windows\\System32"]
-    : platform === "darwin"
-      ? ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", join(homeDir, ".local", "bin"), join(homeDir, "go", "bin")]
-      : ["/usr/local/bin", "/usr/bin", "/bin", join(homeDir, ".local", "bin"), join(homeDir, "go", "bin")];
-  const names = platform === "win32" ? [`${name}.exe`, `${name}.cmd`, name] : [name];
-  for (const root of paths) for (const candidate of names) {
-    const path = join(root, candidate);
-    if (existsSync(path)) return path;
-  }
-  return null;
-}
 export function executableIdentity(path) {
   let lexical;
   try { lexical = lstatSync(path); } catch (error) { return { ok: false, status: error?.code === "ENOENT" ? "binary_missing" : "probe_error" }; }

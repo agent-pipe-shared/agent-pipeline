@@ -73,7 +73,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { loadManifestSafe, gateConfig } from "../../plugins/pipeline-core/lib/manifest.mjs";
-import { resolveSystemExecutable } from "./security-readiness/tool-identity.mjs";
+import { assessTrustedExecutablePath, resolveTrustedSystemExecutable } from "./security-readiness/tool-identity.mjs";
 
 import * as gitleaksAdapter from "./security-adapters/gitleaks.mjs";
 import * as osvScannerAdapter from "./security-adapters/osv-scanner.mjs";
@@ -241,7 +241,7 @@ function scannerEntry(adapter, result) {
  * even on failure paths" DoD requirement, which requires this function to always reach the
  * write call).
  */
-export async function runSecurityScan({ rootDir, timeoutMs = DEFAULT_TIMEOUT_MS, env = process.env, spawnFn } = {}) {
+export async function runSecurityScan({ rootDir, timeoutMs = DEFAULT_TIMEOUT_MS, env = process.env, spawnFn, platform = process.platform } = {}) {
   const manifest = loadManifestSafe(rootDir);
   const blockOn = resolveBlockOn(manifest);
   const mode = resolveGateMode(manifest);
@@ -270,12 +270,17 @@ export async function runSecurityScan({ rootDir, timeoutMs = DEFAULT_TIMEOUT_MS,
         };
       } else {
       let inst = adapter.isInstalled(env);
+      if (inst.installed && key !== "license-check") {
+        const assessed = assessTrustedExecutablePath(inst.path, { platform });
+        inst = assessed.ok ? { installed: true, path: assessed.path } : { installed: false, status: assessed.status, reason: `resolved ${key} path was rejected: ${assessed.status}` };
+      }
       if (!inst.installed && key !== "license-check" && typeof env?.HOME === "string" && env.HOME.length > 0) {
-        const standardPath = resolveSystemExecutable(key, { platform: process.platform, homeDir: env.HOME });
-        if (standardPath !== null) inst = { installed: true, path: standardPath };
+        const trusted = resolveTrustedSystemExecutable(key, { platform, homeDir: env.HOME });
+        if (trusted.ok) inst = { installed: true, path: trusted.path };
+        else if (inst.status === undefined) inst = { ...inst, status: trusted.status };
       }
       if (!inst.installed) {
-        entry = { tool: adapter.name, status: "SKIPPED", classification: "binary_missing", findingCount: 0, reason: inst.reason };
+        entry = { tool: adapter.name, status: "SKIPPED", classification: inst.status ?? "binary_missing", findingCount: 0, reason: inst.reason };
       } else {
         const adapterConfig = { ...buildAdapterConfig(key, { rootDir, manifest, policiesPathAbs }), binaryPath: inst.path };
         const runArgs = { rootDir, config: adapterConfig, timeoutMs, env };
