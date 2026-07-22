@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
-import { chmodSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import test from "node:test";
@@ -16,6 +16,54 @@ import {
 const SCRIPT = new URL("./check-doc-contracts.mjs", import.meta.url).pathname;
 const REPO = resolve(new URL("../..", import.meta.url).pathname);
 const roots = [];
+
+const STATEFUL_DESIGN_CONTRACTS = [
+  {
+    id: "authority-issuer-replay",
+    template: "Authority issuer and replay rule.",
+    elephant: "authority issuer and replay rule",
+  },
+  {
+    id: "durable-storage-atomicity",
+    template: "Durable storage and atomicity boundary.",
+    elephant: "durable storage and atomicity",
+  },
+  {
+    id: "crash-state-matrix",
+    template: "Complete resource/phase crash-state matrix.",
+    elephant: "complete resource/phase crash-state matrix",
+  },
+  {
+    id: "mutation-enforcement",
+    template: "Exact mutation point and kernel/controller enforcement point.",
+    elephant: "exact mutation plus kernel/controller enforcement points",
+  },
+  {
+    id: "bootstrap-self-update",
+    template: "Bootstrap and self-update transition.",
+    elephant: "bootstrap/self-update transition",
+  },
+  {
+    id: "candidate-evidence-binding",
+    template: "Binary candidate/evidence binding.",
+    elephant: "binary candidate/evidence binding",
+  },
+  {
+    id: "pre-post-bytes",
+    template: "Exact pre- and post-mutation bytes.",
+    elephant: "exact pre/post bytes",
+  },
+  {
+    id: "sole-recovery-authority",
+    template: "Sole recovery authority.",
+    elephant: "sole recovery authority",
+  },
+  {
+    id: "self-reference-audit",
+    template: "Self-reference audit (what mutable material cannot authenticate itself).",
+    elephant: "self-reference audit",
+  },
+];
 
 function write(root, path, content) {
   const file = join(root, path);
@@ -229,6 +277,36 @@ test("CLI fails closed when Git enumeration is unavailable", () => {
   const result = spawnSync(process.execPath, [SCRIPT, "--root", root], { encoding: "utf8" });
   assert.equal(result.status, 2);
   assert.match(result.stderr, /git ls-files failed/);
+});
+
+test("stateful design checklist is complete on both required documentation surfaces", () => {
+  const baseline = checkRepository(REPO);
+  assert.deepEqual(baseline.findings, []);
+  assert.equal(
+    baseline.stats.statefulDesignContracts,
+    "checked",
+    "the repository result must attest that both stateful-design documentation surfaces were checked",
+  );
+
+  for (const requirement of STATEFUL_DESIGN_CONTRACTS) {
+    for (const [surface, phrase] of [
+      ["templates/spec.md", requirement.template],
+      ["roles/elephant.md", requirement.elephant],
+    ]) {
+      const result = checkRepository(REPO, {
+        readText(file) {
+          const text = readFileSync(file, "utf8");
+          if (relative(REPO, file).split("\\").join("/") !== surface) return text;
+          assert(text.includes(phrase), `${surface} fixture must contain ${requirement.id}`);
+          return text.replace(phrase, `[intentionally omitted: ${requirement.id}]`);
+        },
+      });
+      assert(
+        result.findings.some((finding) => finding.includes(`stateful-design-contract: ${surface}: ${requirement.id}`)),
+        `${surface} must reject an omitted ${requirement.id} checklist concept; got: ${result.findings.join(" | ")}`,
+      );
+    }
+  }
 });
 
 test("current repository integration passes and excludes the instruction path", () => {
