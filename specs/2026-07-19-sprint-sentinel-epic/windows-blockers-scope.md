@@ -12,6 +12,12 @@ Records; der PO-/Human-Review der noch fehlenden nativen Windows-Host-Evidenz,
 zulässigen Tool-Roots und Wrapper-Policy ist spätestens am **2026-08-31**
 erneut vorzulegen. Das ist eine Ablaufgrenze, keine stillschweigende Freigabe.
 
+**Plattformvertrag:** Dieses Scope-Dokument ist der bytegenau gebundene Input
+des [Platform-Support-Contracts](platform-support-contract.md). Der Vertrag
+ordnet Windows, Linux, WSL und macOS capability-spezifisch ein und verbietet,
+Docker- oder fremde Host-Evidenz als native Windows-Evidenz zu ersetzen. Diese
+Verweisung ändert weder die fünf `open`-Records noch ihre Abschlusskriterien.
+
 ## Zweck und Grenzen
 
 Diese fünf Blocker erweitern Sentinel um den nativen Windows-Pfad, der vor dem

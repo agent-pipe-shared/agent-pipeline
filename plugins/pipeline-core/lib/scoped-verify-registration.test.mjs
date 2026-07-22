@@ -23,7 +23,7 @@ function check(name, condition) {
 
 const TASK_ID = "pipeline.verify-gate-scoped-registration";
 const PRD_PATH = "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md";
-const PRD_SHA256 = "0c4b426c7b691b433cbc9a6963d8010e6c737efd00cb22c405a78b9d5743d5ca";
+const PRD_SHA256 = "c8ff825c4917d1010451694497a8e5b25568d57d1a28bf06fd7ec557995c7588";
 const WINDOWS_ASSURANCE_MATRIX_PATH = "specs/2026-07-19-sprint-sentinel-epic/windows-trusted-tool-resolution-ac-matrix.md";
 const WINDOWS_ASSURANCE_SUITES = Object.freeze([
   "plugins/pipeline-core/lib/trusted-tool-resolution.test.mjs",
@@ -230,7 +230,7 @@ import { validateScopedVerifyRegistration } from "./plugins/pipeline-core/lib/sc
 const result = validateScopedVerifyRegistration({
   schema: "pipeline.scoped-verify-registration.v1",
   taskId: "pipeline.verify-gate-scoped-registration",
-  authority: { prd: { path: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md", sha256: "0c4b426c7b691b433cbc9a6963d8010e6c737efd00cb22c405a78b9d5743d5ca" } },
+  authority: { prd: { path: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md", sha256: "c8ff825c4917d1010451694497a8e5b25568d57d1a28bf06fd7ec557995c7588" } },
   suites: [
     { name: "scoped-verify-registration-tests", file: "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs" },
     { name: "workflow-preflight-tests", file: "plugins/pipeline-core/lib/workflow-preflight.test.mjs" },
