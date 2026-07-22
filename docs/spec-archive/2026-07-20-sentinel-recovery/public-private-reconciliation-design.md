@@ -206,7 +206,7 @@ Credentials oder unnötiger personenbezogener Betriebsdaten.
 ### 4.3 Repository- und Remote-Rollen
 
 - Im Public-Checkout ist `origin` das neutrale Public-Repository.
-- Im privaten Checkout ist `origin` das private `roaspeci`-Repository.
+- Im privaten Checkout ist `origin` das private, versionierte Erweiterungs-Repository.
 - Ein optionales read-only `upstream` im privaten Checkout darf Public-
   Historie vergleichen, ist aber weder Push-Ziel noch automatische
   Merge-Autorität.

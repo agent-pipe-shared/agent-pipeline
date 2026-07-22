@@ -151,6 +151,7 @@
           "docs/adr/0040-advisor-consent-and-readonly-bash.md",
           "docs/adr/0041-po-authorized-codex-functional-equivalent.md",
           "docs/adr/0042-global-observation-and-document-governance.md",
+          "docs/adr/0043-post-go-live-sprint-model.md",
           "docs/adr/README.md"
         ]
       },
