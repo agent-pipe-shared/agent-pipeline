@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import { createHash } from "node:crypto";
+import { isAbsolute } from "node:path";
 
 import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
 
@@ -99,7 +100,10 @@ function validPacketBoundary(packet) {
     || !exactKeys(packet.checkout, ["realPath", "gitDir", "commonDir", "objectFormat", "candidateOid", "candidateTree", "creatorNonce"])
     || !["sha1", "sha256"].includes(packet.checkout.objectFormat)
     || packet.checkout.objectFormat !== packet.ruleset.objectFormat
-    || ![packet.checkout.realPath, packet.checkout.gitDir, packet.checkout.commonDir].every((path) => typeof path === "string" && path.startsWith("/"))
+    // A packet-producing host's real filesystem paths are absolute in that host's own
+    // convention ("/..." on POSIX, "C:\..." on native Windows); the boundary check is
+    // "is this a real absolute path", not "does it start with a POSIX slash".
+    || ![packet.checkout.realPath, packet.checkout.gitDir, packet.checkout.commonDir].every((path) => typeof path === "string" && path.length > 0 && isAbsolute(path))
     || packet.checkout.candidateOid !== packet.candidate.commit || packet.checkout.candidateTree !== packet.candidate.tree
     || !/^[a-f0-9]{64}$/u.test(packet.checkout.creatorNonce ?? "")
     || !/^[a-f0-9]{64}$/u.test(packet.cleanupCapability ?? "")
