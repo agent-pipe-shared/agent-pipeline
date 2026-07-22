@@ -35,3 +35,7 @@ Dieses Paket migriert nur Advisory-Receipt-Persistenz. Andere private
 Autoritätsdateien werden erst nach eigener Consumer-Inventur migriert. Ein
 normaler Revert der Writer-/Test-Commits ist der einzige Rollback; anschließend
 folgen fokussierte Tests und Full Verify auf dem Revert-Kandidaten.
+
+Die in `windows-trusted-tool-resolution-ac-matrix.md` gebundene geschlossene
+Windows-Assurance-Registrierung umfasst auch diese Receipt-Suite; sie erweitert
+keine andere Verify-Authority und ist kein Backlog-Übergang.

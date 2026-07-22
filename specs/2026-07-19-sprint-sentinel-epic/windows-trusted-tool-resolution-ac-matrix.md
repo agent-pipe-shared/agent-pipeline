@@ -26,6 +26,16 @@ eigene PO-Ausnahme; sie gehören nicht zu diesem Paket.
 | AC-37.5 | `setup.mjs` erhält für eine bereitstehende, vertrauenswürdige Windows-Toolchain keinen Exit-Code 2 mehr; ein fehlendes oder abgelehntes Tool bleibt ein ehrlicher Bootstrap-Blocker. |
 | AC-37.6 | Fokussierte Positiv-/Negativtests, registrierte Aggregate-Verify-Evidenz, Security-Evidenz, unabhängiger Critic und native Windows-Nachweis binden den Kandidaten. |
 
+## PO-freigegebene Verify-Bindung
+
+Die PO-Freigabe vom 2026-07-22 autorisiert eine zweite, unabhängige und
+geschlossene Verify-Registrierung ausschließlich für die Windows-Assurance:
+`trusted-tool-resolution-tests`, `advisory-receipt-assurance-tests` und
+`toolchain-preflight-tests`. Sie ist an diesen Vertrag und an genau diese drei
+repository-relativen Testdateien gebunden. Sie darf weder die geschlossene
+SNT-7-Registrierung erweitern noch Discovery, Globs, Kommandoeingaben,
+Persistenz oder andere Suites zulassen.
+
 ## Nicht im Paket
 
 Keine automatische Zulassung von benutzerlokalen Paketmanagern, Wrappern oder
