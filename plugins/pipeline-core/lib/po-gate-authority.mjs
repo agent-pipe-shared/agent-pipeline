@@ -31,6 +31,7 @@ import {
 import { TextDecoder } from "node:util";
 
 import { parseYaml } from "./yaml-lite.mjs";
+import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
 
 export const PO_GATE_PROFILE_RECEIPT_SCHEMA = "pipeline.po-gate-profile-receipt.v1";
 export const PO_GATE_AUTHORITY_EVIDENCE_SCHEMA = "pipeline.po-gate-authority-evidence.v1";
@@ -369,12 +370,15 @@ function loadReceipt(gitCommonDir) {
   const parentRelative = relative(common, dirname(path)).split(sep).join("/");
   physicalPath(common, parentRelative, "directory");
   const info = lstatSync(path);
-  if (!info.isFile() || info.isSymbolicLink() || realpathSync(path) !== path || (info.mode & 0o777) !== 0o600) {
+  const posixModeViolation = process.platform !== "win32" && (info.mode & 0o777) !== 0o600;
+  if (!info.isFile() || info.isSymbolicLink() || realpathSync(path) !== path || posixModeViolation) {
     throw new Error("unsafe receipt");
   }
   const receiptRelative = relative(common, path).split(sep).join("/");
   const raw = decodeUtf8(readPhysicalFile(common, receiptRelative));
-  if ((lstatSync(path).mode & 0o777) !== 0o600) throw new Error("unsafe receipt mode");
+  if (process.platform === "win32") {
+    if (assessWindowsPrivatePath(path).status !== "secure" || assessWindowsPrivatePath(dirname(path)).status !== "secure") throw new Error("unsafe receipt Windows assurance");
+  } else if ((lstatSync(path).mode & 0o777) !== 0o600) throw new Error("unsafe receipt mode");
   const receipt = JSON.parse(raw);
   if (!validatePoGateProfileReceipt(receipt) || raw !== serializePoGateProfileReceipt(receipt)) {
     throw new Error("invalid receipt");
