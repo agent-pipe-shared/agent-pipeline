@@ -226,6 +226,49 @@ disposition, plugin registration, and final feature-branch delivery
   checks may replace redundant loops; scope/security changes still require
   full gates. TP-1–TP-5 may be lifted only while editing the exact protected
   file and must be restored before staging/commit/push. Both are restored now.
+- **2026-07-22/23 native-Windows Verify block (closed out, pushed):** this
+  continuation ran the full `verify.mjs` suite natively on a Windows host for
+  the first time in this Sentinel block. The first native run surfaced ~20
+  distinct suites non-zero that had only ever been exercised on Linux/CI;
+  every one was root-caused, fixed, and re-verified individually green, then
+  committed as 18 atomic commits (`7f630da`..`4126e5c`, on top of two
+  already-present same-theme commits `0df4d88`/`01e41a7`) covering: a shared
+  native Windows DACL-observation primitive
+  (`plugins/pipeline-core/lib/windows-private-state.mjs`) extended to
+  advisory-receipt, worktree-lifecycle, po-gate authority/publisher,
+  codex-critic-host, document-adapter/render-controller, and
+  release-version-plan private-state consumers; directory-fsync tolerance
+  (native Windows raises EPERM/EINVAL on a directory handle) applied across
+  every private-state writer that still fsync'd directories unconditionally,
+  plus an `openSync(path, "r")` → `"r+"` fix for regular-file fsync (a
+  read-only handle has no write-back to flush on Windows); a
+  `pathToFileURL()`-based fix for the `import.meta.url === file://...`
+  self-invocation idiom across a dozen CLI wrappers (the manual template never
+  matches a drive-rooted Windows path); git-porcelain forward-slash-vs-native-
+  separator normalization at every `git rev-parse --show-toplevel` /
+  `--git-common-dir` / `worktree list` comparison site; two POSIX-literal-path
+  absolute-path checks (`critic-export-policy.mjs`, and the backslash-ban in
+  `public-core-observation.mjs` and `private-overlay-activation.mjs`) that
+  rejected every native-Windows absolute path outright; a cross-platform
+  adapter-path-simulation bug in `session-power.mjs`; a genuine test-suite
+  flake in `runner-profile-migration-v3.test.mjs` (short-write iteration count
+  cut from ~57 to ~3-4 to stop tripping the real 1000ms recovery-preview
+  callback-timeout bound under full-suite load — the production boundary
+  itself is unchanged); an injectable trust-assessment seam added to
+  `security-scan.mjs` for fixture testing; and capability-probe gating
+  (symlink/fifo/chmod-mode/mode-bit/trusted-git) added across roughly a dozen
+  test files, mirroring the established `private-overlay-activation.mjs`
+  pattern rather than assuming behavior by platform. One leftover
+  `GF3_DEBUG`-gated debug line found in `runner-profile-migration-v2.mjs` was
+  removed as unrelated cruft before committing. A final full native
+  `verify.mjs` run against the resulting committed HEAD confirmed every
+  registered suite `=0`, `exit 0`, evidence commit-bound; the branch was then
+  pushed to `origin/feat/v3-public-core-foundation` under explicit PO
+  authorization (push approved live, verify-to-push cycle pre-authorized for
+  any further fix-and-reverify rounds). No suite registration or gate scope
+  changed; this is portability-bugfix evidence toward #36 (Windows Verify
+  reproducibility), not a closure of #36 or #37 — #37's canonical trusted-tool
+  resolver and Windows-root policy decisions remain open as scoped above.
 
 - The SNT-A implementation candidate `17115fe07e7e455635c055771110dde7b0fc54e9`
   and the subsequent documentation-only close commit are pushed to
