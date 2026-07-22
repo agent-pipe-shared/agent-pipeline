@@ -20,6 +20,12 @@ import {
 import { tmpdir } from "node:os";
 import { basename, dirname, join, relative } from "node:path";
 
+// plan.targets[].path is canonical forward-slash form; node:path's relative()
+// returns the host's own separator (backslash on native Windows), so a
+// multi-segment target compared against it never matches there. Used only where
+// the result is compared against a canonical target-path string, not for display.
+function posixRelative(root, target) { return relative(root, target).replaceAll("\\", "/"); }
+
 import {
   applyRunnerProfileMigrationV2,
   inspectRunnerProfileMigrationV2,
@@ -196,6 +202,31 @@ function record(name, run) {
     console.log(`FAIL  ${name} -- ${detail}`);
   }
 }
+
+function skip(name, reason) {
+  console.log(`SKIP  ${name} -- [capability: ${reason}]`);
+}
+
+// Native Windows requires SeCreateSymbolicLinkPrivilege (admin or Developer Mode) to create a
+// FILE symlink; probe this once so the file-symlink fixtures below can fail closed with a
+// visible capability note instead of the raw fixture-setup EPERM masquerading as a product bug.
+// Directory symlinks are exercised via NTFS junctions (no privilege required, still a real
+// reparse point that lstatSync reports as isSymbolicLink() === true) -- so directory-boundary
+// coverage stays fully active on every platform.
+const fileSymlinkCapability = (() => {
+  if (process.platform !== "win32") return { ok: true };
+  const probeDir = mkdtempSync(join(tmpdir(), "runner-profile-migration-v2-symcap-"));
+  try {
+    const target = join(probeDir, "target.txt");
+    writeFileSync(target, "probe");
+    symlinkSync(target, join(probeDir, "link.txt"));
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, code: error && error.code };
+  } finally {
+    rmSync(probeDir, { recursive: true, force: true });
+  }
+})();
 
 record("v0: valid legacy Claude routes are preserved in complete multi-runner v2 and become idempotent", () => {
   const legacy = v0Source();
@@ -537,7 +568,7 @@ record("apply: writes only declared targets, commits source last, and preserves 
       activate: true,
       deps: {
         renameSync(from, to) {
-          const destination = relative(root, to);
+          const destination = posixRelative(root, to);
           if (known.has(destination)) destinations.push(destination);
           renameSync(from, to);
         },
@@ -572,7 +603,7 @@ record("apply: every rename-after-effect fault rolls all targets back without fa
         deps: {
           renameSync(from, to) {
             renameSync(from, to);
-            if (!injected && relative(root, to) === injectedTarget) {
+            if (!injected && posixRelative(root, to) === injectedTarget) {
               injected = true;
               throw new Error(`fault after durable rename ${injectedTarget}`);
             }
@@ -752,7 +783,13 @@ record("CLI: inspect, plan, activation, apply, and error exits are JSON and neve
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-for (const path of trackedPaths) record(`path safety: ${path} symlink fails closed`, () => {
+for (const path of trackedPaths) {
+  const name = `path safety: ${path} symlink fails closed`;
+  if (!fileSymlinkCapability.ok) {
+    skip(name, `file symlink unavailable (${fileSymlinkCapability.code}) -- requires admin or Developer Mode on win32`);
+    continue;
+  }
+  record(name, () => {
     const root = fixtureRoot();
     const outside = mkdtempSync(join(tmpdir(), "runner-profile-migration-v2-outside-"));
     try {
@@ -769,7 +806,8 @@ for (const path of trackedPaths) record(`path safety: ${path} symlink fails clos
       rmSync(root, { recursive: true, force: true });
       rmSync(outside, { recursive: true, force: true });
     }
-});
+  });
+}
 
 for (const parent of [".claude", ".codex"]) record(`path safety: ${parent} parent symlink fails closed before an outside write`, () => {
     const root = fixtureRoot();
@@ -778,7 +816,11 @@ for (const parent of [".claude", ".codex"]) record(`path safety: ${parent} paren
       const localParent = join(root, parent);
       const externalParent = join(outside, parent.slice(1));
       renameSync(localParent, externalParent);
-      symlinkSync(externalParent, localParent);
+      // Directory-to-directory symlinks need admin/Developer Mode on win32; an NTFS junction is
+      // a reparse point too (no privilege required) and lstatSync still reports
+      // isSymbolicLink() === true, so the production "path contains a symbolic link" guard is
+      // exercised identically. POSIX keeps the plain symlink.
+      symlinkSync(externalParent, localParent, process.platform === "win32" ? "junction" : undefined);
       const before = bytes(root, runtimePaths.filter((path) => path.startsWith(`${parent}/`)));
       const plan = planRunnerProfileMigrationV2({ rootDir: root });
       assert.notEqual(plan.status, "ready", `${parent} symlink must fail closed before planning`);
