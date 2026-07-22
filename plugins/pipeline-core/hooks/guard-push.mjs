@@ -323,6 +323,7 @@ function resolveSourceCommit(binding) {
 // .claude/pipeline.json; it is a repository-local expected identity, never a global
 // git default or a private account profile.
 const PUBLIC_PUSH_IDENTITY_SCHEMA = "pipeline.public-push-identity.v1";
+const SSH_HOST_ALIAS = /^[A-Za-z0-9](?:[A-Za-z0-9.-]{0,251}[A-Za-z0-9])?$/u;
 const TRAILER_DENY = /^(?:co-authored-by|signed-off-by|reviewed-by|assisted-by|provider|model|session|run|trace|private(?:-account)?|account|operator|machine|host|workspace|worktree)\s*:/im;
 const EMAIL_IN_MESSAGE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/;
 const PRIVATE_CORRELATION_IN_MESSAGE = /\b(?:provider|model|session|account|operator|codex|claude|openai|anthropic|gpt(?:[-\s]?[a-z0-9.]+)?|gemini|machine|host|workspace|worktree|correlation|trace(?:[-\s]?id)?|run[-\s]?id)\b/i;
@@ -371,6 +372,9 @@ function readPublicPushIdentity(binding) {
   }
   if (identity.schema !== PUBLIC_PUSH_IDENTITY_SCHEMA || identity.mode !== "required") {
     return { enabled: true, error: "publicPushIdentity calibration is not a required v1 anonymous-public binding" };
+  }
+  if (!SSH_HOST_ALIAS.test(identity.sshHostAlias)) {
+    return { enabled: true, error: "publicPushIdentity SSH host alias is malformed" };
   }
   return { enabled: true, identity };
 }
@@ -440,7 +444,13 @@ function authenticatedSshAccount(identity) {
   const result = spawnSync(
     "ssh",
     ["-T", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", identity.sshHostAlias],
-    { encoding: "utf8", timeout: 7000 },
+    {
+      encoding: "utf8",
+      timeout: 7000,
+      // Node does not directly execute a .cmd fixture on Windows. The host alias
+      // is calibration-validated before this shell resolution is enabled.
+      shell: process.platform === "win32",
+    },
   );
   const output = `${result.stdout ?? ""}\n${result.stderr ?? ""}`;
   return output.includes(`Hi ${identity.sshAccount}!`)
