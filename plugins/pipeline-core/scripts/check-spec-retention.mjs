@@ -16,9 +16,12 @@ import { fileURLToPath } from "node:url";
 
 const HERE = new URL(".", import.meta.url);
 export const DEFAULT_ROOT = resolve(fileURLToPath(new URL("../../../", HERE)));
-export const INVENTORY_SCHEMA = "pipeline.spec-retention.v1";
-export const ARCHIVE_SCHEMA = "pipeline.spec-retention-archive.v1";
-const AUTHORITY_KEYS = ["prd", "spec", "acceptance", "design", "recovery", "platformSupport", "windowsBlockers"];
+export const INVENTORY_SCHEMA = "pipeline.spec-retention.v2";
+export const ARCHIVE_SCHEMA = "pipeline.spec-retention-archive.v2";
+export const LEGACY_INVENTORY_SCHEMA = "pipeline.spec-retention.v1";
+export const LEGACY_ARCHIVE_SCHEMA = "pipeline.spec-retention-archive.v1";
+const LEGACY_AUTHORITY_KEYS = ["prd", "spec", "acceptance", "design", "recovery"];
+const AUTHORITY_KEYS = [...LEGACY_AUTHORITY_KEYS, "platformSupport", "windowsBlockers"];
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -60,7 +63,7 @@ function readBytes(root, path, findings, label) {
   }
 }
 
-function checkLinks(root, entry, sourcePaths, findings) {
+function checkLinks(root, entry, sourcePaths, authorityKeys, findings) {
   for (const key of ["handoverPath", "nextSessionPath"]) {
     const path = safePath(root, entry[key]);
     if (!path) {
@@ -70,7 +73,7 @@ function checkLinks(root, entry, sourcePaths, findings) {
     const bytes = readBytes(root, path, findings, `${entry.id}.${key}`);
     if (bytes === null) continue;
     const text = bytes.toString("utf8");
-    for (const keyName of AUTHORITY_KEYS) {
+    for (const keyName of authorityKeys) {
       if (!text.includes(sourcePaths[keyName])) {
         findings.push(`${entry.id}.${key} must link ${sourcePaths[keyName]}`);
       }
@@ -84,8 +87,10 @@ export function checkSpecRetention(root = DEFAULT_ROOT, inventoryPath = "governa
   if (!inventoryRel) return { ok: false, findings: ["spec-retention inventory path is invalid"] };
   const inventory = readJson(root, inventoryRel, findings, "spec-retention inventory");
   if (!inventory) return { ok: false, findings };
-  if (!exactKeys(inventory, ["schema", "active"]) || inventory.schema !== INVENTORY_SCHEMA || !Array.isArray(inventory.active) || inventory.active.length === 0) {
-    findings.push(`inventory must contain schema ${INVENTORY_SCHEMA} and at least one active authority`);
+  const authorityKeys = inventory?.schema === LEGACY_INVENTORY_SCHEMA ? LEGACY_AUTHORITY_KEYS : AUTHORITY_KEYS;
+  const archiveSchema = inventory?.schema === LEGACY_INVENTORY_SCHEMA ? LEGACY_ARCHIVE_SCHEMA : ARCHIVE_SCHEMA;
+  if (!exactKeys(inventory, ["schema", "active"]) || ![INVENTORY_SCHEMA, LEGACY_INVENTORY_SCHEMA].includes(inventory.schema) || !Array.isArray(inventory.active) || inventory.active.length === 0) {
+    findings.push(`inventory must contain schema ${INVENTORY_SCHEMA} or ${LEGACY_INVENTORY_SCHEMA} and at least one active authority`);
     return { ok: false, findings };
   }
   const ids = new Set();
@@ -99,18 +104,18 @@ export function checkSpecRetention(root = DEFAULT_ROOT, inventoryPath = "governa
       continue;
     }
     ids.add(entry.id);
-    if (!exactKeys(entry.sourcePaths, AUTHORITY_KEYS)) {
-      findings.push(`${entry.id}.sourcePaths must declare ${AUTHORITY_KEYS.join(", ")}`);
+    if (!exactKeys(entry.sourcePaths, authorityKeys)) {
+      findings.push(`${entry.id}.sourcePaths must declare ${authorityKeys.join(", ")}`);
       continue;
     }
     const sourcePaths = {};
-    for (const key of AUTHORITY_KEYS) {
+    for (const key of authorityKeys) {
       sourcePaths[key] = safePath(root, entry.sourcePaths[key]);
       if (!sourcePaths[key]) findings.push(`${entry.id}.sourcePaths.${key} must be repository-relative`);
     }
     if (Object.values(sourcePaths).some((path) => path === null)) continue;
     const sourceDigests = {};
-    for (const key of AUTHORITY_KEYS) {
+    for (const key of authorityKeys) {
       const bytes = readBytes(root, sourcePaths[key], findings, `${entry.id}.${key} authority`);
       if (bytes !== null) sourceDigests[key] = digest(bytes);
     }
@@ -122,14 +127,14 @@ export function checkSpecRetention(root = DEFAULT_ROOT, inventoryPath = "governa
     const manifest = readJson(root, manifestPath, findings, `${entry.id} archive manifest`);
     if (!manifest) continue;
     if (!exactKeys(manifest, ["schema", "id", "sourcePaths", "archivePaths", "sha256"])
-      || manifest.schema !== ARCHIVE_SCHEMA || manifest.id !== entry.id
-      || !exactKeys(manifest.sourcePaths, AUTHORITY_KEYS)
-      || !exactKeys(manifest.archivePaths, AUTHORITY_KEYS)
-      || !exactKeys(manifest.sha256, AUTHORITY_KEYS)) {
+      || manifest.schema !== archiveSchema || manifest.id !== entry.id
+      || !exactKeys(manifest.sourcePaths, authorityKeys)
+      || !exactKeys(manifest.archivePaths, authorityKeys)
+      || !exactKeys(manifest.sha256, authorityKeys)) {
       findings.push(`${entry.id} archive manifest shape or identity is invalid`);
       continue;
     }
-    for (const key of AUTHORITY_KEYS) {
+    for (const key of authorityKeys) {
       if (manifest.sourcePaths[key] !== sourcePaths[key]) findings.push(`${entry.id} archive source path drift for ${key}`);
       const archivePath = safePath(root, manifest.archivePaths[key]);
       if (!archivePath) {
@@ -142,7 +147,7 @@ export function checkSpecRetention(root = DEFAULT_ROOT, inventoryPath = "governa
       }
       if (manifest.sha256[key] !== sourceDigests[key]) findings.push(`${entry.id} archive digest is stale for ${key}`);
     }
-    checkLinks(root, entry, sourcePaths, findings);
+    checkLinks(root, entry, sourcePaths, authorityKeys, findings);
   }
   return { ok: findings.length === 0, findings };
 }

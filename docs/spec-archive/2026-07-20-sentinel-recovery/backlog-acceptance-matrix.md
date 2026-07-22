@@ -21,9 +21,9 @@ allein schließen keine Zeile.
 Die folgende Re-Baseline wurde historisch am Kandidaten
 `962ed4a45f1e72f68117b92f4946182a204e0b9d` ausgeführt. Sie ergänzt den
 Auditstand; sie ist weder ein Statusübergang noch eine Closure-Behauptung. Die
-aktuelle Full-Verify-/Security-Evidenz ist separat an Kandidat
-`0ab73b89795de507ad67f56e1e98e4ab1de37c0b` gebunden und berichtet 122/122
-Schritte sowie einen grünen Security-Scan. Die Einzeltests belegen lokale
+aktuelle, kandidatengebundene Full-Verify-/Security-Evidenz liegt in
+`evidence/verify-latest.json` und `evidence/security-latest.json` vor und
+berichtet 122/122 Schritte sowie einen grünen Security-Scan. Die Einzeltests belegen lokale
 Kontrollpfade; sie ersetzen keine native Plattformattestierung, keinen
 Human-Gate und keinen Remote-Effekt.
 
