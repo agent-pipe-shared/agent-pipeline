@@ -11,7 +11,7 @@
  * cases have a real, deterministic commit sha to compare against.
  */
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -843,6 +843,18 @@ function deployApprovalState(forArtifact, forEnvironment) {
   const { dir } = freshRepo("anonymous-public-green");
   const { command, env } = prepareAnonymousPublicPush(dir);
   check("PG26a allow  calibrated anonymous feature-branch range", command, dir, ALLOW, { stderrEmpty: true, env });
+}
+{
+  const { dir } = freshRepo("anonymous-public-malformed-host-alias");
+  const { command, env } = prepareAnonymousPublicPush(dir);
+  const calibrationPath = join(dir, ".claude", "pipeline.json");
+  const calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
+  calibration.publicPushIdentity.sshHostAlias = "github-share & untrusted-command";
+  writeFileSync(calibrationPath, JSON.stringify(calibration));
+  check("PG26aa block malformed SSH host alias before shell fixture resolution", command, dir, BLOCK, {
+    stderrIncludes: ["SSH host alias is malformed"],
+    env,
+  });
 }
 {
   const { dir } = freshRepo("anonymous-public-personal-author");
