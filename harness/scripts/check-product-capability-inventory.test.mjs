@@ -34,12 +34,14 @@ function revision(ref) {
 }
 
 function nonAncestorRevision() {
-  const commits = execFileSync("git", ["rev-list", "--all", "--not", "HEAD"], { cwd: repoRoot, encoding: "utf8" })
-    .trim()
-    .split("\n")
-    .filter(Boolean);
-  assert.ok(commits.length > 0, "test fixture requires a resolvable commit outside HEAD ancestry");
-  return revision(commits[0]);
+  // Depending on the checkout's ambient branch/tag topology (e.g. whether any ref
+  // diverges from HEAD) is fragile and environment-dependent, not a portability
+  // concern. `commit-tree` creates a real, resolvable, parentless commit object
+  // directly -- unreachable from HEAD by construction, no branch/tag/working-tree
+  // side effects, deterministic on every host and every repo state.
+  const emptyTree = execFileSync("git", ["hash-object", "-t", "tree", "--stdin"], { cwd: repoRoot, encoding: "utf8", input: "" }).trim();
+  const commit = execFileSync("git", ["commit-tree", emptyTree, "-m", "non-ancestor fixture root"], { cwd: repoRoot, encoding: "utf8" }).trim();
+  return revision(commit);
 }
 
 check("HAW-A01 discovers the complete current direct product surface", () => {

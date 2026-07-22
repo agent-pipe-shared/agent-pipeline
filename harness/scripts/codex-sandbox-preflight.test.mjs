@@ -2,18 +2,41 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import test from "node:test";
 
 import { advancePreflightCleanup, buildSandboxInvocation, canonicalJson, classifyPlatform, compilePermissionProfile, decidePreflightCleanup, evaluatePreflight, evaluatePreflightLease, loadProfileIntent, resolveNodeRuntimeReadSet, runBoundedProbe, sha256, validatePreflightReceipt, validateProfileIntent } from "./codex-sandbox-preflight.mjs";
+
+// buildSandboxInvocation validates codexPath/nodePath/payloadPath as
+// absolute AND host-canonical (`resolve(path) === path`); it never touches
+// the filesystem for them. A bare POSIX literal like "/opt/codex" is already
+// canonical on Linux but is rewritten by Windows' resolve() to a
+// drive-rooted path, so wrap fixed argv-shape literals through resolve()
+// to stay canonical on whichever host the test runs on.
+function hostPath(posixLiteral) { return resolve(posixLiteral); }
+
+// `/proc/self` and `/dev/null` are real, `physicalRuntimePath`-recognized
+// Linux special files. They are not Windows-resolvable paths (there is no
+// procfs, and Node's `resolve()` rewrites a bare "/x" literal to a
+// drive-rooted path on win32), so this fixture is not exercising a genuine
+// procfs/devnull contract on non-Linux hosts -- it only needs two real,
+// canonical, host-resolvable regular files to stand in for them.
+function defaultRuntimeReadSet(root) {
+  if (process.platform === "linux") return [realpathSync(process.execPath), "/proc/self", "/dev/null"];
+  const a = join(root, "runtime-read-a");
+  const b = join(root, "runtime-read-b");
+  writeFileSync(a, "a");
+  writeFileSync(b, "b");
+  return [realpathSync(process.execPath), realpathSync(a), realpathSync(b)];
+}
 
 function roots(t) {
   const root = realpathSync(mkdtempSync(join(tmpdir(), "codex-preflight-")));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const make = (name) => { const path = join(root, name); mkdirSync(path); return realpathSync(path); };
-  const value = { inputRoot: make("input"), outputRoot: make("output"), runtimeReadSet: [realpathSync(process.execPath), "/proc/self", "/dev/null"], deniedRoots: [make("denied")], sensitiveRoots: [make("sensitive")] };
+  const value = { inputRoot: make("input"), outputRoot: make("output"), runtimeReadSet: defaultRuntimeReadSet(root), deniedRoots: [make("denied")], sensitiveRoots: [make("sensitive")] };
   return { ...value, sandboxCwd: value.inputRoot };
 }
 
@@ -63,18 +86,21 @@ test("profile compilation binds physical nonoverlapping roots and fixed shell-fr
   assert.deepEqual(Object.keys(compiled.state).sort(), ["permissionProfile", "sandboxCwd", "useLegacyLandlock"]);
   assert.match(compiled.profileRawSha256, /^[0-9a-f]{64}$/);
   const sandboxStateJson = compiled.raw.toString("utf8");
-  const invocation = buildSandboxInvocation({ codexPath: "/opt/codex", sandboxStateJson, sandboxStateSha256: sha256(Buffer.from(sandboxStateJson)), nodePath: "/usr/bin/node", payloadPath: "/opt/preflight.mjs" });
+  const invocation = buildSandboxInvocation({ codexPath: hostPath("/opt/codex"), sandboxStateJson, sandboxStateSha256: sha256(Buffer.from(sandboxStateJson)), nodePath: hostPath("/usr/bin/node"), payloadPath: hostPath("/opt/preflight.mjs") });
   assert.deepEqual(invocation.argv.slice(0, 3), ["sandbox", "--sandbox-state-json", sandboxStateJson]);
   assert.equal(invocation.options.shell, false);
 });
 
 test("CLI-owned helper selection rejects the incompatible explicit helper state", (t) => {
-  const compiled = compilePermissionProfile("intermediate", { ...roots(t), runtimeReadSet: [realpathSync(process.execPath), "/proc/self", "/dev/null"] });
+  const fixtureRoots = roots(t);
+  const runtimeRoot = realpathSync(mkdtempSync(join(tmpdir(), "codex-preflight-runtime-")));
+  t.after(() => rmSync(runtimeRoot, { recursive: true, force: true }));
+  const compiled = compilePermissionProfile("intermediate", { ...fixtureRoots, runtimeReadSet: defaultRuntimeReadSet(runtimeRoot) });
   const legacy = JSON.parse(compiled.raw.toString("utf8"));
   legacy.codexLinuxSandboxExe = "/opt/incompatible-bwrap";
   assert.throws(() => buildSandboxInvocation({
-    codexPath: "/opt/codex", sandboxStateJson: canonicalJson(legacy), sandboxStateSha256: sha256(Buffer.from(canonicalJson(legacy))),
-    nodePath: "/usr/bin/node", payloadPath: "/opt/preflight.mjs",
+    codexPath: hostPath("/opt/codex"), sandboxStateJson: canonicalJson(legacy), sandboxStateSha256: sha256(Buffer.from(canonicalJson(legacy))),
+    nodePath: hostPath("/usr/bin/node"), payloadPath: hostPath("/opt/preflight.mjs"),
   }), { code: "profile-error" });
 });
 
@@ -170,7 +196,11 @@ test("bounded runner accepts only semantic payload lifecycle and keeps shell dis
   assert.deepEqual(result.semanticEvents.map(({ type }) => type), ["started", "result"]);
 });
 
-test("strong runtime resolver enumerates files without the :minimal macro", () => {
+// resolveNodeRuntimeReadSet is a fixed Linux-only ELF dependency resolver
+// (hardcoded /usr/bin/ldd, Linux ldd output format, /proc/self and /dev/null
+// literals) -- there is no Windows equivalent to fall back to, and the
+// production function itself fails closed off-Linux. Skip rather than adapt.
+test("strong runtime resolver enumerates files without the :minimal macro", { skip: process.platform !== "linux" && "ldd-based resolver is Linux-only" }, () => {
   const values = resolveNodeRuntimeReadSet(realpathSync(process.execPath));
   assert.equal(values.includes(realpathSync(process.execPath)), true);
   assert.equal(values.includes("/proc/self"), true);
