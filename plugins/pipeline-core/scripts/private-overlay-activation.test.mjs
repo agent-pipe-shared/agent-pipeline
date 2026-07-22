@@ -9,6 +9,15 @@ import test from "node:test";
 
 import { main } from "./private-overlay-activation.mjs";
 
+let symlinkCapable = true;
+{
+  const probeDir = mkdtempSync(join(tmpdir(), "private-overlay-activation-symlink-probe-"));
+  try { writeFileSync(join(probeDir, "target"), "x"); symlinkSync(join(probeDir, "target"), join(probeDir, "link")); }
+  catch { symlinkCapable = false; }
+  finally { rmSync(probeDir, { recursive: true, force: true }); }
+  if (!symlinkCapable) process.stdout.write("[capability: symlink unavailable] skipping symlink-specific checks\n");
+}
+
 const PROJECT_ROOT = "/private/customer/project";
 const SOURCE_PLUGIN_ROOT = "/public/source/plugins/pipeline-core";
 const PLUGIN_ROOT = "/installed/cache/pipeline-core-version";
@@ -531,7 +540,7 @@ test("post-apply input read failure is partial and never invokes the publisher",
   assert.equal(published, false);
 });
 
-test("production reader admits stable project-local files and rejects source or runtime symlinks", () => {
+test("production reader admits stable project-local files and rejects source or runtime symlinks", { skip: !symlinkCapable && "symlink unavailable" }, () => {
   const base = mkdtempSync(join(tmpdir(), "private-overlay-cli-read-test-"));
   const root = join(base, "overlay");
   const outside = join(base, "outside.yaml");
