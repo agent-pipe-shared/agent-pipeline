@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Local host entry point for the approved profile-bound isolation acceptance. */
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { CODEX_CRITIC_ARTIFACTS, runProfileBoundIsolation } from "./codex-critic-isolation.mjs";
 
@@ -56,7 +56,7 @@ export async function run({ commit, repoRoot = root, debugLog } = {}) {
   return Object.freeze(publicResult);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   let debugMode = false;
   try {
     const args = parseArgs(process.argv.slice(2));

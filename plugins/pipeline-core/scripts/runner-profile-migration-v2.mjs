@@ -7,6 +7,7 @@ import {
   inspectRunnerProfileMigrationV2,
   planRunnerProfileMigrationV2,
 } from "../lib/runner-profile-migration-v2.mjs";
+import { pathToFileURL } from "node:url";
 
 function usage() {
   return "Usage: node plugins/pipeline-core/scripts/runner-profile-migration-v2.mjs <inspect|plan|apply> --root <project-dir> [--activate]";
@@ -52,4 +53,4 @@ export function main(args = process.argv.slice(2), { write = process.stdout.writ
   return ["ready", "noop", "applied"].includes(output.status) ? 0 : 1;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) process.exit(main());
+if (import.meta.url === pathToFileURL(process.argv[1]).href) process.exit(main());

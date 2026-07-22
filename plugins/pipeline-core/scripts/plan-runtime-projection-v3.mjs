@@ -4,6 +4,7 @@
 /** Read-only CLI for the V3 runtime projection planner. */
 import { readFileSync } from "node:fs";
 import { extname, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 import {
   planRuntimeProjectionV3,
@@ -106,4 +107,4 @@ export function main(args = process.argv.slice(2), { write = process.stdout.writ
   return plan.status === "ready" ? 0 : 1;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) process.exit(main());
+if (import.meta.url === pathToFileURL(process.argv[1]).href) process.exit(main());

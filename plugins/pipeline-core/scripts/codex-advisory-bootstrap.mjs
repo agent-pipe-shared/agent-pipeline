@@ -7,6 +7,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 import { TextDecoder } from "node:util";
 
 import { derivePoGateRepositoryFingerprint, resolvePoGateRepositoryTopology } from "../lib/po-gate-authority.mjs";
@@ -102,6 +103,6 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
   } finally { rmSync(temp, { recursive: true, force: true }); }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   runCodexAdvisoryBootstrap().then((code) => { process.exitCode = code; }, (error) => { process.stderr.write(`${error.message}\n`); process.exitCode = error.message === USAGE ? 64 : 2; });
 }

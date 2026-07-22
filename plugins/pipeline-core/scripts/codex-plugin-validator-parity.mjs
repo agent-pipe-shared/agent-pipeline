@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: Apache-2.0
 import process from 'node:process';
+import { pathToFileURL } from 'node:url';
 
 const OBSERVATION_SCHEMA = 'pipeline.codex-plugin-validator-observation.v1';
 const OUTCOME_SCHEMA = 'pipeline.codex-plugin-validator-parity.v1';
@@ -90,6 +91,6 @@ async function main() {
   process.exitCode = result.status === 'aligned' ? 0 : 1;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   await main();
 }
