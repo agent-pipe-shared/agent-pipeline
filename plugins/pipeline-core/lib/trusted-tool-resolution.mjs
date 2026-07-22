@@ -1,9 +1,29 @@
 // SPDX-License-Identifier: Apache-2.0
 import { lstatSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
-import { join, win32 as winPath } from "node:path";
+import { posix as posixPath, win32 as winPath } from "node:path";
 
-export const WINDOWS_SYSTEM_TOOL_ROOTS = Object.freeze(["C:\\Program Files\\Git\\cmd", "C:\\Program Files\\Git\\bin", "C:\\Program Files\\Git\\mingw64\\bin", "C:\\Windows\\System32"]);
+function windowsEnvironmentDirectory(environment, names, fallback) {
+  for (const name of names) {
+    const value = environment?.[name];
+    if (typeof value === "string" && winPath.isAbsolute(value)) return value;
+  }
+  return fallback;
+}
+
+/** Derives the fixed Windows system roots without consulting PATH or user-home variables. */
+export function windowsSystemToolRoots(environment = process.env) {
+  const programFiles = windowsEnvironmentDirectory(environment, ["ProgramFiles", "PROGRAMFILES"], "C:\\Program Files");
+  const systemRoot = windowsEnvironmentDirectory(environment, ["SystemRoot", "SYSTEMROOT", "WINDIR"], "C:\\Windows");
+  return Object.freeze([
+    winPath.join(programFiles, "Git", "cmd"),
+    winPath.join(programFiles, "Git", "bin"),
+    winPath.join(programFiles, "Git", "mingw64", "bin"),
+    winPath.join(systemRoot, "System32"),
+  ]);
+}
+
+export const WINDOWS_SYSTEM_TOOL_ROOTS = windowsSystemToolRoots();
 
 function missing(error) { return error?.code === "ENOENT" || error?.code === "ENOTDIR"; }
 function normalWinPath(value) { return String(value).replaceAll("/", "\\").replace(/\\+$/u, "").toLowerCase(); }
@@ -11,7 +31,10 @@ function withinWindowsRoots(path, roots) { const candidate = normalWinPath(path)
 function windowsCandidate(name) { return name.toLowerCase().endsWith(".exe") ? name : `${name}.exe`; }
 
 /** Validates a candidate selected by a caller through the same authority. */
-export function assessTrustedExecutablePath(path, { platform = process.platform, windowsRoots = WINDOWS_SYSTEM_TOOL_ROOTS, fsOps = { lstatSync, realpathSync } } = {}) {
+export function assessTrustedExecutablePath(path, options = {}) {
+  const platform = options.platform ?? process.platform;
+  const windowsRoots = options.windowsRoots ?? windowsSystemToolRoots(options.env);
+  const fsOps = options.fsOps ?? { lstatSync, realpathSync };
   if (typeof path !== "string" || path.length === 0) return { ok: false, status: "probe_error" };
   if (platform === "win32" && (!path.toLowerCase().endsWith(".exe") || !withinWindowsRoots(path, windowsRoots))) return { ok: false, status: "untrusted_path" };
   let lexical; let resolved; let finalInfo;
@@ -23,12 +46,18 @@ export function assessTrustedExecutablePath(path, { platform = process.platform,
 }
 
 /** Resolves a Pipeline tool without consulting PATH and retains rejection provenance. */
-export function resolveTrustedSystemExecutable(name, { platform = process.platform, homeDir = homedir(), windowsRoots = WINDOWS_SYSTEM_TOOL_ROOTS, fsOps = { lstatSync, realpathSync } } = {}) {
+export function resolveTrustedSystemExecutable(name, options = {}) {
+  const platform = options.platform ?? process.platform;
+  const windowsRoots = options.windowsRoots ?? windowsSystemToolRoots(options.env);
+  const fsOps = options.fsOps ?? { lstatSync, realpathSync };
+  // A mocked foreign-platform resolution must not inherit this host's home directory.
+  const homeDir = options.homeDir ?? (platform === process.platform && platform !== "win32" ? homedir() : undefined);
   if (typeof name !== "string" || name.length === 0 || /[\\/\0]/u.test(name)) return { ok: false, status: "probe_error" };
   if (platform !== "win32") {
-    const paths = platform === "darwin" ? ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", join(homeDir, ".local", "bin"), join(homeDir, "go", "bin")] : ["/usr/local/bin", "/usr/bin", "/bin", join(homeDir, ".local", "bin"), join(homeDir, "go", "bin")];
+    const homePaths = typeof homeDir === "string" ? [posixPath.join(homeDir, ".local", "bin"), posixPath.join(homeDir, "go", "bin")] : [];
+    const paths = platform === "darwin" ? ["/opt/homebrew/bin", "/usr/local/bin", "/usr/bin", "/bin", ...homePaths] : ["/usr/local/bin", "/usr/bin", "/bin", ...homePaths];
     for (const root of paths) {
-      const path = join(root, name);
+      const path = posixPath.join(root, name);
       try { fsOps.lstatSync(path); } catch (error) { if (!missing(error)) return { ok: false, status: "probe_error" }; continue; }
       const assessed = assessTrustedExecutablePath(path, { platform, fsOps });
       if (assessed.ok) return assessed;
