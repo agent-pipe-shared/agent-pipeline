@@ -7,15 +7,15 @@ definiert, wann eine konkrete Fähigkeit auf Windows, Linux, WSL oder macOS als
 unterstützt bezeichnet werden darf. Er schließt kein Backlog-Item, ersetzt keine
 plattformspezifische AC-Matrix und erweitert keine Laufzeitberechtigung.
 
-<!-- windows-blockers-scope-sha256: 4a4c85c93389a40ec5c0388156f8c062131bce7521aaa3b4cdf9267bae1ddc79 -->
+<!-- windows-blockers-scope-sha256: 0752415e7916b4db41b8c257339953a31924c68392d644e6c7b07993e08ecca0 -->
 
 Der gebundene Input ist die benachbarte
-[`windows-blockers-scope.md`](windows-blockers-scope.md). Ihre fünf offenen
-Windows-Blocker bleiben unverändert offen. Der PRD bindet diesen Vertrag; damit
-ist die Kette **PRD → Platform-Support-Contract → Windows-Blocker-Scope**
-bytegenau. Eine Änderung eines Inputs invalidiert die daraus abgeleitete
-Plattform- oder Go-live-Aussage bis die gebundene Kette und ihre Evidenz erneut
-geprüft sind.
+[`windows-blockers-scope.md`](windows-blockers-scope.md). Sein Fünf-Record-
+Windows-Track führt `#33` kanonisch geschlossen und `#34`–`#37` offen. Der PRD
+bindet diesen Vertrag; damit ist die Kette **PRD → Platform-Support-Contract →
+Windows-Blocker-Scope** bytegenau. Eine Änderung eines Inputs invalidiert die
+daraus abgeleitete Plattform- oder Go-live-Aussage bis die gebundene Kette und
+ihre Evidenz erneut geprüft sind.
 
 ## Geltungsbereich und Begriffe
 
@@ -76,7 +76,7 @@ unterstützt ist.
 
 | Zielklasse | Aktueller, zulässiger Stand |
 | --- | --- |
-| Windows | Die fünf gebundenen nativen Windows-Blocker sind offen. Es gibt derzeit keinen aus diesem Vertrag ableitbaren `supported`-Claim für ihre betroffenen Fähigkeiten; fehlende native Evidenz bleibt `blocked` oder `unavailable`. |
+| Windows | `#33` ist kanonisch geschlossen; `#34`–`#37` bleiben offen. Für die von den offenen Records betroffenen Fähigkeiten gibt es derzeit keinen aus diesem Vertrag ableitbaren `supported`-Claim; fehlende native Evidenz bleibt `blocked` oder `unavailable`. |
 | Linux | Bestehende Linux-Kontrollen können nur capability-spezifisch und unter den jeweiligen Voraussetzungen als `conditionally-supported` erscheinen. Sie übertragen keine Zusage auf WSL, Windows oder macOS. |
 | WSL | Der Status ist ohne explizite Variante, Host-/Filesystem-Observation und same-surface evidence `ambiguous`. WSL erbt weder Linux- noch Windows-Unterstützung. |
 | macOS | Für nicht nativ belegte Fähigkeiten ist der Status `unavailable`. Ein Mock eines macOS-Pfads oder Resolver-Tests ist keine native macOS-Unterstützung. |

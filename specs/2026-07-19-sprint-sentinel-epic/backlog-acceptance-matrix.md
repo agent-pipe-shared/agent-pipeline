@@ -18,12 +18,13 @@ allein schließen keine Zeile.
 
 ## Re-Baseline des aktuellen Kandidaten
 
-Die folgende Re-Baseline wurde am Kandidaten
+Die folgende Re-Baseline wurde historisch am Kandidaten
 `962ed4a45f1e72f68117b92f4946182a204e0b9d` ausgeführt. Sie ergänzt den
-historischen Auditstand; sie ist weder ein Statusübergang noch eine
-Closure-Behauptung. Das aktuelle Full Verify bindet diesen Kandidaten mit
-122/122 Schritten und einem grünen Security-Scan. Die Einzeltests belegen
-lokale Kontrollpfade; sie ersetzen keine native Plattformattestierung, keinen
+Auditstand; sie ist weder ein Statusübergang noch eine Closure-Behauptung. Die
+aktuelle Full-Verify-/Security-Evidenz ist separat an Kandidat
+`4fb89cca24cc912b0a1868b23b814c7f01e1163f` gebunden und berichtet 122/122
+Schritte sowie einen grünen Security-Scan. Die Einzeltests belegen lokale
+Kontrollpfade; sie ersetzen keine native Plattformattestierung, keinen
 Human-Gate und keinen Remote-Effekt.
 
 | Item | Aktuell nachgeprüfte lokale Evidenz | Für einen Abschluss weiterhin erforderlich |
