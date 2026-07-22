@@ -9,12 +9,12 @@ import { loadManifest } from "../lib/manifest.mjs";
 import { probeGitleaks } from "./security-readiness/gitleaks-readiness.mjs";
 import { probeOsvScanner } from "./security-readiness/osv-scanner-readiness.mjs";
 import { probeSemgrep } from "./security-readiness/semgrep-readiness.mjs";
-import { buildHandle, executableIdentity, resolveSystemExecutable, runProbe, sha256 } from "./tool-identity.mjs";
+import { buildHandle, executableIdentity, resolveSystemExecutable, resolveTrustedSystemExecutable, runProbe, sha256 } from "./tool-identity.mjs";
 
 export const TOOLCHAIN_SCHEMA = "pipeline.toolchain-preflight.v1";
 export const FIXED_TOOLS = Object.freeze(["node", "git", "gitleaks", "osv-scanner", "semgrep", "license-check"]);
 const KNOWN_SCANNERS = new Set(["gitleaks", "osv-scanner", "semgrep", "license-check"]);
-const STATUS_PRECEDENCE = Object.freeze(["execution_environment", "binary_missing", "input_missing", "probe_timeout", "probe_error", "incompatible_version", "incompatible_capability"]);
+const STATUS_PRECEDENCE = Object.freeze(["execution_environment", "untrusted_path", "binary_missing", "input_missing", "probe_timeout", "probe_error", "incompatible_version", "incompatible_capability"]);
 const REQUIRED_CAPABILITIES = Object.freeze({ gitleaks: ["--source", "--report-format", "--report-path", "--no-banner", "--exit-code"], "osv-scanner": ["--format", "recursive-source"], semgrep: ["--json", "--config"] });
 const GUIDANCE = Object.freeze({
   linux: { node: "Install Node.js 24 or newer from the platform package policy.", git: "Install Git with rev-parse and diff support.", gitleaks: "Install a compatible Gitleaks binary in a recognized system, ~/.local/bin, or ~/go/bin location.", "osv-scanner": "Install OSV-Scanner 2.x in a recognized system, ~/.local/bin, or ~/go/bin location.", semgrep: "Install Semgrep with pipx or place a compatible binary in a recognized location.", "license-check": "Create the configured allowlist and third-party-licenses.json as regular files." },
@@ -77,7 +77,9 @@ function actionableResult(entry, platform, installers = new Set()) {
     : prerequisiteMissing
     ? entry.status === "input_missing"
       ? `Security readiness cannot be claimed until the configured inputs for ${entry.tool} exist.`
-      : entry.tool === "license-check"
+    : entry.status === "untrusted_path"
+      ? `Security readiness cannot be claimed because ${entry.tool} resolved to an untrusted path.`
+    : entry.tool === "license-check"
       ? "Security readiness cannot be claimed until the configured license inputs exist."
       : entry.tool === "node" || entry.tool === "git"
         ? `Pipeline verification cannot be claimed until ${entry.tool} is installed and compatible.`
@@ -85,6 +87,8 @@ function actionableResult(entry, platform, installers = new Set()) {
     : null;
   const baseGuidance = hostBoundaryFailure
     ? `Rerun the no-flag setup or self-application preflight through the host-authorized local read-only boundary; do not reinstall ${entry.tool} from this result.`
+    : entry.status === "untrusted_path"
+      ? `Use a direct .exe for ${entry.tool} in a named Windows system root; wrappers, user, repository, and temporary paths are not accepted.`
     : prerequisiteMissing
     ? entry.status === "input_missing"
       ? `Create the configured project inputs required by ${entry.tool}.`
@@ -117,8 +121,10 @@ function defaultNodeProbe({ now = new Date() } = {}) {
   const observed = executableIdentity(process.execPath); if (!observed.ok) return observed;
   return { ok: true, status: "ready", handle: buildHandle("node", observed.identity, process.versions.node, ["spawn-shell-false"], now.toISOString()) };
 }
-export function defaultGitProbe({ rootDir, tempDir, now = new Date() } = {}, { runProbeFn = runProbe } = {}) {
-  const path = resolveSystemExecutable("git"); if (path === null) return { ok: false, status: "binary_missing" };
+export function defaultGitProbe({ rootDir, tempDir, now = new Date(), platform = process.platform } = {}, { runProbeFn = runProbe, resolveExecutableFn = resolveTrustedSystemExecutable } = {}) {
+  const resolved = resolveExecutableFn("git", { platform });
+  const path = typeof resolved === "string" ? resolved : resolved?.ok ? resolved.path : null;
+  if (path === null) return { ok: false, status: typeof resolved === "object" ? resolved.status ?? "probe_error" : "binary_missing" };
   const observed = executableIdentity(path); if (!observed.ok) return observed;
   const probeOptions = { cwd: rootDir, tempDir, acceptSuccessfulEperm: true };
   const versionResult = runProbeFn(observed.identity.realPath, ["--version"], probeOptions); if (!versionResult.ok) return versionResult;
@@ -134,6 +140,7 @@ function manifestDigest(rootDir) {
   try { return createHash("sha256").update(readFileSync(path)).digest("hex"); } catch { return null; }
 }
 function platformName(value) { return ["linux", "darwin", "win32"].includes(value) ? value : "unsupported"; }
+function resolvedTool(resolver, tool, platform) { const resolved = resolver(tool, { platform }); if (typeof resolved === "string") return { ok: true, path: resolved }; if (resolved === null || resolved === undefined) return { ok: false, status: "binary_missing" }; return resolved.ok === true && typeof resolved.path === "string" ? { ok: true, path: resolved.path } : { ok: false, status: resolved.status ?? "probe_error" }; }
 function licenseProbe(rootDir, manifest, now) {
   const policyRoot = manifest.governance?.policies_path;
   const paths = [typeof policyRoot === "string" ? join(rootDir, policyRoot, "license-allowlist.json") : null, join(rootDir, "third-party-licenses.json")];
@@ -164,7 +171,7 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
   }
   const now = deps.now ?? new Date();
   const nodeObserved = (deps.probeNodeFn ?? defaultNodeProbe)({ rootDir: root, tempDir, now });
-  const gitObserved = (deps.probeGitFn ?? defaultGitProbe)({ rootDir: root, tempDir, now });
+  const gitObserved = (deps.probeGitFn ?? defaultGitProbe)({ rootDir: root, tempDir, now, platform }, { resolveExecutableFn: deps.resolveTrustedExecutableFn ?? resolveTrustedSystemExecutable });
   baseResults.node = readyCompatibility("node", nodeObserved); if (baseResults.node.status === "ready") handles.node = nodeObserved.handle;
   baseResults.git = readyCompatibility("git", gitObserved); if (baseResults.git.status === "ready") handles.git = gitObserved.handle;
   const manifest = loaded.status === "ok" ? loaded.manifest : null;
@@ -172,13 +179,13 @@ export function runToolchainPreflight({ rootDir, manifestResult = null, platform
   const enabled = Object.entries(manifest?.security?.scanners ?? {}).filter(([, config]) => config?.enabled === true).map(([name]) => name).sort();
   const unsupported = enabled.some((name) => !KNOWN_SCANNERS.has(name));
   const probes = deps.scannerProbes ?? { gitleaks: probeGitleaks, "osv-scanner": probeOsvScanner, semgrep: probeSemgrep };
-  const resolver = deps.resolveExecutableFn ?? resolveSystemExecutable;
+  const resolver = deps.resolveExecutableFn ?? resolveTrustedSystemExecutable;
   const installerResolver = deps.resolveInstallerFn ?? resolveSystemExecutable;
   const installers = new Set(INSTALLER_NAMES.filter((name) => installerResolver(name, { platform }) !== null));
   for (const tool of ["gitleaks", "osv-scanner", "semgrep"]) {
     if (!enabled.includes(tool)) continue;
-    const path = resolver(tool, { platform });
-    const observed = path === null ? { ok: false, status: "binary_missing" } : probes[tool]({ executablePath: path, rootDir: root, tempDir }, { now });
+    const trusted = resolvedTool(resolver, tool, platform);
+    const observed = !trusted.ok ? trusted : probes[tool]({ executablePath: trusted.path, rootDir: root, tempDir }, { now });
     baseResults[tool] = readyCompatibility(tool, observed); if (baseResults[tool].status === "ready") handles[tool] = observed.handle;
   }
   if (enabled.includes("license-check")) {

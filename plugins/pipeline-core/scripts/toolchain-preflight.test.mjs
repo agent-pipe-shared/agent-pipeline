@@ -121,6 +121,17 @@ check("a missing configured prerequisite names the blocked claim and a copyable 
     assert.equal(probeCalls, 0);
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
+check("a rejected Windows path stays untrusted and blocks without probing or install guidance", () => {
+  const repo = root(); let probeCalls = 0;
+  try {
+    const result = runToolchainPreflight({ rootDir: repo, platform: "win32", manifestResult: manifest({ semgrep: { enabled: true } }) }, {
+      probeNodeFn: nodeReady, probeGitFn: gitReady, resolveExecutableFn: () => ({ ok: false, status: "untrusted_path" }), resolveInstallerFn: () => null,
+      scannerProbes: { semgrep: () => { probeCalls += 1; throw new Error("a rejected tool must not be executed"); } },
+    });
+    const rejected = result.results.find(({ tool }) => tool === "semgrep");
+    assert.equal(result.code, "TCP-UNTRUSTED-PATH"); assert.equal(result.exitCode, 2); assert.equal(rejected.status, "untrusted_path"); assert.equal(rejected.installCommand, null); assert.match(rejected.guidance, /direct .exe/u); assert.equal(probeCalls, 0);
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
 check("standard per-user pipx and Go bin locations are discovered without trusting arbitrary PATH order", () => {
   const home = root();
   try {
@@ -182,4 +193,4 @@ check("Semgrep probes use bounded temporary settings instead of writing the user
     assert.deepEqual(readdirSync(repo), ["semgrep"]);
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
-process.stdout.write(`${passed}/11 checks passed.\n`);
+process.stdout.write(`${passed}/12 checks passed.\n`);

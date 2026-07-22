@@ -10,8 +10,8 @@
  * runtime transport; only the sanitized receipt is written to disk.
  */
 import { createHash, randomUUID } from "node:crypto";
-import { readFile, rename, unlink, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { readFile, unlink } from "node:fs/promises";
+import { basename, resolve } from "node:path";
 import { createInterface } from "node:readline";
 
 import { coordinateAdvisory } from "../lib/advisory-coordinator.mjs";
@@ -20,6 +20,7 @@ import { executeSandboxedReadonlyDuty, runSandboxedReadonlyHostBridge } from "./
 import { sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
 import { invokeCodexAdvisoryAppServer } from "./codex-advisory-app-server.mjs";
+import { AdvisoryReceiptAssuranceError, persistAdvisoryReceipt } from "../lib/advisory-receipt-assurance.mjs";
 
 const USAGE = "usage: advisory-host-bridge.mjs --input <json> --receipt <json> [--timeout-ms <1000..600000>]";
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -234,16 +235,10 @@ function makeHostAdapter(iterator, timeoutMs) {
   };
 }
 
-async function writeReceiptAtomic(path, receipt) {
+function writeReceiptAtomic(path, receipt) {
   const target = resolve(path);
-  const temporary = `${target}.tmp-${process.pid}-${randomUUID()}`;
-  try {
-    await writeFile(temporary, advisoryReceiptBytes(receipt), { flag: "wx", mode: 0o600 });
-    await rename(temporary, target);
-  } catch (error) {
-    await unlink(temporary).catch(() => {});
-    throw error;
-  }
+  const temporaryName = `.${basename(target)}.tmp-${process.pid}-${randomUUID()}`;
+  return persistAdvisoryReceipt({ target, bytes: advisoryReceiptBytes(receipt), temporaryName });
 }
 
 export async function runAdvisoryHostBridge(argv = process.argv.slice(2), dependencies = {}) {
@@ -286,15 +281,25 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
         });
       }
     } else result = await coordinateAdvisory(input, { invokeNative: adapter, invokeConsult: adapter, advisorExport });
-    if (result.receipt) await writeReceiptAtomic(args.receipt, result.receipt);
+    let reported = result;
+    let receiptPath = null;
+    if (result.receipt) {
+      try {
+        writeReceiptAtomic(args.receipt, result.receipt);
+        receiptPath = resolve(args.receipt);
+      } catch (error) {
+        if (!(error instanceof AdvisoryReceiptAssuranceError)) throw error;
+        reported = { ...result, ok: false, code: `advisory_receipt_${error.status}`, answer: null, receipt: null };
+      }
+    }
     emit({
       schema: "pipeline.advisory-host.v1",
       type: "advisory.completed",
-      ok: result.ok,
-      code: result.code,
-      answer: result.answer,
-      receiptPath: result.receipt ? resolve(args.receipt) : null,
-      attempts: result.attempts,
+      ok: reported.ok,
+      code: reported.code,
+      answer: reported.answer,
+      receiptPath,
+      attempts: reported.attempts,
       sandboxBinding: execution?.childStarted === true ? {
         selectionId: execution.selectionId,
         selectionSha256: execution.selectionSha256,
@@ -302,7 +307,7 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
         dutyReceiptSha256: execution.dutyReceiptSha256,
       } : null,
     });
-    return result.ok ? 0 : 2;
+    return reported.ok ? 0 : 2;
   } finally {
     lines.close();
   }
