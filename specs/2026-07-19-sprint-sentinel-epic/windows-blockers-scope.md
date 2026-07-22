@@ -43,6 +43,15 @@ Jedes Paket benötigt vor Code eine eigene AC-Matrix, fokussierte Tests, die
 registrierte Aggregate-Verify-Evidenz, Security-Evidenz und einen unabhängigen
 Critic. Keine Zeile darf allein aufgrund dieses Scope-Dokuments transitionieren.
 
+Die für die erste Umsetzung eingefrorenen Paketverträge sind
+[`windows-trusted-tool-resolution-ac-matrix.md`](windows-trusted-tool-resolution-ac-matrix.md)
+für `#37` und
+[`windows-advisory-receipt-assurance-ac-matrix.md`](windows-advisory-receipt-assurance-ac-matrix.md)
+für den ersten Receipt-Consumer von `#34/#35`. Sie dokumentieren die
+PO-Entscheidungen über direkte System-Executables, Wrapper-/Nutzerpfad-Verbot,
+fail-closed Durability und die strikte Owner-Policy; sie sind weder eine
+Implementation noch eine Closure.
+
 ## Rollback
 
 Die Scope-Aufnahme wird nur durch normale Revert-Commits der Writer-, Ledger-
