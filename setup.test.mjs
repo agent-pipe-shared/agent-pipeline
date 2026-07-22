@@ -73,6 +73,9 @@ import { poGateProfileReceiptPath } from "./plugins/pipeline-core/lib/po-gate-au
 
 const USER_YAML_PATH = fileURLToPath(new URL("./pipeline.user.yaml", import.meta.url));
 const THREE_SCOPE_FIXTURES_PATH = fileURLToPath(new URL("./templates/three-scope-fixtures.md", import.meta.url));
+// Native Windows permits directory junctions without Developer Mode; they retain
+// the fixture's directory traversal semantics without requiring a privileged link.
+function linkFixtureDirectory(target, path) { symlinkSync(target, path, process.platform === "win32" ? "junction" : "dir"); }
 const PLUGINS_PATH = fileURLToPath(new URL("./plugins", import.meta.url));
 const READY_TOOLCHAIN = Object.freeze({
   ok: true,
@@ -176,8 +179,8 @@ function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" }
   const root = mkdtempSync(join(tmpdir(), "setup-po-profile-receipt-"));
   const common = join(root, ".git");
   mkdirSync(common, { recursive: true });
-  symlinkSync(PLUGINS_PATH, join(root, "plugins"), "dir");
-  symlinkSync(join(ROOT_DIR, "governance"), join(root, "governance"), "dir");
+  linkFixtureDirectory(PLUGINS_PATH, join(root, "plugins"));
+  linkFixtureDirectory(join(ROOT_DIR, "governance"), join(root, "governance"));
   const userYamlText = renderUserYaml(buildDefaultAnswers());
   const runtimeYamlText = renderPipelineYaml(buildDefaultAnswers(), "po-profile");
   const topology = { repoRoot: root, primaryRoot: root, gitCommonDir: common, registeredWorktreeRoots: [root] };
@@ -195,8 +198,8 @@ function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" }
   const root = mkdtempSync(join(tmpdir(), "setup-po-profile-invalid-"));
   const common = join(root, ".git");
   mkdirSync(common, { recursive: true });
-  symlinkSync(PLUGINS_PATH, join(root, "plugins"), "dir");
-  symlinkSync(join(ROOT_DIR, "governance"), join(root, "governance"), "dir");
+  linkFixtureDirectory(PLUGINS_PATH, join(root, "plugins"));
+  linkFixtureDirectory(join(ROOT_DIR, "governance"), join(root, "governance"));
   const userYamlText = renderUserYaml(buildDefaultAnswers());
   const runtimeYamlText = renderPipelineYaml({ ...buildDefaultAnswers(), language: { human_facing: "de", agent_facing: "en" } }, "po-profile-drift");
   const topology = { repoRoot: root, primaryRoot: root, gitCommonDir: common, registeredWorktreeRoots: [root] };
@@ -210,8 +213,8 @@ function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" }
   const linked = join(base, "linked");
   const common = join(base, "common.git");
   for (const root of [primary, linked, common]) mkdirSync(root, { recursive: true });
-  symlinkSync(PLUGINS_PATH, join(linked, "plugins"), "dir");
-  symlinkSync(join(ROOT_DIR, "governance"), join(linked, "governance"), "dir");
+  linkFixtureDirectory(PLUGINS_PATH, join(linked, "plugins"));
+  linkFixtureDirectory(join(ROOT_DIR, "governance"), join(linked, "governance"));
   const userYamlText = renderUserYaml(buildDefaultAnswers());
   const runtimeYamlText = renderPipelineYaml(buildDefaultAnswers(), "po-profile-linked");
   const before = `${userYamlText}\n# linked sentinel\n`;
@@ -290,7 +293,7 @@ function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" }
 {
   const root = mkdtempSync(join(tmpdir(), "setup-overlay-missing-"));
   mkdirSync(join(root, ".claude"), { recursive: true });
-  symlinkSync(PLUGINS_PATH, join(root, "plugins"), "dir");
+  linkFixtureDirectory(PLUGINS_PATH, join(root, "plugins"));
   const sentinels = new Map([
     [join(root, "pipeline.user.yaml"), renderUserYaml(buildDefaultAnswers())],
     [join(root, ".claude", "settings.json"), "settings-before\n"],
@@ -309,7 +312,7 @@ function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" }
 {
   const root = mkdtempSync(join(tmpdir(), "setup-v2-source-required-"));
   mkdirSync(join(root, ".claude"), { recursive: true });
-  symlinkSync(PLUGINS_PATH, join(root, "plugins"), "dir");
+  linkFixtureDirectory(PLUGINS_PATH, join(root, "plugins"));
   const sentinels = new Map([
     [join(root, ".claude", "settings.json"), "settings-before\n"],
     [join(root, ".claude", "pipeline.json"), "pipeline-before\n"],
@@ -348,7 +351,7 @@ for (const [name, source] of [
 ]) {
   const root = mkdtempSync(join(tmpdir(), `setup-language-${name}-`));
   mkdirSync(join(root, ".claude"), { recursive: true });
-  symlinkSync(PLUGINS_PATH, join(root, "plugins"), "dir");
+  linkFixtureDirectory(PLUGINS_PATH, join(root, "plugins"));
   const sentinels = new Map([
     [join(root, "pipeline.user.yaml"), source],
     [join(root, ".claude", "settings.json"), "settings-before\n"],
@@ -377,7 +380,7 @@ for (const [name, source] of [
 {
   const root = mkdtempSync(join(tmpdir(), "setup-policylock-before-write-"));
   mkdirSync(join(root, ".claude"), { recursive: true });
-  symlinkSync(PLUGINS_PATH, join(root, "plugins"), "dir");
+  linkFixtureDirectory(PLUGINS_PATH, join(root, "plugins"));
   mkdirSync(join(root, ".pipeline"), { recursive: true });
   const sha = "a".repeat(40);
   writeFileSync(join(root, ".pipeline", "private-overlay.yaml"), `shared:\n  sha: ${sha}\n`);
@@ -400,7 +403,7 @@ for (const [name, source] of [
 {
   const root = mkdtempSync(join(tmpdir(), "setup-overlay-real-idempotent-"));
   mkdirSync(join(root, ".claude"), { recursive: true });
-  symlinkSync(PLUGINS_PATH, join(root, "plugins"), "dir");
+  linkFixtureDirectory(PLUGINS_PATH, join(root, "plugins"));
   const sha = "a".repeat(40);
   mkdirSync(join(root, ".pipeline"), { recursive: true });
   writeFileSync(join(root, ".pipeline", "private-overlay.yaml"), `shared:\n  sha: ${sha}\n`);
