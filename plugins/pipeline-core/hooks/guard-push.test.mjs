@@ -349,14 +349,17 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
 {
   const { dir, head: verifiedOid } = freshRepo("source-oid");
   gitAt(dir, "branch", "verified", verifiedOid);
+  const verifiedDir = join(dir, "verified-worktree");
+  gitAt(dir, "worktree", "add", "-q", verifiedDir, "verified");
   writeFileSync(join(dir, "later.txt"), "later\n");
   gitAt(dir, "add", "later.txt");
   gitAt(dir, "commit", "-q", "-m", "later");
   const laterOid = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
   writeManifest(dir, manifestPush({ approval: "standing-approved" }));
-  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: verifiedOid });
-  check("PG17c allow  evidence binds explicit older source, not checkout HEAD", "git push origin verified", dir, ALLOW, { stderrEmpty: true });
-  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: laterOid });
+  writeManifest(verifiedDir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(verifiedDir, "evidence/verify-latest.json", { exitCode: 0, commit: verifiedOid });
+  check("PG17c allow  attached short source binds its worktree evidence, not checkout HEAD", "git push origin verified", dir, ALLOW, { stderrEmpty: true });
+  writeEvidence(verifiedDir, "evidence/verify-latest.json", { exitCode: 0, commit: laterOid });
   check("PG17d block  checkout-HEAD evidence cannot authorize another source", "git push origin verified", dir, BLOCK, {
     stderrIncludes: [verifiedOid, "pushed source commit"],
   });
@@ -679,7 +682,11 @@ function deployApprovalState(forArtifact, forEnvironment) {
 {
   const { dir } = freshRepo("deploy-nongated-allow");
   gitAt(dir, "branch", "canary-1");
-  writeManifest(dir, releaseManifest({ includeCanary: true }));
+  const canaryDir = join(dir, "canary-worktree");
+  gitAt(dir, "worktree", "add", "-q", canaryDir, "canary-1");
+  const manifest = releaseManifest({ includeCanary: true });
+  writeManifest(dir, manifest);
+  writeManifest(canaryDir, manifest);
   check("PGD12 allow  deploy-trigger to a non-human-gated env (automated) never demands a deployApproval", "git push origin canary-1", dir, ALLOW, {
     stderrEmpty: true,
   });

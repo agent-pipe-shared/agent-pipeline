@@ -1062,10 +1062,11 @@ function resolveEvidenceProject(binding, commit) {
     timeout: 5000,
   });
   const sourceRef = symbolic.status === 0 ? symbolic.stdout?.trim() : "";
-  // Only a fully-qualified branch source explicitly requests the attached-worktree
-  // evidence binding.  Short branch names retain their historical bound-project
-  // semantics alongside detached and OID sources.
-  if (!binding.source.startsWith("refs/heads/") || !sourceRef.startsWith("refs/heads/")) {
+  // Git's resolved symbolic ref, rather than the command spelling, determines
+  // whether this is an attached branch source.  A short branch name therefore
+  // receives the same exact-worktree/OID binding as refs/heads/<branch>, while
+  // detached and literal-OID sources retain the bound command project.
+  if (!sourceRef.startsWith("refs/heads/")) {
     return { ok: true, projectDir: binding.projectDir };
   }
 
