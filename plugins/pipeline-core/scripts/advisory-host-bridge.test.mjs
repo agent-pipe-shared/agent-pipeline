@@ -10,6 +10,7 @@ import test from "node:test";
 
 import { canonicalJson, loadCompatibilityPolicy } from "../lib/codex-sandbox-compatibility.mjs";
 import { createSandboxSelectionStore, SELECTION_SCHEMA_SHA256 } from "./codex-sandbox-select.mjs";
+import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { runAdvisoryHostBridge, runCodexAdvisoryThroughSelectedSandbox, runCodexAdvisoryWithHostFallback } from "./advisory-host-bridge.mjs";
 
 const SCRIPT = new URL("./advisory-host-bridge.mjs", import.meta.url);
@@ -52,8 +53,17 @@ function currentHostEvidence() {
     },
   };
 }
+// On native Windows a fresh mkdtemp dir inherits SYSTEM/Administrators ACEs, so a
+// receipt/private write into it is correctly refused as insecure. A real caller
+// supplies a hardened private root; harden every fixture root to match that
+// contract (no-op on POSIX).
+async function hardenedMkdtemp(prefix) {
+  const root = await mkdtemp(prefix);
+  if (process.platform === "win32") hardenWindowsPrivateDirectory(root);
+  return root;
+}
 async function selectedTransport() {
-  const root = await mkdtemp(join(tmpdir(), "hawkeye-advisory-"));
+  const root = await hardenedMkdtemp(join(tmpdir(), "hawkeye-advisory-"));
   return {
     root,
     store: createSandboxSelectionStore({ root, now: () => "2026-07-19T00:00:00.000Z" }),
@@ -125,7 +135,7 @@ test("Codex advisory reads a persisted selected transport before the adapter and
 });
 
 test("the production Codex host path consumes raw transport before its receipt-backed host-consult fallback failure", async () => {
-  const root = await mkdtemp(join(tmpdir(), "hawkeye-advisory-raw-"));
+  const root = await hardenedMkdtemp(join(tmpdir(), "hawkeye-advisory-raw-"));
   const inputPath = join(root, "input.json");
   const receiptPath = join(root, "receipt.json");
   const question = "repository-private question that must not persist";
@@ -145,7 +155,7 @@ test("the production Codex host path consumes raw transport before its receipt-b
 });
 
 test("production Codex path invokes the native App-Server adapter without a host adapter request", async () => {
-  const root = await mkdtemp(join(tmpdir(), "hawkeye-advisory-native-"));
+  const root = await hardenedMkdtemp(join(tmpdir(), "hawkeye-advisory-native-"));
   const inputPath = join(root, "input.json");
   const receiptPath = join(root, "receipt.json");
   const transport = await selectedTransport();
@@ -171,7 +181,7 @@ test("production Codex path invokes the native App-Server adapter without a host
 });
 
 test("selected transport discovery failure cannot fall back to an unbound host consult", async () => {
-  const root = await mkdtemp(join(tmpdir(), "hawkeye-advisory-fallback-"));
+  const root = await hardenedMkdtemp(join(tmpdir(), "hawkeye-advisory-fallback-"));
   const inputPath = join(root, "input.json");
   const receiptPath = join(root, "receipt.json");
   let payload = null;

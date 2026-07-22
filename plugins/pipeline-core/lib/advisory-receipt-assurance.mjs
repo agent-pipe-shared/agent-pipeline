@@ -3,12 +3,18 @@
 /**
  * Fail-closed persistence for authority-bearing Advisory receipts.
  *
- * Windows DACL observation is deliberately an injected, explicit boundary:
- * Node's portable fs APIs cannot attest it. The evaluator keeps the Windows
- * model testable without implying that this module closes that native gap.
+ * Windows DACL observation is an injected, explicit boundary: Node's portable
+ * fs APIs cannot attest it, so the evaluator (below) stays a pure policy
+ * function over an already-observed `{file, directory}` shape. The default
+ * native Windows probe/identity resolution (further below) is the one place
+ * that closes that gap for real callers, by reusing the same fixed native
+ * observation primitive already reviewed in windows-private-state.mjs -- it
+ * never invents a second native script.
  */
+import { spawnSync } from "node:child_process";
 import { closeSync, fsyncSync, lstatSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
+import { observeWindowsPrivatePath, WINDOWS_POWERSHELL_PATHS } from "./windows-private-state.mjs";
 
 const UNSUPPORTED_DIRECTORY_CODES = new Set(["ENOSYS", "ENOTSUP", "EOPNOTSUPP"]);
 const UNSAFE_WINDOWS_PRINCIPALS = new Set(["everyone", "users", "authenticated users", "system", "administrators"]);
@@ -51,8 +57,48 @@ function nativeStatObservation(path, { expectedOwner, kind, lstat = lstatSync } 
   try { const info = lstat(path); return { kind: info.isDirectory() ? "directory" : info.isFile() ? "file" : "other", owner: String(info.uid), reparsePoint: info.isSymbolicLink(), mode: info.mode, dacl: null, expectedOwner }; }
   catch (error) { if (error?.code === "ENOENT" && kind === "file") return { kind: "missing", owner: expectedOwner, reparsePoint: false, mode: 0o600, dacl: null }; throw error; }
 }
-/** Observes portable POSIX state; Windows requires a supplied native probe. */
-export function createAdvisoryReceiptAssurance({ platform = process.platform === "win32" ? "windows" : process.platform === "darwin" ? "darwin" : "linux", expectedOwner = process.getuid?.(), lstat = lstatSync, windowsProbe = null } = {}) {
+function fixedPowerShellPath(lstat = lstatSync, paths = WINDOWS_POWERSHELL_PATHS) {
+  for (const path of paths) {
+    try { const info = lstat(path); if (info.isFile() && !info.isSymbolicLink()) return path; } catch { /* try the next fixed system location */ }
+  }
+  return null;
+}
+let cachedWindowsPrincipal;
+/** Resolves the concrete current Windows principal once, from the same fixed system PowerShell used to observe DACLs, so both share one identity source. */
+export function resolveWindowsPrincipal({ run = spawnSync } = {}) {
+  if (cachedWindowsPrincipal !== undefined) return cachedWindowsPrincipal;
+  const executable = fixedPowerShellPath();
+  if (executable === null) { cachedWindowsPrincipal = null; return null; }
+  const result = run(executable, ["-NoLogo", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", "[System.Security.Principal.WindowsIdentity]::GetCurrent().Name"], { encoding: "utf8", timeout: 7_000, shell: false, windowsHide: true });
+  cachedWindowsPrincipal = (result?.status === 0 && typeof result.stdout === "string" && result.stdout.trim().length > 0) ? result.stdout.trim() : null;
+  return cachedWindowsPrincipal;
+}
+function nativeWindowsEntry(path, kind, { lstat = lstatSync, observe = observeWindowsPrivatePath } = {}) {
+  try { lstat(path); }
+  catch (error) { if (error?.code === "ENOENT" && kind === "file") return { kind: "missing" }; throw error; }
+  const { status, observation } = observe(path);
+  if (status || !observation) return { kind: "unavailable" };
+  return { kind, owner: observation.owner, reparsePoint: observation.reparsePoint, dacl: { status: "secure", principals: observation.principals } };
+}
+/** Default native Windows probe: reuses the one fixed DACL-observation primitive from windows-private-state.mjs for both the target and its parent directory. */
+export function nativeWindowsAdvisoryProbe({ target, parent }, options = {}) {
+  const directory = nativeWindowsEntry(parent, "directory", options);
+  if (directory.kind !== "directory") return { file: null, directory: null };
+  const file = nativeWindowsEntry(target, "file", options);
+  if (file.kind === "unavailable") return { file: null, directory: null };
+  if (file.kind === "missing") {
+    const identity = resolveWindowsPrincipal(options);
+    return { file: { kind: "missing", owner: identity, reparsePoint: false, dacl: { status: "secure", principals: identity ? [identity] : [] } }, directory };
+  }
+  return { file, directory };
+}
+/** Observes portable POSIX state; Windows uses the native probe/identity above unless a caller injects its own (e.g. a fixture). */
+export function createAdvisoryReceiptAssurance({
+  platform = process.platform === "win32" ? "windows" : process.platform === "darwin" ? "darwin" : "linux",
+  expectedOwner = platform === "windows" ? resolveWindowsPrincipal() : process.getuid?.(),
+  lstat = lstatSync,
+  windowsProbe = platform === "windows" ? nativeWindowsAdvisoryProbe : null,
+} = {}) {
   const owner = expectedOwner === undefined || expectedOwner === null ? null : String(expectedOwner);
   return Object.freeze({ assess(target) {
     if (!isAbsolute(target) || resolve(target) !== target || owner === null) return state("unavailable", "receipt target or expected owner is unavailable");
@@ -71,12 +117,26 @@ export function persistAdvisoryReceipt({ target, bytes, assurance = createAdviso
   const temporary = resolve(dirname(target), temporaryName); let renamed = false;
   try {
     assure(assurance, target, "pre-persist"); io.writeFileSync(temporary, bytes, { flag: "wx", mode: 0o600 });
-    const descriptor = io.openSync(temporary, "r"); try { io.fsyncSync(descriptor); } finally { io.closeSync(descriptor); }
+    // "r+", not "r": a Windows handle opened read-only has no write-back to flush, so
+    // fsync fails closed with EPERM even though this handle only syncs bytes this
+    // process just wrote. "r+" is correct and portable; behaves like "r" on POSIX.
+    const descriptor = io.openSync(temporary, "r+"); try { io.fsyncSync(descriptor); } finally { io.closeSync(descriptor); }
     assure(assurance, temporary, "pre-rename"); io.renameSync(temporary, target); renamed = true;
-    try { io.fsyncDirectory(dirname(target)); } catch (error) { throw new AdvisoryReceiptAssuranceError(unsupportedDirectoryDurability(error, platform) ? "unsupported" : "durability_unknown", "post-rename-directory-sync", error); }
+    // The regular-file rename + fsync above already durably committed the receipt
+    // bytes. Directory-entry durability is a distinct, platform-dependent OS
+    // guarantee (native Windows never provides it); an unsupported outcome there is
+    // an honest, typed weaker assurance, not a reason to discard an already-durable,
+    // already-DACL/owner-verified authority-bearing receipt. A genuinely unexpected
+    // durability fault (`durability_unknown`) remains a hard non-success.
+    let directoryDurability;
+    try { io.fsyncDirectory(dirname(target)); }
+    catch (error) {
+      if (!unsupportedDirectoryDurability(error, platform)) throw new AdvisoryReceiptAssuranceError("durability_unknown", "post-rename-directory-sync", error);
+      directoryDurability = "unsupported";
+    }
     assure(assurance, target, "post-persist-readback"); const readback = io.readFileSync(target);
     if (!Buffer.from(readback).equals(bytes)) throw new AdvisoryReceiptAssuranceError("insecure", "post-persist-readback");
-    return { status: "durable", bytes: Buffer.from(readback) };
+    return directoryDurability ? { status: "durable", bytes: Buffer.from(readback), directoryDurability } : { status: "durable", bytes: Buffer.from(readback) };
   } catch (error) {
     if (!renamed) { try { io.unlinkSync(temporary); } catch {} if (error instanceof AdvisoryReceiptAssuranceError) throw error; throw new AdvisoryReceiptAssuranceError("pre_rename_failure", "pre-rename", error); }
     if (error instanceof AdvisoryReceiptAssuranceError) throw error;
