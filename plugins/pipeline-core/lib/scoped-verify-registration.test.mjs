@@ -24,17 +24,28 @@ function check(name, condition) {
 const TASK_ID = "pipeline.verify-gate-scoped-registration";
 const PRD_PATH = "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md";
 const PRD_SHA256 = "2b4c722de508cb9424b3fb83c6308602dd20e7e67ce240740c51deeb58541136";
-const SUITE = Object.freeze({
-  name: "scoped-verify-registration-tests",
-  file: "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs",
-});
+const SUITES = Object.freeze([
+  Object.freeze({
+    name: "scoped-verify-registration-tests",
+    file: "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs",
+  }),
+  Object.freeze({
+    name: "workflow-preflight-tests",
+    file: "plugins/pipeline-core/lib/workflow-preflight.test.mjs",
+  }),
+  Object.freeze({
+    name: "interaction-continuity-tests",
+    file: "plugins/pipeline-core/lib/interaction-continuity.test.mjs",
+  }),
+]);
+const [SCOPED_SUITE, WORKFLOW_PREFLIGHT_SUITE, INTERACTION_CONTINUITY_SUITE] = SUITES;
 
 function entry(overrides = {}) {
   return {
     schema: "pipeline.scoped-verify-registration.v1",
     taskId: TASK_ID,
     authority: { prd: { path: PRD_PATH, sha256: PRD_SHA256 } },
-    suites: [{ ...SUITE }],
+    suites: SUITES.map((suite) => ({ ...suite })),
     ...overrides,
   };
 }
@@ -55,7 +66,7 @@ function rejects(value) {
   }
 }
 
-check("SVR01 accepts the one static SNT-7 registration bound to its PRD authority", accepts(entry()));
+check("SVR01 accepts only the canonical three-suite SNT-7 registration bound to its PRD authority", accepts(entry()));
 
 for (const field of ["schema", "taskId", "authority", "suites"]) {
   const { [field]: omitted, ...withoutField } = entry();
@@ -96,35 +107,57 @@ check("SVR13 traversal PRD paths fail closed", rejects(entry({
   authority: { prd: { ...entry().authority.prd, path: "specs/../prd_sentinel-epic.md" } },
 })));
 check("SVR14 absolute suite paths fail closed", rejects(entry({
-  suites: [{ ...SUITE, file: `/${SUITE.file}` }],
+  suites: [{ ...SCOPED_SUITE, file: `/${SCOPED_SUITE.file}` }, { ...WORKFLOW_PREFLIGHT_SUITE }, { ...INTERACTION_CONTINUITY_SUITE }],
 })));
 check("SVR15 traversal suite paths fail closed", rejects(entry({
-  suites: [{ ...SUITE, file: "plugins/pipeline-core/lib/../scoped-verify-registration.test.mjs" }],
+  suites: [{ ...SCOPED_SUITE, file: "plugins/pipeline-core/lib/../scoped-verify-registration.test.mjs" }, { ...WORKFLOW_PREFLIGHT_SUITE }, { ...INTERACTION_CONTINUITY_SUITE }],
 })));
 check("SVR16 non-test suite targets fail closed", rejects(entry({
-  suites: [{ ...SUITE, file: "plugins/pipeline-core/lib/scoped-verify-registration.mjs" }],
+  suites: [{ ...SCOPED_SUITE, file: "plugins/pipeline-core/lib/scoped-verify-registration.mjs" }, { ...WORKFLOW_PREFLIGHT_SUITE }, { ...INTERACTION_CONTINUITY_SUITE }],
 })));
 check("SVR17 missing .test.mjs targets relative to the repository root fail closed", rejects(entry({
-  suites: [{ ...SUITE, file: "plugins/pipeline-core/lib/missing-scoped-verify-target.test.mjs" }],
+  suites: [{ ...SCOPED_SUITE, file: "plugins/pipeline-core/lib/missing-scoped-verify-target.test.mjs" }, { ...WORKFLOW_PREFLIGHT_SUITE }, { ...INTERACTION_CONTINUITY_SUITE }],
 })));
-check("SVR18 only the static SNT-7 suite name and existing test target are accepted", rejects(entry({
-  suites: [{
+check("SVR18 an arbitrary existing test path cannot replace an authorized SNT-7 suite", rejects(entry({
+  suites: [
+    { name: "runner-profile-migration-v2-tests", file: "plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs" },
+    { ...WORKFLOW_PREFLIGHT_SUITE },
+    { ...INTERACTION_CONTINUITY_SUITE },
+  ],
+})));
+
+for (const omittedSuite of SUITES) {
+  check(`SVR19 omitting authorized suite ${omittedSuite.name} fails closed`, rejects(entry({
+    suites: SUITES.filter((suite) => suite !== omittedSuite).map((suite) => ({ ...suite })),
+  })));
+}
+check("SVR20 adding a fourth otherwise-valid suite fails closed", rejects(entry({
+  suites: [...SUITES.map((suite) => ({ ...suite })), {
     name: "runner-profile-migration-v2-tests",
     file: "plugins/pipeline-core/lib/runner-profile-migration-v2.test.mjs",
   }],
 })));
-
-const { name: suiteName, ...suiteWithoutName } = SUITE;
-const { file: suiteFile, ...suiteWithoutFile } = SUITE;
-check("SVR19 missing suite name fails closed", rejects(entry({ suites: [suiteWithoutName] })));
-check("SVR20 missing suite file target fails closed", rejects(entry({ suites: [suiteWithoutFile] })));
-check("SVR21 extra suite keys fail closed", rejects(entry({ suites: [{ ...SUITE, enabled: true }] })));
-check("SVR22 an empty suite list fails closed", rejects(entry({ suites: [] })));
-check("SVR23 a duplicate suite name fails closed", rejects(entry({
-  suites: [{ ...SUITE }, { ...SUITE, file: "plugins/pipeline-core/lib/another.test.mjs" }],
+check("SVR21 reordering the canonical allowlist fails closed", rejects(entry({
+  suites: [{ ...WORKFLOW_PREFLIGHT_SUITE }, { ...SCOPED_SUITE }, { ...INTERACTION_CONTINUITY_SUITE }],
 })));
-check("SVR24 a duplicate suite file fails closed", rejects(entry({
-  suites: [{ ...SUITE }, { name: "another-suite", file: SUITE.file }],
+
+const { name: suiteName, ...suiteWithoutName } = SCOPED_SUITE;
+const { file: suiteFile, ...suiteWithoutFile } = SCOPED_SUITE;
+check("SVR22 missing suite name fails closed", rejects(entry({
+  suites: [suiteWithoutName, { ...WORKFLOW_PREFLIGHT_SUITE }, { ...INTERACTION_CONTINUITY_SUITE }],
+})));
+check("SVR23 missing suite file target fails closed", rejects(entry({
+  suites: [suiteWithoutFile, { ...WORKFLOW_PREFLIGHT_SUITE }, { ...INTERACTION_CONTINUITY_SUITE }],
+})));
+check("SVR24 extra suite keys fail closed", rejects(entry({
+  suites: [{ ...SCOPED_SUITE, enabled: true }, { ...WORKFLOW_PREFLIGHT_SUITE }, { ...INTERACTION_CONTINUITY_SUITE }],
+})));
+check("SVR25 an empty suite list fails closed", rejects(entry({ suites: [] })));
+check("SVR26 a duplicate suite name fails closed", rejects(entry({
+  suites: [{ ...SCOPED_SUITE }, { ...WORKFLOW_PREFLIGHT_SUITE, name: SCOPED_SUITE.name }, { ...INTERACTION_CONTINUITY_SUITE }],
+})));
+check("SVR27 a duplicate suite file fails closed", rejects(entry({
+  suites: [{ ...SCOPED_SUITE }, { ...WORKFLOW_PREFLIGHT_SUITE, file: SCOPED_SUITE.file }, { ...INTERACTION_CONTINUITY_SUITE }],
 })));
 
 function scopedRegistrationFailureFixture() {
@@ -157,13 +190,13 @@ function scopedRegistrationFailureFixture() {
   }
 }
 
-check("SVR25 Verify writes only the failed scoped-registration evidence when its registered target is absent", scopedRegistrationFailureFixture());
+check("SVR28 Verify writes only the failed scoped-registration evidence when its registered target is absent", scopedRegistrationFailureFixture());
 
 function prdDriftFixture() {
   const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
   const fixtureRoot = mkdtempSync(join(tmpdir(), "scoped-verify-registration-prd-drift-"));
   const registration = join(fixtureRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs");
-  const suiteTarget = join(fixtureRoot, SUITE.file);
+  const suiteTarget = join(fixtureRoot, SCOPED_SUITE.file);
   const prd = join(fixtureRoot, PRD_PATH);
   const child = join(fixtureRoot, "validate-prd-drift.mjs");
 
@@ -172,7 +205,7 @@ function prdDriftFixture() {
     mkdirSync(dirname(suiteTarget), { recursive: true });
     mkdirSync(dirname(prd), { recursive: true });
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs"), registration);
-    copyFileSync(join(repoRoot, SUITE.file), suiteTarget);
+    copyFileSync(join(repoRoot, SCOPED_SUITE.file), suiteTarget);
     copyFileSync(join(repoRoot, PRD_PATH), prd);
     writeFileSync(prd, `${readFileSync(prd, "utf8")}\nfixture tamper\n`);
     writeFileSync(child, `
@@ -182,7 +215,11 @@ const result = validateScopedVerifyRegistration({
   schema: "pipeline.scoped-verify-registration.v1",
   taskId: "pipeline.verify-gate-scoped-registration",
   authority: { prd: { path: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md", sha256: "2b4c722de508cb9424b3fb83c6308602dd20e7e67ce240740c51deeb58541136" } },
-  suites: [{ name: "scoped-verify-registration-tests", file: "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs" }],
+  suites: [
+    { name: "scoped-verify-registration-tests", file: "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs" },
+    { name: "workflow-preflight-tests", file: "plugins/pipeline-core/lib/workflow-preflight.test.mjs" },
+    { name: "interaction-continuity-tests", file: "plugins/pipeline-core/lib/interaction-continuity.test.mjs" },
+  ],
 });
 assert.deepEqual(result, { ok: false, code: "SVR-PRD-DRIFT" });
 `);
@@ -196,7 +233,7 @@ assert.deepEqual(result, { ok: false, code: "SVR-PRD-DRIFT" });
   }
 }
 
-check("SVR26 detects a tampered canonical PRD from the validator fixture root", prdDriftFixture());
+check("SVR29 detects a tampered canonical PRD from the validator fixture root", prdDriftFixture());
 
 console.log(`\n${passed} passed, ${failed} failed`);
 process.exitCode = failed === 0 ? 0 : 1;
