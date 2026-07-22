@@ -130,7 +130,9 @@ test("inline and reference links are extracted while fenced fakes are ignored", 
 
 test("minimal repository passes", () => {
   const { root } = fixture();
-  assert.deepEqual(runFixture(root).findings, []);
+  const result = runFixture(root);
+  assert.deepEqual(result.findings, []);
+  assert.equal(result.stats.statefulDesignContracts, "not-applicable");
 });
 
 test("missing file and missing anchor fail", () => {
@@ -308,6 +310,59 @@ test("stateful design checklist is complete on both required documentation surfa
     }
   }
 });
+
+const statefulDesignBaseTrackedPaths = [".claude/pipeline.json", "CLAUDE.md", "docs/state.md", "README.md"];
+for (const [presentSurface, missingSurface, phraseKey] of [
+  ["templates/spec.md", "roles/elephant.md", "template"],
+  ["roles/elephant.md", "templates/spec.md", "elephant"],
+]) {
+  test(`a lone ${presentSurface} stateful-design surface fails closed`, () => {
+    const { root } = fixture({
+      [presentSurface]: `${STATEFUL_DESIGN_CONTRACTS.map((contract) => contract[phraseKey]).join("\n")}\n`,
+    });
+    const result = runFixture(root, { trackedPaths: [...statefulDesignBaseTrackedPaths, presentSurface] });
+    assert.notEqual(
+      result.stats.statefulDesignContracts,
+      "not-applicable",
+      `${missingSurface} must not silently disable the stateful-design contract`,
+    );
+    assert(
+      result.findings.some((finding) => finding.startsWith(`stateful-design-contract: ${missingSurface}:`)),
+      `${missingSurface} must have a surface-specific stateful-design finding; got: ${result.findings.join(" | ")}`,
+    );
+  });
+}
+
+for (const [context, conceal] of [
+  ["fenced code", (phrase) => `\n\`\`\`text\n${phrase}\n\`\`\`\n`],
+  ["HTML comment", (phrase) => `<!-- ${phrase} -->`],
+]) {
+  for (const [surface, phraseKey] of [
+    ["templates/spec.md", "template"],
+    ["roles/elephant.md", "elephant"],
+  ]) {
+    test(`stateful-design phrases hidden only in ${context} fail on ${surface}`, () => {
+      const result = checkRepository(REPO, {
+        readText(file) {
+          let text = readFileSync(file, "utf8");
+          if (relative(REPO, file).split("\\").join("/") !== surface) return text;
+          for (const requirement of STATEFUL_DESIGN_CONTRACTS) {
+            const phrase = requirement[phraseKey];
+            assert(text.includes(phrase), `${surface} fixture must contain ${requirement.id}`);
+            text = text.replaceAll(phrase, conceal(phrase));
+          }
+          return text;
+        },
+      });
+      for (const requirement of STATEFUL_DESIGN_CONTRACTS) {
+        assert(
+          result.findings.includes(`stateful-design-contract: ${surface}: ${requirement.id}`),
+          `${surface} must reject ${requirement.id} hidden only in ${context}; got: ${result.findings.join(" | ")}`,
+        );
+      }
+    });
+  }
+}
 
 test("current repository integration passes and excludes the instruction path", () => {
   const result = checkRepository(REPO);
