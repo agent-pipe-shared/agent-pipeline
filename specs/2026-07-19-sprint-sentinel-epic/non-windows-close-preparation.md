@@ -81,3 +81,12 @@ Windows-, Linux-, WSL- oder macOS-Evidenz.
    echten Remote-Effekten durchführen.
 5. Erst danach die einzelnen sanktionierten Writer-Übergänge und die finale
    21-Item-Reconciliation prüfen.
+
+## Rollback
+
+Diese Vorbereitung ist ohne Laufzeit-, Status- oder Remote-Nebenwirkung
+reversibel: Ein normaler Revert der Commits, die diese Datei und ihren
+`docs/state.md`-Verweis einführen, entfernt ausschließlich die
+Arbeitsvorbereitung. Danach `node harness/scripts/check-doc-contracts.mjs` und
+Full Verify auf dem Revert-Kandidaten ausführen. Kein Backlog-Item, Ledger,
+Receipt oder Release-Ref wird dabei geändert oder zurückgesetzt.
