@@ -21,6 +21,7 @@ import {
 } from "../lib/codex-sandbox-compatibility.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { resolvePoGateRepositoryTopology } from "../lib/po-gate-authority.mjs";
+import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
 const DUTIES = new Set(["advisory", "readiness", "critic"]);
 const FAILURE_CLASSES = new Set(["policy-drift", "host-unsupported", "evidence-stale", "preflight-failed", "profile-drift", "host-mode-unavailable"]);
@@ -312,23 +313,33 @@ function assertPrivateOwner(stat, label) {
 }
 function privateFile(path) {
   const lexical = lstatSync(path);
-  if (lexical.isSymbolicLink() || !lexical.isFile() || lexical.nlink !== 1 || (lexical.mode & 0o777) !== 0o600) {
+  const posixModeViolation = process.platform !== "win32" && (lexical.mode & 0o777) !== 0o600;
+  if (lexical.isSymbolicLink() || !lexical.isFile() || lexical.nlink !== 1 || posixModeViolation) {
     fail("private sandbox record is not a private single-link regular file");
   }
   assertPrivateOwner(lexical, "private sandbox record");
   if (realpathSync(path) !== resolve(path)) fail("private sandbox record crosses a symlink");
+  if (process.platform === "win32" && (assessWindowsPrivatePath(path).status !== "secure" || assessWindowsPrivatePath(dirname(path)).status !== "secure")) {
+    fail("private sandbox record Windows assurance is unavailable or insecure");
+  }
   return lexical;
 }
 function privateDirectory(path) {
-  if (!existsSync(path)) mkdirSync(path, { recursive: true, mode: 0o700 });
+  const existed = existsSync(path);
+  if (!existed) mkdirSync(path, { recursive: true, mode: 0o700 });
   const lexical = lstatSync(path);
   if (lexical.isSymbolicLink() || !lexical.isDirectory() || realpathSync(path) !== resolve(path)) {
     fail("private sandbox store path is not a physical directory");
   }
   chmodSync(path, 0o700);
   const stat = statSync(path);
-  if (!stat.isDirectory() || (stat.mode & 0o777) !== 0o700 || realpathSync(path) !== resolve(path)) fail("private sandbox store path is not a mode-0700 physical directory");
+  const posixModeViolation = process.platform !== "win32" && (stat.mode & 0o777) !== 0o700;
+  if (!stat.isDirectory() || posixModeViolation || realpathSync(path) !== resolve(path)) fail("private sandbox store path is not a mode-0700 physical directory");
   assertPrivateOwner(stat, "private sandbox store path");
+  if (process.platform === "win32") {
+    const state = existed ? assessWindowsPrivatePath(path) : hardenWindowsPrivateDirectory(path);
+    if (state.status !== "secure") fail("private sandbox store Windows assurance is unavailable or insecure");
+  }
   return stat;
 }
 function canonicalBytes(value) { return Buffer.from(canonicalJson(value), "utf8"); }
@@ -347,11 +358,15 @@ function privateLockFile(path) {
   const lexical = lstatSync(path);
   // A no-replace hard-link publish has a brief, safe two-link interval before
   // its staging name is removed. Lock ownership remains fully readable there.
-  if (lexical.isSymbolicLink() || !lexical.isFile() || ![1, 2].includes(lexical.nlink) || (lexical.mode & 0o777) !== 0o600) {
+  const posixModeViolation = process.platform !== "win32" && (lexical.mode & 0o777) !== 0o600;
+  if (lexical.isSymbolicLink() || !lexical.isFile() || ![1, 2].includes(lexical.nlink) || posixModeViolation) {
     fail("private sandbox lock is not a private regular file");
   }
   assertPrivateOwner(lexical, "private sandbox lock");
   if (realpathSync(path) !== resolve(path)) fail("private sandbox lock crosses a symlink");
+  if (process.platform === "win32" && (assessWindowsPrivatePath(path).status !== "secure" || assessWindowsPrivatePath(dirname(path)).status !== "secure")) {
+    fail("private sandbox lock Windows assurance is unavailable or insecure");
+  }
   return lexical;
 }
 function deadLockOwner(path) {
