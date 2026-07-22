@@ -23,8 +23,10 @@ import {
 import {
   applyBacklogTransition,
   applySentinelBacklogRecovery,
+  applySentinelScopeExtension,
   checkBacklogState,
   planSentinelBacklogRecovery,
+  planSentinelScopeExtension,
   recoverBacklogTransaction,
   writeBacklogProjections,
 } from "../scripts/check-backlog-state.mjs";
@@ -250,6 +252,29 @@ function recoveryFixture(catalog = sentinelCatalog()) {
       && validateSentinelRecoveryCatalog(unknown).some((finding) => finding.includes("unsupported field unreviewed"))
       && validateSentinelRecoveryCatalog(empty).some((finding) => finding.includes("non-empty array"))
       && !blocked.ok && blocked.findings.some((finding) => finding.includes("must not claim closed status")), blocked.findings.join("; "));
+}
+{
+  const root = recoveryFixture();
+  applySentinelBacklogRecovery(root, { checkCommit: false, evidenceCommit: "a".repeat(40) });
+  const extension = {
+    schema: "pipeline.sentinel-scope-extension.v1",
+    source: "specs/sentinel-windows-blockers.md",
+    admittedAt: "2026-07-22",
+    items: [{ id: "pipeline.windows-runtime-baseline-containment", status: "open", type: "defect" }],
+  };
+  write(root, "backlog/sentinel-scope-extension-2026-07-22.json", `${JSON.stringify(extension)}\n`);
+  const options = {
+    checkCommit: false,
+    evidenceCommit: "a".repeat(40),
+  };
+  const preview = planSentinelScopeExtension(root, extension, options);
+  const applied = applySentinelScopeExtension(root, extension, options);
+  const added = applied.events?.at(-1);
+  check("BS08cc Sentinel scope extension uses the sanctioned recovery transaction with truthful actor and evidence",
+    preview.ok && !preview.wrote && applied.ok && applied.wrote
+      && added?.actor === "sentinel-scope-extension" && added?.evidence?.kind === "sentinel-scope-extension"
+      && added?.reason === "Record the PO-approved Sentinel scope extension; no implementation or closure is claimed."
+      && checkBacklogState(root, { checkCommit: false }).ok, applied.findings.join("; "));
 }
 {
   const root = recoveryFixture();
