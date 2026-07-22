@@ -3,12 +3,16 @@
 
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
 import test from "node:test";
 
 import { main } from "./codex-private-overlay-activation.mjs";
 
-const PROJECT_ROOT = "/private/project";
-const SOURCE_PLUGIN_ROOT = "/local/marketplace/plugins/pipeline-core";
+// Fixed argv-shape literals; wrapped through resolve() so they stay
+// host-canonical (production requires resolve(path) === path) on whichever
+// platform runs this test instead of being a Linux-only POSIX literal.
+const PROJECT_ROOT = resolve("/private/project");
+const SOURCE_PLUGIN_ROOT = resolve("/local/marketplace/plugins/pipeline-core");
 const SENTINEL = "private-host-sentinel";
 const PLAN_SHA256 = "a".repeat(64);
 const USAGE = "Usage: codex-private-overlay-activation.mjs <inspect|plan|status|load-context> --project-root <absolute-path>\n       codex-private-overlay-activation.mjs activate --project-root <absolute-path> --expected-plan-sha256 <64hex>\n";
