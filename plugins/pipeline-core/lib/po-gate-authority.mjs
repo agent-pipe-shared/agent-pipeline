@@ -256,6 +256,16 @@ export function serializePoGateProfileReceipt(receipt) {
   return `${JSON.stringify(ordered, null, 2)}\n`;
 }
 
+/**
+ * Git (including Git for Windows) always emits worktree porcelain roots with
+ * `/` separators, even on win32. Canonicalize only that fixed separator
+ * convention before the strict absolute-path check; never relax the check
+ * itself, and leave POSIX platforms byte-for-byte unchanged.
+ */
+function gitWorktreeRootCandidate(root) {
+  return process.platform === "win32" ? root.replaceAll("/", sep) : root;
+}
+
 /** Parse `git worktree list --porcelain -z` without exposing paths in errors. */
 export function parseGitWorktreeList(raw) {
   if (typeof raw !== "string" || !raw.endsWith("\0")) return null;
@@ -265,7 +275,7 @@ export function parseGitWorktreeList(raw) {
     const fields = record.split("\0").filter(Boolean);
     if (!fields[0]?.startsWith("worktree ")) return null;
     const root = fields[0].slice("worktree ".length);
-    if (normalizeAbsolute(root) === null) return null;
+    if (normalizeAbsolute(gitWorktreeRootCandidate(root)) === null) return null;
     const head = fields.find((field) => field.startsWith("HEAD "))?.slice(5);
     const branch = fields.find((field) => field.startsWith("branch "))?.slice(7) ?? null;
     const detached = fields.includes("detached");

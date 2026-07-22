@@ -14,7 +14,7 @@
 import { chmodSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync, renameSync, symlinkSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -37,11 +37,13 @@ import {
   PO_GATE_AUTHORITY_EVIDENCE_SCHEMA,
   PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA,
   PO_GATE_PRD_LANGUAGE_MARKER,
+  PO_GATE_PROFILE_RECEIPT_RELATIVE_PATH,
   createPoGateProfileReceipt,
   derivePoGateRepositoryFingerprint,
   poGateProfileReceiptPath,
   serializePoGateProfileReceipt,
 } from "../../plugins/pipeline-core/lib/po-gate-authority.mjs";
+import { hardenWindowsPrivateDirectory } from "../../plugins/pipeline-core/lib/windows-private-state.mjs";
 
 const CLI = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
 const ALL_DIRS = [];
@@ -61,6 +63,15 @@ function ok(id, cond, detail = "") {
     failures.push(`${id}${detail ? `: ${detail}` : ""}`);
     console.log(`FAIL  ${id}${detail ? ` -- ${detail}` : ""}`);
   }
+}
+
+let symlinkCapable = true;
+{
+  const probeDir = mkdtempSync(join(tmpdir(), "pipeline-state-symlink-probe-"));
+  try { writeFileSync(join(probeDir, "target"), "x"); symlinkSync(join(probeDir, "target"), join(probeDir, "link")); }
+  catch { symlinkCapable = false; }
+  finally { rmSync(probeDir, { recursive: true, force: true }); }
+  if (!symlinkCapable) console.log("[capability: symlink unavailable] skipping symlink-specific checks");
 }
 
 function captureConsoleError(action) {
@@ -144,6 +155,13 @@ function seedSubprocessPoGateAuthority(dir, planPath) {
   });
   const receiptPath = poGateProfileReceiptPath(gitCommonDir);
   mkdirSync(join(gitCommonDir, "agent-pipeline", "po-gate"), { recursive: true });
+  if (process.platform === "win32") {
+    let cursor = gitCommonDir;
+    for (const component of dirname(PO_GATE_PROFILE_RECEIPT_RELATIVE_PATH).split(/[\\/]/u).filter(Boolean)) {
+      cursor = join(cursor, component);
+      hardenWindowsPrivateDirectory(cursor);
+    }
+  }
   writeFileSync(receiptPath, serializePoGateProfileReceipt(receipt));
   chmodSync(receiptPath, 0o600);
 }
@@ -1149,7 +1167,7 @@ function canonicalFixtureJson(value) {
 }
 
 // ---- PS43: unsafe request paths and symlinks fail before lock acquisition -------------------
-{
+if (symlinkCapable) {
   const dir = freshDir("continuity-request-path");
   seedContinuityRoot(dir);
   const outside = writeRequest(dir, "real-request", continuityState());
@@ -1416,16 +1434,18 @@ function canonicalFixtureJson(value) {
     ok(`PS44W ${name} Result bytes are refused byte-null`, refused === 2 && readFileSync(statePath(dir), "utf8") === before);
   }
 
-  const ancestorDir = freshDir("continuity-result-ancestor-symlink");
-  const outsideDir = freshDir("continuity-result-ancestor-target");
-  run(["set-feature", "--id", CONTINUITY_FEATURE, "--plan-path", "specs/prd.md"], { dir: ancestorDir, now: FIXED_NOW });
-  writeFileSync(join(outsideDir, "result.md"), RESULT_FIXTURE);
-  symlinkSync(outsideDir, join(ancestorDir, "specs"));
-  const initFile = writeRequest(ancestorDir, "ancestor-init", continuityState());
-  const before = readFileSync(statePath(ancestorDir), "utf8");
-  const refused = run(continuityArgs("continuity-init", "absent", initFile), continuityDeps(ancestorDir));
-  ok("PS44W ancestor symlink in Result path is refused before mutation", refused === 2
-    && readFileSync(statePath(ancestorDir), "utf8") === before);
+  if (symlinkCapable) {
+    const ancestorDir = freshDir("continuity-result-ancestor-symlink");
+    const outsideDir = freshDir("continuity-result-ancestor-target");
+    run(["set-feature", "--id", CONTINUITY_FEATURE, "--plan-path", "specs/prd.md"], { dir: ancestorDir, now: FIXED_NOW });
+    writeFileSync(join(outsideDir, "result.md"), RESULT_FIXTURE);
+    symlinkSync(outsideDir, join(ancestorDir, "specs"));
+    const initFile = writeRequest(ancestorDir, "ancestor-init", continuityState());
+    const before = readFileSync(statePath(ancestorDir), "utf8");
+    const refused = run(continuityArgs("continuity-init", "absent", initFile), continuityDeps(ancestorDir));
+    ok("PS44W ancestor symlink in Result path is refused before mutation", refused === 2
+      && readFileSync(statePath(ancestorDir), "utf8") === before);
+  }
 }
 
 // ---- PS44X: historical entries are recursively validated, not checksum-trusted ---------

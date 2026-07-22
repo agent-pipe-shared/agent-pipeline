@@ -9,6 +9,7 @@ import {
   mkdirSync,
   mkdtempSync,
   readFileSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   unlinkSync,
@@ -22,6 +23,7 @@ import { run as runPipelineState } from "../../../harness/scripts/pipeline-state
 
 import {
   PO_GATE_PRD_LANGUAGE_MARKER,
+  PO_GATE_PROFILE_RECEIPT_RELATIVE_PATH,
   createPoGateProfileReceipt,
   derivePoGateRepositoryFingerprint,
   normalizeRepositoryPath,
@@ -35,6 +37,8 @@ import {
   validatePoGateProfileReceipt,
   validatePoGateProfileForRepository,
 } from "./po-gate-authority.mjs";
+import { hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
+import { resolveTrustedSystemExecutable } from "./trusted-tool-resolution.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(HERE, "..", "..", "..");
@@ -49,10 +53,53 @@ function check(name, fn) {
   process.stdout.write(`ok ${passed} - ${name}\n`);
 }
 
+let symlinkCapable = true;
+{
+  const probeDir = mkdtempSync(join(tmpdir(), "po-gate-authority-symlink-probe-"));
+  try { writeFileSync(join(probeDir, "target"), "x"); symlinkSync(join(probeDir, "target"), join(probeDir, "link")); }
+  catch { symlinkCapable = false; }
+  finally { rmSync(probeDir, { recursive: true, force: true }); }
+  if (!symlinkCapable) process.stdout.write("[capability: symlink unavailable] skipping symlink-specific checks\n");
+}
+
 function write(path, value, mode = undefined) {
   mkdirSync(dirname(path), { recursive: true });
   writeFileSync(path, value);
   if (mode !== undefined) chmodSync(path, mode);
+}
+
+/**
+ * The fixture writes the receipt directly (it is not exercising the
+ * production publisher), so on win32 it must reproduce the publisher's own
+ * per-directory hardening: `loadReceipt` requires both the receipt file and
+ * its parent directory to report a secure DACL. POSIX is unaffected.
+ */
+function hardenWindowsReceiptDirectory(common) {
+  if (process.platform !== "win32") return;
+  let cursor = common;
+  for (const component of dirname(PO_GATE_PROFILE_RECEIPT_RELATIVE_PATH).split(/[\\/]/u).filter(Boolean)) {
+    cursor = join(cursor, component);
+    const state = hardenWindowsPrivateDirectory(cursor);
+    assert.equal(state.status, "secure", `fixture could not harden ${component}: ${JSON.stringify(state)}`);
+  }
+}
+
+/**
+ * Simulate a receipt whose closed-permission acceptance criterion fails.
+ * POSIX enforces this via the 0600 mode bit; win32 has no mode-bit analog
+ * (chmod there cannot express DACL state), so simulate the equivalent
+ * insecurity by granting an extra DACL principal via the fixed system
+ * `icacls` tool -- never by weakening `evaluateWindowsPrivateState` itself.
+ */
+function weakenReceiptPermissions(path) {
+  if (process.platform !== "win32") {
+    chmodSync(path, 0o644);
+    return;
+  }
+  const icacls = resolveTrustedSystemExecutable("icacls");
+  assert.equal(icacls.ok, true, `fixture requires the system icacls tool: ${JSON.stringify(icacls)}`);
+  const result = spawnSync(icacls.path, [path, "/grant", "*S-1-1-0:(R)"], { encoding: "utf8", shell: false });
+  assert.equal(result.status, 0, `fixture could not weaken the receipt DACL: ${result.stderr}`);
 }
 
 function source(language) {
@@ -100,7 +147,10 @@ function publishReceipt(common, primary) {
     updatedAt: NOW,
   });
   const path = poGateProfileReceiptPath(common);
-  write(path, serializePoGateProfileReceipt(receipt), 0o600);
+  mkdirSync(dirname(path), { recursive: true });
+  hardenWindowsReceiptDirectory(common);
+  writeFileSync(path, serializePoGateProfileReceipt(receipt));
+  chmodSync(path, 0o600);
   return { path, receipt };
 }
 
@@ -196,7 +246,7 @@ check("profile-only readback validates the receipt without pipeline-state, PRD o
 check("profile-only readback rejects missing, stale and non-0600 receipts", () => {
   for (const mutation of [
     ({ receiptPath }) => unlinkSync(receiptPath),
-    ({ receiptPath }) => chmodSync(receiptPath, 0o644),
+    ({ receiptPath }) => weakenReceiptPermissions(receiptPath),
     ({ primary }) => write(join(primary, "pipeline.user.yaml"), `${source("de")}# stale\n`),
     ({ primary }) => write(join(primary, ".claude", "pipeline.yaml"), runtime("en")),
   ]) {
@@ -209,7 +259,7 @@ check("profile-only readback rejects missing, stale and non-0600 receipts", () =
   }
 });
 
-check("profile-only readback rejects symlinked receipt, source and runtime inputs", () => {
+if (symlinkCapable) check("profile-only readback rejects symlinked receipt, source and runtime inputs", () => {
   withFixture({}, ({ base, receiptPath, validateProfile }) => {
     const outside = join(base, "outside-receipt.json");
     write(outside, readFileSync(receiptPath), 0o600);
@@ -244,7 +294,7 @@ check("profile-only readback follows the existing registered linked-worktree aut
 check("profile-only failures and evidence never expose machine-local paths or raw profile bytes", () => {
   withFixture({ linkedLanguage: "en" }, ({ base, primary, current, receiptPath, validateProfile }) => {
     const validOutput = JSON.stringify(validateProfile());
-    chmodSync(receiptPath, 0o644);
+    weakenReceiptPermissions(receiptPath);
     const failedOutput = JSON.stringify(validateProfile());
     for (const output of [validOutput, failedOutput]) {
       for (const forbidden of [base, primary, current, source("de"), runtime("de")]) {
@@ -321,7 +371,7 @@ check("a stale primary projection invalidates the common receipt", () => {
 check("missing, non-0600 and noncanonical receipts all fail closed with repair guidance", () => {
   for (const mutation of [
     ({ receiptPath }) => unlinkSync(receiptPath),
-    ({ receiptPath }) => chmodSync(receiptPath, 0o644),
+    ({ receiptPath }) => weakenReceiptPermissions(receiptPath),
     ({ receiptPath, receipt }) => writeFileSync(receiptPath, JSON.stringify(receipt)),
   ]) {
     withFixture({}, (f) => {
@@ -334,7 +384,7 @@ check("missing, non-0600 and noncanonical receipts all fail closed with repair g
   }
 });
 
-check("symlinked receipt leaves and parents fail before receipt content is trusted", () => {
+if (symlinkCapable) check("symlinked receipt leaves and parents fail before receipt content is trusted", () => {
   withFixture({}, ({ base, receiptPath, validate }) => {
     const alternate = join(base, "alternate-receipt.json");
     write(alternate, readFileSync(receiptPath));
@@ -406,7 +456,7 @@ check("an unregistered current checkout cannot borrow the primary authority", ()
   });
 });
 
-check("symlinked feature directories and PRD leaves fail physical-path validation", () => {
+if (symlinkCapable) check("symlinked feature directories and PRD leaves fail physical-path validation", () => {
   withFixture({}, ({ base, primary, validate }) => {
     const feature = join(primary, "specs", "feature");
     const outside = join(base, "outside-feature");
@@ -560,11 +610,15 @@ check("approve-plan leaves state unchanged when the initial worktree authority i
 
 check("detached worktree porcelain is parsed without branch inference", () => {
   const oid = "a".repeat(40);
-  const raw = `worktree /repo\0HEAD ${oid}\0branch refs/heads/main\0\0worktree /repo/branch/detached/x\0HEAD ${oid}\0detached\0\0`;
+  // Real Git always emits worktree porcelain roots as full absolute paths -- with a
+  // drive letter on native Windows (e.g. "D:/repo"), never a bare POSIX-style "/repo".
+  const primaryRoot = process.platform === "win32" ? "D:/repo" : "/repo";
+  const detachedRoot = process.platform === "win32" ? "D:/repo/branch/detached/x" : "/repo/branch/detached/x";
+  const raw = `worktree ${primaryRoot}\0HEAD ${oid}\0branch refs/heads/main\0\0worktree ${detachedRoot}\0HEAD ${oid}\0detached\0\0`;
   const entries = parseGitWorktreeList(raw);
   assert.equal(entries.length, 2);
-  assert.equal(selectPrimaryWorktree(entries).root, "/repo");
-  assert.deepEqual(entries[1], { root: "/repo/branch/detached/x", head: oid, branch: null, detached: true });
+  assert.equal(selectPrimaryWorktree(entries).root, primaryRoot);
+  assert.deepEqual(entries[1], { root: detachedRoot, head: oid, branch: null, detached: true });
   assert.equal(parseGitWorktreeList(`worktree relative\0HEAD ${oid}\0detached\0\0`), null);
 });
 
@@ -642,7 +696,11 @@ check("literal linked detached worktree uses the primary receipt without reconci
     git(primary, "add", ".");
     git(primary, "commit", "-m", "fixture");
     git(primary, "worktree", "add", "--detach", linked, "HEAD");
-    const commonRaw = git(primary, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    // Real Git always emits --git-common-dir with "/" separators, even on native
+    // Windows; production always realpathSync's this before use (which canonicalizes
+    // to the host's own separator convention) -- match that here rather than feeding
+    // raw git output straight into normalizeAbsolute's strict resolve(x)===x check.
+    const commonRaw = realpathSync(git(primary, "rev-parse", "--path-format=absolute", "--git-common-dir"));
     publishReceipt(commonRaw, primary);
 
     write(join(linked, "pipeline.user.yaml"), source("en"));

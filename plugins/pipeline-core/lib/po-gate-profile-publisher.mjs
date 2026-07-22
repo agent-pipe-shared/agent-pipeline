@@ -119,10 +119,29 @@ function ensurePhysicalPrivateDirectory(commonDir, relativeDirectory, io) {
   return { common, parent: cursor };
 }
 
+function unsupportedDirectoryDurability(error) {
+  return process.platform === "win32"
+    && (error?.code === "EPERM" || error?.code === "EINVAL"
+      || error?.code === "EISDIR" || error?.code === "EACCES"
+      || error?.code === "ENOTSUP");
+}
 function syncDirectory(path, io) {
-  const descriptor = io.openSync(path, constants.O_RDONLY);
+  // Directory durability is a hard POSIX flush; native Windows raises EPERM/EINVAL
+  // on directory handles. The preceding regular-file fsync is the hard durability
+  // guarantee; parent-directory durability is best-effort on Windows and its typed-
+  // unavailable outcome is not a failure.
+  let descriptor;
+  try {
+    descriptor = io.openSync(path, constants.O_RDONLY);
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
+  }
   try {
     io.fsyncSync(descriptor);
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
   } finally {
     io.closeSync(descriptor);
   }
