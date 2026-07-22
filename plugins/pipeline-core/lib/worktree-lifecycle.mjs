@@ -261,9 +261,36 @@ export function canonicalDetachedTarget(primaryRoot, purpose, oid) {
   return { purpose: label, oid, target };
 }
 
+/**
+ * Directory durability is a hard POSIX flush but is not portably available on
+ * native Windows, where opening or fsync-ing a directory handle raises
+ * EPERM/EINVAL. The regular-file flush that precedes every call is the hard
+ * durability guarantee; parent-directory durability is therefore best-effort on
+ * Windows, and its typed-unavailable outcome is not a failure.
+ */
+function unsupportedDirectoryDurability(error) {
+  return process.platform === "win32"
+    && (error?.code === "EPERM" || error?.code === "EINVAL"
+      || error?.code === "EISDIR" || error?.code === "EACCES"
+      || error?.code === "ENOTSUP");
+}
+
 function fsyncDirectory(path) {
-  const fd = openSync(path, "r");
-  try { fsyncSync(fd); } finally { closeSync(fd); }
+  let fd;
+  try {
+    fd = openSync(path, "r");
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
+  }
+  try {
+    fsyncSync(fd);
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
+  } finally {
+    closeSync(fd);
+  }
 }
 
 function writeAtomic(path, bytes, mode = 0o600) {
