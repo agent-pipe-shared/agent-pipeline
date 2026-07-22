@@ -16,6 +16,10 @@ import { checkObservationGovernance } from "./check-observation-governance.mjs";
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const EXCLUDED_PATH = "AGENTS.md";
 const STATEFUL_DESIGN_SURFACES = ["templates/spec.md", "roles/elephant.md"];
+const STATEFUL_DESIGN_OPERATIVE_HEADINGS = [
+  "### 2a. Stateful guard/control pre-readiness checklist (conditional, mandatory)",
+  "### EL-07 (MUST) — Spec-readiness check before implementation",
+];
 const STATEFUL_DESIGN_CONTRACTS = [
   {
     id: "authority-issuer-replay",
@@ -71,6 +75,16 @@ function defaultReadText(file) {
   return decoder.decode(readFileSync(file));
 }
 
+function extractMarkdownSection(markdown, heading) {
+  const lines = markdown.split("\n");
+  const start = lines.findIndex((line) => line.trimEnd() === heading);
+  if (start === -1) return "";
+
+  const level = heading.match(/^#+/)[0].length;
+  const end = lines.findIndex((line, index) => index > start && (line.match(/^(#{1,6})\s/)?.[1].length ?? Infinity) <= level);
+  return lines.slice(start, end === -1 ? undefined : end).join("\n");
+}
+
 /**
  * Check the two stateful-design documentation surfaces against their distinct,
  * equivalent checklist wording. Callers decide whether both surfaces apply.
@@ -80,7 +94,8 @@ export function checkStatefulDesignContracts(surfaces) {
   for (const [surfaceIndex, surface] of STATEFUL_DESIGN_SURFACES.entries()) {
     const text = surfaces[surface];
     if (typeof text !== "string") continue;
-    const operativeText = stripFencedCode(text).replace(/<!--[\s\S]*?-->/g, "");
+    const visibleText = stripFencedCode(text).replace(/<!--[\s\S]*?-->/g, "");
+    const operativeText = extractMarkdownSection(visibleText, STATEFUL_DESIGN_OPERATIVE_HEADINGS[surfaceIndex]);
     for (const contract of STATEFUL_DESIGN_CONTRACTS) {
       if (!operativeText.includes(contract.phrases[surfaceIndex])) {
         findings.push(`stateful-design-contract: ${surface}: ${contract.id}`);
