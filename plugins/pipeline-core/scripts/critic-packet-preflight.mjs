@@ -31,6 +31,7 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { loadManifest } from "../lib/manifest.mjs";
+import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 import { deriveCriticExportView, validateCriticExportAuthorization } from "../lib/critic-export-policy.mjs";
 import {
   CRITIC_PACKET_GOVERNANCE_INPUT_SCHEMA,
@@ -114,8 +115,10 @@ function inside(root, child) {
 function assertRealPrivateDir(path, label) {
   const lexical = lstatSync(path);
   if (lexical.isSymbolicLink() || !lexical.isDirectory()) fail("CPP-CONTROL", `${label} must be a real directory.`);
-  if ((lexical.mode & 0o077) !== 0) fail("CPP-CONTROL", `${label} must deny group and other access.`);
-  return realpathSync(path);
+  if (process.platform !== "win32" && (lexical.mode & 0o077) !== 0) fail("CPP-CONTROL", `${label} must deny group and other access.`);
+  const physical = realpathSync(path);
+  if (process.platform === "win32" && assessWindowsPrivatePath(physical).status !== "secure") fail("CPP-CONTROL", `${label} Windows assurance is unavailable or insecure.`);
+  return physical;
 }
 function assertNoSymlinkPath(path, root, label) {
   const realRoot = realpathSync(root);
@@ -148,6 +151,7 @@ function publishExclusive(path, value) {
     throw error;
   } finally { unlinkSync(temporary); }
   chmodSync(path, 0o600);
+  if (process.platform === "win32" && assessWindowsPrivatePath(path).status !== "secure") fail("CPP-RECORD", "Packet record Windows assurance is unavailable or insecure.");
   return { bytes: Buffer.byteLength(bytes), sha256: sha256(bytes) };
 }
 function replaceState(path, value) {
@@ -155,13 +159,15 @@ function replaceState(path, value) {
   const fd = openSync(temporary, "wx", 0o600);
   try { writeFileSync(fd, canonicalJson(value)); fsyncSync(fd); } finally { closeSync(fd); }
   renameSync(temporary, path);
+  if (process.platform === "win32" && assessWindowsPrivatePath(path).status !== "secure") fail("CPP-RECORD", "Packet state Windows assurance is unavailable or insecure.");
   fsyncDir(dirname(path));
 }
 function readJson(path, code = "CPP-RECORD") {
   const info = lstatSync(path);
-  if (info.isSymbolicLink() || !info.isFile() || info.size > 1024 * 1024 || (info.mode & 0o077) !== 0) {
+  if (info.isSymbolicLink() || !info.isFile() || info.size > 1024 * 1024 || (process.platform !== "win32" && (info.mode & 0o077) !== 0)) {
     fail(code, `${path} is not a private bounded regular file.`);
   }
+  if (process.platform === "win32" && (assessWindowsPrivatePath(path).status !== "secure" || assessWindowsPrivatePath(dirname(path)).status !== "secure")) fail(code, `${path} Windows assurance is unavailable or insecure.`);
   try { return JSON.parse(readFileSync(path, "utf8")); } catch { fail(code, `${path} is not valid JSON.`); }
 }
 
@@ -331,7 +337,8 @@ function revalidateCandidate(packet) {
   let diffBytes;
   try {
     const info = lstatSync(join(checkout, packet.diff.path));
-    if (!info.isFile() || info.isSymbolicLink() || (info.mode & 0o077) !== 0 || info.size !== packet.diff.bytes) fail("CPP-DIFF", "Packet diff snapshot is not a private exact regular file.");
+    if (!info.isFile() || info.isSymbolicLink() || (process.platform !== "win32" && (info.mode & 0o077) !== 0) || info.size !== packet.diff.bytes) fail("CPP-DIFF", "Packet diff snapshot is not a private exact regular file.");
+    if (process.platform === "win32" && (assessWindowsPrivatePath(join(checkout, packet.diff.path)).status !== "secure" || assessWindowsPrivatePath(dirname(join(checkout, packet.diff.path))).status !== "secure")) fail("CPP-DIFF", "Packet diff snapshot Windows assurance is unavailable or insecure.");
     diffBytes = readFileSync(join(checkout, packet.diff.path));
   } catch (error) {
     if (error instanceof CriticPacketError) throw error;
@@ -376,6 +383,7 @@ export function prepareCandidatePacket(options, { now = new Date(), nonce = rand
     const diffPaths = changedPaths(repoRoot, base, candidate);
     const packetDir = assertNoSymlinkPath(join(controlRoot, options.packetId), controlRoot, "packet directory");
     mkdirSync(packetDir, { mode: 0o700 });
+    if (process.platform === "win32" && hardenWindowsPrivateDirectory(packetDir).status !== "secure") fail("CPP-CONTROL", "packet directory Windows assurance is unavailable or insecure.");
     const checkoutPath = join(packetDir, "checkout");
     const creatorNonce = nonce(32).toString("hex");
     const cleanupCapability = nonce(32).toString("hex");
