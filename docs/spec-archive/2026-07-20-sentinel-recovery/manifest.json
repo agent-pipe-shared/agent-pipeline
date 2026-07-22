@@ -18,7 +18,7 @@
   "sha256": {
     "prd": "0c4b426c7b691b433cbc9a6963d8010e6c737efd00cb22c405a78b9d5743d5ca",
     "spec": "aaec0b6411626b3f1988dbd2f5db16b2870c9aaed07e5edd3ed1e1e735c43b9b",
-    "acceptance": "c21f1973e5ef43b397ad25a5b7a868886b2df032bf03e770c6de07d5e84404be",
+    "acceptance": "b1663fb3e1d8c3e7c38b0a591705e432ad878fddd3c2647c3c6f5d40b82d04d7",
     "design": "3b4cee9f23a5db1ea7318ce86a1190d1ec868561b55a7ee9b30994ff0d073075",
     "recovery": "dbac9bafece60f965e7f1aa6c5d4b28665474678ce4be78591ca78f506b2a840"
   }
