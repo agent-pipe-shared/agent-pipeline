@@ -14,6 +14,7 @@ import { lstatSync, realpathSync } from "node:fs";
 import { isAbsolute, resolve } from "node:path";
 
 import { validatePrivateDocumentAdapter } from "./document-adapter.mjs";
+import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 
 export const DOCUMENT_RENDER_SYSTEMD_RUN = "/usr/bin/systemd-run";
 export const DOCUMENT_RENDER_RUNTIME_SECONDS = 295;
@@ -33,7 +34,12 @@ function absolutePhysical(path, label, { stat = lstatSync, realpath = realpathSy
   if (typeof path !== "string" || path.includes("\0") || !isAbsolute(path) || resolve(path) !== path) fail("DR-PATH", `${label} must be canonical absolute`);
   let info;
   try { info = stat(path); } catch { fail("DR-PATH", `${label} is unavailable`); }
-  if (!info.isDirectory() || info.isSymbolicLink() || (info.mode & 0o077) !== 0) fail("DR-PATH", `${label} must be a physical owner-only directory`);
+  // POSIX mode bits express owner-only exclusivity directly; native Windows has no
+  // such mode semantics (mode is a synthetic constant), so the equivalent assurance
+  // there is the shared owner-DACL check, never a relaxed/skipped check.
+  const posixModeViolation = process.platform !== "win32" && (info.mode & 0o077) !== 0;
+  const windowsInsecure = process.platform === "win32" && assessWindowsPrivatePath(path).status !== "secure";
+  if (!info.isDirectory() || info.isSymbolicLink() || posixModeViolation || windowsInsecure) fail("DR-PATH", `${label} must be a physical owner-only directory`);
   try { if (realpath(path) !== path) fail("DR-PATH", `${label} must be physical`); }
   catch (error) { if (error instanceof DocumentRenderControllerError) throw error; fail("DR-PATH", `${label} is unavailable`); }
   return path;

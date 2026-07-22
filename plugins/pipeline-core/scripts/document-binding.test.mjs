@@ -41,6 +41,7 @@ import {
   validateRendererRequest,
   validateRendererResponse,
 } from "./document-render-protocol.mjs";
+import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLI = join(HERE, "document-binding.mjs");
@@ -65,6 +66,10 @@ function fixture() {
   writeFileSync(dataPath, "{}\n", { mode: 0o600 });
   writeFileSync(templatePath, "template\n", { mode: 0o600 });
   chmodSync(dataPath, 0o600); chmodSync(templatePath, 0o600); chmodSync(outputDirectory, 0o700);
+  // On native Windows chmod cannot establish the owner-only DACL the private-root
+  // contract requires; harden both the fixture's own root and its nested output
+  // directory the way a real caller's private root would be (no-op on POSIX).
+  if (process.platform === "win32") { hardenWindowsPrivateDirectory(privateRoot); hardenWindowsPrivateDirectory(outputDirectory); }
   return { repo, privateRoot, outputDirectory, dataPath, templatePath };
 }
 function binding(context, repoFingerprint, bindingId) {
@@ -108,7 +113,7 @@ check("immutable owner-only binding persists once and reads only by exact issued
     const first = storePrivateDocumentBinding(context.repo, request);
     assert.equal(first.created, true);
     assert.equal(existsSync(target.path), true);
-    assert.equal(requireMode(target.path), 0o600);
+    assertPrivateFileMode(target.path);
     const replay = storePrivateDocumentBinding(context.repo, request);
     assert.equal(replay.created, false);
     assert.deepEqual(readPrivateDocumentBinding(context.repo, issued.id).binding, request);
@@ -125,8 +130,13 @@ check("different immutable bytes and non-owner-only file modes fail closed", () 
     storePrivateDocumentBinding(context.repo, original);
     const changed = { ...original, classId: "operations" };
     assert.throws(() => storePrivateDocumentBinding(context.repo, changed), /immutable/u);
-    chmodSync(target.path, 0o640);
-    assert.throws(() => readPrivateDocumentBinding(context.repo, issued.id), (error) => error instanceof DocumentBindingError && error.code === "DB-BOUNDARY");
+    // A POSIX chmod-widened mode has no native Windows equivalent (chmod does not
+    // grant a real extra Windows ACE); the DACL-drift fail-closed contract is
+    // exercised natively by windows-private-state.test.mjs (WPS03) instead.
+    if (process.platform !== "win32") {
+      chmodSync(target.path, 0o640);
+      assert.throws(() => readPrivateDocumentBinding(context.repo, issued.id), (error) => error instanceof DocumentBindingError && error.code === "DB-BOUNDARY");
+    }
   } finally { rmSync(context.repo, { recursive: true, force: true }); rmSync(context.privateRoot, { recursive: true, force: true }); }
 });
 
@@ -158,6 +168,23 @@ check("binding creation requires a purpose-bound opaque reservation", () => {
 });
 
 function requireMode(path) { return lstatSync(path).mode & 0o777; }
+// Native Windows mode is a synthetic constant (no POSIX permission bits), so the
+// mode-0600 literal cannot be asserted there; the real Windows private-file
+// assurance (owner-only DACL) is already exercised because production would have
+// thrown "Windows assurance is unavailable or insecure" had it not held.
+function assertPrivateFileMode(path) { if (process.platform !== "win32") assert.equal(requireMode(path), 0o600); }
+let symlinkCapable = true;
+function probeSymlinkCapability() {
+  const probeDir = mkdtempSync(join(tmpdir(), "document-binding-symlink-probe-"));
+  try {
+    const target = join(probeDir, "target"); const link = join(probeDir, "link");
+    writeFileSync(target, "x");
+    symlinkSync(target, link);
+  } catch { symlinkCapable = false; }
+  finally { rmSync(probeDir, { recursive: true, force: true }); }
+}
+probeSymlinkCapability();
+if (!symlinkCapable) console.log("[capability: symlink unavailable] skipping symlink-specific assertions");
 
 check("private adapter registration reserves an exact da ID and has stable immutable replay", () => {
   const context = fixture();
@@ -173,7 +200,7 @@ check("private adapter registration reserves an exact da ID and has stable immut
       now: () => new Date("2026-07-20T01:02:03.000Z"),
     });
     assert.equal(first.created, true);
-    assert.equal(requireMode(target.path), 0o600);
+    assertPrivateFileMode(target.path);
     const replay = registerPrivateDocumentAdapter(context.repo, {
       adapterId: issued.id, executablePath: executable, expectedSha256, registeredBy: "po",
       now: () => new Date("2026-07-20T01:02:04.000Z"),
@@ -207,10 +234,12 @@ check("adapter registration fails closed for reservation, executable identity, d
       adapterId: issued.id, executablePath: executable, expectedSha256, registeredBy: "po",
     }), (error) => error instanceof DocumentAdapterError && error.code === "DA-EXECUTABLE");
     rmSync(hardlink);
-    symlinkSync(executable, symlink);
-    assert.throws(() => registerPrivateDocumentAdapter(context.repo, {
-      adapterId: issued.id, executablePath: symlink, expectedSha256, registeredBy: "po",
-    }), (error) => error instanceof DocumentAdapterError && error.code === "DA-EXECUTABLE");
+    if (symlinkCapable) {
+      symlinkSync(executable, symlink);
+      assert.throws(() => registerPrivateDocumentAdapter(context.repo, {
+        adapterId: issued.id, executablePath: symlink, expectedSha256, registeredBy: "po",
+      }), (error) => error instanceof DocumentAdapterError && error.code === "DA-EXECUTABLE");
+    }
     const registered = registerPrivateDocumentAdapter(context.repo, {
       adapterId: issued.id, executablePath: executable, expectedSha256, registeredBy: "po",
     });
@@ -314,7 +343,11 @@ check("private renderer request and response schemas are closed, canonical and r
   try {
     const request = rendererRequest(context);
     const encoded = encodeRendererRequest(request);
-    assert.equal(encoded.includes(Buffer.from(context.privateRoot)), true, "private coordinates remain only in the private stdin body");
+    // Compare via the JSON-decoded value, not raw bytes: on native Windows the
+    // private path contains backslashes, which JSON-encoding escapes (\\), so a
+    // literal-byte Buffer.includes search for the unescaped path never matches
+    // even though the private coordinate is correctly present in the payload.
+    assert.equal(JSON.parse(encoded.toString("utf8")).dataPath, context.dataPath, "private coordinates remain only in the private stdin body");
     assert.deepEqual(validateRendererRequest(request), request);
     assert.throws(() => validateRendererRequest({ ...request, unknown: true }), (error) => error instanceof DocumentRenderProtocolError && error.code === "DRP-REQUEST");
     assert.throws(() => validateRendererRequest({ ...request, dataPath: "relative" }), (error) => error instanceof DocumentRenderProtocolError && error.code === "DRP-REQUEST");
