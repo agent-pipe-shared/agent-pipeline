@@ -152,7 +152,9 @@ check("D0-04 branch creation records exact canonical state and one /branch/ excl
   assert.equal(git(primary, ["status", "--porcelain", "--untracked-files=all"]).stdout, "");
   const registryDir = join(repo.commonDir, "agent-pipeline", "worktrees");
   assert.equal(readdirJson(registryDir).length, 1);
-  assert.equal(statSync(join(registryDir, readdirJson(registryDir)[0])).mode & 0o777, 0o600);
+  // Native Windows mode is a synthetic constant, not real POSIX permission bits; the
+  // production write path enforces the equivalent owner-DACL assurance separately.
+  if (process.platform !== "win32") assert.equal(statSync(join(registryDir, readdirJson(registryDir)[0])).mode & 0o777, 0o600);
 });
 
 check("D0-05 protected or sole-copy content cannot enter a cleanup manifest", () => {
@@ -421,7 +423,9 @@ check("D0 CLIs create canonical branches and drain registered scratch without ra
 check("D0 session descriptor is private, bound to one common dir and retires only after cleanup", () => {
   const { primary } = repoFixture();
   const session = startSessionDescriptor(primary, { sessionId: "session-descriptor-test", ownerNonce: "owner-nonce-descriptor-000001" });
-  assert.equal(lstatSync(session.path).mode & 0o777, 0o600);
+  // Native Windows mode is a synthetic constant, not real POSIX permission bits; the
+  // production write path enforces the equivalent owner-DACL assurance separately.
+  if (process.platform !== "win32") assert.equal(lstatSync(session.path).mode & 0o777, 0o600);
   const loaded = loadSessionDescriptor(primary, session.sessionId);
   assert.equal(loaded.ownerNonce, session.ownerNonce);
   assert.equal(loaded.descriptorSha256, session.descriptorSha256);

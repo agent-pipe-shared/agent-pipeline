@@ -35,6 +35,7 @@ import {
   sep,
 } from "node:path";
 import { spawnSync } from "node:child_process";
+import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 
 export const WORKTREE_RECORD_SCHEMA = "pipeline.worktree-lifecycle.v1";
 export const CLEANUP_MANIFEST_SCHEMA = "pipeline.session-cleanup-manifest.v1";
@@ -293,15 +294,36 @@ function fsyncDirectory(path) {
   }
 }
 
-function writeAtomic(path, bytes, mode = 0o600) {
+/**
+ * Only the components newly created by this call are hardened as owned; a
+ * pre-existing (possibly raced-in) directory is merely assessed, never assumed
+ * to be ours -- the same discipline as private-boundary.mjs's directory chain.
+ * `existing` must be the nearest already-existing ancestor captured BEFORE the
+ * caller's mkdirSync, and `code` is the caller's own error code.
+ */
+function assureWindowsLocalDirectories(existing, parent, code) {
+  const created = [];
+  for (let cursor = resolve(parent); cursor !== existing; cursor = dirname(cursor)) created.push(cursor);
+  created.reverse();
+  for (const directory of created) {
+    if (hardenWindowsPrivateDirectory(directory).status !== "secure") fail(code, "local state directory Windows assurance is unavailable or insecure");
+  }
+  if (created.length === 0 && assessWindowsPrivatePath(existing).status !== "secure") {
+    fail(code, "local state directory Windows assurance is unavailable or insecure");
+  }
+}
+
+function writeAtomic(path, bytes, mode = 0o600, { windowsAssurance = true } = {}) {
   const parent = dirname(path);
   let existing = parent;
   while (!existsSync(existing)) existing = dirname(existing);
   if (realpathSync(existing) !== resolve(existing)) fail("WT-LOCAL-SYMLINK", "local state path crosses a symlink");
+  const existingBeforeCreate = resolve(existing);
   mkdirSync(parent, { recursive: true, mode: 0o700 });
   if (lstatSync(parent).isSymbolicLink() || realpathSync(parent) !== resolve(parent)) {
     fail("WT-LOCAL-SYMLINK", "local state directory crosses a symlink");
   }
+  if (process.platform === "win32" && windowsAssurance) assureWindowsLocalDirectories(existingBeforeCreate, parent, "WT-LOCAL-WINDOWS-ASSURANCE");
   const temporary = join(parent, `.${basename(path)}.${process.pid}.${randomBytes(6).toString("hex")}.tmp`);
   const fd = openSync(temporary, "wx", mode);
   try {
@@ -328,7 +350,9 @@ export function ensurePrimaryBranchExclude(repository) {
   const lines = before.split(/\r?\n/).filter((line, index, all) => !(line === "" && index === all.length - 1));
   const next = [...lines.filter((line) => line !== "/branch/"), "/branch/"];
   const rendered = `${next.join("\n")}\n`;
-  if (rendered !== before) writeAtomic(exclude, rendered, 0o600);
+  // .git/info is Git's own conventional directory, not Pipeline private state; it
+  // is never hardened as owned and must not be held to the private-state DACL bar.
+  if (rendered !== before) writeAtomic(exclude, rendered, 0o600, { windowsAssurance: false });
   return { path: exclude, changed: rendered !== before, digest: rawSha256(rendered) };
 }
 
@@ -369,7 +393,9 @@ function readWorktreeRecords(repo) {
   return readdirSync(dir).filter((name) => /^[0-9a-f]{32}\.json$/.test(name)).map((name) => {
     const path = join(dir, name);
     const stat = lstatSync(path);
-    if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || (stat.mode & 0o077) !== 0) {
+    const posixModeViolation = process.platform !== "win32" && (stat.mode & 0o077) !== 0;
+    const windowsInsecure = process.platform === "win32" && (assessWindowsPrivatePath(path).status !== "secure" || assessWindowsPrivatePath(dir).status !== "secure");
+    if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || posixModeViolation || windowsInsecure) {
       fail("WT-REGISTRY-TYPE", "worktree record is not a private single-link regular file");
     }
     const record = JSON.parse(readFileSync(path, "utf8"));
@@ -473,7 +499,13 @@ function sessionDescriptorPath(repo, sessionId) {
 
 function assertPrivateRegularFile(path, code, label) {
   const stat = lstatSync(path);
-  if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || (stat.mode & 0o077) !== 0) {
+  // POSIX mode bits express owner-only exclusivity directly; native Windows has no
+  // such mode semantics (mode is a synthetic constant), so the equivalent assurance
+  // there is the shared owner-DACL check on both the file and its parent directory.
+  const posixModeViolation = process.platform !== "win32" && (stat.mode & 0o077) !== 0;
+  const windowsInsecure = process.platform === "win32"
+    && (assessWindowsPrivatePath(path).status !== "secure" || assessWindowsPrivatePath(dirname(path)).status !== "secure");
+  if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || posixModeViolation || windowsInsecure) {
     fail(code, `${label} is not a private single-link regular file`);
   }
 }
@@ -613,11 +645,18 @@ function acquireManifestLock(repo, sessionId, nonce) {
   const manifestPath = cleanupManifestPath(repo, sessionId);
   const lockPath = `${manifestPath}.lock`;
   const expectedOwner = ownerDigest(nonce);
-  mkdirSync(dirname(lockPath), { recursive: true, mode: 0o700 });
-  if (realpathSync(dirname(lockPath)) !== resolve(dirname(lockPath))) fail("WT-LOCAL-SYMLINK", "cleanup lock directory crosses a symlink");
+  const lockParent = dirname(lockPath);
+  let existingLockAncestor = lockParent;
+  while (!existsSync(existingLockAncestor)) existingLockAncestor = dirname(existingLockAncestor);
+  const existingLockAncestorBeforeCreate = resolve(existingLockAncestor);
+  mkdirSync(lockParent, { recursive: true, mode: 0o700 });
+  if (realpathSync(lockParent) !== resolve(lockParent)) fail("WT-LOCAL-SYMLINK", "cleanup lock directory crosses a symlink");
+  if (process.platform === "win32") assureWindowsLocalDirectories(existingLockAncestorBeforeCreate, lockParent, "WT-MANIFEST-LOCK");
   if (existsSync(lockPath)) {
     const stat = lstatSync(lockPath);
-    if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || (stat.mode & 0o077) !== 0) {
+    const posixModeViolation = process.platform !== "win32" && (stat.mode & 0o077) !== 0;
+    const windowsInsecure = process.platform === "win32" && assessWindowsPrivatePath(lockPath).status !== "secure";
+    if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || posixModeViolation || windowsInsecure) {
       fail("WT-MANIFEST-LOCK", "cleanup writer lock is not a private regular file");
     }
     let stale;
@@ -675,7 +714,9 @@ function loadManifest(repo, sessionId, nonce, { create = false, now } = {}) {
     return { path, manifest: newManifest(repo, sessionId, nonce, now) };
   }
   const stat = lstatSync(path);
-  if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || (stat.mode & 0o077) !== 0) {
+  const posixModeViolation = process.platform !== "win32" && (stat.mode & 0o077) !== 0;
+  const windowsInsecure = process.platform === "win32" && (assessWindowsPrivatePath(path).status !== "secure" || assessWindowsPrivatePath(dirname(path)).status !== "secure");
+  if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || posixModeViolation || windowsInsecure) {
     fail("WT-MANIFEST-TYPE", "cleanup manifest is not a private single-link regular file");
   }
   const manifest = JSON.parse(readFileSync(path, "utf8"));
