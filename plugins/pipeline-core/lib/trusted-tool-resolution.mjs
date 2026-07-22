@@ -8,7 +8,17 @@ export const WINDOWS_SYSTEM_TOOL_ROOTS = Object.freeze([
   "C:\\Program Files\\Git\\cmd",
   "C:\\Program Files\\Git\\bin",
   "C:\\Program Files\\Git\\mingw64\\bin",
+  "C:\\Program Files\\Gitleaks",
+  "C:\\Program Files\\OSV-Scanner",
+  "C:\\Program Files\\Semgrep",
   "C:\\Windows\\System32",
+  "D:\\Program Files\\Git\\cmd",
+  "D:\\Program Files\\Git\\bin",
+  "D:\\Program Files\\Git\\mingw64\\bin",
+  "D:\\Program Files\\Gitleaks",
+  "D:\\Program Files\\OSV-Scanner",
+  "D:\\Program Files\\Semgrep",
+  "D:\\Windows\\System32",
 ]);
 
 /** Returns the immutable Windows executable allowlist. */

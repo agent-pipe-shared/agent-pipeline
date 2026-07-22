@@ -5,6 +5,7 @@ import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, w
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 import {
   checkRepository,
   collectAnchors,
@@ -13,8 +14,8 @@ import {
   stripFencedCode,
 } from "./check-doc-contracts.mjs";
 
-const SCRIPT = new URL("./check-doc-contracts.mjs", import.meta.url).pathname;
-const REPO = resolve(new URL("../..", import.meta.url).pathname);
+const SCRIPT = fileURLToPath(new URL("./check-doc-contracts.mjs", import.meta.url));
+const REPO = resolve(fileURLToPath(new URL("../..", import.meta.url)));
 const roots = [];
 
 const STATEFUL_DESIGN_CONTRACTS = [

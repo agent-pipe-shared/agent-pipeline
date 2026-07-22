@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 
@@ -774,7 +775,7 @@ test("Result coherence checking fails closed without throwing on malformed sourc
 
 test("checker invocation without --result is an explicit successful SKIP", () => {
   const checkerPath = new URL("./check-phase3-sdlc-coherence.mjs", import.meta.url);
-  const run = spawnSync(process.execPath, [checkerPath.pathname], {
+  const run = spawnSync(process.execPath, [fileURLToPath(checkerPath)], {
     encoding: "utf8",
     timeout: 5_000,
   });
