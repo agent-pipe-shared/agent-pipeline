@@ -100,7 +100,7 @@ function prepareAnonymousPublicPush(dir, branch = "feat/v0.3-phase2.6-multi-cli"
   chmodSync(fakeSsh, 0o755);
   // Windows does not execute POSIX shebang fixtures.  Keep the POSIX helper and
   // add a native command shim so the account probe never falls through to real SSH.
-  writeFileSync(join(bin, "ssh.cmd"), "@echo off\r\necho Hi agent-pipe-shared! You've successfully authenticated, but GitHub does not provide shell access.\r\nexit /b 1\r\n");
+  writeFileSync(join(bin, "ssh.cmd"), "@echo off\r\nif \"%FAKE_SSH_ACCOUNT%\"==\"\" set \"FAKE_SSH_ACCOUNT=agent-pipe-shared\"\r\necho Hi %FAKE_SSH_ACCOUNT%! You've successfully authenticated, but GitHub does not provide shell access.\r\nexit /b 1\r\n");
   return { head, command: `git push origin HEAD:refs/heads/${branch}`, env: { PATH: `${bin}${delimiter}${process.env.PATH}` } };
 }
 
