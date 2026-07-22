@@ -15,6 +15,45 @@ import { checkObservationGovernance } from "./check-observation-governance.mjs";
 
 const decoder = new TextDecoder("utf-8", { fatal: true });
 const EXCLUDED_PATH = "AGENTS.md";
+const STATEFUL_DESIGN_SURFACES = ["templates/spec.md", "roles/elephant.md"];
+const STATEFUL_DESIGN_CONTRACTS = [
+  {
+    id: "authority-issuer-replay",
+    phrases: ["Authority issuer and replay rule.", "authority issuer and replay rule"],
+  },
+  {
+    id: "durable-storage-atomicity",
+    phrases: ["Durable storage and atomicity boundary.", "durable storage and atomicity"],
+  },
+  {
+    id: "crash-state-matrix",
+    phrases: ["Complete resource/phase crash-state matrix.", "complete resource/phase crash-state matrix"],
+  },
+  {
+    id: "mutation-enforcement",
+    phrases: ["Exact mutation point and kernel/controller enforcement point.", "exact mutation plus kernel/controller enforcement points"],
+  },
+  {
+    id: "bootstrap-self-update",
+    phrases: ["Bootstrap and self-update transition.", "bootstrap/self-update transition"],
+  },
+  {
+    id: "candidate-evidence-binding",
+    phrases: ["Binary candidate/evidence binding.", "binary candidate/evidence binding"],
+  },
+  {
+    id: "pre-post-bytes",
+    phrases: ["Exact pre- and post-mutation bytes.", "exact pre/post bytes"],
+  },
+  {
+    id: "sole-recovery-authority",
+    phrases: ["Sole recovery authority.", "sole recovery authority"],
+  },
+  {
+    id: "self-reference-audit",
+    phrases: ["Self-reference audit (what mutable material cannot authenticate itself).", "self-reference audit"],
+  },
+];
 function posixPath(value) {
   return value.split(sep).join("/");
 }
@@ -30,6 +69,22 @@ function inside(root, target) {
 
 function defaultReadText(file) {
   return decoder.decode(readFileSync(file));
+}
+
+/**
+ * Check the two stateful-design documentation surfaces against their distinct,
+ * equivalent checklist wording. Callers decide whether both surfaces apply.
+ */
+export function checkStatefulDesignContracts(surfaces) {
+  const findings = [];
+  for (const [surfaceIndex, surface] of STATEFUL_DESIGN_SURFACES.entries()) {
+    for (const contract of STATEFUL_DESIGN_CONTRACTS) {
+      if (!surfaces[surface].includes(contract.phrases[surfaceIndex])) {
+        findings.push(`stateful-design-contract: ${surface}: ${contract.id}`);
+      }
+    }
+  }
+  return findings;
 }
 
 export function stripFencedCode(markdown) {
@@ -401,6 +456,26 @@ export function checkRepository(rootInput, options = {}) {
     findings.push(`authority: ${error.message}`);
   }
 
+  let statefulDesignContracts = "not-applicable";
+  if (STATEFUL_DESIGN_SURFACES.every((path) => trackedPaths.has(path))) {
+    const surfaces = {};
+    let available = true;
+    for (const path of STATEFUL_DESIGN_SURFACES) {
+      try {
+        const text = readRepoText(path);
+        if (text === null) throw new Error("surface is excluded");
+        surfaces[path] = text;
+      } catch {
+        available = false;
+        break;
+      }
+    }
+    if (available) {
+      statefulDesignContracts = "checked";
+      findings.push(...checkStatefulDesignContracts(surfaces));
+    }
+  }
+
   const observationGovernance = checkObservationGovernance(root, { optionalWhenAbsent: true });
   for (const item of observationGovernance.findings) findings.push(`observation-governance: ${item}`);
 
@@ -413,6 +488,7 @@ export function checkRepository(rootInput, options = {}) {
       anchorsChecked,
       excludedLinks,
       observationGovernance: observationGovernance.applicable ? "checked" : "not-applicable",
+      statefulDesignContracts,
     },
   };
 }
