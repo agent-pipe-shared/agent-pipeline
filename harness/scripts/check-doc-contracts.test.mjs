@@ -326,15 +326,39 @@ test("pipeline-shaped repositories require both stateful-design surfaces even wh
   assert.equal(result.stats.statefulDesignContracts, "checked");
 });
 
+for (const [presentSurface, phraseKey] of [
+  ["templates/spec.md", "template"],
+  ["roles/elephant.md", "elephant"],
+]) {
+  test(`a generic repository ignores a lone canonical-named ${presentSurface} surface`, () => {
+    const { root } = fixture({
+      [presentSurface]: `${STATEFUL_DESIGN_CONTRACTS.map((contract) => contract[phraseKey]).join("\n")}\n`,
+    });
+    const result = runFixture(root, { trackedPaths: [...statefulDesignBaseTrackedPaths, presentSurface] });
+    assert.equal(
+      result.stats.statefulDesignContracts,
+      "not-applicable",
+      "a canonical filename alone must not classify a generic repository as pipeline-shaped",
+    );
+    assert(
+      !result.findings.some((finding) => finding.startsWith("stateful-design-contract:")),
+      `generic repositories must not emit stateful-design findings; got: ${result.findings.join(" | ")}`,
+    );
+  });
+}
+
 for (const [presentSurface, missingSurface, phraseKey] of [
   ["templates/spec.md", "roles/elephant.md", "template"],
   ["roles/elephant.md", "templates/spec.md", "elephant"],
 ]) {
   test(`a lone ${presentSurface} stateful-design surface fails closed`, () => {
     const { root } = fixture({
+      ".claude/pipeline.yaml": "schema: pipeline.manifest.v0\n",
       [presentSurface]: `${STATEFUL_DESIGN_CONTRACTS.map((contract) => contract[phraseKey]).join("\n")}\n`,
     });
-    const result = runFixture(root, { trackedPaths: [...statefulDesignBaseTrackedPaths, presentSurface] });
+    const result = runFixture(root, {
+      trackedPaths: [...statefulDesignBaseTrackedPaths, ".claude/pipeline.yaml", presentSurface],
+    });
     assert.notEqual(
       result.stats.statefulDesignContracts,
       "not-applicable",
