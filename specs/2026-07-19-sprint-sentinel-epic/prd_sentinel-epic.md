@@ -97,7 +97,9 @@ mit tatsächlicher Fertigstellung verwechselt.
 
 Der ursprüngliche Nachfolger war als ein Feature für HAW-C und HAW-E geplant.
 Der PO hat den Scope anschließend auf alle zum Start `open` oder
-`in_progress` geführten Backlog-Items erweitert. Diese 16 Einträge betreffen
+`in_progress` geführten Backlog-Items erweitert. Diese 16 Baseline-Einträge
+und die am 2026-07-22 explizit aufgenommenen fünf nativen Windows-Blocker
+betreffen
 mehrere unabhängige Kontroll- und Produktoberflächen: Runner, Sandbox,
 Worktrees, Continuity, Governance, Verify, Dokumente, Lizenzierung und Release.
 Das ist ein Epic. Der HAW-C/HAW-E-Control-Contract bleibt darin ein einziges,
@@ -124,6 +126,11 @@ verschoben.
 | `pipeline.stateful-design-contract-template` | open | echte offene Prozessverbesserung | Authority-/Durability-/Recovery-/Enforcement-Checkliste in Vorlage und Elephant-Vertrag |
 | `pipeline.t1-governance-path-preflight` | open | Governance-Paketcode teilweise vorhanden | alle Pfad-, ETA- und Tool-Setup-ACs auditieren, ergänzen und schließen |
 | `pipeline.verify-gate-scoped-registration` | open | echte offene Ursache für unregistrierte Fokustests | enge additive, PO-/Task-gebundene Registrierung implementieren und nutzen |
+| `pipeline.windows-runtime-baseline-containment` | open | Issue `#33`, physische Windows-Containment-Lücke | gemeinsame V2/V3-Hostpfad-Primitive und native Evidenz |
+| `pipeline.windows-directory-durability` | open | Issue `#34`, POSIX-Verzeichnis-fsync-Annahme | Plattform-Assurance ohne schwächeren File-Flush |
+| `pipeline.windows-private-state-assurance` | open | Issue `#35`, POSIX-Modi sind keine Windows-DACL-Proof | typisierte Private-State-Assurance, authority fail-closed |
+| `pipeline.windows-verify-reproducibility` | open | Issue `#36`, Full Verify nicht nativ Windows-reproduzierbar | Capability-gebundene Fixtures und grüner Standard-Account-Gate |
+| `pipeline.windows-trusted-tool-resolution` | open | Issue `#37`, widersprüchliche Tool-Erkennung | gemeinsame vertrauensgebundene Resolver-Authority |
 
 `pipeline.runner-v2-installation-cutover` bleibt geschlossen und wird nur auf
 Konsistenz geprüft. `backlog/items/TEMPLATE.md` ist kein Backlog-Item.
@@ -133,7 +140,7 @@ Konsistenz geprüft. `backlog/items/TEMPLATE.md` ist kein Backlog-Item.
 ### 1. Eine belastbare Backlog-Wahrheit
 
 Sentinel erstellt zuerst eine maschinen- und menschenlesbare
-Akzeptanzmatrix. Für jedes der 16 Items werden Originalkriterien, vorhandene
+Akzeptanzmatrix. Für jedes der 21 Items werden Originalkriterien, vorhandene
 Produktionspfade, Tests, Registrierung im vollständigen Verify, Kandidaten-
 Evidenz und noch fehlende Schritte einander zugeordnet. Zulässige
 Zwischenurteile sind: nicht begonnen, teilweise umgesetzt, geliefert aber
@@ -271,7 +278,7 @@ Das Hawkeye-Result schließt weiterhin genau die drei Produktitems
 Dokumentationsarchitektur, regulierte Dokument-Hooks und Keep-awake in einem
 Result-gebundenen atomaren Batch. Licensing, AFK und die übrigen Kontrollitems
 behalten ihre eigenen nachgewiesenen Übergänge. Der Sentinel-Epic schließt erst,
-wenn alle 16 Einträge geschlossen und Ledger/STATUS/Index konsistent sind.
+wenn alle 21 Einträge geschlossen und Ledger/STATUS/Index konsistent sind.
 
 ## Umsetzungsschnitt und Reihenfolge
 
@@ -380,6 +387,6 @@ Eine PRD-Freigabe ohne Änderung wählt jeweils A.
    - **7B:** Version jetzt festschreiben; verworfen, da Baseline veralten kann.
 8. **Abschlussgranularität**
    - **8A (Empfehlung):** Licensing/AFK/Kontrollitems mit eigener Evidenz;
-     exakter Drei-Item-HAW-E-Batch; Epic-Close erst nach allen 16 Items.
+     exakter Drei-Item-HAW-E-Batch; Epic-Close erst nach allen 21 Items.
    - **8B:** ein pauschaler 16-Item-Batch; verworfen, weil er unterschiedliche
      Authorities und echte Lücken verschleiern würde.

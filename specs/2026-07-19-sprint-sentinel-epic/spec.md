@@ -132,7 +132,7 @@ item whose frontmatter is `open` or `in_progress` at the starting candidate is
 in scope. `backlog/items/TEMPLATE.md` is not an item, and the already closed
 `pipeline.runner-v2-installation-cutover` is audit input but not reopened.
 
-Sentinel owns exactly these 16 backlog items:
+Sentinel owns the 16-item baseline plus five PO-admitted native-Windows blockers:
 
 1. `pipeline.afk-assumption-mode` (`open`)
 2. `pipeline.canonical-worktree-lifecycle` (`open`)
@@ -150,6 +150,11 @@ Sentinel owns exactly these 16 backlog items:
 14. `pipeline.stateful-design-contract-template` (`open`)
 15. `pipeline.t1-governance-path-preflight` (`open`)
 16. `pipeline.verify-gate-scoped-registration` (`open`)
+17. `pipeline.windows-runtime-baseline-containment` (`open`, Issue `#33`)
+18. `pipeline.windows-directory-durability` (`open`, Issue `#34`)
+19. `pipeline.windows-private-state-assurance` (`open`, Issue `#35`)
+20. `pipeline.windows-verify-reproducibility` (`open`, Issue `#36`)
+21. `pipeline.windows-trusted-tool-resolution` (`open`, Issue `#37`)
 
 It also completes the two carried Hawkeye workstreams:
 
@@ -158,11 +163,11 @@ It also completes the two carried Hawkeye workstreams:
 - HAW-E: release-document evidence, version planning, two-channel publication,
   recoverable product close, and final release documentation.
 
-The 16 backlog items are not treated as 16 independent product releases.
+The 21 backlog items are not treated as 21 independent product releases.
 Licensing closes first under its dedicated authority and evidence. AFK closes
 only after its own behavior and recovery evidence are green. The original
 three Hawkeye product items retain their exact Result-bound atomic batch close
-inside HAW-E. Sentinel closes only when all 16 items and both carried
+inside HAW-E. Sentinel closes only when all 21 items and both carried
 workstreams are complete. Items whose implementation already exists are not
 declared complete from file presence: they need acceptance-criterion mapping,
 registered Verify evidence, candidate binding, and a sanctioned backlog
@@ -418,7 +423,7 @@ be closed before Sentinel's final Epic close.
    HAW-E mutation; the three inherited Hawkeye items close in their exact
    Result-bound batch; remaining items close only from their own verified
    acceptance matrix. No bulk command may manufacture completion.
-7. Final reconciliation proves all 16 target items `closed`, exactly one legal
+7. Final reconciliation proves all 21 target items `closed`, exactly one legal
    transition suffix per operation, regenerated projections equal the item
    files/ledger, and no unrelated closed item was reopened or rewritten.
 
@@ -515,7 +520,7 @@ Sentinel is complete only when:
 5. private and neutral-public channels carry the same freshly derived SemVer
    and both branch/tag delivery pairs have exact remote fetch-back;
 6. the HAW-E Result/state/three-item backlog batch/close journal is complete;
-7. all 16 target backlog items are `closed` and projections/ledger agree;
+7. all 21 target backlog items are `closed` and projections/ledger agree;
 8. final Verify, Security Evidence, capability inventory, bilingual docs, and
    high-risk Critic bind the exact final candidates;
 9. handover and HISTORY describe the actual delivered and residual state
