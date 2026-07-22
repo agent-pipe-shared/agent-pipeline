@@ -14,6 +14,15 @@ canonical backlog, transition ledger, and generated projections. Admission is
 not implementation, verification, native-Windows evidence, issue mutation, or
 closure authority.
 
+The Sentinel Windows private-state implementation adds a separate local trust
+boundary: a repository-private authority directory on Windows is trusted only
+after the fixed system-PowerShell adapter proves its concrete current owner,
+owner-only DACL, and absence of a reparse point. POSIX-looking Node mode bits
+are not evidence on Windows. A recursively created private path is a sequence
+of distinct boundaries: each newly created component must have inherited ACLs
+removed and be re-observed; a raced-in component is assessed and fails closed
+instead of being treated as newly owned.
+
 ## Threats, controls, and residual risk
 
 | Threat | Control | Detection | Residual risk |
@@ -24,6 +33,8 @@ closure authority.
 | A caller bypasses the writer and edits the backlog state directly. | The canonical checker validates item files, transition ledger, and generated projections. | `check-backlog-state` and Full Verify fail on inconsistent state. | A reviewer can still approve a malicious direct change; this control is a fail-closed consistency check, not an authorization signature. |
 | Scope admission is mistaken for native-Windows or release evidence. | The scope document, matrix, and generated records retain `open` status and prohibit closure claims. | Full Verify, Critic review, and candidate-bound evidence are required before any later transition. | Native Windows host evidence remains absent for #33 and the other blockers. |
 | A needed admission must be rolled back. | Use an ordinary revert commit; never rewrite evidence, status, or ledger files by hand. | The documented rollback runs `check-backlog-state` and Full Verify on the revert candidate. | Existing external Issues and host evidence are not reverted or reinterpreted. |
+| A Windows private-state directory inherits a non-owner ACL or is a reparse point. | The adapter uses a fixed system PowerShell path, removes inherited ACLs only for a newly created component, sets the concrete current owner, and accepts no other DACL principal. Existing or raced-in components are assessed and unavailable proof blocks the authority write. | `windows-private-state.test.mjs`, advisory-receipt assurance tests, Full Verify, and required native-Windows evidence exercise the typed secure/unavailable boundary. | Native Windows evidence remains required; the adapter deliberately does not infer DACL safety from POSIX mode bits or a successful rename. |
+| A recursive private-directory creation hardens only its leaf while an inherited intermediate directory remains writable. | The private-boundary creates one component at a time and applies the owner-only DACL contract to every newly created component before it can contain authority state. | The focused test records every created component and refuses a raced-in component without DACL proof. | An interruption can leave an empty hardened directory; it cannot authorize a record, and a subsequent run re-assesses it. |
 
 ## Review and change control
 

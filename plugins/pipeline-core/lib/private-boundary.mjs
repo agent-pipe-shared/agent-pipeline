@@ -59,15 +59,48 @@ function nearestExistingParent(path) {
   return cursor;
 }
 
+/**
+ * Applies the Windows DACL contract to every private directory introduced by
+ * one recursive creation. A raced-in component is never hardened as though
+ * it were ours: it must already prove the same contract.
+ */
+export function assureWindowsPrivateDirectories(entries, {
+  harden = hardenWindowsPrivateDirectory,
+  assess = assessWindowsPrivatePath,
+} = {}) {
+  for (const { directory, created } of entries) {
+    const state = created ? harden(directory) : assess(directory);
+    if (state.status !== "secure") {
+      fail("PB-WINDOWS-ASSURANCE", "private-state directory Windows assurance is " + state.status);
+    }
+  }
+}
+
 export function ensurePrivateDirectory(path) {
   const existing = nearestExistingParent(path);
   physicalDirectory(existing, "private-state parent");
-  const existed = existsSync(path);
-  mkdirSync(path, { recursive: true, mode: 0o700 });
-  const directory = physicalDirectory(path, "private-state directory");
+  const target = resolve(path);
+  const pending = [];
+  for (let cursor = target; cursor !== existing; cursor = dirname(cursor)) {
+    const parent = dirname(cursor);
+    if (parent === cursor) fail("PB-PARENT", "private path escapes its existing parent");
+    pending.push(cursor);
+  }
+  pending.reverse();
+  const entries = [];
+  for (const directory of pending) {
+    let created = false;
+    try {
+      mkdirSync(directory, { mode: 0o700 });
+      created = true;
+    } catch (error) {
+      if (error?.code !== "EEXIST") throw error;
+    }
+    entries.push({ directory: physicalDirectory(directory, "private-state directory"), created });
+  }
+  const directory = physicalDirectory(target, "private-state directory");
   if (process.platform === "win32") {
-    const state = existed ? assessWindowsPrivatePath(directory) : hardenWindowsPrivateDirectory(directory);
-    if (state.status !== "secure") fail("PB-WINDOWS-ASSURANCE", `private-state directory Windows assurance is ${state.status}`);
+    assureWindowsPrivateDirectories(entries.length > 0 ? entries : [{ directory, created: false }]);
   }
   return directory;
 }
