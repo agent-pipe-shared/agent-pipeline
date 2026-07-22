@@ -17,6 +17,10 @@ export class AdvisoryReceiptAssuranceError extends Error {
   constructor(status, phase, cause = null) { super(`advisory receipt assurance ${status} during ${phase}`); this.name = "AdvisoryReceiptAssuranceError"; this.status = status; this.phase = phase; this.cause = cause; }
 }
 function state(status, reason) { return { status, reason }; }
+function unsupportedDirectoryDurability(error, platform) {
+  return UNSUPPORTED_DIRECTORY_CODES.has(error?.code)
+    || (platform === "windows" && error?.code === "EPERM");
+}
 function modePrivate(mode) { return Number.isInteger(mode) && (mode & 0o077) === 0; }
 function normalizedPrincipal(value) { return typeof value === "string" ? value.trim().toLowerCase() : ""; }
 
@@ -61,14 +65,14 @@ export function createAdvisoryReceiptAssurance({ platform = process.platform ===
 function defaultIo() { return { closeSync, fsyncSync, lstatSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync, fsyncDirectory(path) { const descriptor = openSync(path, "r"); try { fsyncSync(descriptor); } finally { closeSync(descriptor); } } }; }
 function assure(assurance, target, phase) { const result = assurance.assess(target); if (!result || result.status !== "secure") throw new AdvisoryReceiptAssuranceError(result?.status ?? "unavailable", phase); }
 /** Writes exact bytes, confirms directory durability, then re-observes private state and readback bytes. */
-export function persistAdvisoryReceipt({ target, bytes, assurance = createAdvisoryReceiptAssurance(), io = defaultIo(), temporaryName = ".advisory-receipt.tmp" } = {}) {
+export function persistAdvisoryReceipt({ target, bytes, assurance = createAdvisoryReceiptAssurance(), io = defaultIo(), temporaryName = ".advisory-receipt.tmp", platform = process.platform === "win32" ? "windows" : "posix" } = {}) {
   if (!isAbsolute(target) || resolve(target) !== target || !Buffer.isBuffer(bytes) || typeof temporaryName !== "string" || !temporaryName.startsWith(".")) throw new Error("advisory receipt persistence input is invalid");
   const temporary = resolve(dirname(target), temporaryName); let renamed = false;
   try {
     assure(assurance, target, "pre-persist"); io.writeFileSync(temporary, bytes, { flag: "wx", mode: 0o600 });
     const descriptor = io.openSync(temporary, "r"); try { io.fsyncSync(descriptor); } finally { io.closeSync(descriptor); }
     assure(assurance, temporary, "pre-rename"); io.renameSync(temporary, target); renamed = true;
-    try { io.fsyncDirectory(dirname(target)); } catch (error) { throw new AdvisoryReceiptAssuranceError(UNSUPPORTED_DIRECTORY_CODES.has(error?.code) ? "unsupported" : "durability_unknown", "post-rename-directory-sync", error); }
+    try { io.fsyncDirectory(dirname(target)); } catch (error) { throw new AdvisoryReceiptAssuranceError(unsupportedDirectoryDurability(error, platform) ? "unsupported" : "durability_unknown", "post-rename-directory-sync", error); }
     assure(assurance, target, "post-persist-readback"); const readback = io.readFileSync(target);
     if (!Buffer.from(readback).equals(bytes)) throw new AdvisoryReceiptAssuranceError("insecure", "post-persist-readback");
     return { status: "durable", bytes: Buffer.from(readback) };
