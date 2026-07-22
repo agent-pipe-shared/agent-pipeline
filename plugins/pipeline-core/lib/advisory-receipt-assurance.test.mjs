@@ -3,10 +3,27 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { AdvisoryReceiptAssuranceError, evaluateAdvisoryReceiptPrivateState, persistAdvisoryReceipt } from "./advisory-receipt-assurance.mjs";
 import { evaluateWindowsPrivateState } from "./windows-private-state.mjs";
+import { PrivateBoundaryError, assureWindowsPrivateDirectories } from "./private-boundary.mjs";
 const OWNER = "S-1-5-21-concrete-owner";
 const secureWindows = () => ({ platform: "windows", expectedOwner: OWNER, file: { kind: "file", owner: OWNER, reparsePoint: false, dacl: { status: "secure", principals: [OWNER] } }, directory: { kind: "directory", owner: OWNER, reparsePoint: false, dacl: { status: "secure", principals: [OWNER] } } });
 function memoryIo({ directorySync = null, readback = null, failWrite = null } = {}) { const files = new Map(); const events = []; return { files, events, writeFileSync(path, bytes) { events.push(`write:${path}`); if (failWrite) throw failWrite; files.set(path, Buffer.from(bytes)); }, openSync(path) { events.push(`open:${path}`); return path; }, fsyncSync(fd) { events.push(`fsync:${fd}`); }, closeSync(fd) { events.push(`close:${fd}`); }, renameSync(from, to) { events.push(`rename:${from}:${to}`); files.set(to, files.get(from)); files.delete(from); }, fsyncDirectory(path) { events.push(`dirsync:${path}`); if (directorySync) throw directorySync; }, readFileSync(path) { events.push(`read:${path}`); return readback ?? files.get(path); }, unlinkSync(path) { events.push(`unlink:${path}`); files.delete(path); } }; }
 const assured = { assess: () => ({ status: "secure" }) }; const target = "/private/receipt.json";
+test("recursive Windows private directories harden each created component and fail closed for a raced-in one", () => {
+  const hardened = [];
+  assureWindowsPrivateDirectories([
+    { directory: "one", created: true },
+    { directory: "one/two", created: true },
+    { directory: "one/two/three", created: true },
+  ], {
+    harden: (directory) => { hardened.push(directory); return { status: "secure" }; },
+    assess: () => { throw new Error("newly-created directory must be hardened"); },
+  });
+  assert.deepEqual(hardened, ["one", "one/two", "one/two/three"]);
+  assert.throws(() => assureWindowsPrivateDirectories([{ directory: "raced", created: false }], {
+    harden: () => { throw new Error("raced-in directory must not be hardened as owned"); },
+    assess: () => ({ status: "unavailable" }),
+  }), (error) => error instanceof PrivateBoundaryError && error.code === "PB-WINDOWS-ASSURANCE");
+});
 test("Windows evidence separately requires concrete owner, DACL and reparse-point safety", () => { assert.equal(evaluateAdvisoryReceiptPrivateState(secureWindows()).status, "secure"); for (const principal of ["Everyone", "Users", "Authenticated Users", "SYSTEM", "Administrators"]) { const evidence = secureWindows(); evidence.file.dacl.principals.push(principal); assert.equal(evaluateAdvisoryReceiptPrivateState(evidence).status, "insecure", principal); } const reparse = secureWindows(); reparse.directory.reparsePoint = true; assert.equal(evaluateAdvisoryReceiptPrivateState(reparse).status, "insecure"); const foreignOwner = secureWindows(); foreignOwner.file.owner = "SYSTEM"; assert.equal(evaluateAdvisoryReceiptPrivateState(foreignOwner).status, "insecure"); const unavailable = secureWindows(); unavailable.file.dacl = { status: "unavailable" }; assert.equal(evaluateAdvisoryReceiptPrivateState(unavailable).status, "unavailable"); const unsupported = secureWindows(); unsupported.file.dacl = { status: "unsupported" }; assert.equal(evaluateAdvisoryReceiptPrivateState(unsupported).status, "unsupported"); });
 test("macOS retains the POSIX owner, mode, and reparse-point contract", () => { const secure = { platform: "darwin", expectedOwner: OWNER, file: { kind: "file", owner: OWNER, reparsePoint: false, mode: 0o600 }, directory: { kind: "directory", owner: OWNER, reparsePoint: false, mode: 0o700 } }; assert.equal(evaluateAdvisoryReceiptPrivateState(secure).status, "secure"); secure.file.mode = 0o640; assert.equal(evaluateAdvisoryReceiptPrivateState(secure).status, "insecure"); });
 test("native Windows boundary permits only the concrete owner DACL", () => { const secure = { currentOwner: "DESKTOP\\agent", owner: "DESKTOP\\agent", reparsePoint: false, principals: ["DESKTOP\\agent"] }; assert.equal(evaluateWindowsPrivateState(secure).status, "secure"); for (const principal of ["SYSTEM", "BUILTIN\\Administrators", "Everyone", "DESKTOP\\other"]) { assert.equal(evaluateWindowsPrivateState({ ...secure, principals: [...secure.principals, principal] }).status, "insecure"); } assert.equal(evaluateWindowsPrivateState({ ...secure, reparsePoint: true }).status, "insecure"); assert.equal(evaluateWindowsPrivateState(null).status, "unavailable"); });
