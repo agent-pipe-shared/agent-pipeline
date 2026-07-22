@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import {
   cpSync,
   linkSync,
+  lstatSync,
   mkdirSync,
   mkdtempSync,
   renameSync,
@@ -19,6 +20,28 @@ import { dirname, join } from "node:path";
 import test from "node:test";
 
 import { observePublicCoreIdentity } from "./public-core-observation.mjs";
+
+let symlinkCapable = true;
+{
+  const probeDir = mkdtempSync(join(tmpdir(), "public-core-observation-symlink-probe-"));
+  try { writeFileSync(join(probeDir, "target"), "x"); symlinkSync(join(probeDir, "target"), join(probeDir, "link")); }
+  catch { symlinkCapable = false; }
+  finally { rmSync(probeDir, { recursive: true, force: true }); }
+  if (!symlinkCapable) process.stdout.write("[capability: symlink unavailable] skipping symlink-specific checks\n");
+}
+
+let fifoCapable = true;
+{
+  const probeDir = mkdtempSync(join(tmpdir(), "public-core-observation-fifo-probe-"));
+  try {
+    const fifoPath = join(probeDir, "probe.fifo");
+    execFileSync("mkfifo", [fifoPath]);
+    const info = lstatSync(fifoPath);
+    fifoCapable = !info.isFile() && !info.isDirectory();
+  } catch { fifoCapable = false; }
+  finally { rmSync(probeDir, { recursive: true, force: true }); }
+  if (!fifoCapable) process.stdout.write("[capability: fifo unavailable] skipping fifo-specific checks\n");
+}
 
 const MANIFEST = `${JSON.stringify({
   name: "pipeline-core",
@@ -166,12 +189,12 @@ test("rejects dirt inside the source plugin and accepts dirt outside it", (t) =>
 
 test("rejects symlinked, hard-linked, and special installed entries", () => {
   const cases = [
-    (repo) => symlinkSync(join(repo.installedPluginRoot, "hooks", "codex-hooks.json"), join(repo.installedPluginRoot, "linked.json")),
+    ...(symlinkCapable ? [(repo) => symlinkSync(join(repo.installedPluginRoot, "hooks", "codex-hooks.json"), join(repo.installedPluginRoot, "linked.json"))] : []),
     (repo) => linkSync(join(repo.installedPluginRoot, "hooks", "codex-hooks.json"), join(repo.installedPluginRoot, "hard-linked.json")),
-    (repo) => {
+    ...(fifoCapable ? [(repo) => {
       try { execFileSync("mkfifo", [join(repo.installedPluginRoot, "special.fifo")]); }
       catch (error) { if (error?.status !== 0) throw error; }
-    },
+    }] : []),
   ];
   for (const mutate of cases) {
     const repo = fixture();
