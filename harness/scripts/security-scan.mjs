@@ -241,7 +241,20 @@ function scannerEntry(adapter, result) {
  * even on failure paths" DoD requirement, which requires this function to always reach the
  * write call).
  */
-export async function runSecurityScan({ rootDir, timeoutMs = DEFAULT_TIMEOUT_MS, env = process.env, spawnFn, platform = process.platform } = {}) {
+export async function runSecurityScan({
+  rootDir,
+  timeoutMs = DEFAULT_TIMEOUT_MS,
+  env = process.env,
+  spawnFn,
+  platform = process.platform,
+  // Test-only injection seams (never set by the CLI/production caller): let a test
+  // substitute the trust assessment without touching the reserved trust module itself.
+  // Defaulting to the real imported functions keeps every production code path identical.
+  assessTrustedExecutablePath: assessTrustedExecutablePathOverride,
+  resolveTrustedSystemExecutable: resolveTrustedSystemExecutableOverride,
+} = {}) {
+  const assessPath = assessTrustedExecutablePathOverride ?? assessTrustedExecutablePath;
+  const resolveSystemExec = resolveTrustedSystemExecutableOverride ?? resolveTrustedSystemExecutable;
   const manifest = loadManifestSafe(rootDir);
   const blockOn = resolveBlockOn(manifest);
   const mode = resolveGateMode(manifest);
@@ -271,11 +284,11 @@ export async function runSecurityScan({ rootDir, timeoutMs = DEFAULT_TIMEOUT_MS,
       } else {
       let inst = adapter.isInstalled(env);
       if (inst.installed && key !== "license-check") {
-        const assessed = assessTrustedExecutablePath(inst.path, { platform });
+        const assessed = assessPath(inst.path, { platform });
         inst = assessed.ok ? { installed: true, path: assessed.path } : { installed: false, status: assessed.status, reason: `resolved ${key} path was rejected: ${assessed.status}` };
       }
       if (!inst.installed && key !== "license-check" && typeof env?.HOME === "string" && env.HOME.length > 0) {
-        const trusted = resolveTrustedSystemExecutable(key, { platform, homeDir: env.HOME });
+        const trusted = resolveSystemExec(key, { platform, homeDir: env.HOME });
         if (trusted.ok) inst = { installed: true, path: trusted.path };
         else if (inst.status === undefined) inst = { ...inst, status: trusted.status };
       }
