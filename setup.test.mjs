@@ -189,7 +189,20 @@ function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" }
   const firstBytes = readFileSync(target, "utf8");
   const second = publishPoGateProfileReceipt({ rootDir: root, userYamlText, runtimeYamlText, updatedAt: "2026-07-18T18:01:00.000Z" }, { topology });
   const leftovers = readFileSync(target, "utf8");
-  ok("PO profile receipt: validated primary projection publishes canonical mode-0600 receipt", first.ok && second.ok && (statSync(target).mode & 0o777) === 0o600 && firstBytes !== leftovers);
+  // NTFS has no POSIX permission-bit model: chmod(0o600) on win32 cannot narrow the mode
+  // bits reported by statSync (Node always reports 0o666 for an owner-writable file there),
+  // so the exact-0600 bit check is a POSIX-only capability. The substantive assertions —
+  // publish succeeded twice and the receipt content actually changed — remain active on
+  // every platform; only the platform-specific mode-bit literal is gated.
+  if (process.platform === "win32") {
+    console.log("[capability: POSIX mode bits unavailable on win32] narrowing mode-0600 assertion to publish success + content change");
+  }
+  ok(
+    "PO profile receipt: validated primary projection publishes canonical mode-0600 receipt",
+    first.ok && second.ok
+      && (process.platform === "win32" ? true : (statSync(target).mode & 0o777) === 0o600)
+      && firstBytes !== leftovers,
+  );
   ok("PO profile receipt: atomic replacement leaves no adjacent temp", JSON.stringify(readdirSync(dirname(target)).sort()) === JSON.stringify(["profile-receipt.json"]));
   ok("PO profile receipt: publisher result exposes digests but no machine path", /^[0-9a-f]{64}$/u.test(second.receiptSha256) && !JSON.stringify(second).includes(root));
   rmSync(root, { recursive: true, force: true });

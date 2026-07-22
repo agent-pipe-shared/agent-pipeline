@@ -131,9 +131,32 @@ function assertNoSymlinkPath(path, root, label) {
   }
   return absolute;
 }
+function unsupportedDirectoryDurability(error) {
+  return process.platform === "win32"
+    && (error?.code === "EPERM" || error?.code === "EINVAL"
+      || error?.code === "EISDIR" || error?.code === "EACCES"
+      || error?.code === "ENOTSUP");
+}
 function fsyncDir(path) {
-  const fd = openSync(path, "r");
-  try { fsyncSync(fd); } finally { closeSync(fd); }
+  // Directory durability is a hard POSIX flush; native Windows raises EPERM/EINVAL
+  // on directory handles. Regular-file fsync (above) is the hard guarantee; parent-
+  // directory durability is best-effort on Windows and its typed-unavailable outcome
+  // is not a failure.
+  let fd;
+  try {
+    fd = openSync(path, "r");
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
+  }
+  try {
+    fsyncSync(fd);
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
+  } finally {
+    closeSync(fd);
+  }
 }
 function publishExclusive(path, value) {
   const bytes = canonicalJson(value);

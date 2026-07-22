@@ -343,14 +343,37 @@ function privateDirectory(path) {
   return stat;
 }
 function canonicalBytes(value) { return Buffer.from(canonicalJson(value), "utf8"); }
+/**
+ * Directory durability is a hard POSIX flush but is not portably available on
+ * native Windows, where opening or fsync-ing a directory handle raises
+ * EPERM/EINVAL. The preceding regular-file flush is the hard durability
+ * guarantee; parent-directory durability is therefore best-effort on Windows,
+ * and its typed-unavailable outcome is not a failure. Mirrors the
+ * `unsupportedDirectoryDurability` contract already applied to
+ * private-boundary.mjs and worktree-lifecycle.mjs.
+ */
+function unsupportedDirectoryDurability(error) {
+  return process.platform === "win32"
+    && (error?.code === "EPERM" || error?.code === "EINVAL"
+      || error?.code === "EISDIR" || error?.code === "EACCES"
+      || error?.code === "ENOTSUP");
+}
 function fsyncDirectory(path) {
+  privateDirectory(path);
   let descriptor;
   try {
-    privateDirectory(path);
     descriptor = openSync(path, "r");
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
+  }
+  try {
     fsyncSync(descriptor);
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
   } finally {
-    if (descriptor !== undefined) closeSync(descriptor);
+    closeSync(descriptor);
   }
 }
 function lockOwnerBytes() { return Buffer.from(canonicalJson({ pid: process.pid }), "utf8"); }
