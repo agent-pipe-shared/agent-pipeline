@@ -11,7 +11,7 @@
 
 <!-- technical-spec-sha256: aaec0b6411626b3f1988dbd2f5db16b2870c9aaed07e5edd3ed1e1e735c43b9b -->
 <!-- public-private-reconciliation-design-sha256: 48698f4bc1717932b1f031b6936e7201cc1d3201e6e56d28a50b2891023f0e7f -->
-<!-- platform-support-contract-sha256: 7bb8ccd036e36ab78c8ccfc64284bfdea9b4d549c732b200a731bcd6d923b029 -->
+<!-- platform-support-contract-sha256: a541b1a3ecb0109ca69e52c1e1e3c47d758bea5028fd8d65e92e524e7a8fd83a -->
 
 Die technische Freigabebindung gilt exakt für die benachbarte
 [spec.md](spec.md). Sie übernimmt zusätzlich die vollständigen, per SHA-256
@@ -25,9 +25,9 @@ verbindliche, SHA-256-gebundene Sentinel-Autorität. Er definiert die
 capability-spezifischen Support-Claims für Windows, Linux, WSL und macOS,
 native same-surface evidence sowie die typisierten negativen Outcomes. Docker
 ist derzeit out of scope und ersetzt niemals native Evidenz. Seine gebundene
-Windows-Blocker-Scope-Eingabe lässt die fünf Windows-Items offen; ein
-Plattform-Claim wird nur mit aktueller Verify-, Security- und Critic-Evidenz
-für denselben Kandidaten zulässig.
+Windows-Blocker-Scope-Eingabe führt `#33` geschlossen sowie `#34`–`#37` offen;
+ein Plattform-Claim wird nur mit aktueller Verify-, Security- und
+Critic-Evidenz für denselben Kandidaten zulässig.
 
 Der PO hat am 2026-07-20 zusätzlich das vollständige
 [Public-Core-/Private-Consumer-Design](public-private-reconciliation-design.md)
@@ -136,7 +136,7 @@ verschoben.
 | `pipeline.stateful-design-contract-template` | open | echte offene Prozessverbesserung | Authority-/Durability-/Recovery-/Enforcement-Checkliste in Vorlage und Elephant-Vertrag |
 | `pipeline.t1-governance-path-preflight` | open | Governance-Paketcode teilweise vorhanden | alle Pfad-, ETA- und Tool-Setup-ACs auditieren, ergänzen und schließen |
 | `pipeline.verify-gate-scoped-registration` | open | echte offene Ursache für unregistrierte Fokustests | enge additive, PO-/Task-gebundene Registrierung implementieren und nutzen |
-| `pipeline.windows-runtime-baseline-containment` | open | Issue `#33`, physische Windows-Containment-Lücke | gemeinsame V2/V3-Hostpfad-Primitive und native Evidenz |
+| `pipeline.windows-runtime-baseline-containment` | closed | Issue `#33`, physische Windows-Containment-Lücke | kanonische Closure-Evidenz gebunden; kein Restgate |
 | `pipeline.windows-directory-durability` | open | Issue `#34`, POSIX-Verzeichnis-fsync-Annahme | Plattform-Assurance ohne schwächeren File-Flush |
 | `pipeline.windows-private-state-assurance` | open | Issue `#35`, POSIX-Modi sind keine Windows-DACL-Proof | typisierte Private-State-Assurance, authority fail-closed |
 | `pipeline.windows-verify-reproducibility` | open | Issue `#36`, Full Verify nicht nativ Windows-reproduzierbar | Capability-gebundene Fixtures und grüner Standard-Account-Gate |
