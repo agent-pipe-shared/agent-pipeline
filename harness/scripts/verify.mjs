@@ -43,6 +43,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateScopedVerifyRegistration } from "../../plugins/pipeline-core/lib/scoped-verify-registration.mjs";
+import { validateWindowsAssuranceVerifyRegistration } from "../../plugins/pipeline-core/lib/windows-assurance-verify-registration.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, "..", "..");
@@ -76,6 +77,31 @@ const SCOPED_VERIFY_REGISTRATION = Object.freeze({
     }),
   }),
   suites: SCOPED_VERIFY_SUITES,
+});
+const WINDOWS_ASSURANCE_VERIFY_SUITES = Object.freeze([
+  Object.freeze({
+    name: "trusted-tool-resolution-tests",
+    file: "plugins/pipeline-core/lib/trusted-tool-resolution.test.mjs",
+  }),
+  Object.freeze({
+    name: "advisory-receipt-assurance-tests",
+    file: "plugins/pipeline-core/lib/advisory-receipt-assurance.test.mjs",
+  }),
+  Object.freeze({
+    name: "toolchain-preflight-tests",
+    file: "plugins/pipeline-core/scripts/toolchain-preflight.test.mjs",
+  }),
+]);
+const WINDOWS_ASSURANCE_VERIFY_REGISTRATION = Object.freeze({
+  schema: "pipeline.windows-assurance-verify-registration.v1",
+  taskId: "pipeline.windows-assurance-verify-binding",
+  authority: Object.freeze({
+    matrix: Object.freeze({
+      path: "specs/2026-07-19-sprint-sentinel-epic/windows-trusted-tool-resolution-ac-matrix.md",
+      sha256: "0b1a6c9256b7a517e95f401d6d86a75e5ce6d6ff87a61ded012ec7e672cf3a2e",
+    }),
+  }),
+  suites: WINDOWS_ASSURANCE_VERIFY_SUITES,
 });
 
 const TEST_SUITES = [
@@ -216,19 +242,26 @@ const PHASE_STEPS =
       ];
 
 const steps = [];
-const scopedRegistration = validateScopedVerifyRegistration(SCOPED_VERIFY_REGISTRATION);
-if (!scopedRegistration.ok) {
+const windowsAssuranceRegistration = validateWindowsAssuranceVerifyRegistration(WINDOWS_ASSURANCE_VERIFY_REGISTRATION);
+if (!windowsAssuranceRegistration.ok) {
+  console.error(`Invalid Windows-assurance Verify registration: ${windowsAssuranceRegistration.code}`);
+  steps.push({ name: "windows-assurance-verify-registration", exitCode: 1 });
+} else {
+  const scopedRegistration = validateScopedVerifyRegistration(SCOPED_VERIFY_REGISTRATION);
+  if (!scopedRegistration.ok) {
   console.error(`Invalid scoped Verify registration: ${scopedRegistration.code}`);
   steps.push({ name: "scoped-verify-registration", exitCode: 1 });
-} else {
-  const scopedTests = SCOPED_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
-  for (const suite of [...TEST_SUITES, ...scopedTests, ...PHASE_STEPS]) {
-    console.log(`\n=== ${suite.name} (${suite.file}) ===`);
-    const res = spawnSync(process.execPath, [suite.file, ...(suite.args ?? [])], { encoding: "utf8", cwd: repoRoot });
-    if (res.stdout) process.stdout.write(res.stdout);
-    if (res.stderr) process.stderr.write(res.stderr);
-    const exitCode = res.status ?? 1;
-    steps.push({ name: suite.name, exitCode });
+  } else {
+    const scopedTests = SCOPED_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
+    const windowsAssuranceTests = WINDOWS_ASSURANCE_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
+    for (const suite of [...TEST_SUITES, ...scopedTests, ...windowsAssuranceTests, ...PHASE_STEPS]) {
+      console.log(`\n=== ${suite.name} (${suite.file}) ===`);
+      const res = spawnSync(process.execPath, [suite.file, ...(suite.args ?? [])], { encoding: "utf8", cwd: repoRoot });
+      if (res.stdout) process.stdout.write(res.stdout);
+      if (res.stderr) process.stderr.write(res.stderr);
+      const exitCode = res.status ?? 1;
+      steps.push({ name: suite.name, exitCode });
+    }
   }
 }
 
