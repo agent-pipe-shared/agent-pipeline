@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "fdb7baa3832fc84300e8da293070b30469ba7186dd3814cf6954c01391624f64"
+    "transitionHead": "c3e371eb7e48afa1bc790f8d547a76d95361ee93094df8ffa0de4a44b98fbc67"
   },
   "counts": {
-    "open": 25,
+    "open": 30,
     "in_progress": 3,
     "closed": 1
   },
@@ -261,6 +261,51 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.windows-directory-durability",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-22",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md",
+      "tracking": "PO-approved Sentinel scope extension; no implementation or closure claim."
+    },
+    {
+      "id": "pipeline.windows-private-state-assurance",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-22",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md",
+      "tracking": "PO-approved Sentinel scope extension; no implementation or closure claim."
+    },
+    {
+      "id": "pipeline.windows-runtime-baseline-containment",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-22",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md",
+      "tracking": "PO-approved Sentinel scope extension; no implementation or closure claim."
+    },
+    {
+      "id": "pipeline.windows-trusted-tool-resolution",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-22",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md",
+      "tracking": "PO-approved Sentinel scope extension; no implementation or closure claim."
+    },
+    {
+      "id": "pipeline.windows-verify-reproducibility",
+      "status": "open",
+      "type": "defect",
+      "owner": "pipeline",
+      "created": "2026-07-22",
+      "source": "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md",
+      "tracking": "PO-approved Sentinel scope extension; no implementation or closure claim."
     }
   ]
 }

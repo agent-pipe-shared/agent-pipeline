@@ -34,9 +34,14 @@
 | pipeline.stateful-design-contract-template | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.t1-governance-path-preflight | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.verify-gate-scoped-registration | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.windows-directory-durability | open | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
+| pipeline.windows-private-state-assurance | open | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
+| pipeline.windows-runtime-baseline-containment | open | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
+| pipeline.windows-trusted-tool-resolution | open | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
+| pipeline.windows-verify-reproducibility | open | defect | pipeline | 2026-07-22 | PO-approved Sentinel scope extension; no implementation or closure claim. |
 
 ## Counts
 
-- open: 25
+- open: 30
 - in_progress: 3
 - closed: 1
