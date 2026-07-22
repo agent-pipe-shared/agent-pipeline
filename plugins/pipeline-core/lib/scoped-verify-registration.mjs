@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 export const SCOPED_VERIFY_REGISTRATION_SCHEMA = "pipeline.scoped-verify-registration.v1";
 export const SCOPED_VERIFY_REGISTRATION_TASK_ID = "pipeline.verify-gate-scoped-registration";
 export const SCOPED_VERIFY_REGISTRATION_PRD_PATH = "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md";
-export const SCOPED_VERIFY_REGISTRATION_PRD_SHA256 = "dc9dcacf4d646af3031f03daf887bf986c4d0bb277634534c27a77a56da68a66";
+export const SCOPED_VERIFY_REGISTRATION_PRD_SHA256 = "4050a582393643b38d61ee0b04bb011a013a5eda0f47de56f4425e4bddeae4bd";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const SHA256 = /^[a-f0-9]{64}$/u;

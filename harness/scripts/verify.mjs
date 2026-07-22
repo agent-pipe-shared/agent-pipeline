@@ -73,7 +73,7 @@ const SCOPED_VERIFY_REGISTRATION = Object.freeze({
   authority: Object.freeze({
     prd: Object.freeze({
       path: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      sha256: "dc9dcacf4d646af3031f03daf887bf986c4d0bb277634534c27a77a56da68a66",
+      sha256: "4050a582393643b38d61ee0b04bb011a013a5eda0f47de56f4425e4bddeae4bd",
     }),
   }),
   suites: SCOPED_VERIFY_SUITES,
