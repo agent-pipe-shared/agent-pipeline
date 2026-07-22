@@ -24,6 +24,7 @@ general lifecycle. Earlier working names `/pipeline:start` and
 - **No work before the confirmation line.** The confirmation is the auditable proof of the bootstrap; a session without it counts as not bootstrapped.
 - **NEVER print the confirmation line without actually performing the steps.** That is the documented main failure mode "reported done, but not verified", and a Critic audits trajectories.
 - All bootstrap commands below are read-only (git `ls-remote`/`rev-parse`/`log`, file reads). The bootstrap changes nothing.
+- **Compact continuity:** Compact MUST rerun `pipeline-start` as a continuation re-entry; after that re-entry, automatically continue the persisted next action without waiting. Compact preserves the active task. Only an explicit pause/cancel/replace/redirect, a named gate, completion or a typed blocker may stop continuation.
 
 **Role:** take the role from `$ARGUMENTS` (default when empty: `elephant`).
 
