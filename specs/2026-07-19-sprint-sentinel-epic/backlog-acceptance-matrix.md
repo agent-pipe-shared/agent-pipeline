@@ -16,6 +16,38 @@ kandidatgebundene AC-/Verify-/Close-Kette; `geschlossen` nur mit kanonischer
 Ledger- und Closure-Evidenz. Dateipräsenz oder ein grüner fokussierter Test
 allein schließen keine Zeile.
 
+## Re-Baseline des aktuellen Kandidaten
+
+Die folgende Re-Baseline wurde am Kandidaten
+`962ed4a45f1e72f68117b92f4946182a204e0b9d` ausgeführt. Sie ergänzt den
+historischen Auditstand; sie ist weder ein Statusübergang noch eine
+Closure-Behauptung. Das aktuelle Full Verify bindet diesen Kandidaten mit
+122/122 Schritten und einem grünen Security-Scan. Die Einzeltests belegen
+lokale Kontrollpfade; sie ersetzen keine native Plattformattestierung, keinen
+Human-Gate und keinen Remote-Effekt.
+
+| Item | Aktuell nachgeprüfte lokale Evidenz | Für einen Abschluss weiterhin erforderlich |
+| --- | --- | --- |
+| `pipeline.afk-assumption-mode` | Assumption-, Ledger-, Review-, Transaction-Host- und Activation-Suiten grün (29+8+9+2+13 Fälle). | Vollständige AC-zu-Verify-Registrierung, Kandidaten-Evidenz über den Writer und eigenständiger Close. |
+| `pipeline.canonical-worktree-lifecycle` | Lifecycle-Suite grün (24 Fälle), einschließlich Cleanup-/Descriptor-Recovery. | Beide realen Close-Profile, Post-Commit-Cleanliness und kandidatengebundene Close-Evidenz. |
+| `pipeline.codex-plugin-validator-host-parity` | Parity-Klassifikationssuite grün (6 Checks). | Native-vs.-Generic-A/B auf identischen Fixtures mit beobachteter Host-/Versionsbindung. |
+| `pipeline.codex-sandbox-critic-longterm` | Host-, Preflight-, Selection- und Runtime-Contracts lokal grün. | Die starke input-confined/network-denied-Lane mit ihrem Upstream-, Shadow-, Preflight- und PO-Nachweis; die Zwischenlane bleibt kein Ersatz. |
+| `pipeline.documentation-information-architecture` | Inventory- und Language-Tests grün; finaler Inventory-Checker bleibt ohne aktuelle `criticReceiptSha256` fail-closed. | Aktuelle Critic-Receipt-Bindung, Operator-Journeys, EN/DE-Abnahme und der exakte HAW-E-Batch. |
+| `pipeline.dual-channel-publication` | Release-Version-Plan (14), Publication-Bundle (11) und Publication-Authority (12) grün. | Frische zwei-kanalige Baseline, gemeinsame Autorisierung, vier Remote-Effekte und Fetch-back. |
+| `pipeline.execution-model-switchback` | Main-session-route- und post-compact-regrounding-Contracts in Full Verify. | Echte Main-Session-Attestierung und kandidatengebundene Drift-/Return-Request-Evidenz. |
+| `pipeline.nonblocking-interaction-continuity` | Registration, State-, Host- und Status-Tests grün. | Vollständige Trajectory-/Compact-/Resume-AC-Zuordnung, Kandidaten-Evidenz und Close. |
+| `pipeline.po-gate-worktree-authority` | Authority- und Publisher-Suiten grün (32+8 Fälle), einschließlich linked-worktree Negativfälle. | Vollständige AC-Dispositon am Kandidaten und sanktionierter Einzelübergang. |
+| `pipeline.push-guard-worktree-target` | Target-binding (7) und Push-Guard (95) grün. | Regulärer Ziel-Worktree-Push mit frischer Evidenz und Fetch-back. |
+| `pipeline.regulated-document-hooks` | Hooks-, Identifier-, Lifecycle-, Manifest- und Binding-Suiten grün (18+2+6+8+11). | Jede mandatory `(bindingId,event)`-Kette bis Receipt/Review/Rationale oder typed blocker; danach nur im HAW-E-Batch. |
+| `pipeline.session-keep-awake` | Core-, Controller-, CLI- und Cleanup-Suiten grün (6+3+7+2). | Plattform-/Lease-/Cleanup-Nachweise je unterstützter Hostklasse und HAW-E-Batch-Abnahme. |
+| `pipeline.stateful-design-contract-template` | Documentation-Contract-Test (31) und Check grün. | AC-Mapping gegen ein konkretes Stateful-Design und kandidatengebundene Closure-Evidenz. |
+| `pipeline.t1-governance-path-preflight` | Critic-Packet-Governance und Writer-Preflight sind in Full Verify grün. | Vollständige Pfad-, ETA- und Tool-Setup-ACs, evidenzgebunden und separat reviewt. |
+| `pipeline.verify-gate-scoped-registration` | Geschlossene PRD-gebundene Registrierung grün (35 Fälle), inklusive Drift- und Negativbelegen. | Aktuelle AC-Matrix-/Writer-Evidenz und sanktionierter Einzelübergang; keine rückwirkende Bulk-Closure. |
+
+Die verbindliche plattformbezogene Abschlussgrenze für Windows, Linux, WSL
+und macOS wird in `platform-support-contract.md` geführt. Docker ist weder
+eine unterstützte Plattform noch ein Ersatz für native Evidenz.
+
 | Kanonisches Item und aktueller Status | AC-für-AC-Befund am lokalen Kandidaten | Konkrete Produktions-/Test-/Verify- oder Closure-Referenzen | Noch fehlendes, sanktioniertes Gate |
 | --- | --- | --- | --- |
 | `pipeline.afk-assumption-mode` — **open**, geliefert-aber-unbewiesen | SNT-4 AC 1–6 haben Implementierungsoberflächen für Disabled-Pfad, Bindung, Ledger, Sperren und Review; AC 7 verlangt zusätzlich die vollständige registrierte Test- und Close-Kette. | Produktion: `plugins/pipeline-core/lib/afk-assumption-mode.mjs`, `afk-ledger.mjs`, `afk-review.mjs`, `afk-transaction-host.mjs`; Tests: die gleichnamigen `*.test.mjs` sowie `scripts/afk-activation.test.mjs`. In `harness/scripts/verify.mjs` ist keine eigene AFK-Suite registriert. | Alle SNT-4-ACs am exakten Kandidaten, insbesondere Disabled/Ablauf/Recovery/Rollback/Forbidden-Action/Final-Review, in Full Verify registrieren und mit eigener Evidenz über den Writer schließen. |
