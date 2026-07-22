@@ -43,10 +43,11 @@ PO-Entscheidung.
 
 Dieses Paket migriert Advisory-Receipt-Persistenz und die bereits von
 `private-boundary` getragenen Session-Power- und Private-Document-Binding-
-Records. Direkte Spezialimplementierungen (etwa Critic-Pakete, PO-Profile und
-Sandbox-Store) bleiben bis zu ihrer eigenen Consumer-Migration offen. Ein
-normaler Revert der Writer-/Test-Commits ist der einzige Rollback; anschließend
-folgen fokussierte Tests und Full Verify auf dem Revert-Kandidaten.
+Records sowie die direkten PO-Profile-, Codex-Sandbox- und Critic-Packet-
+Consumer. Weitere unabhängige Authority-Writer bleiben bis zu ihrer eigenen
+Consumer-Migration offen. Ein normaler Revert der Writer-/Test-Commits ist der
+einzige Rollback; anschließend folgen fokussierte Tests und Full Verify auf dem
+Revert-Kandidaten.
 
 Die in `windows-trusted-tool-resolution-ac-matrix.md` gebundene geschlossene
 Windows-Assurance-Registrierung umfasst auch diese Receipt-Suite; sie erweitert
