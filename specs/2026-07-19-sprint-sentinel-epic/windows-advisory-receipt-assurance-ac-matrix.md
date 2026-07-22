@@ -4,9 +4,14 @@
 
 Status: **PO-entschieden; Implementierung und Closure offen**
 Datum: 2026-07-22
-Scope: erster Consumer für `pipeline.windows-directory-durability` (#34) und
-`pipeline.windows-private-state-assurance` (#35): Advisory-Receipts und ihre
-zugehörigen Verzeichnisse.
+Scope: erster Writer für `pipeline.windows-directory-durability` (#34) sowie
+die gemeinsame `private-boundary` für `pipeline.windows-private-state-assurance`
+(#35). Damit konsumieren Session-Power- und Private-Document-Binding-Records
+dieselbe Owner-/DACL-/Reparse-Authority.
+
+Plattformgrenze: Linux und macOS nutzen denselben POSIX-Owner-/Mode-/Reparse-
+Vertrag; Windows verwendet DACL-Evidenz. Ein macOS-Lauf ist eine eigene
+native Annahme und wird nicht durch Linux-Evidenz ersetzt.
 
 ## Verbindliche PO-Entscheidung
 
@@ -28,11 +33,18 @@ PO-Entscheidung.
 | AC-35.2 | `insecure`, `unavailable` und `unsupported` sind getrennte, fail-closed Resultate; insbesondere Gruppenrechte für `Everyone`, `Users` oder `Authenticated Users` sind nicht sicher. |
 | AC-35.3 | Der erste Vertrag akzeptiert nur den konkreten Owner. `SYSTEM` oder Administratoren sind keine implizite Ausnahme. |
 | AC-35.4 | Fokussierte POSIX-/Windows-/Negativtests, registrierte Aggregate-Verify-Evidenz, Security-Evidenz, unabhängiger Critic und native Windows-Nachweis binden den Kandidaten. |
+| AC-35.5 | Die gemeinsame `private-boundary` verwendet auf Windows keine POSIX-Mode-Bits als Sicherheitsbeweis. Ein neu angelegtes privates Verzeichnis entfernt geerbte ACLs und erlaubt ausschließlich dem konkreten aktuellen Principal Zugriff; bestehende, nicht nachweisbare Pfade bleiben fail-closed. |
+| AC-35.6 | Der native Adapter startet ausschließlich eine fest verdrahtete System-PowerShell unter `C:` oder `D:` ohne `PATH`-, Wrapper- oder Nutzerpfad-Auflösung. Nicht verfügbare oder unlesbare DACL-Evidenz ergibt `unavailable`, nie einen Erfolg. |
+| AC-MAC.1 | macOS prüft Owner, private POSIX-Modi und Reparse-Points; eine DACL- oder Windows-Principal-Annahme wird dort nicht verwendet. |
+| AC-MAC.2 | Ein macOS-Directory-Flushfehler `EINVAL`, `ENOTSUP` oder `EOPNOTSUPP` ist ein typisierter fail-closed `unsupported`-Zustand, kein Erfolg. |
+| AC-MAC.3 | Vor einer Plattform-Closure liegen ein nativer macOS-Fokuslauf, Full Verify und ein unabhängiger Critic vor; Linux-Fixtures allein reichen nicht. |
 
 ## Grenzen und Rollback
 
-Dieses Paket migriert nur Advisory-Receipt-Persistenz. Andere private
-Autoritätsdateien werden erst nach eigener Consumer-Inventur migriert. Ein
+Dieses Paket migriert Advisory-Receipt-Persistenz und die bereits von
+`private-boundary` getragenen Session-Power- und Private-Document-Binding-
+Records. Direkte Spezialimplementierungen (etwa Critic-Pakete, PO-Profile und
+Sandbox-Store) bleiben bis zu ihrer eigenen Consumer-Migration offen. Ein
 normaler Revert der Writer-/Test-Commits ist der einzige Rollback; anschließend
 folgen fokussierte Tests und Full Verify auf dem Revert-Kandidaten.
 

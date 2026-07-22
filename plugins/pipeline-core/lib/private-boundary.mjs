@@ -26,6 +26,7 @@ import {
 } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { randomBytes } from "node:crypto";
+import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "./windows-private-state.mjs";
 
 export class PrivateBoundaryError extends Error {
   constructor(code, message) {
@@ -61,14 +62,28 @@ function nearestExistingParent(path) {
 export function ensurePrivateDirectory(path) {
   const existing = nearestExistingParent(path);
   physicalDirectory(existing, "private-state parent");
+  const existed = existsSync(path);
   mkdirSync(path, { recursive: true, mode: 0o700 });
-  return physicalDirectory(path, "private-state directory");
+  const directory = physicalDirectory(path, "private-state directory");
+  if (process.platform === "win32") {
+    const state = existed ? assessWindowsPrivatePath(directory) : hardenWindowsPrivateDirectory(directory);
+    if (state.status !== "secure") fail("PB-WINDOWS-ASSURANCE", `private-state directory Windows assurance is ${state.status}`);
+  }
+  return directory;
 }
 
 export function assertPrivateRegularFile(path, label = "private file") {
   const info = lstatSync(path);
-  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || (info.mode & 0o077) !== 0) {
+  const posixModeViolation = process.platform !== "win32" && (info.mode & 0o077) !== 0;
+  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || posixModeViolation) {
     fail("PB-FILE", `${label} must be a mode-0600 single-link regular file`);
+  }
+  if (process.platform === "win32") {
+    const fileState = assessWindowsPrivatePath(path);
+    const parentState = assessWindowsPrivatePath(dirname(path));
+    if (fileState.status !== "secure" || parentState.status !== "secure") {
+      fail("PB-WINDOWS-ASSURANCE", `${label} Windows assurance is unavailable or insecure`);
+    }
   }
   return info;
 }
