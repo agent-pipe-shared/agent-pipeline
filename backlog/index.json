@@ -3,12 +3,12 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "c3e371eb7e48afa1bc790f8d547a76d95361ee93094df8ffa0de4a44b98fbc67"
+    "transitionHead": "92e42ed2e83f2820f6aac609bb96996f5e9fdd6e12a2878d9340ebc359c9002f"
   },
   "counts": {
-    "open": 30,
+    "open": 29,
     "in_progress": 3,
-    "closed": 1
+    "closed": 2
   },
   "items": [
     {
@@ -282,12 +282,16 @@
     },
     {
       "id": "pipeline.windows-runtime-baseline-containment",
-      "status": "open",
+      "status": "closed",
       "type": "defect",
       "owner": "pipeline",
       "created": "2026-07-22",
       "source": "specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md",
-      "tracking": "PO-approved Sentinel scope extension; no implementation or closure claim."
+      "tracking": "PO-approved Sentinel scope extension; no implementation or closure claim.",
+      "closedAt": "2026-07-22",
+      "closureRepository": "self",
+      "closureCommit": "e21933be86bea8735de7e407f94cff48cffd7bd8",
+      "closureEvidence": "backlog/evidence/2026-07-22-windows-runtime-baseline-containment-closure.md"
     },
     {
       "id": "pipeline.windows-trusted-tool-resolution",
