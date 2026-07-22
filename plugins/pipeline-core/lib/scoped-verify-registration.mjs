@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 /**
- * Bounded validation for Sentinel's one static Verify extension.
+ * Bounded validation for Sentinel's closed static Verify allowlist.
  * This is deliberately not a reusable registry or mutation API.
  */
 import { createHash } from "node:crypto";
@@ -17,8 +17,20 @@ export const SCOPED_VERIFY_REGISTRATION_PRD_SHA256 = "2b4c722de508cb9424b3fb83c6
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 const SHA256 = /^[a-f0-9]{64}$/u;
-const SCOPED_SUITE_NAME = "scoped-verify-registration-tests";
-const SCOPED_SUITE_FILE = "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs";
+const SCOPED_SUITES = Object.freeze([
+  Object.freeze({
+    name: "scoped-verify-registration-tests",
+    file: "plugins/pipeline-core/lib/scoped-verify-registration.test.mjs",
+  }),
+  Object.freeze({
+    name: "workflow-preflight-tests",
+    file: "plugins/pipeline-core/lib/workflow-preflight.test.mjs",
+  }),
+  Object.freeze({
+    name: "interaction-continuity-tests",
+    file: "plugins/pipeline-core/lib/interaction-continuity.test.mjs",
+  }),
+]);
 
 function exactKeys(value, keys) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
@@ -55,17 +67,19 @@ export function validateScopedVerifyRegistration(entry) {
   } catch {
     return rejected("SVR-PRD-FILE");
   }
-  if (!Array.isArray(entry.suites) || entry.suites.length !== 1) return rejected("SVR-SUITES");
-  const [suite] = entry.suites;
-  if (!exactKeys(suite, ["name", "file"]) || suite.name !== SCOPED_SUITE_NAME || suite.file !== SCOPED_SUITE_FILE) {
-    return rejected("SVR-SUITE-BINDING");
-  }
-  const target = safeRelativeFile(suite.file);
-  if (!target) return rejected("SVR-SUITE-PATH");
-  try {
-    if (!lstatSync(target).isFile()) return rejected("SVR-SUITE-FILE");
-  } catch {
-    return rejected("SVR-SUITE-FILE");
+  if (!Array.isArray(entry.suites) || entry.suites.length !== SCOPED_SUITES.length) return rejected("SVR-SUITES");
+  for (const [index, suite] of entry.suites.entries()) {
+    const expected = SCOPED_SUITES[index];
+    if (!exactKeys(suite, ["name", "file"]) || suite.name !== expected.name || suite.file !== expected.file) {
+      return rejected("SVR-SUITE-BINDING");
+    }
+    const target = safeRelativeFile(suite.file);
+    if (!target) return rejected("SVR-SUITE-PATH");
+    try {
+      if (!lstatSync(target).isFile()) return rejected("SVR-SUITE-FILE");
+    } catch {
+      return rejected("SVR-SUITE-FILE");
+    }
   }
   return Object.freeze({ ok: true });
 }
