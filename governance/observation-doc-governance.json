@@ -162,6 +162,7 @@
         "paths": [
           "docs/spec-archive/2026-07-20-sentinel-recovery/RECOVERY.md",
           "docs/spec-archive/2026-07-20-sentinel-recovery/backlog-acceptance-matrix.md",
+          "docs/spec-archive/2026-07-20-sentinel-recovery/platform-support-contract.md",
           "docs/spec-archive/2026-07-20-sentinel-recovery/prd_sentinel-epic.md",
           "docs/spec-archive/2026-07-20-sentinel-recovery/public-private-reconciliation-design.md",
           "docs/spec-archive/2026-07-20-sentinel-recovery/spec.md"

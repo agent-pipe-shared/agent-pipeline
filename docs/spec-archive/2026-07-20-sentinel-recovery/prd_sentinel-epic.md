@@ -11,6 +11,7 @@
 
 <!-- technical-spec-sha256: aaec0b6411626b3f1988dbd2f5db16b2870c9aaed07e5edd3ed1e1e735c43b9b -->
 <!-- public-private-reconciliation-design-sha256: 48698f4bc1717932b1f031b6936e7201cc1d3201e6e56d28a50b2891023f0e7f -->
+<!-- platform-support-contract-sha256: 7bb8ccd036e36ab78c8ccfc64284bfdea9b4d549c732b200a731bcd6d923b029 -->
 
 Die technische Freigabebindung gilt exakt für die benachbarte
 [spec.md](spec.md). Sie übernimmt zusätzlich die vollständigen, per SHA-256
@@ -18,6 +19,15 @@ gebundenen Hawkeye-Verträge und den Control-Contract aus
 the recorded design-phase control contract. Ändert sich einer dieser
 Inputs, werden die lokale Readiness-/Authority-Prüfung und PO-Freigabe vor
 weiterer Umsetzung erneuert.
+
+Der [Platform-Support-Contract](platform-support-contract.md) ist eine
+verbindliche, SHA-256-gebundene Sentinel-Autorität. Er definiert die
+capability-spezifischen Support-Claims für Windows, Linux, WSL und macOS,
+native same-surface evidence sowie die typisierten negativen Outcomes. Docker
+ist derzeit out of scope und ersetzt niemals native Evidenz. Seine gebundene
+Windows-Blocker-Scope-Eingabe lässt die fünf Windows-Items offen; ein
+Plattform-Claim wird nur mit aktueller Verify-, Security- und Critic-Evidenz
+für denselben Kandidaten zulässig.
 
 Der PO hat am 2026-07-20 zusätzlich das vollständige
 [Public-Core-/Private-Consumer-Design](public-private-reconciliation-design.md)
