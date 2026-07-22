@@ -2,7 +2,7 @@
 /** Fail-closed form checker for the public, sanitized error-register authority. */
 import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DEFAULT_REGISTER = join(root, "backlog", "error-register.md");
@@ -67,7 +67,7 @@ function read(path) {
   try { return readFileSync(path, "utf8"); } catch { return null; }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const target = process.argv[2] ? (isAbsolute(process.argv[2]) ? process.argv[2] : resolve(process.cwd(), process.argv[2])) : DEFAULT_REGISTER;
   const form = checkErrorRegister(read(target));
   const consumers = checkDeclaredBriefingConsumers((relativePath) => read(join(root, relativePath)));

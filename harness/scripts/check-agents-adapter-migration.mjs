@@ -2,7 +2,7 @@
 /** Narrow contract check for the one optional, public AGENTS adapter migration. */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { MIGRATED_AGENTS_ADAPTER } from "../../setup.mjs";
 
@@ -20,7 +20,7 @@ export function checkAgentsAdapterMigration(text) {
   return { ok: errors.length === 0, errors };
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   let text = null;
   try { text = readFileSync(join(root, DECLARED_ADAPTER_PATH), "utf8"); } catch { /* checker returns a category only */ }
   const result = checkAgentsAdapterMigration(text);

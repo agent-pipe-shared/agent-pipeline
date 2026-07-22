@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /** Local entry point for the one approved control-decomposition acceptance. */
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { runControlDecomposition } from "./codex-isolation-control-decomposition.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
@@ -27,7 +27,7 @@ export async function run({ commit, repoRoot = root } = {}) {
   });
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   try {
     const result = await run(parseArgs(process.argv.slice(2)));
     if (!result.ok) {

@@ -3,6 +3,7 @@
 
 /** Project-local inspect/plan/apply surface for the V3 authority cutover. */
 import { writeSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
 import {
   applyPendingTransactionRecoveryV3,
@@ -149,4 +150,4 @@ export function main(args = process.argv.slice(2), {
   return ["ready", "noop", "applied"].includes(output.status) ? 0 : 1;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) process.exit(main());
+if (import.meta.url === pathToFileURL(process.argv[1]).href) process.exit(main());

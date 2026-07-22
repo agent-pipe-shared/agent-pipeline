@@ -6,7 +6,7 @@
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const DECLARED_CONTRACT_PATHS = Object.freeze([
@@ -95,7 +95,7 @@ function read(path) {
   try { return readFileSync(path, "utf8"); } catch { return null; }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const texts = Object.fromEntries(DECLARED_CONTRACT_PATHS.map((path) => [path, read(join(root, path))]));
   const result = checkCriticFailClosedContract(texts);
   if (!result.ok) {
