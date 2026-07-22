@@ -24,6 +24,7 @@ import {
   writePrivateFileNoReplaceAtomic,
 } from "../lib/private-boundary.mjs";
 import { discoverRepository } from "../lib/worktree-lifecycle.mjs";
+import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 
 export const PRIVATE_DOCUMENT_BINDING_SCHEMA = "pipeline.private-document-binding.v1";
 const BINDING_ID = /^dh_[a-z2-7]{25}[aeimquy4]$/u;
@@ -63,17 +64,19 @@ export function validateTriggerPattern(pattern) {
 function assertPrivateDirectory(path, label) {
   if (!isAbsolute(path) || resolve(path) !== path || path.includes("\0")) fail("DB-PATH", `${label} path is not canonical absolute`);
   const info = lstatSync(path);
-  if (!info.isDirectory() || info.isSymbolicLink() || (info.mode & 0o777) !== 0o700 || realpathSync(path) !== path) {
+  if (!info.isDirectory() || info.isSymbolicLink() || (process.platform !== "win32" && (info.mode & 0o777) !== 0o700) || realpathSync(path) !== path) {
     fail("DB-BOUNDARY", `${label} must be a physical mode-0700 directory`);
   }
+  if (process.platform === "win32" && assessWindowsPrivatePath(path).status !== "secure") fail("DB-BOUNDARY", `${label} Windows assurance is unavailable or insecure`);
   return path;
 }
 function assertPrivateFile(root, path, label) {
   if (!isAbsolute(path) || resolve(path) !== path || !contained(root, path)) fail("DB-PATH", `${label} must be below privateRoot`);
   const info = lstatSync(path);
-  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || (info.mode & 0o777) !== 0o600 || realpathSync(path) !== path) {
+  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || (process.platform !== "win32" && (info.mode & 0o777) !== 0o600) || realpathSync(path) !== path) {
     fail("DB-BOUNDARY", `${label} must be a physical mode-0600 single-link regular file`);
   }
+  if (process.platform === "win32" && (assessWindowsPrivatePath(path).status !== "secure" || assessWindowsPrivatePath(dirname(path)).status !== "secure")) fail("DB-BOUNDARY", `${label} Windows assurance is unavailable or insecure`);
   return path;
 }
 
