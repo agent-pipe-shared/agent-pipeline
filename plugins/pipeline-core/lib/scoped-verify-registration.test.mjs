@@ -24,6 +24,12 @@ function check(name, condition) {
 const TASK_ID = "pipeline.verify-gate-scoped-registration";
 const PRD_PATH = "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md";
 const PRD_SHA256 = "0c4b426c7b691b433cbc9a6963d8010e6c737efd00cb22c405a78b9d5743d5ca";
+const WINDOWS_ASSURANCE_MATRIX_PATH = "specs/2026-07-19-sprint-sentinel-epic/windows-trusted-tool-resolution-ac-matrix.md";
+const WINDOWS_ASSURANCE_SUITES = Object.freeze([
+  "plugins/pipeline-core/lib/trusted-tool-resolution.test.mjs",
+  "plugins/pipeline-core/lib/advisory-receipt-assurance.test.mjs",
+  "plugins/pipeline-core/scripts/toolchain-preflight.test.mjs",
+]);
 const SUITES = Object.freeze([
   Object.freeze({
     name: "scoped-verify-registration-tests",
@@ -165,16 +171,26 @@ function scopedRegistrationFailureFixture() {
   const fixtureRoot = mkdtempSync(join(tmpdir(), "scoped-verify-registration-"));
   const writer = join(fixtureRoot, "harness", "scripts", "verify.mjs");
   const registration = join(fixtureRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs");
+  const windowsRegistration = join(fixtureRoot, "plugins", "pipeline-core", "lib", "windows-assurance-verify-registration.mjs");
   const prd = join(fixtureRoot, PRD_PATH);
+  const windowsAssuranceMatrix = join(fixtureRoot, WINDOWS_ASSURANCE_MATRIX_PATH);
   const evidencePath = join(fixtureRoot, "evidence", "verify-latest.json");
 
   try {
     mkdirSync(dirname(writer), { recursive: true });
     mkdirSync(dirname(registration), { recursive: true });
     mkdirSync(dirname(prd), { recursive: true });
+    mkdirSync(dirname(windowsAssuranceMatrix), { recursive: true });
     copyFileSync(join(repoRoot, "harness", "scripts", "verify.mjs"), writer);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs"), registration);
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-assurance-verify-registration.mjs"), windowsRegistration);
     copyFileSync(join(repoRoot, PRD_PATH), prd);
+    copyFileSync(join(repoRoot, WINDOWS_ASSURANCE_MATRIX_PATH), windowsAssuranceMatrix);
+    for (const suite of WINDOWS_ASSURANCE_SUITES) {
+      const target = join(fixtureRoot, suite);
+      mkdirSync(dirname(target), { recursive: true });
+      writeFileSync(target, "// fixture target\n");
+    }
 
     const result = spawnSync(process.execPath, [writer], { cwd: fixtureRoot, encoding: "utf8" });
     if (result.status === 0 || !existsSync(evidencePath)) return false;
