@@ -87,6 +87,10 @@ function branch(primary, name) {
   git(primary, ["branch", name]);
 }
 
+function linkFixtureDirectory(target, path) {
+  symlinkSync(target, path, process.platform === "win32" ? "junction" : "dir");
+}
+
 function assertLifecycleError(fn, code) {
   assert.throws(fn, (error) => error instanceof WorktreeLifecycleError && error.code === code);
 }
@@ -128,7 +132,7 @@ check("D0-03 symlink parents and case-fold aliases fail before creation", () => 
   rmSync(join(branchRoot, "Feat"), { recursive: true });
   const outside = join(fixture, "outside");
   mkdirSync(outside);
-  symlinkSync(outside, join(branchRoot, "linked"), "dir");
+  linkFixtureDirectory(outside, join(branchRoot, "linked"));
   assertLifecycleError(() => canonicalBranchTarget(primary, "linked/x"), "WT-SYMLINK-PARENT");
 });
 
