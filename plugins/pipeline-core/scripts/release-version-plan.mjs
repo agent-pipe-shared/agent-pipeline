@@ -21,6 +21,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, isAbsolute, join, resolve } from "node:path";
+import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
 export const RELEASE_VERSION_DECISION_SCHEMA = "pipeline.release-version-decision.v1";
 export const RELEASE_VERSION_PLAN_SCHEMA = "pipeline.release-version-plan.v1";
@@ -192,11 +193,19 @@ export function createReleaseVersionDecision(input, { nowMs = Date.now() } = {})
   return candidate;
 }
 
-function assertPhysicalDirectory(path, label, { privateMode = false } = {}) {
+function assertPhysicalDirectory(path, label, { privateMode = false, created = false } = {}) {
   const resolved = resolve(path);
   const info = lstatSync(resolved);
   if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(resolved) !== resolved) fail("RVD-STORAGE", `${label} must be a physical directory`);
-  if (privateMode && ((info.mode & 0o077) !== 0 || (typeof process.getuid === "function" && info.uid !== process.getuid()))) fail("RVD-STORAGE", `${label} must be owner-only`);
+  if (privateMode) {
+    // POSIX mode bits express owner-only exclusivity directly; native Windows has no
+    // such mode semantics, so the equivalent assurance there is the shared owner-DACL
+    // check -- hardened only if this call just created the directory, never assumed
+    // for a pre-existing (possibly raced-in) one.
+    const posixModeViolation = process.platform !== "win32" && ((info.mode & 0o077) !== 0 || (typeof process.getuid === "function" && info.uid !== process.getuid()));
+    const windowsState = process.platform === "win32" ? (created ? hardenWindowsPrivateDirectory(resolved) : assessWindowsPrivatePath(resolved)) : null;
+    if (posixModeViolation || (windowsState && windowsState.status !== "secure")) fail("RVD-STORAGE", `${label} must be owner-only`);
+  }
   return resolved;
 }
 
@@ -205,13 +214,16 @@ function ensurePrivateDirectory(path) {
   const parent = dirname(resolved);
   if (!existsSync(parent)) ensurePrivateDirectory(parent);
   else assertPhysicalDirectory(parent, "private record parent", { privateMode: parent.includes(`${join("agent-pipeline", "releases")}`) });
-  if (!existsSync(resolved)) mkdirSync(resolved, { mode: 0o700 });
-  return assertPhysicalDirectory(resolved, "private record directory", { privateMode: true });
+  const created = !existsSync(resolved);
+  if (created) mkdirSync(resolved, { mode: 0o700 });
+  return assertPhysicalDirectory(resolved, "private record directory", { privateMode: true, created });
 }
 
 function assertPrivateFile(path) {
   const info = lstatSync(path);
-  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || (info.mode & 0o077) !== 0 || (typeof process.getuid === "function" && info.uid !== process.getuid())) fail("RVD-STORAGE", "release decision record is not a private single-link file");
+  const posixModeViolation = process.platform !== "win32" && ((info.mode & 0o077) !== 0 || (typeof process.getuid === "function" && info.uid !== process.getuid()));
+  const windowsInsecure = process.platform === "win32" && (assessWindowsPrivatePath(path).status !== "secure" || assessWindowsPrivatePath(dirname(path)).status !== "secure");
+  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || posixModeViolation || windowsInsecure) fail("RVD-STORAGE", "release decision record is not a private single-link file");
 }
 
 export function releaseVersionDecisionPath({ gitCommonDir, repoFingerprint, decisionId }) {
@@ -221,9 +233,28 @@ export function releaseVersionDecisionPath({ gitCommonDir, repoFingerprint, deci
   return join(resolve(gitCommonDir), "agent-pipeline", "releases", repoFingerprint, "decisions", `${decisionId}.json`);
 }
 
+function unsupportedDirectoryDurability(error) {
+  return process.platform === "win32"
+    && (error?.code === "EPERM" || error?.code === "EINVAL"
+      || error?.code === "EISDIR" || error?.code === "EACCES"
+      || error?.code === "ENOTSUP");
+}
 function fsyncDirectory(path) {
-  const fd = openSync(path, "r");
-  try { fsyncSync(fd); } finally { closeSync(fd); }
+  let fd;
+  try {
+    fd = openSync(path, "r");
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
+  }
+  try {
+    fsyncSync(fd);
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error)) return;
+    throw error;
+  } finally {
+    closeSync(fd);
+  }
 }
 
 /** Store only at the fixed decision-ID path.  Exact replay is a zero-write; any other bytes conflict. */

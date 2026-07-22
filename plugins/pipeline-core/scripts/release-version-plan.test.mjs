@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0
 
 import assert from "node:assert/strict";
-import { chmodSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import {
   CHANNEL_FETCH_SKEW_MS,
@@ -26,6 +26,7 @@ import {
   validateReleaseVersionDecision,
   validateReleaseVersionPlan,
 } from "./release-version-plan.mjs";
+import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
 const NOW = Date.parse("2026-07-19T12:00:00.000Z");
 const h = (char, length = 64) => char.repeat(length);
@@ -123,7 +124,7 @@ const cases = [
       assert.equal(replay.status, "replay");
       assert.equal(stored.path, expected);
       assert.equal(readFileSync(expected, "utf8"), canonicalJson(decision));
-      assert.equal(lstatSync(expected).mode & 0o777, 0o600);
+      if (process.platform !== "win32") assert.equal(lstatSync(expected).mode & 0o777, 0o600);
       writeFileSync(expected, "{}", "utf8");
       assert.throws(() => storeReleaseVersionDecision({ gitCommonDir: common, repoFingerprint: h("9"), decision }, { nowMs: NOW }), (error) => error instanceof ReleaseVersionDecisionError && error.code === "RVD-CONFLICT");
     } finally { rmSync(common, { recursive: true, force: true }); }
@@ -165,8 +166,10 @@ const cases = [
       assert.equal(replay.status, "replay");
       assert.equal(readFileSync(recordPath, "utf8"), canonicalJson(plan));
       assert.equal(JSON.parse(readFileSync(journalPath, "utf8")).phase, "complete");
-      assert.equal(lstatSync(recordPath).mode & 0o777, 0o600);
-      assert.equal(lstatSync(journalPath).mode & 0o777, 0o600);
+      if (process.platform !== "win32") {
+        assert.equal(lstatSync(recordPath).mode & 0o777, 0o600);
+        assert.equal(lstatSync(journalPath).mode & 0o777, 0o600);
+      }
     } finally { rmSync(common, { recursive: true, force: true }); }
   }],
   ["prepared plan journal recovers only its named absent or exact record", () => {
@@ -177,8 +180,21 @@ const cases = [
       const recordPath = releaseVersionPlanPath({ gitCommonDir: common, repoFingerprint: h("c"), planId: plan.planId });
       const journalPath = releaseVersionPlanJournalPath({ gitCommonDir: common, repoFingerprint: h("c"), planId: plan.planId });
       const journal = createReleaseVersionPlanJournal({ gitCommonDir: common, repoFingerprint: h("c"), plan, decision: source.decision, createdAt: new Date(NOW).toISOString() });
+      let existingAncestor = dirname(journalPath);
+      while (!existsSync(existingAncestor)) existingAncestor = dirname(existingAncestor);
       mkdirSync(join(journalPath, ".."), { recursive: true, mode: 0o700 });
       chmodSync(join(journalPath, ".."), 0o700);
+      // On native Windows chmod cannot establish the owner-only DACL the private
+      // record directory contract requires; the recursive mkdirSync above may have
+      // created several nested levels, and production's ensurePrivateDirectory
+      // asserts every ancestor down to the journal's parent -- harden each newly
+      // created component (no-op on POSIX), matching how the production writer
+      // hardens directories it creates itself.
+      if (process.platform === "win32") {
+        for (let cursor = dirname(journalPath); cursor !== existingAncestor; cursor = dirname(cursor)) {
+          hardenWindowsPrivateDirectory(cursor);
+        }
+      }
       writeFileSync(journalPath, canonicalJson(journal), { mode: 0o600 });
       const recovered = recoverReleaseVersionPlan({ gitCommonDir: common, repoFingerprint: h("c"), planId: plan.planId, decision: source.decision }, { nowMs: NOW });
       assert.equal(recovered.status, "stored");
