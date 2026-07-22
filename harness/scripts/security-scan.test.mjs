@@ -123,6 +123,21 @@ function writeLicenseFiles(rootDir, { allowlist, declared, policiesRelPath = "go
   if (declared !== undefined) writeFileSync(join(rootDir, "third-party-licenses.json"), JSON.stringify(declared));
 }
 
+/**
+ * Test-only trust mock (see security-scan.mjs's injectable `assessTrustedExecutablePath`
+ * seam): the real trusted-tool-resolution.mjs (RESERVED, never edited here) enforces a
+ * fixed allowlist of real installed-scanner system roots (plus a real `.exe` extension on
+ * Windows) that a throwaway fixture binary under BIN_DIR can never satisfy. This mock
+ * trusts exactly the fixture binaries this suite itself wrote under BIN_DIR -- nothing
+ * else -- so the runner-level tests exercise their real adapter.run() path on every
+ * platform without touching the production trust policy.
+ */
+function mockAssessFixtureBinary(path) {
+  return typeof path === "string" && path.startsWith(BIN_DIR)
+    ? { ok: true, path }
+    : { ok: false, status: "untrusted_path" };
+}
+
 // ---------------------------------------------------------------------------------------------
 // Gitleaks fixture binaries
 // ---------------------------------------------------------------------------------------------
@@ -792,7 +807,7 @@ governance:
     PIPELINE_OSV_SCANNER_PATH: osvClean,
     PIPELINE_SEMGREP_PATH: semgrepCrash,
   };
-  const { evidence, exitCode } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
 
   assertEqual(
     "runner: mixed statuses -> [FINDINGS, PASS, ERROR, PASS]",
@@ -887,7 +902,7 @@ security:
 `,
   );
   const env = { PIPELINE_SEMGREP_PATH: semgrepWarningOnly };
-  const { evidence, exitCode } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
   assertEqual("runner: threshold filtering -> only semgrep ran", evidence.scanners.map((s) => s.tool), ["semgrep"]);
   assertEqual("runner: threshold filtering -> semgrep FINDINGS (1 medium)", evidence.scanners[0].status, "FINDINGS");
   assertEqual("runner: threshold filtering -> medium below block_on -> exit 0 (no block)", exitCode, 0);
@@ -918,7 +933,7 @@ security:
 `,
   );
   const env = { PIPELINE_SEMGREP_PATH: semgrepFindings };
-  const { exitCode } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  const { exitCode } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
   assertEqual("runner: mode warn -> exit 1 (not 2) for a blocking-class finding", exitCode, 1);
 }
 
@@ -947,7 +962,7 @@ security:
 `,
   );
   const env = { PIPELINE_SEMGREP_PATH: semgrepCrash };
-  const { evidence, exitCode } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
   assertEqual("runner: ERROR + zero findings -> findings array empty", evidence.findings.length, 0);
   assertEqual("runner: ERROR + zero findings -> still blocking-class -> exit 2", exitCode, 2);
 }
@@ -976,7 +991,13 @@ security:
   assertEqual("runner: all scanners disabled -> exit 0", exitCode, 0);
 }
 
-{
+if (process.platform !== "win32") {
+  // POSIX-only: resolveTrustedSystemExecutable's HOME/.local/bin fallback is a POSIX
+  // behavior with no Windows equivalent (win32 resolution instead requires a fixed
+  // system-root allowlist + a real .exe, per trusted-tool-resolution.mjs, RESERVED).
+  // Creating a file symlink here also requires elevated privilege / Developer Mode on
+  // Windows, which this suite must not assume -- so this case is win32-gated rather
+  // than faked.
   const rootDir = makeRootDir("runner-standard-user-bin-root");
   const fakeHome = makeRootDir("runner-standard-user-bin-home");
   const localBin = join(fakeHome, ".local", "bin");
