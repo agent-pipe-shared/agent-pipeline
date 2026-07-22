@@ -90,13 +90,26 @@ function invoke(path, script, { run = spawnSync, environment = process.env } = {
   return result;
 }
 
+/**
+ * Observe the raw native owner/DACL/reparse facts for one physical Windows path,
+ * without applying policy. Returns `{ status: null, observation }` on a successful
+ * native read, or `{ status: "unavailable"|..., observation: null }` otherwise --
+ * lets a caller that needs the raw facts (e.g. a different policy evaluator) reuse
+ * the one fixed native probe instead of re-implementing it.
+ */
+export function observeWindowsPrivatePath(path, options = {}) {
+  if (typeof path !== "string" || path.length === 0) return { ...unavailable("private path is unavailable"), observation: null };
+  const result = invoke(path, OBSERVE_SCRIPT, options);
+  if (result?.status) return { ...result, observation: null };
+  const observation = parseObservation(result.stdout);
+  return observation === null ? { ...unavailable("native Windows DACL output is malformed"), observation: null } : { status: null, reason: null, observation };
+}
+
 /** Observe one physical Windows path against the concrete current principal. */
 export function assessWindowsPrivatePath(path, options = {}) {
-  if (typeof path !== "string" || path.length === 0) return unavailable("private path is unavailable");
-  const result = invoke(path, OBSERVE_SCRIPT, options);
-  if (result?.status) return result;
-  const observation = parseObservation(result.stdout);
-  return observation === null ? unavailable("native Windows DACL output is malformed") : evaluateWindowsPrivateState(observation);
+  const { status, reason, observation } = observeWindowsPrivatePath(path, options);
+  if (status) return { status, reason };
+  return evaluateWindowsPrivateState(observation);
 }
 
 /** Harden only a freshly created private directory, then re-observe it. */

@@ -13,6 +13,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { readFile, unlink } from "node:fs/promises";
 import { basename, resolve } from "node:path";
 import { createInterface } from "node:readline";
+import { pathToFileURL } from "node:url";
 
 import { coordinateAdvisory } from "../lib/advisory-coordinator.mjs";
 import { canonicalJson } from "../lib/codex-sandbox-compatibility.mjs";
@@ -283,10 +284,12 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
     } else result = await coordinateAdvisory(input, { invokeNative: adapter, invokeConsult: adapter, advisorExport });
     let reported = result;
     let receiptPath = null;
+    let directoryDurability = null;
     if (result.receipt) {
       try {
-        writeReceiptAtomic(args.receipt, result.receipt);
+        const persisted = writeReceiptAtomic(args.receipt, result.receipt);
         receiptPath = resolve(args.receipt);
+        directoryDurability = persisted?.directoryDurability ?? null;
       } catch (error) {
         if (!(error instanceof AdvisoryReceiptAssuranceError)) throw error;
         reported = { ...result, ok: false, code: `advisory_receipt_${error.status}`, answer: null, receipt: null };
@@ -299,6 +302,7 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
       code: reported.code,
       answer: reported.answer,
       receiptPath,
+      directoryDurability,
       attempts: reported.attempts,
       sandboxBinding: execution?.childStarted === true ? {
         selectionId: execution.selectionId,
@@ -313,7 +317,7 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   runAdvisoryHostBridge().then(
     (code) => { process.exitCode = code; },
     (error) => {
