@@ -109,6 +109,11 @@ const cases = [
     assert.match(skill, /EL-01\/EL-02\/EL-03\/EL-04\/EL-16\/EL-18\/EL-19/u);
     assert.match(skill, /Bootstrap check passed:/u);
   }],
+  ["Compact re-enters bootstrap then resumes persisted continuity", () => {
+    assert.match(skill, /Compact MUST rerun `?pipeline-start`? as a continuation re-entry/u);
+    assert.match(skill, /after that re-entry, automatically continue the persisted next action without waiting/u);
+    assert.match(skill, /Only an explicit pause\/cancel\/replace\/redirect, a named gate, completion or a typed blocker may stop/u);
+  }],
   ["affected Codex duties select the documented host mode before any child", () => {
     assert.equal(skill.includes("sandboxed-readonly-host-bridge.mjs"), true, "pipeline start must name the generic selected host bridge");
     assert.equal(skill.includes("network-open/read-only"), true, "pipeline start must name the documented profile");
