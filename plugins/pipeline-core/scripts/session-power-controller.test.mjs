@@ -73,7 +73,11 @@ await check("controller configuration is closed and fixed to the 12-hour lease",
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
-await check("controller sends startup ACK, accepts only an exact commit tuple, and uses fixed argv", async () => {
+const controllerContract = process.platform === "linux"
+  ? "controller sends startup ACK, accepts only an exact commit tuple, and uses fixed argv"
+  : "controller reports the Linux-only host-power capability as unavailable";
+
+await check(controllerContract, async () => {
   const root = mkdtempSync(join(tmpdir(), "session-power-controller-"));
   const pipe = new PrivatePipe();
   const child = new EventEmitter();
@@ -81,6 +85,10 @@ await check("controller sends startup ACK, accepts only an exact commit tuple, a
   child.kill = () => true;
   let spawned = null;
   try {
+    if (process.platform !== "linux") {
+      await assert.rejects(runController(config(root), pipe, { identityForPid, spawnChild() { throw new Error("must not spawn a Linux controller"); } }), /platform is unavailable/u);
+      return;
+    }
     const running = runController(config(root), pipe, {
       identityForPid,
       spawnChild(command, args, options) { spawned = { command, args, options }; return child; },
