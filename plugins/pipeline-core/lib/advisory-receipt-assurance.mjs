@@ -19,21 +19,22 @@ export class AdvisoryReceiptAssuranceError extends Error {
 function state(status, reason) { return { status, reason }; }
 function unsupportedDirectoryDurability(error, platform) {
   return UNSUPPORTED_DIRECTORY_CODES.has(error?.code)
-    || (platform === "windows" && error?.code === "EPERM");
+    || (platform === "windows" && error?.code === "EPERM")
+    || (platform === "darwin" && error?.code === "EINVAL");
 }
 function modePrivate(mode) { return Number.isInteger(mode) && (mode & 0o077) === 0; }
 function normalizedPrincipal(value) { return typeof value === "string" ? value.trim().toLowerCase() : ""; }
 
 /** Pure policy evaluator for portable fixtures and a future native Windows probe. */
 export function evaluateAdvisoryReceiptPrivateState({ platform, expectedOwner, file, directory } = {}) {
-  if (!['posix', 'windows'].includes(platform) || typeof expectedOwner !== "string" || expectedOwner.length === 0) return state("unavailable", "private-state inputs are incomplete");
+  if (!['posix', 'linux', 'darwin', 'windows'].includes(platform) || typeof expectedOwner !== "string" || expectedOwner.length === 0) return state("unavailable", "private-state inputs are incomplete");
   if (!file || !directory || directory.kind !== "directory") return state("unavailable", "file or parent observation is unavailable");
   for (const entry of [file, directory]) {
     if (entry.reparsePoint !== false) return state("insecure", "a receipt path is a reparse point or its state is unknown");
     if (entry.owner !== expectedOwner) return state("insecure", "receipt path owner is not the concrete expected owner");
   }
   if (file.kind !== "file" && file.kind !== "missing") return state("insecure", "receipt target is not a regular file");
-  if (platform === "posix") {
+  if (platform !== "windows") {
     if (!modePrivate(directory.mode) || (file.kind === "file" && !modePrivate(file.mode))) return state("insecure", "POSIX group or other permissions are present");
     return state("secure", "owner, non-reparse path, and supplemental POSIX modes are private");
   }
@@ -51,7 +52,7 @@ function nativeStatObservation(path, { expectedOwner, kind, lstat = lstatSync } 
   catch (error) { if (error?.code === "ENOENT" && kind === "file") return { kind: "missing", owner: expectedOwner, reparsePoint: false, mode: 0o600, dacl: null }; throw error; }
 }
 /** Observes portable POSIX state; Windows requires a supplied native probe. */
-export function createAdvisoryReceiptAssurance({ platform = process.platform === "win32" ? "windows" : "posix", expectedOwner = process.getuid?.(), lstat = lstatSync, windowsProbe = null } = {}) {
+export function createAdvisoryReceiptAssurance({ platform = process.platform === "win32" ? "windows" : process.platform === "darwin" ? "darwin" : "linux", expectedOwner = process.getuid?.(), lstat = lstatSync, windowsProbe = null } = {}) {
   const owner = expectedOwner === undefined || expectedOwner === null ? null : String(expectedOwner);
   return Object.freeze({ assess(target) {
     if (!isAbsolute(target) || resolve(target) !== target || owner === null) return state("unavailable", "receipt target or expected owner is unavailable");
@@ -65,7 +66,7 @@ export function createAdvisoryReceiptAssurance({ platform = process.platform ===
 function defaultIo() { return { closeSync, fsyncSync, lstatSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync, fsyncDirectory(path) { const descriptor = openSync(path, "r"); try { fsyncSync(descriptor); } finally { closeSync(descriptor); } } }; }
 function assure(assurance, target, phase) { const result = assurance.assess(target); if (!result || result.status !== "secure") throw new AdvisoryReceiptAssuranceError(result?.status ?? "unavailable", phase); }
 /** Writes exact bytes, confirms directory durability, then re-observes private state and readback bytes. */
-export function persistAdvisoryReceipt({ target, bytes, assurance = createAdvisoryReceiptAssurance(), io = defaultIo(), temporaryName = ".advisory-receipt.tmp", platform = process.platform === "win32" ? "windows" : "posix" } = {}) {
+export function persistAdvisoryReceipt({ target, bytes, assurance = createAdvisoryReceiptAssurance(), io = defaultIo(), temporaryName = ".advisory-receipt.tmp", platform = process.platform === "win32" ? "windows" : process.platform === "darwin" ? "darwin" : "linux" } = {}) {
   if (!isAbsolute(target) || resolve(target) !== target || !Buffer.isBuffer(bytes) || typeof temporaryName !== "string" || !temporaryName.startsWith(".")) throw new Error("advisory receipt persistence input is invalid");
   const temporary = resolve(dirname(target), temporaryName); let renamed = false;
   try {
