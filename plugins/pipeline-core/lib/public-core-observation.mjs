@@ -58,10 +58,16 @@ function resolveDependencies(value) {
 }
 
 function physicalDirectory(path, code) {
+  // On POSIX "\" is an ordinary filename character, never a separator, so any
+  // backslash is separator-confusion-shaped input and rejected outright. On
+  // native Windows "\" is the platform separator itself (every real absolute
+  // path contains it), so the same literal ban would reject every legitimate
+  // root; resolve(path) !== path below already enforces host-canonical form
+  // (including collapsing "." / "..") without needing a POSIX-only heuristic.
   if (typeof path !== "string"
     || !isAbsolute(path)
     || path.includes("\0")
-    || path.includes("\\")
+    || (process.platform !== "win32" && path.includes("\\"))
     || resolve(path) !== path) fail(code);
   let info;
   try { info = lstatSync(path, { bigint: true }); } catch { fail(code); }
@@ -150,7 +156,11 @@ function observeGit(gitRoot, execFileSync) {
   } catch {
     fail("SNT-A2-GIT-UNAVAILABLE");
   }
-  if (top !== gitRoot) fail("SNT-A2-GIT-ROOT-MISMATCH");
+  // git rev-parse --show-toplevel always prints forward slashes, even on
+  // native Windows where gitRoot is a native backslash path for the same
+  // directory; normalize only the comparison, never the trusted gitRoot value.
+  const topComparable = process.platform === "win32" ? top.replaceAll("/", sep) : top;
+  if (topComparable !== gitRoot) fail("SNT-A2-GIT-ROOT-MISMATCH");
   if (!OID.test(commit) || !OID.test(tree)) fail("SNT-A2-GIT-OID-INVALID");
   if (!validBranch(branch)) fail("SNT-A2-GIT-BRANCH-INVALID");
   if (!validRepository(repository)) fail("SNT-A2-GIT-ORIGIN-INVALID");
