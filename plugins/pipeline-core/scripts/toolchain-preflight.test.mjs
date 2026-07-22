@@ -85,6 +85,14 @@ check("Git accepts only the documented status-zero EPERM false-positive, while o
   assert.deepEqual(accepted, { ok: true, stdout: "git version 2.50.1\n", stderr: "" });
   const eaccesSuccess = () => ({ status: 0, error: Object.assign(new Error("access denied"), { code: "EACCES" }), stdout: "git version 2.50.1\n", stderr: "" });
   assert.equal(runProbe("git", ["--version"], { cwd: "/tmp", tempDir: "/tmp", spawnFn: eaccesSuccess, acceptSuccessfulEperm: true }).status, "execution_environment");
+  if (resolveSystemExecutable("git") === null) {
+    // defaultGitProbe's real resolveExecutableFn default only trusts fixed
+    // system install roots (never PATH). A host with git outside those roots
+    // has no trusted git to probe -- this integration assertion needs one and
+    // is a host-capability gap, not a defaultGitProbe defect.
+    process.stdout.write("SKIP  defaultGitProbe trusted-resolution integration: no trusted-root git install on this host\n");
+    return;
+  }
   const repo = root(); const calls = [];
   try {
     const observedGit = defaultGitProbe({ rootDir: repo, tempDir: "/tmp", now: new Date("2026-07-18T12:00:00.000Z") }, {
@@ -150,7 +158,7 @@ check("missing installer prerequisites are embedded in copyable Ubuntu chains wh
     const repo = root();
     try {
       const available = npmOnly ? new Set(["npm"]) : new Set(["apt-get", "sudo"]);
-      const result = runToolchainPreflight({ rootDir: repo, manifestResult: manifest({ gitleaks: { enabled: true }, semgrep: { enabled: true } }) }, {
+      const result = runToolchainPreflight({ rootDir: repo, platform: "linux", manifestResult: manifest({ gitleaks: { enabled: true }, semgrep: { enabled: true } }) }, {
         probeNodeFn: nodeReady,
         probeGitFn: gitReady,
         resolveExecutableFn: () => null,
@@ -189,7 +197,7 @@ check("Semgrep probes use bounded temporary settings instead of writing the user
     assert.equal(observedSemgrep.ok, true);
     assert.equal(observedSemgrep.handle.version, "1.170.0");
     assert.equal(calls.length, 2);
-    assert.equal(calls.every(({ env }) => env.SEMGREP_SETTINGS_FILE.startsWith(`${repo}/pipeline-semgrep-preflight-`) && env.SEMGREP_SEND_METRICS === "off" && !("HOME" in env)), true);
+    assert.equal(calls.every(({ env }) => env.SEMGREP_SETTINGS_FILE.startsWith(join(repo, "pipeline-semgrep-preflight-")) && env.SEMGREP_SEND_METRICS === "off" && !("HOME" in env)), true);
     assert.deepEqual(readdirSync(repo), ["semgrep"]);
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
