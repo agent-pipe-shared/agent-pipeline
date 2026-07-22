@@ -2,8 +2,8 @@
 
 # AC-Matrix — Sentinel #37: Trusted Tool Resolution
 
-Status: **PO-entschieden; Implementierung und Closure offen**  
-Datum: 2026-07-22  
+Status: **PO-entschieden; Implementierung und Closure offen**
+Datum: 2026-07-22
 Scope: `pipeline.windows-trusted-tool-resolution` / Live-Issue #37
 
 ## Verbindliche PO-Entscheidung

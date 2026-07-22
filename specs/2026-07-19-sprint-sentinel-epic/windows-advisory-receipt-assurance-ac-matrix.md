@@ -2,8 +2,8 @@
 
 # AC-Matrix — Sentinel #34/#35: Advisory-Receipt-Assurance
 
-Status: **PO-entschieden; Implementierung und Closure offen**  
-Datum: 2026-07-22  
+Status: **PO-entschieden; Implementierung und Closure offen**
+Datum: 2026-07-22
 Scope: erster Consumer für `pipeline.windows-directory-durability` (#34) und
 `pipeline.windows-private-state-assurance` (#35): Advisory-Receipts und ihre
 zugehörigen Verzeichnisse.
