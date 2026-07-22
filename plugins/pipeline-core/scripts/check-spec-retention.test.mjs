@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { checkSpecRetention, ARCHIVE_SCHEMA, INVENTORY_SCHEMA } from "./check-spec-retention.mjs";
+import { checkSpecRetention, ARCHIVE_SCHEMA, INVENTORY_SCHEMA, LEGACY_ARCHIVE_SCHEMA, LEGACY_INVENTORY_SCHEMA } from "./check-spec-retention.mjs";
 
 const roots = [];
 let passed = 0;
@@ -57,6 +57,22 @@ function fixture() {
   const subject = fixture();
   const result = checkSpecRetention(subject.root);
   check("SR01 accepts complete active authority and byte-identical archive", result.ok, result.findings.join("; "));
+}
+{
+  const subject = fixture();
+  const legacyKeys = authorityKeys.slice(0, 5);
+  const inventoryPath = join(subject.root, "governance/spec-retention.json");
+  const manifestPath = join(subject.root, "docs/spec-archive/sentinel/manifest.json");
+  const inventory = JSON.parse(readFileSync(inventoryPath, "utf8"));
+  const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  inventory.schema = LEGACY_INVENTORY_SCHEMA;
+  inventory.active[0].sourcePaths = Object.fromEntries(legacyKeys.map((key) => [key, inventory.active[0].sourcePaths[key]]));
+  manifest.schema = LEGACY_ARCHIVE_SCHEMA;
+  for (const field of ["sourcePaths", "archivePaths", "sha256"]) manifest[field] = Object.fromEntries(legacyKeys.map((key) => [key, manifest[field][key]]));
+  writeFileSync(inventoryPath, JSON.stringify(inventory));
+  writeFileSync(manifestPath, JSON.stringify(manifest));
+  const result = checkSpecRetention(subject.root);
+  check("SR01a accepts the legacy v1 authority shape during the v2 rollout", result.ok, result.findings.join("; "));
 }
 {
   const subject = fixture();

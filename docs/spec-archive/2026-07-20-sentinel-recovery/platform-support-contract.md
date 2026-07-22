@@ -1,119 +1,103 @@
-<!-- po-language: de -->
+<!-- po-language: en -->
 
-# Sentinel Platform-Support-Contract
+# Sentinel Platform Support Contract
 
-**Status:** verbindliche Sentinel-Autorität, 2026-07-22. Dieser Vertrag
-definiert, wann eine konkrete Fähigkeit auf Windows, Linux, WSL oder macOS als
-unterstützt bezeichnet werden darf. Er schließt kein Backlog-Item, ersetzt keine
-plattformspezifische AC-Matrix und erweitert keine Laufzeitberechtigung.
+**Status:** binding Sentinel authority, 2026-07-22. This contract defines when
+a named capability may be described as supported on Windows, Linux, WSL, or
+macOS. It closes no backlog item, replaces no platform-specific AC matrix, and
+does not extend runtime authority.
 
 <!-- windows-blockers-scope-sha256: 0752415e7916b4db41b8c257339953a31924c68392d644e6c7b07993e08ecca0 -->
 
-Der gebundene Input ist die benachbarte
-[`windows-blockers-scope.md`](windows-blockers-scope.md). Sein Fünf-Record-
-Windows-Track führt `#33` kanonisch geschlossen und `#34`–`#37` offen. Der PRD
-bindet diesen Vertrag; damit ist die Kette **PRD → Platform-Support-Contract →
-Windows-Blocker-Scope** bytegenau. Eine Änderung eines Inputs invalidiert die
-daraus abgeleitete Plattform- oder Go-live-Aussage bis die gebundene Kette und
-ihre Evidenz erneut geprüft sind.
+The bound input is the adjacent
+[`windows-blockers-scope.md`](windows-blockers-scope.md). Its five-record
+Windows track records `#33` as canonically closed and `#34`–`#37` as open. The
+PRD binds this contract, forming the byte-exact chain **PRD → Platform Support
+Contract → Windows Blocker Scope**. A changed input invalidates every derived
+platform or go-live claim until the chain and its evidence are reviewed again.
 
-## Geltungsbereich und Begriffe
+## Scope and definitions
 
-Eine **Fähigkeit** ist ein eng benannter Produktpfad mit Version, Konfiguration,
-Rechten, Dateisystemklasse und Sicherheitsgrenze, etwa native Full Verify,
-Directory-Durability oder Private-State-Assurance. „Plattform unterstützt"
-ohne diese Fähigkeit ist keine zulässige Produktbehauptung.
+A **capability** is a narrowly named product path with its version,
+configuration, permissions, filesystem class, and security boundary, such as
+native Full Verify, directory durability, or private-state assurance. A bare
+statement that a platform is “supported” is not a valid product claim.
 
-Die Zielklassen dieses Vertrags sind **Windows**, **Linux**, **WSL** und
-**macOS**. WSL ist stets eine eigene Klasse: mindestens die Varianten
-`wsl-native` und `wsl-drvfs` sind voneinander sowie von Windows und Linux zu
-trennen. Ein Ergebnis für eine Variante gilt nicht stillschweigend für eine
-andere.
+The target classes are **Windows**, **Linux**, **WSL**, and **macOS**. WSL is
+always distinct: at least `wsl-native` and `wsl-drvfs` are separate from each
+other, Windows, and Linux. Evidence for one variant never silently transfers to
+another.
 
-**Native same-surface evidence** bedeutet Evidenz auf derselben Zielklasse und
-derselben Oberfläche, auf der die Fähigkeit beansprucht wird: gleicher
-Produktkandidat, tatsächliches Betriebssystem und Dateisystem, derselbe
-privilege-/standard-account-Modus, derselbe Runner/Host und dieselbe relevante
-Tool-/Sandbox-Konfiguration. Cross-compile, Unit-Mock, Emulator oder ein
-anderer Host können einen Testfall erklären, aber keine native Unterstützung
-attestieren.
+**Native same-surface evidence** is evidence on the same target class and
+surface for which the capability is claimed: the same product candidate,
+operating system and filesystem, standard-account privilege mode, runner/host,
+and relevant tool or sandbox configuration. A mock, emulator, cross-compile,
+or different host can explain a test case but cannot attest native support.
 
-Docker ist aktuell **out of scope**. Ein Containerresultat darf eine
-Containerfähigkeit als diagnostisch beschreiben, ersetzt aber niemals native
-same-surface evidence für Windows, Linux, WSL oder macOS. Insbesondere wird
-ein Linux-Container weder zu Windows- noch zu macOS- oder WSL-Evidenz und
-beweist keine Host-Dateisystem-, DACL-, Cgroup-, Sandbox- oder
-Standard-Account-Eigenschaft.
+Docker is currently **out of scope**. A container result may describe a
+container capability as diagnostic-only, but never replaces native same-surface
+evidence for Windows, Linux, WSL, or macOS. In particular, a Linux container
+does not attest host filesystem, DACL, cgroup, sandbox, or standard-account
+properties for another target class.
 
-## Zulässige Capability-Status
+## Capability statuses
 
-Jeder Plattform-/Fähigkeitsrecord verwendet genau einen dieser Status:
-
-| Status | Aussage und Wirkung |
+| Status | Meaning |
 | --- | --- |
-| `supported` | Alle Kriterien dieses Vertrags sind für die konkrete Oberfläche am aktuellen Kandidaten erfüllt. |
-| `conditionally-supported` | Unterstützt nur mit ausdrücklich im Record genannten Voraussetzungen; fehlende Voraussetzung ist kein Erfolg. |
-| `diagnostic-only` | Beobachtung oder Fixture vorhanden, aber keine Support-Zusage. |
-| `blocked` | Benannte offene Abhängigkeit oder AC verhindert die Zusage. |
-| `unavailable` | Die Fähigkeit oder der erforderliche Nachweis ist auf dieser Oberfläche nicht verfügbar; fail-closed. |
-| `unsupported` | Die Fähigkeit liegt außerhalb des freigegebenen Produktumfangs. |
-| `ambiguous` | Plattformklasse, Filesystem- oder Hostgrenze wurde nicht ausreichend beobachtet; fail-closed. |
+| `supported` | Every criterion in this contract is satisfied for the named surface and current candidate. |
+| `conditionally-supported` | Supported only with the explicitly recorded prerequisites. |
+| `diagnostic-only` | Observation or fixture exists, but no support commitment exists. |
+| `blocked` | A named open dependency or AC prevents the commitment. |
+| `unavailable` | The capability or required proof is unavailable on that surface; fail closed. |
+| `unsupported` | The capability is outside approved product scope. |
+| `ambiguous` | Platform, filesystem, or host boundary was not observed sufficiently; fail closed. |
 
-`blocked`, `unavailable`, `unsupported` und `ambiguous` sind typisierte
-negative, nicht als Erfolg wiederverwendbare Outcomes. Ein Fallback, ein
-Best-effort-Lauf oder ein Ergebnis auf einer anderen Klasse darf sie nicht in
-`supported` oder `conditionally-supported` umdeuten. Wo ein Produktadapter
-einen detaillierteren Code führt, muss er ihn zusätzlich zum vorstehenden
-Status erhalten, etwa `native-evidence-missing`, `platform-unavailable`,
-`standard-account-gate-failed`, `filesystem-class-ambiguous` oder
-`security-evidence-unavailable`.
+`blocked`, `unavailable`, `unsupported`, and `ambiguous` are typed negative
+outcomes. A fallback, best-effort run, or another platform result must not
+reinterpret them as `supported` or `conditionally-supported`.
 
-## Gegenwärtige, ehrliche Baseline
+## Honest baseline
 
-Der Vertrag nimmt alle vier Klassen in den Support- und Evidenzumfang auf; das
-ist **keine** Behauptung, dass jede aktuelle Fähigkeit auf jeder Klasse bereits
-unterstützt ist.
+The four target classes are in scope for support and evidence; this does **not**
+claim that every current capability is supported on every class.
 
-| Zielklasse | Aktueller, zulässiger Stand |
+| Target class | Current permitted statement |
 | --- | --- |
-| Windows | `#33` ist kanonisch geschlossen; `#34`–`#37` bleiben offen. Für die von den offenen Records betroffenen Fähigkeiten gibt es derzeit keinen aus diesem Vertrag ableitbaren `supported`-Claim; fehlende native Evidenz bleibt `blocked` oder `unavailable`. |
-| Linux | Bestehende Linux-Kontrollen können nur capability-spezifisch und unter den jeweiligen Voraussetzungen als `conditionally-supported` erscheinen. Sie übertragen keine Zusage auf WSL, Windows oder macOS. |
-| WSL | Der Status ist ohne explizite Variante, Host-/Filesystem-Observation und same-surface evidence `ambiguous`. WSL erbt weder Linux- noch Windows-Unterstützung. |
-| macOS | Für nicht nativ belegte Fähigkeiten ist der Status `unavailable`. Ein Mock eines macOS-Pfads oder Resolver-Tests ist keine native macOS-Unterstützung. |
+| Windows | `#33` is canonically closed; `#34`–`#37` remain open. No `supported` claim follows for capabilities affected by those open records. |
+| Linux | Existing controls may be `conditionally-supported` only per capability and its stated prerequisites. |
+| WSL | Without an explicit variant and native same-surface observation, status is `ambiguous`. |
+| macOS | A capability without native proof is `unavailable`; a mocked path is not native support. |
 
-## Evidenz- und Abschlusskriterien
+## Evidence and closure criteria
 
-Ein `supported`- oder `conditionally-supported`-Record muss für denselben
-aktuellen Kandidaten und dieselbe capability-surface gemeinsam belegen:
+A `supported` or `conditionally-supported` record for one current candidate and
+one capability surface must jointly provide:
 
-1. native same-surface evidence einschließlich der positiven und der relevanten
-   negativen/fail-closed Fälle;
-2. fokussierte, registrierte Tests und ein erfolgreicher Full Verify über
-   `node harness/scripts/verify.mjs`; die maschinelle Verify-Evidenz muss den
-   Kandidaten binden;
-3. aktuelle Security-Evidenz für denselben Kandidaten. Ein fehlender,
-   übersprungener, roter oder nicht bindbarer Security-Lauf ist
-   `security-evidence-unavailable` und kein Support-Erfolg;
-4. einen frischen unabhängigen Critic für den Plattform-/Security-relevanten
-   Diff. Ist native Critic-Isolation nicht verfügbar, gilt ausschließlich die
-   bestehende PO-autorisierte funktionale Äquivalenz mit der wörtlichen
-   Einschränkung `functional-equivalent-read-only; OS isolation not asserted`;
-   sie behauptet keine native Plattform- oder Isolations-Evidenz;
-5. die zugehörige AC-Matrix, offene Prerequisites und erforderliche
-   Human-/PO-Gates. Ein offener Blocker bleibt ein `blocked`-Record und darf
-   nicht durch dokumentierte Absicht geschlossen werden.
+1. native same-surface evidence for positive and relevant negative/fail-closed
+   cases;
+2. focused registered tests and a successful `node harness/scripts/verify.mjs`
+   whose machine evidence binds that candidate;
+3. current Security evidence for that candidate; missing, skipped, red, or
+   unbound evidence is `security-evidence-unavailable`, not support;
+4. a fresh independent Critic for the platform/security-relevant diff. Where
+   native Critic isolation is unavailable, only the existing PO-authorized
+   `functional-equivalent-read-only; OS isolation not asserted` assurance is
+   admissible, and it does not attest native platform or isolation evidence;
+5. the corresponding AC matrix, open prerequisites, and required Human/PO
+   gates. An open blocker remains `blocked`.
 
-Die Evidenz ist nicht portabel: Ein grüner Linux-, WSL-, macOS- oder
-Windows-Lauf erfüllt ausschließlich den Record der nachgewiesenen Klasse und
-Oberfläche. Der vollständige Sentinel-Close benötigt deshalb für jede als
-unterstützt behauptete Fähigkeit den passenden Record; eine fehlende Klasse
-ist sichtbar als negativer Status zu führen, nicht zu verschweigen.
+Evidence is not portable between target classes. A missing class is visible as
+a typed negative status, never silently covered by another host.
 
-## Änderungs- und Dokumentationsregel
+## Change and migration rule
 
-Neue Plattformfähigkeiten oder Änderungen an Status, Voraussetzungen,
-Filesystemklasse, Tool-Trust oder Sicherheitsgrenze aktualisieren zuerst
-diesen Vertrag und die einschlägige AC-Matrix. Danach werden die eingebundenen
-SHA-256-Werte vom geänderten Byteinhalt neu berechnet und Verify/Security/Critic
-am neuen Kandidaten wiederholt. Kein Digest, kein Dokument und keine
-Container-Evidenz ersetzt diese Reihenfolge.
+Platform capability, status, filesystem, tool-trust, or security-boundary
+changes update this contract and the relevant AC matrix first, recompute bound
+SHA-256 values, and repeat Verify, Security, and Critic on the new candidate.
+Docker evidence never substitutes for that order.
+
+The retention authority therefore uses `pipeline.spec-retention.v2` and its
+archive counterpart to bind this contract and the Windows scope. The checker
+continues to accept the complete former `v1` five-authority shape; v1 consumers
+can migrate by adding `platformSupport` and `windowsBlockers` before selecting
+v2. No v1 record is reinterpreted or mutated by the checker.

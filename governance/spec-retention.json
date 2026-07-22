@@ -1,5 +1,5 @@
 {
-  "schema": "pipeline.spec-retention.v1",
+  "schema": "pipeline.spec-retention.v2",
   "active": [
     {
       "id": "sprint-sentinel-epic",
