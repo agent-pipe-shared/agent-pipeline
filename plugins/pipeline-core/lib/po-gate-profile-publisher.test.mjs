@@ -12,6 +12,7 @@ import {
   mkdtempSync,
   readFileSync,
   readdirSync,
+  realpathSync,
   rmSync,
   symlinkSync,
   writeFileSync,
@@ -34,6 +35,15 @@ function check(name, fn) {
   fn();
   passed += 1;
   process.stdout.write(`ok ${passed} - ${name}\n`);
+}
+
+let symlinkCapable = true;
+{
+  const probeDir = mkdtempSync(join(tmpdir(), "po-gate-profile-publisher-symlink-probe-"));
+  try { writeFileSync(join(probeDir, "target"), "x"); symlinkSync(join(probeDir, "target"), join(probeDir, "link")); }
+  catch { symlinkCapable = false; }
+  finally { rmSync(probeDir, { recursive: true, force: true }); }
+  if (!symlinkCapable) process.stdout.write("[capability: symlink unavailable] skipping symlink-specific checks\n");
 }
 
 function write(path, value) {
@@ -78,7 +88,10 @@ function fixture() {
   write(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({ schema: "pipeline.state.v0" }, null, 2)}\n`);
   git(root, "add", ".");
   git(root, "commit", "-m", "neutral fixture");
-  const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+  // Real Git always emits --git-common-dir with "/" separators, even on native
+  // Windows; production always realpathSync's this before use (canonicalizing to
+  // the host's own separator convention) -- match that here.
+  const common = realpathSync(git(root, "rev-parse", "--path-format=absolute", "--git-common-dir"));
   return {
     base,
     common,
@@ -123,8 +136,10 @@ check("publishes a mode-0600 canonical v1 receipt accepted by the existing autho
     const receipt = JSON.parse(bytes);
     assert.equal(validatePoGateProfileReceipt(receipt), true);
     assert.equal(receipt.canonicalPrimaryRoot, root);
-    assert.equal(lstatSync(receiptPath).mode & 0o777, 0o600);
-    assert.equal(lstatSync(dirname(receiptPath)).mode & 0o777, 0o700);
+    if (process.platform !== "win32") {
+      assert.equal(lstatSync(receiptPath).mode & 0o777, 0o600);
+      assert.equal(lstatSync(dirname(receiptPath)).mode & 0o777, 0o700);
+    }
     assert.equal(createHash("sha256").update(bytes).digest("hex"), result.receiptSha256);
 
     const authority = validatePoGateAuthorityForRepository({ repoRoot: root });
@@ -195,7 +210,7 @@ check("rejects a non-primary invocation and sanitizes topology exceptions", () =
   });
 });
 
-check("rejects symlinked receipt leaves and private-directory components", () => {
+if (symlinkCapable) check("rejects symlinked receipt leaves and private-directory components", () => {
   withFixture(({ base, common, publish }) => {
     const target = poGateProfileReceiptPath(common);
     const outside = join(base, "outside.json");
@@ -250,7 +265,7 @@ check("distinguishes post-rename directory durability uncertainty", () => {
       reason: "the atomic receipt rename succeeded but directory durability could not be confirmed",
     });
     assert.equal(lstatSync(poGateProfileReceiptPath(common)).isFile(), true);
-    assert.equal(lstatSync(poGateProfileReceiptPath(common)).mode & 0o777, 0o600);
+    if (process.platform !== "win32") assert.equal(lstatSync(poGateProfileReceiptPath(common)).mode & 0o777, 0o600);
   });
 });
 
