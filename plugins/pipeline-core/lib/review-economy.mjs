@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import { createHash } from "node:crypto";
 
 export const REVIEW_ECONOMY_SCHEMA = "pipeline.review-economy.v1";

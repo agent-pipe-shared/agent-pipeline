@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * schema-lite.mjs -- hand-rolled JSON-Schema validator, no library dependency.
  *

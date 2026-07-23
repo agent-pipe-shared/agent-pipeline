@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 /**
  * Pure HAW-0 state transitions for binding an existing approval to its Spec

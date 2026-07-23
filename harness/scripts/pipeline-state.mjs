@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * pipeline-state.mjs -- the ONLY sanctioned writer for `.claude/pipeline-state.json`
  * (schema `pipeline.state.v0`).

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { assessTrustedExecutablePath, resolveTrustedSystemExecutable, windowsSystemToolRoots } from "./trusted-tool-resolution.mjs";
 let passed = 0;

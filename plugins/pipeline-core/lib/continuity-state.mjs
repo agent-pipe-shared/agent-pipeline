@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /** Pure validation and transition proposals for pipeline.continuity.v0. */
 import { normalizeContinuityHostObservation } from "./continuity-host-adapter.mjs";
 

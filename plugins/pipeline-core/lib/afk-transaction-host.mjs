@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 import { hostname } from "node:os";
 import { execFileSync } from "node:child_process";
 import { readFileSync, realpathSync } from "node:fs";

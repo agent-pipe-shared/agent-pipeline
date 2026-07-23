@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * setup-check.test.mjs — test suite for the SessionStart setup-completion reminder hook
  * (setup-check.mjs, AP2 P3a completion wave).

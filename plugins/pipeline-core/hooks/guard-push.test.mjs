@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * guard-push.test.mjs — test suite for the Push-Gate PreToolUse guard.
  *

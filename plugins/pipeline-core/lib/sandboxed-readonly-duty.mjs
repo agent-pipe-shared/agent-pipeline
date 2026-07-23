@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 /** Closed binding shared by the three Codex read-only pipeline duties. */
 import { createHash } from "node:crypto";

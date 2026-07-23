@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Fail-closed form checker for the Critic's deliberately narrow input boundary.
  * It validates reference categories only: artifact contents are never accepted

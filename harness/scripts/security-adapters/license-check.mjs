@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * license-check.mjs -- security-scan adapter for third-party license allowlisting,
  * AP1-P4 "FUNDIN". PURE NODE, NO BINARY (no `isInstalled` PATH/env resolution needed --

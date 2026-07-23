@@ -2,16 +2,32 @@ Agent-Pipeline
 
 Copyright (c) 2026 agent-pipe-shared and contributors.
 
+Legal rightsholder / contracting party
+
+The legally identifiable rightsholder and commercial/CLA contracting party has
+not yet been recorded in this Public candidate. `agent-pipe-shared` is the
+repository organization and is not asserted here to be a legal person or the
+contracting party. External pull requests may be discussed, but the CLA cannot
+be activated and no external contribution may be merged in reliance on it.
+Commercial intake, CLA/public activation, and commercial relicensing remain
+blocked until a company or other concrete legal person and service/contact
+details are inserted here and approved by the named human legal/rightsholder
+reviewer. No private identity belongs in this repository.
+
 This source-available repository is licensed under Sustainable Use License
 Version 1.0 (SUL-1.0). Preserve this notice and the LICENSE file in copies.
 
 Commercial licensing
 
-Commercial exploitation, including sale, paid distribution, hosting,
-managed-service value substantially derived from Agent-Pipeline, white-label
-use, or embedding the Pipeline as a paid product, requires a separate
-commercial license. Commercial-license intake is handled through the
-repository maintainers:
+Internal use is permitted, including internal commercial-company operations,
+internal evaluation, and making or modifying a fork for your own purposes,
+subject to the LICENSE. A separate agreement with the rightsholder is required
+only when Agent-Pipeline or a substantial derivative is itself monetized,
+including sale or licensing, paid hosting/SaaS/managed service, white-label
+use, material embedding as a value component of a paid product, or commercial
+redistribution. Commercial requests may be discussed through the repository
+maintainers for planning only; the issue tracker is not contract acceptance,
+and no offer can be accepted while the contracting party is unrecorded:
 
 https://github.com/agent-pipe-shared/agent-pipeline/issues
 

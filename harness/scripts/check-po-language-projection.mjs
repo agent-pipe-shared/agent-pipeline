@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /** Fail closed when pipeline.user.yaml and compiled PO-language runtime diverge. */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";

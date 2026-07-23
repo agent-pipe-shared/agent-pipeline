@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * schema-lite.test.mjs -- test suite for the hand-rolled JSON-Schema validator
  * (schema-lite.mjs), extracted from plugins/pipeline-core/scripts/critic-bare.mjs.

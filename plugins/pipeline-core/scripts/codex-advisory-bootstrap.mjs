@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 /** Closed bootstrap launcher: V3 opt-out authority -> one native Codex advisory. */
 import { createHash, randomUUID } from "node:crypto";

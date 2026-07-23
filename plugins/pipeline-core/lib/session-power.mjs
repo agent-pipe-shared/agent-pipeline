@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 /**
  * HAW-B's durable, repository-scoped session-power record boundary.

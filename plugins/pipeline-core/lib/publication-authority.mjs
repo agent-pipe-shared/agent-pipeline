@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Durable, local projection for one publication-bundle transaction.
  *

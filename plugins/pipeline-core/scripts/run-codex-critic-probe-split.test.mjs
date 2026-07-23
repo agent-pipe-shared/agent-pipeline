@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { parseArgs } from "./run-codex-critic-probe-split.mjs";
 let passed = 0;

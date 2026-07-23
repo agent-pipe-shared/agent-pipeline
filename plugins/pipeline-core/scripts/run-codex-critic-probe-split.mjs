@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /** Local, observable host entry point for the approved three-run probe protocol. */
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";

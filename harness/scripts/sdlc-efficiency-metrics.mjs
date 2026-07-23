@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /** Shadow-only validation and deterministic summaries for SDLC efficiency evidence. */
 export const SDLC_EFFICIENCY_METRICS_SCHEMA = "pipeline.sdlc-efficiency-metrics.v1";
 export const UNKNOWN = "unknown";

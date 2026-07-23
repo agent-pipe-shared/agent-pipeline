@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 /** Translate provider-neutral guard exits into Codex PreToolUse denials. */
 import { spawnSync } from "node:child_process";

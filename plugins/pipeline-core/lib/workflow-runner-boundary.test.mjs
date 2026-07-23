@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { normalizeWorkflowRunnerOutcome, runSyntheticWorkflowDispatch, WORKFLOW_RUNNER_CODES } from "./workflow-runner-boundary.mjs";
 

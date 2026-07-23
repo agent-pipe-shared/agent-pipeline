@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 /** Generic exact-selection transport for Codex read-only duties. */
 import { createHash } from "node:crypto";

@@ -18,10 +18,10 @@ specs/2026-07-19-sprint-sentinel-epic/public-private-reconciliation-design.md,
 specs/2026-07-19-sprint-sentinel-epic/RECOVERY.md,
 specs/2026-07-19-sprint-sentinel-epic/platform-support-contract.md and
 specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md directly,
-then verify that the installed plugin cachebuster is
-0.2.0+codex.20260720222336 and that the source/cache manifest and Public branch
-commit/tree match the private overlay lock. Do not claim an observed effective
-model identity.
+then verify through `pipeline-core:pipeline-start` that the currently installed
+plugin's observed commit and source/cache manifest match the private overlay
+lock and the current Public candidate. Do not pin or trust a historical
+cachebuster string, and do not claim an observed effective model identity.
 
 In the configured private overlay, perform the bridge setup in this order:
 inspect -> plan -> explicit activate -> status -> load-context. Keep all

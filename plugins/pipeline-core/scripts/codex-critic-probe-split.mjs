@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Three-run Codex isolation protocol: two observed denied-write probes followed
  * by one ordinary read-only critic verdict.  Raw CLI diagnostics never enter

@@ -10,5 +10,7 @@ The complete governing terms are in [LICENSE](LICENSE) and at:
 https://spdx.org/licenses/SUL-1.0.html
 
 This repository is source available and must not be described as OSI Open
-Source. Commercial publication, hosting, white-labeling, or embedding of the
-Pipeline requires a separate commercial license.
+Source. Internal business use, including internal commercial-company use and
+modification for the user's own purposes, is permitted subject to the LICENSE.
+A separate agreement is required only when Agent-Pipeline or a substantial
+derivative is itself monetized as described in NOTICE and docs/licensing.md.

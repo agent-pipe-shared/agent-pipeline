@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * staleness-check — SessionStart hook: compares the installed pipeline-core plugin SHA
  * against the marketplace remote HEAD and surfaces a reminder/upgrade notice.

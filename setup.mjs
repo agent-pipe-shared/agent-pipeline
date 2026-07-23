@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * setup.mjs — the Shareable Edition's personalization compiler.
  *

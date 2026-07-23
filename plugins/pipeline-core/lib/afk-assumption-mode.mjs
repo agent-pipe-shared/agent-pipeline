@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 import { createHash } from "node:crypto";
 
 export const ACTIVATION_SCHEMA = "pipeline.afk-activation.v1";

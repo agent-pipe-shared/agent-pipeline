@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Route-receipt validation is deliberately provider-neutral. It records the
  * requested route separately from an observed effective model and never turns

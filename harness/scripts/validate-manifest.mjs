@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * validate-manifest.mjs -- thin CLI over plugins/pipeline-core/lib/manifest.mjs.
  * All the actual reading/parsing/validating logic lives in the

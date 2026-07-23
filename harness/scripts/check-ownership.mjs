@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /** Validate a shadow-only ownership map; this module never alters gate configuration. */
 export const CHECK_OWNERSHIP_SCHEMA = "pipeline.check-ownership.v1";
 

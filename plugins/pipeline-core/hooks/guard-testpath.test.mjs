@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * guard-testpath.test.mjs — test suite for the test-path PreToolUse guard (guard-testpath.mjs).
  *

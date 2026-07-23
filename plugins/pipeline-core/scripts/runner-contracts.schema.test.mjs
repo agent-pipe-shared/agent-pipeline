@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
@@ -56,7 +56,7 @@ const P3B_OWNED_MODULES = [
 
 function hasSpdxHeader(path) {
   const lines = readFileSync(join(here, path), "utf8").split(/\r?\n/u);
-  return lines[lines[0] === "#!/usr/bin/env node" ? 1 : 0] === "// SPDX-License-Identifier: Apache-2.0";
+  return lines[lines[0] === "#!/usr/bin/env node" ? 1 : 0] === "// SPDX-License-Identifier: SUL-1.0";
 }
 
 const EXPECTED_PROFILES = {

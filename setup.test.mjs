@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * setup.test.mjs — pure-function test suite for setup.mjs.
  *

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 import { P3B_DIRECT_TERRA_RECEIPT_ADAPTER, validateRouteReceipt } from "./route-receipt.mjs";
 import { projectDirectRoutingDefaults, projectRunnerAssignment, validateDirectRoute } from "./routing-projection.mjs";
 

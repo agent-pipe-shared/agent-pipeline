@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 import { readFileSync } from "node:fs";
 import { extname, resolve } from "node:path";

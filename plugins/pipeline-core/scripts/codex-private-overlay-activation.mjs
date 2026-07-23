@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { isAbsolute, resolve } from "node:path";

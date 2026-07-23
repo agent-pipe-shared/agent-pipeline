@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { EventEmitter } from "node:events";
@@ -62,7 +62,7 @@ const focusedPath = join(focusedDir, "repeat.mjs");
 const secret = "PRIVATE-MACHINE-PATH-MARKER";
 
 function executable(contents, path = fullPath) {
-  writeFileSync(path, `// SPDX-License-Identifier: Apache-2.0\n${contents}\n`, { mode: 0o700 });
+  writeFileSync(path, `// SPDX-License-Identifier: SUL-1.0\n${contents}\n`, { mode: 0o700 });
   chmodSync(path, 0o700);
 }
 

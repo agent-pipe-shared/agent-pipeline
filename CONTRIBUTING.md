@@ -47,12 +47,26 @@ consequences are worth knowing up front:
    or the operating model.
 6. Open a pull request against `main` and fill out the PR template.
 
-## Developer Certificate of Origin (DCO)
+## Developer Certificate of Origin (DCO) and contributor agreement
 
-This project uses the [Developer Certificate of Origin](https://developercertificate.org/)
-instead of a Contributor License Agreement (CLA). Every commit must be
-signed off, certifying that you wrote the change or otherwise have the right
-to submit it under the project's license.
+This project uses both the [Developer Certificate of Origin](https://developercertificate.org/)
+and the separate [Contributor License Agreement](CONTRIBUTOR_LICENSE_AGREEMENT.md).
+The DCO certifies contribution provenance. It does not by itself grant the
+relicensing rights required by this project's source-available and separate
+commercial licensing model.
+
+Every commit must be signed off, and every pull request must record the
+contributor's explicit acceptance of the Contributor License Agreement through
+the dedicated PR-template checkbox. Maintainers must not merge a contribution
+without both records. Acceptance hidden in Code of Conduct participation or
+inferred merely from submitting code is insufficient.
+
+The CLA gate is currently **inactive** because `NOTICE` does not yet identify a
+legal rightsholder/contracting party. External pull requests may be opened and
+discussed, but their CLA checkbox has no activating effect and they must not be
+merged until a company or other legal person is recorded and the named human
+legal/rightsholder reviewer approves the process. Do not put a private personal
+identity into a pull request or repository file to bypass this gate.
 
 Sign off your commits with:
 
@@ -63,9 +77,10 @@ git commit -s
 This appends a `Signed-off-by: Your Name <your.email@example.com>` line to
 your commit message. Pull requests with unsigned commits will not be merged.
 
-## Licensing of contributions
+## Licensing and rights in contributions
 
-By submitting a contribution, you agree that:
+By expressly accepting the Contributor License Agreement for the pull request,
+you agree that:
 
 - Code contributions are licensed under the **Sustainable Use License 1.0
   (SUL-1.0)** (see
@@ -74,10 +89,19 @@ By submitting a contribution, you agree that:
   1.0 (SUL-1.0)** (see
   [`LICENSE-DOCS`](LICENSE-DOCS)).
 
-This is source-available licensing, not OSI Open Source. Internal business use
-is permitted; free non-commercial redistribution is permitted with notices;
-commercial exploitation requires a separate commercial license. Contributors
-must have the right to submit their contribution under these terms.
+This is source-available licensing, not OSI Open Source. Internal business use,
+including internal commercial-company use and modification for one's own
+purposes, is permitted subject to the license. Separate rightsholder
+participation is required only when Agent-Pipeline or a substantial derivative
+is itself monetized as described in `NOTICE` and `docs/licensing.md`.
+
+The Contributor License Agreement grants the project the rights needed to
+publish contributions under SUL-1.0 and, separately, under commercial terms.
+It does not describe an assignment of authorship or copyright. Contributors
+must have the rights needed to make that grant and must identify third-party
+material. These documents are not legal advice and make no guarantee that a
+particular acceptance process or grant is effective under every applicable
+law; the human legal/rightsholder review gate remains mandatory.
 
 ## Code of Conduct
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * git-cmd.mjs -- shared git-command normalization helpers, no library dependency.
  *

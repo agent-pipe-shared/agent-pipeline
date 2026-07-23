@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 import { spawnSync as nodeSpawnSync } from "node:child_process";
 
 const FORMATS = Object.freeze({ sha1: 40, sha256: 64 });

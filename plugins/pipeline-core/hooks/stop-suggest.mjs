@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * stop-suggest — Stop hook: after each main-session turn ends, suggests the NEXT pipeline
  * phase/gate non-blockingly, driven by the declarative manifest (`.claude/pipeline.yaml`,

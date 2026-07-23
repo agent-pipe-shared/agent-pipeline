@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * verify.mjs — THE one verify entry point of this repo (E5/QG-02, self-application E13).
  *
@@ -73,7 +74,7 @@ const SCOPED_VERIFY_REGISTRATION = Object.freeze({
   authority: Object.freeze({
     prd: Object.freeze({
       path: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      sha256: "4050a582393643b38d61ee0b04bb011a013a5eda0f47de56f4425e4bddeae4bd",
+      sha256: "042fbf044897749c5b8a8253c4dd681333d87c41c9174a8969447f967004f931",
     }),
   }),
   suites: SCOPED_VERIFY_SUITES,
@@ -156,6 +157,8 @@ const TEST_SUITES = [
   { name: "codex-sandbox-select-tests", file: join(pluginScriptsDir, "codex-sandbox-select.test.mjs") },
   { name: "codex-sandbox-runtime-tests", file: join(pluginScriptsDir, "codex-sandbox-runtime.test.mjs") },
   { name: "codex-app-server-health-tests", file: join(pluginScriptsDir, "codex-app-server-health.test.mjs") },
+  { name: "codex-advisory-app-server-tests", file: join(pluginScriptsDir, "codex-advisory-app-server.test.mjs") },
+  { name: "codex-advisory-bootstrap-tests", file: join(pluginScriptsDir, "codex-advisory-bootstrap.test.mjs") },
   { name: "codex-plugin-validator-parity-tests", file: join(pluginScriptsDir, "codex-plugin-validator-parity.test.mjs") },
   { name: "worktree-lifecycle-tests", file: join(libDir, "worktree-lifecycle.test.mjs") },
   { name: "advisor-consult-v3-tests", file: join(repoRoot, "plugins", "pipeline-core", "skills", "advisor-consult", "advisor-consult-v3.test.mjs") },
@@ -204,6 +207,8 @@ const TEST_SUITES = [
   { name: "doc-contract-check", file: join(scriptDir, "check-doc-contracts.mjs") },
   { name: "language-canon-tests", file: join(scriptDir, "check-language-canon.test.mjs") },
   { name: "language-canon-check", file: join(scriptDir, "check-language-canon.mjs") },
+  { name: "license-contract-tests", file: join(scriptDir, "check-license-contract.test.mjs") },
+  { name: "license-contract-check", file: join(scriptDir, "check-license-contract.mjs") },
   { name: "security-scan-tests", file: join(scriptDir, "security-scan.test.mjs") },
   { name: "no-autoupdate-key-tests", file: join(scriptDir, "no-autoupdate-key.test.mjs") },
   { name: "phase26-invariants-tests", file: join(scriptDir, "check-phase26-invariants.test.mjs") },

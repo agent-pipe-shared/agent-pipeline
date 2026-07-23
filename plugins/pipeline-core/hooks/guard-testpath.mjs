@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * guard-testpath — PreToolUse deny-guard protecting configured test paths from Edit/Write.
  *

@@ -1,5 +1,15 @@
 {
   "$schema": "pipeline.third-party-licenses.v1",
-  "$comment": "This repository has no package-manager dependency manifest. The empty declaration is an explicit inventory result for the current Public Core candidate, not a legal approval of future dependencies.",
-  "dependencies": []
+  "$comment": "This repository has no package-manager dependency manifest and no known incorporated external code. Incorporated third-party text is still inventoried here and is not relicensed as project-owned SUL-1.0 material.",
+  "dependencies": [
+    {
+      "name": "Contributor Covenant Code of Conduct",
+      "version": "2.1",
+      "license": "CC-BY-SA-4.0",
+      "kind": "incorporated-text",
+      "path": "CODE_OF_CONDUCT.md",
+      "source": "https://www.contributor-covenant.org/version/2/1/code_of_conduct.html",
+      "attribution": "Stewarded by the Organization for Ethical Source; Community Impact Guidelines credit Mozilla's code-of-conduct enforcement ladder as inspiration."
+    }
+  ]
 }

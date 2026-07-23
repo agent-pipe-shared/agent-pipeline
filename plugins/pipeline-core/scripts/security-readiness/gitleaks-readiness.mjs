@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 import { buildHandle, executableIdentity, resolveSystemExecutable, runProbe } from "../tool-identity.mjs";
 
 const GITLEAKS_MODULE = "github.com/zricethezav/gitleaks/v8";

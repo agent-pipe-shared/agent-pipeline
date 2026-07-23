@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * critic-bare.test.mjs -- versioned test suite for the neutral-cwd headless-critic wrapper
  * (critic-bare.mjs) and its verdict schema (critic-verdict.schema.json).

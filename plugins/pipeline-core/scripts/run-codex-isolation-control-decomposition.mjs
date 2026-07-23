@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /** Local entry point for the one approved control-decomposition acceptance. */
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";

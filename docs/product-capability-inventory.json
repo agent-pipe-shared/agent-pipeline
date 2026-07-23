@@ -1,10 +1,14 @@
 {
-  "schema": "pipeline.product-capability-inventory.v1",
+  "schema": "pipeline.product-capability-inventory.v2",
   "sourceBaseline": {
     "commit": "89c3c2ebf73d2b8cd3b43ee0ea463d2819c5f49f",
     "tree": "d8f434afea67c2c852061e84b5bd665e1a9607fd"
   },
-  "criticReceiptSha256": "PENDING_SANCTIONED_CRITIC_RECEIPT",
+  "criticReview": {
+    "status": "required-before-publication",
+    "receiptSha256": null,
+    "reason": "The corrective Sentinel review has findings but no final sanctioned PASS receipt; publication remains blocked until a fresh candidate-bound Critic attestation is recorded."
+  },
   "surfaces": [
     {
       "surfaceId": "agent-role:plugins/pipeline-core/agents/afk-claude-worker.md:afk-claude-worker",
@@ -541,6 +545,18 @@
       "member": "claude-critic-host-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-advisory-app-server-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-advisory-app-server-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-advisory-bootstrap-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-advisory-bootstrap-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-app-server-health-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -707,6 +723,18 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "language-canon-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:license-contract-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "license-contract-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:license-contract-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "license-contract-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
@@ -1321,6 +1349,8 @@
         "verify-phase:harness/scripts/verify.mjs:capture-observation-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:check-ownership-tests",
         "verify-phase:harness/scripts/verify.mjs:claude-critic-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-advisory-app-server-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-advisory-bootstrap-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-app-server-health-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-critic-host-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-plugin-validator-parity-tests",
@@ -1357,6 +1387,8 @@
         "verify-phase:harness/scripts/verify.mjs:human-role-rendering-tests",
         "verify-phase:harness/scripts/verify.mjs:language-canon-check",
         "verify-phase:harness/scripts/verify.mjs:language-canon-tests",
+        "verify-phase:harness/scripts/verify.mjs:license-contract-check",
+        "verify-phase:harness/scripts/verify.mjs:license-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
         "verify-phase:harness/scripts/verify.mjs:migrate-backlog-state-tests",
         "verify-phase:harness/scripts/verify.mjs:no-autoupdate-key-tests",

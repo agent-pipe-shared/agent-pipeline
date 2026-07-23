@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /** Local host entry point for the approved profile-bound isolation acceptance. */
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";

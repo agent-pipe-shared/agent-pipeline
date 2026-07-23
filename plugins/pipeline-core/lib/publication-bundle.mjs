@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 import { createHash } from "node:crypto";
 
 export const PUBLICATION_SCHEMA = "pipeline.publication-channel.v1";

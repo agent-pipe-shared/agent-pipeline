@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 /** Exact-executable `claude --bare` preflight and execution primitive. */
 import { createHash } from "node:crypto";

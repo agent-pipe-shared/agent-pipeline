@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * setup-check — SessionStart hook: detects whether the Shareable Edition's personalization
  * step (`node setup.mjs`) has run at all, and reminds the collegue if not.

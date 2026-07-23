@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * security-scan.test.mjs -- versioned test suite for the security-scan phase runner
  * (security-scan.mjs) and its four adapters (security-adapters/*.mjs), AP1-P4 "FUNDIN".

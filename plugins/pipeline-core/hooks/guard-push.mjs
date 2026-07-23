@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * guard-push — PreToolUse guard enforcing the Push-Gate for Bash|PowerShell.
  *

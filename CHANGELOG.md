@@ -6,6 +6,13 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ## [Unreleased]
 
+### Changed
+
+- Current repository-owned code, documentation, and metadata use the
+  source-available Sustainable Use License 1.0 (SUL-1.0). This change applies
+  to the current candidate and does not alter the MIT, Apache-2.0, or
+  CC-BY-4.0 grants and notices shipped with earlier versions.
+
 ## [0.2.0] — 2026-07-12
 
 ### Added

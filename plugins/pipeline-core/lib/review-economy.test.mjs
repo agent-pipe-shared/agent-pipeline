@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import {
   COURSE_CATALOG_SHA256,
   COURSE_CATALOG_VERSION,

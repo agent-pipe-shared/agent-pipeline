@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 /** Read-only observation of one Public source checkout and one installed copy. */
 import { execFileSync as nodeExecFileSync } from "node:child_process";

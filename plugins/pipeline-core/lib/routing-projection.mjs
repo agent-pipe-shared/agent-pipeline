@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import { readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";

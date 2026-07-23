@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * stop-suggest.test.mjs — test suite for the Stop-hook next-step suggester
  * (stop-suggest.mjs, task AP1-P5 "OIN").

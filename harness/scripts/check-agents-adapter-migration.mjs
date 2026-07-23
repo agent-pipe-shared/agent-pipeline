@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /** Narrow contract check for the one optional, public AGENTS adapter migration. */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";

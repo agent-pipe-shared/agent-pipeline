@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 /** Fixed child payload for one ephemeral Codex advisory turn. */
 import { spawn } from "node:child_process";

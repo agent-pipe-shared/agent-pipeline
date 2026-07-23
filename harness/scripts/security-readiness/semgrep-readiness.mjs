@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 import { mkdtempSync, rmSync } from "node:fs";
 import { join } from "node:path";
 import { buildHandle, executableIdentity, runProbe } from "./tool-identity.mjs";

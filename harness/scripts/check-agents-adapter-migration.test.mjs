@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { MIGRATED_AGENTS_ADAPTER } from "../../setup.mjs";
 import { checkAgentsAdapterMigration } from "./check-agents-adapter-migration.mjs";

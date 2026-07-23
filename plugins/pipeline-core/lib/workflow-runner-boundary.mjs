@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Provider-neutral synthetic workflow boundary.
  *

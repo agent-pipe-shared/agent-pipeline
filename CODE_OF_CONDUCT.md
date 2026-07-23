@@ -1,3 +1,5 @@
+<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->
+
 # Contributor Covenant Code of Conduct
 
 ## Our Pledge
@@ -119,6 +121,9 @@ the community.
 This Code of Conduct is adapted from the [Contributor Covenant][homepage],
 version 2.1, available at
 [https://www.contributor-covenant.org/version/2/1/code_of_conduct.html][v2.1].
+Contributor Covenant is stewarded by the Organization for Ethical Source and
+licensed under [CC BY-SA 4.0][CC-BY-SA-4.0]. This file remains under those
+third-party terms and is not relicensed as Agent-Pipeline-owned SUL-1.0 text.
 
 Community Impact Guidelines were inspired by
 [Mozilla's code of conduct enforcement ladder][Mozilla CoC].
@@ -130,5 +135,6 @@ at [https://www.contributor-covenant.org/translations][translations].
 [homepage]: https://www.contributor-covenant.org
 [v2.1]: https://www.contributor-covenant.org/version/2/1/code_of_conduct.html
 [Mozilla CoC]: https://github.com/mozilla/diversity
+[CC-BY-SA-4.0]: https://creativecommons.org/licenses/by-sa/4.0/
 [FAQ]: https://www.contributor-covenant.org/faq
 [translations]: https://www.contributor-covenant.org/translations

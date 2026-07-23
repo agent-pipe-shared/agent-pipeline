@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 import { afkGateStatus } from "./afk-review.mjs";
 
 const OPERATIONS = new Set([

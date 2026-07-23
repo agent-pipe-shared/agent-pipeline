@@ -1,402 +1,285 @@
 <!-- po-language: en -->
 
-# PRD — Sprint Sentinel: Backlog-Wahrheit und Go-live
+# PRD — Sprint Sentinel: Backlog truth and go-live
 
-> Product Review Document für das PO-Gate. Status: `PO-freigegeben;
-> Implementierung mit dokumentierter Readiness-Ausnahme freigegeben`. Task:
-> `sprint-sentinel-epic` · Profil `epic` · Rigor 2 · Risiko high. Die Freigabe
-> bestätigt die Entscheidungen 1A–8A und die am 2026-07-20 genehmigte
-> Public-Core-/Private-Consumer-Reconciliation. AFK-Aktivierung, Push, Tag und
-> Release bleiben bis zu ihren jeweiligen Gates gesperrt.
+> Product Review Document for the PO gate. Status: `PO-approved; implementation
+> approved with the recorded readiness exception`. Task: `sprint-sentinel-epic`
+> · profile `epic` · rigor 2 · risk high. Approval covers decisions 1A–8A and
+> the Public-Core/private-consumer reconciliation approved on 2026-07-20. AFK
+> activation, push, tag, release, commercial relicensing, and public activation
+> remain blocked until their own gates pass.
 
-<!-- technical-spec-sha256: aaec0b6411626b3f1988dbd2f5db16b2870c9aaed07e5edd3ed1e1e735c43b9b -->
-<!-- public-private-reconciliation-design-sha256: 48698f4bc1717932b1f031b6936e7201cc1d3201e6e56d28a50b2891023f0e7f -->
+<!-- technical-spec-sha256: 2c9eacb6d28479e6406cae5cdb1024cddd537eb6ff2f22e4dd6b5caefb3c7c62 -->
+<!-- public-private-reconciliation-design-sha256: 3b4cee9f23a5db1ea7318ce86a1190d1ec868561b55a7ee9b30994ff0d073075 -->
 <!-- platform-support-contract-sha256: 1f9248c9719b0f53a572501a27b6e799f79d8c1b5d5187539c6249d253c4091e -->
 
-Die technische Freigabebindung gilt exakt für die benachbarte
-[spec.md](spec.md). Sie übernimmt zusätzlich die vollständigen, per SHA-256
-gebundenen Hawkeye-Verträge und den Control-Contract aus
-the recorded design-phase control contract. Ändert sich einer dieser
-Inputs, werden die lokale Readiness-/Authority-Prüfung und PO-Freigabe vor
-weiterer Umsetzung erneuert.
+The technical approval binds the exact neighboring [spec.md](spec.md). That
+Spec also retains all Hawkeye contracts and the recorded design-phase control
+contract. Drift in an input requires renewed local readiness/authority checks
+and renewed PO approval before implementation continues.
 
-Der [Platform-Support-Contract](platform-support-contract.md) ist eine
-verbindliche, SHA-256-gebundene Sentinel-Autorität. Er definiert die
-capability-spezifischen Support-Claims für Windows, Linux, WSL und macOS,
-native same-surface evidence sowie die typisierten negativen Outcomes. Docker
-ist derzeit out of scope und ersetzt niemals native Evidenz. Seine gebundene
-Windows-Blocker-Scope-Eingabe führt `#33` geschlossen sowie `#34`–`#37` offen;
-ein Plattform-Claim wird nur mit aktueller Verify-, Security- und
-Critic-Evidenz für denselben Kandidaten zulässig.
+The [Platform Support Contract](platform-support-contract.md) is binding
+Sentinel authority. It defines capability-specific claims for Windows, Linux,
+WSL, and macOS, requires native same-surface evidence, and preserves typed
+negative outcomes. Docker is out of scope and never substitutes for native
+evidence. The bound Windows scope records issue #33 as closed and #34–#37 as
+open; a platform claim requires current Verify, security, and Critic evidence
+for the same candidate.
 
-Der PO hat am 2026-07-20 zusätzlich das vollständige
-[Public-Core-/Private-Consumer-Design](public-private-reconciliation-design.md)
-freigegeben. Es ist eine additive Sentinel-Autorität: Die bisher im privaten
-Checkout entwickelte portable V3-/Multi-CLI-/Codex-Arbeit wird nicht zuerst
-als privates Produkt geschlossen, sondern kontrolliert in die alleinige
-öffentliche Produktquelle the Public Core überführt. Das private
-`the private consumer repository` wird anschließend ein gebundener Consumer für eigene
-versionierbare Templates, ADRs, Policies, Guidelines und Extensions. Rein
-lokale Benutzer-, Rechner-, Secret- und Runtime-Daten bleiben außerhalb aller
-Git-Repositories in den definierten User-/Git-Common-Dir-Wurzeln.
+The PO also approved the complete
+[Public-Core/private-consumer design](public-private-reconciliation-design.md)
+on 2026-07-20. Portable V3, Multi-CLI, Codex, plugin, harness, documentation,
+schema, test, and distribution work moves into the Public Core as the sole
+product authority. The private repository becomes a bound consumer for its own
+versioned templates, ADRs, policies, guidelines, and extensions. User-, host-,
+secret-, and runtime-specific data remains outside all repositories in the
+defined user or Git-common-dir roots.
 
-Die Public-README muss als Teil dieses Scopes die Befehle und Wege für
-Installation/Aktivierung, Session-Start, Verify, Block-/Feature-Close,
-Update/Migration, Public-Beitrag und private Erweiterung verständlich
-dokumentieren. Sie stellt außerdem die belegten Autoren-/Quellenangaben zum
-Elephants-&-Goldfish-Modell und zum New SDLC sowie die dritte historische
-Acknowledgments-Quelle wieder her.
+The Public README must explain installation and activation, session start,
+Verify, block/feature close, update and migration, Public contribution, private
+extension, and machine-local data roots. It also retains the evidenced sources
+and acknowledgments for the Elephants & Goldfish model and the New SDLC.
 
-## Kurzfassung
+## Summary
 
-Sentinel beendet den Schwebezustand nach Batman und Hawkeye: Es prüft jeden
-offenen oder laufenden Backlog-Eintrag gegen den tatsächlich gelieferten Code,
-schließt bereits erfüllte Arbeit nur mit belastbarer Evidenz und vollendet alle
-echten Lücken. Gleichzeitig werden HAW-C und HAW-E ohne Scope-Verlust als ein
-zusammenhängendes Feature innerhalb des Epics fertiggestellt: private
-regulierte Dokumente, vollständige Review-/Recovery-Kette, gemeinsame
-Release-Evidenz, identische Version in privatem und neutral-öffentlichem Kanal
-sowie atomarer Produktabschluss.
+Sentinel ends the indeterminate state after Batman and Hawkeye. It audits every
+open or in-progress backlog item against delivered production code, registered
+tests, candidate-bound evidence, and canonical state; it closes fulfilled work
+only through sanctioned transitions and completes genuine gaps. HAW-C and
+HAW-E remain one coherent feature inside the Epic: private regulated documents,
+complete review/recovery, shared release evidence, identical versions in the
+private and neutral-Public channels, and atomic product close.
 
-Das Ergebnis ist kein kosmetischer Backlog-Cleanup. Jeder Status muss wieder
-mit Code, registrierten Tests, Verify-Evidenz, State, Ledger und Projektionen
-übereinstimmen. Wo Hawkeye oder Batman bereits vorgearbeitet haben, wird diese
-Arbeit wiederverwendet und neu belegt; fehlende Abschlussbuchhaltung wird nicht
-mit tatsächlicher Fertigstellung verwechselt.
+This is not cosmetic backlog cleanup. Code, registered tests, Verify evidence,
+state, ledger, and generated projections must agree. Existing implementation is
+reused and re-proven; missing close bookkeeping is never confused with product
+completion.
 
-## Verbindliche PO-Ausnahmen dieser Designphase
+## Binding PO exceptions and limits
 
-- PO-Ergänzung vom 2026-07-19: Die Distribution fragt im Setup ausdrücklich
-  nach der repositoryweiten Advisor-Exportfreigabe. Ohne Zustimmung bleibt
-  Advisory optional und ausgeschaltet. Für dieses Repository ist der Export
-  generell freigegeben. Codex-Advisor dürfen Bash zusätzlich zu
-  Read/Grep/Glob ausschließlich im ausgewählten `network-open/read-only`-
-  Sandbox-Profil nutzen. Fehlende externe Voraussetzungen werden aktiv mit
-  kopierbarem Installationsbefehl gemeldet, aber nie automatisch installiert.
+- Repository-wide advisory export is configured through explicit setup
+  consent. Without consent Advisory is disabled. This repository allows the
+  bounded export. Codex Advisory may use Bash in addition to Read/Grep/Glob only
+  in the selected `network-open/read-only` profile. Missing prerequisites are
+  reported with a copyable installation command and are never auto-installed.
+- The selected Codex bridge returned `sandbox_selection_unavailable`: no child
+  started, no material was exported, and no receipt was created. The PO allowed
+  design without an Advisory receipt; this creates no successful bootstrap or
+  Advisory claim.
+- The authorized Sol readiness export was rejected by tenant policy before a
+  child started. The PO allowed implementation from local PRD/Spec digest,
+  authority, documentation, and backlog checks, without claiming independent
+  readiness. Production Codex readiness remains mandatory SNT-0 scope.
+- After exactly one typed selected-sandbox `no-child` or `unavailable` stop, a
+  fresh local read-only consult may answer the same single question as the
+  PO-authorized functional equivalent. It remains one-question, no-export,
+  no-mutation, no-auto-apply, and discloses that selected-sandbox execution, OS
+  isolation, and model identity are not attested. ADR-0041 and the Spec govern.
+- The recorded design and implementation route exceptions do not mutate
+  `pipeline.user.v3` and do not establish observed model identity.
+- AFK mode may activate only after its gate, for local reversible work in this
+  Spec. It never authorizes licensing, release, remote writes, secrets,
+  irreversible action, plan approval, or final acceptance.
 
-- Der ausgewählte Codex-Advisory-Bridge meldete
-  `sandbox_selection_unavailable`: Kein Kind wurde gestartet, nichts
-  exportiert und kein Receipt erzeugt. Der PO erlaubt Sentinel-Design ohne
-  Advisory-Receipt. Ein erfolgreicher Bootstrap-/Advisory-Claim wird daraus
-  ausdrücklich nicht abgeleitet.
-- Der ausdrücklich freigegebene read-only Sol-Readiness-Export wurde durch die
-  maßgebliche Tenant-Policy abgewiesen; es wurde kein Kind gestartet und kein
-  unabhängiger Readiness-Receipt erzeugt. Der PO erlaubt den Wechsel in die
-  Implementierung auf Basis der lokalen PRD-/Spec-Digest-, Authority-,
-  Dokumentations- und Backlog-Prüfung. Daraus wird kein unabhängiger
-  Readiness-Claim abgeleitet; die Codex-Readiness-Verdrahtung bleibt
-  verpflichtender Scope von `SNT-0`.
-- PO-Beschluss vom 2026-07-20: Nach genau einem typisierten Codex-Selected-
-  Sandbox-Stopp `no-child` oder `unavailable` darf ein frischer lokaler,
-  read-only `consult-advisor` dieselbe einzelne Frage als dauerhaft
-  gatefähiger, PO-autorisierter Funktionsäquivalenz-Pass beantworten. Dies gilt
-  bis zu einem PO-Widerruf oder bis die Codex-CLI eine funktionierende Selected
-  Sandbox liefert. Der Pass behauptet keine attestierte Sandbox-Ausführung,
-  OS-Isolation oder Modellidentität; Export, Mutation und Auto-Apply bleiben
-  verboten. ADR-0041 und die Spec definieren die genaue Restzusicherung.
-- Design läuft in dieser Sitzung auf `gpt-5.6-sol / high`; die spätere
-  Implementierung soll auf `gpt-5.6-terra / high` laufen. Beide Abweichungen
-  sind begrenzte PO-Ausnahmen und ändern `pipeline.user.v3` nicht.
-- Die fehlende saubere Codex-Sol-Advisor-Subagent-Verdrahtung ist Pflichtscope.
-  Sie muss vor späteren regulären Advisory-/Readiness-/Critic-Claims grün sein.
-- AFK-Modus ist gewünscht, wird aber erst nach PRD-Freigabe und nur für lokale,
-  reversible Arbeit innerhalb dieser Spec aktiviert. Er ersetzt keine
-  Entscheidung über Lizenz, Release, Remote-Writes oder Abschluss.
+## Why Sentinel is an Epic
 
-## Warum Sentinel ein Epic ist
+The PO expanded the original HAW-C/HAW-E successor to every backlog item that
+was open or in progress at the starting candidate, then admitted five native
+Windows blockers. The resulting 21 obligations span runners, sandboxes,
+worktrees, continuity, governance, Verify, documentation, licensing, and
+release. HAW-C/HAW-E stays a single undivided feature within that Epic.
 
-Der ursprüngliche Nachfolger war als ein Feature für HAW-C und HAW-E geplant.
-Der PO hat den Scope anschließend auf alle zum Start `open` oder
-`in_progress` geführten Backlog-Items erweitert. Diese 16 Baseline-Einträge
-und die am 2026-07-22 explizit aufgenommenen fünf nativen Windows-Blocker
-betreffen
-mehrere unabhängige Kontroll- und Produktoberflächen: Runner, Sandbox,
-Worktrees, Continuity, Governance, Verify, Dokumente, Lizenzierung und Release.
-Das ist ein Epic. Der HAW-C/HAW-E-Control-Contract bleibt darin ein einziges,
-nicht weiter aufgespaltenes Feature und wird nicht in einen späteren Sprint
-verschoben.
+## Complete backlog scope
 
-## Vollständiger Backlog-Scope
-
-| Backlog-ID | Startstatus | Erste Einordnung | Geschuldeter Abschluss |
+| Backlog ID | Starting status | Starting assessment | Required completion |
 | --- | --- | --- | --- |
-| `pipeline.afk-assumption-mode` | open | wesentliche Implementierung/Tests vorhanden, aber nicht vollständig registriert oder geschlossen | AC-Audit, fehlende Fälle, Verify-Registrierung, finaler PO-Review, Close |
-| `pipeline.canonical-worktree-lifecycle` | open | Worktree-/Cleanup-Code und Tests vorhanden | beide Close-Profile, Recovery und Post-Commit-Cleanliness belegen, Close |
-| `pipeline.codex-plugin-validator-host-parity` | open | aktuell reproduzierbar offen | generischen Validator und native Codex-Ingestion versionsgebunden versöhnen |
-| `pipeline.codex-sandbox-critic-longterm` | open | schwächere network-open Read-only-Zwischenstufe vorhanden | lokale ACs vollenden; starke Lane nur nach echtem Upstream-/Preflight-/PO-Gate schließen |
-| `pipeline.documentation-information-architecture` | open | große Teile durch Hawkeye geliefert | Inventar, Sprach-/Link-/Capability-Parität erneuern; im HAW-E-Batch schließen |
-| `pipeline.dual-channel-publication` | open | frühere Kanaltrennung vorhanden, v2-Go-live unvollständig | HAW-E-Zwei-Kanal-Publikation und Fetch-back vollenden |
-| `pipeline.execution-model-switchback` | open | Route-Receipts vorhanden, Hauptsession-Drift nicht vollständig belegt | Soll/Ist-Route über Bootstrap/Re-Grounding sichtbar und testbar machen |
-| `pipeline.nonblocking-interaction-continuity` | open | Continuity-/Hook-Oberflächen vorhanden | Trajectory-, Compact- und Resume-Kriterien vollständig belegen, Close |
-| `pipeline.po-gate-worktree-authority` | open | Mechanismus vorhanden; aktueller Primary-Readback grün | Linked-Worktree-, Kardinalitäts- und Digestfälle im Full Verify belegen, Close |
-| `pipeline.push-guard-worktree-target` | in_progress | Korrektur vorhanden | regulären Push aus Ziel-Worktree mit frischer Evidenz und Fetch-back beweisen, Close |
-| `pipeline.regulated-document-hooks` | open | öffentliche/private Grundlagen vorhanden | vollständiges HAW-C liefern; im HAW-E-Batch schließen |
-| `pipeline.session-keep-awake` | open | Controller/Lifecycle/Tests vorhanden | Plattform-, Ablauf- und Cleanup-Claims auditieren; im HAW-E-Batch schließen |
-| `pipeline.source-available-commercial-licensing` | open | echte offene Produktentscheidung | Rechteprüfung, Lizenzwahl, Repo-Umstellung, Human-Legal-Gate, eigener Close |
-| `pipeline.stateful-design-contract-template` | open | echte offene Prozessverbesserung | Authority-/Durability-/Recovery-/Enforcement-Checkliste in Vorlage und Elephant-Vertrag |
-| `pipeline.t1-governance-path-preflight` | open | Governance-Paketcode teilweise vorhanden | alle Pfad-, ETA- und Tool-Setup-ACs auditieren, ergänzen und schließen |
-| `pipeline.verify-gate-scoped-registration` | open | echte offene Ursache für unregistrierte Fokustests | enge additive, PO-/Task-gebundene Registrierung implementieren und nutzen |
-| `pipeline.windows-runtime-baseline-containment` | closed | Issue `#33`, physische Windows-Containment-Lücke | kanonische Closure-Evidenz gebunden; kein Restgate |
-| `pipeline.windows-directory-durability` | open | Issue `#34`, POSIX-Verzeichnis-fsync-Annahme | Plattform-Assurance ohne schwächeren File-Flush |
-| `pipeline.windows-private-state-assurance` | open | Issue `#35`, POSIX-Modi sind keine Windows-DACL-Proof | typisierte Private-State-Assurance, authority fail-closed |
-| `pipeline.windows-verify-reproducibility` | open | Issue `#36`, Full Verify nicht nativ Windows-reproduzierbar | Capability-gebundene Fixtures und grüner Standard-Account-Gate |
-| `pipeline.windows-trusted-tool-resolution` | open | Issue `#37`, widersprüchliche Tool-Erkennung | gemeinsame vertrauensgebundene Resolver-Authority |
+| `pipeline.afk-assumption-mode` | open | substantial implementation/tests, incomplete registration/close | AC audit, missing cases, Verify registration, final PO review, close |
+| `pipeline.canonical-worktree-lifecycle` | open | lifecycle and cleanup code/tests present | prove both close profiles, recovery, post-commit cleanliness, close |
+| `pipeline.codex-plugin-validator-host-parity` | open | reproducibly open | reconcile generic and native Codex ingestion with version binding |
+| `pipeline.codex-sandbox-critic-longterm` | open | weaker read-only intermediate lane exists | complete local ACs; strong lane closes only on its original upstream gate |
+| `pipeline.documentation-information-architecture` | open | substantially delivered by Hawkeye | renew content/language/link/capability evidence; close in HAW-E batch |
+| `pipeline.dual-channel-publication` | open | channel split exists; v2 go-live incomplete | complete HAW-E two-channel publication and fetch-back |
+| `pipeline.execution-model-switchback` | open | route receipts exist; main-session drift incomplete | observable/testable desired-versus-actual route reconciliation |
+| `pipeline.nonblocking-interaction-continuity` | open | continuity/hook surfaces exist | prove trajectory, compact, and resume criteria, close |
+| `pipeline.po-gate-worktree-authority` | open | mechanism and Primary readback exist | full linked-worktree/cardinality/digest evidence, close |
+| `pipeline.push-guard-worktree-target` | in_progress | correction exists | regular target-worktree push and fetch-back evidence, close |
+| `pipeline.regulated-document-hooks` | open | public/private foundations exist | deliver complete HAW-C; close in HAW-E batch |
+| `pipeline.session-keep-awake` | open | controller/lifecycle/tests exist | platform, expiry, and cleanup evidence; close in HAW-E batch |
+| `pipeline.source-available-commercial-licensing` | open | product decision was genuinely open | rights review, consistent SUL transition, human legal gate, dedicated close |
+| `pipeline.stateful-design-contract-template` | open | genuine process gap | enforce authority, durability, recovery, and self-reference checklist |
+| `pipeline.t1-governance-path-preflight` | open | governance packet partially exists | audit and complete path, ETA, and setup ACs, then close |
+| `pipeline.verify-gate-scoped-registration` | open | root cause for omitted focused suites | narrow additive PO/task-bound registration and evidence |
+| `pipeline.windows-runtime-baseline-containment` | open | issue #33 at scope admission | bound canonical closure evidence; no remaining #33 gate |
+| `pipeline.windows-directory-durability` | open | issue #34, POSIX directory-fsync assumption | typed durability and native Windows/POSIX evidence |
+| `pipeline.windows-private-state-assurance` | open | issue #35, POSIX modes do not prove Windows DACLs | typed assurance with fail-closed authority consumers |
+| `pipeline.windows-verify-reproducibility` | open | issue #36, native Windows Full Verify gap | capability-bound fixtures and standard-account gate |
+| `pipeline.windows-trusted-tool-resolution` | open | issue #37, inconsistent discovery | shared trust-bound resolver authority |
 
-`pipeline.runner-v2-installation-cutover` bleibt geschlossen und wird nur auf
-Konsistenz geprüft. `backlog/items/TEMPLATE.md` ist kein Backlog-Item.
+The acceptance matrix is the current-state projection; this table records the
+approved starting scope and does not override later canonical transitions.
 
-## Was wir liefern
+## Required outcomes
 
-### 1. Eine belastbare Backlog-Wahrheit
+### 1. Evidence-backed backlog truth
 
-Sentinel erstellt zuerst eine maschinen- und menschenlesbare
-Akzeptanzmatrix. Für jedes der 21 Items werden Originalkriterien, vorhandene
-Produktionspfade, Tests, Registrierung im vollständigen Verify, Kandidaten-
-Evidenz und noch fehlende Schritte einander zugeordnet. Zulässige
-Zwischenurteile sind: nicht begonnen, teilweise umgesetzt, geliefert aber
-unbewiesen, verifiziert aber noch nicht transitioniert oder geschlossen.
+The acceptance matrix maps original criteria, production paths, tests, Full
+Verify registration, candidate evidence, and remaining work for all 21 items.
+Allowed intermediate judgments are not started, partially implemented,
+delivered but unproven, verified but not transitioned, and closed. File
+presence never proves completion, and an old open status never by itself proves
+missing implementation.
 
-Ein alter `open`-Status wird nicht automatisch als fehlende Implementierung
-interpretiert. Umgekehrt beweist eine vorhandene Datei keine Fertigstellung.
-Backlog-Items, Ledger, STATUS und Index werden niemals direkt bearbeitet. Alle
-Übergänge laufen über die sanktionierten Writer und akzeptieren bei Recovery
-nur die aufgezeichneten Vor- oder Nachbilder.
+Backlog items, ledger, STATUS, and index are changed only by sanctioned writers.
+Recovery accepts only recorded pre- or post-images. Structural consistency does
+not eliminate the semantic audit: Sentinel identifies which completed criteria
+missed a legitimate transition and which remain unfinished, without inventing
+history.
 
-Der aktuelle strukturelle Validator meldet Item-Dateien, Transition-Ledger,
-Closure-Evidence, STATUS und Index als konsistent. Es liegt damit derzeit keine
-byte-level Projektionkorruption vor. Aufzuräumen ist die semantische Lücke:
-Welche bereits erfüllten Kriterien erhielten nie einen legitimen Übergang, und
-welche Einträge sind tatsächlich noch unvollständig?
+### 2. Honest Codex Advisory, validator, and sandbox claims
 
-Wenn frühere Close-Rituale berechtigte Übergänge ausgelassen oder Projektionen
-nicht synchronisiert haben, repariert Sentinel zuerst den generischen
-Close-/Backlog-Vertrag samt Crash-Recovery. Erst danach werden belegte
-Übergänge wiederholt. Historie wird nicht rückwirkend erfunden.
+Codex receives the production wiring for one fresh Advisory question with no
+handover/chat/memory, read-only access, no auto-apply, and a current
+candidate-bound receipt. The selected sandbox bridge owns execution; host
+unavailability, wrong identity, or absent child evidence remains a typed
+non-success. Claude routing is unchanged.
 
-### 2. Codex-Advisory, Validator und Sandbox ohne falsche Claims
+Generic validator and native Codex ingestion use the same minimal plugin and
+bind claims to the actual host/CLI version. The weaker network-open Critic lane
+is reported honestly; the strong input-confined/network-denied item remains
+open until its upstream, preflight, shadow, T1, and PO gates truly pass.
 
-Codex erhält die fehlende saubere Produktionsverdrahtung für den bereits
-definierten `advisor-consult`: ein frischer Sol-Subagent, genau eine Frage,
-kein Chat/Handover/Memory, Read-only, kein Auto-Apply und ein aktueller,
-kandidatengebundener Receipt. Auswahl und Ausführung laufen durch den
-existierenden selected Sandbox-Bridge; Host-Unverfügbarkeit, falsche
-Modellidentität oder fehlende Kind-Evidenz bleiben typisierte Nicht-Erfolge.
-Claude/Fable-/Opus-Routing bleibt unverändert.
+### 3. Workflow-control completion
 
-Der generische Plugin-Validator und die native Codex-Ingestion werden gegen
-dasselbe minimale Plugin geprüft. Native `hooks` und bewusst nicht autonom
-auslösbare Sicherheits-Skills werden nur akzeptiert, wenn die konkrete
-Host-/CLI-Version sie nachweislich lädt; ein Hostwechsel invalidiert den Beleg.
+- Canonical repository worktrees and session temporaries are cleaned safely in
+  full and light close profiles.
+- Status questions, additive input, compact, and resume preserve the recorded
+  next action.
+- Repository language and one authoritative PRD are consistent across
+  worktrees; Primary readback is the local authority.
+- Push guards verify the actual target worktree and exact evidence.
+- Main-session route drift is visible once and never inferred from a subagent.
+- T1 packets include governance paths and an honest gate ETA or `unknown`.
+- Stateful templates require issuer, replay, storage/atomicity, crash states,
+  enforcement, pre/post-images, and self-reference audit before readiness.
+- Scoped Verify authority adds only predeclared suites; removal, reordering, or
+  weakening is prohibited.
 
-Für den Codex-Critic wird die vorhandene network-open Read-only-Zwischenstufe
-ehrlich als schwächerer Claim fertiggestellt. Die starke input-confined,
-network-denied Lane wird nicht erfunden: Solange der ursprüngliche
-Upstream-/Preflight-/Shadow-/T1-/PO-Vertrag rot ist, bleibt dieses eine Item
-offen und blockiert damit den vollständigen Sentinel-Close. Das Epic enthält
-die Arbeit vollständig, verspricht aber keinen extern nicht erreichbaren
-Erfolg.
+### 4. AFK mode with final human disposition
 
-### 3. Workflow-Control-Nacharbeiten
+Activation binds feature, PRD/Spec, state revision, permitted packages, time,
+and final gate. Every provisional local choice is durably recorded before the
+next mutation with options, recommendation, rationale, impact, and rollback.
+Remote writes, merge, tag, release, licensing, secrets, external/irreversible
+action, plan approval, and final acceptance remain blocked. The PO disposes
+each assumption individually before close.
 
-- Worktrees liegen kanonisch im Repository; sessioneigene Temporaries werden
-  in Full Close und Close-light exakt und sicher geräumt.
-- Statusfragen, additive Hinweise und Compact/Resume verlieren nie die
-  gespeicherte nächste Aktion.
-- PO-Sprache und genau ein PRD gelten repositoryweit über Worktrees; der
-  aktuelle Primary-Receipt bleibt die einzige lokale Quelle.
-- Push-Guards prüfen den tatsächlichen Ziel-Worktree und dessen exakte Verify-/
-  Security-Evidenz.
-- Nach Design-/Review-Läufen wird ein Soll/Ist-Modellkonflikt der Hauptsession
-  einmal sichtbar gemeldet; Subagentenidentität gilt nie als Sessionbeleg.
-- T1-Pakete enthalten alle Manifest-Governance-Pfade; aktive Arbeit nennt eine
-  ehrliche Gate-ETA oder `unknown`; gemeinsames Setup trennt Pipeline-Tools von
-  projektspezifischen Werkzeugen.
-- Stateful-Design-Vorlagen verlangen schon vor Readiness Authority-Issuer,
-  Replay, Storage/Atomicity, komplette Crashzustände, Enforcement-Punkt,
-  Pre-/Postbilder und Self-Reference-Audit.
-- Eine eng begrenzte Verify-Registrierungsautorität darf ausschließlich vorher
-  benannte additive Schritte ergänzen; Entfernen, Umordnen oder Schwächen
-  bleibt gesperrt.
+### 5. Source-available licensing before public activation
 
-### 4. AFK-Modus mit nachgelagerter echter Entscheidung
+Current repository-owned code, documentation, and metadata use SUL-1.0.
+Personal and internal business use—including internal commercial-company use
+and modifying a fork for one's own purposes—is permitted subject to LICENSE.
+Separate rightsholder participation is required only when Agent-Pipeline or a
+substantial derivative is itself monetized: sale/licensing, paid
+hosting/SaaS/managed service, white-labeling, material embedding as a value
+component of a paid product, or commercial redistribution. Consulting,
+training, and support remain allowed when the Pipeline itself is not the paid
+product. There is no automatic Open Source conversion.
 
-Ohne Aktivierung bleibt das Verhalten unverändert. Eine Aktivierung bindet
-Feature, PRD/Spec, State-Revision, erlaubte Pakete, Laufzeit und finales Gate.
-Nur lokale reversible Empfehlungen dürfen provisorisch gewählt werden. Jede
-Annahme wird vor der nächsten Mutation mit Optionen, Empfehlung, Begründung,
-Wirkung und Rückrollpunkt durable erfasst.
+CONTRIBUTING and the separate Contributor License Agreement must establish an
+explicit auditable PR gate for comprehensive rights of use, including SUL and
+separate commercial relicensing, without describing German copyright as
+assigned. Unknown/future forms of use require any separate declaration, form,
+information, consent, and remuneration applicable law demands. No agent text
+is legal advice or an effectiveness guarantee.
 
-Remote-Write, Merge, Tag, Release, Lizenzentscheidung, Secrets, externe oder
-irreversible Aktionen, Planfreigabe und finale Abnahme bleiben technisch
-gesperrt. Am Schluss disponiert der PO jede Annahme einzeln; eine fehlende
-Disposition blockiert Close und Release.
+The PO represents the current project-authored content as 100% owner-controlled
+with no known external code. Third-party text remains separately attributed.
+Historical releases keep the licenses and notices shipped with them; the
+current transition is not retroactive. A named human legal/rightsholder review
+is mandatory before public activation or reliance on contributor relicensing.
 
-### 5. Source-available-Lizenzierung vor dem ersten Produktrelease
+### 6. Complete HAW-C
 
-Private und interne Unternehmensnutzung bleiben kostenlos. Direkte
-kommerzielle Verwertung der Pipeline oder wesentlicher Ableitungen—Verkauf,
-entgeltliche Weitergabe, White-Label, Produktintegration, Hosted/SaaS oder ein
-Managed Service, dessen Wert wesentlich aus Agent-Pipeline entsteht—benötigt
-eine separate kommerzielle Lizenz.
+Sentinel completes private adapter registration, bounded Linux/WSL rendering,
+policy/binding/diff impact, HMAC receipts, reviews and unaffected rationales,
+the current pointer with CAS/expiry/renewal, abandonment, and crash recovery.
+Private organization values, paths, templates, and output stay out of Git,
+Public projections, and logs. The renderer is trusted private code inside the
+OS-user boundary, not a claimed sandbox; without the required cgroup and
+owner-only evidence it reports `unavailable`.
 
-Empfohlene Freigabegrenzen sind: nichtkommerzielle externe Weitergabe bleibt
-mit Notices zulässig; verbundene Unternehmen, Mitarbeiter und Auftragnehmer
-dürfen ausschließlich für interne Zwecke des Lizenznehmers arbeiten;
-unabhängige Beratung, Schulung und Support bleiben erlaubt, solange nicht die
-Pipeline selbst verkauft oder gehostet wird; es gibt keine automatische
-spätere Open-Source-Konvertierung. Das Ergebnis wird ehrlich als source
-available/fair source bezeichnet.
+### 7. HAW-E shared go-live
 
-Eine Rechte-/Provenienzprüfung und ein benannter menschlicher Legal-/
-Rechteinhaber-Review sind Pflicht. Agententext ist keine Rechtsberatung.
-LICENSE, LICENSE-DOCS, NOTICE, CONTRIBUTING, README, SPDX, Plugin-/Marketplace-
-Metadaten und Lizenzprüfungen wechseln konsistent. Historische und
-Drittanbieter-Lizenzen werden nicht rückwirkend umgedeutet. Das Licensing-Item
-schließt eigenständig und wird danach als harte Evidenz von HAW-E konsumiert.
+HAW-E binds document evidence to both candidates, reads both channels freshly,
+and selects exactly one SemVer above both baselines. `0.4.0` is only an
+expectation. VERSION, plugin manifests, marketplace resolution, documentation,
+and annotated tags must match. Separate private and Public consent combine only
+through one short-lived authorization for the branch/worktree CAS, immutable
+tags, and four guarded remote effects. Both branch/tag pairs require fresh
+fetch-back. Partial publication never counts; only a higher-version
+two-channel compensation is permitted after an irreparable partial effect.
 
-### 6. HAW-C vollständig statt nur als Grundlage
+HAW-E closes exactly the documentation architecture, regulated document hooks,
+and keep-awake items in one Result-bound batch. Licensing, AFK, Windows, and
+other controls keep their own transitions. Sentinel closes only after all 21
+items and carried workstreams are complete.
 
-Sentinel vollendet die private Adapterregistrierung, den begrenzten Linux-/WSL-
-Renderer, Policy-/Binding-/Diff-Impact, HMAC-Receipts, Review- und
-Nicht-betroffen-Begründungen, Current-Pointer mit CAS/Ablauf/Erneuerung,
-Abandonment und jede Crash-Recovery-Stufe.
+## Order of work
 
-Private Organisationswerte, Pfade, Vorlagen und Ausgaben bleiben aus Git,
-öffentlichen Projektionen und Logs heraus. Der Renderer ist vertrauenswürdiger
-privater Code innerhalb der OS-Nutzergrenze, keine behauptete Sandbox. Ohne
-nachgewiesene systemd-Cgroup- und Owner-only-Grenze meldet die Funktion ehrlich
-`unavailable`. Ein mandatory Dokumentpaar ohne aktuellen Receipt plus Review
-oder Begründung blockiert Close mit einem typisierten, wiederaufnehmbaren
-Zustand.
+1. Bind PRD, Spec, candidate, and the complete acceptance matrix.
+2. Repair scoped Verify registration and backlog recovery.
+3. Verify Codex Advisory/validator and delivered workflow controls AC by AC.
+4. Complete licensing and its human/evidence gate.
+5. Complete AFK, stateful design, Windows, and remaining control gaps.
+6. Complete HAW-C rendering/review/recovery.
+7. Recheck keep-awake, continuity, worktree, PO gate, push guard, and routing.
+8. Reconcile capability/content inventory and Public English/German front-door
+   parity.
+9. Execute HAW-E evidence, publication, fetch-back, Result, and three-item close.
+10. Complete remaining transitions, Full Verify, security, Critic, handover,
+    HISTORY, and Epic close.
 
-### 7. HAW-E als gemeinsamer Go-live
+## Hard stops
 
-HAW-E bindet vollständige Dokumentevidenz an beide Produktkandidaten, liest
-beide Kanäle frisch und plant genau eine SemVer oberhalb der höheren privaten
-und öffentlichen Baseline. `0.4.0` ist nur eine Erwartung. VERSION, beide
-Plugin-Manifeste, Marketplace-Auflösungen, Dokumentation und annotierte Tags
-müssen exakt übereinstimmen.
+- PRD, Spec, inherited input, or candidate drift;
+- close without complete AC/evidence mapping;
+- omitted relevant suites or red Full Verify/security;
+- missing legal/rightsholder approval or unresolved provenance;
+- private data, secrets, credentials, or organization coordinates in Public;
+- AFK action outside local reversibility or without durable assumption;
+- missing owner-only, cgroup, sandbox, child/stdio, or cleanup evidence;
+- stale channel baseline, version drift, expired consent, third state, or absent
+  fetch-back;
+- one-sided publication, moved tag, partial Result, or partial state close;
+- unresolved major/blocking Critic finding or an overstated assurance claim.
 
-Private und öffentliche Zustimmung bleiben getrennt; erst eine gemeinsame,
-kurzlebige Autorisierung erlaubt privaten Branch-/Worktree-CAS, zwei immutable
-Tags und vier guard-gebundene Remote-Effekte. Beide Branch-/Tag-Paare werden
-frisch zurückgelesen. Einseitige Veröffentlichung ist kein Erfolg. Nach einer
-nicht behebbaren Teilwirkung wird kein Tag bewegt oder gelöscht; nur eine
-higher-version Zwei-Kanal-Kompensation ist zulässig.
+## Non-goals
 
-Das Hawkeye-Result schließt weiterhin genau die drei Produktitems
-Dokumentationsarchitektur, regulierte Dokument-Hooks und Keep-awake in einem
-Result-gebundenen atomaren Batch. Licensing, AFK und die übrigen Kontrollitems
-behalten ihre eigenen nachgewiesenen Übergänge. Der Sentinel-Epic schließt erst,
-wenn alle 21 Einträge geschlossen und Ledger/STATUS/Index konsistent sind.
-
-## Umsetzungsschnitt und Reihenfolge
-
-1. PRD-/Spec-/Kandidatenbindung und vollständige Backlog-Akzeptanzmatrix.
-2. Scoped Verify Registration und Close-/Backlog-Recovery-Reparatur.
-3. Codex Advisor/Validator sowie bereits gelieferte Workflow-Control-Items
-   AC-genau verifizieren und schließen.
-4. Lizenzierung mit eigenem Human-/Evidence-Gate abschließen.
-5. AFK, Stateful-Design und übrige echte Kontrolllücken test-first vollenden.
-6. HAW-C-Renderer-/Review-/Recovery-Vertikale abschließen.
-7. Keep-awake, Continuity, Worktree, PO-Gate, Push-Guard und Routing in einem
-   Integrationscheckpoint erneut prüfen.
-8. Capability-/Content-Inventar und öffentliche EN/DE-Dokumentation abgleichen.
-9. HAW-E Release-Evidenz, Zwei-Kanal-Publikation, Fetch-back, Result und
-   atomaren Drei-Item-Close ausführen.
-10. Alle übrigen belegten Backlog-Übergänge, Full Verify, Security Evidence,
-    Delta-/Final-Critic, State/Handover/HISTORY und Epic-Close abschließen.
-
-Jeder Produktionsslice erhält zuerst ein eingefrorenes Testpaket und danach
-einen gebrieften Terra/High-Goldfish. Der Elephant schreibt keine normale
-Produktionsimplementierung. Parallelität ist nur bei getrennten Dateien und
-Zustandsautoritäten erlaubt.
-
-## Harte Stops
-
-- Drift in PRD, Spec, geerbten Hawkeye-Inputs oder Kandidat;
-- ein Backlog-Close ohne vollständige AC-/Evidence-Zuordnung;
-- unregistrierte relevante Tests oder roter Full Verify/Security-Lauf;
-- fehlende Legal-/Rechteinhaber-Freigabe oder offene Lizenz-Provenienz;
-- private Daten, Secrets, Credentials oder Organisationskoordinaten in
-  öffentlichen Artefakten;
-- AFK-Aktion außerhalb lokaler Reversibilität oder ohne durable Annahme;
-- fehlende Owner-only-, Cgroup-, Sandbox-, Child-/stdio- oder Cleanup-Evidenz;
-- stale/ambiguous Channel-Baseline, Versionsdrift, abgelaufene Zustimmung,
-  Pointer-/Ref-/Worktree-/Index-Drittzustand oder fehlender Fetch-back;
-- einseitige Publikation, bewegter Tag, Teil-Result oder teilweiser
-  Backlog-/State-Close;
-- unresolved Critic blocker/major oder ein stärkerer Assurance-/Legal-/
-  Release-Claim als tatsächlich belegt.
-
-## Nicht-Ziele
-
-- keine direkte Bearbeitung von Backlog-Status, Ledger, STATUS oder Index;
-- keine rückwirkend erfundene Fertigstellung aus vorhandenen Dateien;
-- keine organisationsspezifischen Dokumente oder privaten Renderer im Public
-  Core;
-- keine Behauptung, der private Renderer sei sandboxed oder plattformneutral;
-- kein generischer Hook-/Shell-Bus und kein `danger-full-access`;
-- keine stille Änderung an Claude/Fable-/Opus-Routing oder `pipeline.user.v3`;
-- kein automatischer Modellwechsel ohne beobachtbare Host-Autorität;
-- keine Rechtsberatung oder selbst erteilte Lizenz-/Rechtefreigabe;
-- keine Ein-Kanal-Version, kein Tag-Move, kein generischer Push und kein
-  Release aus AFK-Annahmen;
-- kein Schließen des starken Codex-Isolationsitems, solange dessen eigene
-  Upstream-/Preflight-/Shadow-/T1-/PO-Kriterien nicht erfüllt sind.
+No direct backlog-ledger edits; no inferred historical completion; no private
+organization documents/renderers in Public; no sandbox claim for the private
+renderer; no generic unrestricted shell bus; no silent route mutation; no
+automatic model switch; no legal advice or self-issued rights approval; no
+one-channel release or tag move; and no strong Codex-isolation close before its
+own original gates pass.
 
 ## Definition of Done
 
-Sentinel ist fertig, wenn alle 16 zum Start offenen/laufenden Backlog-Items
-`closed` sind, ihre Originalkriterien und neue Sentinel-Kriterien durch
-kandidatgebundene Evidenz erfüllt werden und Ledger, STATUS sowie Index exakt
-übereinstimmen. HAW-C muss seine vollständige private Vertikale liefern; HAW-E
-muss beide Kanäle unter derselben frisch ermittelten Version mit Branch-/Tag-
-Fetch-back schließen. Licensing und AFK benötigen ihre getrennten menschlichen
-Dispositionen. Full Verify, Security Evidence, Capability-Inventar,
-zweisprachige Dokumentation und ein frischer High-Risk-Critic müssen die
-finalen Kandidaten binden. Ein extern blockiertes Item hält den Epic ehrlich
-offen; es wird nicht aus dem Scope entfernt und nicht per Ausnahme grün genannt.
+Sentinel is complete only when all 21 scoped backlog items are closed through
+candidate-bound evidence and sanctioned transitions, with exact ledger/STATUS/
+index agreement. HAW-C delivers its complete private vertical; HAW-E completes
+both channels at one freshly selected version with branch/tag fetch-back.
+Licensing and AFK have separate human dispositions. Full Verify, security,
+capability inventory, bilingual front-door documentation, and a fresh high-risk
+Critic bind the final candidate. An external blocker keeps the Epic open rather
+than being removed or renamed as success.
 
-## Entscheidungspunkte
+## Approved decisions
 
-Eine PRD-Freigabe ohne Änderung wählt jeweils A.
-
-1. **Sprintform**
-   - **1A (Empfehlung):** Sentinel als Epic; HAW-C/HAW-E bleiben ein internes,
-     ungeteiltes Feature.
-   - **1B:** Feature beibehalten; wäre mit 16 heterogenen Items methodisch zu
-     klein und benötigt eine ausdrückliche Profilabweichung.
-2. **Backlog-Bereinigung**
-   - **2A (Empfehlung):** AC-/Evidence-Audit und ausschließlich sanktionierte
-     Übergänge; kein Status aus Dateiexistenz ableiten.
-   - **2B:** offene Stati pauschal schließen; verworfen, da nicht auditierbar.
-3. **Codex-Advisory**
-   - **3A (Empfehlung):** Sol-Consult als selected read-only Subagent sauber
-     verdrahten; heutige Design-Ausnahme bleibt einmalig.
-   - **3B:** Advisor dauerhaft optional machen; würde V3 Feature/Epic schwächen.
-4. **AFK**
-   - **4A (Empfehlung):** nur lokale reversible Annahmen mit finaler
-     Einzel-Disposition.
-   - **4B:** auch externe Aktionen erlauben; verworfen wegen fehlender
-     aktueller menschlicher Autorität.
-5. **Lizenzgrenzen**
-   - **5A (Empfehlung):** kostenlose interne und nichtkommerzielle Nutzung/
-     Weitergabe; kommerzielle Produkt-/Hosted-Verwertung lizenzpflichtig;
-     Affiliates/Contractors intern erlaubt; Beratung ohne Produktverkauf
-     erlaubt; keine automatische Konvertierung.
-   - **5B:** abweichende Grenzfälle einzeln neu entscheiden und PRD/Spec vor
-     Implementierung aktualisieren.
-6. **Codex-Critic-Isolation**
-   - **6A (Empfehlung):** lokal mögliche Zwischenstufe vollständig liefern,
-     starken Close aber nur bei erfülltem Upstream-/Gate-Vertrag.
-   - **6B:** schwächere Lane als starke Isolation umdeuten; unzulässig.
-7. **Releaseversion**
-   - **7A (Empfehlung):** nächste SemVer oberhalb beider frisch gelesener
-     Baselines; heute nur erwartbar `0.4.0`.
-   - **7B:** Version jetzt festschreiben; verworfen, da Baseline veralten kann.
-8. **Abschlussgranularität**
-   - **8A (Empfehlung):** Licensing/AFK/Kontrollitems mit eigener Evidenz;
-     exakter Drei-Item-HAW-E-Batch; Epic-Close erst nach allen 21 Items.
-   - **8B:** ein pauschaler 16-Item-Batch; verworfen, weil er unterschiedliche
-     Authorities und echte Lücken verschleiern würde.
+Approval selected: Epic profile; AC/evidence audit with sanctioned transitions;
+properly wired one-question Advisory with the one-time design exception;
+local-reversible AFK assumptions with individual final disposition; free
+internal/non-commercial use but separate licensing when the Pipeline itself is
+monetized; honest intermediate Codex Critic lane without claiming strong
+isolation; SemVer chosen above both fresh channel baselines; dedicated evidence
+for licensing, AFK, Windows, and other controls; exact HAW-E three-item batch;
+Epic close only after all 21 items.

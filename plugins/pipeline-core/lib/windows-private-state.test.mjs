@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { evaluateWindowsPrivateState } from "./windows-private-state.mjs";
 import { PrivateBoundaryError, assureWindowsPrivateDirectories } from "./private-boundary.mjs";

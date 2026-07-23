@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * validate-manifest.test.mjs -- standalone test suite for harness/scripts/validate-manifest.mjs
  * (CLI black-box cases, fixtures in a temp dir) and plugins/pipeline-core/lib/manifest.mjs

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 /** Candidate-packet host adapter for Claude native-bare and one weak fallback. */
 import { readFileSync } from "node:fs";

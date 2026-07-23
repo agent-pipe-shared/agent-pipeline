@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -18,7 +19,7 @@ function check(name, fn) {
 
 function inventory() {
   const document = JSON.parse(readFileSync(inventoryPath, "utf8"));
-  document.criticReceiptSha256 = "a".repeat(64);
+  document.criticReview = { status: "attested", receiptSha256: "a".repeat(64), reason: null };
   return document;
 }
 
@@ -52,12 +53,18 @@ check("HAW-A01 discovers the complete current direct product surface", () => {
   assert.deepEqual(discovered, [...discovered].sort((left, right) => Buffer.compare(Buffer.from(left.surfaceId), Buffer.from(right.surfaceId))));
 });
 
-check("HAW-A02 accepts an inventory-phase candidate only with a real receipt digest", () => {
+check("HAW-A02 accepts an attested receipt and an honest inventory-phase pending gate", () => {
   assert.equal(validated(inventory()).ok, true);
-  const pendingReceipt = JSON.parse(readFileSync(inventoryPath, "utf8"));
-  const result = validated(pendingReceipt);
-  assert.equal(result.ok, false);
-  assert.match(result.findings.join("\n"), /criticReceiptSha256/);
+  const pendingReview = JSON.parse(readFileSync(inventoryPath, "utf8"));
+  assert.equal(validated(pendingReview).ok, true);
+  const finalResult = validated(pendingReview, "final");
+  assert.equal(finalResult.ok, false);
+  assert.match(finalResult.findings.join("\n"), /final inventory requires an attested Critic receipt/);
+
+  pendingReview.criticReview.receiptSha256 = "b".repeat(64);
+  const fabricated = validated(pendingReview);
+  assert.equal(fabricated.ok, false);
+  assert.match(fabricated.findings.join("\n"), /must not contain a fabricated receipt digest/);
 });
 
 for (const [name, mutate, pattern] of [

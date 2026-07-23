@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * yaml-lite.mjs -- strict-subset YAML parser, no library dependency.
  *

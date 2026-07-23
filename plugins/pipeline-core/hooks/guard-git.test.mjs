@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * guard-git.test.mjs — versioned test suite for the git-guard union (guard-git.mjs).
  *

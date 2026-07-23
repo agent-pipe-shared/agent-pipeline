@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * pipeline-state.test.mjs — behavior tests for the sanctioned pipeline-state.mjs
  * writer CLI (AP1-P3 "DURIN").

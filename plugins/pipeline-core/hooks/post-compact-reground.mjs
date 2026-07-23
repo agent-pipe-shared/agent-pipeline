@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /** Non-blocking SessionStart projection of validated compact continuity state. */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

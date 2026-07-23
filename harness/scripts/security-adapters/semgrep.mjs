@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * semgrep.mjs -- security-scan adapter for semgrep (static analysis rules), AP1-P4 "FUNDIN".
  *

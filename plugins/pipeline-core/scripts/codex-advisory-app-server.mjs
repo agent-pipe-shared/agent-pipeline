@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 /** Native one-turn adapter executed inside the already-selected Codex sandbox. */
 import { spawn } from "node:child_process";

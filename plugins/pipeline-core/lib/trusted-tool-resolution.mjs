@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 import { lstatSync, realpathSync } from "node:fs";
 import { homedir } from "node:os";
 import { posix as posixPath, win32 as winPath } from "node:path";

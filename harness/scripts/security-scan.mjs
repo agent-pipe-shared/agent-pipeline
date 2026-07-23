@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * security-scan.mjs -- security-scan phase runner, AP1-P4 "FUNDIN".
  *

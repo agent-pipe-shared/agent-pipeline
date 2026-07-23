@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 import { lstatSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";

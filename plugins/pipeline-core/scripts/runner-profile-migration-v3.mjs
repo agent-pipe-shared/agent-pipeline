@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 /** Project-local inspect/plan/apply surface for the V3 authority cutover. */
 import { writeSync } from "node:fs";

@@ -1,14 +1,13 @@
 # Technical Spec — Sprint Sentinel Epic
 
-Status: design candidate for PO review. This specification is implementation
-authority only after the neighboring PRD is explicitly approved and the
-repository state records that approval.
+Status: PO-approved implementation authority. The neighboring PRD records the
+approval and binds these exact bytes through SHA-256.
 
 ## 1. Identity, profile, and immutable inputs
 
 - Epic ID: `sprint-sentinel-epic`
 - V3 profile: `epic`
-- Phase: `design_phase`
+- Phase: `execution_phase`
 - Rigor: 2
 - Risk: high (guardrails, private data boundary, licensing, release, remote
   refs, recovery, and public claims)
@@ -177,7 +176,7 @@ transition. Genuinely unfinished items retain their full original contract.
 
 This table is a design hypothesis to be proven in SNT-7, not closure evidence:
 
-At the design candidate,
+At the approved starting candidate,
 `node plugins/pipeline-core/scripts/check-backlog-state.mjs` reports the item
 files, transition ledger, closure evidence, and generated projections as
 structurally valid. The suspected defect is therefore not current byte-level
@@ -208,7 +207,7 @@ still substantively incomplete.
 
 ### SNT-0 — authority, baseline, and Codex advisory transport
 
-1. Bind this PRD and Spec to the exact candidate and repository-scoped German
+1. Bind this PRD and Spec to the exact candidate and repository-scoped English
    PO authority before implementation.
 2. Add a production Codex host integration that can execute the existing
    `advisor-consult` contract through the selected

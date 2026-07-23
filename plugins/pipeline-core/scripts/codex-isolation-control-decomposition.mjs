@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Control-decomposed Phase-2 Codex isolation acceptance.
  *

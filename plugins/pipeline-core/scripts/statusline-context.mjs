@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * statusline-context — statusLine command: prints a compact context-budget status
  * line and side-writes a per-session usage snapshot for `stop-suggest.mjs`'s staged

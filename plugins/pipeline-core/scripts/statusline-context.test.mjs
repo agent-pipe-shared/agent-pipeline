@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * statusline-context.test.mjs — test suite for the statusLine command
  * (statusline-context.mjs).

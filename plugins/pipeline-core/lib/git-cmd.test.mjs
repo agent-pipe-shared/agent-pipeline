@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * git-cmd.test.mjs -- test suite for the shared git-command normalization helpers
  * (git-cmd.mjs), extracted from plugins/pipeline-core/hooks/guard-git.mjs.

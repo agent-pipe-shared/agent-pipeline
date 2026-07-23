@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 /**
  * End-to-end P3B conformance: a v1 source migrates to complete v2 with its
  * Claude request preserved, the public planner projects both runners, and

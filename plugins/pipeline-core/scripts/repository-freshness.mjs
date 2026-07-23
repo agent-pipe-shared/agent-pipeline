@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Report whether one checkout is equal to, ahead of, behind, or diverged from its
  * configured upstream. The source checkout is never fetched or otherwise mutated:

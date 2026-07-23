@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import { writeFile } from "node:fs/promises";

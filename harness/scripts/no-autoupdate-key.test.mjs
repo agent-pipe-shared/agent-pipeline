@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * no-autoupdate-key.test.mjs -- R9 regression guard: no git-tracked settings.json
  * anywhere in this repo may carry a committed `autoUpdate` key, at any nesting

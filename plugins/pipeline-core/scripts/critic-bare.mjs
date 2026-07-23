@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * critic-bare.mjs -- Neutral-cwd headless-critic wrapper.
  *

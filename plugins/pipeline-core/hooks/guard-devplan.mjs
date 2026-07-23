@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * guard-devplan — PreToolUse guard enforcing the Dev-Plan-Gate for Edit|Write.
  *

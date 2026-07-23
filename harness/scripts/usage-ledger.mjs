@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * usage-ledger.mjs — token-usage aggregation from local Claude Code project transcripts.
  * Extended to also emit a close-block cost row (see the --row mode below).

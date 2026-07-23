@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 /* Integration proof for Batman decision 7A.  This deliberately drives the
  * sanctioned State writer; it never invokes Git push or a remote. */
 import assert from "node:assert/strict";

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Hawkeye user-document language boundary. English is authoritative; exactly
  * three maintained user documents carry a complete German reader copy below a

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * guard-devplan.test.mjs — test suite for the Dev-Plan-Gate PreToolUse guard.
  *

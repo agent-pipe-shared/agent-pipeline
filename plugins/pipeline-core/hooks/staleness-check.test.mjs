@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * staleness-check.test.mjs — versioned test suite for the SessionStart staleness hook
  * (staleness-check.mjs).

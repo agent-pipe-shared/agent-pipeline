@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /** Deterministic, provider-neutral workflow dispatch preflight. */
 import { createHash } from "node:crypto";
 import { validateContinuityState } from "./continuity-state.mjs";

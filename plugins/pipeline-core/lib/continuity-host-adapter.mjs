@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Provider-neutral host status/final normalization for the first Phase-2.6
  * continuity seam.

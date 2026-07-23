@@ -6,6 +6,7 @@
   "author": {
     "name": "agent-pipeline"
   },
+  "license": "SUL-1.0",
   "interface": {
     "displayName": "Agent Pipeline Core",
     "shortDescription": "Safe agentic delivery workflows for Codex.",

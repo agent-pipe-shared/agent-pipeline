@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";

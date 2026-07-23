@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 import { canonicalJson, sha256Canonical } from "./afk-assumption-mode.mjs";
 import { compareAndSwapAfkFeatureRef, observeAfkGitAuthority } from "./afk-git-adapter.mjs";
 

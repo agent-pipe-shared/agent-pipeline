@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * git-guard — central PreToolUse deny-guard for Bash|PowerShell tool calls.
  *

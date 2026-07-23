@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * manifest.mjs -- pipeline.yaml manifest reader/validator.
  *

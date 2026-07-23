@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Profile-bound, coordinator-owned Codex Critic isolation adapter.
  *

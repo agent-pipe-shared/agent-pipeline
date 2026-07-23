@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * check-claude-md-lines.mjs — CLAUDE.md length gate (context economy, E10 / operating-model §6).
  *

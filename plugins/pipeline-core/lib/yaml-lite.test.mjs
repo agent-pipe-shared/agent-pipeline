@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * yaml-lite.test.mjs -- test suite for the strict-subset YAML parser (yaml-lite.mjs).
  *

@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Coordinator-side harness for a normal Codex Critic dispatched through the
  * native host agent surface. This file never starts Codex or another agent.

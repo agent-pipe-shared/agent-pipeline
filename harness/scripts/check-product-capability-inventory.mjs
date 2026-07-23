@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
 /**
  * Checks the staged Hawkeye product-capability inventory.
  *
@@ -13,7 +14,7 @@ import { dirname, isAbsolute, join, normalize, relative, resolve, sep } from "no
 import { fileURLToPath } from "node:url";
 import { parseYaml } from "../../plugins/pipeline-core/lib/yaml-lite.mjs";
 
-const SCHEMA = "pipeline.product-capability-inventory.v1";
+const SCHEMA = "pipeline.product-capability-inventory.v2";
 const INVENTORY_PATH = "docs/product-capability-inventory.json";
 const SHA256_RE = /^[a-f0-9]{64}$/;
 const GIT_OID_RE = /^[a-f0-9]{40,64}$/;
@@ -29,6 +30,7 @@ const OPERATING_SHAPES = new Set(["solo", "small-team", "multi-team"]);
 const DOCUMENTS = new Set(["README", "FLOW", "OPERATING_MODEL", "SETUP"]);
 const TARGET_STATUS = new Set(["pending", "active"]);
 const REASON_CODE = /^[a-z]+(?:-[a-z]+)*$/;
+const CRITIC_REVIEW_STATUS = new Set(["required-before-publication", "attested"]);
 
 function utf8Compare(left, right) {
   return Buffer.compare(Buffer.from(left, "utf8"), Buffer.from(right, "utf8"));
@@ -243,7 +245,7 @@ export function validateInventory({ root, phase = "inventory", inventoryPath = I
     catch (error) { return { ok: false, findings: [`inventory is not valid JSON: ${error.message}`] }; }
   }
 
-  const rootKeys = ["schema", "sourceBaseline", "criticReceiptSha256", "surfaces", "capabilities"];
+  const rootKeys = ["schema", "sourceBaseline", "criticReview", "surfaces", "capabilities"];
   if (!hasExactKeys(inventory, rootKeys)) fail(findings, `inventory root must have exactly ${rootKeys.join(", ")}`);
   if (inventory.schema !== SCHEMA) fail(findings, `inventory schema must equal ${SCHEMA}`);
   if (!hasExactKeys(inventory.sourceBaseline, ["commit", "tree"]) || !GIT_OID_RE.test(inventory.sourceBaseline?.commit ?? "") || !GIT_OID_RE.test(inventory.sourceBaseline?.tree ?? "")) {
@@ -260,8 +262,17 @@ export function validateInventory({ root, phase = "inventory", inventoryPath = I
       }
     }
   }
-  if (typeof inventory.criticReceiptSha256 !== "string" || !SHA256_RE.test(inventory.criticReceiptSha256)) {
-    fail(findings, "criticReceiptSha256 must be a lowercase SHA-256 digest");
+  if (!hasExactKeys(inventory.criticReview, ["status", "receiptSha256", "reason"]) || !CRITIC_REVIEW_STATUS.has(inventory.criticReview?.status)) {
+    fail(findings, "criticReview must have exact status, receiptSha256, and reason fields with a supported status");
+  } else if (inventory.criticReview.status === "attested") {
+    if (typeof inventory.criticReview.receiptSha256 !== "string" || !SHA256_RE.test(inventory.criticReview.receiptSha256)) {
+      fail(findings, "attested criticReview requires a lowercase receiptSha256 digest");
+    }
+    if (inventory.criticReview.reason !== null) fail(findings, "attested criticReview must have null reason");
+  } else {
+    if (inventory.criticReview.receiptSha256 !== null) fail(findings, "pending criticReview must not contain a fabricated receipt digest");
+    if (typeof inventory.criticReview.reason !== "string" || inventory.criticReview.reason.length < 20) fail(findings, "pending criticReview requires a concrete reason");
+    if (phase === "final") fail(findings, "final inventory requires an attested Critic receipt");
   }
   if (!Array.isArray(inventory.surfaces)) fail(findings, "surfaces must be an array");
   if (!Array.isArray(inventory.capabilities)) fail(findings, "capabilities must be an array");

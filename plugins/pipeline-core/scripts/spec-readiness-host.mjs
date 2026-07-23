@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: Apache-2.0
+// SPDX-License-Identifier: SUL-1.0
 
 /** Explicit refs-only readiness call site for the generic selected transport. */
 import { executeSandboxedReadonlyDuty } from "./sandboxed-readonly-host-bridge.mjs";
