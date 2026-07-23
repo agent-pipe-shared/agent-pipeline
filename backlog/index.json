@@ -3,7 +3,7 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "84d2128467224ca61aa980c088e92473b9dda27959ecd29600cf8d4a72b83d3b"
+    "transitionHead": "2849de19fb7f0d0f34d6f2cbe6ed6d5171445abb09fa02132bc9a1d0d707e2b1"
   },
   "counts": {
     "open": 30,
@@ -232,8 +232,8 @@
       "source": "Sentinel SNT-1 licensing gate recovered during Public Core transfer",
       "closedAt": "2026-07-21",
       "closureRepository": "self",
-      "closureCommit": "a798db6d45f2fc113f66d01400d7ea70fcef9427",
-      "closureEvidence": "backlog/evidence/2026-07-21-source-available-commercial-licensing.md"
+      "closureCommit": "2ddf3592ea004bd6e2a830a61bb02c931238070f",
+      "closureEvidence": "backlog/evidence/2026-07-23-snt-1-activation-result.json"
     },
     {
       "id": "pipeline.spec-retention-on-close",

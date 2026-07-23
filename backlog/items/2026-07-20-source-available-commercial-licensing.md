@@ -10,8 +10,8 @@ due: "2026-08-10"
 expires: "2026-08-17"
 closed_at: "2026-07-21"
 closure_repository: "self"
-closure_commit: "a798db6d45f2fc113f66d01400d7ea70fcef9427"
-closure_evidence: "backlog/evidence/2026-07-21-source-available-commercial-licensing.md"
+closure_commit: "2ddf3592ea004bd6e2a830a61bb02c931238070f"
+closure_evidence: "backlog/evidence/2026-07-23-snt-1-activation-result.json"
 ---
 
 # Establish the Public Core source-available licensing boundary
