@@ -16,6 +16,7 @@
 | pipeline.dispatch-provenance | open | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.documentation-information-architecture | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.dual-channel-publication | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.elephant-direct-implementation-under-afk-authorization | open | workflow-improvement | pipeline | 2026-07-23 | — |
 | pipeline.evidence-bound-review-retry-economics | open | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.multi-cli-efficiency-pilots | open | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -42,6 +43,6 @@
 
 ## Counts
 
-- open: 29
+- open: 30
 - in_progress: 3
 - closed: 2

@@ -24,6 +24,7 @@ import {
   parseTransitionLedger,
   planBacklogEvidenceAmendment,
   planBacklogTransition,
+  planElephantAfkLedgerRepair,
   projectBacklog,
   renderBacklogItem,
   transitionHash,
@@ -553,6 +554,26 @@ export function applyBacklogEvidenceAmendment(root = DEFAULT_ROOT, input, option
   const targets = [
     { path: changed.path, after: renderBacklogItem(changed) },
     { path: LEDGER_PATH, after: `${planned.events.map((event) => JSON.stringify(event)).join("\n")}\n` },
+    { path: STATUS_PATH, after: planned.projection.statusText },
+    { path: INDEX_PATH, after: planned.projection.indexText },
+  ];
+  const transaction = writeBacklogTransaction(root, targets, options);
+  return transaction.ok ? { ...current, ok: true, findings: [], wrote: true, transition: planned.event } : { ...current, ok: false, findings: transaction.findings, wrote: false, transition: null };
+}
+
+/** Repair exactly one known missing initial AFK-item event through the common transaction journal. */
+export function applyElephantAfkLedgerRepair(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  const expectedFinding = "items: pipeline.elephant-direct-implementation-under-afk-authorization has no transition-ledger entry";
+  if (current.findings.length !== 1 || current.findings[0] !== expectedFinding) return { ...current, ok: false, findings: ["AFK ledger repair requires its single exact missing-event finding", ...current.findings], wrote: false, transition: null };
+  if (options.checkCommit !== false && !localCommitExists(root, input?.evidenceCommit)) return { ...current, ok: false, findings: ["AFK ledger repair evidence commit is not reachable"], wrote: false, transition: null };
+  const planned = planElephantAfkLedgerRepair(current.items, current.events, input);
+  if (!planned.ok) return { ...current, ok: false, findings: planned.errors, wrote: false, transition: null };
+  const item = current.items.find((entry) => entry.metadata.id === input.id);
+  const ledgerBefore = readFileSync(join(root, LEDGER_PATH), "utf8");
+  const targets = [
+    { path: item.path, after: readFileSync(join(root, item.path), "utf8") },
+    { path: LEDGER_PATH, after: `${ledgerBefore}${JSON.stringify(planned.event)}\n` },
     { path: STATUS_PATH, after: planned.projection.statusText },
     { path: INDEX_PATH, after: planned.projection.indexText },
   ];

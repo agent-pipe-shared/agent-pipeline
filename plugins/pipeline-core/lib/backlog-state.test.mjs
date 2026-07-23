@@ -15,6 +15,7 @@ import {
   parseTransitionLedger,
   planBacklogEvidenceAmendment,
   planBacklogTransition,
+  planElephantAfkLedgerRepair,
   projectBacklog,
   renderBacklogItem,
   transitionHash,
@@ -26,6 +27,7 @@ import {
 import {
   applyBacklogEvidenceAmendment,
   applyBacklogTransition,
+  applyElephantAfkLedgerRepair,
   applySentinelBacklogRecovery,
   applySentinelScopeExtension,
   checkBacklogState,
@@ -143,6 +145,23 @@ function recoveryFixture(catalog = sentinelCatalog()) {
   writeBacklogProjections(root, { checkCommit: false });
   return root;
 }
+const AFK_REPAIR_ID = "pipeline.elephant-direct-implementation-under-afk-authorization";
+const AFK_REPAIR_SOURCE = "close-block ritual step 6b authorship check, native-Windows Verify block (see HISTORY.md 2026-07-23 entry, docs/state.md close-ritual authorship-check incident bullet)";
+function afkRepairFixture() {
+  const root = fixtureRoot();
+  const other = item();
+  const initial = event();
+  write(root, "backlog/items/example.md", renderBacklogItem(other));
+  write(root, "backlog/transitions.ndjson", `${canonicalJson(initial)}\n`);
+  writeBacklogProjections(root, { checkCommit: false });
+  const missing = item({ id: AFK_REPAIR_ID, source: AFK_REPAIR_SOURCE, status: "open", created: "2026-07-23", type: "workflow-improvement" });
+  missing.path = "backlog/items/2026-07-23-elephant-direct-implementation-under-afk-authorization.md";
+  write(root, missing.path, renderBacklogItem(missing));
+  return root;
+}
+function afkRepairInput(overrides = {}) {
+  return { id: AFK_REPAIR_ID, at: "2026-07-23", actor: "sentinel-recovery", evidenceCommit: "a".repeat(40), source: AFK_REPAIR_SOURCE, ...overrides };
+}
 
 {
   const source = renderBacklogItem(item({ source: "A source: with punctuation" }));
@@ -238,6 +257,45 @@ function recoveryFixture(catalog = sentinelCatalog()) {
     written.ok && written.wrote && valid.ok
       && drift.findings.some((finding) => finding.includes("STATUS.md projection drift"))
       && readFileSync(join(root, "backlog/index.json"), "utf8").includes("pipeline.backlog-index.v1"), drift.findings.join("; "));
+}
+
+{
+  const root = afkRepairFixture();
+  const ledgerBefore = readFileSync(join(root, "backlog/transitions.ndjson"), "utf8");
+  const itemBefore = readFileSync(join(root, "backlog/items/2026-07-23-elephant-direct-implementation-under-afk-authorization.md"), "utf8");
+  const current = checkBacklogState(root, { checkCommit: false });
+  const preview = planElephantAfkLedgerRepair(current.items, current.events, afkRepairInput());
+  const applied = applyElephantAfkLedgerRepair(root, afkRepairInput(), { checkCommit: false });
+  const ledgerAfter = readFileSync(join(root, "backlog/transitions.ndjson"), "utf8");
+  const valid = checkBacklogState(root, { checkCommit: false });
+  const snapshot = ["backlog/items/2026-07-23-elephant-direct-implementation-under-afk-authorization.md", "backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"].map((path) => readFileSync(join(root, path), "utf8"));
+  const replay = applyElephantAfkLedgerRepair(root, afkRepairInput(), { checkCommit: false });
+  const replaySnapshot = ["backlog/items/2026-07-23-elephant-direct-implementation-under-afk-authorization.md", "backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"].map((path) => readFileSync(join(root, path), "utf8"));
+  check("BS15 exact AFK missing-event repair preserves the ledger prefix, item source, and open status",
+    current.findings.length === 1 && preview.ok && applied.ok && applied.wrote && ledgerAfter.startsWith(ledgerBefore)
+      && readFileSync(join(root, "backlog/items/2026-07-23-elephant-direct-implementation-under-afk-authorization.md"), "utf8") === itemBefore
+      && applied.transition.from === null && applied.transition.to === "open" && applied.transition.evidence.sourceSha256 === createHash("sha256").update(AFK_REPAIR_SOURCE).digest("hex")
+      && valid.ok && !replay.ok && JSON.stringify(snapshot) === JSON.stringify(replaySnapshot), [...preview.errors, ...applied.findings, ...valid.findings, ...replay.findings].join("; "));
+}
+
+{
+  const root = afkRepairFixture();
+  write(root, "backlog/items/additional-missing.md", renderBacklogItem(item({ id: "pipeline.additional-missing" })));
+  const before = readFileSync(join(root, "backlog/transitions.ndjson"), "utf8");
+  const rejected = applyElephantAfkLedgerRepair(root, afkRepairInput(), { checkCommit: false });
+  const state = checkBacklogState(root, { checkCommit: false });
+  const wrong = planElephantAfkLedgerRepair(state.items, state.events, afkRepairInput({ id: "pipeline.other" }));
+  check("BS16 AFK repair rejects another target or any additional finding with zero mutation", !rejected.ok && !wrong.ok && readFileSync(join(root, "backlog/transitions.ndjson"), "utf8") === before);
+}
+
+{
+  const root = afkRepairFixture();
+  const paths = ["backlog/items/2026-07-23-elephant-direct-implementation-under-afk-authorization.md", "backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"];
+  const before = paths.map((path) => readFileSync(join(root, path), "utf8"));
+  let writes = 0;
+  const interrupted = applyElephantAfkLedgerRepair(root, afkRepairInput(), { checkCommit: false, atomicWrite(path, content) { writeFileSync(path, content); if (++writes === 2) throw new Error("simulated interruption"); } });
+  const after = paths.map((path) => readFileSync(join(root, path), "utf8"));
+  check("BS17 AFK repair interruption restores all four preimages", !interrupted.ok && JSON.stringify(before) === JSON.stringify(after) && !existsSync(join(root, "backlog/.state-transaction.json")), interrupted.findings.join("; "));
 }
 
 {

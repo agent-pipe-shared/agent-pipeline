@@ -30,6 +30,8 @@ const OID = /^[a-f0-9]{40}$/u;
 const SAFE_REPOSITORY_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+$/u;
 const HASH = /^[a-f0-9]{64}$/u;
 const EVIDENCE_AMENDMENT_KEYS = new Set(["kind", "commit", "reference", "previousClosureCommit", "resultSha256", "privateLicenseGateSha256", "neutralPublicLicenseGateSha256"]);
+const AFK_REPAIR_ID = "pipeline.elephant-direct-implementation-under-afk-authorization";
+const AFK_REPAIR_EVIDENCE_KEYS = new Set(["kind", "commit", "reference", "sourceSha256"]);
 const PROJECT_CLOSURE_READBACK_KEYS = new Set(["schema", "repository", "commit", "readbackCommit"]);
 const SENTINEL_RECOVERY_CATALOG_KEYS = new Set(["schema", "source", "recoveredAt", "items"]);
 const SENTINEL_RECOVERY_ITEM_KEYS = new Set(["id", "status", "type"]);
@@ -286,13 +288,14 @@ function validateTransitionShape(event, label) {
   if (!(event.from === null || BACKLOG_STATUSES.includes(event.from))) errors.push(`${label}: from must be null or a canonical status`);
   if (!BACKLOG_STATUSES.includes(event.to)) errors.push(`${label}: to must be a canonical status`);
   const amendment = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "evidence-amendment";
+  const afkRepair = event.id === AFK_REPAIR_ID && event.from === null && event.to === "open" && event?.evidence?.kind === "missing-initial-ledger-repair";
   if (event.from === event.to && !amendment) errors.push(`${label}: transition must change status`);
   if (!validDate(asString(event.at))) errors.push(`${label}: at must be an ISO calendar date`);
   if (!ITEM_ID.test(asString(event.actor))) errors.push(`${label}: actor must be a lowercase stable identifier`);
   if (asString(event.reason).trim().length === 0) errors.push(`${label}: reason must be non-empty`);
   if (!isPlainObject(event.evidence)) errors.push(`${label}: evidence must be an object`);
   else {
-    const evidenceKeys = amendment ? EVIDENCE_AMENDMENT_KEYS : new Set(["kind", "commit", "legacyStatus", "reference"]);
+    const evidenceKeys = amendment ? EVIDENCE_AMENDMENT_KEYS : afkRepair ? AFK_REPAIR_EVIDENCE_KEYS : new Set(["kind", "commit", "legacyStatus", "reference"]);
     for (const key of Object.keys(event.evidence)) if (!evidenceKeys.has(key)) errors.push(`${label}: evidence has unsupported field ${key}`);
     if (typeof event.evidence.kind !== "string" || event.evidence.kind.length === 0) errors.push(`${label}: evidence.kind must be non-empty`);
     if (!OID.test(asString(event.evidence.commit))) errors.push(`${label}: evidence.commit must be a full lowercase Git commit OID`);
@@ -303,6 +306,7 @@ function validateTransitionShape(event, label) {
       if (!OID.test(asString(event.evidence.previousClosureCommit))) errors.push(`${label}: previousClosureCommit must be a full lowercase Git commit OID`);
       for (const key of ["resultSha256", "privateLicenseGateSha256", "neutralPublicLicenseGateSha256"]) if (!HASH.test(asString(event.evidence[key]))) errors.push(`${label}: ${key} must be a SHA-256 hex digest`);
     }
+    if (afkRepair && !HASH.test(asString(event.evidence.sourceSha256))) errors.push(`${label}: sourceSha256 must be a SHA-256 hex digest`);
   }
   if (!(event.previousHash === null || HASH.test(asString(event.previousHash)))) errors.push(`${label}: previousHash must be null or a SHA-256 hex digest`);
   if (!HASH.test(asString(event.entryHash))) errors.push(`${label}: entryHash must be a SHA-256 hex digest`);
@@ -336,6 +340,7 @@ export function validateTransitionLedger(events, items, { commitExists = null } 
     if (event.previousHash !== previousHash) errors.push(`${label}: previousHash does not bind the preceding ledger event`);
     if (!itemById.has(event.id)) errors.push(`${label}: id does not name a current backlog item`);
     const item = itemById.get(event.id);
+    if (event?.evidence?.kind === "missing-initial-ledger-repair" && event.evidence.sourceSha256 !== createHash("sha256").update(asString(item?.metadata?.source)).digest("hex")) errors.push(`${label}: sourceSha256 does not bind the current item source`);
     const prior = stateById.get(event.id);
     if (prior === undefined) {
       if (event.from !== null) errors.push(`${label}: an item's first ledger event must start from null`);
@@ -501,4 +506,22 @@ export function planBacklogEvidenceAmendment(items, events, input) {
   const nextEvents = [...events, event];
   errors.push(...validateTransitionLedger(nextEvents, nextItems));
   return { ok: errors.length === 0, errors, items: nextItems, events: nextEvents, event, projection: errors.length ? null : projectBacklog(nextItems, nextEvents) };
+}
+
+/** Plan the one authorized missing-initial-event repair; never a generic initializer. */
+export function planElephantAfkLedgerRepair(items, events, input) {
+  const errors = [];
+  const expectedKeys = ["id", "at", "actor", "evidenceCommit", "source"];
+  if (!isPlainObject(input) || Object.keys(input).sort().join("\n") !== expectedKeys.sort().join("\n")) return { ok: false, errors: ["AFK ledger repair input shape is invalid"], items, events, projection: null };
+  const record = items.find((entry) => entry?.metadata?.id === AFK_REPAIR_ID);
+  if (input.id !== AFK_REPAIR_ID || input.at !== "2026-07-23" || input.actor !== "sentinel-recovery") errors.push("AFK ledger repair authority binding is invalid");
+  if (!record || record.metadata.status !== "open" || input.source !== record.metadata.source) errors.push("AFK ledger repair item/source binding is invalid");
+  if (!OID.test(asString(input.evidenceCommit))) errors.push("AFK ledger repair evidence commit is invalid");
+  if (events.some((event) => event?.id === AFK_REPAIR_ID)) errors.push("AFK ledger repair event already exists");
+  if (errors.length) return { ok: false, errors, items, events, projection: null };
+  const event = { schema: TRANSITION_SCHEMA, sequence: events.length + 1, id: AFK_REPAIR_ID, from: null, to: "open", at: input.at, actor: input.actor, reason: "Repair the single missing initial ledger event for the existing open AFK-authorization process item; no status change or completion is claimed.", evidence: { kind: "missing-initial-ledger-repair", commit: input.evidenceCommit, reference: record.path, sourceSha256: createHash("sha256").update(record.metadata.source).digest("hex") }, previousHash: events.at(-1)?.entryHash ?? null, entryHash: "" };
+  event.entryHash = transitionHash(event);
+  const nextEvents = [...events, event];
+  errors.push(...validateTransitionLedger(nextEvents, items));
+  return { ok: errors.length === 0, errors, items, events: nextEvents, event, projection: errors.length ? null : projectBacklog(items, nextEvents) };
 }

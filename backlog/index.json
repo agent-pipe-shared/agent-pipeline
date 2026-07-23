@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "92e42ed2e83f2820f6aac609bb96996f5e9fdd6e12a2878d9340ebc359c9002f"
+    "transitionHead": "84d2128467224ca61aa980c088e92473b9dda27959ecd29600cf8d4a72b83d3b"
   },
   "counts": {
-    "open": 29,
+    "open": 30,
     "in_progress": 3,
     "closed": 2
   },
@@ -104,6 +104,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.elephant-direct-implementation-under-afk-authorization",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-23",
+      "source": "close-block ritual step 6b authorship check, native-Windows Verify block (see HISTORY.md 2026-07-23 entry, docs/state.md close-ritual authorship-check incident bullet)"
     },
     {
       "id": "pipeline.evidence-bound-review-retry-economics",
