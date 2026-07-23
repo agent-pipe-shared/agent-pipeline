@@ -5,7 +5,7 @@ type: workflow-improvement
 owner: pipeline
 status: open
 created: 2026-07-23
-source: close-block ritual step 6b authorship check, native-Windows Verify block (see HISTORY.md 2026-07-23 entry, docs/state.md close-ritual authorship-check incident bullet)
+source: "close-block ritual step 6b authorship check, native-Windows Verify block (see HISTORY.md 2026-07-23 entry, docs/state.md close-ritual authorship-check incident bullet)"
 ---
 
 # Elephant direct implementation under explicit PO AFK authorization has no defined light process
