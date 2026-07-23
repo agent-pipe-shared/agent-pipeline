@@ -3,10 +3,10 @@
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
+import { linkSync, mkdtempSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { validateLicenseContract } from "./check-license-contract.mjs";
+import { buildLicenseGateReceipt, buildSnt1Result, licenseSurfaceDigests, storePrivateLicenseGateReceipt, validateLicenseContract, validateLicenseGateProjection, validateSnt1Result } from "./check-license-contract.mjs";
 
 const fixture = mkdtempSync(join(tmpdir(), "license-contract-"));
 const write = (path, value) => { const absolute = join(fixture, ...path.split("/")); mkdirSync(dirname(absolute), { recursive: true }); writeFileSync(absolute, value); };
@@ -20,7 +20,7 @@ write("docs/licensing.md", `${usageBoundary} 100% owner-controlled; André Twach
 write("CONTRIBUTING.md", `${usageBoundary} André Twachtmann is the legal rightsholder for Agent-Pipeline project-authored\ncontent and the CLA contracting party. Third-party material remains under the\nownership and license recorded in \`third-party-licenses.json\`. 2026-07-23 named human reviewer approved activation of the CLA process. both\nits DCO sign-off and the Contributor's personally checked, current-version CLA\nacceptance. maintainer, bot, or submission automation cannot\naccept on the Contributor's behalf. contributor-gates / cla-and-dco is a status check; pull-request\nbranch to be up to date with \`main\` before merge; server-side read-back confirming them\n`);
 write("README.md", "Sustainable Use License 1.0 (SUL-1.0) with the Agent-Pipeline Additional Permission\nSustainable Use License 1.0 (SUL-1.0) mit der Agent-Pipeline Additional Permission\n");
 write("docs/contributor-gate-security.md", "on `opened` the sender must be the PR author; on `edited` the sender must be the PR author. `synchronize` and `reopened` intentionally fail with CLA_ACCEPTANCE_REFRESH_REQUIRED. `trusted-gate` and `candidate` are separate from the GitHub `pull_request` event. Both disable persisted credentials and the workflow consumes no secrets. The receipt contains PR number, public account logins and never writes an email address into the receipt. It uses runner-temporary storage and is not uploaded as an artifact. Named-human data-privacy sign-off is still required before\npublic activation. Freeze merges. Revert the bad checker. perform an authenticated server-side read-back. Re-run the gate.\n");
-write("specs/2026-07-19-sprint-sentinel-epic/snt-1-activation-prerequisite.md", "blocked; no HAW-E Result intent, release consent, publication, or\nbacklog mutation is authorized. private license-gate receipt digest and neutral-public license-gate receipt digest. append-only history remains truthful and must not be edited or filled with invented values. applyBacklogTransition uses a recoverable transaction writer. already `closed`; no same-state evidence-amendment\noperation. `resultSha256`, `transitionSha256`, `privateLicenseGateSha256`, `neutralPublicLicenseGateSha256`.\n");
+write("specs/2026-07-19-sprint-sentinel-epic/snt-1-activation-prerequisite.md", "blocked; no HAW-E Result intent, release consent, publication, or\nbacklog mutation is authorized. constructs closed-schema, candidate-bound receipts and constructs and validates the canonical SNT-1 Result digest. private license-gate receipt digest and neutral-public license-gate receipt digest. append-only history remains truthful and must not be edited or filled with invented values. applyBacklogEvidenceAmendment uses a recoverable transaction writer and preserves every historical ledger byte\nbefore its single amendment suffix. `resultSha256`, `transitionSha256`, `privateLicenseGateSha256`, `neutralPublicLicenseGateSha256`.\n");
 write("setup.mjs", "// SPDX-License-Identifier: SUL-1.0\n"); write("setup.test.mjs", "#!/usr/bin/env node\n// SPDX-License-Identifier: SUL-1.0\n");
 write("harness/example.mjs", "// SPDX-License-Identifier: SUL-1.0\n"); write("plugins/pipeline-core/example.mjs", "// SPDX-License-Identifier: SUL-1.0\n");
 write("plugins/pipeline-core/.claude-plugin/plugin.json", '{"license":"SUL-1.0"}\n'); write("plugins/pipeline-core/.codex-plugin/plugin.json", '{"license":"SUL-1.0"}\n');
@@ -29,7 +29,7 @@ write("CODE_OF_CONDUCT.md", "<!-- SPDX-License-Identifier: CC-BY-SA-4.0 -->\nCon
 const cla = "<!-- CLA-Version: 1.0 -->\ndoes not guarantee effectiveness\nAndré Twachtmann, the legal rightsholder for Agent-Pipeline project-authored\ncontent, the recipient of the Contributor's grants under this Agreement, and\nthe CLA contracting party\ndoes not claim rights in third-party material identified in\n`third-party-licenses.json`\nOn 2026-07-23, André Twachtmann, acting as the\nnamed human rightsholder reviewer, approved activation\ngrant of rights\nof use (`Nutzungsrechte`)\nexclusive, worldwide, may transfer and sublicense\nSUL-1.0 and separate commercial\nlegally required\nseparate declaration, form\nboth the DCO sign-off and the Contributor's\npersonally checked, current-version CLA record\n";
 write("CONTRIBUTOR_LICENSE_AGREEMENT.md", cla);
 const claDigest = createHash("sha256").update(cla, "utf8").digest("hex");
-write(".github/PULL_REQUEST_TEMPLATE.md", `identifies André Twachtmann as legal\nrightsholder for Agent-Pipeline project-authored content and CLA contracting\nparty, excluding inventoried third-party material\n- [ ] **CLA acceptance — Agent-Pipeline CLA v1.0 (SHA-256: \`${claDigest}\`) — I, @REPLACE_WITH_PR_AUTHOR_LOGIN, have read and expressly accept this CLA for every contribution in this pull request and confirm that I have the rights needed to make its grants.**\nchanging the CLA invalidates earlier acceptance\nmaintainer, bot, or\nsubmission automation must not check or rewrite it\n`);
+write(".github/PULL_REQUEST_TEMPLATE.md", `identifies André Twachtmann as legal\nrightsholder for Agent-Pipeline project-authored content and CLA contracting\nparty, excluding inventoried third-party material\n- [ ] **CLA acceptance — Agent-Pipeline CLA v1.0 (SHA-256: \`${claDigest}\`) — I, @REPLACE_WITH_PR_AUTHOR_LOGIN, have read and expressly accept this CLA for every contribution in this pull request and confirm that I have the rights needed to make its grants.**\nchanging the CLA invalidates earlier acceptance\nmaintainer, bot, or\nsubmission automation must not check or rewrite it\nAfter every \`synchronize\` or \`reopened\` event, the author must\npersonally uncheck and save, then re-check and save. Maintainers, bots cannot\nperform that refresh\n`);
 write(".github/workflows/contributor-gates.yml", "on:\n  pull_request:\n    branches:\n      - main\n    types:\n      - opened\n      - reopened\n      - synchronize\n      - edited\npermissions:\n  contents: read\npersist-credentials: false\nnode trusted-gate/harness/scripts/check-pr-contributor-gates.mjs\n--root candidate\n--cla-root trusted-gate\n");
 
 let result = validateLicenseContract(fixture); assert.equal(result.ok, true, result.findings.join("\n")); assert.equal(result.sourceCount, 4);
@@ -49,4 +49,56 @@ write("LICENSE", licenseText.replace("contractors, and service providers", "cont
 result = validateLicenseContract(fixture);
 assert.equal(result.ok, false);
 assert.match(result.findings.join("\n"), /LICENSE lacks internal-operations delegation boundary/);
-console.log("1..6\n# pass 6");
+write("LICENSE", licenseText);
+
+const surfaces = licenseSurfaceDigests(fixture);
+const candidates = { private: { commit: "a".repeat(40), tree: "b".repeat(40) }, "neutral-public": { commit: "c".repeat(40), tree: "d".repeat(40) } };
+const gate = (channel) => buildLicenseGateReceipt({ channel, candidate: candidates[channel], surfaces, command: ["node", "harness/scripts/check-license-contract.mjs"], result: { status: "passed", exitCode: 0 } });
+const privateGate = gate("private");
+const publicGate = gate("neutral-public");
+assert.equal(privateGate.ok, true, privateGate.errors.join("\n"));
+assert.equal(publicGate.ok, true, publicGate.errors.join("\n"));
+assert.deepEqual(validateLicenseGateProjection(publicGate.projection, { channel: "neutral-public", candidate: candidates["neutral-public"] }), []);
+assert.equal(JSON.stringify(publicGate.projection).includes("LICENSE"), false);
+assert.equal(Object.hasOwn(publicGate.projection, "receiptSha256"), false);
+
+const common = mkdtempSync(join(tmpdir(), "license-gate-common-"));
+const stored = storePrivateLicenseGateReceipt({ gitCommonDir: common, receipt: privateGate.receipt });
+assert.equal(statSync(stored.path).mode & 0o777, 0o600);
+assert.equal(JSON.parse(readFileSync(stored.path, "utf8")).channel, "private");
+assert.equal(storePrivateLicenseGateReceipt({ gitCommonDir: common, receipt: privateGate.receipt }).status, "replay");
+const conflictCommon = mkdtempSync(join(tmpdir(), "license-gate-conflict-"));
+const conflict = storePrivateLicenseGateReceipt({ gitCommonDir: conflictCommon, receipt: privateGate.receipt });
+writeFileSync(conflict.path, "{}\n", "utf8");
+assert.throws(() => storePrivateLicenseGateReceipt({ gitCommonDir: conflictCommon, receipt: privateGate.receipt }), /digest conflict/);
+linkSync(stored.path, `${stored.path}.alias`);
+assert.throws(() => storePrivateLicenseGateReceipt({ gitCommonDir: common, receipt: privateGate.receipt }), /single-link/);
+if (process.platform !== "win32") {
+  const permissiveCommon = mkdtempSync(join(tmpdir(), "license-gate-permissive-"));
+  mkdirSync(join(permissiveCommon, "agent-pipeline"), { mode: 0o755 });
+  assert.throws(() => storePrivateLicenseGateReceipt({ gitCommonDir: permissiveCommon, receipt: privateGate.receipt }), /owner-only/);
+  const linkedCommon = mkdtempSync(join(tmpdir(), "license-gate-linked-"));
+  const linkedTarget = mkdtempSync(join(tmpdir(), "license-gate-target-"));
+  symlinkSync(linkedTarget, join(linkedCommon, "agent-pipeline"), "dir");
+  assert.throws(() => storePrivateLicenseGateReceipt({ gitCommonDir: linkedCommon, receipt: privateGate.receipt }), /physical/);
+}
+
+const disposition = { reviewer: "named-human", reviewedAt: "2026-07-23", status: "approved", dispositionSha256: "e".repeat(64) };
+const pending = buildSnt1Result({ licensingDisposition: disposition, privacyDisposition: null, candidates, gates: { private: privateGate.projection, "neutral-public": publicGate.projection }, surfaces });
+assert.equal(pending.ok, false);
+assert.match(pending.errors.join("\n"), /privacy disposition is pending/);
+const ready = buildSnt1Result({ licensingDisposition: disposition, privacyDisposition: { ...disposition, dispositionSha256: "f".repeat(64) }, candidates, gates: { private: privateGate.projection, "neutral-public": publicGate.projection }, surfaces });
+assert.equal(ready.ok, true, ready.errors.join("\n"));
+assert.match(ready.result.resultSha256, /^[a-f0-9]{64}$/u);
+assert.deepEqual(validateSnt1Result(ready.result), []);
+assert.match(validateSnt1Result({ ...ready.result, resultSha256: "0".repeat(64) }).join("\n"), /digest is invalid/);
+
+const replayed = structuredClone(publicGate.projection);
+replayed.candidate.commit = "f".repeat(40);
+assert.match(validateLicenseGateProjection(replayed, { channel: "neutral-public", candidate: candidates["neutral-public"] }).join("\n"), /candidate binding/);
+const leaked = { ...publicGate.projection, privatePath: "/home/private/license.json" };
+assert.match(validateLicenseGateProjection(leaked, { channel: "neutral-public", candidate: candidates["neutral-public"] }).join("\n"), /schema is invalid|leaks private material/);
+const openNested = { ...publicGate.projection, result: { ...publicGate.projection.result, extra: true } };
+assert.match(validateLicenseGateProjection(openNested, { channel: "neutral-public", candidate: candidates["neutral-public"] }).join("\n"), /result shape|projection digest/);
+assert.equal(buildLicenseGateReceipt({ channel: "private", candidate: candidates.private, surfaces: [{ ...surfaces[0], sha256: "0".repeat(64) }, ...surfaces.slice(1)], command: ["node", "harness/scripts/check-license-contract.mjs"], result: { status: "failed", exitCode: 1 } }).ok, false);
+console.log("1..12\n# pass 12");

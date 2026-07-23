@@ -11,6 +11,7 @@
 import { existsSync, readFileSync, readdirSync, renameSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { dirname, join, relative, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -18,8 +19,10 @@ import {
   ITEM_SCHEMA,
   SENTINEL_RECOVERY_CATALOG_SCHEMA,
   TRANSITION_SCHEMA,
+  canonicalJson,
   parseBacklogItem,
   parseTransitionLedger,
+  planBacklogEvidenceAmendment,
   planBacklogTransition,
   projectBacklog,
   renderBacklogItem,
@@ -37,12 +40,47 @@ const STATUS_PATH = "backlog/STATUS.md";
 const INDEX_PATH = "backlog/index.json";
 const TRANSACTION_PATH = "backlog/.state-transaction.json";
 const SENTINEL_RECOVERY_CATALOG_PATH = "backlog/sentinel-recovery-catalog.json";
+const SHA256 = /^[a-f0-9]{64}$/u;
+const OID = /^[a-f0-9]{40}$/u;
+const LICENSE_SURFACES = ["LICENSE", "LICENSE-DOCS", "NOTICE", "CONTRIBUTING.md", "README.md", "docs/licensing.md", "third-party-licenses.json"];
 const SCHEMAS = Object.freeze([
   ["backlog/schemas/item.schema.json", ITEM_SCHEMA],
   ["backlog/schemas/transition.schema.json", TRANSITION_SCHEMA],
   ["backlog/schemas/index.schema.json", INDEX_SCHEMA],
   ["backlog/schemas/sentinel-recovery.schema.json", SENTINEL_RECOVERY_CATALOG_SCHEMA],
 ]);
+
+function exactObject(value, keys) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).sort().join("\n") === [...keys].sort().join("\n");
+}
+
+function sha256Canonical(value) {
+  return createHash("sha256").update(canonicalJson(value)).digest("hex");
+}
+
+function validGateProjection(value, channel, candidate, surfaceSetSha256) {
+  if (!exactObject(value, ["schema", "channel", "candidate", "surfaceSetSha256", "commandSha256", "gateCommitmentSha256", "result", "projectionSha256"])) return false;
+  const payload = Object.fromEntries(Object.entries(value).filter(([key]) => key !== "projectionSha256"));
+  return value.schema === "pipeline.snt1-license-gate-projection.v1" && value.channel === channel
+    && exactObject(value.candidate, ["commit", "tree"]) && value.candidate.commit === candidate.commit && value.candidate.tree === candidate.tree
+    && exactObject(value.result, ["exitCode", "status"]) && value.result.status === "passed" && value.result.exitCode === 0
+    && value.surfaceSetSha256 === surfaceSetSha256
+    && [value.commandSha256, value.gateCommitmentSha256, value.projectionSha256].every((entry) => SHA256.test(entry ?? ""))
+    && value.projectionSha256 === sha256Canonical(payload);
+}
+
+function validReadySnt1Result(value) {
+  if (!exactObject(value, ["schema", "licensingDisposition", "privacyDisposition", "candidates", "gates", "surfaces", "resultSha256"]) || value.schema !== "pipeline.snt1-result.v1") return false;
+  const dispositionKeys = ["reviewer", "reviewedAt", "status", "dispositionSha256"];
+  if (![value.licensingDisposition, value.privacyDisposition].every((entry) => exactObject(entry, dispositionKeys) && entry.status === "approved" && typeof entry.reviewer === "string" && entry.reviewer.length > 0 && /^\d{4}-\d{2}-\d{2}$/u.test(entry.reviewedAt) && SHA256.test(entry.dispositionSha256))) return false;
+  if (!exactObject(value.candidates, ["private", "neutral-public"]) || !exactObject(value.gates, ["private", "neutral-public"])) return false;
+  for (const channel of ["private", "neutral-public"]) if (!exactObject(value.candidates[channel], ["commit", "tree"]) || !OID.test(value.candidates[channel].commit) || !OID.test(value.candidates[channel].tree)) return false;
+  if (!Array.isArray(value.surfaces) || value.surfaces.length !== LICENSE_SURFACES.length || !value.surfaces.every((entry, index) => exactObject(entry, ["path", "sha256"]) && entry.path === LICENSE_SURFACES[index] && SHA256.test(entry.sha256))) return false;
+  const surfaceSetSha256 = sha256Canonical(value.surfaces);
+  if (!["private", "neutral-public"].every((channel) => validGateProjection(value.gates[channel], channel, value.candidates[channel], surfaceSetSha256))) return false;
+  const payload = Object.fromEntries(Object.entries(value).filter(([key]) => key !== "resultSha256"));
+  return SHA256.test(value.resultSha256) && value.resultSha256 === sha256Canonical(payload);
+}
 
 function readText(path, findings, label) {
   try {
@@ -494,6 +532,32 @@ export function applyBacklogTransition(root = DEFAULT_ROOT, input, options = {})
       transition: null,
     };
   }
+}
+
+/** Append one strictly bound evidence amendment to an already-closed item. */
+export function applyBacklogEvidenceAmendment(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  if (!current.ok) return { ...current, wrote: false, transition: null };
+  const planned = planBacklogEvidenceAmendment(current.items, current.events, input);
+  if (!planned.ok) return { ...current, ok: false, findings: planned.errors, wrote: false, transition: null };
+  const changed = planned.items.find((entry) => entry.metadata.id === input.id);
+  if (options.checkCommit !== false && !localCommitExists(root, changed.metadata.closure_commit)) return { ...current, ok: false, findings: [`${input.id}: amendment closure_commit is not a reachable local Git commit`], wrote: false, transition: null };
+  if (!regularFile(root, changed.metadata.closure_evidence)) return { ...current, ok: false, findings: [`${input.id}: amendment closure_evidence is missing or not a regular repository file`], wrote: false, transition: null };
+  let resultRecord;
+  try { resultRecord = JSON.parse(readFileSync(join(root, changed.metadata.closure_evidence), "utf8")); } catch { return { ...current, ok: false, findings: [`${input.id}: amendment closure_evidence is not valid JSON`], wrote: false, transition: null }; }
+  const resultBound = validReadySnt1Result(resultRecord)
+    && resultRecord.resultSha256 === input.evidence.resultSha256
+    && resultRecord?.gates?.private?.projectionSha256 === input.evidence.privateLicenseGateSha256
+    && resultRecord?.gates?.["neutral-public"]?.projectionSha256 === input.evidence.neutralPublicLicenseGateSha256;
+  if (!resultBound) return { ...current, ok: false, findings: [`${input.id}: amendment closure_evidence does not bind the exact ready Result and gate projections`], wrote: false, transition: null };
+  const targets = [
+    { path: changed.path, after: renderBacklogItem(changed) },
+    { path: LEDGER_PATH, after: `${planned.events.map((event) => JSON.stringify(event)).join("\n")}\n` },
+    { path: STATUS_PATH, after: planned.projection.statusText },
+    { path: INDEX_PATH, after: planned.projection.indexText },
+  ];
+  const transaction = writeBacklogTransaction(root, targets, options);
+  return transaction.ok ? { ...current, ok: true, findings: [], wrote: true, transition: planned.event } : { ...current, ok: false, findings: transaction.findings, wrote: false, transition: null };
 }
 
 function cli() {

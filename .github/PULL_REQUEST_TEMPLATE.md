@@ -24,3 +24,7 @@ item is the acceptance record for this pull request. The `contributor-gates`
 check fails for a missing, unchecked, malformed, differently bound, or stale
 record; changing the CLA invalidates earlier acceptance. A maintainer, bot, or
 submission automation must not check or rewrite it on the Contributor's behalf.
+After every `synchronize` or `reopened` event, the pull-request author must
+personally uncheck the CLA item and save the body, then re-check it and save
+again on the current head. Maintainers, bots, and submission automation cannot
+perform that refresh for the Contributor.

@@ -20,7 +20,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
 export const RELEASE_VERSION_DECISION_SCHEMA = "pipeline.release-version-decision.v1";
@@ -209,17 +209,17 @@ function assertPhysicalDirectory(path, label, { privateMode = false, created = f
   return resolved;
 }
 
-function ensurePrivateDirectory(path) {
+export function ensurePrivateDirectory(path) {
   const resolved = resolve(path);
   const parent = dirname(resolved);
   if (!existsSync(parent)) ensurePrivateDirectory(parent);
-  else assertPhysicalDirectory(parent, "private record parent", { privateMode: parent.includes(`${join("agent-pipeline", "releases")}`) });
+  else assertPhysicalDirectory(parent, "private record parent", { privateMode: parent.split(sep).includes("agent-pipeline") });
   const created = !existsSync(resolved);
   if (created) mkdirSync(resolved, { mode: 0o700 });
   return assertPhysicalDirectory(resolved, "private record directory", { privateMode: true, created });
 }
 
-function assertPrivateFile(path) {
+export function assertPrivateFile(path) {
   const info = lstatSync(path);
   const posixModeViolation = process.platform !== "win32" && ((info.mode & 0o077) !== 0 || (typeof process.getuid === "function" && info.uid !== process.getuid()));
   const windowsInsecure = process.platform === "win32" && (assessWindowsPrivatePath(path).status !== "secure" || assessWindowsPrivatePath(dirname(path)).status !== "secure");
@@ -239,7 +239,7 @@ function unsupportedDirectoryDurability(error) {
       || error?.code === "EISDIR" || error?.code === "EACCES"
       || error?.code === "ENOTSUP");
 }
-function fsyncDirectory(path) {
+export function fsyncDirectory(path) {
   let fd;
   try {
     fd = openSync(path, "r");

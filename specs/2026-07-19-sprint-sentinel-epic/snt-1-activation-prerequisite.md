@@ -16,9 +16,29 @@ CLA gate, personal-acceptance event proof, privacy review, threat model, and
 recovery contract. This file records implementation state only. It is not the
 missing Result and does not convert focused test output into closure evidence.
 
-## Missing prerequisite evidence
+## Implemented evidence path and missing actual evidence
 
-Activation remains blocked until one exact evidence package supplies all of:
+The sanctioned path is now implemented in existing governed surfaces:
+
+- `check-license-contract.mjs` constructs closed-schema, candidate-bound
+  private and neutral-public license-gate receipts, a log-safe public
+  projection, and a physical owner-only private record below the Git common
+  directory with POSIX owner/mode or Windows owner/DACL assurance and exact
+  replay/conflict handling. The public projection contains no raw private
+  receipt digest; `privateLicenseGateSha256` binds its sanitized projection
+  digest instead;
+- the same checker constructs and validates the canonical SNT-1 Result digest,
+  binding both candidates, both gates, governing license surfaces, the
+  licensing disposition, and the separate privacy disposition; it refuses a
+  ready result while privacy review is pending; and
+- `backlog-state.mjs` plus `check-backlog-state.mjs` provide one strict
+  `closed` → `closed` `evidence-amendment` suffix through the recoverable
+  transaction writer. Generic transitions still cannot leave or re-close a
+  closed item.
+
+No actual receipt, Result, or evidence amendment is created by that
+implementation. Activation remains blocked until one exact evidence package
+supplies all of:
 
 1. immutable private and neutral-public candidate commit/tree identities;
 2. a license-gate result for each exact candidate tree;
@@ -42,13 +62,13 @@ The owner must freeze both product candidates, run each candidate's license
 gate without exporting private material, construct the private and neutral
 public receipts in their respective authorities, and obtain the named-human
 licensing/privacy dispositions. Only then may it construct the candidate-bound
-Result and verify its digest off-ref. Any required backlog status correction
-must use `applyBacklogTransition` through its recoverable transaction writer;
+Result and verify its digest off-ref. The evidence update must use
+`applyBacklogEvidenceAmendment` through the recoverable transaction writer;
 item Markdown, `backlog/transitions.ndjson`, `backlog/STATUS.md`, and
-`backlog/index.json` must never be hand-edited. Because the current item is
-already `closed`, the existing writer has no same-state evidence-amendment
-operation: a reviewed narrow append-only repair transition or writer extension
-must be approved and tested before any status change.
+`backlog/index.json` must never be hand-edited. The writer requires an already
+closed item, reachable new closure commit, repository evidence file, exact
+Result/private/public gate digests, and preserves every historical ledger byte
+before its single amendment suffix.
 
 HAW-E may consume the prerequisite only after its
 `externalPrerequisite` record validates the exact `closureCommit`,

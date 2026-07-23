@@ -79,6 +79,6 @@ process; it is not a legal-effectiveness guarantee or a release approval.
 
 This repository does not provide legal advice, define prices or contract
 terms, guarantee the effectiveness of any rights grant, or silently grant
-commercial monetization rights. Earlier releases remain governed by the terms
-and notices published with those releases; this candidate does not purport to
-change those grants retroactively.
+commercial monetization rights. Earlier commits or copies already received
+under prior terms remain governed by the terms and notices supplied with
+them; this candidate does not purport to change those grants retroactively.

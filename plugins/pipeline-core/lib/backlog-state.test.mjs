@@ -4,6 +4,7 @@
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 
 import {
   ITEM_SCHEMA,
@@ -12,6 +13,8 @@ import {
   canonicalJson,
   parseBacklogItem,
   parseTransitionLedger,
+  planBacklogEvidenceAmendment,
+  planBacklogTransition,
   projectBacklog,
   renderBacklogItem,
   transitionHash,
@@ -21,6 +24,7 @@ import {
   validateTransitionLedger,
 } from "./backlog-state.mjs";
 import {
+  applyBacklogEvidenceAmendment,
   applyBacklogTransition,
   applySentinelBacklogRecovery,
   applySentinelScopeExtension,
@@ -90,6 +94,18 @@ function fixtureRoot() {
   write(root, "backlog/schemas/transition.schema.json", JSON.stringify({ $id: "pipeline.backlog-transition.v1" }));
   write(root, "backlog/schemas/index.schema.json", JSON.stringify({ $id: "pipeline.backlog-index.v1" }));
   return root;
+}
+function snt1Result() {
+  const surfaces = ["LICENSE", "LICENSE-DOCS", "NOTICE", "CONTRIBUTING.md", "README.md", "docs/licensing.md", "third-party-licenses.json"].map((path, index) => ({ path, sha256: String(index + 1).repeat(64) }));
+  const surfaceSetSha256 = createHash("sha256").update(canonicalJson(surfaces)).digest("hex");
+  const candidates = { private: { commit: "1".repeat(40), tree: "2".repeat(40) }, "neutral-public": { commit: "3".repeat(40), tree: "4".repeat(40) } };
+  const projection = (channel) => {
+    const value = { schema: "pipeline.snt1-license-gate-projection.v1", channel, candidate: candidates[channel], surfaceSetSha256, commandSha256: "5".repeat(64), gateCommitmentSha256: "6".repeat(64), result: { status: "passed", exitCode: 0 } };
+    return { ...value, projectionSha256: createHash("sha256").update(canonicalJson(value)).digest("hex") };
+  };
+  const disposition = { reviewer: "named-human", reviewedAt: "2026-07-23", status: "approved", dispositionSha256: "7".repeat(64) };
+  const payload = { schema: "pipeline.snt1-result.v1", licensingDisposition: disposition, privacyDisposition: { ...disposition, dispositionSha256: "8".repeat(64) }, candidates, gates: { private: projection("private"), "neutral-public": projection("neutral-public") }, surfaces };
+  return { ...payload, resultSha256: createHash("sha256").update(canonicalJson(payload)).digest("hex") };
 }
 function sentinelCatalog(overrides = {}) {
   return {
@@ -222,6 +238,69 @@ function recoveryFixture(catalog = sentinelCatalog()) {
     written.ok && written.wrote && valid.ok
       && drift.findings.some((finding) => finding.includes("STATUS.md projection drift"))
       && readFileSync(join(root, "backlog/index.json"), "utf8").includes("pipeline.backlog-index.v1"), drift.findings.join("; "));
+}
+
+{
+  const root = fixtureRoot();
+  const oldCommit = "b".repeat(40);
+  const newCommit = "c".repeat(40);
+  const resultRecord = snt1Result();
+  const closed = item({ id: "pipeline.source-available-commercial-licensing", status: "closed", closed_at: "2026-07-17", closure_repository: "self", closure_commit: oldCommit, closure_evidence: "specs/old-result.md" });
+  const historical = event({ id: "pipeline.source-available-commercial-licensing", to: "closed", evidence: { kind: "implementation", commit: oldCommit, reference: "specs/old-result.md" }, reason: "Historical close." });
+  const unrelated = item({ id: "pipeline.unrelated" });
+  const unrelatedEvent = event({ id: "pipeline.unrelated", sequence: 2, previousHash: historical.entryHash });
+  write(root, "backlog/items/example.md", renderBacklogItem(closed));
+  write(root, "backlog/items/unrelated.md", renderBacklogItem(unrelated));
+  write(root, "backlog/transitions.ndjson", `${canonicalJson(historical)}\n${canonicalJson(unrelatedEvent)}\n`);
+  write(root, "specs/old-result.md", "# Old result\n");
+  write(root, "specs/current-result.md", `${JSON.stringify(resultRecord)}\n`);
+  writeBacklogProjections(root, { checkCommit: false });
+  const ledgerBefore = readFileSync(join(root, "backlog/transitions.ndjson"), "utf8");
+  const itemBodyBefore = closed.body;
+  const unrelatedBefore = readFileSync(join(root, "backlog/items/unrelated.md"), "utf8");
+  const input = {
+    id: "pipeline.source-available-commercial-licensing", at: "2026-07-23", actor: "sentinel-evidence", reason: "Bind current SNT-1 candidate evidence.",
+    evidence: { kind: "evidence-amendment", commit: newCommit, reference: "specs/current-result.md", resultSha256: resultRecord.resultSha256, privateLicenseGateSha256: resultRecord.gates.private.projectionSha256, neutralPublicLicenseGateSha256: resultRecord.gates["neutral-public"].projectionSha256 },
+    closure: { repository: "self", commit: newCommit, evidence: "specs/current-result.md" },
+  };
+  const preview = planBacklogEvidenceAmendment([closed, unrelated], [historical, unrelatedEvent], input);
+  const generic = planBacklogTransition([closed, unrelated], [historical, unrelatedEvent], { ...input, to: "closed" });
+  write(root, "specs/current-result.md", `${JSON.stringify({ ...resultRecord, resultSha256: "0".repeat(64) })}\n`);
+  const mismatchedEvidence = applyBacklogEvidenceAmendment(root, input, { checkCommit: false });
+  write(root, "specs/current-result.md", `${JSON.stringify(resultRecord)}\n`);
+  const applied = applyBacklogEvidenceAmendment(root, input, { checkCommit: false });
+  const ledgerAfter = readFileSync(join(root, "backlog/transitions.ndjson"), "utf8");
+  const parsed = parseTransitionLedger(ledgerAfter).events;
+  const current = checkBacklogState(root, { checkCommit: false });
+  check("BS12 closed evidence amendment preserves history and binds exact SNT-1 digests without enabling generic closed transitions",
+    preview.ok && !generic.ok && !mismatchedEvidence.ok && mismatchedEvidence.findings.some((finding) => finding.includes("exact ready Result")) && applied.ok && applied.wrote && ledgerAfter.startsWith(ledgerBefore)
+      && parsed.length === 3 && parsed[0].entryHash === historical.entryHash && parsed[1].entryHash === unrelatedEvent.entryHash
+      && parsed[2].from === "closed" && parsed[2].to === "closed" && parsed[2].evidence.previousClosureCommit === oldCommit
+      && current.ok && current.items.find((entry) => entry.metadata.id === input.id).body === itemBodyBefore
+      && current.items.find((entry) => entry.metadata.id === input.id).metadata.closure_commit === newCommit
+      && current.items.find((entry) => entry.metadata.id === input.id).metadata.closed_at === "2026-07-17"
+      && readFileSync(join(root, "backlog/items/unrelated.md"), "utf8") === unrelatedBefore,
+    [...preview.errors, ...generic.errors, ...current.findings].join("; "));
+
+  const tampered = structuredClone(parsed[2]); tampered.evidence.resultSha256 = "0".repeat(64);
+  check("BS13 evidence-amendment tamper and replay are rejected by the append-only chain",
+    validateTransitionLedger([historical, unrelatedEvent, tampered], current.items).some((error) => error.includes("entryHash does not match"))
+      && validateTransitionLedger([historical, unrelatedEvent, parsed[2], parsed[2]], current.items).some((error) => error.includes("sequence must equal physical ledger order") || error.includes("previousHash")));
+}
+
+{
+  const root = fixtureRoot();
+  const oldCommit = "b".repeat(40); const newCommit = "c".repeat(40);
+  const resultRecord = snt1Result();
+  const closed = item({ id: "pipeline.source-available-commercial-licensing", status: "closed", closed_at: "2026-07-17", closure_repository: "self", closure_commit: oldCommit, closure_evidence: "specs/old-result.md" });
+  const historical = event({ id: "pipeline.source-available-commercial-licensing", to: "closed", evidence: { kind: "implementation", commit: oldCommit, reference: "specs/old-result.md" }, reason: "Historical close." });
+  write(root, "backlog/items/example.md", renderBacklogItem(closed)); write(root, "backlog/transitions.ndjson", `${canonicalJson(historical)}\n`);
+  write(root, "specs/old-result.md", "# Old\n"); write(root, "specs/current-result.md", `${JSON.stringify(resultRecord)}\n`); writeBacklogProjections(root, { checkCommit: false });
+  const before = ["backlog/items/example.md", "backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"].map((path) => readFileSync(join(root, path), "utf8"));
+  let writes = 0;
+  const interrupted = applyBacklogEvidenceAmendment(root, { id: "pipeline.source-available-commercial-licensing", at: "2026-07-23", actor: "sentinel-evidence", reason: "Bind evidence.", evidence: { kind: "evidence-amendment", commit: newCommit, reference: "specs/current-result.md", resultSha256: resultRecord.resultSha256, privateLicenseGateSha256: resultRecord.gates.private.projectionSha256, neutralPublicLicenseGateSha256: resultRecord.gates["neutral-public"].projectionSha256 }, closure: { repository: "self", commit: newCommit, evidence: "specs/current-result.md" } }, { checkCommit: false, atomicWrite(path, content) { writeFileSync(path, content); if (++writes === 2) throw new Error("simulated interruption"); } });
+  const after = ["backlog/items/example.md", "backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"].map((path) => readFileSync(join(root, path), "utf8"));
+  check("BS14 evidence-amendment crash restores every preimage and changes no unrelated state", !interrupted.ok && JSON.stringify(before) === JSON.stringify(after) && !existsSync(join(root, "backlog/.state-transaction.json")), interrupted.findings.join("; "));
 }
 {
   const root = recoveryFixture();
