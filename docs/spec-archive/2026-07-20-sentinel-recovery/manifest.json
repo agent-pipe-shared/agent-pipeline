@@ -20,7 +20,7 @@
     "windowsBlockers": "docs/spec-archive/2026-07-20-sentinel-recovery/windows-blockers-scope.md"
   },
   "sha256": {
-    "prd": "38a489c5726473423128e73476a918116e0d540318bce0c78081332d1f6a1a20",
+    "prd": "8fde373cea210f3c51fe96ceb658feb18db47bb370699300e541da12f6610e88",
     "spec": "be147cb58203c5a1a66bbdafddf500aeb7922c22fe10a57804473d881dcbf3a9",
     "acceptance": "fd5d019625ede2c5c980349a994555697787e96edf9324ef0ec10e9dcbdad0fe",
     "design": "3b4cee9f23a5db1ea7318ce86a1190d1ec868561b55a7ee9b30994ff0d073075",
