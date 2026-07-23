@@ -309,28 +309,19 @@ where they conflict with the authoritative session-cut state above.
   The implementation base before this handover record was
   `41407e2a65781247bdb50b68e76734d68ea3c25c`; the working tree also contains
   **uncommitted** Critic repairs. Do not push the dirty state.
-- Already local and committed after the remote: the PO post-go-live Sprint ADR
-  and privacy correction; static SNT-7 Verify allowlist; target-worktree
-  Push-Guard repair; the five Windows blocker records; the sanctioned scope
-  extension writer; #33 physical path containment; and the 21-item Sentinel
-  projection. No Sentinel item was closed by these commits.
-- The five live-read Sentinel Windows blockers are canonically `open` in
-  ledger sequences 32–36: #33 containment, #34 directory durability, #35
-  private-state assurance, #36 Windows Verify reproducibility, and #37 trusted
-  tool resolution. Their scope/ordering is
+- The completed Windows containment package (#33) is canonically `closed` in
+  ledger sequences 37–38, with closure commit `e21933b` and evidence at
+  `backlog/evidence/2026-07-22-windows-runtime-baseline-containment-closure.md`.
+  The integrated, linear Sentinel candidate is now on `main`.
+- The remaining live-read Windows blockers are canonically `open`: #34
+  directory durability, #35 private-state assurance, #36 Windows Verify
+  reproducibility, and #37 trusted-tool resolution. Their scope and separate
+  closure gates remain in
   `specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md`.
-- #33 implementation is in local commit `fbe7162` and has focused V2 20/20
-  and V3 17/17 evidence. Its required native-Windows `setup.mjs` no-op/read
-  evidence is absent; it remains open. #37 has only a read-only audit: the
-  next safe package is one canonical trusted-tool resolver, with PO/Human
-  policy decisions still needed for allowed Windows roots, wrappers, #25
-  machine-local selection, and native-Windows evidence.
-- Full Verify and Security were green at `41407e2`; the independent Critic
-  then failed on stale PRD→Spec binding, an over-broad scope writer, an
-  inaccurate #33 matrix row, and missing rollback/owner/expiry projection.
-  Those repairs are currently dirty and must be completed, focused-tested,
-  committed, then Full-Verified, Critic-reviewed, pushed from the persistent
-  target worktree and fetch-backed before any delivery claim.
+- #37 has only a read-only audit: the next safe package is one canonical
+  trusted-tool resolver, with PO/Human policy decisions still needed for
+  allowed Windows roots, wrappers, #25 machine-local selection, and native
+  Windows evidence.
 - The last in-session Codex app-server probe returned
   `CAS-EXECUTION-UNAVAILABLE` / `EPERM`: it could not execute the daemon
   version probe. This is not evidence that the daemon is dead. A new session

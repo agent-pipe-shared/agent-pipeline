@@ -109,7 +109,7 @@ release. HAW-C/HAW-E stays a single undivided feature within that Epic.
 | `pipeline.stateful-design-contract-template` | open | genuine process gap | enforce authority, durability, recovery, and self-reference checklist |
 | `pipeline.t1-governance-path-preflight` | open | governance packet partially exists | audit and complete path, ETA, and setup ACs, then close |
 | `pipeline.verify-gate-scoped-registration` | open | root cause for omitted focused suites | narrow additive PO/task-bound registration and evidence |
-| `pipeline.windows-runtime-baseline-containment` | open | issue #33 at scope admission | bound canonical closure evidence; no remaining #33 gate |
+| `pipeline.windows-runtime-baseline-containment` | closed | issue #33 canonically closed | bound canonical closure evidence; no remaining #33 gate |
 | `pipeline.windows-directory-durability` | open | issue #34, POSIX directory-fsync assumption | typed durability and native Windows/POSIX evidence |
 | `pipeline.windows-private-state-assurance` | open | issue #35, POSIX modes do not prove Windows DACLs | typed assurance with fail-closed authority consumers |
 | `pipeline.windows-verify-reproducibility` | open | issue #36, native Windows Full Verify gap | capability-bound fixtures and standard-account gate |

@@ -149,7 +149,7 @@ Sentinel owns the 16-item baseline plus five PO-admitted native-Windows blockers
 14. `pipeline.stateful-design-contract-template` (`open`)
 15. `pipeline.t1-governance-path-preflight` (`open`)
 16. `pipeline.verify-gate-scoped-registration` (`open`)
-17. `pipeline.windows-runtime-baseline-containment` (`open`, Issue `#33`)
+17. `pipeline.windows-runtime-baseline-containment` (`closed`, Issue `#33`)
 18. `pipeline.windows-directory-durability` (`open`, Issue `#34`)
 19. `pipeline.windows-private-state-assurance` (`open`, Issue `#35`)
 20. `pipeline.windows-verify-reproducibility` (`open`, Issue `#36`)
