@@ -196,6 +196,10 @@ close has occurred
 
 ## Open items and next block
 
+### 2026-07-23 Codex plugin-refresh restart checkpoint — authoritative latest
+
+`main` and `origin/main` are both at `487986210e6719bf3cf0157b61f5b73c3d5b1d54` after the authorized fast-forward from `0664e835`; no feature implementation was changed in this Codex block. The source/cache comparison found only the two Sentinel registration files from the newly integrated remote commits out of sync with the installed plugin, so the mandatory plugin update flow advanced `plugins/pipeline-core/.codex-plugin/plugin.json` to cachebuster `0.2.0+codex.20260723194910`, reinstalled that version through the Codex CLI, and confirmed the resulting cache is byte-identical to `plugins/pipeline-core`. The generic plugin validator still reports the three already-known admission findings (`hooks` in `plugin.json` and `disable-model-invocation: true` in `close-block` and `critic-review`); these were not introduced here. Codex cannot reload the active plugin in-process, so the PO requested this durable checkpoint and a restart before re-entry. On restart, run `pipeline-core:pipeline-start` from the new cache, confirm local `main` equals `origin/main` and the installed/cache-identical plugin is `0.2.0+codex.20260723194910`, then prepare the shared prerequisite package: correct the release baseline to `0.4.0`, finish #27 and #10, verify/review/push that exact candidate, and write a candidate-bound Windows handover. The Windows/Claude session should then branch from that exact `main` as `feat/sentinel-windows-34-37-close`, own only #34–#37, and return its exact branch OID/tree/evidence before sequential integration; Codex retains #28, #22, and #40, with `0.4.1` reserved for the fully closed Sentinel sprint. Lesson retained: a successful Codex CLI plugin reinstall proves cache content, but a new process/thread is still required to activate the refreshed skill bindings. This checkpoint supersedes older next-action or branch-location statements below where they conflict.
+
 ### 2026-07-23 session cut — authoritative current state
 
 - Work continues in the persistent worktree
