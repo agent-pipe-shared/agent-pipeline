@@ -3,12 +3,12 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-07-22
+**Last updated:** 2026-07-23
 **Project status:** ACTIVE
-**Current block:** Sentinel continuation after closed SNT-A: Public-Core
-freshness/sandbox quickfixes, durable advisor-export consent, PO licensing
-disposition, plugin registration, and final feature-branch delivery
-**Repair baseline:** `89c3c2ebf73d2b8cd3b43ee0ea463d2819c5f49f`
+**Current block:** Sentinel integration paused at the final licensing-surface
+candidate-binding correction; no push, main merge, release, archive, or Epic
+close has occurred
+**Repair baseline:** `9344a5a9b5f246584da1c9946d396f1bd88c1ce2`
 **Release version:** `0.2.0`
 
 ## Operational head
@@ -195,6 +195,86 @@ disposition, plugin registration, and final feature-branch delivery
   Guard-Bypass.
 
 ## Open items and next block
+
+### 2026-07-23 session cut — authoritative current state
+
+- Work continues in the persistent worktree
+  `branch/feat/v3-public-core-foundation` on branch
+  `feat/sentinel-platform-support-contract`. The last product candidate before
+  this session-cut metadata is
+  `8d6c31263256c40a28494472ecd8ef24ec874246`, tree
+  `d2ca8935a0cdf880c69d83a06b42694ada77ff92`. It contains the additive merge
+  of the native-Windows branch and all completed Sentinel licensing,
+  contributor-gate, privacy, backlog-evidence, and prerequisite corrections.
+- The Windows source branch is remotely fixed at
+  `98dbc08b6f19b28a8d5a6b499f37381d0ee648df`. The last read-only remote
+  observation found `main` at
+  `9344a5a9b5f246584da1c9946d396f1bd88c1ce2` and the Sentinel destination
+  branch at `bf70bb06823da777d757e8c178fe5042d96ba335`. No remote ref was changed
+  in this block.
+- Full Verify and Security both passed with exit 0 on exact HEAD `8d6c312`.
+  The machine evidence in `evidence/verify-latest.json` and
+  `evidence/security-latest.json` binds that OID; Gitleaks, Semgrep, and the
+  license scan passed, while OSV honestly skipped because no package sources
+  exist. Observation governance, Spec retention, the CLAUDE.md 43/200 line
+  gate, backlog state, and `git diff --check` were also green.
+- The named-human approval records André Twachtmann's candidate-bound privacy
+  review for `f83803c767f90dceacea936ac3bd52c63dc24bd1`, tree
+  `9bdd679db74aa0b1b7877984df7324ffb880be86`, and 30-day Actions-log
+  retention. Server readback confirmed 30 days with maximum 90 days.
+- SNT-1 Result, licensing/privacy dispositions, sanitized private and
+  neutral-public license-gate projections, and append-only backlog
+  evidence-amendment event 40 are present. The raw private receipt remains
+  owner-only outside public history. The exact HAW-E prerequisite is now
+  documented as consumable without implying HAW-E activation, release,
+  publication, or main approval.
+- The fresh final Critic correctly returned **FAIL / major**: the SNT-1
+  evidence binds seven license surfaces at frozen candidate `f83803c`, but
+  `docs/licensing.md` was changed afterward to record the approval/evidence.
+  Its current digest therefore differs from the approved surface set, and the
+  checker validates only the historical records instead of comparing the live
+  seven surfaces. This is the sole surviving Critic finding.
+- The attempted Goldfish correction was interrupted before any file mutation
+  when the PO requested this session cut. The worktree is clean. Do not push
+  `8d6c312`: its Verify is green, but its required final Critic is red.
+- Authorship check — “Whose are this session's production diffs?”: the
+  correction commits `918d673`, `89dd8fa`, `ee428247`, `ad493668`,
+  `f83803c`, `726b836`, `36fa07d`, `2ddf359`, `c47367b`, and `8d6c312`
+  identify `goldfish_sentinel_corrections (goldfish)` in their commit bodies;
+  `ec2e9bd` is the PO-confirmed governance authority binding, and the merge
+  commits are Elephant-owned integration bookkeeping. The inherited native
+  Windows block retains its already disclosed direct-Elephant authorship
+  incident; no new undisclosed Elephant production implementation was added
+  in this integration block.
+- Next block, after a fresh `pipeline-core:pipeline-start`: first dispatch a
+  Goldfish to make `docs/licensing.md` the final accurate status surface
+  without changing material license/CLA semantics. Freeze and report that
+  exact commit/tree to André Twachtmann for a new candidate-bound
+  licensing/privacy approval. Only after that approval, update the disposition
+  and Result records and make the license checker fail closed unless all seven
+  live surface digests equal the approved set; add positive and drift-negative
+  tests. Do not mutate a licensed surface after that freeze.
+- Then run focused checks, Full Verify/Security, and a new fresh-context final
+  Critic using the absolute evidence paths from this worktree. Only a PASS
+  authorizes the already planned guarded feature-branch push and exact remote
+  readback. Main integration, `v0.4.0`, two-channel publication, branch
+  archival, contributor branch-protection activation, and formal Sentinel
+  close remain later separate gates.
+- Session cleanup descriptor `sentinel-merge-owner-20260722` remains active
+  deliberately because its persistent integration worktree and unfinished
+  feature are still required. Retire it only after release, archive, and
+  formal Sentinel close. The detached preparation worktree under `/tmp`
+  remains an explicit stale-worktree finding for the next block; do not infer
+  or delete it during an unattended cut.
+- Close self-retro: candidate-bound human approvals need a deterministic
+  live-surface post-freeze comparison before later documentation commits are
+  admitted. No generic sanctioned backlog-item initializer exists in the
+  current canonical ledger, so this workflow-improvement proposal is retained
+  here for transfer rather than fabricating a ledger entry. The monthly
+  tooling-radar item is still absent and overdue.
+
+The older continuation notes below are historical context and are superseded
+where they conflict with the authoritative session-cut state above.
 
 ### Current Sentinel continuation — exact handover
 

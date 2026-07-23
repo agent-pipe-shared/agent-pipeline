@@ -333,6 +333,34 @@ Wiedereinstieg stehen im kanonischen [Handover](docs/state.md).
 See the canonical [handover](docs/state.md); it is the sole source of current
 and next-state information.
 
+## 2026-07-23 — Sentinel integration paused at license-surface binding gate
+
+- Integrated the final native-Windows branch into the Sentinel candidate and
+  completed the approved SUL/CLA, contributor-gate, privacy-retention, SNT-1
+  evidence, append-only licensing amendment, and prerequisite-status work.
+- Full Verify and Security passed on exact candidate `8d6c31263256c40a28494472ecd8ef24ec874246`.
+  No push, main merge, release, tag, branch deletion, or Epic close occurred.
+- The fresh final Critic found one major: `docs/licensing.md` changed after the
+  candidate-bound approval while the checker compared only historical
+  evidence records, not the currently delivered seven licensing surfaces.
+  The block therefore ends honestly unfinished and requires a new freeze plus
+  named-human candidate approval before correction and re-review.
+
+### Lessons
+
+- Candidate-bound legal/privacy evidence must compare the live governed
+  surface set against the approved post-freeze digests; validating a
+  self-consistent historical record is insufficient after later documentation
+  mutations.
+- A session cut after a red Critic preserves the clean candidate and exact
+  next authority gate; it must not convert green deterministic tests into a
+  delivery claim.
+
+### Open / next
+
+See the authoritative 2026-07-23 session-cut section in the canonical
+[handover](docs/state.md).
+
 ## 2026-07-22 — Sentinel platform preparation handover
 
 - Recorded the native WSL2/`wsl-native` evidence surface and a strictly
