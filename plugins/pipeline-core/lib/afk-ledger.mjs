@@ -3,12 +3,10 @@ import { randomBytes } from "node:crypto";
 import {
   chmodSync,
   closeSync,
-  constants,
   existsSync,
   fsyncSync,
   linkSync,
   lstatSync,
-  mkdirSync,
   openSync,
   readFileSync,
   readdirSync,
@@ -16,7 +14,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 
 import {
   canonicalJson,
@@ -26,6 +24,8 @@ import {
   validateActivationReceipt,
 } from "./afk-assumption-mode.mjs";
 import { validateAfkWorkerRequest } from "./afk-capability-worker.mjs";
+import { ensurePrivateDirectory } from "./private-boundary.mjs";
+import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
 
 export const AFK_LEDGER_RECORD_SCHEMA = "pipeline.afk-ledger-record.v1";
 export const AFK_LEDGER_ZERO_HASH = "0".repeat(64);
@@ -282,25 +282,21 @@ export function parseAfkLedgerGeneration(raw, expectedActivationId = null) {
   return { ok: true, frames, sequence: frames.length, headSha256: previousHash, bytes };
 }
 
-function assertPlainDirectory(path) {
-  const info = lstatSync(path);
-  if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("unsafe directory");
-}
-
-function privateDirectory(parent, name) {
-  const path = join(parent, name);
-  if (!existsSync(path)) mkdirSync(path, { mode: 0o700 });
-  assertPlainDirectory(path);
-  chmodSync(path, 0o700);
-  return path;
-}
-
+/**
+ * Directory creation/hardening for the private ledger tree reuses
+ * `ensurePrivateDirectory` (private-boundary.mjs) end to end: it walks from
+ * the nearest existing ancestor down to the target in one call, verifies
+ * physicality (no symlink-in-path) at every level, and -- on native Windows
+ * -- applies the shared DACL/owner assurance (harden newly created
+ * components, assess already-existing ones, fail closed otherwise) via
+ * `assureWindowsPrivateDirectories`. This composes cleanly with the nested
+ * agent-pipeline/afk/<activationId>/generations layout: no bespoke
+ * per-level directory helper is needed here anymore.
+ */
 export function afkLedgerPaths(gitCommonDir, activationId) {
   if (!HEX32.test(activationId)) throw new Error("invalid activation ID");
-  const agent = privateDirectory(gitCommonDir, "agent-pipeline");
-  const afk = privateDirectory(agent, "afk");
-  const root = privateDirectory(afk, activationId);
-  const generations = privateDirectory(root, "generations");
+  const generations = ensurePrivateDirectory(join(gitCommonDir, "agent-pipeline", "afk", activationId, "generations"));
+  const root = dirname(generations);
   return {
     root,
     generations,
@@ -309,22 +305,66 @@ export function afkLedgerPaths(gitCommonDir, activationId) {
   };
 }
 
+/**
+ * Injectable IO seam for platform-specific assurance, resolved once per
+ * exported entry point and threaded down to the internal helpers below.
+ * Defaults are the real native primitives; tests override `platform`,
+ * `assessWindowsPrivate`, and/or `syncDirectory` to exercise the
+ * Windows-unsupported-directory-durability and DACL-insecure/-unavailable
+ * paths deterministically, without depending on the actual host OS.
+ */
+function resolveIo(io = {}) {
+  return {
+    platform: io.platform ?? process.platform,
+    assessWindowsPrivate: io.assessWindowsPrivate ?? assessWindowsPrivatePath,
+    syncDirectory: io.syncDirectory ?? defaultFsyncDirectory,
+  };
+}
+
+/**
+ * A private regular file's "is this actually private" check is POSIX exact
+ * mode 0600 on every non-Windows platform (unchanged invariant). Node
+ * synthesizes `.mode` on native Windows from the read-only attribute alone
+ * (group/other bits always mirror the owner bits, e.g. a writable file
+ * always reports 0666 regardless of chmod), so an exact-0600 comparison is
+ * meaningless there and was previously silently always-failing (or, if ever
+ * accidentally true, providing false confidence). On win32 this instead
+ * requires the shared native DACL/owner/reparse-point assurance -- for both
+ * the file and its parent directory -- to report "secure"; any other status
+ * (insecure, unavailable, unsupported) fails closed.
+ */
+function privateRegularFile(path, parentSecure, { platform, assessWindowsPrivate }) {
+  const info = lstatSync(path);
+  if (!info.isFile() || info.isSymbolicLink()) return false;
+  if (platform === "win32") return parentSecure() && assessWindowsPrivate(path).status === "secure";
+  return (info.mode & 0o777) === 0o600;
+}
+
 function chainPrefix(left, right) {
   if (left.frames.length > right.frames.length) return false;
   return left.frames.every((frame, index) => frame.recordHash === right.frames[index].recordHash);
 }
 
-export function loadAfkLedger(gitCommonDir, activationId) {
+export function loadAfkLedger(gitCommonDir, activationId, io = {}) {
+  const resolved = resolveIo(io);
   let paths;
   try { paths = afkLedgerPaths(gitCommonDir, activationId); } catch { return fail("AFK-LEDGER-PATH-UNSAFE"); }
+  // Assessed at most once per call (memoized), not once per generation file:
+  // the generations directory itself does not change between iterations.
+  let parentSecureCache;
+  const parentSecure = () => {
+    if (parentSecureCache === undefined) {
+      parentSecureCache = resolved.assessWindowsPrivate(paths.generations).status === "secure";
+    }
+    return parentSecureCache;
+  };
   const candidates = [];
   for (const name of readdirSync(paths.generations)) {
     if (name.includes(".tmp-")) continue;
     const matched = GENERATION.exec(name);
     if (!matched) return fail("AFK-LEDGER-GENERATION-NAME-INVALID", name);
     const path = join(paths.generations, name);
-    const info = lstatSync(path);
-    if (!info.isFile() || info.isSymbolicLink() || (info.mode & 0o777) !== 0o600) {
+    if (!privateRegularFile(path, parentSecure, resolved)) {
       return fail("AFK-LEDGER-GENERATION-UNSAFE", name);
     }
     const parsed = parseAfkLedgerGeneration(readFileSync(path), activationId);
@@ -347,9 +387,52 @@ export function loadAfkLedger(gitCommonDir, activationId) {
   return { ok: true, paths, frames: current.frames, sequence: current.sequence, headSha256: current.headSha256, bytes: current.bytes };
 }
 
-function fsyncPath(path) {
-  const fd = openSync(path, constants.O_RDONLY);
+/**
+ * Regular-file durability is a hard requirement on every platform: any
+ * fsync failure here must remain a hard, un-swallowed error. The temporary
+ * file is reopened "r+" (read-write), not read-only: on native Windows, a
+ * handle opened read-only has no write-back to flush, so `fsyncSync` fails
+ * closed with EPERM even though this handle only syncs bytes this process
+ * just wrote moments ago. "r+" is correct and portable -- it behaves like a
+ * read-only reopen for fsync purposes on POSIX. Mirrors the identical fix
+ * and rationale in advisory-receipt-assurance.mjs's `persistAdvisoryReceipt`.
+ */
+function fsyncFile(path) {
+  const fd = openSync(path, "r+");
   try { fsyncSync(fd); } finally { closeSync(fd); }
+}
+
+/**
+ * Directory-entry durability is a hard POSIX flush but is not portably
+ * available on native Windows, where opening or fsync-ing a directory
+ * handle raises EPERM/EINVAL/EISDIR/EACCES/ENOTSUP. The regular-file flush
+ * that always precedes a directory-durability step is the hard durability
+ * guarantee; parent-directory durability is therefore best-effort on
+ * Windows, and its typed-unavailable outcome is not a failure. A genuinely
+ * unexpected error is rethrown (never a blanket EPERM/EACCES catch).
+ * Mirrors the identical `unsupportedDirectoryDurability`/`fsyncDirectory`
+ * contract in private-boundary.mjs (not exported there, so reproduced here
+ * narrowly with the exact same code set and win32-only gating).
+ */
+function unsupportedDirectoryDurability(error, platform) {
+  return platform === "win32"
+    && (error?.code === "EPERM" || error?.code === "EINVAL"
+      || error?.code === "EISDIR" || error?.code === "EACCES"
+      || error?.code === "ENOTSUP");
+}
+
+function defaultFsyncDirectory(path) {
+  const fd = openSync(path, "r");
+  try { fsyncSync(fd); } finally { closeSync(fd); }
+}
+
+function fsyncDirectory(path, { platform, syncDirectory }) {
+  try {
+    syncDirectory(path);
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error, platform)) return;
+    throw error;
+  }
 }
 
 function generationName(sequence, head) {
@@ -364,8 +447,10 @@ export function appendAfkLedgerRecord({
   recordedAt,
   expectedHeadSha256 = null,
   fault = null,
+  io = {},
 }) {
-  const loaded = loadAfkLedger(gitCommonDir, activationId);
+  const resolved = resolveIo(io);
+  const loaded = loadAfkLedger(gitCommonDir, activationId, io);
   if (!loaded.ok) return loaded;
   if (expectedHeadSha256 !== null && loaded.headSha256 !== expectedHeadSha256) {
     return fail("AFK-LEDGER-HEAD-CONFLICT");
@@ -388,10 +473,10 @@ export function appendAfkLedgerRecord({
   try {
     writeFileSync(temporary, bytes, { flag: "wx", mode: 0o600 });
     chmodSync(temporary, 0o600);
-    fsyncPath(temporary);
+    fsyncFile(temporary);
     fault?.("after-file-fsync", { temporary, destination, record });
     linkSync(temporary, destination);
-    fsyncPath(loaded.paths.generations);
+    fsyncDirectory(loaded.paths.generations, resolved);
     fault?.("after-directory-fsync", { temporary, destination, record });
     unlinkSync(temporary);
     return {
@@ -408,20 +493,22 @@ export function appendAfkLedgerRecord({
   }
 }
 
-function parseLock(path) {
-  const info = lstatSync(path);
-  if (!info.isFile() || info.isSymbolicLink() || (info.mode & 0o777) !== 0o600) return null;
+function parseLock(path, io = {}) {
+  const resolved = resolveIo(io);
+  const parentSecure = () => resolved.assessWindowsPrivate(dirname(path)).status === "secure";
+  if (!privateRegularFile(path, parentSecure, resolved)) return null;
   const raw = readFileSync(path, "utf8");
   let value;
   try { value = JSON.parse(raw); } catch { return null; }
   return raw === canonicalJsonFile(value) && validLockOwner(value) ? { value, raw } : null;
 }
 
-function createExclusiveLock(path, owner) {
+function createExclusiveLock(path, owner, io = {}) {
+  const resolved = resolveIo(io);
   writeFileSync(path, canonicalJsonFile(owner), { flag: "wx", mode: 0o600 });
   chmodSync(path, 0o600);
-  fsyncPath(path);
-  fsyncPath(join(path, ".."));
+  fsyncFile(path);
+  fsyncDirectory(dirname(path), resolved);
 }
 
 export function acquireAfkWriterLock({
@@ -431,17 +518,18 @@ export function acquireAfkWriterLock({
   inspectOwner = null,
   appendRecoveryRecord = null,
   observedAt = null,
+  io = {},
 }) {
   if (!validLockOwner(owner) || owner.activationId !== activationId) return fail("AFK-WRITER-OWNER-INVALID");
   let paths;
   try { paths = afkLedgerPaths(gitCommonDir, activationId); } catch { return fail("AFK-LEDGER-PATH-UNSAFE"); }
   try {
-    createExclusiveLock(paths.writerLock, owner);
+    createExclusiveLock(paths.writerLock, owner, io);
     return { ok: true, mutation: "lock", owner, path: paths.writerLock };
   } catch (error) {
     if (error?.code !== "EEXIST") return fail("AFK-WRITER-LOCK-FAILED");
   }
-  const existing = parseLock(paths.writerLock);
+  const existing = parseLock(paths.writerLock, io);
   if (existing === null || typeof inspectOwner !== "function" || typeof appendRecoveryRecord !== "function") {
     return fail("AFK-WRITER-LOCK-AMBIGUOUS");
   }
@@ -451,12 +539,12 @@ export function acquireAfkWriterLock({
     || !isoTime(observedAt)) return fail("AFK-WRITER-LOCK-LIVE-OR-FOREIGN");
   const recoveryOwner = { ...owner, ownerNonce: sha256Raw(Buffer.from(`${owner.ownerNonce}:recovery`, "utf8")) };
   try {
-    createExclusiveLock(paths.recoveryLock, recoveryOwner);
+    createExclusiveLock(paths.recoveryLock, recoveryOwner, io);
   } catch {
     return fail("AFK-WRITER-RECOVERY-BUSY");
   }
   try {
-    const current = parseLock(paths.writerLock);
+    const current = parseLock(paths.writerLock, io);
     if (current === null || current.raw !== existing.raw) return fail("AFK-WRITER-LOCK-RACE");
     const tombstone = appendRecoveryRecord({
       oldOwner: existing.value,
@@ -466,7 +554,7 @@ export function acquireAfkWriterLock({
     if (!tombstone || tombstone.ok !== true) return fail("AFK-WRITER-RECOVERY-UNRECORDED");
     if (readFileSync(paths.writerLock, "utf8") !== existing.raw) return fail("AFK-WRITER-LOCK-RACE", null, "wal");
     unlinkSync(paths.writerLock);
-    createExclusiveLock(paths.writerLock, owner);
+    createExclusiveLock(paths.writerLock, owner, io);
     return { ok: true, mutation: "wal+lock", recovered: existing.value, owner, path: paths.writerLock };
   } catch (error) {
     return fail(error?.code?.startsWith?.("AFK-") ? error.code : "AFK-WRITER-RECOVERY-FAILED", null, "unknown");
@@ -475,13 +563,14 @@ export function acquireAfkWriterLock({
   }
 }
 
-export function releaseAfkWriterLock(lock) {
+export function releaseAfkWriterLock(lock, io = {}) {
   if (!lock?.ok || !validLockOwner(lock.owner) || typeof lock.path !== "string") return fail("AFK-WRITER-LOCK-INVALID");
+  const resolved = resolveIo(io);
   try {
-    const current = parseLock(lock.path);
+    const current = parseLock(lock.path, io);
     if (current === null || current.value.ownerNonce !== lock.owner.ownerNonce) return fail("AFK-WRITER-LOCK-OWNER-MISMATCH");
     unlinkSync(lock.path);
-    fsyncPath(join(lock.path, ".."));
+    fsyncDirectory(dirname(lock.path), resolved);
     return { ok: true, mutation: "lock-release" };
   } catch {
     return fail("AFK-WRITER-LOCK-RELEASE-FAILED");
