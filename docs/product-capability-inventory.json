@@ -599,10 +599,28 @@
       "member": "codex-sandbox-select-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-host-advisor-route-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-host-advisor-route-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "continuity-host-adapter-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "host-advisor-status-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:host-advisor-workspace-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "host-advisor-workspace-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-state-tests",
@@ -621,6 +639,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "continuity-status-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:control-execution-exchange-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "control-execution-exchange-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
@@ -1133,6 +1157,18 @@
       "member": "capture-observation-intake-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "github-actions-permissions-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "github-actions-permissions-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:github-issue-operations-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1365,10 +1401,14 @@
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-runtime-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-select-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-host-advisor-route-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
+        "verify-phase:harness/scripts/verify.mjs:host-advisor-workspace-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-state-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-status-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-status-tests",
+        "verify-phase:harness/scripts/verify.mjs:control-execution-exchange-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-export-policy-tests",
         "verify-phase:harness/scripts/verify.mjs:critic-fail-closed-check",
@@ -1384,6 +1424,8 @@
         "verify-phase:harness/scripts/verify.mjs:error-register-check",
         "verify-phase:harness/scripts/verify.mjs:error-register-tests",
         "verify-phase:harness/scripts/verify.mjs:git-cmd-tests",
+        "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-check",
+        "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-tests",
         "verify-phase:harness/scripts/verify.mjs:github-issue-operations-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-git-tests",

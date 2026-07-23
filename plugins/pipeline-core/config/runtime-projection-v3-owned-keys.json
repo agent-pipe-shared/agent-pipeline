@@ -59,6 +59,13 @@
       "ownedKeys": ["model", "model_reasoning_effort"],
       "cell": { "kind": "duty", "dutyId": "critic_normal" },
       "decision": 3
+    },
+    {
+      "path": ".codex/agents/consult-advisor.toml",
+      "format": "toml",
+      "projection": "codex-advisor-agent-v3",
+      "ownedKeys": ["name", "description", "model", "model_reasoning_effort", "developer_instructions", "sandbox_mode"],
+      "cell": { "kind": "duty", "dutyId": "advisory" }
     }
   ]
 }

@@ -98,7 +98,9 @@ const cases = [
     const value = completeIntent(); value.routing.duties.advisory.claude.fallbacks.reverse();
     const checked = validatePipelineUserV3(value); assert.equal(checked.ok, false); assert.ok(checked.errors.some((entry) => entry.path.startsWith("$.routing.duties.advisory.claude.fallbacks")));
   }],
-  ["Codex advisory remains Sol consult", () => {
+  ["Codex advisory host-consult cell is frozen", () => {
+    const cell = completeIntent().routing.duties.advisory.codex;
+    assert.deepEqual(cell, { adapter: "host-consult", effort: "max", evidence: "host-advisor-status", isolation: "project-read-only", runner: "codex", selector: { kind: "model-id", value: "gpt-5.6-sol" }, state: "default", status: "pipeline.host-advisor-status.v1" });
     const value = completeIntent(); value.routing.duties.advisory.codex.selector.value = "gpt-5.6-terra";
     const checked = validatePipelineUserV3(value); assert.equal(checked.ok, false); assert.ok(has(checked, "$.routing.duties.advisory.codex.selector.value", "frozen_mapping"));
   }],
@@ -172,7 +174,7 @@ const cases = [
     const value = clone(registry); value.phases.push("advisory");
     const checked = validateRunnerProfilesV3Registry(value); assert.equal(checked.ok, false); assert.ok(has(checked, "$.phases", "frozen_mapping"));
   }],
-  ["registry cannot silently change consult runner", () => {
+  ["registry cannot silently change host-consult runner", () => {
     const value = clone(registry); value.duties.advisory.codex.runner = "claude";
     const checked = validateRunnerProfilesV3Registry(value); assert.equal(checked.ok, false); assert.ok(has(checked, "$.duties.advisory.codex.runner", "frozen_mapping"));
   }],

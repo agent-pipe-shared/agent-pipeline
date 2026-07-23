@@ -101,6 +101,7 @@
         "paths": [
           "docs/contributor-gate-security.md",
           "docs/critic-isolation-threat-model.md",
+          "docs/github-actions-token-permissions.md",
           "docs/marketplace-supply-chain-threat-model.md",
           "docs/next-session-setup-prompt.md",
           "docs/sentinel-scope-extension-threat-model.md",
@@ -154,6 +155,7 @@
           "docs/adr/0041-po-authorized-codex-functional-equivalent.md",
           "docs/adr/0042-global-observation-and-document-governance.md",
           "docs/adr/0043-post-go-live-sprint-model.md",
+          "docs/adr/0044-control-execution-boundary.md",
           "docs/adr/README.md"
         ]
       },

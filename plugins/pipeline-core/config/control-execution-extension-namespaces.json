@@ -1,0 +1,4 @@
+{
+  "schema": "pipeline.control-execution-extension-namespaces.v1",
+  "namespaces": ["pipeline.credentials", "pipeline.event-projection", "pipeline.isolation", "pipeline.messaging", "pipeline.remote-execution", "pipeline.result-import"]
+}

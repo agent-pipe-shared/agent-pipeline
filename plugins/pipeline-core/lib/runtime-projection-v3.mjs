@@ -397,6 +397,41 @@ function replaceCodexAgentTarget(v2Target, target, intent) {
   };
 }
 
+const ADVISOR_DESCRIPTION = "Fresh independent read-only advisor; answer one supplied question with repository evidence only.";
+const ADVISOR_INSTRUCTIONS = "Use fresh context and answer exactly one supplied question. Read-only sandbox only: no chat, handover, memory, mutation, persistence, auto-apply, or gate decisions; no separate network tool or third-party export. Report evidence and insufficiency without claiming unobserved model identity or OS isolation.";
+
+function renderCodexAdvisorAgent(intent) {
+  const cell = intent.routing.duties.advisory?.codex;
+  if (!cell?.selector?.value || !cell.effort) throw new Error("V3 Codex advisory duty is not projectable");
+  return [
+    `name = ${JSON.stringify("consult-advisor")}`,
+    `description = ${JSON.stringify(ADVISOR_DESCRIPTION)}`,
+    `model = ${JSON.stringify(cell.selector.value)}`,
+    `model_reasoning_effort = ${JSON.stringify(cell.effort)}`,
+    `developer_instructions = ${JSON.stringify(ADVISOR_INSTRUCTIONS)}`,
+    `sandbox_mode = ${JSON.stringify("read-only")}`,
+    "",
+  ].join("\n");
+}
+
+function replaceCodexAdvisorAgentTarget(target, intent, baseline) {
+  const beforeBytes = baselineBytes(baseline);
+  const afterBytes = renderCodexAdvisorAgent(intent);
+  const before = describeBytes(beforeBytes);
+  const after = describeBytes(afterBytes);
+  const cell = intent.routing.duties.advisory.codex;
+  return {
+    path: target.path,
+    format: target.format,
+    projection: target.projection,
+    ownedKeys: [...target.ownedKeys],
+    before,
+    after: { ...after, bytes: afterBytes },
+    changed: before.sha256 !== after.sha256,
+    route: { cell: { kind: "duty", dutyId: "advisory" }, ...requestedRoute(cell) },
+  };
+}
+
 function skipJsonWhitespace(bytes, index) {
   let cursor = index;
   while (cursor < bytes.length && /[\u0009\u000A\u000D\u0020]/u.test(bytes[cursor])) cursor += 1;
@@ -576,6 +611,9 @@ function projectValidatedIntent(intent, { source, baselines }) {
       if (target.path === ".claude/pipeline.yaml") {
         return replaceClaudeTarget(target, manifestTarget, intent, baselineBytes(baselines?.[target.path]));
       }
+      if (manifestTarget.projection === "codex-advisor-agent-v3") {
+        return replaceCodexAdvisorAgentTarget(manifestTarget, intent, baselines?.[target.path]);
+      }
       if (manifestTarget.projection === "codex-custom-agent-v3") {
         return replaceCodexAgentTarget(target, manifestTarget, intent);
       }
@@ -585,6 +623,11 @@ function projectValidatedIntent(intent, { source, baselines }) {
         ownedKeys: [...manifestTarget.ownedKeys],
       };
     });
+    targets.push(replaceCodexAdvisorAgentTarget(
+      manifestTargets[".codex/agents/consult-advisor.toml"],
+      intent,
+      baselines?.[".codex/agents/consult-advisor.toml"],
+    ));
     targets.push(replaceHumanRoleCalibrationTarget(
       manifestTargets[".claude/pipeline.json"],
       intent,
@@ -670,12 +713,15 @@ export function planRuntimeProjectionV3Json(text, options = {}) {
 export function readRuntimeProjectionV3Baselines(rootDir) {
   const baselines = readRuntimeProjectionV2Baselines(rootDir);
   const target = FROZEN_OWNED_KEYS.targets.find((entry) => entry.path === ".claude/pipeline.json");
-  if (!target) throw new Error("V3 human-role calibration target is missing");
+  const advisor = FROZEN_OWNED_KEYS.targets.find((entry) => entry.path === ".codex/agents/consult-advisor.toml");
+  if (!target || !advisor) throw new Error("V3 owned target is missing");
   const root = resolve(rootDir);
-  const path = resolve(root, target.path);
-  if (!isPhysicalPathContained(root, path)) throw new Error(`Unsafe owned target path: ${target.path}`);
-  baselines[target.path] = existsSync(path)
-    ? { status: "present", bytes: readFileSync(path, "utf8") }
-    : { status: "absent" };
+  for (const entry of [target, advisor]) {
+    const path = resolve(root, entry.path);
+    if (!isPhysicalPathContained(root, path)) throw new Error(`Unsafe owned target path: ${entry.path}`);
+    baselines[entry.path] = existsSync(path)
+      ? { status: "present", bytes: readFileSync(path, "utf8") }
+      : { status: "absent" };
+  }
   return baselines;
 }

@@ -5,10 +5,10 @@
 
 **Last updated:** 2026-07-23
 **Project status:** ACTIVE
-**Current block:** Sentinel integration paused at the final licensing-surface
-candidate-binding correction; no push, main merge, release, archive, or Epic
-close has occurred
-**Repair baseline:** `9344a5a9b5f246584da1c9946d396f1bd88c1ce2`
+**Current block:** Sentinel shared-prerequisite hotfix (`#10`, `#27`, direct
+Codex host Advisor) is in final verification before one push to `main`;
+consumer V3 onboarding is queued as the next blocker
+**Repair baseline:** `bd05d351957828393201bd6a9433b46107a880bc`
 **Release version:** `0.2.0`
 
 ## Operational head
@@ -80,6 +80,32 @@ close has occurred
   `pipeline.user.yaml`. Setup reports only the bounded approval/disabled state;
   it never prints raw questions, answers, credentials, paths, or environment
   details. The approved export remains one-question and allowlist-bound.
+- **Queued immediately after the current main push:** validate the sanitized
+  V3 consumer-onboarding observation against the pushed OID. The reported
+  legacy-consumer shape has no generated runtime projections: ordinary V3
+  migration stops at `invalid-baseline / baseline_read`, while Slim Private
+  Overlay admission requires an authenticated `.agent-pipeline/core.lock.json`
+  for which no preview-first consumer lock-creation flow is documented. First
+  classify this as an implementation defect, onboarding/documentation defect,
+  or deliberately unsupported compatibility shape. If it remains valid, use
+  the repository observation-intake flow to produce an exact sanitized preview
+  with duplicate check. The observation is published as
+  [#53](https://github.com/agent-pipe-shared/agent-pipeline/issues/53) with
+  `sprint:sentinel`; do not promote it to backlog, create a lock by hand, or
+  implement the fix before a separate PO approval. The current
+  prerequisite candidate and Windows parallel work remain bound to the pushed
+  main OID before this next block begins.
+- **PO intermediate-push exception, 2026-07-23:** this current `main` push is
+  a Windows-enablement snapshot, not final Sentinel evidence. It receives
+  `git diff --check` and only minimal focused contract probes; Full Verify,
+  Security and aggregate Critic gates are explicitly deferred to the later
+  integrated candidate. It closes no issue and claims no release/go-live.
+- **Windows parallel handover:** after this push, one branch
+  `feat/sentinel-windows-34-37-close` may rebase onto its exact public OID and
+  deliver the resolvable `#34`–`#37` chain in one return. It owns the
+  Windows-specific cores of `#34`, `#35`, and `#37`, then `#36` in the same
+  branch. Shared Verify, state, runtime and capability-inventory integration
+  happens only after that rebase; no current unpushed WSL bytes are input.
 - The PO confirmed SUL-1.0 as the best-fit standard source-available license and
   accepted that no custom lawyer-reviewed two-user license is being offered.
   The commercial boundary and this disposition are recorded in the Public

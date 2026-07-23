@@ -84,6 +84,7 @@ function fixture(source, { omitCodex = false } = {}) {
     ".codex/config.toml": '# config-unowned-sentinel\nprofile = "keep"\n',
     ".codex/agents/implementor.toml": '# implementor-prefix-sentinel\nmodel = "old-implementor"\nmodel_reasoning_effort = "low"\nname = "keep-implementor"\n[metadata]\nmodel = "nested-must-stay"\n',
     ".codex/agents/critic.toml": '# critic-prefix-sentinel\nmodel = "old-critic"\nmodel_reasoning_effort = "medium"\nname = "keep-critic"\n[metadata]\nmodel_reasoning_effort = "nested-must-stay"\n',
+    ".codex/agents/consult-advisor.toml": '# advisor-prefix-sentinel\nname = "old-advisor"\nmodel = "old-advisor"\n',
   };
   for (const path of runtimePaths) {
     if (!omitCodex || !path.startsWith(".codex/")) write(root, path, baselines[path]);

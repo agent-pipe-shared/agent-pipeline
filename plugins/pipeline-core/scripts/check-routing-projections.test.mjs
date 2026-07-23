@@ -177,6 +177,7 @@ try {
     ".codex/config.toml": "profile = \"keep\"\n",
     ".codex/agents/implementor.toml": "model = \"old\"\nmodel_reasoning_effort = \"low\"\n",
     ".codex/agents/critic.toml": "model = \"old\"\nmodel_reasoning_effort = \"low\"\n",
+    ".codex/agents/consult-advisor.toml": "name = \"stale\"\n",
   };
   for (const [path, bytes] of Object.entries(baselines)) {
     const absolute = join(v3Root, path);

@@ -66,15 +66,16 @@ routing:
           value: "fable"
         state: "default"
       codex:
-        adapter: "consult"
+        adapter: "host-consult"
         effort: "max"
-        evidence: "advisory-receipt"
-        isolation: "fresh-read-only"
+        evidence: "host-advisor-status"
+        isolation: "project-read-only"
         runner: "codex"
         selector:
           kind: "model-id"
           value: "gpt-5.6-sol"
         state: "default"
+        status: "pipeline.host-advisor-status.v1"
       eligibility:
         epic: "required"
         feature: "required"

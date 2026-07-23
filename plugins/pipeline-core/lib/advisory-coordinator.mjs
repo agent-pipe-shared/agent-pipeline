@@ -243,6 +243,11 @@ export async function coordinateAdvisory(input, {
   if (eligibility !== "required") {
     return { ok: false, code: "advisory_disabled", answer: null, receipt: null, attempts: [] };
   }
+  // Codex host-consult is owned by the host launch/status flow.  The
+  // coordinator must not invoke an adapter or manufacture the legacy receipt.
+  if (input.runner === "codex" && contract?.codex?.adapter === "host-consult") {
+    return { ok: false, code: "host_route_required", status: "deferred", answer: null, receipt: null, attempts: [] };
+  }
   const steps = routeSteps(contract, input.runner);
   if (steps.length === 0) {
     return { ok: false, code: "route_unavailable", answer: null, receipt: null, attempts: [] };

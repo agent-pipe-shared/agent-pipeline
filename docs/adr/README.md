@@ -55,6 +55,7 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0041](0041-po-authorized-codex-functional-equivalent.md) | PO-authorized Codex functional-equivalent gate pass | accepted | 2026-07-20 |
 | [0042](0042-global-observation-and-document-governance.md) | Global observation intake and document-lifecycle governance | accepted | 2026-07-20 |
 | [0043](0043-post-go-live-sprint-model.md) | Post-go-live Sprint model and common-base branch rule | accepted | 2026-07-22 |
+| [0044](0044-control-execution-boundary.md) | Provider-neutral control/execution boundary | accepted | 2026-07-23 |
 
 ### Resubmissions
 
@@ -125,6 +126,7 @@ Architecture Decision Records der Agent-Pipeline. Die ADRs formalisieren das kan
 | [0041](0041-po-authorized-codex-functional-equivalent.md) | PO-autorisierter Codex-Funktionsäquivalenz-Pass für Gates | akzeptiert | 2026-07-20 |
 | [0042](0042-global-observation-and-document-governance.md) | Globale Observation-Aufnahme und Dokument-Lifecycle-Governance | akzeptiert | 2026-07-20 |
 | [0043](0043-post-go-live-sprint-model.md) | Post-Go-live-Sprint-Modell und Common-Base-Branch-Regel | akzeptiert | 2026-07-22 |
+| [0044](0044-control-execution-boundary.md) | Anbieterneutrale Kontroll-/Ausführungsgrenze | akzeptiert | 2026-07-23 |
 
 ## Wiedervorlagen
 

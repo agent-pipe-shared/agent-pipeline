@@ -135,9 +135,10 @@ V3 source/runtime check:
    V3 this is a read-only source/runtime check. Success must report that
    `pipeline.user.v3` and its runner-neutral advisory runtime projections are
    current and that setup performed no writes.
-   A valid source with missing or declined `advisor_export` consent remains a
-   successful read-only check and prints the exact configuration command
-   `node setup.mjs --configure-advisor-export`; it must not write consent.
+   A valid source with missing/default or declined `advisor_export` consent
+   remains a successful read-only check. Missing/default enables the bounded
+   Codex Host Advisor without a prompt; the configuration command is
+   informational only and must not write consent.
 3. Treat every non-zero result, migration-required result, invalid V3 source,
    missing runtime baseline, or changed V3-owned projection as **F5**. Do not
    repair drift during bootstrap, do not fall back to V2/V1 routing, and do not
@@ -145,8 +146,8 @@ V3 source/runtime check:
    the explicit V3 migration/apply workflow owns authority changes.
 
 The successful no-op is the evidence that a fresh session sees the same V3
-source and runtime projection. It is not effective-model evidence; observed
-identity and the advisory receipt remain separate requirements.
+source and runtime projection. It is not effective-model evidence; Claude
+receipts and Codex Host-Advisor status remain separate requirements.
 
 ## Step 1b — Model/effort (Elephant only)
 
@@ -208,86 +209,33 @@ recovery keeps the exact `CAS-*` code and the operator guidance for
 
 ### V3 advisory duty at session start
 
-- Read the validated V3 `advisorExport` resolution before any advisory action.
-  Missing consent enables the registered same-runner duty by default; only
-  `declined` is an accepted optional bootstrap state: Advisory is disabled and
-  no adapter, selected-sandbox probe, child, export, or receipt may run.
-  Consent is configured explicitly with
-  `node setup.mjs --configure-advisor-export`; no-flag setup remains read-only.
-- Profile eligibility remains frozen: `epic` and `feature` run Advisory unless
-  consent is explicitly declined; `mini` disables it regardless. A disabled state
-  must not fabricate an advisory receipt.
-- **Affected Codex child boundary:** before the first child for every sandboxed
-  read-only Codex advisory, readiness, or Critic duty, require the generic
-  selected host bridge
-  `"${PIPELINE_PLUGIN_ROOT}/scripts/sandboxed-readonly-host-bridge.mjs"`. Supply
-  its exact selected ID only; the bridge must read back the selected
-  `network-open/read-only` profile before launch. A missing, stale, drifted, or
-  host-mode-unavailable selection returns its typed no-child result and starts
-  no child. This host-compatibility boundary changes neither runner nor model.
-  The selected Codex advisory payload is exactly `Read/Grep/Glob/Bash`; Bash
-  does not exist through an unbound host fallback.
-- For Epic/Feature, start the duty through
-  the repository-owned closed launcher for
-  `"${PIPELINE_PLUGIN_ROOT}/scripts/advisory-host-bridge.mjs"`,
-  `"${PIPELINE_PLUGIN_ROOT}/scripts/codex-advisory-bootstrap.mjs"` for Codex, with exactly one
-  material question, bound to the current candidate commit/tree and queue
-  revision. The launcher reads the standing `advisor_export.consent` decision
-  from validated `pipeline.user.v3`; do not rebuild or export its input with
-  raw `node -e`, and do not request a per-run export approval after standing
-  consent is not explicitly declined. Pass the one bounded UTF-8 advisory question only on
-  the launcher's stdin, never in its argv. The bridge
-  calls the coordinator and owns the fallback sequence; never recreate that
-  sequence manually. The bridge consumes its temporary raw input before the
-  first request; persist only its receipt target and never log or retain the
-  runtime transport.
-- **Codex:** the registered primary duty is one fresh ephemeral native Codex
-  App-Server turn on `openai/gpt-5.6-sol`: `initialize` → `initialized` →
-  `thread/start` with provider fallback disabled → `turn/start` with one input,
-  approval `never`, and external read-only/network-open policy → one completed
-  agent answer → `turn/completed` → EOF/exit/cleanup. The exact selected
-  `network-open/read-only` sandbox is its only transport. Unavailability,
-  no-child, wrong identity, missing profile readback, incomplete stdio or
-  incomplete cleanup remains non-success without a duplicate consult. There
-  is no unbound host shell/consult fallback or Claude/Fable substitution.
+- Read the validated V3 `advisorExport` resolution before any Advisory action.
+  Missing consent is the enabled `default`, with no per-run question; only
+  `declined` disables before a child, export or status. `mini` is disabled.
+- For Codex Epic/Feature, resolve `codex-host-advisor-route.mjs` and, for
+  `default|approved`, immediately launch exactly one project-scoped read-only
+  `consult-advisor`. Do not make any selected-sandbox, App-Server, native or
+  other advisory probe before or after it. The child receives one question and
+  allowlisted repository evidence only; it has no inherited chat/handover/
+  memory, mutation, persistence, auto-apply, gate decision, separate network
+  tool or third-party export.
+- The Elephant, not the child, creates the one-use launch and validates the
+  candidate-/launch-/question-bound `pipeline.host-advisor-status.v1` against
+  pre/post workspace observation. Only an answered unchanged status is Codex
+  `host-bound-consult` success. It emits no `pipeline.advisory-receipt.v1` and
+  every claim retains `no attested selected-sandbox execution; OS isolation and
+  model identity are not asserted`. Failure, retry, mutation or observed
+  separate export is non-success with no fallback.
+- The selected-sandbox host bridge
+  `sandboxed-readonly-host-bridge.mjs` remains mandatory only for Codex
+  Readiness and Critic duties; it is not an Advisor route.
 - **Claude:** native Fable is tried for the coordinator's bounded repeated
   attempts. Only after those failures may native Opus run; only after the
   native adapters fail may the same-runner fresh read-only consult run. The
   order is `Fable × bounded repeat → Opus → Claude consult`, never an automatic
   main-model or runner switch.
-- The consult boundary is mandatory: fresh context, one question, no handover,
-  chat history, implementor rationale or memory, Claude tools
-  `Read/Grep/Glob` or selected Codex tools `Read/Grep/Glob/Bash`, no mutation,
-  and no auto-apply. Codex Bash remains constrained to the read-only checkout
-  plus coordinator scratch by the selected profile. Claude uses the
-  `pipeline-core:advisor-consult` adapter contract; Codex uses the native
-  App-Server contract above.
-- Every default-enabled answered or exhausted invocation must emit one schema-valid
-  `pipeline.advisory-receipt.v1`, with candidate binding, runner, configured
-  route, adapter, observed status/identity, question/answer digests and redacted
-  fallback reason. Persist only the sanitized receipt, never raw question,
-  answer, prompt, trace or adapter error. The exact ADR-0041
-  functional-equivalent pass emits only its sanitized candidate-bound status
-  record, never a native advisory receipt.
-- **Attested primary success unless consent is explicitly declined:** An answered Codex
-  Advisory claim requires an `answered` receipt whose
-  observed provider matches the same runner and whose candidate binding is
-  current. A missing/invalid receipt, adapter-protocol error, runner drift,
-  exhausted failure receipt or stale candidate binding creates no attested
-  native advisory, selected-sandbox, identity, isolation or conformance claim.
-  After exactly one typed Codex selected-sandbox `no-child` or `unavailable`
-  stop, ADR-0041 permits one separate fresh, local, hard-read-only
-  `consult-advisor` subagent with the direct single question. If it answers
-  without handover, memory, mutation, network export or auto-apply, print
-  `Advisory po-authorized-functional-equivalent · Receipt n/a · Reason CODE`.
-  This is gate-capable for the affected PO gate, bootstrap/readiness decision,
-  Critic prerequisite, or Epic-close prerequisite until revoked by the PO or
-  replaced by a functional Codex CLI selected sandbox. It is never an attested
-  native advisory: it emits no Pipeline Advisory receipt or selected-sandbox
-  execution attestation, and every resulting claim must disclose `no attested
-  selected-sandbox execution; OS isolation and model identity are not
-  asserted`. A failed local consult, a second question, mutation, or export is
-  not a pass and receives no further fallback.
+- Claude retains its existing coordinator receipt and fallback rules. No raw
+  question, answer, prompt, trace or adapter error is persisted.
 
 ## Step 1c — Spend/usage check (Elephant only; recommended)
 
@@ -411,7 +359,7 @@ Epic/Feature may name only an `answered`, current, schema-valid receipt.
 Explicitly declined consent and Mini are accepted disabled states and must not
 name a receipt:
 
-> V3 authority: pipeline.user.v3 · Runtime projection noop · Profile {{epic|feature|mini}} · Advisory {{answered|disabled-no-consent|disabled-by-profile|po-authorized-functional-equivalent}} · Receipt {{RECEIPT_ID|n/a}} {{· Reason CODE when functional-equivalent}}
+> V3 authority: pipeline.user.v3 · Runtime projection noop · Profile {{epic|feature|mini}} · Advisory {{host-bound-consult|disabled-no-consent|disabled-by-profile}} · Status {{STATUS_SHA256|n/a}}
 
 Elephant adds the model/effort line directly below (MP-17):
 

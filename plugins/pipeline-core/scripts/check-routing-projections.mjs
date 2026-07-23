@@ -88,9 +88,8 @@ export function checkV2RuntimeProjection(root, user) {
 
 /**
  * V3 projects only the declared runtime-owned bytes. In particular, Claude
- * receives advisor_epic/advisor_feature compatibility routes while Codex
- * advisory remains a receipt-bound consult duty and therefore has no invented
- * native custom-agent projection.
+ * receives advisor_epic/advisor_feature compatibility routes and Codex
+ * advisory is projected as the complete V3-owned consult-advisor agent.
  */
 export function checkV3RuntimeProjection(root, user) {
   const findings = [];
@@ -121,8 +120,18 @@ export function checkV3RuntimeProjection(root, user) {
   if (!routeKeys.has("advisor_epic") || !routeKeys.has("advisor_feature") || routeKeys.has("advisor_mini")) {
     findings.push("V3 Claude advisory compatibility projection drift");
   }
-  if (plan.targets.some((target) => target.path.includes("advisor") || target.route?.cell?.dutyId === "advisory")) {
-    findings.push("V3 Codex advisory must remain consult-only without a native custom-agent projection");
+  const advisor = plan.targets.find((target) => target.path === ".codex/agents/consult-advisor.toml");
+  const expectedAdvisor = [
+    'name = "consult-advisor"',
+    'description = "Fresh independent read-only advisor; answer one supplied question with repository evidence only."',
+    'model = "gpt-5.6-sol"',
+    'model_reasoning_effort = "max"',
+    'developer_instructions = "Use fresh context and answer exactly one supplied question. Read-only sandbox only: no chat, handover, memory, mutation, persistence, auto-apply, or gate decisions; no separate network tool or third-party export. Report evidence and insufficiency without claiming unobserved model identity or OS isolation."',
+    'sandbox_mode = "read-only"',
+    "",
+  ].join("\n");
+  if (!advisor || advisor.after.bytes !== expectedAdvisor || advisor.route?.cell?.dutyId !== "advisory") {
+    findings.push("V3 Codex advisor custom-agent projection drift");
   }
   return findings;
 }

@@ -64,21 +64,16 @@ const cases = [
     assert.match(skill, /Ask only when[\s\S]*genuinely\s+ambiguous/u);
     assert.doesNotMatch(skill, /profile question repeats at EVERY bootstrap/u);
   }],
-  ["Epic and Feature advisory defaults on while Mini disables it", () => {
-    assert.match(skill, /Missing consent enables the registered same-runner duty by default/u);
-    assert.match(skill, /`epic` and `feature` run Advisory unless[\s\S]*`mini` disables it/u);
-    assert.match(skill, /Advisory is disabled and\s+no adapter, selected-sandbox probe, child, export,[\s\S]*receipt may run/u);
-    assert.match(skill, /A disabled state[\s\S]*must not fabricate an advisory receipt/u);
+  ["Epic and Feature Codex advisory defaults on while Mini disables it", () => {
+    assert.match(skill, /Missing consent is the enabled `default`, with no per-run question/u);
+    assert.match(skill, /`declined` disables before a child, export or status/u);
+    assert.match(skill, /`mini` is disabled/u);
   }],
-  ["Codex starts with one fresh native attested Sol App-Server turn", () => {
-    assert.match(skill, /\*\*Codex:\*\*[\s\S]*native Codex[\s\S]*openai\/gpt-5\.6-sol/u);
-    assert.match(skill, /`initialize` → `initialized` →[\s\S]*`thread\/start`[\s\S]*`turn\/start`/u);
-    assert.match(skill, /external read-only\/network-open policy/u);
-    assert.match(skill, /exact selected[\s\S]*sandbox is its only transport[\s\S]*There\s+is no unbound host shell\/consult fallback/u);
-    assert.match(skill, /raw `node -e`/u);
-    assert.match(skill, /codex-advisory-bootstrap\.mjs/u);
-    assert.match(skill, /question only on\s+the launcher's stdin, never in its argv/u);
-    assert.match(skill, /consent is not explicitly declined/u);
+  ["Codex starts with exactly one direct Host Advisor", () => {
+    assert.match(skill, /codex-host-advisor-route\.mjs/u);
+    assert.match(skill, /immediately launch exactly one project-scoped read-only\s+`consult-advisor`/u);
+    assert.match(skill, /Do not make any selected-sandbox, App-Server, native or\s+other advisory probe/u);
+    assert.match(skill, /pipeline\.host-advisor-status\.v1/u);
   }],
   ["Claude fallback order is bounded Fable then Opus then consult", () => {
     const chain = skill.match(/order is `([^`]+)`/u)?.[1] ?? "";
@@ -87,16 +82,11 @@ const cases = [
     assert.ok(chain.indexOf("Opus") < chain.indexOf("Claude consult"));
     assert.match(skill, /same-runner fresh read-only consult/u);
   }],
-  ["attested success needs a receipt while the PO-authorized direct fallback has bounded gate capability", () => {
-    assert.match(skill, /pipeline\.advisory-receipt\.v1/u);
-    assert.match(skill, /requires an `answered` receipt/u);
-    assert.match(skill, /observed provider matches the same runner/u);
-    assert.match(skill, /candidate binding is\s+current/u);
-    assert.match(skill, /po-authorized-functional-equivalent/u);
-    assert.match(skill, /emits no Pipeline Advisory\s+receipt/u);
-    assert.match(skill, /gate-capable for the affected PO gate, bootstrap\/readiness decision,\s+Critic prerequisite, or Epic-close prerequisite/u);
-    assert.match(skill, /until revoked by the PO or\s+replaced by a functional Codex CLI selected sandbox/u);
-    assert.match(skill, /no attested\s+selected-sandbox execution; OS isolation and model identity are not\s+asserted/u);
+  ["Codex status is bounded gate capability while Claude receipts remain separate", () => {
+    assert.match(skill, /Only an answered unchanged status is Codex\s+`host-bound-consult` success/u);
+    assert.match(skill, /It emits no `pipeline\.advisory-receipt\.v1`/u);
+    assert.match(skill, /Claude retains its existing coordinator receipt/u);
+    assert.match(skill, /no attested\s+selected-sandbox execution; OS isolation and\s+model identity are not\s+asserted/u);
   }],
   ["existing provenance and Elephant role checks remain", () => {
     assert.match(skill, /git rev-parse HEAD/u);
@@ -114,12 +104,10 @@ const cases = [
     assert.match(skill, /after that re-entry, automatically continue the persisted next action without waiting/u);
     assert.match(skill, /Only an explicit pause\/cancel\/replace\/redirect, a named gate, completion or a typed blocker may stop/u);
   }],
-  ["affected Codex duties select the documented host mode before any child", () => {
+  ["Readiness and Critic retain their documented selected host boundary", () => {
     assert.equal(skill.includes("sandboxed-readonly-host-bridge.mjs"), true, "pipeline start must name the generic selected host bridge");
-    assert.equal(skill.includes("network-open/read-only"), true, "pipeline start must name the documented profile");
-    assert.equal(/before (?:the )?first child/u.test(skill), true, "selection must precede every child");
-    assert.equal(skill.includes("host-mode-unavailable"), true, "unavailable hosts need a typed outcome");
-    assert.equal(/ask (?:the )?(?:PO|user).*sandbox mode/ui.test(skill), false, "user prose cannot choose the host mode");
+    assert.match(skill, /Readiness and Critic duties; it is not an Advisor route/u);
+    assert.doesNotMatch(skill, /Codex Advisory[\s\S]*network-open\/read-only/u);
     assert.equal(skill.includes("danger-full-access"), false, "the prohibited mode must never appear as a workaround");
   }],
   ["self-application probes the managed toolchain without exporting pipeline scope to consumers", () => {

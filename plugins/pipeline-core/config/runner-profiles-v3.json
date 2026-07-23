@@ -79,12 +79,13 @@
       },
       "codex": {
         "state": "default",
-        "adapter": "consult",
+        "adapter": "host-consult",
         "runner": "codex",
         "selector": { "kind": "model-id", "value": "gpt-5.6-sol" },
         "effort": "max",
-        "isolation": "fresh-read-only",
-        "evidence": "advisory-receipt"
+        "isolation": "project-read-only",
+        "evidence": "host-advisor-status",
+        "status": "pipeline.host-advisor-status.v1"
       }
     }
   },

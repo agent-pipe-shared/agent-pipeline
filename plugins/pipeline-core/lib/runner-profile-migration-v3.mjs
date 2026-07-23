@@ -68,6 +68,7 @@ const LEGACY_CLASSIFIER_BASELINES = Object.freeze({
   ".codex/config.toml": "# classifier baseline\n",
   ".codex/agents/implementor.toml": 'model = "legacy"\nmodel_reasoning_effort = "low"\n',
   ".codex/agents/critic.toml": 'model = "legacy"\nmodel_reasoning_effort = "low"\n',
+  ".codex/agents/consult-advisor.toml": "",
 });
 // These seeds exist only in authenticated legacy -> V3 planning memory. They
 // contain the minimum syntax required by the byte-preserving renderer and are
@@ -78,6 +79,7 @@ const LEGACY_V3_RUNTIME_SEEDS = Object.freeze({
   ".codex/config.toml": "",
   ".codex/agents/implementor.toml": 'model = ""\nmodel_reasoning_effort = ""\n',
   ".codex/agents/critic.toml": 'model = ""\nmodel_reasoning_effort = ""\n',
+  ".codex/agents/consult-advisor.toml": "",
 });
 // A slim private overlay can carry the complete, already-valid V3 source while
 // deliberately omitting every ignored runtime projection. These in-memory
@@ -105,6 +107,7 @@ const SLIM_V3_RUNTIME_SEEDS = Object.freeze({
   ".codex/config.toml": "",
   ".codex/agents/implementor.toml": 'model = ""\nmodel_reasoning_effort = ""\n',
   ".codex/agents/critic.toml": 'model = ""\nmodel_reasoning_effort = ""\n',
+  ".codex/agents/consult-advisor.toml": "",
 });
 
 class IntentionalMigrationInterruption extends Error {

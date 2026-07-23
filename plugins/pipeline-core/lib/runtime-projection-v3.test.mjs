@@ -22,6 +22,7 @@ const targetPaths = [
   ".codex/config.toml",
   ".codex/agents/implementor.toml",
   ".codex/agents/critic.toml",
+  ".codex/agents/consult-advisor.toml",
 ];
 
 const PREFIX = "# unowned-prefix\nlanguage:\n  human_facing: en\n  unowned_language_sentinel: exact\ncustomBefore: exact\n";
@@ -56,6 +57,7 @@ function writeFixture(root) {
     ".codex/config.toml": "profile = \"keep\"\n",
     ".codex/agents/implementor.toml": "model = \"old\"\nmodel_reasoning_effort = \"low\"\nname = \"keep\"\n[metadata]\nmodel = \"nested\"\n",
     ".codex/agents/critic.toml": "model = \"old\"\nmodel_reasoning_effort = \"medium\"\nname = \"keep\"\n[metadata]\nmodel_reasoning_effort = \"nested\"\n",
+    ".codex/agents/consult-advisor.toml": "name = \"stale\"\n",
   };
   for (const [path, bytes] of Object.entries(files)) {
     const absolute = join(root, path);
@@ -141,10 +143,12 @@ test("advisor export consent is source-only and never changes runtime projection
   }
 });
 
-test("V3 has no Codex advisor custom-agent target", () => {
+test("V3 owns the Codex advisor custom-agent target", () => {
   const manifest = loadRuntimeProjectionV3OwnedKeys();
-  assert.equal(manifest.targets.some((entry) => /advisor/u.test(entry.path)), false);
-  assert.equal(manifest.targets.some((entry) => entry.cell?.dutyId === "advisory"), false);
+  const advisor = manifest.targets.find((entry) => entry.path === ".codex/agents/consult-advisor.toml");
+  assert.equal(advisor.projection, "codex-advisor-agent-v3");
+  assert.deepEqual(advisor.cell, { kind: "duty", dutyId: "advisory" });
+  assert.deepEqual(advisor.ownedKeys, ["name", "description", "model", "model_reasoning_effort", "developer_instructions", "sandbox_mode"]);
   const humanRoles = manifest.targets.find((entry) => entry.path === ".claude/pipeline.json");
   assert.deepEqual(humanRoles.ownedKeys, ["humanRoles.po.displayLabel"]);
   const claude = manifest.targets.find((entry) => entry.path === ".claude/pipeline.yaml");
@@ -161,11 +165,12 @@ test("V3 planning is deterministic, read-only, and byte-preserving", () => {
     const first = planRuntimeProjectionV3(completeIntent(), { source: "fixture", baselines });
     const second = planRuntimeProjectionV3(completeIntent(), { source: "fixture", baselines });
     assert.deepEqual(second, first);
-    assert.ok(first.targets.every((entry) => entry.unowned.preserved));
+    assert.ok(first.targets.filter((entry) => entry.unowned).every((entry) => entry.unowned.preserved));
     assert.deepEqual(Object.fromEntries(targetPaths.map((path) => [path, readFileSync(join(root, path), "utf8")])), before);
     assert.match(target(first, ".codex/agents/implementor.toml").after.bytes, /model = "gpt-5\.6-luna"/u);
     assert.match(target(first, ".codex/agents/critic.toml").after.bytes, /model = "gpt-5\.6-terra"/u);
     assert.equal(target(first, ".codex/agents/critic.toml").route.requested.effort, "high");
+    assert.match(target(first, ".codex/agents/consult-advisor.toml").after.bytes, /sandbox_mode = "read-only"/u);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
