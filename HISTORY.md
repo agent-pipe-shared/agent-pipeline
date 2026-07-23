@@ -1,5 +1,53 @@
 # History
 
+## 2026-07-23 — Native-Windows Verify block: portability sweep and delivery
+
+- Ran the full `verify.mjs` suite natively on a Windows host for the first
+  time in this Sentinel block. The first native run surfaced roughly 20
+  distinct suites non-zero that had only ever been exercised on Linux/CI.
+- Root-caused and fixed every failure, committed as 18 atomic commits
+  (`7f630da`..`4126e5c`, on top of two already-present same-theme commits):
+  a shared native Windows DACL-observation primitive extended to
+  advisory-receipt, worktree-lifecycle, po-gate authority/publisher,
+  codex-critic-host, document-adapter/render-controller, and
+  release-version-plan; directory-fsync tolerance and a read-only-handle
+  fsync fix applied across every private-state writer; a `pathToFileURL()`
+  fix for the `import.meta.url === file://...` self-invocation idiom across
+  a dozen CLI wrappers; git-porcelain forward-slash-vs-native-separator
+  normalization; POSIX-literal absolute-path check fixes; a cross-platform
+  adapter-path-simulation fix in `session-power.mjs`; a genuine test-suite
+  flake fix (short-write iteration count cut, real production timeout
+  unchanged); an injectable trust-assessment seam in `security-scan.mjs`;
+  and capability-probe gating (symlink/fifo/chmod-mode/mode-bit/trusted-git)
+  across roughly a dozen test files.
+- One leftover `GF3_DEBUG`-gated debug line found in
+  `runner-profile-migration-v2.mjs` was removed as unrelated cruft before
+  committing.
+- A final full native `verify.mjs` run against the resulting committed HEAD
+  (`2478d4a`) confirmed every registered suite `=0`, `exit 0`, evidence
+  commit-bound. The branch was pushed to
+  `origin/feat/v3-public-core-foundation` under explicit PO authorization
+  (identity confirmed neutral immediately before push), and fetch-back
+  confirmed the exact pushed OID.
+
+### Lessons
+
+- Running `verify.mjs` on a platform it has never actually executed on is the
+  only reliable way to find that platform's portability bugs; suite
+  registration and CI coverage on one OS give no signal about another.
+- A directory handle opened `"r"` (read-only) fails Windows fsync (EPERM)
+  even when the handle only flushes bytes the process itself just wrote;
+  the fix is `"r+"`, not weakening the durability check.
+- POSIX mode-bit checks and literal `"/"`/`"\\"` path heuristics need a real
+  platform-appropriate substitute (DACL assurance, `isAmbient`/`isAbsolute`,
+  or a capability probe) on native Windows rather than a platform-blind skip.
+
+### Open / next
+
+See the canonical [handover](docs/state.md) for the remaining Sentinel
+backlog (#33–#37) — this block is portability-bugfix evidence toward #36
+(Windows Verify reproducibility), not a closure of #36 or #37.
+
 ## 2026-07-21 — Recovery timeout quickfix and feature-branch delivery
 
 - Added a bounded synchronous callback timeout to the recovery-preview

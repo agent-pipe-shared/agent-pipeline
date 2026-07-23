@@ -14,6 +14,7 @@ The only allowed table form is:
 | Cross-repository guard overrides can bind audit storage to the coordinator checkout instead of the target repository. | tooling | new |
 | Open-ended reference-variant hardening can expand review scope and delay delivery. | process | recurring -> mechanism: prefer closed structured channels with fail-closed validation before adding free-text variant parsers |
 | Retained public authority copies can drift from active bytes after an approved correction. | quality | new |
+| Code exercised only on one host OS can carry unnoticed OS-specific assumptions (path-separator literals, permission-bit semantics, self-invocation URL comparison, directory-fsync behavior) that only an actual native run on the other OS surfaces. | quality | recurring -> template: a cross-platform portability claim must cite evidence from an actual native run on the target OS, not code review or same-OS test coverage alone |
 | Platform-specific filesystem and privilege assumptions can make a declared host surface unusable. | tooling | new |
 
 Use one concise, generic class per distinct root cause. Similar classes are
