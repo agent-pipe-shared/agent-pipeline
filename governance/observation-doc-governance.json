@@ -99,6 +99,7 @@
         "audience": "maintainer",
         "lifecycle": "maintained",
         "paths": [
+          "docs/contributor-gate-security.md",
           "docs/critic-isolation-threat-model.md",
           "docs/marketplace-supply-chain-threat-model.md",
           "docs/next-session-setup-prompt.md",

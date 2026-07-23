@@ -1,8 +1,12 @@
 # Public Core licensing
 
 The current Public Core candidate uses the Sustainable Use License Version 1.0
-(SUL-1.0), SPDX identifier `SUL-1.0`. This is source-available/fair-source
-licensing and must not be described as OSI Open Source.
+(SUL-1.0), SPDX identifier `SUL-1.0`, with the repository-specific
+Agent-Pipeline Additional Permission. The `LICENSE` file keeps the canonical
+SUL-1.0 body unmodified and states the additional permission separately; the
+SPDX identifier and canonical URL refer only to the base license. This is
+source-available/fair-source licensing and must not be described as OSI Open
+Source.
 
 The selected boundary is deliberately standard-near and not an individually
 negotiated two-user license. In practical terms, and always subject to the
@@ -10,16 +14,18 @@ governing `LICENSE` text:
 
 - personal use, internal business use, internal use by a commercial company,
   and making or modifying a fork for the user's own purposes are permitted;
+- affiliates, employees, contractors, and service providers may use the
+  software solely on the licensee's behalf for the licensee's internal
+  operations;
 - free redistribution for non-commercial purposes is permitted when the
   license and notices travel with the copy;
-- consulting, training, and support may be provided when Agent-Pipeline is not
-  itself sold, hosted, white-labelled, embedded, or offered as the paid
-  product;
+- independent consulting, training, and support are permitted when
+  Agent-Pipeline or a substantial derivative is not itself monetized;
 - a separate agreement with the rightsholder is required only when
-  Agent-Pipeline or a substantial derivative is itself monetized: sale or
-  licensing, paid hosting/SaaS/managed service, white-labeling, material
-  embedding as a value component of a paid product, or commercial
-  redistribution;
+  Agent-Pipeline or a substantial derivative is itself monetized: sale; paid
+  licensing or distribution; paid hosting, SaaS, or managed service;
+  white-label use; material embedding as a value component of a paid product;
+  or commercial redistribution;
 - there is no automatic conversion to an OSI Open Source license.
 
 `LICENSE` contains the governing text and `NOTICE` contains the project notice
@@ -50,6 +56,19 @@ cannot prove those server-side settings; activation for merging therefore
 requires an authenticated branch-protection read-back. The workflow's
 machine-readable receipt is written to the current job log and runner-temporary
 storage only; no immutable long-term archive is asserted.
+
+The contributor gate's personal-acceptance workflow, trusted-base boundary,
+technical data-privacy review, and fail-closed recovery order are documented in
+[`contributor-gate-security.md`](contributor-gate-security.md). Named-human
+data-privacy sign-off remains an activation prerequisite; the CLA-process
+approval does not imply it.
+
+SNT-1 release consumption is also still blocked on its candidate-bound Result
+and private/neutral-public license-gate digests. The exact missing evidence and
+sanctioned append-only construction path are recorded in
+[`snt-1-activation-prerequisite.md`](../specs/2026-07-19-sprint-sentinel-epic/snt-1-activation-prerequisite.md).
+The historical closed backlog record is not rewritten or treated as that
+missing current evidence.
 
 The PO has represented for this candidate that all current project-authored
 content is 100% owner-controlled and that no external code is known to be

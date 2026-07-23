@@ -2,8 +2,10 @@ Documentation License
 
 Documentation, specifications, examples, templates, and other prose in this
 repository are provided under the same Sustainable Use License Version 1.0
-(SPDX identifier: SUL-1.0) as the software, unless a file states a different
-third-party license.
+(SPDX identifier: SUL-1.0) with the Agent-Pipeline Additional Permission as
+the software, unless a file states a different third-party license. The SPDX
+identifier and canonical URL name the unmodified base license; the
+repository-specific additional permission is stated separately in `LICENSE`.
 
 The complete governing terms are in [LICENSE](LICENSE) and at:
 
@@ -12,5 +14,11 @@ https://spdx.org/licenses/SUL-1.0.html
 This repository is source available and must not be described as OSI Open
 Source. Internal business use, including internal commercial-company use and
 modification for the user's own purposes, is permitted subject to the LICENSE.
-A separate agreement is required only when Agent-Pipeline or a substantial
-derivative is itself monetized as described in NOTICE and docs/licensing.md.
+Affiliates, employees, contractors, and service providers may use the material
+solely on the licensee's behalf for the licensee's internal operations.
+Independent consulting, training, and support are permitted when
+Agent-Pipeline or a substantial derivative is not itself monetized. A separate
+agreement is required for sale; paid licensing or distribution; paid hosting,
+SaaS, or managed service; white-label use; material embedding as a value
+component of a paid product; or commercial redistribution of Agent-Pipeline or
+a substantial derivative, as described in NOTICE and docs/licensing.md.

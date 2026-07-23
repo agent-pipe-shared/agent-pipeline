@@ -103,9 +103,18 @@ you agree that:
 
 This is source-available licensing, not OSI Open Source. Internal business use,
 including internal commercial-company use and modification for one's own
-purposes, is permitted subject to the license. Separate rightsholder
-participation is required only when Agent-Pipeline or a substantial derivative
-is itself monetized as described in `NOTICE` and `docs/licensing.md`.
+purposes, is permitted under SUL-1.0 with the repository-specific
+Agent-Pipeline Additional Permission; the SPDX identifier names the unmodified
+base license. Affiliates, employees, contractors, and service providers may
+use the software solely on the
+licensee's behalf for the licensee's internal operations. Independent
+consulting, training, and support are permitted when Agent-Pipeline or a
+substantial derivative is not itself monetized. Separate rightsholder
+participation is required for sale; paid licensing or distribution; paid
+hosting, SaaS, or managed service; white-label use; material embedding as a
+value component of a paid product; or commercial redistribution of
+Agent-Pipeline or a substantial derivative, as described in `NOTICE` and
+`docs/licensing.md`.
 
 The Contributor License Agreement grants the project the rights needed to
 publish contributions under SUL-1.0 and, separately, under commercial terms.

@@ -90,4 +90,23 @@ terms.
 SPDX identifier: SUL-1.0
 Canonical text: https://spdx.org/licenses/SUL-1.0.html
 
+Agent-Pipeline Additional Permission
+
+The following repository-specific permission supplements the unmodified
+Sustainable Use License Version 1.0 text above. For this additional permission,
+the "licensee" is you. Your affiliates, employees, contractors, and service
+providers may use or modify the software solely on your behalf for the
+licensee's internal operations, provided that you remain responsible for their
+compliance with these terms.
+
+Independent consulting, training, and support relating to the software are
+permitted when Agent-Pipeline or a substantial derivative is not itself
+monetized. Agent-Pipeline or a substantial derivative is itself monetized by
+sale; paid licensing or distribution; paid hosting, SaaS, or managed service;
+white-label use; material embedding as a value component of a paid product;
+or commercial redistribution. Those activities require a separate agreement
+with the licensor. This additional permission expands only the permitted
+internal-operation and independent-service uses; every other SUL-1.0 term and
+limitation remains in force.
+
 Copyright (c) 2026 agent-pipe-shared and contributors.

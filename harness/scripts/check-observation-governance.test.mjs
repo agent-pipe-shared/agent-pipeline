@@ -41,6 +41,7 @@ test("provisional Observation 13 scope keeps audience and lifecycle independent"
   const document = policy();
   const expected = new Map([
     ["docs/codex-isolated-critic-foundation.md", { audience: "maintainer", lifecycle: "review-candidate" }],
+    ["docs/contributor-gate-security.md", { audience: "maintainer", lifecycle: "maintained" }],
     ["docs/critic-isolation-threat-model.md", { audience: "maintainer", lifecycle: "maintained" }],
     ["docs/design-decisions.md", { audience: "public-user", lifecycle: "review-candidate" }],
     ["docs/known-issues.md", { audience: "maintainer", lifecycle: "review-candidate" }],

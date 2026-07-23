@@ -7,7 +7,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-export const RECEIPT_SCHEMA = "agent-pipeline.pr-contributor-gate.v1";
+export const RECEIPT_SCHEMA = "agent-pipeline.pr-contributor-gate.v2";
 export const CLA_PATH = "CONTRIBUTOR_LICENSE_AGREEMENT.md";
 export const ALLOWED_ACTIONS = new Set(["opened", "reopened", "synchronize", "edited"]);
 
@@ -29,10 +29,22 @@ export function expectedAcceptanceLine({ version, sha256: digest }, login, check
   return `- [${mark}] **CLA acceptance — Agent-Pipeline CLA v${version} (SHA-256: \`${digest}\`) — I, @${login}, have read and expressly accept this CLA for every contribution in this pull request and confirm that I have the rights needed to make its grants.**`;
 }
 
-function inspectAcceptance(body, cla, login) {
+function inspectAcceptance(event, cla, login, senderLogin) {
+  const body = event?.pull_request?.body;
   const expected = expectedAcceptanceLine(cla, login, true);
   const lines = typeof body === "string" ? body.split(/\r?\n/u) : [];
-  if (lines.filter((line) => line === expected).length === 1) return { accepted: true };
+  if (lines.filter((line) => line === expected).length === 1) {
+    if (senderLogin !== login) return { accepted: false, error: error("CLA_ACCEPTANCE_PROXY_ACTOR") };
+    if (event?.action === "opened") return { accepted: true, bodyTransition: "opened-by-author" };
+    if (event?.action === "edited") {
+      const previousBody = event?.changes?.body?.from;
+      if (typeof previousBody !== "string") return { accepted: false, error: error("CLA_ACCEPTANCE_BODY_CHANGE_REQUIRED") };
+      const previousLines = previousBody.split(/\r?\n/u);
+      if (previousLines.includes(expected)) return { accepted: false, error: error("CLA_ACCEPTANCE_CHECK_TRANSITION_REQUIRED") };
+      return { accepted: true, bodyTransition: "checked-by-author" };
+    }
+    return { accepted: false, error: error("CLA_ACCEPTANCE_REFRESH_REQUIRED") };
+  }
 
   const candidates = lines.filter((line) => line.includes("CLA acceptance — Agent-Pipeline CLA"));
   if (candidates.length === 0) return { accepted: false, error: error("CLA_ACCEPTANCE_MISSING") };
@@ -99,11 +111,12 @@ export function checkDcoRange(root, baseSha, headSha) {
   return result;
 }
 
-export function validatePrContributorGates({ root, event }) {
+export function validatePrContributorGates({ root, claRoot, event }) {
   const errors = [];
   const pr = event?.pull_request;
   const number = Number.isInteger(event?.number) && event.number > 0 ? event.number : null;
   const login = typeof pr?.user?.login === "string" && /^[A-Za-z0-9-]{1,39}$/u.test(pr.user.login) ? pr.user.login : null;
+  const senderLogin = typeof event?.sender?.login === "string" && /^[A-Za-z0-9-]{1,39}$/u.test(event.sender.login) ? event.sender.login : null;
   const headSha = typeof pr?.head?.sha === "string" && /^[a-f0-9]{40}$/u.test(pr.head.sha) ? pr.head.sha : null;
   const baseSha = typeof pr?.base?.sha === "string" && /^[a-f0-9]{40}$/u.test(pr.base.sha) ? pr.base.sha : null;
   const baseRef = typeof pr?.base?.ref === "string" ? pr.base.ref : null;
@@ -111,13 +124,14 @@ export function validatePrContributorGates({ root, event }) {
   if (!ALLOWED_ACTIONS.has(event?.action)) errors.push(error("EVENT_ACTION_INVALID"));
   if (number === null) errors.push(error("PR_NUMBER_INVALID"));
   if (login === null) errors.push(error("PR_AUTHOR_LOGIN_INVALID"));
+  if (senderLogin === null) errors.push(error("EVENT_SENDER_LOGIN_INVALID"));
   if (headSha === null) errors.push(error("PR_HEAD_SHA_INVALID"));
   if (baseSha === null) errors.push(error("PR_BASE_SHA_INVALID"));
   if (baseRef !== "main") errors.push(error("PR_BASE_REF_INVALID"));
 
-  const cla = readClaContract(root);
+  const cla = typeof claRoot === "string" && claRoot.length > 0 ? readClaContract(claRoot) : { error: error("CLA_ROOT_INVALID") };
   if (cla.error) errors.push(cla.error);
-  const acceptance = !cla.error && login !== null ? inspectAcceptance(pr?.body, cla, login) : { accepted: false };
+  const acceptance = !cla.error && login !== null && senderLogin !== null ? inspectAcceptance(event, cla, login, senderLogin) : { accepted: false };
   if (acceptance.error) errors.push(acceptance.error);
   const dco = baseSha && headSha ? checkDcoRange(root, baseSha, headSha) : { status: "failed", checkedCommits: 0, failures: [error("DCO_RANGE_IDENTIFIERS_INVALID")] };
   errors.push(...dco.failures);
@@ -125,6 +139,7 @@ export function validatePrContributorGates({ root, event }) {
   return {
     schema: RECEIPT_SCHEMA,
     ok: errors.length === 0,
+    event: { action: event?.action ?? null, senderLogin, bodyTransition: acceptance.bodyTransition ?? null },
     pullRequest: { number, authorLogin: login, headSha, baseRef, baseSha },
     cla: cla.error ? { path: CLA_PATH, version: null, sha256: null, accepted: false } : { ...cla, accepted: acceptance.accepted },
     dco: { status: dco.status, checkedCommits: dco.checkedCommits },
@@ -133,12 +148,14 @@ export function validatePrContributorGates({ root, event }) {
 }
 
 function parseArgs(argv) {
+  const allowed = new Set(["root", "cla-root", "event", "receipt"]);
   const values = {};
   for (let index = 0; index < argv.length; index += 2) {
     const key = argv[index];
     const value = argv[index + 1];
-    if (!key?.startsWith("--") || value === undefined) return null;
-    values[key.slice(2)] = value;
+    const name = key?.startsWith("--") ? key.slice(2) : null;
+    if (!name || !allowed.has(name) || value === undefined || Object.hasOwn(values, name)) return null;
+    values[name] = value;
   }
   return values;
 }
@@ -147,14 +164,14 @@ export function runCli(argv, io = {}) {
   const stdout = io.stdout ?? process.stdout;
   const stderr = io.stderr ?? process.stderr;
   const args = parseArgs(argv);
-  if (!args?.root || !args?.event) {
-    stderr.write("Usage: check-pr-contributor-gates.mjs --root <candidate> --event <event.json> [--receipt <path>]\n");
+  if (!args?.root || !args?.["cla-root"] || !args?.event) {
+    stderr.write("Usage: check-pr-contributor-gates.mjs --root <candidate> --cla-root <trusted-base> --event <event.json> [--receipt <path>]\n");
     return 2;
   }
   let event;
   try { event = JSON.parse(readFileSync(resolve(args.event), "utf8")); }
   catch { stderr.write("PR event is missing or invalid JSON.\n"); return 2; }
-  const receipt = validatePrContributorGates({ root: resolve(args.root), event });
+  const receipt = validatePrContributorGates({ root: resolve(args.root), claRoot: resolve(args["cla-root"]), event });
   const serialized = `${JSON.stringify(receipt, null, 2)}\n`;
   stdout.write(serialized);
   if (args.receipt) {

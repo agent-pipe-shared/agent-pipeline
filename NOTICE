@@ -17,20 +17,26 @@ party. This public notice intentionally records no private address, email
 address, or private-account link.
 
 This source-available repository is licensed under Sustainable Use License
-Version 1.0 (SUL-1.0). Preserve this notice and the LICENSE file in copies.
+Version 1.0 (SUL-1.0) with the repository-specific Agent-Pipeline Additional
+Permission stated after the unmodified canonical SUL-1.0 body in `LICENSE`.
+The canonical URL identifies only the base SUL-1.0 text. Preserve this notice
+and the LICENSE file in copies.
 
 Commercial licensing
 
 Internal use is permitted, including internal commercial-company operations,
 internal evaluation, and making or modifying a fork for your own purposes,
-subject to the LICENSE. A separate agreement with the rightsholder is required
-only when Agent-Pipeline or a substantial derivative is itself monetized,
-including sale or licensing, paid hosting/SaaS/managed service, white-label
-use, material embedding as a value component of a paid product, or commercial
-redistribution. Commercial requests may be discussed through the repository
-maintainers for planning only; the issue tracker is not contract acceptance,
-and a commercial agreement requires separate express acceptance by André
-Twachtmann:
+subject to the LICENSE. Affiliates, employees, contractors, and service
+providers may use the software solely on the licensee's behalf for the
+licensee's internal operations. Independent consulting, training, and support
+are permitted when Agent-Pipeline or a substantial derivative is not itself
+monetized. A separate agreement with the rightsholder is required only for
+sale; paid licensing or distribution; paid hosting, SaaS, or managed service;
+white-label use; material embedding as a value component of a paid product;
+or commercial redistribution of Agent-Pipeline or a substantial derivative.
+Commercial requests may be discussed through the repository maintainers for
+planning only; the issue tracker is not contract acceptance, and a commercial
+agreement requires separate express acceptance by André Twachtmann:
 
 https://github.com/agent-pipe-shared/agent-pipeline/issues
 

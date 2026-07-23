@@ -44,5 +44,6 @@ jobs:
         run: >-
           node trusted-gate/harness/scripts/check-pr-contributor-gates.mjs
           --root candidate
+          --cla-root trusted-gate
           --event "$GITHUB_EVENT_PATH"
           --receipt "$RUNNER_TEMP/pr-contributor-gate-receipt.json"
