@@ -1,0 +1,17 @@
+{
+  "schema": "pipeline.snt1-privacy-disposition.v1",
+  "status": "approved",
+  "reviewer": "André Twachtmann",
+  "reviewedAt": "2026-07-23",
+  "candidate": {
+    "commit": "f83803c767f90dceacea936ac3bd52c63dc24bd1",
+    "tree": "9bdd679db74aa0b1b7877984df7324ffb880be86"
+  },
+  "surfaceSetSha256": "970a334a87506c8f9c9cda986b5f1aab0e8e08f7f8d36505d7cc3ed481361d1b",
+  "actionsLogRetention": {
+    "days": 30,
+    "maximumAllowedDays": 90,
+    "readBackAt": "2026-07-23"
+  },
+  "approvalText": "Review ist erfolgreich durchgeführt und erledigt! Ich, André Twachtmann, genehmige den kandidatgebundenen Datenschutzreview für f83803c/9bdd679d und 30 Tage Actions-Log-Retention."
+}

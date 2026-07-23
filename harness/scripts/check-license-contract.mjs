@@ -13,7 +13,27 @@ const SOURCE_ROOTS = ["harness", "plugins"];
 export const LICENSE_GATE_SCHEMA = "pipeline.snt1-license-gate.v1";
 export const LICENSE_GATE_PROJECTION_SCHEMA = "pipeline.snt1-license-gate-projection.v1";
 export const SNT1_RESULT_SCHEMA = "pipeline.snt1-result.v1";
+export const SNT1_PRIVACY_DISPOSITION_SCHEMA = "pipeline.snt1-privacy-disposition.v1";
+export const SNT1_LICENSING_DISPOSITION_SCHEMA = "pipeline.snt1-licensing-disposition.v1";
 export const LICENSE_SURFACES = Object.freeze(["LICENSE", "LICENSE-DOCS", "NOTICE", "CONTRIBUTING.md", "README.md", "docs/licensing.md", "third-party-licenses.json"]);
+export const SNT1_CANDIDATE = Object.freeze({ commit: "f83803c767f90dceacea936ac3bd52c63dc24bd1", tree: "9bdd679db74aa0b1b7877984df7324ffb880be86" });
+export const SNT1_LICENSE_SURFACES = Object.freeze([
+  Object.freeze({ path: "LICENSE", sha256: "2858cc44686c7483dfa163ad0d02d7f040973d45b4ef52c18b6c81990dfdd760" }),
+  Object.freeze({ path: "LICENSE-DOCS", sha256: "3bd7e2764f64e765a830102be2b811df50b67a50695a67f21677fe6cadb81174" }),
+  Object.freeze({ path: "NOTICE", sha256: "e5d4f9e964a82cd0db8ec11f182fe38dc179dc090415d2896549f58b3cc129fe" }),
+  Object.freeze({ path: "CONTRIBUTING.md", sha256: "26878e36d4ad1693d0129a1f8028e7b4b053a7795f95ed16c35942cda02c84a3" }),
+  Object.freeze({ path: "README.md", sha256: "cadcccc9a8fed070b80e409eef6d9d427962d85be2ea2b28535f7b0aea93548c" }),
+  Object.freeze({ path: "docs/licensing.md", sha256: "c3f1dcbb4b6ce951a0d1976241755e71aa37bc60fe2235c13b04f3381ceed96e" }),
+  Object.freeze({ path: "third-party-licenses.json", sha256: "137fd317197b1c9a9753679328944cef4ccfb7ad834efaaa26959e5470f05bd0" }),
+]);
+export const SNT1_PRIVACY_APPROVAL = "Review ist erfolgreich durchgeführt und erledigt! Ich, André Twachtmann, genehmige den kandidatgebundenen Datenschutzreview für f83803c/9bdd679d und 30 Tage Actions-Log-Retention.";
+export const SNT1_LICENSING_SEMANTICS = "SUL-1.0 with the Agent-Pipeline Additional Permission: internal operations include affiliates, employees, contractors, and service providers; independent consulting, training, and support remain permitted when Agent-Pipeline itself is not monetized; direct commercial exploitation requires a separate agreement.";
+export const SNT1_CLA_SEMANTICS = "DCO and the Contributor-personal, current-version, digest-bound CLA acceptance remain cumulative; maintainers, bots, and submission automation cannot accept for the Contributor.";
+const SNT1_EVIDENCE_PATHS = Object.freeze({
+  privacy: "backlog/evidence/2026-07-23-snt-1-privacy-disposition.json",
+  licensing: "backlog/evidence/2026-07-23-snt-1-licensing-disposition.json",
+  result: "backlog/evidence/2026-07-23-snt-1-activation-result.json",
+});
 const HEX40 = /^[a-f0-9]{40}$/u;
 const HEX64 = /^[a-f0-9]{64}$/u;
 const INTERNAL_OPERATIONS_DELEGATION = /affiliates,\s+employees,\s+contractors,\s+and\s+service\s+providers[\s\S]{0,180}solely[\s\S]{0,120}licensee's\s+internal\s+operations/iu;
@@ -80,8 +100,10 @@ export function buildSnt1Result({ licensingDisposition, privacyDisposition, cand
   if (!exactKeys(licensingDisposition, ["reviewer", "reviewedAt", "status", "dispositionSha256"]) || licensingDisposition?.status !== "approved" || typeof licensingDisposition?.reviewer !== "string" || licensingDisposition.reviewer.length === 0 || !/^\d{4}-\d{2}-\d{2}$/u.test(licensingDisposition?.reviewedAt ?? "") || !HEX64.test(licensingDisposition?.dispositionSha256 ?? "")) errors.push("named-human licensing disposition is invalid");
   if (privacyDisposition === null || privacyDisposition?.status === "pending") errors.push("named-human privacy disposition is pending");
   else if (!exactKeys(privacyDisposition, ["reviewer", "reviewedAt", "status", "dispositionSha256"]) || privacyDisposition.status !== "approved" || typeof privacyDisposition.reviewer !== "string" || privacyDisposition.reviewer.length === 0 || !/^\d{4}-\d{2}-\d{2}$/u.test(privacyDisposition.reviewedAt ?? "") || !HEX64.test(privacyDisposition.dispositionSha256 ?? "")) errors.push("named-human privacy disposition is invalid");
+  if (!exactKeys(candidates, ["private", "neutral-public"])) errors.push("candidate set schema is invalid");
+  if (!exactKeys(gates, ["private", "neutral-public"])) errors.push("gate set schema is invalid");
   for (const channel of ["private", "neutral-public"]) {
-    if (!exactKeys(candidates?.[channel], ["commit", "tree"]) || !HEX40.test(candidates[channel].commit) || !HEX40.test(candidates[channel].tree)) errors.push(`${channel} candidate is invalid`);
+    if (!exactKeys(candidates?.[channel], ["commit", "tree"]) || !HEX40.test(candidates?.[channel]?.commit ?? "") || !HEX40.test(candidates?.[channel]?.tree ?? "")) errors.push(`${channel} candidate is invalid`);
     errors.push(...validateLicenseGateProjection(gates?.[channel], { channel, candidate: candidates?.[channel] }).map((error) => `${channel}: ${error}`));
   }
   if (!validLicenseSurfaces(surfaces) || digest(surfaces) !== gates?.private?.surfaceSetSha256 || digest(surfaces) !== gates?.["neutral-public"]?.surfaceSetSha256) errors.push("result license surfaces do not bind both gates");
@@ -96,6 +118,57 @@ export function validateSnt1Result(result) {
   const errors = [...rebuilt.errors];
   if (result.resultSha256 !== rebuilt.result.resultSha256) errors.push("SNT-1 Result digest is invalid");
   return errors;
+}
+
+function sameValue(left, right) {
+  return stable(left) === stable(right);
+}
+
+export function validateSnt1EvidenceRecords({ privacy, licensing, result }) {
+  const errors = [];
+  const expectedCandidate = SNT1_CANDIDATE;
+  const expectedSurfaces = SNT1_LICENSE_SURFACES;
+  if (!exactKeys(privacy, ["schema", "status", "reviewer", "reviewedAt", "candidate", "surfaceSetSha256", "actionsLogRetention", "approvalText"])
+      || privacy?.schema !== SNT1_PRIVACY_DISPOSITION_SCHEMA
+      || privacy?.status !== "approved"
+      || privacy?.reviewer !== "André Twachtmann"
+      || privacy?.reviewedAt !== "2026-07-23"
+      || !exactKeys(privacy?.candidate, ["commit", "tree"])
+      || !exactKeys(privacy?.actionsLogRetention, ["days", "maximumAllowedDays", "readBackAt"])) errors.push("privacy disposition schema is invalid");
+  if (!sameValue(privacy?.candidate, expectedCandidate)) errors.push("privacy disposition candidate drift");
+  if (privacy?.surfaceSetSha256 !== digest(expectedSurfaces)) errors.push("privacy disposition surface drift");
+  if (privacy?.actionsLogRetention?.days !== 30 || privacy?.actionsLogRetention?.maximumAllowedDays !== 90 || privacy?.actionsLogRetention?.readBackAt !== "2026-07-23") errors.push("privacy disposition retention drift");
+  if (privacy?.approvalText !== SNT1_PRIVACY_APPROVAL) errors.push("privacy disposition approval text is invalid");
+
+  if (!exactKeys(licensing, ["schema", "status", "reviewer", "reviewedAt", "candidate", "surfaces", "licenseSemantics", "claSemantics", "authorityReference"])
+      || licensing?.schema !== SNT1_LICENSING_DISPOSITION_SCHEMA
+      || licensing?.status !== "approved"
+      || licensing?.reviewer !== "André Twachtmann"
+      || licensing?.reviewedAt !== "2026-07-23") errors.push("licensing disposition schema is invalid");
+  if (!sameValue(licensing?.candidate, expectedCandidate)) errors.push("licensing disposition candidate drift");
+  if (!sameValue(licensing?.surfaces, expectedSurfaces)) errors.push("licensing disposition surface drift");
+  if (licensing?.licenseSemantics !== SNT1_LICENSING_SEMANTICS || licensing?.claSemantics !== SNT1_CLA_SEMANTICS
+      || licensing?.authorityReference !== "backlog/evidence/2026-07-21-source-available-commercial-licensing.md") errors.push("licensing disposition semantics are invalid");
+
+  errors.push(...validateSnt1Result(result));
+  for (const channel of ["private", "neutral-public"]) {
+    if (!sameValue(result?.candidates?.[channel], expectedCandidate)) errors.push(`${channel} Result candidate drift`);
+    const expectedGate = buildLicenseGateReceipt({
+      channel,
+      candidate: expectedCandidate,
+      surfaces: expectedSurfaces,
+      command: ["node", "harness/scripts/check-license-contract.mjs"],
+      result: { status: "passed", exitCode: 0 },
+    }).projection;
+    if (!sameValue(result?.gates?.[channel], expectedGate)) errors.push(`${channel} Result gate drift`);
+  }
+  if (!sameValue(result?.surfaces, expectedSurfaces)) errors.push("SNT-1 Result surface drift");
+  const expectedLicensingSummary = { reviewer: licensing?.reviewer, reviewedAt: licensing?.reviewedAt, status: licensing?.status, dispositionSha256: digest(licensing) };
+  const expectedPrivacySummary = { reviewer: privacy?.reviewer, reviewedAt: privacy?.reviewedAt, status: privacy?.status, dispositionSha256: digest(privacy) };
+  if (!sameValue(result?.licensingDisposition, expectedLicensingSummary)) errors.push("SNT-1 Result licensing disposition digest binding is invalid");
+  if (!sameValue(result?.privacyDisposition, expectedPrivacySummary)) errors.push("SNT-1 Result privacy disposition digest binding is invalid");
+  if (JSON.stringify(result ?? {}).match(/(?:rawReceiptSha256|receiptSha256|privatePath|rawPrivate|\/home\/|[A-Za-z]:\\|-----BEGIN [A-Z ]*PRIVATE KEY-----)/iu)) errors.push("SNT-1 Result leaks raw private material");
+  return [...new Set(errors)];
 }
 
 function walkMjs(root, start, found) {
@@ -145,8 +218,19 @@ export function validateLicenseContract(root) {
   requireText(root, "docs/licensing.md", findings, [["internal-operations delegation boundary", INTERNAL_OPERATIONS_DELEGATION], ["independent-services boundary", INDEPENDENT_SERVICES_BOUNDARY], ["closed monetization boundary", CLOSED_MONETIZATION_BOUNDARY], ["no-retroactive-change boundary", /does not purport to\s+change those grants retroactively/u], ["project-authored legal rightsholder and contracting party", /André Twachtmann is the legal rightsholder for Agent-Pipeline project-authored\s+content and the commercial\/CLA contracting party/u], ["third-party ownership exclusion", /Third-party material listed\s+in `third-party-licenses\.json`.*Contributor Covenant.*upstream ownership and license/su], ["dated named-human CLA activation", /On 2026-07-23, André\s+Twachtmann, acting as the named human\s+rightsholder reviewer, approved activation/u], ["owner-controlled provenance qualification", /100% owner-controlled/u], ["no proxy CLA acceptance", /maintainer, bot, or submission automation cannot accept/u], ["required contributor gate", /contributor-gates \/ cla-and-dco.*required status check/su], ["up-to-date branch protection", /require the PR\s+branch to be current with `main` before merge/u], ["honest receipt retention boundary", /no immutable long-term archive is asserted/u]]);
   requireText(root, "CONTRIBUTING.md", findings, [["internal-operations delegation boundary", INTERNAL_OPERATIONS_DELEGATION], ["independent-services boundary", INDEPENDENT_SERVICES_BOUNDARY], ["closed monetization boundary", CLOSED_MONETIZATION_BOUNDARY], ["project-authored legal rightsholder and contracting party", /André Twachtmann is the legal rightsholder for Agent-Pipeline project-authored\s+content and the CLA contracting party/u], ["third-party ownership exclusion", /Third-party material remains under the\s+ownership and license recorded in `third-party-licenses\.json`/u], ["active CLA approval", /2026-07-23.*approved activation of the CLA process/su], ["cumulative DCO and CLA merge gates", /both\s+its DCO sign-off and the Contributor's personally checked, current-version CLA\s+acceptance/u], ["no proxy acceptance", /maintainer, bot, or submission automation cannot\s+accept on the Contributor's behalf/u], ["required contributor gate", /contributor-gates \/ cla-and-dco.*status check/su], ["up-to-date branch protection", /pull-request\s+branch to be up to date with `main` before merge/u], ["server-side read-back boundary", /server-side read-back confirming them/u]]);
   requireText(root, "README.md", findings, [["English additional-permission qualification", /Sustainable Use License 1\.0 \(SUL-1\.0\) with the Agent-Pipeline Additional Permission/u], ["German additional-permission qualification", /Sustainable Use License 1\.0 \(SUL-1\.0\) mit der Agent-Pipeline Additional Permission/u]]);
-  requireText(root, "docs/contributor-gate-security.md", findings, [["personal opened/edited acceptance transition", /on `opened`.*sender must be the PR author.*on `edited`.*sender must be the PR author/su], ["synchronize and reopened refresh boundary", /`synchronize` and `reopened` intentionally fail.*CLA_ACCEPTANCE_REFRESH_REQUIRED/su], ["trusted-base and untrusted-candidate threat boundary", /`trusted-gate`.*`candidate`.*GitHub `pull_request` event/su], ["credential-free and secret-free boundary", /disable persisted credentials.*consumes no secrets/su], ["receipt privacy minimization", /PR number, public account logins.*never writes an email address into the receipt/su], ["runner-temporary retention boundary", /runner-temporary storage.*not uploaded as an artifact/su], ["honest pending human privacy sign-off", /Named-human data-privacy sign-off is still required before\s+public activation/u], ["fail-closed rollback order", /Freeze merges.*Revert the bad checker.*authenticated server-side read-back.*Re-run the gate/su]]);
-  requireText(root, "specs/2026-07-19-sprint-sentinel-epic/snt-1-activation-prerequisite.md", findings, [["explicit HAW-E activation blocker", /blocked; no HAW-E Result intent, release consent, publication, or\s+backlog mutation is authorized/u], ["implemented receipt/result path", /constructs closed-schema, candidate-bound.*constructs and validates the canonical SNT-1 Result digest/su], ["missing dual license-gate digests", /private license-gate receipt digest.*neutral-public license-gate receipt digest/su], ["no fabricated ledger evidence", /append-only history remains truthful.*must not be edited.*invented values/su], ["sanctioned evidence-amendment writer path", /applyBacklogEvidenceAmendment.*recoverable transaction writer/su], ["historical suffix preservation", /preserves every historical ledger byte\s+before its single amendment suffix/u], ["external prerequisite digest set", /`resultSha256`.*`transitionSha256`.*`privateLicenseGateSha256`.*`neutralPublicLicenseGateSha256`/su]]);
+  requireText(root, "docs/contributor-gate-security.md", findings, [["personal opened/edited acceptance transition", /on `opened`.*sender must be the PR author.*on `edited`.*sender must be the PR author/su], ["synchronize and reopened refresh boundary", /`synchronize` and `reopened` intentionally fail.*CLA_ACCEPTANCE_REFRESH_REQUIRED/su], ["trusted-base and untrusted-candidate threat boundary", /`trusted-gate`.*`candidate`.*GitHub `pull_request` event/su], ["credential-free and secret-free boundary", /disable persisted credentials.*consumes no secrets/su], ["receipt privacy minimization", /PR number, public account logins.*never writes an email address into the receipt/su], ["runner-temporary retention boundary", /runner-temporary storage.*not uploaded as an artifact/su], ["candidate-bound human privacy approval", /André Twachtmann.*genehmige den kandidatgebundenen Datenschutzreview.*f83803c\/9bdd679d.*30 Tage Actions-Log-Retention/su], ["retention read-back", /30 days.*maximum allowed value of 90 days.*2026-07-23/su], ["fail-closed rollback order", /Freeze merges.*Revert the bad checker.*authenticated server-side read-back.*Re-run the gate/su]]);
+  requireText(root, "specs/2026-07-19-sprint-sentinel-epic/snt-1-activation-prerequisite.md", findings, [["explicit HAW-E activation blocker", /blocked; no HAW-E Result intent, release consent, publication, or\s+backlog mutation is authorized/u], ["implemented receipt/result path", /constructs closed-schema, candidate-bound.*constructs and validates the canonical SNT-1 Result digest/su], ["sanitized dual license-gate projections", /private.*neutral-public.*sanitized projection digests/su], ["no raw private publication", /raw private receipt.*not.*public/su], ["no fabricated ledger evidence", /append-only history remains truthful.*must not be edited.*invented values/su], ["sanctioned evidence-amendment writer path", /applyBacklogEvidenceAmendment.*recoverable transaction writer/su], ["historical suffix preservation", /preserves every historical ledger byte\s+before its single amendment suffix/u], ["external prerequisite digest set", /`resultSha256`.*`transitionSha256`.*`privateLicenseGateSha256`.*`neutralPublicLicenseGateSha256`/su]]);
+
+  try {
+    const evidenceErrors = validateSnt1EvidenceRecords({
+      privacy: readJson(repoPath(root, SNT1_EVIDENCE_PATHS.privacy)),
+      licensing: readJson(repoPath(root, SNT1_EVIDENCE_PATHS.licensing)),
+      result: readJson(repoPath(root, SNT1_EVIDENCE_PATHS.result)),
+    });
+    findings.push(...evidenceErrors.map((error) => `SNT-1 evidence: ${error}`));
+  } catch (error) {
+    findings.push(`SNT-1 evidence records are missing or invalid JSON: ${error.message}`);
+  }
 
   for (const path of sourceFiles(root)) {
     const relativePath = relative(root, path).split(sep).join("/");

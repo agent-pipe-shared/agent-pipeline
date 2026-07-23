@@ -1,0 +1,90 @@
+{
+  "schema": "pipeline.snt1-result.v1",
+  "licensingDisposition": {
+    "reviewer": "André Twachtmann",
+    "reviewedAt": "2026-07-23",
+    "status": "approved",
+    "dispositionSha256": "fc046d3fe6c7a681e05b6f7471ee7133dc7436486b93d5f88764390272e2eb5a"
+  },
+  "privacyDisposition": {
+    "reviewer": "André Twachtmann",
+    "reviewedAt": "2026-07-23",
+    "status": "approved",
+    "dispositionSha256": "d8726fe495ba040a72caae81fab3b0d5d9c9b031327b89d4b753dfbee62d4a12"
+  },
+  "candidates": {
+    "private": {
+      "commit": "f83803c767f90dceacea936ac3bd52c63dc24bd1",
+      "tree": "9bdd679db74aa0b1b7877984df7324ffb880be86"
+    },
+    "neutral-public": {
+      "commit": "f83803c767f90dceacea936ac3bd52c63dc24bd1",
+      "tree": "9bdd679db74aa0b1b7877984df7324ffb880be86"
+    }
+  },
+  "gates": {
+    "private": {
+      "schema": "pipeline.snt1-license-gate-projection.v1",
+      "channel": "private",
+      "candidate": {
+        "commit": "f83803c767f90dceacea936ac3bd52c63dc24bd1",
+        "tree": "9bdd679db74aa0b1b7877984df7324ffb880be86"
+      },
+      "surfaceSetSha256": "970a334a87506c8f9c9cda986b5f1aab0e8e08f7f8d36505d7cc3ed481361d1b",
+      "commandSha256": "fba8517cfa79928595e87143885c4548d5cb380c3912f3f1d58f1d982a9b9843",
+      "gateCommitmentSha256": "c16fdf93f03b2a654168ce1575fc81ba1e00529e15b5ec1804e5cd6fe9f7b3b9",
+      "result": {
+        "status": "passed",
+        "exitCode": 0
+      },
+      "projectionSha256": "44b9c3e4a13f44b61b281b604f9e25cce4b98ea409ba304211b55a119557882f"
+    },
+    "neutral-public": {
+      "schema": "pipeline.snt1-license-gate-projection.v1",
+      "channel": "neutral-public",
+      "candidate": {
+        "commit": "f83803c767f90dceacea936ac3bd52c63dc24bd1",
+        "tree": "9bdd679db74aa0b1b7877984df7324ffb880be86"
+      },
+      "surfaceSetSha256": "970a334a87506c8f9c9cda986b5f1aab0e8e08f7f8d36505d7cc3ed481361d1b",
+      "commandSha256": "fba8517cfa79928595e87143885c4548d5cb380c3912f3f1d58f1d982a9b9843",
+      "gateCommitmentSha256": "2788e682972b35fc3cb1d33f0ad37075794ce70a9ce5cf5593482acbc893ecaa",
+      "result": {
+        "status": "passed",
+        "exitCode": 0
+      },
+      "projectionSha256": "e61dc186b036be253db0c41abf7b5c8d5e7fc74f64fb3b38b262cf4d91bdecc0"
+    }
+  },
+  "surfaces": [
+    {
+      "path": "LICENSE",
+      "sha256": "2858cc44686c7483dfa163ad0d02d7f040973d45b4ef52c18b6c81990dfdd760"
+    },
+    {
+      "path": "LICENSE-DOCS",
+      "sha256": "3bd7e2764f64e765a830102be2b811df50b67a50695a67f21677fe6cadb81174"
+    },
+    {
+      "path": "NOTICE",
+      "sha256": "e5d4f9e964a82cd0db8ec11f182fe38dc179dc090415d2896549f58b3cc129fe"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "sha256": "26878e36d4ad1693d0129a1f8028e7b4b053a7795f95ed16c35942cda02c84a3"
+    },
+    {
+      "path": "README.md",
+      "sha256": "cadcccc9a8fed070b80e409eef6d9d427962d85be2ea2b28535f7b0aea93548c"
+    },
+    {
+      "path": "docs/licensing.md",
+      "sha256": "c3f1dcbb4b6ce951a0d1976241755e71aa37bc60fe2235c13b04f3381ceed96e"
+    },
+    {
+      "path": "third-party-licenses.json",
+      "sha256": "137fd317197b1c9a9753679328944cef4ccfb7ad834efaaa26959e5470f05bd0"
+    }
+  ],
+  "resultSha256": "68c75d03de7a59745ba3429c6ffdc3e038b35f52db20a74216744399f7f9775b"
+}

@@ -59,16 +59,24 @@ storage only; no immutable long-term archive is asserted.
 
 The contributor gate's personal-acceptance workflow, trusted-base boundary,
 technical data-privacy review, and fail-closed recovery order are documented in
-[`contributor-gate-security.md`](contributor-gate-security.md). Named-human
-data-privacy sign-off remains an activation prerequisite; the CLA-process
-approval does not imply it.
+[`contributor-gate-security.md`](contributor-gate-security.md). The separate
+named-human data-privacy sign-off is approved for candidate
+`f83803c767f90dceacea936ac3bd52c63dc24bd1` and tree
+`9bdd679db74aa0b1b7877984df7324ffb880be86`; the CLA-process approval alone
+did not imply it.
 
-SNT-1 release consumption is also still blocked on its candidate-bound Result
-and private/neutral-public license-gate digests. The exact missing evidence and
+The candidate-bound licensing and privacy dispositions, the private and
+neutral-public sanitized license-gate projections, and the SNT-1 Result are
+now recorded under `backlog/evidence/` for that same candidate. The licensing
+disposition binds all seven governing license surfaces and the already
+approved SUL-1.0 plus Agent-Pipeline Additional Permission and cumulative
+DCO/Contributor-personal CLA semantics. SNT-1 release consumption remains
+blocked because no append-only backlog evidence amendment or HAW-E
+prerequisite read-back has been performed. The exact remaining evidence and
 sanctioned append-only construction path are recorded in
 [`snt-1-activation-prerequisite.md`](../specs/2026-07-19-sprint-sentinel-epic/snt-1-activation-prerequisite.md).
 The historical closed backlog record is not rewritten or treated as that
-missing current evidence.
+current evidence.
 
 The PO has represented for this candidate that all current project-authored
 content is 100% owner-controlled and that no external code is known to be

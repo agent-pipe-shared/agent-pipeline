@@ -61,11 +61,18 @@ dies with the runner. Maintainers must select the shortest operationally
 adequate Actions retention period and restrict log access consistently with
 repository visibility.
 
-Technical minimization review status: complete for the candidate surfaces
-listed above. Named-human data-privacy sign-off is still required before
-public activation; the existing 2026-07-23 CLA-process approval does not imply
-that separate sign-off. Until it is recorded against the candidate surface
-digest and commit, activation remains blocked.
+Technical minimization review status: approved for candidate commit
+`f83803c767f90dceacea936ac3bd52c63dc24bd1`, tree
+`9bdd679db74aa0b1b7877984df7324ffb880be86`, and its recorded license surface
+set. On 2026-07-23 André Twachtmann supplied the separate named-human privacy
+approval: “Review ist erfolgreich durchgeführt und erledigt! Ich, André
+Twachtmann, genehmige den kandidatgebundenen Datenschutzreview für
+f83803c/9bdd679d und 30 Tage Actions-Log-Retention.” The authenticated
+server-side read-back reported 30 days, a maximum allowed value of 90 days,
+on 2026-07-23. The closed-schema disposition is recorded in
+[`2026-07-23-snt-1-privacy-disposition.json`](../backlog/evidence/2026-07-23-snt-1-privacy-disposition.json).
+This candidate-bound approval does not imply release consent, publication, or
+a backlog evidence amendment.
 
 ## Rollback and recovery order
 

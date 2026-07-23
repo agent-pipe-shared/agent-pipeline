@@ -11,12 +11,15 @@ Result digest, private license-gate digest, or neutral-public license-gate
 digest. The append-only history remains truthful and must not be edited,
 replaced, or supplemented with invented values.
 
-The current Public candidate adds the corrected license boundary, trusted-base
-CLA gate, personal-acceptance event proof, privacy review, threat model, and
-recovery contract. This file records implementation state only. It is not the
-missing Result and does not convert focused test output into closure evidence.
+The frozen candidate at commit
+`f83803c767f90dceacea936ac3bd52c63dc24bd1`, tree
+`9bdd679db74aa0b1b7877984df7324ffb880be86`, contains the corrected license
+boundary, trusted-base CLA gate, personal-acceptance event proof, privacy
+review, threat model, and recovery contract. The public evidence package now
+records its dispositions, sanitized projections, and Result. That package
+does not itself amend the historical closure or authorize release.
 
-## Implemented evidence path and missing actual evidence
+## Constructed public evidence package and missing amendment
 
 The sanctioned path is now implemented in existing governed surfaces:
 
@@ -36,33 +39,32 @@ The sanctioned path is now implemented in existing governed surfaces:
   transaction writer. Generic transitions still cannot leave or re-close a
   closed item.
 
-No actual receipt, Result, or evidence amendment is created by that
-implementation. Activation remains blocked until one exact evidence package
-supplies all of:
+The named-human licensing and privacy dispositions and candidate-bound Result
+are now recorded as closed-schema JSON under `backlog/evidence/`. The private
+and neutral-public gates in that Result expose only sanitized projection
+digests. The raw private receipt, its digest, and its storage path are not
+public. Both projections bind the same candidate and seven-surface set.
 
-1. immutable private and neutral-public candidate commit/tree identities;
-2. a license-gate result for each exact candidate tree;
-3. a private license-gate receipt digest retained only in the private
-   authority and a neutral-public license-gate receipt digest that exposes no
-   private values or correlatable raw private digest;
-4. a candidate-bound SNT-1 Result whose SHA-256 binds the human licensing and
-   data-privacy dispositions, both candidate identities, both license-gate
-   digests, and the current governing license surfaces;
-5. the exact append-only backlog transition digest and closure commit that the
+No backlog evidence amendment has been created. Activation remains blocked
+until the existing exact evidence package is completed with:
+
+1. the raw private license-gate authority record retained outside public
+   repository history;
+2. the exact append-only backlog transition digest and closure commit that the
    HAW-E external prerequisite consumes; and
-6. fresh Verify, security, and independent-Critic evidence for that same
+3. fresh Verify, security, and independent-Critic evidence for that same
    candidate package.
 
-The named-human CLA-process approval dated 2026-07-23 is not a privacy
-sign-off, release consent, or substitute for any missing digest.
+The named-human privacy approval dated 2026-07-23 is candidate-bound and
+records the 30-day Actions-log retention read-back. It is not release consent,
+publication authority, or a substitute for the missing amendment.
 
 ## Sanctioned construction path
 
-The owner must freeze both product candidates, run each candidate's license
-gate without exporting private material, construct the private and neutral
-public receipts in their respective authorities, and obtain the named-human
-licensing/privacy dispositions. Only then may it construct the candidate-bound
-Result and verify its digest off-ref. The evidence update must use
+The owner has frozen the candidate, run the license contract, constructed the
+private and neutral-public sanitized projection digests, recorded the
+named-human licensing/privacy dispositions, and constructed the
+candidate-bound Result. The evidence update must use
 `applyBacklogEvidenceAmendment` through the recoverable transaction writer;
 item Markdown, `backlog/transitions.ndjson`, `backlog/STATUS.md`, and
 `backlog/index.json` must never be hand-edited. The writer requires an already
