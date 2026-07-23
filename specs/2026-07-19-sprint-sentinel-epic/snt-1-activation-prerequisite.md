@@ -1,15 +1,18 @@
 # SNT-1 activation prerequisite status
 
-Status: **blocked; no HAW-E Result intent, release consent, publication, or
-backlog mutation is authorized by this record.**
+Status: **the SNT-1 prerequisite is complete and may be consumed by an exact
+HAW-E `externalPrerequisite` validation. This record grants no HAW-E
+activation, release consent, publication, or main-branch approval.**
 
 The historical backlog transition at sequence 15 closed
 `pipeline.source-available-commercial-licensing` for commit
 `a798db6d45f2fc113f66d01400d7ea70fcef9427`. Its closure evidence predates the
 current Sentinel candidate and does not contain the SNT-1.8 candidate-bound
 Result digest, private license-gate digest, or neutral-public license-gate
-digest. The append-only history remains truthful and must not be edited,
-replaced, or supplemented with invented values.
+digest. Sequence 40 therefore preserves that event and appends a
+`closed` → `closed` `evidence-amendment` for the current candidate. The
+append-only history remains truthful and must not be edited, replaced, or
+supplemented with invented values.
 
 The frozen candidate at commit
 `f83803c767f90dceacea936ac3bd52c63dc24bd1`, tree
@@ -17,9 +20,10 @@ The frozen candidate at commit
 boundary, trusted-base CLA gate, personal-acceptance event proof, privacy
 review, threat model, and recovery contract. The public evidence package now
 records its dispositions, sanitized projections, and Result. That package
-does not itself amend the historical closure or authorize release.
+is now bound into the closure by the append-only amendment. Neither the
+package nor its amendment authorizes HAW-E activation or release.
 
-## Constructed public evidence package and missing amendment
+## Complete public evidence package and amendment
 
 The sanctioned path is now implemented in existing governed surfaces:
 
@@ -45,35 +49,42 @@ and neutral-public gates in that Result expose only sanitized projection
 digests. The raw private receipt, its digest, and its storage path are not
 public. Both projections bind the same candidate and seven-surface set.
 
-No backlog evidence amendment has been created. Activation remains blocked
-until the existing exact evidence package is completed with:
-
-1. the raw private license-gate authority record retained outside public
-   repository history;
-2. the exact append-only backlog transition digest and closure commit that the
-   HAW-E external prerequisite consumes; and
-3. fresh Verify, security, and independent-Critic evidence for that same
-   candidate package.
+Sequence 40 records the completed append-only backlog evidence amendment. It
+keeps `closed_at: "2026-07-21"` unchanged, advances the closure evidence to
+the candidate Result at commit
+`2ddf3592ea004bd6e2a830a61bb02c931238070f`, and preserves ledger events
+1–39 byte-for-byte. The private raw authority remains outside public
+repository history by design; only its sanitized projection is public.
 
 The named-human privacy approval dated 2026-07-23 is candidate-bound and
 records the 30-day Actions-log retention read-back. It is not release consent,
-publication authority, or a substitute for the missing amendment.
+publication authority, HAW-E activation, or main-branch approval.
 
-## Sanctioned construction path
+## Completed construction and HAW-E consumption boundary
 
 The owner has frozen the candidate, run the license contract, constructed the
 private and neutral-public sanitized projection digests, recorded the
 named-human licensing/privacy dispositions, and constructed the
-candidate-bound Result. The evidence update must use
-`applyBacklogEvidenceAmendment` through the recoverable transaction writer;
-item Markdown, `backlog/transitions.ndjson`, `backlog/STATUS.md`, and
-`backlog/index.json` must never be hand-edited. The writer requires an already
-closed item, reachable new closure commit, repository evidence file, exact
-Result/private/public gate digests, and preserves every historical ledger byte
-before its single amendment suffix.
+candidate-bound Result. The evidence update used
+`applyBacklogEvidenceAmendment` through the recoverable transaction writer,
+which preserved every historical ledger byte before its single amendment
+suffix and regenerated the item, ledger, status, and index projections.
 
-HAW-E may consume the prerequisite only after its
-`externalPrerequisite` record validates the exact `closureCommit`,
-`resultSha256`, `transitionSha256`, `privateLicenseGateSha256`, and
-`neutralPublicLicenseGateSha256`. Until that read-back succeeds, the correct
-state is this explicit blocker—not a fabricated close.
+HAW-E may now consume the prerequisite only when its `externalPrerequisite`
+record validates this exact set:
+
+- `closureCommit`:
+  `2ddf3592ea004bd6e2a830a61bb02c931238070f`;
+- `resultSha256`:
+  `68c75d03de7a59745ba3429c6ffdc3e038b35f52db20a74216744399f7f9775b`;
+- `transitionSha256`:
+  `2849de19fb7f0d0f34d6f2cbe6ed6d5171445abb09fa02132bc9a1d0d707e2b1`;
+- `privateLicenseGateSha256`:
+  `44b9c3e4a13f44b61b281b604f9e25cce4b98ea409ba304211b55a119557882f`;
+  and
+- `neutralPublicLicenseGateSha256`:
+  `e61dc186b036be253db0c41abf7b5c8d5e7fc74f64fb3b38b262cf4d91bdecc0`.
+
+Successful consumption establishes only the SNT-1 external prerequisite. It
+does not establish a HAW-E Result, release approval, publication approval, or
+approval to merge to `main`; those authorities remain separate.

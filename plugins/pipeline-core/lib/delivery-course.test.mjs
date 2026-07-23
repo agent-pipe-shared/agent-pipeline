@@ -95,7 +95,7 @@ check("DC03 a second different classified failure may use the final bounded thir
 
 const third = failedAttempt(3, "third-network");
 const thirdDecision = decideDeliveryCourse(course([first, different, third]));
-check("DC04 three total classified delivery attempts exhaust the budget", 
+check("DC04 three total classified delivery attempts exhaust the budget",
   DELIVERY_ATTEMPT_LIMIT === 3 && thirdDecision.action === "course-gate" && thirdDecision.code === "DC-ATTEMPT-BUDGET-EXHAUSTED");
 
 for (const failureClass of DELIVERY_IMMEDIATE_GATE_CLASSES) {
