@@ -318,10 +318,14 @@ where they conflict with the authoritative session-cut state above.
   reproducibility, and #37 trusted-tool resolution. Their scope and separate
   closure gates remain in
   `specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md`.
-- #37 has only a read-only audit: the next safe package is one canonical
-  trusted-tool resolver, with PO/Human policy decisions still needed for
-  allowed Windows roots, wrappers, #25 machine-local selection, and native
-  Windows evidence.
+- #34–#37 each have delivered implementation and focused tests: typed
+  directory-durability handling, shared Windows private-state assurance,
+  capability-bound Verify fixtures, and a trust-bound tool resolver. They are
+  not yet closure-ready because their individual Issue acceptance criteria
+  still require the remaining native-Windows, complete-consumer, and
+  candidate-bound Verify/Security/Critic evidence. #37 additionally retains
+  the PO/Human policy decisions for allowed Windows roots, wrappers, and #25
+  machine-local selection.
 - The last in-session Codex app-server probe returned
   `CAS-EXECUTION-UNAVAILABLE` / `EPERM`: it could not execute the daemon
   version probe. This is not evidence that the daemon is dead. A new session

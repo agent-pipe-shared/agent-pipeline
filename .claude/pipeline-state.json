@@ -6,13 +6,13 @@
     "phase": "implementation"
   },
   "planApproved": true,
-  "updatedAt": "2026-07-23T01:45:07.648Z",
+  "updatedAt": "2026-07-23T19:30:35.636Z",
   "planApproval": {
     "schema": "pipeline.plan-approval.v2",
     "approvedBy": "PO",
-    "approvedAt": "2026-07-23T01:45:07.648Z",
+    "approvedAt": "2026-07-23T19:30:35.636Z",
     "specBoundBy": "PO",
-    "specBoundAt": "2026-07-23T01:45:07.648Z",
+    "specBoundAt": "2026-07-23T19:30:35.636Z",
     "poGateAuthority": {
       "schema": "pipeline.po-gate-authority.v2",
       "humanFacing": "en",
@@ -21,9 +21,9 @@
       "receiptSha256": "c307bdd33d4d590991107b453edaed690ad800d981db42551fdb14ebfb444b78",
       "repositoryFingerprint": "5af06dcbe0d60349beeb52c7a7bdf51092f653f1e9ae6836e676a8bd6f3c47e3",
       "planPath": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      "planSha256": "8fde373cea210f3c51fe96ceb658feb18db47bb370699300e541da12f6610e88",
+      "planSha256": "53520d27e8540a482b858355072c7c09a7af67b25320f257ce66bb1737fc3c5f",
       "specPath": "specs/2026-07-19-sprint-sentinel-epic/spec.md",
-      "specSha256": "be147cb58203c5a1a66bbdafddf500aeb7922c22fe10a57804473d881dcbf3a9"
+      "specSha256": "c0ef962b7976bfcb98210582f23515c9af4428c6ffdda9b7aafae907919b0550"
     }
   }
 }

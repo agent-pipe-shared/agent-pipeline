@@ -9,7 +9,7 @@
 > activation, push, tag, release, commercial relicensing, and public activation
 > remain blocked until their own gates pass.
 
-<!-- technical-spec-sha256: be147cb58203c5a1a66bbdafddf500aeb7922c22fe10a57804473d881dcbf3a9 -->
+<!-- technical-spec-sha256: c0ef962b7976bfcb98210582f23515c9af4428c6ffdda9b7aafae907919b0550 -->
 <!-- public-private-reconciliation-design-sha256: 3b4cee9f23a5db1ea7318ce86a1190d1ec868561b55a7ee9b30994ff0d073075 -->
 <!-- platform-support-contract-sha256: 1f9248c9719b0f53a572501a27b6e799f79d8c1b5d5187539c6249d253c4091e -->
 
