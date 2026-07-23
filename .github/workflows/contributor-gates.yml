@@ -1,0 +1,48 @@
+name: contributor-gates
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - reopened
+      - synchronize
+      - edited
+
+permissions:
+  contents: read
+
+jobs:
+  cla-and-dco:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out trusted gate from the base candidate
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: trusted-gate
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out the untrusted PR candidate without credentials
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: ${{ github.event.pull_request.head.repo.full_name }}
+          ref: ${{ github.event.pull_request.head.sha }}
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Import the base commit into the candidate object store
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: git -C candidate fetch --no-tags ../trusted-gate "$BASE_SHA"
+
+      - name: Verify current CLA acceptance and every PR commit DCO sign-off
+        run: >-
+          node trusted-gate/harness/scripts/check-pr-contributor-gates.mjs
+          --root candidate
+          --event "$GITHUB_EVENT_PATH"
+          --receipt "$RUNNER_TEMP/pr-contributor-gate-receipt.json"

@@ -1,21 +1,25 @@
+<!-- CLA-Version: 1.0 -->
+
 # Agent-Pipeline Contributor License Agreement
 
 This Contributor License Agreement ("Agreement") applies to each contribution
 for which a contributor expressly accepts it in an Agent-Pipeline pull request.
 It is designed for a project expected to be governed by German law. It is not
 legal advice, does not guarantee effectiveness under any law, and does not
-replace the mandatory human legal/rightsholder review before public activation.
+replace any legally required review for a particular contribution or use.
 
 ## 1. Parties and contribution
 
 "Contributor" means the individual or legal entity identified by the GitHub
 account that checks the Agreement checkbox in the pull request. "Project" means
-the legally identifiable Agent-Pipeline rightsholder and contracting party
-identified in the repository's `NOTICE`. Until that identity and its
-service/contact details are recorded and approved, this template is not ready
-for contributor acceptance and no contribution may be merged in reliance on
-it. External pull requests may be discussed while that gate is pending, but
-their CLA checkbox has no activating effect and they must not be merged.
+André Twachtmann, the legal rightsholder for Agent-Pipeline project-authored
+content, the recipient of the Contributor's grants under this Agreement, and
+the CLA contracting party identified in the repository's `NOTICE`. This
+definition does not claim rights in third-party material identified in
+`third-party-licenses.json`. On 2026-07-23, André Twachtmann, acting as the
+named human rightsholder reviewer, approved activation of this Agreement's
+contributor-acceptance process. No private address, email address, or
+private-account link is part of this public Agreement.
 "Contribution" means the copyrightable material intentionally submitted by
 that Contributor in the pull request, excluding material clearly identified as
 third-party material.
@@ -114,6 +118,9 @@ or unenforceable, that does not expand any grant beyond what applicable law
 permits; maintainers must obtain human legal advice before relying on a
 replacement construction.
 
-No contribution may be merged until the DCO and CLA records are present. No
-public activation or commercial relicensing may rely on this template until a
-named human legal/rightsholder reviewer has approved the applicable process.
+No contribution may be merged until both the DCO sign-off and the Contributor's
+personally checked, current-version CLA record are present. The activation
+approval recorded in Section 1 does not permit a maintainer, bot, or submission
+automation to accept this Agreement on a Contributor's behalf, does not waive
+contribution-specific rights review, and is not a general legal-effectiveness
+guarantee.

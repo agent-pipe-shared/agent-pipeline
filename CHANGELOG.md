@@ -12,6 +12,12 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
   source-available Sustainable Use License 1.0 (SUL-1.0). This change applies
   to the current candidate and does not alter the MIT, Apache-2.0, or
   CC-BY-4.0 grants and notices shipped with earlier versions.
+- The PO-selected target is `v0.4.0`, the first public GitHub/Product Release,
+  only after Sentinel is cleanly integrated on `main`. Public VERSION remains
+  `0.2.0`; no public SemVer tag or GitHub Release exists yet. Private
+  `v0.1.0`–`v0.3.1` development tags are not public releases. HAW-E must freshly
+  observe and seal both channels immediately before the later atomic version,
+  tag, and release operation; this entry does not publish or retag anything.
 
 ## [0.2.0] — 2026-07-12
 

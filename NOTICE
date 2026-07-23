@@ -4,15 +4,17 @@ Copyright (c) 2026 agent-pipe-shared and contributors.
 
 Legal rightsholder / contracting party
 
-The legally identifiable rightsholder and commercial/CLA contracting party has
-not yet been recorded in this Public candidate. `agent-pipe-shared` is the
-repository organization and is not asserted here to be a legal person or the
-contracting party. External pull requests may be discussed, but the CLA cannot
-be activated and no external contribution may be merged in reliance on it.
-Commercial intake, CLA/public activation, and commercial relicensing remain
-blocked until a company or other concrete legal person and service/contact
-details are inserted here and approved by the named human legal/rightsholder
-reviewer. No private identity belongs in this repository.
+André Twachtmann is the legal rightsholder for Agent-Pipeline project-authored
+content and the commercial/CLA contracting party. This statement excludes
+third-party material identified in `third-party-licenses.json`, including the
+separately licensed Contributor Covenant text. On 2026-07-23, André Twachtmann,
+acting as the named human
+rightsholder reviewer, approved activation of the Contributor License Agreement
+process described in CONTRIBUTOR_LICENSE_AGREEMENT.md and CONTRIBUTING.md.
+`agent-pipe-shared` remains the repository organization and technical
+maintainer identity; it is not asserted to be the legal person or contracting
+party. This public notice intentionally records no private address, email
+address, or private-account link.
 
 This source-available repository is licensed under Sustainable Use License
 Version 1.0 (SUL-1.0). Preserve this notice and the LICENSE file in copies.
@@ -27,7 +29,8 @@ including sale or licensing, paid hosting/SaaS/managed service, white-label
 use, material embedding as a value component of a paid product, or commercial
 redistribution. Commercial requests may be discussed through the repository
 maintainers for planning only; the issue tracker is not contract acceptance,
-and no offer can be accepted while the contracting party is unrecorded:
+and a commercial agreement requires separate express acceptance by André
+Twachtmann:
 
 https://github.com/agent-pipe-shared/agent-pipeline/issues
 

@@ -197,6 +197,12 @@ with no known external code. Third-party text remains separately attributed.
 Historical releases keep the licenses and notices shipped with them; the
 current transition is not retroactive. A named human legal/rightsholder review
 is mandatory before public activation or reliance on contributor relicensing.
+André Twachtmann is the legal rightsholder for Agent-Pipeline project-authored
+content and the CLA contracting party; inventoried third-party material remains
+excluded. On 2026-07-23, acting as the named human rightsholder reviewer, André
+Twachtmann approved activation of the digest-bound contributor CLA process.
+That approval does not replace the DCO plus Contributor-personal current-CLA
+acceptance gates, guarantee legal effectiveness, or authorize a release.
 
 ### 6. Complete HAW-C
 
@@ -211,9 +217,15 @@ owner-only evidence it reports `unavailable`.
 ### 7. HAW-E shared go-live
 
 HAW-E binds document evidence to both candidates, reads both channels freshly,
-and selects exactly one SemVer above both baselines. `0.4.0` is only an
-expectation. VERSION, plugin manifests, marketplace resolution, documentation,
-and annotated tags must match. Separate private and Public consent combine only
+and selects exactly one SemVer above both baselines. The PO selects `0.4.0` as
+the target and first public GitHub/Product Release after Sentinel is cleanly on
+`main`. This is planning authority, not a release or a substitute for HAW-E
+freshness: Public currently has VERSION `0.2.0`, no public SemVer tag, and no
+GitHub Release; private `v0.1.0` through `v0.3.1` development tags are not
+public releases. Immediately before any tag or release, HAW-E must freshly
+observe and seal both channels again. VERSION, plugin manifests, marketplace
+resolution, documentation, and annotated tags are aligned only in that later
+atomic release step. Separate private and Public consent combine only
 through one short-lived authorization for the branch/worktree CAS, immutable
 tags, and four guarded remote effects. Both branch/tag pairs require fresh
 fetch-back. Partial publication never counts; only a higher-version

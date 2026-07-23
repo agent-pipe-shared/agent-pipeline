@@ -61,12 +61,24 @@ the dedicated PR-template checkbox. Maintainers must not merge a contribution
 without both records. Acceptance hidden in Code of Conduct participation or
 inferred merely from submitting code is insufficient.
 
-The CLA gate is currently **inactive** because `NOTICE` does not yet identify a
-legal rightsholder/contracting party. External pull requests may be opened and
-discussed, but their CLA checkbox has no activating effect and they must not be
-merged until a company or other legal person is recorded and the named human
-legal/rightsholder reviewer approves the process. Do not put a private personal
-identity into a pull request or repository file to bypass this gate.
+André Twachtmann is the legal rightsholder for Agent-Pipeline project-authored
+content and the CLA contracting party. Third-party material remains under the
+ownership and license recorded in `third-party-licenses.json`. On 2026-07-23,
+André Twachtmann, acting as the named human rightsholder
+reviewer, approved activation of the CLA process. External pull requests may
+therefore use the CLA checkbox, but no contribution may be merged unless both
+its DCO sign-off and the Contributor's personally checked, current-version CLA
+acceptance are present. A maintainer, bot, or submission automation cannot
+accept on the Contributor's behalf. No private address, email address, or
+private-account link is required or recorded here.
+
+The repository's server-side branch protection for `main` must require the
+`contributor-gates / cla-and-dco` status check and must require the pull-request
+branch to be up to date with `main` before merge. Without both settings and a
+server-side read-back confirming them, this workflow is evidence but cannot by
+itself claim that GitHub blocks merge. The check emits its machine-readable
+receipt in the job log for the current run; the repository does not claim that
+the log is an immutable long-term acceptance archive.
 
 Sign off your commits with:
 
@@ -101,7 +113,8 @@ It does not describe an assignment of authorship or copyright. Contributors
 must have the rights needed to make that grant and must identify third-party
 material. These documents are not legal advice and make no guarantee that a
 particular acceptance process or grant is effective under every applicable
-law; the human legal/rightsholder review gate remains mandatory.
+law. The recorded 2026-07-23 approval activates the CLA process but is not a
+general legal-effectiveness guarantee or release approval.
 
 ## Code of Conduct
 

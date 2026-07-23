@@ -279,6 +279,12 @@ disclosed in every resulting gate claim.
    Price and contract terms remain outside the repository.
 7. Obtain a named human legal/rightsholder review before public activation.
    Agent output is not legal advice and cannot serve as that approval.
+   André Twachtmann, the legal rightsholder for Agent-Pipeline project-authored
+   content, recipient of contributor grants, and CLA contracting party,
+   supplied that named-human CLA-process activation approval on 2026-07-23.
+   Inventoried third-party material remains excluded. The approval activates
+   only the current digest-bound CLA process; DCO and Contributor-personal
+   acceptance remain cumulative merge gates.
 8. Close only `pipeline.source-available-commercial-licensing` through the
    sanctioned backlog writer with candidate-bound Result and private/public
    license-gate digests. HAW-E consumes this closed result as a hard
@@ -377,7 +383,12 @@ must finish, integrate, and prove:
    tree, version surfaces, and annotated stable tags, with at most 15-minute
    age/skew and no DNS/auth failure represented as a baseline;
 3. one derived SemVer strictly greater than both reachable channel baselines;
-   `0.4.0` remains only an expectation until this decision is fresh;
+   the PO-selected target is `0.4.0`, the first public GitHub/Product Release,
+   after Sentinel is cleanly on `main`. Public VERSION remains `0.2.0` with no
+   public SemVer tags or GitHub Releases, and private `v0.1.0` through `v0.3.1`
+   development tags are not public releases. This target remains non-operative
+   until both channels are freshly observed and sealed immediately before the
+   later atomic release step;
 4. equality of VERSION, both plugin manifests, both marketplace resolutions,
    target tags, and release documentation;
 5. pointer-first publication v2, separate unexpired channel consents, one

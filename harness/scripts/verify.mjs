@@ -74,7 +74,7 @@ const SCOPED_VERIFY_REGISTRATION = Object.freeze({
   authority: Object.freeze({
     prd: Object.freeze({
       path: "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
-      sha256: "042fbf044897749c5b8a8253c4dd681333d87c41c9174a8969447f967004f931",
+      sha256: "38a489c5726473423128e73476a918116e0d540318bce0c78081332d1f6a1a20",
     }),
   }),
   suites: SCOPED_VERIFY_SUITES,
@@ -209,6 +209,7 @@ const TEST_SUITES = [
   { name: "language-canon-check", file: join(scriptDir, "check-language-canon.mjs") },
   { name: "license-contract-tests", file: join(scriptDir, "check-license-contract.test.mjs") },
   { name: "license-contract-check", file: join(scriptDir, "check-license-contract.mjs") },
+  { name: "pr-contributor-gate-tests", file: join(scriptDir, "check-pr-contributor-gates.test.mjs") },
   { name: "security-scan-tests", file: join(scriptDir, "security-scan.test.mjs") },
   { name: "no-autoupdate-key-tests", file: join(scriptDir, "no-autoupdate-key.test.mjs") },
   { name: "phase26-invariants-tests", file: join(scriptDir, "check-phase26-invariants.test.mjs") },

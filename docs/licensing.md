@@ -30,12 +30,33 @@ Covenant 2.1 under that upstream work's CC-BY-SA-4.0 terms. Future dependencies
 or third-party text must be added to the inventory before use and checked
 against `governance/examples/policies/license-allowlist.json`.
 
+André Twachtmann is the legal rightsholder for Agent-Pipeline project-authored
+content and the commercial/CLA contracting party. Third-party material listed
+in `third-party-licenses.json`, including Contributor Covenant text, remains
+under its stated upstream ownership and license. On 2026-07-23, André
+Twachtmann, acting as the named human
+rightsholder reviewer, approved activation of the contributor CLA process. The
+public record intentionally contains no private address, email address, or
+private-account link. Every external contribution still requires both its DCO
+sign-off and the Contributor's own express, current-version CLA acceptance;
+a maintainer, bot, or submission automation cannot accept on the Contributor's
+behalf.
+
+GitHub branch protection for `main` must make
+`contributor-gates / cla-and-dco` a required status check and require the PR
+branch to be current with `main` before merge. The latter prevents an earlier
+green result from surviving a later CLA change on `main`. Repository files
+cannot prove those server-side settings; activation for merging therefore
+requires an authenticated branch-protection read-back. The workflow's
+machine-readable receipt is written to the current job log and runner-temporary
+storage only; no immutable long-term archive is asserted.
+
 The PO has represented for this candidate that all current project-authored
 content is 100% owner-controlled and that no external code is known to be
 incorporated. That representation is recorded provenance, not an automated
 proof or a legal opinion; identified third-party text remains separately
-attributed. A named human legal/rightsholder review remains required before
-public activation.
+attributed. The 2026-07-23 rightsholder approval activates the CLA acceptance
+process; it is not a legal-effectiveness guarantee or a release approval.
 
 This repository does not provide legal advice, define prices or contract
 terms, guarantee the effectiveness of any rights grant, or silently grant

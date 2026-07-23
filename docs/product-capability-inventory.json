@@ -821,6 +821,12 @@
       "member": "post-compact-reground-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:pr-contributor-gate-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "pr-contributor-gate-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1406,6 +1412,7 @@
         "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
         "verify-phase:harness/scripts/verify.mjs:po-language-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:post-compact-reground-tests",
+        "verify-phase:harness/scripts/verify.mjs:pr-contributor-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:private-document-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:private-overlay-activation-e2e-tests",
