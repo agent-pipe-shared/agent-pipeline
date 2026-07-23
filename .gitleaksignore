@@ -25,3 +25,13 @@ plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:715
 # commit/path/rule/line fingerprints are retained narrowly for history scans.
 933e1a8d17d6c7bed040d13f8fccca2511fff9dc:docs/spec-archive/2026-07-20-sentinel-recovery/spec.md:generic-api-key:17
 966e3190138921a20533cb2d44cbfc70d8113e9b:specs/2026-07-19-sprint-sentinel-epic/spec.md:generic-api-key:17
+# Equivalent exact fingerprints after linearizing the unpublished Sentinel
+# integration history. These remain narrow historical false-positive entries.
+00fcc336cfd163d85fed20aa0a7ec2dbcfb6c31a:docs/spec-archive/2026-07-20-sentinel-recovery/spec.md:generic-api-key:17
+aaeb698ff8440b745e15141e2206567afdc7afa8:specs/2026-07-19-sprint-sentinel-epic/spec.md:generic-api-key:17
+193b481ede96759c870730d4a83da3cd7e75a065:harness/scripts/pipeline-state.test.mjs:generic-api-key:1601
+193b481ede96759c870730d4a83da3cd7e75a065:harness/scripts/pipeline-state.test.mjs:generic-api-key:1726
+193b481ede96759c870730d4a83da3cd7e75a065:harness/scripts/pipeline-state.test.mjs:generic-api-key:1774
+e32f34c5aa03f2498844a7fa5d35be5b612c051b:harness/scripts/pipeline-state.test.mjs:generic-api-key:1601
+e32f34c5aa03f2498844a7fa5d35be5b612c051b:harness/scripts/pipeline-state.test.mjs:generic-api-key:1726
+e32f34c5aa03f2498844a7fa5d35be5b612c051b:harness/scripts/pipeline-state.test.mjs:generic-api-key:1774
