@@ -1,3 +1,5 @@
+advisor_export:
+  consent: "approved"
 agent_runtime: "claude-code"
 autonomy:
   branch_model: "feature-branch"
