@@ -46,16 +46,13 @@ absorbed-item mapping).
 
 ## 3. Findings — worth the PO's attention (non-blocking)
 
-1. **CYB-1F binding map omits CYB-5.** CYB-1F §9 ("Downstream binding map")
-   lists CYB-2, CYB-6, CYB-4, CYB-8, CYB-3/CYB-7, CYB-9 as consumers of the
-   frozen identifiers, but not CYB-5 — even though `spec.md` §4 states CYB-5
-   "Depends: CYB-1 (module/control IDs)". This is a real completeness gap in
-   the draft (not a design defect): CYB-1F should add a row naming which
-   frozen identifiers CYB-5's catalog-waiver-class and control entries bind
-   to (likely the control-ID grammar §4 and the module registry §6, for the
-   "PO-waived direct implementation" waiver type and any `ctl.risk.ai-agent.*`
-   controls). Low cost to fix at the next CYB-1F edit; does not block
-   anything since CYB-1F is pre-freeze.
+1. **CYB-1F binding map omitted CYB-5 — FIXED.** CYB-1F §9 ("Downstream
+   binding map") listed CYB-2, CYB-6, CYB-4, CYB-8, CYB-3/CYB-7, CYB-9 as
+   consumers of the frozen identifiers, but not CYB-5 — even though
+   `spec.md` §4 states CYB-5 "Depends: CYB-1 (module/control IDs)". Unlike
+   findings 2-3 below, this one decides nothing new — it only records a
+   dependency `spec.md` already asserts — so it was corrected directly in
+   `cyb-1f-schema-boundary-draft.md` §9 rather than left as an open item.
 2. **"Frozen" language used before the freeze checkpoint.** Several package
    specs (CYB-6 most explicitly: "the 13 capability families are verbatim
    identical to CYB-1F §3's frozen `cap.*` roots") describe CYB-1F content
@@ -101,9 +98,9 @@ document.
 ## 5. Net assessment
 
 No blocking inconsistency found across the ten package specs, `spec.md`, the
-PRD, or the acceptance matrix. The one real gap (finding 1) is a one-line
-addition to CYB-1F, not a redesign. Findings 2–3 are precision/communication
-items best raised explicitly at the mid-CYB-1 PO freeze checkpoint rather
-than fixed unilaterally by the Elephant, since they touch open decisions
-(F-4) and PO-facing wording that the checkpoint itself is supposed to
-ratify.
+PRD, or the acceptance matrix. The one real gap (finding 1) has already been
+corrected (pure doc-sync, decided nothing new). Findings 2–3 are
+precision/communication items deliberately left open for the mid-CYB-1 PO
+freeze checkpoint rather than fixed unilaterally by the Elephant, since they
+touch an open decision (F-4) and PO-facing wording that the checkpoint itself
+is supposed to ratify.

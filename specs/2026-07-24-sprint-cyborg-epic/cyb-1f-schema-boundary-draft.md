@@ -179,6 +179,7 @@ policy authority (#41 §5).
 | CYB-8 (#47) | `ctl.*` and `cap.*` IDs on finding records |
 | CYB-3 / CYB-7 | `cap.sca`, `cap.container`; catalog controls for supply-chain |
 | CYB-9 (#48) | assurance levels + evaluation receipt |
+| CYB-5 (#46) | `ctl.*` grammar (§4) for its catalog-modelled controls (e.g. `ctl.risk.ai-agent.*`); the waiver-class fields (§8) for the "PO-waived direct implementation" L0 waiver type — per `spec.md` §4 ("CYB-5 … Depends: CYB-1 (module/control IDs)"), added here per the cross-spec consistency review's finding 1 (2026-07-25: this row was missing) |
 
 ## 10. Open decisions to resolve AT the freeze checkpoint
 
