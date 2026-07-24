@@ -303,15 +303,17 @@ it does not supersede the release-candidate checkpoint below for other
 branches. Parallel-runner discipline: this runner owns only Sprint Cyborg.
 
 - Sprint Cyborg (label `sprint:cyborg`, issues #39/#41–#48) was activated by
-  the PO on 2026-07-24. `main` was fast-forwarded to
-  `86deb0cbbed8cbaae7d652e7060c220cecfe3436` (= published tag `v0.4.0`; the
-  GitHub release exists, so the "candidate only; not published" wording below
-  is historical). The sprint branch `feat/sprint-cyborg-claude` (normative
-  template `feat/sprint-cyborg-<runner>`) branches from exactly that OID.
-  Cross-sprint prerequisites #22/#27/#28/#40 are closed.
+  the PO on 2026-07-24. `main` was first fast-forwarded to
+  `86deb0cbbed8cbaae7d652e7060c220cecfe3436` (= published tag `v0.4.0`), then
+  — on PO directive later the same day — to
+  `81cc5f1a6cb384057fd49dd1a340e93c3aec3efb` (= tag `v0.4.1`, private-overlay
+  authority-update hotfix), and the sprint branch `feat/sprint-cyborg-claude`
+  (normative template `feat/sprint-cyborg-<runner>`) was rebased onto that
+  OID. Cross-sprint prerequisites #22/#27/#28/#40 are closed.
 - The Epic design package `specs/2026-07-24-sprint-cyborg-epic/` (PRD,
   technical spec with own evidence-spine architecture and deviation catalog
-  D1–D10, backlog acceptance matrix) is committed as `4e79074`.
+  D1–D10, backlog acceptance matrix) is committed as `83e35b1` (rebased onto
+  `v0.4.1`; pre-rebase identity `4e79074`).
   **PO gate (EL-19) is OPEN — no implementation dispatch before "approved".**
   Six backlog items carry Cyborg triage proposals in the PRD (four due
   2026-07-27); triage fields are filled only after PO approval.
@@ -319,7 +321,8 @@ branches. Parallel-runner discipline: this runner owns only Sprint Cyborg.
   read-only consult (Claude chain), answered 2026-07-24; material findings
   are incorporated in the committed design. No advisory-receipt file was
   produced by host machinery; the PRD's advisory record is the disclosure.
-- **Native-Windows verify baseline on `v0.4.0` is RED:** on a clean tree,
+- **Native-Windows verify baseline on `v0.4.0` AND `v0.4.1` is RED:** on a
+  clean tree,
   eleven suites fail individually on this host: afk-ledger,
   repository-freshness, codex-isolated-critic-contract, guard-push,
   feature-package-topology, advisory-host-bridge, codex-advisory-bootstrap,
@@ -328,13 +331,15 @@ branches. Parallel-runner discipline: this runner owns only Sprint Cyborg.
   private-generation/CAS assertions fail natively). This is the known
   Windows-reproducibility class (#36, Sentinel-owned): the eight archived
   Windows commits (`archive/public-sentinel-windows-34-37-close-20260724`)
-  are NOT contained in `v0.4.0`. A separate in-run security-scan
-  `working-tree-not-clean` error was session-caused (design files written
-  during the run), not a defect. Consequence: guard-push evidence cannot go
-  green from this host on a `v0.4.0` base, so pushing
-  `feat/sprint-cyborg-claude` is evidence-blocked until the Sentinel owner
-  integrates the Windows residue (0.4.1 path) or the PO disposes otherwise.
-  Design work and the PO gate are not blocked.
+  are contained in neither `v0.4.0` nor `v0.4.1` (re-measured per suite on
+  `81cc5f1` on 2026-07-24: the same eleven suites fail; the new
+  `private-overlay-activation.e2e` suite passes). A separate in-run
+  security-scan `working-tree-not-clean` error was session-caused (design
+  files written during the run), not a defect. Consequence: guard-push
+  evidence cannot go green from this host on this base, so pushing
+  `feat/sprint-cyborg-claude` stays evidence-blocked until the Sentinel
+  owner integrates the Windows residue into a later hotfix or the PO
+  disposes otherwise. Design work and the PO gate are not blocked.
 - Bootstrap findings of this session: PO-gate authority receipt UNAVAILABLE
   on this checkout (remedy: `node setup.mjs --publish-po-profile` from the
   canonical primary checkout, PO action); the 0.4.0 cache copy of

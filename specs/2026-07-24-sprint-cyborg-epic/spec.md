@@ -8,12 +8,14 @@
 
 ## 1. Identity, profile, and immutable inputs
 
-- Base: `main` @ `86deb0cbbed8cbaae7d652e7060c220cecfe3436` (= `v0.4.0`).
+- Base: `main` @ `81cc5f1a6cb384057fd49dd1a340e93c3aec3efb` (= `v0.4.1`;
+  rebased from `v0.4.0` per PO directive 2026-07-24 — the delta touches only
+  private-overlay activation and docs, none of the substrate below).
 - Branch: `feat/sprint-cyborg-claude`; V3 profile `epic`; this spec is a
   `design_phase` artifact.
 - Requirements input: issues #39, #41–#48 (full text snapshot read
   2026-07-24); absorbed backlog items per PRD.
-- Existing substrate this design builds on (v0.4.0, verified present):
+- Existing substrate this design builds on (verified present on `v0.4.1`):
   - `harness/scripts/security-scan.mjs` — adapter runner (gitleaks,
     osv-scanner, semgrep, license-check), typed `PASS|FINDINGS|SKIPPED|ERROR`,
     manifest-driven config, gate modes, `pipeline.security-evidence.v1` with

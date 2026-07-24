@@ -9,8 +9,11 @@
 
 - **Sprint label:** `sprint:cyborg` — "Post-go-live security: secure-by-design
   controls, candidate assurance and supply-chain integrity."
-- **Common base:** the accepted go-live commit
-  `86deb0cbbed8cbaae7d652e7060c220cecfe3436` = tag `v0.4.0` on `main`. All
+- **Common base:** `main` @
+  `81cc5f1a6cb384057fd49dd1a340e93c3aec3efb` = tag `v0.4.1` (PO directive
+  2026-07-24: rebase onto the 0.4.1 hotfix, superseding the original go-live
+  base `86deb0cb…` = `v0.4.0`). The 0.4.0→0.4.1 delta touches only
+  private-overlay activation and docs — no Cyborg design substrate. All
   Cyborg work branches from this exact OID, never from a pre-go-live
   candidate.
 - **Sprint branch (this runner):** `feat/sprint-cyborg-claude`, following the
