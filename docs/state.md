@@ -3,13 +3,12 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-07-23
+**Last updated:** 2026-07-24
 **Project status:** ACTIVE
-**Current block:** Sentinel shared-prerequisite hotfix (`#10`, `#27`, direct
-Codex host Advisor) is in final verification before one push to `main`;
-consumer V3 onboarding is queued as the next blocker
+**Current block:** `0.4.0` public release-candidate documentation; final
+candidate-bound gates and remote HAW-E authorization are pending
 **Repair baseline:** `bd05d351957828393201bd6a9433b46107a880bc`
-**Release version:** `0.2.0`
+**Release version:** `0.4.0` (candidate only; not published)
 
 ## Operational head
 
@@ -222,11 +221,37 @@ consumer V3 onboarding is queued as the next blocker
 
 ## Open items and next block
 
-### 2026-07-23 Codex plugin-refresh restart checkpoint — authoritative latest
+### 2026-07-24 release-candidate checkpoint — authoritative latest
+
+The PO has dispositioned all Sentinel/HAW-E implementation and tests as
+functionally complete. This is a PO product disposition only: it is not a
+machine-evidence claim, a canonical backlog transition, a Result, a tag, a
+GitHub Release, a marketplace publication, or a remote readback.
+
+The public candidate version is `0.4.0` in `VERSION` and both plugin manifests.
+The candidate's two required marketplace resolutions are documented in
+[`release-0.4-readiness.md`](release-0.4-readiness.md): the selected Codex
+`pipeline-core` marketplace resolution and the Claude
+`pipeline-core@agent-pipeline` marketplace resolution must each resolve to
+`0.4.0` during the later fresh release observation. The former narrow
+SHA-phase exception for the Claude manifest is not used by this candidate.
+
+Release remains pending, for the exact final candidate, a new Full Verify,
+Security, and independent final Critic with candidate-bound evidence, followed
+by the separately authorized HAW-E remote two-channel observation, consent,
+publication, and fetch-back/readback sequence. Historic evidence remains
+historic; this checkpoint claims neither a final gate result nor a remote
+effect. No tag, release, marketplace update, push, merge, or private-repository
+operation is authorized or implied by this documentation change.
+
+This checkpoint supersedes older release-version, current-block, and
+"authoritative latest/current" statements below where they conflict.
+
+### 2026-07-23 Codex plugin-refresh restart checkpoint — historical
 
 `main` and `origin/main` are both at `487986210e6719bf3cf0157b61f5b73c3d5b1d54` after the authorized fast-forward from `0664e835`; no feature implementation was changed in this Codex block. The source/cache comparison found only the two Sentinel registration files from the newly integrated remote commits out of sync with the installed plugin, so the mandatory plugin update flow advanced `plugins/pipeline-core/.codex-plugin/plugin.json` to cachebuster `0.2.0+codex.20260723194910`, reinstalled that version through the Codex CLI, and confirmed the resulting cache is byte-identical to `plugins/pipeline-core`. The generic plugin validator still reports the three already-known admission findings (`hooks` in `plugin.json` and `disable-model-invocation: true` in `close-block` and `critic-review`); these were not introduced here. Codex cannot reload the active plugin in-process, so the PO requested this durable checkpoint and a restart before re-entry. On restart, run `pipeline-core:pipeline-start` from the new cache, confirm local `main` equals `origin/main` and the installed/cache-identical plugin is `0.2.0+codex.20260723194910`, then prepare the shared prerequisite package: correct the release baseline to `0.4.0`, finish #27 and #10, verify/review/push that exact candidate, and write a candidate-bound Windows handover. The Windows/Claude session should then branch from that exact `main` as `feat/sentinel-windows-34-37-close`, own only #34–#37, and return its exact branch OID/tree/evidence before sequential integration; Codex retains #28, #22, and #40, with `0.4.1` reserved for the fully closed Sentinel sprint. Lesson retained: a successful Codex CLI plugin reinstall proves cache content, but a new process/thread is still required to activate the refreshed skill bindings. This checkpoint supersedes older next-action or branch-location statements below where they conflict.
 
-### 2026-07-23 session cut — authoritative current state
+### 2026-07-23 session cut — historical state
 
 - Work continues in the persistent worktree
   `branch/feat/v3-public-core-foundation` on branch

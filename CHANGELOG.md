@@ -2,7 +2,7 @@
 
 All notable changes to the Agent Pipeline are documented here.
 
-Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning per [ADR-0002](docs/adr/0002-versioning-sha-then-semver.md): SHA-based in the early phase — the current commit on `main` is the valid, distributed state; SemVer + tags arrive once the stability phase begins.
+Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning per [ADR-0002](docs/adr/0002-versioning-sha-then-semver.md): the `0.4.0` release candidate uses stable SemVer surfaces; a version in this file is not a tag, GitHub Release, marketplace publication, or remote readback.
 
 ## [Unreleased]
 
@@ -12,12 +12,16 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
   source-available Sustainable Use License 1.0 (SUL-1.0). This change applies
   to the current candidate and does not alter the MIT, Apache-2.0, or
   CC-BY-4.0 grants and notices shipped with earlier versions.
-- The PO-selected target is `v0.4.0`, the first public GitHub/Product Release,
-  only after Sentinel is cleanly integrated on `main`. Public VERSION remains
-  `0.2.0`; no public SemVer tag or GitHub Release exists yet. Private
-  `v0.1.0`–`v0.3.1` development tags are not public releases. HAW-E must freshly
-  observe and seal both channels immediately before the later atomic version,
-  tag, and release operation; this entry does not publish or retag anything.
+- The PO-selected `0.4.0` release candidate now resolves the public `VERSION`
+  and both plugin manifests to the same stable version. The two intended
+  marketplace resolutions and the remaining release gates are documented in
+  [`docs/release-0.4-readiness.md`](docs/release-0.4-readiness.md). This change
+  does not create a tag, GitHub Release, marketplace publication, or remote
+  readback.
+- The PO disposition for the Sentinel/HAW-E implementation is that its tests
+  and functionality are complete. Final candidate-bound Verify, Security, and
+  independent Critic evidence, plus the separately authorized HAW-E remote
+  release/readback sequence, remain required before any release claim.
 
 ## [0.2.0] — 2026-07-12
 
