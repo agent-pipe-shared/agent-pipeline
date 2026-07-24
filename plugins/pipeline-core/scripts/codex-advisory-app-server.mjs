@@ -57,7 +57,9 @@ export async function invokeCodexAdvisoryAppServer(payload, dependencies = {}) {
     && result.observed?.stdinEnded === true && result.observed?.exitCode === 0
     && result.observed?.signal === null && result.observed?.cleanup === "complete"
     && typeof result.answer === "string";
-  if (!success) return { status: "unavailable" };
+  // Do not collapse a completed but invalid child into no-child evidence. The
+  // selected-duty bridge must retain it as a started transport incident.
+  if (!success) return { status: "unavailable", childStarted: terminal.error === null };
   return {
     status: "answered",
     answer: result.answer,

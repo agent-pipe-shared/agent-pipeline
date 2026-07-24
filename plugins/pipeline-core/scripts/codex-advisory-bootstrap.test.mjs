@@ -31,6 +31,7 @@ test("closed launcher reads the V3 opt-out authority and constructs one native c
   assert.deepEqual(captured.advisorExport, { consent: "approved" });
   assert.equal(captured.runner, "codex");
   assert.equal(captured.question, "Which bootstrap boundary is safe?");
+  assert.deepEqual(captured.references, ["plugins/pipeline-core/scripts/advisory-host-bridge.mjs"]);
   assert.equal(captured.dispatch.queueRevision, 2);
   assert.match(captured.dispatch.candidateCommit, /^[a-f0-9]{40}$/u);
   assert.match(captured.dispatch.candidateTree, /^[a-f0-9]{40}$/u);

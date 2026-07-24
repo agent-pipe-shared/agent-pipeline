@@ -98,9 +98,9 @@ const cases = [
     const value = completeIntent(); value.routing.duties.advisory.claude.fallbacks.reverse();
     const checked = validatePipelineUserV3(value); assert.equal(checked.ok, false); assert.ok(checked.errors.some((entry) => entry.path.startsWith("$.routing.duties.advisory.claude.fallbacks")));
   }],
-  ["Codex advisory host-consult cell is frozen", () => {
+  ["Codex advisory selected-sandbox host-consult cell is frozen", () => {
     const cell = completeIntent().routing.duties.advisory.codex;
-    assert.deepEqual(cell, { adapter: "host-consult", effort: "max", evidence: "host-advisor-status", isolation: "project-read-only", runner: "codex", selector: { kind: "model-id", value: "gpt-5.6-sol" }, state: "default", status: "pipeline.host-advisor-status.v1" });
+    assert.deepEqual(cell, { adapter: "host-consult", effort: "max", evidence: "advisory-receipt", isolation: "selected-sandbox-network-open-read-only", runner: "codex", selector: { kind: "model-id", value: "gpt-5.6-sol" }, state: "default", status: "pipeline.codex-sandbox-execution-receipt.v1" });
     const value = completeIntent(); value.routing.duties.advisory.codex.selector.value = "gpt-5.6-terra";
     const checked = validatePipelineUserV3(value); assert.equal(checked.ok, false); assert.ok(has(checked, "$.routing.duties.advisory.codex.selector.value", "frozen_mapping"));
   }],

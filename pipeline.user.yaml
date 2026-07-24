@@ -70,14 +70,14 @@ routing:
       codex:
         adapter: "host-consult"
         effort: "max"
-        evidence: "host-advisor-status"
-        isolation: "project-read-only"
+        evidence: "advisory-receipt"
+        isolation: "selected-sandbox-network-open-read-only"
         runner: "codex"
         selector:
           kind: "model-id"
           value: "gpt-5.6-sol"
         state: "default"
-        status: "pipeline.host-advisor-status.v1"
+        status: "pipeline.codex-sandbox-execution-receipt.v1"
       eligibility:
         epic: "required"
         feature: "required"

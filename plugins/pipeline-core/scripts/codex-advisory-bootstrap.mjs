@@ -94,6 +94,7 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
       runner: "codex",
       question,
       dispatch: { dispatchId: args.dispatchId, queueRevision: args.queueRevision, candidateCommit, candidateTree },
+      references: [...args.references],
       advisorExport: source.advisor_export ?? { consent: "default" },
       sandboxContext: { repoFingerprint, referenceSetSha256: sha256(JSON.stringify([...new Set(args.references)].sort())) },
       sandboxRuntime: { schema: "pipeline.codex-sandbox-runtime.v1", repoRoot, codexPath, observedHelperPath, sessionCleanup: { sessionId: args.sessionId, descriptorSha256: args.descriptorSha256 } },

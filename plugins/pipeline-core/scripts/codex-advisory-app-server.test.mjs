@@ -65,6 +65,6 @@ test("wrong model, protocol failure, write attempt, incomplete stdio/exit or cle
       buildSandboxInvocationFn: () => ({ command: "/codex", argv: ["sandbox"], options: { shell: false } }),
       spawnFn: fakeSpawn(result),
     });
-    assert.deepEqual(actual, { status: "unavailable" });
+    assert.deepEqual(actual, { status: "unavailable", childStarted: true });
   }
 });
