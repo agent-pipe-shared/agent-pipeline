@@ -19,11 +19,11 @@ const PREVIEW_FD = 2;
 const MAX_PREVIEW_BYTES = 64 * 1024;
 
 function usage() {
-  return "Usage: node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs <inspect|plan|apply> --root <project-dir> [--activate]";
+  return "Usage: node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs <inspect|plan|apply> --root <project-dir> [--initialize-missing-runtime] [--activate]";
 }
 
 function parseArgs(args) {
-  const parsed = { activate: false };
+  const parsed = { activate: false, initializeMissingRuntime: false };
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
     if (index === 0 && ["inspect", "plan", "apply"].includes(arg)) parsed.command = arg;
@@ -33,12 +33,14 @@ function parseArgs(args) {
       parsed.root = value;
       index += 1;
     } else if (arg === "--activate") parsed.activate = true;
+    else if (arg === "--initialize-missing-runtime") parsed.initializeMissingRuntime = true;
     else if (arg === "--help" || arg === "-h") parsed.help = true;
     else return { error: `unknown argument: ${arg}` };
   }
   if (!parsed.help && !parsed.command) return { error: "one command is required" };
   if (!parsed.help && !parsed.root) return { error: "--root is required" };
   if (parsed.activate && parsed.command !== "apply") return { error: "--activate is only valid for apply" };
+  if (parsed.initializeMissingRuntime && !["plan", "apply"].includes(parsed.command)) return { error: "--initialize-missing-runtime is only valid for plan or apply" };
   return parsed;
 }
 
@@ -136,7 +138,10 @@ export function main(args = process.argv.slice(2), {
         }
       } else if (recoveryPlan.status !== "none") output = recoveryPlan;
     }
-    const plan = output ? null : planRunnerProfileMigrationV3({ rootDir: options.root });
+    const plan = output ? null : planRunnerProfileMigrationV3({
+      rootDir: options.root,
+      initializeMissingRuntimeForSlimV3: options.initializeMissingRuntime,
+    });
     if (options.command === "plan") output = plan;
     else {
       if (!output && options.activate && ["ready", "noop"].includes(plan.status)) {

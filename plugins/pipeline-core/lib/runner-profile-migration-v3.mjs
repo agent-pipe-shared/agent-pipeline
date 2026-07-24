@@ -215,7 +215,8 @@ function runtimePaths() {
 }
 function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForSlimV3 = false } = {}) {
   const legacy = ["v0", "v1", "v2"].includes(sourceKind);
-  const initializeSlimV3 = sourceKind === "v3" && initializeMissingRuntimeForSlimV3 === true;
+  const initializeSlimV3 = ["v3", "v3-refresh"].includes(sourceKind)
+    && initializeMissingRuntimeForSlimV3 === true;
   const baselines = {};
   const seeded = new Set();
   for (const relative of runtimePaths()) {

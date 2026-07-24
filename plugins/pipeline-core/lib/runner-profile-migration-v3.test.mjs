@@ -259,6 +259,34 @@ record("a V3 authority update refreshes every frozen routing mapping as one regi
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+record("v3-refresh initializes a missing advisor target only with explicit opt-in and preserves apply drift protection", () => {
+  const source = v3Intent();
+  source.routing.duties.implement.codex.effort = "low";
+  const root = fixture(yaml(source));
+  try {
+    const advisor = join(root, ".codex/agents/consult-advisor.toml");
+    rmSync(advisor);
+    const before = snapshot(root);
+    const closed = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(closed.status, "invalid-baseline");
+    assert.equal(closed.sourceKind, "v3-refresh");
+    const plan = planRunnerProfileMigrationV3({ rootDir: root, initializeMissingRuntimeForSlimV3: true });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.sourceKind, "v3-refresh");
+    const seededAdvisor = plan.targets.find((target) => target.path === ".codex/agents/consult-advisor.toml");
+    assert.deepEqual(seededAdvisor.before, { status: "absent", sha256: null, byteLength: 0 });
+    assert.ok(plan.targets.filter((target) => target.kind === "runtime").every((target) => runtimePaths.includes(target.path)));
+    assert.deepEqual(snapshot(root), before, "plan remains read-only");
+    writeFileSync(advisor, "[model]\nmodel = \"drift\"\n");
+    assert.notEqual(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+    rmSync(advisor);
+    const fresh = planRunnerProfileMigrationV3({ rootDir: root, initializeMissingRuntimeForSlimV3: true });
+    assert.equal(applyRunnerProfileMigrationV3(fresh, { rootDir: root, activate: true }).status, "applied");
+    assert.equal(existsSync(advisor), true);
+    assert.equal(parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8")).routing.duties.implement.codex.effort, loadRunnerProfilesV3Registry().duties.implement.codex.effort);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 record("an authority lock and the full V3 registry refresh share one recoverable transaction", () => {
   const source = v3Intent();
   source.routing.duties.implement.codex.effort = "low";
