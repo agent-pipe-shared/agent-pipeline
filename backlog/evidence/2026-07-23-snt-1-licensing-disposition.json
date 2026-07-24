@@ -4,8 +4,8 @@
   "reviewer": "André Twachtmann",
   "reviewedAt": "2026-07-24",
   "candidate": {
-    "commit": "79a2c9b0b979d171d69217df6493db8cc75b9484",
-    "tree": "9fc4320bf00c0af7a08304c8afeeb2014c083508"
+    "commit": "9a7ee7bdf072189817a7b59f291d583d8632bf64",
+    "tree": "51d33be9108c618cecb6c7eee2f753c67e706522"
   },
   "surfaces": [
     {
@@ -30,7 +30,7 @@
     },
     {
       "path": "docs/licensing.md",
-      "sha256": "538af71fe3418e29571e800ce55f9b89f5aa76e023c3c2455d405811da03fb2f"
+      "sha256": "a1473c21da42f48688e02020819d5b7fc073b2a902ea1743356204b423b5924a"
     },
     {
       "path": "third-party-licenses.json",

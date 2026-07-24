@@ -4,22 +4,22 @@
     "reviewer": "André Twachtmann",
     "reviewedAt": "2026-07-24",
     "status": "approved",
-    "dispositionSha256": "3211caecd7569edda5b6572ba4e5b2f4bc7b2a98c4fc5944f5a1cb94bdcfe877"
+    "dispositionSha256": "cdcd2d24f94b5c4e60895ebad2a51ad13a0e66123f022cdef09ad082d85ff749"
   },
   "privacyDisposition": {
     "reviewer": "André Twachtmann",
     "reviewedAt": "2026-07-24",
     "status": "approved",
-    "dispositionSha256": "5fc540925d0c0778ef9c00c4158333d49813c27a3dd760ddb96db205679f8e18"
+    "dispositionSha256": "c5c62bfe5a00dd41c36a2579b65d968e8963f9085f37c3ddd1639a1ff0cefde5"
   },
   "candidates": {
     "private": {
-      "commit": "79a2c9b0b979d171d69217df6493db8cc75b9484",
-      "tree": "9fc4320bf00c0af7a08304c8afeeb2014c083508"
+      "commit": "9a7ee7bdf072189817a7b59f291d583d8632bf64",
+      "tree": "51d33be9108c618cecb6c7eee2f753c67e706522"
     },
     "neutral-public": {
-      "commit": "79a2c9b0b979d171d69217df6493db8cc75b9484",
-      "tree": "9fc4320bf00c0af7a08304c8afeeb2014c083508"
+      "commit": "9a7ee7bdf072189817a7b59f291d583d8632bf64",
+      "tree": "51d33be9108c618cecb6c7eee2f753c67e706522"
     }
   },
   "gates": {
@@ -27,33 +27,33 @@
       "schema": "pipeline.snt1-license-gate-projection.v1",
       "channel": "private",
       "candidate": {
-        "commit": "79a2c9b0b979d171d69217df6493db8cc75b9484",
-        "tree": "9fc4320bf00c0af7a08304c8afeeb2014c083508"
+        "commit": "9a7ee7bdf072189817a7b59f291d583d8632bf64",
+        "tree": "51d33be9108c618cecb6c7eee2f753c67e706522"
       },
-      "surfaceSetSha256": "e0c668f49cb0a8866afff29007b9d3c0b757db3f47831788980775a65782f59d",
+      "surfaceSetSha256": "e3fd887232e2185f3ead84279c428019593efba5d8129858b13afdac3dc8d805",
       "commandSha256": "fba8517cfa79928595e87143885c4548d5cb380c3912f3f1d58f1d982a9b9843",
-      "gateCommitmentSha256": "643f8ce7627da93ccd2b0550f69c805867a2d17529a12ed31d1e982cf4b0c495",
+      "gateCommitmentSha256": "d7ed5dea4a99566f91e470b7cac55180224254b972107f8b6efef1f062d56447",
       "result": {
         "status": "passed",
         "exitCode": 0
       },
-      "projectionSha256": "d70ed503a3d7bf8d7b64110f8c1cbf45c5d8b7636716de1c1486eaa86270d56c"
+      "projectionSha256": "7dedff05b41c11a047e1b71c88f1feb15b33b37f090b34b63aea1e9e2c62c862"
     },
     "neutral-public": {
       "schema": "pipeline.snt1-license-gate-projection.v1",
       "channel": "neutral-public",
       "candidate": {
-        "commit": "79a2c9b0b979d171d69217df6493db8cc75b9484",
-        "tree": "9fc4320bf00c0af7a08304c8afeeb2014c083508"
+        "commit": "9a7ee7bdf072189817a7b59f291d583d8632bf64",
+        "tree": "51d33be9108c618cecb6c7eee2f753c67e706522"
       },
-      "surfaceSetSha256": "e0c668f49cb0a8866afff29007b9d3c0b757db3f47831788980775a65782f59d",
+      "surfaceSetSha256": "e3fd887232e2185f3ead84279c428019593efba5d8129858b13afdac3dc8d805",
       "commandSha256": "fba8517cfa79928595e87143885c4548d5cb380c3912f3f1d58f1d982a9b9843",
-      "gateCommitmentSha256": "224474238f84390a1c015b9a8155448222a5a5c4516753cf90b5410ba545d3eb",
+      "gateCommitmentSha256": "6bf3909a8126daa89e990697ca0162569d06454f7414a61aa7eb193912faf236",
       "result": {
         "status": "passed",
         "exitCode": 0
       },
-      "projectionSha256": "ab9a91224dbaa2d6b8d20cc86efceb2e758b8bdcd16d6874a2b6ac1ba4bf5674"
+      "projectionSha256": "c00dbe066c4b92d8ae5904bdf79acabdeed431353f564a5eba84a80af2b2ddac"
     }
   },
   "surfaces": [
@@ -79,12 +79,12 @@
     },
     {
       "path": "docs/licensing.md",
-      "sha256": "538af71fe3418e29571e800ce55f9b89f5aa76e023c3c2455d405811da03fb2f"
+      "sha256": "a1473c21da42f48688e02020819d5b7fc073b2a902ea1743356204b423b5924a"
     },
     {
       "path": "third-party-licenses.json",
       "sha256": "137fd317197b1c9a9753679328944cef4ccfb7ad834efaaa26959e5470f05bd0"
     }
   ],
-  "resultSha256": "bea349e5e53e2e154dcb46a745183ff5bb9e257a70a701c93f0ab5607141c3d4"
+  "resultSha256": "c86c4a71fc6e225dcce7d4ecbf1b46680931d9cf65fb6814b605e1a584831a5e"
 }
