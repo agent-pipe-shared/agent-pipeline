@@ -23,8 +23,8 @@ import { observeHostAdvisorWorkspace } from "./host-advisor-workspace.mjs";
 
 const USAGE = "usage: advisory-host-bridge.mjs --input <json> --receipt <json> [--timeout-ms <1000..600000>]";
 
-/** Compatibility seam: selected-sandbox advisory is intentionally unavailable. */
-export async function runSelectedAdvisoryHost() { throw Object.assign(new Error("selected sandbox is not an advisory route"), { code: "host_route_required" }); }
+/** Compatibility seam: an unbound host adapter is never an advisory route. */
+export async function runSelectedAdvisoryHost() { throw Object.assign(new Error("selected sandbox execution is required"), { code: "selected_sandbox_required" }); }
 
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 function advisoryReceiptBytes(receipt) { return Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, "utf8"); }
@@ -60,18 +60,20 @@ export async function runCodexAdvisoryThroughSelectedSandbox(input, adapter, tra
   const observe = transport.observeWorkspace ?? observeHostAdvisorWorkspace;
   const before = observe(root);
   const launch = createHostAdvisorLaunch(input.sessionId ?? input.sandboxRuntime?.sessionCleanup?.sessionId ?? "codex-session");
-  const payload = { role: "consult-advisor", subagentType: "consult-advisor", runner: "codex", model: "gpt-5.6-sol", effort: "max", question: input.question, dispatch: structuredClone(input.dispatch), oneQuestion: true, freshContext: true, contextPolicy: "fresh-no-handover-no-chat-history-no-implementor-rationale", tools: ["Read", "Grep", "Glob"], memory: false, autoApply: false, sandbox_mode: "read-only" };
-  let result;
-  try { result = await adapter(payload); } catch { result = { status: "unavailable" }; }
+  // A JSON reply from a host adapter carries neither an exact sandbox
+  // selection nor child/identity attestation.  It must therefore not start a
+  // consult and cannot turn into an answered advisory. The selected-duty bridge
+  // is the sole execution path; until it is supplied, retain typed no-child
+  // evidence instead of a functional-equivalence success claim.
+  void adapter;
   let after; let observationFailed = false;
   try { after = observe(root); } catch { observationFailed = true; after = { workspaceSha256: before.workspaceSha256 }; }
-  const drifted = observationFailed || after.workspaceSha256 !== before.workspaceSha256;
-  const outcome = !drifted && result?.status === "answered" && typeof result.answer === "string" ? "answered" : (observationFailed || result?.status === "unavailable" ? "unavailable" : "failed");
+  const outcome = "unavailable";
   let status;
-  try { status = createHostAdvisorStatus({ candidate: { commit: input.dispatch.candidateCommit, tree: input.dispatch.candidateTree }, launch, questionSha256: sha256(input.question), answerSha256: outcome === "answered" ? sha256(result.answer) : null, workspaceBeforeSha256: before.workspaceSha256, workspaceAfterSha256: after.workspaceSha256, outcome }); }
+  try { status = createHostAdvisorStatus({ candidate: { commit: input.dispatch.candidateCommit, tree: input.dispatch.candidateTree }, launch, questionSha256: sha256(input.question), answerSha256: null, workspaceBeforeSha256: before.workspaceSha256, workspaceAfterSha256: after.workspaceSha256, outcome }); }
   catch { status = createHostAdvisorStatus({ candidate: { commit: input.dispatch.candidateCommit, tree: input.dispatch.candidateTree }, launch, questionSha256: sha256(input.question), answerSha256: null, workspaceBeforeSha256: before.workspaceSha256, workspaceAfterSha256: after.workspaceSha256 === before.workspaceSha256 ? `${"0".repeat(63)}1` : after.workspaceSha256, outcome: "failed" }); }
   status = validateHostAdvisorStatus(status, { commit: input.dispatch.candidateCommit, tree: input.dispatch.candidateTree }, launch, sha256(input.question));
-  return { advisoryResult: { ok: outcome === "answered", code: outcome, answer: outcome === "answered" ? result.answer : null, receipt: null, attempts: [] }, execution: status };
+  return { advisoryResult: { ok: false, code: observationFailed ? "host-observation-unavailable" : "selected-sandbox-required", answer: null, receipt: null, attempts: [] }, execution: status };
 }
 
 /** Compatibility export retained for callers of the former composition seam. */
