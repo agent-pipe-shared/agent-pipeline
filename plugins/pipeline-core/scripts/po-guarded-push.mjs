@@ -50,6 +50,7 @@ import { pathToFileURL } from "node:url";
 
 const FORBIDDEN_BRANCHES = new Set(["main", "master"]);
 const MIN_REASON_LENGTH = 20;
+const SAFE_REMOTE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/u;
 
 /** Pure argv parsing; no I/O. */
 export function parseArgs(argv) {
@@ -71,6 +72,7 @@ export function validateRequest({ branch, remote, reason, currentBranch }) {
     errors.push(`refusing "${branch}" — this script never pushes main/master, use the ordinary guarded path`);
   }
   if (!remote) errors.push('missing "--remote" (default is "origin")');
+  else if (!SAFE_REMOTE.test(remote)) errors.push('"--remote" must be a safe Git remote name, never an option or URL');
   if (!reason || reason.trim().length < MIN_REASON_LENGTH) {
     errors.push(`missing or too-short "--reason" (>= ${MIN_REASON_LENGTH} chars) — state exactly why every failing suite is pre-existing/out of scope`);
   }
@@ -228,7 +230,7 @@ export async function run(argv = process.argv, env = process.env) {
   console.log(`Audit record appended: evidence/dirty-push-log.ndjson`);
 
   try {
-    execFileSync("git", ["push", "-u", record.remote, record.branch], { cwd: repoRoot, stdio: "inherit" });
+    execFileSync("git", ["push", "-u", "--", record.remote, record.branch], { cwd: repoRoot, stdio: "inherit" });
   } catch (e) {
     console.error(`\ngit push failed: ${e.message}`);
     console.error("The audit record above was already written even though the push failed — review it.");

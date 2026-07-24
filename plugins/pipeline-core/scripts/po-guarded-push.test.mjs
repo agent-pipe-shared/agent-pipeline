@@ -73,6 +73,11 @@ const REASON = "8 pre-existing suites red on the branch base, verified identical
 }
 
 {
+  const check9 = validateRequest({ branch: "feat/x", remote: "--force", reason: REASON, currentBranch: "feat/x" });
+  check("PP10b rejects an option-shaped remote name", !check9.ok && check9.errors.some((e) => e.includes("safe Git remote")), JSON.stringify(check9));
+}
+
+{
   const record = buildAuditRecord({
     branch: "feat/x",
     remote: "origin",

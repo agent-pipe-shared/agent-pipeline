@@ -286,12 +286,16 @@ test("request binds exact ordered physical inputs and rejects closed-schema drif
   assert.throws(() => validateRequest(request, { inputRoot: fixture.inputRoot }), { code: "F3-INPUT-MATERIALIZATION" });
 });
 
-test("request materialization rejects symlinks and hard links", { skip: symlinkSkip() }, (t) => {
+test("request materialization rejects symlinks", { skip: symlinkSkip() }, (t) => {
   const fixture = disposable(t);
   const request = makeRequest(fixture);
   symlinkSync("spec.md", join(fixture.inputRoot, "alias.md"));
   assert.throws(() => validateRequest(request, { inputRoot: fixture.inputRoot }), { code: "F3-INPUT-SYMLINK" });
-  rmSync(join(fixture.inputRoot, "alias.md"));
+});
+
+test("request materialization rejects hard links without requiring symlink capability", (t) => {
+  const fixture = disposable(t);
+  const request = makeRequest(fixture);
   linkSync(join(fixture.inputRoot, "spec.md"), join(fixture.inputRoot, "alias.md"));
   assert.throws(() => validateRequest(request, { inputRoot: fixture.inputRoot }), { code: "F3-INPUT-HARDLINK" });
 });
