@@ -214,7 +214,7 @@ function resolveDependencies(deps) {
   if (!isObject(deps)) throw new TypeError("invalid dependencies");
   const allowed = new Set([
     "observe", "validate", "planProjection", "activateProjection", "publishReceipt",
-    "readProjectionInputs", "readBootstrapStatus", "consumeInputs", "pluginRoot", "write", "writeError", "previewWriteSync", "spawnSync",
+    "readProjectionInputs", "readBootstrapStatus", "consumeInputs", "pluginRoot", "write", "writeError", "previewWriteSync", "spawnSync", "resolveExecutable",
   ]);
   if (Object.keys(deps).some((key) => !allowed.has(key))) throw new TypeError("invalid dependencies");
   const selected = {
@@ -526,7 +526,10 @@ export function mainCodexHost(argv, dependencyOverrides = {}) {
   if (!isObject(dependencyOverrides)) return run(argv, dependencyOverrides);
   const { observe: _ignored, ...safeOverrides } = dependencyOverrides;
   return run(argv, { ...safeOverrides, observe(input) {
-    return observeCodexPublicCoreIdentity(input, { spawnSync: safeOverrides.spawnSync ?? nodeSpawnSync });
+    return observeCodexPublicCoreIdentity(input, {
+      spawnSync: safeOverrides.spawnSync ?? nodeSpawnSync,
+      ...(typeof safeOverrides.resolveExecutable === "function" ? { resolveExecutable: safeOverrides.resolveExecutable } : {}),
+    });
   } });
 }
 

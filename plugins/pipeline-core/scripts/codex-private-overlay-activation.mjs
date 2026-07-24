@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import { spawnSync as nodeSpawnSync } from "node:child_process";
-import { isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { resolveTrustedSystemExecutable } from "../lib/trusted-tool-resolution.mjs";
 
 import { mainCodexHost as activationMain } from "./private-overlay-activation.mjs";
 
@@ -19,7 +20,7 @@ const PLUGIN_VERSION = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$/u;
 const MAX_JSON_BYTES = 64 * 1024;
 const TIMEOUT_MS = 5000;
 const MAX_BUFFER = 128 * 1024;
-const DEPENDENCY_KEYS = Object.freeze(["spawnSync", "activationMain", "write", "writeError"]);
+const DEPENDENCY_KEYS = Object.freeze(["spawnSync", "resolveExecutable", "activationMain", "write", "writeError"]);
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -59,6 +60,7 @@ function dependencies(overrides) {
   if (!isObject(overrides) || Object.keys(overrides).some((key) => !DEPENDENCY_KEYS.includes(key))) return null;
   const selected = {
     spawnSync: overrides.spawnSync ?? nodeSpawnSync,
+    resolveExecutable: overrides.resolveExecutable ?? resolveTrustedSystemExecutable,
     activationMain: overrides.activationMain ?? activationMain,
     write: overrides.write ?? process.stdout.write.bind(process.stdout),
     writeError: overrides.writeError ?? process.stderr.write.bind(process.stderr),
@@ -98,6 +100,14 @@ function safeGitMarketplaceSource(value) {
   }
 }
 
+function safeMarketplaceSource(value, pluginRoot) {
+  if (!exactObject(value, ["sourceType", "source"])) return false;
+  if (value.sourceType === "git") return safeGitMarketplaceSource(value.source);
+  return value.sourceType === "local"
+    && localAbsolute(value.source)
+    && value.source === dirname(dirname(pluginRoot));
+}
+
 function sourcePluginRoot(document) {
   if (!exactObject(document, ["installed", "available"])
     || !Array.isArray(document.installed)
@@ -119,23 +129,23 @@ function sourcePluginRoot(document) {
   if (!exactObject(entry.source, ["source", "path"])
     || entry.source.source !== "local"
     || !localAbsolute(entry.source.path)) return null;
-  if (!exactObject(entry.marketplaceSource, ["sourceType", "source"])
-    || entry.marketplaceSource.sourceType !== "git"
-    || !safeGitMarketplaceSource(entry.marketplaceSource.source)) return null;
+  if (!safeMarketplaceSource(entry.marketplaceSource, entry.source.path)) return null;
   return { path: entry.source.path, version: entry.version };
 }
 
-function resolveSourceRoot(spawn) {
+function resolveSourceRoot(spawn, resolveExecutable) {
+  let executable;
+  try { executable = resolveExecutable("codex"); } catch { return null; }
+  if (!isObject(executable) || executable.ok !== true || !localAbsolute(executable.path)) return null;
   let result;
   try {
-    result = spawn("codex", ["plugin", "list", "--marketplace", "agent-pipeline", "--json"], {
+    result = spawn(executable.path, ["plugin", "list", "--marketplace", "agent-pipeline", "--json"], {
       encoding: "utf8",
       env: {
         GIT_TERMINAL_PROMPT: "0",
         LANG: "C",
         LC_ALL: "C",
         NO_COLOR: "1",
-        PATH: process.env.PATH ?? "",
       },
       maxBuffer: MAX_BUFFER,
       shell: false,
@@ -179,7 +189,7 @@ export function main(argv, dependencyOverrides = {}) {
     safeWrite(dependencyOverrides, "write", canonicalLine(REJECTION));
     return 2;
   }
-  const hostPlugin = resolveSourceRoot(deps.spawnSync);
+  const hostPlugin = resolveSourceRoot(deps.spawnSync, deps.resolveExecutable);
   if (hostPlugin === null) {
     safeWrite(dependencyOverrides, "write", canonicalLine(REJECTION));
     return 2;

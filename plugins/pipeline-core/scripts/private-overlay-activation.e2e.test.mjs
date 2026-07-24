@@ -103,6 +103,7 @@ function pluginFiles() {
     description: "Minimal flattened SNT-A E2E plugin fixture.",
     hooks: "./hooks/codex-hooks.json",
     author: { name: "agent-pipeline" },
+    license: "SUL-1.0",
     interface: { displayName: "Pipeline Core E2E" },
   };
   return new Map([

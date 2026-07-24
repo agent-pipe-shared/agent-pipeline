@@ -49,6 +49,7 @@ const MANIFEST = `${JSON.stringify({
   description: "fixture",
   hooks: "./hooks/codex-hooks.json",
   author: { name: "fixture" },
+  license: "SUL-1.0",
   interface: { displayName: "Fixture" },
 }, null, 2)}\n`;
 const VERSIONLESS_MANIFEST = `${JSON.stringify({
@@ -56,12 +57,13 @@ const VERSIONLESS_MANIFEST = `${JSON.stringify({
   description: "fixture",
   hooks: "./hooks/codex-hooks.json",
   author: { name: "fixture" },
+  license: "SUL-1.0",
   interface: { displayName: "Fixture" },
 }, null, 2)}\n`;
 const HOST_PLUGIN_VERSION = "1.2.3-test.1";
 
 function codexHostSpawn(path, version = HOST_PLUGIN_VERSION) {
-  return () => ({
+  const spawnSync = () => ({
     status: 0,
     signal: null,
     stdout: JSON.stringify({
@@ -81,6 +83,7 @@ function codexHostSpawn(path, version = HOST_PLUGIN_VERSION) {
     }),
     stderr: "",
   });
+  return { spawnSync, resolveExecutable: () => ({ ok: true, path: "/trusted/codex" }) };
 }
 
 function git(root, args, options = {}) {
@@ -194,7 +197,7 @@ test("accepts a versionless Codex manifest only with a typed host plugin-list ve
   t.after(repo.cleanup);
 
   rejected(observePublicCoreIdentity(repo.input()), "SNT-A2-SOURCE-MANIFEST-SCHEMA");
-  const result = observeCodexPublicCoreIdentity(repo.input(), { spawnSync: codexHostSpawn(repo.sourcePluginRoot) });
+  const result = observeCodexPublicCoreIdentity(repo.input(), codexHostSpawn(repo.sourcePluginRoot));
   assert.equal(result.status, "ready", JSON.stringify(result));
   assert.equal(result.plugin.version, HOST_PLUGIN_VERSION);
   assert.equal(result.plugin.manifestSha256, createHash("sha256").update(VERSIONLESS_MANIFEST).digest("hex"));
@@ -211,7 +214,7 @@ test("rejects a declared manifest version that differs from the Codex host recor
   const repo = fixture();
   t.after(repo.cleanup);
   rejected(observeCodexPublicCoreIdentity(repo.input(), {
-    spawnSync: codexHostSpawn(repo.sourcePluginRoot, "1.2.3-other"),
+    ...codexHostSpawn(repo.sourcePluginRoot, "1.2.3-other"),
   }), "SNT-A2-SOURCE-MANIFEST-SCHEMA");
 });
 
@@ -225,7 +228,7 @@ test("host-attested version never bypasses versionless source or installed snaps
     try {
       mutate(repo);
       rejected(observeCodexPublicCoreIdentity(repo.input(), {
-        spawnSync: codexHostSpawn(repo.sourcePluginRoot),
+        ...codexHostSpawn(repo.sourcePluginRoot),
       }), expectedCode);
     } finally { repo.cleanup(); }
   }

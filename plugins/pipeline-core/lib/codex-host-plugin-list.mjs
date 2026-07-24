@@ -2,7 +2,8 @@
 
 /** Observe the selected Pipeline plugin directly from the Codex host. */
 import { spawnSync as nodeSpawnSync } from "node:child_process";
-import { isAbsolute, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
+import { resolveTrustedSystemExecutable } from "./trusted-tool-resolution.mjs";
 
 const PLUGIN_VERSION = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$/u;
 const MAX_JSON_BYTES = 64 * 1024;
@@ -41,6 +42,17 @@ function safeGitMarketplaceSource(value) {
   }
 }
 
+function safeMarketplaceSource(value, pluginRoot) {
+  if (!exactObject(value, ["sourceType", "source"])) return false;
+  if (value.sourceType === "git") return safeGitMarketplaceSource(value.source);
+  // A local marketplace is the sanctioned SHA-phase development topology. It
+  // is not a general local-path allowance: it must name precisely the
+  // repository root containing the selected plugin source.
+  return value.sourceType === "local"
+    && localAbsolute(value.source)
+    && value.source === dirname(dirname(pluginRoot));
+}
+
 function selectedPlugin(document) {
   if (!exactObject(document, ["installed", "available"])
     || !Array.isArray(document.installed)
@@ -62,9 +74,7 @@ function selectedPlugin(document) {
   if (!exactObject(entry.source, ["source", "path"])
     || entry.source.source !== "local"
     || !localAbsolute(entry.source.path)) return null;
-  if (!exactObject(entry.marketplaceSource, ["sourceType", "source"])
-    || entry.marketplaceSource.sourceType !== "git"
-    || !safeGitMarketplaceSource(entry.marketplaceSource.source)) return null;
+  if (!safeMarketplaceSource(entry.marketplaceSource, entry.source.path)) return null;
   return Object.freeze({ path: entry.source.path, version: entry.version });
 }
 
@@ -72,18 +82,20 @@ function selectedPlugin(document) {
  * The version is intentionally not an input. It is observed only by executing
  * the fixed Codex host command with a closed environment and schema.
  */
-export function observeSelectedCodexPipelinePlugin({ spawnSync = nodeSpawnSync } = {}) {
-  if (typeof spawnSync !== "function") return null;
+export function observeSelectedCodexPipelinePlugin({ spawnSync = nodeSpawnSync, resolveExecutable = resolveTrustedSystemExecutable } = {}) {
+  if (typeof spawnSync !== "function" || typeof resolveExecutable !== "function") return null;
+  let executable;
+  try { executable = resolveExecutable("codex"); } catch { return null; }
+  if (!isObject(executable) || executable.ok !== true || !localAbsolute(executable.path)) return null;
   let result;
   try {
-    result = spawnSync("codex", ["plugin", "list", "--marketplace", "agent-pipeline", "--json"], {
+    result = spawnSync(executable.path, ["plugin", "list", "--marketplace", "agent-pipeline", "--json"], {
       encoding: "utf8",
       env: {
         GIT_TERMINAL_PROMPT: "0",
         LANG: "C",
         LC_ALL: "C",
         NO_COLOR: "1",
-        PATH: process.env.PATH ?? "",
       },
       maxBuffer: MAX_BUFFER,
       shell: false,

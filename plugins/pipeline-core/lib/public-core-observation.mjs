@@ -22,7 +22,7 @@ const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 const SHA256 = /^[0-9a-f]{64}$/u;
 const PLUGIN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
 const PLUGIN_VERSION = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$/u;
-const MANIFEST_KEYS = Object.freeze(["name", "description", "hooks", "author", "interface"]);
+const MANIFEST_KEYS = Object.freeze(["name", "description", "hooks", "author", "license", "interface"]);
 const IDENTITY_FIELDS = Object.freeze(["dev", "ino", "mode", "size", "mtimeNs", "ctimeNs"]);
 const MANIFEST_PATH = ".codex-plugin/plugin.json";
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
@@ -49,14 +49,16 @@ function exactObject(value, keys) {
 function resolveDependencies(value) {
   if (!exactObject(value, Object.keys(value ?? {}))) fail("SNT-A2-DEPENDENCY-SCHEMA");
   const keys = Object.keys(value);
-  if (keys.some((key) => key !== "execFileSync" && key !== "afterOpen" && key !== "spawnSync")) fail("SNT-A2-DEPENDENCY-SCHEMA");
+  if (keys.some((key) => key !== "execFileSync" && key !== "afterOpen" && key !== "spawnSync" && key !== "resolveExecutable")) fail("SNT-A2-DEPENDENCY-SCHEMA");
   if (Object.hasOwn(value, "execFileSync") && typeof value.execFileSync !== "function") fail("SNT-A2-DEPENDENCY-SCHEMA");
   if (Object.hasOwn(value, "afterOpen") && typeof value.afterOpen !== "function") fail("SNT-A2-DEPENDENCY-SCHEMA");
   if (Object.hasOwn(value, "spawnSync") && typeof value.spawnSync !== "function") fail("SNT-A2-DEPENDENCY-SCHEMA");
+  if (Object.hasOwn(value, "resolveExecutable") && typeof value.resolveExecutable !== "function") fail("SNT-A2-DEPENDENCY-SCHEMA");
   return {
     execFileSync: value.execFileSync ?? nodeExecFileSync,
     afterOpen: value.afterOpen,
     spawnSync: value.spawnSync,
+    resolveExecutable: value.resolveExecutable,
   };
 }
 
@@ -285,6 +287,7 @@ function parseManifest(snapshot, side, hostPluginVersion) {
   if (!exactObject(manifest, hasDeclaredVersion ? [...MANIFEST_KEYS, "version"] : MANIFEST_KEYS)
     || manifest.name !== "pipeline-core"
     || !PLUGIN_NAME.test(manifest.name)
+    || manifest.license !== "SUL-1.0"
     || (hasDeclaredVersion && !PLUGIN_VERSION.test(manifest.version))
     || (!hasDeclaredVersion && hostPluginVersion === undefined)
     || (hasDeclaredVersion && hostPluginVersion !== undefined && manifest.version !== hostPluginVersion)
@@ -360,7 +363,7 @@ export function observePublicCoreIdentity(input = {}, deps = {}) {
 export function observeCodexPublicCoreIdentity(input = {}, deps = {}) {
   try {
     const dependencies = resolveDependencies(deps);
-    const hostPlugin = observeSelectedCodexPipelinePlugin({ spawnSync: dependencies.spawnSync });
+    const hostPlugin = observeSelectedCodexPipelinePlugin({ spawnSync: dependencies.spawnSync, resolveExecutable: dependencies.resolveExecutable });
     if (hostPlugin === null) return rejected("SNT-A2-CODEX-HOST-UNAVAILABLE");
     return observe(input, deps, hostPlugin);
   } catch (error) {

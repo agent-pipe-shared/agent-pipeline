@@ -31,6 +31,10 @@ continue to require a manifest version; source/installed snapshot,
 manifest-digest, content-digest, physical-root, candidate, and private-lock
 checks remain fail-closed.
 
+The host-list source may be the exact local marketplace repository root during
+the SHA phase, but only when it is the canonical parent of the selected plugin
+source. This does not permit arbitrary local marketplace paths.
+
 ## Acceptance criteria
 
 - Regression tests cover all nonempty subsets of the three absent Claude

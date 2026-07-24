@@ -22,6 +22,16 @@ only on that observer's host-attested Codex route. If a manifest version is
 present, it must exactly equal the fresh host observation. Ordinary callers and
 every other runner keep the existing version requirement.
 
+The host-list contract accepts either the established authenticated Git
+marketplace source or the sanctioned local SHA-phase topology. The latter is
+accepted only when its canonical local marketplace root is exactly the parent
+repository root of the selected `plugins/pipeline-core` source; an arbitrary
+local path remains rejected.
+
+The observer retains the established public manifest schema, including the
+existing `license: "SUL-1.0"` field. This is schema recognition only: it does
+not alter license, commercial-boundary, CLA, or DCO semantics.
+
 ## Acceptance criteria
 
 - A versionless source manifest with an equal installed snapshot and a valid

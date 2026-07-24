@@ -61,6 +61,7 @@ function capture(argv, overrides = {}) {
   const calls = [];
   const dependencies = {
     spawnSync: successfulSpawn(),
+    resolveExecutable: () => ({ ok: true, path: "/trusted/codex" }),
     activationMain(args) { calls.push(args); return 0; },
     ...overrides,
     write(chunk) { stdout += String(chunk); return true; },
@@ -88,7 +89,7 @@ test("inspect resolves with the exact fixed Codex argv and injects only the loca
   });
   assert.deepEqual(result, { code: 7, stdout: "", stderr: "", calls: [] });
   assert.equal(spawnCalls.length, 1);
-  assert.equal(spawnCalls[0].command, "codex");
+  assert.equal(spawnCalls[0].command, "/trusted/codex");
   assert.deepEqual(spawnCalls[0].args, ["plugin", "list", "--marketplace", "agent-pipeline", "--json"]);
   assert.deepEqual(spawnCalls[0].options, {
     encoding: "utf8",
@@ -97,7 +98,6 @@ test("inspect resolves with the exact fixed Codex argv and injects only the loca
       LANG: "C",
       LC_ALL: "C",
       NO_COLOR: "1",
-      PATH: process.env.PATH ?? "",
     },
     maxBuffer: 128 * 1024,
     shell: false,
@@ -116,6 +116,20 @@ test("never forwards the host plugin-list version to an activation argument", ()
   });
   assert.equal(result.code, 0);
   assert.deepEqual(received, [["inspect", "--project-root", PROJECT_ROOT, "--source-plugin-root", SOURCE_PLUGIN_ROOT]]);
+});
+
+test("accepts only a local marketplace root that exactly contains the selected plugin", () => {
+  const result = capture(["inspect", "--project-root", PROJECT_ROOT], {
+    spawnSync: successfulSpawn(document([pluginEntry({
+      marketplaceSource: { sourceType: "local", source: resolve("/local/marketplace") },
+    })])),
+  });
+  assert.deepEqual(result, {
+    code: 0,
+    stdout: "",
+    stderr: "",
+    calls: [["inspect", "--project-root", PROJECT_ROOT, "--source-plugin-root", SOURCE_PLUGIN_ROOT]],
+  });
 });
 
 test("activation preserves only public arguments and appends the reviewed digest after the internal source", () => {
@@ -188,7 +202,7 @@ test("closed plugin-list validation rejects every unavailable or unsafe source s
     document([pluginEntry({ source: { source: "remote" } })]),
     document([pluginEntry({ source: { path: "relative/plugins/pipeline-core" } })]),
     document([pluginEntry({ source: { extra: SENTINEL } })]),
-    document([pluginEntry({ marketplaceSource: { sourceType: "local" } })]),
+    document([pluginEntry({ marketplaceSource: { sourceType: "local", source: resolve("/other/repository") } })]),
     document([pluginEntry({ marketplaceSource: { source: "https://user:secret@example.invalid/core.git" } })]),
     document([pluginEntry({ marketplaceSource: { source: "https://example.invalid/core.git?token=secret" } })]),
     document([pluginEntry({ unexpected: SENTINEL })]),
