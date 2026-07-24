@@ -18,7 +18,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { publishPoGateProfileReceipt } from "../lib/po-gate-profile-publisher.mjs";
 import { readPrivateOverlayBootstrapStatus } from "../lib/private-overlay-bootstrap-status.mjs";
-import { validatePrivateOverlayActivation } from "../lib/private-overlay-activation.mjs";
+import {
+  activatePrivateOverlayAuthorityUpdate,
+  planPrivateOverlayAuthorityUpdate,
+  validatePrivateOverlayActivation,
+} from "../lib/private-overlay-activation.mjs";
 import {
   activatePrivateOverlayRuntimeProjection,
   planPrivateOverlayRuntimeProjection,
@@ -28,13 +32,15 @@ import { observeCodexPublicCoreIdentity, observePublicCoreIdentity } from "../li
 const EVIDENCE_SCHEMA = "pipeline.private-overlay-activation-evidence.v1";
 const PLAN_SCHEMA = "pipeline.private-overlay-runtime-projection-plan.v1";
 const APPLY_SCHEMA = "pipeline.private-overlay-runtime-projection-activation.v1";
+const AUTHORITY_PLAN_SCHEMA = "pipeline.private-overlay-authority-update-plan.v1";
+const AUTHORITY_APPLY_SCHEMA = "pipeline.private-overlay-authority-update-activation.v1";
 const RESULT_SCHEMA = "pipeline.private-overlay-activation-result.v1";
 const STATUS_SCHEMA = "pipeline.private-overlay-bootstrap-status.v1";
 const CONTEXT_SCHEMA = "pipeline.private-overlay-operational-context.v1";
 const SHA256 = /^[0-9a-f]{64}$/u;
 const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 const SAFE_CODE = /^(?:SNT-A2?|PO)-[A-Z0-9-]{1,88}$/u;
-const USAGE = "Usage: private-overlay-activation.mjs <inspect|plan|status|load-context> --project-root <absolute-path> --source-plugin-root <absolute-path>\n       private-overlay-activation.mjs activate --project-root <absolute-path> --source-plugin-root <absolute-path> --expected-plan-sha256 <64hex>\n";
+const USAGE = "Usage: private-overlay-activation.mjs <inspect|plan|authority-plan|status|load-context> --project-root <absolute-path> --source-plugin-root <absolute-path>\n       private-overlay-activation.mjs <activate|authority-activate> --project-root <absolute-path> --source-plugin-root <absolute-path> --expected-plan-sha256 <64hex>\n";
 const PREVIEW_FD = 2;
 const MAX_PREVIEW_BYTES = 64 * 1024;
 const MAX_CONTEXT_FILES = 128;
@@ -61,8 +67,10 @@ function canonicalLine(value) {
 function rejectionSchema(command) {
   if (command === "inspect") return EVIDENCE_SCHEMA;
   if (command === "plan") return PLAN_SCHEMA;
+  if (command === "authority-plan") return AUTHORITY_PLAN_SCHEMA;
   if (command === "status") return STATUS_SCHEMA;
   if (command === "load-context") return CONTEXT_SCHEMA;
+  if (command === "authority-activate") return AUTHORITY_APPLY_SCHEMA;
   return APPLY_SCHEMA;
 }
 
@@ -213,7 +221,7 @@ function contextRejection(code = "SNT-A-CONTEXT-LOAD-REJECTED") {
 function resolveDependencies(deps) {
   if (!isObject(deps)) throw new TypeError("invalid dependencies");
   const allowed = new Set([
-    "observe", "validate", "planProjection", "activateProjection", "publishReceipt",
+    "observe", "validate", "planProjection", "activateProjection", "planAuthorityUpdate", "activateAuthorityUpdate", "publishReceipt",
     "readProjectionInputs", "readBootstrapStatus", "consumeInputs", "pluginRoot", "write", "writeError", "previewWriteSync", "spawnSync", "resolveExecutable",
   ]);
   if (Object.keys(deps).some((key) => !allowed.has(key))) throw new TypeError("invalid dependencies");
@@ -222,6 +230,8 @@ function resolveDependencies(deps) {
     validate: deps.validate ?? validatePrivateOverlayActivation,
     planProjection: deps.planProjection ?? planPrivateOverlayRuntimeProjection,
     activateProjection: deps.activateProjection ?? activatePrivateOverlayRuntimeProjection,
+    planAuthorityUpdate: deps.planAuthorityUpdate ?? planPrivateOverlayAuthorityUpdate,
+    activateAuthorityUpdate: deps.activateAuthorityUpdate ?? activatePrivateOverlayAuthorityUpdate,
     publishReceipt: deps.publishReceipt ?? publishPoGateProfileReceipt,
     readProjectionInputs: deps.readProjectionInputs ?? readProjectionInputs,
     readBootstrapStatus: deps.readBootstrapStatus ?? readPrivateOverlayBootstrapStatus,
@@ -232,7 +242,7 @@ function resolveDependencies(deps) {
     previewWriteSync: deps.previewWriteSync ?? writeSync,
     spawnSync: deps.spawnSync ?? nodeSpawnSync,
   };
-  for (const key of ["observe", "validate", "planProjection", "activateProjection", "publishReceipt", "readProjectionInputs", "readBootstrapStatus", "consumeInputs", "write", "writeError", "previewWriteSync", "spawnSync"]) {
+  for (const key of ["observe", "validate", "planProjection", "activateProjection", "planAuthorityUpdate", "activateAuthorityUpdate", "publishReceipt", "readProjectionInputs", "readBootstrapStatus", "consumeInputs", "write", "writeError", "previewWriteSync", "spawnSync"]) {
     if (typeof selected[key] !== "function") throw new TypeError("invalid dependency");
   }
   if (typeof selected.pluginRoot !== "string") throw new TypeError("invalid plugin root");
@@ -240,7 +250,7 @@ function resolveDependencies(deps) {
 }
 
 function invocation(argv) {
-  if (!Array.isArray(argv) || !["inspect", "plan", "status", "load-context", "activate"].includes(argv[0])) return undefined;
+  if (!Array.isArray(argv) || !["inspect", "plan", "authority-plan", "status", "load-context", "activate", "authority-activate"].includes(argv[0])) return undefined;
   const parsed = { command: argv[0] };
   for (let index = 1; index < argv.length; index += 1) {
     const flag = argv[index];
@@ -258,7 +268,7 @@ function invocation(argv) {
   }
   if (typeof parsed.projectRoot !== "string" || !isAbsolute(parsed.projectRoot)
     || typeof parsed.sourcePluginRoot !== "string" || !isAbsolute(parsed.sourcePluginRoot)) return undefined;
-  if (parsed.command === "activate") {
+  if (["activate", "authority-activate"].includes(parsed.command)) {
     if (typeof parsed.expectedPlanSha256 !== "string" || !SHA256.test(parsed.expectedPlanSha256)) return undefined;
   } else if (parsed.expectedPlanSha256 !== undefined) return undefined;
   return parsed;
@@ -380,6 +390,22 @@ function freshAdmission(projectRoot, sourcePluginRoot, dependencies) {
   return evidence.status === "ready" ? { evidence } : { output: evidence };
 }
 
+function authorityReview(projectRoot, sourcePluginRoot, dependencies) {
+  const observation = dependencies.observe({ sourcePluginRoot, installedPluginRoot: dependencies.pluginRoot });
+  if (observation?.status === "rejected") {
+    if (!sanitizedRejection(observation, "pipeline.public-core-observation.v1")) throw new TypeError("invalid observation rejection");
+    return { output: observation };
+  }
+  if (observation?.status !== "ready") throw new TypeError("invalid observation");
+  const review = dependencies.planAuthorityUpdate({
+    overlayRoot: projectRoot,
+    selectedCandidate: observation.candidate,
+    installedPlugin: observation.plugin,
+  });
+  if (!isObject(review)) throw new TypeError("invalid authority review");
+  return { review };
+}
+
 function completeResult(projection, publication, readback) {
   return {
     schema: RESULT_SCHEMA,
@@ -440,6 +466,21 @@ function run(argv, dependencyOverrides = {}) {
       } else {
         context.discard();
         output = contextRejection();
+      }
+    } else if (["authority-plan", "authority-activate"].includes(parsed.command)) {
+      const authority = authorityReview(parsed.projectRoot, parsed.sourcePluginRoot, dependencies);
+      if (authority.output) output = authority.output;
+      else if (parsed.command === "authority-plan" || !["ready", "noop"].includes(authority.review.status)) output = authority.review;
+      else if (authority.review.planSha256 !== parsed.expectedPlanSha256) {
+        output = { schema: AUTHORITY_APPLY_SCHEMA, status: "rejected", reasonCodes: ["SNT-A-AUTHORITY-UPDATE-DIGEST-MISMATCH"] };
+      } else {
+        try { writePreviewFully(canonicalLine(authority.review), dependencies.previewWriteSync); }
+        catch { output = { schema: AUTHORITY_APPLY_SCHEMA, status: "rejected", reasonCodes: ["SNT-A-AUTHORITY-UPDATE-PREVIEW-FAILED"] }; }
+        if (!output) output = dependencies.activateAuthorityUpdate(authority.review, {
+          overlayRoot: parsed.projectRoot,
+          activate: true,
+          expectedPlanSha256: parsed.expectedPlanSha256,
+        });
       }
     } else {
       const admission = freshAdmission(parsed.projectRoot, parsed.sourcePluginRoot, dependencies);
@@ -507,10 +548,12 @@ function run(argv, dependencyOverrides = {}) {
   try { outputWrite(canonicalLine(output)); }
   catch { return 2; }
   if (parsed.command === "inspect") return output?.status === "ready" ? 0 : 2;
-  if (parsed.command === "plan") return ["ready", "noop"].includes(output?.status) ? 0 : 2;
+  if (["plan", "authority-plan"].includes(parsed.command)) return ["ready", "noop"].includes(output?.status) ? 0 : 2;
   if (parsed.command === "status") return output?.status === "activated" ? 0 : 2;
   if (parsed.command === "load-context") return output?.status === "context-loaded" ? 0 : 2;
-  return output?.status === "activated" ? 0 : 2;
+  return ["activate", "authority-activate"].includes(parsed.command)
+    ? (parsed.command === "authority-activate" ? (output?.status === "updated" ? 0 : 2) : (output?.status === "activated" ? 0 : 2))
+    : 2;
 }
 
 /** Standard CLI entrypoint: no host plugin-list attestation is available. */

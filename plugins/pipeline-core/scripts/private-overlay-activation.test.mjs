@@ -24,9 +24,10 @@ const PLUGIN_ROOT = "/installed/cache/pipeline-core-version";
 const RAW_REPOSITORY = "https://example.invalid/private-core.git";
 const PRIVATE_NAME = "customer-secret-policy.md";
 const PLAN_SHA256 = "d".repeat(64);
+const AUTHORITY_PLAN_SHA256 = "a".repeat(64);
 const STATUS_PLAN_SHA256 = "b".repeat(64);
 const RECEIPT_SHA256 = "e".repeat(64);
-const USAGE = "Usage: private-overlay-activation.mjs <inspect|plan|status|load-context> --project-root <absolute-path> --source-plugin-root <absolute-path>\n       private-overlay-activation.mjs activate --project-root <absolute-path> --source-plugin-root <absolute-path> --expected-plan-sha256 <64hex>\n";
+const USAGE = "Usage: private-overlay-activation.mjs <inspect|plan|authority-plan|status|load-context> --project-root <absolute-path> --source-plugin-root <absolute-path>\n       private-overlay-activation.mjs <activate|authority-activate> --project-root <absolute-path> --source-plugin-root <absolute-path> --expected-plan-sha256 <64hex>\n";
 
 const candidate = Object.freeze({
   repository: RAW_REPOSITORY,
@@ -75,6 +76,15 @@ function projection(status = "applied") {
     planSha256: PLAN_SHA256,
     changeCount: status === "noop" ? 0 : 6,
     sourceCommittedLast: status === "applied",
+  };
+}
+function authorityReview(status = "ready") {
+  return {
+    schema: "pipeline.private-overlay-authority-update-plan.v1",
+    status,
+    reasonCodes: [status === "noop" ? "SNT-A-AUTHORITY-UPDATE-NOOP" : "SNT-A-AUTHORITY-UPDATE-READY"],
+    planSha256: AUTHORITY_PLAN_SHA256,
+    changeCount: status === "noop" ? 0 : 1,
   };
 }
 function bootstrapStatus(status = "activated") {
@@ -132,6 +142,14 @@ function baseDependencies() {
     validate: readyEvidence,
     planProjection: () => readyReview(),
     activateProjection: () => projection(),
+    planAuthorityUpdate: () => authorityReview(),
+    activateAuthorityUpdate: () => ({
+      schema: "pipeline.private-overlay-authority-update-activation.v1",
+      status: "updated",
+      reasonCodes: ["SNT-A-AUTHORITY-UPDATE-COMPLETE"],
+      planSha256: AUTHORITY_PLAN_SHA256,
+      changeCount: 1,
+    }),
     readProjectionInputs: () => ({ userYamlText: "user-v3\n", runtimeYamlText: "runtime-v3\n" }),
     publishReceipt: () => ({
       ok: true,
@@ -422,6 +440,40 @@ test("plan emits one sanitized canonical review and performs no mutation or prev
   assert.equal(activated, false);
   assert.equal(read, false);
   assert.equal(published, false);
+});
+
+test("authority update emits a read-only review, then requires the exact digest before activation", () => {
+  let activated = false;
+  const planned = run(commandArgs("authority-plan"));
+  assert.equal(planned.code, 0);
+  assert.deepEqual(JSON.parse(planned.stdout), authorityReview());
+  assert.equal(planned.preview, "");
+
+  const mismatch = run(commandArgs("authority-activate", "--expected-plan-sha256", "0".repeat(64)), {
+    activateAuthorityUpdate: () => { activated = true; },
+  });
+  assert.equal(mismatch.code, 2);
+  assert.equal(JSON.parse(mismatch.stdout).reasonCodes[0], "SNT-A-AUTHORITY-UPDATE-DIGEST-MISMATCH");
+  assert.equal(mismatch.preview, "");
+  assert.equal(activated, false);
+
+  const applied = run(commandArgs("authority-activate", "--expected-plan-sha256", AUTHORITY_PLAN_SHA256), {
+    activateAuthorityUpdate(review, options) {
+      activated = true;
+      assert.deepEqual(review, authorityReview());
+      assert.deepEqual(options, { overlayRoot: PROJECT_ROOT, activate: true, expectedPlanSha256: AUTHORITY_PLAN_SHA256 });
+      return {
+        schema: "pipeline.private-overlay-authority-update-activation.v1",
+        status: "updated",
+        reasonCodes: ["SNT-A-AUTHORITY-UPDATE-COMPLETE"],
+        planSha256: AUTHORITY_PLAN_SHA256,
+        changeCount: 1,
+      };
+    },
+  });
+  assert.equal(applied.code, 0);
+  assert.equal(activated, true);
+  assert.equal(applied.preview, canonicalLine(authorityReview()));
 });
 
 test("digest mismatch performs zero preview, activation, read, or publication", () => {

@@ -24,10 +24,16 @@ import { resolve, sep } from "node:path";
 import { TextDecoder } from "node:util";
 
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
+import {
+  applyRunnerProfileMigrationV3,
+  planRunnerProfileMigrationV3,
+} from "./runner-profile-migration-v3.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 
 const LOCK_SCHEMA = "pipeline.core-lock.v1";
 const EVIDENCE_SCHEMA = "pipeline.private-overlay-activation-evidence.v1";
+const AUTHORITY_PLAN_SCHEMA = "pipeline.private-overlay-authority-update-plan.v1";
+const AUTHORITY_APPLY_SCHEMA = "pipeline.private-overlay-authority-update-activation.v1";
 const CLASSES = Object.freeze(["policies", "guidelines", "templates", "extensions"]);
 const SHA256 = /^[0-9a-f]{64}$/u;
 const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
@@ -49,6 +55,7 @@ const PROHIBITED_COMPOUNDS = new Set([
 const PRIVATE_KEY_BLOCK = /-----BEGIN(?: [A-Z0-9][A-Z0-9 -]{0,64})? PRIVATE KEY-----/u;
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 const AUTHENTICATED_ADMISSIONS = new WeakMap();
+const AUTHENTICATED_AUTHORITY_UPDATE_PLANS = new WeakMap();
 
 export const PRIVATE_OVERLAY_CLASSES = CLASSES;
 
@@ -415,7 +422,7 @@ function resolveAdmissionDependencies(dependencies) {
   return dependencies.afterOpen;
 }
 
-function performAdmission({ overlayRoot, selectedCandidate, installedPlugin } = {}, dependencies = {}) {
+function performAdmission({ overlayRoot, selectedCandidate, installedPlugin, authorityUpdate = false } = {}, dependencies = {}) {
   const afterOpen = resolveAdmissionDependencies(dependencies);
   validateObserved(selectedCandidate, installedPlugin);
   const root = physicalRoot(overlayRoot);
@@ -429,7 +436,11 @@ function performAdmission({ overlayRoot, selectedCandidate, installedPlugin } = 
   assertDirectoryIdentity(root, rootIdentity);
   assertDirectoryIdentity(overlay, overlayIdentity);
   const lock = parseLock(lockBytes);
-  validateBindings(lock, selectedCandidate, installedPlugin);
+  if (authorityUpdate) {
+    if (lock.source.repository !== selectedCandidate.repository || lock.source.branch !== selectedCandidate.branch) {
+      fail("SNT-A-AUTHORITY-UPDATE-SOURCE-MISMATCH");
+    }
+  } else validateBindings(lock, selectedCandidate, installedPlugin);
   const admitted = enumerateOverlay(root, rootIdentity, overlay, overlayIdentity, afterOpen);
   assertDirectoryIdentity(root, rootIdentity);
   const admittedDescriptors = admitted.map(({ className, privateName, sha256: digest, byteLength }) => ({
@@ -440,7 +451,7 @@ function performAdmission({ overlayRoot, selectedCandidate, installedPlugin } = 
   }));
   const admittedCounts = Object.fromEntries(CLASSES.map((className) => [className, admitted.filter((entry) => entry.className === className).length]));
   admittedCounts.total = admitted.length;
-  return {
+  const result = {
     evidence: {
       schema: EVIDENCE_SCHEMA,
       status: "ready",
@@ -467,6 +478,8 @@ function performAdmission({ overlayRoot, selectedCandidate, installedPlugin } = 
     },
     admitted,
   };
+  if (authorityUpdate) result.lock = lock;
+  return result;
 }
 
 /**
@@ -478,6 +491,140 @@ export function validatePrivateOverlayActivation({ overlayRoot, selectedCandidat
   } catch (error) {
     return rejected(error instanceof AdmissionError ? error.code : "SNT-A-INTERNAL-ERROR");
   }
+}
+
+function renderedAuthorityLock(selectedCandidate, installedPlugin) {
+  return `${JSON.stringify({
+    $schema: LOCK_SCHEMA,
+    source: {
+      repository: selectedCandidate.repository,
+      branch: selectedCandidate.branch,
+      commit: selectedCandidate.commit,
+      tree: selectedCandidate.tree,
+    },
+    plugin: {
+      name: installedPlugin.name,
+      version: installedPlugin.version,
+      manifest_sha256: installedPlugin.manifestSha256,
+    },
+  }, null, 2)}\n`;
+}
+
+function authorityPlanRejection(code) {
+  return { schema: AUTHORITY_PLAN_SCHEMA, status: "rejected", reasonCodes: [code] };
+}
+
+function authorityApplyRejection(code, planSha256 = undefined) {
+  const result = { schema: AUTHORITY_APPLY_SCHEMA, status: "rejected", reasonCodes: [code] };
+  if (planSha256 !== undefined) result.planSha256 = planSha256;
+  return result;
+}
+
+/**
+ * Produce the only accepted write plan for a stale Slim Overlay lock.  It
+ * deliberately admits the current lock's topology and source channel without
+ * accepting its obsolete candidate binding, then derives the replacement only
+ * from the observed Public candidate and installed plugin.
+ */
+export function planPrivateOverlayAuthorityUpdate({ overlayRoot, selectedCandidate, installedPlugin } = {}) {
+  let admitted;
+  try {
+    admitted = performAdmission({ overlayRoot, selectedCandidate, installedPlugin, authorityUpdate: true });
+  } catch (error) {
+    return authorityPlanRejection(error instanceof AdmissionError ? error.code : "SNT-A-AUTHORITY-UPDATE-REJECTED");
+  }
+  const authorityLockBytes = renderedAuthorityLock(selectedCandidate, installedPlugin);
+  let nativePlan;
+  try {
+    nativePlan = planRunnerProfileMigrationV3({
+      rootDir: overlayRoot,
+      initializeMissingRuntimeForSlimV3: true,
+      authorityLockBytes,
+    });
+  } catch {
+    return authorityPlanRejection("SNT-A-AUTHORITY-UPDATE-REJECTED");
+  }
+  if (!nativePlan || !["ready", "noop"].includes(nativePlan.status)) {
+    return authorityPlanRejection("SNT-A-AUTHORITY-UPDATE-REJECTED");
+  }
+  const changed = nativePlan.targets?.filter((target) => target.changed) ?? [];
+  if (!Array.isArray(nativePlan.targets)
+    || changed.some((target) => target.path !== ".agent-pipeline/core.lock.json")) {
+    return authorityPlanRejection("SNT-A-AUTHORITY-UPDATE-PROJECTION-DRIFT");
+  }
+  const lockTarget = nativePlan.targets.find((target) => target.path === ".agent-pipeline/core.lock.json");
+  if (!lockTarget || lockTarget.kind !== "authority-lock") {
+    return authorityPlanRejection("SNT-A-AUTHORITY-UPDATE-REJECTED");
+  }
+  const core = {
+    schema: AUTHORITY_PLAN_SCHEMA,
+    status: nativePlan.status,
+    reasonCodes: [nativePlan.status === "noop" ? "SNT-A-AUTHORITY-UPDATE-NOOP" : "SNT-A-AUTHORITY-UPDATE-READY"],
+    candidate: admitted.evidence.candidate,
+    plugin: admitted.evidence.plugin,
+    sourceSha256: admitted.evidence.inputs.sourceSha256,
+    lock: {
+      beforeSha256: lockTarget.before.sha256,
+      afterSha256: lockTarget.after.sha256,
+    },
+    changeCount: changed.length,
+    activation: { required: true },
+  };
+  const plan = { ...core, planSha256: canonicalDigest(core) };
+  AUTHENTICATED_AUTHORITY_UPDATE_PLANS.set(plan, {
+    signature: publicSignature(plan),
+    overlayRoot,
+    selectedCandidate: structuredClone(selectedCandidate),
+    installedPlugin: structuredClone(installedPlugin),
+    nativePlan,
+    planSha256: plan.planSha256,
+    used: false,
+  });
+  return plan;
+}
+
+/** Apply only the exact in-process authority update plan and prove normal admission afterwards. */
+export function activatePrivateOverlayAuthorityUpdate(plan, {
+  overlayRoot,
+  activate = false,
+  expectedPlanSha256,
+} = {}) {
+  const state = plan !== null && typeof plan === "object" ? AUTHENTICATED_AUTHORITY_UPDATE_PLANS.get(plan) : undefined;
+  if (!state || state.used) return authorityApplyRejection(state?.used ? "SNT-A-AUTHORITY-UPDATE-REPLAY" : "SNT-A-AUTHORITY-UPDATE-PLAN-INVALID");
+  if (activate !== true) return authorityApplyRejection("SNT-A-AUTHORITY-UPDATE-ACTIVATION-REQUIRED");
+  if (typeof expectedPlanSha256 !== "string" || !SHA256.test(expectedPlanSha256) || expectedPlanSha256 !== state.planSha256) {
+    return authorityApplyRejection("SNT-A-AUTHORITY-UPDATE-DIGEST-MISMATCH");
+  }
+  try {
+    if (overlayRoot !== state.overlayRoot || publicSignature(plan) !== state.signature
+      || plan.planSha256 !== canonicalDigest(Object.fromEntries(Object.entries(plan).filter(([key]) => key !== "planSha256")))) {
+      return authorityApplyRejection("SNT-A-AUTHORITY-UPDATE-PLAN-INVALID");
+    }
+  } catch {
+    return authorityApplyRejection("SNT-A-AUTHORITY-UPDATE-PLAN-INVALID");
+  }
+  state.used = true;
+  let applied;
+  try { applied = applyRunnerProfileMigrationV3(state.nativePlan, { rootDir: state.overlayRoot, activate: true }); }
+  catch { return authorityApplyRejection("SNT-A-AUTHORITY-UPDATE-APPLY-REJECTED", state.planSha256); }
+  if (!applied || !["applied", "noop"].includes(applied.status)) {
+    return authorityApplyRejection("SNT-A-AUTHORITY-UPDATE-APPLY-REJECTED", state.planSha256);
+  }
+  const readback = validatePrivateOverlayActivation({
+    overlayRoot: state.overlayRoot,
+    selectedCandidate: state.selectedCandidate,
+    installedPlugin: state.installedPlugin,
+  });
+  if (readback.status !== "ready") {
+    return authorityApplyRejection("SNT-A-AUTHORITY-UPDATE-READBACK-REJECTED", state.planSha256);
+  }
+  return {
+    schema: AUTHORITY_APPLY_SCHEMA,
+    status: "updated",
+    reasonCodes: ["SNT-A-AUTHORITY-UPDATE-COMPLETE"],
+    planSha256: state.planSha256,
+    changeCount: plan.changeCount,
+  };
 }
 
 /**

@@ -5,10 +5,10 @@
 
 **Last updated:** 2026-07-24
 **Project status:** ACTIVE
-**Current block:** `0.4.0` public release-candidate documentation; final
-candidate-bound gates and remote HAW-E authorization are pending
+**Current block:** `0.4.1` Slim Private Overlay authority-update hotfix;
+candidate verification and publication are pending
 **Repair baseline:** `bd05d351957828393201bd6a9433b46107a880bc`
-**Release version:** `0.4.0` (candidate only; not published)
+**Release version:** `0.4.0` released; `0.4.1` hotfix candidate
 
 ## Operational head
 
@@ -79,21 +79,15 @@ candidate-bound gates and remote HAW-E authorization are pending
   `pipeline.user.yaml`. Setup reports only the bounded approval/disabled state;
   it never prints raw questions, answers, credentials, paths, or environment
   details. The approved export remains one-question and allowlist-bound.
-- **Queued immediately after the current main push:** validate the sanitized
-  V3 consumer-onboarding observation against the pushed OID. The reported
-  legacy-consumer shape has no generated runtime projections: ordinary V3
-  migration stops at `invalid-baseline / baseline_read`, while Slim Private
-  Overlay admission requires an authenticated `.agent-pipeline/core.lock.json`
-  for which no preview-first consumer lock-creation flow is documented. First
-  classify this as an implementation defect, onboarding/documentation defect,
-  or deliberately unsupported compatibility shape. If it remains valid, use
-  the repository observation-intake flow to produce an exact sanitized preview
-  with duplicate check. The observation is published as
-  [#53](https://github.com/agent-pipe-shared/agent-pipeline/issues/53) with
-  `sprint:sentinel`; do not promote it to backlog, create a lock by hand, or
-  implement the fix before a separate PO approval. The current
-  prerequisite candidate and Windows parallel work remain bound to the pushed
-  main OID before this next block begins.
+- **0.4.1 authority-update hotfix:** the `#53` observation identified that a
+  Slim Private Overlay with a stale but structurally valid Core lock could not
+  obtain a digest-bound update preview. The hotfix adds the host-attested
+  `authority-plan` / `authority-activate` path: it derives the replacement
+  only from the selected Public Core and installed plugin, binds the old lock
+  as the transactional preimage, rejects runtime-projection drift, and
+  revalidates normal admission after the explicit digest-bound write. The
+  consumer must still commit and push its own updated binding through its
+  private workflow; no Public claim includes private coordinates or lock bytes.
 - **PO intermediate-push exception, 2026-07-23:** this current `main` push is
   a Windows-enablement snapshot, not final Sentinel evidence. It receives
   `git diff --check` and only minimal focused contract probes; Full Verify,

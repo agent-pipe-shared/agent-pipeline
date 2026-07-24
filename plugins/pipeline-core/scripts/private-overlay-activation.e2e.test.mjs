@@ -8,6 +8,7 @@ import {
   existsSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
@@ -322,6 +323,37 @@ test("production status rejects a stale exact lock after the Public candidate ad
       reasonCodes: ["SNT-A-COMMIT-MISMATCH"],
     });
     assertSanitized(result, fixture, "advanced candidate");
+  } finally {
+    rmSync(fixture.base, { recursive: true, force: true });
+  }
+});
+
+test("authority-plan updates only a stale lock through the exact reviewed digest", () => {
+  const fixture = createFixture();
+  try {
+    const initialPlan = runCli(fixture, "plan");
+    assert.equal(initialPlan.code, 0, initialPlan.stdout);
+    assert.equal(runCli(fixture, "activate", "--expected-plan-sha256", initialPlan.output.planSha256).code, 0);
+    write(fixture.publicRoot, "candidate-marker.txt", "advanced authority candidate\n");
+    commitAll(fixture.publicRoot, "advance public authority candidate");
+    const lockPath = join(fixture.overlayRoot, ".agent-pipeline", "core.lock.json");
+    const before = readFileSync(lockPath, "utf8");
+    const planned = runCli(fixture, "authority-plan");
+    assert.equal(planned.code, 0, planned.stdout);
+    assert.equal(planned.output.status, "ready");
+    assert.equal(planned.output.changeCount, 1);
+    assert.equal(readFileSync(lockPath, "utf8"), before, "authority-plan must not write");
+    const mismatch = runCli(fixture, "authority-activate", "--expected-plan-sha256", "0".repeat(64));
+    assert.equal(mismatch.code, 2);
+    assert.equal(mismatch.output.reasonCodes[0], "SNT-A-AUTHORITY-UPDATE-DIGEST-MISMATCH");
+    const activated = runCli(fixture, "authority-activate", "--expected-plan-sha256", planned.output.planSha256);
+    assert.equal(activated.code, 0, activated.stdout);
+    assert.equal(activated.output.status, "updated");
+    assert.equal(activated.output.planSha256, planned.output.planSha256);
+    const status = runCli(fixture, "status");
+    assert.equal(status.code, 0, status.stdout);
+    assert.equal(status.output.status, "activated");
+    assertSanitized(activated, fixture, "advanced authority candidate");
   } finally {
     rmSync(fixture.base, { recursive: true, force: true });
   }

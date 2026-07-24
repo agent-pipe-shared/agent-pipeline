@@ -53,9 +53,31 @@ The Slim Private Overlay activation path is intentionally stricter. It is for
 an already V3-valid overlay and requires an authenticated
 `.agent-pipeline/core.lock.json` verified against the selected Public Core.
 That sealed lock is not a substitute for legacy onboarding and must never be
-hand-authored. Use `private-overlay-activation.mjs plan` followed by its exact
-digest-bound `activate` operation only when an authenticated overlay lock has
-been supplied by its authority-update flow.
+hand-authored.
+
+When a previously valid Slim Overlay lock is stale after a Public-Core update,
+use the Core-owned authority-update flow. It observes the selected Public Core
+and installed plugin, accepts only the existing lock's safe topology and source
+channel, and derives the replacement lock itself. The preview is read-only and
+returns a digest; only the matching explicit activation may write. Any runtime
+projection drift is rejected rather than combined silently with the lock update.
+
+```sh
+node plugins/pipeline-core/scripts/private-overlay-activation.mjs authority-plan --project-root /absolute/overlay/root --source-plugin-root /absolute/public/plugins/pipeline-core
+node plugins/pipeline-core/scripts/private-overlay-activation.mjs authority-activate --project-root /absolute/overlay/root --source-plugin-root /absolute/public/plugins/pipeline-core --expected-plan-sha256 <digest-from-authority-plan>
+```
+
+For Codex, use the host-attested wrapper instead of supplying a source root:
+
+```sh
+node plugins/pipeline-core/scripts/codex-private-overlay-activation.mjs authority-plan --project-root /absolute/overlay/root
+node plugins/pipeline-core/scripts/codex-private-overlay-activation.mjs authority-activate --project-root /absolute/overlay/root --expected-plan-sha256 <digest-from-authority-plan>
+```
+
+After a successful activation, rerun `status`, then the normal private-overlay
+`plan`/`activate` lifecycle only when it reports projection work. Commit the
+overlay's new binding through the overlay's own reviewed workflow; never copy
+or edit the lock bytes manually.
 
 ## Ownership
 

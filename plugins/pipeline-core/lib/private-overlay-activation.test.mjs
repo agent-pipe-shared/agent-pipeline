@@ -6,6 +6,7 @@ import {
   linkSync,
   mkdirSync,
   mkdtempSync,
+  readFileSync,
   renameSync,
   rmSync,
   statSync,
@@ -17,10 +18,13 @@ import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 
 import {
+  activatePrivateOverlayAuthorityUpdate,
   admitPrivateOverlayActivation,
   consumePrivateOverlayAdmission,
+  planPrivateOverlayAuthorityUpdate,
   validatePrivateOverlayActivation,
 } from "./private-overlay-activation.mjs";
+import { applyRunnerProfileMigrationV3, planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
 import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
 
 const REGISTRY = loadRunnerProfilesV3Registry();
@@ -571,6 +575,38 @@ test("non-Markdown and malformed UTF-8 inputs reject before any batch can be con
       assert.equal(called, false);
     } finally { rmSync(selected, { recursive: true, force: true }); }
   }
+});
+
+test("authority update binds a stale lock to the observed core through one digest-bound transaction", () => {
+  const root = fixture();
+  try {
+    const bootstrap = planRunnerProfileMigrationV3({ rootDir: root, initializeMissingRuntimeForSlimV3: true });
+    assert.equal(applyRunnerProfileMigrationV3(bootstrap, { rootDir: root, activate: true }).status, "applied");
+    const next = { ...CANDIDATE, commit: "9".repeat(40), tree: "8".repeat(40) };
+    assert.equal(reason(validate(root, { selectedCandidate: next })), "SNT-A-COMMIT-MISMATCH");
+    const before = readFileSync(join(root, ".agent-pipeline", "core.lock.json"), "utf8");
+    const review = planPrivateOverlayAuthorityUpdate({ overlayRoot: root, selectedCandidate: next, installedPlugin: PLUGIN });
+    assert.equal(review.status, "ready");
+    assert.equal(review.changeCount, 1);
+    assert.equal(readFileSync(join(root, ".agent-pipeline", "core.lock.json"), "utf8"), before, "plan must not write");
+    assert.equal(activatePrivateOverlayAuthorityUpdate(review, {
+      overlayRoot: root,
+      activate: true,
+      expectedPlanSha256: "0".repeat(64),
+    }).reasonCodes[0], "SNT-A-AUTHORITY-UPDATE-DIGEST-MISMATCH");
+    const applied = activatePrivateOverlayAuthorityUpdate(review, {
+      overlayRoot: root,
+      activate: true,
+      expectedPlanSha256: review.planSha256,
+    });
+    assert.equal(applied.status, "updated");
+    assert.equal(validate(root, { selectedCandidate: next }).status, "ready");
+    assert.equal(activatePrivateOverlayAuthorityUpdate(review, {
+      overlayRoot: root,
+      activate: true,
+      expectedPlanSha256: review.planSha256,
+    }).reasonCodes[0], "SNT-A-AUTHORITY-UPDATE-REPLAY");
+  } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
 let passed = 0;

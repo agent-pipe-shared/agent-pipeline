@@ -14,7 +14,7 @@ const REJECTION = Object.freeze({
   status: "rejected",
   reasonCodes: ["SNT-A-CODEX-SOURCE-UNAVAILABLE"],
 });
-const USAGE = "Usage: codex-private-overlay-activation.mjs <inspect|plan|status|load-context> --project-root <absolute-path>\n       codex-private-overlay-activation.mjs activate --project-root <absolute-path> --expected-plan-sha256 <64hex>\n";
+const USAGE = "Usage: codex-private-overlay-activation.mjs <inspect|plan|authority-plan|status|load-context> --project-root <absolute-path>\n       codex-private-overlay-activation.mjs <activate|authority-activate> --project-root <absolute-path> --expected-plan-sha256 <64hex>\n";
 const SHA256 = /^[0-9a-f]{64}$/u;
 const PLUGIN_VERSION = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$/u;
 const MAX_JSON_BYTES = 64 * 1024;
@@ -36,7 +36,7 @@ function canonicalLine(value) {
 }
 
 function invocation(argv) {
-  if (!Array.isArray(argv) || !["inspect", "plan", "status", "load-context", "activate"].includes(argv[0])) return undefined;
+  if (!Array.isArray(argv) || !["inspect", "plan", "authority-plan", "status", "load-context", "activate", "authority-activate"].includes(argv[0])) return undefined;
   const parsed = { command: argv[0] };
   for (let index = 1; index < argv.length; index += 1) {
     const flag = argv[index];
@@ -50,7 +50,7 @@ function invocation(argv) {
     } else return undefined;
   }
   if (typeof parsed.projectRoot !== "string" || !isAbsolute(parsed.projectRoot)) return undefined;
-  if (parsed.command === "activate") {
+  if (["activate", "authority-activate"].includes(parsed.command)) {
     if (typeof parsed.expectedPlanSha256 !== "string" || !SHA256.test(parsed.expectedPlanSha256)) return undefined;
   } else if (parsed.expectedPlanSha256 !== undefined) return undefined;
   return parsed;
@@ -173,7 +173,7 @@ function activationArgv(parsed, sourceRoot) {
     "--project-root", parsed.projectRoot,
     "--source-plugin-root", sourceRoot,
   ];
-  if (parsed.command === "activate") argv.push("--expected-plan-sha256", parsed.expectedPlanSha256);
+  if (["activate", "authority-activate"].includes(parsed.command)) argv.push("--expected-plan-sha256", parsed.expectedPlanSha256);
   return argv;
 }
 

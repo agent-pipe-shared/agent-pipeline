@@ -15,7 +15,7 @@ const PROJECT_ROOT = resolve("/private/project");
 const SOURCE_PLUGIN_ROOT = resolve("/local/marketplace/plugins/pipeline-core");
 const SENTINEL = "private-host-sentinel";
 const PLAN_SHA256 = "a".repeat(64);
-const USAGE = "Usage: codex-private-overlay-activation.mjs <inspect|plan|status|load-context> --project-root <absolute-path>\n       codex-private-overlay-activation.mjs activate --project-root <absolute-path> --expected-plan-sha256 <64hex>\n";
+const USAGE = "Usage: codex-private-overlay-activation.mjs <inspect|plan|authority-plan|status|load-context> --project-root <absolute-path>\n       codex-private-overlay-activation.mjs <activate|authority-activate> --project-root <absolute-path> --expected-plan-sha256 <64hex>\n";
 const REJECTION = '{"schema":"pipeline.codex-private-overlay-source-resolution.v1","status":"rejected","reasonCodes":["SNT-A-CODEX-SOURCE-UNAVAILABLE"]}\n';
 
 function pluginEntry(overrides = {}) {
@@ -133,24 +133,26 @@ test("accepts only a local marketplace root that exactly contains the selected p
 });
 
 test("activation preserves only public arguments and appends the reviewed digest after the internal source", () => {
-  const result = capture([
-    "activate",
-    "--expected-plan-sha256", PLAN_SHA256,
-    "--project-root", PROJECT_ROOT,
-  ]);
-  assert.equal(result.code, 0);
-  assert.deepEqual(result.calls, [[
-    "activate",
-    "--project-root", PROJECT_ROOT,
-    "--source-plugin-root", SOURCE_PLUGIN_ROOT,
-    "--expected-plan-sha256", PLAN_SHA256,
-  ]]);
-  assert.equal(result.stdout, "");
-  assert.equal(result.stderr, "");
+  for (const command of ["activate", "authority-activate"]) {
+    const result = capture([
+      command,
+      "--expected-plan-sha256", PLAN_SHA256,
+      "--project-root", PROJECT_ROOT,
+    ]);
+    assert.equal(result.code, 0);
+    assert.deepEqual(result.calls, [[
+      command,
+      "--project-root", PROJECT_ROOT,
+      "--source-plugin-root", SOURCE_PLUGIN_ROOT,
+      "--expected-plan-sha256", PLAN_SHA256,
+    ]]);
+    assert.equal(result.stdout, "");
+    assert.equal(result.stderr, "");
+  }
 });
 
 test("status and load-context delegate through the same internally resolved plugin source", () => {
-  for (const command of ["status", "load-context"]) {
+  for (const command of ["authority-plan", "status", "load-context"]) {
     const result = capture([command, "--project-root", PROJECT_ROOT]);
     assert.deepEqual(result, {
       code: 0,

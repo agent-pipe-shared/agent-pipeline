@@ -1,15 +1,16 @@
-# Release 0.4.0 readiness
+# Release 0.4.0
 
-**Status:** public release candidate documentation as of 2026-07-24. This is
-not a tag, a GitHub Release, a marketplace publication, an authorization, or
-machine evidence of any remote effect.
+**Status:** released on 2026-07-24 as annotated tag `v0.4.0`, peeled commit
+`86deb0cbbed8cbaae7d652e7060c220cecfe3436`. The public `main` ref was read
+back at that same commit. This record describes the released baseline; it does
+not authorize a tag move, a replacement release, or a later publication.
 
 ## Version-resolution contract
 
 ADR-0039 requires one release version across five logical public surfaces. The
-`0.4.0` candidate resolves them as follows:
+`0.4.0` release resolves them as follows:
 
-| Surface | Candidate value | Resolution boundary |
+| Surface | Release value | Resolution boundary |
 | --- | --- | --- |
 | `VERSION` | `0.4.0` | Repository release-version surface. |
 | Codex plugin manifest | `0.4.0` | `plugins/pipeline-core/.codex-plugin/plugin.json`. |
@@ -17,26 +18,14 @@ ADR-0039 requires one release version across five logical public surfaces. The
 | Codex marketplace resolution | `0.4.0` | The selected `pipeline-core` Codex marketplace entry must resolve the Codex manifest above during the later release observation. |
 | Claude marketplace resolution | `0.4.0` | `pipeline-core@agent-pipeline`, declared through `.claude/settings.json`, must resolve the Claude manifest above during the later release observation. |
 
-Both marketplace rows are required release-readback assertions, not claims that
-the local source tree has updated an installed cache or a remote marketplace.
-The later HAW-E procedure must freshly observe and bind them with the candidate
-and immutable `v0.4.0` tags before publication.
+Both marketplace rows were release-readback assertions, not claims that the
+local source tree updates an installed cache or a remote marketplace. A later
+hotfix must make its own fresh candidate-bound observations and publish an
+additional immutable tag; it must not repoint `v0.4.0`.
 
-## PO disposition and remaining gates
+## Historical release gates
 
-The PO has confirmed that Sentinel and HAW-E implementation/tests are
-functionally complete. That disposition does not manufacture candidate-bound
-machine evidence, a canonical backlog transition, a Result, or permission to
-publish.
-
-Release remains pending all of the following for the exact final candidate:
-
-- Full Verify, Security, and an independent final Critic with candidate-bound
-  evidence.
-- Fresh, bounded-age two-channel observations and the required HAW-E remote
-  authorization/consents.
-- The authorized joint publication, immutable tag creation, and required remote
-  fetch-backs/readbacks.
-
-Until those gates complete, `0.4.0` is only a public release candidate and no
-remote release should be inferred from these documentation surfaces.
+The candidate gates, two-channel observations, authorized publication, tag
+creation, and fetch-back/readback completed for the released baseline. This
+historical statement does not transfer any of that evidence or authority to a
+subsequent version.
