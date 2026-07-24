@@ -112,6 +112,21 @@ function makeRootDir(label) {
   return mkdtempSync(join(FIXTURE_ROOT, `${label}-`));
 }
 
+function git(rootDir, ...args) {
+  const result = spawnSync("git", args, { cwd: rootDir, encoding: "utf8", shell: false });
+  if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
+  return result.stdout.trim();
+}
+
+function commitFixture(rootDir) {
+  git(rootDir, "init", "-q");
+  git(rootDir, "config", "user.name", "Security Fixture");
+  git(rootDir, "config", "user.email", "security-fixture@example.invalid");
+  git(rootDir, "remote", "add", "origin", "https://example.invalid/pipeline/security-fixture.git");
+  git(rootDir, "add", "-A");
+  git(rootDir, "commit", "-qm", "security fixture");
+}
+
 function writeManifest(rootDir, yamlText) {
   mkdirSync(join(rootDir, ".claude"), { recursive: true });
   writeFileSync(join(rootDir, ".claude", "pipeline.yaml"), yamlText);
@@ -190,6 +205,18 @@ const gitleaksUnexpectedShape = writeFixtureBinary(
 const args = process.argv.slice(2);
 const reportPath = args[args.indexOf("--report-path") + 1];
 writeFileSync(reportPath, JSON.stringify({ findings: [] }));
+process.exit(0);
+`,
+);
+
+const gitleaksMutatesCandidate = writeFixtureBinary(
+  "gitleaks-mutates-candidate",
+  `import { writeFileSync } from "node:fs";
+const args = process.argv.slice(2);
+const source = args[args.indexOf("--source") + 1];
+const reportPath = args[args.indexOf("--report-path") + 1];
+writeFileSync(source + "/scanner-mutation.txt", "scanner must not mutate the candidate\\n");
+writeFileSync(reportPath, "[]");
 process.exit(0);
 `,
 );
@@ -824,12 +851,17 @@ governance:
   assertEqual("runner: mixed statuses -> findings array carries the 2 gitleaks findings", evidence.findings.length, 2);
   assertTrue(
     "runner: evidence full schema field set",
-    ["schema", "project", "command", "commit", "finishedAt", "thresholds", "execution", "scanners", "findings", "exitCode"].every((k) =>
+    ["schema", "project", "command", "commit", "candidate", "finishedAt", "thresholds", "execution", "scanners", "findings", "exitCode"].every((k) =>
       Object.prototype.hasOwnProperty.call(evidence, k),
     ),
     JSON.stringify(Object.keys(evidence)),
   );
-  assertEqual("runner: evidence.schema", evidence.schema, "pipeline.security-evidence.v0");
+  assertEqual("runner: evidence.schema", evidence.schema, "pipeline.security-evidence.v1");
+  assertEqual("runner: non-Git fixture records unavailable candidate binding", evidence.candidate, {
+    status: "unavailable", commit: null, tree: null, inputSha256: null,
+    repositorySha256: null, inventory: null, reason: "git-identity-unavailable",
+    snapshot: { method: null, verifiedBeforeAfter: false },
+  });
   assertEqual("runner: evidence.command", evidence.command, "node harness/scripts/security-scan.mjs");
   assertTrue("runner: evidence.commit is a non-empty string", typeof evidence.commit === "string" && evidence.commit.length > 0, evidence.commit);
   assertTrue("runner: evidence.project is a non-empty string", typeof evidence.project === "string" && evidence.project.length > 0, evidence.project);
@@ -990,6 +1022,112 @@ security:
   const { evidence, exitCode } = await runSecurityScan({ rootDir, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
   assertEqual("runner: all scanners disabled -> empty scanners[] and findings[]", { scanners: evidence.scanners.length, findings: evidence.findings.length }, { scanners: 0, findings: 0 });
   assertEqual("runner: all scanners disabled -> exit 0", exitCode, 0);
+}
+
+{
+  // Exact-candidate evidence is produced only from a detached materialization,
+  // never from the caller's attached worktree.
+  const rootDir = makeRootDir("runner-exact-candidate-clean-root");
+  writeManifest(
+    rootDir,
+    `schema: pipeline.manifest.v0
+
+gates:
+  security:
+    mode: blocking
+    type: automated
+
+security:
+  scanners:
+    gitleaks:
+      enabled: false
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: false
+    license-check:
+      enabled: false
+`,
+  );
+  writeFileSync(join(rootDir, "governed.txt"), "committed candidate bytes\\n");
+  commitFixture(rootDir);
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("runner: clean Git candidate is scanned from a verified detached worktree", {
+    exitCode, status: evidence.candidate.status, method: evidence.candidate.snapshot.method,
+    verified: evidence.candidate.snapshot.verifiedBeforeAfter,
+  }, { exitCode: 0, status: "clean", method: "git-detached-worktree.v1", verified: true });
+  assertTrue("runner: exact candidate omits private worktree path", !JSON.stringify(evidence).includes(rootDir), JSON.stringify(evidence));
+}
+
+{
+  // An uncommitted local fix must not supply a clean verdict for the vulnerable
+  // committed subject: no adapter receives the mutable root at all.
+  const rootDir = makeRootDir("runner-exact-candidate-dirty-root");
+  writeManifest(
+    rootDir,
+    `schema: pipeline.manifest.v0
+
+gates:
+  security:
+    mode: blocking
+    type: automated
+
+security:
+  scanners:
+    gitleaks:
+      enabled: false
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: false
+    license-check:
+      enabled: false
+`,
+  );
+  writeFileSync(join(rootDir, "governed.txt"), "vulnerable committed bytes\\n");
+  commitFixture(rootDir);
+  writeFileSync(join(rootDir, "governed.txt"), "uncommitted apparent fix\\n");
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("runner: dirty Git candidate is rejected before a mutable scan", {
+    exitCode, status: evidence.candidate.status, verified: evidence.candidate.snapshot.verifiedBeforeAfter,
+  }, { exitCode: 2, status: "dirty", verified: false });
+}
+
+{
+  // A scanner-side mutation of the detached tree invalidates the result even
+  // though the attached HEAD and its tree remain unchanged.
+  const rootDir = makeRootDir("runner-exact-candidate-mutation-root");
+  writeManifest(
+    rootDir,
+    `schema: pipeline.manifest.v0
+
+gates:
+  security:
+    mode: blocking
+    type: automated
+
+security:
+  scanners:
+    gitleaks:
+      enabled: true
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: false
+    license-check:
+      enabled: false
+`,
+  );
+  writeFileSync(join(rootDir, "governed.txt"), "candidate bytes\\n");
+  commitFixture(rootDir);
+  const { evidence, exitCode } = await runSecurityScan({
+    rootDir,
+    env: { PIPELINE_GITLEAKS_PATH: gitleaksMutatesCandidate }, spawnFn: fixtureSpawnFn,
+    timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary,
+  });
+  assertEqual("runner: scanner mutation invalidates an otherwise clean candidate", {
+    exitCode, status: evidence.candidate.status, verified: evidence.candidate.snapshot.verifiedBeforeAfter,
+  }, { exitCode: 2, status: "clean", verified: false });
 }
 
 if (process.platform !== "win32") {

@@ -68,7 +68,9 @@
  *
  * CLI: `node harness/scripts/security-scan.mjs [--root <dir>] [--timeout-ms N]`.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmdirSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { tmpdir } from "node:os";
 import { basename, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -164,6 +166,150 @@ function resolveCommit(rootDir) {
   return "unknown";
 }
 
+function gitText(rootDir, args) {
+  try {
+    const result = spawnSync("git", args, { encoding: "buffer", cwd: rootDir });
+    return result.status === 0 ? result.stdout : null;
+  } catch { return null; }
+}
+
+function gitResult(rootDir, args) {
+  try {
+    return spawnSync("git", args, { encoding: "utf8", cwd: rootDir, timeout: 15000, shell: false });
+  } catch (error) {
+    return { status: null, stdout: "", stderr: "", error };
+  }
+}
+
+function candidateUnavailable(reason) {
+  return {
+    status: "unavailable", commit: null, tree: null, inputSha256: null,
+    repositorySha256: null, inventory: null, reason,
+  };
+}
+
+function normalizedPathKey(path) {
+  return path.normalize("NFKC").toLocaleLowerCase("en-US");
+}
+
+function inspectInventory(bytes) {
+  const entries = bytes.toString("utf8").split("\0").filter(Boolean);
+  const seen = new Set();
+  for (const entry of entries) {
+    const match = /^(\d+) (?:blob|commit) [0-9a-f]{40,64}\t(.+)$/u.exec(entry);
+    if (!match) return { ok: false, reason: "inventory-malformed" };
+    const [, mode, path] = match;
+    if (mode === "120000") return { ok: false, reason: "symlink-input-unsupported" };
+    if (mode === "160000") return { ok: false, reason: "submodule-input-unsupported" };
+    const key = normalizedPathKey(path);
+    if (seen.has(key)) return { ok: false, reason: "path-alias-ambiguous" };
+    seen.add(key);
+  }
+  return { ok: true, entries: entries.length };
+}
+
+/**
+ * Bind a scan to the exact Git tree and tracked-input inventory visible before
+ * and after scanner execution. A missing or dirty Git materialization is typed
+ * uncertainty, never a clean security subject.
+ */
+function observeCandidate(rootDir) {
+  const commit = gitText(rootDir, ["rev-parse", "HEAD"]);
+  const tree = gitText(rootDir, ["rev-parse", "HEAD^{tree}"]);
+  const status = gitText(rootDir, ["status", "--porcelain=v1", "--untracked-files=all"]);
+  const inventory = gitText(rootDir, ["ls-tree", "-r", "-z", "--full-tree", "HEAD"]);
+  if (!commit || !tree || !status || !inventory) return candidateUnavailable("git-identity-unavailable");
+  const inspected = inspectInventory(inventory);
+  if (!inspected.ok) return {
+    status: "unsupported", commit: commit.toString("utf8").trim(), tree: tree.toString("utf8").trim(),
+    inputSha256: createHash("sha256").update(inventory).digest("hex"), repositorySha256: null,
+    inventory: null, reason: inspected.reason,
+  };
+  const clean = status.length === 0;
+  const remote = gitText(rootDir, ["config", "--get", "remote.origin.url"]);
+  const repositorySha256 = remote && remote.length > 0
+    ? createHash("sha256").update(remote.toString("utf8").trim()).digest("hex") : null;
+  return {
+    status: clean ? "clean" : "dirty",
+    commit: commit.toString("utf8").trim(),
+    tree: tree.toString("utf8").trim(),
+    inputSha256: createHash("sha256").update(inventory).digest("hex"),
+    repositorySha256,
+    inventory: { entries: inspected.entries, symlinkPolicy: "reject", submodulePolicy: "reject" },
+    reason: clean ? null : "working-tree-not-clean",
+  };
+}
+
+function sameCandidate(left, right) {
+  return left.status === "clean" && right.status === "clean"
+    && left.commit === right.commit && left.tree === right.tree && left.inputSha256 === right.inputSha256
+    && left.repositorySha256 === right.repositorySha256;
+}
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function fileSha256(path) {
+  try { return sha256(readFileSync(path)); } catch { return null; }
+}
+
+function securityPolicyBinding(scanRoot, manifest, blockOn, mode) {
+  const policiesPath = resolveGovernancePoliciesPath(manifest);
+  const semgrepRules = manifest?.security?.scanners?.semgrep?.rules_dir;
+  const inputs = {
+    manifestSha256: fileSha256(join(scanRoot, ".claude", "pipeline.yaml")),
+    declaredLicensesSha256: fileSha256(join(scanRoot, "third-party-licenses.json")),
+    licenseAllowlistSha256: fileSha256(join(scanRoot, policiesPath, "license-allowlist.json")),
+    semgrepRulesPath: typeof semgrepRules === "string" ? semgrepRules : null,
+  };
+  return {
+    schema: "pipeline.security-policy-binding.v1",
+    configurationSha256: sha256(canonicalJson({ mode, blockOn, scanners: manifest?.security?.scanners ?? null, policiesPath })),
+    inputs,
+    sha256: sha256(canonicalJson(inputs)),
+  };
+}
+
+/**
+ * Git object identity alone is not enough: adapters must receive a filesystem
+ * root whose bytes cannot be shadowed by this process's mutable worktree. The
+ * detached worktree is disposable and is never used for the evidence output.
+ */
+function materializeCandidate(rootDir, candidate) {
+  if (candidate.status !== "clean") return { ok: false, reason: candidate.reason ?? `candidate-${candidate.status}` };
+  let parent;
+  try { parent = mkdtempSync(join(tmpdir(), "pipeline-security-candidate-")); } catch { return { ok: false, reason: "snapshot-temp-unavailable" }; }
+  const snapshotRoot = join(parent, "tree");
+  const added = gitResult(rootDir, ["worktree", "add", "--detach", snapshotRoot, candidate.commit]);
+  if (added.status !== 0) {
+    try { rmdirSync(parent); } catch { /* bounded scratch cleanup */ }
+    return { ok: false, reason: "snapshot-materialization-failed" };
+  }
+  const observed = observeCandidate(snapshotRoot);
+  if (!sameCandidate(candidate, observed)) {
+    gitResult(rootDir, ["worktree", "remove", "--force", snapshotRoot]);
+    try { rmdirSync(parent); } catch { /* bounded scratch cleanup */ }
+    return { ok: false, reason: "snapshot-identity-mismatch" };
+  }
+  return { ok: true, rootDir: snapshotRoot, parent, method: "git-detached-worktree.v1" };
+}
+
+function cleanupCandidateSnapshot(rootDir, snapshot) {
+  if (!snapshot?.ok) return { status: "not-created" };
+  const removed = gitResult(rootDir, ["worktree", "remove", "--force", snapshot.rootDir]);
+  try { rmdirSync(snapshot.parent); } catch { /* retained bounded scratch is diagnostic only */ }
+  return { status: removed.status === 0 ? "removed" : "retained" };
+}
+
 function childProcessError({ tool, error, timeoutMs }) {
   if (error?.code === "EPERM" || error?.code === "EACCES") {
     return {
@@ -216,12 +362,15 @@ export function runChildProcessPreflight({ rootDir, timeoutMs = DEFAULT_TIMEOUT_
   return { status: "PASS", classification: "success" };
 }
 
-function scannerEntry(adapter, result) {
+function scannerEntry(adapter, result, executableSha256 = null) {
   const entry = {
     tool: adapter.name,
+    adapter: "pipeline.security-adapter.v1",
+    executableSha256,
     status: result.status,
     classification: result.classification ?? (result.status === "PASS" ? "success" : result.status === "FINDINGS" ? "findings" : "scanner_error"),
     findingCount: result.findings.length,
+    coverage: { subject: "candidate-tree", exclusions: [] },
   };
   if (result.reason) entry.reason = result.reason;
   return entry;
@@ -256,20 +405,33 @@ export async function runSecurityScan({
 } = {}) {
   const assessPath = assessTrustedExecutablePathOverride ?? assessTrustedExecutablePath;
   const resolveSystemExec = resolveTrustedSystemExecutableOverride ?? resolveTrustedSystemExecutable;
-  const manifest = loadManifestSafe(rootDir);
+  const candidateBefore = observeCandidate(rootDir);
+  const snapshot = materializeCandidate(rootDir, candidateBefore);
+  // Non-Git callers retain a diagnostic-only compatibility report. Such
+  // evidence can never satisfy an exact-candidate consumer. A Git candidate
+  // that is dirty, unsupported, or cannot be materialized is stricter: do not
+  // fall back to its mutable worktree.
+  const refuseMutableSource = candidateBefore.status !== "unavailable" && !snapshot.ok;
+  const scanRoot = snapshot.ok ? snapshot.rootDir : refuseMutableSource ? null : rootDir;
+  const manifest = scanRoot ? loadManifestSafe(scanRoot) : loadManifestSafe(rootDir);
   const blockOn = resolveBlockOn(manifest);
   const mode = resolveGateMode(manifest);
-  const policiesPathAbs = join(rootDir, resolveGovernancePoliciesPath(manifest));
+  const policiesPathAbs = scanRoot ? join(scanRoot, resolveGovernancePoliciesPath(manifest)) : null;
 
   const scanners = [];
   const findings = [];
-  const childProcessPreflight = runChildProcessPreflight({ rootDir, timeoutMs, spawnFn });
+  const childProcessPreflight = scanRoot
+    ? runChildProcessPreflight({ rootDir: scanRoot, timeoutMs, spawnFn })
+    : { status: "ERROR", classification: "candidate_snapshot", reason: snapshot.reason };
 
   for (const { key, adapter } of SCANNER_DEFS) {
     if (!isScannerEnabled(manifest, key)) continue;
 
     let entry;
     try {
+      if (!scanRoot) {
+        entry = { tool: adapter.name, status: "ERROR", classification: "candidate_snapshot", findingCount: 0, reason: snapshot.reason };
+      } else {
       // The license check does not spawn a process and remains usable when the
       // environment cannot start children. Every binary-backed scanner is
       // classified as an execution-environment failure before PATH discovery,
@@ -296,12 +458,13 @@ export async function runSecurityScan({
       if (!inst.installed) {
         entry = { tool: adapter.name, status: "SKIPPED", classification: inst.status ?? "binary_missing", findingCount: 0, reason: inst.reason };
       } else {
-        const adapterConfig = { ...buildAdapterConfig(key, { rootDir, manifest, policiesPathAbs }), binaryPath: inst.path };
-        const runArgs = { rootDir, config: adapterConfig, timeoutMs, env };
+        const adapterConfig = { ...buildAdapterConfig(key, { rootDir: scanRoot, manifest, policiesPathAbs }), binaryPath: inst.path };
+        const runArgs = { rootDir: scanRoot, config: adapterConfig, timeoutMs, env };
         if (spawnFn) runArgs.spawnFn = spawnFn;
         const result = await adapter.run(runArgs);
-        entry = scannerEntry(adapter, result);
+        entry = scannerEntry(adapter, result, fileSha256(inst.path));
         findings.push(...result.findings);
+      }
       }
       }
     } catch (err) {
@@ -313,7 +476,12 @@ export async function runSecurityScan({
   const blockOnSet = new Set(blockOn);
   const hasErrorClass = scanners.some((s) => s.status === "ERROR");
   const hasBlockingFinding = findings.some((f) => blockOnSet.has(f.severity));
-  const blockingClass = hasErrorClass || hasBlockingFinding;
+  const snapshotAfter = scanRoot ? observeCandidate(scanRoot) : null;
+  const candidateAfter = observeCandidate(rootDir);
+  const candidateBound = snapshot.ok && sameCandidate(candidateBefore, candidateAfter)
+    && sameCandidate(candidateBefore, snapshotAfter);
+  const candidateUncertain = candidateBefore.status !== "unavailable" && !candidateBound;
+  const blockingClass = hasErrorClass || hasBlockingFinding || candidateUncertain;
 
   let exitCode;
   if (!blockingClass) {
@@ -326,18 +494,29 @@ export async function runSecurityScan({
     exitCode = 2; // "blocking" (default / fail-closed for any unrecognized mode string)
   }
 
-  const evidence = {
-    schema: "pipeline.security-evidence.v0",
+  const candidate = candidateBound ? {
+    ...candidateAfter,
+    snapshot: { method: snapshot.method, verifiedBeforeAfter: true },
+  } : {
+    ...candidateBefore,
+    snapshot: { method: snapshot.ok ? snapshot.method : null, verifiedBeforeAfter: false },
+  };
+  const cleanup = cleanupCandidateSnapshot(rootDir, snapshot);
+  const evidenceCore = {
+    schema: "pipeline.security-evidence.v1",
     project: resolveProjectName(rootDir),
     command: "node harness/scripts/security-scan.mjs",
     commit: resolveCommit(rootDir),
+    candidate,
     finishedAt: new Date().toISOString(),
     thresholds: { block_on: blockOn },
-    execution: { childProcessPreflight },
+    policy: securityPolicyBinding(scanRoot ?? rootDir, manifest, blockOn, mode),
+    execution: { childProcessPreflight, snapshotCleanup: cleanup },
     scanners,
     findings,
     exitCode,
   };
+  const evidence = { ...evidenceCore, payloadSha256: sha256(canonicalJson(evidenceCore)) };
 
   const evidenceDir = join(rootDir, "evidence");
   mkdirSync(evidenceDir, { recursive: true });

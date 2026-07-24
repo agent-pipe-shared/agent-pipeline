@@ -12,6 +12,7 @@
  * cases have a real, deterministic commit sha to compare against.
  */
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { chmodSync, mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
@@ -52,6 +53,27 @@ function writeEvidence(dir, relPath, obj) {
   const full = join(dir, relPath);
   mkdirSync(join(full, ".."), { recursive: true });
   writeFileSync(full, typeof obj === "string" ? obj : JSON.stringify(obj));
+}
+
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+function exactSecurityEvidence({ head, tree }) {
+  const payload = {
+    schema: "pipeline.security-evidence.v1",
+    exitCode: 0,
+    commit: head,
+    candidate: {
+      status: "clean", commit: head, tree, inputSha256: "a".repeat(64), repositorySha256: "b".repeat(64),
+      inventory: { entries: 1, symlinkPolicy: "reject", submodulePolicy: "reject" },
+      snapshot: { method: "git-detached-worktree.v1", verifiedBeforeAfter: true },
+    },
+    policy: { configurationSha256: "c".repeat(64), sha256: "d".repeat(64) },
+  };
+  return { ...payload, payloadSha256: createHash("sha256").update(canonicalJson(payload)).digest("hex") };
 }
 
 function configureAnonymousPublicPush(dir, branch = "feat/v0.3-phase2.6-multi-cli") {
@@ -287,8 +309,22 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   const { dir, head } = freshRepo("all-green");
   writeManifest(dir, manifestPush({ approval: "standing-approved", security: "blocking" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
-  writeEvidence(dir, "evidence/security-latest.json", { exitCode: 0, commit: head });
+  const tree = gitAt(dir, "rev-parse", "HEAD^{tree}").stdout.trim();
+  writeEvidence(dir, "evidence/security-latest.json", exactSecurityEvidence({ head, tree }));
   check("PG13 allow  all-green (verify + security fresh, standing-approved)", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
+}
+
+{
+  const { dir, head } = freshRepo("security-payload-tamper");
+  writeManifest(dir, manifestPush({ approval: "standing-approved", security: "blocking" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  const tree = gitAt(dir, "rev-parse", "HEAD^{tree}").stdout.trim();
+  const evidence = exactSecurityEvidence({ head, tree });
+  evidence.candidate.snapshot.verifiedBeforeAfter = false;
+  writeEvidence(dir, "evidence/security-latest.json", evidence);
+  check("PG13a block  unverified immutable snapshot and stale payload digest are rejected", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["immutable snapshot was not verified", "payload digest is invalid"],
+  });
 }
 
 // ---- PG14 malformed manifest -> exit 1 warn --------------------------------------------

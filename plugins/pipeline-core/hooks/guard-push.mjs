@@ -84,6 +84,7 @@
  * VERIFY: node plugins/pipeline-core/hooks/guard-push.test.mjs
  */
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { isAbsolute, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
@@ -1163,6 +1164,49 @@ function checkEvidenceFreshness(relPath) {
   return failures;
 }
 
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function validSha256(value) {
+  return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
+}
+
+function checkSecurityEvidenceBinding() {
+  const failures = checkEvidenceFreshness("evidence/security-latest.json");
+  const read = readEvidence("evidence/security-latest.json");
+  if (!read.ok) return failures;
+  const { data } = read;
+  const tree = spawnSync("git", ["-C", evidenceProjectDir, "rev-parse", `${sourceCommit}^{tree}`], { encoding: "utf8", timeout: 5000 });
+  const sourceTree = tree.status === 0 ? tree.stdout.trim() : null;
+  const candidate = data?.candidate;
+  if (data?.schema !== "pipeline.security-evidence.v1") failures.push("evidence/security-latest.json: exact-candidate security evidence v1 is required");
+  if (!candidate || candidate.status !== "clean") failures.push("evidence/security-latest.json: candidate binding is unavailable or dirty");
+  if (candidate?.commit !== sourceCommit) failures.push("evidence/security-latest.json: candidate commit does not match the pushed source");
+  if (!sourceTree || candidate?.tree !== sourceTree) failures.push("evidence/security-latest.json: candidate tree does not match the pushed source");
+  if (!validSha256(candidate?.inputSha256)) failures.push("evidence/security-latest.json: candidate input digest is invalid");
+  if (!validSha256(candidate?.repositorySha256)) failures.push("evidence/security-latest.json: candidate repository identity is invalid");
+  if (!Number.isSafeInteger(candidate?.inventory?.entries) || candidate.inventory.entries < 0
+    || candidate.inventory.symlinkPolicy !== "reject" || candidate.inventory.submodulePolicy !== "reject") {
+    failures.push("evidence/security-latest.json: candidate inventory policy is invalid");
+  }
+  if (candidate?.snapshot?.method !== "git-detached-worktree.v1" || candidate.snapshot.verifiedBeforeAfter !== true) {
+    failures.push("evidence/security-latest.json: immutable snapshot was not verified before and after scanning");
+  }
+  if (!validSha256(data?.policy?.configurationSha256) || !validSha256(data?.policy?.sha256)) {
+    failures.push("evidence/security-latest.json: policy binding is invalid");
+  }
+  const { payloadSha256, ...payload } = data ?? {};
+  if (!validSha256(payloadSha256) || payloadSha256 !== createHash("sha256").update(canonicalJson(payload)).digest("hex")) {
+    failures.push("evidence/security-latest.json: payload digest is invalid");
+  }
+  return [...new Set(failures)];
+}
+
 const failures = [];
 
 // (a) verify evidence -- always checked once the push gate is active.
@@ -1171,7 +1215,7 @@ failures.push(...checkEvidenceFreshness("evidence/verify-latest.json"));
 // (b) security evidence -- only when a security gate is configured and not "off".
 const securityGate = gateConfig(manifest, "security");
 if (securityGate && securityGate.mode !== "off") {
-  failures.push(...checkEvidenceFreshness("evidence/security-latest.json"));
+  failures.push(...checkSecurityEvidenceBinding());
 }
 
 // (b.1) self-application-only anonymous public range and dedicated authenticated

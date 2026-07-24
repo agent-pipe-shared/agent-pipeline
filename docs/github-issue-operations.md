@@ -71,6 +71,17 @@ repository settings or permissions, alter Actions/secrets, or silently close,
 relabel, assign, or comment on issues. Such operations need a separately
 approved capability and narrower confirmation.
 
+## Delivery-status rule
+
+GitHub Issues expose only the `open` and `closed` states. A delivery may use
+the bounded status word **completed** only after the exact candidate has been
+pushed to its declared remote destination and an independent fetch-back has
+confirmed the pushed OID and tree. Before that point, a branch may be reported
+as implemented or verified, but not completed. A completion comment must name
+the remote ref, commit, tree, and verification evidence without private paths
+or credentials. Closing an Issue remains a separate release or explicitly
+authorized human gate; a completed delivery comment never closes it implicitly.
+
 ## Target and privacy rules
 
 - A project remote is a candidate target, not implicit write authorization.
