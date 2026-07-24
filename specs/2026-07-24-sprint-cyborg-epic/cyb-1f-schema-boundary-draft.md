@@ -1,11 +1,13 @@
-# CYB-1F — schema-boundary freeze (DRAFT, pre-gate)
+# CYB-1F — schema-boundary freeze (RATIFIED 2026-07-25)
 
-> **Status: DRAFT / design-phase deepening. Not a freeze.** This document
-> proposes the content of the CYB-1F schema-boundary checkpoint so that CYB-1
-> can move quickly once the PO gate (EL-19) opens. The *actual* freeze remains
-> the mid-CYB-1 PO checkpoint named in
-> [`spec.md`](spec.md) §4 and PRD open decision B. Nothing here is ratified;
-> it does not pre-empt PO decisions A–E.
+> **Status: RATIFIED.** The PO answered the mid-CYB-1 freeze checkpoint on
+> 2026-07-25: "F-1..F-5: approved (wie empfohlen)" — every draft
+> recommendation in §10 is adopted as written. This document is now the
+> actual frozen schema boundary named in [`spec.md`](spec.md) §4 and PRD open
+> decision B, not a proposal. Downstream packages may bind to it; changes now
+> require the §6 re-approval rule (`spec.md` §6), not a fresh freeze
+> discussion. See `docs/state.md` → "PO GATE ANSWERED — decision D + CYB-1F
+> F-1..F-5 approved — 2026-07-25" for the recorded gate answer.
 >
 > **Grounding:** every identifier below is derived from the issue requirements
 > input — capability families verbatim from #44 "Capability families" (the
@@ -181,26 +183,27 @@ policy authority (#41 §5).
 | CYB-9 (#48) | assurance levels + evaluation receipt |
 | CYB-5 (#46) | `ctl.*` grammar (§4) for its catalog-modelled controls (e.g. `ctl.risk.ai-agent.*`); the waiver-class fields (§8) for the "PO-waived direct implementation" L0 waiver type — per `spec.md` §4 ("CYB-5 … Depends: CYB-1 (module/control IDs)"), added here per the cross-spec consistency review's finding 1 (2026-07-25: this row was missing) |
 
-## 10. Open decisions to resolve AT the freeze checkpoint
+## 10. Decisions resolved AT the freeze checkpoint (RATIFIED 2026-07-25)
 
-These are genuine forks I am **not** deciding unilaterally; they are the agenda
-of the mid-CYB-1 PO checkpoint:
+The PO ratified every draft recommendation below as written, 2026-07-25:
 
-- **F-1:** freeze only the thirteen roots (sub-techniques additive), or also
-  fix a first sub-technique set now? *Draft recommendation: roots only.*
-- **F-2:** confirm the module precedence total order in §6. *Draft
-  recommendation: as listed.*
-- **F-3:** ratify the run-outcome → control-result projection (§7).
-- **F-4:** confirm license-check is a catalog control, not a fourteenth
+- **F-1 — RATIFIED:** freeze only the thirteen roots; sub-techniques stay
+  additive, not fixed now.
+- **F-2 — RATIFIED:** the module precedence total order in §6 stands as
+  listed.
+- **F-3 — RATIFIED:** the run-outcome → control-result projection (§7) is
+  ratified as drafted.
+- **F-4 — RATIFIED:** license-check is a catalog control, not a fourteenth
   capability family (§3).
-- **F-5:** control-ID `<domain>` vocabulary — validate strictly against the
-  module registry, or allow a small open base-domain set? *Draft
-  recommendation: fixed class enum + module-validated domain + a short fixed
-  base-domain list.*
+- **F-5 — RATIFIED:** control-ID `<domain>` vocabulary uses a fixed class
+  enum + module-validated domain + a short fixed base-domain list.
 
 ## 11. Gate discipline
 
-This draft changes no runtime artifact, registers no schema, and dispatches no
-implementation (EL-19 respected). It is Elephant design-phase content that
-turns into the real CYB-1F freeze only after: (a) the PO gate opens with
-decisions A/B, and (b) the mid-CYB-1 checkpoint ratifies F-1…F-5 above.
+This freeze changed no runtime artifact and registered no schema itself
+(EL-19 respected up to the gate answer); it became the real CYB-1F freeze
+once (a) the PO gate opened with decisions A/B (2026-07-24) and (b) the
+mid-CYB-1 checkpoint ratified F-1…F-5 above (2026-07-25). Both conditions are
+now satisfied. Implementation dispatch against these frozen identifiers is
+EL-16-eligible; changes after this point go through the §6 re-approval rule,
+not a re-opened freeze discussion.
