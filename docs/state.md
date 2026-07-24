@@ -832,6 +832,47 @@ authoritative view of backlog reality for the Cyborg runner.
   to expect the 11-suite red count to have changed, but this is an
   expectation, not new evidence).
 
+#### AFK continuation — all nine CYB-N feature specs drafted, block complete — 2026-07-25
+
+- Drafted the remaining three package specs, completing full design-phase
+  coverage of every package in `spec.md` §4:
+  [`cyb-7-feature-spec.md`](../specs/2026-07-24-sprint-cyborg-epic/cyb-7-feature-spec.md)
+  (#45, 13 ACs + graded reproducibility-state enum + 7-class tamper fixture
+  set), [`cyb-8-feature-spec.md`](../specs/2026-07-24-sprint-cyborg-epic/cyb-8-feature-spec.md)
+  (#47, 12 ACs + 15-state lifecycle state machine + 7-trigger drift list), and
+  [`cyb-9-feature-spec.md`](../specs/2026-07-24-sprint-cyborg-epic/cyb-9-feature-spec.md)
+  (#48, 12 ACs — the epic's final package, Phase IV). Commits `8540066`,
+  `70c4692`, `791aa55`.
+- **Full inventory of what now exists under `specs/2026-07-24-sprint-cyborg-epic/`:**
+  `prd_cyborg-epic.md`, `spec.md`, `backlog-acceptance-matrix.md` (from the
+  original design session), `cyb-1f-schema-boundary-draft.md` (from task #10),
+  `windows-sandbox-assurance-slice-scope.md`, and ten feature specs —
+  `cyb-a0-`, `cyb-1-` through `cyb-9-feature-spec.md`. Every issue
+  #39/#41-#48 now has its acceptance criteria translated into checkable form,
+  cross-referenced against `backlog-acceptance-matrix.md`'s AC counts (all
+  match) and against each other's stated dependencies (spot-checked while
+  drafting, e.g. CYB-2's F-3 dependency on CYB-1F, CYB-6's family-registry
+  reuse of CYB-1F's frozen roots, CYB-8/CYB-3's mutual SBOM/finding
+  separation invariant) — not run as a separate formal consistency pass.
+- **What this AFK block does NOT include, named explicitly rather than
+  silently skipped:** no Goldfish dispatch of any kind; no schema registered
+  or code touched; `approve-plan`/task #13 still blocked (deliberately, not
+  chased further); Bug 2 (`PO-PROFILE-RECEIPT-INVALID`) still unconfirmed; the
+  ADR-0045 canonical `specs/<id>/` topology migration was deliberately not
+  started; no formal cross-spec consistency/completeness review has run yet
+  (candidate for the PO's next session, or a dedicated Critic/advisor pass,
+  rather than more unilateral Elephant drafting).
+- **All work is on the local, never-pushed branch `feat/sprint-cyborg-claude`**
+  (now rebased onto `origin/main`/`v0.4.2`). Nothing in this block was pushed;
+  no push authorization was sought or needed for docs-only local commits on an
+  unpublished branch.
+- **Next action for the PO:** review the ten feature specs plus the
+  Windows/sandbox-assurance scope sketch as one batch; the epic-level PO gate
+  (decisions A-E) and the CYB-1F freeze checkpoint (F-1..F-5) are the two
+  concrete decision points everything else is waiting on. `approve-plan`
+  remains available to retry from a correctly-cased PowerShell session
+  (Bug 1 workaround) whenever recording `planApproved` is wanted.
+
 ### 2026-07-24 release-candidate checkpoint — authoritative latest
 
 The PO has dispositioned all Sentinel/HAW-E implementation and tests as
