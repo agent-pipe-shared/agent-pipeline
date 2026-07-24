@@ -265,6 +265,21 @@ items and carried workstreams are complete.
 - one-sided publication, moved tag, partial Result, or partial state close;
 - unresolved major/blocking Critic finding or an overstated assurance claim.
 
+## Rollback and deferred-risk ownership
+
+The selected Codex Advisory route has no data/schema migration. If it must be
+withdrawn in production, revert the enabling commit as one guarded change to
+the bridge, the frozen V3 routing cell, and its matching documentation; then
+run Full Verify and Security again before any push. Existing repository-private
+selection journals remain unusable as a success claim after that revert and
+are removed only by their session-bound cleanup path.
+
+The stronger Codex-isolation claim remains intentionally deferred: the current
+selected profile is only `sandbox-read-only-except-coordinator-scratch-network-open`.
+**Owner:** Sentinel Elephant. **Expiry:** 2026-08-31. By that date the owner
+must either close the original stronger-isolation gates with evidence or record
+a renewed, dated PO disposition; it may not silently remain open.
+
 ## Non-goals
 
 No direct backlog-ledger edits; no inferred historical completion; no private
