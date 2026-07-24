@@ -70,6 +70,28 @@ function candidateIdentity() {
   } catch { return { status: "unavailable", commit: null, tree: null }; }
 }
 const startedCandidate = candidateIdentity();
+const command = "node harness/scripts/verify.mjs";
+const evidenceDir = join(repoRoot, "evidence");
+const evidencePath = join(evidenceDir, "verify-latest.json");
+function writeEvidence(evidence) {
+  mkdirSync(evidenceDir, { recursive: true });
+  writeFileSync(evidencePath, JSON.stringify(evidence, null, 2) + "\n");
+}
+// Invalidate an older result before any suite can begin.  If this process is
+// killed, crashes, or loses its host while a suite is running, a later reader
+// sees this red record instead of accidentally trusting prior-candidate proof.
+writeEvidence({
+  schema: "pipeline.verify-evidence.v0",
+  project: "agent-pipeline",
+  command,
+  commit: startedCandidate.commit ?? "unknown",
+  tree: startedCandidate.tree ?? "unknown",
+  candidate: { start: startedCandidate, finish: null, binding: "running" },
+  startedAt: new Date().toISOString(),
+  finishedAt: null,
+  steps: [{ name: "verify-running", exitCode: 1 }],
+  exitCode: 1,
+});
 const SCOPED_VERIFY_SUITES = Object.freeze([
   Object.freeze({
     name: "scoped-verify-registration-tests",
@@ -320,7 +342,6 @@ if (startedCandidate.status === "clean") {
 const overallExitCode = steps.find((s) => s.exitCode !== 0)?.exitCode ?? 0;
 const commit = startedCandidate.commit ?? "unknown";
 
-const command = "node harness/scripts/verify.mjs";
 const evidence = {
   schema: "pipeline.verify-evidence.v0",
   project: "agent-pipeline",
@@ -337,10 +358,7 @@ const evidence = {
   exitCode: overallExitCode,
 };
 
-const evidenceDir = join(repoRoot, "evidence");
-mkdirSync(evidenceDir, { recursive: true });
-const evidencePath = join(evidenceDir, "verify-latest.json");
-writeFileSync(evidencePath, JSON.stringify(evidence, null, 2) + "\n");
+writeEvidence(evidence);
 
 console.log(`\nEvidence written: ${evidencePath}`);
 console.log(`Overall: ${steps.map((s) => `${s.name}=${s.exitCode}`).join(", ")} -> exit ${overallExitCode}`);
