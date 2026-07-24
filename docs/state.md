@@ -483,17 +483,34 @@ authoritative view of backlog reality for the Cyborg runner.
   `81cc5f1` (v0.4.1) — Nova has not advanced on the remote, and Nova does not
   carry the Windows fixes either. Conclusion: archive integration is the wrong
   tool; the question reduces to whether v0.4.1 itself is green on this host.
-- **Empirical test underway:** this checkout has **no root `package.json`, no
-  lockfile, `node_modules` absent** — the repo runs `node --test`/built-ins, so
-  "bootstrap" here is `setup.mjs` + regenerated state, not `npm ci`. A
-  bootstrap-inclusive `verify.mjs` run on this host (v0.4.1 code + docs-only
-  Cyborg commits) is in progress and passing suites so far, including explicit
-  win32 capability narrowing — consistent with the PO's hypothesis. Awaiting the
-  exit code + `evidence/verify-latest.json` before declaring D resolved. If
-  green: D is closed as an environment artifact (normal push works after a clean
-  bootstrap); update PRD decision D and the "native-Windows baseline RED" note
-  above. If still red: capture per-suite signatures and scope a bounded fix as a
-  Cyborg assurance slice.
+- **Binding confirmed clean:** `origin` = the shared public-core repo
+  (`agent-pipe-shared/agent-pipeline.git`); `origin/main` == local `main` ==
+  `v0.4.1` == `81cc5f1`. The Cyborg branch adds only 5 docs files over v0.4.1
+  (991 insertions, **zero code**), so testing the local branch tests v0.4.1
+  code exactly. `.claude/pipeline-state.json` is **tracked and identical to
+  v0.4.1** — the "stale Sentinel" feature-state the stop-hook reads is committed
+  v0.4.1 content, cleared only by CYB-0's feature-state switch (not a
+  reload/checkout). This repo has **no root `package.json`, no lockfile,
+  `node_modules` absent** — it runs `node --test`/built-ins, so "bootstrap" is
+  `setup.mjs` + regenerated state, not `npm ci`.
+- **First verify run (main checkout) is NOT decisive — it drifted.** The
+  evidence at `evidence/verify-latest.json` shows `"binding":"drift"` (start
+  `31056ee` → finish `1124be8`) because a progress commit landed mid-run; the
+  12th red is `candidate-binding` itself, and several others (security-scan,
+  guard-push, repository-freshness, feature-package-topology) bind to a stable
+  candidate and fail on drift. So the 11/12 reds there may be drift artifacts,
+  not real v0.4.1 failures — do not cite that run as proof of a red baseline.
+- **Authoritative test running:** a **pristine detached worktree at v0.4.1**
+  under `D:/dev/ap-v041-verify` (clean tree, no commits during the run) is
+  executing a full `verify.mjs`; output → `D:/dev/ap-v041-verify/run.log`,
+  per-step exitCodes → that worktree's `evidence/verify-latest.json` (isolated
+  from the main checkout). **This is the honest test of the PO's "fresh
+  bootstrap is green" hypothesis.** On completion: read run.log + that evidence.
+  Green ⇒ D closed as an accumulated-working-dir artifact (normal push works;
+  update PRD decision D and the RED note above). Still red ⇒ extract the real
+  per-suite signatures from run.log and scope a bounded Cyborg assurance slice.
+  **Cleanup after:** `git worktree remove /d/dev/ap-v041-verify`. Evidence per
+  step is only `{name, exitCode}` — failure detail lives in run.log.
 
 ### 2026-07-24 release-candidate checkpoint — authoritative latest
 
