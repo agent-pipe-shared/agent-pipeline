@@ -16,47 +16,14 @@ import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 
 import { coordinateAdvisory } from "../lib/advisory-coordinator.mjs";
-import { canonicalJson } from "../lib/codex-sandbox-compatibility.mjs";
-import { executeSandboxedReadonlyDuty, runSandboxedReadonlyHostBridge } from "./sandboxed-readonly-host-bridge.mjs";
-import { sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
-import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
-import { invokeCodexAdvisoryAppServer } from "./codex-advisory-app-server.mjs";
 import { AdvisoryReceiptAssuranceError, persistAdvisoryReceipt } from "../lib/advisory-receipt-assurance.mjs";
+import { createHostAdvisorLaunch, createHostAdvisorStatus, validateHostAdvisorStatus } from "../lib/host-advisor-status.mjs";
+import { observeHostAdvisorWorkspace } from "./host-advisor-workspace.mjs";
 
 const USAGE = "usage: advisory-host-bridge.mjs --input <json> --receipt <json> [--timeout-ms <1000..600000>]";
-const SHA256 = /^[a-f0-9]{64}$/;
 
-function exactKeys(value, keys, label) {
-  if (!value || typeof value !== "object" || Array.isArray(value)
-    || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify([...keys].sort())) throw new Error(`${label} is not closed`);
-}
-function equal(left, right) { return canonicalJson(left) === canonicalJson(right); }
-function sandboxExecutionEvidence(value, selection) {
-  exactKeys(value, ["schema", "selectionId", "selectionSha256", "repoFingerprint", "duty", "dispatch", "observed", "terminal"], "sandbox execution evidence");
-  if (value.schema !== "pipeline.codex-sandbox-host-execution.v1" || value.selectionId !== selection.selectionId
-    || value.selectionSha256 !== sandboxSelectionDigest(selection) || value.repoFingerprint !== selection.repoFingerprint
-    || value.duty !== "advisory" || !equal(value.dispatch, selection.dispatch)) throw new Error("sandbox execution evidence does not bind the selected advisory");
-  exactKeys(value.observed, ["cliSha256", "profileSha256", "networkEnabled", "scratchRootSha256"], "sandbox execution observation");
-  if (value.observed.cliSha256 !== selection.toolchain.cliSha256 || value.observed.profileSha256 !== selection.profile.sha256
-    || value.observed.networkEnabled !== true || value.observed.scratchRootSha256 !== selection.profile.scratchRootSha256) {
-    throw new Error("sandbox execution observation does not read back the selected profile");
-  }
-  exactKeys(value.terminal, ["childStarted", "exitCode", "stdioStatus", "cleanupStatus"], "sandbox execution terminal");
-  if (value.terminal.childStarted !== true || value.terminal.exitCode !== 0
-    || value.terminal.stdioStatus !== "complete" || value.terminal.cleanupStatus !== "complete") {
-    throw new Error("sandbox execution terminal is not a started child observation");
-  }
-  return value;
-}
-
-/**
- * Explicit affected-Codex advisory call site. Selection is supplied by the
- * committed prelaunch selector; the generic bridge returns execution receipt
- * evidence bound to the same advisory dispatch before coordinator invocation.
- */
-export async function runSelectedAdvisoryHost({ selectionId, requested, references = [] }, transport) {
-  return runSandboxedReadonlyHostBridge({ selectionId, duty: "advisory", requested, references }, transport);
-}
+/** Compatibility seam: selected-sandbox advisory is intentionally unavailable. */
+export async function runSelectedAdvisoryHost() { throw Object.assign(new Error("selected sandbox is not an advisory route"), { code: "host_route_required" }); }
 
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 function advisoryReceiptBytes(receipt) { return Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, "utf8"); }
@@ -66,111 +33,25 @@ function advisoryReceiptBytes(receipt) { return Buffer.from(`${JSON.stringify(re
  * until an exact selector record has been read back by the generic bridge.
  */
 export async function runCodexAdvisoryThroughSelectedSandbox(input, adapter, transport = {}) {
-  const context = input?.sandboxContext;
-  if (!context || typeof context !== "object" || Array.isArray(context)
-    || JSON.stringify(Object.keys(context).sort()) !== JSON.stringify(["referenceSetSha256", "repoFingerprint"])
-    || !SHA256.test(context.repoFingerprint) || !SHA256.test(context.referenceSetSha256)) {
-    throw new Error("Codex advisory selection context is unavailable");
-  }
-  const { sandboxContext: _sandboxContext, advisorExport, ...coordinatorInput } = input;
-  let advisoryResult = null;
-  let launchedEvidence = null;
-  let adapterInvoked = false;
-  const selected = await (transport.executeSandboxedReadonlyDuty ?? executeSandboxedReadonlyDuty)({
-    duty: "advisory",
-    repoFingerprint: context.repoFingerprint,
-    dispatch: {
-      queueRevision: coordinatorInput.dispatch.queueRevision,
-      candidateCommit: coordinatorInput.dispatch.candidateCommit,
-      candidateTree: coordinatorInput.dispatch.candidateTree,
-      referenceSetSha256: context.referenceSetSha256,
-    },
-    requested: { runner: "codex", model: "gpt-5.6-sol" },
-    references: [],
-  }, {
-    selection: transport.selection,
-    store: transport.store,
-    bridge: {
-      ...transport.bridge,
-      launch: async ({ selection, requested, references, profile, scratch }) => {
-      const selectedAdapter = async (payload) => {
-        adapterInvoked = true;
-        const response = await adapter({
-          ...payload,
-          sandboxTransport: {
-            selectionId: selection.selectionId,
-            selectionSha256: sandboxSelectionDigest(selection),
-            repoFingerprint: selection.repoFingerprint,
-            duty: "advisory",
-            dispatch: structuredClone(selection.dispatch),
-            requested: structuredClone(requested),
-            toolchain: structuredClone(selection.toolchain),
-            profile: structuredClone(profile),
-            scratch: structuredClone(scratch),
-            references: [...references],
-          },
-        });
-        if (response?.sandboxExecution !== undefined) launchedEvidence = response.sandboxExecution;
-        if (!response || typeof response !== "object") return response;
-        const { sandboxExecution: _sandboxExecution, ...coordinatorResponse } = response;
-        return coordinatorResponse;
-      };
-      advisoryResult = await coordinateAdvisory({
-        ...coordinatorInput,
-        sandbox: {
-          selectionId: selection.selectionId,
-          selectionSha256: sandboxSelectionDigest(selection),
-          requestSha256: selection.dispatch.requestSha256,
-          assurance: selection.assurance,
-        },
-      }, { invokeNative: selectedAdapter, invokeConsult: selectedAdapter, advisorExport });
-      if (!launchedEvidence) return { childStarted: false };
-      const evidence = sandboxExecutionEvidence(launchedEvidence, selection);
-      return { childStarted: true, evidence };
-      },
-      finalize: async ({ selection, requested, launched }) => ({
-        schema: "pipeline.codex-sandbox-execution-receipt.v1",
-        selectionId: selection.selectionId,
-        selectionSha256: sandboxSelectionDigest(selection),
-        repoFingerprint: selection.repoFingerprint,
-        duty: "advisory",
-        dispatch: structuredClone(selection.dispatch),
-        requested: structuredClone(requested),
-        observed: structuredClone(launched.evidence.observed),
-        terminal: structuredClone(launched.evidence.terminal),
-        assurance: structuredClone(selection.assurance),
-        dutyReceipt: {
-          schema: "pipeline.advisory-receipt.v1",
-          sha256: sha256(advisoryReceiptBytes(advisoryResult?.receipt ?? { code: advisoryResult?.code ?? "adapter-failed" })),
-          status: advisoryResult?.ok ? "answered" : "error",
-        },
-        createdAt: new Date().toISOString(),
-      }),
-    },
-  });
-  if (!selected.childStarted) {
-    // A selected host adapter may already have received a question but failed
-    // to attest its child. Retrying that case through the substitute route
-    // could create two advisor turns. Only a pre-dispatch selection failure
-    // is eligible for the one fresh host-consult fallback below.
-    return {
-      advisoryResult: {
-        ok: false,
-        code: adapterInvoked ? "sandbox_execution_unattested" : "sandbox_selection_unavailable",
-        answer: null,
-        receipt: null,
-        attempts: [],
-      },
-      execution: null,
-    };
-  }
-  return { advisoryResult, execution: selected };
+  const root = transport.repoRoot ?? process.cwd();
+  const observe = transport.observeWorkspace ?? observeHostAdvisorWorkspace;
+  const before = observe(root);
+  const launch = createHostAdvisorLaunch(input.sessionId ?? input.sandboxRuntime?.sessionCleanup?.sessionId ?? "codex-session");
+  const payload = { role: "consult-advisor", subagentType: "consult-advisor", runner: "codex", model: "gpt-5.6-sol", effort: "max", question: input.question, dispatch: structuredClone(input.dispatch), oneQuestion: true, freshContext: true, contextPolicy: "fresh-no-handover-no-chat-history-no-implementor-rationale", tools: ["Read", "Grep", "Glob"], memory: false, autoApply: false, sandbox_mode: "read-only" };
+  let result;
+  try { result = await adapter(payload); } catch { result = { status: "unavailable" }; }
+  let after; let observationFailed = false;
+  try { after = observe(root); } catch { observationFailed = true; after = { workspaceSha256: before.workspaceSha256 }; }
+  const drifted = observationFailed || after.workspaceSha256 !== before.workspaceSha256;
+  const outcome = !drifted && result?.status === "answered" && typeof result.answer === "string" ? "answered" : (observationFailed || result?.status === "unavailable" ? "unavailable" : "failed");
+  let status;
+  try { status = createHostAdvisorStatus({ candidate: { commit: input.dispatch.candidateCommit, tree: input.dispatch.candidateTree }, launch, questionSha256: sha256(input.question), answerSha256: outcome === "answered" ? sha256(result.answer) : null, workspaceBeforeSha256: before.workspaceSha256, workspaceAfterSha256: after.workspaceSha256, outcome }); }
+  catch { status = createHostAdvisorStatus({ candidate: { commit: input.dispatch.candidateCommit, tree: input.dispatch.candidateTree }, launch, questionSha256: sha256(input.question), answerSha256: null, workspaceBeforeSha256: before.workspaceSha256, workspaceAfterSha256: after.workspaceSha256 === before.workspaceSha256 ? `${"0".repeat(63)}1` : after.workspaceSha256, outcome: "failed" }); }
+  status = validateHostAdvisorStatus(status, { commit: input.dispatch.candidateCommit, tree: input.dispatch.candidateTree }, launch, sha256(input.question));
+  return { advisoryResult: { ok: outcome === "answered", code: outcome, answer: outcome === "answered" ? result.answer : null, receipt: null, attempts: [] }, execution: status };
 }
 
-/** Compatibility export retained for callers of the former composition seam.
- * The selected sandbox is now the only Bash-capable Codex transport; there is
- * deliberately no unbound host-shell fallback.
- */
+/** Compatibility export retained for callers of the former composition seam. */
 export async function runCodexAdvisoryWithHostFallback(input, adapter, transport = {}) {
   return runCodexAdvisoryThroughSelectedSandbox(input, adapter, transport);
 }
@@ -261,31 +142,22 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
       && Object.keys(advisorExport).length === 1 && advisorExport.consent === "declined";
     if (advisoryDisabled) {
       // An explicit decline is a normal optional state. The
-      // coordinator returns the typed disabled result before any adapter,
-      // selected-sandbox probe, child, export, or receipt.
+      // Coordinator returns the typed disabled result before any adapter,
+      // child, export, or receipt.
       result = await coordinateAdvisory(input, { advisorExport });
     } else if (input.runner === "codex") {
-      try {
-        const transport = dependencies.createCodexSandboxRuntimeTransport?.(input) ?? createCodexSandboxRuntimeTransport(input);
-        const nativeAdapter = dependencies.invokeCodexAdvisoryAppServer ?? invokeCodexAdvisoryAppServer;
-        const outcome = await runCodexAdvisoryWithHostFallback(input, nativeAdapter, transport);
-        result = outcome.advisoryResult;
-        execution = outcome.execution;
-      } catch (error) {
-        if (process.env.PIPELINE_DEBUG_SANDBOX === "1") throw error;
-        // Produce one sanitized exhausted receipt without emitting an adapter
-        // request. The unavailable selected transport never authorizes an
-        // unbound host shell or a second consult.
-        result = await coordinateAdvisory(input, {
-          advisorExport,
-          invokeConsult: async () => ({ status: "unavailable" }),
-        });
-      }
+      const outcome = await runCodexAdvisoryWithHostFallback(input, adapter, { repoRoot: process.cwd() });
+      result = outcome.advisoryResult;
+      execution = outcome.execution;
     } else result = await coordinateAdvisory(input, { invokeNative: adapter, invokeConsult: adapter, advisorExport });
     let reported = result;
     let receiptPath = null;
     let directoryDurability = null;
-    if (result.receipt) {
+    if (execution?.schema === "pipeline.host-advisor-status.v1") {
+      const persisted = writeReceiptAtomic(args.receipt, execution);
+      receiptPath = resolve(args.receipt);
+      directoryDurability = persisted?.directoryDurability ?? null;
+    } else if (result.receipt) {
       try {
         const persisted = writeReceiptAtomic(args.receipt, result.receipt);
         receiptPath = resolve(args.receipt);
@@ -300,16 +172,11 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
       type: "advisory.completed",
       ok: reported.ok,
       code: reported.code,
-      answer: reported.answer,
+      answer: execution?.schema === "pipeline.host-advisor-status.v1" ? null : reported.answer,
       receiptPath,
       directoryDurability,
       attempts: reported.attempts,
-      sandboxBinding: execution?.childStarted === true ? {
-        selectionId: execution.selectionId,
-        selectionSha256: execution.selectionSha256,
-        executionReceiptSha256: execution.executionReceiptSha256,
-        dutyReceiptSha256: execution.dutyReceiptSha256,
-      } : null,
+      sandboxBinding: null,
     });
     return reported.ok ? 0 : 2;
   } finally {

@@ -231,7 +231,9 @@ must not introduce a parallel implementation of the same contract.
 - Isolation, credentials, messaging, event projections, remote execution, and
   result import are extension points only through declared namespaced
   capability fields below `extensions`. Extension keys match
-  `^[a-z][a-z0-9]*(?:\.[a-z][a-z0-9-]*)+$`; values are JSON data.
+  Extension keys begin with a lowercase letter, use lowercase letters or digits,
+  and may contain dot-separated lowercase segments (with hyphens allowed after
+  the first character); values are JSON data.
   `plugins/pipeline-core/config/control-execution-extension-namespaces.json`
   is the sole namespace registry with schema
   `pipeline.control-execution-extension-namespaces.v1` and exactly

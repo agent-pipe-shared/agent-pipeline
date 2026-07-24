@@ -154,7 +154,7 @@ record("v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable
     assert.equal(intent.routing.profiles.epic.design_phase.claude.selector.value, "opus");
     assert.equal(intent.routing.duties.advisory.eligibility.epic, "required");
     assert.equal(intent.routing.duties.advisory.claude.adapter, "native-fable");
-    assert.equal(intent.routing.duties.advisory.codex.adapter, "consult");
+    assert.equal(intent.routing.duties.advisory.codex.adapter, "host-consult");
     assert.equal(intent.advisor_export, undefined);
     assert.deepEqual(validatePipelineUserV3(intent).advisoryExport, { consent: "missing", enabled: true });
     assert.deepEqual(intent.roles, { po: { display_label: "PO" } });

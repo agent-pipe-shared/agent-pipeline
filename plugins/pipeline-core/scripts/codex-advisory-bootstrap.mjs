@@ -69,7 +69,7 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
   const repoRoot = realpathSync(dependencies.repoRoot ?? process.cwd());
   const source = parseYaml(readFileSync(join(repoRoot, "pipeline.user.yaml"), "utf8"));
   const authority = validatePipelineUserV3(source, { source: "pipeline.user.yaml" });
-  if (!authority.ok || authority.advisoryExport?.enabled !== true) throw new Error("pipeline.user.v3 advisor_export is explicitly declined");
+  if (!authority.ok || authority.advisoryExport?.consent === "declined") throw new Error("pipeline.user.v3 advisor_export is explicitly declined");
   const topology = (dependencies.resolveTopologyFn ?? resolvePoGateRepositoryTopology)(repoRoot);
   const repoFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: topology.gitCommonDir, primaryRoot: topology.primaryRoot });
   const questionBytes = await (dependencies.readQuestionBytesFn ?? readQuestionBytes)(process.stdin);
@@ -94,7 +94,7 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
       runner: "codex",
       question,
       dispatch: { dispatchId: args.dispatchId, queueRevision: args.queueRevision, candidateCommit, candidateTree },
-      advisorExport: source.advisor_export ?? null,
+      advisorExport: source.advisor_export ?? { consent: "default" },
       sandboxContext: { repoFingerprint, referenceSetSha256: sha256(JSON.stringify([...new Set(args.references)].sort())) },
       sandboxRuntime: { schema: "pipeline.codex-sandbox-runtime.v1", repoRoot, codexPath, observedHelperPath, sessionCleanup: { sessionId: args.sessionId, descriptorSha256: args.descriptorSha256 } },
     };

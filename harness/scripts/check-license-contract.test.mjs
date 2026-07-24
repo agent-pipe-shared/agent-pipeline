@@ -3,10 +3,10 @@
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { linkSync, mkdtempSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
+import { copyFileSync, linkSync, mkdtempSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { buildLicenseGateReceipt, buildSnt1Result, licenseSurfaceDigests, SNT1_CANDIDATE, SNT1_CLA_SEMANTICS, SNT1_LICENSE_SURFACES, SNT1_LICENSING_SEMANTICS, SNT1_PRIVACY_APPROVAL, storePrivateLicenseGateReceipt, validateLicenseContract, validateLicenseGateProjection, validateSnt1EvidenceRecords, validateSnt1Result } from "./check-license-contract.mjs";
+import { buildLicenseGateReceipt, buildSnt1Result, licenseSurfaceDigests, SNT1_CANDIDATE, SNT1_CLA_SEMANTICS, SNT1_LICENSE_SURFACES, SNT1_LICENSING_SEMANTICS, SNT1_PRIVACY_APPROVAL, storePrivateLicenseGateReceipt, validateLicenseContract, validateLicenseGateProjection, validateLiveLicenseSurfaces, validateSnt1EvidenceRecords, validateSnt1Result } from "./check-license-contract.mjs";
 
 const fixture = mkdtempSync(join(tmpdir(), "license-contract-"));
 const write = (path, value) => { const absolute = join(fixture, ...path.split("/")); mkdirSync(dirname(absolute), { recursive: true }); writeFileSync(absolute, value); };
@@ -37,12 +37,12 @@ write(".github/workflows/contributor-gates.yml", "on:\n  pull_request:\n    bran
 const evidenceCandidate = structuredClone(SNT1_CANDIDATE);
 const evidenceSurfaces = structuredClone(SNT1_LICENSE_SURFACES);
 const privacyRecord = {
-  schema: "pipeline.snt1-privacy-disposition.v1", status: "approved", reviewer: "André Twachtmann", reviewedAt: "2026-07-23",
+  schema: "pipeline.snt1-privacy-disposition.v1", status: "approved", reviewer: "André Twachtmann", reviewedAt: "2026-07-24",
   candidate: evidenceCandidate, surfaceSetSha256: digest(evidenceSurfaces),
-  actionsLogRetention: { days: 30, maximumAllowedDays: 90, readBackAt: "2026-07-23" }, approvalText: SNT1_PRIVACY_APPROVAL,
+  actionsLogRetention: { days: 30, maximumAllowedDays: 90, readBackAt: "2026-07-24" }, approvalText: SNT1_PRIVACY_APPROVAL,
 };
 const licensingRecord = {
-  schema: "pipeline.snt1-licensing-disposition.v1", status: "approved", reviewer: "André Twachtmann", reviewedAt: "2026-07-23",
+  schema: "pipeline.snt1-licensing-disposition.v1", status: "approved", reviewer: "André Twachtmann", reviewedAt: "2026-07-24",
   candidate: evidenceCandidate, surfaces: evidenceSurfaces, licenseSemantics: SNT1_LICENSING_SEMANTICS, claSemantics: SNT1_CLA_SEMANTICS,
   authorityReference: "backlog/evidence/2026-07-21-source-available-commercial-licensing.md",
 };
@@ -128,6 +128,16 @@ assert.match(validateLicenseGateProjection(leaked, { channel: "neutral-public", 
 const openNested = { ...publicGate.projection, result: { ...publicGate.projection.result, extra: true } };
 assert.match(validateLicenseGateProjection(openNested, { channel: "neutral-public", candidate: candidates["neutral-public"] }).join("\n"), /result shape|projection digest/);
 assert.equal(buildLicenseGateReceipt({ channel: "private", candidate: candidates.private, surfaces: [{ ...surfaces[0], sha256: "0".repeat(64) }, ...surfaces.slice(1)], command: ["node", "harness/scripts/check-license-contract.mjs"], result: { status: "failed", exitCode: 1 } }).ok, false);
+
+const approvedSurfaceFixture = mkdtempSync(join(tmpdir(), "license-approved-surfaces-"));
+for (const path of SNT1_LICENSE_SURFACES.map(({ path: surfacePath }) => surfacePath)) {
+  const target = join(approvedSurfaceFixture, path);
+  mkdirSync(dirname(target), { recursive: true });
+  copyFileSync(join(process.cwd(), path), target);
+}
+assert.deepEqual(validateLiveLicenseSurfaces(approvedSurfaceFixture), []);
+writeFileSync(join(approvedSurfaceFixture, "README.md"), "drift");
+assert.match(validateLiveLicenseSurfaces(approvedSurfaceFixture).join("\n"), /drift from the approved SNT-1 digest set/);
 
 assert.deepEqual(validateSnt1EvidenceRecords({ privacy: privacyRecord, licensing: licensingRecord, result: evidenceResult }), []);
 const privacyTamper = structuredClone(privacyRecord); privacyTamper.approvalText += " tampered";

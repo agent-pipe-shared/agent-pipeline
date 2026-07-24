@@ -28,7 +28,7 @@ test("closed launcher reads the V3 opt-out authority and constructs one native c
     },
   });
   assert.equal(code, 0);
-  assert.equal(captured.advisorExport, null);
+  assert.deepEqual(captured.advisorExport, { consent: "approved" });
   assert.equal(captured.runner, "codex");
   assert.equal(captured.question, "Which bootstrap boundary is safe?");
   assert.equal(captured.dispatch.queueRevision, 2);
