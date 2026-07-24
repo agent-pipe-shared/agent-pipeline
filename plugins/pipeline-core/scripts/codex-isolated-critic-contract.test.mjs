@@ -63,6 +63,7 @@ class MemoryPersistence {
     this.replaceCount = 0;
     this.artifactWriteCount = 0;
     this.conflictNextReplace = false;
+    this.directoryDurability = "confirmed";
   }
 
   ensureDirectory(path) {
@@ -90,6 +91,7 @@ class MemoryPersistence {
     if (this.files.has(path)) throw new Error(`existing memory file ${path}`);
     this.directories.add(dirname(path));
     this.files.set(path, Buffer.from(bytes));
+    return this.directoryDurability;
   }
 
   replace(path, expectedRawSha256, bytes) {
@@ -104,12 +106,14 @@ class MemoryPersistence {
     assert.ok(current.length > 0);
     this.files.set(path, Buffer.from(bytes));
     this.replaceCount += 1;
+    return this.directoryDurability;
   }
 
   writeArtifactExclusive(path, bytes) {
     if (this.files.has(path)) throw new Error(`existing memory artifact ${path}`);
     this.files.set(path, Buffer.from(bytes));
     this.artifactWriteCount += 1;
+    return this.directoryDurability;
   }
 }
 
@@ -475,6 +479,17 @@ test("an injected CAS race is detected before replacement", (t) => {
     () => recordOutputObservation(state.context, { stream: "stdout", startOffset: 0, chunkSha256: H.evidence, byteLength: 1 }, { clock: state.clock }),
     { code: "F3-CAS" },
   );
+});
+
+test("reduced directory durability remains typed through isolated-Critic journal creation and mutation", (t) => {
+  const state = setupMemory(t);
+  state.persistence.directoryDurability = "unavailable";
+  const request = makeRequest(state.fixture, { dispatchNonce: "a".repeat(32) });
+  const created = createJournal({ commonDir: state.fixture.commonDir, request, inputRoot: state.fixture.inputRoot, persistence: state.persistence, clock: () => 2_000 });
+  assert.equal(created.directoryDurability, "unavailable");
+  const context = { commonDir: state.fixture.commonDir, dispatchNonce: request.dispatchNonce, persistence: state.persistence };
+  const progressed = advanceLifecycle(context, "sandbox-started", H.evidence, { clock: () => 2_001 });
+  assert.equal(progressed.directoryDurability, "unavailable");
 });
 
 test("crash after verdict-file write still forbids a second model run", (t) => {

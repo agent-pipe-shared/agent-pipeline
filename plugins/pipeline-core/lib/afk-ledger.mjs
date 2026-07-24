@@ -429,8 +429,9 @@ function defaultFsyncDirectory(path) {
 function fsyncDirectory(path, { platform, syncDirectory }) {
   try {
     syncDirectory(path);
+    return "confirmed";
   } catch (error) {
-    if (unsupportedDirectoryDurability(error, platform)) return;
+    if (unsupportedDirectoryDurability(error, platform)) return "unavailable";
     throw error;
   }
 }
@@ -476,7 +477,7 @@ export function appendAfkLedgerRecord({
     fsyncFile(temporary);
     fault?.("after-file-fsync", { temporary, destination, record });
     linkSync(temporary, destination);
-    fsyncDirectory(loaded.paths.generations, resolved);
+    const directoryDurability = fsyncDirectory(loaded.paths.generations, resolved);
     fault?.("after-directory-fsync", { temporary, destination, record });
     unlinkSync(temporary);
     return {
@@ -487,6 +488,7 @@ export function appendAfkLedgerRecord({
       sequence: record.sequence,
       headSha256: framed.recordHash,
       generation: destination,
+      ...(directoryDurability === "unavailable" ? { directoryDurability } : {}),
     };
   } catch (error) {
     return fail("AFK-LEDGER-PUBLISH-FAILED", error?.code ?? null, existsSync(destination) ? "wal" : "none");
@@ -508,7 +510,7 @@ function createExclusiveLock(path, owner, io = {}) {
   writeFileSync(path, canonicalJsonFile(owner), { flag: "wx", mode: 0o600 });
   chmodSync(path, 0o600);
   fsyncFile(path);
-  fsyncDirectory(dirname(path), resolved);
+  return fsyncDirectory(dirname(path), resolved);
 }
 
 export function acquireAfkWriterLock({
@@ -524,8 +526,8 @@ export function acquireAfkWriterLock({
   let paths;
   try { paths = afkLedgerPaths(gitCommonDir, activationId); } catch { return fail("AFK-LEDGER-PATH-UNSAFE"); }
   try {
-    createExclusiveLock(paths.writerLock, owner, io);
-    return { ok: true, mutation: "lock", owner, path: paths.writerLock };
+    const directoryDurability = createExclusiveLock(paths.writerLock, owner, io);
+    return { ok: true, mutation: "lock", owner, path: paths.writerLock, ...(directoryDurability === "unavailable" ? { directoryDurability } : {}) };
   } catch (error) {
     if (error?.code !== "EEXIST") return fail("AFK-WRITER-LOCK-FAILED");
   }
@@ -554,8 +556,8 @@ export function acquireAfkWriterLock({
     if (!tombstone || tombstone.ok !== true) return fail("AFK-WRITER-RECOVERY-UNRECORDED");
     if (readFileSync(paths.writerLock, "utf8") !== existing.raw) return fail("AFK-WRITER-LOCK-RACE", null, "wal");
     unlinkSync(paths.writerLock);
-    createExclusiveLock(paths.writerLock, owner, io);
-    return { ok: true, mutation: "wal+lock", recovered: existing.value, owner, path: paths.writerLock };
+    const directoryDurability = createExclusiveLock(paths.writerLock, owner, io);
+    return { ok: true, mutation: "wal+lock", recovered: existing.value, owner, path: paths.writerLock, ...(directoryDurability === "unavailable" ? { directoryDurability } : {}) };
   } catch (error) {
     return fail(error?.code?.startsWith?.("AFK-") ? error.code : "AFK-WRITER-RECOVERY-FAILED", null, "unknown");
   } finally {
@@ -570,8 +572,8 @@ export function releaseAfkWriterLock(lock, io = {}) {
     const current = parseLock(lock.path, io);
     if (current === null || current.value.ownerNonce !== lock.owner.ownerNonce) return fail("AFK-WRITER-LOCK-OWNER-MISMATCH");
     unlinkSync(lock.path);
-    fsyncDirectory(dirname(lock.path), resolved);
-    return { ok: true, mutation: "lock-release" };
+    const directoryDurability = fsyncDirectory(dirname(lock.path), resolved);
+    return { ok: true, mutation: "lock-release", ...(directoryDurability === "unavailable" ? { directoryDurability } : {}) };
   } catch {
     return fail("AFK-WRITER-LOCK-RELEASE-FAILED");
   }

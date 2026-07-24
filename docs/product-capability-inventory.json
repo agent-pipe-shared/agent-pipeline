@@ -1043,6 +1043,12 @@
       "member": "stop-suggest-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:symlink-capability-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "symlink-capability-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:validate-manifest",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1540,6 +1546,7 @@
         "verify-phase:harness/scripts/verify.mjs:state-budget-tests",
         "verify-phase:harness/scripts/verify.mjs:statusline-context-tests",
         "verify-phase:harness/scripts/verify.mjs:stop-suggest-tests",
+        "verify-phase:harness/scripts/verify.mjs:symlink-capability-tests",
         "verify-phase:harness/scripts/verify.mjs:validate-manifest",
         "verify-phase:harness/scripts/verify.mjs:validate-manifest-tests",
         "verify-phase:harness/scripts/verify.mjs:windows-private-state-tests",

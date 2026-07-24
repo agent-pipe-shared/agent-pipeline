@@ -217,6 +217,7 @@ test("unsupported directory-entry fsync on native Windows is an honest reduced-d
     io: secureWindowsIo({ syncDirectory: unsupported }),
   });
   assert.equal(result.ok, true);
+  assert.equal(result.directoryDurability, "unavailable");
   assert.deepEqual(stages, ["after-file-fsync", "after-directory-fsync"]);
   const loaded = loadAfkLedger(gitCommonDir, ACTIVATION, secureWindowsIo());
   assert.equal(loaded.ok, true);
@@ -253,8 +254,10 @@ test("writer lock acquire and release succeed despite unsupported directory-entr
   const io = secureWindowsIo({ syncDirectory: () => { throw Object.assign(new Error("EPERM"), { code: "EPERM" }); } });
   const acquired = acquireAfkWriterLock({ gitCommonDir, activationId: ACTIVATION, owner: owner(), io });
   assert.equal(acquired.ok, true);
+  assert.equal(acquired.directoryDurability, "unavailable");
   const released = releaseAfkWriterLock(acquired, io);
   assert.equal(released.ok, true);
+  assert.equal(released.directoryDurability, "unavailable");
 });
 
 test("a generation file failing native Windows DACL/owner assurance fails the ledger load closed, and an unavailable observation fails closed the same way", () => {

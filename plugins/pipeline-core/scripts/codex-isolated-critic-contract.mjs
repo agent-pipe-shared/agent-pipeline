@@ -298,8 +298,9 @@ function openAndFsyncDirectory(path) {
 function fsyncDirectory(path, platform = process.platform) {
   try {
     openAndFsyncDirectory(path);
+    return "confirmed";
   } catch (error) {
-    if (unsupportedDirectoryDurability(error, platform)) return;
+    if (unsupportedDirectoryDurability(error, platform)) return "unavailable";
     throw error;
   }
 }
@@ -358,7 +359,7 @@ function writeExclusiveFile(path, bytes) {
     writeFileSync(fd, bytes);
     fsyncSync(fd);
   } finally { closeSync(fd); }
-  fsyncDirectory(dirname(path));
+  return fsyncDirectory(dirname(path));
 }
 
 export const filePersistence = Object.freeze({
@@ -369,16 +370,16 @@ export const filePersistence = Object.freeze({
     assertPrivateFile(path);
     return readFileSync(path);
   },
-  createExclusive(path, bytes) { writeExclusiveFile(path, bytes); },
+  createExclusive(path, bytes) { return writeExclusiveFile(path, bytes); },
   replace(path, expectedRawSha256, bytes) {
     const current = this.read(path);
     if (sha256(current) !== expectedRawSha256) fail("F3-CAS", "journal changed before atomic replacement");
     const temporary = join(dirname(path), `.journal.${process.pid}.${randomBytes(6).toString("hex")}.tmp`);
     writeExclusiveFile(temporary, bytes);
     renameSync(temporary, path);
-    fsyncDirectory(dirname(path));
+    return fsyncDirectory(dirname(path));
   },
-  writeArtifactExclusive(path, bytes) { writeExclusiveFile(path, bytes); },
+  writeArtifactExclusive(path, bytes) { return writeExclusiveFile(path, bytes); },
 });
 
 export function dispatchPaths(commonDir, dispatchNonce) {
@@ -595,8 +596,8 @@ export function createJournal({ commonDir, request, inputRoot, persistence = fil
   };
   validateJournal(journal);
   const raw = Buffer.from(canonicalJson(journal));
-  persistence.createExclusive(paths.journal, raw);
-  return { journal, rawSha256: sha256(raw), paths };
+  const directoryDurability = persistence.createExclusive(paths.journal, raw);
+  return { journal, rawSha256: sha256(raw), paths, ...(directoryDurability === "unavailable" ? { directoryDurability } : {}) };
 }
 
 export function loadJournal(context) {
@@ -624,8 +625,8 @@ function mutateJournal(context, mutation, clock = Date.now) {
   next.updatedAtMs = observedAtMs;
   validateJournal(next);
   const raw = Buffer.from(canonicalJson(next));
-  context.persistence.replace(loaded.paths.journal, loaded.rawSha256, raw);
-  return { journal: next, raw, rawSha256: sha256(raw), paths: loaded.paths, outcome };
+  const directoryDurability = context.persistence.replace(loaded.paths.journal, loaded.rawSha256, raw);
+  return { journal: next, raw, rawSha256: sha256(raw), paths: loaded.paths, outcome, ...(directoryDurability === "unavailable" ? { directoryDurability } : {}) };
 }
 
 function appendEvent(journal, type, body, observedAtMs) {

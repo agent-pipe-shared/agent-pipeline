@@ -21,21 +21,23 @@ function check(name, condition, detail = "") {
   }
 }
 
-function fakeFs({ failWith = null } = {}) {
+function fakeFs({ failWith = null, failAt = "symlink" } = {}) {
   const calls = [];
   return {
     calls,
     fs: {
       mkdtempSync(prefix) {
         calls.push(["mkdtempSync", prefix]);
+        if (failWith && failAt === "mkdtemp") throw failWith;
         return `${prefix}fixture`;
       },
       writeFileSync(path) {
         calls.push(["writeFileSync", path]);
+        if (failWith && failAt === "write") throw failWith;
       },
       symlinkSync(target, path) {
         calls.push(["symlinkSync", target, path]);
-        if (failWith) throw failWith;
+        if (failWith && failAt === "symlink") throw failWith;
       },
       rmSync(path) {
         calls.push(["rmSync", path]);
@@ -77,7 +79,15 @@ function fakeFs({ failWith = null } = {}) {
   } catch (error) {
     threw = error;
   }
-  check("SC05 an unrelated error class is rethrown, never swallowed as a capability gap", threw === enospc);
+check("SC05 an unrelated error class is rethrown, never swallowed as a capability gap", threw === enospc);
+}
+
+for (const failAt of ["mkdtemp", "write"]) {
+  const eperm = Object.assign(new Error(`EPERM during ${failAt}`), { code: "EPERM" });
+  const { fs } = fakeFs({ failWith: eperm, failAt });
+  let threw = null;
+  try { probeSymlinkCapability({ fs, tmpRoot: "/tmp" }); } catch (error) { threw = error; }
+  check(`SC05-${failAt} preserves EPERM outside the actual symlink operation`, threw === eperm);
 }
 
 {

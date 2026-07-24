@@ -10,9 +10,10 @@
  *   into one tested primitive so Full Verify's "no hidden skips" requirement
  *   has a single place to hold: the probe result is typed (available vs. an
  *   explicit, named reason), it is never a blanket try/catch — only EPERM and
- *   EACCES are treated as "capability unavailable"; any other error (disk
- *   full, permission-denied-for-an-unrelated-reason, etc.) is a real defect
- *   and is rethrown, not swallowed.
+ *   EACCES from the actual symlink operation are treated as capability
+ *   unavailable. Temporary-directory setup and target writes always surface
+ *   their real error, including EPERM/EACCES, rather than suppressing a broken
+ *   fixture environment as a missing symlink capability.
  *
  * USAGE
  *   import { symlinkCapability, symlinkSkip } from "../lib/symlink-capability.mjs";
@@ -37,16 +38,18 @@ export function probeSymlinkCapability({
   try {
     probeDir = fs.mkdtempSync(join(tmpRoot, "symlink-capability-probe-"));
     fs.writeFileSync(join(probeDir, "target"), "x");
-    fs.symlinkSync(join(probeDir, "target"), join(probeDir, "link"));
-    return { available: true, reason: null };
-  } catch (error) {
-    if (CAPABILITY_ERROR_CODES.has(error?.code)) {
-      return {
-        available: false,
-        reason: `symlink unavailable (${error.code}): enable Windows Developer Mode or run elevated`,
-      };
+    try {
+      fs.symlinkSync(join(probeDir, "target"), join(probeDir, "link"));
+      return { available: true, reason: null };
+    } catch (error) {
+      if (CAPABILITY_ERROR_CODES.has(error?.code)) {
+        return {
+          available: false,
+          reason: `symlink unavailable (${error.code}): enable Windows Developer Mode or run elevated`,
+        };
+      }
+      throw error;
     }
-    throw error;
   } finally {
     if (probeDir) {
       try {
