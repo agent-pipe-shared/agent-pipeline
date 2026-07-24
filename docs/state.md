@@ -453,6 +453,48 @@ authoritative view of backlog reality for the Cyborg runner.
   (recorded PRD exception); mid-session the PO switched to Opus 4.8/high after
   a credit-limit reset. The design-phase exception is unaffected.
 
+#### Cyborg PO gate PASSED + decision D reframed (Windows baseline) — 2026-07-24
+
+- **EL-19 gate: APPROVED by the PO on 2026-07-24** for the Sprint Cyborg Epic
+  PRD (`specs/2026-07-24-sprint-cyborg-epic/prd_cyborg-epic.md`, branch head at
+  approval time). Decisions A/B/C/E: confirmed as written (nine-issue scope; CYB
+  slicing + Phases I–IV incl. CYB-1F checkpoint; per-package profiles at
+  dispatch; deviation catalog D1–D10). Implementation may now be dispatched
+  under EL-16 (delegate-first) — CYB-0 scaffolding is the first step and clears
+  the stale Sentinel stop-hook by switching feature-state via the sanctioned
+  `pipeline-state.mjs` writer.
+- **Decision D was reframed by the PO,** not answered as (i)/(ii). PO directive
+  2026-07-24: the native-Windows verify baseline should be made green *here* so
+  a normal push works again — the PO is confident v0.4.1 already carries the
+  Windows fixes (implemented differently than the discarded Sentinel line) and
+  that the red suites are a **stale/un-bootstrapped working-checkout artifact**,
+  not missing code. No `0.4.2` on main and no archive resurrection unless a real
+  gap is proven; any genuine residual improvement folds into Cyborg (not a main
+  side-track).
+- **Git evidence gathered (read-only, 2026-07-24):** the eight Sentinel
+  Windows-fix commits live ONLY in `archive/public-sentinel-windows-34-37-close-20260724`
+  (`git cherry main <tag>` → all eight `+`). That archive tag is **divergent —
+  it predates v0.4.1** (`merge-base 9ae4bf8`; v0.4.1 `81cc5f1` is NOT an
+  ancestor); the `v0.4.1→archive` diff is a net **deletion** of v0.4.1 overlay
+  work (`private-overlay-activation.e2e.test.mjs`, `check-artifact-topology.mjs`,
+  the authenticated authority-update flow). Therefore **merging the archive is
+  destructive** and a cherry-pick would conflict on the overlay/advisory files
+  both lines touch. Live remote: `main` AND `feat/sprint-nova-codex` are BOTH at
+  `81cc5f1` (v0.4.1) — Nova has not advanced on the remote, and Nova does not
+  carry the Windows fixes either. Conclusion: archive integration is the wrong
+  tool; the question reduces to whether v0.4.1 itself is green on this host.
+- **Empirical test underway:** this checkout has **no root `package.json`, no
+  lockfile, `node_modules` absent** — the repo runs `node --test`/built-ins, so
+  "bootstrap" here is `setup.mjs` + regenerated state, not `npm ci`. A
+  bootstrap-inclusive `verify.mjs` run on this host (v0.4.1 code + docs-only
+  Cyborg commits) is in progress and passing suites so far, including explicit
+  win32 capability narrowing — consistent with the PO's hypothesis. Awaiting the
+  exit code + `evidence/verify-latest.json` before declaring D resolved. If
+  green: D is closed as an environment artifact (normal push works after a clean
+  bootstrap); update PRD decision D and the "native-Windows baseline RED" note
+  above. If still red: capture per-suite signatures and scope a bounded fix as a
+  Cyborg assurance slice.
+
 ### 2026-07-24 release-candidate checkpoint — authoritative latest
 
 The PO has dispositioned all Sentinel/HAW-E implementation and tests as
