@@ -655,6 +655,58 @@ authoritative view of backlog reality for the Cyborg runner.
   fix for the `PCR-CONTINUITY-MISSING` finding above (a fresh `continuity` block
   gets written for the correct feature going forward).
 
+#### CYB-0 done; recording planApproved surfaced two new native-Windows candidates for the assurance slice — 2026-07-24
+
+- **CYB-0 landed:** `activeFeature` switched to `sprint-cyborg-epic`/phase
+  `design` (commit `57cbb59`). `set-feature` resets `planApproved` to `false` by
+  design (clean slate per feature) — recording the PO's already-given 2026-07-24
+  approval in machine state is a separate, purely mechanical follow-up
+  (`pipeline-state.mjs approve-plan`), **not yet done** — see below.
+- **`approve-plan` is blocked on this host by a genuine PO-gate-authority receipt
+  gap, confirmed to be native-Windows-environment, not a Cyborg-code issue:**
+  1. **CONFIRMED bug — case-sensitivity in `resolvePoGateRepositoryTopology`**
+     (`plugins/pipeline-core/lib/po-gate-authority.mjs:320-337`): it does
+     `start = realpathSync(resolve(repoRoot))` and compares it by strict string
+     equality against `git rev-parse --show-toplevel`'s output. On this host the
+     Bash-tool session's cwd is the case-insensitive alias
+     `D:\dev\agent-pipeline-share` (lowercase "dev"), while the directory's
+     actual on-disk case is `D:\Dev\agent-pipeline-share` — `git` case-corrects
+     its toplevel report, Node's `realpathSync` does not (reproduced directly:
+     invoking from the lowercase-cased cwd throws `"repository root mismatch"`;
+     the identical call from a correctly-cased cwd (PowerShell tool, whose
+     session cwd already carries the canonical capital-D case) succeeds). Fold
+     into the assurance slice: the topology check needs a case-insensitive (or
+     realpath-normalized-both-sides) comparison on Windows.
+  2. **UNCONFIRMED — `PO-PROFILE-RECEIPT-INVALID` immediately after a successful
+     publish.** Running `node setup.mjs --publish-po-profile` from the
+     correctly-cased PowerShell cwd (working around #1) exits 0 ("Repository-
+     scoped PO profile receipt published for language en."), but the very next
+     `check-po-gate-authority.mjs` call (same shell, same cwd) rejects the
+     receipt as "missing, unsafe, noncanonical or malformed." Root cause not
+     isolated (deliberately not chased further — see below); plausibly the same
+     already-catalogued native-Windows DACL/durability gap
+     (`afk-ledger`/`advisory-host-bridge`/`codex-isolated-critic-contract`)
+     resurfacing in `windows-private-state.mjs`'s directory/file hardening for
+     this new receipt path, rather than a distinct third bug. Needs a real
+     investigation pass (not more ad-hoc CLI retries) as part of the slice.
+  3. **Stopped deliberately at this depth** (advisor-flagged rabbit-hole risk):
+     further source-diving to hand-isolate/fix #2 live would mean writing
+     production code as the Elephant (EL-01) with no scope decision yet — the
+     fix belongs to the assurance slice's Goldfish dispatch, not to this
+     session's ad-hoc debugging.
+- **Consequence, stated plainly:** this host currently fails its own machine
+  gates for native-Windows reasons in **two** places with the same shape — the
+  push evidence-freshness gate (decision D, above) and now the PO-gate-authority
+  receipt (`approve-plan`). Symmetric evidence for the assurance slice's
+  justification; does not block design-phase work.
+- **Not on the critical path right now:** `planApproved` only gates *Goldfish
+  implementation dispatch* (`guard-devplan`), not design-phase authoring. The
+  actually-unblocked next action is scoping the Windows/sandbox-assurance slice
+  itself (design-phase Elephant work) — `approve-plan` gets retried once that
+  slice is ready to dispatch, ideally after its own fix for finding #2 lands
+  (or, short-term, by running it from a correctly-cased PowerShell session as a
+  workaround for #1 alone, if approval is needed sooner).
+
 ### 2026-07-24 release-candidate checkpoint — authoritative latest
 
 The PO has dispositioned all Sentinel/HAW-E implementation and tests as
