@@ -67,18 +67,18 @@ did not imply it.
 
 The candidate-bound licensing and privacy dispositions, the private and
 neutral-public sanitized license-gate projections, and the SNT-1 Result are
-historical evidence recorded under `backlog/evidence/` for that same frozen
-candidate. They bind the seven governing license surfaces as they existed at
-freeze, including the approved SUL-1.0 plus Agent-Pipeline Additional
-Permission and cumulative DCO/Contributor-personal CLA semantics. Because
-`docs/licensing.md` changed after that freeze, the live seven-surface set is
-not covered by those records. This document makes no current
-licensing/privacy disposition or release claim: release consumption awaits a
-newly frozen candidate and a new named-human licensing/privacy review. The
-exact evidence and sanctioned construction path are recorded in
+recorded under `backlog/evidence/` for frozen candidate
+`79a2c9b0b979d171d69217df6493db8cc75b9484`, tree
+`9fc4320bf00c0af7a08304c8afeeb2014c083508`. They bind the seven governing
+license surfaces as they existed at that freeze, including the approved SUL-1.0
+plus Agent-Pipeline Additional Permission and cumulative DCO/Contributor-
+personal CLA semantics. The historical `f83803c` privacy sign-off above does
+not substitute for the separately recorded `79a2c9b` disposition. This
+document makes no release claim: any later change to one of the seven surfaces
+requires a newly frozen candidate and a new named-human licensing/privacy
+review. The exact evidence and sanctioned construction path are recorded in
 [`snt-1-activation-prerequisite.md`](../specs/2026-07-19-sprint-sentinel-epic/snt-1-activation-prerequisite.md).
-The historical closed backlog record is not rewritten or treated as current
-evidence.
+The historical closed backlog record is not rewritten.
 
 The PO has represented for this candidate that all current project-authored
 content is 100% owner-controlled and that no external code is known to be
