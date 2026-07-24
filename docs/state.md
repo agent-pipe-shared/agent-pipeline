@@ -493,24 +493,167 @@ authoritative view of backlog reality for the Cyborg runner.
   reload/checkout). This repo has **no root `package.json`, no lockfile,
   `node_modules` absent** — it runs `node --test`/built-ins, so "bootstrap" is
   `setup.mjs` + regenerated state, not `npm ci`.
-- **First verify run (main checkout) is NOT decisive — it drifted.** The
-  evidence at `evidence/verify-latest.json` shows `"binding":"drift"` (start
-  `31056ee` → finish `1124be8`) because a progress commit landed mid-run; the
-  12th red is `candidate-binding` itself, and several others (security-scan,
-  guard-push, repository-freshness, feature-package-topology) bind to a stable
-  candidate and fail on drift. So the 11/12 reds there may be drift artifacts,
-  not real v0.4.1 failures — do not cite that run as proof of a red baseline.
-- **Authoritative test running:** a **pristine detached worktree at v0.4.1**
-  under `D:/dev/ap-v041-verify` (clean tree, no commits during the run) is
-  executing a full `verify.mjs`; output → `D:/dev/ap-v041-verify/run.log`,
-  per-step exitCodes → that worktree's `evidence/verify-latest.json` (isolated
-  from the main checkout). **This is the honest test of the PO's "fresh
-  bootstrap is green" hypothesis.** On completion: read run.log + that evidence.
-  Green ⇒ D closed as an accumulated-working-dir artifact (normal push works;
-  update PRD decision D and the RED note above). Still red ⇒ extract the real
-  per-suite signatures from run.log and scope a bounded Cyborg assurance slice.
-  **Cleanup after:** `git worktree remove /d/dev/ap-v041-verify`. Evidence per
-  step is only `{name, exitCode}` — failure detail lives in run.log.
+- **RESOLVED 2026-07-24 — the real push blocker is the evidence-freshness
+  push-gate, NOT a Windows/DACL/PATH failure directly.** A real
+  `git push --dry-run origin feat/sprint-cyborg-claude` (guard-push runs as a
+  PreToolUse guard on the actual push; there is no installed `.git/hooks/pre-push`)
+  is BLOCKED by `guard-push` with 5 findings: (1) `evidence/verify-latest.json`
+  `exitCode=1` (expected 0); (2) that file's `commit=31056ee` is stale vs pushed
+  HEAD `8fef5a9`; (3) `evidence/security-latest.json` `commit=1124be8` stale;
+  (4)+(5) that file's candidate commit/tree ≠ pushed source. **Findings 2–5 are
+  pure staleness** (both evidence files are leftovers from the contaminated
+  mid-run commits) and self-clear on a clean verify/security re-run at HEAD.
+  **Finding 1 is the single hard blocker: verify must actually reach exitCode 0.**
+  The gate is working as designed — it refuses to push code that has no fresh,
+  green, candidate-bound evidence. So "make a normal push work again" ==
+  "produce a green `verify-latest.json` + `security-latest.json` bound to HEAD".
+- **Faithful fresh-bootstrap test (pristine detached worktree at v0.4.1,
+  `D:/dev/ap-v041-verify`, `setup.mjs` then full `verify.mjs`, no mid-run
+  commits):** `SETUP_EXIT=0` and the tree after setup was **clean** — the fresh
+  bootstrap is a no-op (v0.4.1 ships already-compiled configs), so bootstrap is
+  NOT the cause of red. `VERIFY_EXIT=1` = red, with **11 failing suites**:
+  afk-ledger (7/14), repository-freshness, codex-isolated-critic-contract,
+  guard-push (PG26a fixture), feature-package-topology, advisory-host-bridge,
+  codex-advisory-bootstrap, public-core-observation,
+  codex-private-overlay-activation, license-contract, security-scan. (A separate
+  clean no-setup pristine run also exited 1 — bootstrap changes nothing.)
+- **Root-cause classification of the 11 reds (this decides scope):**
+  - **Likely non-durable stale-shell / session-launch artifacts (per our own
+    CLAUDE.md "git missing from %PATH% = stale shell, not a defect"): NO code
+    fix, must be CONFIRMED in a normally-launched session before scoping any
+    work.** `security-scan` fails because native `gitleaks.exe` cannot find
+    `git` in the Windows `%PATH%` (git resolves only on the Git-Bash
+    `/mingw64/bin` path here); semgrep/osv unconfigured. `repository-freshness`
+    (core.sshCommand transport) is the same git-transport-env family. The three
+    Codex-host suites (`public-core-observation`,
+    `codex-private-overlay-activation`, `codex-advisory-bootstrap`) fail on a
+    **Claude** session with no Codex host record — confirm whether they are
+    host-gated or genuinely applicable.
+  - **Genuine, durable native-Windows DACL / owner / durability portability
+    gap — the ONLY real code work:** `afk-ledger` (7 fails: DACL/owner
+    assurance, immutable-generation privacy, lock-theft evidence — the
+    platform-narrow win32 fsync/EPERM tests already PASS), `advisory-host-bridge`
+    (`directoryDurability:null` → fail-closed), `codex-isolated-critic-contract`
+    (file mode 0600 / torn postimage on Windows). The archived (forbidden)
+    Sentinel line fixed exactly these suites by name — strong evidence they need
+    real code, not test tweaks. Fold a **fresh, bounded** native-Windows
+    assurance slice into Cyborg (no archive resurrection).
+  - **Brittle-test hygiene (defer, not real defects):** `license-contract`
+    asserts a hard-coded JS-source count (`384`) while the tree has `438` — yet
+    the real `license-contract-check` is GREEN ("349 sources; SUL-1.0");
+    `feature-package-topology` crashes on `false !== true` reading package
+    topology (sensitive to the legacy `sprint-sentinel-epic` specs in-tree).
+  - Note: `guard-push` PG26a ("anonymous-public transport must not override the
+    calibrated SSH host-alias path") is a **fixture** failure; the REAL origin is
+    `git@github-share:…` (a calibrated SSH host-alias — the good path), so PG26a
+    does not describe the real push block (see the evidence-gate finding above).
+- **Finalized roadmap to restore a normal push:**
+  1. Confirm the stale-shell/Codex-host reds vanish in a normally-launched
+     session (git on the Windows `%PATH%`, correct session runner). No code fix
+     if so — do NOT scope Cyborg work for a stale-shell artifact.
+  2. Fold the native-Windows DACL/durability assurance (3 suites) into Cyborg as
+     a fresh bounded slice (foundational scope decision → EL-04 register + PO
+     gate). Add the 2 brittle-test hygiene fixes.
+  3. Once `verify` reaches exitCode 0 at HEAD, run verify + security-scan at the
+     exact HEAD → fresh candidate-bound green evidence → guard-push allows a
+     normal push, permanently.
+  - **Interim escape hatch (in-release, not archive):** v0.4.1's `guard-push`
+    has a sanctioned `publication mode` — a typed PO authorization bound to the
+    exact `git [-C <root>] push --porcelain <remote> <candidate>:<full-ref>`
+    grammar — the intended PO-run path for an evidence-blocked branch. Heavy;
+    use only if a push is needed before verify is green.
+- **Cleanup:** remove the throwaway worktree with
+  `git worktree remove /d/dev/ap-v041-verify` once its run.log is no longer
+  needed (the archive-commit worktree `ap-sentinel-verify` was already removed).
+- **Step-1 confirmation (2026-07-24) — the shell matters, and the trusted-tool
+  gap is REAL (not stale-shell).** In native **PowerShell**, `git`, `gitleaks`
+  and `semgrep` all resolve on the Windows PATH (`D:\Dev\Git\Git\cmd\git.exe`
+  etc.), so the Git-Bash "git not found in %PATH%" is confirmed a **launch-shell
+  artifact**. BUT `security-scan.mjs` in PowerShell returns `Verdict: CLEAN
+  exit 0` only because gitleaks/semgrep are `SKIPPED [untrusted_path]` — their
+  install roots (`C:\Users\Andre\go\bin`, `…\.local\bin`) are outside the
+  **immutable** Windows allowlist in `plugins/pipeline-core/lib/trusted-tool-resolution.mjs`
+  (`withinWindowsRoots`), and there is **no env override** for the gitleaks/
+  semgrep paths (only the license-allowlist path is configurable). So CLEAN =
+  clean-because-skipped, not clean-because-scanned. **In a sandbox with a
+  sanitized PATH this degrades further** (git-not-found hard-error or silent
+  skip). This is a genuine, durable **#37-class trusted-tool-resolution gap**
+  (the file's own line-19 comment already references
+  `windows-trusted-tool-resolution-user-path-exception.md`) → **fold a fresh,
+  sandbox-safe trusted-tool resolution slice into Cyborg** (deterministic host/
+  sandbox tool discovery + trusted-path config so the scanners actually RUN).
+- **Neither shell yields a green verify on this host — the red-set is
+  shell-dependent.** Git-Bash faithful verify = **11 red** (all also red in
+  PowerShell — the shell-invariant core). PowerShell verify = **25 red** on a
+  **clean** worktree (0 modified, HEAD still `81cc5f1` — NOT contamination):
+  the extra 14 (`worktree-lifecycle`, `sandboxed-readonly-host-bridge`,
+  `codex-sandbox-select`, `session-power-cli/-cleanup`, `pipeline-state`,
+  `po-gate-*`, `document-identifier`, `private-document-binding`,
+  `release-version-plan`, `codex/claude-critic-host`) depend on POSIX-tool
+  spawns that native PowerShell can't resolve — the mirror image of the Git-Bash
+  Windows-exe problem. The shell-invariant **11-suite core** classifies as:
+  real native-Windows DACL/durability (afk-ledger, advisory-host-bridge,
+  codex-isolated-critic-contract) · trusted-tool/#37 (security-scan,
+  repository-freshness) · Codex-host-on-Claude-session (public-core-observation,
+  codex-private-overlay-activation, codex-advisory-bootstrap) · brittle tests
+  (feature-package-topology, license-contract) · fixture-only (guard-push
+  PG26a — the real origin uses the calibrated `github-share` alias, so it does
+  not describe the real push block). **Correction to the earlier "only 3 DACL +
+  2 brittle" scope: too optimistic** — making verify green on Windows is a
+  genuine cross-shell portability workstream, not a quick triage. Scope it as a
+  dedicated Cyborg assurance slice with controlled isolated per-suite runs, not
+  more ad-hoc worktree passes. Until it lands, a push here needs the sanctioned
+  `guard-push publication mode` (PO-run), not a normal push.
+
+#### Post-compact re-entry + PO decision: start the Windows/sandbox-assurance slice now — 2026-07-24
+
+- **Bootstrap re-entry executed** (compact-continuity contract, `harness/session-bootstrap.md`
+  §3/§6.1) after the `/compact` that interrupted the Step-1 confirmation work above:
+  loaded state = self-application checkout `HEAD 8fef5a9` (branch
+  `feat/sprint-cyborg-claude`); V3 source/runtime check clean (`node setup.mjs` →
+  `pipeline.user.v3` current, no writes, toolchain incl. gitleaks/semgrep/osv
+  reported "ready" — that check is the install/PATH probe, distinct from
+  `trusted-tool-resolution.mjs`'s stricter immutable-root allowlist, so it does not
+  contradict the Step-1 finding above); `CLAUDE_CODE_SUBAGENT_MODEL` unset (env-check
+  `status: clear`); staleness clean (local `main`/`origin/main` both `81cc5f1`, no
+  upstream drift, no 0.4.2 landed yet); verify gate present
+  (`harness/scripts/verify.mjs`). **Model note:** PO ran `/model` mid-session,
+  switching the main session to **Sonnet 5** (labelled PO exception to the
+  recorded Fable 5/xhigh → Opus 4.8/high design-phase route per MP-05/07).
+- **F5 crash-recovery scan:** one orphaned worktree remnant found —
+  `D:/Dev/ap-v041-verify` (detached at `81cc5f1`), the throwaway decision-D test
+  worktree; cleanup command already on file above, not yet run (kept for its logs).
+  No other WIP/in-flight-dispatch remnants.
+- **`PCR-CONTINUITY-MISSING` SessionStart signal investigated (not a new blocker):**
+  the post-compact reground hook (`plugins/pipeline-core/hooks/post-compact-reground.mjs`)
+  read `.claude/pipeline-state.json` and found no `continuity` key at all →
+  `dispatchEligibility: CS-INVALID`, `workResumptionAllowed: false`. Read the hook
+  and `plugins/pipeline-core/lib/continuity-state.mjs` source: this hook is
+  **non-blocking and writes nothing** ("Real hook boundary. It always exits zero and
+  never writes repository state") — its only job is to gate *silent auto-resume of
+  a persisted next action*. Since the committed `pipeline-state.json` is the same
+  stale v0.4.1/`sprint-sentinel-epic` content already diagnosed above (no
+  `continuity` block was ever written for it), there IS no persisted next action to
+  resume — so the missing-continuity finding is the same known stale-feature-state
+  fact, surfaced by newer tooling, not an additional gate on fresh, deliberate
+  dispatch. It does not block CYB-0.
+- **PO decision 2026-07-24 (supersedes the earlier (a)/(b) fork):** start the
+  Cyborg Windows/sandbox-assurance slice **now, in parallel** with the pending
+  `0.4.2` mini-fix release, rather than waiting to re-baseline against it first.
+  PO rationale: `0.4.2` only touches bootstrap/migration/first-install, which has
+  "hardly any overlap" with the native-Windows DACL/durability and sandbox-safe
+  trusted-tool-resolution work. This is accepted as the scoping call — a
+  cross-shell-portability rebaseline against `0.4.2` remains a cheap follow-up
+  once it lands (rebase `feat/sprint-cyborg-claude` onto it, per the PO's earlier
+  note), not a precondition to starting.
+- **Next action:** dispatch **CYB-0** (Goldfish, implementor tier) — the
+  already-approved first step under the passed EL-19 gate — to switch
+  `.claude/pipeline-state.json`'s `activeFeature` from the archived
+  `sprint-sentinel-epic` to `sprint-cyborg-epic` via the sanctioned
+  `harness/scripts/pipeline-state.mjs set-feature` writer (never a hand-edit).
+  This is both required scaffolding (clears the stale Sentinel stop-hook) and the
+  fix for the `PCR-CONTINUITY-MISSING` finding above (a fresh `continuity` block
+  gets written for the correct feature going forward).
 
 ### 2026-07-24 release-candidate checkpoint — authoritative latest
 
