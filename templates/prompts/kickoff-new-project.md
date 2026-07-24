@@ -13,27 +13,16 @@ answer-language footer — INSIDE the paste region by design (it must be part
 of the first pasted message), not a prompt-injection payload.
 
 USAGE (the PO)
-1. Before pasting: pick a session profile — **`Profile: advisor`**
-   ("Advisor (Cost/Quality)") — the design-tier model plus the advisor model
-   from session start (a continuous second opinion; MP-26) — or
-   **`Profile: design-first`** ("Design-first (Cost+/Quality+)"): the design
-   phase runs on a cost-optimized model at high effort, switching to the full
-   design-tier model at the PRD gate (MP-01). **Phase-aware `design-first`:**
-   if this session's design is ALREADY approved (the standard case for a later
-   follow-up execution session in this same project, rarely the birth session
-   itself), start DIRECTLY in the execution phase: the **design-tier model from
-   session start**, reserving the cheaper model for T1 critics/readiness
-   subagents; name the cost consequence explicitly (a higher tier active for a
-   whole post-design execution session dominates that session's cost). Cheat-
-   lines (role terms; shipped-default preset in parentheses — override the
-   model names in `pipeline.user.yaml`): `advisor` start = the design-tier
-   model + max effort + the advisor model (default: `/model opus` +
-   `/effort max` + your advisor); `design-first` (design not yet approved)
-   start = a cost-optimized model at high effort (`/effort xhigh`); gate: the
-   design-tier model + max effort (default `/model opus` + `/effort max`);
-   `design-first` (design already approved) start = the design-tier model +
-   max effort (default: `/model opus` + `/effort max`). A free-text answer to
-   the bootstrap's profile question is a PO exception.
+1. Before pasting: choose the V3 work profile that matches this topic —
+   **`Profile: epic`** (architecture/multi-block), **`Profile: feature`**
+   (bounded product change), or **`Profile: mini`** (small feature/hotfix;
+   hard light-process limits). The bootstrap resolves the current phase and
+   uses the registered `routing.profiles.<profile>.<phase>.<runner>` route from
+   `pipeline.user.v3`; do not choose a model or effort here. Advisory is a
+   separate runner-neutral V3 duty, not a profile: it is resolved by the
+   profile and consent rules (Epic/Feature enable it by default; Mini disables
+   it). A free-text answer to the bootstrap's profile question is a PO
+   exception.
 2. Fill the {{PLACEHOLDER}}s in section 0, paste the rest as the FIRST
    message in the new project's repo folder.
 3. One session = one topic; Step 4 onward, the handover file carries
@@ -95,11 +84,10 @@ first user request, not an invisible automatic initializer.
 It ends with three verbatim confirmation lines: the confirmation line
 ("Bootstrap check passed: ruleset <SHA> loaded · Project <name> · Calibration <file> · State <...> · Role <Elephant|Goldfish|Critic>"), the model/effort line (now also carrying
 `· Profile … · Advisor …`), and the role-prohibitions line (§1d/§6.1) — confirm
-model/effort match your chosen profile (`advisor`: design-tier model + advisor
-model from start; `design-first`: cost-optimized model pre-gate, or the
-design-tier model from session start if the design-already-approved phase-aware
-case applies) — or top effort only as the PO's named exception, MP-01 — and
-`CLAUDE_CODE_SUBAGENT_MODEL` unset (MP-04); if not, say so and stop.
+model/effort match the selected V3 profile and resolved phase on its registered
+route; confirm the separate Advisor duty was resolved under the V3 profile and
+consent rules — or name a PO exception — and `CLAUDE_CODE_SUBAGENT_MODEL`
+unset (MP-04); if not, say so and stop.
 **Same-day follow-ups** (same machine/day/SHA, no refresh since) use the
 light bootstrap instead (§6.4) — relevant from session 2 onward.
 

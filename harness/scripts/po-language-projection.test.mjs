@@ -85,4 +85,12 @@ for (const path of consumers) {
     assert.match(text, /first implementation dispatch|ersten Implementierungs-Dispatch/);
   });
 }
+check("new-project kickoff offers only V3 work profiles", () => {
+  const text = readFileSync(join(root, "templates/prompts/kickoff-new-project.md"), "utf8");
+  assert.match(text, /`Profile: epic`/);
+  assert.match(text, /`Profile: feature`/);
+  assert.match(text, /`Profile: mini`/);
+  assert.match(text, /Advisory is a\s+separate runner-neutral V3 duty, not a profile/);
+  assert.doesNotMatch(text, /Profile: (?:advisor|design-first)/);
+});
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);
