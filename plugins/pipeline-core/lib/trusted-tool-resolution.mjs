@@ -15,6 +15,12 @@ export const WINDOWS_SYSTEM_TOOL_ROOTS = Object.freeze([
   "D:\\Program Files\\Git\\cmd",
   "D:\\Program Files\\Git\\bin",
   "D:\\Program Files\\Git\\mingw64\\bin",
+  // PO exception 2026-07-24 (specs/2026-07-19-sprint-sentinel-epic/
+  // windows-trusted-tool-resolution-user-path-exception.md): this host's real
+  // Git install, not a general user-path allowance.
+  "D:\\Dev\\Git\\Git\\cmd",
+  "D:\\Dev\\Git\\Git\\bin",
+  "D:\\Dev\\Git\\Git\\mingw64\\bin",
   "D:\\Program Files\\Gitleaks",
   "D:\\Program Files\\OSV-Scanner",
   "D:\\Program Files\\Semgrep",

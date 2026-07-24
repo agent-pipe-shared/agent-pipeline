@@ -41,6 +41,8 @@ import {
   validateVerdictValue,
   writeReceipt,
 } from "./codex-isolated-critic-contract.mjs";
+import { symlinkSkip } from "../lib/symlink-capability.mjs";
+import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 
 const H = Object.freeze({
   dispatch: "1".repeat(32),
@@ -202,6 +204,21 @@ function exactObservation(request, { running = false, ...overrides } = {}) {
   };
 }
 
+/**
+ * Node synthesizes `.mode` on native Windows from the read-only attribute
+ * alone, so an exact-0600 mode-bit comparison is meaningless there (see
+ * `assertPrivateFile` in codex-isolated-critic-contract.mjs). On win32 this
+ * instead positively asserts the real DACL-secured state; on POSIX it keeps
+ * the exact mode-0600 assertion.
+ */
+function assertPrivateFileMode(path) {
+  if (process.platform === "win32") {
+    assert.equal(assessWindowsPrivatePath(path).status, "secure");
+  } else {
+    assert.equal(lstatSync(path).mode & 0o777, 0o600);
+  }
+}
+
 function claimsFixture() {
   const proven = (kind, locator) => ({
     state: "proven",
@@ -265,7 +282,7 @@ test("request binds exact ordered physical inputs and rejects closed-schema drif
   assert.throws(() => validateRequest(request, { inputRoot: fixture.inputRoot }), { code: "F3-INPUT-MATERIALIZATION" });
 });
 
-test("request materialization rejects symlinks and hard links", (t) => {
+test("request materialization rejects symlinks and hard links", { skip: symlinkSkip() }, (t) => {
   const fixture = disposable(t);
   const request = makeRequest(fixture);
   symlinkSync("spec.md", join(fixture.inputRoot, "alias.md"));
@@ -501,14 +518,14 @@ test("file persistence uses mode 0600 and refuses a torn postimage", (t) => {
   const fixture = disposable(t);
   const request = makeRequest(fixture);
   const created = createJournal({ commonDir: fixture.commonDir, request, inputRoot: fixture.inputRoot, clock: () => 1_000 });
-  assert.equal(lstatSync(created.paths.journal).mode & 0o777, 0o600);
+  assertPrivateFileMode(created.paths.journal);
 
   const context = { commonDir: fixture.commonDir, dispatchNonce: request.dispatchNonce, persistence: filePersistence };
   advanceLifecycle(context, "sandbox-started", H.evidence, { clock: () => 1_001 });
   advanceLifecycle(context, "thread-started", H.evidence, { clock: () => 1_002 });
   advanceLifecycle(context, "turn-started", H.evidence, { clock: () => 1_003 });
   recordVerdictBytes(context, Buffer.from(canonicalJson(verdictFor(request))), { clock: () => 1_004 });
-  assert.equal(lstatSync(created.paths.verdict).mode & 0o777, 0o600);
+  assertPrivateFileMode(created.paths.verdict);
 
   const torn = join(created.paths.directory, ".journal.fixture.tmp");
   writeFileSync(torn, "partial\n", { mode: 0o600 });

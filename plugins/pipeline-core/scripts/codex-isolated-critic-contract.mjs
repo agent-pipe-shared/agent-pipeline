@@ -14,7 +14,6 @@ import {
   existsSync,
   fsyncSync,
   lstatSync,
-  mkdirSync,
   openSync,
   readFileSync,
   readdirSync,
@@ -26,6 +25,8 @@ import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "nod
 import { fileURLToPath } from "node:url";
 
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
+import { PrivateBoundaryError, ensurePrivateDirectory } from "../lib/private-boundary.mjs";
+import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 
 export const REQUEST_SCHEMA = "pipeline.codex-isolated-critic-request.v1";
 export const JOURNAL_SCHEMA = "pipeline.codex-isolated-critic-journal.v1";
@@ -270,24 +271,84 @@ export function validateRequest(request, { inputRoot } = {}) {
   return request;
 }
 
-function fsyncDirectory(path) {
+/**
+ * Directory-entry durability is a hard POSIX flush but is not portably
+ * available on native Windows, where opening or fsync-ing a directory handle
+ * raises EPERM/EINVAL/EISDIR/EACCES/ENOTSUP. The regular-file flush that
+ * always precedes a directory-durability step is the hard durability
+ * guarantee here; parent-directory durability is therefore best-effort on
+ * Windows, and its typed-unavailable outcome is not a failure. A genuinely
+ * unexpected error is rethrown (never a blanket EPERM/EACCES catch). Mirrors
+ * the identical `unsupportedDirectoryDurability`/`fsyncDirectory` contract in
+ * afk-ledger.mjs (not exported there, so reproduced here narrowly with the
+ * exact same code set and win32-only gating).
+ */
+function unsupportedDirectoryDurability(error, platform) {
+  return platform === "win32"
+    && (error?.code === "EPERM" || error?.code === "EINVAL"
+      || error?.code === "EISDIR" || error?.code === "EACCES"
+      || error?.code === "ENOTSUP");
+}
+
+function openAndFsyncDirectory(path) {
   const fd = openSync(path, "r");
   try { fsyncSync(fd); } finally { closeSync(fd); }
 }
 
-function assertPrivateFile(path) {
-  const stat = lstatSync(path);
-  if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || (stat.mode & 0o077) !== 0) {
-    fail("F3-PERSISTENCE", `${basename(path)} is not a mode-0600 single-link regular file`);
+function fsyncDirectory(path, platform = process.platform) {
+  try {
+    openAndFsyncDirectory(path);
+  } catch (error) {
+    if (unsupportedDirectoryDurability(error, platform)) return;
+    throw error;
   }
 }
 
+/**
+ * Node synthesizes `.mode` on native Windows from the read-only attribute
+ * alone (group/other bits always mirror the owner bits, e.g. a writable file
+ * always reports 0666 regardless of chmod), so an exact-0600 comparison is
+ * meaningless there. On win32 this instead requires the shared native
+ * DACL/owner/reparse-point assurance -- for both the file and its parent
+ * directory -- to report "secure"; any other status (insecure, unavailable,
+ * unsupported) fails closed. Mirrors `assertPrivateRegularFile` in
+ * `../lib/private-boundary.mjs`, using this file's own `fail()`/error-code
+ * convention instead of `PrivateBoundaryError`. The POSIX branch (exact mode
+ * 0600) is unchanged.
+ */
+function assertPrivateFile(path) {
+  const stat = lstatSync(path);
+  const posixModeViolation = process.platform !== "win32" && (stat.mode & 0o077) !== 0;
+  if (stat.isSymbolicLink() || !stat.isFile() || stat.nlink !== 1 || posixModeViolation) {
+    fail("F3-PERSISTENCE", `${basename(path)} is not a mode-0600 single-link regular file`);
+  }
+  if (process.platform === "win32") {
+    const fileState = assessWindowsPrivatePath(path);
+    const parentState = assessWindowsPrivatePath(dirname(path));
+    if (fileState.status !== "secure" || parentState.status !== "secure") {
+      fail("F3-PERSISTENCE", `${basename(path)} Windows assurance is unavailable or insecure`);
+    }
+  }
+}
+
+/**
+ * Delegates directory creation and (on native Windows) DACL hardening to the
+ * shared `ensurePrivateDirectory` in `../lib/private-boundary.mjs`, which
+ * creates one path component at a time and hardens only the components it
+ * actually created -- a raced-in pre-existing component is re-assessed, never
+ * assumed-owned. `mkdirSync(path, { recursive: true })` cannot give this
+ * component-tracked guarantee, so it is not used here. Failures are re-thrown
+ * under this file's own `fail("F3-PERSISTENCE", ...)` convention instead of
+ * `PrivateBoundaryError`, so callers only ever observe this file's own error
+ * codes.
+ */
 function ensurePhysicalDirectory(path) {
-  let existing = path;
-  while (!existsSync(existing)) existing = dirname(existing);
-  if (realpathSync(existing) !== resolve(existing)) fail("F3-PERSISTENCE", "dispatch path crosses a symlink");
-  mkdirSync(path, { recursive: true, mode: 0o700 });
-  if (lstatSync(path).isSymbolicLink() || realpathSync(path) !== resolve(path)) fail("F3-PERSISTENCE", "dispatch directory is not physical");
+  try {
+    ensurePrivateDirectory(path);
+  } catch (error) {
+    if (error instanceof PrivateBoundaryError) fail("F3-PERSISTENCE", error.message);
+    throw error;
+  }
 }
 
 function writeExclusiveFile(path, bytes) {
