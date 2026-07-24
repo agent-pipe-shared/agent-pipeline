@@ -1127,6 +1127,12 @@
       "member": "project-authority-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-authority-migration-cli-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "project-authority-migration-cli-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1489,6 +1495,7 @@
         "verify-phase:harness/scripts/verify.mjs:private-overlay-bootstrap-status-tests",
         "verify-phase:harness/scripts/verify.mjs:private-overlay-runtime-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:product-capability-inventory-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-authority-migration-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:project-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
         "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",

@@ -165,6 +165,7 @@ const TEST_SUITES = [
   { name: "runtime-projection-v3-tests", file: join(libDir, "runtime-projection-v3.test.mjs") },
   { name: "runner-profile-migration-v3-tests", file: join(libDir, "runner-profile-migration-v3.test.mjs") },
   { name: "project-authority-tests", file: join(libDir, "project-authority.test.mjs") },
+  { name: "project-authority-migration-cli-tests", file: join(pluginScriptsDir, "project-authority-migration.test.mjs") },
   { name: "feature-package-topology-tests", file: join(libDir, "feature-package-topology.test.mjs") },
   { name: "human-role-label-tests", file: join(libDir, "human-role-labels.test.mjs") },
   { name: "human-role-rendering-tests", file: join(libDir, "human-role-rendering.test.mjs") },

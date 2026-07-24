@@ -64,3 +64,33 @@ been supplied by its authority-update flow.
 and unrelated user settings are preserved. The migration does not move local
 credentials, host settings, caches, or private coordinates into the consumer
 repository.
+
+## Neutral project authority migration
+
+Legacy project gates and lifecycle state may still live in
+`.claude/pipeline.yaml` and `.claude/pipeline-state.json`. Move that portable
+authority to the runner-neutral `project/` layer only through its separate,
+preview-first cutover:
+
+```sh
+node plugins/pipeline-core/scripts/project-authority-migration.mjs inspect --root /absolute/consumer/root
+node plugins/pipeline-core/scripts/project-authority-migration.mjs plan --root /absolute/consumer/root
+node plugins/pipeline-core/scripts/project-authority-migration.mjs apply --root /absolute/consumer/root --activate
+```
+
+`plan` writes nothing and reports only path/digest metadata. `apply` writes a
+sanitized pre-write preview to standard error before it can activate. The
+legacy files are retained for the compatibility reader; the neutral files are
+the only migration writes. A changed legacy source, changed neutral
+destination, mixed authority layer, or pending journal rejects activation.
+
+If an interrupted cutover leaves a journal, do not delete it or hand-copy its
+files. First inspect the recorded recovery, then explicitly activate it:
+
+```sh
+node plugins/pipeline-core/scripts/project-authority-migration.mjs recover --root /absolute/consumer/root
+node plugins/pipeline-core/scripts/project-authority-migration.mjs recover --root /absolute/consumer/root --activate
+```
+
+Recovery restores recorded preimages only after its own digest-bound preview;
+it never resumes an unreviewed write.
