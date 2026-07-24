@@ -758,6 +758,42 @@ authoritative view of backlog reality for the Cyborg runner.
   "Phase I ... Dependency spine: CYB-1F → all") — still Elephant design work,
   still no dispatch.
 
+#### AFK continuation — Phase I/II per-package feature specs drafted — 2026-07-25
+
+- Per the "Next AFK step" above, drafted checkable-form feature specs for
+  every Phase I and Phase II package (issue text fetched verbatim via
+  `gh issue view <N>` for each, read-only, then translated into an AC table
+  cross-checked against `backlog-acceptance-matrix.md`'s per-issue AC count):
+  [`cyb-1-feature-spec.md`](../specs/2026-07-24-sprint-cyborg-epic/cyb-1-feature-spec.md)
+  (#41, 14 ACs, includes the PO-waived-direct-implementation waiver class),
+  [`cyb-a0-feature-spec.md`](../specs/2026-07-24-sprint-cyborg-epic/cyb-a0-feature-spec.md)
+  (recovery-preview quickfix — honestly flags that no detailed Critic-findings
+  artifact exists locally, only a HISTORY.md prose summary, so a fresh Critic
+  pass is the correct first step rather than guessing at stale detail),
+  [`cyb-2-feature-spec.md`](../specs/2026-07-24-sprint-cyborg-epic/cyb-2-feature-spec.md)
+  (#42, 14 ACs + the 15-fixture test-first matrix; flags that CYB-2's L3
+  evaluator cannot finalize before CYB-1F's open decision F-3 is ratified —
+  an unstated cross-package dependency spec.md's package summary doesn't
+  spell out),
+  [`cyb-3-feature-spec.md`](../specs/2026-07-24-sprint-cyborg-epic/cyb-3-feature-spec.md)
+  (#39, 17 ACs / 14 counting single-/multi-ecosystem separately), and
+  [`cyb-4-feature-spec.md`](../specs/2026-07-24-sprint-cyborg-epic/cyb-4-feature-spec.md)
+  (#43, 12 ACs + 8-class fixture matrix; notes the assisted-analysis
+  prompt-injection-resistance requirement as cross-relevant to CYB-5).
+- Each committed as its own atomic docs-only commit
+  (`553eb64`, `bae6d9e`, `7540ce1`, `e533612`, `2bff611`). All remain
+  design-phase drafts: no schema registered, no Goldfish dispatched, no gate
+  claimed opened. Package-root migration to ADR-0045's canonical
+  `specs/<id>/` topology was deliberately NOT done — that migration needs its
+  own explicit lifecycle-approval decision per the ADR's own "Migration"
+  section, which is a separate foundational call left for the PO, not made
+  unilaterally overnight. These specs instead follow the existing in-epic-
+  folder convention already used for CYB-1F.
+- **Next AFK step:** continue into Phase III (CYB-5, CYB-6, CYB-7, CYB-8) in
+  the same pattern, budget/context permitting; if the session ends before
+  Phase III/IV are covered, that is an explicit, named gap for the PO's
+  morning review, not a silent stop.
+
 ### 2026-07-24 release-candidate checkpoint — authoritative latest
 
 The PO has dispositioned all Sentinel/HAW-E implementation and tests as
