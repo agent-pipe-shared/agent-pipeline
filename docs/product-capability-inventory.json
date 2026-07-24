@@ -857,18 +857,6 @@
       "member": "po-gate-authority-fixture-tests"
     },
     {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-guarded-edit-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "po-guarded-edit-tests"
-    },
-    {
-      "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-guarded-push-tests",
-      "kind": "verify-phase",
-      "path": "harness/scripts/verify.mjs",
-      "member": "po-guarded-push-tests"
-    },
-    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1522,8 +1510,6 @@
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
         "verify-phase:harness/scripts/verify.mjs:po-gate-authority-fixture-tests",
         "verify-phase:harness/scripts/verify.mjs:po-gate-profile-publisher-tests",
-        "verify-phase:harness/scripts/verify.mjs:po-guarded-edit-tests",
-        "verify-phase:harness/scripts/verify.mjs:po-guarded-push-tests",
         "verify-phase:harness/scripts/verify.mjs:po-language-projection-check",
         "verify-phase:harness/scripts/verify.mjs:po-language-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:post-compact-reground-tests",

@@ -162,8 +162,6 @@ const TEST_SUITES = [
   { name: "critic-bare-tests", file: join(pluginScriptsDir, "critic-bare.test.mjs") },
   { name: "codex-critic-host-tests", file: join(pluginScriptsDir, "codex-critic-host.test.mjs") },
   { name: "codex-isolated-critic-contract-tests", file: join(pluginScriptsDir, "codex-isolated-critic-contract.test.mjs") },
-  { name: "po-guarded-edit-tests", file: join(pluginScriptsDir, "po-guarded-edit.test.mjs") },
-  { name: "po-guarded-push-tests", file: join(pluginScriptsDir, "po-guarded-push.test.mjs") },
   { name: "claude-critic-host-tests", file: join(pluginScriptsDir, "critic-claude-host.test.mjs") },
   { name: "continuity-host-adapter-tests", file: join(libDir, "continuity-host-adapter.test.mjs") },
   { name: "continuity-state-tests", file: join(libDir, "continuity-state.test.mjs") },

@@ -2,9 +2,8 @@
 
 ## Scope and authorization boundary
 
-This document covers the sanctioned writers that admit the five Sentinel
-Windows blocker records and the PO-run protected-edit and non-main push routes.
-Their inputs are untrusted until
+This document covers the sanctioned writer that admits the five Sentinel
+Windows blocker records. Its input is untrusted until
 `applySentinelScopeExtension` validates it. The writer may create only the
 five `open` defect records named in
 `specs/2026-07-19-sprint-sentinel-epic/windows-blockers-scope.md`, using that
@@ -15,10 +14,6 @@ canonical backlog, transition ledger, and generated projections. Admission is
 not implementation, verification, native-Windows evidence, issue mutation, or
 closure authority.
 
-The PO-run routes are interactive human boundaries, not agent overrides:
-protected edits admit only regular physical files inside the checked repository,
-while a non-main push admits only fully bound Verify and Security evidence for
-the exact `HEAD` commit and tree.
 
 The Sentinel Windows private-state implementation adds a separate local trust
 boundary: a repository-private authority directory on Windows is trusted only
@@ -37,8 +32,6 @@ instead of being treated as newly owned.
 | A caller adds, removes, or reorders blocker IDs. | The writer requires the exact five-ID ordered list. | The focused suite rejects a substituted ID and reversed order. | The hard-coded set deliberately does not discover later Issues automatically. |
 | A caller upgrades status or changes a record type. | Every admitted record must be exactly `open` and `defect`. | The focused suite rejects altered status and type. | The writer does not decide whether the five records are eventually implementable or closable. |
 | A caller bypasses the writer and edits the backlog state directly. | The canonical checker validates item files, transition ledger, and generated projections. | `check-backlog-state` and Full Verify fail on inconsistent state. | A reviewer can still approve a malicious direct change; this control is a fail-closed consistency check, not an authorization signature. |
-| A PO edit job names a symlink, special file, or physical repository escape. | The writer rejects lexical escapes, symlinks/non-regular targets, and `realpath` escapes before preview, then rechecks the physical target immediately before writing. | `po-guarded-edit.test.mjs` covers traversal and symlink rejection; Full Verify registers it. | A local replacement after the final check remains a bounded TOCTOU risk; owner: Sentinel Elephant; remediation decision due 2026-08-31. |
-| A PO push is presented with hand-authored, stale, or partial passing evidence. | The writer requires the complete Verify and Security schemas, exact clean candidate bindings, Verify start/finish binding, and Security immutable snapshot, inventory, policy, and payload digests. | `po-guarded-push.test.mjs`, `guard-push.test.mjs`, and Full Verify reject malformed or stale evidence. | The route remains a non-main convenience; it does not replace server-side branch protection or a fresh fetch-back. |
 | Scope admission is mistaken for native-Windows or release evidence. | The scope document, matrix, and generated records retain `open` status and prohibit closure claims. | Full Verify, Critic review, and candidate-bound evidence are required before any later transition. | Native Windows host evidence remains absent for #33 and the other blockers. |
 | A needed admission must be rolled back. | Use an ordinary revert commit; never rewrite evidence, status, or ledger files by hand. | The documented rollback runs `check-backlog-state` and Full Verify on the revert candidate. | Existing external Issues and host evidence are not reverted or reinterpreted. |
 | A Windows private-state directory inherits a non-owner ACL or is a reparse point. | The adapter uses a fixed system PowerShell path, removes inherited ACLs only for a newly created component, sets the concrete current owner, and accepts no other DACL principal. Existing or raced-in components are assessed and unavailable proof blocks the authority write. | `windows-private-state.test.mjs`, advisory-receipt assurance tests, Full Verify, and required native-Windows evidence exercise the typed secure/unavailable boundary. | Native Windows evidence remains required; the adapter deliberately does not infer DACL safety from POSIX mode bits or a successful rename. |
