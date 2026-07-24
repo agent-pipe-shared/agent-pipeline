@@ -98,6 +98,16 @@ function write(root, relPath, content) {
 
 {
   const root = makeRoot();
+  write(root, "same.txt", "alpha beta");
+  const plan = computeEdits({ jobs: [
+    { file: "same.txt", oldString: "alpha", newString: "ALPHA" },
+    { file: "same.txt", oldString: "beta", newString: "BETA" },
+  ] }, { repoRoot: root });
+  check("GE07b rejects duplicate physical targets instead of applying stale full-file images", !plan.ok && plan.errors.some((error) => error.includes("duplicates")), JSON.stringify(plan));
+}
+
+{
+  const root = makeRoot();
   const plan = computeEdits({ jobs: [{ file: "missing.txt", oldString: "a", newString: "b" }] }, { repoRoot: root });
   check("GE08 rejects a job whose target file cannot be read", !plan.ok && (plan.errors[0].includes("cannot read") || plan.errors[0].includes("unsafe physical target")), JSON.stringify(plan));
 }

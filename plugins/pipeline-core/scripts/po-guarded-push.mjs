@@ -230,7 +230,7 @@ export async function run(argv = process.argv, env = process.env) {
   console.log(`Audit record appended: evidence/dirty-push-log.ndjson`);
 
   try {
-    execFileSync("git", ["push", "-u", "--", record.remote, record.branch], { cwd: repoRoot, stdio: "inherit" });
+    execFileSync("git", ["push", "-u", "--", record.remote, `${record.commit}:refs/heads/${record.branch}`], { cwd: repoRoot, stdio: "inherit" });
   } catch (e) {
     console.error(`\ngit push failed: ${e.message}`);
     console.error("The audit record above was already written even though the push failed — review it.");

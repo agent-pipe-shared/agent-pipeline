@@ -63,6 +63,7 @@ export function computeEdits(jobSpec, { repoRoot, readFile = (p) => readFileSync
 
   const errors = [];
   const edits = [];
+  const plannedTargets = new Set();
   for (const [i, job] of jobs.entries()) {
     const label = `jobs[${i}]`;
     if (typeof job?.file !== "string" || job.file.length === 0) {
@@ -100,6 +101,10 @@ export function computeEdits(jobSpec, { repoRoot, readFile = (p) => readFileSync
       errors.push(`${label}: unsafe physical target ${job.file} (${e.message})`);
       continue;
     }
+    if (plannedTargets.has(physicalTarget)) {
+      errors.push(`${label}: duplicates an already planned physical target`);
+      continue;
+    }
     let before;
     try {
       before = readFile(physicalTarget);
@@ -113,6 +118,7 @@ export function computeEdits(jobSpec, { repoRoot, readFile = (p) => readFileSync
       continue;
     }
     const after = before.split(job.oldString).join(job.newString);
+    plannedTargets.add(physicalTarget);
     edits.push({
       file: job.file,
       absolute: physicalTarget,
