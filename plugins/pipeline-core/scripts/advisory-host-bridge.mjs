@@ -18,6 +18,7 @@ import { pathToFileURL } from "node:url";
 import { coordinateAdvisory } from "../lib/advisory-coordinator.mjs";
 import { validateAdvisoryReceipt } from "../lib/advisory-receipt.mjs";
 import { AdvisoryReceiptAssuranceError, persistAdvisoryReceipt } from "../lib/advisory-receipt-assurance.mjs";
+import { canonicalJson } from "../lib/codex-sandbox-compatibility.mjs";
 import { ROUTES, selectHostAdvisorRoute } from "./codex-host-advisor-route.mjs";
 import { invokeCodexAdvisoryAppServer } from "./codex-advisory-app-server.mjs";
 import { createCodexSandboxRuntimeTransport } from "./codex-sandbox-runtime.mjs";
@@ -33,6 +34,7 @@ function exactKeys(value, keys, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)
     || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify([...keys].sort())) throw new Error(`${label} is not closed`);
 }
+function equal(left, right) { return canonicalJson(left) === canonicalJson(right); }
 function hostRouteInput(input) {
   const advisorExport = input?.advisorExport;
   if (advisorExport !== undefined && (advisorExport === null || typeof advisorExport !== "object" || Array.isArray(advisorExport)
@@ -91,7 +93,8 @@ function selectedAdvisoryHostBridge(input, { invokeAppServer = invokeCodexAdviso
       };
       const result = await invokeAppServer({ question: input.question, sandboxTransport });
       if (result?.status !== "answered" || typeof result.answer !== "string" || !result.sandboxExecution
-        || result.identity?.provider !== "openai" || result.identity?.modelId !== "gpt-5.6-sol" || result.identity?.effort !== "max") {
+        || result.identity?.provider !== "openai" || result.identity?.modelId !== "gpt-5.6-sol" || result.identity?.effort !== "max"
+        || !matchesSelectedHostExecution(result.sandboxExecution, sandboxTransport)) {
         return { childStarted: result?.childStarted === true ? true : undefined };
       }
       completed.set(request.selectionId, { result, sandboxTransport });
@@ -130,6 +133,25 @@ function selectedAdvisoryHostBridge(input, { invokeAppServer = invokeCodexAdviso
       return { answer: result.result.answer, receipt: structuredClone(result.receipt), execution: structuredClone(result.execution) };
     },
   };
+}
+
+function matchesSelectedHostExecution(value, selected) {
+  try {
+    exactKeys(value, ["schema", "selectionId", "selectionSha256", "repoFingerprint", "duty", "dispatch", "observed", "terminal"], "selected advisory host execution");
+    return value.schema === "pipeline.codex-sandbox-host-execution.v1"
+      && value.selectionId === selected.selectionId
+      && value.selectionSha256 === selected.selectionSha256
+      && value.repoFingerprint === selected.repoFingerprint
+      && value.duty === selected.duty
+      && equal(value.dispatch, selected.dispatch)
+      && equal(value.observed, {
+        cliSha256: selected.toolchain.cliSha256,
+        profileSha256: selected.profile.sha256,
+        networkEnabled: true,
+        scratchRootSha256: selected.profile.scratchRootSha256,
+      })
+      && equal(value.terminal, { childStarted: true, exitCode: 0, stdioStatus: "complete", cleanupStatus: "complete" });
+  } catch { return false; }
 }
 
 /**

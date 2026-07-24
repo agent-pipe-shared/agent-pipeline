@@ -6,7 +6,7 @@ import { createHash } from "node:crypto";
 import { copyFileSync, linkSync, mkdtempSync, mkdirSync, readFileSync, statSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { buildLicenseGateReceipt, buildSnt1Result, licenseSurfaceDigests, SNT1_CANDIDATE, SNT1_CLA_SEMANTICS, SNT1_LICENSE_SURFACES, SNT1_LICENSING_SEMANTICS, SNT1_PRIVACY_APPROVAL, storePrivateLicenseGateReceipt, validateLicenseContract, validateLicenseGateProjection, validateLiveLicenseSurfaces, validateSnt1EvidenceRecords, validateSnt1Result } from "./check-license-contract.mjs";
+import { buildLicenseGateReceipt, buildSnt1Result, licenseSurfaceDigests, SNT1_CANDIDATE, SNT1_CLA_SEMANTICS, SNT1_LICENSE_SURFACES, SNT1_LICENSING_SEMANTICS, SNT1_PRIVACY_APPROVAL, storePrivateLicenseGateReceipt, validateContinuingLicensePrivacyApproval, validateLicenseContract, validateLicenseGateProjection, validateLiveLicenseSurfaces, validateSnt1EvidenceRecords, validateSnt1Result } from "./check-license-contract.mjs";
 
 const fixture = mkdtempSync(join(tmpdir(), "license-contract-"));
 const write = (path, value) => { const absolute = join(fixture, ...path.split("/")); mkdirSync(dirname(absolute), { recursive: true }); writeFileSync(absolute, value); };
@@ -58,6 +58,13 @@ const evidenceResult = buildSnt1Result({
 write("backlog/evidence/2026-07-23-snt-1-privacy-disposition.json", `${JSON.stringify(privacyRecord, null, 2)}\n`);
 write("backlog/evidence/2026-07-23-snt-1-licensing-disposition.json", `${JSON.stringify(licensingRecord, null, 2)}\n`);
 write("backlog/evidence/2026-07-23-snt-1-activation-result.json", `${JSON.stringify(evidenceResult, null, 2)}\n`);
+const continuingApproval = {
+  schema: "pipeline.snt1-continuing-license-privacy-approval.v1", status: "approved", reviewer: "André Twachtmann", grantedAt: "2026-07-24",
+  scope: ["license", "commercial-boundary", "cla", "dco", "privacy", "actions-log-retention"], actionsLogRetention: { days: 30, maximumAllowedDays: 90 },
+  renewalTriggers: ["material-license-semantic-change", "new-third-party-code-or-text", "new-personal-data-flow-or-storage", "actions-log-retention-over-90-days"],
+  revocation: { mode: "po-revocable", effective: "immediate" },
+};
+write("backlog/evidence/2026-07-24-snt-1-continuing-license-privacy-approval.json", `${JSON.stringify(continuingApproval, null, 2)}\n`);
 
 let result = validateLicenseContract(fixture); assert.equal(result.ok, true, result.findings.join("\n")); assert.equal(result.sourceCount, 4);
 write("plugins/pipeline-core/example.mjs", "// SPDX-License-Identifier: Apache-2.0\n"); result = validateLicenseContract(fixture); assert.equal(result.ok, false); assert.match(result.findings.join("\n"), /example\.mjs lacks an SPDX SUL-1\.0 header|retains a current Apache-2\.0/);
@@ -135,11 +142,14 @@ for (const path of SNT1_LICENSE_SURFACES.map(({ path: surfacePath }) => surfaceP
   mkdirSync(dirname(target), { recursive: true });
   copyFileSync(join(process.cwd(), path), target);
 }
-assert.deepEqual(validateLiveLicenseSurfaces(approvedSurfaceFixture), []);
+const approvedCurrentSurfaces = licenseSurfaceDigests(approvedSurfaceFixture);
+assert.deepEqual(validateLiveLicenseSurfaces(approvedSurfaceFixture, approvedCurrentSurfaces), []);
 writeFileSync(join(approvedSurfaceFixture, "README.md"), "drift");
-assert.match(validateLiveLicenseSurfaces(approvedSurfaceFixture).join("\n"), /drift from the approved SNT-1 digest set/);
+assert.match(validateLiveLicenseSurfaces(approvedSurfaceFixture, approvedCurrentSurfaces).join("\n"), /drift from the approved SNT-1 digest set/);
 
 assert.deepEqual(validateSnt1EvidenceRecords({ privacy: privacyRecord, licensing: licensingRecord, result: evidenceResult }), []);
+assert.deepEqual(validateContinuingLicensePrivacyApproval(continuingApproval), []);
+assert.match(validateContinuingLicensePrivacyApproval({ ...continuingApproval, status: "revoked" }).join("\n"), /invalid or revoked/);
 const privacyTamper = structuredClone(privacyRecord); privacyTamper.approvalText += " tampered";
 assert.match(validateSnt1EvidenceRecords({ privacy: privacyTamper, licensing: licensingRecord, result: evidenceResult }).join("\n"), /approval text|privacy disposition digest binding/);
 const extraKey = structuredClone(licensingRecord); extraKey.extra = true;

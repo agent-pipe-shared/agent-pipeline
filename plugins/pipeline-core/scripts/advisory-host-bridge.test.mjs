@@ -140,3 +140,19 @@ test("a selected child with the wrong model identity fails closed without return
   assert.equal(result.advisoryResult.answer, null);
   assert.equal(result.advisoryResult.code, "selected-sandbox-required");
 });
+
+test("a stale or foreign host execution cannot be relabelled as the current selected child", async () => {
+  const transport = selectedTransport();
+  const invoke = transport.invokeCodexAdvisoryAppServer;
+  transport.invokeCodexAdvisoryAppServer = async (payload) => {
+    const result = await invoke(payload);
+    result.sandboxExecution.selectionId = "css_bbbbbbbbbbbbbbbbbbbbbbbbbi";
+    return result;
+  };
+  const result = await runCodexAdvisoryThroughSelectedSandbox(base(), async () => ({ status: "answered", answer: "unbound" }), {
+    repoRoot: process.cwd(), observeWorkspace: () => ({ workspaceSha256: "9".repeat(64) }), ...transport,
+  });
+  assert.equal(result.advisoryResult.ok, false);
+  assert.equal(result.advisoryResult.answer, null);
+  assert.equal(result.advisoryResult.code, "selected-sandbox-required");
+});

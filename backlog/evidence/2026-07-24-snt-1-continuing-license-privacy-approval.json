@@ -1,0 +1,28 @@
+{
+  "schema": "pipeline.snt1-continuing-license-privacy-approval.v1",
+  "status": "approved",
+  "reviewer": "André Twachtmann",
+  "grantedAt": "2026-07-24",
+  "scope": [
+    "license",
+    "commercial-boundary",
+    "cla",
+    "dco",
+    "privacy",
+    "actions-log-retention"
+  ],
+  "actionsLogRetention": {
+    "days": 30,
+    "maximumAllowedDays": 90
+  },
+  "renewalTriggers": [
+    "material-license-semantic-change",
+    "new-third-party-code-or-text",
+    "new-personal-data-flow-or-storage",
+    "actions-log-retention-over-90-days"
+  ],
+  "revocation": {
+    "mode": "po-revocable",
+    "effective": "immediate"
+  }
+}

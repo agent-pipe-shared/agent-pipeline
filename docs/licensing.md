@@ -75,10 +75,20 @@ plus Agent-Pipeline Additional Permission and cumulative DCO/Contributor-
 personal CLA semantics. The historical `f83803c` privacy sign-off above does
 not substitute for the separately recorded `79a2c9b` disposition. This
 document makes no release claim: any later change to one of the seven surfaces
-requires a newly frozen candidate and a new named-human licensing/privacy
-review. The exact evidence and sanctioned construction path are recorded in
+required a newly frozen candidate and a new named-human licensing/privacy
+review under the historical SNT-1 procedure. The exact evidence and sanctioned construction path are recorded in
 [`snt-1-activation-prerequisite.md`](../specs/2026-07-19-sprint-sentinel-epic/snt-1-activation-prerequisite.md).
 The historical closed backlog record is not rewritten.
+
+On 2026-07-24, André Twachtmann explicitly replaced the per-candidate
+licensing/privacy gate for ordinary Sentinel work with a continuing PO approval.
+It covers the current SUL-1.0 and commercial boundary, CLA/DCO semantics,
+privacy handling, and 30-day Actions-log retention (maximum 90 days). It is
+immediately revocable by the PO. A new named-human review is required only for
+a material license-semantic change, new third-party code/text, a new personal-
+data flow or storage, or retention above 90 days. The machine-checked public
+record is
+[`2026-07-24-snt-1-continuing-license-privacy-approval.json`](../backlog/evidence/2026-07-24-snt-1-continuing-license-privacy-approval.json).
 
 The PO has represented for this candidate that all current project-authored
 content is 100% owner-controlled and that no external code is known to be

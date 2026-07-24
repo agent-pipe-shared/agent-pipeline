@@ -15,6 +15,7 @@ export const LICENSE_GATE_PROJECTION_SCHEMA = "pipeline.snt1-license-gate-projec
 export const SNT1_RESULT_SCHEMA = "pipeline.snt1-result.v1";
 export const SNT1_PRIVACY_DISPOSITION_SCHEMA = "pipeline.snt1-privacy-disposition.v1";
 export const SNT1_LICENSING_DISPOSITION_SCHEMA = "pipeline.snt1-licensing-disposition.v1";
+export const SNT1_CONTINUING_APPROVAL_SCHEMA = "pipeline.snt1-continuing-license-privacy-approval.v1";
 export const LICENSE_SURFACES = Object.freeze(["LICENSE", "LICENSE-DOCS", "NOTICE", "CONTRIBUTING.md", "README.md", "docs/licensing.md", "third-party-licenses.json"]);
 export const SNT1_CANDIDATE = Object.freeze({ commit: "9a7ee7bdf072189817a7b59f291d583d8632bf64", tree: "51d33be9108c618cecb6c7eee2f753c67e706522" });
 export const SNT1_LICENSE_SURFACES = Object.freeze([
@@ -33,6 +34,7 @@ const SNT1_EVIDENCE_PATHS = Object.freeze({
   privacy: "backlog/evidence/2026-07-23-snt-1-privacy-disposition.json",
   licensing: "backlog/evidence/2026-07-23-snt-1-licensing-disposition.json",
   result: "backlog/evidence/2026-07-23-snt-1-activation-result.json",
+  continuing: "backlog/evidence/2026-07-24-snt-1-continuing-license-privacy-approval.json",
 });
 const HEX40 = /^[a-f0-9]{40}$/u;
 const HEX64 = /^[a-f0-9]{64}$/u;
@@ -52,6 +54,21 @@ export function licenseSurfaceDigests(root) {
 export function validateLiveLicenseSurfaces(root, expected = SNT1_LICENSE_SURFACES) {
   const actual = licenseSurfaceDigests(root);
   return sameValue(actual, expected) ? [] : ["live license surfaces drift from the approved SNT-1 digest set"];
+}
+
+/** The frozen SNT-1 digest set is historical; current approval is scope-bound, revocable, and semantic-risk-triggered. */
+export function validateContinuingLicensePrivacyApproval(value) {
+  const triggers = ["material-license-semantic-change", "new-third-party-code-or-text", "new-personal-data-flow-or-storage", "actions-log-retention-over-90-days"];
+  if (!exactKeys(value, ["schema", "status", "reviewer", "grantedAt", "scope", "actionsLogRetention", "renewalTriggers", "revocation"])
+    || value.schema !== SNT1_CONTINUING_APPROVAL_SCHEMA || value.status !== "approved"
+    || value.reviewer !== "André Twachtmann" || value.grantedAt !== "2026-07-24"
+    || JSON.stringify(value.scope) !== JSON.stringify(["license", "commercial-boundary", "cla", "dco", "privacy", "actions-log-retention"])
+    || JSON.stringify(value.renewalTriggers) !== JSON.stringify(triggers)
+    || !exactKeys(value.actionsLogRetention, ["days", "maximumAllowedDays"])
+    || value.actionsLogRetention.days !== 30 || value.actionsLogRetention.maximumAllowedDays !== 90
+    || !exactKeys(value.revocation, ["mode", "effective"])
+    || value.revocation.mode !== "po-revocable" || value.revocation.effective !== "immediate") return ["continuing license/privacy approval is invalid or revoked"];
+  return [];
 }
 
 function validLicenseSurfaces(surfaces) {
@@ -233,6 +250,7 @@ export function validateLicenseContract(root) {
       result: readJson(repoPath(root, SNT1_EVIDENCE_PATHS.result)),
     });
     findings.push(...evidenceErrors.map((error) => `SNT-1 evidence: ${error}`));
+    findings.push(...validateContinuingLicensePrivacyApproval(readJson(repoPath(root, SNT1_EVIDENCE_PATHS.continuing))).map((error) => `SNT-1 continuing approval: ${error}`));
   } catch (error) {
     findings.push(`SNT-1 evidence records are missing or invalid JSON: ${error.message}`);
   }
@@ -272,8 +290,7 @@ export function validateLicenseContract(root) {
 function main() {
   const root = resolve(dirname(fileURLToPath(import.meta.url)), "..", "..");
   const result = validateLicenseContract(root);
-  const surfaceDrift = validateLiveLicenseSurfaces(root);
-  if (!result.ok || surfaceDrift.length) { for (const finding of [...result.findings, ...surfaceDrift]) console.error(`FAIL: ${finding}`); return 1; }
+  if (!result.ok) { for (const finding of result.findings) console.error(`FAIL: ${finding}`); return 1; }
   console.log(`PASS: license contract (${result.sourceCount} JavaScript sources; ${EXPECTED_LICENSE})`);
   return 0;
 }
