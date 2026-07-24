@@ -321,6 +321,13 @@ branches. Parallel-runner discipline: this runner owns only Sprint Cyborg.
   read-only consult (Claude chain), answered 2026-07-24; material findings
   are incorporated in the committed design. No advisory-receipt file was
   produced by host machinery; the PRD's advisory record is the disclosure.
+  A second PO-requested content-review consult (2026-07-24, on the rebased
+  `v0.4.1` base at `ea742a8`) returned eleven findings; all are applied in
+  the gate revision. The PO-gate revision is the branch head of
+  `feat/sprint-cyborg-claude` at gate-answer time (design `83e35b1` +
+  identity update `ea742a8` + the review-hardening commit); the PRD now
+  carries five open decisions A–E (new: D push channel, E deviation
+  catalog).
 - **Native-Windows verify baseline on `v0.4.0` AND `v0.4.1` is RED:** on a
   clean tree,
   eleven suites fail individually on this host: afk-ledger,
@@ -339,7 +346,11 @@ branches. Parallel-runner discipline: this runner owns only Sprint Cyborg.
   evidence cannot go green from this host on this base, so pushing
   `feat/sprint-cyborg-claude` stays evidence-blocked until the Sentinel
   owner integrates the Windows residue into a later hotfix or the PO
-  disposes otherwise. Design work and the PO gate are not blocked.
+  disposes otherwise (PRD open decision D). Design work and the PO gate are
+  not blocked. Full Verify on `ea742a8` (clean tree, 2026-07-24): exit 1
+  with exactly these eleven suites; the repo-level security-scan step
+  itself is CLEAN (exit 0) and both evidence files were written
+  candidate-bound.
 - Bootstrap findings of this session: PO-gate authority receipt UNAVAILABLE
   on this checkout (remedy: `node setup.mjs --publish-po-profile` from the
   canonical primary checkout, PO action); the 0.4.0 cache copy of

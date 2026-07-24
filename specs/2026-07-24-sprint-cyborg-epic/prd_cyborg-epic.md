@@ -26,8 +26,9 @@
   #40 are CLOSED; `v0.4.0` is released; the PO instructed Cyborg activation on
   2026-07-24. The gate is satisfied.
 - **Runner ownership:** this session/runner owns ONLY Sprint Cyborg. Residual
-  Sentinel work (formal sprint close, `0.4.1`) and any parallel sprint belong
-  to other runners/branches and are never modified from this branch.
+  Sentinel work (formal sprint close; `v0.4.1` shipped and is this sprint's
+  base) and any parallel sprint belong to other runners/branches and are
+  never modified from this branch.
 
 ## Design authority
 
@@ -107,7 +108,7 @@ absorbing package delivers evidence.
 
 ### Explicitly out of scope
 
-- Residual Sentinel work: formal sprint close, `0.4.1`, `sentinel-go-live-completion`, all `pipeline.windows-*` items, `push-guard-worktree-target` (in progress elsewhere), `observation-intake-document-governance`, `private-overlay-activation-bridge`.
+- Residual Sentinel work: formal sprint close, `sentinel-go-live-completion`, all `pipeline.windows-*` items, `push-guard-worktree-target` (in progress elsewhere), `observation-intake-document-governance`, `private-overlay-activation-bridge`.
 - Nightwing (onboarding/docs), Phoenix (governance evidence/audit trails), Nova (execution scale) issues and their backlog analogues (`documentation-information-architecture`, `dual-channel-publication`, `regulated-document-hooks`, `spec-retention` items, `afk-assumption-mode`, `execution-model-switchback`, `multi-cli-efficiency-pilots`, `session-keep-awake`, `nonblocking-interaction-continuity`, review-economics items, `stateful-design-contract-template`, `canonical-worktree-lifecycle`, `po-gate-worktree-authority`, `codex-plugin-validator-host-parity`, `codex-sandbox-critic-longterm`, `t1-governance-path-preflight`, `project-scoped-github-issue-operations`).
 - Anything the issues list as non-goals (certification claims, vendor mandates, auto-installation, default production scanning, publishing sensitive exploit detail, agent-approved waivers/releases).
 
@@ -121,8 +122,10 @@ absorbing package delivers evidence.
 2. **Policy-complete verification (#42, CYB-2)** — required-capability plan
    from the effective control profile; adapter capability contracts;
    fail-closed completeness evaluation with the full typed outcome set;
-   digest-bound tools/rules/config; normalized findings + coverage;
-   `pipeline.security-evidence.v0` migration. "All scanners skipped" can never
+   digest-bound tools/rules/config; normalized findings + coverage; explicit
+   `pipeline.security-evidence` v0/v1→v2 migration (the live substrate emits
+   v1 and guard-push pins v1; #42's v0 AC is subsumed). "All scanners
+   skipped" can never
    exit green again on a repository where policy requires them.
 3. **Supply-chain truth (#39 + #45, CYB-3 + CYB-7)** — governed SBOM artifact
    class (ADR-0032 amendment, #22/ADR-0045 extension), CycloneDX/SPDX
@@ -179,6 +182,8 @@ keep contract work unblocked by real scanner integrations.
 - No package starts implementation before this PRD is approved (EL-19).
 - No work package weakens an existing guardrail, gate or deny rule; Full
   Verify and Security gates stay green at every push (guard-push contract).
+  While the native-Windows baseline is RED, the push channel follows open
+  decision D — never a weakening of the gate itself.
 - Schema/contract changes to another package's approved boundary require a
   recorded re-approval, not a silent edit.
 - An agent may not approve waivers, risk acceptance, disclosure or release —
@@ -223,8 +228,12 @@ human accountability.
 4. **PO-gate authority receipt** is UNAVAILABLE on this checkout
    (`check-po-gate-authority.mjs`); remedy is `node setup.mjs
    --publish-po-profile` from the canonical primary checkout — a PO action
-   outside this branch. Until then, gated pushes rely on the standard
-   guard-push evidence path.
+   outside this branch. Until then — and while the native-Windows verify
+   baseline on `v0.4.1` stays RED (docs/state.md; this branch is currently
+   evidence-blocked for push from this host) — pushes require an explicit
+   PO-authorized override (as recorded for the `v0.4.0` release push) or
+   must originate from an environment with green evidence. See open
+   decision D.
 
 ## Advisory record (V3 duty, Epic profile)
 
@@ -238,13 +247,25 @@ Release/PR/Close/Push boundary map made explicit; CYB-4 → CYB-6 dependency
 wired; D3/D5 narrowed to satisfiable AC form; findings ledger assigned an
 ADR-0045 topology class. No `pipeline.advisory-receipt.v1` file was produced
 by the host machinery in this session; this record is the disclosure, not a
-receipt claim.
+receipt claim. A second PO-requested content-review consult (fresh
+read-only, answered 2026-07-24 on the rebased `v0.4.1` base) returned eleven
+findings — consistency debts, decision-completeness gaps (decisions D/E
+below), and topology homes for CYB-4/CYB-9 — all applied at this gate
+revision under the same disclosure caveat.
 
 ## Open decisions for the PO (answer with the gate)
 
 - **A.** Approve the nine-issue scope plus the six backlog absorptions/triage
   dispositions as listed (or name exclusions).
 - **B.** Approve the CYB package slicing and Phase I→IV order, including
-  CYB-A0 first and the CYB-1 schema-boundary checkpoint as a named PO gate.
+  CYB-A0 as the first implementation package (after CYB-0 scaffolding) and
+  the CYB-1 schema-boundary checkpoint (CYB-1F) as a named PO gate.
 - **C.** Confirm that per-package lifecycle profiles (mini/feature/epic) are
   selected at dispatch time per MP/V3 rules, within this approved Epic.
+- **D.** Decide the push channel while the native-Windows verify baseline
+  stays RED: (i) PO-authorized override per push, (ii) pushes only from an
+  environment with green evidence, or (iii) hold pushes until the Sentinel
+  Windows residue lands on `main`. Note: CYB-A0's 2026-07-27 due date
+  depends on this.
+- **E.** Approve the deviation catalog D1–D10 (spec §3) as listed, or name
+  objections per deviation.

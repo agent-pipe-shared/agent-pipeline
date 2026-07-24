@@ -13,8 +13,8 @@
 | Issue | Pkg | AC clusters (count) | Evidence class | Status |
 | --- | --- | --- | --- | --- |
 | #41 P0/XL control catalog | CYB-1 | closed schema; 3 assurance profiles; module precedence; `unknown` never exempts; verifier/evidence binding; candidate+policy digest; waiver lifecycle; mappings-without-certification; 5 stack fixtures; baseline-without-tooling; single receipt for consumers; view consistency; no silent historical satisfaction; drift detection (14) | schema fixtures + resolver suites + receipt on this repo | open |
-| #42 P0/XL policy-complete verification | CYB-2 | green = all required capabilities terminal; all-/required-skipped fail typed; optional absence safe; identity/digest binding; closed finding+coverage schemas; visibility of exclusions; no floating rules; one evaluator for Push/PR/Close/Release; #40 binding; preflight; v0 migration; failure-class fixtures; docs; no commercial dependency (14) | evidence v2 + negative-gate fixtures + guard-push extension suites | open |
-| #39 P1/XL SBOM lifecycle | CYB-3 | ADR-0032 amended; #22 artifact class; one-command resolve; CycloneDX/SPDX pinned profiles; manifest completeness; deterministic staleness; partial≠complete; release immutable binding + delta; typed outcome diagnostics; monorepo semantics; consumer interface; privacy/export policy; #9 bundle refs; #6 checks; 16 fixture classes; zero-byte legacy compat; docs (17) | manifest fixtures + Node adapter run + release-binding suite | open |
+| #42 P0/XL policy-complete verification | CYB-2 | green = all required capabilities terminal; all-/required-skipped fail typed; optional absence safe; identity/digest binding; closed finding+coverage schemas; visibility of exclusions; no floating rules; one evaluator for Push/PR/Close/Release; #40 binding; preflight; v0/v1→v2 migration; failure-class fixtures; docs; no commercial dependency (14) | evidence v2 + negative-gate fixtures + guard-push extension suites | open |
+| #39 P1/XL SBOM lifecycle | CYB-3 | ADR-0032 amended; #22 artifact class; one-command resolve; CycloneDX/SPDX pinned profiles; manifest completeness; deterministic staleness; partial≠complete; release immutable binding + delta; typed outcome diagnostics; monorepo semantics; consumer interface; privacy/export policy; #9 bundle refs; #6 checks; 13 fixture classes (14 counting single-/multi-ecosystem separately); zero-byte legacy compat; docs (17) | manifest fixtures + Node adapter run + release-binding suite | open |
 | #43 P1/L threat model + requirements | CYB-4 | deterministic applicability; closed schemas; stable IDs; traceability; change-impact review; propose-not-approve; boundary blocking; generated human views; #22 discovery; secret exclusion; 8 fixture classes; no invented history (12) | schema fixtures + repo reference instance + impact-engine suites | open |
 | #46 P1/XL AI-assisted hardening | CYB-5 | typed untrusted inputs; no authority from content; digest-bound definitions; task-authority manifest; explicit host fallback; deny-by-default context export; independent change-integrity checks; independent review for control changes; origin/trust preservation; CI isolation; drift requalification; injection fixtures; evidence hygiene; runner-neutral conformance (14) | taxonomy doc + guard/verify suites + injection fixture corpus | open |
 | #44 P1/XL stack-aware verification | CYB-6 | inventory-driven plan; explainable selection; required-unavailable fails; provider-neutral adapter conformance; #42 evidence feed; exact non-production dynamic targets; fuzz reproducers + replay; typed partial outcomes; no auto-install/untrusted setup; enforced boundaries; cross-platform fixtures; offline conformance; adapter-addition docs (13) | family registry + adapter conformance suites + synthetic fixtures | open |
@@ -37,7 +37,9 @@
 
 Every AC checkbox of every issue maps into exactly one package's feature
 spec; a package may not close while any mapped AC is unevidenced. Deviations
-D1–D8 (spec §3) change the HOW, never silently drop an AC — where a
-deviation narrows delivery (D2, D3, D4, D5), the affected ACs are satisfied
-by contract + synthetic conformance evidence and the narrowing is named in
-the package's PO gate.
+D1–D10 (spec §3) change the HOW, never silently drop an AC — where a
+deviation narrows delivery (D2, D3, D4, D5, D10), the affected ACs are
+satisfied by contract + synthetic conformance evidence (D10: typed
+`unavailable` for the Codex transport) and the narrowing is named in the
+package's PO gate; D9's compatibility window is time-bounded and reviewed
+at sprint close.

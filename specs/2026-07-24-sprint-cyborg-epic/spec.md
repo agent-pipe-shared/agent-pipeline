@@ -137,7 +137,7 @@ existing choke points — not as a new framework:
 | D6 | #47 could be read as a tracker product | Ledger + projection reusing backlog-ledger mechanics; external trackers are projections (none in Cyborg core) | Proven append-only pattern, no new stateful service |
 | D7 | #48 sketches org-wide IR integration surface | Schemas + canonical artifacts + this repo's own SECURITY.md/support policy as reference instance; ITSM/SIEM integrations out | Reference instance proves the contract; integrations are consumer work |
 | D8 | Issues imply nine independent schema families | One layered spine (§2.1) with digest links | Overlap elimination; single migration story |
-| D9 | #42 scope 7: manifest-less behavior only via explicit `not-applicable` policy | Time-bounded compatibility window for not-yet-migrated repos (§2.2.3); window ends on first L1 policy adoption; sprint-close review of remaining windowed repos; releasable repos need the explicit `not-applicable` decision to stay windowed | Big-bang enforcement would break every consumer repo on day one; the window is the migration path, not a permanent weakening |
+| D9 | #42 scope 7: manifest-less behavior only via explicit `not-applicable` policy | Time-bounded compatibility window for not-yet-migrated repos (§2.2 item 3); window ends on first L1 policy adoption; sprint-close review of remaining windowed repos; releasable repos need the explicit `not-applicable` decision to stay windowed | Big-bang enforcement would break every consumer repo on day one; the window is the migration path, not a permanent weakening |
 | D10 | #46 requires runner-consistent controls "through capability contracts" | CYB-5's enforcement points (PreToolUse guard, 6-field briefing manifest, `Dispatch:` trailers) are Claude-runner-native today; the control catalog entries declare runner-neutral capability requirements, and the Codex transport maps them to its host-boundary equivalents (or records typed `unavailable`) in a named CYB-5 sub-deliverable | Honest runner asymmetry with a typed gap beats pretended parity |
 
 ## 4. Work packages and ordering
@@ -194,12 +194,15 @@ Applicability from assurance profile; closed threat-model and requirement
 schemas (machine-readable core + generated/checked human view); lifecycle +
 change-impact triggers; assisted-analysis safeguards (proposals never
 self-approve). Repo-level reference instance for agent-pipeline itself.
-Depends: CYB-1.
+Canonical records get a new `threat-model` class in
+`governance/artifact-topology.json` (same ADR-0045 extension mechanism as
+`security-finding`). Depends: CYB-1.
 
 ### CYB-5 — AI-assisted development hardening (#46) (XL, P1)
 Per §2.4, delivered as three slices: (a) trust taxonomy + definition-integrity
-inventory + task-authority manifest & guards + drift requalification (needs
-(a)'s digest inventory, so it lives here); (b) change-integrity verify
+inventory + task-authority manifest & guards + drift requalification
+(requalification consumes this slice's digest inventory, hence co-located);
+(b) change-integrity verify
 suites + dispatch-provenance enforcement + Critic isolation checklist;
 (c) override-ledger target binding + CI authority suites + the D10 Codex
 equivalence mapping. Depends: CYB-1 (module/control IDs); ONLY the
@@ -232,7 +235,9 @@ package with original-trigger replay; drift reopening. Depends: CYB-2
 ### CYB-9 — product-security readiness (#48) (L, P2)
 Applicability-driven artifact set; SECURITY.md public projection; support/EOL
 policy; response + IR/rollback runbooks; security release evidence linking
-L4–L6. Reference instance: this repository. Depends: CYB-1, CYB-8.
+L4–L6; the readiness artifact set gets a new `security-readiness` topology
+class (same ADR-0045 extension mechanism). Reference instance: this
+repository. Depends: CYB-1, CYB-8.
 
 **Phases:** I = CYB-0, CYB-A0, CYB-1 (CYB-1F freeze mid-package) ·
 II = CYB-2, CYB-3, CYB-4 (+ CYB-5c's override-ledger fix only) ·
