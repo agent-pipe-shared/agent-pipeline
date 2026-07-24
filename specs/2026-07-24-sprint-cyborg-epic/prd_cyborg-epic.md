@@ -263,9 +263,10 @@ revision under the same disclosure caveat.
 - **C.** Confirm that per-package lifecycle profiles (mini/feature/epic) are
   selected at dispatch time per MP/V3 rules, within this approved Epic.
 - **D.** Decide the push channel while the native-Windows verify baseline
-  stays RED: (i) PO-authorized override per push, (ii) pushes only from an
-  environment with green evidence, or (iii) hold pushes until the Sentinel
-  Windows residue lands on `main`. Note: CYB-A0's 2026-07-27 due date
-  depends on this.
+  stays RED on this host: (i) PO-authorized override per push, or (ii)
+  pushes only from an environment with green evidence. (A wait-for-Sentinel
+  option is moot: per PO directive 2026-07-24 and the live remote state,
+  `main` is final and all Sentinel refs are archived.) Note: CYB-A0's
+  2026-07-27 due date depends on this.
 - **E.** Approve the deviation catalog D1–D10 (spec §3) as listed, or name
   objections per deviation.

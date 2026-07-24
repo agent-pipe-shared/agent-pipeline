@@ -344,13 +344,21 @@ branches. Parallel-runner discipline: this runner owns only Sprint Cyborg.
   security-scan `working-tree-not-clean` error was session-caused (design
   files written during the run), not a defect. Consequence: guard-push
   evidence cannot go green from this host on this base, so pushing
-  `feat/sprint-cyborg-claude` stays evidence-blocked until the Sentinel
-  owner integrates the Windows residue into a later hotfix or the PO
-  disposes otherwise (PRD open decision D). Design work and the PO gate are
-  not blocked. Full Verify on `ea742a8` (clean tree, 2026-07-24): exit 1
+  `feat/sprint-cyborg-claude` stays evidence-blocked from this host; per
+  the PO ref-scope directive below the archived Sentinel refs are final, so
+  resolution is the PO's push-channel decision (PRD open decision D), not a
+  pending integration. Design work and the PO gate are not blocked. Full Verify on `ea742a8` (clean tree, 2026-07-24): exit 1
   with exactly these eleven suites; the repo-level security-scan step
   itself is CLEAN (exit 0) and both evidence files were written
   candidate-bound.
+- **PO ref-scope directive (2026-07-24, post-rebase):** only `main`, the
+  Cyborg branch (`feat/sprint-cyborg-claude`), and the parallel runner's
+  Nova branch are current; every other ref is outdated. Live `ls-remote`
+  confirms: `main` @ `81cc5f1` is the only remote branch; all Sentinel work
+  exists solely as `archive/*` tags. The stale local
+  `feat/sentinel-windows-34-37-close` was deleted after verifying its tip
+  equals the remote archive tag
+  `archive/public-sentinel-windows-34-37-close-20260724` (`e2aea6a`).
 - Bootstrap findings of this session: PO-gate authority receipt UNAVAILABLE
   on this checkout (remedy: `node setup.mjs --publish-po-profile` from the
   canonical primary checkout, PO action); the 0.4.0 cache copy of
