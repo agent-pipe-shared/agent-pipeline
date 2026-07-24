@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -103,9 +104,7 @@ const REASON = "8 pre-existing suites red on the branch base, verified identical
   const root = mkdtempSync(join(tmpdir(), "po-guarded-push-"));
   try {
     mkdirSync(join(root, "evidence"));
-    writeFileSync(join(root, "evidence", "verify.json"), JSON.stringify({
-      commit: "commit-a", tree: "tree-a", exitCode: 0, candidate: { status: "clean" },
-    }));
+    writeFileSync(join(root, "evidence", "verify.json"), JSON.stringify({ schema: "pipeline.verify-evidence.v0", project: "agent-pipeline", command: "node harness/scripts/verify.mjs", commit: "commit-a", tree: "tree-a", exitCode: 0, candidate: { binding: "exact", start: { status: "clean", commit: "commit-a", tree: "tree-a" }, finish: { status: "clean", commit: "commit-a", tree: "tree-a" } } }));
     const exact = readExactPassingEvidence(root, "evidence/verify.json", "commit-a", "tree-a");
     const stale = readExactPassingEvidence(root, "evidence/verify.json", "commit-b", "tree-a");
     check("PP12 accepts only exact clean passing evidence and rejects a stale binding", exact.valid && !stale.valid, JSON.stringify({ exact, stale }));

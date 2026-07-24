@@ -43,7 +43,7 @@
  *
  * VERIFY: node plugins/pipeline-core/scripts/po-guarded-edit.test.mjs
  */
-import { readFileSync, writeFileSync } from "node:fs";
+import { lstatSync, readFileSync, realpathSync, writeFileSync } from "node:fs";
 import { isAbsolute, relative, resolve } from "node:path";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
@@ -88,9 +88,21 @@ export function computeEdits(jobSpec, { repoRoot, readFile = (p) => readFileSync
       errors.push(`${label}: "file" resolves outside the repository root`);
       continue;
     }
+    let physicalTarget;
+    try {
+      const stat = lstatSync(absolute);
+      if (!stat.isFile() || stat.isSymbolicLink()) throw new Error("target is not a regular non-symlink file");
+      const physicalRoot = realpathSync(repoRoot);
+      physicalTarget = realpathSync(absolute);
+      const physicalRel = relative(physicalRoot, physicalTarget);
+      if (physicalRel.startsWith("..") || isAbsolute(physicalRel)) throw new Error("target physically resolves outside the repository root");
+    } catch (e) {
+      errors.push(`${label}: unsafe physical target ${job.file} (${e.message})`);
+      continue;
+    }
     let before;
     try {
-      before = readFile(absolute);
+      before = readFile(physicalTarget);
     } catch (e) {
       errors.push(`${label}: cannot read ${job.file} (${e.message})`);
       continue;
@@ -103,7 +115,7 @@ export function computeEdits(jobSpec, { repoRoot, readFile = (p) => readFileSync
     const after = before.split(job.oldString).join(job.newString);
     edits.push({
       file: job.file,
-      absolute,
+      absolute: physicalTarget,
       before,
       after,
       oldString: job.oldString,
@@ -179,6 +191,13 @@ export async function run(argv = process.argv, env = process.env) {
   }
 
   for (const edit of plan.edits) {
+    try {
+      const stat = lstatSync(edit.absolute);
+      if (!stat.isFile() || stat.isSymbolicLink() || realpathSync(edit.absolute) !== edit.absolute) throw new Error("target changed or is no longer a regular non-symlink file");
+    } catch (error) {
+      console.error(`Refusing to apply — target safety changed for ${edit.file}: ${error.message}`);
+      return 1;
+    }
     writeFileSync(edit.absolute, edit.after, "utf8");
     console.log(`Applied: ${edit.file}`);
   }

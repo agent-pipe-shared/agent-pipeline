@@ -43,6 +43,7 @@
  */
 import { appendFileSync, readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { join } from "node:path";
 import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
@@ -79,7 +80,41 @@ export function validateRequest({ branch, remote, reason, currentBranch }) {
   return { ok: errors.length === 0, errors };
 }
 
-/** Reads an exact, clean, passing gate record for the commit/tree being pushed. */
+function canonicalJson(value) {
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+}
+
+function sha256(value) {
+  return typeof value === "string" && /^[a-f0-9]{64}$/u.test(value);
+}
+
+function validVerify(data, commit, tree) {
+  const candidate = data?.candidate;
+  return data?.schema === "pipeline.verify-evidence.v0" && data?.project === "agent-pipeline"
+    && data?.command === "node harness/scripts/verify.mjs" && data?.exitCode === 0
+    && data?.commit === commit && data?.tree === tree && candidate?.binding === "exact"
+    && candidate?.start?.status === "clean" && candidate?.finish?.status === "clean"
+    && candidate.start.commit === commit && candidate.finish.commit === commit
+    && candidate.start.tree === tree && candidate.finish.tree === tree;
+}
+
+function validSecurity(data, commit, tree) {
+  const candidate = data?.candidate;
+  const { payloadSha256, ...payload } = data ?? {};
+  return data?.schema === "pipeline.security-evidence.v1" && data?.project === "agent-pipeline"
+    && data?.command === "node harness/scripts/security-scan.mjs" && data?.exitCode === 0
+    && data?.commit === commit && candidate?.status === "clean" && candidate.commit === commit && candidate.tree === tree
+    && sha256(candidate.inputSha256) && sha256(candidate.repositorySha256)
+    && Number.isSafeInteger(candidate?.inventory?.entries) && candidate.inventory.entries >= 0
+    && candidate.inventory.symlinkPolicy === "reject" && candidate.inventory.submodulePolicy === "reject"
+    && candidate?.snapshot?.method === "git-detached-worktree.v1" && candidate.snapshot.verifiedBeforeAfter === true
+    && data?.policy?.schema === "pipeline.security-policy-binding.v1" && sha256(data.policy.configurationSha256) && sha256(data.policy.sha256)
+    && sha256(payloadSha256) && payloadSha256 === createHash("sha256").update(canonicalJson(payload)).digest("hex");
+}
+
+/** Reads an exact, complete, clean, passing gate record for the commit/tree being pushed. */
 export function readExactPassingEvidence(repoRoot, relPath, commit, tree) {
   try {
     const raw = readFileSync(join(repoRoot, relPath), "utf8");
@@ -88,8 +123,7 @@ export function readExactPassingEvidence(repoRoot, relPath, commit, tree) {
     const evidenceCommit = data.commit ?? candidate.commit ?? null;
     const evidenceTree = data.tree ?? candidate.tree ?? null;
     return {
-      valid: data.exitCode === 0 && evidenceCommit === commit && evidenceTree === tree
-        && (candidate.status === undefined || candidate.status === "clean"),
+      valid: relPath.includes("verify") ? validVerify(data, commit, tree) : validSecurity(data, commit, tree),
       exitCode: typeof data.exitCode === "number" ? data.exitCode : null,
       commit: evidenceCommit,
       tree: evidenceTree,

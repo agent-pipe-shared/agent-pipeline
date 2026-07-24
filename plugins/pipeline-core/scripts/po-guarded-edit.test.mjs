@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -99,7 +99,7 @@ function write(root, relPath, content) {
 {
   const root = makeRoot();
   const plan = computeEdits({ jobs: [{ file: "missing.txt", oldString: "a", newString: "b" }] }, { repoRoot: root });
-  check("GE08 rejects a job whose target file cannot be read", !plan.ok && plan.errors[0].includes("cannot read"), JSON.stringify(plan));
+  check("GE08 rejects a job whose target file cannot be read", !plan.ok && (plan.errors[0].includes("cannot read") || plan.errors[0].includes("unsafe physical target")), JSON.stringify(plan));
 }
 
 {
@@ -114,6 +114,16 @@ function write(root, relPath, content) {
   write(root, "f.txt", "one");
   const plan = computeEdits([{ file: "f.txt", oldString: "one", newString: "two" }], { repoRoot: root });
   check("GE11 accepts a bare array job spec (no wrapping object)", plan.ok && plan.edits[0].after === "two");
+}
+
+{
+  const root = makeRoot();
+  const outside = join(root, "..", "po-guarded-edit-outside.txt");
+  writeFileSync(outside, "alpha");
+  symlinkSync(outside, join(root, "link.txt"));
+  const plan = computeEdits({ jobs: [{ file: "link.txt", oldString: "alpha", newString: "beta" }] }, { repoRoot: root });
+  check("GE12 rejects a symlinked target before it can escape the repository", !plan.ok && plan.errors[0].includes("unsafe physical target"), JSON.stringify(plan));
+  rmSync(outside, { force: true });
 }
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });
