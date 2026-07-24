@@ -1055,6 +1055,12 @@
       "member": "validate-manifest-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:windows-private-state-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "windows-private-state-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:workflow-runner-boundary-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1536,6 +1542,7 @@
         "verify-phase:harness/scripts/verify.mjs:stop-suggest-tests",
         "verify-phase:harness/scripts/verify.mjs:validate-manifest",
         "verify-phase:harness/scripts/verify.mjs:validate-manifest-tests",
+        "verify-phase:harness/scripts/verify.mjs:windows-private-state-tests",
         "verify-phase:harness/scripts/verify.mjs:workflow-runner-boundary-tests",
         "verify-phase:harness/scripts/verify.mjs:workflow-writer-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:worktree-lifecycle-tests",
