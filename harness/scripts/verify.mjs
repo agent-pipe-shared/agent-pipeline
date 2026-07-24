@@ -54,6 +54,22 @@ const hooksDir = join(repoRoot, "plugins", "pipeline-core", "hooks");
 
 const libDir = join(repoRoot, "plugins", "pipeline-core", "lib");
 const pluginScriptsDir = join(repoRoot, "plugins", "pipeline-core", "scripts");
+
+/** Capture one exact clean Git candidate; an unavailable Git fixture stays explicit. */
+function candidateIdentity() {
+  try {
+    const commit = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", cwd: repoRoot });
+    const tree = spawnSync("git", ["rev-parse", "HEAD^{tree}"], { encoding: "utf8", cwd: repoRoot });
+    const worktree = spawnSync("git", ["status", "--porcelain=v1", "--untracked-files=no"], { encoding: "utf8", cwd: repoRoot });
+    if (commit.status !== 0 || tree.status !== 0 || worktree.status !== 0) return { status: "unavailable", commit: null, tree: null };
+    return {
+      status: worktree.stdout === "" ? "clean" : "dirty",
+      commit: commit.stdout.trim(),
+      tree: tree.stdout.trim(),
+    };
+  } catch { return { status: "unavailable", commit: null, tree: null }; }
+}
+const startedCandidate = candidateIdentity();
 const SCOPED_VERIFY_SUITES = Object.freeze([
   Object.freeze({
     name: "scoped-verify-registration-tests",
@@ -258,40 +274,50 @@ const PHASE_STEPS =
       ];
 
 const steps = [];
-const windowsAssuranceRegistration = validateWindowsAssuranceVerifyRegistration(WINDOWS_ASSURANCE_VERIFY_REGISTRATION);
-if (!windowsAssuranceRegistration.ok) {
-  console.error(`Invalid Windows-assurance Verify registration: ${windowsAssuranceRegistration.code}`);
-  steps.push({ name: "windows-assurance-verify-registration", exitCode: 1 });
+// A known dirty candidate cannot produce delivery evidence.  Fail before any
+// expensive or externally-dependent suite so this is an actionable preflight,
+// not a misleading red full run.  Non-Git fixtures retain the historic
+// portability behavior and report an unavailable (never exact) binding.
+if (startedCandidate.status === "dirty") {
+  console.error("VERIFY-CANDIDATE-PREFLIGHT: Commit or stash tracked changes before Verify; no suite was started.");
+  steps.push({ name: "candidate-preflight", exitCode: 1 });
 } else {
-  const scopedRegistration = validateScopedVerifyRegistration(SCOPED_VERIFY_REGISTRATION);
-  if (!scopedRegistration.ok) {
-  console.error(`Invalid scoped Verify registration: ${scopedRegistration.code}`);
-  steps.push({ name: "scoped-verify-registration", exitCode: 1 });
+  const windowsAssuranceRegistration = validateWindowsAssuranceVerifyRegistration(WINDOWS_ASSURANCE_VERIFY_REGISTRATION);
+  if (!windowsAssuranceRegistration.ok) {
+    console.error(`Invalid Windows-assurance Verify registration: ${windowsAssuranceRegistration.code}`);
+    steps.push({ name: "windows-assurance-verify-registration", exitCode: 1 });
   } else {
-    const scopedTests = SCOPED_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
-    const windowsAssuranceTests = WINDOWS_ASSURANCE_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
-    for (const suite of [...TEST_SUITES, ...scopedTests, ...windowsAssuranceTests, ...PHASE_STEPS]) {
-      console.log(`\n=== ${suite.name} (${suite.file}) ===`);
-      const res = spawnSync(process.execPath, [suite.file, ...(suite.args ?? [])], { encoding: "utf8", cwd: repoRoot });
-      if (res.stdout) process.stdout.write(res.stdout);
-      if (res.stderr) process.stderr.write(res.stderr);
-      const exitCode = res.status ?? 1;
-      steps.push({ name: suite.name, exitCode });
+    const scopedRegistration = validateScopedVerifyRegistration(SCOPED_VERIFY_REGISTRATION);
+    if (!scopedRegistration.ok) {
+      console.error(`Invalid scoped Verify registration: ${scopedRegistration.code}`);
+      steps.push({ name: "scoped-verify-registration", exitCode: 1 });
+    } else {
+      const scopedTests = SCOPED_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
+      const windowsAssuranceTests = WINDOWS_ASSURANCE_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
+      for (const suite of [...TEST_SUITES, ...scopedTests, ...windowsAssuranceTests, ...PHASE_STEPS]) {
+        console.log(`\n=== ${suite.name} (${suite.file}) ===`);
+        const res = spawnSync(process.execPath, [suite.file, ...(suite.args ?? [])], { encoding: "utf8", cwd: repoRoot });
+        if (res.stdout) process.stdout.write(res.stdout);
+        if (res.stderr) process.stderr.write(res.stderr);
+        const exitCode = res.status ?? 1;
+        steps.push({ name: suite.name, exitCode });
+      }
     }
   }
 }
 
-const overallExitCode = steps.find((s) => s.exitCode !== 0)?.exitCode ?? 0;
-
-// ---- HEAD sha (best-effort; "unknown" if git is unavailable) ------------------------
-let commit = "unknown";
-try {
-  const gitRes = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", cwd: repoRoot });
-  if (gitRes.status === 0) commit = gitRes.stdout.trim();
-} catch {
-  // git missing from PATH: evidence still gets written, commit stays "unknown"
-  // (CLAUDE.md environment note: treat as a stale shell, not a missing install).
+const finishedCandidate = candidateIdentity();
+if (startedCandidate.status === "clean") {
+  const stable = finishedCandidate.status === "clean"
+    && startedCandidate.commit === finishedCandidate.commit
+    && startedCandidate.tree === finishedCandidate.tree;
+  if (!stable) {
+    console.error("VERIFY-CANDIDATE-DRIFT: Verify requires one clean, unchanged Git candidate from start through evidence write.");
+    steps.push({ name: "candidate-binding", exitCode: 1 });
+  }
 }
+const overallExitCode = steps.find((s) => s.exitCode !== 0)?.exitCode ?? 0;
+const commit = startedCandidate.commit ?? "unknown";
 
 const command = "node harness/scripts/verify.mjs";
 const evidence = {
@@ -299,6 +325,12 @@ const evidence = {
   project: "agent-pipeline",
   command,
   commit,
+  tree: startedCandidate.tree ?? "unknown",
+  candidate: {
+    start: startedCandidate,
+    finish: finishedCandidate,
+    binding: startedCandidate.status === "unavailable" ? "unavailable" : startedCandidate.status === "dirty" ? "preflight-rejected" : steps.some((step) => step.name === "candidate-binding") ? "drift" : "exact",
+  },
   finishedAt: new Date().toISOString(),
   steps,
   exitCode: overallExitCode,
