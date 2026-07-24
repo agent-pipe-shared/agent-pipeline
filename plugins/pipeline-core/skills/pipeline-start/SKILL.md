@@ -23,13 +23,14 @@ general lifecycle. Earlier working names `/pipeline:start` and
 
 - **No work before the confirmation line.** The confirmation is the auditable proof of the bootstrap; a session without it counts as not bootstrapped.
 - **NEVER print the confirmation line without actually performing the steps.** That is the documented main failure mode "reported done, but not verified", and a Critic audits trajectories.
-- All bootstrap commands below are read-only (git `ls-remote`/`rev-parse`/`log`, file reads). The bootstrap changes nothing.
+- Normal bootstrap commands below are read-only (git `ls-remote`/`rev-parse`/`log`, file reads). The sole exception is F0's explicit user-authorized onboarding `apply --activate`; it ends this bootstrap with no confirmation and requires a fresh read-only bootstrap run afterwards.
 - **Compact continuity:** Compact MUST rerun `pipeline-start` as a continuation re-entry; after that re-entry, automatically continue the persisted next action without waiting. Compact preserves the active task. Only an explicit pause/cancel/replace/redirect, a named gate, completion or a typed blocker may stop continuation.
 
 **Role:** take the role from `$ARGUMENTS` (default when empty: `elephant`).
 
 | Step | Elephant | Goldfish | Critic |
 |---|---|---|---|
+| 0 consumer-root onboarding state | MANDATORY before Git or V3 authority | fixed by the dispatch receipt | skip |
 | 1 presence + loaded state | full | compact (guardrails active? state = SHA from briefing) | compact (confirm read-only toolset) |
 | 1a V3 source/runtime authority | MANDATORY | fixed by the dispatch receipt | skip (Critic receives candidate inputs only) |
 | 1b model/effort | MANDATORY | skip (frontmatter/dispatch, MP-02) | skip (frontmatter/dispatch, MP-07) |
@@ -45,6 +46,63 @@ general lifecycle. Earlier working names `/pipeline:start` and
 Goldfish/Critic normally receive their compact variant embedded in the dispatch briefing (goldfish-task / critic-review templates in the agent-pipeline repo). If this skill runs with role `goldfish` or `critic`, execute only the steps marked above.
 
 **Context economy — role-path-only load:** execute and read only the row/section that applies to YOUR actual role (Elephant full path, or Goldfish/Critic compact rows above; Elephant profile variants live under "Same-day light bootstrap" / "Mini bootstrap" below) — do not read the other two roles' full step text as part of running this skill. No step is dropped by this; it only stops front-loading unrelated role material into the session. **Measurable target: context after bootstrap ≤ ~75k tokens (down from >150k today), measured via the statusline.**
+
+## Step 0 — Consumer-root onboarding state (Elephant only; before every Git or V3 check)
+
+Before **any** `git rev-parse`, Git freshness helper, `setup.mjs`, V3 authority
+validator, or project-local pipeline assumption, resolve the loaded plugin root
+from this skill and run exactly:
+
+`node "${PIPELINE_PLUGIN_ROOT}/scripts/project-onboarding-v3.mjs" inspect --root "$PWD"`
+
+This is the first decision point for a consumer root. `inspect` is read-only;
+it classifies the root without initializing Git or writing pipeline files. Do
+not replace it with a shell emptiness check, a copied consumer-root `setup.mjs`,
+or an incidental Git error.
+
+- **`ready` V3:** continue to Step 1 and then use the ordinary V3 authority
+  readback. A ready result is not a shortcut around the later bootstrap gates.
+- **`fresh`:** run the plugin-local, read-only plan immediately:
+
+  `node "${PIPELINE_PLUGIN_ROOT}/scripts/project-onboarding-v3.mjs" plan --root "$PWD"`
+
+  Report typed **F0: onboarding-required** and print **no bootstrap
+  confirmation line**. The plan is the exact public list of proposed targets
+  and digests, not an authorization to write. Tell the user that the only
+  official initializer is:
+
+  `node "${PIPELINE_PLUGIN_ROOT}/scripts/project-onboarding-v3.mjs" apply --root "$PWD" --activate`
+
+  `inspect` and `plan` are read-only. `apply --activate` is the sole write
+  operation: it may initialize the new repository and create the complete V3
+  authority/runtime seed, but it makes no commit, remote, dependency install,
+  application scaffold, or project-policy decision beyond that safe seed. An
+  explicit user request to **create** or **initialize** this project authorizes
+  the agent to run that exact `apply --activate` command after reporting the
+  plan; otherwise stop after F0 and wait for that authorization. After a
+  successful apply, rerun `pipeline-start` from Step 0 and require the normal
+  plugin-local V3 authority readback before any confirmation.
+- **`migration-required` (V0/V1/V2):** stop normal bootstrap with no
+  confirmation line. Use only the official V3 migration sequence:
+
+  `node "${PIPELINE_PLUGIN_ROOT}/scripts/runner-profile-migration-v3.mjs" inspect --root "$PWD"`
+
+  `node "${PIPELINE_PLUGIN_ROOT}/scripts/runner-profile-migration-v3.mjs" plan --root "$PWD"`
+
+  `node "${PIPELINE_PLUGIN_ROOT}/scripts/runner-profile-migration-v3.mjs" apply --root "$PWD" --activate`
+
+  Its explicit `apply --activate` is the only writer for a legacy consumer.
+  Never initialize over a legacy source or treat its generated bytes as V3
+  authority.
+- **`partial`, `invalid`, `unsafe`, a malformed result, or a non-zero exit:**
+  fail closed, make no write, and print no confirmation line. Report the typed
+  diagnostic and offer only the indicated repair or migration diagnosis. Never
+  infer ownership of existing files or overwrite a non-empty/partial root.
+
+Codex currently has no SessionStart hook in its manifest. This check is
+proactive when the mandatory `pipeline-start` skill executes for the user's
+first request; it is not an invisible automatic initializer or host-wide write
+barrier.
 
 ## Step 1 — Ruleset presence + loaded state
 
@@ -457,6 +515,7 @@ for this profile; no advisor probe or receipt is permitted.
 
 | Case | Finding | Binding behavior |
 |---|---|---|
+| **F0** | Fresh consumer root requires onboarding | **STOP before normal bootstrap.** `project-onboarding-v3.mjs inspect` and `plan` are read-only. Report `F0: onboarding-required`, the plan's public targets/digests, and the exact official `apply --activate` command. Only an explicit user request to create/initialize the project authorizes that apply; otherwise make no write. A successful apply still requires a new `pipeline-start` run and normal V3 authority readback before any confirmation line. |
 | **F1** | Ruleset missing entirely (plugin not installed, skills not found) | **STOP.** Inform the PO. Only **minimal-safe mode**: reading (Read/Glob/Grep), read-only git (`status`/`log`/`diff`), plugin diagnosis (`/plugin` menu, settings inspection). NO edits/writes/commits/pushes, no settings changes. **NO confirmation line** — the session counts as not bootstrapped. |
 | **F2** | Plugin stale (installed SHA ≠ remote HEAD) | Warn + offer the canonical scope-aware refresh ritual verbatim (D1, Project-Scope is the only supported install/update scope, → `docs/adr/0001-distribution-plugin-marketplace.md` addendum 2026-07-11): `claude plugin marketplace update agent-pipeline` → `claude plugin update pipeline-core@agent-pipeline --scope project` (the unscoped command fails with "not found," default scope is user) → then `/reload-plugins`. Work MAY continue — EXCEPT when the delta touches guardrails (paths `hooks/`, `agents/`, permission settings): then refresh FIRST, work after. Delta check: in a local checkout of the agent-pipeline repo run `git fetch` + `git log --name-only {{INSTALLED_SHA}}..origin/main`; without a checkout the default-safe rule applies: **when in doubt, refresh** (the refresh is cheap, stale guardrails are not). Confirmation line carries the NOTE suffix. After every refresh, repeat steps 1–2 (new SHA in the confirmation line) — otherwise the refresh is not evidenced. **Expectation note:** `/reload-plugins` may report "0 skills" (or an apparently empty skill count) even though skills remain invocable afterwards — verify by invoking a skill, not by the message. |
 | **F3** | Offline / remote unreachable | Warn + continue on cache state (the cache is a complete copy; day-to-day operation is offline-capable). Redo the staleness check at next connectivity, at latest at the next bootstrap. Confirmation line carries the offline suffix. |
@@ -469,4 +528,4 @@ Why F2 has the guardrail exception: a stale ruleset with old hooks means the ses
 ## Open points
 
 - OPEN: authoritative machine-readable source for the installed plugin SHA (step 1); multi-machine validation (ADR-0010).
-- **SessionStart hook:** the hook that requests this skill IS wired — `hooks/hooks.json` carries a `SessionStart` entry (matcher `startup|resume|clear`) running `hooks/staleness-check.mjs`, fail-open, read-only; it passed a T1 Critic review. Open only: multi-machine E2E validation.
+- **Codex startup boundary:** the current Codex manifest has PreToolUse guards but no SessionStart hook. Its first-request `pipeline-start` invocation is therefore the proactive onboarding entry; no invisible automatic initialization is claimed. Claude's plugin `SessionStart` wiring is a separate runtime integration and does not extend to Codex.

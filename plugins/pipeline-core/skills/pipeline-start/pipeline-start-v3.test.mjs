@@ -10,6 +10,40 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const skill = readFileSync(join(HERE, "SKILL.md"), "utf8");
 
 const cases = [
+  ["consumer onboarding state is checked before Git or V3 authority", () => {
+    const onboarding = skill.indexOf("## Step 0 — Consumer-root onboarding state");
+    const loadedState = skill.indexOf("## Step 1 — Ruleset presence + loaded state");
+    const v3Authority = skill.indexOf("## Step 1a — V3 source/runtime authority");
+    assert.ok(onboarding >= 0, "Step 0 must exist");
+    assert.ok(onboarding < loadedState, "onboarding must precede loaded-state Git checks");
+    assert.ok(onboarding < v3Authority, "onboarding must precede V3 authority checks");
+    assert.match(skill, /Before \*\*any\*\* `git rev-parse`, Git freshness helper, `setup\.mjs`, V3 authority\s+validator/u);
+    assert.match(skill, /project-onboarding-v3\.mjs" inspect --root "\$PWD"/u);
+    assert.match(skill, /Do\s+not replace it with a shell emptiness check, a copied consumer-root `setup\.mjs`,\s+or an incidental Git error/u);
+  }],
+  ["fresh roots stop as F0 and name the only authorized initializer", () => {
+    assert.match(skill, /Report typed \*\*F0: onboarding-required\*\* and print \*\*no bootstrap\s+confirmation line\*\*/u);
+    assert.match(skill, /project-onboarding-v3\.mjs" plan --root "\$PWD"/u);
+    assert.match(skill, /project-onboarding-v3\.mjs" apply --root "\$PWD" --activate/u);
+    assert.match(skill, /`inspect` and `plan` are read-only\. `apply --activate` is the sole write\s+operation/u);
+    assert.match(skill, /sole exception is F0's explicit user-authorized onboarding `apply --activate`/u);
+    assert.match(skill, /explicit user request to \*\*create\*\* or \*\*initialize\*\* this project authorizes\s+the agent to run that exact `apply --activate` command/u);
+    assert.match(skill, /makes no commit, remote, dependency install,\s+application scaffold, or project-policy decision/u);
+    assert.match(skill, /successful apply, rerun `pipeline-start` from Step 0/u);
+  }],
+  ["legacy and partial roots never get an inferred overwrite", () => {
+    assert.match(skill, /\*\*`migration-required` \(V0\/V1\/V2\):\*\*[\s\S]*runner-profile-migration-v3\.mjs" inspect --root/u);
+    assert.match(skill, /Its explicit `apply --activate` is the only writer for a legacy consumer/u);
+    assert.match(skill, /Never initialize over a legacy source/u);
+    assert.match(skill, /\*\*`partial`, `invalid`, `unsafe`, a malformed result, or a non-zero exit:\*\*[\s\S]*fail closed/u);
+    assert.match(skill, /Never\s+infer ownership of existing files or overwrite a non-empty\/partial root/u);
+  }],
+  ["Codex onboarding is first-request proactive, not an invisible hook", () => {
+    assert.match(skill, /Codex currently has no SessionStart hook in its manifest/u);
+    assert.match(skill, /proactive when the mandatory `pipeline-start` skill executes for the user's\s+first request/u);
+    assert.match(skill, /not an invisible automatic initializer/u);
+    assert.match(skill, /Codex manifest has PreToolUse guards but no SessionStart hook/u);
+  }],
   ["V3 source and runtime-noop are bootstrap authority", () => {
     assert.match(skill, /pipeline\.user\.v3/u);
     assert.match(skill, /v3-bootstrap-authority\.mjs" --root "\$PWD"/u);

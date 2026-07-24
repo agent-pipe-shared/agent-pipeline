@@ -79,10 +79,12 @@ They stay ignored and are never compiled into a public projection. This keeps a
 second device reproducible from the public snapshot plus its matching private
 pin, without copying secrets or local history.
 
-`pipeline.user.yaml` is the public source of setup intent. `node setup.mjs`
-compiles its owned runtime projections; **never hand-edit generated runtime
-configuration**. Change the source, then rerun setup or the explicit V3
-migration below. The compiler detects drift rather than silently treating a
+In a **pipeline-source checkout**, `pipeline.user.yaml` is the public source of
+setup intent and `node setup.mjs` compiles its owned runtime projections. A
+consumer project must not copy or run a root `setup.mjs`; its loaded plugin
+classifies fresh, legacy, and partial roots through `pipeline-start` and owns
+the official onboarding/migration path. **Never hand-edit generated runtime
+configuration.** The compiler detects drift rather than silently treating a
 local edit as authority.
 
 V3 has registered routes for both Claude and Codex. Claude Code is the
@@ -199,8 +201,9 @@ human.
 
 ## Quick start
 
-See [`SETUP.md`](SETUP.md) for the full walkthrough: clone, run `node setup.mjs`,
-bind the plugin, start your first session.
+See [`SETUP.md`](SETUP.md) for the full walkthrough: maintain a pipeline source
+with `node setup.mjs`, then bind the plugin and start a consumer's first
+session. A fresh consumer root never needs a copied/root `setup.mjs`.
 
 ### Command lifecycle
 
@@ -360,12 +363,14 @@ Sie bleiben ignoriert und werden nie in eine öffentliche Projektion kompiliert.
 So ist ein zweites Gerät aus dem öffentlichen Snapshot plus passendem Private-Pin
 reproduzierbar, ohne Secrets oder lokale Historie zu kopieren.
 
-`pipeline.user.yaml` ist die öffentliche Quelle der Setup-Absicht. `node
-setup.mjs` kompiliert die zugehörigen Runtime-Projektionen; **generierte
-Runtime-Konfiguration wird nie von Hand bearbeitet**. Ändere die Quelle und
-führe danach Setup oder die explizite V3-Migration unten erneut aus. Der
-Compiler erkennt Drift, statt eine lokale Änderung stillschweigend zur Autorität
-zu machen.
+In einem **Pipeline-Source-Checkout** ist `pipeline.user.yaml` die öffentliche
+Quelle der Setup-Absicht, und `node setup.mjs` kompiliert die zugehörigen
+Runtime-Projektionen. Ein Consumer-Projekt darf weder eine Root-`setup.mjs`
+kopieren noch ausführen; sein geladenes Plugin klassifiziert frische, Legacy-
+und partielle Roots durch `pipeline-start` und besitzt den offiziellen
+Onboarding-/Migrationspfad. **Generierte Runtime-Konfiguration wird nie von
+Hand bearbeitet.** Der Compiler erkennt Drift, statt eine lokale Änderung
+stillschweigend zur Autorität zu machen.
 
 V3 hat registrierte Routen für Claude und Codex. Claude Code ist die
 Full-Enforcement-Laufzeit: Plugin und Hooks können konfigurierte Guardrails
@@ -485,8 +490,10 @@ Urteil bleibt trotzdem immer beim Menschen.
 
 ## Schnellstart
 
-Der vollständige Ablauf steht in [`SETUP.md`](SETUP.md): klonen, `node setup.mjs`
-ausführen, Plugin binden, erste Session starten.
+Der vollständige Ablauf steht in [`SETUP.md`](SETUP.md): eine Pipeline-Source
+mit `node setup.mjs` pflegen, dann das Plugin binden und die erste Consumer-
+Session starten. Ein frischer Consumer-Root benötigt keine kopierte/root
+`setup.mjs`.
 
 ### Befehls-Lebenszyklus
 

@@ -62,16 +62,35 @@ enters the pipeline.
 
 ## 1. Bootstrap (do this first, before anything else)
 
-Greenfield kickoff — none of the three bootstrap layers exist yet (plugin
-binding, calibration, handover; `harness/session-bootstrap.md` §2). Expect
-this sequence, not an error: first `/pipeline-core:pipeline-start` → case
-**F1** (no binding) → Minimal-Safe-Mode fallback
-(`templates/prompts/session-bootstrap-check.md`, read-only tools + read-only
-git only) → run Step 0, then Step 1 → re-run it → case **F4** (here: calibration
-and handover both missing — the expected greenfield state; read-only stays
-allowed) → the offered create-from-template actions ARE Steps 2 and 4. (F4's
-general trigger is calibration OR handover missing — in the greenfield
-instant both happen to be, but either alone fires it in later sessions.)
+Start with `/pipeline-core:pipeline-start`. For a new consumer root it runs the
+plugin-owned onboarding inspection **before** Git or V3 checks. A genuinely
+empty root produces **F0: onboarding-required**, no bootstrap confirmation,
+and a read-only plan. Do not manually run `git init`, copy a root `setup.mjs`,
+or create V3 runtime files/calibration first.
+
+The only fresh-project initializer is the loaded plugin command:
+
+```sh
+node "${PIPELINE_PLUGIN_ROOT}/scripts/project-onboarding-v3.mjs" inspect --root "$PWD"
+node "${PIPELINE_PLUGIN_ROOT}/scripts/project-onboarding-v3.mjs" plan --root "$PWD"
+node "${PIPELINE_PLUGIN_ROOT}/scripts/project-onboarding-v3.mjs" apply --root "$PWD" --activate
+```
+
+`inspect` and `plan` are read-only. The final command is the sole write step;
+run it only when the PO has explicitly asked to create/initialize this project.
+It initializes the repository and the safe V3 seed, but does not commit, add a
+remote, install dependencies, scaffold the application, or choose project
+policy beyond that seed. After it succeeds, rerun
+`/pipeline-core:pipeline-start` and require normal V3 authority readback before
+any bootstrap confirmation or application work.
+
+If the root is V0/V1/V2, use the official V3 migration inspect → plan →
+explicit apply flow instead; if it is partial, invalid, non-empty, or unsafe,
+stop with its typed diagnostic and do not overwrite it. If `pipeline-core` is
+not loaded, F1 still permits only minimal-safe diagnosis until the runtime's
+supported plugin installation is complete. Codex currently has no SessionStart
+hook: this is proactive when the mandatory `pipeline-start` skill runs for the
+first user request, not an invisible automatic initializer.
 
 It ends with three verbatim confirmation lines: the confirmation line
 ("Bootstrap check passed: ruleset <SHA> loaded · Project <name> · Calibration <file> · State <...> · Role <Elephant|Goldfish|Critic>"), the model/effort line (now also carrying
@@ -95,15 +114,17 @@ items under `backlog/items/`. If a checkout is impossible, fall back per
 the close-block rule: record backlog items verbatim in the handover for
 transfer, and ask the PO for template contents instead of improvising them.
 
-### Step 0 — Toolchain, repo init, git identity
+### Step 0 — Toolchain and onboarding authorization
 
 Confirm `git`/`gh`/node are on PATH and versioned — node is required
 regardless of this project's own stack, since the guard hook itself runs via
 node (`plugins/pipeline-core/hooks/hooks.json`). Confirm `gh auth status` is green
-(Step 1 needs it). `git init` + first commit if the repo doesn't exist yet;
-set local git identity if it differs from the global one. No `.claude/**`
-touched — Elephant self-execution (stage-0 fast path, operating-model §3.3)
-or a trivial Goldfish dispatch, your call.
+if this project will use GitHub. Review the onboarding plan with the PO; their
+explicit request to create/initialize authorizes the exact plugin
+`apply --activate` command in §1. The initializer, not an ad-hoc `git init` or
+consumer-root `setup.mjs`, owns the initial Git/V3 authority/runtime write.
+Choose local Git identity, remote, first commit, dependencies, and application
+scaffolding separately after onboarding.
 
 ### Step 1 — Plugin first-binding
 
@@ -124,16 +145,15 @@ install + version + `enabled: true`. Restart or `/reload-plugins`, then
 `CLAUDE_CODE_PLUGIN_KEEP_MARKETPLACE_ON_FAILURE=1` once if unset; leave
 `autoUpdate` at its default "off".
 
-### Step 2 — Calibration (`.claude/pipeline.json`)
+### Step 2 — Review the generated bootstrap calibration
 
-Copy `templates/pipeline.json.example` (agent-pipeline repo) to
-`.claude/pipeline.json`; fill every field for real — `verify`, `autonomy`,
-`branchModel`, `verification`, `wipLimit`, `worktree`, `stakes`,
-`constraints`, `claudeMdMaxLines`, `riskZones`, `handover` (semantics:
-`docs/operating-model.md` §8). **the PO's walkthrough is the gate:** propose
-values, wait for his explicit confirmation before committing — a new
-calibration is a project-policy decision, never an agent-alone act (F4,
-`harness/session-bootstrap.md` §4).
+The initializer creates the minimal V3-owned bootstrap calibration; do not
+pre-create or overwrite it from `templates/pipeline.json.example`. Once normal
+bootstrap reaches the calibration/project-policy decision, propose any project-
+specific `verify`, autonomy, branch, stakes, constraints, and handover changes
+to the PO and wait for explicit confirmation before applying them. A new or
+changed calibration remains a project-policy decision, never an agent-alone
+action.
 
 ### Step 3 — CLAUDE.md (new, lean, correct-from-birth)
 

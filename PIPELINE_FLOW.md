@@ -175,12 +175,12 @@ evidence and approval rules.
 | Spec, scope, evidence, or authority drift | Elephant and human as needed. | Re-plan or re-approve; never carry stale approval into a changed contract. | Return to triage, Spec, readiness, or approval — whichever became stale. |
 | Unknown cause, repeated signature, exhausted budget, or conflict | Human decision-maker. | Continue with a new direction, defer, or stop. | No unbounded retry loop and no success claim without required evidence. |
 
-## Configure V3 without hand-editing projections
+## Configure a pipeline-source V3 authority without hand-editing projections
 
-`pipeline.user.yaml` is the V3 source of routing intent. Generated runtime
-projection files are not a second configuration surface. When a V3 source needs
-the sanctioned migration/apply path, review the plan, activate it, then read it
-back:
+In a **pipeline-source checkout**, `pipeline.user.yaml` is the V3 source of
+routing intent. Generated runtime projection files are not a second
+configuration surface. When that source needs the sanctioned migration/apply
+path, review the plan, activate it, then read it back:
 
 ```sh
 node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
@@ -192,6 +192,13 @@ The first command lets you inspect the planned projection; the second is explici
 activation; `node setup.mjs` confirms that source and generated runtime projection
 are current and performs no writes. If a step reports drift or an invalid source,
 stop rather than editing generated `.claude` bytes by hand.
+
+These are not consumer-root setup commands. A fresh consumer first runs the
+mandatory `pipeline-start` skill, which classifies it before any Git/V3 check;
+its plugin-owned `project-onboarding-v3` inspect → plan → explicit
+`apply --activate` path is the only initializer. An explicit user request to
+create/initialize authorizes the apply; partial roots fail closed and are never
+overwritten.
 
 ## Support boundary and current scope
 
@@ -401,12 +408,12 @@ eigenen Nachweis- und Freigaberegeln.
 | Spec-, Scope-, Nachweis- oder Authority-Drift | Elephant und nötigenfalls Mensch. | Neu planen oder freigeben; alte Freigabe nie in einen veränderten Vertrag tragen. | Zur Triage, Spec, Readiness oder Freigabe zurück — je nachdem, was veraltet ist. |
 | Unbekannte Ursache, wiederholte Signatur, erschöpftes Budget oder Konflikt | Menschlicher Entscheider. | Mit neuer Richtung fortsetzen, verschieben oder stoppen. | Keine endlose Retry-Schleife und kein Erfolg ohne erforderliche Nachweise. |
 
-## V3 konfigurieren, ohne Projektionen von Hand zu editieren
+## Eine V3-Autorität der Pipeline-Source ohne manuelles Bearbeiten von Projektionen konfigurieren
 
-`pipeline.user.yaml` ist die V3-Quelle der Routing-Absicht. Generierte
-Runtime-Projektionsdateien sind keine zweite Konfigurationsoberfläche. Braucht
-eine V3-Quelle den sanktionierten Migrations-/Apply-Pfad, prüfe den Plan,
-aktiviere ihn und lies ihn dann zurück:
+In einem **Pipeline-Source-Checkout** ist `pipeline.user.yaml` die V3-Quelle
+der Routing-Absicht. Generierte Runtime-Projektionsdateien sind keine zweite
+Konfigurationsoberfläche. Braucht diese Quelle den sanktionierten Migrations-/
+Apply-Pfad, prüfe den Plan, aktiviere ihn und lies ihn dann zurück:
 
 ```sh
 node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"
@@ -419,6 +426,13 @@ Aktivierung; `node setup.mjs` bestätigt, dass Quelle und generierte
 Runtime-Projektion aktuell sind, und schreibt nichts. Meldet ein Schritt Drift
 oder eine ungültige Quelle, halte dort an, statt generierte `.claude`-Bytes von
 Hand zu bearbeiten.
+
+Das sind keine Setup-Befehle für Consumer-Roots. Ein frischer Consumer startet
+zuerst den verpflichtenden Skill `pipeline-start`, der ihn vor jedem Git-/V3-
+Check klassifiziert; sein Plugin-eigener Pfad `project-onboarding-v3` mit
+inspect → plan → explizitem `apply --activate` ist der einzige Initialisierer.
+Eine explizite Bitte, das Projekt zu erstellen/initialisieren, autorisiert Apply;
+partielle Roots schlagen geschlossen fehl und werden nie überschrieben.
 
 ## Supportgrenze und aktueller Scope
 

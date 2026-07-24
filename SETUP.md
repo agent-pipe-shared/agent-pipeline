@@ -179,6 +179,30 @@ Repeat this section for every application or service repository you want to
 govern. A governed project does not inherit your local account or credentials;
 it commits only its portable calibration and its project rules.
 
+### 0. Let `pipeline-start` classify the consumer root first
+
+Do not copy `setup.mjs` into a consumer project or start a blank directory by
+manually creating Git/V3 runtime files. Once `pipeline-core` is loaded, invoke
+`/pipeline-core:pipeline-start` as the first project action. Its plugin-owned
+preflight runs before Git or V3 authority checks and has these outcomes:
+
+- A fresh empty root stops as `F0: onboarding-required`, with no bootstrap
+  confirmation. The agent runs the plugin-local read-only `inspect` and `plan`
+  operations and reports their public targets/digests.
+- Only an explicit user request to create or initialize the project authorizes
+  the exact plugin-local `project-onboarding-v3.mjs apply --activate` command.
+  That transaction initializes Git and the complete V3 source/runtime seed,
+  but creates no commit or remote and installs no dependencies or application
+  scaffold. Rerun `pipeline-start` afterwards; its normal V3 readback remains
+  required before a confirmation line.
+- A V0/V1/V2 authority uses the official migration inspect → plan → explicit
+  apply workflow, never the fresh initializer. A partial, invalid, non-empty,
+  unsafe, or malformed root fails closed with no overwrite.
+
+Codex currently has no SessionStart hook in its manifest. The mandatory
+`pipeline-start` invocation is proactive for the user's first request; it is
+not an automatic hidden initialization.
+
 ### 1. Bind the plugin at project scope (Claude Code)
 
 In the project repository, add the marketplace that hosts your pipeline source
@@ -253,9 +277,16 @@ explicit activation, rerun `pipeline-core:pipeline-start`; project calibration,
 handover, Verify, and feature-state checks remain separate and may still fail
 closed even when the overlay bridge is activated.
 
-### 2. Add the small, committed project calibration
+### 2. Complete project calibration after onboarding
 
-Copy and adapt these templates in the project repository:
+For a fresh root, the official initializer already creates the minimal
+V3-owned bootstrap calibration and runtime projection. Do not pre-create,
+copy over, or hand-edit those generated targets. After the initializer and its
+readback, propose project-specific calibration choices to the repository owner
+and apply them through the normal reviewed workflow.
+
+For an existing project that is being adopted (not a fresh initializer), copy
+and adapt these templates in the project repository:
 
 ```sh
 cp <pipeline-source>/templates/pipeline.json.example .claude/pipeline.json
