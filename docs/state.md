@@ -707,6 +707,57 @@ authoritative view of backlog reality for the Cyborg runner.
   (or, short-term, by running it from a correctly-cased PowerShell session as a
   workaround for #1 alone, if approval is needed sooner).
 
+#### Windows/sandbox-assurance slice — scope sketch drafted (AFK continuation) — 2026-07-25
+
+- **PO directive, 2026-07-24 (live, verbatim in German):** "du kannst mE
+  parallel schon die anpassung für windows beginnen, da die anpassungen 0.4.2
+  nur das bootstrap betreffen und migration und erst installation. Das sollte
+  kaum überschneidungen haben" — start the Windows slice now, in parallel with
+  the pending 0.4.2 release, rather than waiting to re-baseline against it.
+  The PO then went AFK overnight with an explicit instruction to continue as
+  far as possible within role bounds ("du musst im afk mode durchziehen so
+  weit du kannst").
+- **advisor() consulted before committing to an overnight plan** (this is a
+  role-boundary-sensitive moment: the prior AFK incident above, lines ~850-864,
+  is exactly the failure mode to avoid repeating unsupervised). Verdict: design
+  work is the correct green zone for tonight — deep on scoping, package specs,
+  EL-04 register entries — but **no Goldfish implementation dispatch**
+  (package-level specs mostly don't exist yet, so a briefing would be
+  underspecified) and **no further chasing of finding #2** (`PO-PROFILE-RECEIPT-INVALID`)
+  or `approve-plan` workaround attempts (the closed gate is doing its job:
+  holding the session in design phase, which is where tonight's work belongs
+  anyway). Deliverable = a clean, PO-reviewable handover by morning.
+- **Scope sketch drafted:**
+  [`specs/2026-07-24-sprint-cyborg-epic/windows-sandbox-assurance-slice-scope.md`](../specs/2026-07-24-sprint-cyborg-epic/windows-sandbox-assurance-slice-scope.md).
+  Consolidates the shell-invariant 11-suite classification above into a single
+  scope table: real DACL/durability (#34/#35, already open), the two new
+  PO-gate-authority findings from this section (now filed as their own backlog
+  items rather than only chat/state prose), trusted-tool-resolution (#37,
+  already open), and brittle-test hygiene (feature-package-topology,
+  license-contract — bundled as one new item). It explicitly excludes the
+  Codex-host-on-Claude-session suites and the `guard-push` PG26a fixture
+  failure from this slice's scope, and proposes a sequencing (brittle-test
+  hygiene → path-canonicalization → #34 → #35 (absorbing the receipt-readback
+  finding) → #37 → re-verify).
+- **Three new backlog items filed** (self-observed defects, `status: open`,
+  untriaged — triage is the next session's Elephant per `backlog/README.md`):
+  - [`pipeline.po-gate-authority-path-canonicalization`](../backlog/items/2026-07-25-po-gate-authority-path-canonicalization.md)
+    (finding #1 above, confirmed).
+  - [`pipeline.po-gate-authority-receipt-readback`](../backlog/items/2026-07-25-po-gate-authority-receipt-readback.md)
+    (finding #2 above, unconfirmed — needs a dedicated repro pass before it can
+    be sequenced with confidence).
+  - [`pipeline.windows-verify-brittle-test-hygiene`](../backlog/items/2026-07-25-windows-verify-brittle-test-hygiene.md)
+    (the two brittle-test fixes, bundled).
+- **Gate:** this slice is a foundational scope decision and needs an explicit
+  PO gate (EL-19) before any Goldfish dispatch, same as any other epic-adjacent
+  scope addition — the scope sketch is the artifact to review. Task #14
+  (session task tracker) is the design-phase deliverable this closes; task #13
+  (`approve-plan`) remains pending/blocked, explicitly not urgent.
+- **Next AFK step:** continue with per-package feature-spec drafting for the
+  Cyborg epic itself, in dependency order starting with CYB-1 (spec.md §4:
+  "Phase I ... Dependency spine: CYB-1F → all") — still Elephant design work,
+  still no dispatch.
+
 ### 2026-07-24 release-candidate checkpoint — authoritative latest
 
 The PO has dispositioned all Sentinel/HAW-E implementation and tests as
