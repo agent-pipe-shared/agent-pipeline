@@ -373,6 +373,69 @@ branches. Parallel-runner discipline: this runner owns only Sprint Cyborg.
   checkpoint. Session cleanup descriptor `session-13b3c042ba3bcf02203b17b6`
   is active for this session.
 
+#### Backlog cleanup — PAUSED, handover (2026-07-24; PO finishes in Nova sprint)
+
+PO directive 2026-07-24: close all Sentinel backlog items (Sentinel did not
+close them at sprint close); set the six Cyborg-absorbed items to
+`in_progress` + Cyborg assignment; propose sprints for the rest; list
+questionable items for PO sorting. Work was scoped and drafted, then
+**reverted — nothing is applied to the ledger; the working tree is clean at
+the branch head.** The draft scripts lived in the (ephemeral) session
+scratchpad; THIS block is the durable plan. Apply only through the sanctioned
+writer (`applyBacklogTransition` / `check-backlog-state --write`); never
+hand-edit `STATUS.md`/`index.json`.
+
+- **Resolve first — "Sentinel items" is ambiguous.** (a) Sentinel *sprint
+  scope/deliverables* → 6 closeable items:
+  `sentinel-go-live-completion`, `windows-directory-durability`,
+  `windows-private-state-assurance`, `windows-trusted-tool-resolution`,
+  `windows-verify-reproducibility`, `push-guard-worktree-target`
+  (`windows-runtime-baseline-containment` is already closed). (b) *Everything
+  tagged "Sentinel recovery baseline"* → the whole 2026-07-19 batch (~13),
+  but most are general workflow-improvement/defect items that are NOT
+  implemented — closing them as done would be a false completion claim. The
+  draft used interpretation (a). PO confirms (a) vs (b) before applying.
+- **Cyborg absorptions → `in_progress` (6):**
+  `recovery-preview-callback-attestation` (CYB-A0),
+  `critic-context-isolation` (CYB-5b), `dispatch-provenance` (CYB-5b),
+  `cross-repository-override-ledger-binding` (CYB-5c),
+  `elephant-direct-implementation-under-afk-authorization` (CYB-1 waiver
+  class), `verify-gate-scoped-registration` (CYB-2). These already carry the
+  Cyborg PRD; the ledger transition is what remains.
+- **Sprint proposals for the remaining open items (PO confirms):**
+  Nightwing (docs/onboarding) → `documentation-information-architecture`,
+  `dual-channel-publication`. Phoenix (governance/evidence) →
+  `regulated-document-hooks`, `spec-retention-on-close`,
+  `close-spec-retention-and-consent`, `stateful-design-contract-template`.
+  Nova (execution/session) → `afk-assumption-mode`,
+  `execution-model-switchback`, `multi-cli-efficiency-pilots`,
+  `session-keep-awake`, `nonblocking-interaction-continuity`,
+  `closed-input-channel-review-economics`,
+  `evidence-bound-review-retry-economics`, `canonical-worktree-lifecycle`,
+  `po-gate-worktree-authority`.
+- **Questionable — PO sorts:** `observation-intake-document-governance`
+  (in_progress; tied to issue #53 `sprint:sentinel` — close as Sentinel, or
+  keep for Phoenix governance?); `private-overlay-activation-bridge`
+  (in_progress; overlay activation shipped in `v0.4.1` — close as done, or
+  keep?); `codex-plugin-validator-host-parity`,
+  `codex-sandbox-critic-longterm`, `t1-governance-path-preflight`,
+  `project-scoped-github-issue-operations` (Codex/tooling — Nova, or a
+  dedicated Codex sprint?).
+- **Technical gotchas for whoever applies it:** (1) Ledger events 39 & 40
+  reference commits not reachable in the public repo (`726b836…`,
+  `2ddf359…`), so `check-backlog-state` fails under the default
+  `checkCommit`; run the writer with `checkCommit:false`, or make those
+  objects reachable first — a pre-existing Sentinel-introduced defect that
+  itself deserves an item. (2) Forward-only ledger `open → in_progress →
+  closed`: closing an `open` item needs an intermediate `in_progress`
+  pass-through event; a closure needs `{repository:"self",
+  commit:<reachable OID>, evidence:<existing repo file>}` and a disposition
+  evidence file (draft text was in the reverted
+  `backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md`).
+- **Session model note:** the Cyborg design was authored under Fable 5/xhigh
+  (recorded PRD exception); mid-session the PO switched to Opus 4.8/high
+  after a credit-limit reset. The design-phase exception is unaffected.
+
 ### 2026-07-24 release-candidate checkpoint — authoritative latest
 
 The PO has dispositioned all Sentinel/HAW-E implementation and tests as
