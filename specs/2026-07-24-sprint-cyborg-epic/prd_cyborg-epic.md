@@ -91,7 +91,7 @@ mini/feature/epic lifecycle profile at dispatch time.
 | #47 | P1 / XL | Finding, exception, VEX and remediation lifecycle | CYB-8 |
 | #48 | P2 / L | Product-security readiness, disclosure, support, IR | CYB-9 |
 
-### Backlog items absorbed into Cyborg (proposed triage; PO confirms at this gate)
+### Backlog items absorbed into Cyborg (canonical in the Nova ledger)
 
 | Backlog item | Fit | Disposition |
 | --- | --- | --- |
@@ -102,13 +102,19 @@ mini/feature/epic lifecycle profile at dispatch time.
 | `pipeline.elephant-direct-implementation-under-afk-authorization` | #41 §6 waiver/exception lifecycle: "PO-waived direct implementation" becomes a governed, expiring exception class with mandatory follow-up Critic | Absorbed into CYB-1 (waiver semantics) + close-ritual hook |
 | `pipeline.verify-gate-scoped-registration` (stub) | #42 scoped capability registration | Absorbed into CYB-2 |
 
-Accepting this PRD records the triage decision (decision/rationale/assignment/
-date) in each item per the backlog process; the items stay open until their
-absorbing package delivers evidence.
+These six items are already `in_progress` and Cyborg-assigned in the
+**canonical Nova ledger** (`feat/sprint-nova-codex`; see `docs/state.md` →
+"Backlog cleanup — DONE in Nova" mirror block). The Cyborg branch holds a
+non-canonical mirror only and applies **no** ledger transition itself. Each
+item closes when its absorbing package delivers: the Cyborg runner returns
+`{item-ID, spec, candidate commit, evidence}` to Nova, and Nova executes the
+closure through the sanctioned writer. `in_progress` here reflects sprint
+assignment, not an open EL-19 gate — implementation dispatch still requires the
+PO's literal "approved".
 
 ### Explicitly out of scope
 
-- Residual Sentinel work: formal sprint close, `sentinel-go-live-completion`, all `pipeline.windows-*` items, `push-guard-worktree-target` (in progress elsewhere), `observation-intake-document-governance`, `private-overlay-activation-bridge`.
+- Residual Sentinel work: formal sprint close, and the Sentinel/residual backlog items now **closed in the canonical Nova ledger** (`sentinel-go-live-completion`, all `pipeline.windows-*` items, `push-guard-worktree-target`, `observation-intake-document-governance`, `private-overlay-activation-bridge`, `source-available-commercial-licensing`).
 - Nightwing (onboarding/docs), Phoenix (governance evidence/audit trails), Nova (execution scale) issues and their backlog analogues (`documentation-information-architecture`, `dual-channel-publication`, `regulated-document-hooks`, `spec-retention` items, `afk-assumption-mode`, `execution-model-switchback`, `multi-cli-efficiency-pilots`, `session-keep-awake`, `nonblocking-interaction-continuity`, review-economics items, `stateful-design-contract-template`, `canonical-worktree-lifecycle`, `po-gate-worktree-authority`, `codex-plugin-validator-host-parity`, `codex-sandbox-critic-longterm`, `t1-governance-path-preflight`, `project-scoped-github-issue-operations`).
 - Anything the issues list as non-goals (certification claims, vendor mandates, auto-installation, default production scanning, publishing sensitive exploit detail, agent-approved waivers/releases).
 
@@ -206,8 +212,10 @@ human accountability.
 
 - All nine issues satisfy their acceptance criteria with candidate-bound
   machine evidence, each closed individually with its evidence comment.
-- The six absorbed backlog items carry completed triage records and either
-  closure evidence or an explicit remaining-scope note.
+- The six absorbed backlog items are closed in the canonical Nova ledger via
+  the delivery-return path (Cyborg returns candidate commit + evidence to Nova;
+  Nova transitions through the sanctioned writer); the Cyborg branch never
+  self-closes them.
 - Full Verify and the Security gate pass on the final integrated candidate;
   independent Critic review per checkpoint deliverable (ADR-0014/0015);
   PO gate passed per package and at sprint close.
@@ -255,8 +263,10 @@ revision under the same disclosure caveat.
 
 ## Open decisions for the PO (answer with the gate)
 
-- **A.** Approve the nine-issue scope plus the six backlog absorptions/triage
-  dispositions as listed (or name exclusions).
+- **A.** Approve the nine-issue scope (or name exclusions). The six backlog
+  absorptions are already canonical in the Nova ledger (`in_progress`,
+  Cyborg-assigned), so this decision no longer sorts them — it only confirms
+  the issue scope and that the absorptions stay with Cyborg.
 - **B.** Approve the CYB package slicing and Phase I→IV order, including
   CYB-A0 as the first implementation package (after CYB-0 scaffolding) and
   the CYB-1 schema-boundary checkpoint (CYB-1F) as a named PO gate.

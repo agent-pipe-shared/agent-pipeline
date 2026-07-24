@@ -148,9 +148,12 @@ docs live in the package's ADR-0045 topology under `specs/<package-id>/`.
 "Boundary" = the schemas/contracts a package freezes for its consumers.
 
 ### CYB-0 — sprint scaffolding (S)
-Feature-state switch via the sanctioned `pipeline-state.mjs` writer; triage
-records for the six absorbed backlog items; spec-retention registration for
-this Epic's authority set; sprint telemetry note. No product code.
+Feature-state switch via the sanctioned `pipeline-state.mjs` writer;
+spec-retention registration for this Epic's authority set; sprint telemetry
+note. No product code. The six absorbed backlog items are canonical in the
+Nova ledger (already `in_progress`/Cyborg-assigned); CYB-0 writes **no** local
+backlog transition — closures return to Nova on delivery (PRD §"Backlog items
+absorbed into Cyborg").
 
 ### CYB-A0 — assurance quickfix: recovery-preview callback attestation (S/M)
 Resolve the open Critic findings on the existing candidate
@@ -281,7 +284,9 @@ acceptance mapping) staged for sprint close. The acceptance matrix
 ## 8. Completion contract
 
 Sprint close = all nine issues individually evidence-closed per the issues'
-close-accounting rule; six absorbed backlog items transitioned with evidence;
+close-accounting rule; six absorbed backlog items closed in the canonical Nova
+ledger via the delivery-return path (evidence returned to Nova; Nova executes
+the transition);
 final integrated candidate green (Full Verify + Security), fresh Critic PASS,
 PO gate; `docs/state.md` handover updated; spec retention registered. Cyborg
 does NOT claim: certification, vulnerability-freedom, SLSA levels, or

@@ -373,68 +373,85 @@ branches. Parallel-runner discipline: this runner owns only Sprint Cyborg.
   checkpoint. Session cleanup descriptor `session-13b3c042ba3bcf02203b17b6`
   is active for this session.
 
-#### Backlog cleanup — PAUSED, handover (2026-07-24; PO finishes in Nova sprint)
+#### Backlog cleanup — DONE in Nova; Cyborg holds a NON-CANONICAL mirror (2026-07-24)
 
-PO directive 2026-07-24: close all Sentinel backlog items (Sentinel did not
-close them at sprint close); set the six Cyborg-absorbed items to
-`in_progress` + Cyborg assignment; propose sprints for the rest; list
-questionable items for PO sorting. Work was scoped and drafted, then
-**reverted — nothing is applied to the ledger; the working tree is clean at
-the branch head.** The draft scripts lived in the (ephemeral) session
-scratchpad; THIS block is the durable plan. Apply only through the sanctioned
-writer (`applyBacklogTransition` / `check-backlog-state --write`); never
-hand-edit `STATUS.md`/`index.json`.
+**Authority.** The PO completed the backlog cleanup in the Nova sprint. The
+Nova repository on `feat/sprint-nova-codex` is now the **single canonical
+backlog- and ledger authority**. The Cyborg branch keeps a **read-only,
+non-canonical mirror** of that state and MUST NOT run a competing canonical
+ledger here. This block supersedes the earlier "PAUSED — apply through the
+sanctioned writer in this repo" plan: **no backlog transition is to be applied
+in the Cyborg repo.** The reverted draft scripts and the interpretation-(a)/(b)
+ambiguity are moot — the PO's canonical sort resolved every open question below.
 
-- **Resolve first — "Sentinel items" is ambiguous.** (a) Sentinel *sprint
-  scope/deliverables* → 6 closeable items:
-  `sentinel-go-live-completion`, `windows-directory-durability`,
-  `windows-private-state-assurance`, `windows-trusted-tool-resolution`,
-  `windows-verify-reproducibility`, `push-guard-worktree-target`
-  (`windows-runtime-baseline-containment` is already closed). (b) *Everything
-  tagged "Sentinel recovery baseline"* → the whole 2026-07-19 batch (~13),
-  but most are general workflow-improvement/defect items that are NOT
-  implemented — closing them as done would be a false completion claim. The
-  draft used interpretation (a). PO confirms (a) vs (b) before applying.
-- **Cyborg absorptions → `in_progress` (6):**
-  `recovery-preview-callback-attestation` (CYB-A0),
-  `critic-context-isolation` (CYB-5b), `dispatch-provenance` (CYB-5b),
-  `cross-repository-override-ledger-binding` (CYB-5c),
+**Canonical snapshot (delivered by the PO as the Nova→Cyborg handover):**
+
+- Base `v0.4.1`; snapshot `5ca5a4b`; backlog tree `832bf98`.
+- Ledger head (content digest, sha256):
+  `36dd616d3aa5bc21e49e138f6b8a9a17a9de25321998304306e4fa47289de562`.
+- Count: **6 open / 19 in_progress / 10 closed** (35 items — reconciles the
+  earlier "35 accounted" tally).
+
+**Sprint rosters (mirror; Nova is authoritative on any conflict):**
+
+- **Cyborg — `in_progress` (6):** `recovery-preview-callback-attestation`
+  (CYB-A0), `critic-context-isolation` (CYB-5b), `dispatch-provenance`
+  (CYB-5b), `cross-repository-override-ledger-binding` (CYB-5c),
   `elephant-direct-implementation-under-afk-authorization` (CYB-1 waiver
-  class), `verify-gate-scoped-registration` (CYB-2). These already carry the
-  Cyborg PRD; the ledger transition is what remains.
-- **Sprint proposals for the remaining open items (PO confirms):**
-  Nightwing (docs/onboarding) → `documentation-information-architecture`,
-  `dual-channel-publication`. Phoenix (governance/evidence) →
-  `regulated-document-hooks`, `spec-retention-on-close`,
-  `close-spec-retention-and-consent`, `stateful-design-contract-template`.
-  Nova (execution/session) → `afk-assumption-mode`,
+  class), `verify-gate-scoped-registration` (CYB-2). `in_progress` here means
+  *sprint-assigned/active from sprint start* — it does NOT open the Cyborg
+  EL-19 gate; implementation dispatch still needs the PO's literal "approved".
+- **Nova — `in_progress` (13):** `afk-assumption-mode`,
   `execution-model-switchback`, `multi-cli-efficiency-pilots`,
   `session-keep-awake`, `nonblocking-interaction-continuity`,
   `closed-input-channel-review-economics`,
   `evidence-bound-review-retry-economics`, `canonical-worktree-lifecycle`,
-  `po-gate-worktree-authority`.
-- **Questionable — PO sorts:** `observation-intake-document-governance`
-  (in_progress; tied to issue #53 `sprint:sentinel` — close as Sentinel, or
-  keep for Phoenix governance?); `private-overlay-activation-bridge`
-  (in_progress; overlay activation shipped in `v0.4.1` — close as done, or
-  keep?); `codex-plugin-validator-host-parity`,
+  `po-gate-worktree-authority`, `codex-plugin-validator-host-parity`,
   `codex-sandbox-critic-longterm`, `t1-governance-path-preflight`,
-  `project-scoped-github-issue-operations` (Codex/tooling — Nova, or a
-  dedicated Codex sprint?).
-- **Technical gotchas for whoever applies it:** (1) Ledger events 39 & 40
-  reference commits not reachable in the public repo (`726b836…`,
-  `2ddf359…`), so `check-backlog-state` fails under the default
-  `checkCommit`; run the writer with `checkCommit:false`, or make those
-  objects reachable first — a pre-existing Sentinel-introduced defect that
-  itself deserves an item. (2) Forward-only ledger `open → in_progress →
-  closed`: closing an `open` item needs an intermediate `in_progress`
-  pass-through event; a closure needs `{repository:"self",
-  commit:<reachable OID>, evidence:<existing repo file>}` and a disposition
-  evidence file (draft text was in the reverted
-  `backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md`).
+  `project-scoped-github-issue-operations`. (Resolution of my earlier
+  "questionable" list: the four Codex/tooling items all went to Nova, not a
+  dedicated Codex sprint.)
+- **Nightwing — `open` (2):** `documentation-information-architecture`,
+  `dual-channel-publication`.
+- **Phoenix — `open` (4):** `regulated-document-hooks`,
+  `spec-retention-on-close`, `close-spec-retention-and-consent`,
+  `stateful-design-contract-template`.
+- **Closed (10):** `source-available-commercial-licensing`,
+  `windows-runtime-baseline-containment`, `sentinel-go-live-completion`,
+  `push-guard-worktree-target`, `windows-directory-durability`,
+  `windows-private-state-assurance`, `windows-trusted-tool-resolution`,
+  `windows-verify-reproducibility`, `observation-intake-document-governance`,
+  `private-overlay-activation-bridge`. (Both earlier "questionable"
+  candidates — `observation-intake-document-governance` and
+  `private-overlay-activation-bridge` — were resolved to closed.)
+
+**Binding rules from the handover (govern all future Cyborg backlog work):**
+
+1. This state is recorded expressly as a **non-canonical mirror**; Cyborg
+   never becomes a second canonical ledger.
+2. Do **not** rebuild or renumber Nova ledger events **41–72**.
+3. Do **not** self-close any Cyborg deliverable canonically.
+4. **On each Cyborg delivery, return {item-ID, spec, candidate commit,
+   evidence} to Nova; Nova executes the status transition through the
+   sanctioned writer.** This is the standing close path for the six Cyborg
+   items above.
+5. Historical ledger events **39 & 40** carry evidence commits that are not
+   reachable in the public repo. Until repaired, the normal checker may report
+   **only** these two findings — do not rewrite history to silence them.
+6. **Issue #57 is Nova P0** and will automate this spec/delivery/status
+   synchronisation. It is not yet a canonical ledger item because the current
+   writer has no generic initializer.
+
+**Local-mirror reconciliation.** The Cyborg branch's own
+`backlog/transitions.ndjson` + `STATUS.md`/`index.json` still show the
+pre-cleanup projection; they are **not** to be hand-synced here (rules 1–2).
+They reconcile automatically the next time `feat/sprint-cyborg-claude` rebases
+onto a `main` that carries Nova's merged ledger. Until then, this block is the
+authoritative view of backlog reality for the Cyborg runner.
+
 - **Session model note:** the Cyborg design was authored under Fable 5/xhigh
-  (recorded PRD exception); mid-session the PO switched to Opus 4.8/high
-  after a credit-limit reset. The design-phase exception is unaffected.
+  (recorded PRD exception); mid-session the PO switched to Opus 4.8/high after
+  a credit-limit reset. The design-phase exception is unaffected.
 
 ### 2026-07-24 release-candidate checkpoint — authoritative latest
 

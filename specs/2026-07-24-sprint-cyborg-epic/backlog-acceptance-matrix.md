@@ -24,6 +24,13 @@
 
 ## Absorbed backlog items
 
+> Canonical status lives in the **Nova ledger** (`feat/sprint-nova-codex`): all
+> six are `in_progress`/Cyborg-assigned. The "Status" column below tracks
+> *Cyborg delivery*, not the ledger. On delivery the Cyborg runner returns
+> `{item-ID, spec, candidate commit, evidence}` to Nova, which executes the
+> transition through the sanctioned writer — the Cyborg branch never self-closes
+> (see `docs/state.md` → "Backlog cleanup — DONE in Nova").
+
 | Item | Pkg | Acceptance | Status |
 | --- | --- | --- | --- |
 | `pipeline.recovery-preview-callback-attestation` (due 2026-07-27) | CYB-A0 | open Critic findings resolved; one-preview-one-acknowledgement invariant; deterministic negative tests; independent review; ledger transition with evidence | open |
