@@ -12,7 +12,8 @@ const skill = readFileSync(join(HERE, "SKILL.md"), "utf8");
 const cases = [
   ["V3 source and runtime-noop are bootstrap authority", () => {
     assert.match(skill, /pipeline\.user\.v3/u);
-    assert.match(skill, /node setup\.mjs/u);
+    assert.match(skill, /v3-bootstrap-authority\.mjs" --root "\$PWD"/u);
+    assert.match(skill, /Consumer-root `setup\.mjs`\s+is neither required nor consulted/u);
     assert.match(skill, /Runtime projection noop/u);
     assert.match(skill, /explicit V3 migration\/apply/u);
     assert.match(skill, /V3 contract\s+supersedes legacy/u);

@@ -127,14 +127,16 @@ V3 source/runtime check:
 1. `pipeline.user.yaml` must exist and declare `schema: pipeline.user.v3`.
    Neither a V1/V2 compatibility projection nor the installed plugin cache is
    a substitute authority.
-2. Run `node setup.mjs` with **no flags** from the governed project root
-   through the host-authorized local read-only execution boundary. Do not first
+2. Run the loaded plugin's `node "${PIPELINE_PLUGIN_ROOT}/scripts/v3-bootstrap-authority.mjs" --root "$PWD"`
+   through the host-authorized local read-only execution boundary. This is the
+   plugin-shipped read-only V3 authority validator; a Consumer-root `setup.mjs`
+   is neither required nor consulted. Do not first
    run a known sandbox-restricted probe and classify its
    `execution_environment` or `probe_timeout` result as a missing installation.
-   In
-   V3 this is a read-only source/runtime check. Success must report that
-   `pipeline.user.v3` and its runner-neutral advisory runtime projections are
-   current and that setup performed no writes.
+   In V3 this is a read-only source/runtime check. Success must report a current
+   `pipeline.user.v3` source and an empty V3 migration plan (`runtimeProjection:
+   "noop"`); it performs no Consumer writes. It accepts no V3 registry-refresh,
+   V1/V2, legacy, or runtime-projection fallback.
    A valid source with missing/default or declined `advisor_export` consent
    remains a successful read-only check. Missing/default enables the bounded
    Codex Host Advisor without a prompt; the configuration command is
