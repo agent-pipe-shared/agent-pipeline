@@ -647,6 +647,18 @@
       "member": "control-execution-exchange-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:artifact-topology-check",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "artifact-topology-check"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:artifact-topology-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "artifact-topology-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1103,6 +1115,12 @@
       "member": "product-capability-inventory-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-authority-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "project-authority-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1386,6 +1404,8 @@
         "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-tests",
         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-check",
         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:artifact-topology-check",
+        "verify-phase:harness/scripts/verify.mjs:artifact-topology-tests",
         "verify-phase:harness/scripts/verify.mjs:backlog-state-tests",
         "verify-phase:harness/scripts/verify.mjs:bootstrap-env-check-tests",
         "verify-phase:harness/scripts/verify.mjs:capture-observation-intake-tests",
@@ -1462,6 +1482,7 @@
         "verify-phase:harness/scripts/verify.mjs:private-overlay-bootstrap-status-tests",
         "verify-phase:harness/scripts/verify.mjs:private-overlay-runtime-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:product-capability-inventory-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
         "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",
         "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",

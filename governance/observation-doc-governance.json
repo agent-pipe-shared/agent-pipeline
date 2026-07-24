@@ -76,7 +76,8 @@
           "docs/licensing.md",
           "docs/observation-intake.md",
           "docs/operating-model.md",
-          "docs/runtime-boundary.md"
+          "docs/runtime-boundary.md",
+          "docs/v3-consumer-onboarding.md"
         ]
       },
       {
@@ -99,6 +100,7 @@
         "audience": "maintainer",
         "lifecycle": "maintained",
         "paths": [
+          "docs/artifact-topology.md",
           "docs/contributor-gate-security.md",
           "docs/critic-isolation-threat-model.md",
           "docs/github-actions-token-permissions.md",
@@ -156,6 +158,8 @@
           "docs/adr/0042-global-observation-and-document-governance.md",
           "docs/adr/0043-post-go-live-sprint-model.md",
           "docs/adr/0044-control-execution-boundary.md",
+          "docs/adr/0045-canonical-artifact-topology.md",
+          "docs/adr/0046-project-authority-layering.md",
           "docs/adr/README.md"
         ]
       },
