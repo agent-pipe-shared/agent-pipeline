@@ -4,6 +4,7 @@
 import { lstatSync, readFileSync } from "node:fs";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { validateFeatureTopology } from "../lib/feature-package-topology.mjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 export const DEFAULT_ROOT = resolve(HERE, "..", "..", "..");
@@ -32,7 +33,9 @@ export function checkArtifactTopology(root = DEFAULT_ROOT, path = "governance/ar
   if (topology?.packageRoot !== "specs/<feature-id>") findings.push("packageRoot must be specs/<feature-id>");
   if (!Array.isArray(topology?.states) || topology.states.join("\0") !== TOPOLOGY_STATES.join("\0")) findings.push("states must equal the closed topology state order");
   if (!Array.isArray(topology?.classes) || topology.classes.join("\0") !== TOPOLOGY_CLASSES.join("\0")) findings.push("classes must equal the closed topology class order");
-  return { ok: findings.length === 0, status: findings.length === 0 ? "valid" : "invalid", findings, mode: topology?.mode ?? null };
+  const packages = validateFeatureTopology(root);
+  findings.push(...packages.findings);
+  return { ok: findings.length === 0, status: findings.length === 0 ? "valid" : "invalid", findings, mode: topology?.mode ?? null, packages: { inventory: packages.inventory, receipts: packages.receipts } };
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

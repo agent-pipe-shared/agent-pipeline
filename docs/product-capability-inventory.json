@@ -659,6 +659,12 @@
       "member": "artifact-topology-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "feature-package-topology-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:critic-bare-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1441,6 +1447,7 @@
         "verify-phase:harness/scripts/verify.mjs:document-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:error-register-check",
         "verify-phase:harness/scripts/verify.mjs:error-register-tests",
+        "verify-phase:harness/scripts/verify.mjs:feature-package-topology-tests",
         "verify-phase:harness/scripts/verify.mjs:git-cmd-tests",
         "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-check",
         "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-tests",
