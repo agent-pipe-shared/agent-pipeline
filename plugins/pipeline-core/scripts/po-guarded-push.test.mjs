@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
-import { parseArgs, validateRequest, buildAuditRecord } from "./po-guarded-push.mjs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { buildAuditRecord, parseArgs, readExactPassingEvidence, validateRequest } from "./po-guarded-push.mjs";
 
 let passed = 0;
 let failed = 0;
@@ -73,39 +77,41 @@ const REASON = "8 pre-existing suites red on the branch base, verified identical
     remote: "origin",
     reason: REASON,
     commit: "abc123",
-    verifyExitCode: 1,
-    securityExitCode: 0,
+    tree: "def456",
+    verifyEvidence: { valid: true, exitCode: 0, commit: "abc123", tree: "def456" },
+    securityEvidence: { valid: true, exitCode: 0, commit: "abc123", tree: "def456" },
     timestamp: "2026-07-24T00:00:00.000Z",
   });
   check(
-    "PP11 audit record captures branch/remote/commit/reason/exitCodes/schema/timestamp verbatim",
-    record.schema === "pipeline.po-guarded-push-audit.v1" &&
+    "PP11 audit record captures branch/remote/commit/tree/reason/exact evidence/schema/timestamp verbatim",
+    record.schema === "pipeline.po-guarded-push-audit.v2" &&
       record.branch === "feat/x" &&
       record.remote === "origin" &&
       record.commit === "abc123" &&
+      record.tree === "def456" &&
       record.reason === REASON &&
-      record.overriddenEvidence.verifyExitCode === 1 &&
-      record.overriddenEvidence.securityExitCode === 0 &&
+      record.evidence.verify.valid === true &&
+      record.evidence.verify.exitCode === 0 &&
+      record.evidence.security.valid === true &&
+      record.evidence.security.exitCode === 0 &&
       record.timestamp === "2026-07-24T00:00:00.000Z",
     JSON.stringify(record),
   );
 }
 
 {
-  const record = buildAuditRecord({
-    branch: "feat/x",
-    remote: "origin",
-    reason: REASON,
-    commit: "abc123",
-    verifyExitCode: null,
-    securityExitCode: null,
-    timestamp: "2026-07-24T00:00:00.000Z",
-  });
-  check(
-    "PP12 audit record tolerates unreadable/missing evidence as null, not a crash",
-    record.overriddenEvidence.verifyExitCode === null && record.overriddenEvidence.securityExitCode === null,
-    JSON.stringify(record),
-  );
+  const root = mkdtempSync(join(tmpdir(), "po-guarded-push-"));
+  try {
+    mkdirSync(join(root, "evidence"));
+    writeFileSync(join(root, "evidence", "verify.json"), JSON.stringify({
+      commit: "commit-a", tree: "tree-a", exitCode: 0, candidate: { status: "clean" },
+    }));
+    const exact = readExactPassingEvidence(root, "evidence/verify.json", "commit-a", "tree-a");
+    const stale = readExactPassingEvidence(root, "evidence/verify.json", "commit-b", "tree-a");
+    check("PP12 accepts only exact clean passing evidence and rejects a stale binding", exact.valid && !stale.valid, JSON.stringify({ exact, stale }));
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 }
 
 console.log(`\n${passed}/${passed + failed} checks passed.`);

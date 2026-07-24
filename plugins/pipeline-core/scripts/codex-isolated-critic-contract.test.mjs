@@ -481,19 +481,26 @@ test("an injected CAS race is detected before replacement", (t) => {
   );
 });
 
-test("reduced directory durability remains typed through isolated-Critic journal creation and mutation", (t) => {
-  const state = setupMemory(t);
-  state.persistence.directoryDurability = "unavailable";
-  const request = makeRequest(state.fixture, { dispatchNonce: "a".repeat(32) });
-  const created = createJournal({ commonDir: state.fixture.commonDir, request, inputRoot: state.fixture.inputRoot, persistence: state.persistence, clock: () => 2_000 });
-  assert.equal(created.directoryDurability, "unavailable");
-  const context = { commonDir: state.fixture.commonDir, dispatchNonce: request.dispatchNonce, persistence: state.persistence };
-  const progressed = advanceLifecycle(context, "sandbox-started", H.evidence, { clock: () => 2_001 });
-  assert.equal(progressed.directoryDurability, "unavailable");
-  advanceLifecycle(context, "thread-started", H.evidence, { clock: () => 2_002 });
-  advanceLifecycle(context, "turn-started", H.evidence, { clock: () => 2_003 });
-  const verdict = recordVerdictBytes(context, Buffer.from(canonicalJson(verdictFor(request))), { clock: () => 2_004 });
-  assert.equal(verdict.verdictDirectoryDurability, "unavailable");
+test("unconfirmed directory durability fails closed through isolated-Critic journal creation, mutation, and verdict publication", (t) => {
+  const creation = setupMemory(t);
+  creation.persistence.directoryDurability = "unavailable";
+  const request = makeRequest(creation.fixture, { dispatchNonce: "a".repeat(32) });
+  assert.throws(
+    () => createJournal({ commonDir: creation.fixture.commonDir, request, inputRoot: creation.fixture.inputRoot, persistence: creation.persistence, clock: () => 2_000 }),
+    { code: "F3-PERSISTENCE-DURABILITY" },
+  );
+  const mutation = setupMemory(t);
+  mutation.persistence.directoryDurability = "unavailable";
+  assert.throws(() => advanceLifecycle(mutation.context, "sandbox-started", H.evidence, { clock: mutation.clock }), { code: "F3-PERSISTENCE-DURABILITY" });
+  const verdictState = setupMemory(t);
+  advanceLifecycle(verdictState.context, "sandbox-started", H.evidence, { clock: verdictState.clock });
+  advanceLifecycle(verdictState.context, "thread-started", H.evidence, { clock: verdictState.clock });
+  advanceLifecycle(verdictState.context, "turn-started", H.evidence, { clock: verdictState.clock });
+  verdictState.persistence.directoryDurability = "unavailable";
+  assert.throws(
+    () => recordVerdictBytes(verdictState.context, Buffer.from(canonicalJson(verdictFor(verdictState.request))), { clock: verdictState.clock }),
+    { code: "F3-PERSISTENCE-DURABILITY" },
+  );
 });
 
 test("crash after verdict-file write still forbids a second model run", (t) => {
@@ -506,13 +513,12 @@ test("crash after verdict-file write still forbids a second model run", (t) => {
   assert.equal(replay.action, "validate-existing-output-once");
 });
 
-test("reduced directory durability remains typed when the receipt artifact is published", (t) => {
+test("unconfirmed directory durability fails closed when the receipt artifact is published", (t) => {
   const state = setupMemory(t);
-  state.persistence.directoryDurability = "unavailable";
   recordCleanup(state.context, exactObservation(state.request), null, { clock: state.clock });
   recordTerminal(state.context, "timeout", { clock: state.clock });
-  const written = writeReceipt(state.context, claimsFixture(), { clock: state.clock });
-  assert.equal(written.directoryDurability, "unavailable");
+  state.persistence.directoryDurability = "unavailable";
+  assert.throws(() => writeReceipt(state.context, claimsFixture(), { clock: state.clock }), { code: "F3-PERSISTENCE-DURABILITY" });
 });
 
 test("claims require evidence exactly for proven or disproven states", () => {

@@ -563,6 +563,12 @@ function contextPaths(context) {
   return dispatchPaths(context.commonDir, context.dispatchNonce);
 }
 
+function requireConfirmedDirectoryDurability(directoryDurability, artifact) {
+  if (directoryDurability !== "confirmed") {
+    fail("F3-PERSISTENCE-DURABILITY", `${artifact} directory durability is unavailable`);
+  }
+}
+
 function assertNoTornPostimage(context, paths) {
   const torn = context.persistence.list(paths.directory).filter((name) => /^\.journal\..+\.tmp$/.test(name));
   if (torn.length > 0) fail("F3-TORN-POSTIMAGE", "journal directory contains an unresolved temporary postimage");
@@ -597,7 +603,8 @@ export function createJournal({ commonDir, request, inputRoot, persistence = fil
   validateJournal(journal);
   const raw = Buffer.from(canonicalJson(journal));
   const directoryDurability = persistence.createExclusive(paths.journal, raw);
-  return { journal, rawSha256: sha256(raw), paths, ...(directoryDurability === "unavailable" ? { directoryDurability } : {}) };
+  requireConfirmedDirectoryDurability(directoryDurability, "journal");
+  return { journal, rawSha256: sha256(raw), paths };
 }
 
 export function loadJournal(context) {
@@ -626,7 +633,8 @@ function mutateJournal(context, mutation, clock = Date.now) {
   validateJournal(next);
   const raw = Buffer.from(canonicalJson(next));
   const directoryDurability = context.persistence.replace(loaded.paths.journal, loaded.rawSha256, raw);
-  return { journal: next, raw, rawSha256: sha256(raw), paths: loaded.paths, outcome, ...(directoryDurability === "unavailable" ? { directoryDurability } : {}) };
+  requireConfirmedDirectoryDurability(directoryDurability, "journal");
+  return { journal: next, raw, rawSha256: sha256(raw), paths: loaded.paths, outcome };
 }
 
 function appendEvent(journal, type, body, observedAtMs) {
@@ -714,7 +722,8 @@ function artifactWriteIdempotent(persistence, path, bytes) {
     return { written: false, directoryDurability: null };
   }
   const directoryDurability = persistence.writeArtifactExclusive(path, bytes);
-  return { written: true, directoryDurability: directoryDurability === "unavailable" ? directoryDurability : null };
+  requireConfirmedDirectoryDurability(directoryDurability, basename(path));
+  return { written: true, directoryDurability: null };
 }
 
 export function recordVerdictBytes(context, bytes, { clock = Date.now } = {}) {

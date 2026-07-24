@@ -1,42 +1,26 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 /**
- * po-guarded-push — PO-run pusher for a branch whose guard-push evidence
- * check cannot honestly pass because the failing Verify/Security suites are
- * inherited from the branch's base and are out of scope for the branch's own
- * diff (e.g. owned by a different, parallel session working on `main`).
+ * po-guarded-push — PO-run, interactive pusher for a non-main branch with
+ * the same exact passing Verify/Security evidence required by the ordinary
+ * guarded path.
  *
  * WHY THIS FILE EXISTS
  *   guard-push.mjs (a Claude Code PreToolUse hook, plugins/pipeline-core/hooks/guard-push.mjs)
  *   requires evidence/verify-latest.json and evidence/security-latest.json to
- *   be fresh (bound to the exact pushed commit) AND exitCode === 0, with no
- *   override mechanism — by design, the same "binds agents, not humans"
- *   boundary as guard-testpath.mjs (see po-guarded-edit.mjs in this same
- *   directory). It has no in-session escape hatch, even with explicit PO
- *   confirmation in the transcript: an agent session cannot honestly claim
- *   exitCode 0 when it is not, and must not fabricate evidence to satisfy the
- *   gate.
- *   The documented fallback for exactly this situation is the PO running the
- *   push themselves, outside any guarded session. There are no actual git
- *   hooks installed (.git/hooks/pre-push does not exist) — guard-push only
- *   intercepts an agent's own Bash/PowerShell tool calls inside a session, so
- *   this script does not disable, patch, or bypass anything; it simply runs
- *   the same `git push` a human could always run directly. Wrapping it here
- *   exists only to force a deliberate reason and leave a durable record, the
- *   same generalization request that produced po-guarded-edit.mjs.
+ *   be fresh (bound to the exact pushed commit and tree) AND exitCode === 0.
+ *   This script preserves that boundary for human-run non-main pushes while
+ *   additionally requiring an interactive confirmation and audit record.
  *
- * THIS IS NOT A GENERAL "SKIP TESTS AND PUSH" TOOL.
- *   Use it only when you (the PO) have independently confirmed that every
- *   failing suite is pre-existing on the branch's base / unrelated to the
- *   branch's own diff — never to push a branch whose OWN changes broke
- *   something. Each run requires --reason; it is recorded verbatim in the
- *   audit log, not summarized or inferred.
+ * THIS IS NOT A TEST OR SECURITY OVERRIDE TOOL.
+ *   A failed, missing, stale, or misbound gate always refuses before the
+ *   confirmation prompt. Each run requires --reason; it is recorded verbatim
+ *   in the audit log, not summarized or inferred.
  *
  * SAFETY MODEL
  *   - Refuses to run unless stdin is an interactive TTY (never agent-driven).
  *   - Requires the operator to type the literal word "yes" after reviewing
- *     the exact branch/remote/commit/reason and the current verify/security
- *     evidence exit codes it is overriding.
+ *     the exact branch/remote/commit/reason and the passing evidence binding.
  *   - Refuses `main`/`master` outright — a hard-coded boundary, not a flag.
  *     Use the ordinary guarded path for main; that is where exitCode===0
  *     matters most.
@@ -45,15 +29,15 @@
  *   - Never force-pushes, never deletes a ref, never rewrites history: a
  *     plain `git push -u <remote> <branch>` only, via execFile (no shell).
  *   - Appends one NDJSON record to evidence/dirty-push-log.ndjson (branch,
- *     remote, commit, ISO timestamp, reason, and the verify/security
- *     exitCodes being overridden) BEFORE pushing, so a failed push still
+ *     remote, commit, tree, ISO timestamp, reason, and exact gate bindings)
+ *     BEFORE pushing, so a failed push still
  *     leaves the record. Does not stage or commit that file — review
  *     `git diff` and commit it yourself, same as po-guarded-edit.mjs.
  *
  * USAGE (run directly by the PO, never via an agent's Bash/PowerShell tool):
  *   node plugins/pipeline-core/scripts/po-guarded-push.mjs \
  *     --branch feat/sentinel-windows-34-37-close \
- *     --reason "8 pre-existing suites red on origin/main baseline (SSH alias, Codex CLI absent, license/doc-contract drift) -- verified identical on a clean origin/main worktree, none touch this branch's diff"
+ *     --reason "PO-reviewed release branch publication"
  *
  * VERIFY: node plugins/pipeline-core/scripts/po-guarded-push.test.mjs
  */
@@ -95,27 +79,37 @@ export function validateRequest({ branch, remote, reason, currentBranch }) {
   return { ok: errors.length === 0, errors };
 }
 
-/** Best-effort read of one evidence file's exitCode; never throws. */
-function readExitCode(repoRoot, relPath) {
+/** Reads an exact, clean, passing gate record for the commit/tree being pushed. */
+export function readExactPassingEvidence(repoRoot, relPath, commit, tree) {
   try {
     const raw = readFileSync(join(repoRoot, relPath), "utf8");
     const data = JSON.parse(raw);
-    return typeof data.exitCode === "number" ? data.exitCode : null;
+    const candidate = data.candidate ?? {};
+    const evidenceCommit = data.commit ?? candidate.commit ?? null;
+    const evidenceTree = data.tree ?? candidate.tree ?? null;
+    return {
+      valid: data.exitCode === 0 && evidenceCommit === commit && evidenceTree === tree
+        && (candidate.status === undefined || candidate.status === "clean"),
+      exitCode: typeof data.exitCode === "number" ? data.exitCode : null,
+      commit: evidenceCommit,
+      tree: evidenceTree,
+    };
   } catch {
-    return null;
+    return { valid: false, exitCode: null, commit: null, tree: null };
   }
 }
 
 /** Pure record construction; no I/O. */
-export function buildAuditRecord({ branch, remote, reason, commit, verifyExitCode, securityExitCode, timestamp }) {
+export function buildAuditRecord({ branch, remote, reason, commit, tree, verifyEvidence, securityEvidence, timestamp }) {
   return {
-    schema: "pipeline.po-guarded-push-audit.v1",
+    schema: "pipeline.po-guarded-push-audit.v2",
     timestamp,
     branch,
     remote,
     commit,
+    tree,
     reason,
-    overriddenEvidence: { verifyExitCode, securityExitCode },
+    evidence: { verify: verifyEvidence, security: securityEvidence },
   };
 }
 
@@ -150,42 +144,46 @@ export async function run(argv = process.argv, env = process.env) {
   }
 
   let commit;
+  let tree;
   try {
     commit = execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot }).toString().trim();
+    tree = execFileSync("git", ["rev-parse", "HEAD^{tree}"], { cwd: repoRoot }).toString().trim();
   } catch (e) {
     console.error(`Cannot resolve HEAD: ${e.message}`);
     return 1;
   }
 
-  const verifyExitCode = readExitCode(repoRoot, "evidence/verify-latest.json");
-  const securityExitCode = readExitCode(repoRoot, "evidence/security-latest.json");
+  const verifyEvidence = readExactPassingEvidence(repoRoot, "evidence/verify-latest.json", commit, tree);
+  const securityEvidence = readExactPassingEvidence(repoRoot, "evidence/security-latest.json", commit, tree);
+  if (!verifyEvidence.valid || !securityEvidence.valid) {
+    console.error("Refusing to push — Verify and Security must both be exact, clean, passing evidence for HEAD.");
+    return 1;
+  }
   const record = buildAuditRecord({
     branch: args.branch,
     remote: args.remote,
     reason: args.reason,
     commit,
-    verifyExitCode,
-    securityExitCode,
+    tree,
+    verifyEvidence,
+    securityEvidence,
     timestamp: new Date().toISOString(),
   });
 
-  console.log(
-    "This script pushes a branch outside the in-session guard-push evidence gate. Run it " +
-      "directly in your own terminal — it refuses to run when stdin is not an interactive TTY, " +
-      "so it cannot be driven unattended by an agent session.\n",
-  );
+  console.log("This script enforces the exact passing gate before an interactive human branch push.\n");
   console.log(`branch:   ${record.branch}`);
   console.log(`remote:   ${record.remote}`);
   console.log(`commit:   ${record.commit}`);
-  console.log(`verify evidence exitCode:   ${JSON.stringify(record.overriddenEvidence.verifyExitCode)}`);
-  console.log(`security evidence exitCode: ${JSON.stringify(record.overriddenEvidence.securityExitCode)}`);
+  console.log(`tree:     ${record.tree}`);
+  console.log(`verify evidence:   ${JSON.stringify(record.evidence.verify)}`);
+  console.log(`security evidence: ${JSON.stringify(record.evidence.security)}`);
   console.log(`reason:   ${record.reason}\n`);
 
   if (!process.stdin.isTTY) {
     console.error("Refusing to run non-interactively (stdin is not a TTY). Nothing was pushed.");
     return 2;
   }
-  const proceed = await confirm(`Push ${record.branch} to ${record.remote} despite the evidence above? Type "yes" to proceed: `);
+  const proceed = await confirm(`Push ${record.branch} to ${record.remote} with the passing evidence above? Type "yes" to proceed: `);
   if (!proceed) {
     console.log("Aborted — nothing was pushed, no audit record written.");
     return 2;

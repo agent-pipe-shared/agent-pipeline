@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: SUL-1.0
 import test from "node:test";
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -23,7 +23,6 @@ import {
   observeAfkGitAuthority,
   planAfkEntry,
 } from "./afk-git-adapter.mjs";
-import { symlinkSkip } from "./symlink-capability.mjs";
 
 const ACTIVATION = "c".repeat(32);
 const ADAPTER = Buffer.from("bounded worker\n");
@@ -52,9 +51,16 @@ function createRepo(objectFormat = "sha1") {
   writeFileSync(join(root, "plugins/pipeline-core/lib/delete.mjs"), "delete me\n");
   writeFileSync(join(root, "plugins/pipeline-core/lib/executable.mjs"), "#!/bin/sh\nexit 0\n");
   chmodSync(join(root, "plugins/pipeline-core/lib/executable.mjs"), 0o755);
-  symlinkSync("target.mjs", join(root, "plugins/pipeline-core/lib/link.mjs"));
   writeFileSync(join(root, ".gitattributes"), "*.txt filter=hostile\n");
   git(root, "add", ".");
+  // Git stores a symlink as a mode-120000 blob. Build that object directly so
+  // ordinary AFK planning/CAS tests stay native on Windows without requiring
+  // Developer Mode; this is the exact Git object the adapter must preserve.
+  const linkSource = join(root, ".afk-link-target");
+  writeFileSync(linkSource, "target.mjs");
+  const linkBlob = git(root, "hash-object", "-w", ".afk-link-target");
+  git(root, "update-index", "--add", "--cacheinfo", `120000,${linkBlob},plugins/pipeline-core/lib/link.mjs`);
+  unlinkSync(linkSource);
   git(root, "commit", "-m", "base");
   git(root, "config", "filter.hostile.clean", "false");
   git(root, "config", "filter.hostile.required", "true");
@@ -157,7 +163,7 @@ function requestAndProposal(repo) {
   return { request, proposal: made.proposal };
 }
 
-test("planning is read-only and derives one deterministic sorted tree and commit", { skip: symlinkSkip() }, () => {
+test("planning is read-only and derives one deterministic sorted tree and commit", () => {
   const repo = createRepo();
   const { request, proposal } = requestAndProposal(repo);
   const featureBefore = git(repo.root, "rev-parse", "refs/heads/feat/batman");
@@ -175,7 +181,7 @@ test("planning is read-only and derives one deterministic sorted tree and commit
   assert.equal(git(repo.root, "rev-parse", "refs/heads/feat/batman"), featureBefore);
 });
 
-test("intent precedes all object/ref effects and one CAS moves only the private ref", { skip: symlinkSkip() }, () => {
+test("intent precedes all object/ref effects and one CAS moves only the private ref", () => {
   const repo = createRepo();
   const { request, proposal } = requestAndProposal(repo);
   const calls = [];
@@ -203,7 +209,7 @@ test("intent precedes all object/ref effects and one CAS moves only the private 
   assert.equal(git(repo.root, "cat-file", "-t", `${outcome.intent.resultCommit}:plugins/pipeline-core/lib/link.mjs`), "blob");
 });
 
-test("crash after objects is replayable and exact duplicate performs zero ref write", { skip: symlinkSkip() }, () => {
+test("crash after objects is replayable and exact duplicate performs zero ref write", () => {
   const repo = createRepo();
   const { request, proposal } = requestAndProposal(repo);
   const planned = planAfkEntry({ root: repo.root, request, proposal, entryId: "entry-1", gitTimestamp: "1784404800 +0000" });
@@ -223,7 +229,7 @@ test("crash after objects is replayable and exact duplicate performs zero ref wr
   assert.equal(duplicate.mutation, "none");
 });
 
-test("ref drift blocks without reset, merge or alternate recovery", { skip: symlinkSkip() }, () => {
+test("ref drift blocks without reset, merge or alternate recovery", () => {
   const repo = createRepo();
   const { request, proposal } = requestAndProposal(repo);
   const planned = planAfkEntry({ root: repo.root, request, proposal, entryId: "entry-1", gitTimestamp: "1784404800 +0000" });
@@ -235,7 +241,7 @@ test("ref drift blocks without reset, merge or alternate recovery", { skip: syml
   assert.equal(git(repo.root, "rev-list", "--count", "refs/heads/feat/batman"), "1");
 });
 
-test("fault after private-ref CAS is recognized and records the missing applied boundary", { skip: symlinkSkip() }, () => {
+test("fault after private-ref CAS is recognized and records the missing applied boundary", () => {
   const repo = createRepo();
   const { request, proposal } = requestAndProposal(repo);
   const calls = [];
@@ -250,7 +256,7 @@ test("fault after private-ref CAS is recognized and records the missing applied 
   assert.deepEqual(calls, ["entry-intent", "entry-applied"]);
 });
 
-test("SHA-256 repository uses native 64-hex blobs, trees, commits and CAS", { skip: symlinkSkip() || (() => {
+test("SHA-256 repository uses native 64-hex blobs, trees, commits and CAS", { skip: (() => {
   try {
     const probe = mkdtempSync(join(tmpdir(), "afk-sha256-probe-"));
     execFileSync("git", ["init", "--object-format=sha256", probe], { stdio: "ignore" });

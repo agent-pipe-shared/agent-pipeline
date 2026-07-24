@@ -207,7 +207,7 @@ function secureWindowsIo(overrides = {}) {
   return { platform: "win32", assessWindowsPrivate: () => ({ status: "secure" }), ...overrides };
 }
 
-test("unsupported directory-entry fsync on native Windows is an honest reduced-durability append success, never a discarded WAL record", () => {
+test("unsupported directory-entry fsync on native Windows fails closed after the WAL publish is no longer durably confirmed", () => {
   const gitCommonDir = root();
   const stages = [];
   const unsupported = () => { throw Object.assign(new Error("EPERM"), { code: "EPERM" }); };
@@ -216,8 +216,9 @@ test("unsupported directory-entry fsync on native Windows is an honest reduced-d
     fault(stage) { stages.push(stage); },
     io: secureWindowsIo({ syncDirectory: unsupported }),
   });
-  assert.equal(result.ok, true);
-  assert.equal(result.directoryDurability, "unavailable");
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "AFK-LEDGER-DIRECTORY-DURABILITY-UNAVAILABLE");
+  assert.equal(result.mutation, "wal");
   assert.deepEqual(stages, ["after-file-fsync", "after-directory-fsync"]);
   const loaded = loadAfkLedger(gitCommonDir, ACTIVATION, secureWindowsIo());
   assert.equal(loaded.ok, true);
@@ -249,15 +250,13 @@ test("directory-sync EPERM is classified narrowly to win32 and is never swallowe
   assert.equal(result.detail, "EPERM");
 });
 
-test("writer lock acquire and release succeed despite unsupported directory-entry fsync on native Windows", () => {
+test("writer lock acquire and release fail closed when native Windows cannot confirm directory-entry durability", () => {
   const gitCommonDir = root();
   const io = secureWindowsIo({ syncDirectory: () => { throw Object.assign(new Error("EPERM"), { code: "EPERM" }); } });
   const acquired = acquireAfkWriterLock({ gitCommonDir, activationId: ACTIVATION, owner: owner(), io });
-  assert.equal(acquired.ok, true);
-  assert.equal(acquired.directoryDurability, "unavailable");
-  const released = releaseAfkWriterLock(acquired, io);
-  assert.equal(released.ok, true);
-  assert.equal(released.directoryDurability, "unavailable");
+  assert.equal(acquired.ok, false);
+  assert.equal(acquired.code, "AFK-WRITER-LOCK-DIRECTORY-DURABILITY-UNAVAILABLE");
+  assert.equal(acquired.mutation, "lock");
 });
 
 test("a generation file failing native Windows DACL/owner assurance fails the ledger load closed, and an unavailable observation fails closed the same way", () => {
