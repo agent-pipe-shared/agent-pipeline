@@ -296,6 +296,59 @@ next-action, branch, and release statement below where they conflict.
 
 ## Open items and next block
 
+### 2026-07-24 Cyborg epic design session — authoritative for `feat/sprint-cyborg-claude`
+
+Scope note: this block is authoritative ONLY for the Cyborg sprint branch;
+it does not supersede the release-candidate checkpoint below for other
+branches. Parallel-runner discipline: this runner owns only Sprint Cyborg.
+
+- Sprint Cyborg (label `sprint:cyborg`, issues #39/#41–#48) was activated by
+  the PO on 2026-07-24. `main` was fast-forwarded to
+  `86deb0cbbed8cbaae7d652e7060c220cecfe3436` (= published tag `v0.4.0`; the
+  GitHub release exists, so the "candidate only; not published" wording below
+  is historical). The sprint branch `feat/sprint-cyborg-claude` (normative
+  template `feat/sprint-cyborg-<runner>`) branches from exactly that OID.
+  Cross-sprint prerequisites #22/#27/#28/#40 are closed.
+- The Epic design package `specs/2026-07-24-sprint-cyborg-epic/` (PRD,
+  technical spec with own evidence-spine architecture and deviation catalog
+  D1–D10, backlog acceptance matrix) is committed as `4e79074`.
+  **PO gate (EL-19) is OPEN — no implementation dispatch before "approved".**
+  Six backlog items carry Cyborg triage proposals in the PRD (four due
+  2026-07-27); triage fields are filled only after PO approval.
+- The V3 advisory duty for the Epic profile was discharged: one fresh
+  read-only consult (Claude chain), answered 2026-07-24; material findings
+  are incorporated in the committed design. No advisory-receipt file was
+  produced by host machinery; the PRD's advisory record is the disclosure.
+- **Native-Windows verify baseline on `v0.4.0` is RED:** on a clean tree,
+  eleven suites fail individually on this host: afk-ledger,
+  repository-freshness, codex-isolated-critic-contract, guard-push,
+  feature-package-topology, advisory-host-bridge, codex-advisory-bootstrap,
+  public-core-observation, codex-private-overlay-activation,
+  license-contract, security-scan-tests (afk-ledger signature: multiple
+  private-generation/CAS assertions fail natively). This is the known
+  Windows-reproducibility class (#36, Sentinel-owned): the eight archived
+  Windows commits (`archive/public-sentinel-windows-34-37-close-20260724`)
+  are NOT contained in `v0.4.0`. A separate in-run security-scan
+  `working-tree-not-clean` error was session-caused (design files written
+  during the run), not a defect. Consequence: guard-push evidence cannot go
+  green from this host on a `v0.4.0` base, so pushing
+  `feat/sprint-cyborg-claude` is evidence-blocked until the Sentinel owner
+  integrates the Windows residue (0.4.1 path) or the PO disposes otherwise.
+  Design work and the PO gate are not blocked.
+- Bootstrap findings of this session: PO-gate authority receipt UNAVAILABLE
+  on this checkout (remedy: `node setup.mjs --publish-po-profile` from the
+  canonical primary checkout, PO action); the 0.4.0 cache copy of
+  `lib/session-power.mjs` exits silently on native Windows instead of
+  emitting its typed result (Windows self-invocation idiom class,
+  observation candidate; functionally moot here because
+  `session.keep_awake: false`).
+- Next on this branch after PO approval: CYB-0 sprint scaffolding
+  (feature-state switch via the sanctioned writer, triage records,
+  spec-retention registration), then CYB-A0 (recovery-preview attestation
+  quickfix, due 2026-07-27), then CYB-1 with the CYB-1F schema-boundary
+  checkpoint. Session cleanup descriptor `session-13b3c042ba3bcf02203b17b6`
+  is active for this session.
+
 ### 2026-07-24 release-candidate checkpoint — authoritative latest
 
 The PO has dispositioned all Sentinel/HAW-E implementation and tests as
