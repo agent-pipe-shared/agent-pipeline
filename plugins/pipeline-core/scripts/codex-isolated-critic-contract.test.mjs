@@ -490,6 +490,10 @@ test("reduced directory durability remains typed through isolated-Critic journal
   const context = { commonDir: state.fixture.commonDir, dispatchNonce: request.dispatchNonce, persistence: state.persistence };
   const progressed = advanceLifecycle(context, "sandbox-started", H.evidence, { clock: () => 2_001 });
   assert.equal(progressed.directoryDurability, "unavailable");
+  advanceLifecycle(context, "thread-started", H.evidence, { clock: () => 2_002 });
+  advanceLifecycle(context, "turn-started", H.evidence, { clock: () => 2_003 });
+  const verdict = recordVerdictBytes(context, Buffer.from(canonicalJson(verdictFor(request))), { clock: () => 2_004 });
+  assert.equal(verdict.verdictDirectoryDurability, "unavailable");
 });
 
 test("crash after verdict-file write still forbids a second model run", (t) => {
@@ -500,6 +504,15 @@ test("crash after verdict-file write still forbids a second model run", (t) => {
   assert.equal(replay.verdictBytesObserved, true);
   assert.equal(replay.mayStartModel, false);
   assert.equal(replay.action, "validate-existing-output-once");
+});
+
+test("reduced directory durability remains typed when the receipt artifact is published", (t) => {
+  const state = setupMemory(t);
+  state.persistence.directoryDurability = "unavailable";
+  recordCleanup(state.context, exactObservation(state.request), null, { clock: state.clock });
+  recordTerminal(state.context, "timeout", { clock: state.clock });
+  const written = writeReceipt(state.context, claimsFixture(), { clock: state.clock });
+  assert.equal(written.directoryDurability, "unavailable");
 });
 
 test("claims require evidence exactly for proven or disproven states", () => {

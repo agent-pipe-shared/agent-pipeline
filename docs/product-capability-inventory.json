@@ -473,6 +473,12 @@
       "member": "three-scope-fixtures.md"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:afk-ledger-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "afk-ledger-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisor-consult-v3-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -567,6 +573,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "codex-critic-host-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-isolated-critic-contract-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-isolated-critic-contract-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-plugin-validator-parity-tests",
@@ -1424,6 +1436,7 @@
         "verify-phase:harness/scripts/verify.mjs:advisory-coordinator-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-host-bridge-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:afk-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-check",
         "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-tests",
         "verify-phase:harness/scripts/verify.mjs:artifact-lifecycle-check",
@@ -1440,6 +1453,7 @@
         "verify-phase:harness/scripts/verify.mjs:codex-app-server-health-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-critic-host-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-host-advisor-route-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-isolated-critic-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-plugin-validator-parity-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-private-overlay-activation-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-compatibility-tests",

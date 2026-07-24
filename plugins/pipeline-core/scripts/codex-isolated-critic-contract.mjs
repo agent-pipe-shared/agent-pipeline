@@ -711,10 +711,10 @@ function artifactWriteIdempotent(persistence, path, bytes) {
   if (persistence.exists(path)) {
     const current = persistence.read(path);
     if (!Buffer.from(current).equals(Buffer.from(bytes))) fail("F3-REPLAY-CONFLICT", `${basename(path)} already contains different bytes`);
-    return false;
+    return { written: false, directoryDurability: null };
   }
-  persistence.writeArtifactExclusive(path, bytes);
-  return true;
+  const directoryDurability = persistence.writeArtifactExclusive(path, bytes);
+  return { written: true, directoryDurability: directoryDurability === "unavailable" ? directoryDurability : null };
 }
 
 export function recordVerdictBytes(context, bytes, { clock = Date.now } = {}) {
@@ -722,9 +722,9 @@ export function recordVerdictBytes(context, bytes, { clock = Date.now } = {}) {
   if (payload.length < 1 || payload.length > 1_048_576) fail("F3-VERDICT-SIZE", "verdict bytes must be 1..1048576 bytes");
   const paths = contextPaths(context);
   const digest = sha256(payload);
-  artifactWriteIdempotent(context.persistence, paths.verdict, payload);
+  const artifact = artifactWriteIdempotent(context.persistence, paths.verdict, payload);
   const at = clock();
-  return mutateJournal(context, (journal) => {
+  const recorded = mutateJournal(context, (journal) => {
     if (journal.verdict.status !== "absent") {
       if (journal.verdict.rawSha256 === digest && journal.verdict.size === payload.length) return { noMutation: true, verdictSha256: digest };
       fail("F3-REPLAY-CONFLICT", "journal already binds different verdict bytes");
@@ -735,6 +735,10 @@ export function recordVerdictBytes(context, bytes, { clock = Date.now } = {}) {
     if (!duplicate) appendEvent(journal, "semantic-progress", { kind: "verdict-frame", contentSha256: digest, byteLength: payload.length }, at);
     return { verdictSha256: digest };
   }, () => at);
+  return {
+    ...recorded,
+    ...(artifact.directoryDurability ? { verdictDirectoryDurability: artifact.directoryDurability } : {}),
+  };
 }
 
 export function recordVerdictReceived(context, { clock = Date.now } = {}) {
@@ -996,8 +1000,14 @@ export function writeReceipt(context, claims, { clock = Date.now } = {}) {
   }
   const receipt = buildReceipt(context, claims, { clock });
   const bytes = Buffer.from(canonicalJson(receipt));
-  artifactWriteIdempotent(context.persistence, paths.receipt, bytes);
-  return { receipt, written: true, path: paths.receipt, rawSha256: sha256(bytes) };
+  const artifact = artifactWriteIdempotent(context.persistence, paths.receipt, bytes);
+  return {
+    receipt,
+    written: artifact.written,
+    path: paths.receipt,
+    rawSha256: sha256(bytes),
+    ...(artifact.directoryDurability ? { directoryDurability: artifact.directoryDurability } : {}),
+  };
 }
 
 export function schemaArtifacts() {
