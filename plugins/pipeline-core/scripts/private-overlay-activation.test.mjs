@@ -169,7 +169,6 @@ function run(argv, overrides = {}) {
   const code = main(argv, dependencies);
   return { code, stdout, stderr, preview };
 }
-
 test("inspect remains canonical and wires observed candidate and plugin to admission", () => {
   const calls = [];
   const evidence = readyEvidence();
@@ -188,6 +187,22 @@ test("inspect remains canonical and wires observed candidate and plugin to admis
   for (const forbidden of [PROJECT_ROOT, SOURCE_PLUGIN_ROOT, PLUGIN_ROOT, PRIVATE_NAME, RAW_REPOSITORY]) {
     assert.equal(result.stdout.includes(forbidden), false);
   }
+});
+
+test("generic CLI accepts no host-version value", () => {
+  const observed = [];
+  const generic = run(commandArgs("inspect"), {
+    observe(input) { observed.push(input); return readyObservation(); },
+  });
+  assert.equal(generic.code, 0);
+  assert.deepEqual(observed, [{ sourcePluginRoot: SOURCE_PLUGIN_ROOT, installedPluginRoot: PLUGIN_ROOT }]);
+
+  let observedFromCli = false;
+  const cliAttempt = run([...commandArgs("inspect"), "--host-plugin-version", plugin.version], {
+    observe: () => { observedFromCli = true; return readyObservation(); },
+  });
+  assert.deepEqual(cliAttempt, { code: 64, stdout: "", stderr: USAGE, preview: "" });
+  assert.equal(observedFromCli, false);
 });
 
 test("all malformed invocations emit only fixed usage and perform no observation", () => {

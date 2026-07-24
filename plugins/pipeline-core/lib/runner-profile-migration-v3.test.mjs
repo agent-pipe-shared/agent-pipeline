@@ -75,7 +75,7 @@ function publicLegacyIntent() {
   };
 }
 function write(root, path, content) { const target = join(root, path); mkdirSync(dirname(target), { recursive: true }); writeFileSync(target, content); }
-function fixture(source, { omitCodex = false } = {}) {
+function fixture(source, { omitCodex = false, omitRuntime = [] } = {}) {
   const root = mkdtempSync(join(tmpdir(), "runner-profile-v3-test-"));
   const baselines = {
     ".claude/settings.json": "{\n  \"settings-unowned-sentinel\": true\n}\n",
@@ -87,11 +87,48 @@ function fixture(source, { omitCodex = false } = {}) {
     ".codex/agents/consult-advisor.toml": '# advisor-prefix-sentinel\nname = "old-advisor"\nmodel = "old-advisor"\n',
   };
   for (const path of runtimePaths) {
-    if (!omitCodex || !path.startsWith(".codex/")) write(root, path, baselines[path]);
+    if ((!omitCodex || !path.startsWith(".codex/")) && !omitRuntime.includes(path)) write(root, path, baselines[path]);
   }
   write(root, "pipeline.user.yaml", source);
   return root;
 }
+
+let passed = 0;
+const failures = [];
+function record(name, run) {
+  try { run(); passed += 1; console.log(`PASS  ${name}`); }
+  catch (error) { failures.push(`${name}: ${error.message}`); console.log(`FAIL  ${name} -- ${error.message}`); }
+}
+
+record("legacy migration seeds every absent Claude runtime subset without widening V3 slim initialization", () => {
+  const claudeTargets = [".claude/settings.json", ".claude/pipeline.json", ".claude/pipeline.yaml"];
+  const subsets = Array.from({ length: (1 << claudeTargets.length) - 1 }, (_, mask) => (
+    claudeTargets.filter((_, index) => (mask & (1 << index)) !== 0)
+  ));
+  const sources = [
+    ["v0", () => yaml(publicLegacyIntent())],
+    ["v1", () => renderUserYaml(buildDefaultAnswers())],
+    ["v2", () => yaml(v2Intent())],
+  ];
+  for (const [sourceKind, source] of sources) {
+    for (const omitted of subsets) {
+      const root = fixture(source(), { omitRuntime: omitted });
+      try {
+        const plan = planRunnerProfileMigrationV3({ rootDir: root });
+        assert.equal(plan.status, "ready", `${sourceKind} must plan with ${omitted.join(", ")} absent`);
+        assert.equal(plan.sourceKind, sourceKind);
+        for (const path of omitted) {
+          const target = plan.targets.find((entry) => entry.path === path);
+          assert.deepEqual(target.before, { status: "absent", sha256: null, byteLength: 0 });
+          assert.equal(existsSync(join(root, path)), false, "plan must remain read-only");
+        }
+        assert.equal(applyRunnerProfileMigrationV3(plan, { rootDir: root, activate: true }).status, "applied");
+        for (const path of omitted) assert.equal(existsSync(join(root, path)), true, "activation writes the planned target");
+        assert.match(readFileSync(join(root, ".claude/pipeline.yaml"), "utf8"), /session:\n  keep_awake: false\n/u);
+      } finally { rmSync(root, { recursive: true, force: true }); }
+    }
+  }
+});
 function snapshot(root) { return Object.fromEntries([...runtimePaths, "pipeline.user.yaml"].map((path) => {
   const target = join(root, path);
   return [path, existsSync(target) ? readFileSync(target, "utf8") : null];
@@ -128,13 +165,6 @@ function runCli(args) {
     writePreview: (chunk) => { preview += String(chunk); },
   });
   return { status, json: JSON.parse(output), preview: preview ? JSON.parse(preview) : null };
-}
-
-let passed = 0;
-const failures = [];
-function record(name, run) {
-  try { run(); passed += 1; console.log(`PASS  ${name}`); }
-  catch (error) { failures.push(`${name}: ${error.message}`); console.log(`FAIL  ${name} -- ${error.message}`); }
 }
 
 record("v2 -> v3 is one-way, digest-only, and old design.advisory cannot disable the advisory duty", () => {

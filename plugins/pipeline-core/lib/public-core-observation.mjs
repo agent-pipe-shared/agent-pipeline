@@ -15,13 +15,14 @@ import {
 } from "node:fs";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { TextDecoder } from "node:util";
+import { observeSelectedCodexPipelinePlugin } from "./codex-host-plugin-list.mjs";
 
 const SCHEMA = "pipeline.public-core-observation.v1";
 const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 const SHA256 = /^[0-9a-f]{64}$/u;
 const PLUGIN_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
 const PLUGIN_VERSION = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$/u;
-const MANIFEST_KEYS = Object.freeze(["name", "version", "description", "hooks", "author", "interface"]);
+const MANIFEST_KEYS = Object.freeze(["name", "description", "hooks", "author", "interface"]);
 const IDENTITY_FIELDS = Object.freeze(["dev", "ino", "mode", "size", "mtimeNs", "ctimeNs"]);
 const MANIFEST_PATH = ".codex-plugin/plugin.json";
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
@@ -48,12 +49,14 @@ function exactObject(value, keys) {
 function resolveDependencies(value) {
   if (!exactObject(value, Object.keys(value ?? {}))) fail("SNT-A2-DEPENDENCY-SCHEMA");
   const keys = Object.keys(value);
-  if (keys.some((key) => key !== "execFileSync" && key !== "afterOpen")) fail("SNT-A2-DEPENDENCY-SCHEMA");
+  if (keys.some((key) => key !== "execFileSync" && key !== "afterOpen" && key !== "spawnSync")) fail("SNT-A2-DEPENDENCY-SCHEMA");
   if (Object.hasOwn(value, "execFileSync") && typeof value.execFileSync !== "function") fail("SNT-A2-DEPENDENCY-SCHEMA");
   if (Object.hasOwn(value, "afterOpen") && typeof value.afterOpen !== "function") fail("SNT-A2-DEPENDENCY-SCHEMA");
+  if (Object.hasOwn(value, "spawnSync") && typeof value.spawnSync !== "function") fail("SNT-A2-DEPENDENCY-SCHEMA");
   return {
     execFileSync: value.execFileSync ?? nodeExecFileSync,
     afterOpen: value.afterOpen,
+    spawnSync: value.spawnSync,
   };
 }
 
@@ -273,17 +276,24 @@ function snapshotPluginRoot(pluginRoot, afterOpen, rootCode) {
   return { files, directories, content, contentSha256 };
 }
 
-function parseManifest(snapshot, side) {
+function parseManifest(snapshot, side, hostPluginVersion) {
   const entry = snapshot.files.find(({ path }) => path === MANIFEST_PATH);
   if (entry === undefined) fail(`SNT-A2-${side}-MANIFEST-MISSING`);
   let manifest;
   try { manifest = JSON.parse(UTF8.decode(entry.bytes)); } catch { fail(`SNT-A2-${side}-MANIFEST-MALFORMED`); }
-  if (!exactObject(manifest, MANIFEST_KEYS)
+  const hasDeclaredVersion = Object.hasOwn(manifest, "version");
+  if (!exactObject(manifest, hasDeclaredVersion ? [...MANIFEST_KEYS, "version"] : MANIFEST_KEYS)
     || manifest.name !== "pipeline-core"
     || !PLUGIN_NAME.test(manifest.name)
-    || !PLUGIN_VERSION.test(manifest.version)
+    || (hasDeclaredVersion && !PLUGIN_VERSION.test(manifest.version))
+    || (!hasDeclaredVersion && hostPluginVersion === undefined)
+    || (hasDeclaredVersion && hostPluginVersion !== undefined && manifest.version !== hostPluginVersion)
     || manifest.hooks !== "./hooks/codex-hooks.json") fail(`SNT-A2-${side}-MANIFEST-SCHEMA`);
-  return { name: manifest.name, version: manifest.version, manifestSha256: entry.sha256 };
+  return {
+    name: manifest.name,
+    version: hasDeclaredVersion ? manifest.version : hostPluginVersion,
+    manifestSha256: entry.sha256,
+  };
 }
 
 function sameSnapshot(source, installed) {
@@ -302,10 +312,13 @@ function rejected(code) {
   return { schema: SCHEMA, status: "rejected", reasonCodes: [code] };
 }
 
-export function observePublicCoreIdentity(input = {}, deps = {}) {
+function observe(input = {}, deps = {}, hostPlugin = undefined) {
   try {
     if (!exactObject(input, ["sourcePluginRoot", "installedPluginRoot"])) fail("SNT-A2-INPUT-SCHEMA");
     const dependencies = resolveDependencies(deps);
+    if (hostPlugin !== undefined && (hostPlugin.path !== input.sourcePluginRoot || !PLUGIN_VERSION.test(hostPlugin.version))) {
+      fail("SNT-A2-CODEX-HOST-MISMATCH");
+    }
     const layout = resolveSourceLayout(input.sourcePluginRoot);
     physicalDirectory(input.installedPluginRoot, "SNT-A2-INSTALLED-ROOT-UNSAFE");
     const candidate = observeGit(layout.gitRoot, dependencies.execFileSync);
@@ -313,8 +326,8 @@ export function observePublicCoreIdentity(input = {}, deps = {}) {
     const installed = input.installedPluginRoot === layout.sourcePluginRoot
       ? source
       : snapshotPluginRoot(input.installedPluginRoot, dependencies.afterOpen, "SNT-A2-INSTALLED-ROOT-UNSAFE");
-    const sourceManifest = parseManifest(source, "SOURCE");
-    const installedManifest = parseManifest(installed, "INSTALLED");
+    const sourceManifest = parseManifest(source, "SOURCE", hostPlugin?.version);
+    const installedManifest = parseManifest(installed, "INSTALLED", hostPlugin?.version);
     if (sourceManifest.name !== installedManifest.name
       || sourceManifest.version !== installedManifest.version
       || sourceManifest.manifestSha256 !== installedManifest.manifestSha256) fail("SNT-A2-MANIFEST-MISMATCH");
@@ -330,6 +343,26 @@ export function observePublicCoreIdentity(input = {}, deps = {}) {
         contentSha256: installed.contentSha256,
       },
     };
+  } catch (error) {
+    return rejected(error instanceof ObservationError ? error.code : "SNT-A2-INTERNAL-ERROR");
+  }
+}
+
+/** Generic runners require a version declared by each manifest. */
+export function observePublicCoreIdentity(input = {}, deps = {}) {
+  return observe(input, deps);
+}
+
+/**
+ * Codex-only path: the selected host record is observed here, never accepted
+ * as caller data. Its source root must exactly match the requested source.
+ */
+export function observeCodexPublicCoreIdentity(input = {}, deps = {}) {
+  try {
+    const dependencies = resolveDependencies(deps);
+    const hostPlugin = observeSelectedCodexPipelinePlugin({ spawnSync: dependencies.spawnSync });
+    if (hostPlugin === null) return rejected("SNT-A2-CODEX-HOST-UNAVAILABLE");
+    return observe(input, deps, hostPlugin);
   } catch (error) {
     return rejected(error instanceof ObservationError ? error.code : "SNT-A2-INTERNAL-ERROR");
   }

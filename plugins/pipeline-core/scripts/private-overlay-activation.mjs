@@ -11,6 +11,7 @@ import {
   realpathSync,
   writeSync,
 } from "node:fs";
+import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { dirname, isAbsolute, resolve, sep } from "node:path";
 import { TextDecoder } from "node:util";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -22,7 +23,7 @@ import {
   activatePrivateOverlayRuntimeProjection,
   planPrivateOverlayRuntimeProjection,
 } from "../lib/private-overlay-runtime-projection.mjs";
-import { observePublicCoreIdentity } from "../lib/public-core-observation.mjs";
+import { observeCodexPublicCoreIdentity, observePublicCoreIdentity } from "../lib/public-core-observation.mjs";
 
 const EVIDENCE_SCHEMA = "pipeline.private-overlay-activation-evidence.v1";
 const PLAN_SCHEMA = "pipeline.private-overlay-runtime-projection-plan.v1";
@@ -213,7 +214,7 @@ function resolveDependencies(deps) {
   if (!isObject(deps)) throw new TypeError("invalid dependencies");
   const allowed = new Set([
     "observe", "validate", "planProjection", "activateProjection", "publishReceipt",
-    "readProjectionInputs", "readBootstrapStatus", "consumeInputs", "pluginRoot", "write", "writeError", "previewWriteSync",
+    "readProjectionInputs", "readBootstrapStatus", "consumeInputs", "pluginRoot", "write", "writeError", "previewWriteSync", "spawnSync",
   ]);
   if (Object.keys(deps).some((key) => !allowed.has(key))) throw new TypeError("invalid dependencies");
   const selected = {
@@ -229,8 +230,9 @@ function resolveDependencies(deps) {
     write: deps.write ?? process.stdout.write.bind(process.stdout),
     writeError: deps.writeError ?? process.stderr.write.bind(process.stderr),
     previewWriteSync: deps.previewWriteSync ?? writeSync,
+    spawnSync: deps.spawnSync ?? nodeSpawnSync,
   };
-  for (const key of ["observe", "validate", "planProjection", "activateProjection", "publishReceipt", "readProjectionInputs", "readBootstrapStatus", "consumeInputs", "write", "writeError", "previewWriteSync"]) {
+  for (const key of ["observe", "validate", "planProjection", "activateProjection", "publishReceipt", "readProjectionInputs", "readBootstrapStatus", "consumeInputs", "write", "writeError", "previewWriteSync", "spawnSync"]) {
     if (typeof selected[key] !== "function") throw new TypeError("invalid dependency");
   }
   if (typeof selected.pluginRoot !== "string") throw new TypeError("invalid plugin root");
@@ -273,7 +275,7 @@ function readBootstrapStatus(parsed, dependencies, consumeInputs = dependencies.
       if (callbackCalls !== 1) throw new TypeError("consumer called more than once");
       return consumeInputs(batch);
     },
-  });
+  }, { observe: dependencies.observe });
   if (!sanitizedBootstrapStatus(result)
     || callbackCalls > 1
     || (result.status === "activated" && callbackCalls !== 1)
@@ -406,7 +408,7 @@ function partialResult(projection, reasonCode) {
 }
 
 /** Run one private-overlay inspection, projection plan, status/context readback, or activation. */
-export function main(argv, dependencyOverrides = {}) {
+function run(argv, dependencyOverrides = {}) {
   const parsed = invocation(argv);
   if (parsed === undefined) {
     const writeError = typeof dependencyOverrides?.writeError === "function"
@@ -509,6 +511,23 @@ export function main(argv, dependencyOverrides = {}) {
   if (parsed.command === "status") return output?.status === "activated" ? 0 : 2;
   if (parsed.command === "load-context") return output?.status === "context-loaded" ? 0 : 2;
   return output?.status === "activated" ? 0 : 2;
+}
+
+/** Standard CLI entrypoint: no host plugin-list attestation is available. */
+export function main(argv, dependencyOverrides = {}) {
+  return run(argv, dependencyOverrides);
+}
+
+/**
+ * Codex bridge entrypoint. It selects an observer which re-reads the fixed
+ * host plugin-list command itself; no caller can supply a plugin version.
+ */
+export function mainCodexHost(argv, dependencyOverrides = {}) {
+  if (!isObject(dependencyOverrides)) return run(argv, dependencyOverrides);
+  const { observe: _ignored, ...safeOverrides } = dependencyOverrides;
+  return run(argv, { ...safeOverrides, observe(input) {
+    return observeCodexPublicCoreIdentity(input, { spawnSync: safeOverrides.spawnSync ?? nodeSpawnSync });
+  } });
 }
 
 if (process.argv[1] !== undefined && pathToFileURL(realpathSync(process.argv[1])).href === import.meta.url) {

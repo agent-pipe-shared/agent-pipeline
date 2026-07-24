@@ -19,7 +19,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import test from "node:test";
 
-import { observePublicCoreIdentity } from "./public-core-observation.mjs";
+import { observeCodexPublicCoreIdentity, observePublicCoreIdentity } from "./public-core-observation.mjs";
 
 let symlinkCapable = true;
 {
@@ -51,6 +51,37 @@ const MANIFEST = `${JSON.stringify({
   author: { name: "fixture" },
   interface: { displayName: "Fixture" },
 }, null, 2)}\n`;
+const VERSIONLESS_MANIFEST = `${JSON.stringify({
+  name: "pipeline-core",
+  description: "fixture",
+  hooks: "./hooks/codex-hooks.json",
+  author: { name: "fixture" },
+  interface: { displayName: "Fixture" },
+}, null, 2)}\n`;
+const HOST_PLUGIN_VERSION = "1.2.3-test.1";
+
+function codexHostSpawn(path, version = HOST_PLUGIN_VERSION) {
+  return () => ({
+    status: 0,
+    signal: null,
+    stdout: JSON.stringify({
+      installed: [{
+        pluginId: "pipeline-core@agent-pipeline",
+        name: "pipeline-core",
+        marketplaceName: "agent-pipeline",
+        version,
+        installed: true,
+        enabled: true,
+        source: { source: "local", path },
+        marketplaceSource: { sourceType: "git", source: "https://example.test/public-core.git" },
+        installPolicy: "AVAILABLE",
+        authPolicy: "ON_INSTALL",
+      }],
+      available: [],
+    }),
+    stderr: "",
+  });
+}
 
 function git(root, args, options = {}) {
   return execFileSync("git", args, {
@@ -62,13 +93,13 @@ function git(root, args, options = {}) {
   }).trim();
 }
 
-function fixture(origin = "https://example.test/owner/public-core.git") {
+function fixture(origin = "https://example.test/owner/public-core.git", manifest = MANIFEST) {
   const base = mkdtempSync(join(tmpdir(), "public-core-observation-"));
   const sourceRoot = join(base, "source");
   const sourcePluginRoot = join(sourceRoot, "plugins", "pipeline-core");
   const sourceManifestPath = join(sourcePluginRoot, ".codex-plugin", "plugin.json");
   mkdirSync(dirname(sourceManifestPath), { recursive: true });
-  writeFileSync(sourceManifestPath, MANIFEST);
+  writeFileSync(sourceManifestPath, manifest);
   mkdirSync(join(sourcePluginRoot, "hooks"));
   writeFileSync(join(sourcePluginRoot, "hooks", "codex-hooks.json"), "{}\n");
   mkdirSync(join(sourcePluginRoot, "empty-directory"));
@@ -156,6 +187,48 @@ test("accepts one physical source root as the installed development root", (t) =
   const result = observePublicCoreIdentity(repo.input({ installedPluginRoot: repo.sourcePluginRoot }));
   assert.equal(result.status, "ready", JSON.stringify(result));
   assert.match(result.plugin.contentSha256, /^[0-9a-f]{64}$/u);
+});
+
+test("accepts a versionless Codex manifest only with a typed host plugin-list version", (t) => {
+  const repo = fixture(undefined, VERSIONLESS_MANIFEST);
+  t.after(repo.cleanup);
+
+  rejected(observePublicCoreIdentity(repo.input()), "SNT-A2-SOURCE-MANIFEST-SCHEMA");
+  const result = observeCodexPublicCoreIdentity(repo.input(), { spawnSync: codexHostSpawn(repo.sourcePluginRoot) });
+  assert.equal(result.status, "ready", JSON.stringify(result));
+  assert.equal(result.plugin.version, HOST_PLUGIN_VERSION);
+  assert.equal(result.plugin.manifestSha256, createHash("sha256").update(VERSIONLESS_MANIFEST).digest("hex"));
+});
+
+test("rejects caller-supplied and unavailable Codex host versions for a versionless manifest", (t) => {
+  const repo = fixture(undefined, VERSIONLESS_MANIFEST);
+  t.after(repo.cleanup);
+  rejected(observePublicCoreIdentity(repo.input({ hostPluginVersion: HOST_PLUGIN_VERSION })), "SNT-A2-INPUT-SCHEMA");
+  rejected(observeCodexPublicCoreIdentity(repo.input(), { spawnSync: () => ({ status: 1 }) }), "SNT-A2-CODEX-HOST-UNAVAILABLE");
+});
+
+test("rejects a declared manifest version that differs from the Codex host record", (t) => {
+  const repo = fixture();
+  t.after(repo.cleanup);
+  rejected(observeCodexPublicCoreIdentity(repo.input(), {
+    spawnSync: codexHostSpawn(repo.sourcePluginRoot, "1.2.3-other"),
+  }), "SNT-A2-SOURCE-MANIFEST-SCHEMA");
+});
+
+test("host-attested version never bypasses versionless source or installed snapshot drift", () => {
+  const mutations = [
+    [(repo) => writeFileSync(repo.installedManifestPath, MANIFEST), "SNT-A2-MANIFEST-MISMATCH"],
+    [(repo) => writeFileSync(join(repo.installedPluginRoot, "hooks", "codex-hooks.json"), "changed\n"), "SNT-A2-CONTENT-MISMATCH"],
+  ];
+  for (const [mutate, expectedCode] of mutations) {
+    const repo = fixture(undefined, VERSIONLESS_MANIFEST);
+    try {
+      mutate(repo);
+      rejected(observeCodexPublicCoreIdentity(repo.input(), {
+        spawnSync: codexHostSpawn(repo.sourcePluginRoot),
+      }), expectedCode);
+    } finally { repo.cleanup(); }
+  }
 });
 
 test("rejects missing, extra, and byte-drifted installed content", () => {

@@ -5,7 +5,7 @@ import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { main as activationMain } from "./private-overlay-activation.mjs";
+import { mainCodexHost as activationMain } from "./private-overlay-activation.mjs";
 
 const SCHEMA = "pipeline.codex-private-overlay-source-resolution.v1";
 const REJECTION = Object.freeze({
@@ -122,7 +122,7 @@ function sourcePluginRoot(document) {
   if (!exactObject(entry.marketplaceSource, ["sourceType", "source"])
     || entry.marketplaceSource.sourceType !== "git"
     || !safeGitMarketplaceSource(entry.marketplaceSource.source)) return null;
-  return entry.source.path;
+  return { path: entry.source.path, version: entry.version };
 }
 
 function resolveSourceRoot(spawn) {
@@ -179,13 +179,13 @@ export function main(argv, dependencyOverrides = {}) {
     safeWrite(dependencyOverrides, "write", canonicalLine(REJECTION));
     return 2;
   }
-  const sourceRoot = resolveSourceRoot(deps.spawnSync);
-  if (sourceRoot === null) {
+  const hostPlugin = resolveSourceRoot(deps.spawnSync);
+  if (hostPlugin === null) {
     safeWrite(dependencyOverrides, "write", canonicalLine(REJECTION));
     return 2;
   }
   try {
-    const code = deps.activationMain(activationArgv(parsed, sourceRoot));
+    const code = deps.activationMain(activationArgv(parsed, hostPlugin.path));
     if (Number.isInteger(code)) return code;
     safeWrite(dependencyOverrides, "write", canonicalLine(REJECTION));
     return 2;

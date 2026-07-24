@@ -76,6 +76,14 @@ const LEGACY_CLASSIFIER_BASELINES = Object.freeze({
 // config seed is deliberately empty: provider, machine and communication
 // preferences are user-owned, not Public migration policy.
 const LEGACY_V3_RUNTIME_SEEDS = Object.freeze({
+  // Legacy consumer onboarding supports a project with no generated runtime
+  // projections. These are renderer inputs only: planning keeps them in
+  // memory, reports absent preimages, and the existing activation transaction
+  // is the sole writer. Do not reuse the Slim Overlay calibration here; a
+  // legacy project must derive its public runtime projection from its source.
+  ".claude/settings.json": "{}\n",
+  ".claude/pipeline.json": "{}\n",
+  ".claude/pipeline.yaml": "language:\n  human_facing: en\nmodelRouting:\n  legacy:\n    model: legacy\n    effort: low\n",
   ".codex/config.toml": "",
   ".codex/agents/implementor.toml": 'model = ""\nmodel_reasoning_effort = ""\n',
   ".codex/agents/critic.toml": 'model = ""\nmodel_reasoning_effort = ""\n',

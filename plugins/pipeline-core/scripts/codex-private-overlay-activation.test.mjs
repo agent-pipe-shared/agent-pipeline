@@ -106,6 +106,18 @@ test("inspect resolves with the exact fixed Codex argv and injects only the loca
   });
 });
 
+test("never forwards the host plugin-list version to an activation argument", () => {
+  let received;
+  const result = capture(["inspect", "--project-root", PROJECT_ROOT], {
+    activationMain(...args) {
+      received = args;
+      return 0;
+    },
+  });
+  assert.equal(result.code, 0);
+  assert.deepEqual(received, [["inspect", "--project-root", PROJECT_ROOT, "--source-plugin-root", SOURCE_PLUGIN_ROOT]]);
+});
+
 test("activation preserves only public arguments and appends the reviewed digest after the internal source", () => {
   const result = capture([
     "activate",
@@ -147,6 +159,7 @@ test("invalid public invocations emit fixed usage before source resolution", () 
     ["inspect", "--project-root", "relative"],
     ["inspect", "--project-root", PROJECT_ROOT, "--project-root", PROJECT_ROOT],
     ["inspect", "--project-root", PROJECT_ROOT, "--source-plugin-root", SOURCE_PLUGIN_ROOT],
+    ["inspect", "--project-root", PROJECT_ROOT, "--host-plugin-version", "0.2.0+fixture"],
     ["inspect", "--project-root", PROJECT_ROOT, "--expected-plan-sha256", PLAN_SHA256],
     ["status", "--project-root", PROJECT_ROOT, "--expected-plan-sha256", PLAN_SHA256],
     ["load-context", "--project-root", PROJECT_ROOT, "--expected-plan-sha256", PLAN_SHA256],
@@ -171,6 +184,7 @@ test("closed plugin-list validation rejects every unavailable or unsafe source s
     document([pluginEntry({ pluginId: "other@agent-pipeline" })]),
     document([pluginEntry({ name: "other" })]),
     document([pluginEntry({ marketplaceName: "other" })]),
+    document([pluginEntry({ version: "not a version" })]),
     document([pluginEntry({ source: { source: "remote" } })]),
     document([pluginEntry({ source: { path: "relative/plugins/pipeline-core" } })]),
     document([pluginEntry({ source: { extra: SENTINEL } })]),
@@ -246,6 +260,7 @@ test("delegate exceptions and open dependency injection remain sanitized", () =>
 test("wrapper has no filesystem mutation surface and success writes only through the delegated main", () => {
   const source = readFileSync(new URL("./codex-private-overlay-activation.mjs", import.meta.url), "utf8");
   assert.doesNotMatch(source, /from "node:fs"|writeFile|mkdir|rename|unlink|chmod|rmSync/u);
+  assert.doesNotMatch(source, /--host-plugin-version|core\.lock|process\.env\.(?!PATH)/u);
   let hostCalls = 0;
   const result = capture(["plan", "--project-root", PROJECT_ROOT], {
     spawnSync: () => { hostCalls += 1; return successfulSpawn()(); },
