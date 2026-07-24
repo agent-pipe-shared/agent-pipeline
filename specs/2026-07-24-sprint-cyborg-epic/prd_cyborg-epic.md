@@ -165,7 +165,8 @@ PO's literal "approved".
 ## Order of work
 
 - **Phase I — Foundation:** CYB-0 (sprint scaffolding: feature-state switch via
-  the sanctioned writer, triage records, spec-retention registration),
+  the sanctioned writer, spec-retention registration; backlog transitions stay
+  canonical in Nova),
   CYB-A0 (assurance quickfix), CYB-1 (#41 catalog). CYB-1's schema-boundary
   freeze (CYB-1F, incl. the capability-ID grammar and the thirteen family
   IDs) is a named PO checkpoint delivered mid-package so Phase II can start.
