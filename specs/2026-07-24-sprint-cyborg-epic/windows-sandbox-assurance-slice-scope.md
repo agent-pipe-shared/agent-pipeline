@@ -23,13 +23,24 @@ cross-referenced.
 
 ## In-scope items (confirmed)
 
+> **Correction, 2026-07-25:** the "Brittle-test hygiene" row below was
+> re-diagnosed after direct reproduction (`node --test` against each suite,
+> reading the exact thrown assertion). Both original diagnoses were wrong.
+> `feature-package-topology` is a real, confirmed `node:path` normalize()
+> Windows bug (stays here, still a fine quick win). `license-contract`'s
+> finding is NOT a source-count staleness issue — it's `0o600` vs `0o666`
+> mode bits (384 vs 438 in decimal, which is what produced the original
+> misreading) and is the same private-state/DACL class as #35 — moved to
+> that row. See `backlog/items/2026-07-25-windows-verify-brittle-test-hygiene.md`
+> for the full corrected diagnosis.
+
 | Class | Suites / findings | Backlog record | Root cause | Priority |
 | --- | --- | --- | --- | --- |
-| Native-Windows DACL/durability | `afk-ledger`, `advisory-host-bridge`, `codex-isolated-critic-contract` | `pipeline.windows-directory-durability` (#34), `pipeline.windows-private-state-assurance` (#35) — both already `open` | Directory-fsync/DACL assurance genuinely unavailable/untyped on native Windows | P0 |
+| Native-Windows DACL/durability | `afk-ledger`, `advisory-host-bridge`, `codex-isolated-critic-contract`, `license-contract` (private-receipt mode assertion, folded in 2026-07-25) | `pipeline.windows-directory-durability` (#34), `pipeline.windows-private-state-assurance` (#35) — both already `open` | Directory-fsync/DACL assurance genuinely unavailable/untyped on native Windows; Windows `fs` mode bits don't honor POSIX owner-only semantics even when explicitly requested | P0 |
 | PO-gate-authority path canonicalization | `approve-plan` → `PO-GATE-AUTHORITY-UNAVAILABLE` | `pipeline.po-gate-authority-path-canonicalization` (NEW, this sketch) | `resolvePoGateRepositoryTopology` strict path equality breaks under Windows cwd case drift — **confirmed** by direct reproduction | P0 (same code path as #35, blocks a real pipeline operation today) |
-| PO-gate-authority receipt readback | Publish succeeds, immediate re-validate rejects | `pipeline.po-gate-authority-receipt-readback` (NEW, this sketch) | **Unconfirmed** — plausibly same DACL/durability gap class as #34/#35, not yet isolated | P1 (needs repro before it can be sequenced) |
+| PO-gate-authority receipt readback | Publish succeeds, immediate re-validate rejects | `pipeline.po-gate-authority-receipt-readback` (NEW, this sketch) | **Confirmed reproduced 2026-07-25** (`PO-PROFILE-RECEIPT-INVALID` after fixing the case-mismatch to reach this check) — root cause still not isolated, only that it's real, not phantom | P1 (repro done; isolation still needed before a fix can be scoped) |
 | Trusted-tool resolution | `security-scan`, `repository-freshness` | `pipeline.windows-trusted-tool-resolution` (#37) — already `open` | Conflicting `binary_missing` results without a shared trust-bound resolver | P1 |
-| Brittle-test hygiene | `feature-package-topology`, `license-contract` | `pipeline.windows-verify-brittle-test-hygiene` (NEW, this sketch) | Stale fixture assertions, not platform defects | P2 (quick win, no dependency on the rest) |
+| Path-normalization quick win | `feature-package-topology` | `pipeline.windows-verify-brittle-test-hygiene` (NEW, this sketch; corrected 2026-07-25 — no longer a "hygiene" issue, a real bug) | `canonicalRelative()`'s `node:path` `normalize()` silently rewrites `/` to `\` on win32, rejecting every valid forward-slash artifact path — **confirmed** by isolated fixture reproduction | P2 (still a quick, isolated, well-understood fix; no dependency on the rest) |
 
 ## Explicitly out of scope for this slice
 
@@ -51,16 +62,20 @@ cross-referenced.
 
 ## Sequencing (adapted from the existing #34→#35→#37→#36 order)
 
-1. **Brittle-test hygiene** (P2 but zero dependencies) — can land first as a
-   low-risk warm-up, shrinking the red count without touching product code.
+1. **`feature-package-topology` path-normalization fix** (P2, zero
+   dependencies — corrected 2026-07-25, previously mislabeled "brittle-test
+   hygiene") — can land first as a low-risk, isolated fix, shrinking the red
+   count without touching DACL/durability code.
 2. **`pipeline.po-gate-authority-path-canonicalization`** — small, isolated,
    already has a confirmed repro and a concrete fix direction; unblocks
    `approve-plan` end-to-end on this host.
 3. **`pipeline.windows-directory-durability` (#34)** then
    **`pipeline.windows-private-state-assurance` (#35)** — the real DACL/durability
-   primitive work; #35 should absorb the receipt-readback investigation
-   (`pipeline.po-gate-authority-receipt-readback`) once reproduced, since it
-   is plausibly the same gap class.
+   primitive work; #35 now absorbs BOTH the receipt-readback investigation
+   (`pipeline.po-gate-authority-receipt-readback`, confirmed reproduced
+   2026-07-25) and `license-contract`'s private-receipt file-mode assertion
+   (confirmed 2026-07-25 to be the same POSIX-mode-bits-don't-exist-on-Windows
+   class, moved out of the path-normalization item).
 4. **`pipeline.windows-trusted-tool-resolution` (#37)** — independent resolver
    lane, can run in parallel with step 3.
 5. Re-run native Windows `verify` at the resulting HEAD; only then is a
