@@ -794,6 +794,44 @@ authoritative view of backlog reality for the Cyborg runner.
   Phase III/IV are covered, that is an explicit, named gap for the PO's
   morning review, not a silent stop.
 
+#### AFK continuation — CYB-5/CYB-6 drafted; 0.4.2 landed, plugin updated, branch rebased — 2026-07-25
+
+- Drafted [`cyb-5-feature-spec.md`](../specs/2026-07-24-sprint-cyborg-epic/cyb-5-feature-spec.md)
+  (#46, 14 ACs mapped to CYB-5's own (a)/(b)/(c) slice structure, cross-
+  referencing the three already-filed absorbed backlog items for slices b/c)
+  and [`cyb-6-feature-spec.md`](../specs/2026-07-24-sprint-cyborg-epic/cyb-6-feature-spec.md)
+  (#44, 13 ACs; notes the thirteen capability families are verbatim identical
+  to CYB-1F's frozen `cap.*` roots — CYB-6 populates the registry, never
+  redefines identity). Commits `a3f9a58`, `530548e` (pre-rebase SHAs; see
+  below for the post-rebase SHAs). Phase III now half-drafted (CYB-5, CYB-6
+  done; CYB-7, CYB-8, then Phase IV's CYB-9 remain).
+- **Live PO message received mid-session** (PO was not fully AFK yet):
+  `0.4.2` landed on `origin/main` (tag `v0.4.2`, tip `c47fb794adfe2a8840813bf26b035841bf278c1f`,
+  "docs(release): record 0.4.2 publication and recovery"). PO asked to update
+  the plugin (so the PO can reload their own client) and then rebase this
+  branch onto it.
+- **Plugin updated:** `claude plugin marketplace update agent-pipeline` then
+  `claude plugin update pipeline-core@agent-pipeline --scope project` (run
+  from this checkout) — `0.4.0 → 0.4.2` for project scope
+  `D:\dev\agent-pipeline-share`, `installed_plugins.json` now records
+  `gitCommitSha: c47fb794adfe2a8840813bf26b035841bf278c1f`, matching
+  `origin/main` exactly. PO still needs to do their own client reload to pick
+  this up in their session.
+- **Branch rebased:** `feat/sprint-cyborg-claude` had never been pushed to
+  `origin` (no upstream configured, no remote ref) — confirmed via
+  `git ls-remote` before rebasing, so this was a purely local history rewrite
+  with no force-push implication. Rebased all 23 commits (the full Cyborg
+  design history, `v0.4.1` base → `origin/main`/`v0.4.2` base) cleanly, zero
+  conflicts. `origin/main` is now a confirmed ancestor of `HEAD`. This closes
+  the PO's earlier-noted "cheap follow-up, not a precondition to starting"
+  item from the original start-Windows-work-in-parallel decision.
+- Did not additionally re-run native Windows `verify` against the new base
+  as part of this action (not asked; the decision-D root-cause classification
+  above stands until a fresh run is actually done — 0.4.2's changed commits
+  are onboarding/mini-profile fixes, not Windows-DACL-related, so no reason
+  to expect the 11-suite red count to have changed, but this is an
+  expectation, not new evidence).
+
 ### 2026-07-24 release-candidate checkpoint — authoritative latest
 
 The PO has dispositioned all Sentinel/HAW-E implementation and tests as
