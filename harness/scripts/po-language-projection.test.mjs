@@ -90,6 +90,7 @@ check("new-project kickoff offers only V3 work profiles", () => {
   assert.match(text, /`Profile: epic`/);
   assert.match(text, /`Profile: feature`/);
   assert.match(text, /`Profile: mini`/);
+  assert.match(text, /genuinely small, bounded,\s+reversible feature\/hotfix; hard light-process limits/);
   assert.match(text, /Advisory is a\s+separate runner-neutral V3 duty, not a profile/);
   assert.doesNotMatch(text, /Profile: (?:advisor|design-first)/);
 });

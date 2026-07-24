@@ -15,8 +15,8 @@ of the first pasted message), not a prompt-injection payload.
 USAGE (the PO)
 1. Before pasting: choose the V3 work profile that matches this topic —
    **`Profile: epic`** (architecture/multi-block), **`Profile: feature`**
-   (bounded product change), or **`Profile: mini`** (small feature/hotfix;
-   hard light-process limits). The bootstrap resolves the current phase and
+   (bounded product change), or **`Profile: mini`** (genuinely small, bounded,
+   reversible feature/hotfix; hard light-process limits). The bootstrap resolves the current phase and
    uses the registered `routing.profiles.<profile>.<phase>.<runner>` route from
    `pipeline.user.v3`; do not choose a model or effort here. Advisory is a
    separate runner-neutral V3 duty, not a profile: it is resolved by the
