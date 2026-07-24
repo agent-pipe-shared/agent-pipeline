@@ -32,7 +32,7 @@ export function windowsSystemToolRoots() { return WINDOWS_SYSTEM_TOOL_ROOTS; }
 
 function missing(error) { return error?.code === "ENOENT" || error?.code === "ENOTDIR"; }
 function normalWinPath(value) { return String(value).replaceAll("/", "\\").replace(/\\+$/u, "").toLowerCase(); }
-function withinWindowsRoots(path, roots) { const candidate = normalWinPath(path); return roots.some((root) => { const normalizedRoot = normalWinPath(root); return candidate === normalizedRoot || candidate.startsWith(`${normalizedRoot}\\`); }); }
+function withinWindowsRoots(path, roots) { const candidate = normalWinPath(path); return roots.some((root) => winPath.dirname(candidate) === normalWinPath(root)); }
 function windowsCandidate(name) { return name.toLowerCase().endsWith(".exe") ? name : `${name}.exe`; }
 
 /** Validates a candidate selected by a caller through the same authority. */
