@@ -18,6 +18,7 @@ import { pathToFileURL } from "node:url";
 import { coordinateAdvisory } from "../lib/advisory-coordinator.mjs";
 import { AdvisoryReceiptAssuranceError, persistAdvisoryReceipt } from "../lib/advisory-receipt-assurance.mjs";
 import { createHostAdvisorLaunch, createHostAdvisorStatus, validateHostAdvisorStatus } from "../lib/host-advisor-status.mjs";
+import { ROUTES, selectHostAdvisorRoute } from "./codex-host-advisor-route.mjs";
 import { observeHostAdvisorWorkspace } from "./host-advisor-workspace.mjs";
 
 const USAGE = "usage: advisory-host-bridge.mjs --input <json> --receipt <json> [--timeout-ms <1000..600000>]";
@@ -27,12 +28,34 @@ export async function runSelectedAdvisoryHost() { throw Object.assign(new Error(
 
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 function advisoryReceiptBytes(receipt) { return Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, "utf8"); }
+function hostRouteInput(input) {
+  const advisorExport = input?.advisorExport;
+  if (advisorExport !== undefined && (advisorExport === null || typeof advisorExport !== "object" || Array.isArray(advisorExport)
+    || JSON.stringify(Object.keys(advisorExport).sort()) !== JSON.stringify(["consent"]))) {
+    throw Object.assign(new Error("advisor export consent is invalid"), { code: "invalid-route-input" });
+  }
+  return { runner: input?.runner, profile: input?.profile, consent: advisorExport?.consent ?? "default" };
+}
+function disabledHostAdvisory(route) {
+  return {
+    advisoryResult: {
+      ok: false,
+      code: route === ROUTES.NO_CONSENT ? "advisory_disabled_no_consent" : "advisory_disabled",
+      answer: null,
+      receipt: null,
+      attempts: [],
+    },
+    execution: null,
+  };
+}
 
 /**
  * Production Codex advisory call path. The coordinator cannot see an adapter
  * until an exact selector record has been read back by the generic bridge.
  */
 export async function runCodexAdvisoryThroughSelectedSandbox(input, adapter, transport = {}) {
+  const route = selectHostAdvisorRoute(hostRouteInput(input));
+  if (route !== ROUTES.HOST) return disabledHostAdvisory(route);
   const root = transport.repoRoot ?? process.cwd();
   const observe = transport.observeWorkspace ?? observeHostAdvisorWorkspace;
   const before = observe(root);
@@ -138,14 +161,7 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
     let result;
     let execution = null;
     const advisorExport = input?.advisorExport;
-    const advisoryDisabled = advisorExport && typeof advisorExport === "object" && !Array.isArray(advisorExport)
-      && Object.keys(advisorExport).length === 1 && advisorExport.consent === "declined";
-    if (advisoryDisabled) {
-      // An explicit decline is a normal optional state. The
-      // Coordinator returns the typed disabled result before any adapter,
-      // child, export, or receipt.
-      result = await coordinateAdvisory(input, { advisorExport });
-    } else if (input.runner === "codex") {
+    if (input.runner === "codex") {
       const outcome = await runCodexAdvisoryWithHostFallback(input, adapter, { repoRoot: process.cwd() });
       result = outcome.advisoryResult;
       execution = outcome.execution;

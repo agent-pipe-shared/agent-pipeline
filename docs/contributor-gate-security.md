@@ -74,6 +74,8 @@ on 2026-07-23. The closed-schema disposition is recorded in
 This candidate-bound approval does not imply release consent, publication, or
 a backlog evidence amendment.
 
+On 2026-07-24 André Twachtmann confirmed: “bestätigt ausdrücklich die Privacy-Freigabe für den gebundenen Freeze-Kandidaten 79a2c9b0b979d171d69217df6493db8cc75b9484 / Tree 9fc4320bf00c0af7a08304c8afeeb2014c083508, einschließlich 30 Tagen Actions-Log-Retention”. The candidate-specific disposition remains separate from the historical approval above and does not widen it to later candidates.
+
 ## Rollback and recovery order
 
 If the checker, workflow, or server ruleset is wrong, recovery is fail-closed:

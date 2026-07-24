@@ -39,6 +39,17 @@ test("unavailable, malformed, or mutating consults fail closed without fallback"
   }
 });
 
+test("route authority disables mini and declined input before any child and rejects malformed consent", async () => {
+  for (const input of [{ ...base(), profile: "mini" }, { ...base(), advisorExport: { consent: "declined" } }]) {
+    let calls = 0;
+    const result = await runCodexAdvisoryThroughSelectedSandbox(input, async () => { calls += 1; return { status: "answered", answer: "must not run" }; }, { repoRoot: process.cwd() });
+    assert.equal(calls, 0); assert.equal(result.advisoryResult.ok, false); assert.equal(result.execution, null);
+  }
+  let calls = 0;
+  await assert.rejects(runCodexAdvisoryThroughSelectedSandbox({ ...base(), advisorExport: { consent: "approved", extra: true } }, async () => { calls += 1; }, { repoRoot: process.cwd() }), { code: "invalid-route-input" });
+  assert.equal(calls, 0);
+});
+
 test("production bridge consumes raw input and persists only sanitized host status", async () => {
   const root = await mkdtemp(join(tmpdir(), "host-advisor-")); const inputPath = join(root, "input.json"); const receiptPath = join(root, "status.json");
   try {
