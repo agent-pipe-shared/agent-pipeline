@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 
 import { clearGateEstimateForMutation, deriveNextGate, prepareGateEstimateMutation, projectGateEstimate, readGateEstimateEvidence, validateGateEstimateEvidence } from "./gate-estimate.mjs";
+import { symlinkCapability } from "./symlink-capability.mjs";
 
 let passed = 0;
 function check(name, fn) { fn(); passed += 1; process.stdout.write(`PASS GE${String(passed).padStart(2, "0")} ${name}\n`); }
@@ -37,7 +38,11 @@ check("reads only a bounded regular in-repository evidence file", () => {
   try {
     mkdirSync(join(root, "evidence")); const bytes = `${JSON.stringify(evidence())}\n`; writeFileSync(join(root, "evidence", "eta.json"), bytes);
     const result = readGateEstimateEvidence(root, "evidence/eta.json"); assert.equal(result.ok, true); assert.equal(result.sha256, createHash("sha256").update(bytes).digest("hex"));
-    symlinkSync(join(root, "evidence", "eta.json"), join(root, "evidence", "alias.json")); assert.equal(readGateEstimateEvidence(root, "evidence/alias.json").code, "GE-EVIDENCE-SYMLINK");
+    if (symlinkCapability().available) {
+      symlinkSync(join(root, "evidence", "eta.json"), join(root, "evidence", "alias.json")); assert.equal(readGateEstimateEvidence(root, "evidence/alias.json").code, "GE-EVIDENCE-SYMLINK");
+    } else {
+      console.log("[capability: symlink unavailable] skipping symlink alias assertion in gate-estimate.test.mjs");
+    }
     assert.equal(readGateEstimateEvidence(root, "../outside.json").code, "GE-EVIDENCE-PATH");
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
