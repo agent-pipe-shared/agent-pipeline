@@ -35,3 +35,18 @@ aaeb698ff8440b745e15141e2206567afdc7afa8:specs/2026-07-19-sprint-sentinel-epic/s
 e32f34c5aa03f2498844a7fa5d35be5b612c051b:harness/scripts/pipeline-state.test.mjs:generic-api-key:1601
 e32f34c5aa03f2498844a7fa5d35be5b612c051b:harness/scripts/pipeline-state.test.mjs:generic-api-key:1726
 e32f34c5aa03f2498844a7fa5d35be5b612c051b:harness/scripts/pipeline-state.test.mjs:generic-api-key:1774
+# Nova A1 deterministic digest/idempotency records. These exact historical
+# fingerprints are non-secret evidence values; do not widen to a path or rule.
+9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:backlog/transitions.ndjson:generic-api-key:73
+9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:backlog/transitions.ndjson:generic-api-key:74
+9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md:generic-api-key:1
+9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:backlog/receipts/7ac4c1dd233bdbfbec854f3f818464ebed2850144c42da6816557112af743570.json:generic-api-key:1
+9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:backlog/receipts/9367a90e2516ec6f621b5710ffabef67cbbf27116f7f46cef8f1f0dd69aebc25.json:generic-api-key:1
+9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:specs/sprint-nova-epic/evidence/backlog/event-39-amendment-intent.json:generic-api-key:1
+9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:backlog/receipts/f33b8d45db38e7b9061dde268405d86123fc90afc24330a626afba2507650281.json:generic-api-key:1
+9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:specs/sprint-nova-epic/evidence/backlog/event-40-amendment-intent.json:generic-api-key:1
+9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:specs/sprint-nova-epic/evidence/backlog/event-39-delivery-intent.json:generic-api-key:1
+9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:backlog/receipts/d311a66737ff088e2ae324df5f3525b08cefd4c9f58787d09870d3bd26961363.json:generic-api-key:1
+9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:specs/sprint-nova-epic/evidence/backlog/event-40-delivery-intent.json:generic-api-key:1
+9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:specs/sprint-nova-epic/evidence/backlog/issue-57-assign-intent.json:generic-api-key:1
+9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:specs/sprint-nova-epic/evidence/backlog/issue-57-bootstrap-intent.json:generic-api-key:1
