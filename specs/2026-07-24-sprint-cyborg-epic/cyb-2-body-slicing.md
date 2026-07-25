@@ -91,13 +91,38 @@ than CYB-1's brand-new-file waves needed).
 
 ## 3. Open items requiring PO/Elephant resolution before full dispatch-readiness
 
-1. **AC8 call-site unknown (CYB-2I):** only `guard-push.mjs` was found as a
-   concrete "Push" enforcement point; "PR/Close/Release" call sites were not
-   located as distinct guard files in this session's investigation. Before
-   CYB-2I can be briefed, the Elephant needs to either locate them (they may
-   live outside `plugins/pipeline-core/hooks/`, e.g. in CI workflow files or
-   the close-ritual skill) or get a PO/spec clarification on what these four
-   call sites concretely are in this repo's current architecture.
+1. **AC8 call-site unknown (CYB-2I) — RESOLVED 2026-07-25 by Explore-agent
+   investigation, disposition still needed:**
+   - **Push:** `plugins/pipeline-core/hooks/guard-push.mjs` (confirmed
+     existing, as before).
+   - **PR:** `.github/workflows/contributor-gates.yml` (triggers on
+     `pull_request: opened/reopened/synchronize/edited`) invokes
+     `harness/scripts/check-pr-contributor-gates.mjs` — a concrete, distinct
+     enforcement script. It currently gates CLA acceptance/DCO sign-off, not
+     completeness — CYB-2I would need to EXTEND this script's checks, not
+     invent a new one.
+   - **Close:** no standalone gating script exists. Enforcement is embedded
+     as procedural ritual steps inside
+     `plugins/pipeline-core/skills/close-block/SKILL.md`, with named
+     extension points `close.pre`/`close.post` that a project can hook its
+     own script into (this repo's own `.claude/pipeline.json` already uses
+     `close.pre` for its CLAUDE.md-length and spec-retention checks). CYB-2I's
+     "Close" integration means registering a new `close.pre` hook entry, not
+     writing a new top-level guard file.
+   - **Release:** enforcement is diffuse — no single `release-gate.*` file.
+     The closest concrete pieces are
+     `plugins/pipeline-core/scripts/release-version-plan.mjs` (pre-mutation
+     release-version decision logic) and generic `verify.mjs`/
+     `check-license-contract.mjs` checks; `docs/release-0.4.4-readiness.md`
+     and siblings are readiness documents, not executable gates. CYB-2I would
+     need to pick one concrete integration point here (most likely wiring the
+     completeness evaluator into `release-version-plan.mjs`'s pre-mutation
+     checks) — this is a genuine design choice for CYB-2I's own briefing, not
+     a rediscovery task.
+   - **Net effect:** the AC8 unknown is no longer "does the call site exist"
+     but "how does CYB-2I extend/hook into each of these four different
+     existing mechanisms" — a real but bounded design task for CYB-2I's own
+     briefing once Wave 4/5 (2E/2F) land. Does not block Wave 1 (CYB-2A).
 2. **CYB-2B/2E schema evolution vs. the "compatibility window" (PRD deviation
    D9):** the feature-spec names a dual-emit compatibility window ending "on
    first L1 policy adoption, reviewed at sprint close" — this plan defers the
