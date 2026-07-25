@@ -9,6 +9,13 @@ import { buildHandle, resolveSystemExecutable } from "../../../harness/scripts/s
 import { runProbe } from "../../../harness/scripts/security-readiness/tool-identity.mjs";
 import { defaultGitProbe, FIXED_TOOLS, runToolchainPreflight } from "./toolchain-preflight.mjs";
 import { probeSemgrep } from "../../../harness/scripts/security-readiness/semgrep-readiness.mjs";
+// CYB-2G (AC10) additions: new imports kept on their own lines rather than
+// merged into the existing import statements above, so this additive change
+// touches zero pre-existing lines.
+import { spawnSync } from "node:child_process";
+import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { CAPABILITY_TOOL_ROOTS, evaluateCapabilityCompleteness } from "./toolchain-preflight.mjs";
 
 let passed = 0;
 function check(name, fn) { fn(); passed += 1; process.stdout.write(`PASS TCP${String(passed).padStart(2, "0")} ${name}\n`); }
@@ -19,6 +26,14 @@ const nodeReady = () => observed("node", "24.15.0", ["spawn-shell-false"]);
 const gitReady = () => observed("git", "2.50.1", ["object-format", "diff-paths"]);
 function manifest(scanners, mode = "blocking") { return { status: "ok", manifest: { gates: { security: { mode, type: "automated" } }, security: { scanners }, governance: { policies_path: "policies" } } }; }
 function root() { return mkdtempSync(join(tmpdir(), "toolchain-preflight-")); }
+// CYB-2G (AC10) additions below this line.
+function entry(tool, status) { return { tool, status }; }
+const REPO_ROOT = resolve(fileURLToPath(new URL("../../../", import.meta.url)));
+function gitStatus() {
+  const result = spawnSync("git", ["status", "--porcelain=v1", "--untracked-files=all"], { cwd: REPO_ROOT, encoding: "utf8" });
+  assert.equal(result.status, 0, `git status failed: ${String(result.stderr)}`);
+  return result.stdout;
+}
 
 check("invalid manifest blocks before every identity or capability probe", () => {
   const repo = root(); let calls = 0;
@@ -201,4 +216,90 @@ check("Semgrep probes use bounded temporary settings instead of writing the user
     assert.deepEqual(readdirSync(repo), ["semgrep"]);
   } finally { rmSync(repo, { recursive: true, force: true }); }
 });
-process.stdout.write(`${passed}/12 checks passed.\n`);
+
+// --- CYB-2G (AC10): evaluateCapabilityCompleteness() -----------------------
+// Fixtures below construct synthetic preflight-result-shaped inputs
+// (`{ results: [...] }`) rather than requiring real scanner binaries, per
+// field 2/3 of the briefing. Together they exercise all five DoD-named
+// states (required/available/missing/unsupported/optional) plus the
+// omitted-entirely (no-information) branch, the node/git exclusion, the
+// license-check informative-only representation, the frozen tool->capability
+// mapping, a real runToolchainPreflight()-shaped integration fixture, and the
+// zero-mutation proof.
+check("capability-completeness: tool-to-capability-root mapping matches the CYB-1F frozen assignment", () => {
+  assert.deepEqual(CAPABILITY_TOOL_ROOTS, { gitleaks: "cap.secrets", "osv-scanner": "cap.sca", semgrep: "cap.sast" });
+});
+check("capability-completeness: a required capability with a ready tool reports \"required\"", () => {
+  const output = evaluateCapabilityCompleteness({ results: [entry("gitleaks", "ready")] }, ["cap.secrets"]);
+  assert.deepEqual(output.capabilities, [{ capability: "cap.secrets", status: "required", tool: "gitleaks" }]);
+});
+check("capability-completeness: a required capability with a known-but-not-ready tool reports \"missing\"", () => {
+  const output = evaluateCapabilityCompleteness({ results: [entry("osv-scanner", "binary_missing")] }, ["cap.sca"]);
+  assert.deepEqual(output.capabilities, [{ capability: "cap.sca", status: "missing", tool: "osv-scanner" }]);
+});
+check("capability-completeness: a required capability whose tool was never enabled (not_required) also reports \"missing\"", () => {
+  const output = evaluateCapabilityCompleteness({ results: [entry("semgrep", "not_required")] }, ["cap.sast"]);
+  assert.deepEqual(output.capabilities, [{ capability: "cap.sast", status: "missing", tool: "semgrep" }]);
+});
+check("capability-completeness: a required capability with no mapped tool reports \"unsupported\"", () => {
+  const output = evaluateCapabilityCompleteness({ results: [] }, ["cap.container"]);
+  assert.deepEqual(output.capabilities, [{ capability: "cap.container", status: "unsupported", tool: null }]);
+});
+check("capability-completeness: a not-required capability whose tool is ready reports \"available\"", () => {
+  const output = evaluateCapabilityCompleteness({ results: [entry("semgrep", "ready")] }, []);
+  assert.deepEqual(output.capabilities, [{ capability: "cap.sast", status: "available", tool: "semgrep" }]);
+});
+check("capability-completeness: a not-required capability whose tool is known but not ready reports \"optional\"", () => {
+  const output = evaluateCapabilityCompleteness({ results: [entry("osv-scanner", "binary_missing")] }, []);
+  assert.deepEqual(output.capabilities, [{ capability: "cap.sca", status: "optional", tool: "osv-scanner" }]);
+});
+check("capability-completeness: a not-required capability whose tool was never enabled is omitted entirely", () => {
+  const output = evaluateCapabilityCompleteness({ results: [entry("gitleaks", "not_required")] }, []);
+  assert.deepEqual(output.capabilities, []);
+});
+check("capability-completeness: a not-required capability with no mapped tool at all is omitted entirely", () => {
+  const output = evaluateCapabilityCompleteness({ results: [] }, []);
+  assert.deepEqual(output.capabilities, []);
+});
+check("capability-completeness: node and git are excluded from the capability-level report entirely", () => {
+  const output = evaluateCapabilityCompleteness({ results: [entry("node", "ready"), entry("git", "ready"), entry("gitleaks", "ready")] }, ["cap.secrets"]);
+  assert.deepEqual(output.capabilities.map(({ capability }) => capability), ["cap.secrets"]);
+});
+check("capability-completeness: license-check is never a cap.* verdict, only an informative field", () => {
+  const output = evaluateCapabilityCompleteness({ results: [entry("license-check", "input_missing"), entry("gitleaks", "ready")] }, ["cap.secrets"]);
+  assert.equal(output.capabilities.some(({ capability }) => capability.includes("license")), false);
+  assert.deepEqual(output.licenseControl, { control: "license-check", status: "input_missing", note: "catalog control (CYB-1F F-4), not a cap.* capability-root verdict" });
+});
+check("capability-completeness: licenseControl is null when license-check is absent from the preflight results", () => {
+  const output = evaluateCapabilityCompleteness({ results: [entry("gitleaks", "ready")] }, ["cap.secrets"]);
+  assert.equal(output.licenseControl, null);
+});
+check("capability-completeness: rejects a non-array requiredCapabilities and a preflightResult without a results array", () => {
+  assert.throws(() => evaluateCapabilityCompleteness({ results: [] }, "cap.secrets"), TypeError);
+  assert.throws(() => evaluateCapabilityCompleteness({}, ["cap.secrets"]), TypeError);
+  assert.throws(() => evaluateCapabilityCompleteness(null, ["cap.secrets"]), TypeError);
+});
+check("capability-completeness: derives directly from a real runToolchainPreflight() result", () => {
+  const repo = root();
+  try {
+    const probes = { gitleaks: () => observed("gitleaks", "8.28.0", ["--source", "--report-format", "--report-path", "--no-banner", "--exit-code"]) };
+    const preflight = runToolchainPreflight({ rootDir: repo, manifestResult: manifest({ gitleaks: { enabled: true } }) }, { probeNodeFn: nodeReady, probeGitFn: gitReady, scannerProbes: probes, resolveExecutableFn: (name) => `/tools/${name}` });
+    const output = evaluateCapabilityCompleteness(preflight, ["cap.secrets", "cap.sca", "cap.container"]);
+    assert.deepEqual(output.capabilities, [
+      { capability: "cap.container", status: "unsupported", tool: null },
+      { capability: "cap.sca", status: "missing", tool: "osv-scanner" },
+      { capability: "cap.secrets", status: "required", tool: "gitleaks" },
+    ]);
+    // license-check is always present in a real preflight (default "not_required"
+    // when disabled in the manifest); it still surfaces only as an informative
+    // field, never as a cap.* verdict.
+    assert.deepEqual(output.licenseControl, { control: "license-check", status: "not_required", note: "catalog control (CYB-1F F-4), not a cap.* capability-root verdict" });
+  } finally { rmSync(repo, { recursive: true, force: true }); }
+});
+check("capability-completeness: performs zero filesystem/git mutation (repo status is byte-identical before and after)", () => {
+  const before = gitStatus();
+  evaluateCapabilityCompleteness({ results: [entry("gitleaks", "ready"), entry("osv-scanner", "binary_missing"), entry("license-check", "input_missing")] }, ["cap.secrets", "cap.sca", "cap.container", "cap.dast"]);
+  const after = gitStatus();
+  assert.equal(after, before);
+});
+process.stdout.write(`${passed}/27 checks passed.\n`);
