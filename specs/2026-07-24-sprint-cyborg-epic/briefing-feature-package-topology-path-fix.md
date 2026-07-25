@@ -1,12 +1,10 @@
 # Prepared Goldfish briefing — feature-package-topology path-normalization fix
 
-> **Status: PREPARED, NOT YET DISPATCHED.** Authored as Elephant design-phase
-> work per PO approval of decision D (Windows-slice sequencing, 2026-07-25).
-> `planApproved` for `sprint-cyborg-epic` is still mechanically `false`
-> (blocked by the confirmed `PO-PROFILE-RECEIPT-INVALID`, Bug 2 — see
-> `docs/state.md`), so this briefing is prepared, not dispatched. Refresh the
-> ruleset SHA in field 6 to the actual HEAD at dispatch time before sending.
-> Windows-slice sequencing item 1 (`windows-sandbox-assurance-slice-scope.md`).
+> **Status: DISPATCHED 2026-07-25.** `planApproved` for `sprint-cyborg-epic`
+> was recorded 2026-07-25 (see `docs/state.md`, "planApproved RECORDED");
+> gate is open. Ruleset SHA refreshed to `996d22f8b3f2e128618d26209f3b5395a588fd8a`
+> for this dispatch. Windows-slice sequencing item 1
+> (`windows-sandbox-assurance-slice-scope.md`).
 
 ---
 
