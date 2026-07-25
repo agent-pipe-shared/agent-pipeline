@@ -34,6 +34,11 @@
  * verified in this environment: on timeout, `res.error.code === "ETIMEDOUT"`, `res.status
  * === null`, `res.signal === "SIGTERM"` -- Node kills the child itself, no manual watchdog
  * needed for a one-shot report-and-exit tool like gitleaks).
+ *
+ * CAPABILITY_CONTRACT_V2 (CYB-2D, additive): a frozen, machine-readable transcription of the
+ * behavior documented above, exported for CYB-2E's later aggregator work to read a uniform
+ * capability contract across all four scanner adapters without re-deriving it from prose
+ * comments. Purely additive data -- does not change any existing behavior in this file.
  */
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
@@ -323,3 +328,43 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
     },
   };
 }
+
+/**
+ * CAPABILITY_CONTRACT_V2 -- machine-readable capability-contract descriptor (CYB-2D). A pure,
+ * static, additive transcription of behavior this file already has and already documents in
+ * its header comment above -- consumed by CYB-2E's later aggregator work to read a uniform
+ * capability contract across all four adapters without re-deriving it from prose. Adding this
+ * export changes none of `run()`/`isInstalled()`'s existing behavior.
+ */
+export const CAPABILITY_CONTRACT_V2 = Object.freeze({
+  contractVersion: "v2",
+  tool: name,
+  kind: "capability",
+  capabilityId: "cap.secrets",
+  controlRef: null,
+  supportedEcosystems: null,
+  toolVersionConstraint: null,
+  networkBehavior: "offline",
+  requiredInputs: ["rootDir"],
+  severityNormalization: Object.freeze({
+    source: "fixed",
+    value: "high",
+    rationale: "gitleaks findings carry no native severity field",
+  }),
+  confidenceNormalization: null,
+  coverageLimitations: Object.freeze([
+    "No --config/custom rule-pack flag is passed to `detect` -- this adapter relies on whatever rule set is built into the resolved gitleaks binary itself, not a project-specific config.",
+    "No --log-opts or other git-history-range flag is passed -- this file does not restrict or configure a commit range; scan scope is whatever `gitleaks detect --source <rootDir>` resolves to by the installed binary's own default, unmodified by this adapter.",
+    "Single-shot, full scan per invocation -- no --baseline-path or other incremental/diff mechanism; every run() call re-scans the entirety of rootDir from scratch.",
+  ]),
+  exitCodeMapping: Object.freeze({
+    "0": "always -- status derived from parsed report content, never from exit code (forced via --exit-code 0)",
+    nonzero: "scanner_error (ERROR) -- genuine crash, never findings",
+  }),
+  timeoutContract: Object.freeze({
+    defaultMs: 60000,
+    cancellable: true,
+    mechanism: "node:child_process spawnSync timeout option (SIGTERM on expiry)",
+  }),
+  evidenceFields: Object.freeze(["tool", "severity", "rule", "path", "line", "msg"]),
+});
