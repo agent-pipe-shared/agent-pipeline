@@ -76,6 +76,25 @@ const HARDEN_DIRECTORY_SCRIPT = [
   "Set-Acl -LiteralPath $p -AclObject $a",
 ].join(";");
 
+/**
+ * Strip `PSModulePath` (any casing -- Windows env vars are case-insensitive,
+ * plain JS objects are not) from a copy of `environment` so the spawned fixed
+ * legacy `powershell.exe` computes its own untouched default module path
+ * instead of inheriting whatever the calling process's own shell ancestry
+ * set it to. A calling process descended from PowerShell 7 (pwsh) prefixes
+ * PS7-specific module directories; the legacy engine's module autoloader can
+ * then find an incompatible `Microsoft.PowerShell.Security` there first and
+ * fail to load it, making `Get-Acl`/`Set-Acl` unavailable -- a false
+ * negative in observation, not a real DACL/security finding.
+ */
+export function sanitizeChildEnvironment(environment) {
+  const sanitized = { ...environment };
+  for (const key of Object.keys(sanitized)) {
+    if (key.toLocaleLowerCase("en-US") === "psmodulepath") delete sanitized[key];
+  }
+  return sanitized;
+}
+
 function invoke(path, script, { run = spawnSync, environment = process.env } = {}) {
   const executable = fixedPowerShell();
   if (executable === null) return unavailable("fixed Windows PowerShell is unavailable");
@@ -84,7 +103,7 @@ function invoke(path, script, { run = spawnSync, environment = process.env } = {
     timeout: 7_000,
     shell: false,
     windowsHide: true,
-    env: { ...environment, PIPELINE_PRIVATE_STATE_PATH: path },
+    env: { ...sanitizeChildEnvironment(environment), PIPELINE_PRIVATE_STATE_PATH: path },
   });
   if (result?.error || result?.status !== 0) return unavailable("native Windows DACL observation failed");
   return result;
