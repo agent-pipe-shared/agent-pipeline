@@ -5,7 +5,7 @@ type: defect
 owner: pipeline
 status: open
 created: 2026-07-25
-source: Self-observation during Sprint Cyborg CYB-0 follow-up (approve-plan dispatch), 2026-07-24/25; unconfirmed, root cause not isolated.
+source: Self-observation during Sprint Cyborg CYB-0 follow-up (approve-plan dispatch), 2026-07-24/25; reproduced a second time 2026-07-25 (see docs/state.md, "PO GATE ANSWERED" entry) — repro confirmed, root cause still not isolated.
 ---
 
 # pipeline.po-gate-authority-receipt-readback
@@ -23,18 +23,25 @@ publish step from a correctly-cased PowerShell session.
 
 ## Triggering situation
 
-Observed once during the Sprint Cyborg design phase, 2026-07-24/25, while
-attempting to record `planApproved` for `sprint-cyborg-epic`. Deliberately not
-chased further in that session to respect the Elephant/Goldfish role boundary
-(no live production-code debugging as Elephant, EL-01). Root cause is
-**unconfirmed** — plausibly related to the same DACL/directory-durability gap
-class already catalogued for afk-ledger, advisory-host-bridge and
-codex-isolated-critic-contract (`backlog/items/2026-07-22-windows-directory-durability.md`,
+Observed during the Sprint Cyborg design phase, 2026-07-24/25, while
+attempting to record `planApproved` for `sprint-cyborg-epic` — first during
+the original CYB-0 follow-up, then **reproduced a second time** on 2026-07-25
+after the PO's gate answer, applying the same Bug-1 workaround (correctly-cased
+PowerShell session) and hitting the identical `PO-PROFILE-RECEIPT-INVALID`
+immediately after a successful publish. **The repro itself is now confirmed —
+this is real, not a one-off artifact of a specific command sequence.** Root
+cause is still **not isolated** — plausibly related to the same
+DACL/directory-durability gap class already catalogued for afk-ledger,
+advisory-host-bridge and codex-isolated-critic-contract
+(`backlog/items/2026-07-22-windows-directory-durability.md`,
 `backlog/items/2026-07-22-windows-private-state-assurance.md`) — e.g. a
 receipt read racing ahead of a DACL-hardening step that has not yet settled,
-or a write/read path mismatch distinct from the sibling item above. Not
-reproduced a second time; needs a dedicated repro attempt before scoping a
-fix.
+or a write/read path mismatch distinct from the sibling item above.
+Deliberately not chased further as live production-code debugging in this
+role (no Elephant production-code changes, EL-01) — isolation and fix belong
+to a dispatched Goldfish under `pipeline.windows-private-state-assurance`
+(#35), which already absorbs this finding per
+`specs/2026-07-24-sprint-cyborg-epic/windows-sandbox-assurance-slice-scope.md`.
 
 ## Affected artifact
 
