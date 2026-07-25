@@ -84,7 +84,7 @@ function rootEntries(root, fs) {
     if (info.isDirectory() && !info.isSymbolicLink()) {
       try { empty = fs.readdirSync(path).length === 0; } catch {}
     }
-    return { name, symlink: info.isSymbolicLink(), directory: info.isDirectory(), writable, empty };
+    return { name, symlink: info.isSymbolicLink(), directory: info.isDirectory(), file: info.isFile(), writable, empty };
   });
 }
 function runtimePaths() { return loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path).sort(); }
@@ -96,9 +96,18 @@ function isHostControlLayout(entries) {
 }
 
 function isExistingGitMetadata(entry, root, fs) {
-  if (entry.name !== ".git" || entry.symlink || !entry.directory) return false;
+  if (entry.name !== ".git" || entry.symlink) return false;
   const path = join(root, ".git");
-  return fs.existsSync(join(path, "HEAD")) && fs.existsSync(join(path, "objects"));
+  if (entry.directory) return fs.existsSync(join(path, "HEAD")) && fs.existsSync(join(path, "objects"));
+  if (!entry.file) return false;
+  let pointer;
+  try { pointer = fs.readFileSync(path, "utf8"); } catch { return false; }
+  // A linked worktree keeps a regular `.git` pointer file rather than a
+  // directory. Require Git to validate that pointer before treating it as
+  // preserved project metadata; malformed user bytes remain fail-closed.
+  if (!/^gitdir: [^\r\n\0]+\r?\n?$/u.test(pointer)) return false;
+  const probe = fs.spawnSync("git", ["rev-parse", "--is-inside-work-tree"], { cwd: root, encoding: "utf8" });
+  return probe.status === 0 && String(probe.stdout ?? "").trim() === "true";
 }
 
 function isAdoptableUnmanagedRoot(entries, root, fs) {

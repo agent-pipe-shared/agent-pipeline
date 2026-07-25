@@ -24,6 +24,7 @@ function dispose(path) { rmSync(path, { recursive: true, force: true }); }
 function fakeGit(command, args, options = {}) {
   if (command !== "git") return { status: 1, stderr: "unexpected program" };
   if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+  if (args[0] === "rev-parse" && args[1] === "--is-inside-work-tree") return { status: 0, stdout: "true\n", stderr: "" };
   if (args[0] === "init" && args[1] === "--initial-branch=main") { mkdirSync(join(options.cwd, ".git")); return { status: 0, stdout: "", stderr: "" }; }
   return { status: 1, stderr: "unexpected git arguments" };
 }
@@ -170,8 +171,8 @@ test("an existing unmanaged project receives an additive adoption plan", () => {
   } finally { dispose(path); }
 });
 
-test("adoption preserves a pre-existing Git directory and blocks user-owned reserved paths", () => {
-  const adopted = root(); const reserved = root();
+test("adoption preserves directory and linked-worktree Git metadata and blocks user-owned reserved paths", () => {
+  const adopted = root(); const linked = root(); const reserved = root();
   try {
     writeFileSync(join(adopted, "README.md"), "existing project\n");
     mkdirSync(join(adopted, ".git", "objects"), { recursive: true });
@@ -183,10 +184,20 @@ test("adoption preserves a pre-existing Git directory and blocks user-owned rese
     assert.equal(applied.status, "applied");
     assert.equal(readFileSync(join(adopted, ".git", "HEAD"), "utf8"), "ref: refs/heads/main\n");
 
+    writeFileSync(join(linked, "README.md"), "linked worktree project\n");
+    writeFileSync(join(linked, ".git"), "gitdir: /outside/managed-worktree\n");
+    const linkedPlan = planProjectOnboardingV3({ rootDir: linked, deps: fakeDeps });
+    assert.equal(inspectProjectOnboardingV3({ rootDir: linked, deps: fakeDeps }).status, "existing-unmanaged");
+    assert.equal(linkedPlan.status, "ready");
+    assert.equal(linkedPlan.git.initializesGit, false);
+    const linkedApplied = applyProjectOnboardingV3(linkedPlan, { rootDir: linked, activate: true, deps: fakeDeps });
+    assert.equal(linkedApplied.status, "applied");
+    assert.equal(readFileSync(join(linked, ".git"), "utf8"), "gitdir: /outside/managed-worktree\n");
+
     writeFileSync(join(reserved, "README.md"), "existing project\n");
     mkdirSync(join(reserved, ".codex"));
     assert.equal(inspectProjectOnboardingV3({ rootDir: reserved }).status, "partial");
-  } finally { dispose(adopted); dispose(reserved); }
+  } finally { dispose(adopted); dispose(linked); dispose(reserved); }
 });
 
 test("legacy V0 is migration-required and never receives a fresh fallback", () => {

@@ -1,7 +1,7 @@
 # Release 0.4.3
 
-**Status:** candidate — not published, tagged, pushed, or marketplace-read
-back.
+**Status:** corrective candidate — a provisional public tag exists, but no
+GitHub Release or marketplace readback has been published.
 
 This patch candidate contains the issue #59 managed-onboarding repair. It is a
 release surface update only; it does not itself create any irreversible release
@@ -27,17 +27,22 @@ exact reviewed commit and tree:
 2. record an independent Critic review of the candidate diff;
 3. confirm both plugin manifests and `VERSION` equal `0.4.3`;
 4. obtain the explicit release/push approval for the exact candidate; and
-5. only then fast-forward the approved public branch, create immutable
-   annotated tag `v0.4.3`, push the approved branch and tag, and read back the
-   public refs plus both marketplace resolutions.
+5. only then fast-forward the approved public branch and read back its ref. A
+   provisional `v0.4.3` tag was created before the Critic finding; the PO has
+   explicitly authorized deleting and recreating that tag on the corrected,
+   re-verified commit. Read back the recreated public tag plus both marketplace
+   resolutions before publishing the GitHub Release.
 
 The current `release-version-plan.mjs` decision policy computes a next-minor
-target and therefore is not evidence for this patch target. A release owner
-must first use an approved patch-version decision path or update that policy
-with its own reviewed change; this document does not bypass it.
+target and therefore is not evidence for this patch target. This release uses
+the PO's explicit patch-release approval recorded in the release operation;
+the release owner (`agent-pipe-shared`) must either add a reviewed patch-version
+decision path or retire this exception by **2026-08-08**. Until then, no later
+patch release may cite this exception implicitly.
 
 ## Recovery
 
-Never move or delete `v0.4.3`. A discovered defect requires a new reviewed
-patch candidate and immutable tag. Existing consumers may remain pinned to
-their last known-good version while that work is prepared.
+After this one PO-authorized corrective replacement, `v0.4.3` is immutable.
+A later defect requires a new reviewed patch candidate and immutable tag.
+Existing consumers may remain pinned to their last known-good version while
+that work is prepared.

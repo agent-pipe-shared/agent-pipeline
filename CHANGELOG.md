@@ -14,6 +14,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
   adoption, legacy V0/V1/V2 migration, and a host-owned incompatible control
   layout. Adoption writes only absent Pipeline-owned targets and preserves
   application content plus existing valid Git metadata.
+- Adoption recognizes a valid linked-worktree `.git` pointer through a
+  read-only Git probe and preserves that pointer unchanged.
 - Generated Codex implementor and critic roles carry the required developer
   instructions and are checked against the source role files.
 - Fresh onboarding seeds a declared local-only Git lifecycle, while the
