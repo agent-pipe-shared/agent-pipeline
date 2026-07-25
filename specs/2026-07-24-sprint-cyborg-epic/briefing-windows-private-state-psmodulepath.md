@@ -1,11 +1,18 @@
 # Prepared Goldfish briefing — PSModulePath pollution fix in `windows-private-state.mjs`
 
-> **Status: PREPARED, ready to dispatch (gate open).** `planApproved` for
-> `sprint-cyborg-epic` was recorded 2026-07-25 (`docs/state.md`, "planApproved
-> RECORDED"). This is a THIRD, distinct root cause from WIN-FPT-1 and
-> WIN-PGA-2 — do not fold it into either; one concern per briefing, per this
-> epic's own established discipline. Refresh the ruleset SHA in field 6 to
-> the actual HEAD at dispatch time.
+> **Status: DISPATCHING NOW.** `planApproved` recorded; gate open. This is a
+> THIRD, distinct root cause from WIN-FPT-1 and WIN-PGA-2 — do not fold it
+> into either; one concern per briefing. Ruleset SHA refreshed to `281e17a`
+> (current HEAD, post-v0.4.4-rebase-publish). **Verify-baseline note (read
+> this before running anything):** `node harness/scripts/verify.mjs`
+> currently exits non-zero on this branch for reasons entirely unrelated to
+> this task — a confirmed gitleaks false-positive in `security-scan.mjs`
+> (see `backlog/items/2026-07-25-security-scan-cross-branch-gitleaks-findings.md`)
+> plus pre-existing native-Windows suite reds and one new suite
+> (`project-onboarding-e2e-tests`) from the v0.4.x hotfix range. Do NOT
+> investigate or attempt to fix any of that — it is out of scope and already
+> tracked. Your own DoD below does not require a full `verify.mjs` run for
+> exactly this reason.
 
 ---
 
@@ -16,7 +23,7 @@ files or session history — this briefing replaces them.
 
 First output line (compact bootstrap confirmation):
 
-> Bootstrap check passed: ruleset {{RULESET_SHA — fill with actual HEAD at dispatch}} loaded · Project agent-pipeline · Calibration .claude/pipeline.json · State briefing WIN-PSM-1/2026-07-25 · Role Goldfish (deep)
+> Bootstrap check passed: ruleset 281e17a loaded · Project agent-pipeline · Calibration .claude/pipeline.json · State briefing WIN-PSM-1/2026-07-25 · Role Goldfish (deep)
 
 ---
 
@@ -95,8 +102,10 @@ directories prepended) fails with the module-autoload error. Toggling
 - AC: existing tests in `windows-private-state.test.mjs` continue to pass
   unchanged.
 - Verify command: `node --test plugins/pipeline-core/lib/windows-private-state.test.mjs`
-  must exit 0; `node harness/scripts/verify.mjs` — no new regression in any
-  other suite.
+  must exit 0. Do NOT run the full `node harness/scripts/verify.mjs` for
+  this task — see the status note at the top of this briefing; it currently
+  exits non-zero for reasons unrelated to your work, and reconciling that is
+  the Elephant's job after your dispatch, same as the WIN-PGA-2 precedent.
 - Machine-written test/verify output is your evidence artifact — never
   prose you compose.
 
@@ -142,10 +151,9 @@ directories prepended) fails with the module-autoload error. Toggling
 
 ### 6. Dispatch metadata
 
-- Ruleset SHA/version: `{{FILL AT DISPATCH TIME — current HEAD}}` (this
-  briefing was authored against
-  `996d22f8b3f2e128618d26209f3b5395a588fd8a`; do not dispatch against a
-  stale SHA without refreshing this field).
+- Ruleset SHA/version: `281e17a` (refreshed 2026-07-25 for this dispatch,
+  post-v0.4.4-rebase-publish; originally authored against
+  `996d22f8b3f2e128618d26209f3b5395a588fd8a`).
 - Model/effort: `goldfish-deep` / xhigh. This is DACL-assurance canon code
   (spec.md §5: "Guard/hook/canon code... authorship dispatch to
   goldfish-deep") with genuine in-task design latitude (the exact mechanism
