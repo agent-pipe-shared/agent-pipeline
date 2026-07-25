@@ -328,7 +328,19 @@ function gitObservation(root, args, spawn = spawnSync) {
 export function resolvePoGateRepositoryTopology(repoRoot, deps = {}) {
   const start = assertPhysicalDirectory(realpathSync(resolve(repoRoot)));
   const observedRoot = assertPhysicalDirectory(realpathSync(gitObservation(start, ["rev-parse", "--show-toplevel"], deps.spawn).trim()));
-  if (observedRoot !== start) throw new Error("repository root mismatch");
+  // `start` is derived from the caller's (possibly mis-cased) current working
+  // directory; plain `realpathSync` on Windows preserves whatever casing it is
+  // given rather than normalizing to the filesystem's on-disk canonical
+  // casing, while Git's own `--show-toplevel` output already resolves to that
+  // disk-canonical casing regardless of the cwd casing it was invoked with.
+  // Re-derive both sides through the native OS realpath immediately before
+  // comparing (never before -- `start`/`observedRoot` themselves, and every
+  // value returned below, must stay byte-identical to today) so a same-directory
+  // case mismatch is corrected without ever treating two genuinely different
+  // physical directories as equal: `realpathSync.native` only normalizes the
+  // casing of a path that already resolves to one real directory, and is a
+  // no-op on case-sensitive/POSIX filesystems.
+  if (realpathSync.native(observedRoot) !== realpathSync.native(start)) throw new Error("repository root mismatch");
   const commonRaw = gitObservation(start, ["rev-parse", "--path-format=absolute", "--git-common-dir"], deps.spawn).trim();
   const gitCommonDir = assertPhysicalDirectory(realpathSync(isAbsolute(commonRaw) ? commonRaw : resolve(start, commonRaw)));
   const worktrees = parseGitWorktreeList(gitObservation(start, ["worktree", "list", "--porcelain", "-z"], deps.spawn));
