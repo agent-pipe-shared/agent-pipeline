@@ -1,7 +1,7 @@
 # Release 0.4.4
 
-**Status:** local hotfix candidate — not committed as a release candidate,
-tagged, pushed, published, or read back from either marketplace.
+**Status:** sealed local hotfix candidate — not tagged, pushed, published, or
+read back from either marketplace.
 
 ## Scope
 
@@ -11,16 +11,20 @@ present) in an otherwise writable fresh project root. The initializer leaves
 those controls untouched and writes only portable project authority plus
 `.claude/**`.
 
+The changed control boundary is assessed in the
+[marketplace supply-chain threat model](marketplace-supply-chain-threat-model.md).
+
 The managed-root E2E test invokes the shipped CLI entry functions in-process
 because this Codex sandbox rejects a nested Node process with `EPERM`. It still
 uses real disposable filesystem roots and validates the public CLI output.
 
 ## Candidate boundary
 
-`0.4.4` has exactly one evidence-bearing candidate. Its commit SHA and tree SHA
-are captured only after all content and integration decisions are final. The
-full verify evidence is intentionally git-ignored; it is a readback for that
-candidate, not a file to commit after the verification run.
+At a time, `0.4.4` has exactly one sealed, evidence-bearing candidate. Its
+commit SHA and tree SHA are captured only after all content and integration
+decisions are final. The full verify evidence is intentionally git-ignored; it
+is a readback for that candidate, not a file to commit after the verification
+run.
 
 The two concurrent feature branches may rebase while this hotfix is still
 unsealed. Before sealing, their owners and the release owner must agree which
@@ -32,6 +36,28 @@ or version change is permitted after the candidate is sealed.
 Any such change creates a new commit or tree and therefore invalidates *all*
 previous 0.4.4 verification and Critic evidence. The release returns to the
 first step below; evidence is never patched forward by assertion.
+
+## Compatibility and rollback
+
+`fresh-host-managed` is an additive typed state of the plugin-local
+`project-onboarding-v3` CLI. It replaces the former rejection only for the
+exact empty, read-only Codex-control layout; ordinary fresh roots, existing
+projects, user-owned reserved paths, symlinks, non-empty controls, and partial
+layouts retain their former classifications and fail-closed behavior.
+
+The direct consumers are `pipeline-start` and an operator who explicitly runs
+the onboarding CLI. An updated client receives the explicit
+`fresh-host-managed` state and still cannot write until `apply --activate` is
+requested. Automation that treated the prior nonzero host-layout rejection as
+a hard stop cannot silently create a project: it must deliberately invoke the
+same explicit activation. Consumers that cannot recognize the additive state
+may remain pinned to `0.4.3` until they are updated.
+
+No project data is migrated and no host control is replaced. Before activation,
+rollback is pinning or reverting the plugin to `0.4.3`; after activation, the
+portable source and `.claude/**` authority remain intact, while a corrective
+patch release — not a host-control overwrite — is the recovery path for a
+defect in the managed mode.
 
 ## Release sequence
 
