@@ -705,6 +705,52 @@ check("topology still rejects EPERM unless Git reported an actual zero exit stat
   });
 });
 
+function flipAsciiCase(value) {
+  return [...value].map((ch) => (ch === ch.toLowerCase() ? ch.toUpperCase() : ch.toLowerCase())).join("");
+}
+
+if (process.platform === "win32") check("topology tolerates a case-divergent start directory that is the same real Windows directory Git reports", () => {
+  withFixture({ linkedLanguage: "en" }, ({ common, primary, current }) => {
+    const oid = "a".repeat(40);
+    // Disk-canonical casing for the fixture's real directory, exactly as Git's own
+    // `--show-toplevel` would report it regardless of the cwd casing it was invoked with.
+    const canonicalCurrent = realpathSync.native(current);
+    // A same-directory path a mis-cased shell cwd could plausibly hand in as `repoRoot`.
+    const misCasedRepoRoot = flipAsciiCase(current);
+    assert.notEqual(misCasedRepoRoot, current, "fixture requires an actually case-divergent path to be meaningful");
+    const spawn = (_command, args) => {
+      if (args.join(" ") === "rev-parse --show-toplevel") return { status: 0, stdout: `${canonicalCurrent}\n` };
+      if (args.join(" ") === "rev-parse --path-format=absolute --git-common-dir") return { status: 0, stdout: `${common}\n` };
+      if (args.join(" ") === "worktree list --porcelain -z") {
+        return { status: 0, stdout: `worktree ${primary}\0HEAD ${oid}\0branch refs/heads/main\0\0worktree ${current}\0HEAD ${oid}\0detached\0\0` };
+      }
+      throw new Error(`unexpected git command: ${args.join(" ")}`);
+    };
+    const topology = resolvePoGateRepositoryTopology(misCasedRepoRoot, { spawn });
+    // Compare through the native realpath on both sides -- the returned strings
+    // themselves may legitimately still carry the caller's casing (the fix never
+    // rewrites returned values), only the equality check is case-normalized.
+    assert.equal(realpathSync.native(topology.repoRoot), canonicalCurrent);
+    assert.equal(realpathSync.native(topology.primaryRoot), realpathSync.native(primary));
+    assert.equal(realpathSync.native(topology.gitCommonDir), realpathSync.native(common));
+  });
+});
+
+check("topology still rejects a genuinely different physical directory even though both sides are real, existing paths", () => {
+  const dirA = mkdtempSync(join(tmpdir(), "po-gate-authority-mismatch-alpha-"));
+  const dirB = mkdtempSync(join(tmpdir(), "po-gate-authority-mismatch-beta-"));
+  try {
+    const spawn = (_command, args) => {
+      if (args.join(" ") === "rev-parse --show-toplevel") return { status: 0, stdout: `${dirB}\n` };
+      throw new Error(`unexpected git command: ${args.join(" ")}`);
+    };
+    assert.throws(() => resolvePoGateRepositoryTopology(dirA, { spawn }), /repository root mismatch/u);
+  } finally {
+    rmSync(dirA, { recursive: true, force: true });
+    rmSync(dirB, { recursive: true, force: true });
+  }
+});
+
 check("failures and public evidence never expose machine-specific absolute roots", () => {
   withFixture({ linkedLanguage: "en" }, ({ base, primary, current, validate }) => {
     const result = validate();
