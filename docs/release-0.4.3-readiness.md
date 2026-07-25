@@ -40,6 +40,30 @@ the release owner (`agent-pipe-shared`) must either add a reviewed patch-version
 decision path or retire this exception by **2026-08-08**. Until then, no later
 patch release may cite this exception implicitly.
 
+## Security exception
+
+**PO-approved scope:** the release owner `agent-pipe-shared` approves exactly
+the 14 `gitleaks` `generic-api-key` findings reported on 2026-07-25 for this
+candidate. They are pre-existing content outside the 0.4.3 correction diff:
+
+- `backlog/transitions.ndjson`;
+- `backlog/receipts/7ac4c1dd233bdbfbec854f3f818464ebed2850144c42da6816557112af743570.json`;
+- `backlog/receipts/9367a90e2516ec6f621b5710ffabef67cbbf27116f7f46cef8f1f0dd69aebc25.json`;
+- `backlog/receipts/d311a66737ff088e2ae324df5f3525b08cefd4c9f58787d09870d3bd26961363.json`;
+- `backlog/receipts/f33b8d45db38e7b9061dde268405d86123fc90afc24330a626afba2507650281.json`; and
+- `specs/sprint-nova-epic/evidence/backlog/event-39-amendment-intent.json`;
+- `specs/sprint-nova-epic/evidence/backlog/event-39-delivery-intent.json`;
+- `specs/sprint-nova-epic/evidence/backlog/event-40-amendment-intent.json`;
+- `specs/sprint-nova-epic/evidence/backlog/event-40-delivery-intent.json`;
+- `specs/sprint-nova-epic/evidence/backlog/issue-57-assign-intent.json`;
+- `specs/sprint-nova-epic/evidence/backlog/issue-57-bootstrap-intent.json`; and
+- `specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md`.
+
+This exception expires on **2026-08-08**. Owner: `agent-pipe-shared`. It does
+not waive any new finding, any other scanner, or a later release candidate.
+The recorded Verify result remains security-blocking rather than being relabeled
+green; publication relies on this explicit, bounded PO disposition.
+
 ## Recovery
 
 After this one PO-authorized corrective replacement, `v0.4.3` is immutable.
