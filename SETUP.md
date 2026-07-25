@@ -269,7 +269,7 @@ marketplace or cache files.
 
 ### 1c. Declare the Git lifecycle before delivery
 
-The initial seed deliberately sets `repositoryMode: "local-only"` in
+An ordinary initial seed deliberately sets `repositoryMode: "local-only"` in
 `.claude/pipeline.json`: onboarding creates a repository but no initial commit,
 remote, or credential binding. Make the initial commit before normal work.
 When the project is intentionally connected to a shared remote, change the
@@ -277,6 +277,13 @@ committed calibration to `repositoryMode: "remote-tracked"`; the session
 freshness check then requires an upstream and blocks writes when it is stale or
 unknown. `local-only` permits local work only; it never authorizes a push,
 publication, or release claim.
+
+For the exact Codex `fresh-host-managed` layout, the seed instead records
+`repositoryMode: "host-managed"` and deliberately creates neither Git metadata
+nor an initial commit. Codex owns `.git` and `.codex`; retain those controls,
+configure a project-specific verification command, and do not make a
+push/publication/release claim from this mode until the project has its own
+delivery-ready repository lifecycle.
 
 ### 1b. Activate a slim private overlay
 
