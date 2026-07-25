@@ -2,13 +2,14 @@
 
 /**
  * Fresh consumer-root onboarding for the public V3 authority.  Unlike the
- * migration, this is deliberately narrow: it will only ever write to a real,
- * empty directory after an explicit activation.  Existing projects stay owned
- * by the migration/repair workflow.
+ * migration, this is deliberately narrow: it writes only absent, Pipeline-owned
+ * targets after an explicit activation. A pre-existing ungoverned project is a
+ * distinct additive adoption path; existing authority stays owned by the
+ * migration/repair workflow.
  */
 import { createHash } from "node:crypto";
 import {
-  existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, readFileSync,
+  accessSync, constants, existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, readFileSync,
   rmSync, rmdirSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -16,7 +17,7 @@ import { dirname, join, resolve, sep } from "node:path";
 
 import { inspectRunnerProfileMigrationV3, planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
 import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
-import { loadRuntimeProjectionV3OwnedKeys, planRuntimeProjectionV3 } from "./runtime-projection-v3.mjs";
+import { codexCustomAgentSeed, loadRuntimeProjectionV3OwnedKeys, planRuntimeProjectionV3 } from "./runtime-projection-v3.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 
 const SOURCE = "pipeline.user.yaml";
@@ -24,6 +25,8 @@ const SCHEMA = "pipeline.project-onboarding.v3";
 const PLAN_SCHEMA = "pipeline.project-onboarding-plan.v3";
 const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
 const AUTHENTICATED = new WeakMap();
+const HOST_CONTROL_PATHS = Object.freeze([".agents", ".codex", ".git"]);
+const USER_RESERVED_PATHS = new Set([".agents", ".claude", ".codex"]);
 
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
@@ -48,7 +51,7 @@ function renderYaml(value, indent = "") {
   }).join("");
 }
 function deps(overrides = {}) {
-  return { existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, readFileSync, rmSync, rmdirSync, unlinkSync, writeFileSync, spawnSync, ...overrides };
+  return { accessSync, constants, existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, readFileSync, rmSync, rmdirSync, unlinkSync, writeFileSync, spawnSync, ...overrides };
 }
 function safeRoot(rootDir, fs) {
   if (typeof rootDir !== "string" || rootDir.length === 0) throw new Error("root must be a non-empty path");
@@ -75,11 +78,35 @@ function rootEntries(root, fs) {
   return fs.readdirSync(root).sort().map((name) => {
     const path = join(root, name);
     const info = fs.lstatSync(path);
-    return { name, symlink: info.isSymbolicLink(), directory: info.isDirectory() };
+    let writable = false;
+    try { fs.accessSync(path, fs.constants.W_OK); writable = true; } catch {}
+    let empty = false;
+    if (info.isDirectory() && !info.isSymbolicLink()) {
+      try { empty = fs.readdirSync(path).length === 0; } catch {}
+    }
+    return { name, symlink: info.isSymbolicLink(), directory: info.isDirectory(), writable, empty };
   });
 }
 function runtimePaths() { return loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path).sort(); }
 function hasOwnRuntime(root, fs) { return runtimePaths().some((relative) => fs.existsSync(safePath(root, relative, fs))); }
+
+function isHostControlLayout(entries) {
+  if (entries.length !== HOST_CONTROL_PATHS.length || entries.map((entry) => entry.name).join("\0") !== HOST_CONTROL_PATHS.join("\0")) return false;
+  return entries.every((entry) => entry.directory && !entry.symlink && entry.empty && !entry.writable);
+}
+
+function isExistingGitMetadata(entry, root, fs) {
+  if (entry.name !== ".git" || entry.symlink || !entry.directory) return false;
+  const path = join(root, ".git");
+  return fs.existsSync(join(path, "HEAD")) && fs.existsSync(join(path, "objects"));
+}
+
+function isAdoptableUnmanagedRoot(entries, root, fs) {
+  return entries.length > 0 && entries.every((entry) => {
+    if (entry.name === ".git") return isExistingGitMetadata(entry, root, fs);
+    return !USER_RESERVED_PATHS.has(entry.name) && !entry.symlink;
+  });
+}
 
 function freshIntent() {
   const registry = loadRunnerProfilesV3Registry();
@@ -104,11 +131,11 @@ function freshBaselines() {
     // `git diff --check` is deliberately HEAD-independent: onboarding creates
     // no commit, so `git diff --check HEAD` would make the one verify command
     // fail before the user's initial commit exists.
-    ".claude/pipeline.json": { status: "present", bytes: `${JSON.stringify({ project: "new-project", verify: "git diff --check", handover: "docs/state.md", autonomy: "gated", branchModel: "feature-branch", worktree: "optional", stakes: "standard", constraints: ["Configure project-specific policy before delivery."] }, null, 2)}\n` },
+    ".claude/pipeline.json": { status: "present", bytes: `${JSON.stringify({ project: "new-project", verify: "git diff --check", handover: "docs/state.md", autonomy: "gated", branchModel: "feature-branch", repositoryMode: "local-only", worktree: "optional", stakes: "standard", constraints: ["Configure project-specific policy before delivery."] }, null, 2)}\n` },
     ".claude/pipeline.yaml": { status: "present", bytes: "language:\n  human_facing: en\nmodelRouting:\n  legacy:\n    model: legacy\n    effort: low\n" },
     ".codex/config.toml": { status: "present", bytes: "" },
-    ".codex/agents/implementor.toml": { status: "present", bytes: 'model = ""\nmodel_reasoning_effort = ""\n' },
-    ".codex/agents/critic.toml": { status: "present", bytes: 'model = ""\nmodel_reasoning_effort = ""\n' },
+    ".codex/agents/implementor.toml": { status: "present", bytes: codexCustomAgentSeed("implementor") },
+    ".codex/agents/critic.toml": { status: "present", bytes: codexCustomAgentSeed("critic") },
     ".codex/agents/consult-advisor.toml": { status: "present", bytes: "" },
   };
 }
@@ -129,6 +156,20 @@ function inspection(rootDir, fs) {
   const link = entries.find((entry) => entry.symlink);
   if (link) return { schema: SCHEMA, status: "unsafe", root, diagnostics: [diagnostic(`$.entries.${link.name}`, "symlink_entry", "fresh onboarding rejects symbolic links", "use a real empty directory")], entries: entries.map((entry) => entry.name) };
   if (entries.length === 0) return { schema: SCHEMA, status: "fresh", root, diagnostics: [], entries: [] };
+  if (isHostControlLayout(entries)) {
+    return {
+      schema: SCHEMA,
+      status: "host-layout-incompatible",
+      root,
+      diagnostics: [diagnostic(
+        "$.entries",
+        "host_layout_incompatible",
+        "the logical root contains only empty, non-writable reserved control paths and cannot materialize the required Git and Codex targets",
+        "use a supported host integration or a writable project root; do not remove, overwrite, or silently bypass the reserved paths",
+      )],
+      entries: entries.map((entry) => entry.name),
+    };
+  }
   const sourcePath = safePath(root, SOURCE, fs);
   if (fs.existsSync(sourcePath)) {
     const migrated = inspectRunnerProfileMigrationV3({ rootDir: root });
@@ -145,6 +186,20 @@ function inspection(rootDir, fs) {
   catch (error) {
     return { schema: SCHEMA, status: "unsafe", root, diagnostics: [diagnostic("$.runtime", "unsafe_runtime_path", error.message, "remove symbolic links before onboarding")], entries: entries.map((entry) => entry.name) };
   }
+  if (!runtimePresent && !fs.existsSync(sourcePath) && isAdoptableUnmanagedRoot(entries, root, fs)) {
+    return {
+      schema: SCHEMA,
+      status: "existing-unmanaged",
+      root,
+      diagnostics: [diagnostic(
+        "$.root",
+        "adoption_required",
+        "the root contains an existing project without Pipeline authority; only absent, conflict-free Pipeline targets may be added after explicit activation",
+        "review the adoption plan and pass apply --activate; existing project files and Git history stay untouched",
+      )],
+      entries: entries.map((entry) => entry.name),
+    };
+  }
   const code = runtimePresent || fs.existsSync(sourcePath) ? "partial_v3_state" : "unrelated_entries";
   return { schema: SCHEMA, status: "partial", root, diagnostics: [diagnostic("$.root", code, "the root is not a brand-new empty project directory", "do not overwrite it; inspect or repair its existing authority explicitly")], entries: entries.map((entry) => entry.name) };
 }
@@ -153,7 +208,7 @@ export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: over
 
 export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {} } = {}) {
   const fs = deps(overrides); const inspected = inspection(rootDir, fs);
-  if (inspected.status !== "fresh") return { schema: PLAN_SCHEMA, status: inspected.status, root: inspected.root, diagnostics: inspected.diagnostics, targets: [], requiresExplicitActivation: true };
+  if (!["fresh", "existing-unmanaged"].includes(inspected.status)) return { schema: PLAN_SCHEMA, status: inspected.status, root: inspected.root, diagnostics: inspected.diagnostics, targets: [], requiresExplicitActivation: true };
   const git = gitCapability(fs);
   if (!git.ok) return { schema: PLAN_SCHEMA, status: "unsupported", root: inspected.root, diagnostics: [diagnostic("$.git", "git_initial_branch_unsupported", git.reason, "install Git 2.28 or newer before activation")], targets: [], requiresExplicitActivation: true };
   const intent = freshIntent(); const validation = validatePipelineUserV3(intent);
@@ -165,14 +220,15 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
     { path: SOURCE, bytes: renderYaml(intent) },
   ].sort((left, right) => left.path.localeCompare(right.path));
   const targets = internal.map((target) => ({ path: target.path, kind: target.path === SOURCE ? "source" : "runtime", before: describe(null), after: describe(target.bytes), changed: true }));
-  const plan = { schema: PLAN_SCHEMA, status: "ready", root: inspected.root, state: "fresh", intentSha256: sha256(JSON.stringify(stable(intent))), git: { initialBranch: "main", version: git.version }, targets, changes: targets.map((target) => target.path), requiresExplicitActivation: true, activation: { command: "apply --activate", createsGitRepository: true, createsCommit: false } };
-  AUTHENTICATED.set(plan, { signature: JSON.stringify(plan), root: inspected.root, targets: internal });
+  const initializesGit = inspected.status === "fresh" || !inspected.entries.includes(".git");
+  const plan = { schema: PLAN_SCHEMA, status: "ready", root: inspected.root, state: inspected.status, intentSha256: sha256(JSON.stringify(stable(intent))), git: { initialBranch: "main", version: git.version, initializesGit }, targets, changes: targets.map((target) => target.path), requiresExplicitActivation: true, activation: { command: "apply --activate", createsGitRepository: initializesGit, createsCommit: false } };
+  AUTHENTICATED.set(plan, { signature: JSON.stringify(plan), root: inspected.root, targets: internal, state: inspected.status, initializesGit });
   return plan;
 }
 
-function ensurePreimage(root, fs) {
+function ensurePreimage(root, expectedState, fs) {
   const now = inspection(root, fs);
-  if (now.status !== "fresh") throw new Error(`root changed since planning (${now.status})`);
+  if (now.status !== expectedState) throw new Error(`root changed since planning (${now.status})`);
 }
 function removeEmptyParents(root, target, fs) {
   let parent = dirname(target);
@@ -198,12 +254,14 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
   try {
     root = safeRoot(rootDir, fs);
     if (root !== state.root) throw new Error("apply root differs from authenticated onboarding plan root");
-    ensurePreimage(root, fs);
+    ensurePreimage(root, state.state, fs);
     for (const target of state.targets) safePath(root, target.path, fs);
     const git = gitCapability(fs); if (!git.ok) throw new Error(git.reason);
-    const initialized = fs.spawnSync("git", ["init", "--initial-branch=main"], { cwd: root, encoding: "utf8" });
-    if (initialized.error || initialized.status !== 0) throw new Error(`git init --initial-branch=main failed: ${String(initialized.stderr ?? initialized.error ?? "unknown error").trim()}`);
-    gitCreated = true;
+    if (state.initializesGit) {
+      const initialized = fs.spawnSync("git", ["init", "--initial-branch=main"], { cwd: root, encoding: "utf8" });
+      if (initialized.error || initialized.status !== 0) throw new Error(`git init --initial-branch=main failed: ${String(initialized.stderr ?? initialized.error ?? "unknown error").trim()}`);
+      gitCreated = true;
+    }
     for (const target of state.targets) {
       const path = safePath(root, target.path, fs);
       if (fs.existsSync(path)) throw new Error(`target appeared during activation: ${target.path}`);
@@ -215,7 +273,7 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     if (authority.status !== "ready") throw new Error("post-apply V3 bootstrap authority readback was not ready");
     const migration = planRunnerProfileMigrationV3({ rootDir: root });
     if (migration.status !== "noop") throw new Error("post-apply V3 migration plan was not noop");
-    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: { initialized: true, initialBranch: "main", committed: false }, authority: { status: authority.status, runtimeProjection: authority.runtimeProjection }, migration: { status: migration.status }, diagnostics: [] };
+    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: { initialized: gitCreated, initialBranch: "main", committed: false }, authority: { status: authority.status, runtimeProjection: authority.runtimeProjection }, migration: { status: migration.status }, diagnostics: [] };
   } catch (error) {
     const rollbackFailures = root ? rollback(root, created, gitCreated, fs) : [];
     if (rollbackFailures.length) return { schema: PLAN_SCHEMA, status: "rollback-failed", root, diagnostics: [diagnostic("$.transaction", "rollback_failed", `${error.message}; rollback also failed: ${rollbackFailures[0].message}`, "repair generated paths manually before retrying")] };

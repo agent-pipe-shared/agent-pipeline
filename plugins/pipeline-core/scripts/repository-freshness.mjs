@@ -6,7 +6,7 @@
  * remote objects land in a disposable bare repository whose object lookup reads the
  * source object directory through GIT_ALTERNATE_OBJECT_DIRECTORIES.
  */
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, lstatSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -58,8 +58,20 @@ function outputBase(status, fields = {}) {
     fetchAttempted: fields.fetchAttempted ?? false,
     otherUnmergedRemoteBranches: fields.otherUnmergedRemoteBranches ?? [],
     otherUnmergedRemoteBranchesTruncated: fields.otherUnmergedRemoteBranchesTruncated ?? 0,
+    repositoryMode: fields.repositoryMode ?? "remote-tracked",
     reason: fields.reason ?? null,
   };
+}
+
+function declaredRepositoryMode(repo) {
+  const calibration = join(repo, ".claude", "pipeline.json");
+  if (!existsSync(calibration)) return { mode: "remote-tracked" };
+  try {
+    const parsed = JSON.parse(readFileSync(calibration, "utf8"));
+    if (parsed.repositoryMode === undefined) return { mode: "remote-tracked" };
+    if (parsed.repositoryMode === "local-only" || parsed.repositoryMode === "remote-tracked") return { mode: parsed.repositoryMode };
+  } catch {}
+  return { mode: null, reason: "invalid-repository-mode" };
 }
 
 function fullOid(value) {
@@ -98,22 +110,31 @@ export function inspectRepositoryFreshness(
   } = {},
 ) {
   const repo = resolve(repoPath);
+  try {
+    if (!lstatSync(repo).isDirectory()) return { exitCode: 2, error: "repository root is unavailable" };
+  } catch {
+    return { exitCode: 2, error: "repository root is unavailable" };
+  }
+  const declared = declaredRepositoryMode(repo);
+  if (!declared.mode) return { exitCode: 0, result: outputBase("unknown", { reason: declared.reason }) };
+  const repositoryMode = declared.mode;
   const headResult = git(repo, ["rev-parse", "--verify", "HEAD"]);
   const head = headResult.stdout?.trim();
   if (headResult.status !== 0 || !fullOid(head)) {
-    return { exitCode: 2, error: "repository HEAD is unavailable" };
+    return { exitCode: 0, result: outputBase("pre-head", { repositoryMode }) };
   }
 
   const branchResult = git(repo, ["symbolic-ref", "-q", "--short", "HEAD"]);
   const branch = branchResult.stdout?.trim() || null;
-  if (!branch) return { exitCode: 0, result: outputBase("detached", { head }) };
+  if (!branch) return { exitCode: 0, result: outputBase("detached", { head, repositoryMode }) };
+  if (repositoryMode === "local-only") return { exitCode: 0, result: outputBase("local-only", { head, branch, repositoryMode }) };
 
   const remoteResult = git(repo, ["config", "--get", `branch.${branch}.remote`]);
   const mergeResult = git(repo, ["config", "--get", `branch.${branch}.merge`]);
   const remote = remoteResult.stdout?.trim();
   const mergeRef = mergeResult.stdout?.trim();
   if (remoteResult.status !== 0 || mergeResult.status !== 0 || !remote || !mergeRef?.startsWith("refs/heads/")) {
-    return { exitCode: 0, result: outputBase("no-upstream", { head, branch }) };
+    return { exitCode: 0, result: outputBase("no-upstream", { head, branch, repositoryMode }) };
   }
 
   const upstreamBranch = mergeRef.slice("refs/heads/".length);

@@ -9,6 +9,7 @@ import { join } from "node:path";
 import { main as planRuntimeProjectionV3Cli } from "../scripts/plan-runtime-projection-v3.mjs";
 import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
 import {
+  codexCustomAgentSeed,
   loadRuntimeProjectionV3OwnedKeys,
   planRuntimeProjectionV3,
   readRuntimeProjectionV3Baselines,
@@ -29,6 +30,12 @@ const PREFIX = "# unowned-prefix\nlanguage:\n  human_facing: en\n  unowned_langu
 const OWNED = "modelRouting:\n  stale: true\n";
 const LEGACY_RUNNER_ROUTES = "runnerRoutes:\n  worktype_feature_advisor:\n    runner: claude\n  worktype_mini_advisor:\n    runner: claude\n";
 const SUFFIX = "unownedAfter: exact\n";
+
+for (const role of ["implementor", "critic"]) {
+  const source = readFileSync(join(process.cwd(), ".codex", "agents", `${role}.toml`), "utf8");
+  const requiredInstruction = codexCustomAgentSeed(role).match(/^developer_instructions = (.+)$/mu)?.[1];
+  assert.ok(requiredInstruction && source.includes(`developer_instructions = ${requiredInstruction}`), `source ${role} role must carry the consumer developer instructions`);
+}
 
 function clone(value) {
   return JSON.parse(JSON.stringify(value));

@@ -33,6 +33,7 @@ import { applyRunnerProfileMigrationV2, planRunnerProfileMigrationV2 } from "./r
 import { validatePipelineUserV2 } from "./runner-profiles-v2.mjs";
 import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import {
+  codexCustomAgentSeed,
   loadRuntimeProjectionV3OwnedKeys,
   planRuntimeProjectionV3,
 } from "./runtime-projection-v3.mjs";
@@ -66,8 +67,8 @@ const LEGACY_CLASSIFIER_BASELINES = Object.freeze({
   ".claude/pipeline.json": "{}\n",
   ".claude/pipeline.yaml": "modelRouting:\n  legacy:\n    model: legacy\n    effort: low\n",
   ".codex/config.toml": "# classifier baseline\n",
-  ".codex/agents/implementor.toml": 'model = "legacy"\nmodel_reasoning_effort = "low"\n',
-  ".codex/agents/critic.toml": 'model = "legacy"\nmodel_reasoning_effort = "low"\n',
+  ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"),
+  ".codex/agents/critic.toml": codexCustomAgentSeed("critic"),
   ".codex/agents/consult-advisor.toml": "",
 });
 // These seeds exist only in authenticated legacy -> V3 planning memory. They
@@ -85,8 +86,8 @@ const LEGACY_V3_RUNTIME_SEEDS = Object.freeze({
   ".claude/pipeline.json": "{}\n",
   ".claude/pipeline.yaml": "language:\n  human_facing: en\nmodelRouting:\n  legacy:\n    model: legacy\n    effort: low\n",
   ".codex/config.toml": "",
-  ".codex/agents/implementor.toml": 'model = ""\nmodel_reasoning_effort = ""\n',
-  ".codex/agents/critic.toml": 'model = ""\nmodel_reasoning_effort = ""\n',
+  ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"),
+  ".codex/agents/critic.toml": codexCustomAgentSeed("critic"),
   ".codex/agents/consult-advisor.toml": "",
 });
 // A slim private overlay can carry the complete, already-valid V3 source while
@@ -113,8 +114,8 @@ const SLIM_V3_RUNTIME_SEEDS = Object.freeze({
   }, null, 2)}\n`,
   ".claude/pipeline.yaml": "language:\n  human_facing: en\nmodelRouting:\n  legacy:\n    model: legacy\n    effort: low\n",
   ".codex/config.toml": "",
-  ".codex/agents/implementor.toml": 'model = ""\nmodel_reasoning_effort = ""\n',
-  ".codex/agents/critic.toml": 'model = ""\nmodel_reasoning_effort = ""\n',
+  ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"),
+  ".codex/agents/critic.toml": codexCustomAgentSeed("critic"),
   ".codex/agents/consult-advisor.toml": "",
 });
 

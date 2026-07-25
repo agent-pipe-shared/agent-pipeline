@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -45,6 +45,12 @@ function fixture(name) {
   git(root, "clone", "-q", "-b", "main", remote, checkout);
   configure(checkout);
   return { root, remote, seed, checkout };
+}
+
+function setRepositoryMode(repo, mode) {
+  const directory = join(repo, ".claude");
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, "pipeline.json"), `${JSON.stringify({ repositoryMode: mode })}\n`);
 }
 
 function snapshot(repo) {
@@ -145,6 +151,29 @@ check("detached and no-upstream do not fetch", () => {
   git(noUpstream, "config", "--unset", "branch.main.merge");
   const noUpstreamResult = inspectRepositoryFreshness(noUpstream).result;
   expect(noUpstreamResult.status === "no-upstream" && noUpstreamResult.fetchAttempted === false, "no-upstream classification wrong");
+});
+
+check("declared local-only repositories and pre-HEAD roots are typed without a remote probe", () => {
+  const { checkout } = fixture("local-only");
+  setRepositoryMode(checkout, "local-only");
+  const local = inspectRepositoryFreshness(checkout).result;
+  expect(local.status === "local-only" && local.repositoryMode === "local-only", `local=${local.status}/${local.repositoryMode}`);
+  expect(local.fetchAttempted === false && local.upstream === null, "local-only must not inspect an upstream");
+
+  const root = mkdtempSync(join(tmpdir(), "repository-freshness-pre-head-"));
+  roots.push(root);
+  git(root, "init", "-q", "-b", "main");
+  const preHead = inspectRepositoryFreshness(root).result;
+  expect(preHead.status === "pre-head" && preHead.repositoryMode === "remote-tracked", `pre-head=${preHead.status}/${preHead.repositoryMode}`);
+  expect(preHead.fetchAttempted === false, "pre-head must not fetch");
+});
+
+check("invalid repository mode is fail-closed without a remote probe", () => {
+  const { checkout } = fixture("invalid-mode");
+  setRepositoryMode(checkout, "later");
+  const result = inspectRepositoryFreshness(checkout).result;
+  expect(result.status === "unknown" && result.reason === "invalid-repository-mode", `status/reason=${result.status}/${result.reason}`);
+  expect(result.fetchAttempted === false, "invalid mode must not fetch");
 });
 
 check("configured core.sshCommand is passed to temporary fetch without changing source", () => {

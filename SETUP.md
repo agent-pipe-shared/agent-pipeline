@@ -182,9 +182,12 @@ it commits only its portable calibration and its project rules.
 ### 0. Let `pipeline-start` classify the consumer root first
 
 Do not copy `setup.mjs` into a consumer project or start a blank directory by
-manually creating Git/V3 runtime files. Once `pipeline-core` is loaded, invoke
-`/pipeline-core:pipeline-start` as the first project action. Its plugin-owned
-preflight runs before Git or V3 authority checks and has these outcomes:
+manually creating Git/V3 runtime files. Bind the runner first, then **end that
+host process and start a new session in the project root**. A Claude
+`/reload-plugins` refresh is not equivalent to the mandatory first binding
+restart. In the new session invoke `/pipeline-core:pipeline-start` as the first
+project action. Its plugin-owned preflight runs before Git or V3 authority
+checks and has these outcomes:
 
 - A fresh empty root stops as `F0: onboarding-required`, with no bootstrap
   confirmation. The agent runs the plugin-local read-only `inspect` and `plan`
@@ -195,9 +198,18 @@ preflight runs before Git or V3 authority checks and has these outcomes:
   but creates no commit or remote and installs no dependencies or application
   scaffold. Rerun `pipeline-start` afterwards; its normal V3 readback remains
   required before a confirmation line.
+- An existing project with no Pipeline authority stops as `F0A:
+  adoption-required`. Its reviewed plan adds only absent Pipeline-owned targets
+  and preserves project files plus valid Git metadata; it is neither a legacy
+  migration nor permission to overwrite an existing `.claude`, `.codex`, or
+  `.agents` path.
 - A V0/V1/V2 authority uses the official migration inspect → plan → explicit
-  apply workflow, never the fresh initializer. A partial, invalid, non-empty,
-  unsafe, or malformed root fails closed with no overwrite.
+  apply workflow, never the fresh initializer. A partial, invalid, unsafe, or
+  malformed root fails closed with no overwrite. A root consisting solely of
+  host-owned, non-writable `.agents`, `.codex`, and `.git` controls reports the
+  typed `host-layout-incompatible` result: use a supported host integration or
+  a writable project root; never delete, overwrite, ignore, or silently bypass
+  those paths.
 
 Codex currently has no SessionStart hook in its manifest. The mandatory
 `pipeline-start` invocation is proactive for the user's first request; it is
@@ -224,9 +236,13 @@ claude plugin update pipeline-core@agent-pipeline --scope project
 /reload-plugins
 ```
 
-For a non-Claude runtime, do not copy these commands or claim that its hooks
-are installed. Use that runtime's supported integration, then follow the
-methodology and manual controls described in the runtime-boundary document.
+After the first project-scoped Claude binding, fully close Claude Code and
+start a new Claude session in the project root before invoking
+`/pipeline-core:pipeline-start`. Do not substitute `/reload-plugins` for this
+first-bind restart. For a non-Claude runtime, do not copy these commands or
+claim that its hooks are installed. Use that runtime's supported integration,
+then follow the methodology and manual controls described in the
+runtime-boundary document.
 
 ### 1a. Bind or refresh the plugin in Codex
 
@@ -243,8 +259,21 @@ codex plugin list --marketplace agent-pipeline --json
 
 The final command must report exactly one installed and enabled
 `pipeline-core@agent-pipeline`. A Git marketplace snapshot is not the running
-plugin: start a new Codex thread after installation or refresh so the host
-loads that exact version. Do not hand-edit Codex marketplace or cache files.
+plugin: after the first binding, fully end the Codex host process and start a
+new thread in the project root before invoking `/pipeline-core:pipeline-start`.
+For a later refresh, start a new Codex thread as well. Do not hand-edit Codex
+marketplace or cache files.
+
+### 1c. Declare the Git lifecycle before delivery
+
+The initial seed deliberately sets `repositoryMode: "local-only"` in
+`.claude/pipeline.json`: onboarding creates a repository but no initial commit,
+remote, or credential binding. Make the initial commit before normal work.
+When the project is intentionally connected to a shared remote, change the
+committed calibration to `repositoryMode: "remote-tracked"`; the session
+freshness check then requires an upstream and blocks writes when it is stale or
+unknown. `local-only` permits local work only; it never authorizes a push,
+publication, or release claim.
 
 ### 1b. Activate a slim private overlay
 

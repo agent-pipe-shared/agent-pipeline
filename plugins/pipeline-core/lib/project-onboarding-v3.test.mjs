@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -96,6 +96,8 @@ test("explicit apply initializes a complete Codex-ready V3 project without a com
     assert.equal(existsSync(join(path, ".codex/agents/implementor.toml")), true);
     assert.equal(existsSync(join(path, ".codex/agents/critic.toml")), true);
     assert.equal(existsSync(join(path, ".codex/agents/consult-advisor.toml")), true);
+    assert.match(readFileSync(join(path, ".codex/agents/implementor.toml"), "utf8"), /developer_instructions\s*=/u);
+    assert.match(readFileSync(join(path, ".codex/agents/critic.toml"), "utf8"), /developer_instructions\s*=/u);
     assert.equal(existsSync(join(path, "setup.mjs")), false);
     assert.equal(existsSync(join(path, ".agent-pipeline/core.lock.json")), false);
     assert.equal(validatePipelineUserV3(parseYaml(readFileSync(join(path, "pipeline.user.yaml"), "utf8"))).ok, true);
@@ -107,17 +109,19 @@ test("explicit apply initializes a complete Codex-ready V3 project without a com
     assert.equal(source.autonomy.push_policy, "gated");
     assert.equal(source.autonomy.branch_model, "feature-branch");
     assert.equal(source.gates.security, "warn");
-    assert.equal(JSON.parse(readFileSync(join(path, ".claude/pipeline.json"), "utf8")).verify, "git diff --check");
+    const calibration = JSON.parse(readFileSync(join(path, ".claude/pipeline.json"), "utf8"));
+    assert.equal(calibration.verify, "git diff --check");
+    assert.equal(calibration.repositoryMode, "local-only");
     assert.equal(existsSync(join(path, "docs/state.md")), false, "handover stays a project decision; normal bootstrap deliberately remains F4 until it exists");
   } finally { dispose(path); }
 });
 
-test("unrelated, partial, and symlink roots fail closed without writes", () => {
+test("existing unmanaged projects plan read-only while partial and symlink roots fail closed", () => {
   const unrelated = root(); const partial = root(); const linkedParent = root(); const unsafe = root(); const unsafeClaude = root();
   try {
     writeFileSync(join(unrelated, "README.md"), "existing\n");
-    assert.equal(inspectProjectOnboardingV3({ rootDir: unrelated }).status, "partial");
-    assert.equal(planProjectOnboardingV3({ rootDir: unrelated, deps: fakeDeps }).status, "partial");
+    assert.equal(inspectProjectOnboardingV3({ rootDir: unrelated }).status, "existing-unmanaged");
+    assert.equal(planProjectOnboardingV3({ rootDir: unrelated, deps: fakeDeps }).status, "ready");
     assert.deepEqual(names(unrelated), ["README.md"]);
     mkdirSync(join(partial, ".codex")); writeFileSync(join(partial, ".codex/config.toml"), "existing\n");
     assert.equal(inspectProjectOnboardingV3({ rootDir: partial }).status, "partial");
@@ -129,6 +133,60 @@ test("unrelated, partial, and symlink roots fail closed without writes", () => {
     assert.equal(planProjectOnboardingV3({ rootDir: unsafeClaude, deps: fakeDeps }).status, "unsafe");
     assert.deepEqual(names(unsafeClaude), [".claude"]);
   } finally { dispose(unrelated); dispose(partial); dispose(linkedParent); dispose(unsafe); dispose(unsafeClaude); }
+});
+
+test("a recognized read-only host control layout is typed incompatible without an overwrite attempt", () => {
+  const path = root();
+  try {
+    for (const name of [".agents", ".codex", ".git"]) {
+      const target = join(path, name);
+      mkdirSync(target);
+      chmodSync(target, 0o555);
+    }
+    const inspected = inspectProjectOnboardingV3({ rootDir: path });
+    assert.equal(inspected.status, "host-layout-incompatible");
+    assert.equal(inspected.diagnostics[0].code, "host_layout_incompatible");
+    const planned = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(planned.status, "host-layout-incompatible");
+    assert.deepEqual(names(path), [".agents", ".codex", ".git"]);
+  } finally { dispose(path); }
+});
+
+test("an existing unmanaged project receives an additive adoption plan", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "README.md"), "existing project\n");
+    const inspected = inspectProjectOnboardingV3({ rootDir: path });
+    assert.equal(inspected.status, "existing-unmanaged");
+    const plan = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.state, "existing-unmanaged");
+    assert.equal(plan.git.initializesGit, true);
+    const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "applied");
+    assert.equal(readFileSync(join(path, "README.md"), "utf8"), "existing project\n");
+    assert.equal(existsSync(join(path, "pipeline.user.yaml")), true);
+    assert.equal(existsSync(join(path, ".git")), true);
+  } finally { dispose(path); }
+});
+
+test("adoption preserves a pre-existing Git directory and blocks user-owned reserved paths", () => {
+  const adopted = root(); const reserved = root();
+  try {
+    writeFileSync(join(adopted, "README.md"), "existing project\n");
+    mkdirSync(join(adopted, ".git", "objects"), { recursive: true });
+    writeFileSync(join(adopted, ".git", "HEAD"), "ref: refs/heads/main\n");
+    const plan = planProjectOnboardingV3({ rootDir: adopted, deps: fakeDeps });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.git.initializesGit, false);
+    const applied = applyProjectOnboardingV3(plan, { rootDir: adopted, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "applied");
+    assert.equal(readFileSync(join(adopted, ".git", "HEAD"), "utf8"), "ref: refs/heads/main\n");
+
+    writeFileSync(join(reserved, "README.md"), "existing project\n");
+    mkdirSync(join(reserved, ".codex"));
+    assert.equal(inspectProjectOnboardingV3({ rootDir: reserved }).status, "partial");
+  } finally { dispose(adopted); dispose(reserved); }
 });
 
 test("legacy V0 is migration-required and never receives a fresh fallback", () => {

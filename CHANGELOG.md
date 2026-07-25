@@ -6,6 +6,28 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ## [Unreleased]
 
+## [0.4.3] — 2026-07-25
+
+### Fixed
+
+- Consumer onboarding now distinguishes an empty root, a safe existing-project
+  adoption, legacy V0/V1/V2 migration, and a host-owned incompatible control
+  layout. Adoption writes only absent Pipeline-owned targets and preserves
+  application content plus existing valid Git metadata.
+- Generated Codex implementor and critic roles carry the required developer
+  instructions and are checked against the source role files.
+- Fresh onboarding seeds a declared local-only Git lifecycle, while the
+  repository freshness helper separately reports local-only, pre-initial-commit,
+  and remote-tracked states without a false remote-freshness claim.
+- First-binding instructions now require a new Claude or Codex host process;
+  Claude plugin reload is documented only as a later refresh operation.
+
+### Added
+
+- A process-level temporary-repository onboarding test exercises the shipped CLI
+  for both empty and existing-project roots, including the typed host-layout
+  incompatibility result.
+
 ### Changed
 
 - Current repository-owned code, documentation, and metadata use the

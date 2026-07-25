@@ -31,6 +31,32 @@ const OWNED_KEYS_PATH = join(HERE, "..", "config", "runtime-projection-v3-owned-
 const PLAN_SCHEMA = "pipeline.runtime-projection-plan.v3";
 const EFFECTIVE_MODEL_UNKNOWN = "effective-model-not-observed";
 
+export const CODEX_CUSTOM_AGENT_METADATA = Object.freeze({
+  implementor: Object.freeze({
+    name: "implementor",
+    description: "Briefed scoped implementor",
+    developerInstructions: "Act as a briefed Implementor. Work only within the explicitly provided scope, preserve project privacy boundaries, run the requested verification, and report evidence without claiming unobserved model identity.",
+  }),
+  critic: Object.freeze({
+    name: "critic",
+    description: "Independent read-only critic",
+    developerInstructions: "Act as an independent, read-only Critic. Inspect only the explicitly provided scope, preserve privacy boundaries, and report evidence-backed findings without mutating files or claiming unobserved model identity.",
+  }),
+});
+
+export function codexCustomAgentSeed(role) {
+  const metadata = CODEX_CUSTOM_AGENT_METADATA[role];
+  if (!metadata) throw new Error(`unknown Codex custom-agent role: ${role}`);
+  return [
+    `name = ${JSON.stringify(metadata.name)}`,
+    `description = ${JSON.stringify(metadata.description)}`,
+    'model = ""',
+    'model_reasoning_effort = ""',
+    `developer_instructions = ${JSON.stringify(metadata.developerInstructions)}`,
+    "",
+  ].join("\n");
+}
+
 function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }

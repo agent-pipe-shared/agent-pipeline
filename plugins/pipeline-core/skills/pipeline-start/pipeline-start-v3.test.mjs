@@ -32,6 +32,9 @@ const cases = [
     assert.match(skill, /successful apply, rerun `pipeline-start` from Step 0/u);
   }],
   ["legacy and partial roots never get an inferred overwrite", () => {
+    assert.match(skill, /\*\*`existing-unmanaged`:\*\*[\s\S]*\*\*F0A: adoption-required\*\*/u);
+    assert.match(skill, /This is not a legacy migration and\s+not permission to overwrite project content/u);
+    assert.match(skill, /\*\*`host-layout-incompatible`:\*\*[\s\S]*Never remove, overwrite, ignore, or silently relocate/u);
     assert.match(skill, /\*\*`migration-required` \(V0\/V1\/V2\):\*\*[\s\S]*runner-profile-migration-v3\.mjs" inspect --root/u);
     assert.match(skill, /Its explicit `apply --activate` is the only writer for a legacy consumer/u);
     assert.match(skill, /Never initialize over a legacy source/u);
