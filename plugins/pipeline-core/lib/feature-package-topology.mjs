@@ -9,7 +9,7 @@
  */
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
-import { isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
+import { isAbsolute, join, posix, relative, resolve, sep } from "node:path";
 import { PLAN_LIFECYCLE_STATUSES } from "./plan-spec-state-v2.mjs";
 
 export const FEATURE_PACKAGE_SCHEMA = "pipeline.feature-package.v1";
@@ -25,7 +25,7 @@ function exact(value, keys) { return object(value) && Object.keys(value).sort().
 function digest(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function canonicalRelative(root, value) {
   if (typeof value !== "string" || value.length === 0 || isAbsolute(value) || value.includes("\\")) return null;
-  const cleaned = normalize(value);
+  const cleaned = posix.normalize(value);
   if (cleaned !== value || value.split("/").some((part) => part === "." || part === ".." || part.length === 0)) return null;
   const full = resolve(root, value);
   const rel = relative(root, full);
