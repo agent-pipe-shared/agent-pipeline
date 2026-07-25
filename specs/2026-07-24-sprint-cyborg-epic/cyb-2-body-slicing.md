@@ -1,12 +1,9 @@
 # CYB-2 body-slicing plan — policy-complete verification (#42)
 
-> **Status: DRAFT, design-phase, presented for PO plan-gate approval.**
-> Nothing here is dispatch-eligible yet. Per `cyb-2-feature-spec.md` §8 and
-> the epic's "same universal package rule": Full Verify + Security green,
-> independent fresh Critic, THEN a PO gate — CYB-1's "Freigabe" closed CYB-1
-> only, it did not open CYB-2's dispatch gate. This plan itself is the thing
-> being gated: no Goldfish dispatch happens against it before an explicit PO
-> "approved" on this document (or a named deviation).
+> **Status: APPROVED by the PO, 2026-07-25 ("cyb 2 plan approved").** As-is,
+> no named deviations. Wave 1 (CYB-2A) is now dispatch-eligible. The AC8
+> call-site unknown (§3 item 1) remains open and specifically blocks
+> CYB-2I's own briefing, not the earlier waves.
 
 ## 0. Why CYB-2 is not sliced the way CYB-1 was
 
