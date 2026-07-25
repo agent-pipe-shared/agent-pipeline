@@ -15,7 +15,7 @@ files or session history — this briefing replaces them.
 
 First output line (compact bootstrap confirmation):
 
-> Bootstrap check passed: ruleset {{RULESET_SHA — fill with actual HEAD at dispatch}} loaded · Project agent-pipeline · Calibration .claude/pipeline.json · State briefing WIN-FPT-1/2026-07-25 · Role Goldfish
+> Bootstrap check passed: ruleset 996d22f8b3f2e128618d26209f3b5395a588fd8a loaded · Project agent-pipeline · Calibration .claude/pipeline.json · State briefing WIN-FPT-1/2026-07-25 · Role Goldfish
 
 ---
 
@@ -115,9 +115,8 @@ in `canonicalRelative` rejects every legitimately-safe artifact path as
 
 ### 6. Dispatch metadata
 
-- Ruleset SHA/version: `{{FILL AT DISPATCH TIME — current HEAD}}` (this
-  briefing was authored against `7f54f6d83739691679af2238f5bc3f79d2e24359`;
-  do not dispatch against a stale SHA without refreshing this field).
+- Ruleset SHA/version: `996d22f8b3f2e128618d26209f3b5395a588fd8a` (refreshed
+  2026-07-25 for this dispatch).
 - Model/effort: the implement-tier model / medium (`goldfish-implementor`) —
   this is a narrow, well-understood, already-isolated bugfix with a named
   root cause and fix direction; no design latitude, so the mechanic tier
