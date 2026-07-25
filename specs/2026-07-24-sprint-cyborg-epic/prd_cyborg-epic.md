@@ -1,7 +1,15 @@
 # PRD — Sprint Cyborg: Post-go-live security assurance
 
-> Status: **DRAFT — awaiting PO approval** (EL-19 gate; no implementation
-> dispatch before the PO writes "approved").
+<!-- po-language: en -->
+<!-- technical-spec-sha256: af750a40f2601343dbc66bcfdb76ea40eaec2cc732f30808dd8100c735440ded -->
+
+> Status: **APPROVED** (EL-19 gate). PO approved decision D + CYB-1F F-1..F-5
+> "wie empfohlen" 2026-07-25 (see `docs/state.md`, "PO GATE ANSWERED"); the
+> machine `planApproved` record was pending on a separate profile-receipt
+> defect until this session's PSModulePath fix (see `docs/state.md`,
+> "Bug 2 root cause CONFIRMED"). The two language/spec-binding marker lines
+> above are required by `po-gate-authority.mjs`'s PRD-authority check and
+> were added at that point, not part of the original PO-facing draft content.
 > Authored 2026-07-24 in the Cyborg design phase (V3 profile `epic`,
 > `design_phase`).
 
