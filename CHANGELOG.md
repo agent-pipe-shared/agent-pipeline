@@ -6,6 +6,20 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ## [Unreleased]
 
+## [0.4.4] — 2026-07-25
+
+### Fixed
+
+- Fresh Codex workspaces whose host owns empty, read-only `.git`/`.codex`
+  controls (and `.agents` when present) now use the explicit
+  `fresh-host-managed` onboarding path. It creates only portable
+  `pipeline.user.yaml` and `.claude/**` bytes, never chmods or writes reserved
+  controls, and returns the bounded
+  `host-managed-codex` V3 readback instead of rejecting the workspace.
+- The onboarding E2E suite now exercises the host-managed success path and
+  invokes its CLI entry points in-process when managed Codex sandboxes reject
+  nested Node processes.
+
 ## [0.4.3] — 2026-07-25
 
 ### Fixed

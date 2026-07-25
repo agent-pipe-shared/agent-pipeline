@@ -29,6 +29,6 @@ export function main(args = process.argv.slice(2), { write = process.stdout.writ
   else if (options.command === "plan") output = planProjectOnboardingV3({ rootDir: options.root, deps });
   else output = applyProjectOnboardingV3(planProjectOnboardingV3({ rootDir: options.root, deps }), { rootDir: options.root, activate: options.activate, deps });
   write(`${JSON.stringify(output, null, 2)}\n`);
-  return ["fresh", "ready", "migration-required", "applied"].includes(output.status) ? 0 : 1;
+  return ["fresh", "fresh-host-managed", "ready", "migration-required", "applied"].includes(output.status) ? 0 : 1;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exit(main());

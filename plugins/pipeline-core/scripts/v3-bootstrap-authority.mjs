@@ -9,6 +9,8 @@
  * that migration's empty plan is the complete public bootstrap authority.
  */
 import { pathToFileURL } from "node:url";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 import {
   inspectRunnerProfileMigrationV3,
@@ -23,6 +25,22 @@ function diagnostic(path, code, message, repair) {
 
 function rejected(root, diagnostics, extra = {}) {
   return { schema: SCHEMA, status: "rejected", root, diagnostics, ...extra };
+}
+
+function hasHostManagedCalibration(root) {
+  try {
+    const calibration = JSON.parse(readFileSync(join(root, ".claude", "pipeline.json"), "utf8"));
+    return calibration?.repositoryMode === "host-managed";
+  } catch { return false; }
+}
+
+function isHostManagedCodexProjection(plan, inspection) {
+  return inspection.sourceKind === "v3"
+    && plan.status === "ready"
+    && plan.runtimeMode === "host-managed-codex"
+    && plan.sourceSha256 === inspection.sourceSha256
+    && (plan.changes?.length ?? 0) > 0
+    && plan.changes.every((change) => change?.path?.startsWith(".codex/"));
 }
 
 function parseArgs(args) {
@@ -61,6 +79,19 @@ export function validateV3BootstrapAuthority({ rootDir = process.cwd() } = {}) {
   }
 
   const plan = planRunnerProfileMigrationV3({ rootDir });
+  const hostManagedCalibration = hasHostManagedCalibration(inspection.root);
+  if (hostManagedCalibration && isHostManagedCodexProjection(plan, inspection)) {
+    return {
+      schema: SCHEMA,
+      status: "ready",
+      root: plan.root,
+      source: inspection.source,
+      sourceKind: "v3",
+      sourceSha256: inspection.sourceSha256,
+      runtimeProjection: "host-managed-codex",
+      diagnostics: [],
+    };
+  }
   if (plan.status !== "noop" || plan.sourceKind !== "v3" || plan.sourceSha256 !== inspection.sourceSha256
     || (plan.changes?.length ?? 0) !== 0 || (plan.decisionConflicts?.length ?? 0) !== 0) {
     const code = plan.status === "ready" ? "v3_runtime_drift"
@@ -75,6 +106,8 @@ export function validateV3BootstrapAuthority({ rootDir = process.cwd() } = {}) {
       source: inspection.source,
       sourceKind: plan.sourceKind ?? inspection.sourceKind,
       planStatus: plan.status,
+      runtimeMode: plan.runtimeMode ?? "standard",
+      hostManagedCalibration,
       changes: (plan.changes ?? []).map((change) => change.path),
     });
   }

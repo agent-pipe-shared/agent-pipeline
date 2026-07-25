@@ -10,7 +10,9 @@
  */
 import { createHash } from "node:crypto";
 import {
+  accessSync,
   closeSync,
+  constants,
   existsSync,
   fsyncSync,
   linkSync,
@@ -19,6 +21,7 @@ import {
   mkdtempSync,
   openSync,
   readFileSync,
+  readdirSync,
   realpathSync,
   renameSync,
   rmdirSync,
@@ -29,6 +32,7 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
 
+import { hasCodexHostControlLayout } from "./codex-host-layout.mjs";
 import { applyRunnerProfileMigrationV2, planRunnerProfileMigrationV2 } from "./runner-profile-migration-v2.mjs";
 import { validatePipelineUserV2 } from "./runner-profiles-v2.mjs";
 import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
@@ -138,8 +142,8 @@ function result(status, diagnostics = [], extra = {}) {
 }
 function dependencies(overrides = {}) {
   return {
-    closeSync, existsSync, fsyncSync, linkSync, lstatSync, mkdirSync, mkdtempSync, openSync,
-    readFileSync, realpathSync, renameSync, rmdirSync, rmSync, unlinkSync,
+    accessSync, closeSync, constants, existsSync, fsyncSync, linkSync, lstatSync, mkdirSync, mkdtempSync, openSync,
+    readFileSync, readdirSync, realpathSync, renameSync, rmdirSync, rmSync, unlinkSync,
     writeFileSync, process: globalThis.process, ...overrides,
   };
 }
@@ -218,6 +222,13 @@ function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForS
   const legacy = ["v0", "v1", "v2"].includes(sourceKind);
   const initializeSlimV3 = ["v3", "v3-refresh"].includes(sourceKind)
     && initializeMissingRuntimeForSlimV3 === true;
+  const hostManagedCodex = ["v3", "v3-refresh"].includes(sourceKind)
+    && hasCodexHostControlLayout(root, {
+      access: deps.accessSync,
+      fsConstants: deps.constants,
+      lstat: deps.lstatSync,
+      readdir: deps.readdirSync,
+    });
   const baselines = {};
   const seeded = new Set();
   for (const relative of runtimePaths()) {
@@ -225,7 +236,9 @@ function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForS
     if (!deps.existsSync(target)) {
       const seed = legacy
         ? LEGACY_V3_RUNTIME_SEEDS[relative]
-        : initializeSlimV3 ? SLIM_V3_RUNTIME_SEEDS[relative] : undefined;
+        : initializeSlimV3 ? SLIM_V3_RUNTIME_SEEDS[relative]
+          : hostManagedCodex && relative.startsWith(".codex/") ? LEGACY_V3_RUNTIME_SEEDS[relative]
+            : undefined;
       if (typeof seed !== "string") throw new Error(`declared runtime baseline is missing: ${relative}`);
       baselines[relative] = { status: "present", bytes: seed };
       seeded.add(relative);
@@ -235,7 +248,7 @@ function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForS
     if (!info.isFile() || info.isSymbolicLink()) throw new Error(`declared runtime baseline is not a regular file: ${relative}`);
     baselines[relative] = { status: "present", bytes: deps.readFileSync(target, "utf8") };
   }
-  return { baselines, seeded };
+  return { baselines, seeded, hostManagedCodex };
 }
 
 function renderScalar(value) {
@@ -474,10 +487,11 @@ export function planRunnerProfileMigrationV3({
   if (!classified.intent) return result("invalid-source", classified.diagnostics, { root, targets: [], changes: [] });
   const validation = validatePipelineUserV3(classified.intent, { source: SOURCE_FILE });
   if (!validation.ok) return result("invalid-intent", validation.errors, { root, sourceKind: classified.kind, targets: [], changes: [] });
-  let projection; let seeded;
+  let projection; let seeded; let hostManagedCodex;
   try {
     const runtime = runtimeBaselines(root, deps, classified.kind, { initializeMissingRuntimeForSlimV3 });
     seeded = runtime.seeded;
+    hostManagedCodex = runtime.hostManagedCodex;
     projection = planRuntimeProjectionV3(classified.intent, { source: SOURCE_FILE, baselines: runtime.baselines });
   } catch (error) {
     return result("invalid-baseline", [diagnostic("$.runtime", "baseline_read", error.message, "repair declared V3 runtime targets")], { root, sourceKind: classified.kind, targets: [], changes: [] });
@@ -514,7 +528,7 @@ export function planRunnerProfileMigrationV3({
   const targets = internal.map(publicTarget);
   const changes = targets.filter((target) => target.changed);
   return remember(result(changes.length === 0 ? "noop" : "ready", [], {
-    root, sourceKind: classified.kind, sourceSha256: sha256(classified.source.bytes), intentSha256: sha256(JSON.stringify(stable(classified.intent))), compatibilityDeltas: classified.compatibilityDeltas, decisionConflicts: projection.decisionConflicts ?? [], targets, changes,
+    root, sourceKind: classified.kind, sourceSha256: sha256(classified.source.bytes), intentSha256: sha256(JSON.stringify(stable(classified.intent))), compatibilityDeltas: classified.compatibilityDeltas, decisionConflicts: projection.decisionConflicts ?? [], runtimeMode: hostManagedCodex ? "host-managed-codex" : "standard", targets, changes,
     activation: { required: true, command: "apply --activate", sourceCommittedLast: true },
   }), internal);
 }

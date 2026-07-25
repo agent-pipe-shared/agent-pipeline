@@ -136,20 +136,37 @@ test("existing unmanaged projects plan read-only while partial and symlink roots
   } finally { dispose(unrelated); dispose(partial); dispose(linkedParent); dispose(unsafe); dispose(unsafeClaude); }
 });
 
-test("a recognized read-only host control layout is typed incompatible without an overwrite attempt", () => {
+test("a recognized read-only host control layout receives portable onboarding without an overwrite attempt", () => {
   const path = root();
   try {
-    for (const name of [".agents", ".codex", ".git"]) {
+    for (const name of [".codex", ".git"]) {
       const target = join(path, name);
       mkdirSync(target);
       chmodSync(target, 0o555);
     }
     const inspected = inspectProjectOnboardingV3({ rootDir: path });
-    assert.equal(inspected.status, "host-layout-incompatible");
-    assert.equal(inspected.diagnostics[0].code, "host_layout_incompatible");
+    assert.equal(inspected.status, "fresh-host-managed");
+    assert.equal(inspected.diagnostics[0].code, "host_managed_fresh_root");
     const planned = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
-    assert.equal(planned.status, "host-layout-incompatible");
-    assert.deepEqual(names(path), [".agents", ".codex", ".git"]);
+    assert.equal(planned.status, "ready");
+    assert.equal(planned.state, "fresh-host-managed");
+    assert.equal(planned.git.mode, "host-managed");
+    assert.equal(planned.git.initializesGit, false);
+    assert.deepEqual(planned.targets.map((target) => target.path), [
+      ".claude/pipeline.json", ".claude/pipeline.yaml", ".claude/settings.json", "pipeline.user.yaml",
+    ]);
+    const applied = applyProjectOnboardingV3(planned, { rootDir: path, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "applied");
+    assert.equal(applied.git.mode, "host-managed");
+    assert.equal(applied.authority.runtimeProjection, "host-managed-codex");
+    assert.equal(inspectProjectOnboardingV3({ rootDir: path }).status, "ready");
+    assert.deepEqual(names(join(path, ".codex")), []);
+    assert.deepEqual(names(join(path, ".git")), []);
+    const calibrationPath = join(path, ".claude/pipeline.json");
+    const calibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
+    calibration.repositoryMode = "local-only";
+    writeFileSync(calibrationPath, `${JSON.stringify(calibration, null, 2)}\n`);
+    assert.equal(validateV3BootstrapAuthority({ rootDir: path }).status, "rejected", "the host projection is accepted only with its explicit calibration marker");
   } finally { dispose(path); }
 });
 

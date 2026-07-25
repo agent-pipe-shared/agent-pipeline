@@ -189,15 +189,18 @@ restart. In the new session invoke `/pipeline-core:pipeline-start` as the first
 project action. Its plugin-owned preflight runs before Git or V3 authority
 checks and has these outcomes:
 
-- A fresh empty root stops as `F0: onboarding-required`, with no bootstrap
+- A fresh empty root, including Codex's `fresh-host-managed` root, stops as
+  `F0: onboarding-required`, with no bootstrap
   confirmation. The agent runs the plugin-local read-only `inspect` and `plan`
   operations and reports their public targets/digests.
 - Only an explicit user request to create or initialize the project authorizes
   the exact plugin-local `project-onboarding-v3.mjs apply --activate` command.
-  That transaction initializes Git and the complete V3 source/runtime seed,
-  but creates no commit or remote and installs no dependencies or application
-  scaffold. Rerun `pipeline-start` afterwards; its normal V3 readback remains
-  required before a confirmation line.
+  For a normal root that transaction initializes Git and the complete V3
+  source/runtime seed. For `fresh-host-managed`, it creates only the portable
+  authority and `.claude/**`, retaining Codex-owned `.git`/`.codex` controls
+  (and `.agents` when present) unchanged. Neither form creates a commit or remote, nor installs
+  dependencies or application scaffolding. Rerun `pipeline-start` afterwards;
+  its normal V3 readback remains required before a confirmation line.
 - An existing project with no Pipeline authority stops as `F0A:
   adoption-required`. Its reviewed plan adds only absent Pipeline-owned targets
   and preserves project files plus valid Git metadata; it is neither a legacy
@@ -206,10 +209,10 @@ checks and has these outcomes:
 - A V0/V1/V2 authority uses the official migration inspect → plan → explicit
   apply workflow, never the fresh initializer. A partial, invalid, unsafe, or
   malformed root fails closed with no overwrite. A root consisting solely of
-  host-owned, non-writable `.agents`, `.codex`, and `.git` controls reports the
-  typed `host-layout-incompatible` result: use a supported host integration or
-  a writable project root; never delete, overwrite, ignore, or silently bypass
-  those paths.
+  host-owned, non-writable `.git`/`.codex` controls (and `.agents` when
+  present) is the
+  supported `fresh-host-managed` variant; never delete, overwrite, chmod,
+  ignore, or silently bypass those paths.
 
 Codex currently has no SessionStart hook in its manifest. The mandatory
 `pipeline-start` invocation is proactive for the user's first request; it is

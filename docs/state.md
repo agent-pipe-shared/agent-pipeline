@@ -3,17 +3,25 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-07-24
+**Last updated:** 2026-07-25
 **Project status:** ACTIVE
-**Current block:** `0.4.1` Slim Private Overlay authority-update hotfix;
-candidate verification and publication are pending
-**Repair baseline:** `bd05d351957828393201bd6a9433b46107a880bc`
-**Release version:** `0.4.0` released; `0.4.1` hotfix candidate
+**Current block:** `0.4.4` Codex managed-workspace onboarding hotfix; final
+candidate verification, independent review, and authorized publication pending
+**Repair baseline:** `e4d62646f842e2dfd7ab8ef48457ea676fceecd3`
+**Release version:** `0.4.3` released; `0.4.4` local hotfix candidate
 
 ## Operational head
 
 - Project calibration: [`.claude/pipeline.json`](../.claude/pipeline.json).
 - Required gate: `node harness/scripts/verify.mjs`.
+- **0.4.4 managed-workspace hotfix:** Codex may create a writable fresh root
+  containing host-owned, empty read-only `.git`/`.codex` controls (and
+  `.agents` when present). The onboarding classifier now recognizes only that
+  bounded layout, writes portable authority plus `.claude/**`, and never
+  chmods or writes host controls. The candidate is not release evidence until
+  one final commit has passed Full Verify and an independent Critic on its
+  exact commit/tree; the release sequence is
+  [`release-0.4.4-readiness.md`](release-0.4.4-readiness.md).
 - Formal decisions: [`docs/adr/README.md`](adr/README.md); no state-local
   override is active.
 - This file is the sole current/open/next handover under

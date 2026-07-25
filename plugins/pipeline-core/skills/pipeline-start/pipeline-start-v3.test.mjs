@@ -34,7 +34,8 @@ const cases = [
   ["legacy and partial roots never get an inferred overwrite", () => {
     assert.match(skill, /\*\*`existing-unmanaged`:\*\*[\s\S]*\*\*F0A: adoption-required\*\*/u);
     assert.match(skill, /This is not a legacy migration and\s+not permission to overwrite project content/u);
-    assert.match(skill, /\*\*`host-layout-incompatible`:\*\*[\s\S]*Never remove, overwrite, ignore, or silently relocate/u);
+    assert.match(skill, /\*\*`fresh` or `fresh-host-managed`:\*\*[\s\S]*writes only `pipeline\.user\.yaml` and `\.claude\/\*\*`/u);
+    assert.match(skill, /Never\s+remove, overwrite, ignore, chmod, or silently relocate/u);
     assert.match(skill, /\*\*`migration-required` \(V0\/V1\/V2\):\*\*[\s\S]*runner-profile-migration-v3\.mjs" inspect --root/u);
     assert.match(skill, /Its explicit `apply --activate` is the only writer for a legacy consumer/u);
     assert.match(skill, /Never initialize over a legacy source/u);
@@ -51,7 +52,7 @@ const cases = [
     assert.match(skill, /pipeline\.user\.v3/u);
     assert.match(skill, /v3-bootstrap-authority\.mjs" --root "\$PWD"/u);
     assert.match(skill, /Consumer-root `setup\.mjs`\s+is neither required nor consulted/u);
-    assert.match(skill, /Runtime projection noop/u);
+    assert.match(skill, /Runtime projection \{\{noop\|host-managed-codex\}\}/u);
     assert.match(skill, /explicit V3 migration\/apply/u);
     assert.match(skill, /V3 contract\s+supersedes legacy/u);
   }],

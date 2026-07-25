@@ -1,5 +1,32 @@
 # History
 
+## 2026-07-25 — Codex managed-workspace onboarding hotfix prepared
+
+- Corrected fresh-project onboarding for the bounded Codex host layout with
+  empty read-only `.git`/`.codex` controls and optional `.agents`: it now
+  creates only portable authority and `.claude/**`, without chmod or writes to
+  host controls.
+- Replaced the regression that expected host-layout rejection with a real
+  disposable-root success path, including exact post-apply authority readback.
+- Added a release record that freezes integration before evidence: Full Verify
+  and the independent Critic bind one final commit/tree, and generated Verify
+  evidence remains ignored rather than creating another candidate commit.
+
+### Lessons
+
+- A host-layout test is only useful when it proves the supported first-use
+  transaction succeeds; a green test for rejection can preserve the user-facing
+  outage it was meant to prevent.
+- Release metadata, rebases, and review evidence must be finalized in that
+  order. Any candidate mutation after a gate requires a new gate, not a prose
+  assertion that prior evidence still applies.
+
+### Open / next
+
+Run the final Full Verify and independent Critic against the one committed
+0.4.4 candidate, then publish only if their commit/tree readbacks match the
+authorized release identity.
+
 ## 2026-07-23 — Native-Windows Verify block: portability sweep and delivery
 
 - Ran the full `verify.mjs` suite natively on a Windows host for the first
