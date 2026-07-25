@@ -1,14 +1,17 @@
 # Prepared Goldfish briefing — PO-gate-authority path-canonicalization fix
 
-> **Status: PREPARED, NOT YET DISPATCHED.** Authored as Elephant design-phase
-> work per PO approval of decision D (Windows-slice sequencing, 2026-07-25).
-> `planApproved` for `sprint-cyborg-epic` is still mechanically `false`
-> (blocked by the confirmed `PO-PROFILE-RECEIPT-INVALID`, Bug 2 — see
-> `docs/state.md`), so this briefing is prepared, not dispatched. Refresh the
-> ruleset SHA in field 6 to the actual HEAD at dispatch time before sending.
-> Windows-slice sequencing item 2 (`windows-sandbox-assurance-slice-scope.md`).
-> **This fix is itself a prerequisite for recording `planApproved` on this
-> host** — do not treat it as low-stakes cleanup.
+> **Status: READY TO DISPATCH (gate open), dispatching now.** `planApproved`
+> for `sprint-cyborg-epic` was recorded 2026-07-25 (see `docs/state.md`,
+> "planApproved RECORDED"). Ruleset SHA refreshed to
+> `d221c53a7fcb899b8db94966fc01cacd64ef7a4d` for this dispatch. Windows-slice
+> sequencing item 2. Note: `PO-PROFILE-RECEIPT-INVALID`/Bug 2 was itself
+> already resolved this epic (see "planApproved RECORDED" and "Bug 2 deadlock
+> DISSOLVED" entries) — this task's DoD AC about reaching that error is now
+> moot/superseded; the real bar is simply `resolvePoGateRepositoryTopology`
+> succeeding from a mis-cased cwd, full stop. **Tier escalated to
+> `goldfish-deep`/xhigh** per advisor review 2026-07-25: this is
+> authority-boundary code with a genuine security-relevant primitive choice
+> (see field 6).
 
 ---
 
@@ -19,7 +22,7 @@ files or session history — this briefing replaces them.
 
 First output line (compact bootstrap confirmation):
 
-> Bootstrap check passed: ruleset {{RULESET_SHA — fill with actual HEAD at dispatch}} loaded · Project agent-pipeline · Calibration .claude/pipeline.json · State briefing WIN-PGA-2/2026-07-25 · Role Goldfish
+> Bootstrap check passed: ruleset d221c53a7fcb899b8db94966fc01cacd64ef7a4d loaded · Project agent-pipeline · Calibration .claude/pipeline.json · State briefing WIN-PGA-2/2026-07-25 · Role Goldfish
 
 ---
 
@@ -142,17 +145,22 @@ against the identical repository state.
 
 ### 6. Dispatch metadata
 
-- Ruleset SHA/version: `{{FILL AT DISPATCH TIME — current HEAD}}` (this
-  briefing was authored against `7f54f6d83739691679af2238f5bc3f79d2e24359`;
-  do not dispatch against a stale SHA without refreshing this field).
-- Model/effort: the implement-tier model / medium (`goldfish-implementor`).
-  Deviation consideration: this touches trust/authority-boundary code
-  (`po-gate-authority.mjs` gates a PO-approval recording path) — if the
-  actual diff turns out to require non-trivial judgment about the
-  canonicalization primitive's security properties, escalate to
-  `goldfish-deep`/xhigh per MP-05 rather than force it through at the
-  implementor tier; note that escalation decision explicitly in the final
-  report if taken.
+- Ruleset SHA/version: `d221c53a7fcb899b8db94966fc01cacd64ef7a4d` (refreshed
+  2026-07-25 for this dispatch; originally authored against
+  `7f54f6d83739691679af2238f5bc3f79d2e24359`).
+- Model/effort: `goldfish-deep` / xhigh. Escalated from implementor tier per
+  advisor review 2026-07-25: this is authority-boundary code
+  (`po-gate-authority.mjs` gates a PO-approval recording path) with a genuine
+  security-relevant primitive choice, not a pre-decided mechanical fix.
+  Specifically evaluate `fs.realpathSync.native` (on Windows this resolves to
+  disk-canonical casing for BOTH sides being compared, so a plain `===`
+  after that call needs no separate case-insensitive logic and carries no
+  over-accept risk) as the primary candidate, against a manual
+  case-insensitive string comparison (which risks over-accepting on
+  case-sensitive mounts/UNC paths — the real hazard this task must not
+  introduce). Prefer `realpathSync.native` unless the diagnosis in field 2
+  reveals a concrete reason it does not apply here; if choosing the
+  case-insensitive-comparison route instead, justify why in the final report.
 - Worktree: no — single file pair, no parallel-dispatch conflict risk
   expected in isolation (confirm against calibration `.claude/pipeline.json`
   `"worktree": "optional"` at actual dispatch time).
