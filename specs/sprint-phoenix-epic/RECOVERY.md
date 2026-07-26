@@ -84,6 +84,16 @@ was unchanged before, between, and after. This was a new bootstrap duty, not a
 third attempt inside the exhausted initial route, and it created no
 Advisor-pass claim.
 
+A later compact-continuation re-entry again selected the same policy. Its
+primary timed out at the single 60-second deadline and was interrupted once.
+The exact policy-named fast fallback role was not exposed by the current Codex
+agent adapter, so that launch was rejected before any child or export. No
+substitute role/model and no third attempt was used. The workspace digest
+`fddcca4ff370939a45f44a5d5c97157a86aab4f070aa70851d3403629f720c0d`
+was unchanged before, between, and after. This is adapter availability
+friction, not an Advisor pass, workspace mutation, repository write
+restriction, or product authority.
+
 ## R-04 — Inherited active-feature continuity
 
 The repository state initially still named the completed 0.4.6 Codex
@@ -274,6 +284,26 @@ prohibited personal/pseudonymous/free-form or otherwise erasable data before
 portable durability, and added the separately protected restricted-event
 schema/store/operation/test inventory. A fresh correction re-review is
 required; this recovery record does not self-issue privacy sign-off.
+
+## R-06 — First privacy correction re-review failed closed
+
+The first correction re-review ran on candidate
+`2891205e21f4f3f17e0c94b488c40a7e6fd80ca7`, tree
+`0ef439f5f0885ac808b9799717f971a1d257b961`, without reviewer mutation or
+remote write. The machine trajectory was consistent. It returned FAIL because:
+
+- bound Spec §§4.4–4.5 still permitted a false interpretation of independent
+  per-stream Git access/retention and an exclusive physical read boundary;
+- append-only H-AC-06 did not state how restricted expiry, erase, and key
+  destruction take precedence; and
+- five restricted-store implementation files were outside the bound Spec
+  inventory.
+
+Phoenix accepted all three findings without waiver. The second correction uses
+the normative Acceptance matrix to interpret the bound Spec, limits append-only
+preservation to portable repository records, and assigns every restricted
+operation to existing Spec-listed envelope/policy/decision/event-store/CLI/test
+and documentation files. A new bounded re-review remains required.
 
 ## Audit classification
 

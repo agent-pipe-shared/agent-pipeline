@@ -12,6 +12,25 @@ is normative and is summarized by the Epic criteria in `spec.md`. A package
 cannot claim completion from prose review alone; each criterion must map to a
 named test or deterministic Verify step and exact candidate evidence.
 
+## Normative interpretation of Spec §§4.4–4.5
+
+For every Phoenix stream, package, briefing, and implementation, Spec §4.4's
+“independently configured” retention/access statement means independent
+capture eligibility and downstream projection/export decisions within a
+selected storage profile. It does not mean independent physical ACLs or
+retention for files committed to one Git repository: every portable record
+shares the repository's complete access population and durable-history
+boundary. A narrower requirement selects `restricted-machine-local` or fails
+closed before persistence.
+
+Spec §4.5's “sole read boundary” means that the query/projection service is the
+only sanctioned semantic input for replay, viewer, bundle, adapter, ITSM, and
+export consumers. It is not the only physically possible filesystem or Git
+read and is not a confidentiality control against repository readers. Portable
+admission therefore SHALL make direct clone/read exposure safe before the
+first durable byte. This interpretation is normative and cannot be weakened by
+architecture prose or an implementation briefing.
+
 ## PX0 — Runner-neutral ruleset source and freshness
 
 - **PX0-AC-01:** WHEN bootstrap resolves a loaded Pipeline distribution, THE
@@ -100,9 +119,14 @@ named test or deterministic Verify step and exact candidate evidence.
   record SHALL contain only the non-identifying authority/actor class and
   assurance; any natural-person attribution or joinable pseudonymous reference
   SHALL remain in the separately protected, erasable machine-local profile.
-- **H-AC-06:** WHEN an authority decision is consumed, revoked, expired, or
-  superseded, THE SYSTEM SHALL leave the original event unchanged and append
-  the new disposition.
+- **H-AC-06:** WHEN a `repository-public-safe` authority decision is consumed,
+  revoked, expired, or superseded, THE SYSTEM SHALL leave the original event
+  unchanged and append the new disposition. This append-only requirement
+  applies only to portable repository records. A `restricted-machine-local`
+  record SHALL instead follow its authorized expiry, erase, and key-destruction
+  policy under H-AC-11/H-AC-13; after the proved erasure boundary, only a
+  non-correlating sanitized operation receipt MAY remain, and dependent
+  authority SHALL fail closed rather than reconstructing the erased content.
 - **H-AC-07:** IF a decision from one repository is presented in another, THEN
   THE SYSTEM SHALL reject it before state or external mutation.
 - **H-AC-08:** WHEN a legacy approval/override/deploy record cannot prove its
@@ -188,7 +212,15 @@ named test or deterministic Verify step and exact candidate evidence.
   either policy to weaken the other's authority boundary. Portable records in
   one Git repository SHALL share that repository's access and retention
   boundary; a stream requiring a narrower boundary SHALL use the separately
-  protected machine-local profile or fail closed before persistence.
+  protected machine-local profile or fail closed before persistence. This is
+  the normative interpretation of Spec §§4.4–4.5: “independently configured”
+  means independent capture eligibility and downstream projection/export
+  decisions within the selected storage profile, not per-stream physical ACL
+  or retention inside one Git repository; “sole read boundary” means the sole
+  sanctioned semantic consumer interface for the listed projections, not an
+  exclusive filesystem/Git read or confidentiality boundary. Direct repository
+  reads are assumed possible and SHALL be safe from restricted or erasable
+  content by pre-durability admission.
 - **A-AC-13:** WHEN interrupted, concurrent, duplicate, or out-of-order journal
   submissions occur, THE SYSTEM SHALL produce deterministic typed outcomes and
   preserve one valid canonical history or a fail-closed fork state.

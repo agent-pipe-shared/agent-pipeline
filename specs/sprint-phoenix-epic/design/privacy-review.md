@@ -1,6 +1,6 @@
 # Sprint Phoenix data-privacy review
 
-Status: initial privacy review failed; corrections prepared for fresh re-review
+Status: two privacy review rounds failed; second corrections prepared for fresh re-review
 
 Date: 2026-07-26
 
@@ -10,8 +10,14 @@ review pass. The first fresh read-only review returned FAIL because ordinary
 Git reads bypassed the claimed per-stream access boundary and immutable
 portable records could retain personal attribution/free-form rationale without
 an erasable operation. Those findings are accepted. The corrected contract
-below must receive a fresh bounded re-review before the design can reach the
-Product Owner gate.
+then received a correction re-review. It also returned FAIL because the bound
+Spec wording remained open to a false per-stream confidentiality
+interpretation, H-AC-06 did not scope append-only preservation away from
+restricted erasure, and the architecture introduced restricted-store files
+outside the bound Spec inventory. All three findings are accepted. The
+normative Acceptance interpretation, scoped lifecycle rule, and
+Spec-inventory-only ownership below must receive a fresh bounded re-review
+before the design can reach the Product Owner gate.
 
 ## 1. Processing boundary
 
@@ -86,7 +92,9 @@ pass the same capture policy and still cannot grant human authority.
 6. Portable stream policy independently controls capture eligibility and
    downstream projections, but all Git-resident streams share the repository's
    access and retention. A stricter stream requirement rejects portable append;
-   policy cannot silently extend it.
+   policy cannot silently extend it. This is the normative interpretation of
+   Spec §4.4; “independently configured” does not claim independent physical
+   access or retention inside Git.
 7. The restricted profile stores the complete event outside Git under an
    owner-only root, verified ACL/reparse boundary, encryption at rest, separate
    key custody, explicit expiry, and exact `erase`/`destroy-key` operations.
@@ -99,8 +107,15 @@ pass the same capture policy and still cannot grant human authority.
 9. Repository access is coarse. Least privilege applies to the restricted
    local store and to viewer, bundle, adapter, ITSM, and export operations;
    projection policy is not described as protection from direct Git reads.
+   Spec §4.5's “sole read boundary” means the sole sanctioned semantic source
+   for those consumers, not the only physically possible repository read.
 10. Backfill after policy/destination change requires exact preview and
     explicit consent; prior eligibility is never inferred.
+11. Restricted storage, schema discrimination, policy, operations, tests, and
+    operator guidance SHALL be implemented only inside the event-envelope,
+    capture-policy, human-decision, event-store, `governance-event` CLI, and
+    documentation files already listed in bound Spec §§7.3–7.4. No separate
+    restricted-store implementation file is authorized by this design.
 
 ## 4. Required privacy fixtures
 
@@ -147,8 +162,13 @@ The reviewer must:
 
 The initial independent review returned FAIL with one blocker and one major:
 portable Git storage could bypass claimed stream ACLs, and personal/free-form
-content had no executable erasure/key-destruction contract. The corrected
-repository-wide trust-zone admission and restricted-store operation/inventory
-must be checked in a fresh re-review. Until it passes, governance checklist
-item 1 remains NOT MET and Phoenix remains blocked before the Product Owner
-gate.
+content had no executable erasure/key-destruction contract. The first
+correction re-review returned FAIL with one blocker and two majors: normative
+Spec wording remained ambiguous, append-only conflicted with restricted
+erasure, and five new restricted-store files exceeded the Spec inventory. The
+current correction makes Acceptance the explicit interpretation of Spec
+§§4.4–4.5, scopes append-only to portable records, and assigns every restricted
+operation to existing Spec-listed files. A fresh re-review must check all five
+accepted privacy findings and direct regressions. Until it passes, governance
+checklist item 1 remains NOT MET and Phoenix remains blocked before the Product
+Owner gate.

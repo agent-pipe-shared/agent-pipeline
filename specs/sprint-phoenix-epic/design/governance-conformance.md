@@ -36,7 +36,7 @@ No design-stage deviation from the twelve guidelines is proposed.
 
 | # | Policy item | Current state | Required evidence before implementation close/push |
 | --- | --- | --- | --- |
-| 1 | Data-privacy review | NOT MET until correction re-review passes | The first fixed-candidate privacy review failed on unenforceable per-stream Git access and missing erasable restricted storage. [privacy-review.md](privacy-review.md) now declares one repository-wide portable trust zone, fail-closed non-personal admission, and a separate encrypted/erasable machine-local event store with no portable join. Fresh re-review remains blocking. |
+| 1 | Data-privacy review | NOT MET until second correction re-review passes | Two review rounds failed on unenforceable per-stream Git access, missing erasable restricted storage, ambiguous Spec wording, append-only/erasure conflict, and out-of-inventory files. [privacy-review.md](privacy-review.md) now makes Acceptance the normative interpretation, scopes append-only to portable records, and assigns the restricted profile only to Spec-listed files. Fresh re-review remains blocking. |
 | 2 | Threat model updated | MET (design) | [architecture.md §15](architecture.md#15-security-and-privacy-posture) defines current threats/controls. Implementation creates and maintains `docs/phoenix-governance-threat-model.md` and obtains blocking Security review. |
 | 3 | License header present | NOT APPLICABLE to current Markdown-only design | Every future source/schema file follows the repository's license/SPDX convention; Verify checks the implemented candidate. |
 | 4 | Rollback path documented | MET (design) | `spec.md` migration/compatibility, stateful recovery checklist, architecture crash matrices, and `RECOVERY.md` define recovery authority and no-history-fabrication. |
@@ -53,8 +53,8 @@ No design-stage deviation from the twelve guidelines is proposed.
 | `PHX-DESIGN-INHERITED-CONTINUITY` | Product Owner for exception authority; Phoenix Elephant for exact execution/readback | 2026-07-31 | RESOLVED 2026-07-26 through the documented exact repair, sanctioned writers, Phoenix continuity initialization, cleanup, and full bootstrap readback. |
 | `PHX-DESIGN-HANDOVER-DRIFT` | Phoenix close owner; Product Owner controls scope | 2026-07-31 | Reconcile the canonical handover at close without reopening Product Owner-dispositioned 0.4.6 implementation. |
 | `PHX-LEGACY-AUTHORITY-COMPATIBILITY` | Phoenix integration-package owner | Earlier of Phoenix integration close or 2026-10-31 | Migrate every direct mutable authority reader, dual-evaluate ledger/state, block disagreement, and prohibit compatibility removal or Phoenix completion while any reader remains unmigrated. |
-| `PHX-PRIVACY-PORTABLE-TRUST-ZONE` | Phoenix integration-package owner | Before Product Owner gate | Re-review repository-wide portable admission and prove direct Git reads expose no restricted/erasable data. |
-| `PHX-PRIVACY-RESTRICTED-ERASURE` | Phoenix integration-package owner | Before Product Owner gate | Re-review the closed restricted schema/store/CLI inventory, expiry, erase, key destruction, readback, and honest backup/clone limits. |
+| `PHX-PRIVACY-PORTABLE-TRUST-ZONE` | Phoenix integration-package owner | Before Product Owner gate | Re-review the normative Spec §§4.4–4.5 interpretation, repository-wide portable admission, and proof that direct Git reads expose no restricted/erasable data. |
+| `PHX-PRIVACY-RESTRICTED-ERASURE` | Phoenix integration-package owner | Before Product Owner gate | Re-review portable-only append semantics plus restricted expiry, erase, key destruction, readback, honest backup/clone limits, and ownership solely in Spec-listed files. |
 
 If an open risk reaches its date without disposition, the Phoenix design returns to a
 blocked course gate. The expiry does not authorize the action automatically.

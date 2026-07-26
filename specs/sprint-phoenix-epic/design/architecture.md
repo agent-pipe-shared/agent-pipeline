@@ -101,10 +101,15 @@ feature, package, candidate commit/tree, artifact digest, environment, action,
 rule, and validity window. Unknown or not-applicable values are typed; they are
 never filled from ambient Git state after the event.
 
-### G-4 — Append-only means new records
+### G-4 — Portable append-only means new records
 
-Correction, contradiction, expiry, revocation, supersession, compensation, and
-recovery append new records. They never edit an earlier event.
+For immutable `repository-public-safe` records, correction, contradiction,
+expiry, revocation, supersession, compensation, and recovery append new
+records. They never edit an earlier portable event. A
+`restricted-machine-local` record is outside that portable history and follows
+its authorized expiry, erase, and key-destruction policy; a sanitized
+non-correlating operation receipt may describe only the proved store boundary,
+and dependent authority fails closed after content or key destruction.
 
 ### G-5 — Privacy precedes durability
 
@@ -350,16 +355,16 @@ policy; it is not an operating-system or Git confidentiality boundary. Direct
 repository reads remain possible and safe only because the portable admission
 contract excludes restricted or erasable data before the first durable byte.
 
-`governance-restricted-record
-plan-put|put|query|plan-erase|erase|plan-destroy-key|destroy-key|status`
-is the closed machine-local operation surface. Every mutation binds physical
-store identity, data class, purpose, retention deadline, expected preimage,
-authorization class, and idempotency key. `erase` proves the exact record is
-gone from the active encrypted store; `destroy-key` proves the named
-per-stream/key-generation material is unavailable after readback. Receipts
-contain only operation class, counts, pre/post digests, outcome, and explicit
-limitations. They never claim deletion from copies or backups outside the
-proved store boundary.
+The existing Spec-listed `governance-event` CLI owns the closed machine-local
+subsurface:
+`restricted plan-put|put|query|plan-erase|erase|plan-destroy-key|destroy-key|status`.
+Every mutation binds physical store identity, data class, purpose, retention
+deadline, expected preimage, authorization class, and idempotency key. `erase`
+proves the exact record is gone from the active encrypted store; `destroy-key`
+proves the named per-stream/key-generation material is unavailable after
+readback. Receipts contain only operation class, counts, pre/post digests,
+outcome, and explicit limitations. They never claim deletion from copies or
+backups outside the proved store boundary.
 
 No expiry, correction, appended disposition, portable redaction, Git removal,
 or key destruction is described as satisfying a legal erasure obligation
@@ -857,8 +862,9 @@ Delivery waves:
    lifecycle manifest now; implementation first delivers the transactional
    feature-package manifest writer missing from the #22 base, then PX-0 plus
    the shared envelope, event store, checkpoint verifier, recovery command,
-   repository-public-safe admission, restricted machine-local record store,
-   policy hooks, and topology extension.
+   repository-public-safe admission, the restricted machine-local storage
+   profile within the same Spec-listed kernel, policy hooks, and topology
+   extension.
 2. **Canonical streams:** #30, #17, and #9 foundation; #5 begins with base
    artifacts.
 3. **Dependent records/adapters:** #31 and #23.
@@ -889,16 +895,21 @@ The first package owns this exact writer inventory:
 | `plugins/pipeline-core/scripts/feature-package.mjs` | expose `inspect|plan|apply|status` with digest-bound explicit activation and sanitized output |
 | `plugins/pipeline-core/scripts/feature-package.test.mjs` | prove the CLI never turns preview, chat, handover, or a stale candidate into a manifest write |
 
-The kernel package additionally owns the restricted-data inventory that the
-bound Spec's generic event-store inventory did not enumerate:
+The kernel package implements the restricted-data profile exclusively through
+the files already authorized by bound Spec §§7.3–7.4. Architecture narrows
+their responsibilities here; it does not authorize another implementation
+file:
 
 | File | Contract |
 | --- | --- |
-| `plugins/pipeline-core/schemas/governance-restricted-record.schema.json` | closed purpose/data-class/retention/encryption-generation request and receipt shapes; no portable join handle |
-| `plugins/pipeline-core/lib/governance-restricted-store.mjs` | owner-only physical store, ACL/reparse checks, encryption boundary, expiry, exact erase and key-destruction readback |
-| `plugins/pipeline-core/lib/governance-restricted-store.test.mjs` | reject Git/repository roots, unsafe permissions, joins in portable output, replay/drift, expired records, incomplete erase and unverifiable key destruction |
-| `plugins/pipeline-core/scripts/governance-restricted-record.mjs` | expose only the closed plan/apply/query/status operations in §4.5 with sanitized output |
-| `plugins/pipeline-core/scripts/governance-restricted-record.test.mjs` | prove confirmation, authorization, preimage, idempotency, crash recovery, backup-limit disclosure, and no-false-erasure claims |
+| `governance/schemas/governance-event-envelope.schema.json` | add the closed storage-profile discriminator and common restricted-envelope limits without a portable join field |
+| `governance/schemas/governance-capture-policy.schema.json` | add purpose, personal/contextual-identifiability, storage-profile, retention, disclosure, encryption-generation request, and sanitized receipt policy shapes |
+| `governance/schemas/human-governance-decision.schema.json` | permit personal attribution/free-form rationale only for a complete `restricted-machine-local` decision and prohibit those fields for `repository-public-safe` |
+| `plugins/pipeline-core/lib/governance-event-store.mjs` | implement both closed physical strategies: portable stream writer/query/verify/recovery and owner-only restricted storage with ACL/reparse, encryption, expiry, exact erase, and key-destruction readback |
+| `plugins/pipeline-core/lib/governance-event-store.test.mjs` | reject Git/repository restricted roots, unsafe permissions, portable joins, replay/drift, expired records, incomplete erase, and unverifiable key destruction in addition to the portable crash/fork matrix |
+| `plugins/pipeline-core/scripts/governance-event.mjs` | expose the public operations in §4.4 plus the closed `restricted …` operation namespace in §4.5 with sanitized output |
+| `plugins/pipeline-core/scripts/governance-event.test.mjs` | prove confirmation, authorization, preimage, idempotency, crash recovery, backup-limit disclosure, and no-false-erasure claims |
+| `docs/governance-events.md` and `docs/human-governance-ledger.md` | document profile selection, operator authorization, retention/erasure limits, recovery, and the absence of portable correlation |
 
 ## 17. Rejected architecture alternatives
 

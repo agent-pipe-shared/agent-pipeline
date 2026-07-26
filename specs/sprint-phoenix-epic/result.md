@@ -45,3 +45,26 @@ attribution or free-form rationale had no separately erasable storage and
 operation contract. The findings are accepted and corrected in the normative
 acceptance and architecture documents. A fresh bounded privacy re-review is
 required; this failed entry is never rewritten into a pass.
+
+## Entry 3 — First privacy correction re-review
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-07-26 |
+| Candidate commit | `2891205e21f4f3f17e0c94b488c40a7e6fd80ca7` |
+| Candidate tree | `0ef439f5f0885ac808b9799717f971a1d257b961` |
+| Correction range | `1b7860616c16c3879fc67dd964f1dd48a4a58100..2891205e21f4f3f17e0c94b488c40a7e6fd80ca7` |
+| Full Verify | exit 0; evidence SHA-256 `cce4f4b83f0b52e8e58dfc5359bc9743f878060f190752faf212593224fa7e2b` |
+| Security | exit 0 / CLEAN; evidence SHA-256 `fd894dba9ffa36b8c29c02c3036f36ffba3275bce29e83709f3f80b14bf06af6` |
+| Independent privacy re-review | FAIL under `functional-equivalent-read-only; OS isolation not asserted` |
+| Machine trajectory | consistent |
+| Remote write | none |
+
+The reviewer found one blocker and two majors: the bound Spec still admitted a
+false per-stream confidentiality interpretation, append-only H-AC-06 conflicted
+with restricted erasure/key destruction, and five restricted-store files were
+outside the bound Spec inventory. All findings are accepted. The next candidate
+uses the normative Acceptance matrix to disambiguate Spec §§4.4–4.5, limits
+append-only preservation to portable records, and implements the restricted
+profile only through already inventoried kernel/ledger files. A fresh privacy
+re-review remains mandatory; this failed entry is never rewritten.

@@ -6,7 +6,7 @@
 | Profile | epic |
 | Consent | approved |
 | Route | host-bound read-only consult |
-| Outcome | unavailable after each bootstrap's one primary and one fallback attempt |
+| Outcome | unavailable after bounded primary/fallback routes; the latest fallback adapter was not exposed |
 | Workspace mutation | none; guarded digest unchanged |
 | Readiness effect | no Advisor-pass claim |
 | Compensating review authority | Product Owner explicitly authorized the fixed-candidate read-only Critic on 2026-07-26 |
@@ -53,6 +53,19 @@ were interrupted once. The workspace digest was
 `e6aed2d81304e623bdd976a5e4da410b2e4dbe6d8001f43f0e57db63c5a002d6`
 before, between, and after; no third attempt was made in that bootstrap.
 
+### Mandatory compact-continuation re-entry bootstrap
+
+The later compact re-entry resolved the same 0.4.6 Epic policy. The fresh
+primary received one bounded question over only the Spec, Acceptance,
+architecture, privacy contract, prior privacy findings, and lifecycle manifest;
+it returned no answer within 60 seconds and was interrupted once. The policy's
+named `consult-advisor-fast` fallback role was not exposed by the current Codex
+agent adapter, so the exact fallback launch was rejected before a child
+started. No substitute model/role and no third attempt was used. The workspace
+digest was
+`fddcca4ff370939a45f44a5d5c97157a86aab4f070aa70851d3403629f720c0d`
+before, between, and after.
+
 There was no attested selected-sandbox execution; OS isolation and model
 identity are not asserted. No output was auto-applied and no Advisor finding
 exists to accept or reject.
@@ -73,6 +86,6 @@ claims about the unavailable Advisor execution.
 The first compensating review is recorded in
 [critic-review.md](critic-review.md). It found concrete integrity, migration,
 privacy, recovery, lifecycle, and evidence gaps. The first independent privacy
-review then found two further enforceability gaps; both are corrected without
-waiver. Phoenix remains in design correction until the privacy and original
-finding re-reviews pass.
+review then found two further enforceability gaps, and its correction re-review
+found three more; all are corrected without waiver. Phoenix remains in design
+correction until the privacy and original finding re-reviews pass.

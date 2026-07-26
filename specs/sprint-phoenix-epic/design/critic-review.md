@@ -1,6 +1,6 @@
 # Sprint Phoenix independent review record
 
-Status: initial design and privacy findings corrected; fresh re-reviews pending
+Status: initial design and two privacy review rounds failed; second privacy corrections pending re-review
 
 Date: 2026-07-26
 
@@ -88,3 +88,45 @@ Both findings are accepted without waiver. The corrected design now:
 A fresh privacy re-review receives only the privacy correction diff, this
 prior finding record, configured governance paths, and exact machine evidence.
 It checks PHX-PR-01/02, their corrections, and direct regressions.
+
+## Independent privacy correction re-review — second verdict
+
+| Field | Value |
+| --- | --- |
+| Candidate commit | `2891205e21f4f3f17e0c94b488c40a7e6fd80ca7` |
+| Candidate tree | `0ef439f5f0885ac808b9799717f971a1d257b961` |
+| Correction range | `1b7860616c16c3879fc67dd964f1dd48a4a58100..2891205e21f4f3f17e0c94b488c40a7e6fd80ca7` |
+| Assurance | `functional-equivalent-read-only; OS isolation not asserted` |
+| Reviewer mutation | none |
+| Machine trajectory | consistent |
+| Verdict | FAIL |
+
+The correction re-review accepted neither an ambiguity nor an inventory
+exception:
+
+1. **PHX-PR-03 / blocker:** bound Spec §§4.4–4.5 could still be implemented as
+   independent per-stream access/retention plus an exclusive read boundary,
+   contradicting the repository-wide Git trust-zone correction.
+2. **PHX-PR-04 / major:** H-AC-06 required every authority decision to remain
+   unchanged and gain an appended disposition, but restricted records require
+   expiry, erase, and key destruction.
+3. **PHX-PR-05 / major:** the architecture added five restricted-store files
+   outside bound Spec §7, even though that Spec requires an update before
+   dispatching any unlisted implementation file.
+
+All three findings are accepted without waiver. The second correction:
+
+- makes A-AC-12 the explicit normative interpretation of Spec §§4.4–4.5:
+  independent policy means capture and downstream projection choices within a
+  storage profile, while “sole read boundary” is semantic rather than physical;
+- scopes H-AC-06 and architecture G-4 append-only preservation to
+  `repository-public-safe` records, with restricted expiry/erase/key
+  destruction, sanitized non-correlating receipts, and fail-closed dependent
+  authority;
+- removes every out-of-inventory restricted-store file and assigns the
+  restricted profile only to the event envelope, capture policy, human
+  decision schema, event store, `governance-event` CLI, tests, and
+  documentation already listed in bound Spec §§7.3–7.4.
+
+The next privacy re-review is bounded to PHX-PR-01..05, these corrections, and
+direct regressions. No prior failed entry is reclassified as a pass.
