@@ -376,8 +376,10 @@ reservation, initialized proof, Git tree, or pending directory maps to
 `apply-failed` / `git_control_preparation_failed`, not preimage drift or the
 generic host failure. An exact retry with an existing transaction intent,
 reservation, or initialized proof repeats that file's fsync plus Git and
-pending-directory fsync before admission publication; visible exact bytes
-alone cannot skip a failed durability boundary.
+pending-directory fsync before admission publication. The pending transaction
+retry also fsyncs its parent directory before any Git preparation, so a
+visible pending path cannot skip a failed directory-entry publication
+boundary. Visible exact bytes alone cannot skip a failed durability boundary.
 
 Receipt v1 was emitted only by unpublished local 0.4.5 test candidates and
 lacks the physical Git postimage. The release candidate does not accept or

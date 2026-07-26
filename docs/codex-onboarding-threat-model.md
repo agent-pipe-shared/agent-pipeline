@@ -132,7 +132,9 @@ unchanged empty membership before and after capture, so an added child is
 preserved and reported rather than silently relocated as clean. Operational
 persistence failures remain distinct from preimage drift and generic host
 failure, and a retry repeats exact transaction-file fsync plus Git and
-pending-directory fsync before it may publish admission.
+pending-directory fsync. It also repeats the pending parent-directory fsync
+before Git preparation, so a visible but not durably published transaction
+cannot authorize a new Git control.
 Disposable-worktree rollback first renames the exact
 recorded tree into quarantine. Each recorded leaf is then atomically renamed
 to a fresh cleanup name and revalidated there before unlink/rmdir; a

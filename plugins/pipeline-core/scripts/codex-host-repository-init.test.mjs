@@ -980,6 +980,70 @@ test("retry classifies a failed intent-file fsync as Git-control preparation fai
   assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY)), false);
 });
 
+test("retry repeats pending and parent directory durability before Git preparation", () => {
+  for (const relativeTarget of [
+    CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY,
+    ".claude/.runtime/agent-pipeline/onboarding",
+  ]) {
+    const root = fixture();
+    const plan = planHostRepositoryInit({
+      rootDir: root,
+      deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+    });
+    const target = join(root, relativeTarget);
+    let targetDescriptor = null;
+    let targetSyncAttempts = 0;
+    let failed = false;
+    const deps = {
+      spawnSync(command, args, options) {
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        completeGitInit(options.cwd);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      openSync(path, flags, mode) {
+        const descriptor = openSync(path, flags, mode);
+        if (path === target) targetDescriptor = descriptor;
+        return descriptor;
+      },
+      fsyncSync(descriptor) {
+        if (descriptor === targetDescriptor) {
+          targetSyncAttempts += 1;
+          if (!failed) {
+            failed = true;
+            const error = new Error("synthetic transaction-directory fsync failure");
+            error.code = "EIO";
+            throw error;
+          }
+        }
+        return fsyncSync(descriptor);
+      },
+      closeSync(descriptor) {
+        if (descriptor === targetDescriptor) targetDescriptor = null;
+        return closeSync(descriptor);
+      },
+    };
+    const first = applyHostRepositoryInit({
+      rootDir: root,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps,
+    });
+    assert.equal(first.status, "apply-failed");
+    assert.deepEqual(first.diagnostics, [{ code: "git_control_preparation_failed" }]);
+    assert.equal(existsSync(join(root, ".git")), false);
+    const attemptsAfterFailure = targetSyncAttempts;
+    assert.equal(attemptsAfterFailure, 1);
+    const retried = applyHostRepositoryInit({
+      rootDir: root,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps,
+    });
+    assert.equal(retried.status, "restart-required");
+    assert.equal(targetSyncAttempts > attemptsAfterFailure, true);
+  }
+});
+
 test("Git-tree read failures remain operational rather than preimage drift", () => {
   const root = fixture();
   const plan = planHostRepositoryInit({

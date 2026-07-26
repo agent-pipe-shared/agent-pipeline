@@ -517,20 +517,15 @@ function prepareTransaction(root, planSha256, fs = {}) {
   const parent = join(root, ".claude/.runtime/agent-pipeline/onboarding");
   const intentBytes = Buffer.from(`${JSON.stringify(transactionIntent(root, planSha256), null, 2)}\n`, "utf8");
   const exists = fs.existsSync ?? existsSync;
+  assertPhysicalParents(root, ".claude/.runtime/agent-pipeline/onboarding", fs);
+  const parentIdentity = assertPhysicalDirectory(parent, fs);
   let pendingIdentity;
   let intentIdentity;
   if (!exists(pendingPath)) {
-    assertPhysicalParents(root, ".claude/.runtime/agent-pipeline/onboarding", fs);
-    const parentIdentity = assertPhysicalDirectory(parent, fs);
     (fs.mkdirSync ?? mkdirSync)(pendingPath, { mode: 0o700 });
     pendingIdentity = physicalIdentity((fs.lstatSync ?? lstatSync)(pendingPath), "directory");
     if (!pendingIdentity) throw new Error("host-init pending transaction identity is unavailable");
     intentIdentity = ensureExactDurableFile(join(pendingPath, "intent.json"), intentBytes, fs);
-    if (!samePhysicalIdentity(parent, parentIdentity, fs)) {
-      throw new Error("host-init pending parent changed during publication");
-    }
-    fsyncDirectory(pendingPath, fs);
-    fsyncDirectory(parent, fs);
   }
   pendingIdentity ??= assertPhysicalDirectory(pendingPath, fs);
   const intent = readBoundFileObservation(join(pendingPath, "intent.json"), fs);
@@ -543,6 +538,12 @@ function prepareTransaction(root, planSha256, fs = {}) {
     intentBytes,
     fs,
   );
+  fsyncDirectory(pendingPath, fs);
+  fsyncDirectory(parent, fs);
+  if (!samePhysicalIdentity(pendingPath, pendingIdentity, fs)
+    || !samePhysicalIdentity(parent, parentIdentity, fs)) {
+    throw drift("host-init pending transaction changed during durability replay");
+  }
   return {
     pendingPath,
     intentBytes,
