@@ -20,8 +20,6 @@ import {
   readdirSync,
   realpathSync,
   renameSync,
-  rmSync,
-  rmdirSync,
   writeFileSync,
 } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -297,9 +295,24 @@ function createPrivateDirectory(path, parent, created, fs = {}) {
   created.directories.push({ path, identity });
 }
 
-function cleanupCapturePath(path, fs = {}) {
+function cleanupCapturePath(quarantineDirectory, fs = {}) {
   const random = fs.randomBytes ?? randomBytes;
-  return join(dirname(path), `.host-init-cleanup-${random(12).toString("hex")}`);
+  return join(quarantineDirectory, `captured-${random(12).toString("hex")}`);
+}
+
+function createCleanupQuarantine(parent, fs = {}) {
+  const exists = fs.existsSync ?? existsSync;
+  const random = fs.randomBytes ?? randomBytes;
+  const parentIdentity = assertPhysicalDirectory(parent, fs);
+  const path = join(parent, `.host-init-quarantine-${random(12).toString("hex")}`);
+  if (exists(path)) throw new Error("host-init cleanup quarantine already exists");
+  (fs.mkdirSync ?? mkdirSync)(path, { mode: 0o700 });
+  const identity = physicalIdentity((fs.lstatSync ?? lstatSync)(path), "directory");
+  if (!identity || !samePhysicalIdentity(parent, parentIdentity, fs)) {
+    throw new Error("host-init cleanup quarantine identity is unavailable");
+  }
+  fsyncDirectory(parent, fs);
+  return { path, identity };
 }
 
 function restoreCleanupCapture(path, capture, captured, fs = {}) {
@@ -310,7 +323,7 @@ function restoreCleanupCapture(path, capture, captured, fs = {}) {
   }
 }
 
-function removeCreatedFile(path, expected, fs = {}, expectedBytes = null) {
+function removeCreatedFile(path, expected, fs = {}, expectedBytes = null, quarantineParent) {
   const exists = fs.existsSync ?? existsSync;
   if (!exists(path)) return;
   if (!samePhysicalIdentity(path, expected, fs)
@@ -319,7 +332,8 @@ function removeCreatedFile(path, expected, fs = {}, expectedBytes = null) {
   }
   const parent = dirname(path);
   const parentIdentity = assertPhysicalDirectory(parent, fs);
-  const capture = cleanupCapturePath(path, fs);
+  const quarantine = createCleanupQuarantine(quarantineParent, fs);
+  const capture = cleanupCapturePath(quarantine.path, fs);
   if (exists(capture)) throw new Error("host-init cleanup capture already exists");
   (fs.faultInjector ?? (() => {}))("before-host-init-cleanup-capture", {
     path,
@@ -327,22 +341,22 @@ function removeCreatedFile(path, expected, fs = {}, expectedBytes = null) {
   });
   (fs.renameSync ?? renameSync)(path, capture);
   fsyncDirectory(parent, fs);
+  fsyncDirectory(quarantine.path, fs);
   const capturedIdentity = physicalIdentity((fs.lstatSync ?? lstatSync)(capture), "file");
   try {
     if (!samePhysicalIdentity(capture, expected, fs)
       || (expectedBytes !== null && !exactFile(capture, expectedBytes, fs))
-      || !samePhysicalIdentity(parent, parentIdentity, fs)) {
+      || !samePhysicalIdentity(parent, parentIdentity, fs)
+      || !samePhysicalIdentity(quarantine.path, quarantine.identity, fs)) {
       throw new Error("created host-init file changed during cleanup capture");
     }
-    (fs.rmSync ?? rmSync)(capture, { force: true });
-    fsyncDirectory(parent, fs);
   } catch (error) {
     restoreCleanupCapture(path, capture, capturedIdentity, fs);
     throw error;
   }
 }
 
-function removeCreatedDirectory(path, expected, fs = {}) {
+function removeCreatedDirectory(path, expected, fs = {}, quarantineParent) {
   const exists = fs.existsSync ?? existsSync;
   if (!exists(path)) return;
   if (!samePhysicalIdentity(path, expected, fs)) {
@@ -350,7 +364,8 @@ function removeCreatedDirectory(path, expected, fs = {}) {
   }
   const parent = dirname(path);
   const parentIdentity = assertPhysicalDirectory(parent, fs);
-  const capture = cleanupCapturePath(path, fs);
+  const quarantine = createCleanupQuarantine(quarantineParent, fs);
+  const capture = cleanupCapturePath(quarantine.path, fs);
   if (exists(capture)) throw new Error("host-init cleanup capture already exists");
   (fs.faultInjector ?? (() => {}))("before-host-init-cleanup-capture", {
     path,
@@ -358,14 +373,14 @@ function removeCreatedDirectory(path, expected, fs = {}) {
   });
   (fs.renameSync ?? renameSync)(path, capture);
   fsyncDirectory(parent, fs);
+  fsyncDirectory(quarantine.path, fs);
   const capturedIdentity = physicalIdentity((fs.lstatSync ?? lstatSync)(capture), "directory");
   try {
     if (!samePhysicalIdentity(capture, expected, fs)
-      || !samePhysicalIdentity(parent, parentIdentity, fs)) {
+      || !samePhysicalIdentity(parent, parentIdentity, fs)
+      || !samePhysicalIdentity(quarantine.path, quarantine.identity, fs)) {
       throw new Error("created host-init directory changed during cleanup capture");
     }
-    (fs.rmdirSync ?? rmdirSync)(capture);
-    fsyncDirectory(parent, fs);
   } catch (error) {
     restoreCleanupCapture(path, capture, capturedIdentity, fs);
     throw error;
@@ -450,11 +465,35 @@ function writeDurableExclusive(path, bytes, fs = {}) {
 
 function ensureExactDurableFile(path, bytes, fs = {}) {
   if ((fs.existsSync ?? existsSync)(path)) {
-    const observed = readBoundFileObservation(path, fs);
-    if (!observed || observed.bytes.compare(bytes) !== 0) {
-      throw drift("host-init transaction file drifted");
+    const open = fs.openSync ?? openSync;
+    const fstat = fs.fstatSync ?? fstatSync;
+    const read = fs.readFileSync ?? readFileSync;
+    const sync = fs.fsyncSync ?? fsyncSync;
+    const close = fs.closeSync ?? closeSync;
+    const fsConstants = fs.constants ?? constants;
+    const parent = dirname(path);
+    const parentIdentity = assertPhysicalDirectory(parent, fs);
+    const before = physicalIdentity((fs.lstatSync ?? lstatSync)(path), "file");
+    let descriptor;
+    try {
+      if (!before) throw drift("host-init transaction file drifted");
+      descriptor = open(path, fsConstants.O_RDWR | (fsConstants.O_NOFOLLOW ?? 0));
+      const opened = physicalIdentity(fstat(descriptor), "file");
+      if (!opened || opened.dev !== before.dev || opened.ino !== before.ino
+        || read(descriptor).compare(bytes) !== 0) {
+        throw drift("host-init transaction file drifted");
+      }
+      sync(descriptor);
+      const after = physicalIdentity(fstat(descriptor), "file");
+      if (!after || after.dev !== opened.dev || after.ino !== opened.ino
+        || !samePhysicalIdentity(path, opened, fs)
+        || !samePhysicalIdentity(parent, parentIdentity, fs)) {
+        throw drift("host-init transaction file changed during durability replay");
+      }
+      return opened;
+    } finally {
+      if (descriptor !== undefined) close(descriptor);
     }
-    return observed.identity;
   }
   const identity = writeDurableExclusive(path, bytes, fs);
   if (!samePhysicalIdentity(path, identity, fs) || !exactFile(path, bytes, fs)) {
@@ -497,7 +536,11 @@ function prepareTransaction(root, planSha256, fs = {}) {
     || !samePhysicalIdentity(pendingPath, pendingIdentity, fs)) {
     throw drift("host-init pending transaction does not match the reviewed plan");
   }
-  intentIdentity ??= intent.identity;
+  intentIdentity = ensureExactDurableFile(
+    join(pendingPath, "intent.json"),
+    intentBytes,
+    fs,
+  );
   return {
     pendingPath,
     intentBytes,
@@ -599,8 +642,12 @@ function prepareGitControl(root, planSha256, currentGitVersion, pendingPath, spa
       || observed.value.inode !== gitIdentity.ino) {
       throw drift("existing Git control path is not the reserved transaction path");
     }
-    reservationIdentity = observed.identity;
     reservationBytes = observed.bytes;
+    reservationIdentity = ensureExactDurableFile(
+      reservationPath,
+      reservationBytes,
+      fs,
+    );
   }
 
   const initialized = exists(initializedPath)
@@ -619,6 +666,11 @@ function prepareGitControl(root, planSha256, currentGitVersion, pendingPath, spa
       || initialized.value.gitTreeSha256 !== sha256(Buffer.from(JSON.stringify(logicalTree), "utf8"))) {
       throw drift("initialized Git control proof drifted");
     }
+    const initializedIdentity = ensureExactDurableFile(
+      initializedPath,
+      initialized.bytes,
+      fs,
+    );
     (fs.faultInjector ?? (() => {}))("before-git-control-fsync");
     fsyncDirectory(gitPath, fs);
     fsyncDirectory(pendingPath, fs);
@@ -634,7 +686,7 @@ function prepareGitControl(root, planSha256, currentGitVersion, pendingPath, spa
         },
         initialized: {
           path: initializedPath,
-          identity: initialized.identity,
+          identity: initializedIdentity,
           bytes: initialized.bytes,
         },
         template: {
@@ -734,8 +786,11 @@ function bindPrivateContinuity(root, {
   ensurePrivateDirectory(agentPipeline, git, created, fs);
   ensurePrivateDirectory(directory, agentPipeline, created, fs);
   assertPhysicalParents(root, ".git/agent-pipeline/onboarding", fs);
-  created.history = ensureExactDurableFile(target, historyBytes, fs);
-  if (!created.history) throw new Error("created continuity identity is unavailable");
+  created.history = {
+    identity: ensureExactDurableFile(target, historyBytes, fs),
+    bytes: historyBytes,
+  };
+  if (!created.history.identity) throw new Error("created continuity identity is unavailable");
   fsyncDirectory(directory, fs);
   const receipt = {
     schema: "pipeline.codex-host-repository-init-receipt.v2",
@@ -759,9 +814,15 @@ function bindPrivateContinuity(root, {
   }
   const admissionIdentity = assertPhysicalDirectory(admissionPath, fs);
   const admissionParentIdentity = assertPhysicalDirectory(admissionParent, fs);
-  created.intent = ensureExactDurableFile(intentPath, intentBytes, fs);
-  created.receipt = ensureExactDurableFile(receiptPath, receiptBytes, fs);
-  if (!created.receipt) throw new Error("created receipt identity is unavailable");
+  created.intent = {
+    identity: ensureExactDurableFile(intentPath, intentBytes, fs),
+    bytes: intentBytes,
+  };
+  created.receipt = {
+    identity: ensureExactDurableFile(receiptPath, receiptBytes, fs),
+    bytes: receiptBytes,
+  };
+  if (!created.receipt.identity) throw new Error("created receipt identity is unavailable");
   const marker = {
     schema: "pipeline.codex-host-repository-init-marker.v1",
     rootSha256: receipt.rootSha256,
@@ -771,8 +832,11 @@ function bindPrivateContinuity(root, {
   };
   const markerBytes = Buffer.from(`${JSON.stringify(marker, null, 2)}\n`, "utf8");
   (fs.faultInjector ?? (() => {}))("before-host-init-marker-publication");
-  created.marker = ensureExactDurableFile(markerPath, markerBytes, fs);
-  if (!created.marker) throw new Error("created host-init marker identity is unavailable");
+  created.marker = {
+    identity: ensureExactDurableFile(markerPath, markerBytes, fs),
+    bytes: markerBytes,
+  };
+  if (!created.marker.identity) throw new Error("created host-init marker identity is unavailable");
   fsyncDirectory(admissionPath, fs);
   if (sha256(Buffer.from(JSON.stringify(initialGitTree(git, fs)), "utf8")) !== gitTreeSha256) {
     throw new Error("Git control tree changed before admission publication");
@@ -785,7 +849,7 @@ function bindPrivateContinuity(root, {
   }
   (fs.faultInjector ?? (() => {}))("before-host-init-admission-rename");
   (fs.renameSync ?? renameSync)(admissionPath, finalAdmissionPath);
-  created.admission = physicalIdentity((fs.lstatSync ?? lstatSync)(finalAdmissionPath), "directory");
+  created.admission = admissionIdentity;
   if (!samePhysicalIdentity(finalAdmissionPath, admissionIdentity, fs)) {
     throw new Error("host-init admission identity changed during publication");
   }
@@ -932,6 +996,7 @@ export function applyHostRepositoryInit({
       marker: null,
       directories: [],
     };
+    const cleanupQuarantineParent = join(root, ".claude/.runtime/agent-pipeline");
     try {
       bindPrivateContinuity(root, {
         planSha256,
@@ -943,13 +1008,47 @@ export function applyHostRepositoryInit({
       }, deps, created);
     } catch {
       try {
-        removeCreatedFile(join(root, CODEX_HOST_REPOSITORY_INIT_MARKER), created.marker, deps);
-        removeCreatedFile(join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT), created.receipt, deps);
-        removeCreatedFile(join(root, CODEX_HOST_REPOSITORY_INIT_INTENT), created.intent, deps);
-        removeCreatedDirectory(join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY), created.admission, deps);
-        removeCreatedFile(join(root, ".git/agent-pipeline/onboarding/continuity-history.json"), created.history, deps);
+        removeCreatedFile(
+          join(root, CODEX_HOST_REPOSITORY_INIT_MARKER),
+          created.marker?.identity,
+          deps,
+          created.marker?.bytes ?? null,
+          cleanupQuarantineParent,
+        );
+        removeCreatedFile(
+          join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT),
+          created.receipt?.identity,
+          deps,
+          created.receipt?.bytes ?? null,
+          cleanupQuarantineParent,
+        );
+        removeCreatedFile(
+          join(root, CODEX_HOST_REPOSITORY_INIT_INTENT),
+          created.intent?.identity,
+          deps,
+          created.intent?.bytes ?? null,
+          cleanupQuarantineParent,
+        );
+        removeCreatedDirectory(
+          join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY),
+          created.admission,
+          deps,
+          cleanupQuarantineParent,
+        );
+        removeCreatedFile(
+          join(root, ".git/agent-pipeline/onboarding/continuity-history.json"),
+          created.history?.identity,
+          deps,
+          created.history?.bytes ?? null,
+          cleanupQuarantineParent,
+        );
         for (const entry of [...created.directories].reverse()) {
-          removeCreatedDirectory(entry.path, entry.identity, deps);
+          removeCreatedDirectory(
+            entry.path,
+            entry.identity,
+            deps,
+            cleanupQuarantineParent,
+          );
         }
         if (!samePhysicalIdentity(join(root, ".git"), gitIdentity, deps)
           || JSON.stringify(physicalTreeSnapshot(join(root, ".git"), deps))
@@ -969,28 +1068,33 @@ export function applyHostRepositoryInit({
         transaction.cleanup.intent.identity,
         deps,
         transaction.cleanup.intent.bytes,
+        cleanupQuarantineParent,
       );
       removeCreatedFile(
         gitCleanup.initialized.path,
         gitCleanup.initialized.identity,
         deps,
         gitCleanup.initialized.bytes,
+        cleanupQuarantineParent,
       );
       removeCreatedFile(
         gitCleanup.reservation.path,
         gitCleanup.reservation.identity,
         deps,
         gitCleanup.reservation.bytes,
+        cleanupQuarantineParent,
       );
       removeCreatedDirectory(
         gitCleanup.template.path,
         gitCleanup.template.identity,
         deps,
+        cleanupQuarantineParent,
       );
       removeCreatedDirectory(
         transaction.cleanup.pending.path,
         transaction.cleanup.pending.identity,
         deps,
+        cleanupQuarantineParent,
       );
       fsyncDirectory(join(root, ".claude/.runtime/agent-pipeline/onboarding"), deps);
     } catch {

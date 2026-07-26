@@ -9,7 +9,7 @@
 > reliable project work. Approval authorizes implementation dispatch only; it
 > does not authorize push, merge, tag, publication, Issue closure, or release.
 
-<!-- technical-spec-sha256: 77242eac1c27a116dff97ea9bbd2014e142b04c66795897456d33d1accc38d54 -->
+<!-- technical-spec-sha256: 7cdd23eaa43242ac078eaa8fc5aa93993d162fab29fbac362ad1acc636e3aa77 -->
 
 The technical approval binds the exact neighboring [spec.md](spec.md). Any
 change to that file after approval invalidates the implementation gate until
@@ -251,9 +251,12 @@ declared by 0.4.5; it does not permit a fabricated hook capability.
       process interruption.
 - [ ] Completed host-init replay revalidates the admitted Git identity and
       core-tree; descriptor-bound tree observation and identity-bound pending
-      cleanup atomically capture and preserve raced replacements, while an
-      exact retry repeats failed durability work and persistence failure
-      remains distinguishable from preimage drift.
+      cleanup atomically capture and preserve raced replacements. Validated
+      writer-owned cleanup captures leave the active namespace and remain in
+      private non-authoritative quarantine because Node exposes no
+      identity-bound unlink. An exact retry repeats failed file and directory
+      durability work, and persistence failure remains distinguishable from
+      preimage drift.
 - [ ] The physical Git postimage is carried only by the closed v2 receipt;
       unpublished unbound v1 test receipts are terminal invalid, and released
       0.4.4 compatibility is unaffected because it issued no such receipt.

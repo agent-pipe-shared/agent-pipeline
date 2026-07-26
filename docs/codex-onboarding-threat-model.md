@@ -124,9 +124,13 @@ and digest still match identities captured at creation or validation, never
 identities sampled immediately before deletion. Foreign or identity-drifted
 pending paths are preserved and reported as `pending_cleanup_retained`.
 Cleanup first atomically renames each recorded object to a fresh quarantine
-name and revalidates its recorded identity and bytes there before deletion.
-Operational persistence failures remain distinct from preimage drift, and a
-retry repeats Git and pending-directory fsync before it may publish admission.
+name outside the active transaction namespace and revalidates its recorded
+identity and bytes there. Validated captures are retained in that private,
+non-authoritative quarantine instead of being passed to a final pathname
+unlink that cannot be inode-bound by Node. Operational persistence failures
+remain distinct from preimage drift, and a retry repeats exact
+transaction-file fsync plus Git and pending-directory fsync before it may
+publish admission.
 Disposable-worktree rollback first renames the exact
 recorded tree into quarantine. Each recorded leaf is then atomically renamed
 to a fresh cleanup name and revalidated there before unlink/rmdir; a
@@ -152,6 +156,7 @@ unbound postimage. Released 0.4.4 issued no host-init receipt.
 | Raw launch tokens necessarily exist in one fresh child environment until consumed or expired. Process inspection by the same fully compromised OS account is outside the protection offered here. | `pipeline-core` security maintainers | 2026-10-31 |
 | Directory durability has platform-specific limits already represented by the private-state assurance layer; unsupported assurance never becomes a strong success claim. | `pipeline-core` runtime maintainers | 2026-10-31 |
 | The Bash exemption recognizes only exact plugin-local remediation command shapes. Novel legitimate recovery commands remain blocked and require a reviewed lifecycle change or manual PO execution rather than a broad shell bypass. | `pipeline-core` guardrail maintainers | 2026-10-31 |
+| One fresh host initialization retains five small writer-owned transaction captures below private `.claude/.runtime/agent-pipeline/.host-init-quarantine-*` directories. They are non-authoritative and avoid an ungrounded inode-safe deletion claim; bounded garbage collection requires a future native identity-bound host primitive. | `pipeline-core` runtime maintainers | 2026-10-31 |
 
 These residuals add no credential store, network trust, or third-party
 dependency. Any future widening of the token carrier, accepted executable

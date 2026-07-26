@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import {
-  chmodSync, existsSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync,
+  chmodSync, closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -243,9 +243,9 @@ test("an interrupted admission publication resumes from the exact pending intent
         if (point === "before-host-init-admission-rename") {
           throw new Error("synthetic process interruption");
         }
-      },
-      rmSync() {
-        throw new Error("simulate process loss before rollback");
+        if (point === "before-host-init-cleanup-capture") {
+          throw new Error("simulate process loss before rollback");
+        }
       },
     },
   });
@@ -349,9 +349,9 @@ test("a replaced Git directory cannot borrow an interrupted transaction", () => 
       },
       faultInjector(point) {
         if (point === "before-host-init-admission-rename") throw new Error("synthetic interruption");
-      },
-      rmSync() {
-        throw new Error("simulate process loss before rollback");
+        if (point === "before-host-init-cleanup-capture") {
+          throw new Error("simulate process loss before rollback");
+        }
       },
     },
   });
@@ -603,6 +603,110 @@ test("successful cleanup preserves a pending directory replaced after validation
   assert.equal(existsSync(originalTemplate), true);
 });
 
+test("successful cleanup retires captures without a final pathname unlink", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        completeGitInit(options.cwd);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      rmSync() {
+        assert.fail("captured paths must not be removed by pathname");
+      },
+      rmdirSync() {
+        assert.fail("captured directories must not be removed by pathname");
+      },
+    },
+  });
+  assert.equal(result.status, "restart-required");
+  assert.deepEqual(result.diagnostics, []);
+  assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY)), false);
+  const quarantineParent = join(root, ".claude/.runtime/agent-pipeline");
+  const quarantines = readdirSync(quarantineParent)
+    .filter((name) => name.startsWith(".host-init-quarantine-"));
+  assert.equal(quarantines.length, 5);
+  for (const quarantine of quarantines) {
+    assert.equal(readdirSync(join(quarantineParent, quarantine)).length, 1);
+  }
+});
+
+test("rollback preserves in-place byte replacements in published admission files", () => {
+  for (const name of ["marker.json", "receipt.json", "intent.json"]) {
+    const root = fixture();
+    const plan = planHostRepositoryInit({
+      rootDir: root,
+      deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+    });
+    const foreignBytes = `foreign-${name}\n`;
+    const pendingFile = join(
+      root,
+      CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY,
+      "admission",
+      name,
+    );
+    const result = applyHostRepositoryInit({
+      rootDir: root,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        spawnSync(command, args, options) {
+          if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+          completeGitInit(options.cwd);
+          return { status: 0, stdout: "", stderr: "" };
+        },
+        faultInjector(point) {
+          if (point === "before-host-init-admission-rename") {
+            writeFileSync(pendingFile, foreignBytes);
+          }
+        },
+      },
+    });
+    assert.equal(result.status, "rollback-failed");
+    assert.equal(
+      readFileSync(join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY, name), "utf8"),
+      foreignBytes,
+    );
+  }
+});
+
+test("rollback preserves an in-place byte replacement of migrated continuity", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const history = join(root, ".git/agent-pipeline/onboarding/continuity-history.json");
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        completeGitInit(options.cwd);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      faultInjector(point) {
+        if (point === "before-host-init-marker-publication") {
+          writeFileSync(history, "foreign-history\n");
+          throw new Error("synthetic binding failure");
+        }
+      },
+    },
+  });
+  assert.equal(result.status, "rollback-failed");
+  assert.equal(readFileSync(history, "utf8"), "foreign-history\n");
+});
+
 test("initialized-tree read rejects a leaf replaced between lstat and descriptor open", () => {
   const root = fixture();
   const plan = planHostRepositoryInit({
@@ -714,6 +818,67 @@ test("Git-control persistence failures keep their operational classification", (
   });
   assert.equal(retried.status, "restart-required");
   assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY)), true);
+});
+
+test("retry repeats a failed initialized-proof file fsync before admission", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const initializedPath = join(
+    root,
+    CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY,
+    "git-initialized.json",
+  );
+  let initializedDescriptor = null;
+  let initializedSyncAttempts = 0;
+  let failed = false;
+  const deps = {
+    spawnSync(command, args, options) {
+      if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+      completeGitInit(options.cwd);
+      return { status: 0, stdout: "", stderr: "" };
+    },
+    openSync(path, flags, mode) {
+      const descriptor = openSync(path, flags, mode);
+      if (path === initializedPath) initializedDescriptor = descriptor;
+      return descriptor;
+    },
+    fsyncSync(descriptor) {
+      if (descriptor === initializedDescriptor) {
+        initializedSyncAttempts += 1;
+        if (!failed) {
+          failed = true;
+          const error = new Error("synthetic initialized-proof fsync failure");
+          error.code = "EIO";
+          throw error;
+        }
+      }
+      return fsyncSync(descriptor);
+    },
+    closeSync(descriptor) {
+      if (descriptor === initializedDescriptor) initializedDescriptor = null;
+      return closeSync(descriptor);
+    },
+  };
+  const first = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps,
+  });
+  assert.equal(first.status, "apply-failed");
+  assert.deepEqual(first.diagnostics, [{ code: "git_control_preparation_failed" }]);
+  assert.equal(existsSync(initializedPath), true);
+  const retried = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps,
+  });
+  assert.equal(retried.status, "restart-required");
+  assert.equal(initializedSyncAttempts, 2);
 });
 
 test("Git-tree read failures remain operational rather than preimage drift", () => {

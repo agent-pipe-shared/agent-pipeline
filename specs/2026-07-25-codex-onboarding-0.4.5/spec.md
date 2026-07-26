@@ -365,12 +365,16 @@ own. Core-tree leaves use descriptor-bound no-follow reads plus after-read leaf
 and parent identity checks; directory traversal repeats physical identity and
 membership checks. Cleanup uses the identities and exact bytes captured when
 each pending artifact was created or validated, atomically renames the object
-to a fresh quarantine name, revalidates it there before deletion, preserves
-any replacement, and reports `pending_cleanup_retained`. Storage/fsync failure
-maps to `apply-failed` / `git_control_preparation_failed`, not preimage drift.
-An exact retry with an existing initialized proof repeats Git and pending
-directory fsync before admission publication; the proof alone cannot skip a
-failed durability boundary.
+out of the active namespace into a fresh private quarantine, and revalidates
+it there. The validated capture is retained rather than passed to a final
+pathname-based unlink, because Node exposes no primitive that binds unlink to
+the revalidated inode; any replacement is preserved, and drift reports
+`pending_cleanup_retained`. Storage/fsync failure maps to `apply-failed` /
+`git_control_preparation_failed`, not preimage drift. An exact retry with an
+existing transaction intent, reservation, or initialized proof repeats that
+file's fsync plus Git and pending-directory fsync before admission
+publication; visible exact bytes alone cannot skip a failed durability
+boundary.
 
 Receipt v1 was emitted only by unpublished local 0.4.5 test candidates and
 lacks the physical Git postimage. The release candidate does not accept or
