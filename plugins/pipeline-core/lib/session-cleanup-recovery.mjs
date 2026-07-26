@@ -5,12 +5,14 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  bindOnboardingSessionCleanup,
   readOnboardingSessionCleanupBinding,
   releaseOnboardingSessionCleanup,
 } from "./onboarding-continuity.mjs";
 import {
   inspectSessionClosure,
   listActiveSessionDescriptors,
+  loadSessionDescriptor,
 } from "./worktree-lifecycle.mjs";
 
 export const SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA = "pipeline.session-cleanup-recovery-plan.v1";
@@ -57,14 +59,46 @@ function recoveryBinding(plan) {
     sessionCleanup: plan.sessionCleanup,
     closure: plan.closure,
     activeDescriptorCount: plan.activeDescriptorCount,
+    recovery: plan.recovery,
+  };
+}
+
+function readyRecoveryPlan(partial, scriptPath) {
+  const planSha256 = digest(recoveryBinding(partial));
+  const status = partial.recovery === "bind-orphan" ? "rebound" : "recovered";
+  const applyAction = {
+    kind: "command",
+    executable: "node",
+    argv: [
+      scriptPath,
+      "apply-recovery",
+      "--repo",
+      partial.root,
+      "--plan-sha256",
+      planSha256,
+      "--activate",
+    ],
+    mutation: true,
+    requiresConfirmation: true,
+    expected: {
+      schema: SESSION_CLEANUP_RECOVERY_APPLY_SCHEMA,
+      statuses: [status],
+    },
+  };
+  const plan = { ...partial, applyAction };
+  return {
+    ...plan,
+    status: "ready",
+    planSha256: digest(recoveryBinding(plan)),
   };
 }
 
 /**
- * Plan only the ambiguous crash residue: the State handle remains, while both
- * its private descriptor and a completed closure receipt are absent. Active
- * descriptors must go through ordinary cleanup and closed descriptors through
- * release-binding; neither is eligible for a PO override.
+ * Plan only the two crash residues that can be reconciled without replacing or
+ * deleting a descriptor: a single validated unbound active descriptor can be
+ * rebound through explicit PO confirmation, while a bound handle whose private
+ * descriptor and closure receipt are both absent can be released. Active bound
+ * descriptors still require ordinary cleanup and closed ones release-binding.
  */
 export function planSessionCleanupRecovery({
   rootDir,
@@ -77,11 +111,35 @@ export function planSessionCleanupRecovery({
   const listDescriptors = deps.listActiveSessionDescriptorsFn
     ?? listActiveSessionDescriptors;
   const binding = readBinding({ rootDir });
-  if (binding.status !== "bound") {
-    return {
+  if (binding.status === "unbound") {
+    const activeDescriptors = listDescriptors(binding.root);
+    if (activeDescriptors.length === 0) {
+      return {
+        schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+        status: "not-needed",
+      };
+    }
+    if (activeDescriptors.length !== 1) {
+      return {
+        schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+        status: "orphan-recovery-unavailable",
+        activeDescriptorCount: activeDescriptors.length,
+      };
+    }
+    return readyRecoveryPlan({
       schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
-      status: "not-needed",
-    };
+      root: binding.root,
+      stateSha256: binding.stateSha256,
+      revision: binding.revision,
+      sessionCleanup: activeDescriptors[0],
+      closure: "active",
+      activeDescriptorCount: 1,
+      recovery: "bind-orphan",
+      applyAction: null,
+    }, scriptPath);
+  }
+  if (binding.status !== "bound") {
+    fail("WT-SESSION-RECOVERY-BINDING", "cleanup recovery binding status is invalid");
   }
   const closure = inspectClosure(binding.root, binding.sessionCleanup.sessionId, {
     expectedDescriptorSha256: binding.sessionCleanup.descriptorSha256,
@@ -120,34 +178,10 @@ export function planSessionCleanupRecovery({
     sessionCleanup: binding.sessionCleanup,
     closure: "unknown",
     activeDescriptorCount: 0,
+    recovery: "release-lost-binding",
     applyAction: null,
   };
-  const planSha256 = digest(recoveryBinding(partial));
-  const applyAction = {
-    kind: "command",
-    executable: "node",
-    argv: [
-      scriptPath,
-      "apply-recovery",
-      "--repo",
-      binding.root,
-      "--plan-sha256",
-      planSha256,
-      "--activate",
-    ],
-    mutation: true,
-    requiresConfirmation: true,
-    expected: {
-      schema: SESSION_CLEANUP_RECOVERY_APPLY_SCHEMA,
-      statuses: ["recovered"],
-    },
-  };
-  const plan = { ...partial, applyAction };
-  return {
-    ...plan,
-    status: "ready",
-    planSha256: digest(recoveryBinding(plan)),
-  };
+  return readyRecoveryPlan(partial, scriptPath);
 }
 
 export function applySessionCleanupRecovery({
@@ -166,6 +200,38 @@ export function applySessionCleanupRecovery({
     || plan.planSha256 !== expectedPlanSha256
     || digest(recoveryBinding(plan)) !== expectedPlanSha256) {
     fail("WT-SESSION-RECOVERY-PLAN", "cleanup recovery plan digest does not match");
+  }
+  if (plan.recovery === "bind-orphan") {
+    const loadDescriptor = deps.loadSessionDescriptorFn ?? loadSessionDescriptor;
+    const bind = deps.bindOnboardingSessionCleanupFn ?? bindOnboardingSessionCleanup;
+    const descriptor = loadDescriptor(plan.root, plan.sessionCleanup.sessionId, {
+      expectedDescriptorSha256: plan.sessionCleanup.descriptorSha256,
+    });
+    const result = bind({
+      rootDir: plan.root,
+      expectedStateSha256: plan.stateSha256,
+      expectedRevision: plan.revision,
+      sessionCleanup: {
+        sessionId: descriptor.sessionId,
+        descriptorSha256: descriptor.descriptorSha256,
+      },
+    });
+    if (!new Set(["bound", "reused"]).has(result.status)
+      || result.sessionCleanup.sessionId !== plan.sessionCleanup.sessionId
+      || result.sessionCleanup.descriptorSha256 !== plan.sessionCleanup.descriptorSha256) {
+      fail("WT-SESSION-RECOVERY-READBACK", "cleanup recovery did not bind the exact active descriptor");
+    }
+    return {
+      schema: SESSION_CLEANUP_RECOVERY_APPLY_SCHEMA,
+      status: "rebound",
+      root: plan.root,
+      planSha256: plan.planSha256,
+      stateSha256: result.stateSha256,
+      revision: result.revision,
+    };
+  }
+  if (plan.recovery !== "release-lost-binding") {
+    fail("WT-SESSION-RECOVERY-PLAN", "cleanup recovery plan mode is invalid");
   }
   const release = deps.releaseOnboardingSessionCleanupFn
     ?? releaseOnboardingSessionCleanup;

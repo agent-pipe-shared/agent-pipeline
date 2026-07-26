@@ -41,7 +41,10 @@ export const WORKTREE_RECORD_SCHEMA = "pipeline.worktree-lifecycle.v1";
 export const CLEANUP_MANIFEST_SCHEMA = "pipeline.session-cleanup-manifest.v1";
 export const CLEANUP_RECEIPT_SCHEMA = "pipeline.session-cleanup-receipt.v1";
 export const HYGIENE_RECEIPT_SCHEMA = "pipeline.worktree-hygiene-receipt.v1";
-export const SESSION_DESCRIPTOR_SCHEMA = "pipeline.session-descriptor.v1";
+export const SESSION_DESCRIPTOR_SCHEMA = "pipeline.session-descriptor.v2";
+export const LEGACY_SESSION_DESCRIPTOR_SCHEMA = "pipeline.session-descriptor.v1";
+export const SESSION_OWNER_RUNTIME_SCHEMA = "pipeline.session-owner-runtime.v1";
+export const SESSION_OWNER_STATUS_SCHEMA = "pipeline.session-owner-status.v1";
 
 const SAFE_COMPONENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/;
@@ -492,6 +495,33 @@ function ownerDigest(ownerNonce) {
   return rawSha256(Buffer.from(ownerNonce));
 }
 
+function localProcessStartIdentity(pid) {
+  if (!Number.isSafeInteger(pid) || pid < 1 || process.platform !== "linux") return null;
+  try {
+    const fields = readFileSync(`/proc/${pid}/stat`, "utf8").trim().split(" ");
+    return /^\d+$/u.test(fields[21] ?? "") ? fields[21] : null;
+  } catch {
+    return null;
+  }
+}
+
+function localProcessOwnerRuntime(pid = process.pid) {
+  const processStartId = localProcessStartIdentity(pid);
+  return processStartId === null ? null : {
+    schema: SESSION_OWNER_RUNTIME_SCHEMA,
+    pid,
+    processStartId,
+  };
+}
+
+function validOwnerRuntime(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && Object.keys(value).length === 3
+    && value.schema === SESSION_OWNER_RUNTIME_SCHEMA
+    && Number.isSafeInteger(value.pid) && value.pid > 0
+    && typeof value.processStartId === "string" && /^\d+$/u.test(value.processStartId);
+}
+
 function sessionDescriptorPath(repo, sessionId) {
   ensureSafeId(sessionId, "session ID");
   return join(localRoot(repo.commonDir), "session-descriptors", "active", `${sessionId}.json`);
@@ -511,15 +541,18 @@ function assertPrivateRegularFile(path, code, label) {
 }
 
 function validSessionDescriptor(value, repo, sessionId) {
-  return value !== null && typeof value === "object" && !Array.isArray(value)
-    && Object.keys(value).length === 7
-    && value.schema === SESSION_DESCRIPTOR_SCHEMA
+  const common = value !== null && typeof value === "object" && !Array.isArray(value)
     && value.sessionId === sessionId
     && value.primaryRoot === repo.primaryRoot
     && value.commonDir === repo.commonDir
     && typeof value.createdAt === "string"
     && typeof value.ownerNonce === "string"
     && value.ownerNonceSha256 === ownerDigest(value.ownerNonce);
+  if (!common) return false;
+  if (value.schema === LEGACY_SESSION_DESCRIPTOR_SCHEMA) return Object.keys(value).length === 7;
+  return value.schema === SESSION_DESCRIPTOR_SCHEMA
+    && Object.keys(value).length === 8
+    && (value.ownerRuntime === null || validOwnerRuntime(value.ownerRuntime));
 }
 
 /** Create the local, non-committed capability used by all session cleanup calls. */
@@ -538,6 +571,7 @@ export function startSessionDescriptor(startPath, options = {}) {
     createdAt: nowIso(options.now),
     ownerNonce,
     ownerNonceSha256: ownerDigest(ownerNonce),
+    ownerRuntime: localProcessOwnerRuntime(options.ownerPid ?? process.pid),
   };
   writeAtomic(path, canonicalJson(descriptor));
   return {
@@ -572,6 +606,38 @@ export function loadSessionDescriptor(startPath, sessionId, options = {}) {
     sessionId,
     ownerNonce: descriptor.ownerNonce,
     descriptorSha256,
+    descriptorSchema: descriptor.schema,
+    ownerRuntime: descriptor.schema === SESSION_DESCRIPTOR_SCHEMA ? structuredClone(descriptor.ownerRuntime) : null,
+  };
+}
+
+/**
+ * Read the local liveness evidence of one descriptor without exposing its
+ * nonce, process coordinates, or any runner conversation data. Legacy v1
+ * descriptors deliberately remain unobserved rather than being guessed stale.
+ */
+export function inspectSessionOwnerRuntime(startPath, sessionId, options = {}) {
+  const loaded = loadSessionDescriptor(startPath, sessionId, options);
+  const base = {
+    schema: SESSION_OWNER_STATUS_SCHEMA,
+    sessionId: loaded.sessionId,
+    descriptorSha256: loaded.descriptorSha256,
+  };
+  if (loaded.descriptorSchema === LEGACY_SESSION_DESCRIPTOR_SCHEMA) {
+    return { ...base, status: "unobserved" };
+  }
+  if (loaded.ownerRuntime === null) return { ...base, status: "unavailable" };
+  let alive = true;
+  try { process.kill(loaded.ownerRuntime.pid, 0); } catch (error) {
+    if (error?.code === "ESRCH") alive = false;
+    else return { ...base, status: "unavailable" };
+  }
+  if (!alive) return { ...base, status: "not-live" };
+  const observedStartId = localProcessStartIdentity(loaded.ownerRuntime.pid);
+  if (observedStartId === null) return { ...base, status: "unavailable" };
+  return {
+    ...base,
+    status: observedStartId === loaded.ownerRuntime.processStartId ? "live" : "reused",
   };
 }
 

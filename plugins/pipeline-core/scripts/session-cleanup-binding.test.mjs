@@ -18,6 +18,7 @@ import {
   listActiveSessionDescriptors,
   loadSessionDescriptor,
   retireSessionDescriptor,
+  startSessionDescriptor,
 } from "../lib/worktree-lifecycle.mjs";
 import { main as sessionCleanupMain } from "./session-cleanup.mjs";
 
@@ -156,6 +157,121 @@ test("an unbound private descriptor blocks creation of a second descriptor", () 
       () => invoke(["start", "--repo", root, "--session", "session-binding-second"]),
       (candidate) => candidate?.code === "WT-SESSION-UNBOUND-DESCRIPTOR",
     );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an unbound continuity state without descriptors needs no recovery", () => {
+  const root = fixture("no-orphan-recovery");
+  try {
+    assert.deepEqual(invoke(["plan-recovery", "--repo", root]).output, {
+      schema: "pipeline.session-cleanup-recovery-plan.v1",
+      status: "not-needed",
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("status lists sanitized descriptor owner observations in sorted order", () => {
+  const root = fixture("owner-status");
+  try {
+    const second = startSessionDescriptor(root, { sessionId: "session-owner-status-z" });
+    const first = startSessionDescriptor(root, { sessionId: "session-owner-status-a" });
+    const status = invoke(["status", "--repo", root]).output;
+    assert.deepEqual(status.schema, "pipeline.session-cleanup-status.v1");
+    assert.equal(status.status, "observed");
+    assert.deepEqual(status.descriptors.map(({ sessionId }) => sessionId), [first.sessionId, second.sessionId]);
+    assert.deepEqual(status.descriptors.map(({ descriptorSha256 }) => descriptorSha256), [
+      first.descriptorSha256,
+      second.descriptorSha256,
+    ]);
+    assert.equal(status.descriptors.every(({ status: ownerStatus }) => new Set([
+      "live", "not-live", "reused", "unavailable", "unobserved",
+    ]).has(ownerStatus)), true);
+    const serialized = JSON.stringify(status);
+    assert.equal(serialized.includes(first.ownerNonce), false);
+    assert.equal(serialized.includes(second.ownerNonce), false);
+    assert.equal(serialized.includes("processStartId"), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a single unbound descriptor requires an activated digest-bound rebind", () => {
+  const root = fixture("orphan-rebind");
+  try {
+    const orphan = startSessionDescriptor(root, { sessionId: "session-binding-orphan-rebind" });
+    const plan = invoke(["plan-recovery", "--repo", root]).output;
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.recovery, "bind-orphan");
+    assert.equal(plan.closure, "active");
+    assert.equal(plan.activeDescriptorCount, 1);
+    assert.deepEqual(plan.sessionCleanup, {
+      sessionId: orphan.sessionId,
+      descriptorSha256: orphan.descriptorSha256,
+    });
+    assert.equal(plan.applyAction.requiresConfirmation, true);
+    assert.deepEqual(plan.applyAction.expected.statuses, ["rebound"]);
+    assert.throws(
+      () => invoke([
+        "apply-recovery", "--repo", root,
+        "--plan-sha256", plan.planSha256,
+      ]),
+      (error) => error?.code === "WT-SESSION-RECOVERY-ACTIVATION",
+    );
+    assert.throws(
+      () => invoke([
+        "apply-recovery", "--repo", root,
+        "--plan-sha256", "f".repeat(64),
+        "--activate",
+      ]),
+      (error) => error?.code === "WT-SESSION-RECOVERY-PLAN",
+    );
+    const applied = invoke([
+      "apply-recovery", "--repo", root,
+      "--plan-sha256", plan.planSha256,
+      "--activate",
+    ]).output;
+    assert.equal(applied.status, "rebound");
+    assert.deepEqual(readOnboardingSessionCleanupBinding({ rootDir: root }).sessionCleanup, plan.sessionCleanup);
+    assert.deepEqual(listActiveSessionDescriptors(root), [plan.sessionCleanup]);
+    assert.equal(invoke(["start", "--repo", root]).output.code, "WT-SESSION-REUSED");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("unbound recovery refuses multiple or replaced active descriptors", () => {
+  const root = fixture("orphan-rebind-refusal");
+  try {
+    const first = startSessionDescriptor(root, { sessionId: "session-binding-orphan-first" });
+    startSessionDescriptor(root, { sessionId: "session-binding-orphan-second" });
+    const multiple = invoke(["plan-recovery", "--repo", root]).output;
+    assert.deepEqual(multiple, {
+      schema: "pipeline.session-cleanup-recovery-plan.v1",
+      status: "orphan-recovery-unavailable",
+      activeDescriptorCount: 2,
+    });
+
+    unlinkSync(loadSessionDescriptor(root, "session-binding-orphan-second").path);
+    const plan = invoke(["plan-recovery", "--repo", root]).output;
+    unlinkSync(first.path);
+    const replacement = startSessionDescriptor(root, { sessionId: first.sessionId });
+    assert.throws(
+      () => invoke([
+        "apply-recovery", "--repo", root,
+        "--plan-sha256", plan.planSha256,
+        "--activate",
+      ]),
+      (error) => error?.code === "WT-SESSION-RECOVERY-PLAN",
+    );
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
+    assert.deepEqual(listActiveSessionDescriptors(root), [{
+      sessionId: replacement.sessionId,
+      descriptorSha256: replacement.descriptorSha256,
+    }]);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

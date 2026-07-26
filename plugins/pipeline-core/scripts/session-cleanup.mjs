@@ -28,6 +28,7 @@ import {
   cleanupSession,
   finalizeTemporaryResource,
   inspectSessionClosure,
+  inspectSessionOwnerRuntime,
   listActiveSessionDescriptors,
   loadSessionDescriptor,
   registerTemporaryIntent,
@@ -38,6 +39,7 @@ import {
 
 const USAGE = `Usage:
   session-cleanup.mjs start --repo <checkout> [--session <safe-id>]
+  session-cleanup.mjs status --repo <checkout>
   session-cleanup.mjs release-binding --repo <checkout>
   session-cleanup.mjs plan-recovery --repo <checkout>
   session-cleanup.mjs apply-recovery --repo <checkout> --plan-sha256 <sha256> --activate
@@ -109,7 +111,7 @@ function drainSessionPower(repo, session) {
 function parseArgs(argv) {
   const [command, ...rest] = argv;
   if (!new Set([
-    "start", "release-binding", "plan-recovery", "apply-recovery",
+    "start", "status", "release-binding", "plan-recovery", "apply-recovery",
     "register-intent", "finalize", "seal", "cleanup", "hygiene",
   ]).has(command)) throw new Error(USAGE);
   const flags = {};
@@ -131,7 +133,7 @@ function parseArgs(argv) {
   const extra = command === "register-intent" ? ["resource-id", "type", "path", "content-class", "policy"]
     : new Set(["finalize", "seal"]).has(command) ? ["resource-id", "canary"] : [];
   const allowed = command === "start" ? new Set(["repo", "session"])
-    : command === "release-binding" ? new Set(["repo"])
+    : new Set(["status", "release-binding"]).has(command) ? new Set(["repo"])
       : command === "plan-recovery" ? new Set(["repo"])
         : command === "apply-recovery" ? new Set(["repo", "plan-sha256", "activate"])
       : new Set([...common, ...extra]);
@@ -181,7 +183,34 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
   const write = dependencies.writeFn ?? ((value) => process.stdout.write(value));
   let output;
   let exitCode = 0;
-  if (command === "plan-recovery") {
+  if (command === "status") {
+    const listDescriptors = dependencies.listActiveSessionDescriptorsFn
+      ?? listActiveSessionDescriptors;
+    const inspectOwnerRuntime = dependencies.inspectSessionOwnerRuntimeFn
+      ?? inspectSessionOwnerRuntime;
+    const descriptors = listDescriptors(repo).map((descriptor) => {
+      const observed = inspectOwnerRuntime(repo, descriptor.sessionId, {
+        expectedDescriptorSha256: descriptor.descriptorSha256,
+      });
+      if (!observed || typeof observed !== "object" || Array.isArray(observed)
+        || observed.schema !== "pipeline.session-owner-status.v1"
+        || observed.sessionId !== descriptor.sessionId
+        || observed.descriptorSha256 !== descriptor.descriptorSha256
+        || !new Set(["live", "not-live", "reused", "unavailable", "unobserved"]).has(observed.status)) {
+        throw new WorktreeLifecycleError("WT-SESSION-OWNER-STATUS", "session owner status readback is invalid");
+      }
+      return {
+        sessionId: observed.sessionId,
+        descriptorSha256: observed.descriptorSha256,
+        status: observed.status,
+      };
+    });
+    output = {
+      schema: "pipeline.session-cleanup-status.v1",
+      status: "observed",
+      descriptors,
+    };
+  } else if (command === "plan-recovery") {
     output = planSessionCleanupRecovery({ rootDir: repo });
   } else if (command === "apply-recovery") {
     output = applySessionCleanupRecovery({

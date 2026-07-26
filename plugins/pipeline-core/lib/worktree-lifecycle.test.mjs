@@ -33,6 +33,7 @@ import {
   finalizeTemporaryResource,
   inspectTemporaryResource,
   inspectSessionClosure,
+  inspectSessionOwnerRuntime,
   migrateBranchWorktree,
   parseWorktreePorcelain,
   rawSha256,
@@ -457,6 +458,42 @@ check("D0 session descriptor is private, bound to one common dir and retires onl
   assert.equal(existsSync(session.path), false);
   assert.equal(inspectSessionClosure(primary, session.sessionId).status, "closed");
   assertLifecycleError(() => loadSessionDescriptor(primary, session.sessionId), "WT-SESSION-MISSING");
+});
+
+check("D0 session owner runtime status is sanitized, detects PID reuse, and preserves legacy descriptors", () => {
+  const { primary } = repoFixture();
+  const session = startSessionDescriptor(primary, {
+    sessionId: "session-owner-runtime",
+    ownerNonce: "owner-nonce-runtime-000000001",
+  });
+  const live = inspectSessionOwnerRuntime(primary, session.sessionId);
+  assert.equal(live.schema, "pipeline.session-owner-status.v1");
+  assert.equal(live.status, process.platform === "linux" ? "live" : "unavailable");
+  assert.equal(JSON.stringify(live).includes(session.ownerNonce), false);
+
+  if (process.platform === "linux") {
+    const descriptor = JSON.parse(readFileSync(session.path, "utf8"));
+    descriptor.ownerRuntime.processStartId = `${Number(descriptor.ownerRuntime.processStartId) + 1}`;
+    writeFileSync(session.path, `${JSON.stringify(descriptor, null, 2)}\n`, { mode: 0o600 });
+    assert.equal(inspectSessionOwnerRuntime(primary, session.sessionId).status, "reused");
+  }
+
+  const unavailable = startSessionDescriptor(primary, {
+    sessionId: "session-owner-unavailable",
+    ownerNonce: "owner-nonce-unavailable-000001",
+    ownerPid: -1,
+  });
+  assert.equal(inspectSessionOwnerRuntime(primary, unavailable.sessionId).status, "unavailable");
+
+  const legacy = startSessionDescriptor(primary, {
+    sessionId: "session-owner-legacy",
+    ownerNonce: "owner-nonce-legacy-000000001",
+  });
+  const legacyDescriptor = JSON.parse(readFileSync(legacy.path, "utf8"));
+  delete legacyDescriptor.ownerRuntime;
+  legacyDescriptor.schema = "pipeline.session-descriptor.v1";
+  writeFileSync(legacy.path, `${JSON.stringify(legacyDescriptor, null, 2)}\n`, { mode: 0o600 });
+  assert.equal(inspectSessionOwnerRuntime(primary, legacy.sessionId).status, "unobserved");
 });
 
 check("D0 session-cleanup CLI accepts descriptor ownership without receiving the nonce", () => {
