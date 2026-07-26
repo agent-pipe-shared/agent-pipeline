@@ -1,6 +1,6 @@
 # Sprint Phoenix independent review record
 
-Status: initial design and two privacy review rounds failed; second privacy corrections pending re-review
+Status: privacy re-review passed; comprehensive original-finding re-review pending
 
 Date: 2026-07-26
 
@@ -130,3 +130,31 @@ All three findings are accepted without waiver. The second correction:
 
 The next privacy re-review is bounded to PHX-PR-01..05, these corrections, and
 direct regressions. No prior failed entry is reclassified as a pass.
+
+## Independent privacy correction re-review — final verdict
+
+| Field | Value |
+| --- | --- |
+| Candidate commit | `643c7d0623a43333b4597013ba96fa7c5990bdba` |
+| Candidate tree | `449465e59ef250d2739140b60e95f0d774474c83` |
+| Correction range | `2891205e21f4f3f17e0c94b488c40a7e6fd80ca7..643c7d0623a43333b4597013ba96fa7c5990bdba` |
+| Verify evidence SHA-256 | `540203c7708df1968a24334232e06eca1e5215db28d26b855f33be514600264b` |
+| Security evidence SHA-256 | `beeae93bb4229fae2e0004d71aef4dd5208ba038eaa7824c150d4b1e54211059` |
+| Assurance | `functional-equivalent-read-only; OS isolation not asserted` |
+| Reviewer mutation / delegation | none / none |
+| Machine trajectory | consistent |
+| Verdict | PASS |
+
+The fresh Critic reported no findings. It deliberately cleared:
+
+- PHX-PR-01/03 through the Acceptance matrix's normative interpretation of
+  Spec §§4.4–4.5;
+- PHX-PR-02/04 through portable-only append semantics plus restricted
+  expiry/erase/key-destruction and fail-closed reconstruction;
+- PHX-PR-05 through ownership solely in Spec §§7.3–7.4 inventory files;
+- direct scope, test-integrity, failure-path, security, dependency, language,
+  governance, and lifecycle-hash regressions.
+
+The pass satisfies the design privacy gate only. The initial broad Critic's six
+findings still require one comprehensive correction re-review before the
+Product Owner gate.

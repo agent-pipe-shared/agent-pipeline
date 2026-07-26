@@ -87,5 +87,7 @@ The first compensating review is recorded in
 [critic-review.md](critic-review.md). It found concrete integrity, migration,
 privacy, recovery, lifecycle, and evidence gaps. The first independent privacy
 review then found two further enforceability gaps, and its correction re-review
-found three more; all are corrected without waiver. Phoenix remains in design
-correction until the privacy and original finding re-reviews pass.
+found three more; all were corrected without waiver. The final privacy
+re-review passed. Phoenix remains in design review until the initial broad
+Critic's six findings and direct regressions receive their comprehensive
+re-review.

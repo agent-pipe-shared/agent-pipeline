@@ -1,6 +1,6 @@
 # Sprint Phoenix design readiness audit
 
-Status: initial design and two privacy review rounds failed; second privacy correction under review
+Status: privacy design gate passed; comprehensive correction re-review pending
 
 Date: 2026-07-26
 
@@ -25,7 +25,7 @@ independent review, commit, push, implementation, and final Epic completion.
 | Remain independent of Nova/Cyborg/Nightwing | Accepted prerequisites and negative dependency gate `EPIC-AC-02` | PROVEN in design; implementation evidence pending |
 | Use Advisor help | Approved bounded routes attempted; primaries timed out, earlier fallbacks timed out, and the latest exact fast-fallback role was unavailable in the adapter; workspace digests remained unchanged; [advisor-review.md](advisor-review.md) | ATTEMPTED / UNAVAILABLE, never passed |
 | Obtain independent semantic review | Initial fixed candidate received one uncontaminated read-only Critic verdict; [critic-review.md](critic-review.md) | FAILED with three blockers and three majors; every finding has a required correction |
-| Satisfy the data-privacy policy gate | [privacy-review.md](privacy-review.md) inventories processing, normative Spec interpretation, repository-wide portable access/retention, fail-closed non-personal admission, restricted local erasure in Spec-listed files, external boundaries, and fixtures | Two review rounds FAIL; second corrections prepared; fresh re-review required |
+| Satisfy the data-privacy policy gate | [privacy-review.md](privacy-review.md) inventories processing, normative Spec interpretation, repository-wide portable access/retention, fail-closed non-personal admission, restricted local erasure in Spec-listed files, external boundaries, and fixtures | PROVEN for design by final fixed-candidate PASS; implementation evidence remains pending |
 | Produce readable PRD and exact Spec binding | [../prd_phoenix-epic.md](../prd_phoenix-epic.md) plus its `technical-spec-sha256` marker | PROVEN as draft; approval pending |
 | No implementation before literal `approved` | Only the design package, lifecycle state, and recovery audit are changed; no product source/schema/test is created | PROVEN for current workspace |
 
@@ -89,6 +89,9 @@ trusted time, destination retention, analyst review, or compliance.
 | Full repository Verify on first privacy-correction candidate | exit 0 at `2891205e21f4f3f17e0c94b488c40a7e6fd80ca7`, tree `0ef439f5f0885ac808b9799717f971a1d257b961`; evidence SHA-256 `cce4f4b83f0b52e8e58dfc5359bc9743f878060f190752faf212593224fa7e2b` |
 | Integrated Security on first privacy-correction candidate | exit 0 / CLEAN at the same candidate/tree; evidence SHA-256 `fd894dba9ffa36b8c29c02c3036f36ffba3275bce29e83709f3f80b14bf06af6` |
 | Independent re-review of first privacy correction | FAIL with one blocker and two majors; machine trajectory consistent; all findings accepted and corrected |
+| Full repository Verify on second privacy-correction candidate | exit 0 at `643c7d0623a43333b4597013ba96fa7c5990bdba`, tree `449465e59ef250d2739140b60e95f0d774474c83`; evidence SHA-256 `540203c7708df1968a24334232e06eca1e5215db28d26b855f33be514600264b` |
+| Integrated Security on second privacy-correction candidate | exit 0 / CLEAN at the same candidate/tree; evidence SHA-256 `beeae93bb4229fae2e0004d71aef4dd5208ba038eaa7824c150d4b1e54211059` |
+| Independent re-review of second privacy correction | PASS with no findings; PHX-PR-01..05 cleared; machine trajectory consistent; no write or delegation |
 
 The machine files are Git-ignored by repository policy and are passed directly
 as evidence paths to the next Critic. Their command, exit code, timestamp,
@@ -115,12 +118,10 @@ evidence, issue closure, and Product Owner approval remain unclaimed.
 
 1. Complete all six Critic corrections and create the canonical lifecycle
    manifest/Result.
-2. Commit and verify the second privacy corrections, then obtain a fresh bounded
-   re-review of PHX-PR-01..05 and their direct regressions.
-3. Freshly re-review the prior findings, fixes, and direct regressions with
+2. Freshly re-review the initial broad Critic findings, fixes, and direct regressions with
    exact machine evidence.
-4. Reconcile the canonical handover and design-gate continuity projection.
-5. Present the readable PRD and wait for the literal Product Owner
+3. Reconcile the canonical handover and design-gate continuity projection.
+4. Present the readable PRD and wait for the literal Product Owner
    `approved` implementation gate.
 
 No remote write is needed for these design-readiness steps.

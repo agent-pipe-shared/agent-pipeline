@@ -68,3 +68,23 @@ uses the normative Acceptance matrix to disambiguate Spec §§4.4–4.5, limits
 append-only preservation to portable records, and implements the restricted
 profile only through already inventoried kernel/ledger files. A fresh privacy
 re-review remains mandatory; this failed entry is never rewritten.
+
+## Entry 4 — Final privacy correction re-review
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-07-26 |
+| Candidate commit | `643c7d0623a43333b4597013ba96fa7c5990bdba` |
+| Candidate tree | `449465e59ef250d2739140b60e95f0d774474c83` |
+| Correction range | `2891205e21f4f3f17e0c94b488c40a7e6fd80ca7..643c7d0623a43333b4597013ba96fa7c5990bdba` |
+| Full Verify | exit 0; evidence SHA-256 `540203c7708df1968a24334232e06eca1e5215db28d26b855f33be514600264b` |
+| Security | exit 0 / CLEAN; evidence SHA-256 `beeae93bb4229fae2e0004d71aef4dd5208ba038eaa7824c150d4b1e54211059` |
+| Independent privacy re-review | PASS under `functional-equivalent-read-only; OS isolation not asserted` |
+| Machine trajectory | consistent |
+| Reviewer mutation / delegation | none / none |
+| Remote write | none |
+
+The reviewer reported no findings and explicitly cleared PHX-PR-01..05, their
+fixes, and direct regressions. This entry closes the Phoenix design privacy
+gate only. It does not reclassify Entries 1–3, approve the plan, authorize
+implementation, or satisfy the comprehensive original-finding re-review.

@@ -305,6 +305,20 @@ preservation to portable repository records, and assigns every restricted
 operation to existing Spec-listed envelope/policy/decision/event-store/CLI/test
 and documentation files. A new bounded re-review remains required.
 
+## R-07 — Privacy correction re-review passed
+
+The fresh bounded review ran on commit
+`643c7d0623a43333b4597013ba96fa7c5990bdba`, tree
+`449465e59ef250d2739140b60e95f0d774474c83`, with exact Verify and Security
+evidence. Under
+`functional-equivalent-read-only; OS isolation not asserted`, it reported no
+findings, a consistent machine trajectory, no briefing violation, and no
+reviewer write or delegation. It cleared PHX-PR-01..05 and direct regressions.
+
+This closes the design privacy course gate only. It does not convert the two
+earlier FAIL entries into passes and creates no implementation, push, merge,
+release, external-write, or final-Epic authority.
+
 ## Audit classification
 
 These records illustrate the Phoenix recovery profile:

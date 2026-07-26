@@ -1,6 +1,6 @@
 # Sprint Phoenix data-privacy review
 
-Status: two privacy review rounds failed; second corrections prepared for fresh re-review
+Status: independent privacy correction re-review passed on the fixed candidate
 
 Date: 2026-07-26
 
@@ -168,7 +168,12 @@ Spec wording remained ambiguous, append-only conflicted with restricted
 erasure, and five new restricted-store files exceeded the Spec inventory. The
 current correction makes Acceptance the explicit interpretation of Spec
 §§4.4–4.5, scopes append-only to portable records, and assigns every restricted
-operation to existing Spec-listed files. A fresh re-review must check all five
-accepted privacy findings and direct regressions. Until it passes, governance
-checklist item 1 remains NOT MET and Phoenix remains blocked before the Product
-Owner gate.
+operation to existing Spec-listed files.
+
+That re-review passed on commit
+`643c7d0623a43333b4597013ba96fa7c5990bdba`, tree
+`449465e59ef250d2739140b60e95f0d774474c83`, under
+`functional-equivalent-read-only; OS isolation not asserted`. It reported no
+findings, a consistent machine trajectory, no briefing violation, no write
+action, and no delegation. This satisfies the Phoenix design privacy gate; it
+does not approve implementation, push, merge, release, or external writes.
