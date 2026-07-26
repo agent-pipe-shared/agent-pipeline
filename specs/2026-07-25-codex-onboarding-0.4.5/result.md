@@ -8,6 +8,15 @@ in that Issue is complete. The Issue should be closed only after the final
 0.4.5 commit is pushed and read back; the remaining work below must first be
 captured in the follow-up Issue.
 
+Post-spec PO disposition (2026-07-26): after the recorded sequence of fresh
+operator live tests, the PO stopped further local-install iterations and
+explicitly authorized completing the functional candidate, moving all three
+stable version surfaces to 0.4.5, and creating the final local commit(s) through
+the Git-push PO gate. Push, tag, merge, publication, Issue mutation, and release
+remain separately gated. This disposition supersedes only the earlier
+candidate wording that held versioning and commits until another live test; it
+does not weaken any Verify, Security, Critic, or immutable-publication gate.
+
 ## Delivered in 0.4.5
 
 - An ungoverned Codex folder receives a visible, optional Agent Pipeline offer

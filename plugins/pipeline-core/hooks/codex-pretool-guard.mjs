@@ -8,6 +8,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { evaluateLifecycleReadyGuard, isSanctionedLifecycleCommand } from "./guard-lifecycle-ready.mjs";
+import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
 
 const DEBUG_PREFIX = "[pipeline.codex-pretool.v1]";
 const PLUGIN_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -89,6 +90,7 @@ const lifecycleGoverned = [
   "pipeline.user.yaml",
   ".claude/pipeline.json",
   ".claude/pipeline.yaml",
+  ...loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path),
 ].some((marker) => existsSync(join(projectRoot, marker)));
 const isLifecycleTool = toolName === "Bash" && isSanctionedLifecycleCommand(command, projectRoot);
 

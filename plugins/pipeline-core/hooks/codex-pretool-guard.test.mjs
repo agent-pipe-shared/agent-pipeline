@@ -130,6 +130,20 @@ check("ordinary ungoverned shell commands do not start heavyweight guards", () =
   assert.equal(result.stdout, "");
 });
 
+check("runtime-only V3 targets activate lifecycle enforcement in the outer adapter", () => {
+  for (const marker of [".codex/config.toml", ".codex/agents/critic.toml"]) {
+    const root = fixture();
+    mkdirSync(dirname(join(root, marker)), { recursive: true });
+    writeFileSync(join(root, marker), "runtime-only\n");
+    const output = decision(run({
+      tool_name: "Bash",
+      tool_input: { command: "touch bypassed" },
+    }, root));
+    assert.equal(output.permissionDecision, "deny", marker);
+    assert.match(output.permissionDecisionReason, /guard-lifecycle-ready/u, marker);
+  }
+});
+
 check("Codex native cwd wins over a stale inherited CLAUDE_PROJECT_DIR", () => {
   const current = mkdtempSync(join(tmpdir(), "codex-pretool-current-"));
   const stale = fixture();
