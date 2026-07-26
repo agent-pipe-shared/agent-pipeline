@@ -9,7 +9,7 @@
 > reliable project work. Approval authorizes implementation dispatch only; it
 > does not authorize push, merge, tag, publication, Issue closure, or release.
 
-<!-- technical-spec-sha256: 9778003693e1c6f16745d3cef81b495fed2599b44b50a470d899df4cb8a1b512 -->
+<!-- technical-spec-sha256: 6181eebf39fae962b76307727b4031454486c405fca117046066f2b544fe37d1 -->
 
 The technical approval binds the exact neighboring [spec.md](spec.md). Any
 change to that file after approval invalidates the implementation gate until
@@ -243,6 +243,10 @@ declared by 0.4.5; it does not permit a fabricated hook capability.
 - [ ] The host helper creates no commit, mutates no `.codex/**`, migrates only
       private continuity, never reruns the full inspector at the host boundary,
       and requires exactly one project-session restart.
+- [ ] Host initialization publishes a durable plan/root intent before Git,
+      atomically exposes the complete intent/receipt/marker admission
+      directory, and idempotently resumes the same pending intent after a
+      process interruption.
 - [ ] After that restart the repository is locally writable with a
       receipt-bound plugin-managed runtime; the read-only mount alone never
       yields `ready`, and no runtime initialization/readback or second restart
@@ -304,6 +308,7 @@ Each slice must remain testable and fail-closed. No slice may temporarily report
 | A fifth parallel state machine | `project-onboarding-v3` is the sole public lifecycle owner. |
 | Restart claimed without host evidence | Native loaded-runtime receipt or typed unavailable; no heuristic fallback. |
 | Host-managed mode masks unusable Git | Git operations are explicitly non-applicable and remain blocked. |
+| Host init stops between Git and admission publication | Durable pending intent resumes only the same reviewed root/plan; the complete admission directory appears by one atomic rename. |
 | Broad guard change weakens existing protection | Additive lifecycle gate; retain drift/preimage checks; high-risk Critic. |
 | Copy-safe text diverges from executed args | Render human command from the same closed argv structure and test it exactly. |
 | Version bump mistaken for release | Separate push/tag/publication/release gates remain blocked. |

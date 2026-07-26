@@ -37,9 +37,11 @@ the before/after assertion are recorded in
   host Git initialization. It creates `main` without a commit, preserves the
   private continuity binding, and asks for one project-session restart.
 - The post-restart protected Git view is admitted only through the exact
-  root-, authority-, and history-bound host-init receipt plus its separate
-  receipt-digest marker. Missing counterparts, copied, malformed,
-  permission-weakened, or drifted admissions fail closed.
+  root-, plan-, authority-, and history-bound host-init intent, receipt, and
+  receipt-digest marker published as one private admission directory. Missing
+  counterparts, copied, malformed, permission-weakened, or drifted admissions
+  fail closed; an interrupted publication resumes only its exact pending
+  root/plan intent.
 - The lifecycle PreToolUse adapter accepts the exact session-ready V4 result or
   that narrowly bound host-init compatibility admission only for the two
   authenticated cross-view repository-control failures. App-Server, runtime,

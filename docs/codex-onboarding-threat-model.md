@@ -12,6 +12,9 @@ Issue #61.
   records, and native readback receipts.
 - The initial continuity transaction and its PRD, Spec, handover, state, and
   private history postimages.
+- The host-repository-init transaction intent and the atomically published
+  admission directory containing its intent, receipt, and receipt-digest
+  marker.
 - The readiness decision consumed by bootstrap, session, worktree, Advisor,
   Critic, implementation, Goldfish, and write guards.
 
@@ -37,6 +40,10 @@ or accepted from a project file.
 5. A shell command is a write-capable boundary. In a governed non-ready root,
    Bash, Edit, Write, and apply_patch remain blocked except for an exact
    plugin-local lifecycle/remediation command with closed arguments.
+6. The separately confirmed host initializer is the sole issuer of the 0.4.5
+   compatibility admission. The workspace process may consume that admission
+   but cannot mint it, infer it from an empty control mount, or replace its
+   exact root/plan/authority/history bindings.
 
 ## Attacker capabilities
 
@@ -74,20 +81,41 @@ transport, not invented by onboarding.
 - Lifecycle admission is intent-bound. Stronger session and dispatch intents
   repeat their capability probes and cannot reuse onboarding/bootstrap
   readiness.
+- Host initialization first durably publishes a private pending intent bound
+  to the reviewed plan and root. If the process ends after Git initialization
+  but before admission publication, the same digest-bound apply resumes that
+  intent; an unrelated physical `.git` without it remains a preimage failure.
+- The host admission is one mode-0700 directory published by a single atomic
+  rename. It contains an exact intent, receipt, and marker. The marker binds
+  both intent and receipt digests; the receipt binds root, reviewed plan,
+  portable authority, kickoff history, Git version, and branch.
+- Admission files are opened with `O_NOFOLLOW` and read through descriptors.
+  Leaf device/inode/mode/link identity and every parent-directory identity are
+  checked before and after the read. A raced replacement is invalid evidence,
+  not bytes that can authorize guarded writes.
+- Only the complete atomically published directory is authoritative. A
+  malformed directory or any missing counterpart is terminal
+  `projection-drift`; a pending intent is recovery authority only and never a
+  readiness receipt.
 
 ## Failure and rollback behavior
 
-Private-state writes use exclusive creation, file fsync, rename, directory
-fsync, exact readback, and identity-bound cleanup. Runtime and kickoff writers
-verify every preimage, retain crash-recovery authority, and roll back only
-files/directories whose device, inode, link count, and digest still match the
-writer's records. Foreign or identity-drifted paths are preserved and the
-operation reports an unavailable/indeterminate result instead of false
-success. Disposable-worktree rollback first renames the exact recorded tree
-into quarantine. Each recorded leaf is then atomically renamed to a fresh
-cleanup name and revalidated there before unlink/rmdir; a replacement between
-the first validation and atomic capture is restored and retained rather than
-deleted.
+Private-state writes use exclusive no-follow creation, file fsync, atomic
+rename, directory fsync, exact descriptor-bound readback, and identity-bound
+cleanup. The host-init files are assembled below the exact pending intent and
+renamed as one directory, so the authoritative namespace exposes neither a
+receipt-only nor marker-only crash state. A retry resumes the exact pending
+intent and byte-identical partial files; a mismatched pending intent, foreign
+Git path, raced parent/leaf, or changed postimage fails closed. Runtime and
+kickoff writers verify every preimage, retain crash-recovery authority, and
+roll back only files/directories whose device, inode, link count, and digest
+still match the writer's records. Foreign or identity-drifted paths are
+preserved and the operation reports an unavailable/indeterminate result
+instead of false success. Disposable-worktree rollback first renames the exact
+recorded tree into quarantine. Each recorded leaf is then atomically renamed
+to a fresh cleanup name and revalidated there before unlink/rmdir; a
+replacement between the first validation and atomic capture is restored and
+retained rather than deleted.
 
 Rollback of the shipped change is a source revert before release. A live local
 candidate is removed by restoring the prior installed plugin selection and

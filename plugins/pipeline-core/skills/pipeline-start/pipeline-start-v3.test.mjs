@@ -70,12 +70,13 @@ const cases = [
     assert.match(skill, /never in the workspace sandbox/u);
     assert.match(skill, /pipeline\.codex-host-repository-init-apply\.v1/u);
     assert.match(skill, /initializes Git without a commit, copies the private kickoff continuity\s+history into the new Git control path/u);
-    assert.match(skill, /leaves one private digest-bound\s+post-init receipt plus its separate receipt-digest marker in `\.claude\/\.runtime`/u);
-    assert.match(skill, /fresh Codex hook can distinguish\s+the otherwise identical empty\s+protected mount/u);
+    assert.match(skill, /atomically publishes one private\s+digest-bound admission directory containing the transaction intent, post-init\s+receipt, and receipt-digest marker in `\.claude\/\.runtime`/u);
+    assert.match(skill, /An exact\s+pending intent makes the same confirmed apply restart-safe; it is never\s+readiness by itself/u);
+    assert.match(skill, /fresh Codex\s+hook can distinguish the otherwise identical empty protected mount/u);
     assert.match(skill, /mutates no portable\s+Pipeline\/project file/u);
     assert.match(skill, /exactly one ordinary project-session\s+restart/u);
     assert.match(skill, /Do not run the\s+onboarding inspector at the host boundary/u);
-    assert.match(skill, /For this 0\.4\.5 hotfix only, the\s+lifecycle guard may fall back to that exact host-init admission pair/u);
+    assert.match(skill, /For this 0\.4\.5 hotfix only, the\s+lifecycle guard may fall back to that exact host-init admission directory/u);
     assert.match(skill, /physical project root, stable Pipeline source\/calibration authority, and\s+immutable kickoff history/u);
     assert.match(skill, /Issue #25 owns replacing this compatibility\s+fallback with one native cross-view session attestation/u);
   }],

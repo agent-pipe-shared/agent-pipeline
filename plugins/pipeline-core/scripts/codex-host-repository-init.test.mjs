@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import {
-  chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync,
+  chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,8 +12,12 @@ import test from "node:test";
 
 import { applyHostRepositoryInit, planHostRepositoryInit } from "./codex-host-repository-init.mjs";
 import {
+  CODEX_HOST_REPOSITORY_INIT_DIRECTORY,
+  CODEX_HOST_REPOSITORY_INIT_INTENT,
   CODEX_HOST_REPOSITORY_INIT_MARKER,
+  CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY,
   CODEX_HOST_REPOSITORY_INIT_RECEIPT,
+  readCodexHostRepositoryInitAdmission,
 } from "../lib/codex-host-layout.mjs";
 import {
   applyOnboardingKickoff,
@@ -97,6 +101,9 @@ test("plan binds only the exact non-ready host-managed plugin reservation", () =
   assert.deepEqual(plan.changes, [
     ".git",
     ".git/agent-pipeline/onboarding/continuity-history.json",
+    CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY,
+    CODEX_HOST_REPOSITORY_INIT_DIRECTORY,
+    CODEX_HOST_REPOSITORY_INIT_INTENT,
     CODEX_HOST_REPOSITORY_INIT_RECEIPT,
     CODEX_HOST_REPOSITORY_INIT_MARKER,
   ]);
@@ -151,6 +158,10 @@ test("host apply initializes only Git and requires one restart", () => {
   assert.equal(marker.schema, "pipeline.codex-host-repository-init-marker.v1");
   assert.equal(marker.planSha256, plan.planSha256);
   assert.match(marker.receiptSha256, /^[a-f0-9]{64}$/u);
+  assert.deepEqual(
+    readdirSync(join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY)).sort(),
+    ["intent.json", "marker.json", "receipt.json"],
+  );
   assert.equal(classifyOnboardingContinuity({
     rootDir: root,
     repositoryCapability: "local",
@@ -162,13 +173,70 @@ test("host apply initializes only Git and requires one restart", () => {
   }).status, "valid");
 });
 
-test("a marker publication failure rolls back the receipt and initialized Git", () => {
+test("an interrupted admission publication resumes from the exact pending intent", () => {
   const root = fixture();
   const plan = planHostRepositoryInit({
     rootDir: root,
     deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
   });
-  const nativeWrite = writeFileSync;
+  const interrupted = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        assert.equal(command, "git");
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        mkdirSync(join(options.cwd, ".git"));
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      faultInjector(point) {
+        if (point === "before-host-init-admission-rename") {
+          throw new Error("synthetic process interruption");
+        }
+      },
+      rmSync() {
+        throw new Error("simulate process loss before rollback");
+      },
+    },
+  });
+  assert.equal(interrupted.status, "rollback-failed");
+  assert.equal(existsSync(join(root, ".git")), true);
+  assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY)), true);
+  assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY)), false);
+
+  const resumed = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args) {
+        assert.equal(command, "git");
+        assert.deepEqual(args, ["--version"]);
+        return { status: 0, stdout: "git version 2.50.1\n", stderr: "" };
+      },
+    },
+  });
+  assert.equal(resumed.status, "restart-required");
+  assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY)), false);
+  assert.deepEqual(readCodexHostRepositoryInitAdmission(root), {
+    gitVersion: "2.40.1",
+    repositoryMode: "host-managed",
+  });
+});
+
+test("admission publication rejects a directory replaced after validation", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const pendingAdmission = join(
+    root,
+    CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY,
+    "admission",
+  );
+  const capturedAdmission = `${pendingAdmission}.captured`;
   const result = applyHostRepositoryInit({
     rootDir: root,
     planSha256: plan.planSha256,
@@ -180,11 +248,127 @@ test("a marker publication failure rolls back the receipt and initialized Git", 
         mkdirSync(join(options.cwd, ".git"));
         return { status: 0, stdout: "", stderr: "" };
       },
-      writeFileSync(target, bytes, options) {
-        if (target === join(root, CODEX_HOST_REPOSITORY_INIT_MARKER)) {
+      faultInjector(point) {
+        if (point === "before-host-init-admission-rename") {
+          renameSync(pendingAdmission, capturedAdmission);
+          mkdirSync(pendingAdmission, { mode: 0o700 });
+          writeFileSync(join(pendingAdmission, "foreign"), "preserve\n");
+        }
+      },
+    },
+  });
+  assert.equal(result.status, "rollback-failed");
+  assert.equal(
+    readFileSync(join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY, "foreign"), "utf8"),
+    "preserve\n",
+  );
+  assert.equal(existsSync(capturedAdmission), true);
+});
+
+test("admission read rejects a leaf replaced between lstat and descriptor open", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const initialized = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        assert.equal(command, "git");
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        mkdirSync(join(options.cwd, ".git"));
+        return { status: 0, stdout: "", stderr: "" };
+      },
+    },
+  });
+  assert.equal(initialized.status, "restart-required");
+  const receiptPath = join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT);
+  const backupPath = `${receiptPath}.original`;
+  let replaced = false;
+  const admission = readCodexHostRepositoryInitAdmission(root, {
+    open(path, flags, mode) {
+      if (!replaced && path === receiptPath) {
+        replaced = true;
+        renameSync(receiptPath, backupPath);
+        writeFileSync(receiptPath, "{}\n", { mode: 0o600 });
+        const descriptor = openSync(path, flags, mode);
+        rmSync(receiptPath);
+        renameSync(backupPath, receiptPath);
+        return descriptor;
+      }
+      return openSync(path, flags, mode);
+    },
+  });
+  assert.equal(admission, null);
+  assert.notEqual(readCodexHostRepositoryInitAdmission(root), null);
+});
+
+test("admission read rejects its private directory replaced after permission validation", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const initialized = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        assert.equal(command, "git");
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        mkdirSync(join(options.cwd, ".git"));
+        return { status: 0, stdout: "", stderr: "" };
+      },
+    },
+  });
+  assert.equal(initialized.status, "restart-required");
+  const admissionPath = join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY);
+  const backupPath = `${admissionPath}.original`;
+  let replaced = false;
+  const admission = readCodexHostRepositoryInitAdmission(root, {
+    open(path, flags, mode) {
+      if (!replaced && path === join(root, "pipeline.user.yaml")) {
+        replaced = true;
+        renameSync(admissionPath, backupPath);
+        mkdirSync(admissionPath, { mode: 0o700 });
+        for (const name of readdirSync(backupPath)) {
+          writeFileSync(join(admissionPath, name), readFileSync(join(backupPath, name)), { mode: 0o600 });
+        }
+      }
+      return openSync(path, flags, mode);
+    },
+  });
+  assert.equal(admission, null);
+  rmSync(admissionPath, { recursive: true });
+  renameSync(backupPath, admissionPath);
+  assert.notEqual(readCodexHostRepositoryInitAdmission(root), null);
+});
+
+test("a marker publication failure rolls back the receipt and initialized Git", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        assert.equal(command, "git");
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        mkdirSync(join(options.cwd, ".git"));
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      faultInjector(point) {
+        if (point === "before-host-init-marker-publication") {
           throw new Error("synthetic marker publication failure");
         }
-        nativeWrite(target, bytes, options);
       },
     },
   });
@@ -271,7 +455,6 @@ test("host rollback preserves a Git directory whose identity changed during bind
     rootDir: root,
     deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
   });
-  const nativeWrite = writeFileSync;
   const result = applyHostRepositoryInit({
     rootDir: root,
     planSha256: plan.planSha256,
@@ -283,14 +466,13 @@ test("host rollback preserves a Git directory whose identity changed during bind
         mkdirSync(join(options.cwd, ".git"));
         return { status: 0, stdout: "", stderr: "" };
       },
-      writeFileSync(target, bytes, options) {
-        if (target === join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT)) {
+      faultInjector(point) {
+        if (point === "before-host-init-marker-publication") {
           rmSync(join(root, ".git"), { recursive: true, force: true });
           mkdirSync(join(root, ".git"));
-          nativeWrite(join(root, ".git", "foreign"), "foreign\n");
+          writeFileSync(join(root, ".git", "foreign"), "foreign\n");
           throw new Error("synthetic control-path identity race");
         }
-        nativeWrite(target, bytes, options);
       },
     },
   });
@@ -316,12 +498,11 @@ test("host rollback preserves foreign content added beneath the same Git directo
         mkdirSync(join(options.cwd, ".git"));
         return { status: 0, stdout: "", stderr: "" };
       },
-      writeFileSync(target, bytes, options) {
-        if (target === join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT)) {
+      faultInjector(point) {
+        if (point === "before-host-init-marker-publication") {
           writeFileSync(join(root, ".git", "foreign"), "foreign\n");
           throw new Error("synthetic Git content race");
         }
-        writeFileSync(target, bytes, options);
       },
     },
   });

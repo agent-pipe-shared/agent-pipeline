@@ -10,7 +10,7 @@
  * CLI process would test the sandbox rather than onboarding behavior.
  */
 import assert from "node:assert/strict";
-import { chmodSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -23,6 +23,8 @@ import { ProjectOnboardingReadyError } from "../lib/project-onboarding-ready-gat
 import { applyHostRepositoryInit, planHostRepositoryInit } from "./codex-host-repository-init.mjs";
 import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
 import {
+  CODEX_HOST_REPOSITORY_INIT_DIRECTORY,
+  CODEX_HOST_REPOSITORY_INIT_INTENT,
   CODEX_HOST_REPOSITORY_INIT_MARKER,
   CODEX_HOST_REPOSITORY_INIT_RECEIPT,
   observeCodexHostRepositoryInitAdmission,
@@ -195,8 +197,11 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
     assert.equal(initialized.status, "restart-required");
     assert.equal(initialized.gitVersion, "2.40.1");
     assert.equal(readdirSync(join(path, ".claude/.runtime/agent-pipeline/onboarding")).sort().includes("continuity-history.json"), true);
-    assert.equal(readdirSync(join(path, ".claude/.runtime/agent-pipeline/onboarding")).sort().includes("host-repository-init.json"), true);
-    assert.equal(readdirSync(join(path, ".claude/.runtime/agent-pipeline/onboarding")).sort().includes("host-repository-init-bound.json"), true);
+    assert.equal(readdirSync(join(path, ".claude/.runtime/agent-pipeline/onboarding")).sort().includes("host-repository-init"), true);
+    assert.equal(existsSync(join(path, CODEX_HOST_REPOSITORY_INIT_DIRECTORY)), true);
+    assert.equal(existsSync(join(path, CODEX_HOST_REPOSITORY_INIT_INTENT)), true);
+    assert.equal(existsSync(join(path, CODEX_HOST_REPOSITORY_INIT_RECEIPT)), true);
+    assert.equal(existsSync(join(path, CODEX_HOST_REPOSITORY_INIT_MARKER)), true);
     assert.equal(evaluateLifecycleReadyGuard({
       tool_name: "Bash",
       tool_input: { command: "rg --files" },

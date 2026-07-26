@@ -122,18 +122,25 @@ portable preimage, and marks the apply as both confirmation-required and
 host-bound. Only that exact apply runs outside the workspace sandbox. It
 initializes `main` without a commit and moves the private kickoff continuity
 receipt into the new Git control path. It never runs the full onboarding
-inspector at the host boundary and never writes `.codex/**`.
+inspector at the host boundary and never writes `.codex/**`. Before Git
+initialization it persists an exact private transaction intent. A process
+interruption resumes only that same plan/root intent instead of treating the
+resulting Git path as a fresh repository.
 
 The successful host apply requires exactly one ordinary project-session
 restart so Codex remounts the new repository. Only the exact durable host-init
 admission bound to the current root, authority, kickoff artifacts, and private
 history promotes the fresh session to `local-valid-writable` plus
 `plugin-managed`; it must not request a runtime initialization, native
-readback, or second restart. The initializer persists a separate digest marker
-for its receipt. A present invalid/drifted receipt, or either half missing
-after initialization, maps to terminal `projection-drift` with no repeat-init
-action. A different read-only target or any non-empty/colliding reserved path
-still fails closed with the typed target/layout diagnostic.
+readback, or second restart. The initializer assembles intent, receipt, and
+receipt-digest marker below the exact pending transaction, fsyncs them, and
+publishes the admission directory with one atomic rename plus exact
+descriptor-bound readback. A process interruption before that rename resumes
+the same pending intent. A present invalid/drifted admission directory, or any
+counterpart missing after publication, maps to terminal `projection-drift`
+with no repeat-init action. A different read-only target or any
+non-empty/colliding reserved path still fails closed with the typed
+target/layout diagnostic.
 
 This argv contract is runner- and platform-neutral. Codex uses the host action
 only for its reserved-control-mount case; Claude keeps its normal local Git

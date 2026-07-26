@@ -332,17 +332,28 @@ partial success is forbidden.
 
 `plugin-managed` is accepted only when the reserved Codex runtime control path
 is accompanied by the exact durable host-repository-init admission bound to
-the current root, portable authority, kickoff state, handover, PRD, Spec, and
-private history. The admission consists of the exact receipt plus its separate
-receipt-digest marker, so deleting either one after initialization is
-distinguishable from a pristine pre-init root. An empty read-only `.codex`
-directory by itself is only
+the current root, reviewed plan, portable authority, kickoff state, handover,
+PRD, Spec, and private history. The admission is one atomically renamed private
+directory containing the exact transaction intent, receipt, and
+receipt-digest marker. The marker binds both other files. Each file is read
+through an `O_NOFOLLOW` descriptor and accepted only when its leaf and all
+parent-directory identities remain unchanged before and after the read.
+Deleting any counterpart after initialization is distinguishable from a
+pristine pre-init root. An empty read-only `.codex` directory by itself is only
 `plugin-managed-unattested`; after valid kickoff it maps to aggregate
 `host-repository-init-required`, whose sole next action is the read-only,
 plugin-local host-init planner. It never maps to `ready` and therefore cannot
 admit guarded project writes. A present malformed/drifted receipt, or a marker
 without its receipt, maps to terminal `projection-drift` with `nextAction:
 null`; initialization is never offered again for that state.
+
+The confirmed host apply writes and fsyncs an exact pending intent before Git
+initialization. Receipt and marker are assembled beneath that intent and
+published together by one directory rename plus parent-directory fsync and
+exact readback. A process interruption before publication is idempotently
+resumed only by the same root and plan digest. A physical Git path without the
+matching pending intent remains `host-preimage-changed`; the pending intent is
+never runtime admission on its own.
 
 Runtime initialization reuses the existing V3 migration planner/apply engine
 with `initializeMissingRuntime: true`, but the public command is owned by
@@ -921,7 +932,8 @@ The required fixture outcomes are exact:
 | same process presents barrier | `restart-required` | runtime `restart-required` | restart-process |
 | fresh ticket plus valid host receipt | `kickoff-required` when pristine; otherwise the next controlling row | runtime `readback-current` | collect goal when pristine |
 | native restart ticket/readback unavailable, invalid, or replayed | `runtime-readback-unavailable` | runtime `readback-unavailable` | `null` |
-| existing host-init receipt/marker missing counterpart, invalid, or drifted | `projection-drift` | runtime `projection-drift` | `null`; repair the existing host-init admission, never repeat initialization |
+| existing published host-init intent/receipt/marker missing counterpart, invalid, or drifted | `projection-drift` | runtime `projection-drift` | `null`; repair the existing host-init admission, never repeat initialization |
+| interrupted host init with exact pending root/plan intent | `host-repository-init-required` | runtime `plugin-managed-unattested` | rerun the same digest-bound host apply; no guarded write admission |
 | absent sanctioned state | `kickoff-required` | continuity `absent-pristine` | collect goal |
 | malformed/orphan/incomplete sanctioned state | `continuity-damaged` | continuity `damaged` | continuity inspect |
 | read-only/invalid Git controls | `repository-mount-read-only` or `repository-control-path-invalid` according to the exact repository mapping | repository | `null` |
@@ -945,6 +957,12 @@ the exact recorded tree, then atomically captures each leaf into a fresh
 cleanup name before validating and deleting it. A replacement between
 validation and capture is restored/preserved and fails the capability instead
 of being unlinked.
+
+Host-init fixtures interrupt before marker creation and before the admission
+directory rename. They assert that the final namespace never exposes a
+one-sided pair, that the exact pending intent resumes to the same committed
+readback, and that leaf replacement between lstat and descriptor open is
+rejected without authorizing readiness.
 
 Each fixture asserts both zero unintended writes and the exact typed next
 action where applicable.

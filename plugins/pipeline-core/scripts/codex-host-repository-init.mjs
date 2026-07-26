@@ -9,7 +9,9 @@
 import { createHash } from "node:crypto";
 import {
   closeSync,
+  constants,
   existsSync,
+  fstatSync,
   fsyncSync,
   lstatSync,
   mkdirSync,
@@ -17,19 +19,24 @@ import {
   readFileSync,
   readdirSync,
   realpathSync,
+  renameSync,
   rmSync,
   rmdirSync,
   writeFileSync,
 } from "node:fs";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
 import {
+  CODEX_HOST_REPOSITORY_INIT_DIRECTORY,
+  CODEX_HOST_REPOSITORY_INIT_INTENT,
   CODEX_HOST_REPOSITORY_INIT_MARKER,
+  CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY,
   CODEX_HOST_REPOSITORY_INIT_RECEIPT,
   codexHostRepositoryAuthoritySha256,
+  readCodexHostRepositoryInitAdmission,
 } from "../lib/codex-host-layout.mjs";
 
 const PLAN_SCHEMA = "pipeline.codex-host-repository-init-plan.v1";
@@ -165,6 +172,9 @@ export function planHostRepositoryInit({ rootDir = process.cwd(), deps = {} } = 
     changes: [
       ".git",
       ".git/agent-pipeline/onboarding/continuity-history.json",
+      CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY,
+      CODEX_HOST_REPOSITORY_INIT_DIRECTORY,
+      CODEX_HOST_REPOSITORY_INIT_INTENT,
       CODEX_HOST_REPOSITORY_INIT_RECEIPT,
       CODEX_HOST_REPOSITORY_INIT_MARKER,
     ],
@@ -283,29 +293,177 @@ function removeCreatedGit(root, expected, expectedTree, fs = {}) {
   (fs.rmSync ?? rmSync)(path, { recursive: true, force: true });
 }
 
-function bindPrivateContinuity(root, { planSha256, gitVersion, gitIdentity }, fs = {}, created = {}) {
+function fsyncDirectory(path, fs = {}) {
+  if ((fs.process?.platform ?? process.platform) === "win32") return;
+  const open = fs.openSync ?? openSync;
+  const sync = fs.fsyncSync ?? fsyncSync;
+  const close = fs.closeSync ?? closeSync;
+  const descriptor = open(path, "r");
+  try { sync(descriptor); } finally { close(descriptor); }
+}
+
+function readBoundFile(path, fs = {}) {
+  const lstat = fs.lstatSync ?? lstatSync;
+  const open = fs.openSync ?? openSync;
+  const fstat = fs.fstatSync ?? fstatSync;
+  const read = fs.readFileSync ?? readFileSync;
+  const close = fs.closeSync ?? closeSync;
+  const fsConstants = fs.constants ?? constants;
+  let descriptor;
+  try {
+    const parent = dirname(path);
+    const parentIdentity = assertPhysicalDirectory(parent, fs);
+    const before = physicalIdentity(lstat(path), "file");
+    if (!before) return null;
+    descriptor = open(path, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+    const opened = physicalIdentity(fstat(descriptor), "file");
+    if (opened?.dev !== before.dev || opened?.ino !== before.ino) return null;
+    const bytes = read(descriptor);
+    const after = physicalIdentity(fstat(descriptor), "file");
+    return after?.dev === opened.dev && after?.ino === opened.ino
+      && samePhysicalIdentity(path, opened, fs)
+      && samePhysicalIdentity(parent, parentIdentity, fs)
+      ? bytes
+      : null;
+  } catch {
+    return null;
+  } finally {
+    if (descriptor !== undefined) {
+      try { close(descriptor); } catch {}
+    }
+  }
+}
+
+function exactFile(path, bytes, fs = {}) {
+  return readBoundFile(path, fs)?.compare(bytes) === 0;
+}
+
+function writeDurableExclusive(path, bytes, fs = {}) {
+  const open = fs.openSync ?? openSync;
+  const write = fs.writeFileSync ?? writeFileSync;
+  const sync = fs.fsyncSync ?? fsyncSync;
+  const close = fs.closeSync ?? closeSync;
+  const fstat = fs.fstatSync ?? fstatSync;
+  const fsConstants = fs.constants ?? constants;
+  let descriptor;
+  const parent = dirname(path);
+  const parentIdentity = assertPhysicalDirectory(parent, fs);
+  try {
+    descriptor = open(path, fsConstants.O_WRONLY | fsConstants.O_CREAT
+      | fsConstants.O_EXCL | (fsConstants.O_NOFOLLOW ?? 0), 0o600);
+    write(descriptor, bytes);
+    sync(descriptor);
+    const identity = physicalIdentity(fstat(descriptor), "file");
+    if (!identity) throw new Error("published host-init file identity is unavailable");
+    if (!samePhysicalIdentity(parent, parentIdentity, fs)) {
+      throw new Error("host-init file parent changed during publication");
+    }
+    return identity;
+  } finally {
+    if (descriptor !== undefined) close(descriptor);
+  }
+}
+
+function ensureExactDurableFile(path, bytes, fs = {}) {
+  if ((fs.existsSync ?? existsSync)(path)) {
+    if (!exactFile(path, bytes, fs)) throw new Error("host-init transaction file drifted");
+    return physicalIdentity((fs.lstatSync ?? lstatSync)(path), "file");
+  }
+  const identity = writeDurableExclusive(path, bytes, fs);
+  if (!samePhysicalIdentity(path, identity, fs) || !exactFile(path, bytes, fs)) {
+    throw new Error("host-init transaction file readback failed");
+  }
+  return identity;
+}
+
+function transactionIntent(root, planSha256) {
+  return {
+    schema: "pipeline.codex-host-repository-init-intent.v1",
+    rootSha256: sha256(Buffer.from(root, "utf8")),
+    planSha256,
+  };
+}
+
+function prepareTransaction(root, planSha256, fs = {}) {
+  const pendingPath = join(root, CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY);
+  const parent = join(root, ".claude/.runtime/agent-pipeline/onboarding");
+  const intentBytes = Buffer.from(`${JSON.stringify(transactionIntent(root, planSha256), null, 2)}\n`, "utf8");
+  const exists = fs.existsSync ?? existsSync;
+  if (!exists(pendingPath)) {
+    assertPhysicalParents(root, ".claude/.runtime/agent-pipeline/onboarding", fs);
+    const parentIdentity = assertPhysicalDirectory(parent, fs);
+    (fs.mkdirSync ?? mkdirSync)(pendingPath, { mode: 0o700 });
+    const identity = physicalIdentity((fs.lstatSync ?? lstatSync)(pendingPath), "directory");
+    if (!identity) throw new Error("host-init pending transaction identity is unavailable");
+    ensureExactDurableFile(join(pendingPath, "intent.json"), intentBytes, fs);
+    if (!samePhysicalIdentity(parent, parentIdentity, fs)) {
+      throw new Error("host-init pending parent changed during publication");
+    }
+    fsyncDirectory(pendingPath, fs);
+    fsyncDirectory(parent, fs);
+  }
+  assertPhysicalDirectory(pendingPath, fs);
+  if (!exactFile(join(pendingPath, "intent.json"), intentBytes, fs)) {
+    throw new Error("host-init pending transaction does not match the reviewed plan");
+  }
+  return { pendingPath, intentBytes };
+}
+
+function transactionGitVersion(pendingPath, root, planSha256, currentGitVersion, fs = {}) {
+  const receiptPath = join(pendingPath, "admission", "receipt.json");
+  if (!(fs.existsSync ?? existsSync)(receiptPath)) return currentGitVersion;
+  try {
+    const receiptBytes = readBoundFile(receiptPath, fs);
+    if (!receiptBytes) return null;
+    const receipt = JSON.parse(receiptBytes.toString("utf8"));
+    return receipt?.schema === "pipeline.codex-host-repository-init-receipt.v1"
+      && receipt.rootSha256 === sha256(Buffer.from(root, "utf8"))
+      && receipt.planSha256 === planSha256
+      && parseGitVersion(`git version ${receipt.gitVersion}`) === receipt.gitVersion
+      ? receipt.gitVersion
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function ensurePrivateDirectory(path, parent, created, fs = {}) {
+  const exists = fs.existsSync ?? existsSync;
+  if (exists(path)) {
+    assertPhysicalDirectory(path, fs);
+    return;
+  }
+  createPrivateDirectory(path, parent, created, fs);
+}
+
+function bindPrivateContinuity(root, {
+  planSha256,
+  gitVersion,
+  gitIdentity,
+  pendingPath,
+  intentBytes,
+}, fs = {}, created = {}) {
   const source = join(root, ".claude/.runtime/agent-pipeline/onboarding/continuity-history.json");
   const git = join(root, ".git");
   const agentPipeline = join(git, "agent-pipeline");
   const directory = join(agentPipeline, "onboarding");
   const target = join(directory, "continuity-history.json");
-  const receiptPath = join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT);
-  const markerPath = join(root, CODEX_HOST_REPOSITORY_INIT_MARKER);
+  const admissionPath = join(pendingPath, "admission");
+  const receiptPath = join(admissionPath, "receipt.json");
+  const markerPath = join(admissionPath, "marker.json");
+  const intentPath = join(admissionPath, "intent.json");
+  const finalAdmissionPath = join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY);
+  const admissionParent = join(root, ".claude/.runtime/agent-pipeline/onboarding");
   const read = fs.readFileSync ?? readFileSync;
-  const write = fs.writeFileSync ?? writeFileSync;
-  const open = fs.openSync ?? openSync;
-  const sync = fs.fsyncSync ?? fsyncSync;
-  const close = fs.closeSync ?? closeSync;
-  const historyBytes = read(source);
+  const historyBytes = readBoundFile(source, fs);
+  if (!historyBytes) throw new Error("portable continuity history changed during binding");
   if (!samePhysicalIdentity(git, gitIdentity, fs)) throw new Error("Git control identity changed before continuity binding");
-  createPrivateDirectory(agentPipeline, git, created, fs);
-  createPrivateDirectory(directory, agentPipeline, created, fs);
+  ensurePrivateDirectory(agentPipeline, git, created, fs);
+  ensurePrivateDirectory(directory, agentPipeline, created, fs);
   assertPhysicalParents(root, ".git/agent-pipeline/onboarding", fs);
-  write(target, historyBytes, { flag: "wx", mode: 0o600 });
-  created.history = physicalIdentity((fs.lstatSync ?? lstatSync)(target), "file");
+  created.history = ensureExactDurableFile(target, historyBytes, fs);
   if (!created.history) throw new Error("created continuity identity is unavailable");
-  const descriptor = open(target, "r");
-  try { sync(descriptor); } finally { close(descriptor); }
+  fsyncDirectory(directory, fs);
   const receipt = {
     schema: "pipeline.codex-host-repository-init-receipt.v1",
     planSha256,
@@ -319,24 +477,55 @@ function bindPrivateContinuity(root, { planSha256, gitVersion, gitIdentity }, fs
     branch: "main",
   };
   if (receipt.authoritySha256 === null) throw new Error("host-init authority is unavailable");
-  assertPhysicalParents(root, ".claude/.runtime/agent-pipeline/onboarding", fs);
   const receiptBytes = Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, "utf8");
-  write(receiptPath, receiptBytes, { flag: "wx", mode: 0o600 });
-  created.receipt = physicalIdentity((fs.lstatSync ?? lstatSync)(receiptPath), "file");
+  if (!(fs.existsSync ?? existsSync)(admissionPath)) {
+    (fs.mkdirSync ?? mkdirSync)(admissionPath, { mode: 0o700 });
+  }
+  const admissionIdentity = assertPhysicalDirectory(admissionPath, fs);
+  const admissionParentIdentity = assertPhysicalDirectory(admissionParent, fs);
+  created.intent = ensureExactDurableFile(intentPath, intentBytes, fs);
+  created.receipt = ensureExactDurableFile(receiptPath, receiptBytes, fs);
   if (!created.receipt) throw new Error("created receipt identity is unavailable");
-  const receiptDescriptor = open(receiptPath, "r");
-  try { sync(receiptDescriptor); } finally { close(receiptDescriptor); }
   const marker = {
     schema: "pipeline.codex-host-repository-init-marker.v1",
     rootSha256: receipt.rootSha256,
     planSha256: receipt.planSha256,
+    intentSha256: sha256(intentBytes),
     receiptSha256: sha256(receiptBytes),
   };
-  write(markerPath, `${JSON.stringify(marker, null, 2)}\n`, { flag: "wx", mode: 0o600 });
-  created.marker = physicalIdentity((fs.lstatSync ?? lstatSync)(markerPath), "file");
+  const markerBytes = Buffer.from(`${JSON.stringify(marker, null, 2)}\n`, "utf8");
+  (fs.faultInjector ?? (() => {}))("before-host-init-marker-publication");
+  created.marker = ensureExactDurableFile(markerPath, markerBytes, fs);
   if (!created.marker) throw new Error("created host-init marker identity is unavailable");
-  const markerDescriptor = open(markerPath, "r");
-  try { sync(markerDescriptor); } finally { close(markerDescriptor); }
+  fsyncDirectory(admissionPath, fs);
+  if (!samePhysicalIdentity(admissionPath, admissionIdentity, fs)) {
+    throw new Error("host-init admission directory changed before publication");
+  }
+  if ((fs.existsSync ?? existsSync)(finalAdmissionPath)) {
+    throw new Error("host-init admission appeared before atomic publication");
+  }
+  (fs.faultInjector ?? (() => {}))("before-host-init-admission-rename");
+  (fs.renameSync ?? renameSync)(admissionPath, finalAdmissionPath);
+  created.admission = physicalIdentity((fs.lstatSync ?? lstatSync)(finalAdmissionPath), "directory");
+  if (!samePhysicalIdentity(finalAdmissionPath, admissionIdentity, fs)) {
+    throw new Error("host-init admission identity changed during publication");
+  }
+  if (!samePhysicalIdentity(admissionParent, admissionParentIdentity, fs)) {
+    throw new Error("host-init admission parent changed during publication");
+  }
+  fsyncDirectory(admissionParent, fs);
+  const readback = readCodexHostRepositoryInitAdmission(root, {
+    lstat: fs.lstatSync ?? lstatSync,
+    readFile: fs.readFileSync ?? readFileSync,
+    open: fs.openSync ?? openSync,
+    fstat: fs.fstatSync ?? fstatSync,
+    close: fs.closeSync ?? closeSync,
+    fsConstants: fs.constants ?? constants,
+    platform: fs.process?.platform ?? process.platform,
+  });
+  if (!readback || readback.gitVersion !== gitVersion || readback.repositoryMode !== "host-managed") {
+    throw new Error("host-init admission exact readback failed");
+  }
 }
 
 export function applyHostRepositoryInit({
@@ -354,28 +543,68 @@ export function applyHostRepositoryInit({
       return { schema: APPLY_SCHEMA, status: "host-preimage-changed", root, diagnostics: [{ code: "plan_digest_mismatch" }] };
     }
     const exists = deps.existsSync ?? existsSync;
-    if (exists(join(root, ".git")) || exists(join(root, ".codex")) || exists(join(root, ".agents"))) {
-      return { schema: APPLY_SCHEMA, status: "host-preimage-changed", root, diagnostics: [{ code: "reserved_host_path_present" }] };
-    }
-    const spawn = deps.spawnSync ?? spawnSync;
-    const observed = spawn("git", ["--version"], { cwd: root, encoding: "utf8" });
-    const gitVersion = !observed.error && observed.status === 0 ? parseGitVersion(observed.stdout) : null;
-    if (!gitVersion) {
-      return { schema: APPLY_SCHEMA, status: "git-unavailable", root, diagnostics: [{ code: "git_2_28_required" }] };
-    }
-
-    const initialized = spawn("git", ["init", "--initial-branch=main"], { cwd: root, encoding: "utf8" });
-    if (initialized.error || initialized.status !== 0) {
+    const currentAdmission = readCodexHostRepositoryInitAdmission(root, {
+      lstat: deps.lstatSync ?? lstatSync,
+      readFile: deps.readFileSync ?? readFileSync,
+      open: deps.openSync ?? openSync,
+      fstat: deps.fstatSync ?? fstatSync,
+      close: deps.closeSync ?? closeSync,
+      fsConstants: deps.constants ?? constants,
+      platform: deps.process?.platform ?? process.platform,
+    });
+    if (currentAdmission && exists(join(root, ".git"))
+      && !exists(join(root, ".codex")) && !exists(join(root, ".agents"))) {
       return {
         schema: APPLY_SCHEMA,
-        status: "apply-failed",
+        status: "restart-required",
         root,
-        diagnostics: [{
-          code: exists(join(root, ".git"))
-            ? "git_init_failed_partial_control_path_retained"
-            : "git_init_failed",
-        }],
+        gitVersion: currentAdmission.gitVersion,
+        branch: "main",
+        createsCommit: false,
+        operatorAction: "Restart the current project session once so Codex remounts the newly initialized repository.",
+        diagnostics: [],
       };
+    }
+    const pendingPath = join(root, CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY);
+    const resuming = exists(pendingPath);
+    if (exists(join(root, ".codex")) || exists(join(root, ".agents"))
+      || (exists(join(root, ".git")) && !resuming)) {
+      return { schema: APPLY_SCHEMA, status: "host-preimage-changed", root, diagnostics: [{ code: "reserved_host_path_present" }] };
+    }
+    const transaction = prepareTransaction(root, planSha256, deps);
+    const spawn = deps.spawnSync ?? spawnSync;
+    const observed = spawn("git", ["--version"], { cwd: root, encoding: "utf8" });
+    const currentGitVersion = !observed.error && observed.status === 0 ? parseGitVersion(observed.stdout) : null;
+    if (!currentGitVersion) {
+      return { schema: APPLY_SCHEMA, status: "git-unavailable", root, diagnostics: [{ code: "git_2_28_required" }] };
+    }
+    const gitVersion = transactionGitVersion(
+      transaction.pendingPath,
+      root,
+      planSha256,
+      currentGitVersion,
+      deps,
+    );
+    if (!gitVersion) {
+      return { schema: APPLY_SCHEMA, status: "host-preimage-changed", root, diagnostics: [{ code: "pending_transaction_drift" }] };
+    }
+
+    let createdGitThisCall = false;
+    if (!exists(join(root, ".git"))) {
+      const initialized = spawn("git", ["init", "--initial-branch=main"], { cwd: root, encoding: "utf8" });
+      if (initialized.error || initialized.status !== 0) {
+        return {
+          schema: APPLY_SCHEMA,
+          status: "apply-failed",
+          root,
+          diagnostics: [{
+            code: exists(join(root, ".git"))
+              ? "git_init_failed_partial_control_path_retained"
+              : "git_init_failed",
+          }],
+        };
+      }
+      createdGitThisCall = true;
     }
     const gitIdentity = physicalIdentity((deps.lstatSync ?? lstatSync)(join(root, ".git")), "directory");
     if (!gitIdentity) {
@@ -387,22 +616,50 @@ export function applyHostRepositoryInit({
       };
     }
     const gitTree = physicalTreeSnapshot(join(root, ".git"), deps);
-    const created = { history: null, receipt: null, marker: null, directories: [] };
+    const created = {
+      admission: null,
+      history: null,
+      intent: null,
+      receipt: null,
+      marker: null,
+      directories: [],
+    };
     try {
-      bindPrivateContinuity(root, { planSha256, gitVersion, gitIdentity }, deps, created);
+      bindPrivateContinuity(root, {
+        planSha256,
+        gitVersion,
+        gitIdentity,
+        pendingPath: transaction.pendingPath,
+        intentBytes: transaction.intentBytes,
+      }, deps, created);
     } catch {
       try {
         removeCreatedFile(join(root, CODEX_HOST_REPOSITORY_INIT_MARKER), created.marker, deps);
         removeCreatedFile(join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT), created.receipt, deps);
+        removeCreatedFile(join(root, CODEX_HOST_REPOSITORY_INIT_INTENT), created.intent, deps);
+        removeCreatedDirectory(join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY), created.admission, deps);
         removeCreatedFile(join(root, ".git/agent-pipeline/onboarding/continuity-history.json"), created.history, deps);
         for (const entry of [...created.directories].reverse()) {
           removeCreatedDirectory(entry.path, entry.identity, deps);
         }
-        removeCreatedGit(root, gitIdentity, gitTree, deps);
+        if (createdGitThisCall) removeCreatedGit(root, gitIdentity, gitTree, deps);
       } catch {
         return { schema: APPLY_SCHEMA, status: "rollback-failed", root, diagnostics: [{ code: "host_init_identity_changed" }] };
       }
       return { schema: APPLY_SCHEMA, status: "apply-failed", root, diagnostics: [{ code: "continuity_binding_failed" }] };
+    }
+    try {
+      removeCreatedFile(join(transaction.pendingPath, "intent.json"),
+        physicalIdentity((deps.lstatSync ?? lstatSync)(join(transaction.pendingPath, "intent.json")), "file"),
+        deps);
+      removeCreatedDirectory(transaction.pendingPath,
+        physicalIdentity((deps.lstatSync ?? lstatSync)(transaction.pendingPath), "directory"),
+        deps);
+      fsyncDirectory(join(root, ".claude/.runtime/agent-pipeline/onboarding"), deps);
+    } catch {
+      // The committed admission is already exact and authoritative. A stale
+      // empty pending directory is non-authoritative and may be retained for
+      // an attended hygiene pass without downgrading the committed result.
     }
     return {
       schema: APPLY_SCHEMA,
