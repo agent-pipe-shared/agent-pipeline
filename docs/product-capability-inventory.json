@@ -593,6 +593,12 @@
       "member": "codex-critic-host-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-critic-isolation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-critic-isolation-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-isolated-critic-contract-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -651,6 +657,24 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "codex-host-advisor-route-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-host-repository-init-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-host-repository-init-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-pretool-guard-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-pretool-guard-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-session-start-hint-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-session-start-hint-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
@@ -785,6 +809,12 @@
       "member": "guard-devplan-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-apply-patch-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -897,6 +927,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "pipeline-start-v3-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "pipeline-start-preflight-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
@@ -1527,17 +1563,21 @@
         "verify-phase:harness/scripts/verify.mjs:codex-advisory-bootstrap-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-app-server-health-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-critic-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-critic-isolation-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-host-advisor-route-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-host-repository-init-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-isolated-critic-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-onboarding-app-server-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-onboarding-capabilities-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-onboarding-runtime-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-plugin-validator-parity-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-pretool-guard-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-private-overlay-activation-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-compatibility-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-runtime-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-select-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-session-start-hint-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-state-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-status-cli-tests",
@@ -1562,6 +1602,7 @@
         "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-check",
         "verify-phase:harness/scripts/verify.mjs:github-actions-permissions-tests",
         "verify-phase:harness/scripts/verify.mjs:github-issue-operations-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-apply-patch-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-lifecycle-ready-tests",
@@ -1587,6 +1628,7 @@
         "verify-phase:harness/scripts/verify.mjs:phase26-invariants-tests",
         "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-check",
         "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-tests",
+        "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
         "verify-phase:harness/scripts/verify.mjs:po-gate-authority-fixture-tests",
