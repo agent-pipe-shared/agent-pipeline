@@ -167,6 +167,12 @@
       "member": "PreToolUse:apply_patch|Edit|Write:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\""
     },
     {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/codex-hooks.json:SessionStart:startup|resume|clear|compact:node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/codex-hooks.json",
+      "member": "SessionStart:startup|resume|clear|compact:node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\""
+    },
+    {
       "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
       "kind": "hook",
       "path": "plugins/pipeline-core/hooks/hooks.json",
@@ -195,6 +201,12 @@
       "kind": "hook",
       "path": "plugins/pipeline-core/hooks/hooks.json",
       "member": "SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\""
+    },
+    {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\""
     },
     {
       "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs\"",
@@ -1379,6 +1391,7 @@
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-devplan.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/staleness-check.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:Stop::node \"${CLAUDE_PLUGIN_ROOT}/hooks/stop-suggest.mjs\""
@@ -1438,6 +1451,7 @@
         "guard:plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:guard-lifecycle-ready",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:Bash:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:apply_patch|Edit|Write:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
+        "hook:plugins/pipeline-core/hooks/codex-hooks.json:SessionStart:startup|resume|clear|compact:node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
         "publication:plugins/pipeline-core/.codex-plugin/plugin.json:codex-plugin-manifest"
       ],
       "runners": [

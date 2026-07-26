@@ -70,7 +70,9 @@ with the documented attended boundary.
 
 **Title**
 
-`[P2][Codex] Make plugin refresh and cross-view onboarding attestation native`
+```text
+[P2][Codex] Make plugin refresh and cross-view onboarding attestation native
+```
 
 **Labels**
 
