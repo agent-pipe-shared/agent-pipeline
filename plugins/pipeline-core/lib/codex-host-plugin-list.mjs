@@ -61,8 +61,11 @@ function selectedPlugin(document) {
     entry?.pluginId === "pipeline-core@agent-pipeline-local");
   const official = document.installed.filter((entry) =>
     entry?.pluginId === "pipeline-core@agent-pipeline");
-  const candidates = local.length > 0 ? local : official;
-  if (candidates.length !== 1) return null;
+  // Local development and the released identity share the Codex App Server.
+  // A simultaneous enabled registration is therefore an ambiguous authority,
+  // not a preference for the local candidate.
+  if (local.length + official.length !== 1) return null;
+  const candidates = local.length === 1 ? local : official;
   const entry = candidates[0];
   if (!exactObject(entry, [
     "pluginId", "name", "marketplaceName", "version", "installed", "enabled",

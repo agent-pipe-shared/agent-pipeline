@@ -43,8 +43,8 @@ export function installedPipelineIdentity(pluginList = readInstalledPluginList) 
     eligible(entry) && entry.pluginId === LOCAL_PLUGIN_ID);
   const officialMatches = payload.installed.filter((entry) =>
     eligible(entry) && entry.pluginId === PLUGIN_ID);
-  const matches = localMatches.length > 0 ? localMatches : officialMatches;
-  if (matches.length !== 1) return null;
+  if (localMatches.length + officialMatches.length !== 1) return null;
+  const matches = localMatches.length === 1 ? localMatches : officialMatches;
   const entry = matches[0];
   const exactLocalSource = entry?.marketplaceSource?.sourceType === "local"
     && typeof entry.marketplaceSource.source === "string"

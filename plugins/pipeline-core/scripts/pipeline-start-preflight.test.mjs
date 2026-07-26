@@ -144,7 +144,7 @@ test("an exact registered local marketplace is a visible development source", ()
   });
 });
 
-test("the isolated local-development installation takes precedence over the official id", () => {
+test("simultaneous local-development and official installations fail closed", () => {
   const official = JSON.parse(pluginList("0.4.4", "git")()).installed[0];
   const local = JSON.parse(pluginList(
     "0.4.5+test",
@@ -158,8 +158,8 @@ test("the isolated local-development installation takes precedence over the offi
     read: () => manifest,
   });
   assert.equal(result.status, "ready");
-  assert.equal(result.installedVersion, "0.4.5+test");
-  assert.equal(result.installedSource, "local-development");
+  assert.equal(result.installedVersion, null);
+  assert.equal(result.installedSource, "unknown");
 });
 
 test("the isolated development id is accepted only from its exact local marketplace root", () => {

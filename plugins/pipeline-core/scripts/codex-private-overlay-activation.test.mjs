@@ -132,7 +132,7 @@ test("accepts only a local marketplace root that exactly contains the selected p
   });
 });
 
-test("prefers the isolated local-development plugin over the official installation", () => {
+test("rejects simultaneous isolated local-development and official installations", () => {
   const official = pluginEntry();
   const local = pluginEntry({
     pluginId: "pipeline-core@agent-pipeline-local",
@@ -143,12 +143,7 @@ test("prefers the isolated local-development plugin over the official installati
   const result = capture(["inspect", "--project-root", PROJECT_ROOT], {
     spawnSync: successfulSpawn(document([official, local])),
   });
-  assert.deepEqual(result, {
-    code: 0,
-    stdout: "",
-    stderr: "",
-    calls: [["inspect", "--project-root", PROJECT_ROOT, "--source-plugin-root", SOURCE_PLUGIN_ROOT]],
-  });
+  assert.deepEqual(result, { code: 2, stdout: REJECTION, stderr: "", calls: [] });
 });
 
 test("rejects an isolated development id from a remote marketplace", () => {

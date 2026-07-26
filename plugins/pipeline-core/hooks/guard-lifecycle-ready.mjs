@@ -254,7 +254,12 @@ function commandPath(value, root) {
  */
 export function isForbiddenCrossRepositoryMutation(command, root, dependencies = {}) {
   const words = parseSimpleShellWords(command, root);
-  if (!words || words.length === 0) return false;
+  // The simple-word parser intentionally rejects redirection.  Detect an
+  // absolute or parent-relative redirection target before its rejection can
+  // turn into a ready-session escape from the project root.
+  if (!words || words.length === 0) {
+    return /(?:^|[\s;|&])\d*(?:>>?|<>|>&|<&)\s*["']?(?:\/|\.\.\/)/u.test(command);
+  }
   const exists = dependencies.existsSyncFn ?? existsSync;
   const executable = basename(words[0]).toLowerCase();
   const args = words.slice(1);

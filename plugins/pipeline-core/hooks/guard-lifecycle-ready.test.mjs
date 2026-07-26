@@ -189,6 +189,7 @@ test("consumer sessions cannot mutate Pipeline sources, cachebusters or plugin i
       `git -C ${outside} commit -m drift`,
       `sed -i s/old/new/ ${outside}/plugins/pipeline-core/.codex-plugin/plugin.json`,
       `rm ${outside}/plugins/pipeline-core/.codex-plugin/plugin.json`,
+      `printf x > ${outside}/plugins/pipeline-core/.codex-plugin/plugin.json`,
     ];
     for (const command of commands) {
       assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
