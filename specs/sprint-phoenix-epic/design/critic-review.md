@@ -1,6 +1,6 @@
 # Sprint Phoenix independent review record
 
-Status: correction in progress after failed initial review
+Status: initial design and privacy findings corrected; fresh re-reviews pending
 
 Date: 2026-07-26
 
@@ -46,3 +46,45 @@ The correction re-review receives only the corrected fixed diff, this prior
 finding record, the normative Spec, calibration/governance paths, exact
 machine Verify/Security evidence, and the required assurance metadata. It
 checks only these findings, their fixes, and direct regressions.
+
+## Independent privacy review — first verdict
+
+| Field | Value |
+| --- | --- |
+| Candidate commit | `1b7860616c16c3879fc67dd964f1dd48a4a58100` |
+| Candidate tree | `374248edea18bea452532771821cf6e669949b9f` |
+| Contract | `design/privacy-review.md` |
+| Assurance | `functional-equivalent-read-only; OS isolation not asserted` |
+| Dispatch | paths/refs only; uncontaminated |
+| Reviewer mutation | none |
+| Machine trajectory | consistent; exact Verify/Security candidate binding confirmed |
+| Verdict | FAIL |
+
+The privacy reviewer reported:
+
+1. **PHX-PR-01 / blocker:** ordinary repository/Git reads bypassed the
+   claimed per-stream access policy because the three canonical streams were
+   ordinary files in one repository.
+2. **PHX-PR-02 / major:** immutable portable human records could include
+   personal/pseudonymous attribution and free-form rationale, while the
+   operation and implementation inventory had no erasable restricted store,
+   deletion, or key-destruction contract.
+
+Both findings are accepted without waiver. The corrected design now:
+
+- declares Git to be one coarse repository-wide access/retention trust zone,
+  and describes the query service only as the sanctioned semantic source;
+- admits portable records only when the complete bytes are proven
+  `repository-public-safe`, non-personal, and compatible with repository
+  retention;
+- rejects natural-person identifiers, joinable pseudonyms, free-form
+  rationale, uncertain contextual identifiability, and finite-erasure or
+  narrower-access requirements before any portable temporary/final file;
+- defines a separately protected machine-local profile for the complete
+  restricted event, with no portable counterpart or join handle;
+- closes the restricted schema/store/CLI inventory and exact
+  expiry/erase/key-destruction/readback/limitation tests.
+
+A fresh privacy re-review receives only the privacy correction diff, this
+prior finding record, configured governance paths, and exact machine evidence.
+It checks PHX-PR-01/02, their corrections, and direct regressions.

@@ -42,6 +42,14 @@ The first combined shell inspection was also rejected by the lifecycle guard.
 It was replaced by separate read-only commands. No rejected command mutated
 the repository.
 
+During the privacy-correction audit, a second combined read-only command
+containing explicit source-root arguments was conservatively classified as a
+possible cross-repository action and rejected before execution. The same
+`diff --check`, status, topology, criterion-count, and privacy checks were run
+as separate commands from the already authenticated physical Phoenix root and
+passed. This is recorded as guard-routing friction, not as repository
+read-only state; the rejection produced no mutation.
+
 ## R-03 — Advisor route exhausted
 
 | Field | Value |
@@ -53,7 +61,7 @@ the repository.
 | Primary result | timeout; interrupted once |
 | Fallback | fresh smaller Advisor, 45-second limit |
 | Fallback result | timeout; interrupted once |
-| Further attempts | prohibited by the selected policy |
+| Further attempts | prohibited within the selected bootstrap route |
 | Workspace result | digest unchanged across the full route |
 | Readiness claim | Advisory unavailable; no Advisor-pass claim |
 
@@ -66,6 +74,15 @@ unavailable Advisor route into a success.
 
 See [design/advisor-review.md](design/advisor-review.md) for the bounded
 question and required follow-up.
+
+The mandatory continuation re-entry later reran the same 0.4.6 Epic
+bootstrap. Its newly selected route again performed only one bounded primary
+and one bounded fallback; both timed out and were interrupted once. The
+workspace digest
+`e6aed2d81304e623bdd976a5e4da410b2e4dbe6d8001f43f0e57db63c5a002d6`
+was unchanged before, between, and after. This was a new bootstrap duty, not a
+third attempt inside the exhausted initial route, and it created no
+Advisor-pass claim.
 
 ## R-04 — Inherited active-feature continuity
 
@@ -237,6 +254,26 @@ to correction re-review. Its public-safe SHA-256 digests are:
   `4b8e2591346f6c9b26939107992c3df60f01f72a0e4466007cc07ff8f11f72ef`;
 - Security:
   `a3b575069b933e145d3a738de8bcde1c5143de8a2dc7ed0944773a1802c69aab`.
+
+## R-05 — Initial privacy review failed closed
+
+The first independent privacy review ran on correction candidate
+`1b7860616c16c3879fc67dd964f1dd48a4a58100`, tree
+`374248edea18bea452532771821cf6e669949b9f`, with exact Verify/Security
+evidence and the literal functional-equivalent read-only assurance. It
+returned FAIL with:
+
+- a blocker because direct repository/Git reads bypassed the claimed
+  per-stream access boundary; and
+- a major because immutable portable attribution/rationale had no closed
+  erasable storage, delete, or key-destruction contract.
+
+No write or remote action occurred in the review. Phoenix accepted both
+findings, declared Git one coarse public-safe access/retention trust zone,
+prohibited personal/pseudonymous/free-form or otherwise erasable data before
+portable durability, and added the separately protected restricted-event
+schema/store/operation/test inventory. A fresh correction re-review is
+required; this recovery record does not self-issue privacy sign-off.
 
 ## Audit classification
 

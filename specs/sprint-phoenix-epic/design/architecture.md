@@ -112,6 +112,15 @@ Allowlisting, classification, size limits, and deterministic redaction happen
 before portable persistence, outbox persistence, dead-letter storage,
 diagnostics, metrics, preview, or export.
 
+The Git repository is one coarse access and retention trust zone, not a
+per-stream confidentiality boundary. Portable persistence is allowed only
+when the complete record is classified `repository-public-safe`, contains no
+natural-person identifier, joinable pseudonym, or free-form rationale, and has
+no erasure/access/retention requirement stricter than the repository itself.
+Uncertain classification fails closed. Data that needs narrower access or
+finite erasure uses the separately protected machine-local profile and never
+enters Git history.
+
 ### G-6 — Operational state is not authority
 
 Stream heads, query indexes, exporter cursors, adapter checkpoints, caches,
@@ -151,7 +160,8 @@ fields. Payload schemas own domain-specific data.
   available;
 - candidate commit/tree and governed artifact references where material;
 - policy, configuration, capture-policy, and redaction-policy digests;
-- data classification, retention class, and disclosure class;
+- data classification, storage profile, retention compatibility, and
+  disclosure class;
 - payload digest and payload object.
 
 Actor, agent, transport, approval, assumption, external-object, and delivery
@@ -202,7 +212,7 @@ authority.
 ### 4.1 Physical topology
 
 Phoenix extends ADR-0045 with a dedicated `governance-event` artifact class.
-The proposed portable root is:
+The proposed portable root is one repository-wide public-safe trust zone:
 
 ```text
 governance/events/
@@ -215,6 +225,36 @@ governance/events/
 Each event is a new immutable file. A generated `heads.json` or query index may
 exist, but it is explicitly a replaceable projection and cannot authenticate
 itself.
+
+Every repository reader or clone can read every byte in this portable root.
+Phoenix therefore does not claim that file layout, the query service, stream
+metadata, or projection policy creates per-stream ACLs or shorter retention.
+The repository's access population and durable-history policy apply to all
+portable events. A stream policy may independently decide capture eligibility
+and downstream projection/export, but it may not promise confidentiality or
+deletion that Git cannot enforce.
+
+The closed storage profiles are:
+
+| Profile | Location and controls | Admitted content | Retention/deletion behavior |
+| --- | --- | --- | --- |
+| `repository-public-safe` | immutable files under the portable root; repository-wide access and retention | closed non-personal fields, non-identifying actor/authority class, stable reason codes, public-safe evidence references | append-only; an event is rejected before persistence if its policy requires erasure, correction in place, selective access, or earlier expiry |
+| `restricted-machine-local` | outside the repository/Git common history; owner-only per-stream root, no symlink/reparse traversal, encryption at rest with a separately protected key, exact ACL/owner readback | the complete canonical decision/event when it contains natural-person attribution, a joinable pseudonym, free-form rationale, or other policy-classified restricted data | explicit record expiry/erase and key-destruction operations with preimage, authorization, readback, and sanitized receipt |
+
+The restricted profile is not portable authority, is excluded from Git,
+bundles, viewer assets, diagnostics, and ordinary export, and cannot make an
+otherwise invalid portable decision valid. It stores the whole restricted
+event, not an identity sidecar keyed by a portable event. There is no portable
+counterpart, event-ID mapping, digest, or join handle from which a repository
+reader can correlate that event. A privileged local query may read the
+restricted event only for an authorized operator; sanitized operational
+receipts never expose its subject, content, or correlation.
+
+A restricted human decision can satisfy only a local action evaluated against
+that same physically authenticated restricted store and policy. It cannot be
+transferred to another clone, repository, bundle, or external gate. If that
+store is unavailable, expired, erased, or no longer decryptable, the dependent
+local authority fails closed; no portable projection recreates it.
 
 A hash chain proves internal prefix integrity, not completeness. Every
 authority, bundle, viewer, migration, and release evaluation therefore requires
@@ -230,7 +270,8 @@ This shape is chosen over a single mutable NDJSON ledger because:
 - an earlier event is not rewritten by an append;
 - Git merge conflicts and same-sequence forks are detectable rather than
   silently line-merged;
-- individual events can carry independent retention/disclosure metadata;
+- individual events can carry capture/projection metadata while admission
+  rejects any requirement incompatible with repository-wide access/retention;
 - canonical records can be referenced by path and digest without byte-range
   ambiguity.
 
@@ -301,6 +342,30 @@ single valid chain exactly to the retained checkpoint. A fork or canonical
 interpretation change requires an appended compensating/superseding decision;
 the command can never delete or rewrite a published event.
 
+### 4.5 Read, retention, and restricted-data operations
+
+The query service is the sole sanctioned semantic source for replay, viewers,
+bundles, adapters, ITSM, and export. It validates records and disclosure
+policy; it is not an operating-system or Git confidentiality boundary. Direct
+repository reads remain possible and safe only because the portable admission
+contract excludes restricted or erasable data before the first durable byte.
+
+`governance-restricted-record
+plan-put|put|query|plan-erase|erase|plan-destroy-key|destroy-key|status`
+is the closed machine-local operation surface. Every mutation binds physical
+store identity, data class, purpose, retention deadline, expected preimage,
+authorization class, and idempotency key. `erase` proves the exact record is
+gone from the active encrypted store; `destroy-key` proves the named
+per-stream/key-generation material is unavailable after readback. Receipts
+contain only operation class, counts, pre/post digests, outcome, and explicit
+limitations. They never claim deletion from copies or backups outside the
+proved store boundary.
+
+No expiry, correction, appended disposition, portable redaction, Git removal,
+or key destruction is described as satisfying a legal erasure obligation
+beyond the exact observed store. Backup/clone retention remains an adopting
+organization responsibility and cannot be inferred as successful.
+
 ## 5. Human Governance Decision Ledger
 
 ### 5.1 Authority model
@@ -323,19 +388,24 @@ expiry, consumption, revocation, and policy binding.
 
 The payload carries:
 
-- actor class and public-safe actor reference;
+- non-identifying actor/authority class;
 - attribution source;
 - identity-assurance class;
 - timestamp and time-assurance class;
 - authorization source;
 - outcome and stable reason code;
-- bounded rationale only where policy requires it;
 - exact scope tuple and evidence references;
 - single-use, expiry, consumes, revokes, supersedes, and compensates links.
 
-A local user label is not presented as cryptographically verified identity.
+A natural-person label, joinable pseudonym, and free-form rationale are not
+portable v1 payload fields. When an adopting organization needs them, the
+restricted machine-local profile stores and erases the complete decision event
+under its own purpose, ACL, encryption, and retention policy. It creates no
+portable counterpart or join. A privileged local query may display that
+separately authorized restricted event; portable authority resolution depends
+only on independently valid non-identifying portable decisions.
 Signature and trusted-time references are optional, separately verified
-assurance.
+assurance and never legal-identity proof.
 
 ### 5.3 Migration
 
@@ -716,13 +786,18 @@ Threats include:
 - secrets in errors, previews, metrics, queues, or dead letters;
 - malicious high-cardinality fields and resource exhaustion;
 - cross-repository/private-coordinate leakage;
+- direct repository/clone reads bypassing a projection policy;
+- personal or erasable content entering immutable Git history;
+- machine-local restricted records surviving expiry or key rotation;
 - mutable projections authenticating themselves.
 
 Controls include closed schemas, repository/candidate binding, canonical bytes,
 hash chains, idempotency, size/count limits, allowlisted fields, redaction
 before persistence, physical-path checks, endpoint scheme/allowlists, TLS
-requirements, least privilege, source-last projections, exact readback, and
-separate authority resolution.
+requirements, repository-wide portable admission, restricted-store
+owner/ACL/encryption checks, explicit erase/key-destruction readback, least
+privilege, source-last projections, exact readback, and separate authority
+resolution.
 
 Regulatory references guide controls without becoming product claims:
 
@@ -782,6 +857,7 @@ Delivery waves:
    lifecycle manifest now; implementation first delivers the transactional
    feature-package manifest writer missing from the #22 base, then PX-0 plus
    the shared envelope, event store, checkpoint verifier, recovery command,
+   repository-public-safe admission, restricted machine-local record store,
    policy hooks, and topology extension.
 2. **Canonical streams:** #30, #17, and #9 foundation; #5 begins with base
    artifacts.
@@ -812,6 +888,17 @@ The first package owns this exact writer inventory:
 | `plugins/pipeline-core/lib/feature-package-writer.test.mjs` | cover absent/existing manifests, preimage drift, illegal transitions, rollback seams, readback, replay, path/privacy and authority failures |
 | `plugins/pipeline-core/scripts/feature-package.mjs` | expose `inspect|plan|apply|status` with digest-bound explicit activation and sanitized output |
 | `plugins/pipeline-core/scripts/feature-package.test.mjs` | prove the CLI never turns preview, chat, handover, or a stale candidate into a manifest write |
+
+The kernel package additionally owns the restricted-data inventory that the
+bound Spec's generic event-store inventory did not enumerate:
+
+| File | Contract |
+| --- | --- |
+| `plugins/pipeline-core/schemas/governance-restricted-record.schema.json` | closed purpose/data-class/retention/encryption-generation request and receipt shapes; no portable join handle |
+| `plugins/pipeline-core/lib/governance-restricted-store.mjs` | owner-only physical store, ACL/reparse checks, encryption boundary, expiry, exact erase and key-destruction readback |
+| `plugins/pipeline-core/lib/governance-restricted-store.test.mjs` | reject Git/repository roots, unsafe permissions, joins in portable output, replay/drift, expired records, incomplete erase and unverifiable key destruction |
+| `plugins/pipeline-core/scripts/governance-restricted-record.mjs` | expose only the closed plan/apply/query/status operations in §4.5 with sanitized output |
+| `plugins/pipeline-core/scripts/governance-restricted-record.test.mjs` | prove confirmation, authorization, preimage, idempotency, crash recovery, backup-limit disclosure, and no-false-erasure claims |
 
 ## 17. Rejected architecture alternatives
 

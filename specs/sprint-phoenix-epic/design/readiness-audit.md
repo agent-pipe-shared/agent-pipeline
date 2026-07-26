@@ -1,6 +1,6 @@
 # Sprint Phoenix design readiness audit
 
-Status: initial candidate failed Critic; correction and re-review in progress
+Status: initial design and privacy reviews failed; corrections and re-reviews in progress
 
 Date: 2026-07-26
 
@@ -25,7 +25,7 @@ independent review, commit, push, implementation, and final Epic completion.
 | Remain independent of Nova/Cyborg/Nightwing | Accepted prerequisites and negative dependency gate `EPIC-AC-02` | PROVEN in design; implementation evidence pending |
 | Use Advisor help | Approved bounded primary and one fallback attempted; both timed out; workspace digest unchanged; [advisor-review.md](advisor-review.md) | ATTEMPTED / UNAVAILABLE, never passed |
 | Obtain independent semantic review | Initial fixed candidate received one uncontaminated read-only Critic verdict; [critic-review.md](critic-review.md) | FAILED with three blockers and three majors; every finding has a required correction |
-| Satisfy the data-privacy policy gate | [privacy-review.md](privacy-review.md) inventories processing, flows, minimization, retention/access, external boundaries, and fixtures | NOT MET until a fresh fixed-candidate reviewer signs off |
+| Satisfy the data-privacy policy gate | [privacy-review.md](privacy-review.md) inventories processing, repository-wide portable access/retention, fail-closed non-personal admission, restricted local erasure, external boundaries, and fixtures | Initial review FAIL; corrections prepared; fresh re-review required |
 | Produce readable PRD and exact Spec binding | [../prd_phoenix-epic.md](../prd_phoenix-epic.md) plus its `technical-spec-sha256` marker | PROVEN as draft; approval pending |
 | No implementation before literal `approved` | Only the design package, lifecycle state, and recovery audit are changed; no product source/schema/test is created | PROVEN for current workspace |
 
@@ -83,6 +83,9 @@ trusted time, destination retention, analyst review, or compliance.
 | Branch/readback | `sprint_phoenix...origin/main`; no push performed |
 | Full repository Verify on initial candidate | exit 0, exact candidate/tree bound; machine evidence SHA-256 `4b8e2591346f6c9b26939107992c3df60f01f72a0e4466007cc07ff8f11f72ef` |
 | Integrated Security on initial candidate | exit 0 / CLEAN; machine evidence SHA-256 `a3b575069b933e145d3a738de8bcde1c5143de8a2dc7ed0944773a1802c69aab` |
+| Full repository Verify on six-finding correction candidate | exit 0 at `1b7860616c16c3879fc67dd964f1dd48a4a58100`, tree `374248edea18bea452532771821cf6e669949b9f`; evidence SHA-256 `ed981314372daebc81dc2f52b00042a34c40b60fae1edb7de4db20546a119583` |
+| Integrated Security on six-finding correction candidate | exit 0 / CLEAN at the same candidate/tree; evidence SHA-256 `55ac566017d8b6ef69249218990768e38f735b8a00ab172e0088134498dc05ff` |
+| Independent privacy review on six-finding correction candidate | FAIL with one blocker and one major; machine trajectory consistent; both findings accepted and corrected |
 
 The machine files are Git-ignored by repository policy and are passed directly
 as evidence paths to the next Critic. Their command, exit code, timestamp,
@@ -109,7 +112,8 @@ evidence, issue closure, and Product Owner approval remain unclaimed.
 
 1. Complete all six Critic corrections and create the canonical lifecycle
    manifest/Result.
-2. Obtain independent privacy sign-off on the fixed correction candidate.
+2. Commit and verify the privacy corrections, then obtain a fresh bounded
+   re-review of PHX-PR-01/02 and their direct regressions.
 3. Freshly re-review the prior findings, fixes, and direct regressions with
    exact machine evidence.
 4. Reconcile the canonical handover and design-gate continuity projection.

@@ -96,7 +96,10 @@ named test or deterministic Verify step and exact candidate evidence.
   decision missing or mismatching any required dimension.
 - **H-AC-05:** WHEN identity or time is locally attributed rather than
   independently attested, THE SYSTEM SHALL record the lower assurance class and
-  SHALL NOT claim verified identity or trusted time.
+  SHALL NOT claim verified identity or trusted time. A portable repository
+  record SHALL contain only the non-identifying authority/actor class and
+  assurance; any natural-person attribution or joinable pseudonymous reference
+  SHALL remain in the separately protected, erasable machine-local profile.
 - **H-AC-06:** WHEN an authority decision is consumed, revoked, expired, or
   superseded, THE SYSTEM SHALL leave the original event unchanged and append
   the new disposition.
@@ -114,9 +117,14 @@ named test or deterministic Verify step and exact candidate evidence.
   constraints, and mandatory follow-up review; it SHALL NOT create a standing
   implicit bypass.
 - **H-AC-11:** WHEN a reviewer reconstructs a human decision, THE SYSTEM SHALL
-  expose request, attributed actor and assurance, time and assurance, exact
-  scope, bounded rationale/reason, policy and rule digests, evidence, outcome,
-  consumption, revocation, expiry, correction, and supersession.
+  expose request, actor/authority class and assurance, time and assurance,
+  exact scope, stable reason code, policy and rule digests, evidence, outcome,
+  consumption, revocation, expiry, correction, and supersession. A
+  natural-person attribution or free-form rationale MAY be exposed only from
+  a separately protected machine-local decision record to an authorized local
+  query. That restricted record SHALL have no portable counterpart or join
+  handle and SHALL NOT be persisted in, bundled from, or inferred by a
+  repository record.
 - **H-AC-12:** WHEN an existing guard, plan, release, deployment, or override
   path grants or consumes human authority, including `guard-devplan`,
   `guard-push`, `pipeline-state`, release planning, deploy approval/consumption,
@@ -126,8 +134,13 @@ named test or deterministic Verify step and exact candidate evidence.
   and carry the shared compatibility owner and expiry.
 - **H-AC-13:** IF a proposed portable ledger entry contains a secret, raw
   prompt, complete transcript, unrestricted command/output, private path, or
-  private coordinate, THEN THE SYSTEM SHALL reject or redact it before
-  persistence according to the closed capture policy.
+  private coordinate, natural-person identifier, joinable pseudonym,
+  free-form rationale, or any data whose policy requires selective access,
+  finite erasure, correction in place, or a retention period shorter than the
+  repository's, THEN THE SYSTEM SHALL reject portable persistence before any
+  temporary or final file exists. Deterministic redaction MAY produce a new
+  public-safe request only when the result is classified for the repository's
+  single access/retention trust zone.
 - **H-AC-14:** WHEN the human-ledger package is declared complete, THE SYSTEM
   SHALL provide maintained schemas, event taxonomy, authority/trust model,
   threat model, migration, retention, recovery, and operator guidance.
@@ -170,8 +183,12 @@ named test or deterministic Verify step and exact candidate evidence.
   `assumed`, `inferred`, `observed`, `verified`, `contradicted`,
   `unavailable`, and `unknown` as distinct typed states.
 - **A-AC-12:** WHEN journal retention, access, or integrity policy is resolved,
-  THE SYSTEM SHALL keep it independently configurable from the human ledger
-  without permitting either policy to weaken the other's authority boundary.
+  THE SYSTEM SHALL keep capture eligibility and downstream projection/export
+  policy independently configurable from the human ledger without permitting
+  either policy to weaken the other's authority boundary. Portable records in
+  one Git repository SHALL share that repository's access and retention
+  boundary; a stream requiring a narrower boundary SHALL use the separately
+  protected machine-local profile or fail closed before persistence.
 - **A-AC-13:** WHEN interrupted, concurrent, duplicate, or out-of-order journal
   submissions occur, THE SYSTEM SHALL produce deterministic typed outcomes and
   preserve one valid canonical history or a fail-closed fork state.

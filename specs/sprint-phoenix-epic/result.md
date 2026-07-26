@@ -26,3 +26,22 @@ machine-bound trajectory evidence. The exact dispositions are maintained in
 
 No implementation package is authorized while these findings or the literal
 Product Owner plan gate remain open.
+
+## Entry 2 — First independent privacy review
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-07-26 |
+| Candidate commit | `1b7860616c16c3879fc67dd964f1dd48a4a58100` |
+| Candidate tree | `374248edea18bea452532771821cf6e669949b9f` |
+| Full Verify | exit 0; machine evidence binds the exact candidate/tree |
+| Security | exit 0 / CLEAN; machine evidence binds the exact candidate/tree |
+| Independent privacy review | FAIL under `functional-equivalent-read-only; OS isolation not asserted` |
+| Remote write | none |
+
+The reviewer found one blocker and one major: portable Git files could not
+enforce the claimed per-stream access boundary, and personal/pseudonymous
+attribution or free-form rationale had no separately erasable storage and
+operation contract. The findings are accepted and corrected in the normative
+acceptance and architecture documents. A fresh bounded privacy re-review is
+required; this failed entry is never rewritten into a pass.
