@@ -169,6 +169,21 @@ Portable records use UTF-8 JSON with:
   [RFC 8785 JSON Canonicalization Scheme](https://www.rfc-editor.org/rfc/rfc8785.html);
 - SHA-256 for v1 record and chain digests.
 
+The v1 digest preimage is exact and non-recursive:
+
+```text
+payloadDigest = SHA-256(JCS(payload))
+eventDigest = SHA-256(
+  UTF8("pipeline.governance-event.v1\0")
+  || JCS(envelope with exactly eventDigest omitted)
+)
+```
+
+The closed schema requires `eventDigest` in a persisted record, but the
+verifier reconstructs the digest preimage by omitting only that named field.
+It never hashes a placeholder, a mutable head, filesystem metadata, or an
+implementation-dependent JSON representation.
+
 The schema stores the algorithm and canonicalization profile so a future
 version can migrate without reinterpreting v1 bytes. Signing does not reuse the
 hash chain as proof of actor identity or trusted time.
@@ -201,6 +216,15 @@ Each event is a new immutable file. A generated `heads.json` or query index may
 exist, but it is explicitly a replaceable projection and cannot authenticate
 itself.
 
+A hash chain proves internal prefix integrity, not completeness. Every
+authority, bundle, viewer, migration, and release evaluation therefore requires
+an expected stream checkpoint `{repositoryFingerprint, streamId, sequence,
+eventDigest, candidateCommit, candidateTree}` from an exact candidate-bound
+evidence artifact, retained human decision, or separately validated signed
+bundle. A head may locate that checkpoint but cannot supply it. With no
+independently retained checkpoint, an offline verifier returns
+`prefix-valid`/completeness `unknown`; it never returns a gate-capable pass.
+
 This shape is chosen over a single mutable NDJSON ledger because:
 
 - an earlier event is not rewritten by an append;
@@ -222,12 +246,14 @@ One sanctioned writer performs:
 4. lock the exact stream head;
 5. re-read repository, policy, previous event, and candidate preconditions;
 6. allocate sequence and event ID;
-7. write a mode-safe same-directory temporary file;
-8. fsync the file, atomically publish it, and fsync the directory where
+7. compute the payload and event digests from the exact §3.2 preimages;
+8. write a mode-safe same-directory temporary file;
+9. fsync the file, atomically publish it, and fsync the directory where
    supported;
-9. read back and revalidate exact bytes and chain;
-10. update the replaceable head/index source-last;
-11. return a sanitized receipt.
+10. read back and revalidate exact bytes and chain;
+11. update the replaceable head/index source-last;
+12. return a sanitized receipt containing the exact checkpoint witness for
+    independent candidate-bound retention.
 
 A concurrent writer either observes the new head and retries with the same
 idempotency key or fails typed. It never creates a second valid event for the
@@ -239,14 +265,41 @@ same idempotency key.
 | --- | --- | --- |
 | no final event, temporary present | pre-publication interruption | writer-owned cleanup after physical identity and age checks |
 | final event valid, head stale | event committed; projection interrupted | rebuild/advance head after full chain validation |
-| head names missing/invalid event | projection corruption | fail closed; reconstruct from last valid chain and record a recovery decision |
+| head names missing/invalid event | projection corruption | fail closed; reconstruct only to an independently retained checkpoint and record the recovery receipt |
 | two events claim one previous digest/sequence | concurrent or Git-merge fork | fail closed; human disposition plus compensating/superseding record |
 | event exists with wrong repository fingerprint | cross-repository write | quarantine as invalid evidence; never consume |
-| chain truncated/reordered/modified | tampering or incomplete checkout | fail verification and all dependent authority claims |
+| chain truncated/reordered/modified | tampering or incomplete checkout | fail verification against the required checkpoint and all dependent authority claims |
 | idempotency replay matches exact event | safe retry | return existing receipt with zero write |
 | idempotency replay conflicts | ambiguous duplicate | fail closed |
 
 The writer never deletes a published canonical event as recovery.
+
+### 4.4 Verification and recovery command
+
+The normative public service surface is
+`governance-event preview|append|verify|query|recover`. The shorter inventory in
+the bound Spec is not permission to omit `recover`; `K-AC-05..07` and this
+section are the stricter acceptance contract.
+
+`recover` accepts one closed
+`pipeline.governance-event-recovery-request.v1` with:
+
+- physical repository fingerprint and stream ID;
+- expected candidate commit/tree and retained checkpoint;
+- observed registry, head, chain, fork, temporary-file, and journal digests;
+- exact recovery kind: `resume-publication`, `rebuild-projection`, or
+  `append-disposition`;
+- idempotency key, expected preimage digest, and requested postimage digest;
+- a valid human-ledger decision reference for any action that changes
+  canonical interpretation or authority.
+
+The command writes through the same stream lock and writer journal, validates
+the checkpoint before mutation, publishes source-last, reseals exact
+postimages, and returns a candidate-bound recovery receipt after readback.
+Projection rebuild needs no new human decision only when it reproduces the
+single valid chain exactly to the retained checkpoint. A fork or canonical
+interpretation change requires an appended compensating/superseding decision;
+the command can never delete or rewrite a published event.
 
 ## 5. Human Governance Decision Ledger
 
@@ -295,6 +348,24 @@ and receipts are inventoried. A legacy record becomes:
 
 No historical actor, time, rationale, or approval is reconstructed from chat or
 mutable state.
+
+The direct-reader inventory is mandatory rather than illustrative:
+
+| Authority surface | Direct consumer to migrate | Dual-read obligation |
+| --- | --- | --- |
+| plan approval | `plugins/pipeline-core/hooks/guard-devplan.mjs` | compare mutable projection with the exact live ledger decision and deny disagreement |
+| push, deploy, and promotion approval | `plugins/pipeline-core/hooks/guard-push.mjs` | validate decision scope, consumption, candidate/artifact/environment, and expiry |
+| plan/push/deploy writers and recovery | `harness/scripts/pipeline-state.mjs` | append/read back the decision before projecting mutable state |
+| Git guard override | `plugins/pipeline-core/hooks/guard-git.mjs` and its override ledger | bind decision, target repository, single use, restoration, and consumption |
+| release planning | `plugins/pipeline-core/scripts/release-version-plan.mjs` and release gate callers | validate the candidate/release decision before transition |
+
+The Phoenix integration-package owner owns this compatibility migration. The
+window expires at the earlier of Phoenix integration close or 2026-10-31.
+Before expiry, every migrated reader dual-evaluates and fails closed on
+disagreement; all new authority writes are ledger-first. At expiry, any
+unmigrated direct reader or unresolved disagreement blocks Phoenix completion,
+release, and compatibility removal. Extending the date requires a new human
+decision with owner, reason, bounded replacement date, and fresh review.
 
 ## 6. Agent Decision and Assumption Journal
 
@@ -666,12 +737,18 @@ Regulatory references guide controls without becoming product claims:
 Phoenix documentation must state that technical support does not establish
 legal applicability or compliance.
 
+The design-stage data inventory, purposes, minimization rules, retention/access
+boundaries, external-flow checks, and sign-off criteria are maintained in
+[privacy-review.md](privacy-review.md). It is a blocking independent review,
+not a self-attestation by this architecture.
+
 ## 16. Dependency graph and delivery waves
 
 ```mermaid
 flowchart TD
-    BASE[#10 exchange + #22 topology + ADR-0046] --> PX0[PX-0 ruleset-source trust root]
-    BASE --> K[PX-1 governance event kernel]
+    BASE[#10 exchange + #22 topology/preview + ADR-0046] --> PKG[Phoenix lifecycle bootstrap/writer closure]
+    PKG --> PX0[PX-0 ruleset-source trust root]
+    PKG --> K[PX-1 governance event kernel]
     K --> H[#30 human decision ledger]
     K --> L[#17 lifecycle stream and replay]
     K --> P[#9 policy packs and bundle foundation]
@@ -701,8 +778,11 @@ Mermaid check: passed.
 
 Delivery waves:
 
-1. **Trust root and kernel:** PX-0 plus shared envelope, event store, policy
-   hooks, integrity verifier, and topology extension.
+1. **Package authority, trust root and kernel:** create the reviewed Phoenix
+   lifecycle manifest now; implementation first delivers the transactional
+   feature-package manifest writer missing from the #22 base, then PX-0 plus
+   the shared envelope, event store, checkpoint verifier, recovery command,
+   policy hooks, and topology extension.
 2. **Canonical streams:** #30, #17, and #9 foundation; #5 begins with base
    artifacts.
 3. **Dependent records/adapters:** #31 and #23.
@@ -714,6 +794,24 @@ Delivery waves:
 Repository WIP remains one implementation package at a time. Parallelism is
 limited to independent read-only review or testing; no two writers own the same
 files or event stream.
+
+The initial checked-in Phoenix `lifecycle.json` is a reviewed design artifact,
+not evidence that the missing production writer exists. Before any later
+package or consumer creates or transitions a manifest, Phoenix implements a
+single transactional writer with closed preview, expected-manifest digest,
+required authority class, same-directory durable replacement, exact readback,
+candidate/evidence binding, and idempotent replay. Until that writer passes
+Verify and Critic, no bundle, viewer, adapter, or Close path may infer
+lifecycle authority from a hand-written or legacy package.
+
+The first package owns this exact writer inventory:
+
+| File | Contract |
+| --- | --- |
+| `plugins/pipeline-core/lib/feature-package-writer.mjs` | validate preview authority, exact manifest preimage, legal transition, artifact digests and candidate/evidence binding; publish transactionally |
+| `plugins/pipeline-core/lib/feature-package-writer.test.mjs` | cover absent/existing manifests, preimage drift, illegal transitions, rollback seams, readback, replay, path/privacy and authority failures |
+| `plugins/pipeline-core/scripts/feature-package.mjs` | expose `inspect|plan|apply|status` with digest-bound explicit activation and sanitized output |
+| `plugins/pipeline-core/scripts/feature-package.test.mjs` | prove the CLI never turns preview, chat, handover, or a stale candidate into a manifest write |
 
 ## 17. Rejected architecture alternatives
 

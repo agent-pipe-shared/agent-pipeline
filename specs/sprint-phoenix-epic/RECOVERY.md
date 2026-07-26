@@ -212,6 +212,32 @@ The canonical handover still reports `Last updated: 2026-07-25` despite later
 non-documentation commits. That is retained as an explicit drift warning and
 does not reopen the Product Owner-dispositioned 0.4.6 work.
 
+### Critic route and initial verdict
+
+After the fixed design candidate was committed, the prescribed selected
+read-only host-bridge dispatch was prepared with exact commit/tree,
+governance paths, ruleset, and no prose. The environment approval boundary
+denied that external bridge action before a child or payload export. The
+denial was not retried or bypassed, and the temporary request was removed.
+
+The standing Product Owner-authorized functional equivalent then ran one fresh
+paths/refs-only Critic with no chat history, no delegation, and no invoked
+write tool under the literal assurance
+`functional-equivalent-read-only; OS isolation not asserted`. It returned
+FAIL with three blockers and three majors. The durable finding/disposition
+record is [design/critic-review.md](design/critic-review.md). No effective
+model identity or native isolation is claimed.
+
+The unchanged initial candidate subsequently passed the canonical Full Verify
+and integrated Security gate through the host boundary. The machine-written,
+Git-ignored evidence binds the exact candidate commit/tree and remains an input
+to correction re-review. Its public-safe SHA-256 digests are:
+
+- Verify:
+  `4b8e2591346f6c9b26939107992c3df60f01f72a0e4466007cc07ff8f11f72ef`;
+- Security:
+  `a3b575069b933e145d3a738de8bcde1c5143de8a2dc7ed0944773a1802c69aab`.
+
 ## Audit classification
 
 These records illustrate the Phoenix recovery profile:
@@ -230,9 +256,10 @@ profile.
 
 | Risk | Owner | Expiry | State |
 | --- | --- | --- | --- |
-| Advisor route unavailable | Phoenix Elephant; Product Owner controls Critic dispatch | 2026-07-31 | Critic explicitly authorized; fixed-candidate review pending |
+| Advisor route unavailable | Phoenix Elephant; Product Owner controls Critic dispatch | 2026-07-31 | Initial Critic failed; correction, privacy review, and re-review pending |
 | Inherited 0.4.6 continuity could not close through the exposed sanctioned route | Product Owner controlled exception authority; Phoenix Elephant controlled exact execution/readback | 2026-07-31 | RESOLVED 2026-07-26; exact repair, close, Phoenix initialization, cleanup, and V4 readback recorded |
 | Canonical handover lags the current released implementation | Phoenix close owner; Product Owner controls any scope change | 2026-07-31 | OPEN documentation drift; completed 0.4.6 work remains excluded from Phoenix product scope |
+| Mutable authority-reader compatibility could remain indefinite | Phoenix integration-package owner | Earlier of Phoenix integration close or 2026-10-31 | Direct readers inventoried; dual-read fail-closed migration and expiry now normative; implementation evidence pending |
 
 Expiry is a stop/review point, not automatic permission. See
 [design/governance-conformance.md](design/governance-conformance.md).

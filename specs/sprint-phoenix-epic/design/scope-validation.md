@@ -57,7 +57,7 @@ must be consumed without unpublished sibling work:
 | Dependency | Readback | Phoenix use |
 | --- | --- | --- |
 | [#10](https://github.com/agent-pipe-shared/agent-pipeline/issues/10) | closed/completed 2026-07-24 | `pipeline.control-execution-exchange.v1` is the minimum event correlation input. Phoenix does not depend on Nova #14. |
-| [#22](https://github.com/agent-pipe-shared/agent-pipeline/issues/22) | closed/completed 2026-07-24 | ADR-0045 and `governance/artifact-topology.json` provide canonical artifact identity and retention classes. |
+| [#22](https://github.com/agent-pipe-shared/agent-pipeline/issues/22) | closed/completed 2026-07-24 | ADR-0045 and `governance/artifact-topology.json` provide canonical artifact identity, validation, retention classes, and non-mutating transition previews. They do not provide a lifecycle manifest writer; Phoenix owns that explicit closure before dependent bundle/viewer/adapter use. |
 | [#27](https://github.com/agent-pipe-shared/agent-pipeline/issues/27) | closed/completed 2026-07-24 | Existing least-privilege Actions policy remains the automation floor. |
 | ADR-0046 | accepted on base | Public Core, neutral project authority, private overlay, generated runner projections, and machine-local state remain distinct. |
 

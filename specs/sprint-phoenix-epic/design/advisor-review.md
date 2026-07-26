@@ -10,6 +10,7 @@
 | Workspace mutation | none; guarded digest unchanged |
 | Readiness effect | no Advisor-pass claim |
 | Compensating review authority | Product Owner explicitly authorized the fixed-candidate read-only Critic on 2026-07-26 |
+| Initial compensating review | FAIL with three blockers and three majors; no finding waived |
 
 ## Bounded review set
 
@@ -56,3 +57,8 @@ Before the PRD is presented for approval:
 
 The compensating review can establish local design readiness. It cannot make
 claims about the unavailable Advisor execution.
+
+The first compensating review is recorded in
+[critic-review.md](critic-review.md). It found concrete integrity, migration,
+privacy, recovery, lifecycle, and evidence gaps. Phoenix remains in design
+correction until independent privacy review and a fresh bounded re-review pass.

@@ -1,6 +1,6 @@
 # Sprint Phoenix design readiness audit
 
-Status: design content ready; fixed-candidate review pending
+Status: initial candidate failed Critic; correction and re-review in progress
 
 Date: 2026-07-26
 
@@ -24,6 +24,8 @@ independent review, commit, push, implementation, and final Epic completion.
 | Produce one coherent Epic architecture | Separate canonical streams over one event kernel; dependency graph and one-writer package sequence in [architecture.md](architecture.md) | PROVEN |
 | Remain independent of Nova/Cyborg/Nightwing | Accepted prerequisites and negative dependency gate `EPIC-AC-02` | PROVEN in design; implementation evidence pending |
 | Use Advisor help | Approved bounded primary and one fallback attempted; both timed out; workspace digest unchanged; [advisor-review.md](advisor-review.md) | ATTEMPTED / UNAVAILABLE, never passed |
+| Obtain independent semantic review | Initial fixed candidate received one uncontaminated read-only Critic verdict; [critic-review.md](critic-review.md) | FAILED with three blockers and three majors; every finding has a required correction |
+| Satisfy the data-privacy policy gate | [privacy-review.md](privacy-review.md) inventories processing, flows, minimization, retention/access, external boundaries, and fixtures | NOT MET until a fresh fixed-candidate reviewer signs off |
 | Produce readable PRD and exact Spec binding | [../prd_phoenix-epic.md](../prd_phoenix-epic.md) plus its `technical-spec-sha256` marker | PROVEN as draft; approval pending |
 | No implementation before literal `approved` | Only the design package, lifecycle state, and recovery audit are changed; no product source/schema/test is created | PROVEN for current workspace |
 
@@ -79,10 +81,14 @@ trusted time, destination retention, analyst review, or compliance.
 | PRD technical-Spec binding | exact SHA-256 marker matches current `spec.md` |
 | Git whitespace check for tracked changes | pass |
 | Branch/readback | `sprint_phoenix...origin/main`; no push performed |
+| Full repository Verify on initial candidate | exit 0, exact candidate/tree bound; machine evidence SHA-256 `4b8e2591346f6c9b26939107992c3df60f01f72a0e4466007cc07ff8f11f72ef` |
+| Integrated Security on initial candidate | exit 0 / CLEAN; machine evidence SHA-256 `a3b575069b933e145d3a738de8bcde1c5143de8a2dc7ed0944773a1802c69aab` |
 
-Full Verify, Security, privacy review, implementation tests, native platform
-evidence, Critic, and issue closure are deliberately not claimed in the design
-phase.
+The machine files are Git-ignored by repository policy and are passed directly
+as evidence paths to the next Critic. Their command, exit code, timestamp,
+candidate commit/tree, before/after cleanliness, and step/scanner outcomes are
+machine written. Privacy sign-off, implementation tests, native platform
+evidence, issue closure, and Product Owner approval remain unclaimed.
 
 ## Completed pre-review authority transitions
 
@@ -94,13 +100,20 @@ phase.
 3. The Product Owner explicitly authorized the fixed-candidate Critic.
 4. A repeated full bootstrap passed under Pipeline 0.4.6. The canonical
    handover's 2026-07-25 date remains a visible documentation-drift warning.
+5. The first fixed candidate was committed and received a FAIL verdict with six
+   evidence-gated findings; no finding was waived.
+6. Full Verify and integrated Security subsequently passed on that exact
+   unchanged candidate through the required host boundary.
 
 ## Remaining authority gates
 
-1. Fix the design and recovery record in one local candidate commit.
-2. Run the authorized independent Critic on fixed paths and refs.
-3. Correct and freshly re-review any blocking or major finding.
-4. Present the readable PRD and wait for the literal Product Owner
+1. Complete all six Critic corrections and create the canonical lifecycle
+   manifest/Result.
+2. Obtain independent privacy sign-off on the fixed correction candidate.
+3. Freshly re-review the prior findings, fixes, and direct regressions with
+   exact machine evidence.
+4. Reconcile the canonical handover and design-gate continuity projection.
+5. Present the readable PRD and wait for the literal Product Owner
    `approved` implementation gate.
 
 No remote write is needed for these design-readiness steps.

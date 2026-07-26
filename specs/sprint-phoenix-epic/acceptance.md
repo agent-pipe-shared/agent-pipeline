@@ -53,16 +53,24 @@ named test or deterministic Verify step and exact candidate evidence.
 - **K-AC-03:** IF an idempotency key is reused with different content, THEN THE
   SYSTEM SHALL fail closed without adding an event.
 - **K-AC-04:** WHEN an event is published, THE SYSTEM SHALL create one immutable
-  canonical file, bind its previous digest and sequence, atomically read it
-  back, and update only replaceable indexes source-last.
+  canonical file, compute its domain-separated event digest over canonical
+  bytes with exactly the `eventDigest` field omitted, bind its previous digest
+  and sequence, atomically read it back, emit an independently retainable
+  checkpoint witness, and update only replaceable indexes source-last.
 - **K-AC-05:** IF two records fork from one predecessor or claim one sequence,
   THEN THE SYSTEM SHALL mark the stream invalid until an explicit governed
-  disposition is appended.
+  disposition is appended through the sanctioned recovery operation; recovery
+  SHALL never delete or rewrite either published record.
 - **K-AC-06:** IF a canonical record is truncated, reordered, changed,
   duplicated, symlinked, path-substituted, or bound to another repository, THEN
-  offline verification SHALL fail.
+  offline verification against the required candidate-bound or independently
+  retained checkpoint SHALL fail. Without such a checkpoint, verification may
+  report only `prefix-valid`/completeness `unknown` and SHALL NOT satisfy an
+  authority, bundle, viewer, migration, or release gate.
 - **K-AC-07:** WHEN an index/head is absent or stale but canonical records form
-  one valid chain, THE SYSTEM SHALL rebuild the projection without changing
+  one valid chain up to the required checkpoint, THE SYSTEM SHALL rebuild the
+  projection only through `governance-event recover` with exact preimage,
+  checkpoint, idempotency, write-ahead, and readback binding, without changing
   canonical records.
 - **K-AC-08:** IF a head/index asserts a canonical record that is absent or
   invalid, THEN THE SYSTEM SHALL fail closed rather than trusting the
@@ -110,8 +118,12 @@ named test or deterministic Verify step and exact candidate evidence.
   scope, bounded rationale/reason, policy and rule digests, evidence, outcome,
   consumption, revocation, expiry, correction, and supersession.
 - **H-AC-12:** WHEN an existing guard, plan, release, deployment, or override
-  path grants or consumes human authority, THE SYSTEM SHALL reference and
-  validate the canonical decision ID before the transition becomes effective.
+  path grants or consumes human authority, including `guard-devplan`,
+  `guard-push`, `pipeline-state`, release planning, deploy approval/consumption,
+  and Git-guard override consumption, THE SYSTEM SHALL reference and validate
+  the canonical decision ID before the transition becomes effective. Every
+  direct reader SHALL dual-evaluate during migration, fail on disagreement,
+  and carry the shared compatibility owner and expiry.
 - **H-AC-13:** IF a proposed portable ledger entry contains a secret, raw
   prompt, complete transcript, unrestricted command/output, private path, or
   private coordinate, THEN THE SYSTEM SHALL reject or redact it before
@@ -219,15 +231,20 @@ named test or deterministic Verify step and exact candidate evidence.
   credentials, endpoints, private tenant/project coordinates, private actor
   mappings, and private signing keys.
 - **P-AC-06:** WHEN a bundle is built, THE SYSTEM SHALL inventory artifacts
-  through #22, bind exact source digests, policy versions, event-chain heads,
-  candidate/release identity, and verification results, and fail on missing,
-  orphaned, misplaced, stale, or illegally mutable required artifacts.
+  through a valid `pipeline.feature-package.v1` manifest and the #22 topology
+  validator, bind exact source digests, policy versions, independently retained
+  event-chain checkpoints, candidate/release identity, and verification
+  results, and fail on legacy, missing, orphaned, misplaced, stale, truncated,
+  or illegally mutable required artifacts.
 - **P-AC-07:** WHEN a bundle is signed, THE SYSTEM SHALL use an external key
   interface and declare signature/key/time assurance without implying trusted
   identity, custody, retention, or compliance beyond the evidence.
 - **P-AC-08:** WHEN a normative PRD/Spec/acceptance/result is required at Close,
-  THE SYSTEM SHALL retain it at a durable topology path or require an explicit
-  human disposition; handover prose SHALL NOT substitute for it.
+  THE SYSTEM SHALL retain it at a durable topology path under a valid lifecycle
+  manifest or require an explicit human disposition; initial manifest creation
+  and every lifecycle transition SHALL use an exact preview, authority class,
+  candidate/evidence binding, transactional writer, and readback. Handover
+  prose SHALL NOT substitute for it.
 - **P-AC-09:** WHEN historical events would become exportable after a policy or
   destination change, THE SYSTEM SHALL require exact preview and explicit
   backfill consent.
@@ -468,8 +485,8 @@ named test or deterministic Verify step and exact candidate evidence.
 ## Epic integration and release
 
 - **EPIC-AC-01:** WHEN any issue package is delivered, THE SYSTEM SHALL retain
-  its issue mapping, exact dependencies, candidate evidence, and independent
-  closure status within the single Phoenix Epic.
+  its issue mapping, exact dependencies, valid lifecycle manifest, candidate
+  evidence, and independent closure status within the single Phoenix Epic.
 - **EPIC-AC-02:** IF a package consumes an unpublished Nova, Cyborg, or
   Nightwing commit, THEN Phoenix verification SHALL fail.
 - **EPIC-AC-03:** WHEN implementation deviates from this rigor-2 specification,

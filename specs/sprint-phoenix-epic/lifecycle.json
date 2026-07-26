@@ -1,0 +1,116 @@
+{
+  "schema": "pipeline.feature-package.v1",
+  "feature": {
+    "id": "sprint-phoenix-epic",
+    "rigor": 2
+  },
+  "state": "draft",
+  "artifacts": [
+    {
+      "class": "prd",
+      "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+      "sha256": "93cef81e4d80c8f9adf1854fc90466d1a627afdf4557e4d3fd0bc42716914d5c",
+      "authority": true,
+      "mutability": "immutable",
+      "retention": "active"
+    },
+    {
+      "class": "spec",
+      "path": "specs/sprint-phoenix-epic/spec.md",
+      "sha256": "4bb3bbc47aade0d7c9c71fc4a43dafe196573c222c4d5643c8ee1be7686e2c3e",
+      "authority": true,
+      "mutability": "immutable",
+      "retention": "active"
+    },
+    {
+      "class": "acceptance",
+      "path": "specs/sprint-phoenix-epic/acceptance.md",
+      "sha256": "c99af3e3a4076ee3480749550026dfb78c271589afd4702b063f0bc39178a7e6",
+      "authority": true,
+      "mutability": "mutable",
+      "retention": "active"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/RECOVERY.md",
+      "sha256": "23442d2154c37462021d48ac574ba186d551ac87b988a4d5ac217d2cbca2a532",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "result",
+      "path": "specs/sprint-phoenix-epic/result.md",
+      "sha256": "c27b4d382f4c4cae130c6300cbfd12c7f11d6cdaaabe909aa3846b5ca75ae0d5",
+      "authority": true,
+      "mutability": "append-only",
+      "retention": "active"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/design/advisor-review.md",
+      "sha256": "32d0cf36b495bb58e0a6874f0610d14e129562cea0ac39450661fe3d94d58b0f",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/design/architecture.md",
+      "sha256": "b8491c331df2b3d4290e6df1e4aab8f46b37b4f94ee23dc0f5ff9678842034ce",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/design/critic-review.md",
+      "sha256": "eb4fd73e55cf26539f9bb10f14005f8edb281ad4f76f5b1bfd4a621091a6162e",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/design/governance-conformance.md",
+      "sha256": "e15b7a659ca939b98ceea1d26a9bca41ef6d855a23972a33cab50091b56aef8e",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/design/issue-coverage.md",
+      "sha256": "06f03b29bfd36a033474c56eada4d25251f64927b8238e824cfef5f4e4a9ef88",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/design/privacy-review.md",
+      "sha256": "8a80dc2ac6ae2b2ae8b2b65167fd0b393800b3eb6a96ea90ee51c9de3e049131",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/design/readiness-audit.md",
+      "sha256": "13c29d64d4cf74e81f0e9686490ebccf42b6b0d9fd1267652e200357af487d12",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-phoenix-epic/design/scope-validation.md",
+      "sha256": "7cb1c6927fae7f7867dd7ee9a94faf57f88f87016d626c92a7a9c1d6dceae1ce",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    }
+  ],
+  "candidate": null,
+  "supersedes": null
+}

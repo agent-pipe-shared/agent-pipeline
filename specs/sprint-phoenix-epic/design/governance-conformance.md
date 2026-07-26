@@ -1,6 +1,6 @@
 # Sprint Phoenix governance conformance
 
-Status: design-stage assessment
+Status: design correction under independent review
 
 Date: 2026-07-26
 
@@ -36,22 +36,23 @@ No design-stage deviation from the twelve guidelines is proposed.
 
 | # | Policy item | Current state | Required evidence before implementation close/push |
 | --- | --- | --- | --- |
-| 1 | Data-privacy review | PENDING | Independent privacy review on the exact integrated candidate; prohibited-content fixtures prove absence from canonical events, projections, queues, receipts, bundles, viewer, diagnostics, and exports. |
+| 1 | Data-privacy review | NOT MET until independent sign-off | [privacy-review.md](privacy-review.md) now defines the processing inventory, data flows, minimization, retention/access boundaries, fixtures, and exact sign-off gate. A fresh fixed-candidate privacy review remains blocking. |
 | 2 | Threat model updated | MET (design) | [architecture.md §15](architecture.md#15-security-and-privacy-posture) defines current threats/controls. Implementation creates and maintains `docs/phoenix-governance-threat-model.md` and obtains blocking Security review. |
 | 3 | License header present | NOT APPLICABLE to current Markdown-only design | Every future source/schema file follows the repository's license/SPDX convention; Verify checks the implemented candidate. |
 | 4 | Rollback path documented | MET (design) | `spec.md` migration/compatibility, stateful recovery checklist, architecture crash matrices, and `RECOVERY.md` define recovery authority and no-history-fabrication. |
 | 5 | Third-party license compliance | NOT APPLICABLE to current design | No package dependency is added. Any implementation dependency/profile library requires exact registry identity, pin, license allowlist check, and evidence before dispatch/merge. |
 | 6 | Secrets handling reviewed | MET (design) | Default-deny schemas, pre-persistence redaction, machine-local secret bindings, endpoint restrictions, and prohibited-content tests are normative. |
-| 7 | Backward compatibility assessed | MET (design) | Dual-read bounded migration, new-write-only ledger, immutable legacy schemas, no fabricated history, and separately approved compatibility removal are specified. |
+| 7 | Backward compatibility assessed | MET (corrected design; re-review pending) | Every direct plan/push/deploy/release/override reader is now inventoried; dual-read is ledger-first, disagreement fails closed, the integration-package owner is named, and the window expires no later than 2026-10-31. |
 | 8 | Deferred-risk owner/expiry | MET for current design record | The current course-gate risks are owned and dated below; implementation residuals cannot close without the same treatment. |
 
 ## Current course-gate risks
 
 | Risk | Owner | Expiry | Required disposition |
 | --- | --- | --- | --- |
-| `PHX-DESIGN-ADVISORY-UNAVAILABLE` | Phoenix Elephant, with PO authority for review dispatch | 2026-07-31 | The fixed-candidate Critic is explicitly authorized and pending; never claim Advisor pass. |
+| `PHX-DESIGN-ADVISORY-UNAVAILABLE` | Phoenix Elephant, with PO authority for review dispatch | 2026-07-31 | Initial compensating Critic completed with six findings; correction, privacy review, and fresh re-review are pending. Never claim Advisor pass. |
 | `PHX-DESIGN-INHERITED-CONTINUITY` | Product Owner for exception authority; Phoenix Elephant for exact execution/readback | 2026-07-31 | RESOLVED 2026-07-26 through the documented exact repair, sanctioned writers, Phoenix continuity initialization, cleanup, and full bootstrap readback. |
 | `PHX-DESIGN-HANDOVER-DRIFT` | Phoenix close owner; Product Owner controls scope | 2026-07-31 | Reconcile the canonical handover at close without reopening Product Owner-dispositioned 0.4.6 implementation. |
+| `PHX-LEGACY-AUTHORITY-COMPATIBILITY` | Phoenix integration-package owner | Earlier of Phoenix integration close or 2026-10-31 | Migrate every direct mutable authority reader, dual-evaluate ledger/state, block disagreement, and prohibit compatibility removal or Phoenix completion while any reader remains unmigrated. |
 
 If an open risk reaches its date without disposition, the Phoenix design returns to a
 blocked course gate. The expiry does not authorize the action automatically.
@@ -65,7 +66,7 @@ The later Critic dispatch must contain only:
 - `.claude/pipeline.json`;
 - `governance/examples/guidelines`;
 - `governance/examples/policies`;
-- the deterministic design-evidence path(s);
+- the prior Critic record and exact machine Verify/Security evidence paths;
 - the loaded ruleset SHA and project name;
 - `verdict:yes`;
 - the exact approved read-only assurance.
