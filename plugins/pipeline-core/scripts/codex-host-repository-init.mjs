@@ -392,10 +392,32 @@ function removeCreatedDirectory(path, expected, fs = {}, quarantineParent) {
 function fsyncDirectory(path, fs = {}) {
   if ((fs.process?.platform ?? process.platform) === "win32") return;
   const open = fs.openSync ?? openSync;
+  const fstat = fs.fstatSync ?? fstatSync;
   const sync = fs.fsyncSync ?? fsyncSync;
   const close = fs.closeSync ?? closeSync;
-  const descriptor = open(path, "r");
-  try { sync(descriptor); } finally { close(descriptor); }
+  const fsConstants = fs.constants ?? constants;
+  const before = physicalIdentity((fs.lstatSync ?? lstatSync)(path), "directory");
+  if (!before) throw drift("host-init durability path is not a physical directory");
+  const descriptor = open(
+    path,
+    fsConstants.O_RDONLY
+      | (fsConstants.O_DIRECTORY ?? 0)
+      | (fsConstants.O_NOFOLLOW ?? 0),
+  );
+  try {
+    const opened = physicalIdentity(fstat(descriptor), "directory");
+    if (!opened || opened.dev !== before.dev || opened.ino !== before.ino) {
+      throw drift("host-init durability directory changed before fsync");
+    }
+    sync(descriptor);
+    const after = physicalIdentity(fstat(descriptor), "directory");
+    if (!after || after.dev !== opened.dev || after.ino !== opened.ino
+      || !samePhysicalIdentity(path, opened, fs)) {
+      throw drift("host-init durability directory changed during fsync");
+    }
+  } finally {
+    close(descriptor);
+  }
 }
 
 function readBoundFileObservation(path, fs = {}, { preserveOperationalError = false } = {}) {

@@ -1044,6 +1044,78 @@ test("retry repeats pending and parent directory durability before Git preparati
   }
 });
 
+test("retry rejects an ABA replacement of each durability directory descriptor", () => {
+  for (const relativeTarget of [
+    CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY,
+    ".claude/.runtime/agent-pipeline/onboarding",
+  ]) {
+    const root = fixture();
+    const plan = planHostRepositoryInit({
+      rootDir: root,
+      deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+    });
+    const target = join(root, relativeTarget);
+    let targetDescriptor = null;
+    let failed = false;
+    const first = applyHostRepositoryInit({
+      rootDir: root,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        openSync(path, flags, mode) {
+          const descriptor = openSync(path, flags, mode);
+          if (path === target) targetDescriptor = descriptor;
+          return descriptor;
+        },
+        fsyncSync(descriptor) {
+          if (descriptor === targetDescriptor && !failed) {
+            failed = true;
+            const error = new Error("synthetic initial directory fsync failure");
+            error.code = "EIO";
+            throw error;
+          }
+          return fsyncSync(descriptor);
+        },
+        closeSync(descriptor) {
+          if (descriptor === targetDescriptor) targetDescriptor = null;
+          return closeSync(descriptor);
+        },
+      },
+    });
+    assert.equal(first.status, "apply-failed");
+    assert.deepEqual(first.diagnostics, [{ code: "git_control_preparation_failed" }]);
+    assert.equal(existsSync(join(root, ".git")), false);
+
+    const original = `${target}.original`;
+    const foreign = `${target}.foreign`;
+    let swapped = false;
+    const retried = applyHostRepositoryInit({
+      rootDir: root,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        openSync(path, flags, mode) {
+          if (path === target && !swapped) {
+            swapped = true;
+            renameSync(target, original);
+            mkdirSync(target, { mode: 0o700 });
+            const descriptor = openSync(target, flags, mode);
+            renameSync(target, foreign);
+            renameSync(original, target);
+            return descriptor;
+          }
+          return openSync(path, flags, mode);
+        },
+      },
+    });
+    assert.equal(retried.status, "host-preimage-changed");
+    assert.deepEqual(retried.diagnostics, [{ code: "pending_git_control_drift" }]);
+    assert.equal(existsSync(join(root, ".git")), false);
+    assert.equal(existsSync(target), true);
+    assert.equal(existsSync(foreign), true);
+  }
+});
+
 test("Git-tree read failures remain operational rather than preimage drift", () => {
   const root = fixture();
   const plan = planHostRepositoryInit({

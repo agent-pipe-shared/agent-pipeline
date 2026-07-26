@@ -379,7 +379,11 @@ reservation, or initialized proof repeats that file's fsync plus Git and
 pending-directory fsync before admission publication. The pending transaction
 retry also fsyncs its parent directory before any Git preparation, so a
 visible pending path cannot skip a failed directory-entry publication
-boundary. Visible exact bytes alone cannot skip a failed durability boundary.
+boundary. Every directory fsync uses a no-follow directory descriptor and
+requires its `fstat` identity before/after fsync plus the final pathname
+identity to equal the pre-open observation; an ABA replacement is
+`host-preimage-changed`. Visible exact bytes alone cannot skip a failed
+durability boundary.
 
 Receipt v1 was emitted only by unpublished local 0.4.5 test candidates and
 lacks the physical Git postimage. The release candidate does not accept or

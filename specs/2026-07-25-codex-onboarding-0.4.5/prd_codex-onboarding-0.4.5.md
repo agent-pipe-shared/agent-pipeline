@@ -9,7 +9,7 @@
 > reliable project work. Approval authorizes implementation dispatch only; it
 > does not authorize push, merge, tag, publication, Issue closure, or release.
 
-<!-- technical-spec-sha256: 5138f62da77ea11826ce01fe5da55955448f0111325e0f706a184ff4537a815b -->
+<!-- technical-spec-sha256: dede6520733f58ccf4b54e52aa1a700deff80bf795edaaa1b213d716de52addc -->
 
 The technical approval binds the exact neighboring [spec.md](spec.md). Any
 change to that file after approval invalidates the implementation gate until
@@ -260,7 +260,8 @@ declared by 0.4.5; it does not permit a fabricated hook capability.
       the specific Git-control preparation classification rather than falling
       through to a generic host failure. Before Git preparation, retry also
       re-establishes the pending directory's own durability and its
-      publication in the parent directory.
+      publication in the parent directory through no-follow descriptors bound
+      to the exact pre/post physical identities.
 - [ ] The physical Git postimage is carried only by the closed v2 receipt;
       unpublished unbound v1 test receipts are terminal invalid, and released
       0.4.4 compatibility is unaffected because it issued no such receipt.
