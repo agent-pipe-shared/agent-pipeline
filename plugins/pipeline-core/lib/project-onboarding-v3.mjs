@@ -23,7 +23,11 @@ import {
   hasCodexRuntimeControlMount,
   observeCodexHostRepositoryInitAdmission,
 } from "./codex-host-layout.mjs";
-import { appServerNextAction, observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
+import {
+  appServerNextAction,
+  observeOnboardingAppServer,
+  RUNNERS_WITHOUT_APP_SERVER,
+} from "./codex-onboarding-app-server.mjs";
 import { observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
 import {
   applyOnboardingContinuityRepair,
@@ -1150,7 +1154,12 @@ function validAppServerComponent(value) {
     || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(["code", "required", "status"])) {
     return false;
   }
-  if (value.required === false) return value.status === "not-requested" && value.code === null;
+  // `not-requested` (this intent does not need it) and `not-applicable` (this
+  // runner has no App-Server concept at all) are both code-free non-required
+  // states; every required state keeps its exact existing status/code pairing.
+  if (value.required === false) {
+    return (value.status === "not-requested" || value.status === "not-applicable") && value.code === null;
+  }
   if (value.required !== true || typeof value.code !== "string" || !/^CAS-[A-Z0-9-]+$/u.test(value.code)) return false;
   if (value.status === "running") return value.code === "CAS-READY";
   if (value.status === "execution-denied") return value.code === "CAS-EXECUTION-UNAVAILABLE";
@@ -1160,7 +1169,12 @@ function validAppServerComponent(value) {
     && value.code !== "CAS-DAEMON-UNREACHABLE";
 }
 
-function observeReadyAppServer(intent, fs) {
+function notApplicableAppServer() { return { required: false, status: "not-applicable", code: null }; }
+
+function observeReadyAppServer(intent, runner, fs) {
+  // A runner with no App-Server concept is not-applicable for every intent: no
+  // observation is attempted, nothing is claimed running, nothing blocks.
+  if (RUNNERS_WITHOUT_APP_SERVER.has(runner)) return notApplicableAppServer();
   if (intent === "onboarding") return emptyAppServer();
   try {
     const observed = fs.observeOnboardingAppServer({ intent });
@@ -1222,7 +1236,7 @@ function readyLifecycleResult({ root, intent, repository, runtime, continuity = 
   // plugin-managed projection still requires the same single, read-only
   // App-Server observation as a project-local projection before bootstrap,
   // session, or dispatch may report ready.
-  const appServer = observeReadyAppServer(intent, fs);
+  const appServer = observeReadyAppServer(intent, runner, fs);
   if (appServer.required === true && appServer.status !== "running") {
     const status = appServer.status === "execution-denied"
       ? "app-server-execution-denied"

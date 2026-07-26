@@ -32,6 +32,15 @@ import {
 } from "../lib/project-authority.mjs";
 
 const SCHEMA = "pipeline.v3-bootstrap-authority.v1";
+/**
+ * The restart barrier and its native readback are Codex-specific: the barrier
+ * binds a `codexExecutableSha256` and proves a fresh Codex process reloaded the
+ * projected runtime. A runner listed here has no comparable contract in this
+ * codebase, so requiring that artifact would be a permanently unsatisfiable
+ * gate rather than evidence. Such a runner reports the honest
+ * `runtimeReadback: "not-applicable"` and never claims `"current"`.
+ */
+const RUNNERS_WITHOUT_NATIVE_READBACK = new Set(["claude"]);
 
 function diagnostic(path, code, message, repair) {
   return { path, code, message, repair };
@@ -99,7 +108,23 @@ function repositoryCapability(root, deps) {
   return hasHostManagedCalibration(root, deps) ? "host-managed" : "local";
 }
 
-function projectionCurrent(root, inspection, runtimeProjection, extra = {}, deps = {}) {
+function projectionCurrent(root, inspection, runtimeProjection, extra = {}, deps = {}, runner = "codex") {
+  if (RUNNERS_WITHOUT_NATIVE_READBACK.has(runner)) {
+    // The private Codex runtime authority is never read for this runner: no
+    // restart barrier has to exist on disk, and none is fabricated.
+    return {
+      schema: SCHEMA,
+      status: "ready",
+      root,
+      source: inspection.source,
+      sourceKind: "v3",
+      sourceSha256: inspection.sourceSha256,
+      runtimeProjection,
+      runtimeReadback: "not-applicable",
+      diagnostics: [],
+      ...extra,
+    };
+  }
   const repositoryMode = repositoryCapability(root, deps);
   let barrier;
   try {
@@ -201,7 +226,13 @@ function parseArgs(args) {
   return parsed;
 }
 
-export function validateV3BootstrapAuthority({ rootDir = process.cwd(), deps = {} } = {}) {
+/**
+ * `runner` is the runner the caller already derived from the project's own V3
+ * source. It defaults to `"codex"`, so every existing caller keeps today's
+ * exact native-readback requirement; a `null`/unknown value also stays on that
+ * fail-closed Codex path.
+ */
+export function validateV3BootstrapAuthority({ rootDir = process.cwd(), deps = {}, runner = "codex" } = {}) {
   const inspection = inspectRunnerProfileMigrationV3({ rootDir, deps });
   if (inspection.status !== "ready") {
     return rejected(inspection.root, [diagnostic(
@@ -305,7 +336,7 @@ export function validateV3BootstrapAuthority({ rootDir = process.cwd(), deps = {
     });
   }
 
-  return projectionCurrent(plan.root, inspection, "noop", {}, deps);
+  return projectionCurrent(plan.root, inspection, "noop", {}, deps, runner);
 }
 
 export function main(args = process.argv.slice(2), {
