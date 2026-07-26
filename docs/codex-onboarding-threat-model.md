@@ -82,9 +82,12 @@ transport, not invented by onboarding.
   repeat their capability probes and cannot reuse onboarding/bootstrap
   readiness.
 - Host initialization first durably publishes a private pending intent bound
-  to the reviewed plan and root. If the process ends after Git initialization
-  but before admission publication, the same digest-bound apply resumes that
-  intent; an unrelated physical `.git` without it remains a preimage failure.
+  to the reviewed plan and root. It exclusively reserves `.git`, durably binds
+  that directory's device/inode identity before `git init`, and records the
+  closed initialized core-tree digest only after successful initialization.
+  If the process ends before admission publication, the same digest-bound
+  apply resumes only that exact reserved identity and tree. A partial,
+  replaced, or unrelated physical `.git` cannot borrow the pending intent.
 - The host admission is one mode-0700 directory published by a single atomic
   rename. It contains an exact intent, receipt, and marker. The marker binds
   both intent and receipt digests; the receipt binds root, reviewed plan,
@@ -105,8 +108,9 @@ rename, directory fsync, exact descriptor-bound readback, and identity-bound
 cleanup. The host-init files are assembled below the exact pending intent and
 renamed as one directory, so the authoritative namespace exposes neither a
 receipt-only nor marker-only crash state. A retry resumes the exact pending
-intent and byte-identical partial files; a mismatched pending intent, foreign
-Git path, raced parent/leaf, or changed postimage fails closed. Runtime and
+intent, reserved Git identity/tree, and byte-identical partial files; a
+mismatched pending intent, partial/replaced/foreign Git path, raced
+parent/leaf, or changed postimage fails closed. Runtime and
 kickoff writers verify every preimage, retain crash-recovery authority, and
 roll back only files/directories whose device, inode, link count, and digest
 still match the writer's records. Foreign or identity-drifted paths are

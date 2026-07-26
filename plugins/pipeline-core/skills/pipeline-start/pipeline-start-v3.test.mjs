@@ -71,7 +71,7 @@ const cases = [
     assert.match(skill, /pipeline\.codex-host-repository-init-apply\.v1/u);
     assert.match(skill, /initializes Git without a commit, copies the private kickoff continuity\s+history into the new Git control path/u);
     assert.match(skill, /atomically publishes one private\s+digest-bound admission directory containing the transaction intent, post-init\s+receipt, and receipt-digest marker in `\.claude\/\.runtime`/u);
-    assert.match(skill, /An exact\s+pending intent makes the same confirmed apply restart-safe; it is never\s+readiness by itself/u);
+    assert.match(skill, /An exact\s+pending intent plus the same exclusively reserved Git directory identity and\s+successfully initialized closed core-tree make the confirmed apply\s+restart-safe; a partial or replaced `\.git` fails closed, and pending state is\s+never readiness by itself/u);
     assert.match(skill, /fresh Codex\s+hook can distinguish the otherwise identical empty protected mount/u);
     assert.match(skill, /mutates no portable\s+Pipeline\/project file/u);
     assert.match(skill, /exactly one ordinary project-session\s+restart/u);

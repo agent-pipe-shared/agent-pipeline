@@ -125,7 +125,10 @@ receipt into the new Git control path. It never runs the full onboarding
 inspector at the host boundary and never writes `.codex/**`. Before Git
 initialization it persists an exact private transaction intent. A process
 interruption resumes only that same plan/root intent instead of treating the
-resulting Git path as a fresh repository.
+resulting Git path as a fresh repository. The helper exclusively reserves the
+Git control directory and binds its physical identity before initialization;
+retry requires that same identity plus the successfully initialized closed
+core-tree digest. A partial or replaced control directory is never admission.
 
 The successful host apply requires exactly one ordinary project-session
 restart so Codex remounts the new repository. Only the exact durable host-init

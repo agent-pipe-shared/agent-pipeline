@@ -41,6 +41,22 @@ import {
 
 const PLAN_SCHEMA = "pipeline.codex-host-repository-init-plan.v1";
 const APPLY_SCHEMA = "pipeline.codex-host-repository-init-apply.v1";
+const GIT_RESERVATION_SCHEMA = "pipeline.codex-host-git-reservation.v1";
+const GIT_INITIALIZED_SCHEMA = "pipeline.codex-host-git-initialized.v1";
+const GIT_RESERVATION_FILE = "git-reservation.json";
+const GIT_INITIALIZED_FILE = "git-initialized.json";
+const GIT_TEMPLATE_DIRECTORY = "git-template";
+const INITIAL_GIT_PATHS = new Set([
+  "",
+  "HEAD",
+  "config",
+  "objects",
+  "objects/info",
+  "objects/pack",
+  "refs",
+  "refs/heads",
+  "refs/tags",
+]);
 const REQUIRED = [
   "pipeline.user.yaml",
   ".claude/pipeline.json",
@@ -279,20 +295,6 @@ function removeCreatedDirectory(path, expected, fs = {}) {
   (fs.rmdirSync ?? rmdirSync)(path);
 }
 
-function removeCreatedGit(root, expected, expectedTree, fs = {}) {
-  const path = join(root, ".git");
-  const exists = fs.existsSync ?? existsSync;
-  if (!exists(path)) return;
-  if (!samePhysicalIdentity(path, expected, fs)) {
-    throw new Error("created Git control directory changed identity before rollback");
-  }
-  const actualTree = physicalTreeSnapshot(path, fs);
-  if (JSON.stringify(actualTree) !== JSON.stringify(expectedTree)) {
-    throw new Error("created Git control tree changed before rollback");
-  }
-  (fs.rmSync ?? rmSync)(path, { recursive: true, force: true });
-}
-
 function fsyncDirectory(path, fs = {}) {
   if ((fs.process?.platform ?? process.platform) === "win32") return;
   const open = fs.openSync ?? openSync;
@@ -409,22 +411,149 @@ function prepareTransaction(root, planSha256, fs = {}) {
   return { pendingPath, intentBytes };
 }
 
-function transactionGitVersion(pendingPath, root, planSha256, currentGitVersion, fs = {}) {
-  const receiptPath = join(pendingPath, "admission", "receipt.json");
-  if (!(fs.existsSync ?? existsSync)(receiptPath)) return currentGitVersion;
+function readClosedJson(path, keys, schema, fs = {}) {
   try {
-    const receiptBytes = readBoundFile(receiptPath, fs);
-    if (!receiptBytes) return null;
-    const receipt = JSON.parse(receiptBytes.toString("utf8"));
-    return receipt?.schema === "pipeline.codex-host-repository-init-receipt.v1"
-      && receipt.rootSha256 === sha256(Buffer.from(root, "utf8"))
-      && receipt.planSha256 === planSha256
-      && parseGitVersion(`git version ${receipt.gitVersion}`) === receipt.gitVersion
-      ? receipt.gitVersion
+    const bytes = readBoundFile(path, fs);
+    if (!bytes) return null;
+    const value = JSON.parse(bytes.toString("utf8"));
+    return value && typeof value === "object" && !Array.isArray(value)
+      && value.schema === schema
+      && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort())
+      ? { value, bytes }
       : null;
   } catch {
     return null;
   }
+}
+
+function initialGitTree(path, fs = {}) {
+  const rows = physicalTreeSnapshot(path, fs).filter(
+    (row) => row.path !== "agent-pipeline" && !row.path.startsWith("agent-pipeline/"),
+  );
+  if (rows.some((row) => !INITIAL_GIT_PATHS.has(row.path))) {
+    throw new Error("initialized Git control tree contains an unexpected path");
+  }
+  if (!INITIAL_GIT_PATHS.size || rows.length !== INITIAL_GIT_PATHS.size) {
+    throw new Error("initialized Git control tree is incomplete");
+  }
+  return rows.map(({ path: relativePath, kind, sha256: digestValue = null }) => ({
+    path: relativePath,
+    kind,
+    sha256: digestValue,
+  }));
+}
+
+function prepareGitControl(root, planSha256, currentGitVersion, pendingPath, spawn, fs = {}) {
+  const gitPath = join(root, ".git");
+  const reservationPath = join(pendingPath, GIT_RESERVATION_FILE);
+  const initializedPath = join(pendingPath, GIT_INITIALIZED_FILE);
+  const templatePath = join(pendingPath, GIT_TEMPLATE_DIRECTORY);
+  const exists = fs.existsSync ?? existsSync;
+  const rootSha256 = sha256(Buffer.from(root, "utf8"));
+  let gitIdentity;
+  if (!exists(gitPath)) {
+    const rootIdentity = assertPhysicalDirectory(root, fs);
+    (fs.mkdirSync ?? mkdirSync)(gitPath, { mode: 0o700 });
+    gitIdentity = physicalIdentity((fs.lstatSync ?? lstatSync)(gitPath), "directory");
+    if (!gitIdentity || !samePhysicalIdentity(root, rootIdentity, fs)) {
+      throw new Error("Git reservation identity is unavailable");
+    }
+    const reservation = {
+      schema: GIT_RESERVATION_SCHEMA,
+      rootSha256,
+      planSha256,
+      device: gitIdentity.dev,
+      inode: gitIdentity.ino,
+    };
+    ensureExactDurableFile(
+      reservationPath,
+      Buffer.from(`${JSON.stringify(reservation, null, 2)}\n`, "utf8"),
+      fs,
+    );
+    fsyncDirectory(gitPath, fs);
+    fsyncDirectory(root, fs);
+    fsyncDirectory(pendingPath, fs);
+  } else {
+    const observed = readClosedJson(
+      reservationPath,
+      ["device", "inode", "planSha256", "rootSha256", "schema"],
+      GIT_RESERVATION_SCHEMA,
+      fs,
+    );
+    gitIdentity = physicalIdentity((fs.lstatSync ?? lstatSync)(gitPath), "directory");
+    if (!observed || !gitIdentity
+      || observed.value.rootSha256 !== rootSha256
+      || observed.value.planSha256 !== planSha256
+      || observed.value.device !== gitIdentity.dev
+      || observed.value.inode !== gitIdentity.ino) {
+      throw new Error("existing Git control path is not the reserved transaction path");
+    }
+  }
+
+  const initialized = exists(initializedPath)
+    ? readClosedJson(
+      initializedPath,
+      ["gitTreeSha256", "gitVersion", "planSha256", "rootSha256", "schema"],
+      GIT_INITIALIZED_SCHEMA,
+      fs,
+    )
+    : null;
+  if (initialized) {
+    const logicalTree = initialGitTree(gitPath, fs);
+    if (initialized.value.rootSha256 !== rootSha256
+      || initialized.value.planSha256 !== planSha256
+      || parseGitVersion(`git version ${initialized.value.gitVersion}`) !== initialized.value.gitVersion
+      || initialized.value.gitTreeSha256 !== sha256(Buffer.from(JSON.stringify(logicalTree), "utf8"))) {
+      throw new Error("initialized Git control proof drifted");
+    }
+    return {
+      gitIdentity,
+      gitVersion: initialized.value.gitVersion,
+      gitTreeSha256: initialized.value.gitTreeSha256,
+    };
+  }
+  if (exists(initializedPath)) throw new Error("initialized Git control proof is invalid");
+
+  if (!exists(templatePath)) (fs.mkdirSync ?? mkdirSync)(templatePath, { mode: 0o700 });
+  const templateIdentity = assertPhysicalDirectory(templatePath, fs);
+  if ((fs.readdirSync ?? readdirSync)(templatePath).length !== 0) {
+    throw new Error("Git initialization template is not empty");
+  }
+  const initializedResult = spawn(
+    "git",
+    ["init", "--initial-branch=main", `--template=${templatePath}`],
+    { cwd: root, encoding: "utf8" },
+  );
+  if (initializedResult.error || initializedResult.status !== 0) {
+    return { status: "git-init-failed", gitIdentity };
+  }
+  if (!samePhysicalIdentity(gitPath, gitIdentity, fs)) {
+    throw new Error("Git control identity changed during initialization");
+  }
+  if (!samePhysicalIdentity(templatePath, templateIdentity, fs)
+    || (fs.readdirSync ?? readdirSync)(templatePath).length !== 0) {
+    throw new Error("Git initialization template changed during initialization");
+  }
+  const logicalTree = initialGitTree(gitPath, fs);
+  const initializedProof = {
+    schema: GIT_INITIALIZED_SCHEMA,
+    rootSha256,
+    planSha256,
+    gitVersion: currentGitVersion,
+    gitTreeSha256: sha256(Buffer.from(JSON.stringify(logicalTree), "utf8")),
+  };
+  ensureExactDurableFile(
+    initializedPath,
+    Buffer.from(`${JSON.stringify(initializedProof, null, 2)}\n`, "utf8"),
+    fs,
+  );
+  fsyncDirectory(gitPath, fs);
+  fsyncDirectory(pendingPath, fs);
+  return {
+    gitIdentity,
+    gitVersion: currentGitVersion,
+    gitTreeSha256: initializedProof.gitTreeSha256,
+  };
 }
 
 function ensurePrivateDirectory(path, parent, created, fs = {}) {
@@ -440,6 +569,7 @@ function bindPrivateContinuity(root, {
   planSha256,
   gitVersion,
   gitIdentity,
+  gitTreeSha256,
   pendingPath,
   intentBytes,
 }, fs = {}, created = {}) {
@@ -498,6 +628,9 @@ function bindPrivateContinuity(root, {
   created.marker = ensureExactDurableFile(markerPath, markerBytes, fs);
   if (!created.marker) throw new Error("created host-init marker identity is unavailable");
   fsyncDirectory(admissionPath, fs);
+  if (sha256(Buffer.from(JSON.stringify(initialGitTree(git, fs)), "utf8")) !== gitTreeSha256) {
+    throw new Error("Git control tree changed before admission publication");
+  }
   if (!samePhysicalIdentity(admissionPath, admissionIdentity, fs)) {
     throw new Error("host-init admission directory changed before publication");
   }
@@ -525,6 +658,9 @@ function bindPrivateContinuity(root, {
   });
   if (!readback || readback.gitVersion !== gitVersion || readback.repositoryMode !== "host-managed") {
     throw new Error("host-init admission exact readback failed");
+  }
+  if (sha256(Buffer.from(JSON.stringify(initialGitTree(git, fs)), "utf8")) !== gitTreeSha256) {
+    throw new Error("Git control tree changed during admission publication");
   }
 }
 
@@ -578,43 +714,33 @@ export function applyHostRepositoryInit({
     if (!currentGitVersion) {
       return { schema: APPLY_SCHEMA, status: "git-unavailable", root, diagnostics: [{ code: "git_2_28_required" }] };
     }
-    const gitVersion = transactionGitVersion(
-      transaction.pendingPath,
-      root,
-      planSha256,
-      currentGitVersion,
-      deps,
-    );
-    if (!gitVersion) {
-      return { schema: APPLY_SCHEMA, status: "host-preimage-changed", root, diagnostics: [{ code: "pending_transaction_drift" }] };
+    let gitControl;
+    try {
+      gitControl = prepareGitControl(
+        root,
+        planSha256,
+        currentGitVersion,
+        transaction.pendingPath,
+        spawn,
+        deps,
+      );
+    } catch {
+      return {
+        schema: APPLY_SCHEMA,
+        status: "host-preimage-changed",
+        root,
+        diagnostics: [{ code: "pending_git_control_drift" }],
+      };
     }
-
-    let createdGitThisCall = false;
-    if (!exists(join(root, ".git"))) {
-      const initialized = spawn("git", ["init", "--initial-branch=main"], { cwd: root, encoding: "utf8" });
-      if (initialized.error || initialized.status !== 0) {
-        return {
-          schema: APPLY_SCHEMA,
-          status: "apply-failed",
-          root,
-          diagnostics: [{
-            code: exists(join(root, ".git"))
-              ? "git_init_failed_partial_control_path_retained"
-              : "git_init_failed",
-          }],
-        };
-      }
-      createdGitThisCall = true;
-    }
-    const gitIdentity = physicalIdentity((deps.lstatSync ?? lstatSync)(join(root, ".git")), "directory");
-    if (!gitIdentity) {
+    if (gitControl.status === "git-init-failed") {
       return {
         schema: APPLY_SCHEMA,
         status: "apply-failed",
         root,
-        diagnostics: [{ code: "git_init_identity_unavailable" }],
+        diagnostics: [{ code: "git_init_failed_reserved_control_path_retained" }],
       };
     }
+    const { gitIdentity, gitVersion, gitTreeSha256 } = gitControl;
     const gitTree = physicalTreeSnapshot(join(root, ".git"), deps);
     const created = {
       admission: null,
@@ -629,6 +755,7 @@ export function applyHostRepositoryInit({
         planSha256,
         gitVersion,
         gitIdentity,
+        gitTreeSha256,
         pendingPath: transaction.pendingPath,
         intentBytes: transaction.intentBytes,
       }, deps, created);
@@ -642,7 +769,11 @@ export function applyHostRepositoryInit({
         for (const entry of [...created.directories].reverse()) {
           removeCreatedDirectory(entry.path, entry.identity, deps);
         }
-        if (createdGitThisCall) removeCreatedGit(root, gitIdentity, gitTree, deps);
+        if (!samePhysicalIdentity(join(root, ".git"), gitIdentity, deps)
+          || JSON.stringify(physicalTreeSnapshot(join(root, ".git"), deps))
+            !== JSON.stringify(gitTree)) {
+          throw new Error("reserved Git control path changed during rollback");
+        }
       } catch {
         return { schema: APPLY_SCHEMA, status: "rollback-failed", root, diagnostics: [{ code: "host_init_identity_changed" }] };
       }
@@ -651,6 +782,15 @@ export function applyHostRepositoryInit({
     try {
       removeCreatedFile(join(transaction.pendingPath, "intent.json"),
         physicalIdentity((deps.lstatSync ?? lstatSync)(join(transaction.pendingPath, "intent.json")), "file"),
+        deps);
+      removeCreatedFile(join(transaction.pendingPath, GIT_INITIALIZED_FILE),
+        physicalIdentity((deps.lstatSync ?? lstatSync)(join(transaction.pendingPath, GIT_INITIALIZED_FILE)), "file"),
+        deps);
+      removeCreatedFile(join(transaction.pendingPath, GIT_RESERVATION_FILE),
+        physicalIdentity((deps.lstatSync ?? lstatSync)(join(transaction.pendingPath, GIT_RESERVATION_FILE)), "file"),
+        deps);
+      removeCreatedDirectory(join(transaction.pendingPath, GIT_TEMPLATE_DIRECTORY),
+        physicalIdentity((deps.lstatSync ?? lstatSync)(join(transaction.pendingPath, GIT_TEMPLATE_DIRECTORY)), "directory"),
         deps);
       removeCreatedDirectory(transaction.pendingPath,
         physicalIdentity((deps.lstatSync ?? lstatSync)(transaction.pendingPath), "directory"),

@@ -175,8 +175,10 @@ history into the new Git control path, and atomically publishes one private
 digest-bound admission directory containing the transaction intent, post-init
 receipt, and receipt-digest marker in `.claude/.runtime` so the fresh Codex
 hook can distinguish the otherwise identical empty protected mount. An exact
-pending intent makes the same confirmed apply restart-safe; it is never
-readiness by itself. It mutates no portable
+pending intent plus the same exclusively reserved Git directory identity and
+successfully initialized closed core-tree make the confirmed apply
+restart-safe; a partial or replaced `.git` fails closed, and pending state is
+never readiness by itself. It mutates no portable
 Pipeline/project file. Ask for exactly one ordinary project-session restart and
 stop. Do not run the onboarding inspector at the host boundary.
 After restart, the normal local/plugin-managed form above may continue without

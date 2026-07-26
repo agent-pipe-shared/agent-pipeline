@@ -348,12 +348,15 @@ without its receipt, maps to terminal `projection-drift` with `nextAction:
 null`; initialization is never offered again for that state.
 
 The confirmed host apply writes and fsyncs an exact pending intent before Git
-initialization. Receipt and marker are assembled beneath that intent and
-published together by one directory rename plus parent-directory fsync and
-exact readback. A process interruption before publication is idempotently
-resumed only by the same root and plan digest. A physical Git path without the
-matching pending intent remains `host-preimage-changed`; the pending intent is
-never runtime admission on its own.
+initialization. It then exclusively reserves `.git`, persists that directory's
+device/inode identity, and records a closed initialized core-tree digest only
+after successful `git init`. Receipt and marker are assembled beneath the
+intent and published together by one directory rename plus parent-directory
+fsync and exact readback. A process interruption before publication is
+idempotently resumed only by the same root, plan, Git identity, and initialized
+tree. A partial, replaced, or unrelated physical Git path remains
+`host-preimage-changed`; the pending intent is never runtime admission on its
+own.
 
 Runtime initialization reuses the existing V3 migration planner/apply engine
 with `initializeMissingRuntime: true`, but the public command is owned by
@@ -961,8 +964,9 @@ of being unlinked.
 Host-init fixtures interrupt before marker creation and before the admission
 directory rename. They assert that the final namespace never exposes a
 one-sided pair, that the exact pending intent resumes to the same committed
-readback, and that leaf replacement between lstat and descriptor open is
-rejected without authorizing readiness.
+readback, that a partial or replaced Git directory cannot borrow that intent,
+and that leaf replacement between lstat and descriptor open is rejected
+without authorizing readiness.
 
 Each fixture asserts both zero unintended writes and the exact typed next
 action where applicable.

@@ -9,7 +9,7 @@
 > reliable project work. Approval authorizes implementation dispatch only; it
 > does not authorize push, merge, tag, publication, Issue closure, or release.
 
-<!-- technical-spec-sha256: 6181eebf39fae962b76307727b4031454486c405fca117046066f2b544fe37d1 -->
+<!-- technical-spec-sha256: d09ff954ffbd6dda4e1cb912d2ec0eae9c50e5c8d769f15d471eee4a7b2f9e97 -->
 
 The technical approval binds the exact neighboring [spec.md](spec.md). Any
 change to that file after approval invalidates the implementation gate until
@@ -244,6 +244,8 @@ declared by 0.4.5; it does not permit a fabricated hook capability.
       private continuity, never reruns the full inspector at the host boundary,
       and requires exactly one project-session restart.
 - [ ] Host initialization publishes a durable plan/root intent before Git,
+      binds the exclusively reserved Git directory identity and initialized
+      core-tree before any retry can reuse it,
       atomically exposes the complete intent/receipt/marker admission
       directory, and idempotently resumes the same pending intent after a
       process interruption.

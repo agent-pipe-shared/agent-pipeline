@@ -90,6 +90,16 @@ function readyInspection(root) {
   };
 }
 
+function completeGitInit(root) {
+  const git = join(root, ".git");
+  mkdirSync(join(git, "objects", "info"), { recursive: true });
+  mkdirSync(join(git, "objects", "pack"), { recursive: true });
+  mkdirSync(join(git, "refs", "heads"), { recursive: true });
+  mkdirSync(join(git, "refs", "tags"), { recursive: true });
+  writeFileSync(join(git, "HEAD"), "ref: refs/heads/main\n");
+  writeFileSync(join(git, "config"), "[core]\n\trepositoryformatversion = 0\n\tbare = false\n");
+}
+
 test("plan binds only the exact non-ready host-managed plugin reservation", () => {
   const root = fixture();
   const plan = planHostRepositoryInit({
@@ -134,8 +144,10 @@ test("host apply initializes only Git and requires one restart", () => {
       spawnSync(command, args, options) {
         assert.equal(command, "git");
         if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
-        assert.deepEqual(args, ["init", "--initial-branch=main"]);
-        mkdirSync(join(options.cwd, ".git"));
+        assert.equal(args[0], "init");
+        assert.equal(args[1], "--initial-branch=main");
+        assert.match(args[2], /^--template=/u);
+        completeGitInit(options.cwd);
         return { status: 0, stdout: "", stderr: "" };
       },
     },
@@ -187,7 +199,7 @@ test("an interrupted admission publication resumes from the exact pending intent
       spawnSync(command, args, options) {
         assert.equal(command, "git");
         if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
-        mkdirSync(join(options.cwd, ".git"));
+        completeGitInit(options.cwd);
         return { status: 0, stdout: "", stderr: "" };
       },
       faultInjector(point) {
@@ -225,6 +237,54 @@ test("an interrupted admission publication resumes from the exact pending intent
   });
 });
 
+test("a replaced Git directory cannot borrow an interrupted transaction", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const interrupted = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        assert.equal(command, "git");
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        completeGitInit(options.cwd);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      faultInjector(point) {
+        if (point === "before-host-init-admission-rename") throw new Error("synthetic interruption");
+      },
+      rmSync() {
+        throw new Error("simulate process loss before rollback");
+      },
+    },
+  });
+  assert.equal(interrupted.status, "rollback-failed");
+  const originalGit = join(root, ".git.original");
+  renameSync(join(root, ".git"), originalGit);
+  mkdirSync(join(root, ".git"), { mode: 0o700 });
+  completeGitInit(root);
+  const retried = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args) {
+        assert.equal(command, "git");
+        assert.deepEqual(args, ["--version"]);
+        return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+      },
+    },
+  });
+  assert.equal(retried.status, "host-preimage-changed");
+  assert.deepEqual(retried.diagnostics, [{ code: "pending_git_control_drift" }]);
+  assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY)), false);
+  assert.equal(existsSync(originalGit), true);
+});
+
 test("admission publication rejects a directory replaced after validation", () => {
   const root = fixture();
   const plan = planHostRepositoryInit({
@@ -245,7 +305,7 @@ test("admission publication rejects a directory replaced after validation", () =
       spawnSync(command, args, options) {
         assert.equal(command, "git");
         if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
-        mkdirSync(join(options.cwd, ".git"));
+        completeGitInit(options.cwd);
         return { status: 0, stdout: "", stderr: "" };
       },
       faultInjector(point) {
@@ -279,7 +339,7 @@ test("admission read rejects a leaf replaced between lstat and descriptor open",
       spawnSync(command, args, options) {
         assert.equal(command, "git");
         if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
-        mkdirSync(join(options.cwd, ".git"));
+        completeGitInit(options.cwd);
         return { status: 0, stdout: "", stderr: "" };
       },
     },
@@ -320,7 +380,7 @@ test("admission read rejects its private directory replaced after permission val
       spawnSync(command, args, options) {
         assert.equal(command, "git");
         if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
-        mkdirSync(join(options.cwd, ".git"));
+        completeGitInit(options.cwd);
         return { status: 0, stdout: "", stderr: "" };
       },
     },
@@ -348,7 +408,7 @@ test("admission read rejects its private directory replaced after permission val
   assert.notEqual(readCodexHostRepositoryInitAdmission(root), null);
 });
 
-test("a marker publication failure rolls back the receipt and initialized Git", () => {
+test("a marker publication failure retains only the reserved retryable Git transaction", () => {
   const root = fixture();
   const plan = planHostRepositoryInit({
     rootDir: root,
@@ -362,7 +422,7 @@ test("a marker publication failure rolls back the receipt and initialized Git", 
       spawnSync(command, args, options) {
         assert.equal(command, "git");
         if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
-        mkdirSync(join(options.cwd, ".git"));
+        completeGitInit(options.cwd);
         return { status: 0, stdout: "", stderr: "" };
       },
       faultInjector(point) {
@@ -375,7 +435,8 @@ test("a marker publication failure rolls back the receipt and initialized Git", 
   assert.equal(result.status, "apply-failed");
   assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_MARKER)), false);
   assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT)), false);
-  assert.equal(existsSync(join(root, ".git")), false);
+  assert.equal(existsSync(join(root, ".git")), true);
+  assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY)), true);
 });
 
 test("host apply rejects drift and any physical reserved host path before Git", () => {
@@ -424,7 +485,7 @@ test("the sandbox view cannot apply through its reserved .git control mount", (t
   chmodSync(join(root, ".git"), 0o700);
 });
 
-test("failed git init retains an unproven partial control path", () => {
+test("failed git init retains a reserved but unadmitted partial control path", () => {
   const root = fixture();
   const plan = planHostRepositoryInit({
     rootDir: root,
@@ -438,15 +499,30 @@ test("failed git init retains an unproven partial control path", () => {
       spawnSync(command, args, options) {
         assert.equal(command, "git");
         if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
-        mkdirSync(join(options.cwd, ".git"));
         writeFileSync(join(options.cwd, ".git", "foreign"), "foreign\n");
         return { status: 1, stdout: "", stderr: "synthetic init failure" };
       },
     },
   });
   assert.equal(result.status, "apply-failed");
-  assert.deepEqual(result.diagnostics, [{ code: "git_init_failed_partial_control_path_retained" }]);
+  assert.deepEqual(result.diagnostics, [{ code: "git_init_failed_reserved_control_path_retained" }]);
   assert.equal(readFileSync(join(root, ".git", "foreign"), "utf8"), "foreign\n");
+  const retried = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        assert.equal(command, "git");
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        completeGitInit(options.cwd);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+    },
+  });
+  assert.equal(retried.status, "host-preimage-changed");
+  assert.deepEqual(retried.diagnostics, [{ code: "pending_git_control_drift" }]);
+  assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY)), false);
 });
 
 test("host rollback preserves a Git directory whose identity changed during binding", () => {
@@ -463,7 +539,7 @@ test("host rollback preserves a Git directory whose identity changed during bind
       spawnSync(command, args, options) {
         assert.equal(command, "git");
         if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
-        mkdirSync(join(options.cwd, ".git"));
+        completeGitInit(options.cwd);
         return { status: 0, stdout: "", stderr: "" };
       },
       faultInjector(point) {
@@ -495,7 +571,7 @@ test("host rollback preserves foreign content added beneath the same Git directo
       spawnSync(command, args, options) {
         assert.equal(command, "git");
         if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
-        mkdirSync(join(options.cwd, ".git"));
+        completeGitInit(options.cwd);
         return { status: 0, stdout: "", stderr: "" };
       },
       faultInjector(point) {
@@ -527,7 +603,7 @@ test("host binding never follows a raced-in Git continuity symlink", (t) => {
       spawnSync(command, args, options) {
         assert.equal(command, "git");
         if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
-        mkdirSync(join(options.cwd, ".git"));
+        completeGitInit(options.cwd);
         return { status: 0, stdout: "", stderr: "" };
       },
       mkdirSync(target, options) {
