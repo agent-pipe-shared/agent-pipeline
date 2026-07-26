@@ -258,11 +258,13 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
   // absolute or parent-relative redirection target before its rejection can
   // turn into a ready-session escape from the project root.
   if (!words || words.length === 0) {
-    const redirect = /(?:^|[\s;|&])\d*(?:>>?|<>|>&|<&)\s*["']?([^\s"']+)/u.exec(command);
-    if (!redirect) return false;
-    const target = redirect[1];
-    if (target.includes("$") || target.includes("`") || target.includes("(")) return true;
-    return !pathInside(root, resolve(root, target));
+    const redirects = [...command.matchAll(/(?:^|[\s;|&])\d*(?:>>?|<>|>&|<&)\s*["']?([^\s"']+)/gu)];
+    if (redirects.length === 0) return false;
+    return redirects.some((redirect) => {
+      const target = redirect[1];
+      return target.includes("$") || target.includes("`") || target.includes("(")
+        || !pathInside(root, resolve(root, target));
+    });
   }
   const exists = dependencies.existsSyncFn ?? existsSync;
   const executable = basename(words[0]).toLowerCase();
