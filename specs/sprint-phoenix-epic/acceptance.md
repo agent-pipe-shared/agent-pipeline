@@ -298,7 +298,11 @@ architecture prose or an implementation briefing.
   the already inventoried `harness/scripts/pipeline-state.mjs`, covered by
   `harness/scripts/pipeline-state.test.mjs`, and SHALL consume the accepted
   #22 topology validator/transition planner rather than introducing an
-  implementation file outside bound Spec §7.
+  implementation file outside bound Spec §7. This writer closure SHALL be the
+  mandatory first slice inside Spec §4.6 package PHX-0, not a separate package
+  before PHX-0; PHX-0 SHALL NOT proceed to its ruleset-trust-root slice and
+  PHX-1 SHALL NOT start until the writer slice passes its focused Verify and
+  Critic gates.
 - **P-AC-09:** WHEN historical events would become exportable after a policy or
   destination change, THE SYSTEM SHALL require exact preview and explicit
   backfill consent.

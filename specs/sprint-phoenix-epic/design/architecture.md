@@ -826,9 +826,9 @@ not a self-attestation by this architecture.
 
 ```mermaid
 flowchart TD
-    BASE[#10 exchange + #22 topology/preview + ADR-0046] --> PKG[Phoenix lifecycle bootstrap/writer closure]
-    PKG --> PX0[PX-0 ruleset-source trust root]
-    PKG --> K[PX-1 governance event kernel]
+    BASE[#10 exchange + #22 topology/preview + ADR-0046] --> PX0A[PHX-0 slice A: lifecycle writer closure]
+    PX0A --> PX0B[PHX-0 slice B: ruleset-source trust root]
+    PX0B --> K[PHX-1 governance event kernel]
     K --> H[#30 human decision ledger]
     K --> L[#17 lifecycle stream and replay]
     K --> P[#9 policy packs and bundle foundation]
@@ -847,7 +847,7 @@ flowchart TD
     L --> E
     A --> E
     P --> E
-    PX0 --> G[Phoenix integration gates]
+    PX0B --> G[Phoenix integration gates]
     B --> G
     V --> G
     C --> G
@@ -858,11 +858,13 @@ Mermaid check: passed.
 
 Delivery waves:
 
-1. **Package authority, trust root and kernel:** create the reviewed Phoenix
-   lifecycle manifest now; implementation first delivers the transactional
-   feature-package manifest writer missing from the #22 base through the
-   already inventoried Pipeline state writer, then PX-0 plus the shared
-   envelope, event store, checkpoint verifier, recovery command,
+1. **PHX-0, then kernel:** create the reviewed Phoenix lifecycle manifest now.
+   PHX-0 remains implementation package 1 exactly as bound Spec §4.6 requires.
+   Its blocking slice A first delivers the transactional feature-package
+   manifest writer missing from the #22 base through the already inventoried
+   Pipeline state writer; only after slice A passes focused Verify and Critic
+   may PHX-0 slice B deliver the runner-neutral ruleset trust root. PHX-1 then
+   delivers the shared envelope, event store, checkpoint verifier, recovery command,
    repository-public-safe admission, the restricted machine-local storage
    profile within the same Spec-listed kernel, policy hooks, and topology
    extension.
@@ -900,7 +902,7 @@ state mutations, exact preimages, authority checks, continuity/publication
 transactions, and readback. Feature-package manifest transitions are the same
 lifecycle-state responsibility, not event-stream storage, so this placement
 preserves the single-writer boundary without expanding the governance event
-kernel. The first package owns this exact closed inventory:
+kernel. PHX-0 slice A owns this exact closed inventory:
 
 | File | Contract |
 | --- | --- |
@@ -935,10 +937,13 @@ artifacts, or infer success from a temporary file.
 The bootstrap manifest remains `draft` through the Product Owner design gate:
 it inventories the reviewed design but is not itself approval authority.
 Literal plan approval remains in the existing repository-scoped PO gate. Once
-the first approved implementation package has delivered and verified this
-writer, it consumes that exact approval and candidate evidence to perform the
-first sanctioned lifecycle transition. No other package may run before this
-writer package, and no hand-written state change may bridge the bootstrap gap.
+the approved PHX-0 package has delivered and verified its mandatory slice A,
+the writer consumes that exact approval and candidate evidence to perform the
+first sanctioned lifecycle transition. Slice B remains part of the same PHX-0
+package and WIP record; it cannot start before slice A passes. PHX-1 through
+PHX-6 cannot start before all of PHX-0 passes. No separate pre-PHX-0 package,
+parallel writer package, or hand-written state change may bridge the bootstrap
+gap.
 
 The kernel package implements the restricted-data profile exclusively through
 the files already authorized by bound Spec §§7.3–7.4. Architecture narrows

@@ -1,6 +1,6 @@
 # Sprint Phoenix governance conformance
 
-Status: privacy gate met; lifecycle-writer inventory correction pending re-review
+Status: privacy gate met; lifecycle-writer PHX-0 sequencing correction pending re-review
 
 Date: 2026-07-26
 
@@ -55,7 +55,7 @@ No design-stage deviation from the twelve guidelines is proposed.
 | `PHX-LEGACY-AUTHORITY-COMPATIBILITY` | Phoenix integration-package owner | Earlier of Phoenix integration close or 2026-10-31 | Migrate every direct mutable authority reader, dual-evaluate ledger/state, block disagreement, and prohibit compatibility removal or Phoenix completion while any reader remains unmigrated. |
 | `PHX-PRIVACY-PORTABLE-TRUST-ZONE` | Phoenix integration-package owner | Before Product Owner gate | RESOLVED 2026-07-26 by fixed-candidate privacy PASS over the normative Spec §§4.4–4.5 interpretation and repository-wide admission. |
 | `PHX-PRIVACY-RESTRICTED-ERASURE` | Phoenix integration-package owner | Before Product Owner gate | RESOLVED 2026-07-26 by fixed-candidate privacy PASS over portable-only append semantics, restricted erasure/key destruction, and Spec-inventory ownership. |
-| `PHX-LIFECYCLE-WRITER-INVENTORY` | Phoenix design owner | Before Product Owner gate | PHX-CR-05R accepted and corrected by assigning the #22 writer capability only to Spec-listed `pipeline-state`/topology-support files; fresh Critic clearance is pending. |
+| `PHX-LIFECYCLE-WRITER-INVENTORY` | Phoenix design owner | Before Product Owner gate | File inventory/transaction design accepted by Critic; PHX-CR-05S sequencing correction now makes writer closure mandatory PHX-0 slice A, before its trust-root slice and PHX-1..6; fresh Critic clearance is pending. |
 
 If an open risk reaches its date without disposition, the Phoenix design returns to a
 blocked course gate. The expiry does not authorize the action automatically.

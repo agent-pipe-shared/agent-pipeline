@@ -191,3 +191,35 @@ inventoried `harness/scripts/pipeline-state.mjs` and
 support only in the already listed Spec §7.1 files. Acceptance P-AC-08 makes
 this inventory binding normative. A fresh bounded re-review must clear
 PHX-CR-05R and direct regressions; this FAIL is never rewritten as a pass.
+
+## Lifecycle-writer inventory correction re-review — first verdict
+
+| Field | Value |
+| --- | --- |
+| Candidate commit | `df0387a2b62e85e5cc881e6a41ddff596fe42db3` |
+| Candidate tree | `0cfbff6fedd0eb3fcb7b127aca28d362ff71cbc2` |
+| Correction range | `4dad856c216e3a55cba658ee1ea9d9752144674a..df0387a2b62e85e5cc881e6a41ddff596fe42db3` |
+| Verify evidence SHA-256 | `308c60512d942956e66efa217cbcecdcf6544d228d02686cd95b5af08150a78f` |
+| Security evidence SHA-256 | `8917d5b943fcc7a88eee684d6b99c778384a4368972de866d1125e1be985bf71` |
+| Assurance | `functional-equivalent-read-only; OS isolation not asserted` |
+| Reviewer mutation / delegation | none / none |
+| Machine trajectory | consistent |
+| Verdict | FAIL |
+
+The fresh higher-capability Critic accepted the Spec-file inventory
+correction, transaction/recovery semantics, test matrix, governance
+disposition, lifecycle hashes, and exact Verify/Security trajectory. It
+retained one major direct regression:
+
+- **PHX-CR-05S / major:** architecture made writer closure a separate package
+  before PHX-0, while bound Spec §4.6 makes PHX-0 the first implementation
+  package. That admitted a Spec-bound PHX-0 dispatch before the architecture's
+  blocking prerequisite and created contradictory sequence authority.
+
+The finding is accepted without waiver. The correction keeps Spec §4.6
+unchanged and makes writer closure the mandatory first ordered slice of the
+single PHX-0 package. The PHX-0 ruleset-trust-root slice cannot start until
+writer Verify/Critic passes, and PHX-1..6 cannot start until PHX-0 completes.
+Acceptance P-AC-08 carries the same normative sequencing. A fresh bounded
+re-review must clear PHX-CR-05S and direct regressions; this FAIL is never
+rewritten.

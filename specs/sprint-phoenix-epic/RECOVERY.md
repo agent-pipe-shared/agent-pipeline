@@ -50,6 +50,12 @@ as separate commands from the already authenticated physical Phoenix root and
 passed. This is recorded as guard-routing friction, not as repository
 read-only state; the rejection produced no mutation.
 
+The PHX-0 sequence correction reproduced the same class once: a combined
+read-only command containing absolute source-root arguments was rejected before
+execution. Its topology, criterion-count, whitespace, and status checks were
+then run as separate repository-relative commands and passed. No guard was
+bypassed and no rejected command mutated state.
+
 ## R-03 — Advisor route exhausted
 
 | Field | Value |
@@ -340,6 +346,22 @@ The correction re-entry Advisor primary timed out once; the exact policy
 fallback role was unavailable before launch. The workspace remained unchanged
 through that route, no Advisor output was applied, and no pass is claimed. A
 fresh Critic must clear PHX-CR-05R before the PO gate.
+
+## R-09 — Writer correction exposed a package-sequence conflict
+
+The fresh re-review of commit
+`df0387a2b62e85e5cc881e6a41ddff596fe42db3`, tree
+`0cfbff6fedd0eb3fcb7b127aca28d362ff71cbc2`, accepted the closed writer file
+inventory and transaction design. It failed closed on PHX-CR-05S because the
+architecture placed writer closure in a separate prerequisite package while
+bound Spec §4.6 makes PHX-0 implementation package 1.
+
+Phoenix accepted the finding without changing the Spec. Writer closure is now
+mandatory PHX-0 slice A; the runner-neutral trust root is slice B in the same
+package and WIP record. Slice B requires slice A's focused Verify/Critic pass,
+and PHX-1..6 require complete PHX-0. This removes the competing package
+authority while preserving the writer-first safety gate. A fresh review is
+still required; the failed verdict is retained.
 
 ## Audit classification
 

@@ -110,3 +110,26 @@ without waiver and reassigned the entire writer capability to already
 inventoried lifecycle state-writer/test and topology-support files. A fresh
 re-review is mandatory; this entry does not approve the plan or authorize
 implementation.
+
+## Entry 6 — Lifecycle-writer inventory correction re-review
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-07-26 |
+| Candidate commit | `df0387a2b62e85e5cc881e6a41ddff596fe42db3` |
+| Candidate tree | `0cfbff6fedd0eb3fcb7b127aca28d362ff71cbc2` |
+| Correction range | `4dad856c216e3a55cba658ee1ea9d9752144674a..df0387a2b62e85e5cc881e6a41ddff596fe42db3` |
+| Full Verify | exit 0; evidence SHA-256 `308c60512d942956e66efa217cbcecdcf6544d228d02686cd95b5af08150a78f` |
+| Security | exit 0 / CLEAN; evidence SHA-256 `8917d5b943fcc7a88eee684d6b99c778384a4368972de866d1125e1be985bf71` |
+| Independent re-review | FAIL under `functional-equivalent-read-only; OS isolation not asserted` |
+| Machine trajectory | consistent |
+| Reviewer mutation / delegation | none / none |
+| Remote write | none |
+
+The reviewer accepted the in-inventory writer design but found one sequencing
+major: architecture placed writer closure in a package before PHX-0 even
+though bound Spec §4.6 makes PHX-0 the first implementation package. Phoenix
+accepted the finding and moved writer closure into mandatory PHX-0 slice A,
+before the ruleset trust-root slice and every PHX-1..6 package. A fresh
+re-review remains mandatory; this entry creates no approval or implementation
+authority.
