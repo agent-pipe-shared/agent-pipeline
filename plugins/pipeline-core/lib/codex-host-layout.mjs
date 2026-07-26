@@ -319,7 +319,7 @@ export function readCodexHostRepositoryInitAdmission(root, {
   }
   const keys = [
     "authoritySha256", "branch", "gitVersion", "historySha256",
-    "planSha256", "rootSha256", "schema",
+    "gitDevice", "gitInode", "gitTreeSha256", "planSha256", "rootSha256", "schema",
   ];
   const markerKeys = ["intentSha256", "planSha256", "receiptSha256", "rootSha256", "schema"];
   const intentKeys = ["planSha256", "rootSha256", "schema"];
@@ -350,6 +350,9 @@ export function readCodexHostRepositoryInitAdmission(root, {
     || intent.schema !== "pipeline.codex-host-repository-init-intent.v1"
     || receipt.branch !== "main"
     || !/^\d+\.\d+(?:\.\d+)?(?:[.-][0-9A-Za-z]+)*$/u.test(receipt.gitVersion ?? "")
+    || !/^\d+$/u.test(receipt.gitDevice ?? "")
+    || !/^\d+$/u.test(receipt.gitInode ?? "")
+    || !/^[a-f0-9]{64}$/u.test(receipt.gitTreeSha256 ?? "")
     || !/^[a-f0-9]{64}$/u.test(receipt.planSha256 ?? "")
     || receipt.rootSha256 !== sha256(Buffer.from(root, "utf8"))
     || intent.rootSha256 !== receipt.rootSha256
@@ -376,6 +379,10 @@ export function readCodexHostRepositoryInitAdmission(root, {
   return history && directoriesUnchanged && receipt.historySha256 === history.historySha256
     ? {
       gitVersion: receipt.gitVersion,
+      gitDevice: receipt.gitDevice,
+      gitInode: receipt.gitInode,
+      gitTreeSha256: receipt.gitTreeSha256,
+      planSha256: receipt.planSha256,
       repositoryMode: hostManagedCalibrationBytes === null ? "host-managed" : "local-only",
     }
     : null;

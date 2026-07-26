@@ -3,7 +3,7 @@
 
 import assert from "node:assert/strict";
 import {
-  chmodSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync,
+  chmodSync, existsSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -165,6 +165,9 @@ test("host apply initializes only Git and requires one restart", () => {
   assert.equal(receipt.planSha256, plan.planSha256);
   assert.match(receipt.authoritySha256, /^[a-f0-9]{64}$/u);
   assert.equal(receipt.gitVersion, "2.40.1");
+  assert.match(receipt.gitDevice, /^\d+$/u);
+  assert.match(receipt.gitInode, /^\d+$/u);
+  assert.match(receipt.gitTreeSha256, /^[a-f0-9]{64}$/u);
   assert.equal(receipt.branch, "main");
   const marker = JSON.parse(readFileSync(join(root, CODEX_HOST_REPOSITORY_INIT_MARKER), "utf8"));
   assert.equal(marker.schema, "pipeline.codex-host-repository-init-marker.v1");
@@ -233,8 +236,64 @@ test("an interrupted admission publication resumes from the exact pending intent
   assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY)), false);
   assert.deepEqual(readCodexHostRepositoryInitAdmission(root), {
     gitVersion: "2.40.1",
+    gitDevice: String(lstatSync(join(root, ".git")).dev),
+    gitInode: String(lstatSync(join(root, ".git")).ino),
+    gitTreeSha256: JSON.parse(
+      readFileSync(join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT), "utf8"),
+    ).gitTreeSha256,
+    planSha256: plan.planSha256,
     repositoryMode: "host-managed",
   });
+});
+
+test("completed replay requires the admitted Git identity and initialized tree", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const initialized = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        completeGitInit(options.cwd);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+    },
+  });
+  assert.equal(initialized.status, "restart-required");
+  const replay = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(replay.status, "restart-required");
+
+  writeFileSync(join(root, ".git", "foreign"), "foreign\n");
+  const changedTree = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(changedTree.status, "host-preimage-changed");
+  assert.deepEqual(changedTree.diagnostics, [{ code: "completed_git_control_drift" }]);
+  rmSync(join(root, ".git", "foreign"));
+
+  const originalGit = join(root, ".git.original");
+  renameSync(join(root, ".git"), originalGit);
+  mkdirSync(join(root, ".git"), { mode: 0o700 });
+  completeGitInit(root);
+  const replaced = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(replaced.status, "host-preimage-changed");
+  assert.deepEqual(replaced.diagnostics, [{ code: "completed_git_control_drift" }]);
+  assert.equal(existsSync(originalGit), true);
 });
 
 test("a replaced Git directory cannot borrow an interrupted transaction", () => {
@@ -437,6 +496,178 @@ test("a marker publication failure retains only the reserved retryable Git trans
   assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT)), false);
   assert.equal(existsSync(join(root, ".git")), true);
   assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY)), true);
+});
+
+test("successful cleanup preserves a pending artifact replaced after validation", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const pendingIntent = join(root, CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY, "intent.json");
+  const originalIntent = `${pendingIntent}.original`;
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        completeGitInit(options.cwd);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      faultInjector(point) {
+        if (point === "before-host-init-pending-cleanup") {
+          const bytes = readFileSync(pendingIntent);
+          renameSync(pendingIntent, originalIntent);
+          writeFileSync(pendingIntent, bytes, { mode: 0o600 });
+        }
+      },
+    },
+  });
+  assert.equal(result.status, "restart-required");
+  assert.deepEqual(result.diagnostics, [{ code: "pending_cleanup_retained" }]);
+  assert.equal(existsSync(pendingIntent), true);
+  assert.equal(existsSync(originalIntent), true);
+});
+
+test("initialized-tree read rejects a leaf replaced between lstat and descriptor open", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const head = join(root, ".git", "HEAD");
+  const originalHead = `${head}.original`;
+  let replaced = false;
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        completeGitInit(options.cwd);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      openSync(path, flags, mode) {
+        if (!replaced && path === head) {
+          replaced = true;
+          const bytes = readFileSync(head);
+          renameSync(head, originalHead);
+          writeFileSync(head, bytes, { mode: 0o600 });
+        }
+        return openSync(path, flags, mode);
+      },
+    },
+  });
+  assert.equal(result.status, "host-preimage-changed");
+  assert.deepEqual(result.diagnostics, [{ code: "pending_git_control_drift" }]);
+  assert.equal(existsSync(originalHead), true);
+});
+
+test("initialized-tree traversal rejects a directory replaced after its first identity observation", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const objects = join(root, ".git", "objects");
+  const originalObjects = `${objects}.original`;
+  let replaced = false;
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        completeGitInit(options.cwd);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      readdirSync(path, options) {
+        if (!replaced && path === objects) {
+          replaced = true;
+          renameSync(objects, originalObjects);
+          mkdirSync(objects, { mode: 0o700 });
+          mkdirSync(join(objects, "info"), { mode: 0o700 });
+          mkdirSync(join(objects, "pack"), { mode: 0o700 });
+        }
+        return readdirSync(path, options);
+      },
+    },
+  });
+  assert.equal(result.status, "host-preimage-changed");
+  assert.deepEqual(result.diagnostics, [{ code: "pending_git_control_drift" }]);
+  assert.equal(existsSync(originalObjects), true);
+});
+
+test("Git-control persistence failures keep their operational classification", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        completeGitInit(options.cwd);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      faultInjector(point) {
+        if (point === "before-git-control-fsync") {
+          const error = new Error("synthetic storage failure");
+          error.code = "EIO";
+          throw error;
+        }
+      },
+      fsyncSync,
+    },
+  });
+  assert.equal(result.status, "apply-failed");
+  assert.deepEqual(result.diagnostics, [{ code: "git_control_preparation_failed" }]);
+  assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY)), false);
+});
+
+test("Git-tree read failures remain operational rather than preimage drift", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const head = join(root, ".git", "HEAD");
+  let headDescriptor = null;
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        completeGitInit(options.cwd);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      openSync(path, flags, mode) {
+        const descriptor = openSync(path, flags, mode);
+        if (path === head) headDescriptor = descriptor;
+        return descriptor;
+      },
+      readFileSync(path, options) {
+        if (path === headDescriptor) {
+          const error = new Error("synthetic read failure");
+          error.code = "EIO";
+          throw error;
+        }
+        return readFileSync(path, options);
+      },
+    },
+  });
+  assert.equal(result.status, "apply-failed");
+  assert.deepEqual(result.diagnostics, [{ code: "git_control_preparation_failed" }]);
 });
 
 test("host apply rejects drift and any physical reserved host path before Git", () => {

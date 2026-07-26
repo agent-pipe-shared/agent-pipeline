@@ -43,7 +43,10 @@ the before/after assertion are recorded in
   fail closed; an interrupted publication resumes only its exact pending
   root/plan intent and the same reserved, successfully initialized Git
   identity/core-tree. Partial, replaced, or unrelated Git controls cannot
-  borrow that recovery authority.
+  borrow that recovery authority. Completed apply replay revalidates the Git
+  identity and core-tree carried by the final receipt; tree reads and pending
+  cleanup are descriptor-/identity-bound, raced replacements are retained, and
+  persistence failures remain distinct from preimage drift.
 - The lifecycle PreToolUse adapter accepts the exact session-ready V4 result or
   that narrowly bound host-init compatibility admission only for the two
   authenticated cross-view repository-control failures. App-Server, runtime,

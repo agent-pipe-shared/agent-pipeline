@@ -338,6 +338,10 @@ directory containing the exact transaction intent, receipt, and
 receipt-digest marker. The marker binds both other files. Each file is read
 through an `O_NOFOLLOW` descriptor and accepted only when its leaf and all
 parent-directory identities remain unchanged before and after the read.
+The receipt also carries the exclusively reserved Git directory's device,
+inode, and closed initialized core-tree digest. A repeated completed host
+apply revalidates that exact postimage before it may return
+`restart-required`; replacement or tree drift is `host-preimage-changed`.
 Deleting any counterpart after initialization is distinguishable from a
 pristine pre-init root. An empty read-only `.codex` directory by itself is only
 `plugin-managed-unattested`; after valid kickoff it maps to aggregate
@@ -356,7 +360,12 @@ fsync and exact readback. A process interruption before publication is
 idempotently resumed only by the same root, plan, Git identity, and initialized
 tree. A partial, replaced, or unrelated physical Git path remains
 `host-preimage-changed`; the pending intent is never runtime admission on its
-own.
+own. Core-tree leaves use descriptor-bound no-follow reads plus after-read leaf
+and parent identity checks; directory traversal repeats physical identity and
+membership checks. Cleanup uses the identities and exact bytes
+captured when each pending artifact was created or validated, preserves any
+replacement, and reports `pending_cleanup_retained`. Storage/fsync failure
+maps to `apply-failed` / `git_control_preparation_failed`, not preimage drift.
 
 Runtime initialization reuses the existing V3 migration planner/apply engine
 with `initializeMissingRuntime: true`, but the public command is owned by

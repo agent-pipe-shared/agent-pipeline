@@ -46,6 +46,10 @@ const GIT_INITIALIZED_SCHEMA = "pipeline.codex-host-git-initialized.v1";
 const GIT_RESERVATION_FILE = "git-reservation.json";
 const GIT_INITIALIZED_FILE = "git-initialized.json";
 const GIT_TEMPLATE_DIRECTORY = "git-template";
+const OPERATIONAL_FS_ERRORS = new Set([
+  "EACCES", "EBUSY", "EDQUOT", "EIO", "EMFILE", "ENFILE", "ENOMEM",
+  "ENOSPC", "EPERM", "EROFS",
+]);
 const INITIAL_GIT_PATHS = new Set([
   "",
   "HEAD",
@@ -214,6 +218,12 @@ function physicalIdentity(info, kind) {
   return valid ? { dev: String(info.dev), ino: String(info.ino), kind } : null;
 }
 
+class HostInitDriftError extends Error {}
+
+function drift(message) {
+  return new HostInitDriftError(message);
+}
+
 function samePhysicalIdentity(path, expected, fs = {}) {
   if (!expected) return false;
   try {
@@ -227,30 +237,40 @@ function samePhysicalIdentity(path, expected, fs = {}) {
 
 function physicalTreeSnapshot(path, fs = {}) {
   const lstat = fs.lstatSync ?? lstatSync;
-  const read = fs.readFileSync ?? readFileSync;
   const readdir = fs.readdirSync ?? readdirSync;
   const rows = [];
   function visit(current, relative) {
-    const info = lstat(current);
-    if (info.isSymbolicLink()) throw new Error("Git control tree contains a symbolic link");
-    if (info.isDirectory()) {
-      rows.push({ path: relative, kind: "directory", dev: String(info.dev), ino: String(info.ino) });
-      for (const name of readdir(current).sort()) {
+    const before = lstat(current);
+    const directoryIdentity = physicalIdentity(before, "directory");
+    if (directoryIdentity) {
+      const names = readdir(current).sort();
+      for (const name of names) {
         visit(join(current, name), relative ? `${relative}/${name}` : name);
       }
+      if (!samePhysicalIdentity(current, directoryIdentity, fs)
+        || JSON.stringify(readdir(current).sort()) !== JSON.stringify(names)) {
+        throw drift("Git control directory changed during tree observation");
+      }
+      rows.push({
+        path: relative,
+        kind: "directory",
+        dev: directoryIdentity.dev,
+        ino: directoryIdentity.ino,
+      });
       return;
     }
-    if (!info.isFile() || info.nlink !== 1) throw new Error("Git control tree contains an unsafe file");
+    const observed = readBoundFileObservation(current, fs, { preserveOperationalError: true });
+    if (!observed) throw drift("Git control tree contains an unsafe or raced file");
     rows.push({
       path: relative,
       kind: "file",
-      dev: String(info.dev),
-      ino: String(info.ino),
-      sha256: sha256(read(current)),
+      dev: observed.identity.dev,
+      ino: observed.identity.ino,
+      sha256: sha256(observed.bytes),
     });
   }
   visit(path, "");
-  return rows;
+  return rows.sort((left, right) => left.path.localeCompare(right.path));
 }
 
 function assertPhysicalDirectory(path, fs = {}) {
@@ -277,10 +297,11 @@ function createPrivateDirectory(path, parent, created, fs = {}) {
   created.directories.push({ path, identity });
 }
 
-function removeCreatedFile(path, expected, fs = {}) {
+function removeCreatedFile(path, expected, fs = {}, expectedBytes = null) {
   const exists = fs.existsSync ?? existsSync;
   if (!exists(path)) return;
-  if (!samePhysicalIdentity(path, expected, fs)) {
+  if (!samePhysicalIdentity(path, expected, fs)
+    || (expectedBytes !== null && !exactFile(path, expectedBytes, fs))) {
     throw new Error("created host-init file changed identity before rollback");
   }
   (fs.rmSync ?? rmSync)(path, { force: true });
@@ -304,7 +325,7 @@ function fsyncDirectory(path, fs = {}) {
   try { sync(descriptor); } finally { close(descriptor); }
 }
 
-function readBoundFile(path, fs = {}) {
+function readBoundFileObservation(path, fs = {}, { preserveOperationalError = false } = {}) {
   const lstat = fs.lstatSync ?? lstatSync;
   const open = fs.openSync ?? openSync;
   const fstat = fs.fstatSync ?? fstatSync;
@@ -325,15 +346,20 @@ function readBoundFile(path, fs = {}) {
     return after?.dev === opened.dev && after?.ino === opened.ino
       && samePhysicalIdentity(path, opened, fs)
       && samePhysicalIdentity(parent, parentIdentity, fs)
-      ? bytes
+      ? { bytes, identity: opened }
       : null;
-  } catch {
+  } catch (error) {
+    if (preserveOperationalError && OPERATIONAL_FS_ERRORS.has(error?.code)) throw error;
     return null;
   } finally {
     if (descriptor !== undefined) {
       try { close(descriptor); } catch {}
     }
   }
+}
+
+function readBoundFile(path, fs = {}) {
+  return readBoundFileObservation(path, fs)?.bytes ?? null;
 }
 
 function exactFile(path, bytes, fs = {}) {
@@ -368,12 +394,15 @@ function writeDurableExclusive(path, bytes, fs = {}) {
 
 function ensureExactDurableFile(path, bytes, fs = {}) {
   if ((fs.existsSync ?? existsSync)(path)) {
-    if (!exactFile(path, bytes, fs)) throw new Error("host-init transaction file drifted");
-    return physicalIdentity((fs.lstatSync ?? lstatSync)(path), "file");
+    const observed = readBoundFileObservation(path, fs);
+    if (!observed || observed.bytes.compare(bytes) !== 0) {
+      throw drift("host-init transaction file drifted");
+    }
+    return observed.identity;
   }
   const identity = writeDurableExclusive(path, bytes, fs);
   if (!samePhysicalIdentity(path, identity, fs) || !exactFile(path, bytes, fs)) {
-    throw new Error("host-init transaction file readback failed");
+    throw drift("host-init transaction file readback failed");
   }
   return identity;
 }
@@ -391,35 +420,51 @@ function prepareTransaction(root, planSha256, fs = {}) {
   const parent = join(root, ".claude/.runtime/agent-pipeline/onboarding");
   const intentBytes = Buffer.from(`${JSON.stringify(transactionIntent(root, planSha256), null, 2)}\n`, "utf8");
   const exists = fs.existsSync ?? existsSync;
+  let pendingIdentity;
+  let intentIdentity;
   if (!exists(pendingPath)) {
     assertPhysicalParents(root, ".claude/.runtime/agent-pipeline/onboarding", fs);
     const parentIdentity = assertPhysicalDirectory(parent, fs);
     (fs.mkdirSync ?? mkdirSync)(pendingPath, { mode: 0o700 });
-    const identity = physicalIdentity((fs.lstatSync ?? lstatSync)(pendingPath), "directory");
-    if (!identity) throw new Error("host-init pending transaction identity is unavailable");
-    ensureExactDurableFile(join(pendingPath, "intent.json"), intentBytes, fs);
+    pendingIdentity = physicalIdentity((fs.lstatSync ?? lstatSync)(pendingPath), "directory");
+    if (!pendingIdentity) throw new Error("host-init pending transaction identity is unavailable");
+    intentIdentity = ensureExactDurableFile(join(pendingPath, "intent.json"), intentBytes, fs);
     if (!samePhysicalIdentity(parent, parentIdentity, fs)) {
       throw new Error("host-init pending parent changed during publication");
     }
     fsyncDirectory(pendingPath, fs);
     fsyncDirectory(parent, fs);
   }
-  assertPhysicalDirectory(pendingPath, fs);
-  if (!exactFile(join(pendingPath, "intent.json"), intentBytes, fs)) {
-    throw new Error("host-init pending transaction does not match the reviewed plan");
+  pendingIdentity ??= assertPhysicalDirectory(pendingPath, fs);
+  const intent = readBoundFileObservation(join(pendingPath, "intent.json"), fs);
+  if (!intent || intent.bytes.compare(intentBytes) !== 0
+    || !samePhysicalIdentity(pendingPath, pendingIdentity, fs)) {
+    throw drift("host-init pending transaction does not match the reviewed plan");
   }
-  return { pendingPath, intentBytes };
+  intentIdentity ??= intent.identity;
+  return {
+    pendingPath,
+    intentBytes,
+    cleanup: {
+      pending: { path: pendingPath, identity: pendingIdentity },
+      intent: {
+        path: join(pendingPath, "intent.json"),
+        identity: intentIdentity,
+        bytes: intentBytes,
+      },
+    },
+  };
 }
 
 function readClosedJson(path, keys, schema, fs = {}) {
   try {
-    const bytes = readBoundFile(path, fs);
-    if (!bytes) return null;
-    const value = JSON.parse(bytes.toString("utf8"));
+    const observed = readBoundFileObservation(path, fs);
+    if (!observed) return null;
+    const value = JSON.parse(observed.bytes.toString("utf8"));
     return value && typeof value === "object" && !Array.isArray(value)
       && value.schema === schema
       && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort())
-      ? { value, bytes }
+      ? { value, bytes: observed.bytes, identity: observed.identity }
       : null;
   } catch {
     return null;
@@ -427,14 +472,25 @@ function readClosedJson(path, keys, schema, fs = {}) {
 }
 
 function initialGitTree(path, fs = {}) {
-  const rows = physicalTreeSnapshot(path, fs).filter(
-    (row) => row.path !== "agent-pipeline" && !row.path.startsWith("agent-pipeline/"),
-  );
+  let rows;
+  try {
+    rows = physicalTreeSnapshot(path, fs).filter(
+      (row) => row.path !== "agent-pipeline" && !row.path.startsWith("agent-pipeline/"),
+    );
+  } catch (error) {
+    if (error instanceof HostInitDriftError
+      || ["ENOENT", "ENOTDIR", "ELOOP"].includes(error?.code)) {
+      throw error instanceof HostInitDriftError
+        ? error
+        : drift("initialized Git control tree changed during observation");
+    }
+    throw error;
+  }
   if (rows.some((row) => !INITIAL_GIT_PATHS.has(row.path))) {
-    throw new Error("initialized Git control tree contains an unexpected path");
+    throw drift("initialized Git control tree contains an unexpected path");
   }
   if (!INITIAL_GIT_PATHS.size || rows.length !== INITIAL_GIT_PATHS.size) {
-    throw new Error("initialized Git control tree is incomplete");
+    throw drift("initialized Git control tree is incomplete");
   }
   return rows.map(({ path: relativePath, kind, sha256: digestValue = null }) => ({
     path: relativePath,
@@ -451,12 +507,14 @@ function prepareGitControl(root, planSha256, currentGitVersion, pendingPath, spa
   const exists = fs.existsSync ?? existsSync;
   const rootSha256 = sha256(Buffer.from(root, "utf8"));
   let gitIdentity;
+  let reservationIdentity;
+  let reservationBytes;
   if (!exists(gitPath)) {
     const rootIdentity = assertPhysicalDirectory(root, fs);
     (fs.mkdirSync ?? mkdirSync)(gitPath, { mode: 0o700 });
     gitIdentity = physicalIdentity((fs.lstatSync ?? lstatSync)(gitPath), "directory");
     if (!gitIdentity || !samePhysicalIdentity(root, rootIdentity, fs)) {
-      throw new Error("Git reservation identity is unavailable");
+      throw drift("Git reservation identity is unavailable");
     }
     const reservation = {
       schema: GIT_RESERVATION_SCHEMA,
@@ -465,11 +523,8 @@ function prepareGitControl(root, planSha256, currentGitVersion, pendingPath, spa
       device: gitIdentity.dev,
       inode: gitIdentity.ino,
     };
-    ensureExactDurableFile(
-      reservationPath,
-      Buffer.from(`${JSON.stringify(reservation, null, 2)}\n`, "utf8"),
-      fs,
-    );
+    reservationBytes = Buffer.from(`${JSON.stringify(reservation, null, 2)}\n`, "utf8");
+    reservationIdentity = ensureExactDurableFile(reservationPath, reservationBytes, fs);
     fsyncDirectory(gitPath, fs);
     fsyncDirectory(root, fs);
     fsyncDirectory(pendingPath, fs);
@@ -486,8 +541,10 @@ function prepareGitControl(root, planSha256, currentGitVersion, pendingPath, spa
       || observed.value.planSha256 !== planSha256
       || observed.value.device !== gitIdentity.dev
       || observed.value.inode !== gitIdentity.ino) {
-      throw new Error("existing Git control path is not the reserved transaction path");
+      throw drift("existing Git control path is not the reserved transaction path");
     }
+    reservationIdentity = observed.identity;
+    reservationBytes = observed.bytes;
   }
 
   const initialized = exists(initializedPath)
@@ -504,20 +561,36 @@ function prepareGitControl(root, planSha256, currentGitVersion, pendingPath, spa
       || initialized.value.planSha256 !== planSha256
       || parseGitVersion(`git version ${initialized.value.gitVersion}`) !== initialized.value.gitVersion
       || initialized.value.gitTreeSha256 !== sha256(Buffer.from(JSON.stringify(logicalTree), "utf8"))) {
-      throw new Error("initialized Git control proof drifted");
+      throw drift("initialized Git control proof drifted");
     }
     return {
       gitIdentity,
       gitVersion: initialized.value.gitVersion,
       gitTreeSha256: initialized.value.gitTreeSha256,
+      cleanup: {
+        reservation: {
+          path: reservationPath,
+          identity: reservationIdentity,
+          bytes: reservationBytes,
+        },
+        initialized: {
+          path: initializedPath,
+          identity: initialized.identity,
+          bytes: initialized.bytes,
+        },
+        template: {
+          path: templatePath,
+          identity: assertPhysicalDirectory(templatePath, fs),
+        },
+      },
     };
   }
-  if (exists(initializedPath)) throw new Error("initialized Git control proof is invalid");
+  if (exists(initializedPath)) throw drift("initialized Git control proof is invalid");
 
   if (!exists(templatePath)) (fs.mkdirSync ?? mkdirSync)(templatePath, { mode: 0o700 });
   const templateIdentity = assertPhysicalDirectory(templatePath, fs);
   if ((fs.readdirSync ?? readdirSync)(templatePath).length !== 0) {
-    throw new Error("Git initialization template is not empty");
+    throw drift("Git initialization template is not empty");
   }
   const initializedResult = spawn(
     "git",
@@ -528,11 +601,11 @@ function prepareGitControl(root, planSha256, currentGitVersion, pendingPath, spa
     return { status: "git-init-failed", gitIdentity };
   }
   if (!samePhysicalIdentity(gitPath, gitIdentity, fs)) {
-    throw new Error("Git control identity changed during initialization");
+    throw drift("Git control identity changed during initialization");
   }
   if (!samePhysicalIdentity(templatePath, templateIdentity, fs)
     || (fs.readdirSync ?? readdirSync)(templatePath).length !== 0) {
-    throw new Error("Git initialization template changed during initialization");
+    throw drift("Git initialization template changed during initialization");
   }
   const logicalTree = initialGitTree(gitPath, fs);
   const initializedProof = {
@@ -542,17 +615,28 @@ function prepareGitControl(root, planSha256, currentGitVersion, pendingPath, spa
     gitVersion: currentGitVersion,
     gitTreeSha256: sha256(Buffer.from(JSON.stringify(logicalTree), "utf8")),
   };
-  ensureExactDurableFile(
-    initializedPath,
-    Buffer.from(`${JSON.stringify(initializedProof, null, 2)}\n`, "utf8"),
-    fs,
-  );
+  const initializedBytes = Buffer.from(`${JSON.stringify(initializedProof, null, 2)}\n`, "utf8");
+  const initializedIdentity = ensureExactDurableFile(initializedPath, initializedBytes, fs);
+  (fs.faultInjector ?? (() => {}))("before-git-control-fsync");
   fsyncDirectory(gitPath, fs);
   fsyncDirectory(pendingPath, fs);
   return {
     gitIdentity,
     gitVersion: currentGitVersion,
     gitTreeSha256: initializedProof.gitTreeSha256,
+    cleanup: {
+      reservation: {
+        path: reservationPath,
+        identity: reservationIdentity,
+        bytes: reservationBytes,
+      },
+      initialized: {
+        path: initializedPath,
+        identity: initializedIdentity,
+        bytes: initializedBytes,
+      },
+      template: { path: templatePath, identity: templateIdentity },
+    },
   };
 }
 
@@ -604,6 +688,9 @@ function bindPrivateContinuity(root, {
     }),
     historySha256: sha256(historyBytes),
     gitVersion,
+    gitDevice: gitIdentity.dev,
+    gitInode: gitIdentity.ino,
+    gitTreeSha256,
     branch: "main",
   };
   if (receipt.authoritySha256 === null) throw new Error("host-init authority is unavailable");
@@ -688,8 +775,31 @@ export function applyHostRepositoryInit({
       fsConstants: deps.constants ?? constants,
       platform: deps.process?.platform ?? process.platform,
     });
-    if (currentAdmission && exists(join(root, ".git"))
+    const currentGitPath = join(root, ".git");
+    if (currentAdmission && exists(currentGitPath)
       && !exists(join(root, ".codex")) && !exists(join(root, ".agents"))) {
+      let completedPostimageCurrent = false;
+      try {
+        const currentGitIdentity = physicalIdentity(
+          (deps.lstatSync ?? lstatSync)(currentGitPath),
+          "directory",
+        );
+        completedPostimageCurrent = currentAdmission.planSha256 === planSha256
+          && currentGitIdentity?.dev === currentAdmission.gitDevice
+          && currentGitIdentity?.ino === currentAdmission.gitInode
+          && sha256(Buffer.from(JSON.stringify(initialGitTree(currentGitPath, deps)), "utf8"))
+            === currentAdmission.gitTreeSha256;
+      } catch {
+        completedPostimageCurrent = false;
+      }
+      if (!completedPostimageCurrent) {
+        return {
+          schema: APPLY_SCHEMA,
+          status: "host-preimage-changed",
+          root,
+          diagnostics: [{ code: "completed_git_control_drift" }],
+        };
+      }
       return {
         schema: APPLY_SCHEMA,
         status: "restart-required",
@@ -724,7 +834,15 @@ export function applyHostRepositoryInit({
         spawn,
         deps,
       );
-    } catch {
+    } catch (error) {
+      if (!(error instanceof HostInitDriftError)) {
+        return {
+          schema: APPLY_SCHEMA,
+          status: "apply-failed",
+          root,
+          diagnostics: [{ code: "git_control_preparation_failed" }],
+        };
+      }
       return {
         schema: APPLY_SCHEMA,
         status: "host-preimage-changed",
@@ -740,7 +858,12 @@ export function applyHostRepositoryInit({
         diagnostics: [{ code: "git_init_failed_reserved_control_path_retained" }],
       };
     }
-    const { gitIdentity, gitVersion, gitTreeSha256 } = gitControl;
+    const {
+      gitIdentity,
+      gitVersion,
+      gitTreeSha256,
+      cleanup: gitCleanup,
+    } = gitControl;
     const gitTree = physicalTreeSnapshot(join(root, ".git"), deps);
     const created = {
       admission: null,
@@ -779,27 +902,43 @@ export function applyHostRepositoryInit({
       }
       return { schema: APPLY_SCHEMA, status: "apply-failed", root, diagnostics: [{ code: "continuity_binding_failed" }] };
     }
+    let cleanupDiagnostics = [];
     try {
-      removeCreatedFile(join(transaction.pendingPath, "intent.json"),
-        physicalIdentity((deps.lstatSync ?? lstatSync)(join(transaction.pendingPath, "intent.json")), "file"),
-        deps);
-      removeCreatedFile(join(transaction.pendingPath, GIT_INITIALIZED_FILE),
-        physicalIdentity((deps.lstatSync ?? lstatSync)(join(transaction.pendingPath, GIT_INITIALIZED_FILE)), "file"),
-        deps);
-      removeCreatedFile(join(transaction.pendingPath, GIT_RESERVATION_FILE),
-        physicalIdentity((deps.lstatSync ?? lstatSync)(join(transaction.pendingPath, GIT_RESERVATION_FILE)), "file"),
-        deps);
-      removeCreatedDirectory(join(transaction.pendingPath, GIT_TEMPLATE_DIRECTORY),
-        physicalIdentity((deps.lstatSync ?? lstatSync)(join(transaction.pendingPath, GIT_TEMPLATE_DIRECTORY)), "directory"),
-        deps);
-      removeCreatedDirectory(transaction.pendingPath,
-        physicalIdentity((deps.lstatSync ?? lstatSync)(transaction.pendingPath), "directory"),
-        deps);
+      (deps.faultInjector ?? (() => {}))("before-host-init-pending-cleanup");
+      removeCreatedFile(
+        transaction.cleanup.intent.path,
+        transaction.cleanup.intent.identity,
+        deps,
+        transaction.cleanup.intent.bytes,
+      );
+      removeCreatedFile(
+        gitCleanup.initialized.path,
+        gitCleanup.initialized.identity,
+        deps,
+        gitCleanup.initialized.bytes,
+      );
+      removeCreatedFile(
+        gitCleanup.reservation.path,
+        gitCleanup.reservation.identity,
+        deps,
+        gitCleanup.reservation.bytes,
+      );
+      removeCreatedDirectory(
+        gitCleanup.template.path,
+        gitCleanup.template.identity,
+        deps,
+      );
+      removeCreatedDirectory(
+        transaction.cleanup.pending.path,
+        transaction.cleanup.pending.identity,
+        deps,
+      );
       fsyncDirectory(join(root, ".claude/.runtime/agent-pipeline/onboarding"), deps);
     } catch {
       // The committed admission is already exact and authoritative. A stale
-      // empty pending directory is non-authoritative and may be retained for
-      // an attended hygiene pass without downgrading the committed result.
+      // or identity-drifted pending tree is non-authoritative and is retained
+      // rather than deleting a path not bound by this invocation.
+      cleanupDiagnostics = [{ code: "pending_cleanup_retained" }];
     }
     return {
       schema: APPLY_SCHEMA,
@@ -809,7 +948,7 @@ export function applyHostRepositoryInit({
       branch: "main",
       createsCommit: false,
       operatorAction: "Restart the current project session once so Codex remounts the newly initialized repository.",
-      diagnostics: [],
+      diagnostics: cleanupDiagnostics,
     };
   } catch {
     return {

@@ -88,10 +88,14 @@ transport, not invented by onboarding.
   If the process ends before admission publication, the same digest-bound
   apply resumes only that exact reserved identity and tree. A partial,
   replaced, or unrelated physical `.git` cannot borrow the pending intent.
+  The final admission retains the Git device/inode and initialized core-tree
+  digest, so an already completed apply also revalidates its unchanged
+  postimage before returning `restart-required`.
 - The host admission is one mode-0700 directory published by a single atomic
   rename. It contains an exact intent, receipt, and marker. The marker binds
   both intent and receipt digests; the receipt binds root, reviewed plan,
-  portable authority, kickoff history, Git version, and branch.
+  portable authority, kickoff history, Git version, branch, Git identity, and
+  initialized core-tree digest.
 - Admission files are opened with `O_NOFOLLOW` and read through descriptors.
   Leaf device/inode/mode/link identity and every parent-directory identity are
   checked before and after the read. A raced replacement is invalid evidence,
@@ -105,17 +109,22 @@ transport, not invented by onboarding.
 
 Private-state writes use exclusive no-follow creation, file fsync, atomic
 rename, directory fsync, exact descriptor-bound readback, and identity-bound
-cleanup. The host-init files are assembled below the exact pending intent and
+cleanup. Git-tree files are read through no-follow descriptors and their leaf
+and parent identities are checked after the read; directory identities and
+membership are checked before and after traversal. The host-init files
+are assembled below the exact pending intent and
 renamed as one directory, so the authoritative namespace exposes neither a
 receipt-only nor marker-only crash state. A retry resumes the exact pending
 intent, reserved Git identity/tree, and byte-identical partial files; a
 mismatched pending intent, partial/replaced/foreign Git path, raced
 parent/leaf, or changed postimage fails closed. Runtime and
 kickoff writers verify every preimage, retain crash-recovery authority, and
-roll back only files/directories whose device, inode, link count, and digest
-still match the writer's records. Foreign or identity-drifted paths are
-preserved and the operation reports an unavailable/indeterminate result
-instead of false success. Disposable-worktree rollback first renames the exact
+roll back or clean up only files/directories whose device, inode, link count,
+and digest still match identities captured at creation or validation, never
+identities sampled immediately before deletion. Foreign or identity-drifted
+pending paths are preserved and reported as `pending_cleanup_retained`;
+operational persistence failures remain distinct from preimage drift.
+Disposable-worktree rollback first renames the exact
 recorded tree into quarantine. Each recorded leaf is then atomically renamed
 to a fresh cleanup name and revalidated there before unlink/rmdir; a
 replacement between the first validation and atomic capture is restored and

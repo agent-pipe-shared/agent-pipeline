@@ -255,10 +255,13 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
     const localOnlyCalibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
     localOnlyCalibration.repositoryMode = "local-only";
     writeFileSync(calibrationPath, `${JSON.stringify(localOnlyCalibration, null, 2)}\n`);
-    assert.deepEqual(readCodexHostRepositoryInitAdmission(path), {
-      gitVersion: "2.40.1",
-      repositoryMode: "local-only",
-    });
+    const localOnlyAdmission = readCodexHostRepositoryInitAdmission(path);
+    assert.equal(localOnlyAdmission?.gitVersion, "2.40.1");
+    assert.equal(localOnlyAdmission?.repositoryMode, "local-only");
+    assert.match(localOnlyAdmission?.gitDevice ?? "", /^\d+$/u);
+    assert.match(localOnlyAdmission?.gitInode ?? "", /^\d+$/u);
+    assert.match(localOnlyAdmission?.gitTreeSha256 ?? "", /^[a-f0-9]{64}$/u);
+    assert.match(localOnlyAdmission?.planSha256 ?? "", /^[a-f0-9]{64}$/u);
     const localOnlyAuthority = run(authority, ["--root", path], path);
     assert.equal(localOnlyAuthority.status, 0, localOnlyAuthority.stdout);
     assert.equal(localOnlyAuthority.json.status, "ready");

@@ -9,7 +9,7 @@
 > reliable project work. Approval authorizes implementation dispatch only; it
 > does not authorize push, merge, tag, publication, Issue closure, or release.
 
-<!-- technical-spec-sha256: d09ff954ffbd6dda4e1cb912d2ec0eae9c50e5c8d769f15d471eee4a7b2f9e97 -->
+<!-- technical-spec-sha256: ac5e8a2339f4b1aa7c30fb4de6d2c11586aa92eb14f78f1e1b8a5439aaf4eadc -->
 
 The technical approval binds the exact neighboring [spec.md](spec.md). Any
 change to that file after approval invalidates the implementation gate until
@@ -249,6 +249,10 @@ declared by 0.4.5; it does not permit a fabricated hook capability.
       atomically exposes the complete intent/receipt/marker admission
       directory, and idempotently resumes the same pending intent after a
       process interruption.
+- [ ] Completed host-init replay revalidates the admitted Git identity and
+      core-tree; descriptor-bound tree observation and identity-bound pending
+      cleanup preserve raced replacements, while persistence failure remains
+      distinguishable from preimage drift.
 - [ ] After that restart the repository is locally writable with a
       receipt-bound plugin-managed runtime; the read-only mount alone never
       yields `ready`, and no runtime initialization/readback or second restart
