@@ -221,6 +221,7 @@ lifecycle rather than a replacement for the detailed setup guide.
 | Verify the current change | `node harness/scripts/verify.mjs` |
 | Close a completed block | `/pipeline-core:close-block` |
 | Update a Claude Code binding, then reload the running host | `claude plugin marketplace update agent-pipeline`<br>`claude plugin update pipeline-core@agent-pipeline --scope project`<br>`/reload-plugins` |
+| Test a local Codex plugin candidate | Follow [`docs/codex-local-plugin-development.md`](docs/codex-local-plugin-development.md); use the isolated `pipeline-core@agent-pipeline-local` identity |
 | Inspect a V3 authority (pipeline source only) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"` |
 | Plan its V3-owned changes (pipeline source only) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"` |
 | Explicitly activate the reviewed V3 plan (pipeline source only) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate` |
@@ -511,6 +512,7 @@ normalen Ablauf ab und ersetzen nicht den detaillierten Setup-Guide.
 | Aktuelle Änderung verifizieren | `node harness/scripts/verify.mjs` |
 | Fertigen Block abschließen | `/pipeline-core:close-block` |
 | Claude-Code-Binding aktualisieren und laufenden Host neu laden | `claude plugin marketplace update agent-pipeline`<br>`claude plugin update pipeline-core@agent-pipeline --scope project`<br>`/reload-plugins` |
+| Lokalen Codex-Plugin-Kandidaten testen | Folge [`docs/codex-local-plugin-development.md`](docs/codex-local-plugin-development.md); nutze die getrennte Identität `pipeline-core@agent-pipeline-local` |
 | V3-Autorität inspizieren (nur Pipeline Source) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs inspect --root "$PWD"` |
 | Ihre V3-eigenen Änderungen planen (nur Pipeline Source) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs plan --root "$PWD"` |
 | Geprüften V3-Plan explizit aktivieren (nur Pipeline Source) | `node plugins/pipeline-core/scripts/runner-profile-migration-v3.mjs apply --root "$PWD" --activate` |

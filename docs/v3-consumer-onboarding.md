@@ -60,6 +60,7 @@ The normal progress sequence is ordered and fail-closed:
 | `runtime-initialization-required` | Read-only `plan-runtime`, then the returned digest-bound `initialize-runtime --activate` command. This applies only when Codex does not provide the reserved project runtime mount. | Required generated Codex runtime targets validate and a restart barrier is durable. |
 | `restart-required` | Exit the current process and use the returned one-use restart action. | Only a new process with a fresh native, digest-bound effective-runtime readback can clear the barrier. File presence, mtimes, a user assertion, and App-Server health are not substitutes. |
 | `kickoff-required` | Collect and validate the project goal, then produce the read-only sanctioned kickoff plan. | The plan proposes initial machine continuity, separate initial PRD/Spec authority, private history, and a human handover projection. |
+| `continuity-damaged` | Run the exact read-only `plan-repair`. A supported bounded repair requires a separate digest-bound confirmation; an unsupported result stops with no next action. | Only the recognized active-turn resume mismatch or an established PO-bound pre-continuity state is repairable. Kickoff history is never rewritten. |
 | `ready` | No onboarding mutation. Continue through the intent-appropriate bootstrap/session/dispatch gate. | Repository capability, current source/runtime/readback, continuity, and every capability required by that intent passed together. |
 
 For the first two write stages, execute the complete `argv` returned by the

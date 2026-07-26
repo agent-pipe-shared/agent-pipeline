@@ -26,8 +26,11 @@ import {
 import { appServerNextAction, observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
 import { observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
 import {
+  applyOnboardingContinuityRepair,
   applyOnboardingKickoff,
   classifyOnboardingContinuity,
+  KICKOFF_GOAL_MAX_BYTES,
+  planOnboardingContinuityRepair,
   planOnboardingKickoff,
   reconstructOnboardingKickoffPlan,
 } from "./onboarding-continuity.mjs";
@@ -38,7 +41,7 @@ import { parseYaml } from "./yaml-lite.mjs";
 import { codexCustomAgentSeed, loadRuntimeProjectionV3OwnedKeys, planRuntimeProjectionV3 } from "./runtime-projection-v3.mjs";
 import {
   prepareRuntimeRestartBinding, persistRestartBarrier, readCurrentRuntimeReadback,
-  readRestartBarrier, removeRestartBarrierCas,
+  readRestartBarrier, removeRestartBarrierCas, runtimeRestartBindingCurrent,
 } from "./codex-onboarding-runtime.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 
@@ -548,13 +551,76 @@ export function renderProjectOnboardingAction(action) {
   return [executable, ...argv].map(shellWord).join(" ");
 }
 
-function continuityInspectAction(root) {
+const COPY_COMMAND_MAX_COLUMNS = 72;
+function singleQuoted(value, powershell = false) {
+  return powershell
+    ? `'${value.replaceAll("'", "''")}'`
+    : `'${value.replaceAll("'", "'\"'\"'")}'`;
+}
+function boundedAssignmentLines(name, value, powershell = false) {
+  if (/[\r\n]/u.test(value)) throw new TypeError("copy command values cannot contain line breaks");
+  const lines = [];
+  let remaining = value;
+  do {
+    const prefix = powershell
+      ? `${name}${lines.length === 0 ? " = " : " += "}`
+      : `${name}=${lines.length === 0 ? "" : `\${${name}}`}`;
+    let length = remaining.length;
+    while (length > 0
+      && `${prefix}${singleQuoted(remaining.slice(0, length), powershell)}`.length > COPY_COMMAND_MAX_COLUMNS) {
+      length -= 1;
+    }
+    if (length === 0 && remaining.length > 0) throw new TypeError("copy command value cannot be bounded");
+    const chunk = remaining.slice(0, length);
+    lines.push(`${prefix}${singleQuoted(chunk, powershell)}`);
+    remaining = remaining.slice(length);
+  } while (remaining.length > 0);
+  return lines;
+}
+function restartCopyCommands(executable, argv) {
+  const [launcher, rootFlag, root, barrierFlag, barrierSha256, activate] = argv;
+  if (executable !== "node"
+    || rootFlag !== "--root"
+    || barrierFlag !== "--barrier-sha256"
+    || activate !== "--activate"
+    || !/^[a-f0-9]{64}$/u.test(barrierSha256)) {
+    throw new TypeError("restart action cannot be rendered as a bounded command");
+  }
+  const posix = [
+    ...boundedAssignmentLines("P", launcher),
+    ...boundedAssignmentLines("R", root),
+    ...boundedAssignmentLines("B", barrierSha256),
+    'node "$P" \\',
+    '  --root "$R" \\',
+    '  --barrier-sha256 "$B" \\',
+    "  --activate",
+  ];
+  const powershell = [
+    ...boundedAssignmentLines("$P", launcher, true),
+    ...boundedAssignmentLines("$R", root, true),
+    ...boundedAssignmentLines("$B", barrierSha256, true),
+    "& node $P `",
+    "  --root $R `",
+    "  --barrier-sha256 $B `",
+    "  --activate",
+  ];
+  for (const line of [...posix, ...powershell]) {
+    if (line.length > COPY_COMMAND_MAX_COLUMNS) throw new TypeError("copy command line exceeds its bound");
+  }
+  return {
+    maxColumns: COPY_COMMAND_MAX_COLUMNS,
+    posix: posix.join("\n"),
+    powershell: powershell.join("\n"),
+  };
+}
+
+function continuityRepairPlanAction(root) {
   return commandAction(
-    [ONBOARDING_SCRIPT, "continuity", "inspect", "--root", root],
+    [ONBOARDING_SCRIPT, "plan-repair", "--root", root],
     false,
     false,
     SCHEMA,
-    ["continuity-damaged", "continuity-observation-unavailable"],
+    ["continuity-damaged"],
   );
 }
 
@@ -566,7 +632,8 @@ function collectGoalAction() {
       encoding: "utf8",
       trim: true,
       minBytes: 1,
-      maxBytes: 8192,
+      maxBytes: KICKOFF_GOAL_MAX_BYTES,
+      singleLine: true,
       rejectNul: true,
     },
     mutation: false,
@@ -586,9 +653,18 @@ const RESTART_EXPECTED_STATUSES = [
   "continuity-observation-unavailable", "app-server-execution-denied", "app-server-not-running", "app-server-unavailable",
 ];
 function restartAction(root, barrierSha256) {
+  const executable = "node";
+  const argv = [fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url)), "--root", root, "--barrier-sha256", barrierSha256, "--activate"];
   return {
     kind: "restart-process", requiresCurrentProcessExit: true,
-    launch: { executable: "node", argv: [fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url)), "--root", root, "--barrier-sha256", barrierSha256, "--activate"] },
+    launch: {
+      executable,
+      argv,
+      executionBoundary: "external-terminal",
+      invocation: "user-copy-only",
+      codexToolCallPermitted: false,
+      copyCommand: restartCopyCommands(executable, argv),
+    },
     mutation: true, requiresConfirmation: true, expectedStatuses: RESTART_EXPECTED_STATUSES,
   };
 }
@@ -648,6 +724,35 @@ function observeReadyAppServer(intent, fs) {
 }
 
 function readyLifecycleResult({ root, intent, repository, runtime, continuity = emptyContinuity() }, fs) {
+  // The fresh protected-mount transition is not a ready-state claim.  Its
+  // confirmed host repository initializer must be plannable even when the
+  // current workspace sandbox cannot reach the host App-Server control
+  // socket.  App-Server health remains mandatory after host initialization,
+  // before any bootstrap/session/dispatch result may become ready.
+  if (runtime.status === "plugin-managed-unattested" && continuity.status === "valid") {
+    return lifecycleResult({
+      status: "host-repository-init-required",
+      root,
+      intent,
+      repository,
+      runtime,
+      continuity,
+      appServer: emptyAppServer(),
+      nextAction: commandAction(
+        [HOST_REPOSITORY_INIT_SCRIPT, "plan", "--root", root],
+        false,
+        false,
+        "pipeline.codex-host-repository-init-plan.v1",
+        ["ready", "not-applicable"],
+      ),
+      diagnostics: [lifecycleDiagnostic(
+        "$.runtime",
+        "plugin_managed_runtime_unattested",
+        "the reserved Codex runtime mount is not yet bound to a durable host initialization receipt",
+        "review the exact host repository initialization plan",
+      )],
+    });
+  }
   // Runtime projection and App-Server health are distinct authorities. A
   // plugin-managed projection still requires the same single, read-only
   // App-Server observation as a project-local projection before bootstrap,
@@ -718,12 +823,12 @@ function readyLifecycleResult({ root, intent, repository, runtime, continuity = 
       runtime,
       continuity,
       appServer,
-      nextAction: continuityInspectAction(root),
+      nextAction: continuityRepairPlanAction(root),
       diagnostics: [lifecycleDiagnostic(
         "$.continuity",
         "continuity_damaged",
         "existing continuity artifacts are inconsistent or invalid",
-        "inspect and repair continuity through its owning workflow; pristine kickoff is not permitted",
+        "review the bounded continuity repair plan; pristine kickoff is not permitted",
       )],
     });
   }
@@ -741,30 +846,6 @@ function readyLifecycleResult({ root, intent, repository, runtime, continuity = 
         "continuity_observation_unavailable",
         "continuity authority could not be observed safely",
         "repair continuity read access before retrying",
-      )],
-    });
-  }
-  if (runtime.status === "plugin-managed-unattested") {
-    return lifecycleResult({
-      status: "host-repository-init-required",
-      root,
-      intent,
-      repository,
-      runtime,
-      continuity,
-      appServer,
-      nextAction: commandAction(
-        [HOST_REPOSITORY_INIT_SCRIPT, "plan", "--root", root],
-        false,
-        false,
-        "pipeline.codex-host-repository-init-plan.v1",
-        ["ready", "not-applicable"],
-      ),
-      diagnostics: [lifecycleDiagnostic(
-        "$.runtime",
-        "plugin_managed_runtime_unattested",
-        "the reserved Codex runtime mount is not yet bound to a durable host initialization receipt",
-        "review the exact host repository initialization plan",
       )],
     });
   }
@@ -1064,6 +1145,34 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
       try {
         const barrier = readRestartBarrier({ rootDir: legacy.root, repositoryCapability: repository.mode, deps: fs });
         if (barrier.status === "present" && barrier.barrier.state === "restart-required") {
+          if (!runtimeRestartBindingCurrent(barrier.barrier)) {
+            return lifecycleResult({
+              status: "runtime-attestation-required",
+              root: legacy.root,
+              intent,
+              repository,
+              runtime: {
+                status: "projection-current",
+                sourceSha256: barrier.barrier.sourceSha256,
+                targetsSha256: barrier.barrier.runtimeTargetsSha256,
+                barrierSha256: barrier.rawSha256,
+                readbackSha256: null,
+              },
+              nextAction: commandAction(
+                [ONBOARDING_SCRIPT, "plan-readback", "--root", legacy.root],
+                false,
+                false,
+                SCHEMA,
+                ["runtime-attestation-required"],
+              ),
+              diagnostics: [lifecycleDiagnostic(
+                "$.runtime",
+                "restart_binding_drift",
+                "the pending restart barrier is bound to a different Pipeline launcher, helper, or Codex executable",
+                "review and apply the digest-bound readback bootstrap plan to replace the stale barrier",
+              )],
+            });
+          }
           return lifecycleResult({ status: "restart-required", root: legacy.root, intent, repository,
             runtime: { status: "restart-required", sourceSha256: barrier.barrier.sourceSha256, targetsSha256: barrier.barrier.runtimeTargetsSha256, barrierSha256: barrier.rawSha256, readbackSha256: null },
             nextAction: restartAction(legacy.root, barrier.rawSha256),
@@ -1316,6 +1425,35 @@ function planLifecycle(rootDir, fs, operation) {
     if (plan.status !== "ready") return observed;
     return { ...observed, nextAction: commandAction([ONBOARDING_SCRIPT, "apply-portable-seed", "--root", plan.root, "--plan-sha256", lifecyclePlanDigest(plan), "--activate"], true, true, SCHEMA, ["runtime-initialization-required", "restart-required", "kickoff-required"]) };
   }
+  if (operation === "repair" && observed.status === "continuity-damaged") {
+    const plan = planOnboardingContinuityRepair({
+      rootDir,
+      repositoryCapability: observed.repository.mode,
+      spawn: fs.spawnSync,
+    });
+    if (plan.status !== "ready") {
+      return {
+        ...observed,
+        nextAction: null,
+        diagnostics: [lifecycleDiagnostic(
+          "$.continuity",
+          "continuity_repair_unavailable",
+          "the damaged continuity has no bounded automatic repair",
+          "preserve the artifacts and use the continuity-owning workflow; do not retry plan-repair",
+        )],
+      };
+    }
+    return {
+      ...observed,
+      nextAction: commandAction(
+        [ONBOARDING_SCRIPT, "apply-repair", "--root", plan.root, "--plan-sha256", plan.planSha256, "--activate"],
+        true,
+        true,
+        SCHEMA,
+        ["ready"],
+      ),
+    };
+  }
   if (operation === "runtime" || operation === "repair" || operation === "readback") {
     const expected = operation === "runtime"
       ? "runtime-initialization-required"
@@ -1349,6 +1487,26 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate) {
     return v4Inspection(rootDir, fs);
   }
   const beforeApply = v4Inspection(rootDir, fs);
+  if (operation === "repair" && beforeApply.status === "continuity-damaged") {
+    const plan = planOnboardingContinuityRepair({
+      rootDir,
+      repositoryCapability: beforeApply.repository.mode,
+      spawn: fs.spawnSync,
+    });
+    if (plan.status !== "ready" || plan.planSha256 !== planSha256) return beforeApply;
+    try {
+      applyOnboardingContinuityRepair({
+        rootDir,
+        repositoryCapability: beforeApply.repository.mode,
+        expectedPlanSha256: planSha256,
+        activate: true,
+        deps: { spawn: fs.spawnSync },
+      });
+    } catch {
+      return v4Inspection(rootDir, fs);
+    }
+    return v4Inspection(rootDir, fs);
+  }
   const expectedBeforeApply = operation === "runtime"
     ? "runtime-initialization-required"
     : operation === "repair"

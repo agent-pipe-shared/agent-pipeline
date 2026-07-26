@@ -80,7 +80,7 @@ function readyInspection(root) {
       readbackSha256: null,
     },
     continuity: { status: "valid" },
-    appServer: { required: true, status: "running", code: "CAS-READY" },
+    appServer: { required: false, status: "not-requested", code: null },
     nextAction: {
       kind: "command",
       executable: "node",
@@ -855,6 +855,50 @@ test("Git-control persistence failures keep their operational classification", (
   assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY)), true);
 });
 
+test("path-identity observation failures remain operational after directory fsync", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const pendingPath = join(root, CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY);
+  let pendingDescriptor = null;
+  let failNextPendingIdentityRead = false;
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      openSync(path, flags, mode) {
+        const descriptor = openSync(path, flags, mode);
+        if (path === pendingPath) pendingDescriptor = descriptor;
+        return descriptor;
+      },
+      fsyncSync(descriptor) {
+        const result = fsyncSync(descriptor);
+        if (descriptor === pendingDescriptor) failNextPendingIdentityRead = true;
+        return result;
+      },
+      lstatSync(path) {
+        if (path === pendingPath && failNextPendingIdentityRead) {
+          failNextPendingIdentityRead = false;
+          const error = new Error("synthetic identity read failure");
+          error.code = "EIO";
+          throw error;
+        }
+        return lstatSync(path);
+      },
+      closeSync(descriptor) {
+        if (descriptor === pendingDescriptor) pendingDescriptor = null;
+        return closeSync(descriptor);
+      },
+    },
+  });
+  assert.equal(result.status, "apply-failed");
+  assert.deepEqual(result.diagnostics, [{ code: "git_control_preparation_failed" }]);
+  assert.equal(existsSync(join(root, ".git")), false);
+});
+
 test("retry repeats a failed initialized-proof file fsync before admission", () => {
   const root = fixture();
   const plan = planHostRepositoryInit({
@@ -1151,6 +1195,47 @@ test("Git-tree read failures remain operational rather than preimage drift", () 
   });
   assert.equal(result.status, "apply-failed");
   assert.deepEqual(result.diagnostics, [{ code: "git_control_preparation_failed" }]);
+});
+
+test("continuity-directory ABA drift returns host-preimage-changed after rollback", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const onboarding = join(root, ".git", "agent-pipeline", "onboarding");
+  const original = join(root, ".host-init-onboarding-original");
+  const foreign = join(root, ".host-init-onboarding-foreign");
+  let swapped = false;
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        completeGitInit(options.cwd);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      openSync(path, flags, mode) {
+        if (path === onboarding && !swapped) {
+          swapped = true;
+          renameSync(onboarding, original);
+          mkdirSync(onboarding, { mode: 0o700 });
+          const descriptor = openSync(onboarding, flags, mode);
+          renameSync(onboarding, foreign);
+          renameSync(original, onboarding);
+          return descriptor;
+        }
+        return openSync(path, flags, mode);
+      },
+    },
+  });
+  assert.equal(result.status, "host-preimage-changed");
+  assert.deepEqual(result.diagnostics, [{ code: "host_init_continuity_drift" }]);
+  assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY)), false);
+  assert.equal(existsSync(join(root, ".git", "agent-pipeline")), false);
+  assert.equal(existsSync(foreign), true);
 });
 
 test("host apply rejects drift and any physical reserved host path before Git", () => {

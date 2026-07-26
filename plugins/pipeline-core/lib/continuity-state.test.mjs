@@ -7,6 +7,7 @@ import {
   applyCourseDecisionIntent,
   applyDecisionSelection,
   beginCloseTransition,
+  bindContinuitySessionCleanup,
   clearCourseDecisionReceipt,
   clearDecisionSelection,
   compareAndSwapContinuity,
@@ -18,6 +19,7 @@ import {
   recordCloseFinalVerify,
   recordCloseReadback,
   recordCourseDecisionBrief,
+  releaseContinuitySessionCleanup,
   validateContinuityState,
 } from "./continuity-state.mjs";
 import { computeContinuityFinalDigest } from "./continuity-host-adapter.mjs";
@@ -228,6 +230,95 @@ check("runtime may carry only a redacted session-cleanup descriptor handle", () 
   assert.equal(validateContinuityState(value, FEATURE).ok, true);
   value.runtime.sessionCleanup.ownerNonce = "must-not-persist";
   assert.equal(validateContinuityState(value, FEATURE).ok, false);
+});
+
+check("session cleanup binding is a one-time pre-dispatch CAS", () => {
+  const current = state({ queueHead: queueHead({ nextAction: "dispatch", dispatch: null }) });
+  const tuple = { sessionId: "session-local-01", descriptorSha256: A };
+  const bound = bindContinuitySessionCleanup(current, {
+    expectedRevision: 0,
+    sessionCleanup: tuple,
+  }, FEATURE);
+  assert.equal(bound.ok, true);
+  assert.equal(bound.code, "CS-SESSION-CLEANUP-BOUND");
+  assert.equal(bound.mutated, true);
+  assert.equal(bound.state.revision, 1);
+  assert.deepEqual(bound.state.runtime.sessionCleanup, tuple);
+  assert.equal(current.runtime.sessionCleanup, null);
+
+  const replay = bindContinuitySessionCleanup(bound.state, {
+    expectedRevision: 1,
+    sessionCleanup: tuple,
+  }, FEATURE);
+  assert.equal(replay.code, "CS-SESSION-CLEANUP-ALREADY-BOUND");
+  assert.equal(replay.mutated, false);
+});
+
+check("session cleanup binding rejects replacement, stale input and admitted dispatches", () => {
+  const tuple = { sessionId: "session-local-01", descriptorSha256: A };
+  const boundState = state({
+    revision: 1,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: tuple },
+    queueHead: queueHead({ nextAction: "dispatch", dispatch: null }),
+  });
+  assert.equal(bindContinuitySessionCleanup(boundState, {
+    expectedRevision: 1,
+    sessionCleanup: { sessionId: "session-other-02", descriptorSha256: B },
+  }, FEATURE).code, "CS-SESSION-CLEANUP-PROTECTED");
+  assert.equal(bindContinuitySessionCleanup(boundState, {
+    expectedRevision: 0,
+    sessionCleanup: tuple,
+  }, FEATURE).code, "CS-STALE");
+  assert.equal(bindContinuitySessionCleanup(state(), {
+    expectedRevision: 0,
+    sessionCleanup: tuple,
+  }, FEATURE).code, "CS-SESSION-CLEANUP-TOO-LATE");
+});
+
+check("session cleanup release is exact, replayable and permits the next session", () => {
+  const tuple = { sessionId: "session-local-01", descriptorSha256: A };
+  const current = state({
+    revision: 1,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: tuple },
+    queueHead: queueHead({ nextAction: "dispatch", dispatch: null }),
+    resume: { mode: "immediate", sourceRevision: 1, reasonCode: "active-turn" },
+  });
+  const released = releaseContinuitySessionCleanup(current, {
+    expectedRevision: 1,
+    sessionCleanup: tuple,
+  }, FEATURE);
+  assert.equal(released.ok, true);
+  assert.equal(released.code, "CS-SESSION-CLEANUP-RELEASED");
+  assert.equal(released.mutated, true);
+  assert.equal(released.state.revision, 2);
+  assert.equal(released.state.runtime.sessionCleanup, null);
+
+  const replay = releaseContinuitySessionCleanup(released.state, {
+    expectedRevision: 2,
+    sessionCleanup: tuple,
+  }, FEATURE);
+  assert.equal(replay.code, "CS-SESSION-CLEANUP-ALREADY-RELEASED");
+  assert.equal(replay.mutated, false);
+});
+
+check("session cleanup release rejects the wrong tuple and admitted dispatch", () => {
+  const tuple = { sessionId: "session-local-01", descriptorSha256: A };
+  const current = state({
+    revision: 1,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: tuple },
+    queueHead: queueHead({ nextAction: "dispatch", dispatch: null }),
+    resume: { mode: "immediate", sourceRevision: 1, reasonCode: "active-turn" },
+  });
+  assert.equal(releaseContinuitySessionCleanup(current, {
+    expectedRevision: 1,
+    sessionCleanup: { sessionId: "session-other-02", descriptorSha256: B },
+  }, FEATURE).code, "CS-SESSION-CLEANUP-PROTECTED");
+  const admitted = structuredClone(current);
+  admitted.queueHead.dispatch = identity({ queueRevision: 1 });
+  assert.equal(releaseContinuitySessionCleanup(admitted, {
+    expectedRevision: 1,
+    sessionCleanup: tuple,
+  }, FEATURE).code, "CS-SESSION-CLEANUP-RELEASE-TOO-LATE");
 });
 
 for (const [name, mutate] of [

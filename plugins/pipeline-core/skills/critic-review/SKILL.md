@@ -1,6 +1,6 @@
 ---
 name: critic-review
-description: "Independent Critic review of one finished piece of work. Pass PATHS/REFS ONLY - the Critic constructs its own input (git diff, spec, guardrails, evidence) and never accepts prose context. Runs as a fresh-context read-only subagent; two-phase protocol - adversarial hunt, then evidence-gated honest report. T1 uses the selected runner's native isolation or the explicitly assured standing functional-equivalent lane."
+description: "Independent, diff-scoped Critic review of one finished piece of work. Pass PATHS/REFS ONLY - the Critic constructs its own input (git diff, spec, guardrails, evidence) and never accepts prose context. Runs as a fresh-context read-only subagent; two-phase protocol - adversarial hunt, then evidence-gated honest report. T1 uses the selected runner's native isolation or the explicitly assured standing functional-equivalent lane."
 disable-model-invocation: true
 argument-hint: "<spec-path> <fixed-candidate-diff-range> [guardrail-path ...] [evidence:<path> ...] [sha:<ruleset-sha>] [project:<name>] [verdict:yes|no] [assurance:runner-native:<evidence>|functional-equivalent-read-only]"
 context: fork
@@ -44,6 +44,28 @@ Missing spec path or diff range → report "dispatch defect: missing {{FIELD}}" 
 **Governance wiring (conditional, dispatch-construction rule):** if the reviewed project declares a `.claude/pipeline.yaml` with a `governance` block, the dispatch MUST include the resolved `guidelines_path` and `policies_path` among the guardrail/constraint paths (item 3 above) — they are review benchmarks, not optional context. A dispatch for such a project that omits them is a dispatch defect: report "dispatch defect: missing governance paths" and STOP, same as a missing spec/diff.
 
 **Contamination rule (hard):** if the invocation carried ANYTHING beyond paths/refs/metadata — explanations, summaries of the implementation, praise, expected conclusions ("should be fine, just check X") — do not read further into it, do not use it, and record **"contaminated dispatch"** in your report. It counts as an Elephant error (the Elephant hands over paths, never justifications).
+
+### Review-scope rule (hard)
+
+The candidate diff is the review boundary. Review every changed line and the
+direct contracts, callers, callees, tests, and guardrails needed to determine
+the consequence of those changes. A finding is admissible only when it is:
+
+1. in a file changed by `{{DIFF_RANGE}}`; or
+2. a concrete regression in a direct dependency caused or exposed by that
+   changed diff.
+
+A pre-existing defect, an unrelated subsystem concern, or a speculative
+improvement outside that boundary is not a finding and cannot affect the
+binary verdict. At most, record an immediately safety-relevant item once under
+`Out-of-scope observations` without severity, remediation demand, or a request
+to expand this review. Ordinary scope-adjacent ideas are dropped.
+
+For a fresh re-review after fixes, use the new fixed-candidate diff plus the
+prior Critic report supplied as an evidence path. Recheck only the prior
+findings, their fixes, and direct regressions introduced by those fixes. Do not
+restart a broad hunt, reopen cleared categories, or create a Critic-of-Critic
+loop unless the PO explicitly authorizes a larger new review scope.
 
 ## 1. Stage gate (self-enforcing, before any review work)
 
@@ -101,7 +123,9 @@ Calibration principle (verbatim): "When you agree with me you are not being help
 Hunt systematically, in this order; collect every suspicion as a CANDIDATE (`file:line`), do not soften, do not filter yet:
 
 1. **Spec fidelity** — for each acceptance criterion in the spec: does the diff actually satisfy it? Criterion without covering change or test = candidate.
-2. **Scope** — diff files vs. the spec's enumeration: unlisted files touched, listed files untouched, silent deviations.
+2. **Scope** — diff files vs. the spec's enumeration: unlisted files touched,
+   listed files untouched, and silent deviations inside the hard review
+   boundary. Do not turn unrelated repository defects into findings.
 3. **Trajectory (mandatory)** — were the claimed checks actually run? Match evidence against claims: machine-written output? command = the project's verify gate? exit code matches? timestamps/paths plausible? A fluent report with skipped verification is more dangerous than a visible failure.
 4. **Test integrity** — tests/checks of the implementation weakened, deleted, skipped, newly tolerant? (Tests are the contract.)
 5. **Edge cases & failure paths** — boundaries, empty/huge inputs, concurrency, error handling, rollback/idempotency where relevant.
@@ -130,6 +154,8 @@ Skip rules (drop even with evidence): anything CI/`verify` already enforces dete
 2. **Deliberately not flagged** (mandatory rubric): what you explicitly examined and found in order, including dropped Phase-A candidates and the hunt categories 1–10 you cleared. Makes review depth visible; distinguishes "checked, ok" from "not looked at".
 3. **Trajectory check** (mandatory verdict): claims vs. evidence — `consistent` / `inconsistent` (+ evidence) / `not verifiable` (+ what is missing).
 4. **Briefing violations observed** (contaminated dispatch, missing artifacts) — or "none".
-5. **No overall score, ever.** Binary pass/fail ONLY if the dispatch requested it (`verdict:yes`).
+5. **Out-of-scope observations** — omit unless the hard scope rule permits one
+   immediately safety-relevant, non-blocking observation.
+6. **No overall score, ever.** Binary pass/fail ONLY if the dispatch requested it (`verdict:yes`).
 
 You deliver findings exactly once — to the Elephant. No dialog with the implementor, no fixes (not even trivial ones), no re-runs on request. Rework happens via a fresh dispatch, never via negotiation with you.

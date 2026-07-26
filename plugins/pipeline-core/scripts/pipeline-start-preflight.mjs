@@ -4,11 +4,12 @@
 /** Report loaded distribution identity and restart-handoff presence without secrets. */
 import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const SCHEMA = "pipeline.start-preflight.v1";
 const PLUGIN_ID = "pipeline-core@agent-pipeline";
+const LOCAL_PLUGIN_ID = "pipeline-core@agent-pipeline-local";
 
 function readInstalledPluginList() {
   const result = spawnSync("codex", ["plugin", "list", "--json"], {
@@ -22,7 +23,7 @@ function readInstalledPluginList() {
   return result.stdout;
 }
 
-export function installedPipelineVersion(pluginList = readInstalledPluginList) {
+export function installedPipelineIdentity(pluginList = readInstalledPluginList) {
   let payload;
   try {
     payload = JSON.parse(pluginList());
@@ -30,15 +31,42 @@ export function installedPipelineVersion(pluginList = readInstalledPluginList) {
     return null;
   }
   if (!Array.isArray(payload?.installed)) return null;
-  const matches = payload.installed.filter((entry) =>
-    entry?.pluginId === PLUGIN_ID
+  const eligible = (entry) =>
+    [PLUGIN_ID, LOCAL_PLUGIN_ID].includes(entry?.pluginId)
     && entry?.name === "pipeline-core"
-    && entry?.marketplaceName === "agent-pipeline"
+    && entry?.marketplaceName === entry.pluginId.slice("pipeline-core@".length)
     && entry?.installed === true
     && entry?.enabled === true
     && typeof entry?.version === "string"
-    && entry.version.trim() !== "");
-  return matches.length === 1 ? matches[0].version : null;
+    && entry.version.trim() !== "";
+  const localMatches = payload.installed.filter((entry) =>
+    eligible(entry) && entry.pluginId === LOCAL_PLUGIN_ID);
+  const officialMatches = payload.installed.filter((entry) =>
+    eligible(entry) && entry.pluginId === PLUGIN_ID);
+  const matches = localMatches.length > 0 ? localMatches : officialMatches;
+  if (matches.length !== 1) return null;
+  const entry = matches[0];
+  const exactLocalSource = entry?.marketplaceSource?.sourceType === "local"
+    && typeof entry.marketplaceSource.source === "string"
+    && isAbsolute(entry.marketplaceSource.source)
+    && resolve(entry.marketplaceSource.source) === entry.marketplaceSource.source
+    && entry?.source?.source === "local"
+    && typeof entry.source.path === "string"
+    && isAbsolute(entry.source.path)
+    && resolve(entry.source.path) === entry.source.path
+    && resolve(entry.marketplaceSource.source, "plugins", "pipeline-core") === entry.source.path;
+  if (entry.pluginId === LOCAL_PLUGIN_ID && !exactLocalSource) return null;
+  let source = "unknown";
+  if (entry?.marketplaceSource?.sourceType === "git") {
+    source = "remote";
+  } else if (exactLocalSource) {
+    source = "local-development";
+  }
+  return { version: entry.version, source };
+}
+
+export function installedPipelineVersion(pluginList = readInstalledPluginList) {
+  return installedPipelineIdentity(pluginList)?.version ?? null;
 }
 
 export function observePipelineStartPreflight({
@@ -46,6 +74,7 @@ export function observePipelineStartPreflight({
   pluginList = readInstalledPluginList,
   read = readFileSync,
   scriptUrl = import.meta.url,
+  cwd = process.cwd(),
 } = {}) {
   const pluginRoot = resolve(dirname(fileURLToPath(scriptUrl)), "..");
   let version;
@@ -57,22 +86,49 @@ export function observePipelineStartPreflight({
   } catch {
     version = null;
   }
-  const installedVersion = installedPipelineVersion(pluginList);
+  const installedIdentity = installedPipelineIdentity(pluginList);
+  const installedVersion = installedIdentity?.version ?? null;
   const ticket = Object.prototype.hasOwnProperty.call(env, "PIPELINE_CODEX_ONBOARDING_TICKET_ID")
     && String(env.PIPELINE_CODEX_ONBOARDING_TICKET_ID) !== "";
   const token = Object.prototype.hasOwnProperty.call(env, "PIPELINE_CODEX_ONBOARDING_TOKEN")
     && String(env.PIPELINE_CODEX_ONBOARDING_TOKEN) !== "";
+  const wsl = [env.WSL_DISTRO_NAME, env.WSL_INTEROP]
+    .some((value) => typeof value === "string" && value.trim() !== "");
+  const executionBoundary = wsl ? "host-authorized-wsl" : "default";
+  const status = !version
+    ? "plugin-identity-unavailable"
+    : installedVersion !== null && installedVersion !== version
+      ? "plugin-refresh-required"
+      : "ready";
   return {
     schema: SCHEMA,
-    status: !version
-      ? "plugin-identity-unavailable"
-      : installedVersion !== null && installedVersion !== version
-        ? "plugin-refresh-required"
-        : "ready",
+    status,
     version,
     installedVersion,
+    installedSource: installedIdentity?.source ?? "unknown",
+    executionBoundary,
     pluginRoot,
     handoff: ticket && token ? "ready" : ticket || token ? "malformed" : "none",
+    nextAction: status === "ready"
+      ? {
+          kind: "command",
+          executable: "node",
+          argv: [
+            resolve(pluginRoot, "scripts/project-onboarding-v3.mjs"),
+            "inspect",
+            "--root",
+            resolve(cwd),
+            "--intent",
+            "bootstrap",
+          ],
+          mutation: false,
+          requiresConfirmation: false,
+          executionBoundary,
+          expected: {
+            schema: "pipeline.project-onboarding.v4",
+          },
+        }
+      : null,
   };
 }
 

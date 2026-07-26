@@ -90,7 +90,7 @@ test("inspect resolves with the exact fixed Codex argv and injects only the loca
   assert.deepEqual(result, { code: 7, stdout: "", stderr: "", calls: [] });
   assert.equal(spawnCalls.length, 1);
   assert.equal(spawnCalls[0].command, "/trusted/codex");
-  assert.deepEqual(spawnCalls[0].args, ["plugin", "list", "--marketplace", "agent-pipeline", "--json"]);
+  assert.deepEqual(spawnCalls[0].args, ["plugin", "list", "--json"]);
   assert.deepEqual(spawnCalls[0].options, {
     encoding: "utf8",
     env: {
@@ -130,6 +130,35 @@ test("accepts only a local marketplace root that exactly contains the selected p
     stderr: "",
     calls: [["inspect", "--project-root", PROJECT_ROOT, "--source-plugin-root", SOURCE_PLUGIN_ROOT]],
   });
+});
+
+test("prefers the isolated local-development plugin over the official installation", () => {
+  const official = pluginEntry();
+  const local = pluginEntry({
+    pluginId: "pipeline-core@agent-pipeline-local",
+    marketplaceName: "agent-pipeline-local",
+    version: "0.4.6+local",
+    marketplaceSource: { sourceType: "local", source: resolve("/local/marketplace") },
+  });
+  const result = capture(["inspect", "--project-root", PROJECT_ROOT], {
+    spawnSync: successfulSpawn(document([official, local])),
+  });
+  assert.deepEqual(result, {
+    code: 0,
+    stdout: "",
+    stderr: "",
+    calls: [["inspect", "--project-root", PROJECT_ROOT, "--source-plugin-root", SOURCE_PLUGIN_ROOT]],
+  });
+});
+
+test("rejects an isolated development id from a remote marketplace", () => {
+  const result = capture(["inspect", "--project-root", PROJECT_ROOT], {
+    spawnSync: successfulSpawn(document([pluginEntry({
+      pluginId: "pipeline-core@agent-pipeline-local",
+      marketplaceName: "agent-pipeline-local",
+    })])),
+  });
+  assert.deepEqual(result, { code: 2, stdout: REJECTION, stderr: "", calls: [] });
 });
 
 test("activation preserves only public arguments and appends the reviewed digest after the internal source", () => {

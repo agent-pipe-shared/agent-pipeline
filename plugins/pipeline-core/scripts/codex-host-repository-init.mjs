@@ -157,9 +157,9 @@ export function planHostRepositoryInit({ rootDir = process.cwd(), deps = {} } = 
     && lifecycle.runtime?.barrierSha256 === null
     && lifecycle.runtime?.readbackSha256 === null
     && lifecycle.continuity?.status === "valid"
-    && lifecycle.appServer?.required === true
-    && lifecycle.appServer?.status === "running"
-    && lifecycle.appServer?.code === "CAS-READY"
+    && lifecycle.appServer?.required === false
+    && lifecycle.appServer?.status === "not-requested"
+    && lifecycle.appServer?.code === null
     && lifecycle.nextAction?.kind === "command"
     && lifecycle.nextAction?.executable === "node"
     && JSON.stringify(lifecycle.nextAction?.argv) === JSON.stringify([
@@ -228,7 +228,8 @@ function samePhysicalIdentity(path, expected, fs = {}) {
     const info = (fs.lstatSync ?? lstatSync)(path);
     const actual = physicalIdentity(info, expected.kind);
     return actual?.dev === expected.dev && actual?.ino === expected.ino;
-  } catch {
+  } catch (error) {
+    if (OPERATIONAL_FS_ERRORS.has(error?.code)) throw error;
     return false;
   }
 }
@@ -1049,7 +1050,7 @@ export function applyHostRepositoryInit({
         pendingPath: transaction.pendingPath,
         intentBytes: transaction.intentBytes,
       }, deps, created);
-    } catch {
+    } catch (bindingError) {
       try {
         removeCreatedFile(
           join(root, CODEX_HOST_REPOSITORY_INIT_MARKER),
@@ -1100,6 +1101,14 @@ export function applyHostRepositoryInit({
         }
       } catch {
         return { schema: APPLY_SCHEMA, status: "rollback-failed", root, diagnostics: [{ code: "host_init_identity_changed" }] };
+      }
+      if (bindingError instanceof HostInitDriftError) {
+        return {
+          schema: APPLY_SCHEMA,
+          status: "host-preimage-changed",
+          root,
+          diagnostics: [{ code: "host_init_continuity_drift" }],
+        };
       }
       return { schema: APPLY_SCHEMA, status: "apply-failed", root, diagnostics: [{ code: "continuity_binding_failed" }] };
     }

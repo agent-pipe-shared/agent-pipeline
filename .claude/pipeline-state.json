@@ -25,5 +25,49 @@
       "specPath": "specs/2026-07-25-codex-onboarding-0.4.5/spec.md",
       "specSha256": "dede6520733f58ccf4b54e52aa1a700deff80bf795edaaa1b213d716de52addc"
     }
+  },
+  "continuity": {
+    "schema": "pipeline.continuity.v0",
+    "featureId": "codex-onboarding-0.4.5",
+    "revision": 0,
+    "runtime": {
+      "humanFacingLanguage": "en",
+      "activeDuty": "Coordinator",
+      "sessionCleanup": null
+    },
+    "authority": {
+      "prd": {
+        "path": "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md",
+        "sha256": "9825ca78a3765dc71ee2793ef9f84f2eaf998bf297086d869be3562d792cdb94"
+      },
+      "spec": {
+        "path": "specs/2026-07-25-codex-onboarding-0.4.5/spec.md",
+        "sha256": "5a95aa55b393a88e0d7ab1a8006957fc04d80bcae24399b40f3ffa8e4eb3cf70"
+      },
+      "result": null
+    },
+    "queueHead": {
+      "packageId": "continuity-adoption",
+      "actionId": "review-active-feature",
+      "nextAction": "review",
+      "productRetryCount": 0,
+      "environmentRerouteCount": 0,
+      "dispatch": null
+    },
+    "blocker": null,
+    "acknowledgedFinal": null,
+    "resume": {
+      "mode": "immediate",
+      "sourceRevision": 0,
+      "reasonCode": "active-turn"
+    },
+    "recovery": null,
+    "decisionTxn": null,
+    "capacity": {
+      "concurrencyLimit": 4,
+      "reservedCriticSlots": 1,
+      "reservedRecoverySlots": 1,
+      "fallbackPolicy": "defer"
+    }
   }
 }

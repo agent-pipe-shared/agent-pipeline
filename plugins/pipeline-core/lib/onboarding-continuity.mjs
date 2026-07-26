@@ -40,13 +40,21 @@ import {
 import { fileURLToPath } from "node:url";
 
 import { projectReadContinuityStatus } from "./continuity-status.mjs";
-import { validateContinuityState } from "./continuity-state.mjs";
+import {
+  bindContinuitySessionCleanup,
+  releaseContinuitySessionCleanup,
+  validateContinuityState,
+} from "./continuity-state.mjs";
 import { resolveOnboardingPrivateState } from "./codex-onboarding-runtime.mjs";
 import { readState as readSanctionedState } from "../scripts/continuity-status.mjs";
 
 export const KICKOFF_PLAN_SCHEMA = "pipeline.codex-onboarding-kickoff-plan.v1";
 export const KICKOFF_HISTORY_SCHEMA = "pipeline.codex-onboarding-continuity-history.v1";
 export const KICKOFF_APPLY_SCHEMA = "pipeline.codex-onboarding-kickoff-apply.v1";
+export const KICKOFF_GOAL_MAX_BYTES = 160;
+export const CONTINUITY_REPAIR_PLAN_SCHEMA = "pipeline.codex-onboarding-continuity-repair-plan.v1";
+export const CONTINUITY_REPAIR_APPLY_SCHEMA = "pipeline.codex-onboarding-continuity-repair-apply.v1";
+export const SESSION_CLEANUP_BIND_SCHEMA = "pipeline.codex-onboarding-session-cleanup-bind.v1";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ONBOARDING_SCRIPT = join(HERE, "..", "scripts", "project-onboarding-v3.mjs");
@@ -391,6 +399,571 @@ export function classifyOnboardingContinuity(options = {}) {
   return observeDetailed(options).continuity;
 }
 
+function repairArtifact(root, path, label) {
+  const safe = safeRelativePath(path, label);
+  const observed = observeOptionalProjectFile(root, safe, label);
+  if (observed.status !== "present") {
+    fail("CONTINUITY-REPAIR-UNSUPPORTED", `${label} is absent`);
+  }
+  return { path: safe, sha256: observed.sha256 };
+}
+
+function establishedContinuity(state, observed) {
+  const authority = state.planApproval?.poGateAuthority;
+  if (state.planApproved !== true
+    || !isObject(authority)
+    || !new Set([
+      "pipeline.po-gate-authority-evidence.v1",
+      "pipeline.po-gate-authority.v2",
+    ]).has(authority.schema)
+    || !new Set(["de", "en"]).has(authority.humanFacing)
+    || typeof authority.planPath !== "string"
+    || typeof authority.specPath !== "string") {
+    fail("CONTINUITY-REPAIR-UNSUPPORTED", "legacy state has no established PO authority");
+  }
+  const prd = repairArtifact(observed.root, authority.planPath, "approved PRD");
+  const spec = repairArtifact(observed.root, authority.specPath, "approved specification");
+  const continuity = {
+    schema: "pipeline.continuity.v0",
+    featureId: state.activeFeature.id,
+    revision: 0,
+    runtime: {
+      humanFacingLanguage: authority.humanFacing,
+      activeDuty: "Coordinator",
+      sessionCleanup: null,
+    },
+    authority: {
+      prd,
+      spec,
+      result: null,
+    },
+    queueHead: {
+      packageId: "continuity-adoption",
+      actionId: "review-active-feature",
+      nextAction: "review",
+      productRetryCount: 0,
+      environmentRerouteCount: 0,
+      dispatch: null,
+    },
+    blocker: null,
+    acknowledgedFinal: null,
+    resume: {
+      mode: "immediate",
+      sourceRevision: 0,
+      reasonCode: "active-turn",
+    },
+    recovery: null,
+    decisionTxn: null,
+    capacity: {
+      concurrencyLimit: 4,
+      reservedCriticSlots: 1,
+      reservedRecoverySlots: 1,
+      fallbackPolicy: "defer",
+    },
+  };
+  if (!validateContinuityState(continuity, state.activeFeature.id).ok) {
+    fail("CONTINUITY-REPAIR-UNSUPPORTED", "legacy continuity adoption is invalid");
+  }
+  return {
+    reason: "adopt-established-state",
+    state: { ...state, continuity },
+    authority: { prd, spec },
+  };
+}
+
+function normalizedContinuity(state, observed) {
+  const current = state.continuity;
+  if (!isObject(current)
+    || current.resume?.mode !== "resume-on-next-turn"
+    || current.resume?.reasonCode !== "active-turn") {
+    fail("CONTINUITY-REPAIR-UNSUPPORTED", "damaged continuity has no bounded normalization");
+  }
+  const next = structuredClone(state);
+  next.continuity.resume.mode = "immediate";
+  if (!validateContinuityState(next.continuity, next.activeFeature?.id).ok) {
+    fail("CONTINUITY-REPAIR-UNSUPPORTED", "damaged continuity has additional invalid fields");
+  }
+  const prd = repairArtifact(observed.root, next.continuity.authority.prd.path, "continuity PRD");
+  const spec = repairArtifact(observed.root, next.continuity.authority.spec.path, "continuity specification");
+  if (prd.sha256 !== next.continuity.authority.prd.sha256
+    || spec.sha256 !== next.continuity.authority.spec.sha256) {
+    fail("CONTINUITY-REPAIR-UNSUPPORTED", "continuity authority bytes do not match state");
+  }
+  if (observed.historyObservation.status !== "present") {
+    fail("CONTINUITY-REPAIR-UNSUPPORTED", "kickoff continuity history is absent");
+  }
+  return {
+    reason: "normalize-active-resume",
+    state: next,
+    authority: { prd, spec },
+  };
+}
+
+function continuityRepairBinding(plan) {
+  return {
+    schema: plan.schema,
+    root: plan.root,
+    repositoryCapability: plan.repositoryCapability,
+    reason: plan.reason,
+    calibration: plan.calibration,
+    handover: plan.handover,
+    history: plan.history,
+    authority: plan.authority,
+    target: plan.target,
+  };
+}
+
+/**
+ * Plan only two bounded repairs:
+ * - normalize the invalid resume-on-next-turn/active-turn pair; or
+ * - add continuity to an established pre-continuity state carrying PO authority.
+ *
+ * Arbitrary malformed state, authority drift, and missing kickoff history are
+ * never re-signed by this compatibility path.
+ */
+export function planOnboardingContinuityRepair({
+  rootDir,
+  repositoryCapability = "local",
+  spawn = defaultGitSpawn,
+} = {}) {
+  let observed;
+  try {
+    observed = observeDetailed({ rootDir, repositoryCapability, spawn });
+    if (observed.continuity.status !== "damaged"
+      || observed.stateObservation?.status !== "present"
+      || observed.handoverObservation?.status !== "present") {
+      return { schema: CONTINUITY_REPAIR_PLAN_SCHEMA, status: "unsupported" };
+    }
+    let proposed;
+    if (observed.projected?.code === "CS-STATUS-CONTINUITY-INVALID") {
+      proposed = normalizedContinuity(observed.state, observed);
+    } else if (observed.projected?.code === "CS-STATUS-ACTIVE-NO-CONTINUITY"
+      && observed.historyObservation.status === "absent") {
+      proposed = establishedContinuity(observed.state, observed);
+    } else {
+      return { schema: CONTINUITY_REPAIR_PLAN_SCHEMA, status: "unsupported" };
+    }
+    const stateBytes = expectedStateBytes(proposed.state);
+    const binding = {
+      schema: CONTINUITY_REPAIR_PLAN_SCHEMA,
+      root: observed.root,
+      repositoryCapability,
+      reason: proposed.reason,
+      calibration: {
+        path: CALIBRATION_RELATIVE_PATH,
+        sha256: observed.calibrationSha256,
+      },
+      handover: {
+        path: observed.handoverPath,
+        sha256: observed.handoverObservation.sha256,
+      },
+      history: {
+        path: HISTORY_BASENAME,
+        sha256: observed.historyObservation.sha256,
+      },
+      authority: proposed.authority,
+      target: {
+        path: STATE_RELATIVE_PATH,
+        beforeSha256: observed.stateObservation.sha256,
+        afterSha256: sha256(stateBytes),
+        value: proposed.state,
+      },
+    };
+    return {
+      ...binding,
+      status: "ready",
+      planSha256: canonicalSha256(binding),
+    };
+  } catch (error) {
+    if (error instanceof KickoffError) {
+      return {
+        schema: CONTINUITY_REPAIR_PLAN_SCHEMA,
+        status: "unsupported",
+        code: error.code,
+      };
+    }
+    throw error;
+  }
+}
+
+/**
+ * Apply one state-only continuity repair under the existing State writer lock.
+ * Kickoff history is an immutable precondition and is never rewritten here.
+ */
+export function applyOnboardingContinuityRepair({
+  rootDir,
+  repositoryCapability = "local",
+  expectedPlanSha256,
+  activate = false,
+  deps = {},
+} = {}) {
+  if (activate !== true) {
+    fail("CONTINUITY-REPAIR-ACTIVATION-REQUIRED", "continuity repair requires explicit activation");
+  }
+  const spawn = deps.spawn ?? defaultGitSpawn;
+  const plan = planOnboardingContinuityRepair({ rootDir, repositoryCapability, spawn });
+  if (plan.status !== "ready"
+    || !SHA256_RE.test(expectedPlanSha256 ?? "")
+    || plan.planSha256 !== expectedPlanSha256
+    || canonicalSha256(continuityRepairBinding(plan)) !== expectedPlanSha256) {
+    fail("CONTINUITY-REPAIR-PLAN-DIGEST", "continuity repair plan digest does not match");
+  }
+  const statePath = absoluteProjectPath(plan.root, STATE_RELATIVE_PATH, "Pipeline machine state");
+  const token = `continuity-repair-${plan.planSha256.slice(0, 32)}`;
+  const lock = acquireLock(
+    `${statePath}.lock`,
+    "pipeline.continuity-lock.v0",
+    token,
+    {
+      nowMs: deps.nowMs ?? Date.now,
+      lockStaleMs: deps.lockStaleMs ?? 30_000,
+    },
+  );
+  let temporaryRecord;
+  let committed = false;
+  try {
+    const current = planOnboardingContinuityRepair({ rootDir, repositoryCapability, spawn });
+    if (current.status !== "ready" || current.planSha256 !== plan.planSha256) {
+      fail("CONTINUITY-REPAIR-CAS-DRIFT", "continuity repair preimage changed");
+    }
+    const suffixSource = (deps.randomUUID ?? randomUUID)();
+    if (typeof suffixSource !== "string" || !/^[a-f0-9-]{32,64}$/iu.test(suffixSource)) {
+      fail("CONTINUITY-REPAIR-RANDOM-UNAVAILABLE", "continuity repair temporary-name source is invalid");
+    }
+    const temporary = join(
+      dirname(statePath),
+      `.${basename(statePath)}.continuity-repair-${suffixSource.replaceAll("-", "")}.tmp`,
+    );
+    const stateBytes = expectedStateBytes(plan.target.value);
+    temporaryRecord = writeExclusiveSynced(temporary, stateBytes, 0o600);
+    if (sha256(readPhysicalFile(statePath, "Pipeline machine state")) !== plan.target.beforeSha256) {
+      fail("CONTINUITY-REPAIR-CAS-DRIFT", "continuity repair state preimage changed");
+    }
+    renameSync(temporary, statePath);
+    temporaryRecord = null;
+    committed = true;
+    fsyncDirectory(dirname(statePath));
+    const continuity = classifyOnboardingContinuity({
+      rootDir: plan.root,
+      repositoryCapability,
+      spawn,
+    });
+    if (continuity.status !== "valid"
+      || continuity.stateSha256 !== plan.target.afterSha256
+      || continuity.handoverSha256 !== plan.handover.sha256
+      || continuity.historySha256 !== plan.history.sha256) {
+      fail("CONTINUITY-REPAIR-READBACK-INVALID", "continuity repair readback is invalid", {
+        committed: true,
+      });
+    }
+    return {
+      schema: CONTINUITY_REPAIR_APPLY_SCHEMA,
+      status: "applied",
+      root: plan.root,
+      reason: plan.reason,
+      planSha256: plan.planSha256,
+      continuity,
+    };
+  } catch (error) {
+    if (!committed && temporaryRecord) {
+      try { unlinkOwned(temporaryRecord); } catch {}
+    }
+    if (error instanceof KickoffError) throw error;
+    fail("CONTINUITY-REPAIR-WRITE-FAILED", "continuity repair failed", { committed });
+  } finally {
+    releaseLock(lock);
+  }
+}
+
+function observeSessionCleanupState(rootDir) {
+  const root = physicalRoot(rootDir);
+  const path = absoluteProjectPath(root, STATE_RELATIVE_PATH, "Pipeline machine state");
+  assertPhysicalChain(root, path, { leafMayBeAbsent: false });
+  const raw = readPhysicalFile(path, "Pipeline machine state");
+  let state;
+  try {
+    state = JSON.parse(raw.toString("utf8"));
+  } catch {
+    fail("SESSION-CLEANUP-STATE-MALFORMED", "Pipeline machine state is malformed");
+  }
+  if (!isObject(state)
+    || state.schema !== "pipeline.state.v0"
+    || !isObject(state.activeFeature)
+    || typeof state.activeFeature.id !== "string"
+    || !isObject(state.continuity)) {
+    fail("SESSION-CLEANUP-STATE-MALFORMED", "Pipeline machine state cannot own a cleanup descriptor");
+  }
+  const validation = validateContinuityState(state.continuity, state.activeFeature.id);
+  if (!validation.ok) {
+    fail("SESSION-CLEANUP-CONTINUITY-INVALID", `continuity state rejected cleanup binding (${validation.code})`);
+  }
+  return {
+    root,
+    path,
+    raw,
+    state,
+    stateSha256: sha256(raw),
+    revision: state.continuity.revision,
+    activeFeatureId: state.activeFeature.id,
+    sessionCleanup: state.continuity.runtime.sessionCleanup ?? null,
+  };
+}
+
+/**
+ * Read the exact persisted cleanup tuple and its CAS preimage without writing.
+ * The owner nonce remains solely in the repository-private descriptor.
+ */
+export function readOnboardingSessionCleanupBinding({ rootDir } = {}) {
+  const observed = observeSessionCleanupState(rootDir);
+  return {
+    schema: SESSION_CLEANUP_BIND_SCHEMA,
+    status: observed.sessionCleanup === null ? "unbound" : "bound",
+    root: observed.root,
+    stateSha256: observed.stateSha256,
+    revision: observed.revision,
+    sessionCleanup: structuredClone(observed.sessionCleanup),
+  };
+}
+
+/**
+ * Persist the first cleanup descriptor through one narrow, state-lock-bound CAS.
+ * Existing bindings are replayable but immutable. No other state field may
+ * change, and admitted dispatch/decision/close state rejects a late binding.
+ */
+export function bindOnboardingSessionCleanup({
+  rootDir,
+  expectedStateSha256,
+  expectedRevision,
+  sessionCleanup,
+  deps = {},
+} = {}) {
+  if (!SHA256_RE.test(expectedStateSha256 ?? "")
+    || !Number.isSafeInteger(expectedRevision)
+    || expectedRevision < 0
+    || !isObject(sessionCleanup)) {
+    fail("SESSION-CLEANUP-BIND-REQUEST", "cleanup binding request is invalid");
+  }
+  const initial = observeSessionCleanupState(rootDir);
+  if (initial.sessionCleanup !== null
+    && canonicalJson(initial.sessionCleanup) === canonicalJson(sessionCleanup)) {
+    return {
+      schema: SESSION_CLEANUP_BIND_SCHEMA,
+      status: "reused",
+      root: initial.root,
+      stateSha256: initial.stateSha256,
+      revision: initial.revision,
+      sessionCleanup: structuredClone(initial.sessionCleanup),
+      mutated: false,
+    };
+  }
+  if (initial.stateSha256 !== expectedStateSha256 || initial.revision !== expectedRevision) {
+    fail("SESSION-CLEANUP-BIND-CAS", "cleanup binding preimage changed");
+  }
+
+  const token = `session-cleanup-bind-${expectedStateSha256.slice(0, 32)}`;
+  const lock = acquireLock(
+    `${initial.path}.lock`,
+    "pipeline.continuity-lock.v0",
+    token,
+    {
+      nowMs: deps.nowMs ?? Date.now,
+      lockStaleMs: deps.lockStaleMs ?? 30_000,
+    },
+  );
+  let temporaryRecord;
+  let committed = false;
+  try {
+    const current = observeSessionCleanupState(initial.root);
+    if (current.sessionCleanup !== null
+      && canonicalJson(current.sessionCleanup) === canonicalJson(sessionCleanup)) {
+      return {
+        schema: SESSION_CLEANUP_BIND_SCHEMA,
+        status: "reused",
+        root: current.root,
+        stateSha256: current.stateSha256,
+        revision: current.revision,
+        sessionCleanup: structuredClone(current.sessionCleanup),
+        mutated: false,
+      };
+    }
+    if (current.stateSha256 !== expectedStateSha256 || current.revision !== expectedRevision) {
+      fail("SESSION-CLEANUP-BIND-CAS", "cleanup binding preimage changed");
+    }
+    const proposal = bindContinuitySessionCleanup(current.state.continuity, {
+      expectedRevision,
+      sessionCleanup,
+    }, current.activeFeatureId);
+    if (!proposal.ok) {
+      fail(proposal.code, "continuity state rejected cleanup binding");
+    }
+    if (!proposal.mutated) {
+      fail("SESSION-CLEANUP-BIND-REPLAY-INVALID", "cleanup binding replay was not observed in persisted state");
+    }
+
+    const next = structuredClone(current.state);
+    next.continuity = proposal.state;
+    const stateBytes = expectedStateBytes(next);
+    const suffixSource = (deps.randomUUID ?? randomUUID)();
+    if (typeof suffixSource !== "string" || !/^[a-f0-9-]{32,64}$/iu.test(suffixSource)) {
+      fail("SESSION-CLEANUP-BIND-RANDOM", "cleanup binding temporary-name source is invalid");
+    }
+    const temporary = join(
+      dirname(current.path),
+      `.${basename(current.path)}.session-cleanup-${suffixSource.replaceAll("-", "")}.tmp`,
+    );
+    temporaryRecord = writeExclusiveSynced(temporary, stateBytes, 0o600);
+    if (sha256(readPhysicalFile(current.path, "Pipeline machine state")) !== expectedStateSha256) {
+      fail("SESSION-CLEANUP-BIND-CAS", "cleanup binding state preimage changed");
+    }
+    renameSync(temporary, current.path);
+    temporaryRecord = null;
+    committed = true;
+    fsyncDirectory(dirname(current.path));
+
+    const readback = observeSessionCleanupState(current.root);
+    const expectedAfterSha256 = sha256(stateBytes);
+    if (readback.stateSha256 !== expectedAfterSha256
+      || readback.revision !== expectedRevision + 1
+      || canonicalJson(readback.sessionCleanup) !== canonicalJson(sessionCleanup)) {
+      fail("SESSION-CLEANUP-BIND-READBACK", "cleanup binding readback is invalid", { committed: true });
+    }
+    return {
+      schema: SESSION_CLEANUP_BIND_SCHEMA,
+      status: "bound",
+      root: readback.root,
+      stateSha256: readback.stateSha256,
+      revision: readback.revision,
+      sessionCleanup: structuredClone(readback.sessionCleanup),
+      mutated: true,
+    };
+  } catch (error) {
+    if (!committed && temporaryRecord) {
+      try { unlinkOwned(temporaryRecord); } catch {}
+    }
+    if (error instanceof KickoffError) throw error;
+    fail("SESSION-CLEANUP-BIND-WRITE", "cleanup binding write failed", { committed });
+  } finally {
+    releaseLock(lock);
+  }
+}
+
+/**
+ * Clear one exact persisted handle after the caller has proved that descriptor
+ * closure completed. Unknown or different handles never rotate through this
+ * routine.
+ */
+export function releaseOnboardingSessionCleanup({
+  rootDir,
+  expectedStateSha256,
+  expectedRevision,
+  sessionCleanup,
+  deps = {},
+} = {}) {
+  if (!SHA256_RE.test(expectedStateSha256 ?? "")
+    || !Number.isSafeInteger(expectedRevision)
+    || expectedRevision < 0
+    || !isObject(sessionCleanup)) {
+    fail("SESSION-CLEANUP-RELEASE-REQUEST", "cleanup release request is invalid");
+  }
+  const initial = observeSessionCleanupState(rootDir);
+  if (initial.sessionCleanup === null) {
+    return {
+      schema: SESSION_CLEANUP_BIND_SCHEMA,
+      status: "released",
+      root: initial.root,
+      stateSha256: initial.stateSha256,
+      revision: initial.revision,
+      sessionCleanup: null,
+      mutated: false,
+    };
+  }
+  if (initial.stateSha256 !== expectedStateSha256
+    || initial.revision !== expectedRevision
+    || canonicalJson(initial.sessionCleanup) !== canonicalJson(sessionCleanup)) {
+    fail("SESSION-CLEANUP-RELEASE-CAS", "cleanup release preimage changed");
+  }
+  const token = `session-cleanup-release-${expectedStateSha256.slice(0, 32)}`;
+  const lock = acquireLock(
+    `${initial.path}.lock`,
+    "pipeline.continuity-lock.v0",
+    token,
+    {
+      nowMs: deps.nowMs ?? Date.now,
+      lockStaleMs: deps.lockStaleMs ?? 30_000,
+    },
+  );
+  let temporaryRecord;
+  let committed = false;
+  try {
+    const current = observeSessionCleanupState(initial.root);
+    if (current.sessionCleanup === null) {
+      return {
+        schema: SESSION_CLEANUP_BIND_SCHEMA,
+        status: "released",
+        root: current.root,
+        stateSha256: current.stateSha256,
+        revision: current.revision,
+        sessionCleanup: null,
+        mutated: false,
+      };
+    }
+    if (current.stateSha256 !== expectedStateSha256
+      || current.revision !== expectedRevision
+      || canonicalJson(current.sessionCleanup) !== canonicalJson(sessionCleanup)) {
+      fail("SESSION-CLEANUP-RELEASE-CAS", "cleanup release preimage changed");
+    }
+    const proposal = releaseContinuitySessionCleanup(current.state.continuity, {
+      expectedRevision,
+      sessionCleanup,
+    }, current.activeFeatureId);
+    if (!proposal.ok || !proposal.mutated) {
+      fail(proposal.code, "continuity state rejected cleanup release");
+    }
+    const next = structuredClone(current.state);
+    next.continuity = proposal.state;
+    const stateBytes = expectedStateBytes(next);
+    const suffixSource = (deps.randomUUID ?? randomUUID)();
+    if (typeof suffixSource !== "string" || !/^[a-f0-9-]{32,64}$/iu.test(suffixSource)) {
+      fail("SESSION-CLEANUP-RELEASE-RANDOM", "cleanup release temporary-name source is invalid");
+    }
+    const temporary = join(
+      dirname(current.path),
+      `.${basename(current.path)}.session-cleanup-release-${suffixSource.replaceAll("-", "")}.tmp`,
+    );
+    temporaryRecord = writeExclusiveSynced(temporary, stateBytes, 0o600);
+    if (sha256(readPhysicalFile(current.path, "Pipeline machine state")) !== expectedStateSha256) {
+      fail("SESSION-CLEANUP-RELEASE-CAS", "cleanup release state preimage changed");
+    }
+    renameSync(temporary, current.path);
+    temporaryRecord = null;
+    committed = true;
+    fsyncDirectory(dirname(current.path));
+    const readback = observeSessionCleanupState(current.root);
+    if (readback.stateSha256 !== sha256(stateBytes)
+      || readback.revision !== expectedRevision + 1
+      || readback.sessionCleanup !== null) {
+      fail("SESSION-CLEANUP-RELEASE-READBACK", "cleanup release readback is invalid", { committed: true });
+    }
+    return {
+      schema: SESSION_CLEANUP_BIND_SCHEMA,
+      status: "released",
+      root: readback.root,
+      stateSha256: readback.stateSha256,
+      revision: readback.revision,
+      sessionCleanup: null,
+      mutated: true,
+    };
+  } catch (error) {
+    if (!committed && temporaryRecord) {
+      try { unlinkOwned(temporaryRecord); } catch {}
+    }
+    if (error instanceof KickoffError) throw error;
+    fail("SESSION-CLEANUP-RELEASE-WRITE", "cleanup release write failed", { committed });
+  } finally {
+    releaseLock(lock);
+  }
+}
+
 /** Trim and validate one goal as UTF-8 data, never as shell syntax. */
 export function validateKickoffGoal(goal) {
   if (typeof goal !== "string" || goal.includes("\0")) {
@@ -398,8 +971,11 @@ export function validateKickoffGoal(goal) {
   }
   const normalized = goal.trim();
   const bytes = Buffer.byteLength(normalized, "utf8");
-  if (bytes < 1 || bytes > 8192) {
-    fail("KICKOFF-GOAL-INVALID", "goal must contain 1-8192 UTF-8 bytes after trimming");
+  if (/[\r\n]/u.test(normalized)) {
+    fail("KICKOFF-GOAL-INVALID", "goal must be a single line");
+  }
+  if (bytes < 1 || bytes > KICKOFF_GOAL_MAX_BYTES) {
+    fail("KICKOFF-GOAL-INVALID", `goal must contain 1-${KICKOFF_GOAL_MAX_BYTES} UTF-8 bytes after trimming`);
   }
   return normalized;
 }

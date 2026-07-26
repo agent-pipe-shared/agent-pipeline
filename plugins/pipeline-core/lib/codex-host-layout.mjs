@@ -502,6 +502,44 @@ export function hasCodexInitializedGitControlMount(root, {
   return boundKickoffHistory(root, historyPath, { lstat, readFile, platform }) !== null;
 }
 
+/**
+ * Recognise the narrow protected projection of a pre-existing Git repository.
+ *
+ * Unlike the fresh-root transition, an existing repository has no host-init
+ * admission receipt.  Codex 0.145 on WSL may nevertheless expose its complete
+ * Git control tree read-only while the writable host view remains healthy.
+ * This structural observation is used only for the documented cross-view
+ * compatibility path; it is not a Git-writability, freshness, push, or release
+ * attestation.
+ */
+export function hasCodexExistingGitControlMount(root, {
+  access = accessSync,
+  fsConstants = constants,
+  lstat = lstatSync,
+  readFile = readFileSync,
+  readdir = readdirSync,
+} = {}) {
+  if (!readonlyEmptyDirectory(root, ".codex", {
+    access, fsConstants, lstat, readdir,
+  })) return false;
+  const git = join(root, ".git");
+  if (!physicalDirectory(git, { lstat })) return false;
+  try { access(git, fsConstants.W_OK); return false; } catch {}
+  if (![join(git, "objects"), join(git, "refs")]
+    .every((path) => physicalDirectory(path, { lstat }))) return false;
+  const head = join(git, "HEAD");
+  const config = join(git, "config");
+  if (![head, config].every((path) => physicalRegularFile(path, { lstat }))) return false;
+  try {
+    const headValue = readFile(head, "utf8");
+    const symbolic = /^ref: refs\/heads\/[A-Za-z0-9._/-]+\n?$/u.test(headValue);
+    const detached = /^[a-f0-9]{40,64}\n?$/u.test(headValue);
+    return symbolic || detached;
+  } catch {
+    return false;
+  }
+}
+
 export function hasCodexGitControlMount(root, options = {}) {
   return readonlyEmptyDirectory(root, ".git", options);
 }

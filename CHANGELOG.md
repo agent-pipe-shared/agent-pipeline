@@ -1,10 +1,57 @@
 # Changelog
 
+- Fix the 0.4.6 Codex onboarding candidate so recognized damaged continuity
+  receives a bounded, digest-confirmed repair instead of a diagnostic loop;
+  established PO-bound repositories can adopt continuity without fabricating
+  kickoff history, and direct edits of the writer-owned machine State are
+  blocked.
+
 All notable changes to the Agent Pipeline are documented here.
 
 Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versioning per [ADR-0002](docs/adr/0002-versioning-sha-then-semver.md): the `0.4.0` release candidate uses stable SemVer surfaces; a version in this file is not a tag, GitHub Release, marketplace publication, or remote readback.
 
 ## [Unreleased]
+
+## [0.4.6] — 2026-07-26
+
+### Fixed
+
+- Fresh Codex folders now reach the digest-bound host Git initialization
+  before App-Server readiness is required, preventing a sandbox-only
+  App-Server denial from deadlocking repository creation.
+- Restarted WSL sessions recognize the exact protected projection of an
+  existing physical Git control tree and retain a narrowly parsed read-only
+  diagnostic lane while lifecycle writes remain closed.
+- The Codex preflight now returns the exact initial lifecycle-inspection action
+  together with its WSL host-boundary requirement, so agents no longer
+  reconstruct or first run that capability probe in the misleading workspace
+  sandbox.
+- Restart actions now declare `external-terminal` / `user-copy-only` execution
+  and prohibit Codex tool calls; the lifecycle guard returns a targeted
+  external-action instruction if an agent nevertheless attempts one.
+- Codex Advisor routing now has one explicit productive CLI contract instead
+  of an undocumented stdin-only interface, preventing empty-output help/source
+  discovery loops before the single bounded consult.
+- Codex Advisory now has a 60-second Sol/max primary and one 45-second
+  Terra/high fresh fallback, with workspace digests checked before, between,
+  and after attempts. Unchanged-workspace exhaustion is reported as
+  non-blocking `advisory-unavailable`; mutation remains a hard stop.
+- Bootstrap Verify availability checks no longer execute arbitrary entrypoints
+  with `--help`; Node gates use syntax-only `node --check`, and other commands
+  receive existence-only observation without creating evidence.
+- A registered local Codex marketplace is reported as
+  `local-development` instead of stale or mismatched. It remains subject to
+  the ordinary candidate-bound Verify, Security, PO approval, and readback
+  gates before push or release.
+- Host-init drift and operational filesystem failures retain their distinct
+  typed classifications through durability checks and continuity rollback.
+- Critic findings are bound to the candidate diff and directly regressed
+  dependencies; fix re-reviews check prior findings without opening recursive
+  Critic-of-Critic loops.
+
+The multi-step installation ceremony and confirmation-count tuning remain
+owned by Issue #25; this hotfix does not broaden lifecycle mutations or
+delivery authority.
 
 ## [0.4.5] — 2026-07-26
 

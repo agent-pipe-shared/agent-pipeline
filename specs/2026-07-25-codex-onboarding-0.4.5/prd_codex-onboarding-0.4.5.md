@@ -104,16 +104,20 @@ heuristics, same-process values, and replayed receipts cannot clear the barrier.
 
 Restart is performed by a plugin-local, digest-bound one-use launch wrapper.
 It stores only a token digest in private state, passes the raw token only to
-the newly spawned Codex process, consumes it once under CAS, and still requires
-the host-native loaded config/agent chain. The token proves the launch; the
-native loaded-chain proves effective runtime. Neither can be self-asserted by
-the model.
+the directly invoked readback helper, consumes it once under CAS, and still
+requires a separate strict App-Server `config/read` plus the bound agent chain.
+The helper removes the token before starting that App Server. Only after the
+readback clears the barrier does the wrapper start an ordinary token-free
+Codex TUI. The token proves the one-use external handoff; the native loaded
+chain proves effective runtime. Neither can be self-asserted by the model.
 
 ### 5. Kickoff is sanctioned continuity initialization
 
 A pristine project without valid continuity is `kickoff-required`, not damaged.
-A reviewed kickoff plan turns the supplied project goal into initial continuity,
-then the sanctioned writer applies it and `continuity-status` validates it.
+A reviewed kickoff plan turns a concise, single-line project goal (at most 160
+UTF-8 bytes) into initial continuity, then the sanctioned writer applies it and
+`continuity-status` validates it. Full pasted designs and requirements remain
+post-bootstrap PRD/spec input rather than approval-command arguments.
 
 An arbitrary or empty `docs/state.md` is not continuity. Established malformed
 continuity remains a separate damaged state and never receives the pristine
@@ -153,10 +157,12 @@ a generic `ready` result from hiding an operation-specific host failure.
 ### 7. Remediation is executable data
 
 Operator actions contain an executable and complete argv array plus mutation,
-confirmation, and expected-readback fields. Human output is one single-line,
-copy-safe rendering of those exact arguments.
+confirmation, and expected-readback fields. Human output is a fenced,
+copy-safe command block with short, intentional platform-appropriate
+continuation lines derived from those exact arguments.
 
-No detachable flags, wrapped root/value pairs, shell chains, incomplete
+No detachable flags, visually wrapped or gutter-prefixed fragments, shell
+chains, incomplete
 `--initialize-missing-runtime` instructions, or generic `codex doctor`
 recommendations are allowed.
 
@@ -221,7 +227,8 @@ declared by 0.4.5; it does not permit a fabricated hook capability.
       successful apply/readback.
 - [ ] No supported recovery directly edits a generated projection.
 - [ ] Missing Codex runtime targets yield a complete onboarding-owned plan.
-- [ ] Remediation is complete structured argv and copy-safe single-line text.
+- [ ] Remediation is complete structured argv and a copy-safe fenced command
+      block with explicit shell-safe continuation boundaries.
 - [ ] Runtime initialization is transactional, idempotent, and deterministic.
 - [ ] Runtime creation/change persists `restart-required`.
 - [ ] Only a fresh native effective-runtime readback clears the restart barrier.
@@ -236,6 +243,10 @@ declared by 0.4.5; it does not permit a fabricated hook capability.
 - [ ] Damaged continuity is never treated as pristine.
 - [ ] Invalid, empty, or read-only Git controls are classified before cleanup,
       worktree, remote, or dispatch operations.
+- [ ] One WSL execution-boundary selection routes capability-sensitive
+      bootstrap helpers directly to their host-authorized local or
+      network-open/read-only boundary without a known-failing sandbox probe;
+      mutation confirmations and isolation claims remain unchanged.
 - [ ] A normal empty local root initializes Git inside the reviewed portable
       transaction; a Codex host-managed root never attempts Git initialization
       in the workspace sandbox and uses only the separately confirmed,
@@ -305,9 +316,11 @@ declared by 0.4.5; it does not permit a fabricated hook capability.
 3. Bootstrap/session/Advisor/dispatch enforcement plus hook coverage.
 4. E2E matrix, maintained documentation, Full Verify, blocking Security, and
    independent Critic.
-5. Install the exact tested worktree locally through the sanctioned Codex
-   plugin development/cachebuster flow and read back the active candidate
-   digests.
+5. Install the exact tested worktree through the isolated
+   `pipeline-core@agent-pipeline-local` Codex development identity and a fresh
+   cachebuster; never repoint the released `pipeline-core@agent-pipeline`
+   identity to a checkout. Read back selector, local source root, version, and
+   active candidate digests.
 6. Stop for the operator's live onboarding test. Incorporate any findings and
    repeat automated checks plus local installation until the operator accepts
    the behavior.

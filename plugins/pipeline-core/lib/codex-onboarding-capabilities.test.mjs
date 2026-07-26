@@ -23,6 +23,7 @@ import { join, relative, resolve } from "node:path";
 import test from "node:test";
 
 import { observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
+import { hasCodexExistingGitControlMount } from "./codex-host-layout.mjs";
 
 const roots = [];
 
@@ -222,6 +223,27 @@ test("a fresh Codex root with only an empty read-only .git mount is host-managed
     sessionCapability: "not-required",
     worktreeCapability: "not-required",
   });
+});
+
+test("the WSL cross-view recognizer distinguishes an existing protected Git tree from a fresh empty mount", (t) => {
+  if (process.platform === "win32") return t.skip("POSIX protected-mount fixture");
+  const existing = localRepository("existing protected Git mount");
+  mkdirSync(join(existing, ".codex"));
+  chmodSync(join(existing, ".codex"), 0o500);
+  chmodSync(join(existing, ".git"), 0o500);
+  assert.equal(hasCodexExistingGitControlMount(existing), true);
+
+  const fresh = makeRoot("fresh protected control mounts");
+  mkdirSync(join(fresh, ".codex"));
+  mkdirSync(join(fresh, ".git"));
+  chmodSync(join(fresh, ".codex"), 0o500);
+  chmodSync(join(fresh, ".git"), 0o500);
+  assert.equal(hasCodexExistingGitControlMount(fresh), false);
+
+  chmodSync(join(existing, ".git"), 0o700);
+  writeFileSync(join(existing, ".git", "HEAD"), "not-a-ref\n");
+  chmodSync(join(existing, ".git"), 0o500);
+  assert.equal(hasCodexExistingGitControlMount(existing), false);
 });
 
 test("a restarted Codex session accepts only a kickoff-bound initialized host Git mount", (t) => {

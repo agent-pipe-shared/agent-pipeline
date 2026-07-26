@@ -44,6 +44,32 @@ or accepted from a project file.
    compatibility admission. The workspace process may consume that admission
    but cannot mint it, infer it from an empty control mount, or replace its
    exact root/plan/authority/history bindings.
+7. A pre-release Codex candidate uses the isolated installed identity
+   `pipeline-core@agent-pipeline-local`; released operation uses
+   `pipeline-core@agent-pipeline`. The local identity is accepted only from an
+   exact registered local marketplace root containing its plugin source. This
+   prevents an older resumed session from reconciling the released identity
+   over a candidate cache. The complete operator transition and remote return
+   readback are defined in
+   [`codex-local-plugin-development.md`](codex-local-plugin-development.md).
+8. The restart launcher is an external-terminal boundary. It refuses an active
+   Codex thread before ticket issuance; neither a Codex tool PTY nor a normal
+   tokenless session restart is a valid substitute. The raw token exists only
+   in the directly invoked readback-helper environment. That helper removes it
+   before starting a separate strict Codex App Server, performs the bound
+   `config/read`, and clears the barrier before the wrapper starts an ordinary
+   token-free TUI. A failure before readback leaves one bounded ticket and
+   publishes its retry-after time, so no immediate parallel ticket may be
+   issued. A TUI-start failure after readback is reported separately and does
+   not invalidate or repeat the consumed readback.
+9. The start preflight selects one capability execution boundary for the whole
+   bootstrap. On WSL, fixed read-only helpers that inspect or spawn Git, probe
+   worktree/session capability, or observe the App-Server socket run directly
+   at the host-authorized local boundary; remote freshness alone uses the
+   network-open/read-only boundary. They are not first run in the known-
+   incompatible workspace sandbox. This avoids false `EPERM`, invalid-layout,
+   socket-unavailable, and DNS results without widening mutation authority,
+   project access, Critic/Advisor isolation, or assurance.
 
 ## Attacker capabilities
 
@@ -67,9 +93,14 @@ transport, not invented by onboarding.
   writer is the explicit digest-bound `apply-readback --activate` lifecycle
   operation, which records the complete unchanged runtime target set and then
   requires restart.
+- A pending barrier whose launcher, helper, or Codex executable binding no
+  longer matches the loaded candidate is also `runtime-attestation-required`.
+  The same reviewed `apply-readback` path replaces it; the inspector never
+  reissues an action that the current launcher must reject.
 - The launcher issues one random, expiring, single-live ticket for one exact
   barrier. Only the token digest is persisted; the raw token exists only in
-  the fresh child environment.
+  the directly invoked helper environment and is removed before that helper
+  starts the strict Codex App Server child.
 - Authentication rechecks the ticket ID, token digest, expiry, repository,
   source, runtime targets, barrier, writer generation, launcher, helper, and
   Codex executable. Missing, duplicate, expired, replayed, wrong-identity, or
@@ -160,7 +191,7 @@ unbound postimage. Released 0.4.4 issued no host-init receipt.
 
 | Residual | Owner | Expiry / mandatory review |
 |---|---|---|
-| Raw launch tokens necessarily exist in one fresh child environment until consumed or expired. Process inspection by the same fully compromised OS account is outside the protection offered here. | `pipeline-core` security maintainers | 2026-10-31 |
+| Raw launch tokens necessarily exist in the directly invoked helper environment until consumed or expired. The helper removes them before starting the strict App Server child. Process inspection by the same fully compromised OS account is outside the protection offered here. | `pipeline-core` security maintainers | 2026-10-31 |
 | Directory durability has platform-specific limits already represented by the private-state assurance layer; unsupported assurance never becomes a strong success claim. | `pipeline-core` runtime maintainers | 2026-10-31 |
 | The Bash exemption recognizes only exact plugin-local remediation command shapes. Novel legitimate recovery commands remain blocked and require a reviewed lifecycle change or manual PO execution rather than a broad shell bypass. | `pipeline-core` guardrail maintainers | 2026-10-31 |
 | One fresh host initialization retains five small writer-owned transaction captures below private `.claude/.runtime/agent-pipeline/.host-init-quarantine-*` directories. They are non-authoritative and avoid an ungrounded inode-safe deletion claim; bounded garbage collection requires a future native identity-bound host primitive. | `pipeline-core` runtime maintainers | 2026-10-31 |

@@ -138,8 +138,8 @@ check("F1 evidence tuples are closed, normalized and duplicate-free", () => {
 
 check("F1 network-open diagnostics and write-restore observations are not promoted by the threat model", () => {
   const threatModel = readFileSync(join(scriptDir, "..", "..", "..", "docs", "critic-isolation-threat-model.md"), "utf8");
-  assert.match(threatModel, /network\.enabled=true[^\n]+Zwischenklasse/);
-  assert.match(threatModel, /Nachzustand allein ist kein Präventionsbeleg/);
+  assert.match(threatModel, /network\.enabled=true[^\n]+intermediate class/);
+  assert.match(threatModel, /post-state alone is not prevention evidence/);
   assert.match(threatModel, /no-usable-review/);
 });
 

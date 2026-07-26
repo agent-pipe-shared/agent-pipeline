@@ -5,37 +5,90 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  installedPipelineVersion, observePipelineStartPreflight,
+  installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
   pipelineStartPreflightExitCode, SCHEMA,
 } from "./pipeline-start-preflight.mjs";
 
 const manifest = JSON.stringify({ version: "0.4.5+test" });
-const pluginList = (version = "0.4.5+test") => () => JSON.stringify({
+const pluginList = (
+  version = "0.4.5+test",
+  sourceType = "git",
+  marketplaceName = "agent-pipeline",
+) => () => JSON.stringify({
   installed: [{
-    pluginId: "pipeline-core@agent-pipeline",
+    pluginId: `pipeline-core@${marketplaceName}`,
     name: "pipeline-core",
-    marketplaceName: "agent-pipeline",
+    marketplaceName,
     version,
     installed: true,
     enabled: true,
+    source: {
+      source: "local",
+      path: sourceType === "local"
+        ? "/local/agent-pipeline/plugins/pipeline-core"
+        : "/cache/agent-pipeline/plugins/pipeline-core",
+    },
+    marketplaceSource: sourceType === "local"
+      ? { sourceType: "local", source: "/local/agent-pipeline" }
+      : { sourceType: "git", source: "https://github.com/agent-pipe-shared/agent-pipeline.git" },
   }],
   available: [],
 });
 
 test("preflight reports exact identity and no-handoff without secret fields", () => {
+  const cwd = "/projects/current";
   const result = observePipelineStartPreflight({
     env: {},
     pluginList: pluginList(),
     read: () => manifest,
+    cwd,
   });
   assert.deepEqual(Object.keys(result).sort(), [
-    "handoff", "installedVersion", "pluginRoot", "schema", "status", "version",
+    "executionBoundary", "handoff", "installedSource", "installedVersion",
+    "nextAction", "pluginRoot", "schema", "status", "version",
   ]);
   assert.equal(result.schema, SCHEMA);
   assert.equal(result.status, "ready");
   assert.equal(result.version, "0.4.5+test");
   assert.equal(result.installedVersion, "0.4.5+test");
+  assert.equal(result.installedSource, "remote");
+  assert.equal(result.executionBoundary, "default");
   assert.equal(result.handoff, "none");
+  assert.deepEqual(result.nextAction, {
+    kind: "command",
+    executable: "node",
+    argv: [
+      `${result.pluginRoot}/scripts/project-onboarding-v3.mjs`,
+      "inspect",
+      "--root",
+      cwd,
+      "--intent",
+      "bootstrap",
+    ],
+    mutation: false,
+    requiresConfirmation: false,
+    executionBoundary: "default",
+    expected: {
+      schema: "pipeline.project-onboarding.v4",
+    },
+  });
+});
+
+test("preflight selects one host-authorized capability boundary for WSL", () => {
+  for (const env of [
+    { WSL_DISTRO_NAME: "Ubuntu" },
+    { WSL_INTEROP: "/run/WSL/1_interop" },
+  ]) {
+    const result = observePipelineStartPreflight({
+      env,
+      pluginList: pluginList(),
+      read: () => manifest,
+      cwd: "/projects/wsl",
+    });
+    assert.equal(result.executionBoundary, "host-authorized-wsl");
+    assert.equal(result.nextAction.executionBoundary, "host-authorized-wsl");
+    assert.equal(result.nextAction.argv[3], "/projects/wsl");
+  }
 });
 
 test("preflight distinguishes complete and malformed handoff by presence only", () => {
@@ -76,6 +129,56 @@ test("preflight turns a loaded/installed mismatch into a typed refresh handoff",
   assert.equal(pipelineStartPreflightExitCode(result), 0);
 });
 
+test("an exact registered local marketplace is a visible development source", () => {
+  const result = observePipelineStartPreflight({
+    env: {},
+    pluginList: pluginList("0.4.5+test", "local"),
+    read: () => manifest,
+  });
+  assert.equal(result.status, "ready");
+  assert.equal(result.installedVersion, "0.4.5+test");
+  assert.equal(result.installedSource, "local-development");
+  assert.deepEqual(installedPipelineIdentity(pluginList("0.4.5+test", "local")), {
+    version: "0.4.5+test",
+    source: "local-development",
+  });
+});
+
+test("the isolated local-development installation takes precedence over the official id", () => {
+  const official = JSON.parse(pluginList("0.4.4", "git")()).installed[0];
+  const local = JSON.parse(pluginList(
+    "0.4.5+test",
+    "local",
+    "agent-pipeline-local",
+  )()).installed[0];
+  const both = () => JSON.stringify({ installed: [official, local], available: [] });
+  const result = observePipelineStartPreflight({
+    env: {},
+    pluginList: both,
+    read: () => manifest,
+  });
+  assert.equal(result.status, "ready");
+  assert.equal(result.installedVersion, "0.4.5+test");
+  assert.equal(result.installedSource, "local-development");
+});
+
+test("the isolated development id is accepted only from its exact local marketplace root", () => {
+  for (const invalid of [
+    pluginList("0.4.5+test", "git", "agent-pipeline-local"),
+    () => {
+      const entry = JSON.parse(pluginList(
+        "0.4.5+test",
+        "local",
+        "agent-pipeline-local",
+      )()).installed[0];
+      entry.marketplaceSource.source = "/other/local-marketplace";
+      return JSON.stringify({ installed: [entry], available: [] });
+    },
+  ]) {
+    assert.equal(installedPipelineIdentity(invalid), null);
+  }
+});
+
 test("unavailable registry remains non-blocking when the loaded identity is coherent", () => {
   for (const unavailable of [
     () => { throw new Error("unavailable"); },
@@ -89,6 +192,7 @@ test("unavailable registry remains non-blocking when the loaded identity is cohe
     });
     assert.equal(result.status, "ready");
     assert.equal(result.installedVersion, null);
+    assert.equal(result.installedSource, "unknown");
   }
 });
 
@@ -104,6 +208,8 @@ test("installed version accepts only one exact enabled Agent-Pipeline entry", ()
       version: "9",
       installed: true,
       enabled: true,
+      source: { source: "local", path: "/cache/other/plugins/pipeline-core" },
+      marketplaceSource: { sourceType: "git", source: "https://example.invalid/other.git" },
     }] }),
     () => JSON.stringify({ installed: [
       JSON.parse(pluginList()()).installed[0],

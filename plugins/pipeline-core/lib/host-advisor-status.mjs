@@ -13,11 +13,16 @@ function valid(v) {
   if (!exact(v, KEYS) || v.schema !== HOST_ADVISOR_STATUS_SCHEMA || !exact(v.candidate,["commit","tree"]) || !SHA.test(v.candidate.commit) || !SHA.test(v.candidate.tree)
     || !exact(v.launch,["sessionId","launchId"]) || typeof v.launch.sessionId !== "string" || !SHA256.test(v.launch.launchId)
     || !SHA256.test(v.questionSha256) || !(v.answerSha256 === null || SHA256.test(v.answerSha256))
-    || !exact(v.attempt,["agentName","count","terminal"]) || v.attempt.agentName !== "consult-advisor" || v.attempt.count !== 1 || !["answered","failed","unavailable"].includes(v.attempt.terminal)
+    || !exact(v.attempt,["agentName","count","terminal"])
+    || !["consult-advisor","consult-advisor-fast"].includes(v.attempt.agentName)
+    || ![1, 2].includes(v.attempt.count)
+    || (v.attempt.count === 1) !== (v.attempt.agentName === "consult-advisor")
+    || !["answered","failed","unavailable"].includes(v.attempt.terminal)
     || !exact(v.boundary,["sandboxMode","workspaceBeforeSha256","workspaceAfterSha256","selectedSandboxAttempts","nativeAdapterAttempts"])
     || v.boundary.sandboxMode !== "read-only" || !SHA256.test(v.boundary.workspaceBeforeSha256) || !SHA256.test(v.boundary.workspaceAfterSha256)
     || v.boundary.selectedSandboxAttempts !== 0 || v.boundary.nativeAdapterAttempts !== 0 || !["answered","failed","unavailable"].includes(v.outcome)) return false;
-  if (v.attempt.terminal !== v.outcome) return false;
+  if (v.attempt.terminal !== v.outcome
+    || v.boundary.workspaceBeforeSha256 !== v.boundary.workspaceAfterSha256) return false;
   if (v.outcome === "answered") return v.answerSha256 !== null && v.boundary.workspaceBeforeSha256 === v.boundary.workspaceAfterSha256;
   return v.answerSha256 === null;
 }
@@ -30,10 +35,10 @@ export function canonicalJson(value) {
 
 export function createHostAdvisorStatus(input, deps = {}) {
   if (!input || typeof input !== "object") throw new Error("invalid input");
-  const allowed = ["candidate","launch","questionSha256","answerSha256","workspaceBeforeSha256","workspaceAfterSha256","outcome"];
+  const allowed = ["candidate","launch","questionSha256","answerSha256","workspaceBeforeSha256","workspaceAfterSha256","outcome","agentName","attemptCount"];
   if (Object.keys(input).some(k => !allowed.includes(k)) || !input.launch) throw new Error("invalid input");
   const launch = input.launch;
-  const status = { schema: HOST_ADVISOR_STATUS_SCHEMA, candidate: { ...input.candidate }, launch: { ...launch }, questionSha256: input.questionSha256, answerSha256: input.answerSha256 ?? null, attempt: { agentName: "consult-advisor", count: 1, terminal: input.outcome }, boundary: { sandboxMode: "read-only", workspaceBeforeSha256: input.workspaceBeforeSha256, workspaceAfterSha256: input.workspaceAfterSha256, selectedSandboxAttempts: 0, nativeAdapterAttempts: 0 }, outcome: input.outcome };
+  const status = { schema: HOST_ADVISOR_STATUS_SCHEMA, candidate: { ...input.candidate }, launch: { ...launch }, questionSha256: input.questionSha256, answerSha256: input.answerSha256 ?? null, attempt: { agentName: input.agentName ?? "consult-advisor", count: input.attemptCount ?? 1, terminal: input.outcome }, boundary: { sandboxMode: "read-only", workspaceBeforeSha256: input.workspaceBeforeSha256, workspaceAfterSha256: input.workspaceAfterSha256, selectedSandboxAttempts: 0, nativeAdapterAttempts: 0 }, outcome: input.outcome };
   if (!valid(status)) throw new Error("invalid status");
   return freeze(status);
 }

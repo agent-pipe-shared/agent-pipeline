@@ -4,32 +4,91 @@
 import { spawnSync } from "node:child_process";
 import { pathToFileURL } from "node:url";
 
-import { TICKET_SCHEMA, canonicalJson, issueLaunchTicket } from "../lib/codex-onboarding-runtime.mjs";
+import {
+  HELPER_PATH,
+  TICKET_SCHEMA,
+  canonicalJson,
+  issueLaunchTicket,
+} from "../lib/codex-onboarding-runtime.mjs";
+import { READBACK_STATUS_SCHEMA } from "./codex-project-runtime-readback-host.mjs";
+
+const READBACK_TIMEOUT_MS = 35_000;
+const READBACK_MAX_BUFFER = 128 * 1024;
 
 function parse(argv) {
   if (argv.length !== 5 || argv[0] !== "--root" || argv[2] !== "--barrier-sha256" || argv[4] !== "--activate"
     || !/^[a-f0-9]{64}$/u.test(argv[3])) throw new Error("Usage: codex-onboarding-launch.mjs --root <project-root> --barrier-sha256 <sha256> --activate");
   return { rootDir: argv[1], barrierSha256: argv[3] };
 }
-export function main(argv = process.argv.slice(2), { spawn = spawnSync, write = process.stdout.write.bind(process.stdout) } = {}) {
+export function main(argv = process.argv.slice(2), {
+  spawn = spawnSync,
+  write = process.stdout.write.bind(process.stdout),
+  env = process.env,
+} = {}) {
+  let issued;
+  let readbackProduced = false;
   try {
     const options = parse(argv);
-    const issued = issueLaunchTicket(options);
+    if (typeof env.CODEX_THREAD_ID === "string" && env.CODEX_THREAD_ID !== "") {
+      write(`${canonicalJson({ schema: TICKET_SCHEMA, status: "external-launch-required" })}\n`);
+      return 2;
+    }
+    issued = issueLaunchTicket(options);
+    const ticketEnvironment = {
+      ...env,
+      PIPELINE_CODEX_ONBOARDING_TICKET_ID: issued.ticketId,
+      PIPELINE_CODEX_ONBOARDING_TOKEN: issued.token.toString("hex"),
+    };
+    const readback = spawn(process.execPath, [HELPER_PATH, "--root", options.rootDir], {
+      cwd: options.rootDir,
+      encoding: "utf8",
+      env: ticketEnvironment,
+      maxBuffer: READBACK_MAX_BUFFER,
+      shell: false,
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: READBACK_TIMEOUT_MS,
+    });
+    const expectedReadback = `${canonicalJson({
+      schema: READBACK_STATUS_SCHEMA,
+      status: "produced",
+    })}\n`;
+    if (readback?.status !== 0
+      || (readback?.signal !== null && readback?.signal !== undefined)
+      || readback?.error !== undefined
+      || readback?.stdout !== expectedReadback
+      || readback?.stderr !== "") {
+      write(`${canonicalJson({
+        schema: TICKET_SCHEMA,
+        status: "readback-unavailable",
+        ticketId: issued.ticketId,
+        retryAfterEpochMs: issued.expiresAtEpochMs,
+      })}\n`);
+      return 2;
+    }
+    readbackProduced = true;
+    const cleanEnvironment = { ...env };
+    delete cleanEnvironment.PIPELINE_CODEX_ONBOARDING_TICKET_ID;
+    delete cleanEnvironment.PIPELINE_CODEX_ONBOARDING_TOKEN;
     const result = spawn(issued.executable, ["-C", options.rootDir, "pipeline-core:pipeline-start"], {
       cwd: options.rootDir, shell: false, stdio: "inherit",
-      env: {
-        ...process.env,
-        PIPELINE_CODEX_ONBOARDING_TICKET_ID: issued.ticketId,
-        PIPELINE_CODEX_ONBOARDING_TOKEN: issued.token.toString("hex"),
-      },
+      env: cleanEnvironment,
     });
-    // The token is never included in output, state, diagnostics, or a child
-    // argument. A load failure leaves the issued ticket unconsumed.
-    write(`${canonicalJson({ schema: TICKET_SCHEMA, status: result?.status === 0 ? "launched" : "launch-unavailable", ticketId: issued.ticketId })}\n`);
-    return result?.status === 0 ? 0 : 2;
+    write(`${canonicalJson({
+      schema: TICKET_SCHEMA,
+      status: result?.status === 0 ? "launched" : "readback-produced",
+      ticketId: issued.ticketId,
+    })}\n`);
+    return 0;
   } catch {
-    write(`${canonicalJson({ schema: TICKET_SCHEMA, status: "launch-unavailable" })}\n`);
-    return 2;
+    write(`${canonicalJson({
+      schema: TICKET_SCHEMA,
+      status: readbackProduced ? "readback-produced" : "launch-unavailable",
+      ...(issued ? {
+        ticketId: issued.ticketId,
+        ...(readbackProduced ? {} : { retryAfterEpochMs: issued.expiresAtEpochMs }),
+      } : {}),
+    })}\n`);
+    return readbackProduced ? 0 : 2;
   }
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exitCode = main();

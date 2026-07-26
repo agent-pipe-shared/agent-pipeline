@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
-import { lstatSync, readFileSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -11,11 +11,24 @@ import {
   requireProjectOnboardingReady,
 } from "../lib/project-onboarding-ready-gate.mjs";
 import {
+  KickoffError,
+  bindOnboardingSessionCleanup,
+  readOnboardingSessionCleanupBinding,
+  releaseOnboardingSessionCleanup,
+} from "../lib/onboarding-continuity.mjs";
+import {
+  SessionCleanupRecoveryError,
+  applySessionCleanupRecovery,
+  planSessionCleanupRecovery,
+} from "../lib/session-cleanup-recovery.mjs";
+import {
   WorktreeLifecycleError,
   canonicalJson,
   checkSessionHygiene,
   cleanupSession,
   finalizeTemporaryResource,
+  inspectSessionClosure,
+  listActiveSessionDescriptors,
   loadSessionDescriptor,
   registerTemporaryIntent,
   retireSessionDescriptor,
@@ -25,6 +38,9 @@ import {
 
 const USAGE = `Usage:
   session-cleanup.mjs start --repo <checkout> [--session <safe-id>]
+  session-cleanup.mjs release-binding --repo <checkout>
+  session-cleanup.mjs plan-recovery --repo <checkout>
+  session-cleanup.mjs apply-recovery --repo <checkout> --plan-sha256 <sha256> --activate
   session-cleanup.mjs register-intent --repo <checkout> (--session <id> | --session-descriptor <id> --expected-descriptor-sha256 <sha256>) --resource-id <id> --type <scratch-file|scratch-directory> --path <absolute> --content-class <scratch|disposable-control|generated-output> --policy <unlink-file|remove-directory>
   session-cleanup.mjs finalize --repo <checkout> (--session <id> | --session-descriptor <id> --expected-descriptor-sha256 <sha256>) --resource-id <id> [--canary <relative-file>]
   session-cleanup.mjs seal --repo <checkout> (--session <id> | --session-descriptor <id> --expected-descriptor-sha256 <sha256>) --resource-id <id>
@@ -92,10 +108,19 @@ function drainSessionPower(repo, session) {
 
 function parseArgs(argv) {
   const [command, ...rest] = argv;
-  if (!new Set(["start", "register-intent", "finalize", "seal", "cleanup", "hygiene"]).has(command)) throw new Error(USAGE);
+  if (!new Set([
+    "start", "release-binding", "plan-recovery", "apply-recovery",
+    "register-intent", "finalize", "seal", "cleanup", "hygiene",
+  ]).has(command)) throw new Error(USAGE);
   const flags = {};
   for (let index = 0; index < rest.length; index += 2) {
     const key = rest[index];
+    if (key === "--activate") {
+      if (flags.activate === true) throw new Error("Duplicate option: --activate");
+      flags.activate = true;
+      index -= 1;
+      continue;
+    }
     const value = rest[index + 1];
     if (!key?.startsWith("--") || value === undefined || value.startsWith("--")) throw new Error(USAGE);
     const name = key.slice(2);
@@ -105,7 +130,11 @@ function parseArgs(argv) {
   const common = new Set(["repo", "session", "session-descriptor", "expected-descriptor-sha256", "owner-nonce-file"]);
   const extra = command === "register-intent" ? ["resource-id", "type", "path", "content-class", "policy"]
     : new Set(["finalize", "seal"]).has(command) ? ["resource-id", "canary"] : [];
-  const allowed = command === "start" ? new Set(["repo", "session"]) : new Set([...common, ...extra]);
+  const allowed = command === "start" ? new Set(["repo", "session"])
+    : command === "release-binding" ? new Set(["repo"])
+      : command === "plan-recovery" ? new Set(["repo"])
+        : command === "apply-recovery" ? new Set(["repo", "plan-sha256", "activate"])
+      : new Set([...common, ...extra]);
   for (const name of Object.keys(flags)) if (!allowed.has(name)) throw new Error(`Unknown option: --${name}`);
   return { command, flags };
 }
@@ -152,10 +181,110 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
   const write = dependencies.writeFn ?? ((value) => process.stdout.write(value));
   let output;
   let exitCode = 0;
-  if (command === "start") {
+  if (command === "plan-recovery") {
+    output = planSessionCleanupRecovery({ rootDir: repo });
+  } else if (command === "apply-recovery") {
+    output = applySessionCleanupRecovery({
+      rootDir: repo,
+      expectedPlanSha256: required(flags, "plan-sha256"),
+      activate: flags.activate === true,
+    });
+  } else if (command === "start") {
     requireReady({ rootDir: repo, intent: "session" });
-    const started = startDescriptor(repo, { sessionId: flags.session });
-    output = { ok: true, code: "WT-SESSION-STARTED", sessionId: started.sessionId, descriptorSha256: started.descriptorSha256 };
+    const readBinding = dependencies.readOnboardingSessionCleanupBindingFn
+      ?? readOnboardingSessionCleanupBinding;
+    const bindCleanup = dependencies.bindOnboardingSessionCleanupFn
+      ?? bindOnboardingSessionCleanup;
+    const listDescriptors = dependencies.listActiveSessionDescriptorsFn
+      ?? listActiveSessionDescriptors;
+    const loadDescriptor = dependencies.loadSessionDescriptorFn
+      ?? loadSessionDescriptor;
+    const retireDescriptor = dependencies.retireSessionDescriptorFn
+      ?? retireSessionDescriptor;
+    const binding = readBinding({ rootDir: repo });
+    if (binding.status === "bound") {
+      if (flags.session && flags.session !== binding.sessionCleanup.sessionId) {
+        throw new WorktreeLifecycleError(
+          "WT-SESSION-BINDING",
+          "requested session ID conflicts with the persisted cleanup descriptor",
+        );
+      }
+      const reused = loadDescriptor(repo, binding.sessionCleanup.sessionId, {
+        expectedDescriptorSha256: binding.sessionCleanup.descriptorSha256,
+      });
+      output = {
+        ok: true,
+        code: "WT-SESSION-REUSED",
+        sessionId: reused.sessionId,
+        descriptorSha256: reused.descriptorSha256,
+      };
+    } else {
+      const activeDescriptors = listDescriptors(repo);
+      if (activeDescriptors.length !== 0) {
+        throw new WorktreeLifecycleError(
+          "WT-SESSION-UNBOUND-DESCRIPTOR",
+          "an active cleanup descriptor exists without a continuity binding",
+        );
+      }
+      const started = startDescriptor(repo, { sessionId: flags.session });
+      let persisted;
+      try {
+        persisted = bindCleanup({
+          rootDir: repo,
+          expectedStateSha256: binding.stateSha256,
+          expectedRevision: binding.revision,
+          sessionCleanup: {
+            sessionId: started.sessionId,
+            descriptorSha256: started.descriptorSha256,
+          },
+        });
+      } catch (error) {
+        try {
+          retireDescriptor(repo, started);
+        } catch {
+          throw new WorktreeLifecycleError(
+            "WT-SESSION-BIND-ROLLBACK",
+            "cleanup binding failed and the new descriptor could not be retired",
+          );
+        }
+        throw error;
+      }
+      output = {
+        ok: true,
+        code: persisted.mutated === false ? "WT-SESSION-REUSED" : "WT-SESSION-STARTED",
+        sessionId: persisted.sessionCleanup.sessionId,
+        descriptorSha256: persisted.sessionCleanup.descriptorSha256,
+      };
+    }
+  } else if (command === "release-binding") {
+    requireReady({ rootDir: repo, intent: "session" });
+    const readBinding = dependencies.readOnboardingSessionCleanupBindingFn
+      ?? readOnboardingSessionCleanupBinding;
+    const inspectClosure = dependencies.inspectSessionClosureFn
+      ?? inspectSessionClosure;
+    const releaseCleanup = dependencies.releaseOnboardingSessionCleanupFn
+      ?? releaseOnboardingSessionCleanup;
+    const binding = readBinding({ rootDir: repo });
+    if (binding.status !== "bound") {
+      output = { ok: true, code: "WT-SESSION-BINDING-ALREADY-RELEASED" };
+    } else {
+      const closure = inspectClosure(repo, binding.sessionCleanup.sessionId, {
+        expectedDescriptorSha256: binding.sessionCleanup.descriptorSha256,
+      });
+      if (closure.status !== "closed") {
+        throw new WorktreeLifecycleError(
+          "WT-SESSION-CLOSURE-REQUIRED",
+          "cleanup binding cannot be released without a completed closure receipt",
+        );
+      }
+      releaseCleanup({
+        rootDir: repo,
+        expectedStateSha256: binding.stateSha256,
+        expectedRevision: binding.revision,
+        sessionCleanup: binding.sessionCleanup,
+      });
+      output = { ok: true, code: "WT-SESSION-BINDING-RELEASED" };
+    }
   } else if (command === "hygiene") {
     const session = flags["session-descriptor"] ? sessionOwner(repo, flags, env) : { sessionId: required(flags, "session") };
     output = checkHygiene(repo, { sessionId: session.sessionId });
@@ -194,11 +323,50 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       // Close's established descriptor-bound cleanup path drains the bounded
       // inhibitor first.  `cleanup-pending` aborts before touching manifest
       // resources or retiring the descriptor.
-      if (command === "cleanup") drainSessionPower(repo, session);
+      let cleanupBinding = null;
+      if (command === "cleanup") {
+        drainSessionPower(repo, session);
+        if (existsSync(join(repo, ".claude", "pipeline-state.json"))) {
+          const readBinding = dependencies.readOnboardingSessionCleanupBindingFn
+            ?? readOnboardingSessionCleanupBinding;
+          const observed = readBinding({ rootDir: repo });
+          if (observed.status === "bound") {
+            if (observed.sessionCleanup.sessionId !== session.sessionId
+              || observed.sessionCleanup.descriptorSha256 !== session.descriptorSha256) {
+              throw new WorktreeLifecycleError(
+                "WT-SESSION-BINDING",
+                "cleanup descriptor does not match the persisted continuity binding",
+              );
+            }
+            cleanupBinding = observed;
+          }
+        }
+      }
       const cleanup = cleanupSession(repo, { sessionId: ownedSessionId, ownerNonce: nonce }, { allowAbsent: session.descriptorSha256 !== null });
       output = cleanup.receipt;
       if (cleanup.ok && session.descriptorSha256) {
         retireSessionDescriptor(repo, { sessionId: ownedSessionId, ownerNonce: nonce, descriptorSha256: session.descriptorSha256 });
+        if (cleanupBinding !== null) {
+          const inspectClosure = dependencies.inspectSessionClosureFn
+            ?? inspectSessionClosure;
+          const closure = inspectClosure(repo, session.sessionId, {
+            expectedDescriptorSha256: session.descriptorSha256,
+          });
+          if (closure.status !== "closed") {
+            throw new WorktreeLifecycleError(
+              "WT-SESSION-CLOSURE-REQUIRED",
+              "cleanup descriptor retired without a completed closure receipt",
+            );
+          }
+          const releaseCleanup = dependencies.releaseOnboardingSessionCleanupFn
+            ?? releaseOnboardingSessionCleanup;
+          releaseCleanup({
+            rootDir: repo,
+            expectedStateSha256: cleanupBinding.stateSha256,
+            expectedRevision: cleanupBinding.revision,
+            sessionCleanup: cleanupBinding.sessionCleanup,
+          });
+        }
       }
       if (!cleanup.ok) exitCode = 2;
     }
@@ -212,7 +380,10 @@ if (invokedDirectly) {
   try {
     process.exitCode = main();
   } catch (error) {
-    const code = error instanceof WorktreeLifecycleError || error instanceof ProjectOnboardingReadyError
+    const code = error instanceof WorktreeLifecycleError
+      || error instanceof ProjectOnboardingReadyError
+      || error instanceof KickoffError
+      || error instanceof SessionCleanupRecoveryError
       ? error.code
       : "WT-ARGUMENT";
     const detail = error instanceof ProjectOnboardingReadyError

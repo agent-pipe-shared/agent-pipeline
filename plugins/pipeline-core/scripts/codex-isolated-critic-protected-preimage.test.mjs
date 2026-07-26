@@ -33,10 +33,10 @@ function digest(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-check("F1 protected inventory is closed and bound to the Storm baseline", () => {
-  assert.deepEqual(Object.keys(inventory), ["schema", "baselineCommit", "files"]);
+check("F1 protected inventory is closed and names the current post-Storm baseline", () => {
+  assert.deepEqual(Object.keys(inventory), ["schema", "baselineLabel", "files"]);
   assert.equal(inventory.schema, "pipeline.codex-isolated-critic-protected-preimage.v1");
-  assert.equal(inventory.baselineCommit, "3e811d4f82652fa6b666e4e6df02e79d00c6c881");
+  assert.equal(inventory.baselineLabel, "post-storm-v0.4.6-candidate");
   assert.deepEqual(inventory.files.map((entry) => entry.path), EXPECTED_PATHS);
   assert.equal(new Set(inventory.files.map((entry) => entry.path)).size, EXPECTED_PATHS.length);
 });
@@ -54,7 +54,7 @@ check("F1 protected paths are regular in-repository files without aliasing", () 
   }
 });
 
-check("F1 current Critic execution surfaces remain byte-identical to Storm", () => {
+check("F1 current Critic execution surfaces remain byte-identical to the protected baseline", () => {
   for (const entry of inventory.files) {
     const actual = digest(readFileSync(join(repoRoot, ...entry.path.split("/"))));
     assert.equal(actual, entry.rawSha256, entry.path);

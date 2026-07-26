@@ -12,7 +12,7 @@ import { fileURLToPath } from "node:url";
 import { PassThrough, Writable } from "node:stream";
 
 import {
-  authenticateLaunchTicket, canonicalJson, canonicalSha256, consumeRuntimeReadback, issueLaunchTicket,
+  HELPER_PATH, authenticateLaunchTicket, canonicalJson, canonicalSha256, consumeRuntimeReadback, issueLaunchTicket,
   persistRestartBarrier, prepareRuntimeRestartBinding, readCurrentRuntimeReadback, readRestartBarrier,
   resolveRuntimeExecutable, sha256,
 } from "./codex-onboarding-runtime.mjs";
@@ -177,6 +177,8 @@ test("the PATH resolver selects the first symlinked Codex entry and binds its ph
 test("the launch wrapper preserves the interactive Codex process contract without exposing its token", () => {
   const successPath = root();
   const failurePath = root();
+  const readbackFailurePath = root();
+  const tuiFailurePath = root();
   const priorTicketId = process.env.PIPELINE_CODEX_ONBOARDING_TICKET_ID;
   const priorToken = process.env.PIPELINE_CODEX_ONBOARDING_TOKEN;
   const priorSentinel = process.env.PIPELINE_ONBOARDING_HOST_ENV_SENTINEL;
@@ -191,34 +193,64 @@ test("the launch wrapper preserves the interactive Codex process contract withou
     };
     const successBarrier = prepare(successPath, counterRandom(0x01, 0x02));
     const failureBarrier = prepare(failurePath, counterRandom(0x03, 0x04));
+    const readbackFailureBarrier = prepare(readbackFailurePath, counterRandom(0x05, 0x06));
+    const tuiFailureBarrier = prepare(tuiFailurePath, counterRandom(0x07, 0x08));
     delete process.env.PIPELINE_CODEX_ONBOARDING_TICKET_ID;
     delete process.env.PIPELINE_CODEX_ONBOARDING_TOKEN;
     process.env.PIPELINE_ONBOARDING_HOST_ENV_SENTINEL = "preserved";
 
-    const invoke = (path, stored, spawn) => {
+    const externalEnv = { ...process.env };
+    delete externalEnv.CODEX_THREAD_ID;
+    const invoke = (path, stored, spawn, env = externalEnv) => {
       let stdout = "";
       const status = onboardingLaunchMain([
         "--root", path, "--barrier-sha256", stored.rawSha256, "--activate",
-      ], { spawn, write: (chunk) => { stdout += chunk; } });
+      ], { spawn, write: (chunk) => { stdout += chunk; }, env });
       return { status, stdout };
     };
-    let launch;
+    const calls = [];
     const success = invoke(successPath, successBarrier, (childExecutable, argv, options) => {
-      launch = { executable: childExecutable, argv, options };
+      calls.push({ executable: childExecutable, argv, options });
+      if (childExecutable === process.execPath) {
+        return {
+          status: 0,
+          signal: null,
+          stdout: `${canonicalJson({
+            schema: "pipeline.codex-project-runtime-readback-status.v1",
+            status: "produced",
+          })}\n`,
+          stderr: "",
+        };
+      }
       return { status: 0 };
     });
-    assert.equal(launch.executable, executable);
-    assert.deepEqual(launch.argv, ["-C", successPath, "pipeline-core:pipeline-start"]);
-    const { env, ...launchOptions } = launch.options;
-    assert.deepEqual(launchOptions, { cwd: successPath, shell: false, stdio: "inherit" });
+    assert.equal(calls.length, 2);
+    const [readback, launch] = calls;
+    assert.equal(readback.executable, process.execPath);
+    assert.deepEqual(readback.argv, [HELPER_PATH, "--root", successPath]);
+    const { env: readbackEnv, ...readbackOptions } = readback.options;
+    assert.deepEqual(readbackOptions, {
+      cwd: successPath,
+      encoding: "utf8",
+      maxBuffer: 128 * 1024,
+      shell: false,
+      stdio: ["ignore", "pipe", "pipe"],
+      timeout: 35_000,
+    });
     const {
       PIPELINE_CODEX_ONBOARDING_TICKET_ID: childTicketId,
       PIPELINE_CODEX_ONBOARDING_TOKEN: childToken,
-      ...inheritedEnv
-    } = env;
-    assert.deepEqual(inheritedEnv, { ...process.env });
+      ...readbackInheritedEnv
+    } = readbackEnv;
+    assert.deepEqual(readbackInheritedEnv, externalEnv);
     assert.match(childTicketId, /^[A-Za-z0-9._-]{1,80}$/u);
     assert.match(childToken, /^[a-f0-9]{64}$/u);
+
+    assert.equal(launch.executable, executable);
+    assert.deepEqual(launch.argv, ["-C", successPath, "pipeline-core:pipeline-start"]);
+    const { env: launchEnv, ...launchOptions } = launch.options;
+    assert.deepEqual(launchOptions, { cwd: successPath, shell: false, stdio: "inherit" });
+    assert.deepEqual(launchEnv, externalEnv);
     assert.equal(process.env.PIPELINE_CODEX_ONBOARDING_TICKET_ID, undefined);
     assert.equal(process.env.PIPELINE_CODEX_ONBOARDING_TOKEN, undefined);
     assert.equal(success.status, 0);
@@ -233,11 +265,76 @@ test("the launch wrapper preserves the interactive Codex process contract withou
       throw new Error(`sensitive child failure ${failedToken}`);
     });
     assert.equal(failure.status, 2);
-    assert.deepEqual(JSON.parse(failure.stdout), {
-      schema: "pipeline.codex-onboarding-launch.v1", status: "launch-unavailable",
-    });
+    const failed = JSON.parse(failure.stdout);
+    assert.deepEqual(Object.keys(failed).sort(), [
+      "retryAfterEpochMs", "schema", "status", "ticketId",
+    ]);
+    assert.equal(failed.schema, "pipeline.codex-onboarding-launch.v1");
+    assert.equal(failed.status, "launch-unavailable");
+    assert.match(failed.ticketId, /^[A-Za-z0-9._-]{1,80}$/u);
+    assert.equal(Number.isSafeInteger(failed.retryAfterEpochMs), true);
     assert.equal(failure.stdout.includes(failedToken), false);
     assert.equal(failure.stdout.includes("sensitive child failure"), false);
+
+    let readbackFailureCalls = 0;
+    const readbackFailure = invoke(readbackFailurePath, readbackFailureBarrier, () => {
+      readbackFailureCalls += 1;
+      return {
+        status: 2,
+        signal: null,
+        stdout: `${canonicalJson({
+          schema: "pipeline.codex-project-runtime-readback-status.v1",
+          status: "unavailable",
+          code: "transport-unavailable",
+        })}\n`,
+        stderr: "",
+      };
+    });
+    assert.equal(readbackFailureCalls, 1);
+    assert.equal(readbackFailure.status, 2);
+    const unavailable = JSON.parse(readbackFailure.stdout);
+    assert.equal(unavailable.status, "readback-unavailable");
+    assert.match(unavailable.ticketId, /^[A-Za-z0-9._-]{1,80}$/u);
+    assert.equal(Number.isSafeInteger(unavailable.retryAfterEpochMs), true);
+
+    let tuiCalls = 0;
+    const tuiFailure = invoke(tuiFailurePath, tuiFailureBarrier, (childExecutable) => {
+      tuiCalls += 1;
+      if (childExecutable === process.execPath) {
+        return {
+          status: 0,
+          signal: null,
+          stdout: `${canonicalJson({
+            schema: "pipeline.codex-project-runtime-readback-status.v1",
+            status: "produced",
+          })}\n`,
+          stderr: "",
+        };
+      }
+      throw new Error("interactive TUI unavailable after readback");
+    });
+    assert.equal(tuiCalls, 2);
+    assert.equal(tuiFailure.status, 0);
+    assert.equal(JSON.parse(tuiFailure.stdout).status, "readback-produced");
+
+    const guardedPath = root();
+    try {
+      const guardedBarrier = prepare(guardedPath, counterRandom(0x31, 0x32));
+      let spawned = false;
+      const guarded = invoke(
+        guardedPath,
+        guardedBarrier,
+        () => { spawned = true; return { status: 0 }; },
+        { ...externalEnv, CODEX_THREAD_ID: "active-codex-thread" },
+      );
+      assert.equal(guarded.status, 2);
+      assert.deepEqual(JSON.parse(guarded.stdout), {
+        schema: "pipeline.codex-onboarding-launch.v1",
+        status: "external-launch-required",
+      });
+      assert.equal(spawned, false);
+      assert.equal(nativeFs.existsSync(guardedBarrier.paths.tickets), false);
+    } finally { dispose(guardedPath); }
   } finally {
     if (priorTicketId === undefined) delete process.env.PIPELINE_CODEX_ONBOARDING_TICKET_ID;
     else process.env.PIPELINE_CODEX_ONBOARDING_TICKET_ID = priorTicketId;
@@ -247,6 +344,8 @@ test("the launch wrapper preserves the interactive Codex process contract withou
     else process.env.PIPELINE_ONBOARDING_HOST_ENV_SENTINEL = priorSentinel;
     dispose(successPath);
     dispose(failurePath);
+    dispose(readbackFailurePath);
+    dispose(tuiFailurePath);
   }
 });
 
@@ -686,6 +785,33 @@ test("expired tickets and unchanged barrier replays fail closed", () => {
     assert.equal(replay.written, false); assert.equal(replay.rawSha256, stored.rawSha256);
     const issued = issueLaunchTicket({ rootDir: path, barrierSha256: stored.rawSha256, codexExecutable: process.execPath, now: 20_000, random: counterRandom(0x53, 0x54), spawn: host });
     assert.throws(() => authenticateLaunchTicket({ rootDir: path, ticketId: issued.ticketId, token: issued.token, now: 320_000, spawn: host }), /unavailable or replayed/u);
+  } finally { dispose(path); }
+});
+
+test("a stale launcher binding is replaced even when source and runtime targets are unchanged", () => {
+  const path = root();
+  try {
+    git(path);
+    const fixture = seeded(path);
+    const binding = prepareRuntimeRestartBinding({
+      rootDir: path,
+      ...fixture,
+      codexExecutable: process.execPath,
+      random: counterRandom(0x61, 0x62),
+    });
+    const host = gitCommon(path);
+    const stale = persistRestartBarrier({
+      rootDir: path,
+      binding: { ...binding, launcherSha256: "f".repeat(64) },
+      spawn: host,
+    });
+    const rebound = persistRestartBarrier({ rootDir: path, binding, spawn: host });
+    assert.equal(stale.written, true);
+    assert.equal(rebound.written, true);
+    assert.notEqual(rebound.rawSha256, stale.rawSha256);
+    assert.equal(rebound.barrier.revision, stale.barrier.revision + 1);
+    assert.equal(rebound.barrier.priorStateSha256, stale.rawSha256);
+    assert.equal(rebound.barrier.launcherSha256, binding.launcherSha256);
   } finally { dispose(path); }
 });
 

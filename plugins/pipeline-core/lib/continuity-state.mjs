@@ -56,6 +56,8 @@ const CLOSE_DELIVERY_REQUEST_KEYS = new Set(["expectedRevision", "result", "push
 const CLOSE_READBACK_REQUEST_KEYS = new Set(["expectedRevision", "result", "fetchedOid"]);
 const CLOSE_COMPLETE_REQUEST_KEYS = new Set(["expectedRevision", "result"]);
 const CAS_KEYS = new Set(["expectedRevision", "next"]);
+const SESSION_CLEANUP_BIND_KEYS = new Set(["expectedRevision", "sessionCleanup"]);
+const SESSION_CLEANUP_RELEASE_KEYS = new Set(["expectedRevision", "sessionCleanup"]);
 const FINAL_REQUEST_KEYS = new Set(["expectedRevision", "observation", "next"]);
 const DECISION_APPLY_KEYS = new Set(["expectedRevision", "decisionTxn", "queueHead", "blocker", "resume"]);
 const DECISION_CLEAR_KEYS = new Set(["expectedRevision", "receipt"]);
@@ -481,6 +483,74 @@ function compareAndSwap(current, request, activeFeatureId, {
 /** Validate a pure compare-and-swap proposal; performs no I/O. */
 export function compareAndSwapContinuity(current, request, activeFeatureId = undefined) {
   return compareAndSwap(current, request, activeFeatureId);
+}
+
+/**
+ * Bind the one private cleanup descriptor used by this continuity lifecycle.
+ *
+ * This is deliberately narrower than generic CAS: only an absent/null cleanup
+ * tuple may become one exact descriptor binding. Existing bindings are never
+ * replaced, and a state with an admitted dispatch cannot have its revision
+ * changed underneath that dispatch identity.
+ */
+export function bindContinuitySessionCleanup(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, SESSION_CLEANUP_BIND_KEYS)
+    || !safeInteger(request.expectedRevision)
+    || !exactKeys(request.sessionCleanup, SESSION_CLEANUP_KEYS)
+    || !safeId(request.sessionCleanup.sessionId)
+    || !digest(request.sessionCleanup.descriptorSha256)) {
+    return result(false, before.ok ? "CS-SESSION-CLEANUP-REQUEST" : before.code);
+  }
+  if (request.expectedRevision !== current.revision) return result(false, "CS-STALE");
+  if (current.runtime.sessionCleanup !== undefined && current.runtime.sessionCleanup !== null) {
+    return sameJson(current.runtime.sessionCleanup, request.sessionCleanup)
+      ? result(true, "CS-SESSION-CLEANUP-ALREADY-BOUND", structuredClone(current), false)
+      : result(false, "CS-SESSION-CLEANUP-PROTECTED");
+  }
+  if (current.queueHead?.dispatch !== null || current.decisionTxn !== null || current.closeTransition != null) {
+    return result(false, "CS-SESSION-CLEANUP-TOO-LATE");
+  }
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.runtime.sessionCleanup = structuredClone(request.sessionCleanup);
+  const after = validateContinuityState(next, activeFeatureId);
+  return after.ok
+    ? result(true, "CS-SESSION-CLEANUP-BOUND", next, true)
+    : result(false, after.code);
+}
+
+/**
+ * Release the exact cleanup binding after the I/O layer has proved closure.
+ * This pure transition deliberately accepts no boolean "force" flag and never
+ * clears a different descriptor or changes an admitted dispatch identity.
+ */
+export function releaseContinuitySessionCleanup(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, SESSION_CLEANUP_RELEASE_KEYS)
+    || !safeInteger(request.expectedRevision)
+    || !exactKeys(request.sessionCleanup, SESSION_CLEANUP_KEYS)
+    || !safeId(request.sessionCleanup.sessionId)
+    || !digest(request.sessionCleanup.descriptorSha256)) {
+    return result(false, before.ok ? "CS-SESSION-CLEANUP-RELEASE-REQUEST" : before.code);
+  }
+  if (request.expectedRevision !== current.revision) return result(false, "CS-STALE");
+  if (current.runtime.sessionCleanup === undefined || current.runtime.sessionCleanup === null) {
+    return result(true, "CS-SESSION-CLEANUP-ALREADY-RELEASED", structuredClone(current), false);
+  }
+  if (!sameJson(current.runtime.sessionCleanup, request.sessionCleanup)) {
+    return result(false, "CS-SESSION-CLEANUP-PROTECTED");
+  }
+  if (current.queueHead?.dispatch !== null || current.decisionTxn !== null || current.closeTransition != null) {
+    return result(false, "CS-SESSION-CLEANUP-RELEASE-TOO-LATE");
+  }
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.runtime.sessionCleanup = null;
+  const after = validateContinuityState(next, activeFeatureId);
+  return after.ok
+    ? result(true, "CS-SESSION-CLEANUP-RELEASED", next, true)
+    : result(false, after.code);
 }
 
 function adapterAck(acknowledgedFinal) {
@@ -924,6 +994,11 @@ export function clearCourseDecisionReceipt(current, request, activeFeatureId = u
 
 export const CONTINUITY_STATE_CODES = Object.freeze([
   "CS-INVALID", "CS-STATE-BUDGET", "CS-VALID", "CS-REQUEST", "CS-STALE",
+  "CS-SESSION-CLEANUP-REQUEST", "CS-SESSION-CLEANUP-ALREADY-BOUND",
+  "CS-SESSION-CLEANUP-PROTECTED", "CS-SESSION-CLEANUP-TOO-LATE",
+  "CS-SESSION-CLEANUP-BOUND",
+  "CS-SESSION-CLEANUP-RELEASE-REQUEST", "CS-SESSION-CLEANUP-ALREADY-RELEASED",
+  "CS-SESSION-CLEANUP-RELEASE-TOO-LATE", "CS-SESSION-CLEANUP-RELEASED",
   "CS-REVISION-OVERFLOW", "CS-REVISION", "CS-CAS-APPLIED", "CS-NO-DISPATCH",
   "CS-SUPERSEDED-ORIGIN-FINAL", "CS-RUNNING", "CS-COMPLETED-UNDELIVERED",
   "CS-HOST-FAILED", "CS-DUPLICATE-FINAL", "CS-FINAL-REJECTED",

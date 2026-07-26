@@ -172,7 +172,7 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
     assert.equal(bootstrap.json.repository.status, "host-managed");
     assert.equal(bootstrap.json.runtime.status, "plugin-managed-unattested");
     assert.equal(bootstrap.json.continuity.status, "valid");
-    assert.deepEqual(bootstrap.json.appServer, { required: true, status: "running", code: "CAS-READY" });
+    assert.deepEqual(bootstrap.json.appServer, { required: false, status: "not-requested", code: null });
     assert.equal(bootstrap.json.nextAction.kind, "command");
     assert.equal(bootstrap.json.nextAction.argv[0].endsWith("codex-host-repository-init.mjs"), true);
     assert.deepEqual(bootstrap.json.nextAction.argv.slice(1), ["plan", "--root", path]);
@@ -319,7 +319,13 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
     assert.equal(evaluateLifecycleReadyGuard({
       tool_name: "Bash",
       tool_input: { command: "rg --files" },
-    }, { projectDir: path }).exitCode, 2);
+    }, { projectDir: path }).exitCode, 0,
+    "a damaged admission remains read-only diagnosable");
+    assert.equal(evaluateLifecycleReadyGuard({
+      tool_name: "Bash",
+      tool_input: { command: "printf mutation > implementation.txt" },
+    }, { projectDir: path }).exitCode, 2,
+    "a damaged admission still blocks project mutation");
   } finally { dispose(path); }
 });
 

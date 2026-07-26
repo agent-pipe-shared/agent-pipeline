@@ -7,8 +7,28 @@ export const ROUTES = Object.freeze({
   NO_CONSENT: "disabled-no-consent",
   PROFILE: "disabled-by-profile",
 });
+export const HOST_ADVISOR_POLICY = Object.freeze({
+  schema: "pipeline.codex-host-advisor-policy.v1",
+  maxAttempts: 2,
+  primary: Object.freeze({
+    agentName: "consult-advisor",
+    model: "gpt-5.6-sol",
+    effort: "max",
+    timeoutMs: 60_000,
+  }),
+  fallback: Object.freeze({
+    agentName: "consult-advisor-fast",
+    model: "gpt-5.6-terra",
+    effort: "high",
+    timeoutMs: 45_000,
+    forkTurns: "none",
+  }),
+  workspaceGuard: "sha256-before-between-after",
+  exhausted: "continue-advisory-unavailable",
+});
 
 const KEYS = ["consent", "profile", "runner"];
+export const USAGE = "Usage: codex-host-advisor-route.mjs --runner codex --profile <epic|feature|mini> --consent <default|approved|declined>";
 function invalid(message) {
   const error = new Error(message);
   error.code = "invalid-route-input";
@@ -30,9 +50,56 @@ export function selectHostAdvisorRoute(input) {
 // Compatibility name for callers that use the generic advisory terminology.
 export const selectAdvisoryRoute = selectHostAdvisorRoute;
 
+export function resolveHostAdvisorRoute(input) {
+  const route = selectHostAdvisorRoute(input);
+  return {
+    route,
+    policy: route === ROUTES.HOST ? HOST_ADVISOR_POLICY : null,
+  };
+}
+
+export function parseHostAdvisorRouteArgs(argv) {
+  if (!Array.isArray(argv) || argv.length !== 6) invalid(USAGE);
+  const input = {};
+  for (let index = 0; index < argv.length; index += 2) {
+    const flag = argv[index];
+    const value = argv[index + 1];
+    if (!["--runner", "--profile", "--consent"].includes(flag)
+      || Object.prototype.hasOwnProperty.call(input, flag.slice(2))
+      || typeof value !== "string"
+      || value === "") invalid(USAGE);
+    input[flag.slice(2)] = value;
+  }
+  return input;
+}
+
+function writeRoute(input, write) {
+  write(`${JSON.stringify(resolveHostAdvisorRoute(input))}\n`);
+}
+
 if (import.meta.url === `file://${process.argv[1]}`) {
-  let text = "";
-  process.stdin.setEncoding("utf8");
-  process.stdin.on("data", (chunk) => { text += chunk; });
-  process.stdin.on("end", () => { try { process.stdout.write(`${JSON.stringify({ route: selectHostAdvisorRoute(JSON.parse(text)) })}\n`); } catch { process.exitCode = 2; } });
+  const argv = process.argv.slice(2);
+  if (argv.length > 0) {
+    if (argv.length === 1 && argv[0] === "--help") {
+      process.stdout.write(`${USAGE}\n`);
+    } else {
+      try {
+        writeRoute(parseHostAdvisorRouteArgs(argv), process.stdout.write.bind(process.stdout));
+      } catch {
+        process.stderr.write(`${USAGE}\n`);
+        process.exitCode = 2;
+      }
+    }
+  } else {
+    let text = "";
+    process.stdin.setEncoding("utf8");
+    process.stdin.on("data", (chunk) => { text += chunk; });
+    process.stdin.on("end", () => {
+      try {
+        writeRoute(JSON.parse(text), process.stdout.write.bind(process.stdout));
+      } catch {
+        process.exitCode = 2;
+      }
+    });
+  }
 }

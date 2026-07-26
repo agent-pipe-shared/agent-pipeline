@@ -100,9 +100,29 @@ test("session start calls the gate once before its mutation while hygiene remain
           order.push(["gate", options]);
           return { status: "ready" };
         },
+        readOnboardingSessionCleanupBindingFn({ rootDir }) {
+          order.push(["read-binding", { rootDir }]);
+          return {
+            status: "unbound",
+            stateSha256: "b".repeat(64),
+            revision: 0,
+            sessionCleanup: null,
+          };
+        },
+        listActiveSessionDescriptorsFn(startPath) {
+          order.push(["list-descriptors", { startPath }]);
+          return [];
+        },
         startSessionDescriptorFn(_root, { sessionId }) {
           order.push(["start", { sessionId }]);
           return { sessionId, descriptorSha256: "a".repeat(64) };
+        },
+        bindOnboardingSessionCleanupFn(request) {
+          order.push(["bind", request]);
+          return {
+            mutated: true,
+            sessionCleanup: request.sessionCleanup,
+          };
         },
         writeFn(value) { output.push(value); },
       },
@@ -110,7 +130,18 @@ test("session start calls the gate once before its mutation while hygiene remain
     assert.equal(code, 0);
     assert.deepEqual(order, [
       ["gate", { rootDir: root, intent: "session" }],
+      ["read-binding", { rootDir: root }],
+      ["list-descriptors", { startPath: root }],
       ["start", { sessionId: "gate-positive" }],
+      ["bind", {
+        rootDir: root,
+        expectedStateSha256: "b".repeat(64),
+        expectedRevision: 0,
+        sessionCleanup: {
+          sessionId: "gate-positive",
+          descriptorSha256: "a".repeat(64),
+        },
+      }],
     ]);
     const started = JSON.parse(output.join(""));
     assert.deepEqual(Object.keys(started).sort(), ["code", "descriptorSha256", "ok", "sessionId"]);

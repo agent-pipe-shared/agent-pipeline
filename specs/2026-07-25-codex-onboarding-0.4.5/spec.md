@@ -153,7 +153,7 @@ For a progress result, `status` is exactly one of:
 | --- | --- | --- |
 | `portable-seed-required` | No valid V3 source/calibration seed exists. | `apply-portable-seed --activate` |
 | `runtime-initialization-required` | Portable source is valid; selected-runner runtime targets are absent. | `initialize-runtime --activate` |
-| `runtime-attestation-required` | A project-local selected projection is current but no native effective-runtime readback authority exists yet. This state does not apply to the exact Codex plugin-managed control mount. | digest-bound `apply-readback --activate`, then restart |
+| `runtime-attestation-required` | A project-local selected projection is current but no native effective-runtime readback authority exists yet, or the pending restart barrier is bound to a different launcher/helper/Codex executable identity. This state does not apply to the exact Codex plugin-managed control mount. | digest-bound `apply-readback --activate` creates or replaces the private barrier without changing runtime targets, then restart |
 | `restart-required` | Project-local Codex config/agent bytes changed after the active host loaded its project runtime. | typed `restart-process` action; it cannot execute inside the current process |
 | `kickoff-required` | Runtime readback is current, repository capability is usable, but no valid initial continuity exists. | `kickoff plan`, then `kickoff apply --activate` |
 | `host-repository-init-required` | Kickoff is valid in a fresh host-managed Codex root, but the reserved runtime mount has no durable host-init admission. | read-only `codex-host-repository-init.mjs plan`, then its separately confirmed host-bound apply |
@@ -421,7 +421,7 @@ digest is stored. `launcherSha256` hashes the exact
 helper bytes, and
 `codexExecutableSha256` hashes the exact resolved regular non-symlink
 executable bytes used by the restart wrapper. The wrapper rechecks both before
-launch, and the reader rechecks all three before receipt production. Clearing
+readback, and the reader rechecks all three before receipt production. Clearing
 increments the revision, binds the prior raw-state SHA through CAS, and changes
 only `revision`, `priorStateSha256`, and `state`.
 
@@ -456,7 +456,8 @@ produced by strict parsing of every frozen required agent definition.
 The sole production producer/verifier is the plugin-local
 `codex-project-runtime-readback-host.mjs`. The restart wrapper resolves and
 hash-binds that file plus the exact Codex executable before creating the
-barrier. In the launched process, before bootstrap confirmation, the helper:
+barrier. The confirmed external wrapper invokes the helper directly before
+starting an ordinary Codex TUI. The helper:
 
 1. authenticates the one-use launch ticket below without changing it;
 2. creates a new 256-bit reader-generation nonce from `crypto.randomBytes`,
@@ -479,8 +480,8 @@ caller-supplied evidence object, and kills its child on timeout/protocol error.
 Tests may inject only the random-byte source, clock, child transport, and
 filesystem interface. Production dependency injection is rejected.
 Repository file presence alone, mtime, PID/start time, a user statement,
-`CAS-READY`, model output, ambient variables other than the ticket inherited
-from the fixed wrapper, same-generation evidence, and replay never clear the
+`CAS-READY`, model output, ambient variables other than the ticket supplied
+directly by the fixed external wrapper, same-generation evidence, and replay never clear the
 barrier. Any missing capability or mismatch returns
 `runtime-readback-unavailable` without consuming the barrier.
 
@@ -503,12 +504,21 @@ The authenticated issuer/verifier contract is:
    `expectedSourceSha256`, `expectedRuntimeTargetsSha256`,
    `writerGenerationSha256`, `tokenSha256`, `state`, and `consumedBy`.
    Initial `state` is `issued`; `consumedBy` is `null`.
-3. The raw token is never printed or stored. It is passed only in the spawned
-   Codex process environment together with the non-secret `ticketId`; the
-   ticket stores only `tokenSha256`.
-4. The wrapper spawns exactly
-   `codex -C <root> pipeline-core:pipeline-start`. A strict-config/load failure
-   prevents the first turn and leaves the ticket unconsumed.
+3. The raw token is never printed or stored. It is passed only in the directly
+   spawned readback-helper environment together with the non-secret
+   `ticketId`; the ticket stores only `tokenSha256`.
+4. The wrapper invokes the hash-bound helper with
+   `node <helper> --root <root>`. The helper removes both ticket variables
+   before starting the hash-bound executable as
+   `codex --strict-config app-server --listen stdio://`, performs the exact
+   `config/read`, and consumes the ticket plus restart barrier only after the
+   complete receipt validates. Only an exact typed `produced` result permits
+   the wrapper to start
+   `codex -C <root> pipeline-core:pipeline-start` with both ticket variables
+   absent. A helper failure leaves the bounded ticket unconsumed and publishes
+   its retry-after time. A TUI-start failure after a successful readback
+   reports `readback-produced`; it does not invalidate or repeat the consumed
+   readback, and the user may start ordinary Codex.
    `expiresAtEpochMs` is exactly `issuedAtEpochMs + 300000` (five minutes).
    Both are safe nonnegative integer milliseconds from the local OS clock; the
    wrapper and verifier use the same injected clock interface in tests.
@@ -547,6 +557,18 @@ Only a root with no prior valid continuity history may be
 `absent-pristine`/`kickoff-required`. Existing malformed or inconsistent
 continuity is `damaged` and has a repair path, not kickoff.
 
+The repair path is deliberately narrower than the damaged classification. It
+accepts only (a) the invalid `resume-on-next-turn` plus `active-turn` pairing
+when changing the mode to `immediate` makes the otherwise unchanged continuity
+valid and its PRD/Spec bytes still match, or (b) an established legacy active
+state with no continuity/history that carries explicit PO-gate authority. The
+legacy adoption starts a conservative revision-0 review queue. Every accepted
+repair is State-preimage-, calibration-, handover-, authority-, and private
+history-bound, uses the ordinary State lock, and requires a separately
+confirmed digest-bound apply. Existing kickoff history is an immutable
+precondition and is never rewritten. Every other damaged state returns
+`continuity_repair_unavailable` and no next action.
+
 The decision reuses, without redefining, the sanctioned state reader and
 validator in `plugins/pipeline-core/scripts/continuity-status.mjs`,
 `plugins/pipeline-core/lib/continuity-status.mjs`, and
@@ -577,9 +599,11 @@ creating/deleting handover Markdown: without machine state, a present handover
 makes the root damaged.
 
 `kickoff-required` first returns a closed `collect-input` action for `goal`.
-The goal is required UTF-8 text after trimming, 1–8192 bytes, contains no NUL,
-and remains project intent rather than shell syntax. Once supplied, the
-lifecycle constructs this exact read-only command action:
+The goal is required single-line UTF-8 text after trimming, 1–160 bytes,
+contains no NUL, and remains a concise project objective rather than shell
+syntax, pasted design, requirements, acceptance criteria, or PRD content. The
+complete user input stays outside the bootstrap argv for later PRD/spec review.
+Once supplied, the lifecycle constructs this exact read-only command action:
 
 ```json
 {
@@ -725,7 +749,8 @@ the restart action below, or this closed input action:
     "encoding": "utf8",
     "trim": true,
     "minBytes": 1,
-    "maxBytes": 8192,
+    "maxBytes": 160,
+    "singleLine": true,
     "rejectNul": true
   },
   "mutation": false,
@@ -750,7 +775,12 @@ the restart action below, or this closed input action:
       "--barrier-sha256",
       "<sha256>",
       "--activate"
-    ]
+    ],
+    "copyCommand": {
+      "maxColumns": 72,
+      "posix": "<exact bounded POSIX shell script>",
+      "powershell": "<exact bounded PowerShell script>"
+    }
   },
   "mutation": true,
   "requiresConfirmation": true,
@@ -785,21 +815,30 @@ the restart action below, or this closed input action:
 ```
 
 The lifecycle never auto-executes `restart-process`: it renders the exact
-confirmed launch-wrapper command and stops. The wrapper invokes Codex with the
-`pipeline-start` prompt; its first onboarding
-readback is `inspect --intent bootstrap`. The native host supplies the new
-process-generation/runtime receipt to that readback, which clears the barrier
-under private-state CAS before continuity and required App-Server checks run.
-Absent/invalid host evidence becomes `runtime-readback-unavailable`; a
-same-generation or replayed receipt remains rejected and cannot advance.
+confirmed launch-wrapper command and stops. In a real external terminal, the
+wrapper first invokes the bound helper directly. The helper starts a separate
+strict App Server, produces the effective-runtime receipt, consumes the ticket,
+and clears the barrier under private-state CAS. Only then does the wrapper
+start an ordinary token-free Codex TUI with the `pipeline-start` prompt. Its
+first onboarding readback is `inspect --intent bootstrap` and observes the
+already current readback; it does not depend on client environment propagation
+to a long-lived daemon. Absent or invalid helper evidence becomes
+`runtime-readback-unavailable`; a same-generation or replayed receipt remains
+rejected and cannot advance. If only the final TUI launch fails, the wrapper
+reports `readback-produced` and ordinary Codex may be started separately.
 `expectedStatuses` is the exhaustive set of valid post-restart aggregate
 outcomes. It deliberately includes later controlling failures rather than
 promising `ready`.
 
-The human rendering is one shell-escaped single line derived from the same
-array. It must include every required flag and remain copy-safe when the root
-contains spaces. No wrapped fragments, detached flag/value pairs, shell
-chains, or instructions to edit generated projections are allowed.
+The restart action carries its own exact `launch.copyCommand` object with
+`maxColumns:72`, a POSIX script for Linux/macOS, and a PowerShell script for
+Windows. Every physical line is at most 72 columns. Long values are assembled
+only through quoted variable assignments; the final invocation refers to those
+variables. The runner prints the matching returned script verbatim in a fenced
+block and never reconstructs it from argv. Rendering must never rely on visual
+wrapping or include terminal gutter characters. No detached flag/value pairs,
+unbound shell chains, or instructions to edit generated projections are
+allowed.
 
 The non-null command catalog is exact (`<onboarding>` is the absolute loaded
 `project-onboarding-v3.mjs`; `<migration>` is the absolute loaded
@@ -814,7 +853,7 @@ The non-null command catalog is exact (`<onboarding>` is the absolute loaded
 | `migration-required` | `node [<migration>, "inspect", "--root", root]` | false / false | `pipeline.runner-profile-migration-inspect.v3`: `ready|invalid-root|recovery-required|invalid-source` |
 | `adoption-required` | `node [<onboarding>, "plan", "--root", root]` | false / false | `pipeline.project-onboarding.v4`: `adoption-required` |
 | `projection-drift` | `node [<onboarding>, "plan-repair", "--root", root]` | false / false | `pipeline.project-onboarding.v4`: `projection-drift` |
-| `continuity-damaged` | `node [<onboarding>, "continuity", "inspect", "--root", root]` | false / false | `pipeline.project-onboarding.v4`: `continuity-damaged|continuity-observation-unavailable` |
+| `continuity-damaged` | `node [<onboarding>, "plan-repair", "--root", root]` | false / false | `pipeline.project-onboarding.v4`: `continuity-damaged` |
 | `app-server-not-running` | `node [<app-health>, "--recover"]` | true / true | `pipeline.codex-app-server-health.v1`: `ready|unavailable|stale` |
 | `app-server-unavailable` with `CAS-CODEX-UNAVAILABLE|CAS-DAEMON-RECOVERY-FAILED` | `node [<app-health>, "--doctor"]` | false / false | `pipeline.codex-app-server-doctor.v1`: `completed|failed` |
 | `app-server-unavailable` with `CAS-DAEMON-INVALID-OBSERVATION|CAS-DAEMON-VERSION-DRIFT` | `node [<app-health>, "--recover"]` | true / true | `pipeline.codex-app-server-health.v1`: `ready|unavailable|stale` |
@@ -831,9 +870,10 @@ command schema:
 - projection-current readback bootstrap:
   `[<onboarding>, "apply-readback", "--root", root, "--plan-sha256", digest, "--activate"]`,
   expected `restart-required`, with no runtime-target write;
-- projection repair:
+- projection or bounded continuity repair:
   `[<onboarding>, "apply-repair", "--root", root, "--plan-sha256", digest, "--activate"]`,
-  expected `restart-required|kickoff-required|ready`;
+  expected `restart-required|kickoff-required|ready`; continuity repair changes
+  only the State postimage and does not require a runtime restart;
 - migration uses the existing complete V3 plan/apply preview and activation
   contract; onboarding never renders a partial migration command.
 
@@ -855,7 +895,7 @@ Terminal status recovery is closed:
 | `runtime-target-read-only` | `null`; current environment cannot initialize runtime |
 | `runtime-readback-unavailable` | `null`; restart/readback capability is unsupported here |
 | `projection-drift` | structured onboarding `plan-repair`; it identifies the V3 source and proposed generated-target replacements without writing; only the returned digest-bound `apply-repair --activate` may mutate |
-| `continuity-damaged` | structured continuity `inspect`; never kickoff apply |
+| `continuity-damaged` | structured onboarding `plan-repair`; supported cases expose only a digest-bound confirmed `apply-repair`, while unsupported damage returns `continuity_repair_unavailable` with `null`; never kickoff apply or direct State editing |
 | `continuity-observation-unavailable` | `null`; continuity authority could not be read and kickoff/session/dispatch remain blocked |
 | `app-server-execution-denied` | `null` plus environment-specific guidance; no generic doctor claim |
 | `app-server-not-running` | structured bounded `codex app-server daemon restart` action |

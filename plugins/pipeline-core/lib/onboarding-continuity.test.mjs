@@ -16,9 +16,14 @@ import { spawnSync } from "node:child_process";
 
 import {
   KICKOFF_FAULT_STAGES,
+  applyOnboardingContinuityRepair,
   applyOnboardingKickoff,
+  bindOnboardingSessionCleanup,
   classifyOnboardingContinuity,
+  planOnboardingContinuityRepair,
   planOnboardingKickoff,
+  readOnboardingSessionCleanupBinding,
+  releaseOnboardingSessionCleanup,
   validateKickoffGoal,
 } from "./onboarding-continuity.mjs";
 
@@ -231,22 +236,23 @@ check("mode-unreadable handover is unavailable even for privileged test runners"
 check("goal validation trims UTF-8 and preserves shell metacharacters as data", () => {
   assert.equal(validateKickoffGoal("  build $(touch nope); `echo nope` & keep spaces  "),
     "build $(touch nope); `echo nope` & keep spaces");
-  assert.equal(validateKickoffGoal("ä".repeat(4096)).length, 4096);
+  assert.equal(validateKickoffGoal("ä".repeat(80)).length, 80);
 });
 
 for (const [name, goal] of [
   ["blank", " \n\t "],
   ["NUL", "valid\0invalid"],
-  ["over 8192 bytes", "x".repeat(8193)],
-  ["UTF-8 over 8192 bytes", "ä".repeat(4097)],
+  ["multiple lines", "short goal\nfull design"],
+  ["over 160 bytes", "x".repeat(161)],
+  ["UTF-8 over 160 bytes", "ä".repeat(81)],
 ]) {
   check(`goal rejects ${name}`, () => {
     expectKickoffError("KICKOFF-GOAL-INVALID", () => validateKickoffGoal(goal));
   });
 }
 
-check("8192-byte goal is accepted exactly", () => {
-  assert.equal(Buffer.byteLength(validateKickoffGoal("x".repeat(8192)), "utf8"), 8192);
+check("160-byte goal is accepted exactly", () => {
+  assert.equal(Buffer.byteLength(validateKickoffGoal("x".repeat(160)), "utf8"), 160);
 });
 
 check("kickoff plan is deterministic, closed, valid, and read-only", () => {
@@ -371,6 +377,173 @@ check("apply creates exact state, configured handover, private history, and imme
     Buffer.from(plan.targets.prd.content, "utf8"));
   assert.deepEqual(readFileSync(join(root, plan.targets.spec.path)),
     Buffer.from(plan.targets.spec.content, "utf8"));
+});
+
+check("cleanup descriptor bind and release use exact state CAS without touching other fields", () => {
+  const root = fixture("cleanup-binding");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Bind cleanup safely" });
+  applyOnboardingKickoff({
+    plan,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  const statePath = join(root, ".claude", "pipeline-state.json");
+  const beforeState = JSON.parse(readFileSync(statePath, "utf8"));
+  const before = readOnboardingSessionCleanupBinding({ rootDir: root });
+  assert.equal(before.status, "unbound");
+  const tuple = {
+    sessionId: "session-cleanup-bind-01",
+    descriptorSha256: "a".repeat(64),
+  };
+  const bound = bindOnboardingSessionCleanup({
+    rootDir: root,
+    expectedStateSha256: before.stateSha256,
+    expectedRevision: before.revision,
+    sessionCleanup: tuple,
+    deps: { randomUUID: () => "11111111-1111-4111-8111-111111111111" },
+  });
+  assert.equal(bound.status, "bound");
+  assert.equal(bound.mutated, true);
+  assert.equal(bound.revision, before.revision + 1);
+  assert.deepEqual(bound.sessionCleanup, tuple);
+  const boundState = JSON.parse(readFileSync(statePath, "utf8"));
+  assert.deepEqual(
+    { ...boundState, continuity: undefined },
+    { ...beforeState, continuity: undefined },
+  );
+
+  const replay = bindOnboardingSessionCleanup({
+    rootDir: root,
+    expectedStateSha256: before.stateSha256,
+    expectedRevision: before.revision,
+    sessionCleanup: tuple,
+  });
+  assert.equal(replay.status, "reused");
+  assert.equal(replay.mutated, false);
+  expectKickoffError("SESSION-CLEANUP-BIND-CAS", () => bindOnboardingSessionCleanup({
+    rootDir: root,
+    expectedStateSha256: before.stateSha256,
+    expectedRevision: before.revision,
+    sessionCleanup: {
+      sessionId: "session-cleanup-other-02",
+      descriptorSha256: "b".repeat(64),
+    },
+  }));
+
+  const released = releaseOnboardingSessionCleanup({
+    rootDir: root,
+    expectedStateSha256: bound.stateSha256,
+    expectedRevision: bound.revision,
+    sessionCleanup: tuple,
+    deps: { randomUUID: () => "22222222-2222-4222-8222-222222222222" },
+  });
+  assert.equal(released.status, "released");
+  assert.equal(released.mutated, true);
+  assert.equal(released.revision, bound.revision + 1);
+  assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
+});
+
+check("bounded repair normalizes only the invalid active-turn resume pair", () => {
+  const root = fixture("repair-active-resume");
+  const kickoff = planOnboardingKickoff({ rootDir: root, goal: "Repair active resume" });
+  applyOnboardingKickoff({
+    plan: kickoff,
+    expectedPlanSha256: kickoff.planSha256,
+    activate: true,
+  });
+  const statePath = join(root, ".claude", "pipeline-state.json");
+  const historyPath = join(root, ".git", "agent-pipeline", "onboarding", "continuity-history.json");
+  const state = JSON.parse(readFileSync(statePath, "utf8"));
+  state.continuity.resume = {
+    mode: "resume-on-next-turn",
+    sourceRevision: 0,
+    reasonCode: "active-turn",
+  };
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  const historyBefore = readFileSync(historyPath);
+
+  const plan = planOnboardingContinuityRepair({ rootDir: root });
+  assert.equal(plan.status, "ready");
+  assert.equal(plan.reason, "normalize-active-resume");
+  assert.equal(plan.target.value.continuity.resume.mode, "immediate");
+  const applied = applyOnboardingContinuityRepair({
+    rootDir: root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.continuity.status, "valid");
+  assert.deepEqual(readFileSync(historyPath), historyBefore);
+});
+
+check("legacy adoption is explicit, PO-bound, and does not invent kickoff history", () => {
+  const root = fixture("repair-legacy-state");
+  mkdirSync(join(root, "docs"), { recursive: true });
+  mkdirSync(join(root, "specs", "legacy"), { recursive: true });
+  writeFileSync(join(root, "docs", "state.md"), "# Existing handover\n");
+  writeFileSync(join(root, "specs", "legacy", "prd_legacy.md"), "# Existing PRD\n");
+  writeFileSync(join(root, "specs", "legacy", "spec.md"), "# Existing specification\n");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    activeFeature: {
+      id: "legacy-feature",
+      planPath: "specs/legacy/prd_legacy.md",
+      phase: "implementation",
+    },
+    planApproved: true,
+    updatedAt: "2026-07-26T00:00:00.000Z",
+    planApproval: {
+      approvedBy: "PO",
+      approvedAt: "2026-07-26T00:00:00.000Z",
+      poGateAuthority: {
+        schema: "pipeline.po-gate-authority.v2",
+        humanFacing: "en",
+        planPath: "specs/legacy/prd_legacy.md",
+        specPath: "specs/legacy/spec.md",
+      },
+    },
+  }, null, 2)}\n`);
+
+  const plan = planOnboardingContinuityRepair({ rootDir: root });
+  assert.equal(plan.status, "ready");
+  assert.equal(plan.reason, "adopt-established-state");
+  assert.equal(plan.history.sha256, null);
+  assert.equal(plan.target.value.continuity.queueHead.nextAction, "review");
+  const applied = applyOnboardingContinuityRepair({
+    rootDir: root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(applied.continuity.status, "valid");
+  assert.equal(existsSync(join(root, ".git", "agent-pipeline", "onboarding", "continuity-history.json")), false);
+});
+
+check("continuity repair rejects authority drift and arbitrary invalid state", () => {
+  const root = fixture("repair-rejects-drift");
+  const kickoff = planOnboardingKickoff({ rootDir: root, goal: "Reject repair drift" });
+  applyOnboardingKickoff({
+    plan: kickoff,
+    expectedPlanSha256: kickoff.planSha256,
+    activate: true,
+  });
+  const statePath = join(root, ".claude", "pipeline-state.json");
+  const state = JSON.parse(readFileSync(statePath, "utf8"));
+  state.continuity.resume = {
+    mode: "resume-on-next-turn",
+    sourceRevision: 0,
+    reasonCode: "active-turn",
+  };
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  writeFileSync(join(root, state.continuity.authority.prd.path), "# drifted authority\n");
+  assert.equal(planOnboardingContinuityRepair({ rootDir: root }).status, "unsupported");
+
+  state.continuity.resume = {
+    mode: "immediate",
+    sourceRevision: state.continuity.revision + 1,
+    reasonCode: "active-turn",
+  };
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  assert.equal(planOnboardingContinuityRepair({ rootDir: root }).status, "unsupported");
 });
 
 check("completed apply replay is byte-null and returns the identical continuity hashes", () => {

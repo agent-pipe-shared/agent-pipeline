@@ -397,6 +397,14 @@ export function prepareRuntimeRestartBinding({ rootDir, sourceSha256, runtimeTar
     codexExecutable: executable, codexExecutableSha256: pathDigest(executable),
   };
 }
+export function runtimeRestartBindingCurrent(barrier, { codexExecutable = undefined } = {}) {
+  validateRestartBarrier(barrier);
+  const executable = realpathSync(codexExecutable ?? resolveRuntimeExecutable());
+  physicalFile(executable, "Codex executable");
+  return pathDigest(executable) === barrier.codexExecutableSha256
+    && pathDigest(LAUNCHER_PATH) === barrier.launcherSha256
+    && pathDigest(HELPER_PATH) === barrier.helperSha256;
+}
 export function readRestartBarrier({ rootDir, repositoryCapability = "local", ...options } = {}) {
   const paths = privatePaths(rootDir, repositoryCapability, options);
   if (!existsSync(paths.directory) || !existsSync(paths.barrier)) return { status: "absent", paths, barrier: null, rawSha256: null };
@@ -479,7 +487,10 @@ export function persistRestartBarrier({ rootDir, repositoryCapability = "local",
       if (prior?.value.state === "restart-required"
         && prior.value.repositoryFingerprint === binding.repositoryFingerprint
         && prior.value.sourceSha256 === binding.sourceSha256
-        && prior.value.runtimeTargetsSha256 === binding.runtimeTargetsSha256) {
+        && prior.value.runtimeTargetsSha256 === binding.runtimeTargetsSha256
+        && prior.value.launcherSha256 === binding.launcherSha256
+        && prior.value.helperSha256 === binding.helperSha256
+        && prior.value.codexExecutableSha256 === binding.codexExecutableSha256) {
         return { paths, barrier: prior.value, rawSha256: prior.rawSha256, written: false, createdDirectories };
       }
       const barrier = {
@@ -530,7 +541,7 @@ export function issueLaunchTicket({ rootDir, repositoryCapability = "local", bar
     const barrier = current.value;
     if (barrier.state !== "restart-required" || current.rawSha256 !== barrierSha256) throw new Error("restart barrier changed before launch");
     const executable = realpathSync(options.codexExecutable ?? resolveRuntimeExecutable());
-    if (pathDigest(executable) !== barrier.codexExecutableSha256 || pathDigest(LAUNCHER_PATH) !== barrier.launcherSha256 || pathDigest(HELPER_PATH) !== barrier.helperSha256) throw new Error("restart binding drifted");
+    if (!runtimeRestartBindingCurrent(barrier, { codexExecutable: executable })) throw new Error("restart binding drifted");
     ensureTickets(paths, fs);
     const tickets = readLaunchTicketSet(paths, fs);
     if (liveLaunchTickets(tickets, current.rawSha256, now).length !== 0) throw new Error("a live launch ticket already exists for this barrier");

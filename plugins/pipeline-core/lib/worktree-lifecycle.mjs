@@ -575,6 +575,35 @@ export function loadSessionDescriptor(startPath, sessionId, options = {}) {
   };
 }
 
+/**
+ * Enumerate only validated active descriptor handles. This never returns the
+ * owner nonce and deliberately fails on an unexpected directory entry rather
+ * than guessing whether it is safe to ignore.
+ */
+export function listActiveSessionDescriptors(startPath, options = {}) {
+  const repo = discoverRepository(startPath, options);
+  const directory = join(localRoot(repo.commonDir), "session-descriptors", "active");
+  if (!existsSync(directory)) return [];
+  const info = lstatSync(directory);
+  if (info.isSymbolicLink() || !info.isDirectory()) {
+    fail("WT-SESSION-DESCRIPTOR-DIRECTORY", "session descriptor directory is unsafe");
+  }
+  const entries = readdirSync(directory, { withFileTypes: true })
+    .sort((left, right) => left.name.localeCompare(right.name, "en"));
+  return entries.map((entry) => {
+    if (!entry.isFile() || entry.isSymbolicLink() || !entry.name.endsWith(".json")) {
+      fail("WT-SESSION-DESCRIPTOR-DIRECTORY", "session descriptor directory contains an unexpected entry");
+    }
+    const sessionId = entry.name.slice(0, -".json".length);
+    ensureSafeId(sessionId, "session ID");
+    const loaded = loadSessionDescriptor(repo.primaryRoot, sessionId, options);
+    return {
+      sessionId: loaded.sessionId,
+      descriptorSha256: loaded.descriptorSha256,
+    };
+  });
+}
+
 /** Remove a descriptor only after the exact holder has finished cleanup. */
 export function retireSessionDescriptor(startPath, fields, options = {}) {
   const loaded = loadSessionDescriptor(startPath, fields.sessionId, {

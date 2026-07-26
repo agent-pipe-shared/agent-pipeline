@@ -55,7 +55,9 @@ check("Codex manifest matches the repository version and has a native hook descr
   const manifest = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin", "plugin.json"), "utf8"));
   const repositoryVersion = readFileSync(join(pluginRoot, "..", "..", "VERSION"), "utf8").trim();
   assert.equal(manifest.name, "pipeline-core");
-  assert.equal(manifest.version, repositoryVersion);
+  const [baseVersion, buildMetadata = null] = manifest.version.split("+");
+  assert.equal(baseVersion, repositoryVersion);
+  if (buildMetadata !== null) assert.match(buildMetadata, /^codex\.\d{14}$/u);
   assert.equal(manifest.hooks, "./hooks/codex-hooks.json");
 });
 
@@ -151,7 +153,7 @@ check("Codex native cwd wins over a stale inherited CLAUDE_PROJECT_DIR", () => {
 
   const currentResult = run({
     tool_name: "Bash",
-    tool_input: { command: "rg --files" },
+    tool_input: { command: "touch bypassed" },
   }, current, { claudeProjectDir: stale });
   assert.equal(currentResult.status, 0, currentResult.stderr);
   assert.equal(currentResult.stdout, "");
@@ -159,7 +161,7 @@ check("Codex native cwd wins over a stale inherited CLAUDE_PROJECT_DIR", () => {
   writeFileSync(join(current, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
   const staleResult = decision(run({
     tool_name: "Bash",
-    tool_input: { command: "rg --files" },
+    tool_input: { command: "touch bypassed" },
   }, current, { claudeProjectDir: mkdtempSync(join(tmpdir(), "codex-pretool-stale-plain-")) }));
   assert.equal(staleResult.permissionDecision, "deny");
   assert.match(staleResult.permissionDecisionReason, /guard-lifecycle-ready/);
@@ -198,6 +200,36 @@ check("lifecycle readiness is additive and aggregates with existing write guards
   assert.equal(output.permissionDecision, "deny");
   assert.match(output.permissionDecisionReason, /LIFECYCLE-AGGREGATE/);
   assert.match(output.permissionDecisionReason, /guard-lifecycle-ready/);
+});
+
+check("Codex adapter blocks consumer-to-source drift for Edit, apply_patch and plugin mutation", () => {
+  const root = fixture();
+  const outside = mkdtempSync(join(tmpdir(), "codex-pretool-pipeline-source-"));
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const outsideFile = join(outside, "plugins", "pipeline-core", "SKILL.md");
+
+  const edited = decision(run({
+    tool_name: "Edit",
+    tool_input: { file_path: outsideFile },
+  }, root));
+  assert.equal(edited.permissionDecision, "deny");
+  assert.match(edited.permissionDecisionReason, /only inside its own physical project root/u);
+
+  const patched = decision(run({
+    tool_name: "apply_patch",
+    tool_input: {
+      command: `*** Begin Patch\n*** Add File: ${outsideFile}\n+drift\n*** End Patch`,
+    },
+  }, root));
+  assert.equal(patched.permissionDecision, "deny");
+  assert.match(patched.permissionDecisionReason, /separate session rooted at the exact target/u);
+
+  const installed = decision(run({
+    tool_name: "Bash",
+    tool_input: { command: "codex plugin add pipeline-core@agent-pipeline-local" },
+  }, root));
+  assert.equal(installed.permissionDecision, "deny");
+  assert.match(installed.permissionDecisionReason, /plugin installation/u);
 });
 
 check("existing write-guard warnings remain warnings in an ungoverned repository", () => {

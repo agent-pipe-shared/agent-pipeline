@@ -1,0 +1,61 @@
+{
+  "schema": "pipeline.neutral-leakage-policy.v1",
+  "rules": [
+    {
+      "id": "url-scheme",
+      "deny": [
+        "ssh",
+        "file"
+      ],
+      "allowance": false
+    },
+    {
+      "id": "url-host",
+      "deny": [
+        "localhost",
+        "loopback",
+        "rfc1918",
+        "link-local",
+        "unc"
+      ],
+      "allowance": "exact-reviewed-hash"
+    },
+    {
+      "id": "credential",
+      "contract": "gitleaks-finding",
+      "allowance": false
+    },
+    {
+      "id": "absolute-path",
+      "deny": [
+        "posix-home",
+        "macos-users",
+        "drive-root",
+        "unc"
+      ],
+      "allowance": false
+    },
+    {
+      "id": "private-path",
+      "denyInput": "plan.machineDenySet",
+      "allowance": false
+    },
+    {
+      "id": "identity",
+      "denyInput": "plan.machineDenySet",
+      "allowance": false
+    },
+    {
+      "id": "correlation-trailer",
+      "deny": [
+        "Provider",
+        "Model",
+        "Session",
+        "Account",
+        "Trace",
+        "Dispatch"
+      ],
+      "allowance": false
+    }
+  ]
+}

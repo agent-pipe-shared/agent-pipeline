@@ -36,8 +36,16 @@ plugin root from this loaded skill and run exactly:
 Accept only schema `pipeline.start-preflight.v1`, status
 `ready|plugin-refresh-required`, an absolute `pluginRoot` equal to the loaded
 skill root, a nonempty `version`, `installedVersion` as either null or a
-nonempty version, and handoff `none|ready|malformed`. The helper
-reports handoff presence only and never prints the private ticket or token.
+nonempty version, `installedSource` as
+`remote|local-development|unknown`, `executionBoundary` as
+`default|host-authorized-wsl`, handoff `none|ready|malformed`, and a `nextAction`
+that is null unless status is `ready`. For `ready`, require one read-only
+`command` action for the absolute loaded-root `project-onboarding-v3.mjs`
+`inspect --root <physical-cwd> --intent bootstrap`, with the same
+`executionBoundary`, `mutation:false`, and `requiresConfirmation:false`.
+Execute that exact returned action at its declared boundary; never reconstruct
+or independently invoke the initial lifecycle inspector. The helper reports handoff presence only and never
+prints the private ticket or token.
 
 `plugin-refresh-required` is an attended update handoff, not a project defect:
 report the loaded and installed versions, run no onboarding command, and ask
@@ -55,8 +63,13 @@ active project session or without that explicit authorization.
 
 If the exact preflight command cannot start because its loaded plugin root no
 longer exists, run only `codex plugin list --json` as the native registry
-readback. Accept exactly one installed, enabled `pipeline-core@agent-pipeline`
-entry with a nonempty version. When present, handle it as
+readback. Prefer exactly one installed, enabled
+`pipeline-core@agent-pipeline-local` entry whose marketplace source is local
+and exactly contains its `plugins/pipeline-core` source; otherwise accept
+exactly one installed, enabled `pipeline-core@agent-pipeline` entry. Require a
+nonempty version. This isolated local ID is the sanctioned development override
+and prevents an older official session from replacing its cache. When an
+accepted entry is present, handle it as
 `plugin-refresh-required` using the same runner-specific attended handoff; do
 not search cache directories, use a replacement plugin root, inspect the
 network, or run onboarding. A missing or ambiguous registry entry remains a
@@ -72,6 +85,32 @@ mismatch, or malformed preflight output is a plugin-reload incident: locate no
 replacement by guesswork, run no onboarding command, and ask the user to use
 the native refresh path above before retrying. This identity line is diagnostic
 only; it does not replace any bootstrap step or confirmation line.
+
+When `installedSource` is `local-development`, print directly afterwards:
+
+> Agent Pipeline source: local-development · registered local Codex marketplace
+
+This is an explicit development topology, not F2 staleness. It permits normal
+project work and, after the ordinary exact candidate-bound Verify, Security,
+push/publication approval, and readback gates, also permits push and release.
+It does not itself satisfy or bypass any delivery gate.
+
+When `executionBoundary` is `host-authorized-wsl`, make that one routing
+decision authoritative for the whole bootstrap. Run the exact read-only
+lifecycle inspector returned as the preflight `nextAction` and every later
+fixed Pipeline bootstrap helper that
+inspects or spawns Git, probes worktree/session capability, or observes the
+App-Server control socket directly through the host-authorized local boundary.
+Run a fixed remote-freshness helper through the host-authorized
+network-open/read-only boundary. Do not first execute any of those helpers in
+the workspace sandbox: its known WSL control-path, process, socket, and network
+restrictions yield misleading `EPERM`, invalid-layout, unavailable, or DNS
+results and must not consume a bootstrap attempt. This is execution routing,
+not a readiness or OS-isolation attestation. It does not widen project file
+access, Critic/Advisor isolation, network access for local-only helpers, or any
+mutation authority; every mutating action retains its exact confirmation and
+host-boundary contract. With `default`, use the ordinary boundaries named by
+the individual steps.
 
 | Step | Elephant | Goldfish | Critic |
 |---|---|---|---|
@@ -157,8 +196,9 @@ The fresh pre-initialization form is not `ready`. Accept only aggregate status
 `host-repository-init-required`, repository mode/status `host-managed` with
 `gitVersion:null`, runtime status `plugin-managed-unattested`, a non-null source
 digest, null target/barrier/readback digests, valid continuity, and
-`CAS-READY`. Its sole `nextAction` must be exactly this read-only planner; run
-it and stop before Step 1:
+`appServer.required:false`, `appServer.status:not-requested`, and
+`appServer.code:null`. Its sole `nextAction` must be exactly this read-only
+planner; run it and stop before Step 1:
 
 `node "${PIPELINE_PLUGIN_ROOT}/scripts/codex-host-repository-init.mjs" plan --root "$PWD"`
 
@@ -185,17 +225,22 @@ After restart, the normal local/plugin-managed form above may continue without
 a runtime initialization or another restart.
 
 Codex 0.145 may run PreToolUse against a different physical control-path view
-than the successful bootstrap command. For this 0.4.5 hotfix only, the
-lifecycle guard may fall back to that exact host-init admission directory when its native
-`session` observation is unavailable. The receipt must remain bound to the
-physical project root, stable Pipeline source/calibration authority, and
-immutable kickoff history; an absent, malformed, copied, permission-weakened,
-or drifted admission still blocks. Issue #25 owns replacing this compatibility
-fallback with one native cross-view session attestation.
+than the successful bootstrap command. For this 0.4.6 compatibility hotfix,
+the lifecycle guard may fall back either to the exact fresh-root host-init
+admission directory or, for a pre-existing repository only, to the narrowly
+recognised complete protected Git control mount (`HEAD`, `config`, `objects`,
+and `refs`; never an empty `.git`). The receipt remains bound to the physical
+project root, stable Pipeline source/calibration authority, and immutable
+kickoff history. An absent, malformed, copied, permission-weakened, drifted,
+or merely empty control mount still blocks. Neither compatibility path is a
+freshness, push, release, or writable-Git attestation. Issue #25 owns replacing
+both with one native cross-view session attestation.
 
 Any mixed form is malformed and fail-closed. The V4 inspection itself carries
 the mandatory single read-only App-Server observation for bootstrap, session,
-and dispatch; do not substitute or repeat it with a separate readiness claim.
+and dispatch whenever it evaluates a possible `ready` result. The non-ready
+fresh host-repository-init handoff performs no App-Server observation. Do not
+substitute or repeat an observation with a separate readiness claim.
 
 The inspection result must have exact schema `pipeline.project-onboarding.v4`
 and the complete closed component/action shape. `inspect` is read-only; it
@@ -203,14 +248,15 @@ classifies without initializing Git or writing project files. Do not replace
 it with a shell emptiness check, a copied consumer-root `setup.mjs`, generated
 project-file heuristics, or an incidental Git error.
 
-The normal bootstrap inspector is authoritative only in the current Codex
-session projection. Never repeat or escalate that inspector at a host boundary:
-the host filesystem does not contain Codex's reserved project mounts and is not
-a comparable readback. If this exact in-session inspection returns `ready` but
-a later PreToolUse guard denies an ordinary read, report a Pipeline guard
-adapter defect and stop. Do not reinterpret the host view as
-`runtime-initialization-required`, do not plan or apply runtime initialization,
-and do not request another restart.
+The normal bootstrap inspector is authoritative in the execution boundary
+selected by the preflight. Under `default`, that is the current Codex session
+projection. Under `host-authorized-wsl`, run the exact inspector once directly
+at the host-authorized local read-only boundary and require the same physical
+root; do not precede it with a sandbox probe or repeat it across both views.
+Continue only from that exact typed lifecycle result and never reconstruct a
+different action. If a later PreToolUse guard denies an ordinary read despite
+an exact `ready` result, report a Pipeline guard adapter defect and stop; do
+not plan an unrelated runtime initialization or request an untyped restart.
 
 - **`ready`:** continue to Step 1. This is not a shortcut around the later
   V3, calibration, handover, App-Server, or verify gates.
@@ -226,18 +272,53 @@ and do not request another restart.
   confirmation. A completed apply must yield `restart-required`, never ready
   in the writer process.
 - **`runtime-attestation-required`:** the selected projection is current but
-  has no native readback authority. Follow only its read-only `plan-readback`
-  action. The returned digest-bound `apply-readback` action writes only the
-  private restart barrier, requires explicit confirmation, and must yield
+  has no native readback authority, or its pending restart barrier is bound to
+  a different Pipeline launcher/helper or Codex executable identity. Follow
+  only its read-only `plan-readback` action. The returned digest-bound
+  `apply-readback` action writes only the private restart barrier, replacing a
+  stale binding when necessary, requires explicit confirmation, and must yield
   `restart-required` without changing runtime targets.
 - **`restart-required`:** expose only the returned `restart-process` action
-  with `requiresCurrentProcessExit: true`. Never run the readback helper in the
-  writer/current process, never synthesize a ticket, and never continue normal
-  bootstrap. The confirmed wrapper starts the fresh Codex process; its
-  inherited handoff re-enters this Step 0.
+  with `requiresCurrentProcessExit:true` and a `launch` object declaring
+  `executionBoundary:external-terminal`, `invocation:user-copy-only`, and
+  `codexToolCallPermitted:false`. These are a hard dispatch prohibition, not
+  descriptive hints: never submit the launcher to Bash, exec, PTY, or any
+  other Codex tool, even after the user confirms it. Never execute it through
+  an ordinary session restart either: those paths cannot provide the external
+  controlling terminal and a normal restart cannot inherit the private token.
+  After explicit confirmation, instruct the user to close the current project
+  session and run the exact digest-bound action in a real external terminal.
+  The returned `launch.copyCommand` object is mandatory:
+  require `maxColumns:72` plus nonempty `posix` and `powershell` strings whose
+  physical lines do not exceed that bound. On Linux and macOS print the exact
+  returned `posix` string; on Windows print the exact returned `powershell`
+  string. Put it in a fenced code block and never reconstruct it from argv,
+  reflow it, expose it as wrapped prose, or add terminal gutter characters.
+  The bounded script assembles long paths from short variable assignments so
+  no path, quote, or digest depends on visual wrapping. The launcher refuses
+  an active `CODEX_THREAD_ID` before
+  issuing a ticket and returns `external-launch-required`. The confirmed
+  external wrapper issues the one-use ticket and invokes the digest-bound
+  readback helper directly. That helper starts a separate strict App Server,
+  performs only the bound `config/read`, and clears the restart barrier before
+  the wrapper starts an ordinary token-free Codex TUI. `launched` means both
+  readback and TUI start succeeded. `readback-produced` means the barrier was
+  cleared but the TUI could not be started; the user may then start ordinary
+  Codex without another launcher invocation. `readback-unavailable` or
+  `launch-unavailable` is terminal for this attempt and may be retried only at
+  or after its `retryAfterEpochMs`; never create parallel live tickets. The
+  resulting ordinary TUI re-enters this Step 0 with no inherited handoff and
+  must observe the current cleared readback. Never run the readback helper in
+  the writer/current process, synthesize a ticket, or continue normal
+  bootstrap before the external wrapper has produced the readback.
 - **`kickoff-required`:** stop before normal bootstrap. If the user has already
-  supplied a concrete project goal, reuse it as one argv element; otherwise
-  collect exactly that one input. Then run exactly:
+  supplied a concrete project intent, derive one concise goal summary from it;
+  otherwise collect exactly that one input. The goal is a short project
+  objective, not the pasted design, requirements list, acceptance criteria, or
+  PRD: use one line, ideally 3–12 words, and at most 160 UTF-8 bytes. When the
+  user's intent is clear, shorten it without another question. Preserve the
+  complete design in conversation for the post-bootstrap PRD/spec review, but
+  never pass it through `--goal`. Then run exactly:
 
   `node "${PIPELINE_PLUGIN_ROOT}/scripts/project-onboarding-v3.mjs" kickoff plan --root "$PWD" --goal "{{GOAL}}"`
 
@@ -257,6 +338,14 @@ and do not request another restart.
   Re-inspect through the returned lifecycle result. Never reconstruct the
   digest, split the goal, or substitute a network result. The kickoff apply is
   a separately confirmed mutation.
+- **`continuity-damaged`:** execute only its exact read-only `plan-repair`
+  action. A supported result may expose one digest-bound `apply-repair`
+  command for either the recognized invalid active-turn resume pair or an
+  established pre-continuity state carrying PO authority. Present that exact
+  action and wait for explicit confirmation. The repair never rewrites kickoff
+  history. If the plan returns `continuity_repair_unavailable` with
+  `nextAction:null`, stop; do not repeat the plan, invent hashes, or edit
+  `.claude/pipeline-state.json` directly.
 - **`partial|invalid|unsafe|migration-required|adoption-required|repository-mount-read-only|repository-control-path-invalid|git-capability-unavailable|project-root-read-only|repository-mode-unsupported|repository-observation-unavailable|session-capability-unavailable|worktree-capability-unavailable|runtime-target-read-only|runtime-readback-unavailable|projection-drift|continuity-damaged|continuity-observation-unavailable|app-server-execution-denied|app-server-not-running|app-server-unavailable`:**
   stop with no confirmation and report the exact diagnostics and closed
   `nextAction`. A read-only action may run only when its schema, executable,
@@ -449,20 +538,31 @@ recovery keeps the exact `CAS-*` code and the operator guidance for
 - Read the validated V3 `advisorExport` resolution before any Advisory action.
   Missing consent is the enabled `default`, with no per-run question; only
   `declined` disables before a child, export or status. `mini` is disabled.
-- For Codex Epic/Feature, resolve `codex-host-advisor-route.mjs` and, for
-  `default|approved`, immediately launch exactly one project-scoped read-only
-  `consult-advisor`. Do not make any selected-sandbox, App-Server, native or
-  other advisory probe before or after it. The child receives one question and
+- For Codex Epic/Feature, run exactly
+  `node "${PIPELINE_PLUGIN_ROOT}/scripts/codex-host-advisor-route.mjs" --runner codex --profile "{{PROFILE}}" --consent "{{CONSENT}}"`.
+  Accept exactly JSON keys `route|policy`; do not pass `--root`, probe `--help`,
+  inspect the script, or retry through stdin. For route `host-bound-consult`,
+  require policy `pipeline.codex-host-advisor-policy.v1`: launch the primary
+  once for at most 60 seconds, interrupt it at that single monotonic deadline,
+  verify the unchanged workspace digest, then launch at most one fresh
+  `gpt-5.6-terra` / `high` fallback for at most 45 seconds with `forkTurns:none`.
+  Polling must never reset either deadline. Interrupt an overrun once; never
+  start a third attempt.
+  Do not make any selected-sandbox, App-Server, native or other advisory probe
+  before or after it. The child receives one question and
   allowlisted repository evidence only; it has no inherited chat/handover/
   memory, mutation, persistence, auto-apply, gate decision, separate network
   tool or third-party export.
 - The Elephant, not the child, creates the one-use launch and validates the
   candidate-/launch-/question-bound `pipeline.host-advisor-status.v1` against
-  pre/post workspace observation. Only an answered unchanged status is Codex
-  `host-bound-consult` success. It emits no `pipeline.advisory-receipt.v1` and
+  before/between/after workspace observation. An answered unchanged status
+  from attempt one or two is Codex `host-bound-consult` success. If both
+  bounded attempts are unavailable with an unchanged workspace, record
+  `advisory-unavailable` and continue bootstrap without an Advisory-pass
+  claim; this advisory exhaustion is not a session blocker. Workspace mutation
+  remains a hard integrity stop. It emits no `pipeline.advisory-receipt.v1` and
   every claim retains `no attested selected-sandbox execution; OS isolation and
-  model identity are not asserted`. Failure, retry, mutation or observed
-  separate export is non-success with no fallback.
+  model identity are not asserted`.
 - The selected-sandbox host bridge
   `sandboxed-readonly-host-bridge.mjs` remains mandatory only for Codex
   Readiness and Critic duties; it is not an Advisor route.
@@ -523,6 +623,13 @@ This step ends in a **third mandatory confirmation line** (verbatim, printed dir
   known network-restricted workspace sandbox: that produces a misleading DNS
   error before the authoritative host observation. The host result, including
   `unknown`, is the one bootstrap observation.
+- **Registered local development source:** when the Step-0 preflight reported
+  `installedSource:local-development`, skip the public-marketplace equality
+  helper. The native Codex registry plus the cache-busted loaded/installed
+  version is the explicit local source selection for this session. Report it as
+  local development, not equal/ahead/behind. Repository freshness and all
+  Verify, Security, push/publication approval, and readback gates still run
+  unchanged; a local source is not a delivery bypass.
 - Working repository (EVERY writable governed project, including self-application): run `node "${PIPELINE_PLUGIN_ROOT}/scripts/repository-freshness.mjs"`. This is separate from marketplace/plugin freshness. It compares through a disposable bare repository and never fetches into the source checkout. The committed calibration declares `repositoryMode` as `local-only` or `remote-tracked`; absent means the safe `remote-tracked` default. `local-only` permits writes without an upstream but never justifies a push or release claim. `equal|ahead` permit remote-tracked writes. `pre-head` names a newly initialized repository: the main session may create the initial project scaffold under an exact `session`-ready lifecycle result, but dispatch, worktrees, push, release, and delivery claims remain blocked until the first commit exists. `behind|diverged|detached|no-upstream|unknown` STOP remote-tracked writes and dispatch while read-only diagnosis remains allowed. `host-managed` is retained as the narrow calibration of a Codex fresh-root transition: the helper accepts only the exact protected control layout or the durable digest-bound receipt from the exact host initializer. After that initializer created real Git, the lifecycle's local repository observation is authoritative for session writes, while push/release/branch claims remain unavailable and project-specific verification is still required. Neither host-managed form claims remote freshness or performs a fetch. `unknown` covers invalid mode, invalid host-managed layout or receipt, fetch failure/timeout, unavailable upstream, and insufficient shallow history; never call it fresh. Other unmerged remote branches are bounded information only, never a branch-selection gate.
 - This is a point-in-time protocol check, not an atomic lock or global enforcement claim: the remote may advance immediately afterwards, and SessionStart context is not an OS-level write barrier. The helper never pulls, merges, rebases, checks out, or writes source refs/config.
 - Why: third-party marketplaces do not auto-update; only an explicit refresh propagates — without this check, two-machine cache drift silently replaces the old copy-paste drift.
@@ -555,11 +662,19 @@ This step ends in a **third mandatory confirmation line** (verbatim, printed dir
 - Extract the last-updated date for the confirmation line.
 - Drift check (default threshold): warn when the repo's last commit is NEWER than the handover state AND the delta since then contains at least one non-docs commit (docs-only deltas do not trigger the warning; merge-completion gate). A project MAY override via the `$driftThreshold` comment key in `.claude/pipeline.json` (default applies if absent).
 - **Interaction-continuity re-entry:** run the read-only `node "${PIPELINE_PLUGIN_ROOT}/scripts/continuity-status.mjs" --root "$PWD"`. When it reports active, nonblocked work with a known next action, bootstrap treats that action as mandatory continuation: answer ordinary informational messages and record additive input, then execute the same persisted next action. Startup, resume, crash recovery and automatic/manual compact are not terminal task boundaries. Only an explicit pause/cancel/replace/redirect, a named gate, completion or a typed blocker may stop. The compact hook projects the same duty through `interaction-continuity.mjs`; never reconstruct it from chat history.
-- **Local cleanup session (Elephant only):** before the first pipeline-created temporary resource, run `node "${PIPELINE_PLUGIN_ROOT}/scripts/session-cleanup.mjs" start --repo "$PWD"` once and retain only its `sessionId` plus `descriptorSha256` in continuity runtime state. On Codex, use the host-authorized repository-local execution boundary directly when the workspace sandbox forbids nested Git subprocesses; do not first run a known-to-fail sandbox probe. The nonce stays solely in the private Git-common-dir descriptor. Bootstrap, compact recovery and both close profiles use that same descriptor ID **and the persisted digest**; they never regenerate a nonce, accept a changed descriptor or infer a cleanup target from a path prefix.
+- **Local cleanup session (Elephant only):** before the first pipeline-created temporary resource, run `node "${PIPELINE_PLUGIN_ROOT}/scripts/session-cleanup.mjs" start --repo "$PWD"`. The command owns the entire First-bind CAS: when `continuity.runtime.sessionCleanup` is null it refuses any unbound active descriptor, creates one private descriptor, atomically persists only its `sessionId` plus `descriptorSha256`, and retires the new descriptor again if persistence fails. When the tuple is already bound, `start` validates and returns that exact descriptor with code `WT-SESSION-REUSED`; it MUST NOT create or persist another nonce. Bootstrap and compact recovery reuse the same tuple. A normal close cleans and retires that descriptor, proves its closure receipt and atomically releases the exact State tuple so a later genuine session can bind a new one. If cleanup committed but tuple release was interrupted, use `release-binding`; it accepts only the exact completed closure. If both descriptor and closure receipt are absent, run the read-only `plan-recovery` and present its digest-bound `apply-recovery` action for explicit PO confirmation; an active descriptor is never PO-force-replaced. On Codex, use the host-authorized repository-local execution boundary directly when the workspace sandbox forbids nested Git subprocesses; do not first run a known-to-fail sandbox probe. The nonce stays solely in the private Git-common-dir descriptor. Never accept a changed tuple, edit State directly, or infer a cleanup target from a path prefix.
 
 ## Step 5 — Verify gate available
 
-- Confirm the project's ONE verify command (calibration field `verify`) exists and is invocable — existence/help call only, NO full gate run at bootstrap.
+- Confirm the project's ONE verify command (calibration field `verify`) exists
+  without invoking that command. Never append or pass `--help`: an arbitrary
+  Verify entrypoint may treat it as a real run and write evidence. For a
+  `node <script>` command, require a physical regular script and run only
+  `node --check <script>`. For a direct executable, resolve only the executable
+  path (`command -v` or an exact `test -x`); do not execute it. For any other
+  calibrated form, perform an equivalent non-executing existence check or
+  report the Verify availability as unobserved. Run no full gate and create no
+  evidence at bootstrap.
 - Missing → treat as **F4** (STOP for writing work, offer creation).
 - Why: without a runnable verify, the evidence duty is unfulfillable — that must surface at session start, not at task end.
 
@@ -706,7 +821,7 @@ for this profile; no advisor probe or receipt is permitted.
 | **F0** | V4 status `portable-seed-required` | **STOP before normal bootstrap.** Execute only the exact read-only `nextAction` plan. Present its proposed targets/digests and returned digest-bound `apply-portable-seed --plan-sha256 … --activate` action; never reconstruct or auto-run it. Explicit project-create/initialize authorization may confirm that exact action. Its readback advances only to `runtime-initialization-required` (or another typed failure), never bootstrap success. |
 | **F0A** | V4 status `adoption-required` | **STOP before normal bootstrap.** Execute only the exact read-only `nextAction` plan, report every proposed additive target, and wait for confirmation of its digest-bound `apply-portable-seed` action. Adoption preserves existing content and valid Git metadata, rejects reserved-path/configuration collisions, and still advances through runtime initialization, restart, fresh native readback, and kickoff before readiness. |
 | **F1** | Ruleset missing entirely (plugin not installed, skills not found) | **STOP.** Inform the PO. Only **minimal-safe mode**: reading (Read/Glob/Grep), read-only git (`status`/`log`/`diff`), plugin diagnosis (`/plugin` menu, settings inspection). NO edits/writes/commits/pushes, no settings changes. **NO confirmation line** — the session counts as not bootstrapped. |
-| **F2** | Plugin stale (installed SHA ≠ remote HEAD) | Warn and offer the runner-specific refresh. Claude Code uses the canonical project-scope ritual from ADR-0001: `claude plugin marketplace update agent-pipeline` → `claude plugin update pipeline-core@agent-pipeline --scope project` → `/reload-plugins`. Codex uses `/plugins` to install/update and `/new` to start the documented fresh chat; a proven loaded/installed mismatch after an external CLI update follows the attended App-Server restart handoff above. Work MAY continue except when the delta touches guardrails (`hooks/`, `agents/`, permission settings); then refresh first. Without a checkout, default safe: when in doubt, refresh. After every refresh, repeat steps 1–2 and name the newly loaded identity. |
+| **F2** | Plugin stale (installed SHA ≠ remote HEAD) | Warn and offer the runner-specific refresh. A registry-validated `local-development` source is not F2 and follows Step 2 instead. Claude Code uses the canonical project-scope ritual from ADR-0001: `claude plugin marketplace update agent-pipeline` → `claude plugin update pipeline-core@agent-pipeline --scope project` → `/reload-plugins`. Codex uses `/plugins` to install/update and `/new` to start the documented fresh chat; a proven loaded/installed mismatch after an external CLI update follows the attended App-Server restart handoff above. Work MAY continue except when the delta touches guardrails (`hooks/`, `agents/`, permission settings); then refresh first. Without a checkout, default safe: when in doubt, refresh. After every refresh, repeat steps 1–2 and name the newly loaded identity. |
 | **F3** | Offline / remote unreachable | Warn + continue on cache state (the cache is a complete copy; day-to-day operation is offline-capable). Redo the staleness check at next connectivity, at latest at the next bootstrap. Confirmation line carries the offline suffix. |
 | **F4** | Calibration or handover file missing (or verify command missing) | **STOP for writing work.** Read-only analysis stays allowed. Offer creation: draft the missing calibration from the required-field list in step 3 (canonical example: `templates/pipeline.json.example` in the agent-pipeline repo — an installed plugin cannot read repo templates, so generate the draft from the field list). Newly created files MUST be named to the PO for confirmation — a new calibration is a project-policy decision, never an agent's solo act. **The confirmation line still prints** (F4 is the expected initial state in not-yet-migrated projects, not a bootstrap failure): the affected field reads `MISSING (F4)` (step 6) plus the mandatory suffix `· F4: read-only analysis only until calibration/handover is created`. |
 | **F5** | `pipeline.user.v3` missing/invalid, V3 migration required, or a V3-owned runtime projection is changed/unreadable | **FAIL CLOSED.** Read-only diagnosis only. Do not use V1/V2 or runtime bytes as fallback authority, do not start advisory, do not write/dispatch, and print **no confirmation line**. Repair only through the explicit V3 migration/apply or an independently reviewed authority correction; then rerun bootstrap from Step 1a. |

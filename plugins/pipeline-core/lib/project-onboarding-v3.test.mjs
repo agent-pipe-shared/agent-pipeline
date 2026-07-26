@@ -27,7 +27,7 @@ import { parseYaml } from "./yaml-lite.mjs";
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { main as onboardingCli } from "../scripts/project-onboarding-v3.mjs";
 import {
-  consumeRuntimeReadback, issueLaunchTicket, readCurrentRuntimeReadback, readRestartBarrier,
+  canonicalJson, consumeRuntimeReadback, issueLaunchTicket, readCurrentRuntimeReadback, readRestartBarrier,
   removeRestartBarrierCas, sha256,
 } from "./codex-onboarding-runtime.mjs";
 import { observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
@@ -193,6 +193,30 @@ function assertSingleLineAction(action, expected) {
   assert.equal(rendered.includes("\r"), false);
   assert.ok(rendered.length > 0);
   return rendered;
+}
+
+function assertBoundedRestartCopyCommand(action) {
+  const copy = action?.launch?.copyCommand;
+  assert.deepEqual(Object.keys(copy).sort(), ["maxColumns", "posix", "powershell"]);
+  assert.equal(copy.maxColumns, 72);
+  for (const command of [copy.posix, copy.powershell]) {
+    assert.equal(typeof command, "string");
+    assert.equal(command.split("\n").every((line) => line.length <= copy.maxColumns), true);
+  }
+  if (process.platform !== "win32") {
+    const assignments = copy.posix.split("\n").slice(0, -4).join("\n");
+    const probe = spawnSync("bash", ["-c", `${assignments}\nprintf '%s\\0%s\\0%s' "$P" "$R" "$B"`], {
+      encoding: "buffer",
+      shell: false,
+    });
+    assert.equal(probe.status, 0, String(probe.stderr));
+    assert.deepEqual(probe.stdout.toString("utf8").split("\0"), [
+      action.launch.argv[0],
+      action.launch.argv[2],
+      action.launch.argv[4],
+    ]);
+  }
+  return copy;
 }
 
 function assertDiagnostic(result, code) {
@@ -896,6 +920,48 @@ test("a projection-current upgraded repository must establish a barrier before n
   }
 });
 
+test("a stale pending restart binding yields a replaceable readback plan", () => {
+  const path = root();
+  try {
+    const stale = initializeRestartRequiredRoot(path);
+    writeFileSync(stale.paths.barrier, canonicalJson({
+      ...stale.barrier,
+      launcherSha256: "f".repeat(64),
+    }));
+
+    const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(observed.status, "runtime-attestation-required");
+    assert.equal(observed.runtime.status, "projection-current");
+    assertDiagnostic(observed, "restart_binding_drift");
+    assert.deepEqual(observed.nextAction.argv, [
+      ONBOARDING_SCRIPT,
+      "plan-readback",
+      "--root",
+      path,
+    ]);
+
+    const planned = planProjectOnboardingLifecycleV4({
+      rootDir: path,
+      deps: fakeDeps,
+      operation: "readback",
+    });
+    const digest = planned.nextAction.argv[planned.nextAction.argv.indexOf("--plan-sha256") + 1];
+    const applied = applyProjectOnboardingLifecycleV4({
+      rootDir: path,
+      deps: fakeDeps,
+      operation: "readback",
+      planSha256: digest,
+      activate: true,
+    });
+    assert.equal(applied.status, "restart-required");
+    const rebound = readRestartBarrier({ rootDir: path, spawn: fakeGit });
+    assert.notEqual(rebound.rawSha256, stale.rawSha256);
+    assert.notEqual(rebound.barrier.launcherSha256, "f".repeat(64));
+  } finally {
+    dispose(path);
+  }
+});
+
 test("runtime target preflight maps every reversible probe permission failure without residue", () => {
   for (const code of ["EACCES", "EPERM", "EROFS"]) {
     for (const stage of ["create", "fstat", "write", "file-fsync", "close", "rename", "directory-fsync"]) {
@@ -1015,6 +1081,10 @@ test("portable and runtime apply replays are zero-write with identical canonical
           runtimeApplied.runtime.barrierSha256,
           "--activate",
         ],
+        executionBoundary: "external-terminal",
+        invocation: "user-copy-only",
+        codexToolCallPermitted: false,
+        copyCommand: assertBoundedRestartCopyCommand(runtimeApplied.nextAction),
       },
       mutation: true,
       requiresConfirmation: true,
@@ -1284,12 +1354,12 @@ test("current runtime exposes closed continuity outcomes while required App Serv
     const continuityAction = {
       kind: "command",
       executable: "node",
-      argv: [ONBOARDING_SCRIPT, "continuity", "inspect", "--root", pristine],
+      argv: [ONBOARDING_SCRIPT, "plan-repair", "--root", pristine],
       mutation: false,
       requiresConfirmation: false,
       expected: {
         schema: "pipeline.project-onboarding.v4",
-        statuses: ["continuity-damaged", "continuity-observation-unavailable"],
+        statuses: ["continuity-damaged"],
       },
     };
     assert.match(assertSingleLineAction(damaged.nextAction, continuityAction), /'[^']*with spaces[^']*'/u);
@@ -1299,6 +1369,8 @@ test("current runtime exposes closed continuity outcomes while required App Serv
       write: (chunk) => { continuityOutput += chunk; },
     }), 1);
     assert.equal(JSON.parse(continuityOutput).status, "continuity-damaged");
+    assert.equal(JSON.parse(continuityOutput).nextAction, null);
+    assertDiagnostic(JSON.parse(continuityOutput), "continuity_repair_unavailable");
     const compound = inspectProjectOnboardingV3({
       rootDir: pristine,
       intent: "bootstrap",
@@ -1482,7 +1554,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
       deps: {
         observeOnboardingAppServer() {
           appServerCalls += 1;
-          return { required: true, status: "running", code: "CAS-READY" };
+          throw new Error("pre-init App-Server observation must not run");
         },
       },
     });
@@ -1490,8 +1562,8 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(postKickoff.repository.status, "host-managed");
     assert.equal(postKickoff.runtime.status, "plugin-managed-unattested");
     assert.equal(postKickoff.continuity.status, "valid");
-    assert.deepEqual(postKickoff.appServer, { required: true, status: "running", code: "CAS-READY" });
-    assert.equal(appServerCalls, 1, "plugin-managed bootstrap observes App-Server health exactly once");
+    assert.deepEqual(postKickoff.appServer, { required: false, status: "not-requested", code: null });
+    assert.equal(appServerCalls, 0, "pre-init host handoff does not depend on sandbox App-Server reachability");
     assertSingleLineAction(postKickoff.nextAction, {
       kind: "command",
       executable: "node",
@@ -1515,7 +1587,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
         classifyOnboardingContinuity: () => postKickoff.continuity,
         observeOnboardingAppServer() {
           appServerCalls += 1;
-          return { required: true, status: "running", code: "CAS-READY" };
+          throw new Error("unattested pre-init App-Server observation must not run");
         },
       },
     });
@@ -1523,8 +1595,8 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(afterHostGit.repository.status, "local-valid-writable");
     assert.equal(afterHostGit.runtime.status, "plugin-managed-unattested");
     assert.equal(afterHostGit.repository.sessionCapability, "passed");
-    assert.deepEqual(afterHostGit.appServer, { required: true, status: "running", code: "CAS-READY" });
-    assert.equal(appServerCalls, 1, "unattested plugin-managed session observes App-Server health exactly once");
+    assert.deepEqual(afterHostGit.appServer, { required: false, status: "not-requested", code: null });
+    assert.equal(appServerCalls, 0, "unattested pre-init session does not observe App-Server health");
     const afterHostAuthority = validateV3BootstrapAuthority({ rootDir: path });
     assert.equal(afterHostAuthority.status, "host-init-required");
     assert.equal(afterHostAuthority.runtimeProjection, "plugin-managed-unattested");

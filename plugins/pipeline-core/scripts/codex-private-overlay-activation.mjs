@@ -111,16 +111,21 @@ function safeMarketplaceSource(value, pluginRoot) {
 function sourcePluginRoot(document) {
   if (!exactObject(document, ["installed", "available"])
     || !Array.isArray(document.installed)
-    || !Array.isArray(document.available)
-    || document.installed.length !== 1) return null;
-  const entry = document.installed[0];
+    || !Array.isArray(document.available)) return null;
+  const local = document.installed.filter((entry) =>
+    entry?.pluginId === "pipeline-core@agent-pipeline-local");
+  const official = document.installed.filter((entry) =>
+    entry?.pluginId === "pipeline-core@agent-pipeline");
+  const candidates = local.length > 0 ? local : official;
+  if (candidates.length !== 1) return null;
+  const entry = candidates[0];
   if (!exactObject(entry, [
     "pluginId", "name", "marketplaceName", "version", "installed", "enabled",
     "source", "marketplaceSource", "installPolicy", "authPolicy",
   ])) return null;
-  if (entry.pluginId !== "pipeline-core@agent-pipeline"
+  if (!["pipeline-core@agent-pipeline", "pipeline-core@agent-pipeline-local"].includes(entry.pluginId)
     || entry.name !== "pipeline-core"
-    || entry.marketplaceName !== "agent-pipeline"
+    || entry.marketplaceName !== entry.pluginId.slice("pipeline-core@".length)
     || !PLUGIN_VERSION.test(entry.version)
     || entry.installed !== true
     || entry.enabled !== true
@@ -130,6 +135,8 @@ function sourcePluginRoot(document) {
     || entry.source.source !== "local"
     || !localAbsolute(entry.source.path)) return null;
   if (!safeMarketplaceSource(entry.marketplaceSource, entry.source.path)) return null;
+  if (entry.pluginId === "pipeline-core@agent-pipeline-local"
+    && entry.marketplaceSource.sourceType !== "local") return null;
   return { path: entry.source.path, version: entry.version };
 }
 
@@ -139,7 +146,7 @@ function resolveSourceRoot(spawn, resolveExecutable) {
   if (!isObject(executable) || executable.ok !== true || !localAbsolute(executable.path)) return null;
   let result;
   try {
-    result = spawn(executable.path, ["plugin", "list", "--marketplace", "agent-pipeline", "--json"], {
+    result = spawn(executable.path, ["plugin", "list", "--json"], {
       encoding: "utf8",
       env: {
         GIT_TERMINAL_PROMPT: "0",

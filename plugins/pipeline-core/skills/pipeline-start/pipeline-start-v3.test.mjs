@@ -50,17 +50,16 @@ const cases = [
     assert.match(skill, /receipt-bound forms require no runtime initialization or native readback\s+barrier/u);
     assert.match(skill, /make no project-local\s+runtime or native-readback claim/u);
     assert.match(skill, /empty read-only `\.codex` directory alone is not runtime authority/u);
-    assert.match(skill, /authoritative only in the current Codex\s+session projection/u);
-    assert.match(skill, /Never repeat or escalate that inspector at a host boundary/u);
-    assert.match(skill, /If this exact in-session inspection returns `ready` but\s+a later PreToolUse guard denies an ordinary read, report a Pipeline guard\s+adapter defect and stop/u);
-    assert.match(skill, /Do not reinterpret the host view as\s+`runtime-initialization-required`/u);
-    assert.match(skill, /do not request another restart/u);
+    assert.match(skill, /authoritative in the execution boundary\s+selected by the preflight/u);
+    assert.match(skill, /Under `host-authorized-wsl`, run the exact inspector once directly\s+at the host-authorized local read-only boundary/u);
+    assert.match(skill, /do not precede it with a sandbox probe or repeat it across both views/u);
     assert.match(skill, /Any mixed form\s+is malformed and fail-closed/u);
     assert.match(skill, /V4 inspection itself carries\s+the mandatory single read-only App-Server observation/u);
     assert.match(skill, /`host-managed` form with a concrete `gitVersion` is the narrowly bound\s+post-initialization Codex mount/u);
     assert.match(skill, /fresh pre-initialization form is not `ready`/u);
     assert.match(skill, /`host-repository-init-required`/u);
     assert.match(skill, /runtime status `plugin-managed-unattested`/u);
+    assert.match(skill, /`appServer\.required:false`, `appServer\.status:not-requested`, and\s+`appServer\.code:null`/u);
   }],
   ["host-managed readiness hands off only bounded Git initialization to the host", () => {
     assert.match(skill, /codex-host-repository-init\.mjs" plan --root "\$PWD"/u);
@@ -76,9 +75,10 @@ const cases = [
     assert.match(skill, /mutates no portable\s+Pipeline\/project file/u);
     assert.match(skill, /exactly one ordinary project-session\s+restart/u);
     assert.match(skill, /Do not run the\s+onboarding inspector at the host boundary/u);
-    assert.match(skill, /For this 0\.4\.5 hotfix only, the\s+lifecycle guard may fall back to that exact host-init admission directory/u);
-    assert.match(skill, /physical project root, stable Pipeline source\/calibration authority, and\s+immutable kickoff history/u);
-    assert.match(skill, /Issue #25 owns replacing this compatibility\s+fallback with one native cross-view session attestation/u);
+    assert.match(skill, /For this 0\.4\.6 compatibility hotfix,\s+the lifecycle guard may fall back either to the exact fresh-root host-init\s+admission directory/u);
+    assert.match(skill, /complete protected Git control mount \(`HEAD`, `config`, `objects`,\s+and `refs`; never an empty `\.git`\)/u);
+    assert.match(skill, /physical\s+project root, stable Pipeline source\/calibration authority, and\s+immutable\s+kickoff history/u);
+    assert.match(skill, /Issue #25 owns replacing\s+both with one native cross-view session attestation/u);
   }],
   ["V4 progress and every controlling terminal state expose only their closed structured action", () => {
     for (const status of ["portable-seed-required", "runtime-initialization-required", "runtime-attestation-required", "restart-required", "kickoff-required", "ready"]) {
@@ -96,6 +96,10 @@ const cases = [
     assert.doesNotMatch(skill, /project-onboarding-v3\.mjs" apply --root "\$PWD" --activate/u);
   }],
   ["kickoff-required gives one complete local command and forbids remote syntax discovery", () => {
+    assert.match(skill, /goal is a short project\s+objective, not the pasted design, requirements list, acceptance criteria, or\s+PRD/u);
+    assert.match(skill, /one line, ideally 3–12 words, and at most 160 UTF-8 bytes/u);
+    assert.match(skill, /Preserve the\s+complete design in conversation for the post-bootstrap PRD\/spec review/u);
+    assert.match(skill, /never pass it through `--goal`/u);
     assert.match(skill, /project-onboarding-v3\.mjs" kickoff plan --root "\$PWD" --goal "\{\{GOAL\}\}"/u);
     assert.match(skill, /`kickoff` and `plan` are two separate argv elements in that order/u);
     for (const alias of ["`kickoff-plan`", "`plan-kickoff`", "`plan --goal`", "bare `kickoff`"]) {
@@ -129,8 +133,21 @@ const cases = [
     assert.match(skill, /Never invent a Codex `\/reload-plugins` command/u);
     assert.match(skill, /restart the global daemon from an\s+active project session or without that explicit authorization/u);
     assert.match(skill, /run only `codex plugin list --json` as the native registry\s+readback/u);
+    assert.match(skill, /`pipeline-core@agent-pipeline-local`/u);
+    assert.match(skill, /sanctioned development override/u);
+    assert.match(skill, /prevents an older official session from replacing its cache/u);
     assert.match(skill, /do\s+not search cache directories, use a replacement plugin root, inspect the\s+network, or run onboarding/u);
     assert.match(skill, /run no onboarding command/u);
+    assert.match(skill, /`installedSource` as\s+`remote\|local-development\|unknown`/u);
+    assert.match(skill, /`executionBoundary` as\s+`default\|host-authorized-wsl`/u);
+    assert.match(skill, /a `nextAction`\s+that is null unless status is `ready`/u);
+    assert.match(skill, /Execute that exact returned action at its declared boundary/u);
+    assert.match(skill, /never reconstruct\s+or independently invoke the initial lifecycle inspector/u);
+    assert.match(skill, /Agent Pipeline source: local-development · registered local Codex marketplace/u);
+    assert.match(skill, /also permits push and release/u);
+    assert.match(skill, /make that one routing\s+decision authoritative for the whole bootstrap/u);
+    assert.match(skill, /Do not first execute any of those helpers in\s+the workspace sandbox/u);
+    assert.match(skill, /every mutating action retains its exact confirmation/u);
   }],
   ["V3 source plus native or plugin-managed runtime authority is bootstrap authority", () => {
     assert.match(skill, /pipeline\.user\.v3/u);
@@ -144,6 +161,26 @@ const cases = [
     assert.match(skill, /projection-only\s+`projection-current`, `restart-required`, host-managed projection gap, or\s+unavailable cleared readback is non-success/u);
     assert.match(skill, /explicit V3 migration\/apply/u);
     assert.match(skill, /current native readback/u);
+    assert.match(skill, /pending restart barrier is bound to\s+a different Pipeline launcher\/helper or Codex executable identity/u);
+    assert.match(skill, /replacing a\s+stale binding when necessary/u);
+    assert.match(skill, /`executionBoundary:external-terminal`/u);
+    assert.match(skill, /`invocation:user-copy-only`/u);
+    assert.match(skill, /`codexToolCallPermitted:false`/u);
+    assert.match(skill, /never submit the launcher to Bash, exec, PTY, or any\s+other Codex tool/u);
+    assert.match(skill, /run the exact digest-bound action in a real\s+external terminal/u);
+    assert.match(skill, /returned `launch\.copyCommand` object is mandatory/u);
+    assert.match(skill, /`maxColumns:72` plus nonempty `posix` and `powershell`/u);
+    assert.match(skill, /On Linux and macOS print the exact\s+returned `posix` string/u);
+    assert.match(skill, /on Windows print the exact returned `powershell`\s+string/u);
+    assert.match(skill, /never reconstruct it from argv/u);
+    assert.match(skill, /assembles long paths from short variable assignments/u);
+    assert.match(skill, /`external-launch-required`/u);
+    assert.match(skill, /`retryAfterEpochMs`/u);
+    assert.match(skill, /invokes the digest-bound\s+readback helper directly/u);
+    assert.match(skill, /starts a separate strict App Server/u);
+    assert.match(skill, /ordinary token-free Codex TUI/u);
+    assert.match(skill, /`readback-produced` means the barrier was\s+cleared but the TUI could not be started/u);
+    assert.match(skill, /re-enters this Step 0 with no inherited handoff/u);
   }],
   ["host-managed freshness is bound to protected controls or the durable initializer receipt", () => {
     assert.match(skill, /accepts only the exact protected control layout or the durable digest-bound receipt/u);
@@ -202,11 +239,25 @@ const cases = [
     assert.match(skill, /`declined` disables before a child, export or status/u);
     assert.match(skill, /`mini` is disabled/u);
   }],
-  ["Codex starts with exactly one direct Host Advisor", () => {
+  ["Codex starts one bounded Host Advisor sequence", () => {
     assert.match(skill, /codex-host-advisor-route\.mjs/u);
-    assert.match(skill, /immediately launch exactly one project-scoped read-only\s+`consult-advisor`/u);
+    assert.match(skill, /--runner codex --profile "\{\{PROFILE\}\}" --consent "\{\{CONSENT\}\}"/u);
+    assert.match(skill, /Accept exactly JSON keys `route\|policy`/u);
+    assert.match(skill, /do not pass `--root`, probe `--help`,\s+inspect the script, or retry through stdin/u);
+    assert.match(skill, /pipeline\.codex-host-advisor-policy\.v1/u);
+    assert.match(skill, /primary\s+once for at most 60 seconds/u);
+    assert.match(skill, /`gpt-5\.6-terra` \/ `high` fallback for at most 45 seconds/u);
+    assert.match(skill, /Polling must never reset either deadline/u);
+    assert.match(skill, /never\s+start a third attempt/u);
     assert.match(skill, /Do not make any selected-sandbox, App-Server, native or\s+other advisory probe/u);
     assert.match(skill, /pipeline\.host-advisor-status\.v1/u);
+  }],
+  ["Verify availability never executes the calibrated gate", () => {
+    assert.match(skill, /Confirm the project's ONE verify command[\s\S]*without invoking that command/u);
+    assert.match(skill, /Never append or pass `--help`/u);
+    assert.match(skill, /`node --check <script>`/u);
+    assert.match(skill, /resolve only the executable\s+path/u);
+    assert.match(skill, /Run no full gate and create no\s+evidence at bootstrap/u);
   }],
   ["Claude fallback order is bounded Fable then Opus then consult", () => {
     const chain = skill.match(/order is `([^`]+)`/u)?.[1] ?? "";
@@ -216,7 +267,10 @@ const cases = [
     assert.match(skill, /same-runner fresh read-only consult/u);
   }],
   ["Codex status is bounded gate capability while Claude receipts remain separate", () => {
-    assert.match(skill, /Only an answered unchanged status is Codex\s+`host-bound-consult` success/u);
+    assert.match(skill, /An answered unchanged status\s+from attempt one or two is Codex `host-bound-consult` success/u);
+    assert.match(skill, /record\s+`advisory-unavailable` and continue bootstrap without an Advisory-pass\s+claim/u);
+    assert.match(skill, /advisory exhaustion is not a session blocker/u);
+    assert.match(skill, /Workspace mutation\s+remains a hard integrity stop/u);
     assert.match(skill, /It emits no `pipeline\.advisory-receipt\.v1`/u);
     assert.match(skill, /Claude retains its existing coordinator receipt/u);
     assert.match(skill, /no attested\s+selected-sandbox execution; OS isolation and\s+model identity are not\s+asserted/u);
@@ -226,6 +280,8 @@ const cases = [
     assert.match(skill, /ruleset-freshness\.mjs" --repo "\$PWD"/u);
     assert.match(skill, /`equal\|ahead` is current/u);
     assert.match(skill, /host-authorized\s+network-open\/read-only command boundary/u);
+    assert.match(skill, /`installedSource:local-development`, skip the public-marketplace equality\s+helper/u);
+    assert.match(skill, /all\s+Verify, Security, push\/publication approval, and readback gates still run\s+unchanged/u);
     assert.match(skill, /bootstrap-env-check\.mjs/u);
     assert.match(skill, /do not first run a known-to-fail sandbox probe/u);
     assert.match(skill, /check-po-gate-authority\.mjs/u);
@@ -236,6 +292,16 @@ const cases = [
     assert.match(skill, /Compact MUST rerun `?pipeline-start`? as a continuation re-entry/u);
     assert.match(skill, /after that re-entry, automatically continue the persisted next action without waiting/u);
     assert.match(skill, /Only an explicit pause\/cancel\/replace\/redirect, a named gate, completion or a typed blocker may stop/u);
+  }],
+  ["Cleanup startup reuses one CAS-bound descriptor and exposes only typed rotation/recovery", () => {
+    assert.match(skill, /command owns the entire First-bind CAS/u);
+    assert.match(skill, /WT-SESSION-REUSED/u);
+    assert.match(skill, /MUST NOT create or persist another nonce/u);
+    assert.match(skill, /atomically releases the exact State tuple/u);
+    assert.match(skill, /use `release-binding`/u);
+    assert.match(skill, /read-only `plan-recovery`/u);
+    assert.match(skill, /digest-bound `apply-recovery` action for explicit PO confirmation/u);
+    assert.match(skill, /active descriptor is never PO-force-replaced/u);
   }],
   ["Readiness and Critic retain their documented selected host boundary", () => {
     assert.equal(skill.includes("sandboxed-readonly-host-bridge.mjs"), true, "pipeline start must name the generic selected host bridge");
