@@ -258,7 +258,7 @@ export function isForbiddenCrossRepositoryMutation(command, root, dependencies =
   // absolute or parent-relative redirection target before its rejection can
   // turn into a ready-session escape from the project root.
   if (!words || words.length === 0) {
-    const redirects = [...command.matchAll(/(?:^|[\s;|&])\d*(?:>>?|<>|>&|<&)\s*["']?([^\s"']+)/gu)];
+    const redirects = [...command.matchAll(/\d*(?:>>?|<>|>&|<&)\s*["']?([^\s"']+)/gu)];
     if (redirects.length === 0) return false;
     return redirects.some((redirect) => {
       const target = redirect[1];
