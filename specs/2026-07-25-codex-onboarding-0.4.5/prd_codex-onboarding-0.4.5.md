@@ -9,7 +9,7 @@
 > reliable project work. Approval authorizes implementation dispatch only; it
 > does not authorize push, merge, tag, publication, Issue closure, or release.
 
-<!-- technical-spec-sha256: e26d4d400667beded72d229a2166031cdb83dc60aa392282a3143655f9822648 -->
+<!-- technical-spec-sha256: 9863a5ad10c3bc83d68c06211fdd5ed4dd3edab2db7e88f27fb93f4ec9071fbf -->
 
 The technical approval binds the exact neighboring [spec.md](spec.md). Any
 change to that file after approval invalidates the implementation gate until
@@ -160,6 +160,18 @@ recommendations are allowed.
 
 ## Scope
 
+### PO-approved 0.4.5 rescope
+
+After the operator live-test sequence, the PO explicitly narrowed Issue #61
+and this hotfix to the functional fresh-empty-folder path that the current
+Codex hook surface can enforce. Native interception for Codex implementation,
+Goldfish, and subagent-launch events that are not exposed through the declared
+shell/file mutation hooks is not a 0.4.5 completion claim. It is carried into
+the prepared P2 follow-up Issue with `sprint:NONE`, an owner, and an expiry.
+Issue #25 separately retains installation ceremony and confirmation-count UX.
+This rescope preserves fail-closed enforcement for every entry point actually
+declared by 0.4.5; it does not permit a fabricated hook capability.
+
 ### Lifecycle and validation
 
 - Extend the project onboarding classifier, CLI, schema, and E2E fixtures.
@@ -182,9 +194,9 @@ recommendations are allowed.
 - Make repository-mode results consistent across onboarding, calibration,
   freshness, bootstrap, and session startup.
 - Refine App-Server error mapping and bounded recovery guidance.
-- Block bootstrap success, session activation, cleanup/worktree creation,
-  Advisor, implementation, and Goldfish dispatch at the appropriate non-ready
-  states.
+- Block bootstrap success, session activation, cleanup/worktree creation, the
+  implemented Pipeline-owned dispatch callers, and every declared Codex
+  shell/file mutation entry point at the appropriate non-ready states.
 - Cover actual command callers and hook wiring; prose-only blocking is not
   sufficient.
 
@@ -211,8 +223,12 @@ recommendations are allowed.
 - [ ] Runtime initialization is transactional, idempotent, and deterministic.
 - [ ] Runtime creation/change persists `restart-required`.
 - [ ] Only a fresh native effective-runtime readback clears the restart barrier.
-- [ ] Implementation, Advisor, and subagent dispatch are blocked until runtime
-      readback and all preceding readiness gates pass.
+- [ ] Bash, Edit, Write, `apply_patch`, and every implemented Pipeline-owned
+      dispatch caller are blocked until runtime readback and all preceding
+      readiness gates pass.
+- [ ] Native Codex implementation, Goldfish, and subagent-launch events outside
+      the declared shell/file hook surface are explicitly deferred to the
+      prepared `sprint:NONE` follow-up and are not represented as enforced.
 - [ ] A pristine root without continuity reports `kickoff-required`.
 - [ ] Sanctioned kickoff produces state accepted by `continuity-status`.
 - [ ] Damaged continuity is never treated as pristine.

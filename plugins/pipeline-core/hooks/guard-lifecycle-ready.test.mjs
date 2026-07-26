@@ -109,19 +109,21 @@ test("exact session readiness allows the governed project write", () => {
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
-test("confirmed host-init admission is the only fallback when native session observation differs", () => {
+test("confirmed host-init admission is the only fallback for exact repository cross-view failures", () => {
   const path = root();
   try {
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
-    for (const input of [bash(), edit(), write()]) {
-      assert.deepEqual(evaluateLifecycleReadyGuard(input, {
-        projectDir: path,
-        requireProjectOnboardingReadyFn() { deny("repository-mount-read-only"); },
-        readCodexHostRepositoryInitAdmissionFn(rootDir) {
-          assert.equal(rootDir, path);
-          return { gitVersion: "2.53.0" };
-        },
-      }), { exitCode: 0, stderr: "" });
+    for (const status of ["repository-mount-read-only", "repository-control-path-invalid"]) {
+      for (const input of [bash(), edit(), write()]) {
+        assert.deepEqual(evaluateLifecycleReadyGuard(input, {
+          projectDir: path,
+          requireProjectOnboardingReadyFn() { deny(status); },
+          readCodexHostRepositoryInitAdmissionFn(rootDir) {
+            assert.equal(rootDir, path);
+            return { gitVersion: "2.53.0" };
+          },
+        }), { exitCode: 0, stderr: "" });
+      }
     }
     for (const readCodexHostRepositoryInitAdmissionFn of [
       () => null,
@@ -137,6 +139,57 @@ test("confirmed host-init admission is the only fallback when native session obs
       assert.match(result.stderr, /guard-lifecycle-ready/u);
       assert.equal(result.stderr.includes("private admission detail"), false);
     }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("host-init admission never masks App Server, runtime, continuity, or malformed readiness failures", () => {
+  const path = root();
+  let admissionReads = 0;
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const nonRepositoryStatuses = [
+      "app-server-not-running",
+      "runtime-attestation-required",
+      "continuity-damaged",
+      "repository-observation-unavailable",
+    ];
+    for (const status of nonRepositoryStatuses) {
+      for (const input of [bash(), edit(), write()]) {
+        const result = evaluateLifecycleReadyGuard(input, {
+          projectDir: path,
+          requireProjectOnboardingReadyFn() { deny(status); },
+          readCodexHostRepositoryInitAdmissionFn() {
+            admissionReads += 1;
+            return { gitVersion: "2.53.0" };
+          },
+        });
+        assert.equal(result.exitCode, 2, `${status}/${input.tool_name}`);
+        assert.match(result.stderr, /guard-lifecycle-ready/u, `${status}/${input.tool_name}`);
+      }
+    }
+    for (const failure of [
+      () => { throw new Error("unknown lifecycle exception"); },
+      () => { throw new ProjectOnboardingReadyError(
+        "PORG-INVALID-OBSERVATION",
+        "invalid lifecycle observation",
+        { intent: "session" },
+      ); },
+      () => { throw new ProjectOnboardingReadyError(
+        "PORG-NOT-READY",
+        "wrong intent",
+        { intent: "bootstrap", lifecycleStatus: "repository-control-path-invalid" },
+      ); },
+    ]) {
+      assert.equal(evaluateLifecycleReadyGuard(edit(), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn: failure,
+        readCodexHostRepositoryInitAdmissionFn() {
+          admissionReads += 1;
+          return { gitVersion: "2.53.0" };
+        },
+      }).exitCode, 2);
+    }
+    assert.equal(admissionReads, 0);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 

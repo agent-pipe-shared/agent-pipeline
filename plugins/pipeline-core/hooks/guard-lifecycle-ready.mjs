@@ -6,7 +6,10 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { requireProjectOnboardingReady } from "../lib/project-onboarding-ready-gate.mjs";
+import {
+  ProjectOnboardingReadyError,
+  requireProjectOnboardingReady,
+} from "../lib/project-onboarding-ready-gate.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
 import { readCodexHostRepositoryInitAdmission } from "../lib/codex-host-layout.mjs";
 
@@ -26,6 +29,10 @@ const APP_SERVER_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-hea
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const HEX = /^[a-f0-9]{64}$/u;
+const HOST_INIT_CROSS_VIEW_STATUSES = new Set([
+  "repository-mount-read-only",
+  "repository-control-path-invalid",
+]);
 
 function verdict(exitCode, stderr = "") {
   return { exitCode, stderr };
@@ -219,18 +226,28 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
       rootDir: root,
       intent: "session",
     });
-  } catch {
+  } catch (error) {
     // Codex 0.145 may execute PreToolUse against the physical host Git
     // directory while the successful bootstrap command sees protected virtual
     // control mounts. Accept only the explicit host-init admission written by
     // the confirmed lifecycle action and bound to this root, stable authority,
-    // and immutable kickoff history. Issue #25 owns replacing this narrow
-    // hotfix fallback with one native cross-view session attestation.
-    try {
-      const admission = (dependencies.readCodexHostRepositoryInitAdmissionFn
-        ?? readCodexHostRepositoryInitAdmission)(root);
-      if (admission?.gitVersion) return verdict(0);
-    } catch {}
+    // and immutable kickoff history, and only when the native observation
+    // failed with the two exact repository-control statuses produced by that
+    // cross-view mismatch. App Server, runtime, continuity, malformed
+    // observations, and unknown exceptions must never inherit this admission.
+    // The prepared sprint:NONE follow-up owns replacing this narrow hotfix
+    // fallback with one native cross-view session attestation.
+    const crossViewRepositoryFailure = error instanceof ProjectOnboardingReadyError
+      && error.code === "PORG-NOT-READY"
+      && error.intent === "session"
+      && HOST_INIT_CROSS_VIEW_STATUSES.has(error.lifecycleStatus);
+    if (crossViewRepositoryFailure) {
+      try {
+        const admission = (dependencies.readCodexHostRepositoryInitAdmissionFn
+          ?? readCodexHostRepositoryInitAdmission)(root);
+        if (admission?.gitVersion) return verdict(0);
+      } catch {}
+    }
     return toolName === "Bash"
       && isSanctionedLifecycleCommand(input.tool_input.command, root)
       ? verdict(0)

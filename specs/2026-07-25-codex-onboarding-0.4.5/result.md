@@ -40,8 +40,9 @@ the before/after assertion are recorded in
   root-, authority-, and history-bound host-init receipt. Copied, malformed,
   permission-weakened, or drifted receipts fail closed.
 - The lifecycle PreToolUse adapter accepts the exact session-ready V4 result or
-  that narrowly bound host-init compatibility admission. Other governed writes
-  remain blocked.
+  that narrowly bound host-init compatibility admission only for the two
+  authenticated cross-view repository-control failures. App-Server, runtime,
+  continuity, malformed-observation, and unknown failures remain blocked.
 - An explicitly approved calibration transition from `host-managed` to
   canonical `local-only` preserves the original host-init binding and permits a
   pre-HEAD local project without remote, push, or publication claims.

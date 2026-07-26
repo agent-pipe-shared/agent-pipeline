@@ -1,5 +1,21 @@
 # Technical Spec — Deterministic fresh Codex onboarding (0.4.5)
 
+## PO-approved scope amendment
+
+The operator live-test sequence established a narrower, releasable boundary
+than the original Issue #61 draft. The PO explicitly rescoped 0.4.5 to the
+functional fresh-empty-folder flow supported by Codex's declared Bash, Edit,
+Write, and `apply_patch` hook surface. Native interception for implementation,
+Goldfish, and subagent-launch tool events that Codex does not expose through
+that surface is deferred to the prepared P2 follow-up Issue with
+`sprint:NONE`, owner `@skar667 (PO)`, and expiry `2026-08-31`.
+
+Accordingly, references below to Advisor, implementation, Goldfish, or
+subagent dispatch mean Pipeline-owned callers that are implemented in this
+repository. They do not assert a native Codex launch hook. The result and
+release-readiness documents preserve that residual boundary. Issue #25 owns
+only installation ceremony and confirmation-count tuning.
+
 ## Status and authority
 
 Status: formally approved implementation candidate at the operator live-test
@@ -273,10 +289,12 @@ For `session|dispatch`, `host-managed` maps to
 or implementation worktree and must not dispatch. A failed cleanup probe maps
 to `session-capability-unavailable`; a failed worktree probe maps to
 `worktree-capability-unavailable`. Bootstrap must run a separate
-`inspect --intent session` immediately before creating cleanup, and a separate
+`inspect --intent session` immediately before creating cleanup, and every
+implemented Pipeline-owned dispatch caller must run a separate
 `inspect --intent dispatch` immediately before Advisor/implementation/Goldfish
 dispatch. Earlier `onboarding|bootstrap` readiness cannot be reused as the
-stronger intent result.
+stronger intent result. Native Codex launch events outside the declared
+shell/file hook surface remain the explicitly deferred boundary above.
 
 ### Runtime
 
@@ -570,7 +588,9 @@ App-Server requirement is intent-specific:
 - `onboarding`: not required; report `appServer.status: not-requested`.
 - `bootstrap`: required before bootstrap confirmation or any session component.
 - `session`: required before session activation or cleanup.
-- `dispatch`: required before Advisor, implementation, or subagent launch.
+- `dispatch`: required before every implemented Pipeline-owned Advisor,
+  implementation, or subagent launch; native Codex launch events outside the
+  declared shell/file hook surface are deferred.
 
 For every required intent, a non-running/non-observable App Server becomes the
 matching top-level terminal status. A result therefore never contains
@@ -781,23 +801,27 @@ may improvise one.
 
 ## Enforcement
 
-Bootstrap, session activation, Advisor, implementation dispatch, Goldfish
-dispatch, cleanup creation, and worktree creation consume the same lifecycle
-readback.
+Bootstrap, session activation, every implemented Pipeline-owned Advisor,
+implementation/Goldfish dispatch caller, cleanup creation, worktree creation,
+and every declared Codex shell/file mutation hook consume the lifecycle
+readback appropriate to their intent.
 
 - Before `ready`, bootstrap prints no success confirmation.
 - Before repository capability passes, no cleanup/worktree/remote action starts.
 - Before runtime readback passes, no session activation or model duty starts.
-- Before valid continuity passes, no implementation or Goldfish dispatch starts.
+- Before valid continuity passes, no implemented Pipeline-owned implementation
+  or Goldfish dispatch starts.
 - Guards fail closed when lifecycle authority is missing, malformed, stale, or
   non-ready.
 - Bash is a write-capable implementation boundary: governed non-ready roots
   block arbitrary shell commands and allow only exact plugin-local lifecycle,
   migration, restart/readback, or App-Server remediation argv shapes.
 
-The implementation must cover both the command caller and hook wiring; prose
-alone is not enforcement. Existing `guard-devplan` fail-open behavior for
-absent state is not reused for this readiness barrier.
+The implementation must cover each in-scope command caller and every declared
+hook; prose alone is not enforcement. Native launch events that Codex does not
+expose through the declared hook surface are the explicit follow-up boundary,
+not an inferred 0.4.5 assurance. Existing `guard-devplan` fail-open behavior
+for absent state is not reused for this readiness barrier.
 
 ## Implementation packages
 
@@ -822,10 +846,13 @@ absent state is not reused for this readiness barrier.
 ### Package C — session and dispatch enforcement
 
 - Gate `pipeline-start`, main-session route alignment, session cleanup,
-  worktree creation, Advisor, and implementation/Goldfish dispatch on the
-  lifecycle state appropriate to each stage.
+  worktree creation, implemented Pipeline-owned Advisor and
+  implementation/Goldfish dispatch callers, and the declared Codex shell/file
+  mutation hooks on the lifecycle state appropriate to each stage.
 - Update hook wiring and tests so missing/stale/non-ready authority cannot
   silently pass.
+- Record native Codex implementation, Goldfish, and subagent-launch event
+  interception as deferred rather than inventing unsupported hook wiring.
 
 ### Package D — local candidate acceptance
 
@@ -887,10 +914,13 @@ The required fixture outcomes are exact:
 Every row runs with a root containing spaces and asserts the exact component
 object, diagnostic code, structured argv, and single-line rendering. Compound
 fixtures combine App-Server plus continuity/runtime failures and assert the
-global precedence table. Bootstrap, session, cleanup, Advisor, implementation,
-Critic, and Goldfish entry points each have a denial fixture for every
-controlling non-ready class and a single `ready` allow fixture. Completed-stage
-replay asserts zero unintended writes and an identical canonical response.
+global precedence table. Bootstrap, session, cleanup, every implemented
+Pipeline-owned Advisor/implementation/Critic/Goldfish caller, and every
+declared Codex shell/file mutation entry point have denial coverage for their
+controlling non-ready classes plus a `ready` allow fixture. The tests also
+assert that the hook manifest makes no unsupported native agent-launch claim.
+Completed-stage replay asserts zero unintended writes and an identical
+canonical response.
 
 Each fixture asserts both zero unintended writes and the exact typed next
 action where applicable.
