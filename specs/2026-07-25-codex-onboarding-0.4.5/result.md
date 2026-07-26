@@ -16,6 +16,14 @@ the Git-push PO gate. Push, tag, merge, publication, Issue mutation, and release
 remain separately gated. This disposition supersedes only the earlier
 candidate wording that held versioning and commits until another live test; it
 does not weaken any Verify, Security, Critic, or immutable-publication gate.
+The same disposition explicitly grants the TP1–TP5 test-protection lifts needed
+to add or tighten the focused regression cases for this hotfix; no test was
+removed, skipped, or weakened.
+
+The released 0.4.4 failure was reproduced red before the final correction and
+the permanent regression is green in 0.4.5. Exact command, commit, output, and
+the before/after assertion are recorded in
+[`evidence/pre-fix-reproduction.md`](evidence/pre-fix-reproduction.md).
 
 ## Delivered in 0.4.5
 
@@ -66,21 +74,39 @@ The following original Issue #61 ambitions are not completion claims for
   host-init receipt fallback in the lifecycle guard;
 - automatic refresh of a stale skill/hook catalog by code already loaded from
   the removed cache generation;
+- native Codex hook interception for every implementation, Goldfish, or
+  subagent-launch tool name beyond the currently declared shell/file mutation
+  surface;
 - broader installation-ceremony and confirmation-count tuning, owned by
   Issue #25;
 - platform certification beyond the automated Linux/macOS/Windows command and
   fixture matrix; native macOS assurance remains with Issue #49.
 
-The first three bullets form the follow-up Issue below. They are valuable
+The first four bullets form the follow-up Issue below. They are valuable
 hardening, but they no longer block starting and using a local fresh project
 with the documented attended boundary.
+
+### PO-approved deferred-risk register
+
+| Deferred risk | Owner | Tracking | Expiry |
+| --- | --- | --- | --- |
+| Persistent App-Server catalog invalidation after external install | @skar667 (PO) | Follow-up Issue draft below, `sprint:NONE` | 2026-08-31 |
+| Native cross-view session attestation replacing the 0.4.5 receipt | @skar667 (PO) | Follow-up Issue draft below, `sprint:NONE` | 2026-08-31 |
+| Safe handoff from a removed stale cache generation | @skar667 (PO) | Follow-up Issue draft below, `sprint:NONE` | 2026-08-31 |
+| Native lifecycle interception for implementation/agent-launch tool events | @skar667 (PO) | Follow-up Issue draft below, `sprint:NONE` | 2026-08-31 |
+| Installation ceremony and confirmation-count tuning | @skar667 (PO) | Issue #25 | 2026-08-31 |
+| Native macOS and remaining platform certification | @skar667 (PO) | Issue #49 | 2026-09-30 |
+
+At each expiry the PO must either accept a completed fix, set a new explicit
+owner/date, or remove the corresponding claim. None of these rows is an
+implicit warn-only gate or a 0.4.5 assurance claim.
 
 ## Follow-up Issue draft
 
 **Title**
 
 ```text
-[P2][Codex] Make plugin refresh and cross-view onboarding attestation native
+[P2][Codex] Make refresh, cross-view attestation, and launch hooks native
 ```
 
 **Labels**
@@ -109,6 +135,12 @@ commands and PreToolUse hooks. 0.4.5 bridges the initialized fresh-root case
 with a strict private host-init receipt, but that is a compatibility admission,
 not a native cross-view session attestation.
 
+The 0.4.5 Codex hook manifest also covers the supported shell/file mutation
+surface used by this onboarding flow. A future native contract must enumerate
+and intercept implementation, Goldfish, and subagent-launch events as first
+class lifecycle-governed tools instead of assuming those events share the
+shell/file matcher.
+
 ## Outcome
 
 Provide one Codex-native, typed refresh and attestation contract so a current
@@ -127,6 +159,8 @@ to bootstrap and hooks.
   complete, or provide an equivalent stable native resolver.
 - Replace the 0.4.5 host-init guard receipt fallback with a native cross-view
   session attestation.
+- Declare and enforce supported Codex hook events for implementation,
+  Goldfish, and subagent launch paths, not only shell/file mutation tools.
 - Preserve fail-closed behavior for copied, stale, malformed, or ambiguous
   identities.
 - Cover persistent-daemon updates, removed old cache roots, new threads,
@@ -147,6 +181,8 @@ to bootstrap and hooks.
       lifecycle observation.
 - [ ] The 0.4.5 compatibility receipt can be removed without weakening the
       lifecycle guard.
+- [ ] Supported implementation and agent-launch tools cannot bypass lifecycle
+      readiness through an unregistered hook event.
 - [ ] Linux, macOS, and Windows adapters have automated fixtures; native
       platform assurance remains separately labelled.
 

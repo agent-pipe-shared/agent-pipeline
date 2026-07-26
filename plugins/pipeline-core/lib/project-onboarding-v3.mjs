@@ -613,14 +613,11 @@ function observeReadyAppServer(intent, fs) {
 }
 
 function readyLifecycleResult({ root, intent, repository, runtime, continuity = emptyContinuity() }, fs) {
-  // The reserved Codex mount is already supplied by the installed plugin.
-  // Re-running the complete project inspector through a host boundary would
-  // lose the sandbox-only .git/.codex mounts and misclassify the same root as
-  // local-uninitialized. App-Server health remains a separate pipeline-start
-  // observation before any capability claim; it is not an onboarding writer.
-  const appServer = runtime.status === "plugin-managed"
-    ? emptyAppServer()
-    : observeReadyAppServer(intent, fs);
+  // Runtime projection and App-Server health are distinct authorities. A
+  // plugin-managed projection still requires the same single, read-only
+  // App-Server observation as a project-local projection before bootstrap,
+  // session, or dispatch may report ready.
+  const appServer = observeReadyAppServer(intent, fs);
   if (appServer.required === true && appServer.status !== "running") {
     const status = appServer.status === "execution-denied"
       ? "app-server-execution-denied"
@@ -1066,19 +1063,77 @@ function ensurePreimage(root, expectedState, fs) {
   const now = legacyInspection(root, fs);
   if (now.status !== expectedState) throw new Error(`root changed since planning (${now.status})`);
 }
-function removeEmptyParents(root, target, fs) {
-  let parent = dirname(target);
-  while (parent !== root) {
-    try { fs.rmdirSync(parent); } catch (error) { if (error?.code === "ENOTEMPTY" || error?.code === "ENOENT") break; throw error; }
-    parent = dirname(parent);
+function directoryIdentity(info) {
+  return info && !info.isSymbolicLink() && info.isDirectory()
+    ? { dev: String(info.dev), ino: String(info.ino) }
+    : null;
+}
+
+function sameDirectoryIdentity(expected, path, fs) {
+  try {
+    const actual = fs.lstatSync(path);
+    return !actual.isSymbolicLink()
+      && actual.isDirectory()
+      && String(actual.dev) === expected.dev
+      && String(actual.ino) === expected.ino;
+  } catch {
+    return false;
   }
 }
-function rollback(root, created, gitCreated, fs) {
-  const failures = [];
-  for (const target of [...created].reverse()) {
-    try { if (fs.existsSync(target)) fs.unlinkSync(target); removeEmptyParents(root, target, fs); } catch (error) { failures.push(error); }
+
+function ensureTargetParents(root, target, createdDirectories, fs) {
+  const missing = [];
+  let parent = dirname(target);
+  while (parent !== root && !fs.existsSync(parent)) {
+    missing.push(parent);
+    parent = dirname(parent);
   }
-  if (gitCreated) { try { fs.rmSync(join(root, ".git"), { recursive: true, force: true }); } catch (error) { failures.push(error); } }
+  if (parent !== root) {
+    const info = fs.lstatSync(parent);
+    if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("target parent is not a physical directory");
+  }
+  for (const directory of missing.reverse()) {
+    if (fs.existsSync(directory)) {
+      const info = fs.lstatSync(directory);
+      if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("target parent appeared with an unsafe identity");
+      continue;
+    }
+    fs.mkdirSync(directory, { mode: 0o700 });
+    const identity = directoryIdentity(fs.lstatSync(directory));
+    if (!identity) throw new Error("created target directory identity is unavailable");
+    createdDirectories.push({ path: directory, identity });
+  }
+}
+
+function rollback(root, created, createdDirectories, gitIdentity, gitWasExpectedAbsent, fs) {
+  const failures = [];
+  for (const entry of [...created].reverse()) {
+    try {
+      if (!fs.existsSync(entry.path)) continue;
+      if (!entry.identity || !sameIdentity(entry.identity, entry.path, fs)) {
+        throw new Error("created target changed identity before rollback");
+      }
+      fs.unlinkSync(entry.path);
+    } catch (error) { failures.push(error); }
+  }
+  for (const entry of [...createdDirectories].reverse()) {
+    try {
+      if (!fs.existsSync(entry.path)) continue;
+      if (!entry.identity || !sameDirectoryIdentity(entry.identity, entry.path, fs)) {
+        throw new Error("created target directory changed identity before rollback");
+      }
+      fs.rmdirSync(entry.path);
+    } catch (error) { failures.push(error); }
+  }
+  const gitPath = join(root, ".git");
+  if (gitWasExpectedAbsent && fs.existsSync(gitPath)) {
+    try {
+      if (!gitIdentity || !sameDirectoryIdentity(gitIdentity, gitPath, fs)) {
+        throw new Error("created Git control directory changed identity before rollback");
+      }
+      fs.rmSync(gitPath, { recursive: true, force: true });
+    } catch (error) { failures.push(error); }
+  }
   return failures;
 }
 
@@ -1086,7 +1141,8 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
   if (!activate) return { schema: PLAN_SCHEMA, status: "activation-required", diagnostics: [diagnostic("$.activate", "activation_required", "apply requires explicit activation", "review the plan and pass --activate")] };
   const state = plan && AUTHENTICATED.get(plan);
   if (!state || state.signature !== JSON.stringify(plan)) return { schema: PLAN_SCHEMA, status: "invalid-plan", diagnostics: [diagnostic("$", "invalid_plan", "apply accepts only an unchanged in-process onboarding plan", "run plan again") ] };
-  const fs = deps(overrides); let root; const created = []; let gitCreated = false;
+  const fs = deps(overrides); let root; const created = []; const createdDirectories = [];
+  let gitIdentity = null; let gitWasExpectedAbsent = false;
   try {
     root = safeRoot(rootDir, fs);
     if (root !== state.root) throw new Error("apply root differs from authenticated onboarding plan root");
@@ -1094,24 +1150,28 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     for (const target of state.targets) safePath(root, target.path, fs);
     const git = state.hostManaged ? { ok: true } : gitCapability(fs, root); if (!git.ok) throw new Error(git.reason);
     if (state.initializesGit) {
+      gitWasExpectedAbsent = true;
       const initialized = fs.spawnSync("git", ["init", "--initial-branch=main"], { cwd: root, encoding: "utf8" });
       if (initialized.error || initialized.status !== 0) throw new Error(`git init --initial-branch=main failed: ${String(initialized.stderr ?? initialized.error ?? "unknown error").trim()}`);
-      gitCreated = true;
+      gitIdentity = directoryIdentity(fs.lstatSync(join(root, ".git")));
+      if (!gitIdentity) throw new Error("created Git control directory identity is unavailable");
     }
     for (const target of state.targets) {
       const path = safePath(root, target.path, fs);
       if (fs.existsSync(path)) throw new Error(`target appeared during activation: ${target.path}`);
-      fs.mkdirSync(dirname(path), { recursive: true });
+      ensureTargetParents(root, path, createdDirectories, fs);
       fs.writeFileSync(path, target.bytes, { encoding: "utf8", flag: "wx", mode: 0o600 });
-      created.push(path);
+      const identity = fileIdentity(fs.lstatSync(path));
+      if (!identity) throw new Error(`created target identity is unavailable: ${target.path}`);
+      created.push({ path, identity });
     }
     const source = inspectRunnerProfileMigrationV3({ rootDir: root, deps: fs });
     if (source.status !== "ready" || source.sourceKind !== "v3") throw new Error("post-apply portable source validation was not ready");
     const manifest = loadManifest(root);
     if (manifest.status !== "ok") throw new Error("post-apply canonical manifest validation was not ready");
-    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: state.hostManaged ? { mode: "host-managed", initialized: false, initialBranch: null, committed: false } : { mode: "local", initialized: gitCreated, initialBranch: "main", committed: false }, authority: { status: "portable-seed", runtimeProjection: "missing" }, diagnostics: [] };
+    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: state.hostManaged ? { mode: "host-managed", initialized: false, initialBranch: null, committed: false } : { mode: "local", initialized: gitIdentity !== null, initialBranch: "main", committed: false }, authority: { status: "portable-seed", runtimeProjection: "missing" }, diagnostics: [] };
   } catch (error) {
-    const rollbackFailures = root ? rollback(root, created, gitCreated, fs) : [];
+    const rollbackFailures = root ? rollback(root, created, createdDirectories, gitIdentity, gitWasExpectedAbsent, fs) : [];
     if (rollbackFailures.length) return { schema: PLAN_SCHEMA, status: "rollback-failed", root, diagnostics: [diagnostic("$.transaction", "rollback_failed", `${error.message}; rollback also failed: ${rollbackFailures[0].message}`, "repair generated paths manually before retrying")] };
     return { schema: PLAN_SCHEMA, status: "rolled-back", root, diagnostics: [diagnostic("$.transaction", "apply_failed", error.message, "repair the root and run inspect then plan again")] };
   }

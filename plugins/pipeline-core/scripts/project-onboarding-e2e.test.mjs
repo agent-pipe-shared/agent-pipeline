@@ -80,7 +80,12 @@ function run(script, args, cwd) {
   assert.ok(main, `unsupported CLI entry point: ${script}`);
   const status = main(args, {
     write: (chunk) => { stdout += chunk; },
-    deps: { spawnSync: cliGit },
+    deps: {
+      spawnSync: cliGit,
+      observeOnboardingAppServer: ({ intent }) => intent === "onboarding"
+        ? { required: false, status: "not-requested", code: null }
+        : { required: true, status: "running", code: "CAS-READY" },
+    },
   });
   return { status, stdout, json: stdout ? JSON.parse(stdout) : null };
 }
@@ -162,7 +167,7 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
     assert.equal(bootstrap.json.repository.status, "host-managed");
     assert.equal(bootstrap.json.runtime.status, "plugin-managed");
     assert.equal(bootstrap.json.continuity.status, "valid");
-    assert.deepEqual(bootstrap.json.appServer, { required: false, status: "not-requested", code: null });
+    assert.deepEqual(bootstrap.json.appServer, { required: true, status: "running", code: "CAS-READY" });
     assert.equal(bootstrap.json.nextAction, null);
     assert.deepEqual(readdirSync(join(path, ".codex")), []);
     assert.deepEqual(readdirSync(join(path, ".git")), []);

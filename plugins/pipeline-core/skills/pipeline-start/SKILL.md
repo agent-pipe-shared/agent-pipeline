@@ -135,11 +135,12 @@ runtime forms:
   readback digests;
 - repository mode `local` with repository status `local-valid-writable`,
   runtime status `plugin-managed`, a non-null source digest, null
-  target/barrier/readback digests, and `appServer.required:false` plus
-  `appServer.status:not-requested`;
+  target/barrier/readback digests, and `appServer.required:true` plus
+  `appServer.status:running` and `appServer.code:CAS-READY`;
 - repository mode and status `host-managed`, runtime status `plugin-managed`,
   a non-null source digest, null target/barrier/readback digests, and
-  `appServer.required:false` plus `appServer.status:not-requested`.
+  `appServer.required:true` plus `appServer.status:running` and
+  `appServer.code:CAS-READY`.
 
 The plugin-managed forms are the reserved Codex-control-mount path: the
 installed plugin provides the runtime while Codex owns `.codex`. They require
@@ -179,8 +180,9 @@ immutable kickoff history; an absent, malformed, copied, permission-weakened,
 or drifted admission still blocks. Issue #25 owns replacing this compatibility
 fallback with one native cross-view session attestation.
 
-Any mixed form is malformed and fail-closed. App-Server health remains the
-separate pipeline-start observation required later in this bootstrap.
+Any mixed form is malformed and fail-closed. The V4 inspection itself carries
+the mandatory single read-only App-Server observation for bootstrap, session,
+and dispatch; do not substitute or repeat it with a separate readiness claim.
 
 The inspection result must have exact schema `pipeline.project-onboarding.v4`
 and the complete closed component/action shape. `inspect` is read-only; it

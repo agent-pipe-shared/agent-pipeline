@@ -69,7 +69,7 @@ function readyInspection(root) {
       readbackSha256: null,
     },
     continuity: { status: "valid" },
-    appServer: { required: false, status: "not-requested", code: null },
+    appServer: { required: true, status: "running", code: "CAS-READY" },
     nextAction: null,
   };
 }
@@ -189,4 +189,63 @@ test("the sandbox view cannot apply through its reserved .git control mount", (t
   });
   assert.equal(result.status, "host-preimage-changed");
   chmodSync(join(root, ".git"), 0o700);
+});
+
+test("failed git init retains an unproven partial control path", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        assert.equal(command, "git");
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        mkdirSync(join(options.cwd, ".git"));
+        writeFileSync(join(options.cwd, ".git", "foreign"), "foreign\n");
+        return { status: 1, stdout: "", stderr: "synthetic init failure" };
+      },
+    },
+  });
+  assert.equal(result.status, "apply-failed");
+  assert.deepEqual(result.diagnostics, [{ code: "git_init_failed_partial_control_path_retained" }]);
+  assert.equal(readFileSync(join(root, ".git", "foreign"), "utf8"), "foreign\n");
+});
+
+test("host rollback preserves a Git directory whose identity changed during binding", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const nativeWrite = writeFileSync;
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        assert.equal(command, "git");
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        mkdirSync(join(options.cwd, ".git"));
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      writeFileSync(target, bytes, options) {
+        if (target === join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT)) {
+          rmSync(join(root, ".git"), { recursive: true, force: true });
+          mkdirSync(join(root, ".git"));
+          nativeWrite(join(root, ".git", "foreign"), "foreign\n");
+          throw new Error("synthetic control-path identity race");
+        }
+        nativeWrite(target, bytes, options);
+      },
+    },
+  });
+  assert.equal(result.status, "rollback-failed");
+  assert.deepEqual(result.diagnostics, [{ code: "host_init_identity_changed" }]);
+  assert.equal(readFileSync(join(root, ".git", "foreign"), "utf8"), "foreign\n");
 });

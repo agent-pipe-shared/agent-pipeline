@@ -1467,7 +1467,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
       deps: {
         observeOnboardingAppServer() {
           appServerCalls += 1;
-          return { required: true, status: "execution-denied", code: "CAS-EXECUTION-UNAVAILABLE" };
+          return { required: true, status: "running", code: "CAS-READY" };
         },
       },
     });
@@ -1475,8 +1475,8 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(postKickoff.repository.status, "host-managed");
     assert.equal(postKickoff.runtime.status, "plugin-managed");
     assert.equal(postKickoff.continuity.status, "valid");
-    assert.deepEqual(postKickoff.appServer, { required: false, status: "not-requested", code: null });
-    assert.equal(appServerCalls, 0, "host-bound App-Server health stays a separate pipeline-start observation");
+    assert.deepEqual(postKickoff.appServer, { required: true, status: "running", code: "CAS-READY" });
+    assert.equal(appServerCalls, 1, "plugin-managed bootstrap observes App-Server health exactly once");
     assert.equal(postKickoff.nextAction, null);
     assert.deepEqual(names(join(path, ".codex")), []);
     assert.deepEqual(names(join(path, ".git")), []);
@@ -1490,7 +1490,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
         classifyOnboardingContinuity: () => postKickoff.continuity,
         observeOnboardingAppServer() {
           appServerCalls += 1;
-          return { required: true, status: "execution-denied", code: "CAS-EXECUTION-UNAVAILABLE" };
+          return { required: true, status: "running", code: "CAS-READY" };
         },
       },
     });
@@ -1498,8 +1498,8 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(afterHostGit.repository.status, "local-valid-writable");
     assert.equal(afterHostGit.runtime.status, "plugin-managed");
     assert.equal(afterHostGit.repository.sessionCapability, "passed");
-    assert.deepEqual(afterHostGit.appServer, { required: false, status: "not-requested", code: null });
-    assert.equal(appServerCalls, 0, "plugin-managed App-Server health stays a separate pipeline-start observation after host Git init");
+    assert.deepEqual(afterHostGit.appServer, { required: true, status: "running", code: "CAS-READY" });
+    assert.equal(appServerCalls, 1, "plugin-managed session observes App-Server health exactly once after host Git init");
     const afterHostAuthority = validateV3BootstrapAuthority({ rootDir: path });
     if (afterHostAuthority.status !== "ready") throw new Error(JSON.stringify(afterHostAuthority));
   } finally { dispose(path); }
@@ -1577,6 +1577,30 @@ test("post-git failure rolls every generated preimage back", () => {
     const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: failing });
     assert.equal(applied.status, "rolled-back");
     assert.deepEqual(names(path), []);
+  } finally { dispose(path); }
+});
+
+test("portable rollback preserves a target whose identity changed after exclusive creation", () => {
+  const path = root(); let writes = 0; let firstTarget;
+  const racing = {
+    ...fakeDeps,
+    writeFileSync(target, bytes, options) {
+      writes += 1;
+      if (writes === 1) {
+        firstTarget = target;
+        writeFileSync(target, bytes, options);
+        return;
+      }
+      unlinkSync(firstTarget);
+      writeFileSync(firstTarget, "foreign bytes\n", { flag: "wx", mode: 0o600 });
+      throw new Error("synthetic identity race");
+    },
+  };
+  try {
+    const plan = planProjectOnboardingV3({ rootDir: path, deps: racing });
+    const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: racing });
+    assert.equal(applied.status, "rollback-failed");
+    assert.equal(readFileSync(firstTarget, "utf8"), "foreign bytes\n");
   } finally { dispose(path); }
 });
 

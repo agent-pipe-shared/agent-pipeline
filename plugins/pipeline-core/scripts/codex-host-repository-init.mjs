@@ -107,7 +107,7 @@ function applyAction(root, planSha256) {
     requiresHostBoundary: true,
     expected: {
       schema: APPLY_SCHEMA,
-      statuses: ["restart-required", "host-preimage-changed", "git-unavailable", "apply-failed"],
+      statuses: ["restart-required", "host-preimage-changed", "git-unavailable", "apply-failed", "rollback-failed"],
     },
   };
 }
@@ -129,8 +129,9 @@ export function planHostRepositoryInit({ rootDir = process.cwd(), deps = {} } = 
     && lifecycle.runtime?.barrierSha256 === null
     && lifecycle.runtime?.readbackSha256 === null
     && lifecycle.continuity?.status === "valid"
-    && lifecycle.appServer?.required === false
-    && lifecycle.appServer?.status === "not-requested"
+    && lifecycle.appServer?.required === true
+    && lifecycle.appServer?.status === "running"
+    && lifecycle.appServer?.code === "CAS-READY"
     && lifecycle.nextAction === null;
   if (!accepted) {
     return {
@@ -167,7 +168,44 @@ function parseGitVersion(output) {
   return version[0] > 2 || (version[0] === 2 && version[1] >= 28) ? match[0].slice("git version ".length) : null;
 }
 
-function bindPrivateContinuity(root, { planSha256, gitVersion }, fs = {}) {
+function physicalIdentity(info, kind) {
+  const valid = kind === "directory"
+    ? info && !info.isSymbolicLink() && info.isDirectory()
+    : info && !info.isSymbolicLink() && info.isFile() && info.nlink === 1;
+  return valid ? { dev: String(info.dev), ino: String(info.ino), kind } : null;
+}
+
+function samePhysicalIdentity(path, expected, fs = {}) {
+  if (!expected) return false;
+  try {
+    const info = (fs.lstatSync ?? lstatSync)(path);
+    const actual = physicalIdentity(info, expected.kind);
+    return actual?.dev === expected.dev && actual?.ino === expected.ino;
+  } catch {
+    return false;
+  }
+}
+
+function removeCreatedFile(path, expected, fs = {}) {
+  const exists = fs.existsSync ?? existsSync;
+  if (!exists(path)) return;
+  if (!samePhysicalIdentity(path, expected, fs)) {
+    throw new Error("created host-init file changed identity before rollback");
+  }
+  (fs.rmSync ?? rmSync)(path, { force: true });
+}
+
+function removeCreatedGit(root, expected, fs = {}) {
+  const path = join(root, ".git");
+  const exists = fs.existsSync ?? existsSync;
+  if (!exists(path)) return;
+  if (!samePhysicalIdentity(path, expected, fs)) {
+    throw new Error("created Git control directory changed identity before rollback");
+  }
+  (fs.rmSync ?? rmSync)(path, { recursive: true, force: true });
+}
+
+function bindPrivateContinuity(root, { planSha256, gitVersion }, fs = {}, created = {}) {
   const source = join(root, ".claude/.runtime/agent-pipeline/onboarding/continuity-history.json");
   const directory = join(root, ".git/agent-pipeline/onboarding");
   const target = join(directory, "continuity-history.json");
@@ -181,6 +219,8 @@ function bindPrivateContinuity(root, { planSha256, gitVersion }, fs = {}) {
   const historyBytes = read(source);
   mkdir(directory, { recursive: true, mode: 0o700 });
   write(target, historyBytes, { flag: "wx", mode: 0o600 });
+  created.history = physicalIdentity((fs.lstatSync ?? lstatSync)(target), "file");
+  if (!created.history) throw new Error("created continuity identity is unavailable");
   const descriptor = open(target, "r");
   try { sync(descriptor); } finally { close(descriptor); }
   const receipt = {
@@ -197,6 +237,8 @@ function bindPrivateContinuity(root, { planSha256, gitVersion }, fs = {}) {
   };
   if (receipt.authoritySha256 === null) throw new Error("host-init authority is unavailable");
   write(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+  created.receipt = physicalIdentity((fs.lstatSync ?? lstatSync)(receiptPath), "file");
+  if (!created.receipt) throw new Error("created receipt identity is unavailable");
   const receiptDescriptor = open(receiptPath, "r");
   try { sync(receiptDescriptor); } finally { close(receiptDescriptor); }
 }
@@ -228,14 +270,37 @@ export function applyHostRepositoryInit({
 
     const initialized = spawn("git", ["init", "--initial-branch=main"], { cwd: root, encoding: "utf8" });
     if (initialized.error || initialized.status !== 0) {
-      if (exists(join(root, ".git"))) (deps.rmSync ?? rmSync)(join(root, ".git"), { recursive: true, force: true });
-      return { schema: APPLY_SCHEMA, status: "apply-failed", root, diagnostics: [{ code: "git_init_failed" }] };
+      return {
+        schema: APPLY_SCHEMA,
+        status: "apply-failed",
+        root,
+        diagnostics: [{
+          code: exists(join(root, ".git"))
+            ? "git_init_failed_partial_control_path_retained"
+            : "git_init_failed",
+        }],
+      };
     }
+    const gitIdentity = physicalIdentity((deps.lstatSync ?? lstatSync)(join(root, ".git")), "directory");
+    if (!gitIdentity) {
+      return {
+        schema: APPLY_SCHEMA,
+        status: "apply-failed",
+        root,
+        diagnostics: [{ code: "git_init_identity_unavailable" }],
+      };
+    }
+    const created = { history: null, receipt: null };
     try {
-      bindPrivateContinuity(root, { planSha256, gitVersion }, deps);
+      bindPrivateContinuity(root, { planSha256, gitVersion }, deps, created);
     } catch {
-      (deps.rmSync ?? rmSync)(join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT), { force: true });
-      if (exists(join(root, ".git"))) (deps.rmSync ?? rmSync)(join(root, ".git"), { recursive: true, force: true });
+      try {
+        removeCreatedFile(join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT), created.receipt, deps);
+        removeCreatedFile(join(root, ".git/agent-pipeline/onboarding/continuity-history.json"), created.history, deps);
+        removeCreatedGit(root, gitIdentity, deps);
+      } catch {
+        return { schema: APPLY_SCHEMA, status: "rollback-failed", root, diagnostics: [{ code: "host_init_identity_changed" }] };
+      }
       return { schema: APPLY_SCHEMA, status: "apply-failed", root, diagnostics: [{ code: "continuity_binding_failed" }] };
     }
     return {

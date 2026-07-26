@@ -46,7 +46,7 @@ const cases = [
     assert.match(skill, /repository mode `local` with repository status `local-valid-writable`,\s+runtime status `plugin-managed`/u);
     assert.match(skill, /repository mode and status `host-managed`, runtime status `plugin-managed`/u);
     assert.match(skill, /a non-null source digest, null target\/barrier\/readback digests/u);
-    assert.match(skill, /`appServer\.required:false` plus `appServer\.status:not-requested`/u);
+    assert.match(skill, /`appServer\.required:true` plus\s+`appServer\.status:running` and `appServer\.code:CAS-READY`/u);
     assert.match(skill, /require\s+no runtime initialization or native readback barrier/u);
     assert.match(skill, /make no project-local\s+runtime or native-readback claim/u);
     assert.match(skill, /authoritative only in the current Codex\s+session projection/u);
@@ -55,7 +55,7 @@ const cases = [
     assert.match(skill, /Do not reinterpret the host view as\s+`runtime-initialization-required`/u);
     assert.match(skill, /do not request another restart/u);
     assert.match(skill, /Any mixed form\s+is malformed and fail-closed/u);
-    assert.match(skill, /App-Server health remains the\s+separate pipeline-start observation required later/u);
+    assert.match(skill, /V4 inspection itself carries\s+the mandatory single read-only App-Server observation/u);
     assert.match(skill, /`host-managed` form with a concrete `gitVersion` is the narrowly bound\s+post-initialization Codex mount/u);
     assert.match(skill, /`host-managed` form with\s+`gitVersion:null` is the fresh pre-initialization state/u);
   }],
