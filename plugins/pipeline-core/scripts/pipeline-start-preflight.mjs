@@ -43,6 +43,9 @@ export function installedPipelineIdentity(pluginList = readInstalledPluginList) 
     eligible(entry) && entry.pluginId === LOCAL_PLUGIN_ID);
   const officialMatches = payload.installed.filter((entry) =>
     eligible(entry) && entry.pluginId === PLUGIN_ID);
+  if (localMatches.length + officialMatches.length > 1) {
+    return { version: null, source: "unknown", ambiguous: true };
+  }
   if (localMatches.length + officialMatches.length !== 1) return null;
   const matches = localMatches.length === 1 ? localMatches : officialMatches;
   const entry = matches[0];
@@ -97,7 +100,7 @@ export function observePipelineStartPreflight({
   const executionBoundary = wsl ? "host-authorized-wsl" : "default";
   const status = !version
     ? "plugin-identity-unavailable"
-    : installedVersion !== null && installedVersion !== version
+    : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version
       ? "plugin-refresh-required"
       : "ready";
   return {

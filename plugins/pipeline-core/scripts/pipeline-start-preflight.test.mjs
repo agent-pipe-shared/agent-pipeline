@@ -157,7 +157,7 @@ test("simultaneous local-development and official installations fail closed", ()
     pluginList: both,
     read: () => manifest,
   });
-  assert.equal(result.status, "ready");
+  assert.equal(result.status, "plugin-refresh-required");
   assert.equal(result.installedVersion, null);
   assert.equal(result.installedSource, "unknown");
 });
