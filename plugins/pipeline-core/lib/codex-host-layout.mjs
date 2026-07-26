@@ -345,7 +345,7 @@ export function readCodexHostRepositoryInitAdmission(root, {
     || JSON.stringify(Object.keys(marker).sort()) !== JSON.stringify(markerKeys.sort())
     || intent === null || typeof intent !== "object" || Array.isArray(intent)
     || JSON.stringify(Object.keys(intent).sort()) !== JSON.stringify(intentKeys.sort())
-    || receipt.schema !== "pipeline.codex-host-repository-init-receipt.v1"
+    || receipt.schema !== "pipeline.codex-host-repository-init-receipt.v2"
     || marker.schema !== "pipeline.codex-host-repository-init-marker.v1"
     || intent.schema !== "pipeline.codex-host-repository-init-intent.v1"
     || receipt.branch !== "main"

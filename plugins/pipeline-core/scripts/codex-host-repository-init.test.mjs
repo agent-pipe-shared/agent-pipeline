@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import {
   chmodSync, existsSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync,
 } from "node:fs";
@@ -161,7 +162,7 @@ test("host apply initializes only Git and requires one restart", () => {
   assert.equal(existsSync(join(root, ".git/agent-pipeline/onboarding/continuity-history.json")), true);
   assert.equal(existsSync(join(root, ".claude/.runtime/agent-pipeline/onboarding/continuity-history.json")), true);
   const receipt = JSON.parse(readFileSync(join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT), "utf8"));
-  assert.equal(receipt.schema, "pipeline.codex-host-repository-init-receipt.v1");
+  assert.equal(receipt.schema, "pipeline.codex-host-repository-init-receipt.v2");
   assert.equal(receipt.planSha256, plan.planSha256);
   assert.match(receipt.authoritySha256, /^[a-f0-9]{64}$/u);
   assert.equal(receipt.gitVersion, "2.40.1");
@@ -186,6 +187,39 @@ test("host apply initializes only Git and requires one restart", () => {
       return { status: 0, stdout: `${join(root, ".git")}\n`, stderr: "" };
     },
   }).status, "valid");
+});
+
+test("the bound receipt uses v2 and a pre-release unbound v1 shape is terminal invalid", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  assert.equal(applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        completeGitInit(options.cwd);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+    },
+  }).status, "restart-required");
+  const receiptPath = join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT);
+  const markerPath = join(root, CODEX_HOST_REPOSITORY_INIT_MARKER);
+  const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+  delete receipt.gitDevice;
+  delete receipt.gitInode;
+  delete receipt.gitTreeSha256;
+  receipt.schema = "pipeline.codex-host-repository-init-receipt.v1";
+  const receiptBytes = Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, "utf8");
+  const marker = JSON.parse(readFileSync(markerPath, "utf8"));
+  marker.receiptSha256 = createHash("sha256").update(receiptBytes).digest("hex");
+  writeFileSync(receiptPath, receiptBytes, { mode: 0o600 });
+  writeFileSync(markerPath, `${JSON.stringify(marker, null, 2)}\n`, { mode: 0o600 });
+  assert.equal(readCodexHostRepositoryInitAdmission(root), null);
 });
 
 test("an interrupted admission publication resumes from the exact pending intent", () => {
@@ -516,8 +550,9 @@ test("successful cleanup preserves a pending artifact replaced after validation"
         completeGitInit(options.cwd);
         return { status: 0, stdout: "", stderr: "" };
       },
-      faultInjector(point) {
-        if (point === "before-host-init-pending-cleanup") {
+      faultInjector(point, context) {
+        if (point === "before-host-init-cleanup-capture"
+          && context?.path === pendingIntent && !existsSync(originalIntent)) {
           const bytes = readFileSync(pendingIntent);
           renameSync(pendingIntent, originalIntent);
           writeFileSync(pendingIntent, bytes, { mode: 0o600 });
@@ -529,6 +564,43 @@ test("successful cleanup preserves a pending artifact replaced after validation"
   assert.deepEqual(result.diagnostics, [{ code: "pending_cleanup_retained" }]);
   assert.equal(existsSync(pendingIntent), true);
   assert.equal(existsSync(originalIntent), true);
+});
+
+test("successful cleanup preserves a pending directory replaced after validation", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const template = join(
+    root,
+    CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY,
+    "git-template",
+  );
+  const originalTemplate = `${template}.original`;
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        completeGitInit(options.cwd);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      faultInjector(point, context) {
+        if (point === "before-host-init-cleanup-capture"
+          && context?.path === template && !existsSync(originalTemplate)) {
+          renameSync(template, originalTemplate);
+          mkdirSync(template, { mode: 0o700 });
+        }
+      },
+    },
+  });
+  assert.equal(result.status, "restart-required");
+  assert.deepEqual(result.diagnostics, [{ code: "pending_cleanup_retained" }]);
+  assert.equal(existsSync(template), true);
+  assert.equal(existsSync(originalTemplate), true);
 });
 
 test("initialized-tree read rejects a leaf replaced between lstat and descriptor open", () => {
@@ -608,29 +680,40 @@ test("Git-control persistence failures keep their operational classification", (
     rootDir: root,
     deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
   });
+  let injected = false;
+  const deps = {
+    spawnSync(command, args, options) {
+      if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+      completeGitInit(options.cwd);
+      return { status: 0, stdout: "", stderr: "" };
+    },
+    faultInjector(point) {
+      if (point === "before-git-control-fsync" && !injected) {
+        injected = true;
+        const error = new Error("synthetic storage failure");
+        error.code = "EIO";
+        throw error;
+      }
+    },
+    fsyncSync,
+  };
   const result = applyHostRepositoryInit({
     rootDir: root,
     planSha256: plan.planSha256,
     activate: true,
-    deps: {
-      spawnSync(command, args, options) {
-        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
-        completeGitInit(options.cwd);
-        return { status: 0, stdout: "", stderr: "" };
-      },
-      faultInjector(point) {
-        if (point === "before-git-control-fsync") {
-          const error = new Error("synthetic storage failure");
-          error.code = "EIO";
-          throw error;
-        }
-      },
-      fsyncSync,
-    },
+    deps,
   });
   assert.equal(result.status, "apply-failed");
   assert.deepEqual(result.diagnostics, [{ code: "git_control_preparation_failed" }]);
   assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY)), false);
+  const retried = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps,
+  });
+  assert.equal(retried.status, "restart-required");
+  assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY)), true);
 });
 
 test("Git-tree read failures remain operational rather than preimage drift", () => {

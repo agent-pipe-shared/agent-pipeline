@@ -6,7 +6,7 @@
  * initialization. The host apply deliberately does not rerun onboarding:
  * Codex's virtual .git/.codex mounts are absent at that boundary.
  */
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
   closeSync,
   constants,
@@ -297,6 +297,19 @@ function createPrivateDirectory(path, parent, created, fs = {}) {
   created.directories.push({ path, identity });
 }
 
+function cleanupCapturePath(path, fs = {}) {
+  const random = fs.randomBytes ?? randomBytes;
+  return join(dirname(path), `.host-init-cleanup-${random(12).toString("hex")}`);
+}
+
+function restoreCleanupCapture(path, capture, captured, fs = {}) {
+  const exists = fs.existsSync ?? existsSync;
+  if (!exists(path) && exists(capture) && samePhysicalIdentity(capture, captured, fs)) {
+    (fs.renameSync ?? renameSync)(capture, path);
+    fsyncDirectory(dirname(path), fs);
+  }
+}
+
 function removeCreatedFile(path, expected, fs = {}, expectedBytes = null) {
   const exists = fs.existsSync ?? existsSync;
   if (!exists(path)) return;
@@ -304,7 +317,29 @@ function removeCreatedFile(path, expected, fs = {}, expectedBytes = null) {
     || (expectedBytes !== null && !exactFile(path, expectedBytes, fs))) {
     throw new Error("created host-init file changed identity before rollback");
   }
-  (fs.rmSync ?? rmSync)(path, { force: true });
+  const parent = dirname(path);
+  const parentIdentity = assertPhysicalDirectory(parent, fs);
+  const capture = cleanupCapturePath(path, fs);
+  if (exists(capture)) throw new Error("host-init cleanup capture already exists");
+  (fs.faultInjector ?? (() => {}))("before-host-init-cleanup-capture", {
+    path,
+    kind: "file",
+  });
+  (fs.renameSync ?? renameSync)(path, capture);
+  fsyncDirectory(parent, fs);
+  const capturedIdentity = physicalIdentity((fs.lstatSync ?? lstatSync)(capture), "file");
+  try {
+    if (!samePhysicalIdentity(capture, expected, fs)
+      || (expectedBytes !== null && !exactFile(capture, expectedBytes, fs))
+      || !samePhysicalIdentity(parent, parentIdentity, fs)) {
+      throw new Error("created host-init file changed during cleanup capture");
+    }
+    (fs.rmSync ?? rmSync)(capture, { force: true });
+    fsyncDirectory(parent, fs);
+  } catch (error) {
+    restoreCleanupCapture(path, capture, capturedIdentity, fs);
+    throw error;
+  }
 }
 
 function removeCreatedDirectory(path, expected, fs = {}) {
@@ -313,7 +348,28 @@ function removeCreatedDirectory(path, expected, fs = {}) {
   if (!samePhysicalIdentity(path, expected, fs)) {
     throw new Error("created host-init directory changed identity before rollback");
   }
-  (fs.rmdirSync ?? rmdirSync)(path);
+  const parent = dirname(path);
+  const parentIdentity = assertPhysicalDirectory(parent, fs);
+  const capture = cleanupCapturePath(path, fs);
+  if (exists(capture)) throw new Error("host-init cleanup capture already exists");
+  (fs.faultInjector ?? (() => {}))("before-host-init-cleanup-capture", {
+    path,
+    kind: "directory",
+  });
+  (fs.renameSync ?? renameSync)(path, capture);
+  fsyncDirectory(parent, fs);
+  const capturedIdentity = physicalIdentity((fs.lstatSync ?? lstatSync)(capture), "directory");
+  try {
+    if (!samePhysicalIdentity(capture, expected, fs)
+      || !samePhysicalIdentity(parent, parentIdentity, fs)) {
+      throw new Error("created host-init directory changed during cleanup capture");
+    }
+    (fs.rmdirSync ?? rmdirSync)(capture);
+    fsyncDirectory(parent, fs);
+  } catch (error) {
+    restoreCleanupCapture(path, capture, capturedIdentity, fs);
+    throw error;
+  }
 }
 
 function fsyncDirectory(path, fs = {}) {
@@ -563,6 +619,9 @@ function prepareGitControl(root, planSha256, currentGitVersion, pendingPath, spa
       || initialized.value.gitTreeSha256 !== sha256(Buffer.from(JSON.stringify(logicalTree), "utf8"))) {
       throw drift("initialized Git control proof drifted");
     }
+    (fs.faultInjector ?? (() => {}))("before-git-control-fsync");
+    fsyncDirectory(gitPath, fs);
+    fsyncDirectory(pendingPath, fs);
     return {
       gitIdentity,
       gitVersion: initialized.value.gitVersion,
@@ -679,7 +738,7 @@ function bindPrivateContinuity(root, {
   if (!created.history) throw new Error("created continuity identity is unavailable");
   fsyncDirectory(directory, fs);
   const receipt = {
-    schema: "pipeline.codex-host-repository-init-receipt.v1",
+    schema: "pipeline.codex-host-repository-init-receipt.v2",
     planSha256,
     rootSha256: sha256(Buffer.from(root, "utf8")),
     authoritySha256: codexHostRepositoryAuthoritySha256(root, {

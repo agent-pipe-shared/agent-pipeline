@@ -92,7 +92,7 @@ transport, not invented by onboarding.
   digest, so an already completed apply also revalidates its unchanged
   postimage before returning `restart-required`.
 - The host admission is one mode-0700 directory published by a single atomic
-  rename. It contains an exact intent, receipt, and marker. The marker binds
+  rename. It contains an exact intent, v2 receipt, and marker. The marker binds
   both intent and receipt digests; the receipt binds root, reviewed plan,
   portable authority, kickoff history, Git version, branch, Git identity, and
   initialized core-tree digest.
@@ -122,8 +122,11 @@ kickoff writers verify every preimage, retain crash-recovery authority, and
 roll back or clean up only files/directories whose device, inode, link count,
 and digest still match identities captured at creation or validation, never
 identities sampled immediately before deletion. Foreign or identity-drifted
-pending paths are preserved and reported as `pending_cleanup_retained`;
-operational persistence failures remain distinct from preimage drift.
+pending paths are preserved and reported as `pending_cleanup_retained`.
+Cleanup first atomically renames each recorded object to a fresh quarantine
+name and revalidates its recorded identity and bytes there before deletion.
+Operational persistence failures remain distinct from preimage drift, and a
+retry repeats Git and pending-directory fsync before it may publish admission.
 Disposable-worktree rollback first renames the exact
 recorded tree into quarantine. Each recorded leaf is then atomically renamed
 to a fresh cleanup name and revalidated there before unlink/rmdir; a
@@ -135,6 +138,12 @@ candidate is removed by restoring the prior installed plugin selection and
 starting a new Codex thread; it does not rewrite consumer authority. Existing
 restart-required private state remains controlling until its exact readback or
 an explicit, independently reviewed recovery handles it.
+
+The v2 host-init receipt is the first release candidate that carries the
+physical Git postimage. The earlier v1 shape existed only in unpublished local
+0.4.5 test candidates and is deliberately non-authoritative under this
+candidate; it is terminal invalid rather than silently upgraded from an
+unbound postimage. Released 0.4.4 issued no host-init receipt.
 
 ## Residual risk
 

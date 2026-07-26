@@ -338,7 +338,8 @@ directory containing the exact transaction intent, receipt, and
 receipt-digest marker. The marker binds both other files. Each file is read
 through an `O_NOFOLLOW` descriptor and accepted only when its leaf and all
 parent-directory identities remain unchanged before and after the read.
-The receipt also carries the exclusively reserved Git directory's device,
+The closed `pipeline.codex-host-repository-init-receipt.v2` receipt also
+carries the exclusively reserved Git directory's device,
 inode, and closed initialized core-tree digest. A repeated completed host
 apply revalidates that exact postimage before it may return
 `restart-required`; replacement or tree drift is `host-preimage-changed`.
@@ -362,10 +363,20 @@ tree. A partial, replaced, or unrelated physical Git path remains
 `host-preimage-changed`; the pending intent is never runtime admission on its
 own. Core-tree leaves use descriptor-bound no-follow reads plus after-read leaf
 and parent identity checks; directory traversal repeats physical identity and
-membership checks. Cleanup uses the identities and exact bytes
-captured when each pending artifact was created or validated, preserves any
-replacement, and reports `pending_cleanup_retained`. Storage/fsync failure
+membership checks. Cleanup uses the identities and exact bytes captured when
+each pending artifact was created or validated, atomically renames the object
+to a fresh quarantine name, revalidates it there before deletion, preserves
+any replacement, and reports `pending_cleanup_retained`. Storage/fsync failure
 maps to `apply-failed` / `git_control_preparation_failed`, not preimage drift.
+An exact retry with an existing initialized proof repeats Git and pending
+directory fsync before admission publication; the proof alone cannot skip a
+failed durability boundary.
+
+Receipt v1 was emitted only by unpublished local 0.4.5 test candidates and
+lacks the physical Git postimage. The release candidate does not accept or
+upgrade that unbound shape: it remains terminal invalid. Released 0.4.4 did
+not issue a host-init receipt, so this v2 transition is not a break of a
+released public schema.
 
 Runtime initialization reuses the existing V3 migration planner/apply engine
 with `initializeMissingRuntime: true`, but the public command is owned by
