@@ -1,0 +1,238 @@
+# Sprint Phoenix recovery and design-route record
+
+This file records exceptional design/bootstrap trajectories without treating a
+workaround, transport result, or local observation as product authority.
+
+It intentionally excludes credentials, account details, host names, absolute
+paths, private repository coordinates, raw prompts, transcripts, unrestricted
+tool output, and machine-local session identifiers.
+
+## R-01 — Marketplace freshness recovery
+
+| Field | Value |
+| --- | --- |
+| Phase | bootstrap |
+| Trigger | The loaded Pipeline version could not initially be proven through the runner-independent freshness path. |
+| Sanctioned path result | `unknown / marketplace-unavailable` |
+| Actual local authority | Native Codex plugin registry reported Pipeline Core 0.4.6 from the remote marketplace. |
+| Recovery route | Read-only host observation after the sandboxed child path could not reach the required native/network boundary. |
+| Result | Pipeline Core `0.4.6+codex.20260726170452`, public release `v0.4.6`, loaded commit `9d1b3dc108eb77629ace5b82002120f5539abd8d`. |
+| Product authority | None created by the recovery route. |
+| Phoenix consequence | PHX-0 makes ruleset source and freshness runner-neutral, typed, pre-HEAD capable, and privacy-safe. |
+
+The failure is architectural rather than a documentation-only mismatch:
+freshness currently assumes a Claude-oriented project path and consumer Git
+`HEAD`, while a Codex-only consumer has native plugin-registry authority. The
+Sprint must correct the shared source contract instead of adding another
+runner-specific bypass.
+
+## R-02 — Read-only workspace observation
+
+| Field | Value |
+| --- | --- |
+| Phase | design review |
+| Trigger | The mandated workspace observer could not spawn its nested read-only `git` process inside the current sandbox. |
+| Typed failure | `EPERM` before workspace observation completed |
+| Recovery route | Run the exact observer on the approved host read-only boundary. |
+| Precondition | No workspace mutation was allowed between observations. |
+| Result | One stable digest before, between, and after the Advisor attempts: `35a313dd8035b5144b14ffa3670015bfa53abf8ff8566eaf2ff92c35cab25191`. |
+| Product authority | The digest proves only equality of the observed workspace snapshots; it does not attest OS isolation, actor identity, or model identity. |
+
+The first combined shell inspection was also rejected by the lifecycle guard.
+It was replaced by separate read-only commands. No rejected command mutated
+the repository.
+
+## R-03 — Advisor route exhausted
+
+| Field | Value |
+| --- | --- |
+| Consent | approved |
+| Profile | epic |
+| Selected route | host-bound read-only consultation |
+| Primary | fresh Advisor, 60-second limit |
+| Primary result | timeout; interrupted once |
+| Fallback | fresh smaller Advisor, 45-second limit |
+| Fallback result | timeout; interrupted once |
+| Further attempts | prohibited by the selected policy |
+| Workspace result | digest unchanged across the full route |
+| Readiness claim | Advisory unavailable; no Advisor-pass claim |
+
+No material was auto-applied and no repository file was changed by either
+attempt. There was no attested selected-sandbox execution; OS isolation and
+model identity are not asserted. The design therefore requires an independent
+diff-scoped review and deterministic readiness checks before presentation at
+the Product Owner gate. That review does not retroactively convert the
+unavailable Advisor route into a success.
+
+See [design/advisor-review.md](design/advisor-review.md) for the bounded
+question and required follow-up.
+
+## R-04 — Inherited active-feature continuity
+
+The repository state initially still named the completed 0.4.6 Codex
+onboarding feature as active. Bootstrap adopted it into continuity with a
+`review` queue head and no Result authority.
+
+The sanctioned `close-feature` writer rejected closure because active
+continuity requires an exact revision-, Result-, and close-evidence-bound
+request. The adopted `review-active-feature` state exposes no supported
+transition that can produce that missing Result or move the queue to `close`.
+The failed close attempt wrote nothing.
+
+An exhaustive source/readback check found:
+
+- `review-active-feature` is created by the onboarding-continuity adoption
+  path, but no production consumer implements that action;
+- generic continuity CAS cannot change a `null` Result authority into a bound
+  Result;
+- final integration requires a real dispatch, which the adopted review state
+  deliberately lacks;
+- close transition requires an already bound Result and `nextAction=close`;
+- a historical `result.md` file exists, but it explicitly describes
+  push/readback/Issue closure as pending and retains final-candidate/evidence
+  placeholders.
+
+That historical file is useful scope evidence but cannot be promoted into
+missing close authority without fabricating completion evidence. The Product
+Owner's later statement that the 0.4.6 work is implemented, operational, and
+complete remains the authoritative completion disposition, while the public
+0.4.6 release is product-state corroboration rather than a replacement
+lifecycle Result.
+
+Phoenix must not silently delete or rewrite this state. Before the Phoenix PRD
+can become the repository's active plan, one of the following is required:
+
+1. a sanctioned, evidence-bound transition supplied by the lifecycle tooling;
+   or
+2. explicit Product Owner authority for one narrow administrative repair whose
+   exact preimage, postimage, reason, actor, and readback are recorded.
+
+The proposed narrow repair is:
+
+1. record the exact state preimage digest;
+2. remove only the stranded adopted `continuity` object, with no other freehand
+   state change;
+3. re-read and validate the exact postimage;
+4. close the completed old feature through `pipeline-state.mjs close-feature`
+   under the explicit Product Owner course authority, without inventing a
+   Result;
+5. activate `sprint-phoenix-epic` and its sole PRD through
+   `pipeline-state.mjs set-feature`;
+6. validate the new state/PRD language and record the final digest;
+7. perform no remote write.
+
+After the Product Owner authorized this course on 2026-07-26, the repository
+guard still rejected the attempted agent edit with the typed reason
+`pipeline-state.json is writer-owned and must not be edited directly`. The
+attempt produced zero mutation. No sanctioned override/repair subcommand
+exists for the adopted `review-active-feature` state.
+
+The attended human step therefore uses the temporary one-time helper
+`evidence/one-time-continuity-repair.mjs`, SHA-256
+`faad27be438edf3e9c9876f4878a672d0c38f05ada562eccebd8f4e882bc8d4e`.
+The helper:
+
+- requires the literal `--apply` argument;
+- derives and checks its physical repository root;
+- binds preimage
+  `cc3ccc2e40312e50633cbdfef47ce71aca37e9d85e1f1295bedc6cc97dfd4f96`;
+- validates the exact old feature, revision 3, adoption action, review state,
+  absent dispatch/blocker/decision, and `result: null`;
+- deletes only the `continuity` property;
+- atomically writes and reads back postimage
+  `303942482fb7be0373f84a51c2d007a699528ffbf0f06545706a0ccc45ad358a`;
+- performs no network or remote operation.
+
+The helper's successful output was not the old feature close. It only restored
+the state shape required for the sanctioned `close-feature` and `set-feature`
+writers that followed. The helper was removed after successful readback; its
+digest and this record remain.
+
+The Product Owner's statement that the 0.4.6 work is implemented and
+operational is scope evidence: stale backlog/document status must not reopen
+that work. It does not by itself fabricate the missing lifecycle Result.
+
+### Executed transition and readback
+
+The attended helper completed with the exact declared preimage and postimage
+and reported `remoteWrite:false`. The Product Owner then ran the sanctioned
+writers:
+
+1. `close-feature` closed `codex-onboarding-0.4.5` under the attributed
+   Product Owner course authority at commit
+   `9d1b3dc108eb77629ace5b82002120f5539abd8d`;
+2. `set-feature` activated `sprint-phoenix-epic`, bound this PRD, selected
+   `phase:"design"`, and reset `planApproved:false`.
+
+The first fresh 0.4.6 lifecycle inspection after those writes returned
+`continuity-damaged`. Its read-only repair plan correctly returned
+`continuity_repair_unavailable` with `nextAction:null`; it was not retried.
+That result exposed a second integration gap: the legacy `set-feature` writer
+creates the new active feature, while the normal two-step workflow still
+requires a separate `continuity-init` request. The bootstrap guard prevented
+the agent from creating even that bounded request before V4 readiness.
+
+Under the Product Owner's explicit narrow authority, the host created one
+public-safe request bound to:
+
+- State preimage
+  `f58bdd6f9d0db075d26243a555c9cbee042665f779dbcbc709f1e70f76c8ab63`;
+- PRD
+  `93cef81e4d80c8f9adf1854fc90466d1a627afdf4557e4d3fd0bc42716914d5c`;
+- Spec
+  `4bb3bbc47aade0d7c9c71fc4a43dafe196573c222c4d5643c8ee1be7686e2c3e`;
+- continuity request
+  `26c02313da5d42ba79ce0f6ffe9deba7c46e3d9cbd83a1949d4930642469d429`.
+
+The sanctioned `continuity-init` writer produced Phoenix revision 0 with
+`result:null`, `dispatch:null`, and `nextAction:"review"`. Its exact State
+readback was
+`94e1671550dd1bdc8d164703ea39d16c9a229e3f4a7a35ab5555e414ddfac5da`.
+The temporary request was removed after the succeeding bootstrap proved the
+same continuity valid.
+
+The prior cleanup binding had also been removed with the stranded continuity
+while its private descriptor remained. Read-only status classified that
+descriptor as not live; hygiene proved zero registered and zero remaining
+temporary resources. The descriptor was therefore closed through the
+descriptor-bound cleanup command, producing a complete zero-removal receipt.
+A new Phoenix cleanup descriptor was then bound normally. No project artifact,
+temporary resource, or remote ref was deleted by that cleanup.
+
+The repeated full bootstrap then passed with:
+
+- Pipeline `0.4.6+codex.20260726170452`;
+- V4 repository/runtime/continuity/App-Server status `ready`;
+- `pipeline.user.v3` source and no-op runtime projection current;
+- ruleset and repository freshness `equal`;
+- PO-gate authority, manifest, observation governance, toolchain, and Verify
+  availability valid.
+
+The canonical handover still reports `Last updated: 2026-07-25` despite later
+non-documentation commits. That is retained as an explicit drift warning and
+does not reopen the Product Owner-dispositioned 0.4.6 work.
+
+## Audit classification
+
+These records illustrate the Phoenix recovery profile:
+
+- the agent journal records the trigger, rejected route, bounded options, and
+  selected recovery without hidden reasoning;
+- the human ledger records only an authority-changing exception;
+- lifecycle events record attempted, rejected, applied, read-back, rollback,
+  and cleanup states;
+- evidence records public-safe reason codes and pre/post digests.
+
+A single free-form mega-log is not an acceptable implementation of this
+profile.
+
+## Open course-gate risk ownership
+
+| Risk | Owner | Expiry | State |
+| --- | --- | --- | --- |
+| Advisor route unavailable | Phoenix Elephant; Product Owner controls Critic dispatch | 2026-07-31 | Critic explicitly authorized; fixed-candidate review pending |
+| Inherited 0.4.6 continuity could not close through the exposed sanctioned route | Product Owner controlled exception authority; Phoenix Elephant controlled exact execution/readback | 2026-07-31 | RESOLVED 2026-07-26; exact repair, close, Phoenix initialization, cleanup, and V4 readback recorded |
+| Canonical handover lags the current released implementation | Phoenix close owner; Product Owner controls any scope change | 2026-07-31 | OPEN documentation drift; completed 0.4.6 work remains excluded from Phoenix product scope |
+
+Expiry is a stop/review point, not automatic permission. See
+[design/governance-conformance.md](design/governance-conformance.md).
