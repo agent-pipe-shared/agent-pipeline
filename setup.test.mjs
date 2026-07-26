@@ -135,9 +135,13 @@ function ok(id, condition, detail) {
   const source = readFileSync(USER_YAML_PATH, "utf8").replace(/advisor_export:\n  consent: "approved"\n/u, "");
   writeFileSync(join(root, "pipeline.user.yaml"), source);
   const before = readFileSync(join(root, "pipeline.user.yaml"), "utf8");
+  let bootstrapCalls = 0;
   const readonlyCode = await run([], {
     rootDir: root,
-    validateV3BootstrapAuthority: () => ({ status: "ready" }),
+    validateV3BootstrapAuthority: () => {
+      bootstrapCalls += 1;
+      return { status: "ready" };
+    },
     validateV3SourceAndRuntime: () => ({ ok: true, diagnostics: [] }),
     runToolchainPreflight: () => READY_TOOLCHAIN,
   });
@@ -152,13 +156,17 @@ function ok(id, condition, detail) {
   ok(
     "run: no-flag V3 check stays read-only and explicit opt-out prompt keeps advisory enabled by default",
     readonlyCode === 0 && configuredCode === 0 && before === source && afterReadonly === before
+      && bootstrapCalls === 0
       && parseYaml(readFileSync(join(root, "pipeline.user.yaml"), "utf8")).advisor_export?.consent === "approved",
   );
   rmSync(root, { recursive: true, force: true });
 }
 {
   const root = mkdtempSync(join(tmpdir(), "setup-native-readback-required-"));
-  writeFileSync(join(root, "pipeline.user.yaml"), readFileSync(USER_YAML_PATH, "utf8"));
+  writeFileSync(
+    join(root, "pipeline.user.yaml"),
+    readFileSync(USER_YAML_PATH, "utf8").replace('  default: "claude"', '  default: "codex"'),
+  );
   let toolchainCalls = 0;
   let lifecycleCalls = 0;
   const code = await run([], {
@@ -170,6 +178,7 @@ function ok(id, condition, detail) {
         status: "runtime-attestation-required",
         nextAction: {
           kind: "command",
+          executable: "node",
           argv: ["/plugin/project-onboarding-v3.mjs", "plan-readback", "--root", rootDir],
         },
         intent,
@@ -373,13 +382,54 @@ function managedPolicyLockYaml({ mode = "strict", status = "source-unverified" }
       lifecycleRequest = request;
       return {
         status: "portable-seed-required",
-        nextAction: { kind: "command", argv: ["/plugin/project-onboarding-v3.mjs", "plan", "--root", root] },
+        nextAction: {
+          kind: "command",
+          executable: "node",
+          argv: ["/plugin/project-onboarding-v3.mjs", "plan", "--root", root],
+        },
       };
     },
   });
   const unchanged = !existsSync(join(root, "pipeline.user.yaml"))
     && [...sentinels].every(([path, content]) => readFileSync(path, "utf8") === content);
   ok("run: a new install is lifecycle-classified and fails closed instead of creating legacy defaults", code === 2 && unchanged && lifecycleRequest?.rootDir === root && lifecycleRequest?.intent === "onboarding");
+  rmSync(root, { recursive: true, force: true });
+}
+{
+  const root = mkdtempSync(join(tmpdir(), "setup-copy-safe-action-"));
+  const messages = [];
+  const originalError = console.error;
+  console.error = (message) => { messages.push(String(message)); };
+  let code;
+  try {
+    code = await run(["--defaults"], {
+      rootDir: root,
+      inspectProjectOnboardingV3() {
+        return {
+          status: "portable-seed-required",
+          nextAction: {
+            kind: "command",
+            executable: "node",
+            argv: [
+              "/plugin/project onboarding-v3.mjs",
+              "plan",
+              "--root",
+              `${root}; touch must-stay-inert`,
+            ],
+          },
+        };
+      },
+    });
+  } finally {
+    console.error = originalError;
+  }
+  const rendered = messages.join("\n");
+  ok(
+    "run: lifecycle remediation includes its executable and shell-quotes every argv element",
+    code === 2
+      && rendered.includes("review and run: node '/plugin/project onboarding-v3.mjs' plan --root ")
+      && rendered.includes(`'${root}; touch must-stay-inert'`),
+  );
   rmSync(root, { recursive: true, force: true });
 }
 {

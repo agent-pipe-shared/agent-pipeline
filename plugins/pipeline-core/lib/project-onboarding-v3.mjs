@@ -1081,6 +1081,39 @@ function sameDirectoryIdentity(expected, path, fs) {
   }
 }
 
+function physicalTreeSnapshot(path, fs) {
+  const rows = [];
+  function visit(current, relative) {
+    const info = fs.lstatSync(current);
+    if (info.isSymbolicLink()) throw new Error("Git control tree contains a symbolic link");
+    if (info.isDirectory()) {
+      rows.push({ path: relative, kind: "directory", dev: String(info.dev), ino: String(info.ino) });
+      for (const name of fs.readdirSync(current).sort()) {
+        visit(join(current, name), relative ? `${relative}/${name}` : name);
+      }
+      return;
+    }
+    if (!info.isFile() || info.nlink !== 1) throw new Error("Git control tree contains an unsafe file");
+    rows.push({
+      path: relative,
+      kind: "file",
+      dev: String(info.dev),
+      ino: String(info.ino),
+      sha256: sha256(fs.readFileSync(current)),
+    });
+  }
+  visit(path, "");
+  return rows;
+}
+
+function samePhysicalTree(path, expected, fs) {
+  try {
+    return JSON.stringify(physicalTreeSnapshot(path, fs)) === JSON.stringify(expected);
+  } catch {
+    return false;
+  }
+}
+
 function ensureTargetParents(root, target, createdDirectories, fs) {
   const missing = [];
   let parent = dirname(target);
@@ -1105,7 +1138,7 @@ function ensureTargetParents(root, target, createdDirectories, fs) {
   }
 }
 
-function rollback(root, created, createdDirectories, gitIdentity, gitWasExpectedAbsent, fs) {
+function rollback(root, created, createdDirectories, gitIdentity, gitTree, gitWasExpectedAbsent, fs) {
   const failures = [];
   for (const entry of [...created].reverse()) {
     try {
@@ -1131,6 +1164,9 @@ function rollback(root, created, createdDirectories, gitIdentity, gitWasExpected
       if (!gitIdentity || !sameDirectoryIdentity(gitIdentity, gitPath, fs)) {
         throw new Error("created Git control directory changed identity before rollback");
       }
+      if (!gitTree || !samePhysicalTree(gitPath, gitTree, fs)) {
+        throw new Error("created Git control tree changed before rollback");
+      }
       fs.rmSync(gitPath, { recursive: true, force: true });
     } catch (error) { failures.push(error); }
   }
@@ -1142,7 +1178,7 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
   const state = plan && AUTHENTICATED.get(plan);
   if (!state || state.signature !== JSON.stringify(plan)) return { schema: PLAN_SCHEMA, status: "invalid-plan", diagnostics: [diagnostic("$", "invalid_plan", "apply accepts only an unchanged in-process onboarding plan", "run plan again") ] };
   const fs = deps(overrides); let root; const created = []; const createdDirectories = [];
-  let gitIdentity = null; let gitWasExpectedAbsent = false;
+  let gitIdentity = null; let gitTree = null; let gitWasExpectedAbsent = false;
   try {
     root = safeRoot(rootDir, fs);
     if (root !== state.root) throw new Error("apply root differs from authenticated onboarding plan root");
@@ -1155,6 +1191,7 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
       if (initialized.error || initialized.status !== 0) throw new Error(`git init --initial-branch=main failed: ${String(initialized.stderr ?? initialized.error ?? "unknown error").trim()}`);
       gitIdentity = directoryIdentity(fs.lstatSync(join(root, ".git")));
       if (!gitIdentity) throw new Error("created Git control directory identity is unavailable");
+      gitTree = physicalTreeSnapshot(join(root, ".git"), fs);
     }
     for (const target of state.targets) {
       const path = safePath(root, target.path, fs);
@@ -1171,7 +1208,7 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     if (manifest.status !== "ok") throw new Error("post-apply canonical manifest validation was not ready");
     return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: state.hostManaged ? { mode: "host-managed", initialized: false, initialBranch: null, committed: false } : { mode: "local", initialized: gitIdentity !== null, initialBranch: "main", committed: false }, authority: { status: "portable-seed", runtimeProjection: "missing" }, diagnostics: [] };
   } catch (error) {
-    const rollbackFailures = root ? rollback(root, created, createdDirectories, gitIdentity, gitWasExpectedAbsent, fs) : [];
+    const rollbackFailures = root ? rollback(root, created, createdDirectories, gitIdentity, gitTree, gitWasExpectedAbsent, fs) : [];
     if (rollbackFailures.length) return { schema: PLAN_SCHEMA, status: "rollback-failed", root, diagnostics: [diagnostic("$.transaction", "rollback_failed", `${error.message}; rollback also failed: ${rollbackFailures[0].message}`, "repair generated paths manually before retrying")] };
     return { schema: PLAN_SCHEMA, status: "rolled-back", root, diagnostics: [diagnostic("$.transaction", "apply_failed", error.message, "repair the root and run inspect then plan again")] };
   }

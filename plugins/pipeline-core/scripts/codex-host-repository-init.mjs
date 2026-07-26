@@ -15,8 +15,10 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  readdirSync,
   realpathSync,
   rmSync,
+  rmdirSync,
   writeFileSync,
 } from "node:fs";
 import { join, resolve } from "node:path";
@@ -186,6 +188,58 @@ function samePhysicalIdentity(path, expected, fs = {}) {
   }
 }
 
+function physicalTreeSnapshot(path, fs = {}) {
+  const lstat = fs.lstatSync ?? lstatSync;
+  const read = fs.readFileSync ?? readFileSync;
+  const readdir = fs.readdirSync ?? readdirSync;
+  const rows = [];
+  function visit(current, relative) {
+    const info = lstat(current);
+    if (info.isSymbolicLink()) throw new Error("Git control tree contains a symbolic link");
+    if (info.isDirectory()) {
+      rows.push({ path: relative, kind: "directory", dev: String(info.dev), ino: String(info.ino) });
+      for (const name of readdir(current).sort()) {
+        visit(join(current, name), relative ? `${relative}/${name}` : name);
+      }
+      return;
+    }
+    if (!info.isFile() || info.nlink !== 1) throw new Error("Git control tree contains an unsafe file");
+    rows.push({
+      path: relative,
+      kind: "file",
+      dev: String(info.dev),
+      ino: String(info.ino),
+      sha256: sha256(read(current)),
+    });
+  }
+  visit(path, "");
+  return rows;
+}
+
+function assertPhysicalDirectory(path, fs = {}) {
+  const identity = physicalIdentity((fs.lstatSync ?? lstatSync)(path), "directory");
+  if (!identity) throw new Error("host-init path contains a non-physical directory");
+  return identity;
+}
+
+function assertPhysicalParents(root, relative, fs = {}) {
+  let current = root;
+  for (const component of relative.split("/")) {
+    current = join(current, component);
+    assertPhysicalDirectory(current, fs);
+  }
+}
+
+function createPrivateDirectory(path, parent, created, fs = {}) {
+  const exists = fs.existsSync ?? existsSync;
+  if (exists(path)) throw new Error("host-init private directory appeared before creation");
+  assertPhysicalDirectory(parent, fs);
+  (fs.mkdirSync ?? mkdirSync)(path, { mode: 0o700 });
+  const identity = physicalIdentity((fs.lstatSync ?? lstatSync)(path), "directory");
+  if (!identity) throw new Error("created host-init directory identity is unavailable");
+  created.directories.push({ path, identity });
+}
+
 function removeCreatedFile(path, expected, fs = {}) {
   const exists = fs.existsSync ?? existsSync;
   if (!exists(path)) return;
@@ -195,29 +249,46 @@ function removeCreatedFile(path, expected, fs = {}) {
   (fs.rmSync ?? rmSync)(path, { force: true });
 }
 
-function removeCreatedGit(root, expected, fs = {}) {
+function removeCreatedDirectory(path, expected, fs = {}) {
+  const exists = fs.existsSync ?? existsSync;
+  if (!exists(path)) return;
+  if (!samePhysicalIdentity(path, expected, fs)) {
+    throw new Error("created host-init directory changed identity before rollback");
+  }
+  (fs.rmdirSync ?? rmdirSync)(path);
+}
+
+function removeCreatedGit(root, expected, expectedTree, fs = {}) {
   const path = join(root, ".git");
   const exists = fs.existsSync ?? existsSync;
   if (!exists(path)) return;
   if (!samePhysicalIdentity(path, expected, fs)) {
     throw new Error("created Git control directory changed identity before rollback");
   }
+  const actualTree = physicalTreeSnapshot(path, fs);
+  if (JSON.stringify(actualTree) !== JSON.stringify(expectedTree)) {
+    throw new Error("created Git control tree changed before rollback");
+  }
   (fs.rmSync ?? rmSync)(path, { recursive: true, force: true });
 }
 
-function bindPrivateContinuity(root, { planSha256, gitVersion }, fs = {}, created = {}) {
+function bindPrivateContinuity(root, { planSha256, gitVersion, gitIdentity }, fs = {}, created = {}) {
   const source = join(root, ".claude/.runtime/agent-pipeline/onboarding/continuity-history.json");
-  const directory = join(root, ".git/agent-pipeline/onboarding");
+  const git = join(root, ".git");
+  const agentPipeline = join(git, "agent-pipeline");
+  const directory = join(agentPipeline, "onboarding");
   const target = join(directory, "continuity-history.json");
   const receiptPath = join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT);
   const read = fs.readFileSync ?? readFileSync;
-  const mkdir = fs.mkdirSync ?? mkdirSync;
   const write = fs.writeFileSync ?? writeFileSync;
   const open = fs.openSync ?? openSync;
   const sync = fs.fsyncSync ?? fsyncSync;
   const close = fs.closeSync ?? closeSync;
   const historyBytes = read(source);
-  mkdir(directory, { recursive: true, mode: 0o700 });
+  if (!samePhysicalIdentity(git, gitIdentity, fs)) throw new Error("Git control identity changed before continuity binding");
+  createPrivateDirectory(agentPipeline, git, created, fs);
+  createPrivateDirectory(directory, agentPipeline, created, fs);
+  assertPhysicalParents(root, ".git/agent-pipeline/onboarding", fs);
   write(target, historyBytes, { flag: "wx", mode: 0o600 });
   created.history = physicalIdentity((fs.lstatSync ?? lstatSync)(target), "file");
   if (!created.history) throw new Error("created continuity identity is unavailable");
@@ -236,6 +307,7 @@ function bindPrivateContinuity(root, { planSha256, gitVersion }, fs = {}, create
     branch: "main",
   };
   if (receipt.authoritySha256 === null) throw new Error("host-init authority is unavailable");
+  assertPhysicalParents(root, ".claude/.runtime/agent-pipeline/onboarding", fs);
   write(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, { flag: "wx", mode: 0o600 });
   created.receipt = physicalIdentity((fs.lstatSync ?? lstatSync)(receiptPath), "file");
   if (!created.receipt) throw new Error("created receipt identity is unavailable");
@@ -290,14 +362,18 @@ export function applyHostRepositoryInit({
         diagnostics: [{ code: "git_init_identity_unavailable" }],
       };
     }
-    const created = { history: null, receipt: null };
+    const gitTree = physicalTreeSnapshot(join(root, ".git"), deps);
+    const created = { history: null, receipt: null, directories: [] };
     try {
-      bindPrivateContinuity(root, { planSha256, gitVersion }, deps, created);
+      bindPrivateContinuity(root, { planSha256, gitVersion, gitIdentity }, deps, created);
     } catch {
       try {
         removeCreatedFile(join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT), created.receipt, deps);
         removeCreatedFile(join(root, ".git/agent-pipeline/onboarding/continuity-history.json"), created.history, deps);
-        removeCreatedGit(root, gitIdentity, deps);
+        for (const entry of [...created.directories].reverse()) {
+          removeCreatedDirectory(entry.path, entry.identity, deps);
+        }
+        removeCreatedGit(root, gitIdentity, gitTree, deps);
       } catch {
         return { schema: APPLY_SCHEMA, status: "rollback-failed", root, diagnostics: [{ code: "host_init_identity_changed" }] };
       }

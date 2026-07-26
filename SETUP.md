@@ -194,7 +194,9 @@ checks and has these outcomes:
   confirmation. The agent runs the plugin-local read-only `inspect` and `plan`
   operations and reports their public targets/digests.
 - Only an explicit user request to create or initialize the project authorizes
-  the exact plugin-local `project-onboarding-v3.mjs apply --activate` command.
+  the exact digest-bound plugin-local `project-onboarding-v3.mjs
+  apply-portable-seed --plan-sha256 … --activate` action returned by the
+  reviewed plan. There is no unbound `apply` compatibility alias.
   For a normal root that transaction initializes Git and the complete V3
   source/runtime seed. For `fresh-host-managed`, it creates only the portable
   authority and `.claude/**`, retaining Codex-owned `.git`/`.codex` controls

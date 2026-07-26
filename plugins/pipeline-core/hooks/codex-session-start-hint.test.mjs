@@ -2,13 +2,16 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { main, sessionStartDecision, sessionStartMessage } from "./codex-session-start-hint.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "codex-session-start-hint-"));
+const script = fileURLToPath(new URL("./codex-session-start-hint.mjs", import.meta.url));
 try {
   const optional = sessionStartDecision(root);
   assert.equal(optional.governed, false);
@@ -39,7 +42,28 @@ try {
   assert.equal(payload.hookSpecificOutput.hookEventName, "SessionStart");
   assert.equal(payload.hookSpecificOutput.additionalContext, governed.context);
 
-  console.log("codex-session-start-hint: 13 passed");
+  const fresh = mkdtempSync(join(tmpdir(), "codex-session-start-native-cwd-"));
+  try {
+    const governedCwd = spawnSync(process.execPath, [script], {
+      cwd: root,
+      encoding: "utf8",
+      env: { ...process.env, CLAUDE_PROJECT_DIR: fresh },
+    });
+    assert.equal(governedCwd.status, 0, governedCwd.stderr);
+    assert.equal(JSON.parse(governedCwd.stdout).systemMessage, governed.message);
+
+    const optionalCwd = spawnSync(process.execPath, [script], {
+      cwd: fresh,
+      encoding: "utf8",
+      env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+    });
+    assert.equal(optionalCwd.status, 0, optionalCwd.stderr);
+    assert.equal(JSON.parse(optionalCwd.stdout).systemMessage, optional.message);
+  } finally {
+    rmSync(fresh, { recursive: true, force: true });
+  }
+
+  console.log("codex-session-start-hint: 15 passed");
 } finally {
   rmSync(root, { recursive: true, force: true });
 }

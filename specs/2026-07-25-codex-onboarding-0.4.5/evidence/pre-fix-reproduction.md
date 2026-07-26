@@ -66,7 +66,7 @@ without an overwrite attempt`. On the 0.4.5 candidate it reports:
 
 ```text
 PASS  a recognized read-only host control layout receives portable onboarding without an overwrite attempt
-project-onboarding-v3: 34 passed, 0 failed
+project-onboarding-v3: 35 passed, 0 failed
 ```
 
 Command:

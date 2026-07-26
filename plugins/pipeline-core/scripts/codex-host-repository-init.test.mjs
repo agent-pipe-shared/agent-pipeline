@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -248,4 +250,67 @@ test("host rollback preserves a Git directory whose identity changed during bind
   assert.equal(result.status, "rollback-failed");
   assert.deepEqual(result.diagnostics, [{ code: "host_init_identity_changed" }]);
   assert.equal(readFileSync(join(root, ".git", "foreign"), "utf8"), "foreign\n");
+});
+
+test("host rollback preserves foreign content added beneath the same Git directory", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        assert.equal(command, "git");
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        mkdirSync(join(options.cwd, ".git"));
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      writeFileSync(target, bytes, options) {
+        if (target === join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT)) {
+          writeFileSync(join(root, ".git", "foreign"), "foreign\n");
+          throw new Error("synthetic Git content race");
+        }
+        writeFileSync(target, bytes, options);
+      },
+    },
+  });
+  assert.equal(result.status, "rollback-failed");
+  assert.equal(readFileSync(join(root, ".git", "foreign"), "utf8"), "foreign\n");
+});
+
+test("host binding never follows a raced-in Git continuity symlink", (t) => {
+  if (process.platform === "win32") return t.skip("POSIX symlink fixture");
+  const root = fixture();
+  const outside = mkdtempSync(join(tmpdir(), "codex host init outside "));
+  roots.push(outside);
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        assert.equal(command, "git");
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        mkdirSync(join(options.cwd, ".git"));
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      mkdirSync(target, options) {
+        if (target === join(root, ".git", "agent-pipeline")) {
+          symlinkSync(outside, target, "dir");
+          return;
+        }
+        mkdirSync(target, options);
+      },
+    },
+  });
+  assert.equal(result.status, "rollback-failed");
+  assert.equal(existsSync(join(outside, "onboarding", "continuity-history.json")), false);
 });

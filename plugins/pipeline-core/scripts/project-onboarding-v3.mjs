@@ -28,7 +28,7 @@ function parse(args) {
     if (args[1] !== "inspect") return { error: "continuity requires inspect" };
     output.command = "continuity-inspect";
     start = 2;
-  } else if (["inspect", "plan", "apply", "apply-portable-seed", "plan-runtime", "initialize-runtime", "plan-repair", "apply-repair", "plan-readback", "apply-readback"].includes(args[0])) {
+  } else if (["inspect", "plan", "apply-portable-seed", "plan-runtime", "initialize-runtime", "plan-repair", "apply-repair", "plan-readback", "apply-readback"].includes(args[0])) {
     output.command = args[0];
     start = 1;
   }
@@ -46,7 +46,7 @@ function parse(args) {
   if (!output.help && !output.root) return { error: "--root is required" };
   if (output.command?.startsWith("kickoff-") && output.goal === undefined) return { error: "kickoff plan/apply requires --goal <text>" };
   if (!output.command?.startsWith("kickoff-") && output.goal !== undefined) return { error: "--goal is only valid for kickoff plan/apply" };
-  if (output.activate && !["apply", "apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback", "kickoff-apply"].includes(output.command)) return { error: "--activate is only valid for an apply command" };
+  if (output.activate && !["apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback", "kickoff-apply"].includes(output.command)) return { error: "--activate is only valid for an apply command" };
   return output;
 }
 export function main(args = process.argv.slice(2), {
@@ -85,15 +85,13 @@ export function main(args = process.argv.slice(2), {
           : options.command === "apply-readback"
             ? "readback"
             : "portable";
-      let planSha256 = options.planSha256;
-      // `apply` remains a one-process compatibility alias for older callers. The
-      // public V4 commands stay digest-bound and never reconstruct an unbound plan.
-      if (options.command === "apply" && options.activate) {
-        const plan = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation });
-        const argv = plan.nextAction?.argv;
-        planSha256 = Array.isArray(argv) ? argv[argv.indexOf("--plan-sha256") + 1] : undefined;
-      }
-      output = applyProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation, planSha256, activate: options.activate });
+      output = applyProjectOnboardingLifecycleV4({
+        rootDir: options.root,
+        deps,
+        operation,
+        planSha256: options.planSha256,
+        activate: options.activate,
+      });
     }
   } catch (error) {
     const code = typeof error?.code === "string" ? error.code : "ONBOARDING-ERROR";

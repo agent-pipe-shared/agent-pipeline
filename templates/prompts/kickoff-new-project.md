@@ -62,11 +62,13 @@ The only fresh-project initializer is the loaded plugin command:
 ```sh
 node "${PIPELINE_PLUGIN_ROOT}/scripts/project-onboarding-v3.mjs" inspect --root "$PWD"
 node "${PIPELINE_PLUGIN_ROOT}/scripts/project-onboarding-v3.mjs" plan --root "$PWD"
-node "${PIPELINE_PLUGIN_ROOT}/scripts/project-onboarding-v3.mjs" apply --root "$PWD" --activate
+node "${PIPELINE_PLUGIN_ROOT}/scripts/project-onboarding-v3.mjs" apply-portable-seed --root "$PWD" --plan-sha256 "<digest-from-plan>" --activate
 ```
 
-`inspect` and `plan` are read-only. The final command is the sole write step;
-run it only when the PO has explicitly asked to create/initialize this project.
+`inspect` and `plan` are read-only. The final line illustrates the exact action
+returned by `plan`; never reconstruct it or omit its digest. It is the sole
+write step and runs only when the PO has explicitly asked to
+create/initialize this project.
 It initializes the repository and the safe V3 seed, but does not commit, add a
 remote, install dependencies, scaffold the application, or choose project
 policy beyond that seed. After it succeeds, rerun

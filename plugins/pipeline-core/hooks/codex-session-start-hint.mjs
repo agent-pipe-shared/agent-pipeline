@@ -13,7 +13,7 @@ const GOVERNANCE_MARKERS = [
   ".claude/pipeline.yaml",
 ];
 
-export function sessionStartDecision(projectDir = process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), exists = existsSync) {
+export function sessionStartDecision(projectDir = process.cwd(), exists = existsSync) {
   let governed = false;
   try {
     const root = resolve(projectDir);
@@ -47,7 +47,7 @@ export function sessionStartDecision(projectDir = process.env.CLAUDE_PROJECT_DIR
   };
 }
 
-export function sessionStartMessage(projectDir = process.env.CLAUDE_PROJECT_DIR ?? process.cwd(), exists = existsSync) {
+export function sessionStartMessage(projectDir = process.cwd(), exists = existsSync) {
   return sessionStartDecision(projectDir, exists).message;
 }
 

@@ -653,6 +653,15 @@ test("public CLI emits typed inspect, plan, and explicit-apply results", () => {
     return { code, result: JSON.parse(output) };
   };
   try {
+    let aliasOutput = "";
+    const aliasCode = onboardingCli(["apply", "--root", path, "--activate"], {
+      deps: fakeDeps,
+      write: (chunk) => { aliasOutput += chunk; },
+    });
+    assert.equal(aliasCode, 2);
+    assert.match(aliasOutput, /unknown argument: apply/u);
+    assert.deepEqual(names(path), []);
+
     const inspected = invoke(["inspect", "--root", path]);
     assert.equal(inspected.code, 0); assert.equal(inspected.result.status, "portable-seed-required");
     const planned = invoke(["plan", "--root", path]);
@@ -1601,6 +1610,27 @@ test("portable rollback preserves a target whose identity changed after exclusiv
     const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: racing });
     assert.equal(applied.status, "rollback-failed");
     assert.equal(readFileSync(firstTarget, "utf8"), "foreign bytes\n");
+  } finally { dispose(path); }
+});
+
+test("portable rollback preserves foreign content added beneath its Git directory", () => {
+  const path = root(); let injected = false;
+  const racing = {
+    ...fakeDeps,
+    writeFileSync(target, bytes, options) {
+      if (!injected) {
+        injected = true;
+        writeFileSync(join(path, ".git", "foreign"), "foreign git bytes\n");
+        throw new Error("synthetic Git content race");
+      }
+      writeFileSync(target, bytes, options);
+    },
+  };
+  try {
+    const plan = planProjectOnboardingV3({ rootDir: path, deps: racing });
+    const applied = applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: racing });
+    assert.equal(applied.status, "rollback-failed");
+    assert.equal(readFileSync(join(path, ".git", "foreign"), "utf8"), "foreign git bytes\n");
   } finally { dispose(path); }
 });
 
