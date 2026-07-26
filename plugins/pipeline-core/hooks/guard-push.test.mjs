@@ -201,6 +201,13 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
     ALLOW,
     { stderrEmpty: true },
   );
+  check(
+    "PG03a block  dynamic inline override prefix stays inside the strict shell grammar",
+    `PIPELINE_GUARD_OVERRIDE="$(id)" git push origin ${head}:refs/heads/main`,
+    dir,
+    BLOCK,
+    { stderrIncludes: ["not unambiguous"] },
+  );
 }
 {
   const { dir } = freshRepo("opt-in-ambiguous");

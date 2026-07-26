@@ -122,10 +122,19 @@ if (!rawCommand) process.exit(0);
  * host adapter that invokes both guards on the same Bash input.
  */
 function commandAfterDocumentedOverridePrefix(command) {
-  const bash = command.match(/^PIPELINE_GUARD_OVERRIDE=(?:'[^']*'|"[^"]*"|\S+)\s+([\s\S]*)$/u);
-  if (bash) return bash[1] ?? command;
-  const powerShell = command.match(/^\$env:PIPELINE_GUARD_OVERRIDE\s*=\s*(?:'[^']*'|"[^"]*")\s*;\s*([\s\S]*)$/iu);
-  return powerShell ? (powerShell[1] ?? command) : command;
+  const bash = command.match(/^PIPELINE_GUARD_OVERRIDE=(?:'([^']*)'|"([^"]*)"|([A-Za-z0-9_.:|/-]+))\s+([\s\S]*)$/u);
+  if (bash) {
+    const [, singleQuoted, doubleQuoted, unquoted, remainder] = bash;
+    if (singleQuoted !== undefined) return remainder;
+    if (doubleQuoted !== undefined && !/[`$\\]/u.test(doubleQuoted)) return remainder;
+    if (unquoted !== undefined) return remainder;
+    return command;
+  }
+  const powerShell = command.match(/^\$env:PIPELINE_GUARD_OVERRIDE\s*=\s*(?:'([^']*)'|"([^"]*)")\s*;\s*([\s\S]*)$/iu);
+  if (!powerShell) return command;
+  const [, singleQuoted, doubleQuoted, remainder] = powerShell;
+  if (singleQuoted !== undefined || (doubleQuoted !== undefined && !/[`$\\]/u.test(doubleQuoted))) return remainder;
+  return command;
 }
 
 const cmd = commandAfterDocumentedOverridePrefix(rawCommand);
