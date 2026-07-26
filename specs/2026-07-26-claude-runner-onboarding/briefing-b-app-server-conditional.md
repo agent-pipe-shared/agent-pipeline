@@ -1,16 +1,14 @@
 # Prepared Goldfish briefing — CLAUDE-RUNNER-01b: runner-conditional App-Server/restart requirement
 
-> **Status: NOT YET DISPATCHED — depends on CLAUDE-RUNNER-01a landing and
-> verifying first** (this task consumes the runner-derivation shape (a)
-> establishes in `project-onboarding-v3.mjs`/`project-onboarding-ready-gate.mjs`).
-> Do not dispatch this briefing until (a)'s own DoD checks pass and its
-> commit is confirmed. PO gate answered "freigeben" for
-> `prd_claude-runner-onboarding.md`/`spec.md` (2026-07-26, recorded in
-> `docs/state.md`). Ruleset SHA placeholder: refresh to (a)'s landing commit
-> before dispatch — do not dispatch with a stale SHA. **Worktree: no** — run
-> directly in the main checkout, same reasoning as (a) (documented
-> worktree-isolation incident, this branch has diverged too far from
-> `origin/main` for `isolation: "worktree"` to anchor correctly).
+> **Status: DISPATCHING NOW.** CLAUDE-RUNNER-01a landed as `88c8029` and was
+> independently re-verified (own re-run of both test files, full 9-file
+> regression sweep, `plan-verifier` 12/2/0 — see `docs/state.md`'s
+> "CLAUDE-RUNNER-01a CLOSED" entry, 2026-07-27). PO gate answered "freigeben"
+> for `prd_claude-runner-onboarding.md`/`spec.md` (2026-07-26, recorded in
+> `docs/state.md`). Ruleset SHA `3ecc41a` (current HEAD at dispatch time).
+> **Worktree: no** — run directly in the main checkout, same reasoning as
+> (a) (documented worktree-isolation incident, this branch has diverged too
+> far from `origin/main` for `isolation: "worktree"` to anchor correctly).
 
 ---
 
@@ -21,7 +19,7 @@ files or session history — this briefing replaces them.
 
 First output line (compact bootstrap confirmation):
 
-> Bootstrap check passed: ruleset <REFRESH-SHA> loaded · Project agent-pipeline · Calibration .claude/pipeline.json · State briefing CLAUDE-RUNNER-01b/2026-07-26 · Role Goldfish (deep)
+> Bootstrap check passed: ruleset 3ecc41a loaded · Project agent-pipeline · Calibration .claude/pipeline.json · State briefing CLAUDE-RUNNER-01b/2026-07-26 · Role Goldfish (deep)
 
 ---
 
@@ -207,8 +205,7 @@ break — search for consumers before deciding.
 
 ### 6. Dispatch metadata
 
-- Ruleset SHA/version: refresh to (a)'s landing commit SHA before dispatch —
-  placeholder, do not dispatch unrefreshed.
+- Ruleset SHA/version: `3ecc41a` (current HEAD at dispatch time, 2026-07-27).
 - Model/effort: `goldfish-deep` / xhigh. Rationale: rigor 2 / risk class high
   per Spec header; this task also creates a net-new test file with no
   established fixture precedent (v3-bootstrap-authority.test.mjs), requiring
