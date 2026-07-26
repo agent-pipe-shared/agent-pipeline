@@ -1,6 +1,6 @@
 # Sprint Phoenix design readiness audit
 
-Status: privacy design gate passed; lifecycle-writer package sequencing corrected and pending re-review
+Status: design review passed; close reconciliation and Product Owner gate pending
 
 Date: 2026-07-26
 
@@ -24,7 +24,7 @@ independent review, commit, push, implementation, and final Epic completion.
 | Produce one coherent Epic architecture | Separate canonical streams over one event kernel; dependency graph and one-writer package sequence in [architecture.md](architecture.md) | PROVEN |
 | Remain independent of Nova/Cyborg/Nightwing | Accepted prerequisites and negative dependency gate `EPIC-AC-02` | PROVEN in design; implementation evidence pending |
 | Use Advisor help | Approved bounded routes attempted; primaries timed out, earlier fallbacks timed out, and the latest exact fast-fallback role was unavailable in the adapter; workspace digests remained unchanged; [advisor-review.md](advisor-review.md) | ATTEMPTED / UNAVAILABLE, never passed |
-| Obtain independent semantic review | Initial and correction candidates received uncontaminated read-only Critic verdicts; [critic-review.md](critic-review.md) | Writer inventory correction accepted; one resulting PHX-0 sequencing major corrected and awaiting bounded re-review |
+| Obtain independent semantic review | Initial and correction candidates received uncontaminated read-only Critic verdicts; [critic-review.md](critic-review.md) | PROVEN; every original, privacy, inventory, and PHX-0 sequencing finding cleared by fresh fixed-candidate review |
 | Satisfy the data-privacy policy gate | [privacy-review.md](privacy-review.md) inventories processing, normative Spec interpretation, repository-wide portable access/retention, fail-closed non-personal admission, restricted local erasure in Spec-listed files, external boundaries, and fixtures | PROVEN for design by final fixed-candidate PASS; implementation evidence remains pending |
 | Produce readable PRD and exact Spec binding | [../prd_phoenix-epic.md](../prd_phoenix-epic.md) plus its `technical-spec-sha256` marker | PROVEN as draft; approval pending |
 | No implementation before literal `approved` | Only the design package, lifecycle state, and recovery audit are changed; no product source/schema/test is created | PROVEN for current workspace |
@@ -94,6 +94,7 @@ trusted time, destination retention, analyst review, or compliance.
 | Independent re-review of second privacy correction | PASS with no findings; PHX-PR-01..05 cleared; machine trajectory consistent; no write or delegation |
 | Comprehensive original-finding re-review on `4dad856c216e3a55cba658ee1ea9d9752144674a` | FAIL with one major; PHX-CR-01..04/06 and PHX-PR-01..05 cleared; PHX-CR-05R accepted and corrected without a Spec edit or out-of-inventory implementation file |
 | Lifecycle-writer inventory correction re-review on `df0387a2b62e85e5cc881e6a41ddff596fe42db3` | FAIL with one major; inventory/transaction design accepted; PHX-CR-05S package-sequence conflict accepted and corrected by making writer closure mandatory PHX-0 slice A |
+| Final PHX-0 sequencing correction re-review on `49c1a167c70a83e7e45422ee4407bfd8293d387d` | PASS with no findings; PHX-CR-05S and direct regressions cleared; machine trajectory consistent; no write or delegation |
 
 The machine files are Git-ignored by repository policy and are passed directly
 as evidence paths to the next Critic. Their command, exit code, timestamp,
@@ -118,11 +119,9 @@ evidence, issue closure, and Product Owner approval remain unclaimed.
 
 ## Remaining authority gates
 
-1. Freshly re-review PHX-CR-05S, its PHX-0 slice correction, and direct
-   regressions with exact machine evidence.
-2. Record the final comprehensive verdict and bind the exact design candidate.
-3. Reconcile the canonical handover and design-gate continuity projection.
-4. Present the readable PRD and wait for the literal Product Owner
+1. Reconcile the canonical handover and design-gate continuity projection.
+2. Run the exact post-close deterministic and repository gates.
+3. Present the readable PRD and wait for the literal Product Owner
    `approved` implementation gate.
 
 No remote write is needed for these design-readiness steps.

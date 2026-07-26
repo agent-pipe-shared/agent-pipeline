@@ -101,6 +101,8 @@ The first compensating review is recorded in
 privacy, recovery, lifecycle, and evidence gaps. The first independent privacy
 review then found two further enforceability gaps, and its correction re-review
 found three more; all were corrected without waiver. The final privacy
-re-review passed. Phoenix remains in design review until the initial broad
-Critic's six findings and direct regressions receive their comprehensive
-re-review.
+re-review passed. Two later lifecycle-writer re-reviews exposed and corrected
+the closed-inventory and PHX-0 sequencing gaps. The final fixed-candidate
+re-review passed with no findings. This compensating chain establishes design
+review readiness but never converts any unavailable Advisor attempt into an
+Advisor pass.

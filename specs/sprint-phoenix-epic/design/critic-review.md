@@ -1,6 +1,6 @@
 # Sprint Phoenix independent review record
 
-Status: privacy re-review passed; comprehensive original-finding re-review pending
+Status: privacy and comprehensive correction re-reviews passed; Product Owner gate pending
 
 Date: 2026-07-26
 
@@ -223,3 +223,29 @@ writer Verify/Critic passes, and PHX-1..6 cannot start until PHX-0 completes.
 Acceptance P-AC-08 carries the same normative sequencing. A fresh bounded
 re-review must clear PHX-CR-05S and direct regressions; this FAIL is never
 rewritten.
+
+## PHX-0 sequencing correction re-review — final verdict
+
+| Field | Value |
+| --- | --- |
+| Candidate commit | `49c1a167c70a83e7e45422ee4407bfd8293d387d` |
+| Candidate tree | `2d2990bb98d4ed98bca527ddd1019155213d8cd4` |
+| Correction range | `df0387a2b62e85e5cc881e6a41ddff596fe42db3..49c1a167c70a83e7e45422ee4407bfd8293d387d` |
+| Verify evidence SHA-256 | `9e5160d9e4375dc529886b31f48988a90b5ccae84e40fa69a3b6c53c0e19787d` |
+| Security evidence SHA-256 | `30bf538b1deed29dacc76337e9456aaebd647a53814508b8fbc69dfc13ddae18` |
+| Assurance | `functional-equivalent-read-only; OS isolation not asserted` |
+| Reviewer mutation / delegation | none / none |
+| Machine trajectory | consistent |
+| Verdict | PASS |
+
+The fresh higher-capability Critic reported no findings. It explicitly cleared
+PHX-CR-05S: writer and trust-root work are ordered slices A/B of one PHX-0
+package, PHX-1 is gated on complete PHX-0, Spec §4.6 remains coherent, and
+P-AC-08 supplies the normative slice-level constraint. It also cleared direct
+scope, test-integrity, failure-path, security, dependency, language,
+governance-policy, lifecycle-hash, and machine-evidence regressions.
+
+This PASS closes the comprehensive Phoenix design Critic course gate. It does
+not rewrite any prior FAIL, establish native OS isolation or effective model
+identity, approve the plan, authorize implementation, or perform a remote
+write.

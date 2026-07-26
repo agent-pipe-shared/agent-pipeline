@@ -1,6 +1,6 @@
 # Sprint Phoenix governance conformance
 
-Status: privacy gate met; lifecycle-writer PHX-0 sequencing correction pending re-review
+Status: design governance review met; Product Owner gate pending
 
 Date: 2026-07-26
 
@@ -49,13 +49,13 @@ No design-stage deviation from the twelve guidelines is proposed.
 
 | Risk | Owner | Expiry | Required disposition |
 | --- | --- | --- | --- |
-| `PHX-DESIGN-ADVISORY-UNAVAILABLE` | Phoenix Elephant, with PO authority for review dispatch | 2026-07-31 | Advisor routes remain unavailable. Compensating review cleared all privacy findings and five original findings; one lifecycle-writer correction awaits re-review. Never claim Advisor pass. |
+| `PHX-DESIGN-ADVISORY-UNAVAILABLE` | Phoenix Elephant, with PO authority for review dispatch | 2026-07-31 | RESOLVED for design readiness by the authorized compensating review chain: all original, privacy, writer-inventory, and PHX-0 sequencing findings cleared. Advisor itself remains unavailable and is never claimed passed. |
 | `PHX-DESIGN-INHERITED-CONTINUITY` | Product Owner for exception authority; Phoenix Elephant for exact execution/readback | 2026-07-31 | RESOLVED 2026-07-26 through the documented exact repair, sanctioned writers, Phoenix continuity initialization, cleanup, and full bootstrap readback. |
 | `PHX-DESIGN-HANDOVER-DRIFT` | Phoenix close owner; Product Owner controls scope | 2026-07-31 | Reconcile the canonical handover at close without reopening Product Owner-dispositioned 0.4.6 implementation. |
 | `PHX-LEGACY-AUTHORITY-COMPATIBILITY` | Phoenix integration-package owner | Earlier of Phoenix integration close or 2026-10-31 | Migrate every direct mutable authority reader, dual-evaluate ledger/state, block disagreement, and prohibit compatibility removal or Phoenix completion while any reader remains unmigrated. |
 | `PHX-PRIVACY-PORTABLE-TRUST-ZONE` | Phoenix integration-package owner | Before Product Owner gate | RESOLVED 2026-07-26 by fixed-candidate privacy PASS over the normative Spec §§4.4–4.5 interpretation and repository-wide admission. |
 | `PHX-PRIVACY-RESTRICTED-ERASURE` | Phoenix integration-package owner | Before Product Owner gate | RESOLVED 2026-07-26 by fixed-candidate privacy PASS over portable-only append semantics, restricted erasure/key destruction, and Spec-inventory ownership. |
-| `PHX-LIFECYCLE-WRITER-INVENTORY` | Phoenix design owner | Before Product Owner gate | File inventory/transaction design accepted by Critic; PHX-CR-05S sequencing correction now makes writer closure mandatory PHX-0 slice A, before its trust-root slice and PHX-1..6; fresh Critic clearance is pending. |
+| `PHX-LIFECYCLE-WRITER-INVENTORY` | Phoenix design owner | Before Product Owner gate | RESOLVED 2026-07-26 by final Critic PASS: only Spec-listed writer files, complete transaction/recovery contract, mandatory PHX-0 slice A, trust-root slice B, then PHX-1..6. |
 
 If an open risk reaches its date without disposition, the Phoenix design returns to a
 blocked course gate. The expiry does not authorize the action automatically.
