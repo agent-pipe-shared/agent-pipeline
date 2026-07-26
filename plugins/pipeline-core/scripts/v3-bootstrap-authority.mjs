@@ -5,17 +5,26 @@
  * Read-only public V3 bootstrap authority validator.
  *
  * Consumer roots are not required to ship setup.mjs. The V3 migration owns
- * the source and every runtime projection, so a current V3 source followed by
- * that migration's empty plan is the complete public bootstrap authority.
+ * the source and every runtime projection, while this common reader also
+ * requires the current private native Codex readback before returning ready.
  */
 import { pathToFileURL } from "node:url";
-import { readFileSync } from "node:fs";
+import { lstatSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import {
   inspectRunnerProfileMigrationV3,
   planRunnerProfileMigrationV3,
 } from "../lib/runner-profile-migration-v3.mjs";
+import { loadManifest } from "../lib/manifest.mjs";
+import {
+  readCurrentRuntimeReadback,
+  readRestartBarrier,
+} from "../lib/codex-onboarding-runtime.mjs";
+import {
+  hasCodexRuntimeControlMount,
+  readCodexHostRepositoryInitAdmission,
+} from "../lib/codex-host-layout.mjs";
 
 const SCHEMA = "pipeline.v3-bootstrap-authority.v1";
 
@@ -27,9 +36,12 @@ function rejected(root, diagnostics, extra = {}) {
   return { schema: SCHEMA, status: "rejected", root, diagnostics, ...extra };
 }
 
-function hasHostManagedCalibration(root) {
+function hasHostManagedCalibration(root, deps = {}) {
   try {
-    const calibration = JSON.parse(readFileSync(join(root, ".claude", "pipeline.json"), "utf8"));
+    const calibration = JSON.parse((deps.readFileSync ?? readFileSync)(
+      join(root, ".claude", "pipeline.json"),
+      "utf8",
+    ));
     return calibration?.repositoryMode === "host-managed";
   } catch { return false; }
 }
@@ -41,6 +53,130 @@ function isHostManagedCodexProjection(plan, inspection) {
     && plan.sourceSha256 === inspection.sourceSha256
     && (plan.changes?.length ?? 0) > 0
     && plan.changes.every((change) => change?.path?.startsWith(".codex/"));
+}
+
+function isPluginManagedCodexProjection(root, plan, inspection, deps) {
+  let durableHostInit = false;
+  try {
+    try {
+      (deps.lstatSync ?? lstatSync)(join(root, ".codex"));
+    } catch (error) {
+      if (error?.code === "ENOENT") {
+        durableHostInit = readCodexHostRepositoryInitAdmission(root, {
+          lstat: deps.lstatSync,
+          readFile: deps.readFileSync,
+          platform: deps.process?.platform,
+        }) !== null;
+      }
+    }
+  } catch {
+    durableHostInit = false;
+  }
+  return inspection.sourceKind === "v3"
+    && plan.status === "ready"
+    && plan.runtimeMode === "host-managed-codex"
+    && plan.sourceSha256 === inspection.sourceSha256
+    && (plan.changes?.length ?? 0) > 0
+    && plan.changes.every((change) => change?.path?.startsWith(".codex/"))
+    && (
+      hasCodexRuntimeControlMount(root, {
+        access: deps.accessSync,
+        fsConstants: deps.constants,
+        lstat: deps.lstatSync,
+        readdir: deps.readdirSync,
+      })
+      || durableHostInit
+    );
+}
+
+function repositoryCapability(root, deps) {
+  return hasHostManagedCalibration(root, deps) ? "host-managed" : "local";
+}
+
+function projectionCurrent(root, inspection, runtimeProjection, extra = {}, deps = {}) {
+  const repositoryMode = repositoryCapability(root, deps);
+  let barrier;
+  try {
+    barrier = readRestartBarrier({
+      rootDir: root,
+      repositoryCapability: repositoryMode,
+      deps,
+    });
+  } catch {
+    return rejected(root, [diagnostic(
+      "$.runtime",
+      "v3_runtime_readback_unavailable",
+      "the private Codex runtime readback authority could not be observed safely",
+      "repair the private runtime state before bootstrap",
+    )], {
+      source: inspection.source,
+      sourceKind: "v3",
+      sourceSha256: inspection.sourceSha256,
+      runtimeProjection,
+      ...extra,
+    });
+  }
+  if (barrier.status === "absent") {
+    return {
+      schema: SCHEMA,
+      status: "projection-current",
+      root,
+      source: inspection.source,
+      sourceKind: "v3",
+      sourceSha256: inspection.sourceSha256,
+      runtimeProjection,
+      runtimeReadback: "absent",
+      diagnostics: [],
+      ...extra,
+    };
+  }
+  if (barrier.barrier.state === "restart-required") {
+    return {
+      schema: SCHEMA,
+      status: "restart-required",
+      root,
+      source: inspection.source,
+      sourceKind: "v3",
+      sourceSha256: inspection.sourceSha256,
+      runtimeProjection,
+      runtimeReadback: "restart-required",
+      diagnostics: [],
+      ...extra,
+    };
+  }
+  try {
+    const current = readCurrentRuntimeReadback({
+      rootDir: root,
+      repositoryCapability: repositoryMode,
+      deps,
+    });
+    if (current.status !== "current") throw new Error("runtime readback is absent");
+  } catch {
+    return rejected(root, [diagnostic(
+      "$.runtime",
+      "v3_runtime_readback_unavailable",
+      "the cleared Codex runtime barrier has no current bound native readback",
+      "repeat the authenticated restart/readback workflow",
+    )], {
+      source: inspection.source,
+      sourceKind: "v3",
+      sourceSha256: inspection.sourceSha256,
+      runtimeProjection,
+      ...extra,
+    });
+  }
+  return {
+    schema: SCHEMA,
+    status: "ready",
+    root,
+    source: inspection.source,
+    sourceKind: "v3",
+    sourceSha256: inspection.sourceSha256,
+    runtimeProjection,
+    runtimeReadback: "current",
+    diagnostics: [],
+    ...extra,
+  };
 }
 
 function parseArgs(args) {
@@ -59,8 +195,8 @@ function parseArgs(args) {
   return parsed;
 }
 
-export function validateV3BootstrapAuthority({ rootDir = process.cwd() } = {}) {
-  const inspection = inspectRunnerProfileMigrationV3({ rootDir });
+export function validateV3BootstrapAuthority({ rootDir = process.cwd(), deps = {} } = {}) {
+  const inspection = inspectRunnerProfileMigrationV3({ rootDir, deps });
   if (inspection.status !== "ready") {
     return rejected(inspection.root, [diagnostic(
       "$.source",
@@ -78,19 +214,44 @@ export function validateV3BootstrapAuthority({ rootDir = process.cwd() } = {}) {
     )], { source: inspection.source, sourceKind: inspection.sourceKind });
   }
 
-  const plan = planRunnerProfileMigrationV3({ rootDir });
-  const hostManagedCalibration = hasHostManagedCalibration(inspection.root);
-  if (hostManagedCalibration && isHostManagedCodexProjection(plan, inspection)) {
+  const manifest = loadManifest(inspection.root);
+  if (manifest.status !== "ok") {
+    return rejected(inspection.root, [diagnostic(
+      "$.manifest",
+      "manifest_invalid",
+      "the canonical .claude/pipeline.yaml manifest is absent or invalid",
+      "regenerate the manifest only through the explicit V3 lifecycle writer",
+    )], { source: inspection.source, sourceKind: inspection.sourceKind, manifestStatus: manifest.status });
+  }
+
+  const plan = planRunnerProfileMigrationV3({ rootDir, deps });
+  const hostManagedCalibration = hasHostManagedCalibration(inspection.root, deps);
+  if (isPluginManagedCodexProjection(inspection.root, plan, inspection, deps)) {
     return {
       schema: SCHEMA,
       status: "ready",
-      root: plan.root,
+      root: inspection.root,
+      source: inspection.source,
+      sourceKind: "v3",
+      sourceSha256: inspection.sourceSha256,
+      runtimeProjection: "plugin-managed",
+      runtimeReadback: "plugin-provided",
+      diagnostics: [],
+    };
+  }
+  if (hostManagedCalibration && isHostManagedCodexProjection(plan, inspection)) {
+    return rejected(plan.root, [diagnostic(
+      "$.runtime",
+      "v3_runtime_projection_missing",
+      "the host-managed root has no materialized selected Codex runtime projection",
+      "use the lifecycle capability result; a read-only host target cannot claim bootstrap readiness",
+    )], {
       source: inspection.source,
       sourceKind: "v3",
       sourceSha256: inspection.sourceSha256,
       runtimeProjection: "host-managed-codex",
-      diagnostics: [],
-    };
+      hostManagedCalibration: true,
+    });
   }
   if (plan.status !== "noop" || plan.sourceKind !== "v3" || plan.sourceSha256 !== inspection.sourceSha256
     || (plan.changes?.length ?? 0) !== 0 || (plan.decisionConflicts?.length ?? 0) !== 0) {
@@ -112,19 +273,13 @@ export function validateV3BootstrapAuthority({ rootDir = process.cwd() } = {}) {
     });
   }
 
-  return {
-    schema: SCHEMA,
-    status: "ready",
-    root: plan.root,
-    source: inspection.source,
-    sourceKind: "v3",
-    sourceSha256: inspection.sourceSha256,
-    runtimeProjection: "noop",
-    diagnostics: [],
-  };
+  return projectionCurrent(plan.root, inspection, "noop", {}, deps);
 }
 
-export function main(args = process.argv.slice(2), { write = process.stdout.write.bind(process.stdout) } = {}) {
+export function main(args = process.argv.slice(2), {
+  write = process.stdout.write.bind(process.stdout),
+  deps = {},
+} = {}) {
   const options = parseArgs(args);
   if (options.help) {
     write("Usage: node plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs --root <project-dir>\n");
@@ -134,7 +289,7 @@ export function main(args = process.argv.slice(2), { write = process.stdout.writ
     write(`${options.error}\n`);
     return 2;
   }
-  const result = validateV3BootstrapAuthority({ rootDir: options.root });
+  const result = validateV3BootstrapAuthority({ rootDir: options.root, deps });
   write(`${JSON.stringify(result, null, 2)}\n`);
   return result.status === "ready" ? 0 : 1;
 }

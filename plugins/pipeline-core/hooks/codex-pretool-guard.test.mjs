@@ -19,12 +19,19 @@ function fixture() {
   return root;
 }
 
-function run(input, root = fixture()) {
-  return spawnSync(process.execPath, [adapter], {
+function run(input, root = fixture(), {
+  claudeProjectDir = root,
+  hookCwd = root,
+} = {}) {
+  const envelope = typeof input === "string" ? input : {
     cwd: root,
-    env: { ...process.env, CLAUDE_PROJECT_DIR: root },
+    ...input,
+  };
+  return spawnSync(process.execPath, [adapter], {
+    cwd: hookCwd,
+    env: { ...process.env, CLAUDE_PROJECT_DIR: claudeProjectDir },
     encoding: "utf8",
-    input: typeof input === "string" ? input : JSON.stringify(input),
+    input: typeof envelope === "string" ? envelope : JSON.stringify(envelope),
   });
 }
 
@@ -44,16 +51,22 @@ function decision(result) {
   return JSON.parse(result.stdout).hookSpecificOutput;
 }
 
-check("Codex manifest has a cache-busting version and native hook descriptor", () => {
+check("Codex manifest matches the repository version and has a native hook descriptor", () => {
   const manifest = JSON.parse(readFileSync(join(pluginRoot, ".codex-plugin", "plugin.json"), "utf8"));
+  const repositoryVersion = readFileSync(join(pluginRoot, "..", "..", "VERSION"), "utf8").trim();
   assert.equal(manifest.name, "pipeline-core");
-  assert.match(manifest.version, /^0\.2\.0\+codex\.[0-9A-Za-z.-]+$/);
-  assert.notEqual(manifest.version, "0.2.0");
+  assert.equal(manifest.version, repositoryVersion);
   assert.equal(manifest.hooks, "./hooks/codex-hooks.json");
 });
 
 check("descriptor uses quoted PLUGIN_ROOT with Windows parity for both routing families", () => {
   const descriptor = JSON.parse(readFileSync(join(hookDir, "codex-hooks.json"), "utf8"));
+  const sessionStart = descriptor.hooks.SessionStart;
+  assert.equal(sessionStart.length, 1);
+  assert.equal(sessionStart[0].matcher, "startup|resume|clear|compact");
+  assert.equal(sessionStart[0].hooks[0].command, "node \"${PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"");
+  assert.equal(sessionStart[0].hooks[0].commandWindows, sessionStart[0].hooks[0].command);
+  assert.equal(sessionStart[0].hooks[0].timeout, 3);
   const entries = descriptor.hooks.PreToolUse;
   assert.deepEqual(entries.map((entry) => entry.matcher), ["Bash", "apply_patch|Edit|Write"]);
   for (const entry of entries) {
@@ -110,23 +123,76 @@ check("multiple Bash guard denials are aggregated into one Codex decision", () =
   assert.match(output.permissionDecisionReason, /guard-push/);
 });
 
-check("warnings from both write guards are preserved without inventing a denial", () => {
+check("ordinary ungoverned shell commands do not start heavyweight guards", () => {
+  const root = mkdtempSync(join(tmpdir(), "codex-pretool-plain-"));
+  const result = run({ tool_name: "Bash", tool_input: { command: "pwd" } }, root);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, "");
+});
+
+check("Codex native cwd wins over a stale inherited CLAUDE_PROJECT_DIR", () => {
+  const current = mkdtempSync(join(tmpdir(), "codex-pretool-current-"));
+  const stale = fixture();
+  writeFileSync(join(stale, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+
+  const currentResult = run({
+    tool_name: "Bash",
+    tool_input: { command: "rg --files" },
+  }, current, { claudeProjectDir: stale });
+  assert.equal(currentResult.status, 0, currentResult.stderr);
+  assert.equal(currentResult.stdout, "");
+
+  writeFileSync(join(current, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const staleResult = decision(run({
+    tool_name: "Bash",
+    tool_input: { command: "rg --files" },
+  }, current, { claudeProjectDir: mkdtempSync(join(tmpdir(), "codex-pretool-stale-plain-")) }));
+  assert.equal(staleResult.permissionDecision, "deny");
+  assert.match(staleResult.permissionDecisionReason, /guard-lifecycle-ready/);
+});
+
+check("governed bootstrap can read only its loaded pipeline-start skill and current directory", () => {
+  const root = fixture();
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const skill = join(pluginRoot, "skills", "pipeline-start", "SKILL.md");
+  for (const command of [
+    `sed -n '1,260p' '${skill}'`,
+    `cat -- "${skill}"`,
+    `Get-Content -LiteralPath "${skill}"`,
+    "pwd",
+    "pwd -P",
+  ]) {
+    const result = run({ tool_name: "Bash", tool_input: { command } }, root);
+    assert.equal(result.status, 0, `${command}\n${result.stderr}`);
+    assert.equal(result.stdout, "", command);
+  }
+  const chained = decision(run({
+    tool_name: "Bash",
+    tool_input: { command: `sed -n '1,260p' '${skill}'; touch bypassed` },
+  }, root));
+  assert.equal(chained.permissionDecision, "deny");
+  assert.match(chained.permissionDecisionReason, /guard-lifecycle-ready/);
+});
+
+check("lifecycle readiness is additive and aggregates with existing write guards", () => {
+  const root = fixture();
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  writeFileSync(join(root, ".claude", "guard-config.json"), JSON.stringify({
+    protectedTestPaths: [{ id: "LIFECYCLE-AGGREGATE", pattern: "locked\\.test\\.mjs$", reason: "locked fixture" }],
+  }));
+  const output = decision(run({ tool_name: "Edit", tool_input: { file_path: "locked.test.mjs" } }, root));
+  assert.equal(output.permissionDecision, "deny");
+  assert.match(output.permissionDecisionReason, /LIFECYCLE-AGGREGATE/);
+  assert.match(output.permissionDecisionReason, /guard-lifecycle-ready/);
+});
+
+check("existing write-guard warnings remain warnings in an ungoverned repository", () => {
   const root = fixture();
   writeFileSync(join(root, ".claude", "guard-config.json"), "{broken");
-  writeFileSync(join(root, ".claude", "pipeline-state.json"), "{broken");
-  writeFileSync(join(root, ".claude", "pipeline.yaml"), [
-    "schema: pipeline.manifest.v0",
-    "gates:",
-    "  dev-plan:",
-    "    mode: blocking",
-    "    type: human",
-    "",
-  ].join("\n"));
-  const result = run({ tool_name: "Edit", tool_input: { file_path: "src/allowed.mjs" } }, root);
+  const result = run({ tool_name: "Edit", tool_input: { file_path: "src/warning.mjs" } }, root);
   assert.equal(result.status, 0);
   assert.equal(result.stdout, "");
   assert.match(result.stderr, /guard-testpath/);
-  assert.match(result.stderr, /guard-devplan/);
 });
 
 check("malformed, unsupported and incomplete tool inputs fail closed", () => {

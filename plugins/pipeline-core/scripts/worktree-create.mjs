@@ -5,6 +5,10 @@ import { lstatSync, readFileSync } from "node:fs";
 import { pathToFileURL } from "node:url";
 
 import {
+  ProjectOnboardingReadyError,
+  requireProjectOnboardingReady,
+} from "../lib/project-onboarding-ready-gate.mjs";
+import {
   WorktreeLifecycleError,
   canonicalJson,
   createBranchWorktree,
@@ -74,22 +78,30 @@ function publicResult(record) {
   };
 }
 
-export function main(argv = process.argv.slice(2), env = process.env) {
+export function main(argv = process.argv.slice(2), env = process.env, dependencies = {}) {
   const { command, flags } = parseArgs(argv);
   const repo = required(flags, "repo");
+  (dependencies.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({
+    rootDir: repo,
+    intent: "dispatch",
+  });
+  const createBranch = dependencies.createBranchWorktreeFn ?? createBranchWorktree;
+  const createDetached = dependencies.createDetachedWorktreeFn ?? createDetachedWorktree;
+  const migrateBranch = dependencies.migrateBranchWorktreeFn ?? migrateBranchWorktree;
+  const write = dependencies.writeFn ?? ((value) => process.stdout.write(value));
   let result;
   if (command === "branch") {
-    result = createBranchWorktree(repo, required(flags, "branch"));
+    result = createBranch(repo, required(flags, "branch"));
   } else if (command === "detached") {
-    result = createDetachedWorktree(repo, required(flags, "purpose"), required(flags, "oid"), {
+    result = createDetached(repo, required(flags, "purpose"), required(flags, "oid"), {
       sessionId: required(flags, "session"),
       ownerNonce: ownerNonce(flags, env),
       resourceId: flags["resource-id"],
     });
   } else {
-    result = migrateBranchWorktree(repo, required(flags, "source"), required(flags, "branch"));
+    result = migrateBranch(repo, required(flags, "source"), required(flags, "branch"));
   }
-  process.stdout.write(canonicalJson(publicResult(result)));
+  write(canonicalJson(publicResult(result)));
   return 0;
 }
 
@@ -98,8 +110,13 @@ if (invokedDirectly) {
   try {
     process.exitCode = main();
   } catch (error) {
-    const code = error instanceof WorktreeLifecycleError ? error.code : "WT-ARGUMENT";
-    process.stderr.write(`${code}: ${error.message}\n`);
+    const code = error instanceof WorktreeLifecycleError || error instanceof ProjectOnboardingReadyError
+      ? error.code
+      : "WT-ARGUMENT";
+    const detail = error instanceof ProjectOnboardingReadyError
+      ? "project onboarding readiness denied worktree creation"
+      : error.message;
+    process.stderr.write(`${code}: ${detail}\n`);
     process.exitCode = 2;
   }
 }

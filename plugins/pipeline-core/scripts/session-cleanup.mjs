@@ -7,6 +7,10 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
+  ProjectOnboardingReadyError,
+  requireProjectOnboardingReady,
+} from "../lib/project-onboarding-ready-gate.mjs";
+import {
   WorktreeLifecycleError,
   canonicalJson,
   checkSessionHygiene,
@@ -139,17 +143,22 @@ function sessionOwner(repo, flags, env) {
   return { sessionId: required(flags, "session"), ownerNonce: ownerNonce(flags, env), descriptorSha256: null };
 }
 
-export function main(argv = process.argv.slice(2), env = process.env) {
+export function main(argv = process.argv.slice(2), env = process.env, dependencies = {}) {
   const { command, flags } = parseArgs(argv);
   const repo = required(flags, "repo");
+  const requireReady = dependencies.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady;
+  const startDescriptor = dependencies.startSessionDescriptorFn ?? startSessionDescriptor;
+  const checkHygiene = dependencies.checkSessionHygieneFn ?? checkSessionHygiene;
+  const write = dependencies.writeFn ?? ((value) => process.stdout.write(value));
   let output;
   let exitCode = 0;
   if (command === "start") {
-    const started = startSessionDescriptor(repo, { sessionId: flags.session });
+    requireReady({ rootDir: repo, intent: "session" });
+    const started = startDescriptor(repo, { sessionId: flags.session });
     output = { ok: true, code: "WT-SESSION-STARTED", sessionId: started.sessionId, descriptorSha256: started.descriptorSha256 };
   } else if (command === "hygiene") {
     const session = flags["session-descriptor"] ? sessionOwner(repo, flags, env) : { sessionId: required(flags, "session") };
-    output = checkSessionHygiene(repo, { sessionId: session.sessionId });
+    output = checkHygiene(repo, { sessionId: session.sessionId });
   } else {
     const session = sessionOwner(repo, flags, env);
     const nonce = session.ownerNonce;
@@ -194,7 +203,7 @@ export function main(argv = process.argv.slice(2), env = process.env) {
       if (!cleanup.ok) exitCode = 2;
     }
   }
-  process.stdout.write(canonicalJson(output));
+  write(canonicalJson(output));
   return exitCode || (output.ok === false ? 2 : 0);
 }
 
@@ -203,8 +212,13 @@ if (invokedDirectly) {
   try {
     process.exitCode = main();
   } catch (error) {
-    const code = error instanceof WorktreeLifecycleError ? error.code : "WT-ARGUMENT";
-    process.stderr.write(`${code}: ${error.message}\n`);
+    const code = error instanceof WorktreeLifecycleError || error instanceof ProjectOnboardingReadyError
+      ? error.code
+      : "WT-ARGUMENT";
+    const detail = error instanceof ProjectOnboardingReadyError
+      ? "project onboarding readiness denied session creation"
+      : error.message;
+    process.stderr.write(`${code}: ${detail}\n`);
     process.exitCode = 2;
   }
 }

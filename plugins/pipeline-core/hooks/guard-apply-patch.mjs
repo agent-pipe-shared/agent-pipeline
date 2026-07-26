@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 const GUARDS = [
   fileURLToPath(new URL("./guard-testpath.mjs", import.meta.url)),
   fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url)),
+  fileURLToPath(new URL("./guard-lifecycle-ready.mjs", import.meta.url)),
 ];
 function block(reason) {
   process.stderr.write(`BLOCKED (guard-apply-patch, plugin pipeline-core): ${reason}\n`);
@@ -64,6 +65,8 @@ for (const filePath of paths) {
     const result = spawnSync(process.execPath, [guard], {
       cwd: process.cwd(), env: process.env, encoding: "utf8",
       input: JSON.stringify({ tool_name: "Edit", tool_input: { file_path: filePath } }),
+      shell: false,
+      timeout: 4_000,
     });
     if (result.stderr) stderr.push(result.stderr.trimEnd());
     if (result.status === 2) exitCode = 2;

@@ -18,17 +18,33 @@ import {
   normalizeRepoRelativePath,
   parseCliArgs,
   parseObserverArgs,
-  prepareNativeCritic,
+  prepareNativeCritic as prepareNativeCriticRaw,
   readJsonBounded,
   sha256,
   validateCriticRequest,
   validateHostReturn,
 } from "./codex-critic-host.mjs";
 import { sha256Canonical } from "../lib/review-economy.mjs";
+import {
+  PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
+  ProjectOnboardingReadyError,
+} from "../lib/project-onboarding-ready-gate.mjs";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
 
 let passed = 0;
+
+function prepareNativeCritic(options, dependencies = {}) {
+  return prepareNativeCriticRaw(options, {
+    requireProjectOnboardingReadyFn: () => ({
+      schema: "pipeline.project-onboarding-ready-gate.v1",
+      status: "ready",
+      intent: "dispatch",
+    }),
+    ...dependencies,
+  });
+}
+
 const RULESET_PATHS = [
   "roles/critic.md",
   "templates/prompts/critic-review.md",
@@ -404,6 +420,55 @@ const dispatchStatePath = join(root, "dispatch-state.json");
 const reviewRoot = join(root, "review");
 writeJson(requestPath, legacyRequest);
 const observers = parseObserverArgs([`private=${privateObserver}`, `shared=${sharedObserver}`]);
+check("every controlling non-ready dispatch status and gate failure precedes Critic checkout, temporary state, and child execution", () => {
+  let checkouts = 0;
+  let randomValues = 0;
+  const failures = [
+    ...PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.map((status) => new ProjectOnboardingReadyError(
+      "PORG-NOT-READY",
+      `raw lifecycle detail for ${status} at /private/root`,
+      { intent: "dispatch", lifecycleStatus: status },
+    )),
+    new ProjectOnboardingReadyError(
+      "PORG-INVALID-OBSERVATION",
+      "raw malformed observation at /private/root",
+      { intent: "dispatch" },
+    ),
+    new ProjectOnboardingReadyError(
+      "PORG-OBSERVATION-UNAVAILABLE",
+      "raw observer exception at /private/root",
+      { intent: "dispatch" },
+    ),
+  ];
+  for (const [index, failure] of failures.entries()) {
+    const negativePreparedPath = join(root, `ready-negative-${index}-prepared.json`);
+    const negativeStatePath = join(root, `ready-negative-${index}-state.json`);
+    const negativeReviewRoot = join(root, `ready-negative-${index}-review`);
+    assert.throws(() => prepareNativeCriticRaw({
+      repoRoot: repo,
+      pipelineRoot: rulesetRoot,
+      controlDir: root,
+      dispatchStatePath: negativeStatePath,
+      requestPath,
+      preparedPath: negativePreparedPath,
+      reviewRoot: negativeReviewRoot,
+      observers,
+    }, {
+      requireProjectOnboardingReadyFn({ rootDir, intent }) {
+        assert.equal(rootDir, repo);
+        assert.equal(intent, "dispatch");
+        throw failure;
+      },
+      createCheckout() { checkouts += 1; },
+      randomBytes() { randomValues += 1; return Buffer.alloc(32); },
+    }), (error) => error === failure);
+    assert.equal(existsSync(negativePreparedPath), false);
+    assert.equal(existsSync(negativeStatePath), false);
+    assert.equal(existsSync(negativeReviewRoot), false);
+  }
+  assert.equal(checkouts, 0);
+  assert.equal(randomValues, 0);
+});
 check("prepare requires canonical private and shared observers", () => {
   assert.throws(() => prepareNativeCritic({
     repoRoot: repo,
@@ -515,6 +580,7 @@ const fsmonitorProbe = join(root, "fsmonitor-probe.sh");
 writeFileSync(fsmonitorProbe, `#!/bin/sh\nprintf 'triggered\\n' > '${join(privateObserver, "ignored", "fsmonitor.txt")}'\nexit 0\n`);
 chmodSync(fsmonitorProbe, 0o700);
 run("git", ["config", "core.fsmonitor", fsmonitorProbe], repo);
+const criticGateCalls = [];
 const preparedResult = prepareNativeCritic({
   repoRoot: repo,
   pipelineRoot: rulesetRoot,
@@ -525,6 +591,14 @@ const preparedResult = prepareNativeCritic({
   reviewRoot,
   observers,
 }, {
+  requireProjectOnboardingReadyFn(options) {
+    criticGateCalls.push(options);
+    return {
+      schema: "pipeline.project-onboarding-ready-gate.v1",
+      status: "ready",
+      intent: "dispatch",
+    };
+  },
   randomBytes: () => Buffer.alloc(32, 7),
   now: () => "2026-07-15T00:00:00.000Z",
   runVerify: (checkout) => {
@@ -537,6 +611,7 @@ const preparedRecord = readJsonBounded(preparedPath);
 const prepared = preparedRecord.value;
 
 check("prepare emits fixed native Sol/xhigh route", () => {
+  assert.deepEqual(criticGateCalls, [{ rootDir: repo, intent: "dispatch" }]);
   assert.equal(preparedResult.model, "gpt-5.6-sol");
   assert.equal(preparedResult.effort, "xhigh");
   assert.equal(prepared.route.duty, "criticNormal");

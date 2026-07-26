@@ -11,6 +11,10 @@ import { pathToFileURL } from "node:url";
 import { TextDecoder } from "node:util";
 
 import { derivePoGateRepositoryFingerprint, resolvePoGateRepositoryTopology } from "../lib/po-gate-authority.mjs";
+import {
+  ProjectOnboardingReadyError,
+  requireProjectOnboardingReady,
+} from "../lib/project-onboarding-ready-gate.mjs";
 import { validatePipelineUserV3 } from "../lib/runner-profiles-v3.mjs";
 import { parseYaml } from "../lib/yaml-lite.mjs";
 import { resolveSystemExecutable } from "./tool-identity.mjs";
@@ -67,6 +71,10 @@ function parseArgs(argv) {
 export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), dependencies = {}) {
   const args = parseArgs(argv);
   const repoRoot = realpathSync(dependencies.repoRoot ?? process.cwd());
+  (dependencies.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({
+    rootDir: repoRoot,
+    intent: "dispatch",
+  });
   const source = parseYaml(readFileSync(join(repoRoot, "pipeline.user.yaml"), "utf8"));
   const authority = validatePipelineUserV3(source, { source: "pipeline.user.yaml" });
   if (!authority.ok || authority.advisoryExport?.consent === "declined") throw new Error("pipeline.user.v3 advisor_export is explicitly declined");
@@ -86,7 +94,7 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
   const git = (values) => execFileSync("git", values, { cwd: repoRoot, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
   const candidateCommit = git(["rev-parse", "HEAD"]);
   const candidateTree = git(["rev-parse", "HEAD^{tree}"]);
-  const temp = realpathSync(mkdtempSync(join(tmpdir(), "pipeline-codex-advisory-")));
+  const temp = realpathSync((dependencies.mkdtempFn ?? mkdtempSync)(join(tmpdir(), "pipeline-codex-advisory-")));
   const inputPath = join(temp, `${randomUUID()}.json`);
   try {
     const input = {
@@ -105,5 +113,11 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
 }
 
 if (import.meta.url === pathToFileURL(process.argv[1]).href) {
-  runCodexAdvisoryBootstrap().then((code) => { process.exitCode = code; }, (error) => { process.stderr.write(`${error.message}\n`); process.exitCode = error.message === USAGE ? 64 : 2; });
+  runCodexAdvisoryBootstrap().then((code) => { process.exitCode = code; }, (error) => {
+    const detail = error instanceof ProjectOnboardingReadyError
+      ? `${error.code}: project onboarding readiness denied advisory dispatch`
+      : error.message;
+    process.stderr.write(`${detail}\n`);
+    process.exitCode = error.message === USAGE ? 64 : 2;
+  });
 }

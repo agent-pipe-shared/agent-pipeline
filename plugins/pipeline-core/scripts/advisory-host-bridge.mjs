@@ -255,7 +255,9 @@ export async function runCodexAdvisoryWithHostFallback(input, adapter, transport
 }
 
 function parseArgs(argv) {
-  const parsed = { timeoutMs: 120_000 };
+  // Native advisory turns can legitimately spend longer in startup and
+  // reasoning than the adapter protocol itself. This remains one attempt.
+  const parsed = { timeoutMs: 180_000 };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
     if (token === "--input") parsed.input = argv[++index];

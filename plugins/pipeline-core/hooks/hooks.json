@@ -57,6 +57,11 @@
             "type": "command",
             "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/setup-check.mjs\"",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
+            "timeout": 3
           }
         ]
       },

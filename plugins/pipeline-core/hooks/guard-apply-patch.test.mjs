@@ -72,6 +72,26 @@ check("every extracted path is subjected to the configured write guard", () => {
   blocked(run(patch, { root }), /PATCH-LOCK/);
 });
 
+check("every governed patch target requires dispatch-ready lifecycle without path exemptions", () => {
+  const root = fixture();
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  for (const path of [
+    "src/implementation.mjs",
+    "docs/state.md",
+    "DOCS/state.md",
+    "specs/feature/spec.md",
+    "Specs/feature/spec.md",
+    ".claude/pipeline.json",
+    ".CLAUDE/pipeline.json",
+    "backlog/item.md",
+    "BackLog/item.md",
+    join(tmpdir(), "outside-lifecycle-guard.txt"),
+  ]) {
+    const patch = `*** Begin Patch\n*** Update File: ${path}\n@@\n-a\n+b\n*** End Patch`;
+    blocked(run(patch, { root }), /guard-lifecycle-ready/);
+  }
+});
+
 check("invalid JSON, missing command and ambiguous envelopes block", () => {
   blocked(run("not-json", { raw: true }), /not valid JSON/);
   const missing = spawnSync(process.execPath, [guard], { encoding: "utf8", input: JSON.stringify({ tool_name: "apply_patch", tool_input: {} }) });

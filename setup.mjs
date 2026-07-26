@@ -118,6 +118,8 @@ import { validatePipelineUserV2 } from "./plugins/pipeline-core/lib/runner-profi
 import { planRuntimeProjectionV2, readRuntimeProjectionV2Baselines } from "./plugins/pipeline-core/lib/runtime-projection-v2.mjs";
 import { validatePipelineUserV3 } from "./plugins/pipeline-core/lib/runner-profiles-v3.mjs";
 import { planRuntimeProjectionV3, readRuntimeProjectionV3Baselines } from "./plugins/pipeline-core/lib/runtime-projection-v3.mjs";
+import { inspectProjectOnboardingV3 } from "./plugins/pipeline-core/lib/project-onboarding-v3.mjs";
+import { validateV3BootstrapAuthority } from "./plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs";
 import { runToolchainPreflight } from "./plugins/pipeline-core/scripts/toolchain-preflight.mjs";
 import {
   migrateLegacyRouting,
@@ -1489,7 +1491,24 @@ Legacy v0/v1/v2 sources are never compiled. Review and activate their one-way V3
   const hasV3Source = existingUserYamlRaw !== null && existingUserYamlParsed?.schema === "pipeline.user.v3";
   const needsV1Migration = existingUserYamlRaw !== null && existingUserYamlParsed?.schema !== "pipeline.user.v1";
   if (!hasV3Source) {
+    const lifecycle = (deps.inspectProjectOnboardingV3 ?? inspectProjectOnboardingV3)({ rootDir, intent: "onboarding" });
+    const action = lifecycle.nextAction?.kind === "command"
+      ? lifecycle.nextAction.argv.map((part) => JSON.stringify(part)).join(" ")
+      : null;
+    if (action) console.error(`setup.mjs: onboarding is ${lifecycle.status}; review and run: ${action}`);
+    else console.error(`setup.mjs: onboarding is ${lifecycle.status}; no automatic repair is available in this environment.`);
     console.error(v3MigrationRequiredMessage(existingUserYamlParsed?.schema));
+    return 2;
+  }
+  const bootstrapAuthority = (deps.validateV3BootstrapAuthority ?? validateV3BootstrapAuthority)({ rootDir });
+  if (bootstrapAuthority?.status !== "ready") {
+    const lifecycle = (deps.inspectProjectOnboardingV3 ?? inspectProjectOnboardingV3)({ rootDir, intent: "onboarding" });
+    const action = lifecycle.nextAction?.kind === "command"
+      ? lifecycle.nextAction.argv.map((part) => JSON.stringify(part)).join(" ")
+      : null;
+    if (action) console.error(`setup.mjs: onboarding is ${lifecycle.status}; review and run: ${action}`);
+    else console.error(`setup.mjs: onboarding is ${lifecycle.status}; no automatic repair is available in this environment.`);
+    console.error("setup.mjs: a projection-only V3 result is not operational readiness; current native Codex runtime readback is required.");
     return 2;
   }
   if (opts.configureAdvisorExport) {

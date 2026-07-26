@@ -21,7 +21,7 @@ import { loadRuntimeProjectionV3OwnedKeys } from "./runtime-projection-v3.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { main as migrationCli } from "../scripts/runner-profile-migration-v3.mjs";
 import { main as v3BootstrapAuthorityCli, validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
-import { buildDefaultAnswers, renderUserYaml } from "../../../setup.mjs";
+import { buildDefaultAnswers, renderPipelineYaml, renderUserYaml } from "../../../setup.mjs";
 
 const runtimePaths = loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path);
 
@@ -543,7 +543,24 @@ record("historical Public aliases migrate atomically without pre-seeded Codex fi
 
 record("Issue #58 V0 consumers reach a read-only V3 bootstrap authority without root setup.mjs", () => {
   const root = fixture(yaml(publicLegacyIntent()), { omitCodex: true });
+  const gitCommonDir = join(root, ".git");
+  const authorityDeps = {
+    spawnSync(command, args) {
+      if (command === "git"
+        && args[0] === "rev-parse"
+        && args[1] === "--path-format=absolute"
+        && args[2] === "--git-common-dir") {
+        return { status: 0, stdout: `${gitCommonDir}\n`, stderr: "" };
+      }
+      return { status: 1, stdout: "", stderr: "unexpected Git authority probe" };
+    },
+  };
   try {
+    mkdirSync(gitCommonDir);
+    writeFileSync(
+      join(root, ".claude/pipeline.yaml"),
+      renderPipelineYaml(buildDefaultAnswers(), "issue-58-valid-manifest"),
+    );
     assert.equal(existsSync(join(root, "setup.mjs")), false, "fixture must not provide a consumer setup entrypoint");
     const inspection = runCli(["inspect", "--root", root]);
     assert.equal(inspection.status, 0);
@@ -560,14 +577,18 @@ record("Issue #58 V0 consumers reach a read-only V3 bootstrap authority without 
     assert.equal(existsSync(join(root, "setup.mjs")), false, "migration must not create a consumer setup entrypoint");
 
     const beforeReadback = snapshot(root);
-    const authority = validateV3BootstrapAuthority({ rootDir: root });
-    assert.equal(authority.status, "ready");
+    const authority = validateV3BootstrapAuthority({ rootDir: root, deps: authorityDeps });
+    assert.equal(authority.status, "projection-current", JSON.stringify(authority));
     assert.equal(authority.sourceKind, "v3");
     assert.equal(authority.runtimeProjection, "noop");
+    assert.equal(authority.runtimeReadback, "absent");
     assert.deepEqual(snapshot(root), beforeReadback, "authority readback must not write consumer files");
     let authorityOutput = "";
-    assert.equal(v3BootstrapAuthorityCli(["--root", root], { write: (chunk) => { authorityOutput += String(chunk); } }), 0);
-    assert.equal(JSON.parse(authorityOutput).status, "ready");
+    assert.equal(v3BootstrapAuthorityCli(["--root", root], {
+      write: (chunk) => { authorityOutput += String(chunk); },
+      deps: authorityDeps,
+    }), 1);
+    assert.equal(JSON.parse(authorityOutput).status, "projection-current");
     const followUp = runCli(["plan", "--root", root]);
     assert.equal(followUp.status, 0);
     assert.equal(followUp.json.status, "noop");
@@ -576,7 +597,7 @@ record("Issue #58 V0 consumers reach a read-only V3 bootstrap authority without 
     const driftPath = join(root, ".codex/agents/implementor.toml");
     writeFileSync(driftPath, readFileSync(driftPath, "utf8").replace(/^model = .*$/mu, 'model = "drift"'));
     const driftBeforeReadback = snapshot(root);
-    const drift = validateV3BootstrapAuthority({ rootDir: root });
+    const drift = validateV3BootstrapAuthority({ rootDir: root, deps: authorityDeps });
     assert.equal(drift.status, "rejected");
     assert.equal(drift.diagnostics[0].code, "v3_runtime_drift");
     assert.deepEqual(snapshot(root), driftBeforeReadback, "rejected authority readback must not repair drift");

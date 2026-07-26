@@ -103,8 +103,10 @@ export const CODEX_CRITIC_POLICY = Object.freeze({
   // Historical probe/control modules still read this field. The new acceptance
   // invocation never consumes it and rejects every --sandbox argument.
   sandbox: "read-only",
-  preflightLeaseMs: 120_000,
-  criticLeaseMs: 300_000,
+  // One bounded execution per phase. Raising these avoids cold-start and
+  // reasoning churn; it does not add retries.
+  preflightLeaseMs: 180_000,
+  criticLeaseMs: 480_000,
   sourceReference: Object.freeze({
     tag: "rust-v0.144.4",
     commit: "8c68d4c87dc54d38861f5114e920c3de2efa5876",

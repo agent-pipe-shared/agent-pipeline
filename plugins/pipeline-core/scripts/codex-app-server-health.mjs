@@ -12,6 +12,7 @@ import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const CODEX_APP_SERVER_HEALTH_SCHEMA = "pipeline.codex-app-server-health.v1";
+export const CODEX_APP_SERVER_DOCTOR_SCHEMA = "pipeline.codex-app-server-doctor.v1";
 const VERSION_KEYS = ["status", "backend", "managedCodexPath", "managedCodexVersion", "socketPath", "cliVersion", "appServerVersion"];
 const OPERATOR_ACTION = "codex app-server daemon restart && codex doctor";
 
@@ -120,19 +121,49 @@ export function checkCodexAppServer({ recover = false, executable = "codex", spa
   return { ...after, phase: "recover", recovery: "restarted" };
 }
 
+/**
+ * Run the fixed attended diagnostic once. Completion means only that `codex
+ * doctor` exited successfully; it never means that App Server is ready.
+ */
+export function doctorCodexAppServer({ executable = "codex", spawn = spawnSync } = {}) {
+  const result = invoke(executable, ["doctor"], spawn);
+  const failure = executionFailure(result);
+  if (failure !== null || result.status !== 0) {
+    return {
+      schema: CODEX_APP_SERVER_DOCTOR_SCHEMA,
+      status: "failed",
+      code: "CAS-DOCTOR-FAILED",
+      detail: failure ?? `exit-${result.status}`,
+    };
+  }
+  return {
+    schema: CODEX_APP_SERVER_DOCTOR_SCHEMA,
+    status: "completed",
+    code: "CAS-DOCTOR-COMPLETED",
+    detail: null,
+  };
+}
+
 function parseArgs(argv) {
-  if (argv.length === 0) return { recover: false };
-  if (argv.length === 1 && argv[0] === "--recover") return { recover: true };
-  throw new Error("Usage: codex-app-server-health.mjs [--recover]");
+  if (argv.length === 0) return { mode: "health", recover: false };
+  if (argv.length === 1 && argv[0] === "--recover") return { mode: "health", recover: true };
+  if (argv.length === 1 && argv[0] === "--doctor") return { mode: "doctor", recover: false };
+  throw new Error("Usage: codex-app-server-health.mjs [--recover|--doctor]");
 }
 
 export function run(argv = process.argv.slice(2), deps = {}) {
+  const write = deps.write ?? process.stdout.write.bind(process.stdout);
+  const writeError = deps.writeError ?? process.stderr.write.bind(process.stderr);
+  const { write: _write, writeError: _writeError, ...operationDeps } = deps;
   try {
-    const result = checkCodexAppServer({ ...parseArgs(argv), ...deps });
-    process.stdout.write(`${JSON.stringify(result)}\n`);
-    return result.status === "ready" ? 0 : 2;
+    const parsed = parseArgs(argv);
+    const result = parsed.mode === "doctor"
+      ? doctorCodexAppServer(operationDeps)
+      : checkCodexAppServer({ recover: parsed.recover, ...operationDeps });
+    write(`${JSON.stringify(result)}\n`);
+    return result.status === "ready" || result.status === "completed" ? 0 : 2;
   } catch (error) {
-    process.stderr.write(`${error.message}\n`);
+    writeError(`${error.message}\n`);
     return 64;
   }
 }

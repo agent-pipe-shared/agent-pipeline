@@ -101,6 +101,7 @@
         "lifecycle": "maintained",
         "paths": [
           "docs/artifact-topology.md",
+          "docs/codex-onboarding-threat-model.md",
           "docs/contributor-gate-security.md",
           "docs/critic-isolation-threat-model.md",
           "docs/github-actions-token-permissions.md",

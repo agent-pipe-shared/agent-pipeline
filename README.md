@@ -85,7 +85,11 @@ consumer project must not copy or run a root `setup.mjs`; its loaded plugin
 classifies fresh, legacy, and partial roots through `pipeline-start` and owns
 the official onboarding/migration path. **Never hand-edit generated runtime
 configuration.** The compiler detects drift rather than silently treating a
-local edit as authority.
+local edit as authority. The maintained consumer guide documents the ordered
+Codex lifecycle — portable seed → runtime initialization → restart/native
+readback → sanctioned kickoff → ready — together with host-managed limits and
+the goal-and-plan-digest-bound kickoff apply contract:
+[`docs/v3-consumer-onboarding.md`](docs/v3-consumer-onboarding.md).
 
 V3 has registered routes for both Claude and Codex. Claude Code is the
 full-enforcement runtime: its plugin and hooks can enforce configured guards.

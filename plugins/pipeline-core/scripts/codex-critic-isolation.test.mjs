@@ -763,8 +763,8 @@ await check("debug child observer records categorical proc unavailability withou
 }));
 
 await check("lease policy separates fixed preflight and final-Critic bounds", () => {
-  assert.equal(CODEX_CRITIC_POLICY.preflightLeaseMs, 120_000);
-  assert.equal(CODEX_CRITIC_POLICY.criticLeaseMs, 300_000);
+  assert.equal(CODEX_CRITIC_POLICY.preflightLeaseMs, 180_000);
+  assert.equal(CODEX_CRITIC_POLICY.criticLeaseMs, 480_000);
   assert.equal(Object.hasOwn(CODEX_CRITIC_POLICY, "leaseMs"), false);
 });
 
@@ -1146,7 +1146,7 @@ await check("aggregate binds exact HEAD/five artifacts and emits path-free publi
     const binaryInspection = { binarySha256: "a".repeat(64), versionSha256: "b".repeat(64), runtimeRoot: runtime, runtimeRootSha256: "c".repeat(64), runtimeManifestSha256: "e".repeat(64), runtimeEntries: 1 };
     const result = await runProfileBoundIsolation({ repoRoot: repo, candidateCommit: head, artifactPaths: CODEX_CRITIC_ARTIFACTS, externalParent: path.dirname(repo), resolvedBinary: "/tmp/codex", binaryInspection, inspectBinary: async () => binaryInspection, contractInspection: { contractSha256: "d".repeat(64) }, env: { PATH: "/bin", GITHUB_TOKEN: "private-token-canary", RUST_LOG: "private-user-filter" }, spawn: aggregateSpawn(normalEnvironments) });
     assert.equal(result.ok, true); assert.equal(result.envelope.preflight.ok, true); assert.equal(result.envelope.critic.ok, true);
-    assert.equal(result.envelope.preflightLeaseMs, 120_000); assert.equal(result.envelope.criticLeaseMs, 300_000);
+    assert.equal(result.envelope.preflightLeaseMs, 180_000); assert.equal(result.envelope.criticLeaseMs, 480_000);
     assert.equal(normalEnvironments.length, 4); assert.equal(normalEnvironments.every((value) => value.RUST_LOG === undefined), true);
     const publicEnvelope = JSON.stringify(result.envelope);
     assert.equal(publicEnvelope.includes(repo), false); assert.equal(publicEnvelope.includes(runtime), false); assert.equal(publicEnvelope.includes("private-token-canary"), false);

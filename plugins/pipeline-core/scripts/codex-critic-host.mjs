@@ -42,6 +42,10 @@ import { fileURLToPath } from "node:url";
 import { validateAgainstSchema } from "../lib/schema-lite.mjs";
 import { loadManifest } from "../lib/manifest.mjs";
 import { deriveCriticPacketGovernance, validateCriticPacketGovernance } from "../lib/critic-packet-governance.mjs";
+import {
+  ProjectOnboardingReadyError,
+  requireProjectOnboardingReady,
+} from "../lib/project-onboarding-ready-gate.mjs";
 import { projectHostDuty, routingProvenance } from "../lib/routing-projection.mjs";
 import { PROGRESS_COMPONENTS, admitReviewAttempt, evaluateProgress } from "../lib/review-economy.mjs";
 import { executeSandboxedReadonlyDuty, runSandboxedReadonlyHostBridge } from "./sandboxed-readonly-host-bridge.mjs";
@@ -1060,6 +1064,10 @@ function stageExactFile(path, value) {
 
 export function prepareNativeCritic(options, deps = {}) {
   if (!options.pipelineRoot) fail("pipelineRoot is required; implicit installed-plugin provenance is forbidden");
+  (deps.requireProjectOnboardingReadyFn ?? requireProjectOnboardingReady)({
+    rootDir: options.repoRoot,
+    intent: "dispatch",
+  });
   const pipelineRoot = assertGitRepository(options.pipelineRoot, "pipeline root");
   const repoRoot = assertGitRepository(options.repoRoot, "candidate repository");
   const observers = options.observers ?? [];
@@ -1815,7 +1823,10 @@ async function main() {
         });
     process.stdout.write(canonicalJson(result));
   } catch (error) {
-    process.stderr.write(`codex-critic-host: ${error.message}\n`);
+    const detail = error instanceof ProjectOnboardingReadyError
+      ? `${error.code}: project onboarding readiness denied the Critic dispatch`
+      : error.message;
+    process.stderr.write(`codex-critic-host: ${detail}\n`);
     process.exitCode = 2;
   }
 }

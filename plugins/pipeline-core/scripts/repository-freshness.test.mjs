@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -174,6 +174,105 @@ check("invalid repository mode is fail-closed without a remote probe", () => {
   const result = inspectRepositoryFreshness(checkout).result;
   expect(result.status === "unknown" && result.reason === "invalid-repository-mode", `status/reason=${result.status}/${result.reason}`);
   expect(result.fetchAttempted === false, "invalid mode must not fetch");
+});
+
+check("physical host-managed controls return the narrow non-Git result without any remote action", () => {
+  const root = mkdtempSync(join(tmpdir(), "repository freshness host managed with spaces-"));
+  roots.push(root);
+  mkdirSync(join(root, ".git"));
+  mkdirSync(join(root, ".codex"));
+  setRepositoryMode(root, "host-managed");
+  chmodSync(join(root, ".git"), 0o500);
+  chmodSync(join(root, ".codex"), 0o500);
+  let fetchCalls = 0;
+  let directCalls = 0;
+  try {
+    const result = inspectRepositoryFreshness(root, {
+      runFetch: () => { fetchCalls++; throw new Error("host-managed must not fetch"); },
+      runDirect: () => { directCalls++; throw new Error("host-managed must not inspect a remote"); },
+    }).result;
+    expect(result.status === "host-managed", `status=${result.status}`);
+    expect(result.repositoryMode === "host-managed", `repositoryMode=${result.repositoryMode}`);
+    for (const key of ["head", "branch", "upstream", "remoteHead", "ahead", "behind"]) {
+      expect(result[key] === null, `${key} must be null`);
+    }
+    expect(result.fetchAttempted === false, "host-managed must not fetch");
+    expect(result.otherUnmergedRemoteBranches.length === 0, "host-managed must not claim remote branches");
+    expect(fetchCalls === 0 && directCalls === 0, `remote calls=${fetchCalls}/${directCalls}`);
+  } finally {
+    chmodSync(join(root, ".git"), 0o700);
+    chmodSync(join(root, ".codex"), 0o700);
+  }
+});
+
+check("durable host initialization admits the physical post-restart repository without remote action", () => {
+  const root = mkdtempSync(join(tmpdir(), "repository freshness initialized host with spaces-"));
+  roots.push(root);
+  mkdirSync(join(root, ".git"));
+  setRepositoryMode(root, "host-managed");
+  let fetchCalls = 0;
+  let directCalls = 0;
+  let admissionCalls = 0;
+  const result = inspectRepositoryFreshness(root, {
+    readHostInitAdmission: (observedRoot) => {
+      admissionCalls++;
+      expect(observedRoot === root, "admission root drifted");
+      return { gitVersion: "2.53.0" };
+    },
+    runFetch: () => { fetchCalls++; throw new Error("admitted host init must not fetch"); },
+    runDirect: () => { directCalls++; throw new Error("admitted host init must not inspect a remote"); },
+  }).result;
+  expect(result.status === "host-managed", `status=${result.status}`);
+  expect(result.repositoryMode === "host-managed" && result.reason === null,
+    `repositoryMode/reason=${result.repositoryMode}/${result.reason}`);
+  expect(result.fetchAttempted === false, "admitted host init must not fetch");
+  expect(admissionCalls === 1, `admission calls=${admissionCalls}`);
+  expect(fetchCalls === 0 && directCalls === 0, `remote calls=${fetchCalls}/${directCalls}`);
+});
+
+check("host-managed declaration with writable or nonempty controls fails closed before Git or remote observation", () => {
+  for (const [label, mutate] of [
+    ["writable", () => {}],
+    ["nonempty", (root) => writeFileSync(join(root, ".git", "unexpected"), "host bytes\n")],
+  ]) {
+    const root = mkdtempSync(join(tmpdir(), `repository freshness invalid host ${label} with spaces-`));
+    roots.push(root);
+    mkdirSync(join(root, ".git"));
+    mkdirSync(join(root, ".codex"));
+    setRepositoryMode(root, "host-managed");
+    mutate(root);
+    if (label === "nonempty") {
+      chmodSync(join(root, ".git"), 0o500);
+      chmodSync(join(root, ".codex"), 0o500);
+    }
+    let fetchCalls = 0;
+    try {
+      const result = inspectRepositoryFreshness(root, {
+        readHostInitAdmission: () => null,
+        runFetch: () => { fetchCalls++; throw new Error("invalid host controls must not fetch"); },
+      }).result;
+      expect(result.status === "unknown" && result.reason === "invalid-host-managed-layout",
+        `${label}=${result.status}/${result.reason}`);
+      expect(result.fetchAttempted === false && fetchCalls === 0, `${label} attempted a fetch`);
+    } finally {
+      chmodSync(join(root, ".git"), 0o700);
+      chmodSync(join(root, ".codex"), 0o700);
+    }
+  }
+});
+
+check("host-init admission errors remain sanitized fail-closed unknown", () => {
+  const root = mkdtempSync(join(tmpdir(), "repository freshness admission error with spaces-"));
+  roots.push(root);
+  mkdirSync(join(root, ".git"));
+  setRepositoryMode(root, "host-managed");
+  const result = inspectRepositoryFreshness(root, {
+    readHostInitAdmission: () => { throw new Error("/private/admission/path"); },
+  }).result;
+  expect(result.status === "unknown" && result.reason === "invalid-host-managed-layout",
+    `status/reason=${result.status}/${result.reason}`);
+  expect(JSON.stringify(result).includes("/private/admission/path") === false, "private admission error leaked");
+  expect(result.fetchAttempted === false, "failed admission must not fetch");
 });
 
 check("configured core.sshCommand is passed to temporary fetch without changing source", () => {

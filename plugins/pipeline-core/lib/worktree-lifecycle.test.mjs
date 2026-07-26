@@ -395,13 +395,18 @@ for (const injectedStep of ["target-created", "target-verified", "source-removed
   });
 }
 
-check("D0 CLIs create canonical branches and drain registered scratch without raw-path receipts", () => {
+check("D0 worktree CLI denies unmanaged dispatch before creation while cleanup still drains owned scratch", () => {
   const { primary } = repoFixture();
   branch(primary, "feat/cli");
   const createScript = fileURLToPath(new URL("../scripts/worktree-create.mjs", import.meta.url));
   const cleanupScript = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
-  const created = JSON.parse(nodeCli(createScript, ["branch", "--repo", primary, "--branch", "feat/cli"]).stdout);
-  assert.equal(created.physicalPath, join(resolve(primary), "branch", "feat", "cli"));
+  const denied = spawnSync(process.execPath, [
+    createScript, "branch", "--repo", primary, "--branch", "feat/cli",
+  ], { encoding: "utf8", shell: false });
+  assert.equal(denied.status, 2);
+  assert.match(denied.stderr, /PORG-NOT-READY/);
+  assert.equal(denied.stderr.includes(primary), false);
+  assert.equal(existsSync(join(resolve(primary), "branch", "feat", "cli")), false);
 
   const scratch = mkdtempSync(join(tmpdir(), "worktree-cli-test-"));
   fixtureRoots.push(scratch);
@@ -454,11 +459,13 @@ check("D0 session descriptor is private, bound to one common dir and retires onl
   assertLifecycleError(() => loadSessionDescriptor(primary, session.sessionId), "WT-SESSION-MISSING");
 });
 
-check("D0 session-cleanup CLI keeps the nonce out of start output and accepts descriptor ownership", () => {
+check("D0 session-cleanup CLI accepts descriptor ownership without receiving the nonce", () => {
   const { primary } = repoFixture();
   const cleanupScript = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
-  const started = JSON.parse(nodeCli(cleanupScript, ["start", "--repo", primary, "--session", "session-cli-descriptor"]).stdout);
-  assert.deepEqual(Object.keys(started).sort(), ["code", "descriptorSha256", "ok", "sessionId"]);
+  const started = startSessionDescriptor(primary, {
+    sessionId: "session-cli-descriptor",
+    ownerNonce: "owner-nonce-cli-descriptor-000001",
+  });
   const scratch = mkdtempSync(join(tmpdir(), "worktree-cli-descriptor-test-"));
   fixtureRoots.push(scratch);
   const owned = join(scratch, "owned.txt");
@@ -478,7 +485,10 @@ check("D0 session-cleanup CLI keeps the nonce out of start output and accepts de
 check("D0 descriptor-only session closes cleanly without inventing a temporary manifest", () => {
   const { primary } = repoFixture();
   const cleanupScript = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
-  const started = JSON.parse(nodeCli(cleanupScript, ["start", "--repo", primary, "--session", "session-empty-descriptor"]).stdout);
+  const started = startSessionDescriptor(primary, {
+    sessionId: "session-empty-descriptor",
+    ownerNonce: "owner-nonce-empty-descriptor-0001",
+  });
   const receipt = JSON.parse(nodeCli(cleanupScript, ["cleanup", "--repo", primary, "--session-descriptor", started.sessionId, "--expected-descriptor-sha256", started.descriptorSha256]).stdout);
   assert.equal(receipt.status, "complete");
   assert.deepEqual(receipt.counts, { registered: 0, removed: 0, blocked: 0 });
@@ -488,7 +498,10 @@ check("D0 descriptor-only session closes cleanly without inventing a temporary m
 check("D0 descriptor digest drift blocks CLI cleanup before any registered resource is removed", () => {
   const { primary } = repoFixture();
   const cleanupScript = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
-  const started = JSON.parse(nodeCli(cleanupScript, ["start", "--repo", primary, "--session", "session-digest-drift"]).stdout);
+  const started = startSessionDescriptor(primary, {
+    sessionId: "session-digest-drift",
+    ownerNonce: "owner-nonce-digest-drift-000001",
+  });
   const scratch = mkdtempSync(join(tmpdir(), "worktree-cli-digest-drift-"));
   fixtureRoots.push(scratch);
   const owned = join(scratch, "owned.txt");
@@ -510,7 +523,10 @@ check("D0 descriptor digest drift blocks CLI cleanup before any registered resou
 check("D0 CLI reports a blocked cleanup with exit 2", () => {
   const { primary } = repoFixture();
   const cleanupScript = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
-  const started = JSON.parse(nodeCli(cleanupScript, ["start", "--repo", primary, "--session", "session-blocked-cleanup"]).stdout);
+  const started = startSessionDescriptor(primary, {
+    sessionId: "session-blocked-cleanup",
+    ownerNonce: "owner-nonce-blocked-cleanup-001",
+  });
   const scratch = mkdtempSync(join(tmpdir(), "worktree-cli-blocked-cleanup-"));
   fixtureRoots.push(scratch);
   const owned = join(scratch, "owned.txt");

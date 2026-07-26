@@ -125,6 +125,12 @@
       "member": "guard-apply-patch"
     },
     {
+      "surfaceId": "guard:plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:guard-lifecycle-ready",
+      "kind": "guard",
+      "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
+      "member": "guard-lifecycle-ready"
+    },
+    {
       "surfaceId": "guard:plugins/pipeline-core/hooks/guard-devplan.mjs:guard-devplan",
       "kind": "guard",
       "path": "plugins/pipeline-core/hooks/guard-devplan.mjs",
@@ -581,6 +587,24 @@
       "member": "codex-isolated-critic-contract-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-onboarding-app-server-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-onboarding-app-server-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-onboarding-capabilities-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-onboarding-capabilities-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-onboarding-runtime-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-onboarding-runtime-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-plugin-validator-parity-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -755,6 +779,12 @@
       "member": "guard-git-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-lifecycle-ready-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "guard-lifecycle-ready-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -791,6 +821,12 @@
       "member": "license-contract-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:lifecycle-ready-enforcement-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "lifecycle-ready-enforcement-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -801,6 +837,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "no-autoupdate-key-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:onboarding-continuity-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "onboarding-continuity-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:p3b-runner-conformance-tests",
@@ -1163,6 +1205,12 @@
       "member": "project-onboarding-e2e-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-onboarding-ready-gate-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "project-onboarding-ready-gate-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1387,6 +1435,7 @@
       "benefit": "A Codex-native hook bridge applies the available command and write-path policy without promising controls the host cannot provide.",
       "status": "host-dependent",
       "surfaceIds": [
+        "guard:plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:guard-lifecycle-ready",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:Bash:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:apply_patch|Edit|Write:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
         "publication:plugins/pipeline-core/.codex-plugin/plugin.json:codex-plugin-manifest"
@@ -1466,6 +1515,9 @@
         "verify-phase:harness/scripts/verify.mjs:codex-critic-host-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-host-advisor-route-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-isolated-critic-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-onboarding-app-server-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-onboarding-capabilities-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-onboarding-runtime-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-plugin-validator-parity-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-private-overlay-activation-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-compatibility-tests",
@@ -1498,6 +1550,7 @@
         "verify-phase:harness/scripts/verify.mjs:github-issue-operations-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-devplan-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-git-tests",
+        "verify-phase:harness/scripts/verify.mjs:guard-lifecycle-ready-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-push-tests",
         "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
@@ -1508,10 +1561,12 @@
         "verify-phase:harness/scripts/verify.mjs:language-canon-tests",
         "verify-phase:harness/scripts/verify.mjs:license-contract-check",
         "verify-phase:harness/scripts/verify.mjs:license-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:lifecycle-ready-enforcement-tests",
         "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
         "verify-phase:harness/scripts/verify.mjs:migrate-backlog-state-tests",
         "verify-phase:harness/scripts/verify.mjs:no-autoupdate-key-tests",
         "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
+        "verify-phase:harness/scripts/verify.mjs:onboarding-continuity-tests",
         "verify-phase:harness/scripts/verify.mjs:p3b-runner-conformance-tests",
         "verify-phase:harness/scripts/verify.mjs:parallel-dispatch-planner-tests",
         "verify-phase:harness/scripts/verify.mjs:phase26-invariants-check",
@@ -1536,6 +1591,7 @@
         "verify-phase:harness/scripts/verify.mjs:project-authority-migration-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:project-authority-tests",
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-e2e-tests",
+        "verify-phase:harness/scripts/verify.mjs:project-onboarding-ready-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
         "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",

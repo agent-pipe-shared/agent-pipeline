@@ -7,26 +7,44 @@
  * distinct additive adoption path; existing authority stays owned by the
  * migration/repair workflow.
  */
-import { createHash } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import {
-  accessSync, constants, existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, readFileSync,
-  rmSync, rmdirSync, unlinkSync, writeFileSync,
+  accessSync, closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync,
+  readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { dirname, join, resolve, sep } from "node:path";
+import { fileURLToPath } from "node:url";
 
-import { CODEX_HOST_CONTROL_PATHS, hasCodexHostControlLayout } from "./codex-host-layout.mjs";
-import { inspectRunnerProfileMigrationV3, planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
+import { CODEX_HOST_CONTROL_PATHS, hasCodexGitControlMount, hasCodexHostControlLayout, hasCodexRuntimeControlMount } from "./codex-host-layout.mjs";
+import { appServerNextAction, observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
+import { observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
+import {
+  applyOnboardingKickoff,
+  classifyOnboardingContinuity,
+  planOnboardingKickoff,
+  reconstructOnboardingKickoffPlan,
+} from "./onboarding-continuity.mjs";
+import { applyRunnerProfileMigrationV3, inspectRunnerProfileMigrationV3, planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
 import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
+import { loadManifest, validateManifest } from "./manifest.mjs";
+import { parseYaml } from "./yaml-lite.mjs";
 import { codexCustomAgentSeed, loadRuntimeProjectionV3OwnedKeys, planRuntimeProjectionV3 } from "./runtime-projection-v3.mjs";
+import {
+  prepareRuntimeRestartBinding, persistRestartBarrier, readCurrentRuntimeReadback,
+  readRestartBarrier, removeRestartBarrierCas,
+} from "./codex-onboarding-runtime.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 
 const SOURCE = "pipeline.user.yaml";
-const SCHEMA = "pipeline.project-onboarding.v3";
+const SCHEMA = "pipeline.project-onboarding.v4";
+const LEGACY_SCHEMA = "pipeline.project-onboarding.v3";
 const PLAN_SCHEMA = "pipeline.project-onboarding-plan.v3";
 const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
 const AUTHENTICATED = new WeakMap();
 const USER_RESERVED_PATHS = new Set([".agents", ".claude", ".codex"]);
+const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
+const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
 
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
@@ -51,7 +69,11 @@ function renderYaml(value, indent = "") {
   }).join("");
 }
 function deps(overrides = {}) {
-  return { accessSync, constants, existsSync, lstatSync, mkdirSync, readdirSync, realpathSync, readFileSync, rmSync, rmdirSync, unlinkSync, writeFileSync, spawnSync, ...overrides };
+  return {
+    accessSync, closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync,
+    readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
+    spawnSync, observeCodexOnboardingCapabilities, observeOnboardingAppServer, ...overrides,
+  };
 }
 function safeRoot(rootDir, fs) {
   if (typeof rootDir !== "string" || rootDir.length === 0) throw new Error("root must be a non-empty path");
@@ -90,8 +112,136 @@ function rootEntries(root, fs) {
 function runtimePaths() { return loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path).sort(); }
 function hasOwnRuntime(root, fs) { return runtimePaths().some((relative) => fs.existsSync(safePath(root, relative, fs))); }
 
+function fsyncDirectory(path, fs) {
+  let fd;
+  try {
+    fd = fs.openSync(path, "r");
+    fs.fsyncSync(fd);
+  } catch (error) {
+    if (!(process.platform === "win32"
+      && ["EPERM", "EINVAL", "EISDIR", "EACCES", "ENOTSUP"].includes(error?.code))) throw error;
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
+function sameIdentity(expected, path, fs) {
+  try {
+    const actual = fs.lstatSync(path);
+    return !actual.isSymbolicLink()
+      && actual.isFile()
+      && actual.nlink === 1
+      && String(actual.dev) === expected.dev
+      && String(actual.ino) === expected.ino;
+  } catch {
+    return false;
+  }
+}
+
+function fileIdentity(info) {
+  return info && !info.isSymbolicLink() && info.isFile() && info.nlink === 1
+    ? { dev: String(info.dev), ino: String(info.ino) }
+    : null;
+}
+
+function recoverProbeIdentity(fd, path, candidate, fs) {
+  let descriptor = null;
+  try { if (fd !== undefined) descriptor = fileIdentity(fs.fstatSync(fd)); } catch {}
+  let current = null;
+  try { current = fileIdentity(fs.lstatSync(path)); } catch {}
+  if (descriptor && current && descriptor.dev === current.dev && descriptor.ino === current.ino) return current;
+  if (candidate && current && candidate.dev === current.dev && candidate.ino === current.ino) return current;
+  return null;
+}
+
+function cleanupRuntimeProbe(path, identity, fs) {
+  if (!fs.existsSync(path)) return;
+  if (!identity || !sameIdentity(identity, path, fs)) {
+    throw new Error("runtime capability probe changed identity before rollback");
+  }
+  fs.unlinkSync(path);
+}
+
+function nearestExistingPhysicalParent(root, relative, fs) {
+  const target = safePath(root, relative, fs);
+  let parent = dirname(target);
+  while (!fs.existsSync(parent)) {
+    const next = dirname(parent);
+    if (next === parent || (next !== root && !next.startsWith(`${root}${sep}`))) {
+      throw new Error("runtime target has no safe project-local parent");
+    }
+    parent = next;
+  }
+  const info = fs.lstatSync(parent);
+  if (!info.isDirectory() || info.isSymbolicLink() || fs.realpathSync(parent) !== parent) {
+    throw new Error("runtime target parent is not a physical directory");
+  }
+  return parent;
+}
+
+function selectedRuntimeTargetParents(root, fs) {
+  return [...new Set(runtimePaths()
+    .filter((relative) => relative.startsWith(".codex/"))
+    .map((relative) => nearestExistingPhysicalParent(root, relative, fs)))].sort();
+}
+
+/**
+ * Prove each distinct selected Codex target parent can support the migration
+ * transaction. Every byte is disposable and identity-bound; cleanup controls
+ * over the primary failure so a leaked/foreign path can never be ignored.
+ */
+function probeSelectedRuntimeTargets(root, fs) {
+  const parents = selectedRuntimeTargetParents(root, fs);
+  for (const parent of parents) {
+    const suffix = randomBytes(18).toString("hex");
+    const source = join(parent, `.pipeline-runtime-capability-${suffix}.tmp`);
+    const target = join(parent, `.pipeline-runtime-capability-${suffix}.renamed`);
+    let fd;
+    let identity = null;
+    let createdIdentity = null;
+    let primaryError = null;
+    try {
+      fd = fs.openSync(
+        source,
+        fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | (fs.constants.O_NOFOLLOW ?? 0),
+        0o600,
+      );
+      createdIdentity = fileIdentity(fs.lstatSync(source));
+      const opened = fileIdentity(fs.fstatSync(fd));
+      if (!createdIdentity || !opened
+        || createdIdentity.dev !== opened.dev
+        || createdIdentity.ino !== opened.ino) throw new Error("runtime capability probe identity is unavailable");
+      identity = opened;
+      fs.writeFileSync(fd, Buffer.from("runtime-capability-probe", "utf8"));
+      fs.fsyncSync(fd);
+      fs.closeSync(fd);
+      fd = undefined;
+      fs.renameSync(source, target);
+      fsyncDirectory(parent, fs);
+    } catch (error) {
+      primaryError = error;
+    }
+    identity ??= recoverProbeIdentity(fd, source, createdIdentity, fs)
+      ?? recoverProbeIdentity(fd, target, createdIdentity, fs);
+    const cleanupErrors = [];
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch (error) { cleanupErrors.push(error); }
+    }
+    try { cleanupRuntimeProbe(source, identity, fs); } catch (error) { cleanupErrors.push(error); }
+    try { cleanupRuntimeProbe(target, identity, fs); } catch (error) { cleanupErrors.push(error); }
+    try { fsyncDirectory(parent, fs); } catch (error) { cleanupErrors.push(error); }
+    if (cleanupErrors.length > 0) throw cleanupErrors[0];
+    if (primaryError) throw primaryError;
+  }
+}
+
 function isHostControlLayout(root, entries, fs) {
-  return entries.length >= 2 && entries.length <= CODEX_HOST_CONTROL_PATHS.length
+  return (entries.length === 1 && entries[0].name === ".git" && hasCodexGitControlMount(root, {
+    access: fs.accessSync,
+    fsConstants: fs.constants,
+    lstat: fs.lstatSync,
+    readdir: fs.readdirSync,
+  })) || (entries.length >= 2 && entries.length <= CODEX_HOST_CONTROL_PATHS.length
     && entries.every((entry) => CODEX_HOST_CONTROL_PATHS.includes(entry.name))
     && [".codex", ".git"].every((name) => entries.some((entry) => entry.name === name))
     && hasCodexHostControlLayout(root, {
@@ -99,7 +249,7 @@ function isHostControlLayout(root, entries, fs) {
       fsConstants: fs.constants,
       lstat: fs.lstatSync,
       readdir: fs.readdirSync,
-    });
+    }));
 }
 
 function isExistingGitMetadata(entry, root, fs) {
@@ -141,19 +291,28 @@ function freshIntent() {
     advisor_export: { consent: "declined" },
   };
 }
-function freshBaselines({ hostManaged = false } = {}) {
-  return {
+function freshBaselines(intent, { hostManaged = false } = {}) {
+  const baselines = {
     ".claude/settings.json": { status: "present", bytes: "{}\n" },
     // `git diff --check` is deliberately HEAD-independent: onboarding creates
     // no commit, so `git diff --check HEAD` would make the one verify command
     // fail before the user's initial commit exists.
     ".claude/pipeline.json": { status: "present", bytes: `${JSON.stringify({ project: "new-project", verify: "git diff --check", handover: "docs/state.md", autonomy: "gated", branchModel: "feature-branch", repositoryMode: hostManaged ? "host-managed" : "local-only", worktree: "optional", stakes: "standard", constraints: [hostManaged ? "Codex owns .git and .codex; configure project verification before delivery." : "Configure project-specific policy before delivery."] }, null, 2)}\n` },
-    ".claude/pipeline.yaml": { status: "present", bytes: "language:\n  human_facing: en\nmodelRouting:\n  legacy:\n    model: legacy\n    effort: low\n" },
+    ".claude/pipeline.yaml": { status: "present", bytes: "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nmodelRouting:\n  legacy:\n    model: legacy\n    effort: low\n" },
     ".codex/config.toml": { status: "present", bytes: "" },
     ".codex/agents/implementor.toml": { status: "present", bytes: codexCustomAgentSeed("implementor") },
     ".codex/agents/critic.toml": { status: "present", bytes: codexCustomAgentSeed("critic") },
     ".codex/agents/consult-advisor.toml": { status: "present", bytes: "" },
   };
+  const projection = planRuntimeProjectionV3(intent, { baselines });
+  if (projection.status !== "ready") throw new Error("fresh V3 runtime projection is invalid");
+  for (const target of projection.targets.filter((entry) => entry.path.startsWith(".claude/"))) {
+    if (target.after?.status !== "present" || typeof target.after.bytes !== "string") {
+      throw new Error(`fresh V3 runtime target is invalid: ${target.path}`);
+    }
+    baselines[target.path] = { status: "present", bytes: target.after.bytes };
+  }
+  return baselines;
 }
 function gitCapability(fs, root) {
   const observation = fs.spawnSync("git", ["--version"], { cwd: root, encoding: "utf8" });
@@ -164,17 +323,17 @@ function gitCapability(fs, root) {
   if (major < 2 || (major === 2 && minor < 28)) return { ok: false, reason: "Git 2.28 or newer is required for --initial-branch" };
   return { ok: true, version: match[0] };
 }
-function inspection(rootDir, fs) {
+function legacyInspection(rootDir, fs) {
   let root;
-  try { root = safeRoot(rootDir, fs); } catch (error) { return { schema: SCHEMA, status: "unsafe", diagnostics: [diagnostic("$.root", "unsafe_root", error.message, "supply a real non-symlink directory")] }; }
+  try { root = safeRoot(rootDir, fs); } catch (error) { return { schema: LEGACY_SCHEMA, status: "unsafe", diagnostics: [diagnostic("$.root", "unsafe_root", error.message, "supply a real non-symlink directory")] }; }
   let entries;
-  try { entries = rootEntries(root, fs); } catch (error) { return { schema: SCHEMA, status: "unsafe", root, diagnostics: [diagnostic("$.root", "root_unreadable", error.message, "repair root access before onboarding")] }; }
+  try { entries = rootEntries(root, fs); } catch (error) { return { schema: LEGACY_SCHEMA, status: "unsafe", root, diagnostics: [diagnostic("$.root", "root_unreadable", error.message, "repair root access before onboarding")] }; }
   const link = entries.find((entry) => entry.symlink);
-  if (link) return { schema: SCHEMA, status: "unsafe", root, diagnostics: [diagnostic(`$.entries.${link.name}`, "symlink_entry", "fresh onboarding rejects symbolic links", "use a real empty directory")], entries: entries.map((entry) => entry.name) };
-  if (entries.length === 0) return { schema: SCHEMA, status: "fresh", root, diagnostics: [], entries: [] };
+  if (link) return { schema: LEGACY_SCHEMA, status: "unsafe", root, diagnostics: [diagnostic(`$.entries.${link.name}`, "symlink_entry", "fresh onboarding rejects symbolic links", "use a real empty directory")], entries: entries.map((entry) => entry.name) };
+  if (entries.length === 0) return { schema: LEGACY_SCHEMA, status: "fresh", root, diagnostics: [], entries: [] };
   if (isHostControlLayout(root, entries, fs)) {
     return {
-      schema: SCHEMA,
+      schema: LEGACY_SCHEMA,
       status: "fresh-host-managed",
       root,
       diagnostics: [diagnostic(
@@ -188,23 +347,26 @@ function inspection(rootDir, fs) {
   }
   const sourcePath = safePath(root, SOURCE, fs);
   if (fs.existsSync(sourcePath)) {
-    const migrated = inspectRunnerProfileMigrationV3({ rootDir: root });
+    const migrated = inspectRunnerProfileMigrationV3({ rootDir: root, deps: fs });
     if (migrated.status === "ready" && ["v0", "v1", "v2"].includes(migrated.sourceKind)) {
-      return { schema: SCHEMA, status: "migration-required", root, sourceKind: migrated.sourceKind, diagnostics: [diagnostic("$.source", "legacy_source", "the root has a legacy pipeline authority", "use runner-profile-migration-v3 inspect, plan, then apply --activate")], entries: entries.map((entry) => entry.name) };
+      return { schema: LEGACY_SCHEMA, status: "migration-required", root, sourceKind: migrated.sourceKind, diagnostics: [diagnostic("$.source", "legacy_source", "the root has a legacy pipeline authority", "use runner-profile-migration-v3 inspect, plan, then apply --activate")], entries: entries.map((entry) => entry.name) };
     }
     if (migrated.status === "ready" && migrated.sourceKind === "v3") {
-      const authority = validateV3BootstrapAuthority({ rootDir: root });
-      if (authority.status === "ready") return { schema: SCHEMA, status: "ready", root, diagnostics: [], entries: entries.map((entry) => entry.name) };
+      const authority = validateV3BootstrapAuthority({ rootDir: root, deps: fs });
+      if (["projection-current", "restart-required", "ready"].includes(authority.status)
+        || authority.runtimeProjection === "noop") {
+        return { schema: LEGACY_SCHEMA, status: "ready", root, diagnostics: [], entries: entries.map((entry) => entry.name) };
+      }
     }
   }
   let runtimePresent;
   try { runtimePresent = hasOwnRuntime(root, fs); }
   catch (error) {
-    return { schema: SCHEMA, status: "unsafe", root, diagnostics: [diagnostic("$.runtime", "unsafe_runtime_path", error.message, "remove symbolic links before onboarding")], entries: entries.map((entry) => entry.name) };
+    return { schema: LEGACY_SCHEMA, status: "unsafe", root, diagnostics: [diagnostic("$.runtime", "unsafe_runtime_path", error.message, "remove symbolic links before onboarding")], entries: entries.map((entry) => entry.name) };
   }
   if (!runtimePresent && !fs.existsSync(sourcePath) && isAdoptableUnmanagedRoot(entries, root, fs)) {
     return {
-      schema: SCHEMA,
+      schema: LEGACY_SCHEMA,
       status: "existing-unmanaged",
       root,
       diagnostics: [diagnostic(
@@ -217,23 +379,680 @@ function inspection(rootDir, fs) {
     };
   }
   const code = runtimePresent || fs.existsSync(sourcePath) ? "partial_v3_state" : "unrelated_entries";
-  return { schema: SCHEMA, status: "partial", root, diagnostics: [diagnostic("$.root", code, "the root is not a brand-new empty project directory", "do not overwrite it; inspect or repair its existing authority explicitly")], entries: entries.map((entry) => entry.name) };
+  return { schema: LEGACY_SCHEMA, status: "partial", root, diagnostics: [diagnostic("$.root", code, "the root is not a brand-new empty project directory", "do not overwrite it; inspect or repair its existing authority explicitly")], entries: entries.map((entry) => entry.name) };
 }
 
-export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {} } = {}) { return inspection(rootDir, deps(overrides)); }
+function lifecycleDiagnostic(path, code, message, guidance = "") {
+  return { path, code, message: String(message).replace(/[\r\n]+/gu, " "), guidance: String(guidance).replace(/[\r\n]+/gu, " ") };
+}
+
+function emptyRuntime(status = "not-observed") {
+  return { status, sourceSha256: null, targetsSha256: null, barrierSha256: null, readbackSha256: null };
+}
+
+function emptyContinuity() { return { status: "unavailable", stateSha256: null, handoverSha256: null, historySha256: null }; }
+
+function emptyAppServer() { return { required: false, status: "not-requested", code: null }; }
+
+function runtimeTargetReadOnlyResult({ root, intent, repository }) {
+  return lifecycleResult({
+    status: "runtime-target-read-only",
+    root,
+    intent,
+    repository,
+    runtime: emptyRuntime("target-read-only"),
+    nextAction: null,
+    diagnostics: [lifecycleDiagnostic(
+      "$.runtime",
+      "runtime_target_read_only",
+      "a selected Codex runtime target cannot support the required reversible transaction",
+      "repair target or parent permissions before planning runtime changes",
+    )],
+  });
+}
+
+function unavailableRepository(intent) {
+  return {
+    status: "unavailable",
+    mode: "unknown",
+    gitVersion: null,
+    initializesGit: false,
+    rootWritable: "not-observed",
+    sessionCapability: ["onboarding", "bootstrap"].includes(intent) ? "not-required" : "not-observed",
+    worktreeCapability: intent === "dispatch" ? "not-observed" : "not-required",
+  };
+}
+
+const REPOSITORY_KEYS = [
+  "status", "mode", "gitVersion", "initializesGit", "rootWritable", "sessionCapability", "worktreeCapability",
+];
+const REPOSITORY_STATUSES = new Set([
+  "local-valid-writable", "local-uninitialized", "host-managed", "control-path-read-only", "control-path-invalid",
+  "git-unavailable", "root-read-only", "session-capability-unavailable", "worktree-capability-unavailable", "unavailable",
+]);
+function validRepositoryComponent(value) {
+  return value && typeof value === "object" && !Array.isArray(value)
+    && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...REPOSITORY_KEYS].sort())
+    && REPOSITORY_STATUSES.has(value.status)
+    && new Set(["local", "host-managed", "unknown"]).has(value.mode)
+    && (value.gitVersion === null || (typeof value.gitVersion === "string" && value.gitVersion.length > 0))
+    && typeof value.initializesGit === "boolean"
+    && new Set(["passed", "failed", "not-observed"]).has(value.rootWritable)
+    && new Set(["passed", "failed", "not-required", "not-observed"]).has(value.sessionCapability)
+    && new Set(["passed", "failed", "not-required", "not-observed"]).has(value.worktreeCapability);
+}
+
+function observeRepositoryCapability(rootDir, fs, intent, willInitializeGit = false) {
+  try {
+    const observed = fs.observeCodexOnboardingCapabilities({
+      rootDir,
+      intent,
+      willInitializeGit,
+      deps: { spawnSync: fs.spawnSync },
+    });
+    return validRepositoryComponent(observed) ? observed : unavailableRepository(intent);
+  } catch {
+    return unavailableRepository(intent);
+  }
+}
+
+function persistedHostManagedLayout(root, fs) {
+  try {
+    const calibration = JSON.parse(fs.readFileSync(safePath(root, ".claude/pipeline.json", fs), "utf8"));
+    return calibration?.repositoryMode === "host-managed" && hasCodexHostControlLayout(root, {
+      access: fs.accessSync, fsConstants: fs.constants, lstat: fs.lstatSync, readdir: fs.readdirSync,
+    });
+  } catch { return false; }
+}
+
+function pluginManagedCodexRuntime(root, fs) {
+  return hasCodexRuntimeControlMount(root, {
+    access: fs.accessSync,
+    fsConstants: fs.constants,
+    lstat: fs.lstatSync,
+    readdir: fs.readdirSync,
+  });
+}
+
+function commandAction(argv, mutation, requiresConfirmation, schema, statuses) {
+  return { kind: "command", executable: "node", argv, mutation, requiresConfirmation, expected: { schema, statuses } };
+}
+
+function shellWord(value) {
+  if (typeof value !== "string" || value.includes("\0")) {
+    throw new TypeError("command arguments must be NUL-free strings");
+  }
+  if (/^[A-Za-z0-9_@%+=:,./-]+$/u.test(value)) return value;
+  if (/[\r\n]/u.test(value)) {
+    const escaped = value
+      .replaceAll("\\", "\\\\")
+      .replaceAll("'", "\\'")
+      .replaceAll("\r", "\\r")
+      .replaceAll("\n", "\\n");
+    return `$'${escaped}'`;
+  }
+  return `'${value.replaceAll("'", "'\"'\"'")}'`;
+}
+
+/** Render an exact command/restart action as one copy-safe shell line. */
+export function renderProjectOnboardingAction(action) {
+  let executable;
+  let argv;
+  if (action?.kind === "command") {
+    executable = action.executable;
+    argv = action.argv;
+  } else if (action?.kind === "restart-process") {
+    executable = action.launch?.executable;
+    argv = action.launch?.argv;
+  } else {
+    throw new TypeError("only command and restart-process actions are renderable");
+  }
+  if (typeof executable !== "string" || !Array.isArray(argv) || !argv.every((part) => typeof part === "string")) {
+    throw new TypeError("action executable/argv is invalid");
+  }
+  return [executable, ...argv].map(shellWord).join(" ");
+}
+
+function continuityInspectAction(root) {
+  return commandAction(
+    [ONBOARDING_SCRIPT, "continuity", "inspect", "--root", root],
+    false,
+    false,
+    SCHEMA,
+    ["continuity-damaged", "continuity-observation-unavailable"],
+  );
+}
+
+function collectGoalAction() {
+  return {
+    kind: "collect-input",
+    input: {
+      name: "goal",
+      encoding: "utf8",
+      trim: true,
+      minBytes: 1,
+      maxBytes: 8192,
+      rejectNul: true,
+    },
+    mutation: false,
+    requiresConfirmation: false,
+    expected: {
+      schema: SCHEMA,
+      statuses: ["kickoff-required"],
+    },
+  };
+}
+
+const RESTART_EXPECTED_STATUSES = [
+  "portable-seed-required", "runtime-initialization-required", "kickoff-required", "ready", "partial", "invalid", "unsafe",
+  "migration-required", "adoption-required", "repository-mount-read-only", "repository-control-path-invalid", "git-capability-unavailable",
+  "project-root-read-only", "repository-mode-unsupported", "repository-observation-unavailable", "session-capability-unavailable",
+  "worktree-capability-unavailable", "runtime-target-read-only", "runtime-readback-unavailable", "projection-drift", "continuity-damaged",
+  "continuity-observation-unavailable", "app-server-execution-denied", "app-server-not-running", "app-server-unavailable",
+];
+function restartAction(root, barrierSha256) {
+  return {
+    kind: "restart-process", requiresCurrentProcessExit: true,
+    launch: { executable: "node", argv: [fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url)), "--root", root, "--barrier-sha256", barrierSha256, "--activate"] },
+    mutation: true, requiresConfirmation: true, expectedStatuses: RESTART_EXPECTED_STATUSES,
+  };
+}
+
+function lifecycleResult({
+  status,
+  root,
+  runner = "codex",
+  intent,
+  repository,
+  runtime,
+  continuity = emptyContinuity(),
+  appServer = emptyAppServer(),
+  nextAction = null,
+  diagnostics = [],
+}) {
+  return {
+    schema: SCHEMA,
+    status,
+    root: root ?? null,
+    runner,
+    intent,
+    repository,
+    runtime,
+    continuity,
+    appServer,
+    nextAction,
+    diagnostics,
+  };
+}
+
+function validAppServerComponent(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)
+    || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify(["code", "required", "status"])) {
+    return false;
+  }
+  if (value.required === false) return value.status === "not-requested" && value.code === null;
+  if (value.required !== true || typeof value.code !== "string" || !/^CAS-[A-Z0-9-]+$/u.test(value.code)) return false;
+  if (value.status === "running") return value.code === "CAS-READY";
+  if (value.status === "execution-denied") return value.code === "CAS-EXECUTION-UNAVAILABLE";
+  if (value.status === "not-running") return value.code === "CAS-DAEMON-UNREACHABLE";
+  return value.status === "unavailable"
+    && value.code !== "CAS-READY"
+    && value.code !== "CAS-DAEMON-UNREACHABLE";
+}
+
+function observeReadyAppServer(intent, fs) {
+  if (intent === "onboarding") return emptyAppServer();
+  try {
+    const observed = fs.observeOnboardingAppServer({ intent });
+    return validAppServerComponent(observed)
+      ? observed
+      : { required: true, status: "unavailable", code: "CAS-UNKNOWN" };
+  } catch {
+    return { required: true, status: "unavailable", code: "CAS-UNKNOWN" };
+  }
+}
+
+function readyLifecycleResult({ root, intent, repository, runtime, continuity = emptyContinuity() }, fs) {
+  // The reserved Codex mount is already supplied by the installed plugin.
+  // Re-running the complete project inspector through a host boundary would
+  // lose the sandbox-only .git/.codex mounts and misclassify the same root as
+  // local-uninitialized. App-Server health remains a separate pipeline-start
+  // observation before any capability claim; it is not an onboarding writer.
+  const appServer = runtime.status === "plugin-managed"
+    ? emptyAppServer()
+    : observeReadyAppServer(intent, fs);
+  if (appServer.required === true && appServer.status !== "running") {
+    const status = appServer.status === "execution-denied"
+      ? "app-server-execution-denied"
+      : appServer.status === "not-running"
+        ? "app-server-not-running"
+        : "app-server-unavailable";
+    const diagnostic = status === "app-server-execution-denied"
+      ? lifecycleDiagnostic(
+        "$.appServer",
+        "app_server_execution_denied",
+        "the required read-only App-Server health observation was denied by the execution boundary",
+        "observe App-Server health through the host-authorized local read-only boundary",
+      )
+      : status === "app-server-not-running"
+        ? lifecycleDiagnostic(
+          "$.appServer",
+          "app_server_not_running",
+          "the required local App-Server daemon is not running",
+          "review and explicitly confirm the bounded recovery action",
+        )
+        : lifecycleDiagnostic(
+          "$.appServer",
+          "app_server_unavailable",
+          "the required local App-Server health could not be established",
+          "use only the returned bounded doctor or recovery action when one is available",
+        );
+    return lifecycleResult({
+      status,
+      root,
+      intent,
+      repository,
+      runtime,
+      continuity,
+      appServer,
+      nextAction: appServerNextAction(appServer),
+      diagnostics: [diagnostic],
+    });
+  }
+  if (continuity.status === "absent-pristine") {
+    return lifecycleResult({
+      status: "kickoff-required",
+      root,
+      intent,
+      repository,
+      runtime,
+      continuity,
+      appServer,
+      nextAction: collectGoalAction(),
+      diagnostics: [lifecycleDiagnostic(
+        "$.continuity",
+        "continuity_absent_pristine",
+        "no sanctioned initial continuity exists",
+        "collect and validate the project goal, then review the read-only kickoff plan",
+      )],
+    });
+  }
+  if (continuity.status === "damaged") {
+    return lifecycleResult({
+      status: "continuity-damaged",
+      root,
+      intent,
+      repository,
+      runtime,
+      continuity,
+      appServer,
+      nextAction: continuityInspectAction(root),
+      diagnostics: [lifecycleDiagnostic(
+        "$.continuity",
+        "continuity_damaged",
+        "existing continuity artifacts are inconsistent or invalid",
+        "inspect and repair continuity through its owning workflow; pristine kickoff is not permitted",
+      )],
+    });
+  }
+  if (continuity.status !== "valid") {
+    return lifecycleResult({
+      status: "continuity-observation-unavailable",
+      root,
+      intent,
+      repository,
+      runtime,
+      continuity: { ...continuity, status: "unavailable" },
+      appServer,
+      diagnostics: [lifecycleDiagnostic(
+        "$.continuity",
+        "continuity_observation_unavailable",
+        "continuity authority could not be observed safely",
+        "repair continuity read access before retrying",
+      )],
+    });
+  }
+  return lifecycleResult({
+    status: "ready",
+    root,
+    intent,
+    repository,
+    runtime,
+    continuity,
+    appServer,
+    diagnostics: [],
+  });
+}
+
+function afterRuntimeLifecycleResult({ root, intent, repository, runtime }, fs) {
+  let continuity;
+  try {
+    continuity = (fs.classifyOnboardingContinuity ?? classifyOnboardingContinuity)({
+      rootDir: root,
+      repositoryCapability: repository.mode,
+      spawn: fs.spawnSync,
+    });
+  } catch {
+    continuity = emptyContinuity();
+  }
+  return readyLifecycleResult({ root, intent, repository, runtime, continuity }, fs);
+}
+
+function lifecyclePlanDigest(plan) {
+  return sha256(JSON.stringify(stable({ root: plan.root, state: plan.state ?? plan.sourceKind, intentSha256: plan.intentSha256, sourceSha256: plan.sourceSha256, git: plan.git, targets: plan.targets })));
+}
+
+function selectedRunnerIsCodex(root, fs) {
+  try {
+    const parsed = parseYaml(fs.readFileSync(safePath(root, SOURCE, fs), "utf8"));
+    return parsed?.runners?.default === "codex";
+  } catch { return false; }
+}
+
+const REPOSITORY_FAILURES = {
+  "control-path-read-only": {
+    status: "repository-mount-read-only",
+    code: "repository_control_path_read_only",
+    path: "$.repository",
+    message: "the physical Git control path did not pass its reversible write probe",
+    guidance: "remount or repair the repository control path before retrying",
+  },
+  "control-path-invalid": {
+    status: "repository-control-path-invalid",
+    code: "repository_control_path_invalid",
+    path: "$.repository",
+    message: "the repository control path is invalid or escaped its physical authority",
+    guidance: "repair the Git control layout before retrying",
+  },
+  "git-unavailable": {
+    status: "git-capability-unavailable",
+    code: "git_unavailable",
+    path: "$.repository.gitVersion",
+    message: "Git 2.28 or newer could not be observed",
+    guidance: "install or expose Git 2.28 or newer before retrying",
+  },
+  "root-read-only": {
+    status: "project-root-read-only",
+    code: "project_root_read_only",
+    path: "$.root",
+    message: "the project root did not pass its reversible write probe",
+    guidance: "repair project-root write access before retrying",
+  },
+  "session-capability-unavailable": {
+    status: "session-capability-unavailable",
+    code: "session_capability_unavailable",
+    path: "$.repository.sessionCapability",
+    message: "the session cleanup descriptor probe did not complete and roll back",
+    guidance: "repair the repository-private session capability before retrying",
+  },
+  "worktree-capability-unavailable": {
+    status: "worktree-capability-unavailable",
+    code: "worktree_capability_unavailable",
+    path: "$.repository.worktreeCapability",
+    message: "the dispatch worktree probe did not complete and roll back",
+    guidance: "repair the local Git worktree capability before retrying",
+  },
+  unavailable: {
+    status: "repository-observation-unavailable",
+    code: "repository_observation_unavailable",
+    path: "$.repository",
+    message: "the repository capability could not be observed safely",
+    guidance: "supply one physical project root and retry the observation",
+  },
+};
+
+function repositoryFailureResult(rootDir, fs, intent, repository) {
+  let failure = REPOSITORY_FAILURES[repository.status] ?? null;
+  if (repository.status === "local-uninitialized" && !["onboarding", "bootstrap"].includes(intent)) {
+    failure = REPOSITORY_FAILURES["control-path-invalid"];
+  } else if (repository.status === "host-managed"
+    && (intent === "dispatch" || (intent === "session"
+      && (repository.gitVersion === null || repository.sessionCapability !== "passed")))) {
+    failure = {
+      status: "repository-mode-unsupported",
+      code: "repository_mode_unsupported",
+      path: "$.repository.mode",
+      message: "host-managed repository mode has not established the capability required by this intent",
+      guidance: "complete the exact host repository transition before session work; dispatch still requires a local worktree capability",
+    };
+  } else if (!failure && !["local-valid-writable", "local-uninitialized", "host-managed"].includes(repository.status)) {
+    failure = REPOSITORY_FAILURES.unavailable;
+  }
+  if (!failure) return null;
+  let root = null;
+  if (repository.status !== "unavailable") {
+    try { root = safeRoot(rootDir, fs); } catch {}
+  }
+  return lifecycleResult({
+    status: failure.status,
+    root,
+    runner: root === null ? null : "codex",
+    intent,
+    repository,
+    runtime: emptyRuntime(),
+    nextAction: null,
+    diagnostics: [lifecycleDiagnostic(failure.path, failure.code, failure.message, failure.guidance)],
+  });
+}
+
+function v4Inspection(rootDir, fs, intent = "onboarding") {
+  try {
+    const requestedRoot = resolve(rootDir);
+    const requestedInfo = fs.lstatSync(requestedRoot);
+    if (requestedInfo.isSymbolicLink()) {
+      return lifecycleResult({
+        status: "unsafe",
+        root: null,
+        runner: null,
+        intent,
+        repository: unavailableRepository(intent),
+        runtime: emptyRuntime(),
+        nextAction: null,
+        diagnostics: [lifecycleDiagnostic(
+          "$.root",
+          "root_symlink_rejected",
+          "the requested project root is a symbolic link",
+          "use the canonical physical project directory",
+        )],
+      });
+    }
+  } catch {
+    // The repository observer below owns all other resolution/read failures.
+  }
+  const repository = observeRepositoryCapability(rootDir, fs, intent, intent === "onboarding");
+  const repositoryFailure = repositoryFailureResult(rootDir, fs, intent, repository);
+  if (repositoryFailure) return repositoryFailure;
+  const legacy = legacyInspection(rootDir, fs);
+  const unavailable = lifecycleResult({
+    status: "unsafe", root: legacy.root, runner: legacy.root ? "codex" : null, intent, repository,
+    runtime: emptyRuntime(), diagnostics: [lifecycleDiagnostic("$.root", "root_resolution_failed", "the project root could not be resolved safely", "supply one real project directory")],
+  });
+  if (legacy.status === "unsafe") return unavailable;
+  if (legacy.status === "fresh" || legacy.status === "fresh-host-managed") {
+    return lifecycleResult({
+      status: "portable-seed-required", root: legacy.root, intent, repository,
+      runtime: emptyRuntime(),
+      nextAction: commandAction([ONBOARDING_SCRIPT, "plan", "--root", legacy.root], false, false, SCHEMA, ["portable-seed-required"]),
+      diagnostics: [lifecycleDiagnostic("$.source", "portable_seed_missing", "no portable V3 source and calibration seed exists", "review the portable seed plan")],
+    });
+  }
+  if (legacy.status === "existing-unmanaged") {
+    return lifecycleResult({
+      status: "adoption-required", root: legacy.root, intent, repository,
+      runtime: emptyRuntime(),
+      nextAction: commandAction([ONBOARDING_SCRIPT, "plan", "--root", legacy.root], false, false, SCHEMA, ["adoption-required"]),
+      diagnostics: [lifecycleDiagnostic("$.source", "adoption_required", "the local project has no Pipeline authority", "review the additive adoption plan")],
+    });
+  }
+  if (legacy.status === "migration-required") {
+    return lifecycleResult({
+      status: "migration-required", root: legacy.root, intent, repository,
+      runtime: emptyRuntime(),
+      nextAction: commandAction([MIGRATION_SCRIPT, "inspect", "--root", legacy.root], false, false, "pipeline.runner-profile-migration-inspect.v3", ["ready", "invalid-root", "recovery-required", "invalid-source"]),
+      diagnostics: [lifecycleDiagnostic("$.source", "migration_required", "the project has a legacy Pipeline source", "inspect the V3 migration")],
+    });
+  }
+  if (legacy.status === "partial") {
+    const sourcePath = legacy.root && safePath(legacy.root, SOURCE, fs);
+    if (sourcePath && fs.existsSync(sourcePath)) {
+      const migrated = inspectRunnerProfileMigrationV3({ rootDir: legacy.root, deps: fs });
+      if (migrated.status !== "ready") {
+        return lifecycleResult({ status: "invalid", root: legacy.root, runner: null, intent, repository, runtime: emptyRuntime(), nextAction: null,
+          diagnostics: [lifecycleDiagnostic("$.source", "source_invalid", "pipeline.user.yaml is not a valid V3 source", "repair the source through its owning workflow")] });
+      }
+      if (migrated.sourceKind === "v3") {
+        if (!selectedRunnerIsCodex(legacy.root, fs)) {
+          return lifecycleResult({ status: "invalid", root: legacy.root, runner: null, intent, repository, runtime: emptyRuntime(), nextAction: null,
+            diagnostics: [lifecycleDiagnostic("$.source.runners.default", "source_invalid", "the selected runner is not Codex", "select Codex through the source authority") ] });
+        }
+        const manifest = loadManifest(legacy.root);
+        if (manifest.status !== "ok") {
+          return lifecycleResult({ status: "partial", root: legacy.root, intent, repository, runtime: emptyRuntime(), nextAction: null,
+            diagnostics: [lifecycleDiagnostic("$.manifest", "manifest_invalid", "the generated pipeline manifest is absent or invalid", "regenerate it only through the lifecycle writer")] });
+        }
+        // Codex reserves this directory inside its sandbox. The installed
+        // plugin supplies the runtime there; a consumer project must not be
+        // declared broken merely because it cannot materialize hidden bytes.
+        if (pluginManagedCodexRuntime(legacy.root, fs)) {
+          return afterRuntimeLifecycleResult({
+            root: legacy.root,
+            intent,
+            repository,
+            runtime: { ...emptyRuntime("plugin-managed"), sourceSha256: migrated.sourceSha256 ?? null },
+          }, fs);
+        }
+        if (persistedHostManagedLayout(legacy.root, fs)) {
+          return runtimeTargetReadOnlyResult({ root: legacy.root, intent, repository });
+        }
+        try {
+          selectedRuntimeTargetParents(legacy.root, fs);
+        } catch {
+          return runtimeTargetReadOnlyResult({ root: legacy.root, intent, repository });
+        }
+        const runtimePlan = planRunnerProfileMigrationV3({ rootDir: legacy.root, deps: fs, initializeMissingRuntimeForSlimV3: true });
+        if (runtimePlan.status === "ready") {
+          const runtimeTargets = runtimePlan.targets.filter((target) => target.kind === "runtime");
+          const missing = runtimeTargets.some((target) => target.before?.status === "absent");
+          // A newly appeared owned Codex preimage controls before other absent
+          // targets: initialization must never overwrite it under a "missing" claim.
+          const driftedPresent = runtimeTargets.some((target) => target.path.startsWith(".codex/")
+            && target.before?.status === "present"
+            && target.before.sha256 !== target.after?.sha256);
+          const initialize = missing && !driftedPresent;
+          if (initialize) {
+            try {
+              probeSelectedRuntimeTargets(legacy.root, fs);
+            } catch {
+              return runtimeTargetReadOnlyResult({ root: legacy.root, intent, repository });
+            }
+          }
+          const runtime = { ...emptyRuntime(initialize ? "missing" : "projection-drift"), sourceSha256: runtimePlan.sourceSha256 ?? null };
+          return lifecycleResult({
+            status: initialize ? "runtime-initialization-required" : "projection-drift", root: legacy.root, intent, repository, runtime,
+            nextAction: commandAction([ONBOARDING_SCRIPT, initialize ? "plan-runtime" : "plan-repair", "--root", legacy.root], false, false, SCHEMA, [initialize ? "runtime-initialization-required" : "projection-drift"]),
+            diagnostics: [lifecycleDiagnostic("$.runtime", initialize ? "runtime_missing" : "projection_drift", initialize ? "required Codex runtime targets are absent" : "generated runtime bytes differ from the V3 projection", "review the lifecycle runtime plan")],
+          });
+        }
+      }
+    }
+    return lifecycleResult({ status: "partial", root: legacy.root, intent, repository, runtime: emptyRuntime(), nextAction: null,
+      diagnostics: [lifecycleDiagnostic("$.authority", "partial_authority", "the project has an incomplete Pipeline authority", "inspect the existing source and generated targets")] });
+  }
+  if (legacy.status === "ready") {
+    const authority = validateV3BootstrapAuthority({ rootDir: legacy.root, deps: fs });
+    if (authority.status === "ready" && authority.runtimeProjection === "plugin-managed") {
+      return afterRuntimeLifecycleResult({
+        root: legacy.root,
+        intent,
+        repository,
+        runtime: { ...emptyRuntime("plugin-managed"), sourceSha256: authority.sourceSha256 ?? null },
+      }, fs);
+    }
+    if (["projection-current", "restart-required", "ready"].includes(authority.status)
+      || authority.runtimeProjection === "noop") {
+      try {
+        const barrier = readRestartBarrier({ rootDir: legacy.root, repositoryCapability: repository.mode, deps: fs });
+        if (barrier.status === "present" && barrier.barrier.state === "restart-required") {
+          return lifecycleResult({ status: "restart-required", root: legacy.root, intent, repository,
+            runtime: { status: "restart-required", sourceSha256: barrier.barrier.sourceSha256, targetsSha256: barrier.barrier.runtimeTargetsSha256, barrierSha256: barrier.rawSha256, readbackSha256: null },
+            nextAction: restartAction(legacy.root, barrier.rawSha256),
+            diagnostics: [lifecycleDiagnostic("$.runtime", "restart_required", "Codex runtime targets changed and require a fresh effective-runtime readback", "confirm the one-use restart action")],
+          });
+        }
+        if (barrier.status === "present" && barrier.barrier.state === "cleared") {
+          const current = readCurrentRuntimeReadback({
+            rootDir: legacy.root,
+            repositoryCapability: repository.mode,
+            deps: fs,
+          });
+          if (current.status !== "current") throw new Error("cleared runtime readback marker is absent");
+          return afterRuntimeLifecycleResult({ root: legacy.root, intent, repository,
+            runtime: {
+              status: "readback-current",
+              sourceSha256: current.barrier.sourceSha256,
+              targetsSha256: current.barrier.runtimeTargetsSha256,
+              barrierSha256: current.barrierSha256,
+              readbackSha256: current.readbackSha256,
+            },
+          }, fs);
+        }
+        if (barrier.status === "absent" && authority.status === "projection-current") {
+          return lifecycleResult({
+            status: "runtime-attestation-required",
+            root: legacy.root,
+            intent,
+            repository,
+            runtime: {
+              status: "projection-current",
+              sourceSha256: authority.sourceSha256 ?? null,
+              targetsSha256: sha256(JSON.stringify(runtimePaths())),
+              barrierSha256: null,
+              readbackSha256: null,
+            },
+            nextAction: commandAction(
+              [ONBOARDING_SCRIPT, "plan-readback", "--root", legacy.root],
+              false,
+              false,
+              SCHEMA,
+              ["runtime-attestation-required"],
+            ),
+            diagnostics: [lifecycleDiagnostic(
+              "$.runtime",
+              "restart_required",
+              "the current Codex projection has no native effective-runtime readback",
+              "review and apply the digest-bound readback bootstrap plan, then restart",
+            )],
+          });
+        }
+      } catch (error) {
+        return lifecycleResult({ status: "runtime-readback-unavailable", root: legacy.root, intent, repository,
+          runtime: emptyRuntime("readback-unavailable"), nextAction: null,
+          diagnostics: [lifecycleDiagnostic("$.runtime", "runtime_readback_unavailable", "private restart state could not be observed safely", "restart/readback capability is unavailable in this environment")],
+        });
+      }
+    }
+  }
+  return lifecycleResult({ status: "partial", root: legacy.root, intent, repository, runtime: emptyRuntime(), nextAction: null,
+    diagnostics: [lifecycleDiagnostic("$.authority", "partial_authority", "the Pipeline authority is incomplete", "inspect the source and generated targets")] });
+}
+
+export function inspectProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {}, intent = "onboarding" } = {}) {
+  return v4Inspection(rootDir, deps(overrides), intent);
+}
 
 export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrides = {} } = {}) {
-  const fs = deps(overrides); const inspected = inspection(rootDir, fs);
+  const fs = deps(overrides); const inspected = legacyInspection(rootDir, fs);
   if (!["fresh", "fresh-host-managed", "existing-unmanaged"].includes(inspected.status)) return { schema: PLAN_SCHEMA, status: inspected.status, root: inspected.root, diagnostics: inspected.diagnostics, targets: [], requiresExplicitActivation: true };
   const hostManaged = inspected.status === "fresh-host-managed";
   const git = hostManaged ? { ok: true, version: null } : gitCapability(fs, inspected.root);
   if (!git.ok) return { schema: PLAN_SCHEMA, status: "unsupported", root: inspected.root, diagnostics: [diagnostic("$.git", "git_initial_branch_unsupported", git.reason, "install Git 2.28 or newer before activation")], targets: [], requiresExplicitActivation: true };
   const intent = freshIntent(); const validation = validatePipelineUserV3(intent);
   if (!validation.ok) return { schema: PLAN_SCHEMA, status: "invalid-authority", root: inspected.root, diagnostics: validation.errors, targets: [], requiresExplicitActivation: true };
-  const projection = planRuntimeProjectionV3(intent, { source: SOURCE, baselines: freshBaselines({ hostManaged }) });
-  if (projection.status !== "ready") return { schema: PLAN_SCHEMA, status: "invalid-projection", root: inspected.root, diagnostics: projection.diagnostics ?? [], targets: [], requiresExplicitActivation: true };
+  const baselines = freshBaselines(intent, { hostManaged });
+  const manifest = validateManifest(parseYaml(baselines[".claude/pipeline.yaml"].bytes), { rootDir: inspected.root });
+  if (manifest.status !== "ok") return { schema: PLAN_SCHEMA, status: "invalid-projection", root: inspected.root, diagnostics: manifest.errors, targets: [], requiresExplicitActivation: true };
   const internal = [
-    ...projection.targets.filter((target) => !hostManaged || !target.path.startsWith(".codex/")).map((target) => ({ path: target.path, bytes: target.after.bytes })),
+    ...[".claude/pipeline.json", ".claude/pipeline.yaml", ".claude/settings.json"].map((path) => ({ path, bytes: baselines[path].bytes })),
     { path: SOURCE, bytes: renderYaml(intent) },
   ].sort((left, right) => left.path.localeCompare(right.path));
   const targets = internal.map((target) => ({ path: target.path, kind: target.path === SOURCE ? "source" : "runtime", before: describe(null), after: describe(target.bytes), changed: true }));
@@ -244,7 +1063,7 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
 }
 
 function ensurePreimage(root, expectedState, fs) {
-  const now = inspection(root, fs);
+  const now = legacyInspection(root, fs);
   if (now.status !== expectedState) throw new Error(`root changed since planning (${now.status})`);
 }
 function removeEmptyParents(root, target, fs) {
@@ -286,16 +1105,176 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
       fs.writeFileSync(path, target.bytes, { encoding: "utf8", flag: "wx", mode: 0o600 });
       created.push(path);
     }
-    const authority = validateV3BootstrapAuthority({ rootDir: root });
-    if (authority.status !== "ready") throw new Error(`post-apply V3 bootstrap authority readback was not ready: ${authority.diagnostics?.[0]?.code ?? "unknown"}`);
-    const migration = planRunnerProfileMigrationV3({ rootDir: root });
-    const hostProjectionPending = state.hostManaged && migration.status === "ready" && migration.runtimeMode === "host-managed-codex"
-      && migration.changes.every((target) => target.path.startsWith(".codex/"));
-    if (migration.status !== "noop" && !hostProjectionPending) throw new Error("post-apply V3 migration plan was not noop");
-    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: state.hostManaged ? { mode: "host-managed", initialized: false, initialBranch: null, committed: false } : { mode: "local", initialized: gitCreated, initialBranch: "main", committed: false }, authority: { status: authority.status, runtimeProjection: authority.runtimeProjection }, migration: { status: migration.status, runtimeMode: migration.runtimeMode ?? "standard" }, diagnostics: [] };
+    const source = inspectRunnerProfileMigrationV3({ rootDir: root, deps: fs });
+    if (source.status !== "ready" || source.sourceKind !== "v3") throw new Error("post-apply portable source validation was not ready");
+    const manifest = loadManifest(root);
+    if (manifest.status !== "ok") throw new Error("post-apply canonical manifest validation was not ready");
+    return { schema: PLAN_SCHEMA, status: "applied", root, changes: plan.changes, git: state.hostManaged ? { mode: "host-managed", initialized: false, initialBranch: null, committed: false } : { mode: "local", initialized: gitCreated, initialBranch: "main", committed: false }, authority: { status: "portable-seed", runtimeProjection: "missing" }, diagnostics: [] };
   } catch (error) {
     const rollbackFailures = root ? rollback(root, created, gitCreated, fs) : [];
     if (rollbackFailures.length) return { schema: PLAN_SCHEMA, status: "rollback-failed", root, diagnostics: [diagnostic("$.transaction", "rollback_failed", `${error.message}; rollback also failed: ${rollbackFailures[0].message}`, "repair generated paths manually before retrying")] };
     return { schema: PLAN_SCHEMA, status: "rolled-back", root, diagnostics: [diagnostic("$.transaction", "apply_failed", error.message, "repair the root and run inspect then plan again")] };
   }
+}
+
+function planLifecycle(rootDir, fs, operation) {
+  const observed = v4Inspection(rootDir, fs);
+  if (operation === "portable") {
+    if (!["portable-seed-required", "adoption-required"].includes(observed.status)) return observed;
+    const plan = planProjectOnboardingV3({ rootDir, deps: fs });
+    if (plan.status !== "ready") return observed;
+    return { ...observed, nextAction: commandAction([ONBOARDING_SCRIPT, "apply-portable-seed", "--root", plan.root, "--plan-sha256", lifecyclePlanDigest(plan), "--activate"], true, true, SCHEMA, ["runtime-initialization-required", "restart-required", "kickoff-required"]) };
+  }
+  if (operation === "runtime" || operation === "repair" || operation === "readback") {
+    const expected = operation === "runtime"
+      ? "runtime-initialization-required"
+      : operation === "repair"
+        ? "projection-drift"
+        : "runtime-attestation-required";
+    if (observed.status !== expected) return observed;
+    const plan = planRunnerProfileMigrationV3({ rootDir, deps: fs, initializeMissingRuntimeForSlimV3: operation === "runtime" });
+    if (operation === "readback" ? plan.status !== "noop" : plan.status !== "ready") return observed;
+    const statuses = operation === "runtime"
+      ? ["restart-required"]
+      : operation === "repair"
+        ? ["restart-required", "kickoff-required", "ready"]
+        : ["restart-required"];
+    const applyCommand = operation === "runtime"
+      ? "initialize-runtime"
+      : operation === "repair"
+        ? "apply-repair"
+        : "apply-readback";
+    return { ...observed, nextAction: commandAction([ONBOARDING_SCRIPT, applyCommand, "--root", plan.root, "--plan-sha256", lifecyclePlanDigest(plan), "--activate"], true, true, SCHEMA, statuses) };
+  }
+  return observed;
+}
+
+function applyLifecycle(rootDir, fs, operation, planSha256, activate) {
+  if (!activate || typeof planSha256 !== "string" || !/^[a-f0-9]{64}$/u.test(planSha256)) return v4Inspection(rootDir, fs);
+  if (operation === "portable") {
+    const plan = planProjectOnboardingV3({ rootDir, deps: fs });
+    if (plan.status !== "ready" || lifecyclePlanDigest(plan) !== planSha256) return v4Inspection(rootDir, fs);
+    applyProjectOnboardingV3(plan, { rootDir, activate: true, deps: fs });
+    return v4Inspection(rootDir, fs);
+  }
+  const beforeApply = v4Inspection(rootDir, fs);
+  const expectedBeforeApply = operation === "runtime"
+    ? "runtime-initialization-required"
+    : operation === "repair"
+      ? "projection-drift"
+      : "runtime-attestation-required";
+  if (beforeApply.status !== expectedBeforeApply) return beforeApply;
+  if (operation !== "readback") {
+    try {
+      probeSelectedRuntimeTargets(beforeApply.root, fs);
+    } catch {
+      return runtimeTargetReadOnlyResult(beforeApply);
+    }
+  }
+  const plan = planRunnerProfileMigrationV3({ rootDir, deps: fs, initializeMissingRuntimeForSlimV3: operation === "runtime" });
+  const expectedPlanStatus = operation === "readback" ? "noop" : "ready";
+  if (plan.status !== expectedPlanStatus || lifecyclePlanDigest(plan) !== planSha256) return v4Inspection(rootDir, fs);
+  const runtimeTargets = plan.targets.filter((target) => target.kind === "runtime" && target.path.startsWith(".codex/")).map((target) => ({
+    path: target.path, beforeSha256: target.before.sha256, afterSha256: target.after.sha256,
+  })).sort((left, right) => left.path.localeCompare(right.path));
+  let persisted;
+  try {
+    const binding = prepareRuntimeRestartBinding({ rootDir: plan.root, sourceSha256: plan.sourceSha256, runtimeTargets });
+    // The barrier is durable before the target transaction begins. A crash in
+    // either direction therefore blocks rather than claiming a loaded runtime.
+    persisted = persistRestartBarrier({ rootDir: plan.root, repositoryCapability: beforeApply.repository.mode, binding, deps: fs });
+  } catch {
+    const observed = v4Inspection(rootDir, fs);
+    return lifecycleResult({ status: "runtime-readback-unavailable", root: observed.root, intent: observed.intent, repository: observed.repository,
+      runtime: emptyRuntime("readback-unavailable"), nextAction: null,
+      diagnostics: [lifecycleDiagnostic("$.runtime", "runtime_readback_unavailable", "restart barrier could not be persisted before runtime mutation", "restart/readback capability is unavailable in this environment")],
+    });
+  }
+  if (operation === "readback") return v4Inspection(rootDir, fs);
+  const applied = applyRunnerProfileMigrationV3(plan, { rootDir, activate: true, deps: fs });
+  if (applied.status !== "applied" && persisted.written) {
+    try {
+      removeRestartBarrierCas({ rootDir: plan.root, repositoryCapability: beforeApply.repository.mode, expectedRawSha256: persisted.rawSha256, deps: fs });
+      for (const directory of [...(persisted.createdDirectories ?? [])].reverse()) {
+        if (!fs.existsSync(directory)) continue;
+        const info = fs.lstatSync(directory);
+        if (!info.isDirectory() || info.isSymbolicLink()) throw new Error("private runtime directory changed before rollback");
+        fs.rmdirSync(directory);
+        fsyncDirectory(dirname(directory), fs);
+      }
+    } catch {
+      return lifecycleResult({
+        status: "runtime-readback-unavailable",
+        root: beforeApply.root,
+        intent: beforeApply.intent,
+        repository: beforeApply.repository,
+        runtime: emptyRuntime("readback-unavailable"),
+        nextAction: null,
+        diagnostics: [lifecycleDiagnostic(
+          "$.runtime",
+          "runtime_readback_unavailable",
+          "failed runtime activation could not remove its exact restart barrier",
+          "inspect private restart state before retrying",
+        )],
+      });
+    }
+  }
+  if (applied.status !== "applied" && applied.failureClass === "runtime-target-read-only") {
+    return runtimeTargetReadOnlyResult(beforeApply);
+  }
+  return v4Inspection(rootDir, fs);
+}
+
+export function planProjectOnboardingLifecycleV4({ rootDir = process.cwd(), deps: overrides = {}, operation = "portable" } = {}) {
+  return planLifecycle(rootDir, deps(overrides), operation);
+}
+
+export function applyProjectOnboardingLifecycleV4({ rootDir = process.cwd(), deps: overrides = {}, operation = "portable", planSha256, activate = false } = {}) {
+  return applyLifecycle(rootDir, deps(overrides), operation, planSha256, activate);
+}
+
+export function planProjectOnboardingKickoffV4({
+  rootDir = process.cwd(),
+  goal,
+  deps: overrides = {},
+} = {}) {
+  const fs = deps(overrides);
+  const observed = v4Inspection(rootDir, fs, "onboarding");
+  if (observed.status !== "kickoff-required") return observed;
+  return planOnboardingKickoff({
+    rootDir: observed.root,
+    goal,
+    repositoryCapability: observed.repository.mode,
+    onboardingScript: ONBOARDING_SCRIPT,
+    spawn: fs.spawnSync,
+  });
+}
+
+export function applyProjectOnboardingKickoffV4({
+  rootDir = process.cwd(),
+  goal,
+  planSha256,
+  activate = false,
+  deps: overrides = {},
+} = {}) {
+  const fs = deps(overrides);
+  const observed = v4Inspection(rootDir, fs, "onboarding");
+  if (!["kickoff-required", "ready"].includes(observed.status)
+    || !["absent-pristine", "valid"].includes(observed.continuity.status)) {
+    return observed;
+  }
+  const plan = reconstructOnboardingKickoffPlan({
+    rootDir: observed.root,
+    goal,
+    repositoryCapability: observed.repository.mode,
+    onboardingScript: ONBOARDING_SCRIPT,
+    spawn: fs.spawnSync,
+  });
+  applyOnboardingKickoff({
+    plan,
+    expectedPlanSha256: planSha256,
+    activate,
+    deps: { ...overrides, spawn: fs.spawnSync },
+  });
+  return v4Inspection(rootDir, fs, "onboarding");
 }

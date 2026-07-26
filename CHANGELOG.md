@@ -6,6 +6,29 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
 
 ## [Unreleased]
 
+## [0.4.5] — 2026-07-26
+
+### Fixed
+
+- Fresh Codex folders now receive a visible, optional Agent Pipeline offer
+  before project work and advance through typed, digest-bound portable-seed,
+  kickoff, host Git-initialization, restart, and session-readiness states.
+- Post-restart lifecycle guards admit only exact V4 session readiness or the
+  narrowly bound host-initialization compatibility receipt; ordinary reads no
+  longer deadlock behind an intent mismatch.
+- A PO-approved canonical calibration change from `host-managed` to
+  `local-only` remains valid after the fresh-root transition and is reported as
+  a pre-HEAD local repository without a remote or publication claim.
+- Pipeline start reports the loaded plugin version and distinguishes a
+  loaded/installed Codex generation mismatch from a repository defect. Refresh
+  guidance is runner-specific: Claude Code uses `/reload-plugins`; Codex uses
+  `/plugins` followed by `/new`, or an attended App-Server daemon restart after
+  an external CLI update.
+- Lifecycle remediation commands carry complete, copy-safe argv and do not
+  fall back to web or repository searches when a typed local action exists.
+- Advisor and Critic host-path time budgets are raised to avoid premature
+  retries during otherwise progressing bootstrap and review work.
+
 ## [0.4.4] — 2026-07-25
 
 ### Fixed

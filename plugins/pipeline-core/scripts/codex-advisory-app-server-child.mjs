@@ -136,7 +136,8 @@ if (!process.exitCode) {
   });
   child.stderr.on("data", (chunk) => { stderrBytes += chunk.length; if (stderrBytes > MAX_BYTES) { protocolError = true; finishProtocol(); } });
   send({ id: 1, method: "initialize", params: { clientInfo: { name: "agent-pipeline-advisory", title: null, version: "1" }, capabilities: { experimentalApi: false, requestAttestation: false } } });
-  const timeout = setTimeout(() => { protocolError = true; finishProtocol(); child.kill("SIGTERM"); }, 120_000);
+  // Match the host advisory budget: this is one child turn, not a retry loop.
+  const timeout = setTimeout(() => { protocolError = true; finishProtocol(); child.kill("SIGTERM"); }, 180_000);
   const close = await new Promise((resolve) => {
     child.once("error", (error) => resolve({ code: null, signal: null, spawnError: error?.code ?? "spawn-error" }));
     child.once("close", (code, signal) => resolve({ code, signal, spawnError: null }));

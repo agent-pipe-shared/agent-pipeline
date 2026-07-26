@@ -390,6 +390,17 @@ function locateTomlTopLevelValues(bytes, keys) {
   return found;
 }
 
+/** Parse the exact top-level string route fields accepted by the V3 projector. */
+export function parseRuntimeProjectionV3TomlRoute(bytes, keys) {
+  if (typeof bytes !== "string" || !Array.isArray(keys)
+    || keys.some((key) => typeof key !== "string" || key.length === 0)
+    || new Set(keys).size !== keys.length) {
+    throw new Error("invalid V3 TOML route parser input");
+  }
+  const locations = locateTomlTopLevelValues(bytes, keys);
+  return Object.fromEntries(keys.map((key) => [key, locations.get(key).value]));
+}
+
 function patchTomlValues(bytes, locations, values) {
   let result = bytes;
   for (const [key, location] of [...locations.entries()].sort((left, right) => right[1].start - left[1].start)) {

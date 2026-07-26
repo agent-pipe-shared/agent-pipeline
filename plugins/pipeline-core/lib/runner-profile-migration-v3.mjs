@@ -32,7 +32,10 @@ import {
 import { tmpdir } from "node:os";
 import { dirname, join, resolve, sep } from "node:path";
 
-import { hasCodexHostControlLayout } from "./codex-host-layout.mjs";
+import {
+  hasCodexRuntimeControlMount,
+  readCodexHostRepositoryInitAdmission,
+} from "./codex-host-layout.mjs";
 import { applyRunnerProfileMigrationV2, planRunnerProfileMigrationV2 } from "./runner-profile-migration-v2.mjs";
 import { validatePipelineUserV2 } from "./runner-profiles-v2.mjs";
 import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
@@ -137,6 +140,7 @@ function stable(value) {
 }
 function same(left, right) { return JSON.stringify(stable(left)) === JSON.stringify(stable(right)); }
 function diagnostic(path, code, message, repair) { return { path, code, message, repair }; }
+function permissionFailure(error) { return ["EACCES", "EPERM", "EROFS"].includes(error?.code); }
 function result(status, diagnostics = [], extra = {}) {
   return { schema: PLAN_SCHEMA, status, source: SOURCE_FILE, diagnostics, requiresExplicitActivation: true, ...extra };
 }
@@ -218,17 +222,37 @@ function runtimePaths() {
   if (paths.some((path) => typeof path !== "string" || !SAFE_RELATIVE.test(path)) || new Set(paths).size !== paths.length) throw new Error("V3 runtime ownership manifest has unsafe or duplicate targets");
   return paths;
 }
+function hasDurableHostInitAdmission(root, deps) {
+  try {
+    try {
+      deps.lstatSync(join(root, ".codex"));
+      return false;
+    } catch (error) {
+      if (error?.code !== "ENOENT") return false;
+    }
+    return readCodexHostRepositoryInitAdmission(root, {
+      lstat: deps.lstatSync,
+      readFile: deps.readFileSync,
+      platform: deps.process?.platform,
+    }) !== null;
+  } catch {
+    return false;
+  }
+}
 function runtimeBaselines(root, deps, sourceKind, { initializeMissingRuntimeForSlimV3 = false } = {}) {
   const legacy = ["v0", "v1", "v2"].includes(sourceKind);
   const initializeSlimV3 = ["v3", "v3-refresh"].includes(sourceKind)
     && initializeMissingRuntimeForSlimV3 === true;
   const hostManagedCodex = ["v3", "v3-refresh"].includes(sourceKind)
-    && hasCodexHostControlLayout(root, {
-      access: deps.accessSync,
-      fsConstants: deps.constants,
-      lstat: deps.lstatSync,
-      readdir: deps.readdirSync,
-    });
+    && (
+      hasCodexRuntimeControlMount(root, {
+        access: deps.accessSync,
+        fsConstants: deps.constants,
+        lstat: deps.lstatSync,
+        readdir: deps.readdirSync,
+      })
+      || hasDurableHostInitAdmission(root, deps)
+    );
   const baselines = {};
   const seeded = new Set();
   for (const relative of runtimePaths()) {
@@ -1008,7 +1032,11 @@ export function applyRunnerProfileMigrationV3(plan, { rootDir = plan?.root ?? pr
       if (error instanceof IntentionalMigrationInterruption) return result("interrupted", [diagnostic("$.transaction", "intentional_interruption", error.message, "run inspect, plan, or apply again to recover recorded preimages")]);
       try { restore(root, record, deps); }
       catch (rollbackError) { return result("rollback-failed", [diagnostic("$.transaction", "rollback_failed", rollbackError.message, "recover the validated V3 transaction manually")]); }
-      return result("rolled-back", [diagnostic("$.transaction", "apply_failed", error.message, "repair and plan again")]);
+      return result(
+        "rolled-back",
+        [diagnostic("$.transaction", permissionFailure(error) ? "runtime_target_read_only" : "apply_failed", error.message, "repair and plan again")],
+        permissionFailure(error) ? { failureClass: "runtime-target-read-only" } : {},
+      );
     }
   } catch (error) { return result("apply-failed", [diagnostic("$.transaction", "apply_failed", error.message, "repair project state and plan again")]); }
   finally { if (lock) releaseLock(lock, deps); }

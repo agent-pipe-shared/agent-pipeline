@@ -6,11 +6,16 @@
  * remote objects land in a disposable bare repository whose object lookup reads the
  * source object directory through GIT_ALTERNATE_OBJECT_DIRECTORIES.
  */
-import { existsSync, lstatSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { isAbsolute, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+
+import {
+  hasCodexHostControlLayout,
+  readCodexHostRepositoryInitAdmission,
+} from "../lib/codex-host-layout.mjs";
 
 const SCHEMA = "pipeline.repository-freshness.v0";
 const FETCH_TIMEOUT_MS = 8000;
@@ -69,7 +74,11 @@ function declaredRepositoryMode(repo) {
   try {
     const parsed = JSON.parse(readFileSync(calibration, "utf8"));
     if (parsed.repositoryMode === undefined) return { mode: "remote-tracked" };
-    if (parsed.repositoryMode === "local-only" || parsed.repositoryMode === "remote-tracked") return { mode: parsed.repositoryMode };
+    if (parsed.repositoryMode === "local-only"
+      || parsed.repositoryMode === "remote-tracked"
+      || parsed.repositoryMode === "host-managed") {
+      return { mode: parsed.repositoryMode };
+    }
   } catch {}
   return { mode: null, reason: "invalid-repository-mode" };
 }
@@ -107,17 +116,39 @@ export function inspectRepositoryFreshness(
     fetchTimeoutMs = FETCH_TIMEOUT_MS,
     runFetch = defaultFetch,
     runDirect = defaultDirect,
+    readHostInitAdmission = readCodexHostRepositoryInitAdmission,
   } = {},
 ) {
   const repo = resolve(repoPath);
   try {
-    if (!lstatSync(repo).isDirectory()) return { exitCode: 2, error: "repository root is unavailable" };
+    const root = lstatSync(repo);
+    if (!root.isDirectory() || root.isSymbolicLink() || realpathSync(repo) !== repo) {
+      return { exitCode: 2, error: "repository root is unavailable" };
+    }
   } catch {
     return { exitCode: 2, error: "repository root is unavailable" };
   }
   const declared = declaredRepositoryMode(repo);
   if (!declared.mode) return { exitCode: 0, result: outputBase("unknown", { reason: declared.reason }) };
   const repositoryMode = declared.mode;
+  if (repositoryMode === "host-managed") {
+    const physicalHostControls = hasCodexHostControlLayout(repo);
+    let durableHostInit = false;
+    try {
+      const admission = readHostInitAdmission(repo);
+      durableHostInit = typeof admission?.gitVersion === "string" && admission.gitVersion.length > 0;
+    } catch {
+      durableHostInit = false;
+    }
+    const admitted = physicalHostControls || durableHostInit;
+    return {
+      exitCode: 0,
+      result: outputBase(admitted ? "host-managed" : "unknown", {
+        repositoryMode,
+        reason: admitted ? null : "invalid-host-managed-layout",
+      }),
+    };
+  }
   const headResult = git(repo, ["rev-parse", "--verify", "HEAD"]);
   const head = headResult.stdout?.trim();
   if (headResult.status !== 0 || !fullOid(head)) {

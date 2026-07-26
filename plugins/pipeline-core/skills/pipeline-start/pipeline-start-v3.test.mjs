@@ -6,11 +6,15 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import {
+  PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
+} from "../../lib/project-onboarding-ready-gate.mjs";
+
 const HERE = dirname(fileURLToPath(import.meta.url));
 const skill = readFileSync(join(HERE, "SKILL.md"), "utf8");
 
 const cases = [
-  ["consumer onboarding state is checked before Git or V3 authority", () => {
+  ["V4 bootstrap inspection is checked before Git or ordinary V3 authority", () => {
     const onboarding = skill.indexOf("## Step 0 — Consumer-root onboarding state");
     const loadedState = skill.indexOf("## Step 1 — Ruleset presence + loaded state");
     const v3Authority = skill.indexOf("## Step 1a — V3 source/runtime authority");
@@ -18,43 +22,129 @@ const cases = [
     assert.ok(onboarding < loadedState, "onboarding must precede loaded-state Git checks");
     assert.ok(onboarding < v3Authority, "onboarding must precede V3 authority checks");
     assert.match(skill, /Before \*\*any\*\* `git rev-parse`, Git freshness helper, `setup\.mjs`, V3 authority\s+validator/u);
-    assert.match(skill, /project-onboarding-v3\.mjs" inspect --root "\$PWD"/u);
-    assert.match(skill, /Do\s+not replace it with a shell emptiness check, a copied consumer-root `setup\.mjs`,\s+or an incidental Git error/u);
+    assert.match(skill, /project-onboarding-v3\.mjs" inspect --root "\$PWD" --intent bootstrap/u);
+    assert.match(skill, /pipeline\.project-onboarding\.v4/u);
+    assert.match(skill, /Do not replace\s+it with a shell emptiness check, a copied consumer-root `setup\.mjs`, generated\s+project-file heuristics, or an incidental Git error/u);
   }],
-  ["fresh roots stop as F0 and name the only authorized initializer", () => {
-    assert.match(skill, /Report typed \*\*F0: onboarding-required\*\* and print \*\*no bootstrap\s+confirmation line\*\*/u);
-    assert.match(skill, /project-onboarding-v3\.mjs" plan --root "\$PWD"/u);
-    assert.match(skill, /project-onboarding-v3\.mjs" apply --root "\$PWD" --activate/u);
-    assert.match(skill, /`inspect` and `plan` are read-only\. `apply --activate` is the sole write\s+operation/u);
-    assert.match(skill, /sole exception is F0's explicit user-authorized onboarding `apply --activate`/u);
-    assert.match(skill, /explicit user request to \*\*create\*\* or \*\*initialize\*\* this project authorizes\s+the agent to run that exact `apply --activate` command/u);
-    assert.match(skill, /makes no commit, remote, dependency install,\s+application scaffold, or project-policy decision/u);
-    assert.match(skill, /successful apply, rerun `pipeline-start` from Step 0/u);
+  ["an inherited restart ticket performs private host readback before inspection and then re-inspects", () => {
+    const helper = skill.indexOf("codex-project-runtime-readback-host.mjs");
+    const inspect = skill.indexOf('project-onboarding-v3.mjs" inspect --root "$PWD" --intent bootstrap');
+    assert.ok(helper >= 0 && helper < inspect, "ticket-bound helper must precede the V4 bootstrap inspection");
+    assert.match(skill, /preflight helper's `handoff` result/u);
+    assert.match(skill, /reports handoff presence only and never\s+prints the private ticket or token/u);
+    assert.match(skill, /do not inspect the\s+environment again/u);
+    assert.match(skill, /pipeline\.codex-project-runtime-readback-status\.v1/u);
+    assert.match(skill, /status `produced`/u);
+    assert.match(skill, /runtime-readback-unavailable/u);
+    assert.match(skill, /re-inspect from the beginning/u);
+    assert.match(skill, /runtime\.status `readback-current`/u);
+    assert.match(skill, /post-ticket result may continue only as\s+`ready` with runtime\.status `readback-current`/u);
   }],
-  ["legacy and partial roots never get an inferred overwrite", () => {
-    assert.match(skill, /\*\*`existing-unmanaged`:\*\*[\s\S]*\*\*F0A: adoption-required\*\*/u);
-    assert.match(skill, /This is not a legacy migration and\s+not permission to overwrite project content/u);
-    assert.match(skill, /\*\*`fresh` or `fresh-host-managed`:\*\*[\s\S]*writes only `pipeline\.user\.yaml` and `\.claude\/\*\*`/u);
-    assert.match(skill, /Never\s+remove, overwrite, ignore, chmod, or silently relocate/u);
-    assert.match(skill, /\*\*`migration-required` \(V0\/V1\/V2\):\*\*[\s\S]*runner-profile-migration-v3\.mjs" inspect --root/u);
-    assert.match(skill, /Its explicit `apply --activate` is the only writer for a legacy consumer/u);
-    assert.match(skill, /Never initialize over a legacy source/u);
-    assert.match(skill, /\*\*`partial`, `invalid`, `unsafe`, a malformed result, or a non-zero exit:\*\*[\s\S]*fail closed/u);
-    assert.match(skill, /Never\s+infer ownership of existing files or overwrite a non-empty\/partial root/u);
+  ["normal bootstrap accepts only native local or reserved plugin-managed readiness", () => {
+    assert.match(skill, /On the normal path with no inherited ticket, `ready` has exactly three accepted\s+runtime forms/u);
+    assert.match(skill, /repository mode `local` with repository status `local-valid-writable`/u);
+    assert.match(skill, /repository mode `local` with repository status `local-valid-writable`,\s+runtime status `plugin-managed`/u);
+    assert.match(skill, /repository mode and status `host-managed`, runtime status `plugin-managed`/u);
+    assert.match(skill, /a non-null source digest, null target\/barrier\/readback digests/u);
+    assert.match(skill, /`appServer\.required:false` plus `appServer\.status:not-requested`/u);
+    assert.match(skill, /require\s+no runtime initialization or native readback barrier/u);
+    assert.match(skill, /make no project-local\s+runtime or native-readback claim/u);
+    assert.match(skill, /authoritative only in the current Codex\s+session projection/u);
+    assert.match(skill, /Never repeat or escalate that inspector at a host boundary/u);
+    assert.match(skill, /If this exact in-session inspection returns `ready` but\s+a later PreToolUse guard denies an ordinary read, report a Pipeline guard\s+adapter defect and stop/u);
+    assert.match(skill, /Do not reinterpret the host view as\s+`runtime-initialization-required`/u);
+    assert.match(skill, /do not request another restart/u);
+    assert.match(skill, /Any mixed form\s+is malformed and fail-closed/u);
+    assert.match(skill, /App-Server health remains the\s+separate pipeline-start observation required later/u);
+    assert.match(skill, /`host-managed` form with a concrete `gitVersion` is the narrowly bound\s+post-initialization Codex mount/u);
+    assert.match(skill, /`host-managed` form with\s+`gitVersion:null` is the fresh pre-initialization state/u);
   }],
-  ["Codex onboarding is first-request proactive, not an invisible hook", () => {
-    assert.match(skill, /Codex currently has no SessionStart hook in its manifest/u);
-    assert.match(skill, /proactive when the mandatory `pipeline-start` skill executes for the user's\s+first request/u);
-    assert.match(skill, /not an invisible automatic initializer/u);
-    assert.match(skill, /Codex manifest has PreToolUse guards but no SessionStart hook/u);
+  ["host-managed readiness hands off only bounded Git initialization to the host", () => {
+    assert.match(skill, /codex-host-repository-init\.mjs" plan --root "\$PWD"/u);
+    assert.match(skill, /pipeline\.codex-host-repository-init-plan\.v1/u);
+    assert.match(skill, /`requiresHostBoundary:true`/u);
+    assert.match(skill, /run it only through the host-authorized local write boundary/u);
+    assert.match(skill, /never in the workspace sandbox/u);
+    assert.match(skill, /pipeline\.codex-host-repository-init-apply\.v1/u);
+    assert.match(skill, /initializes Git without a commit, copies the private kickoff continuity\s+history into the new Git control path/u);
+    assert.match(skill, /leaves one private digest-bound\s+post-init receipt in `\.claude\/\.runtime`/u);
+    assert.match(skill, /fresh Codex hook can distinguish\s+the otherwise identical empty protected mount/u);
+    assert.match(skill, /mutates no portable\s+Pipeline\/project file/u);
+    assert.match(skill, /exactly one ordinary project-session\s+restart/u);
+    assert.match(skill, /Do not run the\s+onboarding inspector at the host boundary/u);
+    assert.match(skill, /For this 0\.4\.5 hotfix only, the\s+lifecycle guard may fall back to that exact host-init receipt/u);
+    assert.match(skill, /physical project root, stable Pipeline source\/calibration authority, and\s+immutable kickoff history/u);
+    assert.match(skill, /Issue #25 owns replacing this compatibility\s+fallback with one native cross-view session attestation/u);
   }],
-  ["V3 source and runtime-noop are bootstrap authority", () => {
+  ["V4 progress and every controlling terminal state expose only their closed structured action", () => {
+    for (const status of ["portable-seed-required", "runtime-initialization-required", "runtime-attestation-required", "restart-required", "kickoff-required", "ready"]) {
+      assert.equal(skill.includes(`\`${status}\``), true, `${status} must be documented`);
+    }
+    for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
+      assert.equal(skill.includes(status), true, `${status} must fail closed in bootstrap`);
+    }
+    assert.match(skill, /Execute only a schema-valid read-only `command` action\s+whose `mutation` and `requiresConfirmation` fields are both `false`/u);
+    assert.match(skill, /Never auto-execute a mutating action/u);
+    assert.match(skill, /digest-bound `apply-portable-seed`,\s+`initialize-runtime`, or `apply-repair` action/u);
+    assert.match(skill, /`restart-process`[\s\S]*requiresCurrentProcessExit/u);
+    assert.match(skill, /`partial\|invalid\|unsafe\|migration-required\|adoption-required/u);
+    assert.doesNotMatch(skill, /fresh-host-managed/u);
+    assert.doesNotMatch(skill, /project-onboarding-v3\.mjs" apply --root "\$PWD" --activate/u);
+  }],
+  ["kickoff-required gives one complete local command and forbids remote syntax discovery", () => {
+    assert.match(skill, /project-onboarding-v3\.mjs" kickoff plan --root "\$PWD" --goal "\{\{GOAL\}\}"/u);
+    assert.match(skill, /`kickoff` and `plan` are two separate argv elements in that order/u);
+    for (const alias of ["`kickoff-plan`", "`plan-kickoff`", "`plan --goal`", "bare `kickoff`"]) {
+      assert.equal(skill.includes(alias), true, `${alias} must be explicitly rejected`);
+    }
+    assert.match(skill, /Do not inspect the script, search GitHub,\s+browse the web, call a repository connector, or run any remote command/u);
+    assert.match(skill, /pipeline\.codex-onboarding-kickoff-plan\.v1/u);
+    assert.match(skill, /project-onboarding-v3\.mjs" kickoff apply --root "\$PWD" --goal "\{\{SAME_GOAL\}\}" --plan-sha256 "\{\{PLAN_SHA256\}\}" --activate/u);
+    assert.match(skill, /Never reconstruct the\s+digest, split the goal, or substitute a network result/u);
+  }],
+  ["runner SessionStart hints are visible but never invisible initializers", () => {
+    assert.match(skill, /Codex and Claude expose a visible, non-mutating SessionStart onboarding hint/u);
+    assert.match(skill, /For an ungoverned folder it is an opt-in gate/u);
+    assert.match(skill, /run neither this skill nor an\s+onboarding inspection until the user answers affirmatively/u);
+    assert.match(skill, /Codex and Claude SessionStart hooks surface a visible, non-mutating onboarding reminder/u);
+    assert.match(skill, /MUST NOT invoke this skill or inspect onboarding before the affirmative answer/u);
+  }],
+  ["pipeline-start reports its resolved distribution identity before inspection", () => {
+    assert.match(skill, /Runtime identity line \(mandatory, before Step 0\)/u);
+    assert.match(skill, /pipeline-start-preflight\.mjs/u);
+    assert.match(skill, /pipeline\.start-preflight\.v1/u);
+    assert.match(skill, /reports handoff presence only and never\s+prints the private ticket or token/u);
+    assert.match(skill, /Agent Pipeline start: version \{\{MANIFEST_VERSION\}\} · plugin root \{\{ABSOLUTE_PLUGIN_ROOT\}\}/u);
+    assert.match(skill, /`plugin-refresh-required` is an attended update handoff, not a project defect/u);
+    assert.match(skill, /ask\s+whether the user wants to activate the already installed version/u);
+    assert.match(skill, /Claude Code uses its native\s+`\/reload-plugins`/u);
+    assert.match(skill, /Codex has no such slash command/u);
+    assert.match(skill, /installation performed\s+inside `\/plugins` is followed by `\/new`/u);
+    assert.match(skill, /`plugin-daemon-refresh-required`/u);
+    assert.match(skill, /codex app-server daemon restart/u);
+    assert.match(skill, /Never invent a Codex `\/reload-plugins` command/u);
+    assert.match(skill, /restart the global daemon from an\s+active project session or without that explicit authorization/u);
+    assert.match(skill, /run only `codex plugin list --json` as the native registry\s+readback/u);
+    assert.match(skill, /do\s+not search cache directories, use a replacement plugin root, inspect the\s+network, or run onboarding/u);
+    assert.match(skill, /run no onboarding command/u);
+  }],
+  ["V3 source plus native or plugin-managed runtime authority is bootstrap authority", () => {
     assert.match(skill, /pipeline\.user\.v3/u);
     assert.match(skill, /v3-bootstrap-authority\.mjs" --root "\$PWD"/u);
     assert.match(skill, /Consumer-root `setup\.mjs`\s+is neither required nor consulted/u);
-    assert.match(skill, /Runtime projection \{\{noop\|host-managed-codex\}\}/u);
+    assert.match(skill, /`runtimeProjection: "noop"`/u);
+    assert.match(skill, /`runtimeReadback: "current"`/u);
+    assert.match(skill, /`runtimeProjection: "plugin-managed"`/u);
+    assert.match(skill, /`runtimeReadback: "plugin-provided"`/u);
+    assert.match(skill, /status `ready`/u);
+    assert.match(skill, /projection-only\s+`projection-current`, `restart-required`, host-managed projection gap, or\s+unavailable cleared readback is non-success/u);
     assert.match(skill, /explicit V3 migration\/apply/u);
-    assert.match(skill, /V3 contract\s+supersedes legacy/u);
+    assert.match(skill, /current native readback/u);
+  }],
+  ["host-managed freshness is bound to protected controls or the durable initializer receipt", () => {
+    assert.match(skill, /accepts only the exact protected control layout or the durable digest-bound receipt/u);
+    assert.match(skill, /Neither host-managed form claims remote freshness or performs a fetch/u);
+    assert.match(skill, /invalid host-managed layout or receipt/u);
   }],
   ["V1/V2 and runtime drift fail closed without confirmation", () => {
     assert.match(skill, /\*\*F5\*\*/u);
