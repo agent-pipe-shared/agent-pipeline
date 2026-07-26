@@ -208,6 +208,13 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
     BLOCK,
     { stderrIncludes: ["not unambiguous"] },
   );
+  check(
+    "PG03a block  unquoted override pipeline delimiter stays inside the strict shell grammar",
+    `PIPELINE_GUARD_OVERRIDE=GG-03|git push origin ${head}:refs/heads/main`,
+    dir,
+    BLOCK,
+    { stderrIncludes: ["not unambiguous"] },
+  );
 }
 {
   const { dir } = freshRepo("opt-in-ambiguous");

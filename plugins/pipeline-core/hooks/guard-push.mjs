@@ -122,7 +122,7 @@ if (!rawCommand) process.exit(0);
  * host adapter that invokes both guards on the same Bash input.
  */
 function commandAfterDocumentedOverridePrefix(command) {
-  const bash = command.match(/^PIPELINE_GUARD_OVERRIDE=(?:'([^']*)'|"([^"]*)"|([A-Za-z0-9_.:|/-]+))\s+([\s\S]*)$/u);
+  const bash = command.match(/^PIPELINE_GUARD_OVERRIDE=(?:'([^']*)'|"([^"]*)"|([A-Za-z0-9_.:/-]+))\s+([\s\S]*)$/u);
   if (bash) {
     const [, singleQuoted, doubleQuoted, unquoted, remainder] = bash;
     if (singleQuoted !== undefined) return remainder;
