@@ -1271,6 +1271,12 @@
       "member": "release-version-plan-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-cleanup-binding-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "session-cleanup-binding-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:session-cleanup-power-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1672,6 +1678,7 @@
         "verify-phase:harness/scripts/verify.mjs:sdlc-run-graph-tests",
         "verify-phase:harness/scripts/verify.mjs:security-scan",
         "verify-phase:harness/scripts/verify.mjs:security-scan-tests",
+        "verify-phase:harness/scripts/verify.mjs:session-cleanup-binding-tests",
         "verify-phase:harness/scripts/verify.mjs:session-cleanup-power-tests",
         "verify-phase:harness/scripts/verify.mjs:session-power-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:session-power-controller-tests",
