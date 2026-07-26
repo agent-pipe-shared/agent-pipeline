@@ -85,6 +85,7 @@ const fakeDeps = {
 };
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
+const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
 const APP_SERVER_HEALTH_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-health.mjs", import.meta.url));
 function names(path) { return readdirSync(path).sort(); }
@@ -169,7 +170,7 @@ function clearRuntimeBarrier(path, barrier) {
   });
 }
 
-function completeKickoff(path, goal = "Build a safe project", deps = fakeDeps) {
+function completeKickoff(path, goal = "Build a safe project", deps = fakeDeps, expectedStatus = "ready") {
   const plan = planProjectOnboardingKickoffV4({ rootDir: path, goal, deps });
   assert.equal(plan.schema, "pipeline.codex-onboarding-kickoff-plan.v1");
   const result = applyProjectOnboardingKickoffV4({
@@ -179,7 +180,7 @@ function completeKickoff(path, goal = "Build a safe project", deps = fakeDeps) {
     activate: true,
     deps,
   });
-  assert.equal(result.status, "ready");
+  assert.equal(result.status, expectedStatus);
   assert.equal(result.continuity.status, "valid");
   return plan;
 }
@@ -1465,9 +1466,14 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(applied.authority.runtimeProjection, "missing");
     const postSeed = inspectProjectOnboardingV3({ rootDir: path });
     assert.equal(postSeed.status, "kickoff-required");
-    assert.equal(postSeed.runtime.status, "plugin-managed");
+    assert.equal(postSeed.runtime.status, "plugin-managed-unattested");
     assert.equal(postSeed.nextAction.kind, "collect-input");
-    const kickoff = completeKickoff(path, "Build one small HTML game from the supplied design", {});
+    const kickoff = completeKickoff(
+      path,
+      "Build one small HTML game from the supplied design",
+      {},
+      "host-repository-init-required",
+    );
     assert.equal(kickoff.repositoryCapability, "host-managed");
     let appServerCalls = 0;
     const postKickoff = inspectProjectOnboardingV3({
@@ -1480,13 +1486,23 @@ test("a recognized read-only host control layout receives portable onboarding wi
         },
       },
     });
-    assert.equal(postKickoff.status, "ready");
+    assert.equal(postKickoff.status, "host-repository-init-required");
     assert.equal(postKickoff.repository.status, "host-managed");
-    assert.equal(postKickoff.runtime.status, "plugin-managed");
+    assert.equal(postKickoff.runtime.status, "plugin-managed-unattested");
     assert.equal(postKickoff.continuity.status, "valid");
     assert.deepEqual(postKickoff.appServer, { required: true, status: "running", code: "CAS-READY" });
     assert.equal(appServerCalls, 1, "plugin-managed bootstrap observes App-Server health exactly once");
-    assert.equal(postKickoff.nextAction, null);
+    assertSingleLineAction(postKickoff.nextAction, {
+      kind: "command",
+      executable: "node",
+      argv: [HOST_REPOSITORY_INIT_SCRIPT, "plan", "--root", path],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: {
+        schema: "pipeline.codex-host-repository-init-plan.v1",
+        statuses: ["ready", "not-applicable"],
+      },
+    });
     assert.deepEqual(names(join(path, ".codex")), []);
     assert.deepEqual(names(join(path, ".git")), []);
     chmodSync(join(path, ".git"), 0o700);
@@ -1503,14 +1519,15 @@ test("a recognized read-only host control layout receives portable onboarding wi
         },
       },
     });
-    assert.equal(afterHostGit.status, "ready");
+    assert.equal(afterHostGit.status, "host-repository-init-required");
     assert.equal(afterHostGit.repository.status, "local-valid-writable");
-    assert.equal(afterHostGit.runtime.status, "plugin-managed");
+    assert.equal(afterHostGit.runtime.status, "plugin-managed-unattested");
     assert.equal(afterHostGit.repository.sessionCapability, "passed");
     assert.deepEqual(afterHostGit.appServer, { required: true, status: "running", code: "CAS-READY" });
-    assert.equal(appServerCalls, 1, "plugin-managed session observes App-Server health exactly once after host Git init");
+    assert.equal(appServerCalls, 1, "unattested plugin-managed session observes App-Server health exactly once");
     const afterHostAuthority = validateV3BootstrapAuthority({ rootDir: path });
-    if (afterHostAuthority.status !== "ready") throw new Error(JSON.stringify(afterHostAuthority));
+    assert.equal(afterHostAuthority.status, "host-init-required");
+    assert.equal(afterHostAuthority.runtimeProjection, "plugin-managed-unattested");
   } finally { dispose(path); }
 });
 

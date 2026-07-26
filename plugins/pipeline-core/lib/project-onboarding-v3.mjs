@@ -16,7 +16,13 @@ import { spawnSync } from "node:child_process";
 import { dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { CODEX_HOST_CONTROL_PATHS, hasCodexGitControlMount, hasCodexHostControlLayout, hasCodexRuntimeControlMount } from "./codex-host-layout.mjs";
+import {
+  CODEX_HOST_CONTROL_PATHS,
+  hasCodexGitControlMount,
+  hasCodexHostControlLayout,
+  hasCodexRuntimeControlMount,
+  readCodexHostRepositoryInitAdmission,
+} from "./codex-host-layout.mjs";
 import { appServerNextAction, observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
 import { observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
 import {
@@ -45,6 +51,7 @@ const AUTHENTICATED = new WeakMap();
 const USER_RESERVED_PATHS = new Set([".agents", ".claude", ".codex"]);
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
+const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
@@ -466,12 +473,19 @@ function persistedHostManagedLayout(root, fs) {
 }
 
 function pluginManagedCodexRuntime(root, fs) {
-  return hasCodexRuntimeControlMount(root, {
+  const reserved = hasCodexRuntimeControlMount(root, {
     access: fs.accessSync,
     fsConstants: fs.constants,
     lstat: fs.lstatSync,
     readdir: fs.readdirSync,
   });
+  if (!reserved) return null;
+  const admission = readCodexHostRepositoryInitAdmission(root, {
+    lstat: fs.lstatSync,
+    readFile: fs.readFileSync,
+    platform: fs.process?.platform,
+  });
+  return admission === null ? "reserved-unattested" : "receipt-attested";
 }
 
 function commandAction(argv, mutation, requiresConfirmation, schema, statuses) {
@@ -544,7 +558,7 @@ function collectGoalAction() {
 }
 
 const RESTART_EXPECTED_STATUSES = [
-  "portable-seed-required", "runtime-initialization-required", "kickoff-required", "ready", "partial", "invalid", "unsafe",
+  "portable-seed-required", "runtime-initialization-required", "kickoff-required", "host-repository-init-required", "ready", "partial", "invalid", "unsafe",
   "migration-required", "adoption-required", "repository-mount-read-only", "repository-control-path-invalid", "git-capability-unavailable",
   "project-root-read-only", "repository-mode-unsupported", "repository-observation-unavailable", "session-capability-unavailable",
   "worktree-capability-unavailable", "runtime-target-read-only", "runtime-readback-unavailable", "projection-drift", "continuity-damaged",
@@ -706,6 +720,30 @@ function readyLifecycleResult({ root, intent, repository, runtime, continuity = 
         "continuity_observation_unavailable",
         "continuity authority could not be observed safely",
         "repair continuity read access before retrying",
+      )],
+    });
+  }
+  if (runtime.status === "plugin-managed-unattested") {
+    return lifecycleResult({
+      status: "host-repository-init-required",
+      root,
+      intent,
+      repository,
+      runtime,
+      continuity,
+      appServer,
+      nextAction: commandAction(
+        [HOST_REPOSITORY_INIT_SCRIPT, "plan", "--root", root],
+        false,
+        false,
+        "pipeline.codex-host-repository-init-plan.v1",
+        ["ready", "not-applicable"],
+      ),
+      diagnostics: [lifecycleDiagnostic(
+        "$.runtime",
+        "plugin_managed_runtime_unattested",
+        "the reserved Codex runtime mount is not yet bound to a durable host initialization receipt",
+        "review the exact host repository initialization plan",
       )],
     });
   }
@@ -910,12 +948,18 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
         // Codex reserves this directory inside its sandbox. The installed
         // plugin supplies the runtime there; a consumer project must not be
         // declared broken merely because it cannot materialize hidden bytes.
-        if (pluginManagedCodexRuntime(legacy.root, fs)) {
+        const pluginRuntime = pluginManagedCodexRuntime(legacy.root, fs);
+        if (pluginRuntime) {
           return afterRuntimeLifecycleResult({
             root: legacy.root,
             intent,
             repository,
-            runtime: { ...emptyRuntime("plugin-managed"), sourceSha256: migrated.sourceSha256 ?? null },
+            runtime: {
+              ...emptyRuntime(pluginRuntime === "receipt-attested"
+                ? "plugin-managed"
+                : "plugin-managed-unattested"),
+              sourceSha256: migrated.sourceSha256 ?? null,
+            },
           }, fs);
         }
         if (persistedHostManagedLayout(legacy.root, fs)) {
@@ -963,6 +1007,18 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
         intent,
         repository,
         runtime: { ...emptyRuntime("plugin-managed"), sourceSha256: authority.sourceSha256 ?? null },
+      }, fs);
+    }
+    if (authority.status === "host-init-required"
+      && authority.runtimeProjection === "plugin-managed-unattested") {
+      return afterRuntimeLifecycleResult({
+        root: legacy.root,
+        intent,
+        repository,
+        runtime: {
+          ...emptyRuntime("plugin-managed-unattested"),
+          sourceSha256: authority.sourceSha256 ?? null,
+        },
       }, fs);
     }
     if (["projection-current", "restart-required", "ready"].includes(authority.status)

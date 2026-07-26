@@ -55,38 +55,32 @@ function isHostManagedCodexProjection(plan, inspection) {
     && plan.changes.every((change) => change?.path?.startsWith(".codex/"));
 }
 
-function isPluginManagedCodexProjection(root, plan, inspection, deps) {
+function pluginManagedCodexProjectionState(root, plan, inspection, deps) {
   let durableHostInit = false;
   try {
-    try {
-      (deps.lstatSync ?? lstatSync)(join(root, ".codex"));
-    } catch (error) {
-      if (error?.code === "ENOENT") {
-        durableHostInit = readCodexHostRepositoryInitAdmission(root, {
-          lstat: deps.lstatSync,
-          readFile: deps.readFileSync,
-          platform: deps.process?.platform,
-        }) !== null;
-      }
-    }
+    durableHostInit = readCodexHostRepositoryInitAdmission(root, {
+      lstat: deps.lstatSync,
+      readFile: deps.readFileSync,
+      platform: deps.process?.platform,
+    }) !== null;
   } catch {
     durableHostInit = false;
   }
-  return inspection.sourceKind === "v3"
+  const exactProjection = inspection.sourceKind === "v3"
     && plan.status === "ready"
     && plan.runtimeMode === "host-managed-codex"
     && plan.sourceSha256 === inspection.sourceSha256
     && (plan.changes?.length ?? 0) > 0
-    && plan.changes.every((change) => change?.path?.startsWith(".codex/"))
-    && (
-      hasCodexRuntimeControlMount(root, {
-        access: deps.accessSync,
-        fsConstants: deps.constants,
-        lstat: deps.lstatSync,
-        readdir: deps.readdirSync,
-      })
-      || durableHostInit
-    );
+    && plan.changes.every((change) => change?.path?.startsWith(".codex/"));
+  if (!exactProjection) return null;
+  const reservedMount = hasCodexRuntimeControlMount(root, {
+    access: deps.accessSync,
+    fsConstants: deps.constants,
+    lstat: deps.lstatSync,
+    readdir: deps.readdirSync,
+  });
+  if (durableHostInit) return "receipt-attested";
+  return reservedMount ? "reserved-unattested" : null;
 }
 
 function repositoryCapability(root, deps) {
@@ -226,16 +220,26 @@ export function validateV3BootstrapAuthority({ rootDir = process.cwd(), deps = {
 
   const plan = planRunnerProfileMigrationV3({ rootDir, deps });
   const hostManagedCalibration = hasHostManagedCalibration(inspection.root, deps);
-  if (isPluginManagedCodexProjection(inspection.root, plan, inspection, deps)) {
+  const pluginManagedState = pluginManagedCodexProjectionState(
+    inspection.root,
+    plan,
+    inspection,
+    deps,
+  );
+  if (pluginManagedState) {
     return {
       schema: SCHEMA,
-      status: "ready",
+      status: pluginManagedState === "receipt-attested" ? "ready" : "host-init-required",
       root: inspection.root,
       source: inspection.source,
       sourceKind: "v3",
       sourceSha256: inspection.sourceSha256,
-      runtimeProjection: "plugin-managed",
-      runtimeReadback: "plugin-provided",
+      runtimeProjection: pluginManagedState === "receipt-attested"
+        ? "plugin-managed"
+        : "plugin-managed-unattested",
+      runtimeReadback: pluginManagedState === "receipt-attested"
+        ? "plugin-provided"
+        : "absent",
       diagnostics: [],
     };
   }

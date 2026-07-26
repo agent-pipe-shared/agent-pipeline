@@ -10,7 +10,7 @@
  * mechanisms, then remove their exact descriptor/worktree, newly-created empty
  * parents and Git administration entry before returning.
  */
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import {
   closeSync,
@@ -22,10 +22,10 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  readdirSync,
   realpathSync,
   renameSync,
   rmdirSync,
-  rmSync,
   unlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -267,12 +267,101 @@ function identity(path) {
   return { dev: String(info.dev), ino: String(info.ino), mode: info.mode };
 }
 
+function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
 function sameIdentity(left, path) {
   try {
     const right = identity(path);
     return left.dev === right.dev && left.ino === right.ino && left.mode === right.mode;
   } catch {
     return false;
+  }
+}
+
+function physicalTreeSnapshot(path) {
+  const rows = [];
+  function visit(current, relativePath) {
+    const info = lstatSync(current);
+    if (info.isSymbolicLink()) throw new Error("disposable worktree tree contains a symbolic link");
+    const common = {
+      path: relativePath,
+      dev: String(info.dev),
+      ino: String(info.ino),
+      mode: info.mode,
+    };
+    if (info.isDirectory()) {
+      rows.push({ ...common, kind: "directory" });
+      for (const name of readdirSync(current).sort()) {
+        visit(join(current, name), relativePath ? `${relativePath}/${name}` : name);
+      }
+      return;
+    }
+    if (!info.isFile() || info.nlink !== 1) {
+      throw new Error("disposable worktree tree contains an unsafe entry");
+    }
+    rows.push({
+      ...common,
+      kind: "file",
+      nlink: info.nlink,
+      sha256: sha256(readFileSync(current)),
+    });
+  }
+  visit(path, "");
+  return rows;
+}
+
+function exactTree(path, expected) {
+  try {
+    return JSON.stringify(physicalTreeSnapshot(path)) === JSON.stringify(expected);
+  } catch {
+    return false;
+  }
+}
+
+function removeRecordedTree(path, expectedIdentity, expectedTree) {
+  if (!sameIdentity(expectedIdentity, path) || !exactTree(path, expectedTree)) {
+    throw new Error("disposable worktree tree changed before rollback");
+  }
+  const quarantine = `${path}.pipeline-cleanup-${randomBytes(12).toString("hex")}`;
+  if (existsSync(quarantine)) throw new Error("disposable worktree quarantine already exists");
+  renameSync(path, quarantine);
+  fsyncDirectory(dirname(path));
+  let removedAny = false;
+  try {
+    if (!sameIdentity(expectedIdentity, quarantine) || !exactTree(quarantine, expectedTree)) {
+      throw new Error("disposable worktree tree changed during rollback quarantine");
+    }
+    for (const row of [...expectedTree].reverse()) {
+      const target = row.path === "" ? quarantine : join(quarantine, row.path);
+      const info = lstatSync(target);
+      if (String(info.dev) !== row.dev || String(info.ino) !== row.ino || info.mode !== row.mode
+        || info.isSymbolicLink()) {
+        throw new Error("disposable worktree entry changed during rollback");
+      }
+      if (row.kind === "file") {
+        if (!info.isFile() || info.nlink !== row.nlink || sha256(readFileSync(target)) !== row.sha256) {
+          throw new Error("disposable worktree file changed during rollback");
+        }
+        unlinkSync(target);
+        removedAny = true;
+      } else {
+        if (!info.isDirectory() || readdirSync(target).length !== 0) {
+          throw new Error("disposable worktree directory changed during rollback");
+        }
+        rmdirSync(target);
+        removedAny = true;
+      }
+    }
+    fsyncDirectory(dirname(quarantine));
+  } catch (error) {
+    if (!removedAny && !existsSync(path) && existsSync(quarantine)
+      && sameIdentity(expectedIdentity, quarantine) && exactTree(quarantine, expectedTree)) {
+      renameSync(quarantine, path);
+      fsyncDirectory(dirname(path));
+    }
+    throw error;
   }
 }
 
@@ -292,27 +381,26 @@ function worktreeAdminFromTarget(target, repository) {
     throw new Error("disposable worktree administration escaped the Git common directory");
   }
   physicalDirectory(admin, "disposable worktree administration");
-  return { path: admin, identity: identity(admin) };
+  return { path: admin, identity: identity(admin), tree: physicalTreeSnapshot(admin) };
 }
 
-function removeExactProbeWorktree(target, targetIdentity, admin) {
+function removeExactProbeWorktree(target, targetIdentity, targetTree, admin) {
   if (existsSync(target)) {
-    if (!sameIdentity(targetIdentity, target)
-      || lstatSync(target).isSymbolicLink()
-      || !lstatSync(target).isDirectory()
+    if (!targetTree || !sameIdentity(targetIdentity, target)
+      || lstatSync(target).isSymbolicLink() || !lstatSync(target).isDirectory()
       || realpathSync(target) !== target) {
       throw new Error("disposable worktree changed identity before rollback");
     }
-    rmSync(target, { recursive: true, force: false });
+    removeRecordedTree(target, targetIdentity, targetTree);
   }
   if (admin && existsSync(admin.path)) {
-    if (!sameIdentity(admin.identity, admin.path)
+    if (!admin.tree || !sameIdentity(admin.identity, admin.path)
       || lstatSync(admin.path).isSymbolicLink()
       || !lstatSync(admin.path).isDirectory()
       || realpathSync(admin.path) !== admin.path) {
       throw new Error("disposable worktree administration changed identity before rollback");
     }
-    rmSync(admin.path, { recursive: true, force: false });
+    removeRecordedTree(admin.path, admin.identity, admin.tree);
     fsyncDirectory(dirname(admin.path));
   }
 }
@@ -330,6 +418,7 @@ function worktreeProbe(root, repository, spawn, faultInjector) {
   const target = join(detached, `capability-${randomBytes(12).toString("hex")}`);
   let attempted = false;
   let targetIdentity = null;
+  let targetTree = null;
   let admin = null;
   let primaryError = null;
   try {
@@ -345,6 +434,8 @@ function worktreeProbe(root, repository, spawn, faultInjector) {
     const observedCommon = realpathSync(String(runGit(target,
       ["rev-parse", "--path-format=absolute", "--git-common-dir"], { spawn }).stdout).trim());
     if (observedCommon !== repository.commonDir) throw new Error("disposable worktree changed Git common directory");
+    targetTree = physicalTreeSnapshot(target);
+    admin.tree = physicalTreeSnapshot(admin.path);
     faultInjector?.("worktree-probe-created");
   } catch (error) {
     primaryError = error;
@@ -356,7 +447,7 @@ function worktreeProbe(root, repository, spawn, faultInjector) {
       if (!targetIdentity && existsSync(target)) {
         physicalDirectory(target, "partially-created disposable worktree");
         targetIdentity = identity(target);
-        try { admin = worktreeAdminFromTarget(target, repository); } catch {}
+        throw new Error("partially-created disposable worktree has no trusted tree snapshot");
       }
       if (targetIdentity && existsSync(target) && !sameIdentity(targetIdentity, target)) {
         throw new Error("disposable worktree changed identity before Git rollback");
@@ -364,9 +455,8 @@ function worktreeProbe(root, repository, spawn, faultInjector) {
       if (admin && existsSync(admin.path) && !sameIdentity(admin.identity, admin.path)) {
         throw new Error("disposable worktree administration changed identity before Git rollback");
       }
-      runGit(root, ["worktree", "remove", "--force", target], { spawn, allowNonzero: true });
       if (targetIdentity && (existsSync(target) || (admin && existsSync(admin.path)))) {
-        removeExactProbeWorktree(target, targetIdentity, admin);
+        removeExactProbeWorktree(target, targetIdentity, targetTree, admin);
       }
     }
     if (existsSync(target)) throw new Error("disposable worktree path leaked");

@@ -40,15 +40,16 @@ const cases = [
     assert.match(skill, /runtime\.status `readback-current`/u);
     assert.match(skill, /post-ticket result may continue only as\s+`ready` with runtime\.status `readback-current`/u);
   }],
-  ["normal bootstrap accepts only native local or reserved plugin-managed readiness", () => {
+  ["normal bootstrap accepts only native local or receipt-bound plugin-managed readiness", () => {
     assert.match(skill, /On the normal path with no inherited ticket, `ready` has exactly three accepted\s+runtime forms/u);
     assert.match(skill, /repository mode `local` with repository status `local-valid-writable`/u);
     assert.match(skill, /repository mode `local` with repository status `local-valid-writable`,\s+runtime status `plugin-managed`/u);
     assert.match(skill, /repository mode and status `host-managed`, runtime status `plugin-managed`/u);
     assert.match(skill, /a non-null source digest, null target\/barrier\/readback digests/u);
     assert.match(skill, /`appServer\.required:true` plus\s+`appServer\.status:running` and `appServer\.code:CAS-READY`/u);
-    assert.match(skill, /require\s+no runtime initialization or native readback barrier/u);
+    assert.match(skill, /receipt-bound forms require no runtime initialization or native readback\s+barrier/u);
     assert.match(skill, /make no project-local\s+runtime or native-readback claim/u);
+    assert.match(skill, /empty read-only `\.codex` directory alone is not runtime authority/u);
     assert.match(skill, /authoritative only in the current Codex\s+session projection/u);
     assert.match(skill, /Never repeat or escalate that inspector at a host boundary/u);
     assert.match(skill, /If this exact in-session inspection returns `ready` but\s+a later PreToolUse guard denies an ordinary read, report a Pipeline guard\s+adapter defect and stop/u);
@@ -57,7 +58,9 @@ const cases = [
     assert.match(skill, /Any mixed form\s+is malformed and fail-closed/u);
     assert.match(skill, /V4 inspection itself carries\s+the mandatory single read-only App-Server observation/u);
     assert.match(skill, /`host-managed` form with a concrete `gitVersion` is the narrowly bound\s+post-initialization Codex mount/u);
-    assert.match(skill, /`host-managed` form with\s+`gitVersion:null` is the fresh pre-initialization state/u);
+    assert.match(skill, /fresh pre-initialization form is not `ready`/u);
+    assert.match(skill, /`host-repository-init-required`/u);
+    assert.match(skill, /runtime status `plugin-managed-unattested`/u);
   }],
   ["host-managed readiness hands off only bounded Git initialization to the host", () => {
     assert.match(skill, /codex-host-repository-init\.mjs" plan --root "\$PWD"/u);

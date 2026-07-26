@@ -9,7 +9,7 @@
 > reliable project work. Approval authorizes implementation dispatch only; it
 > does not authorize push, merge, tag, publication, Issue closure, or release.
 
-<!-- technical-spec-sha256: 9863a5ad10c3bc83d68c06211fdd5ed4dd3edab2db7e88f27fb93f4ec9071fbf -->
+<!-- technical-spec-sha256: c49b01d6b431e5571f6e7e24fc6af0494d46cc50c095b621cb95a0c2722735ee -->
 
 The technical approval binds the exact neighboring [spec.md](spec.md). Any
 change to that file after approval invalidates the implementation gate until
@@ -38,9 +38,11 @@ stage.
 A fresh Codex project advances through one explicit lifecycle:
 
 1. `portable-seed-required`
-2. `kickoff-required` for the exact Codex plugin-managed mount, otherwise
+2. `kickoff-required` for the exact Codex reserved runtime mount, otherwise
    `runtime-initialization-required`
-3. one digest-bound host Git initialization for a fresh Codex mount
+3. `host-repository-init-required` after kickoff; the empty read-only runtime
+   mount remains explicitly unattested until the digest-bound host Git
+   initialization completes
 4. exactly one project-session restart
 5. `ready`
 
@@ -242,8 +244,9 @@ declared by 0.4.5; it does not permit a fabricated hook capability.
       private continuity, never reruns the full inspector at the host boundary,
       and requires exactly one project-session restart.
 - [ ] After that restart the repository is locally writable with a
-      plugin-managed runtime; no runtime initialization/readback or second
-      restart is requested.
+      receipt-bound plugin-managed runtime; the read-only mount alone never
+      yields `ready`, and no runtime initialization/readback or second restart
+      is requested.
 - [ ] Host-managed roots cannot pass `session` or `dispatch` intent without
       the required repository/session/worktree capabilities.
 - [ ] App-Server execution denied, unavailable, not running, and ready remain

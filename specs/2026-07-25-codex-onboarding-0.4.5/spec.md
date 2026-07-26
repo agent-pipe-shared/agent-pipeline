@@ -155,6 +155,7 @@ For a progress result, `status` is exactly one of:
 | `runtime-attestation-required` | A project-local selected projection is current but no native effective-runtime readback authority exists yet. This state does not apply to the exact Codex plugin-managed control mount. | digest-bound `apply-readback --activate`, then restart |
 | `restart-required` | Project-local Codex config/agent bytes changed after the active host loaded its project runtime. | typed `restart-process` action; it cannot execute inside the current process |
 | `kickoff-required` | Runtime readback is current, repository capability is usable, but no valid initial continuity exists. | `kickoff plan`, then `kickoff apply --activate` |
+| `host-repository-init-required` | Kickoff is valid in a fresh host-managed Codex root, but the reserved runtime mount has no durable host-init admission. | read-only `codex-host-repository-init.mjs plan`, then its separately confirmed host-bound apply |
 | `ready` | All required dimensions passed for the current source/runtime/readback/continuity digests. | normal bootstrap |
 
 The following are terminal non-ready classifications, not lifecycle progress:
@@ -202,7 +203,7 @@ Source/root classification is mutually exclusive and exact:
 | some Pipeline source/runtime/projection artifact exists but the set is neither a valid legacy source nor a complete valid V3 authority | `partial` |
 | V3 source is valid and the selected projection is absent | `runtime-initialization-required` |
 | V3 source and projection exist but owned bytes/preimages differ | `projection-drift` |
-| V3 source/projection are current | continue to restart/readback, or use the closed `plugin-managed` form when Codex owns the reserved runtime mount |
+| V3 source/projection are current | continue to restart/readback; a reserved Codex mount is `plugin-managed-unattested` until the exact host-init admission promotes it to the closed `plugin-managed` form |
 
 The classifier uses the existing safe-root, recognized-host-layout, legacy
 source inspector, `validatePipelineUserV3`, and V3 projection planner from
@@ -246,13 +247,14 @@ Its top-level mapping is exact:
 
 For `host-managed`, Git initialization is forbidden inside the workspace
 sandbox and remote freshness is `not-applicable`. After portable seed and
-kickoff are valid with the exact `plugin-managed` runtime form,
+kickoff are valid with the exact `plugin-managed-unattested` runtime form,
 `codex-host-repository-init.mjs` may expose one separately confirmed,
 digest-bound host action. That action initializes `main` without a commit,
 migrates only private continuity into the Git control path, and requires one
 ordinary session restart. The full onboarding inspector is never rerun at the
 host boundary. No push, remote, merge, tag, publication, or release claim
-follows.
+follows. Only its exact durable admission can promote the runtime to
+`plugin-managed` and the aggregate to `ready`.
 
 `local-uninitialized` is permitted only while the aggregate state is
 `portable-seed-required`. Its reviewed plan declares
@@ -304,6 +306,8 @@ shell/file hook surface remain the explicitly deferred boundary above.
 - `missing`
 - `projection-current`
 - `projection-drift`
+- `plugin-managed`
+- `plugin-managed-unattested`
 - `target-read-only`
 - `restart-required`
 - `readback-current`
@@ -324,6 +328,15 @@ diagnostic code `runtime_target_read_only`, has all postimage/readback digests
 `null`, and exposes `nextAction: null`. A permission error during the actual
 transaction rolls back all prior target writes and returns the same mapping;
 partial success is forbidden.
+
+`plugin-managed` is accepted only when the reserved Codex runtime control path
+is accompanied by the exact durable host-repository-init admission bound to
+the current root, portable authority, kickoff state, handover, PRD, Spec, and
+private history. An empty read-only `.codex` directory by itself is only
+`plugin-managed-unattested`; after valid kickoff it maps to aggregate
+`host-repository-init-required`, whose sole next action is the read-only,
+plugin-local host-init planner. It never maps to `ready` and therefore cannot
+admit guarded project writes.
 
 Runtime initialization reuses the existing V3 migration planner/apply engine
 with `initializeMissingRuntime: true`, but the public command is owned by
@@ -883,10 +896,10 @@ The required fixture outcomes are exact:
 | --- | --- | --- | --- |
 | empty local root / onboarding | `portable-seed-required` | repository `local-uninitialized` | portable seed plan |
 | recognized read-only host controls / onboarding | `portable-seed-required` | repository `host-managed` | portable seed plan with no Git/`.codex` write |
-| host-managed Codex root after portable seed | `kickoff-required` | runtime `plugin-managed` | collect goal; no runtime initialization/readback restart |
-| host-managed Codex root after kickoff | `ready` for bootstrap only | repository `host-managed`, runtime `plugin-managed` | digest-bound host repository-init plan |
+| host-managed Codex root after portable seed | `kickoff-required` | runtime `plugin-managed-unattested` | collect goal; no runtime initialization/readback restart |
+| host-managed Codex root after kickoff | `host-repository-init-required` | repository `host-managed`, runtime `plugin-managed-unattested` | digest-bound host repository-init planner |
 | confirmed host repository init | `restart-required` from the host helper | physical Git initialized, private continuity migrated | exactly one ordinary project-session restart |
-| fresh session after host repository init | `ready` | repository `local-valid-writable`, runtime `plugin-managed` | normal session bootstrap; no runtime init/readback or second restart |
+| fresh session after host repository init | `ready` | repository `local-valid-writable`, runtime receipt-bound `plugin-managed` | normal session bootstrap; no runtime init/readback or second restart |
 | recognized host controls / session or dispatch | `repository-mode-unsupported` | repository `host-managed` | `null` |
 | existing unmanaged local Git root | `adoption-required` | source | adoption plan |
 | valid V0/V1/V2 source | `migration-required` | source | migration inspect |

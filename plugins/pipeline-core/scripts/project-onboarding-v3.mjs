@@ -101,6 +101,6 @@ export function main(args = process.argv.slice(2), {
   }
   write(`${JSON.stringify(output, null, 2)}\n`);
   if (output.schema === "pipeline.codex-onboarding-kickoff-plan.v1") return 0;
-  return ["portable-seed-required", "runtime-initialization-required", "runtime-attestation-required", "restart-required", "kickoff-required", "ready", "migration-required", "adoption-required", "projection-drift"].includes(output.status) ? 0 : 1;
+  return ["portable-seed-required", "runtime-initialization-required", "runtime-attestation-required", "restart-required", "kickoff-required", "host-repository-init-required", "ready", "migration-required", "adoption-required", "projection-drift"].includes(output.status) ? 0 : 1;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exit(main());

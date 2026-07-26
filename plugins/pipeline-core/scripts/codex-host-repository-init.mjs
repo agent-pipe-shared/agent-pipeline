@@ -121,11 +121,11 @@ export function planHostRepositoryInit({ rootDir = process.cwd(), deps = {} } = 
     intent: "bootstrap",
     deps,
   });
-  const accepted = lifecycle.status === "ready"
+  const accepted = lifecycle.status === "host-repository-init-required"
     && lifecycle.repository?.status === "host-managed"
     && lifecycle.repository?.mode === "host-managed"
     && lifecycle.repository?.gitVersion === null
-    && lifecycle.runtime?.status === "plugin-managed"
+    && lifecycle.runtime?.status === "plugin-managed-unattested"
     && lifecycle.runtime?.sourceSha256
     && lifecycle.runtime?.targetsSha256 === null
     && lifecycle.runtime?.barrierSha256 === null
@@ -134,7 +134,16 @@ export function planHostRepositoryInit({ rootDir = process.cwd(), deps = {} } = 
     && lifecycle.appServer?.required === true
     && lifecycle.appServer?.status === "running"
     && lifecycle.appServer?.code === "CAS-READY"
-    && lifecycle.nextAction === null;
+    && lifecycle.nextAction?.kind === "command"
+    && lifecycle.nextAction?.executable === "node"
+    && JSON.stringify(lifecycle.nextAction?.argv) === JSON.stringify([
+      fileURLToPath(import.meta.url),
+      "plan",
+      "--root",
+      root,
+    ])
+    && lifecycle.nextAction?.mutation === false
+    && lifecycle.nextAction?.requiresConfirmation === false;
   if (!accepted) {
     return {
       schema: PLAN_SCHEMA,

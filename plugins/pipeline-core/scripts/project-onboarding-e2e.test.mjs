@@ -146,7 +146,7 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
     const applied = run(onboarding, actionArgs(planned.json), path);
     assert.equal(applied.status, 0);
     assert.equal(applied.json.status, "kickoff-required");
-    assert.equal(applied.json.runtime.status, "plugin-managed");
+    assert.equal(applied.json.runtime.status, "plugin-managed-unattested");
     assert.equal(applied.json.nextAction.kind, "collect-input");
     const goal = "Build one small HTML game from the supplied design";
     const kickoff = planProjectOnboardingKickoffV4({
@@ -161,15 +161,17 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
       activate: true,
       deps: { spawnSync: cliGit },
     });
-    assert.equal(kickedOff.status, "ready");
+    assert.equal(kickedOff.status, "host-repository-init-required");
     const bootstrap = run(onboarding, ["inspect", "--root", path, "--intent", "bootstrap"], path);
     assert.equal(bootstrap.status, 0, bootstrap.stdout);
-    assert.equal(bootstrap.json.status, "ready");
+    assert.equal(bootstrap.json.status, "host-repository-init-required");
     assert.equal(bootstrap.json.repository.status, "host-managed");
-    assert.equal(bootstrap.json.runtime.status, "plugin-managed");
+    assert.equal(bootstrap.json.runtime.status, "plugin-managed-unattested");
     assert.equal(bootstrap.json.continuity.status, "valid");
     assert.deepEqual(bootstrap.json.appServer, { required: true, status: "running", code: "CAS-READY" });
-    assert.equal(bootstrap.json.nextAction, null);
+    assert.equal(bootstrap.json.nextAction.kind, "command");
+    assert.equal(bootstrap.json.nextAction.argv[0].endsWith("codex-host-repository-init.mjs"), true);
+    assert.deepEqual(bootstrap.json.nextAction.argv.slice(1), ["plan", "--root", path]);
     assert.deepEqual(readdirSync(join(path, ".codex")), []);
     assert.deepEqual(readdirSync(join(path, ".git")), []);
 

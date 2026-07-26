@@ -7,6 +7,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import { applyHostRepositoryInit, planHostRepositoryInit } from "./codex-host-repository-init.mjs";
@@ -60,11 +61,11 @@ test.after(() => {
 
 function readyInspection(root) {
   return {
-    status: "ready",
+    status: "host-repository-init-required",
     root,
     repository: { status: "host-managed", mode: "host-managed", gitVersion: null },
     runtime: {
-      status: "plugin-managed",
+      status: "plugin-managed-unattested",
       sourceSha256: "a".repeat(64),
       targetsSha256: null,
       barrierSha256: null,
@@ -72,11 +73,17 @@ function readyInspection(root) {
     },
     continuity: { status: "valid" },
     appServer: { required: true, status: "running", code: "CAS-READY" },
-    nextAction: null,
+    nextAction: {
+      kind: "command",
+      executable: "node",
+      argv: [fileURLToPath(new URL("./codex-host-repository-init.mjs", import.meta.url)), "plan", "--root", root],
+      mutation: false,
+      requiresConfirmation: false,
+    },
   };
 }
 
-test("plan binds only the exact ready host-managed plugin runtime", () => {
+test("plan binds only the exact non-ready host-managed plugin reservation", () => {
   const root = fixture();
   const plan = planHostRepositoryInit({
     rootDir: root,

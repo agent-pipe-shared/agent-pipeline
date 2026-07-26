@@ -12,6 +12,7 @@ export const PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES = Object.freeze([
   "runtime-attestation-required",
   "restart-required",
   "kickoff-required",
+  "host-repository-init-required",
   "partial",
   "invalid",
   "unsafe",

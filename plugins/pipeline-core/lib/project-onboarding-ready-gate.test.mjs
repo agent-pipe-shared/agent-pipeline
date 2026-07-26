@@ -57,7 +57,7 @@ test("exact V4 ready is bound to the requested intent and returns one sanitized 
 test("every controlling non-ready lifecycle status is preserved and denied without forwarding diagnostics", () => {
   const path = root();
   try {
-    assert.equal(PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.length, 26);
+    assert.equal(PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES.length, 27);
     for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
       assert.throws(() => requireProjectOnboardingReady({
         rootDir: path,

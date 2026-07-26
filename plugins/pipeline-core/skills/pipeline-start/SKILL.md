@@ -142,15 +142,23 @@ runtime forms:
   `appServer.required:true` plus `appServer.status:running` and
   `appServer.code:CAS-READY`.
 
-The plugin-managed forms are the reserved Codex-control-mount path: the
-installed plugin provides the runtime while Codex owns `.codex`. They require
-no runtime initialization or native readback barrier and make no project-local
-runtime or native-readback claim. The `local` form may continue. A
+The ready plugin-managed forms require both the reserved Codex-control-mount
+path and the exact durable host-repository-init admission bound to the current
+root, portable authority, kickoff state, handover, PRD, Spec, and private
+history. An empty read-only `.codex` directory alone is not runtime authority.
+The receipt-bound forms require no runtime initialization or native readback
+barrier and make no project-local runtime or native-readback claim. The `local`
+form may continue. A
 `host-managed` form with a concrete `gitVersion` is the narrowly bound
 post-initialization Codex mount: it may continue through bootstrap and session
-work, while dispatch/worktrees remain blocked. A `host-managed` form with
-`gitVersion:null` is the fresh pre-initialization state: run exactly this
-read-only planner and stop before Step 1:
+work, while dispatch/worktrees remain blocked.
+
+The fresh pre-initialization form is not `ready`. Accept only aggregate status
+`host-repository-init-required`, repository mode/status `host-managed` with
+`gitVersion:null`, runtime status `plugin-managed-unattested`, a non-null source
+digest, null target/barrier/readback digests, valid continuity, and
+`CAS-READY`. Its sole `nextAction` must be exactly this read-only planner; run
+it and stop before Step 1:
 
 `node "${PIPELINE_PLUGIN_ROOT}/scripts/codex-host-repository-init.mjs" plan --root "$PWD"`
 

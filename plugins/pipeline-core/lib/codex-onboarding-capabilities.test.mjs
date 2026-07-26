@@ -588,6 +588,36 @@ test("fault injection after worktree creation rolls back the exact worktree and 
   assert.deepEqual(treeSnapshot(root), before);
 });
 
+test("foreign target and administration content is preserved instead of recursively removed", () => {
+  const root = localRepository("worktree foreign-content race");
+  let target;
+  let admin;
+  const observed = observeCodexOnboardingCapabilities({
+    rootDir: root,
+    intent: "dispatch",
+    faultInjector(step) {
+      if (step !== "worktree-probe-created") return;
+      const detached = join(root, "branch", "detached");
+      target = join(detached, readdirSync(detached)[0]);
+      const marker = readFileSync(join(target, ".git"), "utf8").trim();
+      admin = resolve(target, marker.slice("gitdir: ".length));
+      writeFileSync(join(target, "foreign-target.txt"), "preserve target\n");
+      writeFileSync(join(admin, "foreign-admin.txt"), "preserve admin\n");
+    },
+  });
+  assertExact(observed, {
+    status: "worktree-capability-unavailable",
+    mode: "local",
+    gitVersion: observed.gitVersion,
+    rootWritable: "passed",
+    sessionCapability: "passed",
+    worktreeCapability: "failed",
+  });
+  assert.equal(readFileSync(join(target, "foreign-target.txt"), "utf8"), "preserve target\n");
+  assert.equal(readFileSync(join(admin, "foreign-admin.txt"), "utf8"), "preserve admin\n");
+  assert.match(worktreeSnapshot(root), /capability-/u);
+});
+
 test("injected root-probe failure rolls back its exact temporary paths and stops before Git", () => {
   const root = localRepository("root probe fault");
   const before = treeSnapshot(root);

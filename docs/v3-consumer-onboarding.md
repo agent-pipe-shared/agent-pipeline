@@ -107,14 +107,16 @@ byte-null; a changed goal, digest, calibration, preimage, or target fails closed
 The recognized Codex host-managed layout contains only inert host-owned
 `.git`, `.codex`, and optional `.agents` controls. Portable seeding preserves
 them and never initializes or mutates Git or `.codex/**` inside the workspace
-sandbox. When `.codex` is the exact empty read-only Codex control mount, the
-installed plugin is the runtime provider: successful seed readback advances
-directly to `kickoff-required`, and the later V3 authority reports
-`runtimeProjection: "plugin-managed"` with
-`runtimeReadback: "plugin-provided"`. This does not claim a project-local Codex
-runtime projection and needs no runtime-readback restart.
+sandbox. When `.codex` is the exact empty read-only Codex control mount,
+successful seed readback advances directly to `kickoff-required`, but the
+mount alone is not runtime authority. Until host initialization is durably
+bound, V3 reports `runtimeProjection: "plugin-managed-unattested"` with
+`runtimeReadback: "absent"` and the V4 lifecycle cannot report `ready`. This
+does not claim a project-local Codex runtime projection and needs no
+runtime-readback restart.
 
-After kickoff, `pipeline-start` plans one separate
+After kickoff, V4 reports `host-repository-init-required` and `pipeline-start`
+plans one separate
 `codex-host-repository-init.mjs` action. The plan is read-only, binds the exact
 portable preimage, and marks the apply as both confirmation-required and
 host-bound. Only that exact apply runs outside the workspace sandbox. It
@@ -123,11 +125,13 @@ receipt into the new Git control path. It never runs the full onboarding
 inspector at the host boundary and never writes `.codex/**`.
 
 The successful host apply requires exactly one ordinary project-session
-restart so Codex remounts the new repository. The fresh session must then
-observe `local-valid-writable` plus `plugin-managed`; it must not request a
-runtime initialization, native readback, or second restart. A different
-read-only target or any non-empty/colliding reserved path still fails closed
-with the typed target/layout diagnostic.
+restart so Codex remounts the new repository. Only the exact durable host-init
+admission bound to the current root, authority, kickoff artifacts, and private
+history promotes the fresh session to `local-valid-writable` plus
+`plugin-managed`; it must not request a runtime initialization, native
+readback, or second restart. A different read-only target, missing or drifted
+receipt, or any non-empty/colliding reserved path still fails closed with the
+typed target/layout diagnostic.
 
 This argv contract is runner- and platform-neutral. Codex uses the host action
 only for its reserved-control-mount case; Claude keeps its normal local Git
