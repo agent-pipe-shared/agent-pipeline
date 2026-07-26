@@ -158,3 +158,36 @@ The fresh Critic reported no findings. It deliberately cleared:
 The pass satisfies the design privacy gate only. The initial broad Critic's six
 findings still require one comprehensive correction re-review before the
 Product Owner gate.
+
+## Comprehensive original-finding correction re-review — first verdict
+
+| Field | Value |
+| --- | --- |
+| Candidate commit | `4dad856c216e3a55cba658ee1ea9d9752144674a` |
+| Candidate tree | `a1f22a2c308a2593b8d03b234078c9bccac14d49` |
+| Correction range | `e9f742d1ceeadf6c39b6e67ec149c4d33285b63f..4dad856c216e3a55cba658ee1ea9d9752144674a` |
+| Assurance | `functional-equivalent-read-only; OS isolation not asserted` |
+| Reviewer mutation / delegation | none / none |
+| Machine trajectory | consistent |
+| Verdict | FAIL |
+
+The fresh comprehensive Critic cleared PHX-CR-01 through PHX-CR-04,
+PHX-CR-06, PHX-PR-01 through PHX-PR-05, and every direct scope, privacy,
+security, dependency, language, test-integrity, machine-evidence, and
+lifecycle-hash regression. One major finding remained:
+
+- **PHX-CR-05R / major:** bound Spec §7.10 assigned `lifecycle.json`
+  creation/update to the `#22 lifecycle writer`, but #22 shipped no mutating
+  writer and the architecture had introduced four writer/CLI files outside
+  the Spec's closed implementation inventory.
+
+The finding is accepted without waiver. The correction does not edit the
+bound Spec and does not introduce another implementation file. It defines
+`#22 lifecycle writer` as the missing capability over #22's existing
+unmodified topology validator/planner and assigns its transactional
+inspect/plan/apply/status/recover surface exclusively to the already
+inventoried `harness/scripts/pipeline-state.mjs` and
+`harness/scripts/pipeline-state.test.mjs`, with topology/document/Verify
+support only in the already listed Spec §7.1 files. Acceptance P-AC-08 makes
+this inventory binding normative. A fresh bounded re-review must clear
+PHX-CR-05R and direct regressions; this FAIL is never rewritten as a pass.

@@ -293,7 +293,12 @@ architecture prose or an implementation briefing.
   manifest or require an explicit human disposition; initial manifest creation
   and every lifecycle transition SHALL use an exact preview, authority class,
   candidate/evidence binding, transactional writer, and readback. Handover
-  prose SHALL NOT substitute for it.
+  prose SHALL NOT substitute for it. For Phoenix, the `#22 lifecycle writer`
+  capability SHALL be implemented by the feature-package command family in
+  the already inventoried `harness/scripts/pipeline-state.mjs`, covered by
+  `harness/scripts/pipeline-state.test.mjs`, and SHALL consume the accepted
+  #22 topology validator/transition planner rather than introducing an
+  implementation file outside bound Spec §7.
 - **P-AC-09:** WHEN historical events would become exportable after a policy or
   destination change, THE SYSTEM SHALL require exact preview and explicit
   backfill consent.

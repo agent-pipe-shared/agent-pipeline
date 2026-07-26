@@ -860,8 +860,9 @@ Delivery waves:
 
 1. **Package authority, trust root and kernel:** create the reviewed Phoenix
    lifecycle manifest now; implementation first delivers the transactional
-   feature-package manifest writer missing from the #22 base, then PX-0 plus
-   the shared envelope, event store, checkpoint verifier, recovery command,
+   feature-package manifest writer missing from the #22 base through the
+   already inventoried Pipeline state writer, then PX-0 plus the shared
+   envelope, event store, checkpoint verifier, recovery command,
    repository-public-safe admission, the restricted machine-local storage
    profile within the same Spec-listed kernel, policy hooks, and topology
    extension.
@@ -886,14 +887,58 @@ candidate/evidence binding, and idempotent replay. Until that writer passes
 Verify and Critic, no bundle, viewer, adapter, or Close path may infer
 lifecycle authority from a hand-written or legacy package.
 
-The first package owns this exact writer inventory:
+The phrase `#22 lifecycle writer` in bound Spec §7.10 names a missing
+capability over the accepted #22 topology validator and transition planner; it
+does not prove that #22 already shipped a mutating implementation or authorize
+new files. Phoenix closes that capability only through files already listed in
+bound Spec §§7.1 and 7.4. The existing #22
+`feature-package-topology.mjs` remains an unmodified dependency: it validates
+the closed manifest and returns a non-mutating transition plan.
+
+The sanctioned `pipeline-state.mjs` module already owns repository lifecycle
+state mutations, exact preimages, authority checks, continuity/publication
+transactions, and readback. Feature-package manifest transitions are the same
+lifecycle-state responsibility, not event-stream storage, so this placement
+preserves the single-writer boundary without expanding the governance event
+kernel. The first package owns this exact closed inventory:
 
 | File | Contract |
 | --- | --- |
-| `plugins/pipeline-core/lib/feature-package-writer.mjs` | validate preview authority, exact manifest preimage, legal transition, artifact digests and candidate/evidence binding; publish transactionally |
-| `plugins/pipeline-core/lib/feature-package-writer.test.mjs` | cover absent/existing manifests, preimage drift, illegal transitions, rollback seams, readback, replay, path/privacy and authority failures |
-| `plugins/pipeline-core/scripts/feature-package.mjs` | expose `inspect|plan|apply|status` with digest-bound explicit activation and sanitized output |
-| `plugins/pipeline-core/scripts/feature-package.test.mjs` | prove the CLI never turns preview, chat, handover, or a stale candidate into a manifest write |
+| `harness/scripts/pipeline-state.mjs` | add `feature-package-inspect`, `feature-package-plan`, `feature-package-apply`, `feature-package-status`, and `feature-package-recover`; consume the accepted #22 validator/planner; validate the repo-relative package root, closed request, exact request and manifest preimages, legal transition, authority class/decision, artifact digests, candidate/evidence binding, idempotency key and recovery journal; publish by exclusive same-directory transaction and exact readback |
+| `harness/scripts/pipeline-state.test.mjs` | cover absent/existing manifests, draft bootstrap, noop/conflicting replay, request/manifest drift, illegal transitions, wrong or stale authority, missing candidate/evidence, symlink/case/path/cross-repository rejection, concurrent writers, every crash seam, bounded recovery, sanitized output, and proof that preview/chat/handover cannot become write authority |
+| `governance/artifact-topology.json` | register the lifecycle request, transaction journal, sanitized receipt and candidate-evidence classes at their sole canonical roots without making temporary journals portable authority |
+| `docs/artifact-topology.md` | document discovery, state/authority mapping, bootstrap limitation, transaction/recovery sequence, retention and the prohibition on legacy/path-guess authority |
+| `harness/scripts/verify.mjs` | register the focused writer/recovery suite and the topology validator in the single repository Verify gate |
+
+`feature-package-plan` is read-only and emits a closed
+`pipeline.feature-package-transition-request.v1` plus its SHA-256. The request
+binds package ID/path, exact manifest preimage (`absent` or digest), source and
+target state, complete proposed bytes, #22 validation receipt, artifact-set
+digest, candidate/evidence tuple where required, authority class and decision
+reference, idempotency key, and expiry. `feature-package-apply` accepts only
+that repo-relative request plus its exact digest and expected current preimage;
+it never accepts free-form manifest bytes.
+
+Apply obtains one package-local exclusive lock, writes a closed recovery
+journal before the first replace, writes and syncs a same-directory temporary
+file, rechecks the preimage and authority under the lock, atomically replaces
+the manifest, syncs the directory where supported, validates the complete
+postimage through #22, writes a sanitized receipt, and only then clears the
+journal. A retry with the same idempotency key and identical postimage is a
+verified noop; a reused key with different intent fails. An interrupted
+transaction remains `recovery-required`, never success.
+`feature-package-recover` consumes a separately previewed, digest-bound
+recovery request and may only finish the exact intended postimage or restore
+the exact retained preimage; it cannot select a new state, delete authority
+artifacts, or infer success from a temporary file.
+
+The bootstrap manifest remains `draft` through the Product Owner design gate:
+it inventories the reviewed design but is not itself approval authority.
+Literal plan approval remains in the existing repository-scoped PO gate. Once
+the first approved implementation package has delivered and verified this
+writer, it consumes that exact approval and candidate evidence to perform the
+first sanctioned lifecycle transition. No other package may run before this
+writer package, and no hand-written state change may bridge the bootstrap gap.
 
 The kernel package implements the restricted-data profile exclusively through
 the files already authorized by bound Spec §§7.3–7.4. Architecture narrows

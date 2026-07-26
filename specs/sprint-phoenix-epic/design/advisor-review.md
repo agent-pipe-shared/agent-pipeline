@@ -66,6 +66,19 @@ digest was
 `fddcca4ff370939a45f44a5d5c97157a86aab4f070aa70851d3403629f720c0d`
 before, between, and after.
 
+### Lifecycle-writer correction re-entry bootstrap
+
+The next mandatory re-entry asked one fresh primary to review only the bound
+Spec, Acceptance, architecture, prior Critic record, and the remaining
+PHX-CR-05 lifecycle-writer inventory gap. It returned no answer within the
+single 60-second limit and was interrupted once. The policy-named
+`consult-advisor-fast` role was again not exposed by the current collaboration
+adapter, so the fallback launch was rejected before a child or export. No
+substitute and no third attempt were used. The Git porcelain workspace stream
+had SHA-256
+`e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855`
+before, between, and after.
+
 There was no attested selected-sandbox execution; OS isolation and model
 identity are not asserted. No output was auto-applied and no Advisor finding
 exists to accept or reject.

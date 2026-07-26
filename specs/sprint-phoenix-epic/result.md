@@ -88,3 +88,25 @@ The reviewer reported no findings and explicitly cleared PHX-PR-01..05, their
 fixes, and direct regressions. This entry closes the Phoenix design privacy
 gate only. It does not reclassify Entries 1–3, approve the plan, authorize
 implementation, or satisfy the comprehensive original-finding re-review.
+
+## Entry 5 — Comprehensive correction re-review, first verdict
+
+| Field | Value |
+| --- | --- |
+| Date | 2026-07-26 |
+| Candidate commit | `4dad856c216e3a55cba658ee1ea9d9752144674a` |
+| Candidate tree | `a1f22a2c308a2593b8d03b234078c9bccac14d49` |
+| Correction range | `e9f742d1ceeadf6c39b6e67ec149c4d33285b63f..4dad856c216e3a55cba658ee1ea9d9752144674a` |
+| Independent comprehensive re-review | FAIL under `functional-equivalent-read-only; OS isolation not asserted` |
+| Machine trajectory | consistent |
+| Reviewer mutation / delegation | none / none |
+| Remote write | none |
+
+The reviewer cleared five of the six original findings and all five privacy
+findings, but retained PHX-CR-05 as one major inventory/authority gap: the
+architecture's four proposed lifecycle-writer files were outside the bound
+Spec inventory while #22 itself had no writer. Phoenix accepted the finding
+without waiver and reassigned the entire writer capability to already
+inventoried lifecycle state-writer/test and topology-support files. A fresh
+re-review is mandatory; this entry does not approve the plan or authorize
+implementation.

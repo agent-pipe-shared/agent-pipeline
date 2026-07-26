@@ -319,6 +319,28 @@ This closes the design privacy course gate only. It does not convert the two
 earlier FAIL entries into passes and creates no implementation, push, merge,
 release, external-write, or final-Epic authority.
 
+## R-08 — Comprehensive re-review retained one lifecycle-writer major
+
+The fresh comprehensive review of
+`e9f742d1ceeadf6c39b6e67ec149c4d33285b63f..4dad856c216e3a55cba658ee1ea9d9752144674a`
+cleared PHX-CR-01..04, PHX-CR-06, every privacy finding, and direct
+regressions. It failed closed on one major: #22 had no mutating lifecycle
+writer, while the architecture proposed four files outside bound Spec §7.
+
+Phoenix accepted the finding without changing the Spec or beginning
+implementation. The correction treats `#22 lifecycle writer` as a capability
+over the existing unmodified #22 validator/planner and assigns its complete
+transactional operation, authority, recovery, test, topology-documentation,
+and Verify responsibility only to files already listed in Spec §§7.1/7.4.
+The initial hand-written manifest remains a non-authoritative `draft` bootstrap
+artifact; it cannot transition or authorize downstream packages before the
+first approved implementation package delivers and verifies the writer.
+
+The correction re-entry Advisor primary timed out once; the exact policy
+fallback role was unavailable before launch. The workspace remained unchanged
+through that route, no Advisor output was applied, and no pass is claimed. A
+fresh Critic must clear PHX-CR-05R before the PO gate.
+
 ## Audit classification
 
 These records illustrate the Phoenix recovery profile:
@@ -341,6 +363,7 @@ profile.
 | Inherited 0.4.6 continuity could not close through the exposed sanctioned route | Product Owner controlled exception authority; Phoenix Elephant controlled exact execution/readback | 2026-07-31 | RESOLVED 2026-07-26; exact repair, close, Phoenix initialization, cleanup, and V4 readback recorded |
 | Canonical handover lags the current released implementation | Phoenix close owner; Product Owner controls any scope change | 2026-07-31 | OPEN documentation drift; completed 0.4.6 work remains excluded from Phoenix product scope |
 | Mutable authority-reader compatibility could remain indefinite | Phoenix integration-package owner | Earlier of Phoenix integration close or 2026-10-31 | Direct readers inventoried; dual-read fail-closed migration and expiry now normative; implementation evidence pending |
+| #22 lifecycle writer was assigned to files outside the bound Spec inventory | Phoenix design owner | Before Product Owner gate | Correction confines the capability to Spec-listed `pipeline-state`/topology-support files; fresh Critic clearance pending |
 
 Expiry is a stop/review point, not automatic permission. See
 [design/governance-conformance.md](design/governance-conformance.md).

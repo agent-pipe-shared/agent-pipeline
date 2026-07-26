@@ -1,6 +1,6 @@
 # Sprint Phoenix governance conformance
 
-Status: privacy gate met; comprehensive correction review pending
+Status: privacy gate met; lifecycle-writer inventory correction pending re-review
 
 Date: 2026-07-26
 
@@ -23,7 +23,7 @@ contract. It does not claim that future implementation or evidence exists.
 | 4 | Error handling | MET (design) | Unknown, unavailable, invalid, partial, stale, conflict, fork, and reconciliation states remain typed at their first boundary. |
 | 5 | Logging | MET (design) | Work-unit correlation is explicit; secrets, full PII/private coordinates, prompts, and unrestricted output are prohibited before persistence. |
 | 6 | API versioning | MET (design) | Closed v1 schema/profile family; breaking reinterpretation requires a new version and explicit migration. |
-| 7 | Single responsibility | MET (design) | Human ledger, agent journal, lifecycle stream, policy, viewer, adapters, ITSM, and export remain separate modules/streams. |
+| 7 | Single responsibility | MET (design) | Human ledger, agent journal, lifecycle stream, policy, viewer, adapters, ITSM, and export remain separate modules/streams. The missing #22 manifest mutation is placed in the existing sanctioned repository lifecycle state writer, not the event store or a new out-of-inventory module. |
 | 8 | Configuration | MET (design) | Portable intent/policy is separate from machine-local endpoints, credentials, actor bindings, queues, and runtime settings. |
 | 9 | Idempotency | MET (design) | Canonical writer, adapters, ITSM, outbox, and external mutations have explicit idempotency and conflicting-replay behavior. |
 | 10 | Test placement | MET (design) | The implementation inventory colocates each planned `*.test.mjs` with its source area and registers it with Verify. |
@@ -49,12 +49,13 @@ No design-stage deviation from the twelve guidelines is proposed.
 
 | Risk | Owner | Expiry | Required disposition |
 | --- | --- | --- | --- |
-| `PHX-DESIGN-ADVISORY-UNAVAILABLE` | Phoenix Elephant, with PO authority for review dispatch | 2026-07-31 | Initial compensating Critic completed with six findings; correction, privacy review, and fresh re-review are pending. Never claim Advisor pass. |
+| `PHX-DESIGN-ADVISORY-UNAVAILABLE` | Phoenix Elephant, with PO authority for review dispatch | 2026-07-31 | Advisor routes remain unavailable. Compensating review cleared all privacy findings and five original findings; one lifecycle-writer correction awaits re-review. Never claim Advisor pass. |
 | `PHX-DESIGN-INHERITED-CONTINUITY` | Product Owner for exception authority; Phoenix Elephant for exact execution/readback | 2026-07-31 | RESOLVED 2026-07-26 through the documented exact repair, sanctioned writers, Phoenix continuity initialization, cleanup, and full bootstrap readback. |
 | `PHX-DESIGN-HANDOVER-DRIFT` | Phoenix close owner; Product Owner controls scope | 2026-07-31 | Reconcile the canonical handover at close without reopening Product Owner-dispositioned 0.4.6 implementation. |
 | `PHX-LEGACY-AUTHORITY-COMPATIBILITY` | Phoenix integration-package owner | Earlier of Phoenix integration close or 2026-10-31 | Migrate every direct mutable authority reader, dual-evaluate ledger/state, block disagreement, and prohibit compatibility removal or Phoenix completion while any reader remains unmigrated. |
 | `PHX-PRIVACY-PORTABLE-TRUST-ZONE` | Phoenix integration-package owner | Before Product Owner gate | RESOLVED 2026-07-26 by fixed-candidate privacy PASS over the normative Spec §§4.4–4.5 interpretation and repository-wide admission. |
 | `PHX-PRIVACY-RESTRICTED-ERASURE` | Phoenix integration-package owner | Before Product Owner gate | RESOLVED 2026-07-26 by fixed-candidate privacy PASS over portable-only append semantics, restricted erasure/key destruction, and Spec-inventory ownership. |
+| `PHX-LIFECYCLE-WRITER-INVENTORY` | Phoenix design owner | Before Product Owner gate | PHX-CR-05R accepted and corrected by assigning the #22 writer capability only to Spec-listed `pipeline-state`/topology-support files; fresh Critic clearance is pending. |
 
 If an open risk reaches its date without disposition, the Phoenix design returns to a
 blocked course gate. The expiry does not authorize the action automatically.
