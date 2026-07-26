@@ -213,7 +213,7 @@ export function readCodexHostRepositoryInitAdmission(root, {
     || receipt.rootSha256 !== sha256(Buffer.from(root, "utf8"))
     || (receipt.authoritySha256 !== currentAuthoritySha256
       && receipt.authoritySha256 !== transitionedAuthoritySha256)) return null;
-  const history = kickoffHistory(root, historyPath, { lstat, readFile, platform });
+  const history = boundKickoffHistory(root, historyPath, { lstat, readFile, platform });
   return history && receipt.historySha256 === history.historySha256
     ? {
       gitVersion: receipt.gitVersion,

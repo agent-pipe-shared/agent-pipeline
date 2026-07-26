@@ -19,6 +19,7 @@ import { main as onboardingCli } from "./project-onboarding-v3.mjs";
 import { main as authorityCli } from "./v3-bootstrap-authority.mjs";
 import { inspectRepositoryFreshness } from "./repository-freshness.mjs";
 import { applyProjectOnboardingKickoffV4, planProjectOnboardingKickoffV4 } from "../lib/project-onboarding-v3.mjs";
+import { ProjectOnboardingReadyError } from "../lib/project-onboarding-ready-gate.mjs";
 import { applyHostRepositoryInit, planHostRepositoryInit } from "./codex-host-repository-init.mjs";
 import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
 import {
@@ -195,6 +196,37 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
       tool_name: "Bash",
       tool_input: { command: "rg --files" },
     }, { projectDir: path }).exitCode, 0, "physical hook view accepts the bound host-init admission");
+    const crossViewDependencies = {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {
+        throw new ProjectOnboardingReadyError(
+          "PORG-NOT-READY",
+          "protected Git view differs",
+          { intent: "session", lifecycleStatus: "repository-control-path-invalid" },
+        );
+      },
+    };
+    assert.equal(evaluateLifecycleReadyGuard({
+      tool_name: "Edit",
+      tool_input: { file_path: "src/game.mjs" },
+    }, crossViewDependencies).exitCode, 0, "exact cross-view failure accepts intact kickoff bindings");
+    for (const relative of [
+      ".claude/pipeline-state.json",
+      "docs/state.md",
+      "specs/kickoff-initial-prd.md",
+      "specs/kickoff-initial-spec.md",
+    ]) {
+      const target = join(path, relative);
+      const original = readFileSync(target);
+      writeFileSync(target, Buffer.concat([original, Buffer.from("\ntampered\n")]));
+      assert.equal(readCodexHostRepositoryInitAdmission(path), null, `${relative} drift invalidates admission`);
+      assert.equal(evaluateLifecycleReadyGuard({
+        tool_name: "Edit",
+        tool_input: { file_path: "src/game.mjs" },
+      }, crossViewDependencies).exitCode, 2, `${relative} drift stays blocked behind repository cross-view failure`);
+      writeFileSync(target, original);
+      assert.notEqual(readCodexHostRepositoryInitAdmission(path), null, `${relative} exact restore recovers admission`);
+    }
     const physicalAuthority = run(authority, ["--root", path], path);
     assert.equal(physicalAuthority.status, 0, physicalAuthority.stdout);
     assert.equal(physicalAuthority.json.status, "ready");
