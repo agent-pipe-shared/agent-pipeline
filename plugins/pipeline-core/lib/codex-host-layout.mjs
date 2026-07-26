@@ -12,6 +12,7 @@ import { join } from "node:path";
 
 export const CODEX_HOST_CONTROL_PATHS = Object.freeze([".agents", ".codex", ".git"]);
 export const CODEX_HOST_REPOSITORY_INIT_RECEIPT = ".claude/.runtime/agent-pipeline/onboarding/host-repository-init.json";
+export const CODEX_HOST_REPOSITORY_INIT_MARKER = ".claude/.runtime/agent-pipeline/onboarding/host-repository-init-bound.json";
 const REQUIRED_CODEX_HOST_CONTROL_PATHS = Object.freeze([".codex", ".git"]);
 const HOST_INIT_AUTHORITY_PATHS = Object.freeze([
   "pipeline.user.yaml",
@@ -179,13 +180,21 @@ export function readCodexHostRepositoryInitAdmission(root, {
     }
   }
   const receiptPath = join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT);
+  const markerPath = join(root, CODEX_HOST_REPOSITORY_INIT_MARKER);
   const historyPath = join(root, ".claude/.runtime/agent-pipeline/onboarding/continuity-history.json");
-  if (!physicalRegularFile(receiptPath, { lstat })) return null;
+  if (!physicalRegularFile(receiptPath, { lstat })
+    || !physicalRegularFile(markerPath, { lstat })) return null;
   let receipt;
+  let receiptBytes;
+  let marker;
   try {
     const info = lstat(receiptPath);
-    if (platform !== "win32" && (info.mode & 0o077) !== 0) return null;
-    receipt = JSON.parse(readFile(receiptPath, "utf8"));
+    const markerInfo = lstat(markerPath);
+    if (platform !== "win32"
+      && ((info.mode & 0o077) !== 0 || (markerInfo.mode & 0o077) !== 0)) return null;
+    receiptBytes = readFile(receiptPath);
+    receipt = JSON.parse(receiptBytes.toString("utf8"));
+    marker = JSON.parse(readFile(markerPath, "utf8"));
   } catch {
     return null;
   }
@@ -193,6 +202,7 @@ export function readCodexHostRepositoryInitAdmission(root, {
     "authoritySha256", "branch", "gitVersion", "historySha256",
     "planSha256", "rootSha256", "schema",
   ];
+  const markerKeys = ["planSha256", "receiptSha256", "rootSha256", "schema"];
   const currentAuthoritySha256 = codexHostRepositoryAuthoritySha256(root, { lstat, readFile });
   const hostManagedCalibrationBytes = receipt?.authoritySha256 === currentAuthoritySha256
     ? null
@@ -206,11 +216,17 @@ export function readCodexHostRepositoryInitAdmission(root, {
     });
   if (receipt === null || typeof receipt !== "object" || Array.isArray(receipt)
     || JSON.stringify(Object.keys(receipt).sort()) !== JSON.stringify(keys.sort())
+    || marker === null || typeof marker !== "object" || Array.isArray(marker)
+    || JSON.stringify(Object.keys(marker).sort()) !== JSON.stringify(markerKeys.sort())
     || receipt.schema !== "pipeline.codex-host-repository-init-receipt.v1"
+    || marker.schema !== "pipeline.codex-host-repository-init-marker.v1"
     || receipt.branch !== "main"
     || !/^\d+\.\d+(?:\.\d+)?(?:[.-][0-9A-Za-z]+)*$/u.test(receipt.gitVersion ?? "")
     || !/^[a-f0-9]{64}$/u.test(receipt.planSha256 ?? "")
     || receipt.rootSha256 !== sha256(Buffer.from(root, "utf8"))
+    || marker.rootSha256 !== receipt.rootSha256
+    || marker.planSha256 !== receipt.planSha256
+    || marker.receiptSha256 !== sha256(receiptBytes)
     || (receipt.authoritySha256 !== currentAuthoritySha256
       && receipt.authoritySha256 !== transitionedAuthoritySha256)) return null;
   const history = boundKickoffHistory(root, historyPath, { lstat, readFile, platform });
@@ -220,6 +236,47 @@ export function readCodexHostRepositoryInitAdmission(root, {
       repositoryMode: hostManagedCalibrationBytes === null ? "host-managed" : "local-only",
     }
     : null;
+}
+
+/**
+ * Distinguish a pristine pre-init root from a root that already carries a
+ * malformed or drifted host-init receipt. Callers must never offer a second
+ * initialization plan for the latter state.
+ */
+export function observeCodexHostRepositoryInitAdmission(root, {
+  lstat = lstatSync,
+  readFile = readFileSync,
+  platform = process.platform,
+} = {}) {
+  const receiptPath = join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT);
+  const markerPath = join(root, CODEX_HOST_REPOSITORY_INIT_MARKER);
+  let markerExists = false;
+  try {
+    lstat(markerPath);
+    markerExists = true;
+  } catch (error) {
+    if (error?.code !== "ENOENT") return { status: "invalid", admission: null };
+  }
+  let receiptInfo;
+  try {
+    receiptInfo = lstat(receiptPath);
+  } catch (error) {
+    return error?.code === "ENOENT" && !markerExists
+      ? { status: "absent", admission: null }
+      : { status: "invalid", admission: null };
+  }
+  if (!receiptInfo.isFile() || receiptInfo.isSymbolicLink() || receiptInfo.nlink !== 1
+    || !markerExists) {
+    return { status: "invalid", admission: null };
+  }
+  const admission = readCodexHostRepositoryInitAdmission(root, {
+    lstat,
+    readFile,
+    platform,
+  });
+  return admission === null
+    ? { status: "invalid", admission: null }
+    : { status: "valid", admission };
 }
 
 /**

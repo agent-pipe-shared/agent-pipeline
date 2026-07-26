@@ -27,6 +27,7 @@ import { spawnSync } from "node:child_process";
 
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
 import {
+  CODEX_HOST_REPOSITORY_INIT_MARKER,
   CODEX_HOST_REPOSITORY_INIT_RECEIPT,
   codexHostRepositoryAuthoritySha256,
 } from "../lib/codex-host-layout.mjs";
@@ -165,6 +166,7 @@ export function planHostRepositoryInit({ rootDir = process.cwd(), deps = {} } = 
       ".git",
       ".git/agent-pipeline/onboarding/continuity-history.json",
       CODEX_HOST_REPOSITORY_INIT_RECEIPT,
+      CODEX_HOST_REPOSITORY_INIT_MARKER,
     ],
     createsCommit: false,
     applyAction: applyAction(root, planSha256),
@@ -288,6 +290,7 @@ function bindPrivateContinuity(root, { planSha256, gitVersion, gitIdentity }, fs
   const directory = join(agentPipeline, "onboarding");
   const target = join(directory, "continuity-history.json");
   const receiptPath = join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT);
+  const markerPath = join(root, CODEX_HOST_REPOSITORY_INIT_MARKER);
   const read = fs.readFileSync ?? readFileSync;
   const write = fs.writeFileSync ?? writeFileSync;
   const open = fs.openSync ?? openSync;
@@ -317,11 +320,23 @@ function bindPrivateContinuity(root, { planSha256, gitVersion, gitIdentity }, fs
   };
   if (receipt.authoritySha256 === null) throw new Error("host-init authority is unavailable");
   assertPhysicalParents(root, ".claude/.runtime/agent-pipeline/onboarding", fs);
-  write(receiptPath, `${JSON.stringify(receipt, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+  const receiptBytes = Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, "utf8");
+  write(receiptPath, receiptBytes, { flag: "wx", mode: 0o600 });
   created.receipt = physicalIdentity((fs.lstatSync ?? lstatSync)(receiptPath), "file");
   if (!created.receipt) throw new Error("created receipt identity is unavailable");
   const receiptDescriptor = open(receiptPath, "r");
   try { sync(receiptDescriptor); } finally { close(receiptDescriptor); }
+  const marker = {
+    schema: "pipeline.codex-host-repository-init-marker.v1",
+    rootSha256: receipt.rootSha256,
+    planSha256: receipt.planSha256,
+    receiptSha256: sha256(receiptBytes),
+  };
+  write(markerPath, `${JSON.stringify(marker, null, 2)}\n`, { flag: "wx", mode: 0o600 });
+  created.marker = physicalIdentity((fs.lstatSync ?? lstatSync)(markerPath), "file");
+  if (!created.marker) throw new Error("created host-init marker identity is unavailable");
+  const markerDescriptor = open(markerPath, "r");
+  try { sync(markerDescriptor); } finally { close(markerDescriptor); }
 }
 
 export function applyHostRepositoryInit({
@@ -372,11 +387,12 @@ export function applyHostRepositoryInit({
       };
     }
     const gitTree = physicalTreeSnapshot(join(root, ".git"), deps);
-    const created = { history: null, receipt: null, directories: [] };
+    const created = { history: null, receipt: null, marker: null, directories: [] };
     try {
       bindPrivateContinuity(root, { planSha256, gitVersion, gitIdentity }, deps, created);
     } catch {
       try {
+        removeCreatedFile(join(root, CODEX_HOST_REPOSITORY_INIT_MARKER), created.marker, deps);
         removeCreatedFile(join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT), created.receipt, deps);
         removeCreatedFile(join(root, ".git/agent-pipeline/onboarding/continuity-history.json"), created.history, deps);
         for (const entry of [...created.directories].reverse()) {

@@ -83,7 +83,11 @@ verify every preimage, retain crash-recovery authority, and roll back only
 files/directories whose device, inode, link count, and digest still match the
 writer's records. Foreign or identity-drifted paths are preserved and the
 operation reports an unavailable/indeterminate result instead of false
-success.
+success. Disposable-worktree rollback first renames the exact recorded tree
+into quarantine. Each recorded leaf is then atomically renamed to a fresh
+cleanup name and revalidated there before unlink/rmdir; a replacement between
+the first validation and atomic capture is restored and retained rather than
+deleted.
 
 Rollback of the shipped change is a source revert before release. A live local
 candidate is removed by restoring the prior installed plugin selection and

@@ -11,7 +11,10 @@ import { fileURLToPath } from "node:url";
 import test from "node:test";
 
 import { applyHostRepositoryInit, planHostRepositoryInit } from "./codex-host-repository-init.mjs";
-import { CODEX_HOST_REPOSITORY_INIT_RECEIPT } from "../lib/codex-host-layout.mjs";
+import {
+  CODEX_HOST_REPOSITORY_INIT_MARKER,
+  CODEX_HOST_REPOSITORY_INIT_RECEIPT,
+} from "../lib/codex-host-layout.mjs";
 import {
   applyOnboardingKickoff,
   classifyOnboardingContinuity,
@@ -95,6 +98,7 @@ test("plan binds only the exact non-ready host-managed plugin reservation", () =
     ".git",
     ".git/agent-pipeline/onboarding/continuity-history.json",
     CODEX_HOST_REPOSITORY_INIT_RECEIPT,
+    CODEX_HOST_REPOSITORY_INIT_MARKER,
   ]);
   assert.equal(plan.createsCommit, false);
   assert.equal(plan.applyAction.requiresHostBoundary, true);
@@ -143,6 +147,10 @@ test("host apply initializes only Git and requires one restart", () => {
   assert.match(receipt.authoritySha256, /^[a-f0-9]{64}$/u);
   assert.equal(receipt.gitVersion, "2.40.1");
   assert.equal(receipt.branch, "main");
+  const marker = JSON.parse(readFileSync(join(root, CODEX_HOST_REPOSITORY_INIT_MARKER), "utf8"));
+  assert.equal(marker.schema, "pipeline.codex-host-repository-init-marker.v1");
+  assert.equal(marker.planSha256, plan.planSha256);
+  assert.match(marker.receiptSha256, /^[a-f0-9]{64}$/u);
   assert.equal(classifyOnboardingContinuity({
     rootDir: root,
     repositoryCapability: "local",
@@ -152,6 +160,38 @@ test("host apply initializes only Git and requires one restart", () => {
       return { status: 0, stdout: `${join(root, ".git")}\n`, stderr: "" };
     },
   }).status, "valid");
+});
+
+test("a marker publication failure rolls back the receipt and initialized Git", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const nativeWrite = writeFileSync;
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        assert.equal(command, "git");
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        mkdirSync(join(options.cwd, ".git"));
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      writeFileSync(target, bytes, options) {
+        if (target === join(root, CODEX_HOST_REPOSITORY_INIT_MARKER)) {
+          throw new Error("synthetic marker publication failure");
+        }
+        nativeWrite(target, bytes, options);
+      },
+    },
+  });
+  assert.equal(result.status, "apply-failed");
+  assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_MARKER)), false);
+  assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_RECEIPT)), false);
+  assert.equal(existsSync(join(root, ".git")), false);
 });
 
 test("host apply rejects drift and any physical reserved host path before Git", () => {

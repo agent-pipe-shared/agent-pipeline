@@ -23,7 +23,9 @@ import { ProjectOnboardingReadyError } from "../lib/project-onboarding-ready-gat
 import { applyHostRepositoryInit, planHostRepositoryInit } from "./codex-host-repository-init.mjs";
 import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
 import {
+  CODEX_HOST_REPOSITORY_INIT_MARKER,
   CODEX_HOST_REPOSITORY_INIT_RECEIPT,
+  observeCodexHostRepositoryInitAdmission,
   readCodexHostRepositoryInitAdmission,
 } from "../lib/codex-host-layout.mjs";
 
@@ -194,6 +196,7 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
     assert.equal(initialized.gitVersion, "2.40.1");
     assert.equal(readdirSync(join(path, ".claude/.runtime/agent-pipeline/onboarding")).sort().includes("continuity-history.json"), true);
     assert.equal(readdirSync(join(path, ".claude/.runtime/agent-pipeline/onboarding")).sort().includes("host-repository-init.json"), true);
+    assert.equal(readdirSync(join(path, ".claude/.runtime/agent-pipeline/onboarding")).sort().includes("host-repository-init-bound.json"), true);
     assert.equal(evaluateLifecycleReadyGuard({
       tool_name: "Bash",
       tool_input: { command: "rg --files" },
@@ -277,7 +280,34 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
       tool_input: { command: "rg --files" },
     }, { projectDir: path }).exitCode, 0);
 
-    writeFileSync(join(path, CODEX_HOST_REPOSITORY_INIT_RECEIPT), "{}\n", { mode: 0o600 });
+    const receiptPath = join(path, CODEX_HOST_REPOSITORY_INIT_RECEIPT);
+    const markerPath = join(path, CODEX_HOST_REPOSITORY_INIT_MARKER);
+    const receiptBytes = readFileSync(receiptPath);
+    const markerBytes = readFileSync(markerPath);
+    writeFileSync(receiptPath, "{}\n", { mode: 0o600 });
+    assert.deepEqual(observeCodexHostRepositoryInitAdmission(path), {
+      status: "invalid",
+      admission: null,
+    });
+    const invalidAdmission = run(onboarding, ["inspect", "--root", path, "--intent", "bootstrap"], path);
+    assert.equal(invalidAdmission.status, 0, invalidAdmission.stdout);
+    assert.equal(invalidAdmission.json.status, "projection-drift");
+    assert.equal(invalidAdmission.json.runtime.status, "projection-drift");
+    assert.equal(invalidAdmission.json.nextAction, null);
+    assert.equal(invalidAdmission.json.diagnostics[0].code, "projection_drift");
+    const invalidAuthority = run(authority, ["--root", path], path);
+    assert.equal(invalidAuthority.status, 1, invalidAuthority.stdout);
+    assert.equal(invalidAuthority.json.status, "projection-drift");
+    assert.equal(invalidAuthority.json.runtimeProjection, "plugin-managed-invalid");
+    assert.equal(invalidAuthority.json.runtimeReadback, "invalid");
+    writeFileSync(receiptPath, receiptBytes, { mode: 0o600 });
+    rmSync(markerPath);
+    assert.equal(observeCodexHostRepositoryInitAdmission(path).status, "invalid",
+      "a receipt without its marker is not a pristine pre-init state");
+    writeFileSync(markerPath, markerBytes, { mode: 0o600 });
+    rmSync(receiptPath);
+    assert.equal(observeCodexHostRepositoryInitAdmission(path).status, "invalid",
+      "a marker without its receipt is not a pristine pre-init state");
     assert.equal(evaluateLifecycleReadyGuard({
       tool_name: "Bash",
       tool_input: { command: "rg --files" },

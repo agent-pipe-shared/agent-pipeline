@@ -172,8 +172,9 @@ never in the workspace sandbox. Accept only schema
 `pipeline.codex-host-repository-init-apply.v1` and status `restart-required`;
 it initializes Git without a commit, copies the private kickoff continuity
 history into the new Git control path, and leaves one private digest-bound
-post-init receipt in `.claude/.runtime` so the fresh Codex hook can distinguish
-the otherwise identical empty protected mount. It mutates no portable
+post-init receipt plus its separate receipt-digest marker in `.claude/.runtime`
+so the fresh Codex hook can distinguish the otherwise identical empty
+protected mount. It mutates no portable
 Pipeline/project file. Ask for exactly one ordinary project-session restart and
 stop. Do not run the onboarding inspector at the host boundary.
 After restart, the normal local/plugin-managed form above may continue without
@@ -181,7 +182,7 @@ a runtime initialization or another restart.
 
 Codex 0.145 may run PreToolUse against a different physical control-path view
 than the successful bootstrap command. For this 0.4.5 hotfix only, the
-lifecycle guard may fall back to that exact host-init receipt when its native
+lifecycle guard may fall back to that exact host-init admission pair when its native
 `session` observation is unavailable. The receipt must remain bound to the
 physical project root, stable Pipeline source/calibration authority, and
 immutable kickoff history; an absent, malformed, copied, permission-weakened,

@@ -15,6 +15,7 @@ import {
   readlinkSync,
   rmSync,
   symlinkSync,
+  unlinkSync,
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
@@ -615,6 +616,38 @@ test("foreign target and administration content is preserved instead of recursiv
   });
   assert.equal(readFileSync(join(target, "foreign-target.txt"), "utf8"), "preserve target\n");
   assert.equal(readFileSync(join(admin, "foreign-admin.txt"), "utf8"), "preserve admin\n");
+  assert.match(worktreeSnapshot(root), /capability-/u);
+});
+
+test("an entry replaced after validation is atomically captured, rejected, and restored", () => {
+  const root = localRepository("worktree entry validation race");
+  let target;
+  let injected = false;
+  const observed = observeCodexOnboardingCapabilities({
+    rootDir: root,
+    intent: "dispatch",
+    faultInjector(step, entry) {
+      if (step === "worktree-probe-created") {
+        const detached = join(root, "branch", "detached");
+        target = join(detached, readdirSync(detached)[0]);
+        return;
+      }
+      if (step !== "worktree-cleanup-entry-validated:.git" || injected) return;
+      injected = true;
+      unlinkSync(entry.target);
+      writeFileSync(entry.target, "foreign replacement\n");
+    },
+  });
+  assertExact(observed, {
+    status: "worktree-capability-unavailable",
+    mode: "local",
+    gitVersion: observed.gitVersion,
+    rootWritable: "passed",
+    sessionCapability: "passed",
+    worktreeCapability: "failed",
+  });
+  assert.equal(injected, true);
+  assert.equal(readFileSync(join(target, ".git"), "utf8"), "foreign replacement\n");
   assert.match(worktreeSnapshot(root), /capability-/u);
 });
 

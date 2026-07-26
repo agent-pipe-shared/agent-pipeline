@@ -122,6 +122,7 @@ empty string when no safe guidance exists. `code` is exactly one of:
 - `runtime_target_read_only`
 - `restart_required`
 - `runtime_readback_unavailable`
+- `plugin_managed_runtime_unattested`
 - `continuity_absent_pristine`
 - `continuity_damaged`
 - `continuity_observation_unavailable`
@@ -332,11 +333,16 @@ partial success is forbidden.
 `plugin-managed` is accepted only when the reserved Codex runtime control path
 is accompanied by the exact durable host-repository-init admission bound to
 the current root, portable authority, kickoff state, handover, PRD, Spec, and
-private history. An empty read-only `.codex` directory by itself is only
+private history. The admission consists of the exact receipt plus its separate
+receipt-digest marker, so deleting either one after initialization is
+distinguishable from a pristine pre-init root. An empty read-only `.codex`
+directory by itself is only
 `plugin-managed-unattested`; after valid kickoff it maps to aggregate
 `host-repository-init-required`, whose sole next action is the read-only,
 plugin-local host-init planner. It never maps to `ready` and therefore cannot
-admit guarded project writes.
+admit guarded project writes. A present malformed/drifted receipt, or a marker
+without its receipt, maps to terminal `projection-drift` with `nextAction:
+null`; initialization is never offered again for that state.
 
 Runtime initialization reuses the existing V3 migration planner/apply engine
 with `initializeMissingRuntime: true`, but the public command is owned by
@@ -914,7 +920,8 @@ The required fixture outcomes are exact:
 | runtime apply preimage drift or transactional failure | `projection-drift` or `runtime-target-read-only` according to the observed cause | runtime | exact mapped action; complete rollback |
 | same process presents barrier | `restart-required` | runtime `restart-required` | restart-process |
 | fresh ticket plus valid host receipt | `kickoff-required` when pristine; otherwise the next controlling row | runtime `readback-current` | collect goal when pristine |
-| host receipt unavailable/invalid/replayed | `runtime-readback-unavailable` | runtime `readback-unavailable` | `null` |
+| native restart ticket/readback unavailable, invalid, or replayed | `runtime-readback-unavailable` | runtime `readback-unavailable` | `null` |
+| existing host-init receipt/marker missing counterpart, invalid, or drifted | `projection-drift` | runtime `projection-drift` | `null`; repair the existing host-init admission, never repeat initialization |
 | absent sanctioned state | `kickoff-required` | continuity `absent-pristine` | collect goal |
 | malformed/orphan/incomplete sanctioned state | `continuity-damaged` | continuity `damaged` | continuity inspect |
 | read-only/invalid Git controls | `repository-mount-read-only` or `repository-control-path-invalid` according to the exact repository mapping | repository | `null` |
@@ -933,7 +940,11 @@ declared Codex shell/file mutation entry point have denial coverage for their
 controlling non-ready classes plus a `ready` allow fixture. The tests also
 assert that the hook manifest makes no unsupported native agent-launch claim.
 Completed-stage replay asserts zero unintended writes and an identical
-canonical response.
+canonical response. Disposable-worktree rollback first atomically quarantines
+the exact recorded tree, then atomically captures each leaf into a fresh
+cleanup name before validating and deleting it. A replacement between
+validation and capture is restored/preserved and fails the capability instead
+of being unlinked.
 
 Each fixture asserts both zero unintended writes and the exact typed next
 action where applicable.

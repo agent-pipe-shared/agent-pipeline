@@ -23,7 +23,7 @@ import {
 } from "../lib/codex-onboarding-runtime.mjs";
 import {
   hasCodexRuntimeControlMount,
-  readCodexHostRepositoryInitAdmission,
+  observeCodexHostRepositoryInitAdmission,
 } from "../lib/codex-host-layout.mjs";
 
 const SCHEMA = "pipeline.v3-bootstrap-authority.v1";
@@ -56,15 +56,15 @@ function isHostManagedCodexProjection(plan, inspection) {
 }
 
 function pluginManagedCodexProjectionState(root, plan, inspection, deps) {
-  let durableHostInit = false;
+  let admissionStatus = "absent";
   try {
-    durableHostInit = readCodexHostRepositoryInitAdmission(root, {
+    admissionStatus = observeCodexHostRepositoryInitAdmission(root, {
       lstat: deps.lstatSync,
       readFile: deps.readFileSync,
       platform: deps.process?.platform,
-    }) !== null;
+    }).status;
   } catch {
-    durableHostInit = false;
+    admissionStatus = "invalid";
   }
   const exactProjection = inspection.sourceKind === "v3"
     && plan.status === "ready"
@@ -79,7 +79,8 @@ function pluginManagedCodexProjectionState(root, plan, inspection, deps) {
     lstat: deps.lstatSync,
     readdir: deps.readdirSync,
   });
-  if (durableHostInit) return "receipt-attested";
+  if (admissionStatus === "valid") return "receipt-attested";
+  if (admissionStatus === "invalid") return reservedMount ? "receipt-invalid" : null;
   return reservedMount ? "reserved-unattested" : null;
 }
 
@@ -227,20 +228,36 @@ export function validateV3BootstrapAuthority({ rootDir = process.cwd(), deps = {
     deps,
   );
   if (pluginManagedState) {
+    const invalidAdmission = pluginManagedState === "receipt-invalid";
     return {
       schema: SCHEMA,
-      status: pluginManagedState === "receipt-attested" ? "ready" : "host-init-required",
+      status: pluginManagedState === "receipt-attested"
+        ? "ready"
+        : invalidAdmission
+          ? "projection-drift"
+          : "host-init-required",
       root: inspection.root,
       source: inspection.source,
       sourceKind: "v3",
       sourceSha256: inspection.sourceSha256,
-      runtimeProjection: pluginManagedState === "receipt-attested"
-        ? "plugin-managed"
-        : "plugin-managed-unattested",
-      runtimeReadback: pluginManagedState === "receipt-attested"
-        ? "plugin-provided"
-        : "absent",
-      diagnostics: [],
+      runtimeProjection: invalidAdmission
+        ? "plugin-managed-invalid"
+        : pluginManagedState === "receipt-attested"
+          ? "plugin-managed"
+          : "plugin-managed-unattested",
+      runtimeReadback: invalidAdmission
+        ? "invalid"
+        : pluginManagedState === "receipt-attested"
+          ? "plugin-provided"
+          : "absent",
+      diagnostics: invalidAdmission
+        ? [diagnostic(
+          "$.runtime",
+          "host_init_admission_invalid",
+          "the existing host initialization admission is invalid or stale",
+          "repair the host initialization receipt and control layout before retrying",
+        )]
+        : [],
     };
   }
   if (hostManagedCalibration && isHostManagedCodexProjection(plan, inspection)) {

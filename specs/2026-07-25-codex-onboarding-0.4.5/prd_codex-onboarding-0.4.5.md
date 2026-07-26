@@ -9,7 +9,7 @@
 > reliable project work. Approval authorizes implementation dispatch only; it
 > does not authorize push, merge, tag, publication, Issue closure, or release.
 
-<!-- technical-spec-sha256: c49b01d6b431e5571f6e7e24fc6af0494d46cc50c095b621cb95a0c2722735ee -->
+<!-- technical-spec-sha256: 9778003693e1c6f16745d3cef81b495fed2599b44b50a470d899df4cb8a1b512 -->
 
 The technical approval binds the exact neighboring [spec.md](spec.md). Any
 change to that file after approval invalidates the implementation gate until

@@ -129,9 +129,11 @@ restart so Codex remounts the new repository. Only the exact durable host-init
 admission bound to the current root, authority, kickoff artifacts, and private
 history promotes the fresh session to `local-valid-writable` plus
 `plugin-managed`; it must not request a runtime initialization, native
-readback, or second restart. A different read-only target, missing or drifted
-receipt, or any non-empty/colliding reserved path still fails closed with the
-typed target/layout diagnostic.
+readback, or second restart. The initializer persists a separate digest marker
+for its receipt. A present invalid/drifted receipt, or either half missing
+after initialization, maps to terminal `projection-drift` with no repeat-init
+action. A different read-only target or any non-empty/colliding reserved path
+still fails closed with the typed target/layout diagnostic.
 
 This argv contract is runner- and platform-neutral. Codex uses the host action
 only for its reserved-control-mount case; Claude keeps its normal local Git

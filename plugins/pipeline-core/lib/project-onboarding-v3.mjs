@@ -21,7 +21,7 @@ import {
   hasCodexGitControlMount,
   hasCodexHostControlLayout,
   hasCodexRuntimeControlMount,
-  readCodexHostRepositoryInitAdmission,
+  observeCodexHostRepositoryInitAdmission,
 } from "./codex-host-layout.mjs";
 import { appServerNextAction, observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
 import { observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilities.mjs";
@@ -480,12 +480,33 @@ function pluginManagedCodexRuntime(root, fs) {
     readdir: fs.readdirSync,
   });
   if (!reserved) return null;
-  const admission = readCodexHostRepositoryInitAdmission(root, {
+  const admission = observeCodexHostRepositoryInitAdmission(root, {
     lstat: fs.lstatSync,
     readFile: fs.readFileSync,
     platform: fs.process?.platform,
   });
-  return admission === null ? "reserved-unattested" : "receipt-attested";
+  if (admission.status === "valid") return "receipt-attested";
+  return admission.status === "invalid" ? "receipt-invalid" : "reserved-unattested";
+}
+
+function pluginManagedAdmissionDriftResult({ root, intent, repository, sourceSha256 }) {
+  return lifecycleResult({
+    status: "projection-drift",
+    root,
+    intent,
+    repository,
+    runtime: {
+      ...emptyRuntime("projection-drift"),
+      sourceSha256: sourceSha256 ?? null,
+    },
+    nextAction: null,
+    diagnostics: [lifecycleDiagnostic(
+      "$.runtime",
+      "projection_drift",
+      "an existing Codex host-initialization receipt is invalid or no longer bound to the current authority",
+      "repair the host-initialization receipt and control layout before retrying; do not repeat initialization",
+    )],
+  });
 }
 
 function commandAction(argv, mutation, requiresConfirmation, schema, statuses) {
@@ -950,6 +971,14 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
         // declared broken merely because it cannot materialize hidden bytes.
         const pluginRuntime = pluginManagedCodexRuntime(legacy.root, fs);
         if (pluginRuntime) {
+          if (pluginRuntime === "receipt-invalid") {
+            return pluginManagedAdmissionDriftResult({
+              root: legacy.root,
+              intent,
+              repository,
+              sourceSha256: migrated.sourceSha256,
+            });
+          }
           return afterRuntimeLifecycleResult({
             root: legacy.root,
             intent,
@@ -1020,6 +1049,15 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
           sourceSha256: authority.sourceSha256 ?? null,
         },
       }, fs);
+    }
+    if (authority.status === "projection-drift"
+      && authority.runtimeProjection === "plugin-managed-invalid") {
+      return pluginManagedAdmissionDriftResult({
+        root: legacy.root,
+        intent,
+        repository,
+        sourceSha256: authority.sourceSha256,
+      });
     }
     if (["projection-current", "restart-required", "ready"].includes(authority.status)
       || authority.runtimeProjection === "noop") {

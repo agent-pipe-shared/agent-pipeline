@@ -37,8 +37,9 @@ the before/after assertion are recorded in
   host Git initialization. It creates `main` without a commit, preserves the
   private continuity binding, and asks for one project-session restart.
 - The post-restart protected Git view is admitted only through the exact
-  root-, authority-, and history-bound host-init receipt. Copied, malformed,
-  permission-weakened, or drifted receipts fail closed.
+  root-, authority-, and history-bound host-init receipt plus its separate
+  receipt-digest marker. Missing counterparts, copied, malformed,
+  permission-weakened, or drifted admissions fail closed.
 - The lifecycle PreToolUse adapter accepts the exact session-ready V4 result or
   that narrowly bound host-init compatibility admission only for the two
   authenticated cross-view repository-control failures. App-Server, runtime,
@@ -72,7 +73,7 @@ The following original Issue #61 ambitions are not completion claims for
 - live, in-process invalidation of a persistent Codex App-Server plugin catalog
   after an external `codex plugin add`;
 - a Codex-native cross-view session attestation that removes the temporary
-  host-init receipt fallback in the lifecycle guard;
+  host-init admission-pair fallback in the lifecycle guard;
 - automatic refresh of a stale skill/hook catalog by code already loaded from
   the removed cache generation;
 - native Codex hook interception for every implementation, Goldfish, or
@@ -133,8 +134,8 @@ session may still retain that daemon snapshot. Codex CLI has no
 
 Codex 0.145 can also expose different physical Git-control views to bootstrap
 commands and PreToolUse hooks. 0.4.5 bridges the initialized fresh-root case
-with a strict private host-init receipt, but that is a compatibility admission,
-not a native cross-view session attestation.
+with a strict private host-init receipt plus receipt-digest marker, but that is
+a compatibility admission, not a native cross-view session attestation.
 
 The 0.4.5 Codex hook manifest also covers the supported shell/file mutation
 surface used by this onboarding flow. A future native contract must enumerate
@@ -158,7 +159,7 @@ to bootstrap and hooks.
 - Never prescribe Claude's `/reload-plugins` command to Codex.
 - Retain the old loaded cache generation until its hook/skill handoff can
   complete, or provide an equivalent stable native resolver.
-- Replace the 0.4.5 host-init guard receipt fallback with a native cross-view
+- Replace the 0.4.5 host-init guard admission-pair fallback with a native cross-view
   session attestation.
 - Declare and enforce supported Codex hook events for implementation,
   Goldfish, and subagent launch paths, not only shell/file mutation tools.

@@ -6,13 +6,13 @@
     "phase": "implementation"
   },
   "planApproved": true,
-  "updatedAt": "2026-07-26T02:16:07.384Z",
+  "updatedAt": "2026-07-26T02:46:46.998Z",
   "planApproval": {
     "schema": "pipeline.plan-approval.v2",
     "approvedBy": "PO",
-    "approvedAt": "2026-07-26T02:16:07.384Z",
+    "approvedAt": "2026-07-26T02:46:46.998Z",
     "specBoundBy": "PO",
-    "specBoundAt": "2026-07-26T02:16:07.384Z",
+    "specBoundAt": "2026-07-26T02:46:46.998Z",
     "poGateAuthority": {
       "schema": "pipeline.po-gate-authority.v2",
       "humanFacing": "en",
@@ -21,9 +21,9 @@
       "receiptSha256": "c4fc5171dc507a81908b30137bbf537355626f957d1ccbb9bee3a8ae9db02aa2",
       "repositoryFingerprint": "6af2655d04c85a0e2faff67dedc2116a845874502dbe31c20e4c28372ea7885f",
       "planPath": "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md",
-      "planSha256": "9a4e8ff9871a446cb495e7187ec1186a3cc940562d1eeb900d2f984cf8e928cd",
+      "planSha256": "7e139874960a93ffbb1c4b202a4503c94240dea0cdf4189b92a23e4310fcb0f6",
       "specPath": "specs/2026-07-25-codex-onboarding-0.4.5/spec.md",
-      "specSha256": "c49b01d6b431e5571f6e7e24fc6af0494d46cc50c095b621cb95a0c2722735ee"
+      "specSha256": "9778003693e1c6f16745d3cef81b495fed2599b44b50a470d899df4cb8a1b512"
     }
   }
 }
