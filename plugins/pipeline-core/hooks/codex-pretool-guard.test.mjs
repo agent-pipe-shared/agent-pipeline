@@ -125,6 +125,28 @@ check("multiple Bash guard denials are aggregated into one Codex decision", () =
   assert.match(output.permissionDecisionReason, /guard-push/);
 });
 
+check("Codex routes a documented Git override prefix to the Push-Gate's actual command", () => {
+  const root = fixture();
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), [
+    "schema: pipeline.manifest.v0",
+    "gates:",
+    "  push:",
+    "    mode: blocking",
+    "    type: human",
+    "    approval: standing-approved",
+    "",
+  ].join("\n"));
+  const output = decision(run({
+    tool_name: "Bash",
+    tool_input: {
+      command: 'PIPELINE_GUARD_OVERRIDE="GG-03|20260726-codex-adapter|PO-approved fixture" git push origin deadbeef:refs/heads/main',
+    },
+  }, root));
+  assert.equal(output.permissionDecision, "deny");
+  assert.match(output.permissionDecisionReason, /push repository cannot be resolved to a non-bare worktree/u);
+  assert.doesNotMatch(output.permissionDecisionReason, /push command prefix is ambiguous/u);
+});
+
 check("ordinary ungoverned shell commands do not start heavyweight guards", () => {
   const root = mkdtempSync(join(tmpdir(), "codex-pretool-plain-"));
   const result = run({ tool_name: "Bash", tool_input: { command: "pwd" } }, root);

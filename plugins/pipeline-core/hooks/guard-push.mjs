@@ -105,13 +105,30 @@ function manifestFindingText(finding) {
 }
 
 // ---- read tool input (fail-open) --------------------------------------------------
-let cmd = "";
+let rawCommand = "";
 try {
   const input = JSON.parse(readFileSync(0, "utf8"));
-  cmd = String(input?.tool_input?.command ?? "");
+  rawCommand = String(input?.tool_input?.command ?? "");
 } catch {
   process.exit(0); // fail-open: guard is a safety net, not a prison
 }
+if (!rawCommand) process.exit(0);
+
+/**
+ * `guard-git` owns validation and one-time consumption of the documented
+ * override. The push gate must inspect the command the shell will execute,
+ * rather than treating that valid leading environment assignment as an
+ * ambiguous executable. This preserves the strict one-push grammar for every
+ * host adapter that invokes both guards on the same Bash input.
+ */
+function commandAfterDocumentedOverridePrefix(command) {
+  const bash = command.match(/^PIPELINE_GUARD_OVERRIDE=(?:'[^']*'|"[^"]*"|\S+)\s+([\s\S]*)$/u);
+  if (bash) return bash[1] ?? command;
+  const powerShell = command.match(/^\$env:PIPELINE_GUARD_OVERRIDE\s*=\s*(?:'[^']*'|"[^"]*")\s*;\s*([\s\S]*)$/iu);
+  return powerShell ? (powerShell[1] ?? command) : command;
+}
+
+const cmd = commandAfterDocumentedOverridePrefix(rawCommand);
 if (!cmd) process.exit(0);
 
 // ---- push detection (shared normalization with guard-git.mjs) ----------------------

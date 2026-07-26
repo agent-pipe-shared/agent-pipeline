@@ -191,6 +191,18 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   check("PG03 allow  push gate mode off", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
 }
 {
+  const { dir, head } = freshRepo("inline-override-prefix");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check(
+    "PG03a allow  documented inline override prefix still binds the one explicit push",
+    `PIPELINE_GUARD_OVERRIDE="GG-03|20260726-test|PO-approved fixture" git push origin ${head}:refs/heads/main`,
+    dir,
+    ALLOW,
+    { stderrEmpty: true },
+  );
+}
+{
   const { dir } = freshRepo("opt-in-ambiguous");
   check("PG03b allow  structural policy remains opt-in without a manifest", "git add README.md && git push", dir, ALLOW, {
     stderrEmpty: true,
