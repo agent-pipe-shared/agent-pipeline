@@ -9,7 +9,7 @@
 > reliable project work. Approval authorizes implementation dispatch only; it
 > does not authorize push, merge, tag, publication, Issue closure, or release.
 
-<!-- technical-spec-sha256: 7cdd23eaa43242ac078eaa8fc5aa93993d162fab29fbac362ad1acc636e3aa77 -->
+<!-- technical-spec-sha256: c35f653679b9b6e79446208b4b29a423b5c9c0d64dfef52dde02a16a10ead130 -->
 
 The technical approval binds the exact neighboring [spec.md](spec.md). Any
 change to that file after approval invalidates the implementation gate until
@@ -254,9 +254,11 @@ declared by 0.4.5; it does not permit a fabricated hook capability.
       cleanup atomically capture and preserve raced replacements. Validated
       writer-owned cleanup captures leave the active namespace and remain in
       private non-authoritative quarantine because Node exposes no
-      identity-bound unlink. An exact retry repeats failed file and directory
-      durability work, and persistence failure remains distinguishable from
-      preimage drift.
+      identity-bound unlink. Directory captures additionally require unchanged
+      empty membership. An exact retry repeats failed file and directory
+      durability work, and every transaction-file persistence failure retains
+      the specific Git-control preparation classification rather than falling
+      through to a generic host failure.
 - [ ] The physical Git postimage is carried only by the closed v2 receipt;
       unpublished unbound v1 test receipts are terminal invalid, and released
       0.4.4 compatibility is unaffected because it issued no such receipt.

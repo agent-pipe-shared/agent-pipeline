@@ -358,8 +358,9 @@ function removeCreatedFile(path, expected, fs = {}, expectedBytes = null, quaran
 
 function removeCreatedDirectory(path, expected, fs = {}, quarantineParent) {
   const exists = fs.existsSync ?? existsSync;
+  const readdir = fs.readdirSync ?? readdirSync;
   if (!exists(path)) return;
-  if (!samePhysicalIdentity(path, expected, fs)) {
+  if (!samePhysicalIdentity(path, expected, fs) || readdir(path).length !== 0) {
     throw new Error("created host-init directory changed identity before rollback");
   }
   const parent = dirname(path);
@@ -377,6 +378,7 @@ function removeCreatedDirectory(path, expected, fs = {}, quarantineParent) {
   const capturedIdentity = physicalIdentity((fs.lstatSync ?? lstatSync)(capture), "directory");
   try {
     if (!samePhysicalIdentity(capture, expected, fs)
+      || readdir(capture).length !== 0
       || !samePhysicalIdentity(parent, parentIdentity, fs)
       || !samePhysicalIdentity(quarantine.path, quarantine.identity, fs)) {
       throw new Error("created host-init directory changed during cleanup capture");
@@ -940,7 +942,25 @@ export function applyHostRepositoryInit({
       || (exists(join(root, ".git")) && !resuming)) {
       return { schema: APPLY_SCHEMA, status: "host-preimage-changed", root, diagnostics: [{ code: "reserved_host_path_present" }] };
     }
-    const transaction = prepareTransaction(root, planSha256, deps);
+    let transaction;
+    try {
+      transaction = prepareTransaction(root, planSha256, deps);
+    } catch (error) {
+      if (!(error instanceof HostInitDriftError)) {
+        return {
+          schema: APPLY_SCHEMA,
+          status: "apply-failed",
+          root,
+          diagnostics: [{ code: "git_control_preparation_failed" }],
+        };
+      }
+      return {
+        schema: APPLY_SCHEMA,
+        status: "host-preimage-changed",
+        root,
+        diagnostics: [{ code: "pending_git_control_drift" }],
+      };
+    }
     const spawn = deps.spawnSync ?? spawnSync;
     const observed = spawn("git", ["--version"], { cwd: root, encoding: "utf8" });
     const currentGitVersion = !observed.error && observed.status === 0 ? parseGitVersion(observed.stdout) : null;

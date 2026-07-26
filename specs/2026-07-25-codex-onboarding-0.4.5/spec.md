@@ -368,13 +368,16 @@ each pending artifact was created or validated, atomically renames the object
 out of the active namespace into a fresh private quarantine, and revalidates
 it there. The validated capture is retained rather than passed to a final
 pathname-based unlink, because Node exposes no primitive that binds unlink to
-the revalidated inode; any replacement is preserved, and drift reports
-`pending_cleanup_retained`. Storage/fsync failure maps to `apply-failed` /
-`git_control_preparation_failed`, not preimage drift. An exact retry with an
-existing transaction intent, reservation, or initialized proof repeats that
-file's fsync plus Git and pending-directory fsync before admission
-publication; visible exact bytes alone cannot skip a failed durability
-boundary.
+the revalidated inode. Directory captures require the exact recorded physical
+identity and unchanged empty membership both before and after atomic capture;
+any replacement or unexpected child is preserved, and drift reports
+`pending_cleanup_retained`. Storage/fsync failure for the pending intent,
+reservation, initialized proof, Git tree, or pending directory maps to
+`apply-failed` / `git_control_preparation_failed`, not preimage drift or the
+generic host failure. An exact retry with an existing transaction intent,
+reservation, or initialized proof repeats that file's fsync plus Git and
+pending-directory fsync before admission publication; visible exact bytes
+alone cannot skip a failed durability boundary.
 
 Receipt v1 was emitted only by unpublished local 0.4.5 test candidates and
 lacks the physical Git postimage. The release candidate does not accept or

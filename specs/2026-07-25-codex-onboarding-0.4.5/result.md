@@ -49,12 +49,14 @@ the before/after assertion are recorded in
   raced replacements are retained, and writer-owned captures are retired from
   the active namespace into private non-authoritative quarantine instead of
   making an unsupported pathname-unlink safety claim. Persistence failures
-  remain distinct from preimage drift. An exact retry repeats failed file and
-  directory fsync boundaries before admission. Rollback additionally binds
-  marker, receipt, intent, and migrated continuity to their exact created
-  bytes, not only inode identity. The physical postimage uses receipt v2;
-  unbound v1 receipts from unpublished local candidates are terminal invalid,
-  while released 0.4.4 issued no host-init receipt.
+  remain distinct from preimage drift and generic host failure. Directory
+  capture also binds unchanged empty membership, so an unexpected child is
+  retained and diagnosed. An exact retry repeats failed file and directory
+  fsync boundaries before admission. Rollback additionally binds marker,
+  receipt, intent, and migrated continuity to their exact created bytes, not
+  only inode identity. The physical postimage uses receipt v2; unbound v1
+  receipts from unpublished local candidates are terminal invalid, while
+  released 0.4.4 issued no host-init receipt.
 - The lifecycle PreToolUse adapter accepts the exact session-ready V4 result or
   that narrowly bound host-init compatibility admission only for the two
   authenticated cross-view repository-control failures. App-Server, runtime,

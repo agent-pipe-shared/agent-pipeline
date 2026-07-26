@@ -603,6 +603,41 @@ test("successful cleanup preserves a pending directory replaced after validation
   assert.equal(existsSync(originalTemplate), true);
 });
 
+test("successful cleanup reports and preserves unexpected directory membership", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const template = join(
+    root,
+    CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY,
+    "git-template",
+  );
+  const foreign = join(template, "foreign");
+  const result = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        completeGitInit(options.cwd);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      faultInjector(point, context) {
+        if (point === "before-host-init-cleanup-capture"
+          && context?.path === template && !existsSync(foreign)) {
+          writeFileSync(foreign, "preserve\n");
+        }
+      },
+    },
+  });
+  assert.equal(result.status, "restart-required");
+  assert.deepEqual(result.diagnostics, [{ code: "pending_cleanup_retained" }]);
+  assert.equal(readFileSync(foreign, "utf8"), "preserve\n");
+});
+
 test("successful cleanup retires captures without a final pathname unlink", () => {
   const root = fixture();
   const plan = planHostRepositoryInit({
@@ -879,6 +914,70 @@ test("retry repeats a failed initialized-proof file fsync before admission", () 
   });
   assert.equal(retried.status, "restart-required");
   assert.equal(initializedSyncAttempts, 2);
+});
+
+test("retry classifies a failed intent-file fsync as Git-control preparation failure", () => {
+  const root = fixture();
+  const plan = planHostRepositoryInit({
+    rootDir: root,
+    deps: { inspectProjectOnboardingV3: () => readyInspection(root) },
+  });
+  const interrupted = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      spawnSync(command, args, options) {
+        if (args[0] === "--version") return { status: 0, stdout: "git version 2.40.1\n", stderr: "" };
+        completeGitInit(options.cwd);
+        return { status: 0, stdout: "", stderr: "" };
+      },
+      faultInjector(point) {
+        if (point === "before-host-init-admission-rename") {
+          throw new Error("synthetic process interruption");
+        }
+        if (point === "before-host-init-cleanup-capture") {
+          throw new Error("simulate process loss before rollback");
+        }
+      },
+    },
+  });
+  assert.equal(interrupted.status, "rollback-failed");
+  const intentPath = join(
+    root,
+    CODEX_HOST_REPOSITORY_INIT_PENDING_DIRECTORY,
+    "intent.json",
+  );
+  let intentDescriptor = null;
+  let failed = false;
+  const retried = applyHostRepositoryInit({
+    rootDir: root,
+    planSha256: plan.planSha256,
+    activate: true,
+    deps: {
+      openSync(path, flags, mode) {
+        const descriptor = openSync(path, flags, mode);
+        if (path === intentPath) intentDescriptor = descriptor;
+        return descriptor;
+      },
+      fsyncSync(descriptor) {
+        if (descriptor === intentDescriptor && !failed) {
+          failed = true;
+          const error = new Error("synthetic intent fsync failure");
+          error.code = "EIO";
+          throw error;
+        }
+        return fsyncSync(descriptor);
+      },
+      closeSync(descriptor) {
+        if (descriptor === intentDescriptor) intentDescriptor = null;
+        return closeSync(descriptor);
+      },
+    },
+  });
+  assert.equal(retried.status, "apply-failed");
+  assert.deepEqual(retried.diagnostics, [{ code: "git_control_preparation_failed" }]);
+  assert.equal(existsSync(join(root, CODEX_HOST_REPOSITORY_INIT_DIRECTORY)), false);
 });
 
 test("Git-tree read failures remain operational rather than preimage drift", () => {

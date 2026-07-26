@@ -127,10 +127,12 @@ Cleanup first atomically renames each recorded object to a fresh quarantine
 name outside the active transaction namespace and revalidates its recorded
 identity and bytes there. Validated captures are retained in that private,
 non-authoritative quarantine instead of being passed to a final pathname
-unlink that cannot be inode-bound by Node. Operational persistence failures
-remain distinct from preimage drift, and a retry repeats exact
-transaction-file fsync plus Git and pending-directory fsync before it may
-publish admission.
+unlink that cannot be inode-bound by Node. Directory captures also require
+unchanged empty membership before and after capture, so an added child is
+preserved and reported rather than silently relocated as clean. Operational
+persistence failures remain distinct from preimage drift and generic host
+failure, and a retry repeats exact transaction-file fsync plus Git and
+pending-directory fsync before it may publish admission.
 Disposable-worktree rollback first renames the exact
 recorded tree into quarantine. Each recorded leaf is then atomically renamed
 to a fresh cleanup name and revalidated there before unlink/rmdir; a
