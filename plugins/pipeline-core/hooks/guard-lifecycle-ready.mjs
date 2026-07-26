@@ -255,16 +255,12 @@ function commandPath(value, root) {
 export function isForbiddenCrossRepositoryMutation(command, root, dependencies = {}) {
   const words = parseSimpleShellWords(command, root);
   // The simple-word parser intentionally rejects redirection.  Detect an
-  // absolute or parent-relative redirection target before its rejection can
-  // turn into a ready-session escape from the project root.
+  // unquoted redirect before its rejection can turn into a ready-session
+  // escape from the project root.  The guard deliberately does not attempt
+  // to parse shell descriptor chaining: only the constrained simple-command
+  // form has project-scoped ready-session authority.
   if (!words || words.length === 0) {
-    const redirects = [...command.matchAll(/\d*(?:>>?|<>|>&|<&)\s*["']?([^\s"']+)/gu)];
-    if (redirects.length === 0) return false;
-    return redirects.some((redirect) => {
-      const target = redirect[1];
-      return target.includes("$") || target.includes("`") || target.includes("(")
-        || !pathInside(root, resolve(root, target));
-    });
+    return /[<>]/u.test(command);
   }
   const exists = dependencies.existsSyncFn ?? existsSync;
   const executable = basename(words[0]).toLowerCase();

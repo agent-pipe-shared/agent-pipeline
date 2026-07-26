@@ -45,7 +45,7 @@ function write(filePath = "src/implementation.mjs") {
   return { tool_name: "Write", tool_input: { file_path: filePath } };
 }
 
-function bash(command = "printf implementation > src/output.txt") {
+function bash(command = "printf implementation") {
   return { tool_name: "Bash", tool_input: { command } };
 }
 
@@ -193,6 +193,7 @@ test("consumer sessions cannot mutate Pipeline sources, cachebusters or plugin i
       "printf x > ./../foreign/plugin.json",
       "printf x 2>&1 > ./../foreign/plugin.json",
       "printf x>./../foreign/plugin.json",
+      "printf x 2>&1>./../foreign/plugin.json",
     ];
     for (const command of commands) {
       assert.equal(isForbiddenCrossRepositoryMutation(command, path), true, command);
