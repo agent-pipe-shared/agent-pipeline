@@ -50,8 +50,8 @@ Format based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/). Versio
   Critic-of-Critic loops.
 
 The multi-step installation ceremony and confirmation-count tuning remain
-owned by Issue #25; this hotfix does not broaden lifecycle mutations or
-delivery authority.
+owned by @skar667 (PO) in Issue #25, with expiry 2026-08-31; this hotfix does
+not broaden lifecycle mutations or delivery authority.
 
 ## [0.4.5] — 2026-07-26
 
