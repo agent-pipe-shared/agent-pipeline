@@ -1836,7 +1836,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
       try {
         const barrier = readRestartBarrier({ rootDir: legacy.root, repositoryCapability: repository.mode, deps: fs });
         if (barrier.status === "present" && barrier.barrier.state === "restart-required") {
-          if (!runtimeRestartBindingCurrent(barrier.barrier)) {
+          if (!runtimeRestartBindingCurrent(barrier.barrier, { codexExecutable: fs.codexExecutable })) {
             return lifecycleResult({
               status: "runtime-attestation-required",
               root: legacy.root,
@@ -2206,7 +2206,7 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate) {
       rootDir: plan.root,
       sourceSha256: plan.sourceSha256,
       runtimeTargets,
-      codexExecutable: deps.codexExecutable,
+      codexExecutable: fs.codexExecutable,
     });
     // The barrier is durable before the target transaction begins. A crash in
     // either direction therefore blocks rather than claiming a loaded runtime.
