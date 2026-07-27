@@ -132,6 +132,16 @@ Design approval, implementation is limited to these paths:
 - `plugins/pipeline-core/scripts/forge-capability.schema.json`; and
 - `plugins/pipeline-core/scripts/external-mutation.schema.json`.
 
+The PO additionally approved the strictly local evidence-binding paths required
+to make the new B4 contract discoverable and candidate-bound:
+
+- `harness/scripts/verify.mjs` for the three B4 suite registrations;
+- `docs/product-capability-inventory.json` for the matching discovered-surface
+  inventory and capability mapping;
+- `specs/sprint-nova-epic/spec.md`, `lifecycle.json` and append-only
+  `result.md` for the exact path authority, artifact digests and sanitized
+  progress record.
+
 GitHub and GitLab adapters may use the common transport record but cannot
 interpret a successful push as a merge, release, issue or CI result. No other
 path changes, live-operation integration, credentials, network activation or

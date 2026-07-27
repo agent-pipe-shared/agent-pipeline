@@ -65,6 +65,9 @@ The PO accepted this manifest as one set through ADR-0049:
 
 - `docs/adr/0049-gitlab-ci-constrained-remote-executor-pilot.md`
 - `docs/adr/README.md`
+- `docs/gitlab-ci-pilot-threat-model.md`
+- `governance/observation-doc-governance.json` for that document's
+  maintainer/maintained classification
 - `specs/sprint-nova-epic/design/b2-i-gitlab-ci-pilot.md`
 - `plugins/pipeline-core/lib/gitlab-ci-execution-broker.mjs` and its test
 - `plugins/pipeline-core/scripts/gitlab-ci-execution-broker.mjs` and its test
