@@ -4,9 +4,9 @@
 |---|---|
 | Rigor level | 2 (core onboarding/guard-lifecycle logic, existing production files) |
 | Risk class | high (dispatch-gating logic; a wrong fix can either falsely block or falsely admit implementation work) |
-| Status | draft |
+| Status | implemented |
 | Date | 2026-07-26 |
-| Readiness check | not yet run — required before first dispatch per rigor 2 |
+| Readiness check | performed before first dispatch (see the "Correction after readiness check" and "New, from readiness check" notes in §2 and the Open items section below) and superseded by the now-complete, independently Critic-verified implementation; no separately filed readiness-check artifact exists beyond those inline corrections |
 | Related | `prd_claude-runner-onboarding.md` (same PO gate); discovered during the 0.4.6 rebase onto `feat/sprint-cyborg-claude` (`docs/state.md`, 2026-07-26 entries); no upstream GitHub issue — this is a Pipeline-self-application scope addition, same class as `windows-sandbox-assurance-slice-scope.md` |
 
 ---
@@ -166,13 +166,19 @@ runner=null     → unchanged: today's existing null/unsafe-path semantics
 | 9 | `plugins/pipeline-core/lib/project-onboarding-ready-gate.test.mjs` | modify | Add a fixture: a `ready` observation with `runner: "claude"` is accepted by `requireProjectOnboardingReady`; confirm an out-of-enum runner value still throws. |
 | 10 | `plugins/pipeline-core/lib/codex-onboarding-app-server.test.mjs` | modify | Add fixtures for the new `runner: "claude"` → `not-applicable` path; confirm Codex path unchanged. |
 | 11 | `plugins/pipeline-core/scripts/v3-bootstrap-authority.test.mjs` | create | No test file exists for this script today (confirmed absent) — this is net-new coverage, not a regression-safe modification of an established fixture pattern. Must cover: a Claude-runner fixture reaching `ready` without a restart-barrier artifact, AND enough of the existing Codex-path behavior (ready/host-init-required/projection-drift per §2) to prove #4's change didn't silently alter the Codex path, since no pre-existing test protects that today. |
+| 12 | `docs/product-capability-inventory.json` | modify | This repo's own self-application surface-coverage gate (HAW-A01/HAW-A02) required registering the new surfaces this package introduced: the `v3-bootstrap-authority-tests` verify-phase entry (added alongside the `verify.mjs` registration, commit `609b50e`) and the new `hooks.json` `PreToolUse:Edit\|Write` `guard-lifecycle-ready.mjs` hook surface (added under `claude-hook-safety`, commit `5dd5e6a`, after an interim registration in `8831854` was reverted in `fceab40` and corrected). |
+| 13 | `harness/scripts/verify.mjs` | modify | Registers `v3-bootstrap-authority.test.mjs` as a named `v3-bootstrap-authority-tests` entry in `TEST_SUITES` so the project's own aggregate verify gate actually exercises the only test coverage protecting `v3-bootstrap-authority.mjs` (closes Critic finding F2, major, commit `609b50e`). |
+| 14 | `plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs` | modify | Pre-existing test file (predates this package) extended twice: first with AC-8 fixtures proving the new Claude `Edit\|Write` wiring (commit `b2202ac`), then with an end-to-end no-stub proof of the governed+READY allow path and fail-closed coverage for a broken/malformed owned-key manifest (closes Critic findings F3 minor and F4 major, commit `984ebb5`). |
 
 No other file in the four investigated candidates
 (`runner-profiles-v3.mjs`, `runner-profile-migration-v3.mjs`,
 `config/runtime-projection-v3-owned-keys.json`) is touched by this package —
 per PRD Decision point 2 and the Alternatives table, `agent_runtime` wiring
 and owned-keys conditionality are explicitly deferred, not silently
-in-scope.
+in-scope. The table above now totals 14 items: the original 11 plus 3
+(items 12-14) that are post-implementation hardening and self-application-
+gate follow-ups discovered during Critic review, not silently expanded
+original scope.
 
 ### 5. Acceptance Criteria (EARS)
 
@@ -182,8 +188,18 @@ in-scope.
   `runner: "claude"` rather than returning `status: "invalid"`.
 - AC-2: WHEN a project's `pipeline.user.yaml` has `runners.default` set to a
   value outside the enum `["claude","codex"]`, THE SYSTEM SHALL still return
-  `status: "invalid"` with the existing diagnostic — this criterion proves
-  AC-1 narrowed the check rather than removed runner validation entirely.
+  `status: "invalid"` at the same JSON path (`$.source.runners.default`) with
+  the same error code (`source_invalid`) as before this package — this
+  criterion proves AC-1 narrowed the check rather than removed runner
+  validation entirely. The diagnostic *wording* itself was intentionally
+  changed (commit `88c8029`) to stay accurate now that the check is
+  enum-based rather than Codex-only, and this is not a regression: the
+  message text went from `"the selected runner is not Codex"` / `"select
+  Codex through the source authority"` to `"the selected runner is not one
+  registered, enabled runner"` / `"select one enabled registered runner
+  through the source authority"`. Per §6's level-2 spec-deviation-update
+  rule, this note documents that deliberate wording change; the
+  `status`/path/code invariants above are what AC-2 actually verifies.
 - AC-3: WHEN `observeOnboardingAppServer`/`observeReadyAppServer` is invoked
   with `runner: "claude"` for intent `bootstrap`, `session`, or `dispatch`,
   THE SYSTEM SHALL return `{required: false, status: "not-applicable", code:
