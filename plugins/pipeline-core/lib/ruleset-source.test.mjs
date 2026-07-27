@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
+import { readFileSync } from "node:fs";
 import {
   RULESET_SOURCE_SCHEMA,
   compareLoadedRulesetIdentity,
@@ -21,6 +22,25 @@ function record(id, ok, detail) {
 
 const SHA = "a".repeat(40);
 const OTHER_SHA = "b".repeat(40);
+const SHA256 = "c".repeat(64);
+const RULESET_SOURCE_JSON_SCHEMA = JSON.parse(
+  readFileSync(new URL("../schemas/ruleset-source.schema.json", import.meta.url), "utf8"),
+);
+
+function schemaAcceptsIdentity(identity) {
+  return RULESET_SOURCE_JSON_SCHEMA.$defs.identity.oneOf.some((variant) => {
+    if (typeof identity !== "object" || identity === null || Array.isArray(identity)) return false;
+    const properties = variant.properties ?? {};
+    if ((variant.required ?? []).some((key) => !Object.hasOwn(identity, key))) return false;
+    if (variant.additionalProperties === false && Object.keys(identity).some((key) => !Object.hasOwn(properties, key))) return false;
+    return Object.entries(properties).every(([key, property]) => {
+      if (!Object.hasOwn(identity, key)) return true;
+      if (Object.hasOwn(property, "const") && identity[key] !== property.const) return false;
+      return !property.pattern || (typeof identity[key] === "string" && new RegExp(property.pattern, "u").test(identity[key]));
+    });
+  });
+}
+
 function observation(overrides = {}) {
   return {
     schema: RULESET_SOURCE_SCHEMA,
@@ -31,6 +51,23 @@ function observation(overrides = {}) {
     installedIdentity: { status: "available", algorithm: "git-sha1", value: SHA },
     ...overrides,
   };
+}
+
+for (const { algorithm, valid, invalid } of [
+  { algorithm: "git-sha1", valid: SHA, invalid: SHA256 },
+  { algorithm: "git-sha256", valid: SHA256, invalid: SHA },
+  { algorithm: "content-sha256", valid: SHA256, invalid: SHA },
+]) {
+  for (const [kind, value] of [["valid", valid], ["invalid-length", invalid]]) {
+    const identity = { status: "available", algorithm, value };
+    const schemaAccepted = schemaAcceptsIdentity(identity);
+    const validatorAccepted = validateRulesetSource(observation({ loadedIdentity: identity })).valid;
+    record(
+      `identity-schema-validator-parity-${algorithm}-${kind}`,
+      schemaAccepted === validatorAccepted && schemaAccepted === (kind === "valid"),
+      `schemaAccepted=${schemaAccepted} validatorAccepted=${validatorAccepted}`,
+    );
+  }
 }
 
 for (const [runner, sourceClass] of [

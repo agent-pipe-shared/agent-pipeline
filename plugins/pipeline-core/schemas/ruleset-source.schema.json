@@ -63,12 +63,36 @@
           "required": ["status", "algorithm", "value"],
           "properties": {
             "status": { "const": "available" },
-            "algorithm": {
-              "enum": ["git-sha1", "git-sha256", "content-sha256"]
-            },
+            "algorithm": { "const": "git-sha1" },
             "value": {
               "type": "string",
-              "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$"
+              "pattern": "^[0-9a-f]{40}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "algorithm", "value"],
+          "properties": {
+            "status": { "const": "available" },
+            "algorithm": { "const": "git-sha256" },
+            "value": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "algorithm", "value"],
+          "properties": {
+            "status": { "const": "available" },
+            "algorithm": { "const": "content-sha256" },
+            "value": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
             }
           }
         },
