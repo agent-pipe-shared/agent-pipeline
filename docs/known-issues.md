@@ -76,3 +76,8 @@ After that PO-approved contract revision received its renewed Plan/Spec gate,
 the same session authorization reactivated only TP-1, TP-3, and TP-5 for the
 single renewed PHX-0A dispatch. The rules remain subject to the same immediate
 restoration requirement before independent review and final gates.
+
+That renewed dispatch restored the rules without a code commit after the
+repository topology validator exposed stale authority digests in the existing
+Phoenix draft lifecycle manifest. The pending worktree remains subject to a
+separate exact PO disposition for that manifest reconciliation.
