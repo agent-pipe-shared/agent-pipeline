@@ -186,6 +186,16 @@ Nova A is accepted only when:
 
 ## Nova B issue acceptance
 
+### `#60` Runner-native continuation
+
+- NVA-B60-1: An active work item projects only one generation-bound native goal
+  and receives an exact native readback before continuation is claimed.
+- NVA-B60-2: A Codex native `blocked` readback stops automation and persists as
+  `typed-blocker` evidence with its goal identity, generation and observation.
+- NVA-B60-3: The user-facing notice distinguishes same-blocker CLI resume from
+  a changed objective, which requires `/goal <new objective>`; the Pipeline
+  never silently resumes or replaces the goal.
+
 ### `#21` Local worker pool
 
 - NVA-B21-1: A capable test host can execute a conflict-free wave larger than

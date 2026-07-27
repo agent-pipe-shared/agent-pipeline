@@ -1,5 +1,14 @@
 # Sprint Nova Epic — Result
 
+## 2026-07-27 — B0 Codex blocked-goal continuation correction
+
+Status: `branch-candidate-implemented`.
+
+Codex native `blocked` is retained as a typed blocker with an exact readback,
+not degraded to generic adapter unavailability. The user notice distinguishes
+resuming the same resolved blocker from setting a new short objective with
+`/goal <new objective>`. No replacement goal is created by the Pipeline.
+
 ## 2026-07-27 — B3-A Antigravity Alpha scope adjustment
 
 Status: `approved-alpha-boundary; direct-agy-follow-up-open`.
