@@ -105,6 +105,10 @@ export function observePipelineStartPreflight({
   const sourceReady = rulesetSource?.schema === "pipeline.codex-ruleset-source-observation.v1"
     && rulesetSource.status === "ready"
     && rulesetSource.observation !== null;
+  const selectedPluginVersion = rulesetSource?.observation?.selectedPlugin?.version;
+  const sourceVersionBound = sourceReady
+    && selectedPluginVersion === version
+    && (installedVersion === null || selectedPluginVersion === installedVersion);
   const ticket = Object.prototype.hasOwnProperty.call(env, "PIPELINE_CODEX_ONBOARDING_TICKET_ID")
     && String(env.PIPELINE_CODEX_ONBOARDING_TICKET_ID) !== "";
   const token = Object.prototype.hasOwnProperty.call(env, "PIPELINE_CODEX_ONBOARDING_TOKEN")
@@ -114,7 +118,7 @@ export function observePipelineStartPreflight({
   const executionBoundary = wsl ? "host-authorized-wsl" : "default";
   const status = !version
     ? "plugin-identity-unavailable"
-    : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version || !sourceReady
+    : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version || !sourceVersionBound
       ? "plugin-refresh-required"
       : "ready";
   return {

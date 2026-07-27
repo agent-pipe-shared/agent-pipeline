@@ -10,13 +10,13 @@ import {
 } from "./pipeline-start-preflight.mjs";
 
 const manifest = JSON.stringify({ version: "0.4.5+test" });
-const source = (status = "ready") => ({
+const source = (status = "ready", selectedPluginVersion = "0.4.5+test") => ({
   schema: "pipeline.codex-ruleset-source-observation.v1",
   status,
   observation: status === "ready" ? {
     schema: "pipeline.ruleset-source.v1",
     runner: "codex",
-    selectedPlugin: { id: "pipeline-core@agent-pipeline", version: "0.4.5+test" },
+    selectedPlugin: { id: "pipeline-core@agent-pipeline", version: selectedPluginVersion },
     source: { class: "marketplace-public" },
     loadedIdentity: { status: "available", algorithm: "git-sha1", value: "a".repeat(40) },
     installedIdentity: { status: "available", algorithm: "git-sha1", value: "a".repeat(40) },
@@ -234,6 +234,28 @@ test("preflight binds the normalized Codex observation and fails closed on its d
     assert.deepEqual(rejected.rulesetSource, { status, observation: null });
     assert.equal(rejected.nextAction, null);
   }
+});
+
+test("a ready source observation with a mismatched selected plugin version requires refresh", () => {
+  const result = observeActual({
+    env: {},
+    pluginList: pluginList(),
+    read: () => manifest,
+    observeRulesetSource: () => source("ready", "0.4.5+other"),
+  });
+  assert.equal(result.status, "plugin-refresh-required");
+  assert.equal(result.nextAction, null);
+});
+
+test("a ready source observation with an exact selected plugin version remains ready", () => {
+  const result = observeActual({
+    env: {},
+    pluginList: pluginList(),
+    read: () => manifest,
+    observeRulesetSource: () => source("ready", "0.4.5+test"),
+  });
+  assert.equal(result.status, "ready");
+  assert.notEqual(result.nextAction, null);
 });
 
 test("installed version accepts only one exact enabled Agent-Pipeline entry", () => {
