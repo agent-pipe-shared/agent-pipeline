@@ -215,6 +215,11 @@ with synthetic brokers/jobs only.
 **Entry:** D1 ADR approved with exact remote/broker path manifest and separate
 live-pilot authority.
 
+**Design status:** `design/b2-i-gitlab-ci-pilot.md` is the unapproved
+GitLab-CI constrained-executor proposal. It supplies no credential, CI job,
+provider mutation or implementation authority until its numbered ADR and path
+manifest are expressly approved.
+
 **Outcome:** add external/asynchronous execution only through the accepted
 execution-plane contract and short-lived bounded authority.
 
@@ -273,26 +278,29 @@ approved operator-local authentication boundary is available.
 4. opt-in live capability observation; and
 5. existing Claude/Codex regression.
 
-## Slice B4 — GitLab forge adapter
+## Slice B4 — GitHub/GitLab transport and forge adapter
 
 **Issue:** `#51`
 
-**Outcome:** provider-neutral forge contract, GitHub mapping and GitLab.com /
-Self-Managed adapter while Git remains the VCS.
+**Outcome:** one dual-provider Git transport plus provider-neutral forge
+contract for GitHub and GitLab.com / Self-Managed. Git remains the VCS; the
+forge layer owns provider project, issue, merge, CI, release and governance
+semantics.
 
 **Dependency:** accepted B2-I leases or a separately approved operator-local
 authentication boundary precedes live access or mutation.
 
 **Order:**
 
-1. forge capability and neutral vocabulary;
-2. GitHub reference mapping;
-3. GitLab target/auth capability discovery;
-4. issue/change-request/CI read contracts;
-5. exact preview, matching confirmation, idempotent mutation, partial outcome
+1. exact remote/target resolution and transport capability contract;
+2. GitHub and GitLab reference mappings;
+3. GitHub and GitLab target/auth capability discovery;
+4. fetch/ref readback and bounded new-branch publication;
+5. project/issue/change-request/merge/CI/release read contracts;
+6. exact preview, matching confirmation, idempotent mutation, partial outcome
    handling and exact readback;
-6. governance/tier capability matrix; and
-7. conformance/privacy/rate-limit/partial-success fixtures.
+7. governance/tier capability matrix; and
+8. conformance/privacy/rate-limit/partial-success fixtures.
 
 **Stop:** ambiguous host/project, token exposure, silent weaker control or
 provider-specific field leakage into the core contract.
@@ -346,32 +354,30 @@ candidate before any native or final gate evidence.
 **Stop:** any remaining implementation mutation, missing issue criterion,
 unresolved authority drift or required Cyborg input.
 
-## Slice B6 — Native macOS acceptance and Epic close
+## Slice B6 — Native macOS transfer disposition
 
-**Issue:** `#49`
+**Issue:** `#49`; native follow-up: `#72` (`sprint:NONE`)
 
-**Outcome:** Apple Silicon native acceptance for the exact frozen Nova-only
-candidate.
+**Outcome:** retain the honest synthetic macOS contract while transferring the
+Apple Silicon native acceptance to its dedicated follow-up.
 
 **Order:**
 
-1. support matrix and clean-host procedure;
-2. deterministic native fixtures;
-3. bootstrap/setup/idempotent re-entry;
-4. full lifecycle with supported runners;
-5. Full Verify, Security, Critic/Close;
-6. interruption/cancel/recovery/cleanup;
-7. evidence sanitization and candidate binding; and
-8. public support/limitations documentation.
+1. record the unavailable-device condition and exact transfer target;
+2. retain synthetic/non-native contract coverage plus the B49-7/B49-8
+   keep-awake and continuation contracts in Nova;
+3. bind the original Issue and #72 with the material-scope transfer rule; and
+4. exclude every native Apple-Silicon completion claim from Nova close.
 
-**Stop:** undocumented repair, secret/private data in evidence, candidate drift
-or substitution of hosted CI for native evidence.
+**Stop:** any claim that synthetic, Intel or hosted CI evidence closes #72, or
+any attempt to reopen native execution without a fresh follow-up authority.
 
-The exact B5 candidate receives native lifecycle, Full Verify, Security,
-independent high-risk Critic and PO acceptance without a gate- or
-runtime-affecting byte change. The close tail may add only append-only evidence
-that binds the frozen candidate; any relevant byte change invalidates and
-reruns the applicable gates.
+The exact B5 candidate receives the applicable Nova Verify, Security,
+independent high-risk Critic and PO acceptance without a native macOS claim.
+The #72 follow-up independently owns native lifecycle and Apple-Silicon
+candidate evidence. The close tail may add only append-only evidence that binds
+the frozen candidate; any relevant byte change invalidates and reruns the
+applicable gates.
 
 Every one of the 17 issues receives its own evidence disposition. Any
 incomplete criterion keeps the issue and Epic open unless the PO explicitly

@@ -274,22 +274,29 @@ Nova A is accepted only when:
 - NVA-B15-6: Sprint-close evidence for #15 explicitly says that direct AGY
   implementation is not delivered.
 
-### `#51` GitLab forge
+### `#51` GitHub/GitLab transport and forge
 
-- NVA-B51-1: Git remains the only supported VCS and Public Core hosting remains
-  separate from consumer-forge support.
-- NVA-B51-2: GitHub and GitLab implement one versioned forge capability
-  contract.
+- NVA-B51-1: Git remains the only supported VCS; GitHub and GitLab are
+  interchangeable transport and forge targets for consumer-selected projects.
+- NVA-B51-2: GitHub and GitLab implement one versioned transport-plus-forge
+  capability contract.
 - NVA-B51-3: GitLab.com and explicit Self-Managed targets resolve
   deterministically without exposing tokens.
 - NVA-B51-4: Issues/change requests/CI/governance mappings are exact-target,
   previewed, read back and capability honest.
 - NVA-B51-5: Each control is native, emulated, manual or unsupported; weaker
   controls are never silently substituted.
-- NVA-B51-6: At least one live read-only GitLab capability is proved; zero
-  supported cells cannot close the issue.
+- NVA-B51-6: At least one live read-only GitLab capability and one exact
+  GitLab transport readback are proved; zero supported cells cannot close the
+  issue.
 - NVA-B51-7: Delete, transfer, settings, permissions, silent close/relabel and
   broad batch authority remain unsupported without separate approval.
+- NVA-B51-8: Exact remote resolution, fetch/ref readback and a new-branch
+  publication bind provider, source commit and full destination ref; force,
+  delete and wildcard refspecs remain denied.
+- NVA-B51-9: Change-request merge and release operations are explicit forge
+  mutations with preview, confirmation and readback; a Git push alone never
+  claims either outcome.
 
 ### `#63` V4 recovery deadlock
 
@@ -329,25 +336,29 @@ Nova A is accepted only when:
   the exact candidate; the Issue comment names the actual delivery merge
   commit and relevant verification results before Sprint close.
 
-### `#49` Native macOS
+### `#49` macOS boundary transfer
 
-- NVA-B49-1: A clean Apple Silicon host completes documented bootstrap without
-  omitted manual repair.
-- NVA-B49-2: The exact final candidate completes lifecycle, Full Verify,
-  Security and Close natively.
-- NVA-B49-3: `#7` reports every supported runner cell, including Antigravity
-  after `#15`.
-- NVA-B49-4: Filesystem, Unicode, case-folding, symlink, permission,
-  durability, process and tool-resolution fixtures cover native behavior.
-- NVA-B49-5: Evidence exposes no secret/keychain/account/private-path material.
+- NVA-B49-1: Apple-Silicon native bootstrap and clean-host completion are
+  transferred to #72 (`sprint:NONE`); Nova cannot advertise them as complete.
+- NVA-B49-2: Native lifecycle, Full Verify, Security, Critic and PO-close
+  evidence are owned by #72 with its own candidate/evidence lifecycle.
+- NVA-B49-3: `#7` still reports every Nova-supported runner cell; that
+  non-native inventory duty does not depend on #72's native close.
+- NVA-B49-4: Native execution of filesystem, Unicode, case-folding, symlink,
+  permission, durability, process and tool-resolution fixtures transfers to
+  #72; Nova retains only the synthetic contract fixtures.
+- NVA-B49-5: Nova's retained synthetic records expose no
+  secret/keychain/account/private-path material.
 - NVA-B49-6: Apple Silicon, Intel, hosted CI and synthetic claims remain
-  distinct.
-- NVA-B49-7: Keep-awake is explicit, bounded and observed; denied or
-  unavailable host support is reported honestly and never becomes a
+  distinct; Intel, hosted CI and synthetic evidence never substitute for #72.
+- NVA-B49-7: Keep-awake remains an explicit, bounded Nova lifecycle contract;
+  denied or unavailable support is reported honestly and is never a
   correctness, completion or wakeup guarantee.
-- NVA-B49-8: Nonblocking interaction preserves exact input authority,
-  interruption, completion delivery and deterministic resume without a hidden
-  background-input or approval channel.
+- NVA-B49-8: Nonblocking interaction remains in Nova and preserves exact input
+  authority, interruption, completion delivery and deterministic resume
+  without a hidden background-input or approval channel.
+- NVA-B49-9: Nova records an exact original-Issue transfer comment before its
+  narrowed #49 disposition; it neither closes #72 nor claims a native result.
 
 ## Final evidence matrix
 

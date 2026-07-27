@@ -3,17 +3,20 @@
 ## Purpose and boundary
 
 `pipeline.forge-capability.v1` is a provider-neutral observation contract.
-Git remains the version-control system; hosting is a separate capability plane.
+Git remains the version-control system, but transport and hosting together form
+one dual-provider target surface for GitHub and GitLab.
 The core report identifies the provider, base-URL class, a digest of project
 coordinates, authentication mode, capability cells, governance/tier
 observations, and sanitized evidence. It must not contain credentials,
 provider-private payloads, or assumptions about unobserved behavior.
 
 Each neutral capability cell is exactly one of `native`, `emulated`, `manual`,
-`unsupported`, or `unavailable`. The vocabulary covers issues, change
-requests, CI pipelines/jobs, branch-protection observations, and governance
-observations. Provider-specific names, IDs, statuses, and fields stay inside
-the adapter extension; they never leak into the neutral report.
+`unsupported`, or `unavailable`. The vocabulary covers exact remote
+resolution, fetch/ref readback and bounded branch publication, plus projects,
+issues, change requests/merges, CI pipelines/jobs, releases, branch-protection
+and governance observations. Provider-specific names, IDs, statuses, and
+fields stay inside the adapter extension; they never leak into the neutral
+report.
 
 ## Nova public brand handover
 
@@ -45,6 +48,23 @@ Live read-only capability discovery is opt-in and is required for B4 closure.
 Live access or mutation additionally requires a B2 credential lease or a
 separately approved operator-local authentication boundary. A provider's
 acknowledgement is never accepted as Pipeline success without exact readback.
+
+## Transport and provider-target boundary
+
+Git transport is common to GitHub and GitLab: the adapter resolves one HTTPS
+remote, observes exact refs, fetches without mutating the remote and may
+publish only one explicitly named new branch after preview confirmation. The
+preview binds source commit, remote URL class, full destination ref and remote
+preimage; force, delete, wildcard and broad refspecs are denied. A Git push
+proves only ref publication. Merge, release, project and governance outcomes
+remain provider forge operations with their own preview and readback.
+
+The private `swos1/aps-test` GitLab target is an operator-local pilot only.
+Its 2026-07-27 transport probe published the disposable commit
+`5f8eea638f8a24c8d10b6f840fa61460f1e51f09` solely to
+`nova-transport-probe/20260727-01` and read the same ref back. This is
+transport evidence only. It is not a migration of Agent-Pipeline, a release, a
+merge or an Issue `#51` closure claim.
 
 ## External-mutation lifecycle
 
@@ -82,22 +102,32 @@ readback, provider/host drift, or any unknown state. No access, mutation,
 credential acquisition, network use, push, or release is implied by this
 design.
 
-**Deferred live-integration risk:** Live GitLab capability discovery and every
-external mutation route remain blocked. Accountable follow-up owner:
-**Nova Elephant**. This disposition expires on **2026-08-09**; expiry does not
-activate anything and instead requires a fresh PO-reviewed boundary decision
-before any live access, credential use, capability advertisement, mutation, or
-Issue `#51` closure.
+**Live-pilot boundary:** The PO admitted only operator-local read discovery and
+the one exact new-branch transport probe on the private test target. Every
+forge mutation, existing-branch transport write, merge, release, project
+creation, deletion, settings and permission route remains blocked pending its
+own exact preview and confirmation. This pilot expires on **2026-08-09**;
+expiry does not activate any broader capability or Issue `#51` closure.
 
-## Fixed implementation paths
+## Proposed implementation path manifest
 
-The future implementation is limited to the paths fixed by Spec §7.3:
+The existing closed forge report and GitLab mapping are necessary but not yet
+sufficient for the product promise: there is no common Git-transport contract
+or GitHub provider adapter in the current candidate. After an explicit B4
+Design approval, implementation is limited to these paths:
 
 - `plugins/pipeline-core/lib/forge-capability.mjs` and its matching test;
+- `plugins/pipeline-core/lib/git-transport-contract.mjs` and its matching
+  test, for provider-independent exact remote/ref/fetch/new-branch records;
+- `plugins/pipeline-core/scripts/git-transport-contract.schema.json`;
+- `plugins/pipeline-core/scripts/github-forge-adapter.mjs` and its matching
+  test;
 - `plugins/pipeline-core/scripts/gitlab-forge-adapter.mjs` and its matching
   test;
 - `plugins/pipeline-core/scripts/forge-capability.schema.json`; and
 - `plugins/pipeline-core/scripts/external-mutation.schema.json`.
 
-No other path changes, live-operation integration, credentials, or network
-activation are in scope before the separate approval gates.
+GitHub and GitLab adapters may use the common transport record but cannot
+interpret a successful push as a merge, release, issue or CI result. No other
+path changes, live-operation integration, credentials, network activation or
+consumer-repository migration are in scope before the separate approval gates.

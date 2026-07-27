@@ -809,8 +809,11 @@ and capability success.
 ### 6.3 B2 — Async execution and credential leases (`#16`, `#18`)
 
 B2-C implements pure validators/reducers with fake brokers and jobs. B2-I live
-remote/broker integration is blocked by the same state-authority ADR plus
-separate live-pilot authority.
+remote/broker integration remains blocked by the state-authority ADR plus
+separate live-pilot authority. The proposed narrow GitLab-CI decision and
+path manifest are recorded in
+`design/b2-i-gitlab-ci-pilot.md`; it is a draft, not an implementation or
+provider-mutation authorization.
 
 `pipeline.async-execution-journal.v1` appends provider observations with exact
 provider job binding, subject, provider sequence or `not-provided`, observation
@@ -892,14 +895,26 @@ stay unsupported unless independently certified.
 
 ### 6.5 B4 — Provider-neutral forge and GitLab (`#51`)
 
-`pipeline.forge-capability.v1` separates Git VCS from hosting and defines:
-provider, base URL class, project coordinates digest, authentication mode,
-capability cells, governance/tier observations and evidence. Cells are
-`native`, `emulated`, `manual`, `unsupported` or `unavailable`.
+`pipeline.forge-capability.v1` separates the common Git transport from
+provider hosting, while presenting both as one dual-provider target
+surface. GitHub and GitLab targets bind provider, base URL class, project
+coordinates digest, authentication mode, capability cells, governance/tier
+observations and evidence. Cells are `native`, `emulated`, `manual`,
+`unsupported` or `unavailable`.
 
-The neutral vocabulary covers issue, change request, CI pipeline/job, branch
-protection observation and governance observation. Provider-specific fields
-remain inside adapter extensions.
+The shared transport vocabulary covers exact remote resolution, ref readback,
+fetch and a preview-bound branch push. Forge vocabulary covers project,
+issue, change request/merge, CI pipeline/job, release, branch-protection and
+governance observations. Git is still the sole VCS implementation; a GitLab
+or GitHub adapter must not silently substitute a provider API for Git
+transport. Provider-specific fields remain inside adapter extensions.
+
+Every transport write binds the provider target, exact source commit, complete
+destination ref, expected remote preimage and postimage. It rejects force,
+delete, wildcard and broad refspecs. Branch publication may target only a new
+explicit branch until a separately approved operation contract authorizes an
+existing ref. A forge merge is a provider mutation, never an inferred result
+of a successful Git push.
 
 Every mutation follows
 `pipeline.external-mutation.v1`:
@@ -918,8 +933,9 @@ expected post-state; provider acceptance alone is not success. Retry reuses
 the idempotency key and first reconciles remote state.
 
 GitLab.com and explicit Self-Managed targets are distinct. At least one opt-in
-live read-only GitLab capability is required for closure. Delete, transfer,
-settings, permissions, silent close/relabel and broad batch mutations remain
+live read-only GitLab capability and one exact Git transport readback are
+required for closure. Delete, transfer, settings, permissions, silent
+close/relabel, broad batch mutations and repository destruction remain
 unsupported without a separate PO-approved operation contract.
 
 ### 6.6 B4R — V4 recovery deadlock correction (`#63`)
@@ -970,12 +986,12 @@ Recovery ends at V4 `ready`, another typed controlling state, or explicit
 
 The broader Nightwing onboarding/documentation scope from `#61` is excluded.
 
-### 6.7 B5/B6 — Candidate freeze and native macOS (`#49`)
+### 6.7 B5 — Candidate freeze and macOS boundary (`#49` → `#72`)
 
 Nova B first assembles one Nova-only candidate and freezes its commit/tree.
 No unpublished Cyborg bytes are an input. The 17-issue acceptance mapping,
 focused suites, backlog previews and artifact inventory must be complete
-before native execution.
+before a close claim.
 
 `pipeline.macos-acceptance.v1` binds candidate, hardware class
 (`apple-silicon`, `intel`, `hosted-ci`, `synthetic`), OS/toolchain versions,
@@ -991,21 +1007,23 @@ only an observation may use `observed-active`. `backgroundInputChannel` must
 be `none`. Resume binds the prior interruption and exact authorized input;
 missing delivery/resume evidence is non-success.
 
-Apple Silicon is the required native closure class. Fixtures cover Unicode,
-case-folding, symlinks, permissions, durability, process behavior and
-tool-resolution. Hosted CI, Intel and synthetic observations never substitute
-for Apple Silicon.
+Apple Silicon remains the required native closure class, but it is no longer a
+Nova acceptance gate: the complete native host scope is transferred to Issue
+`#72` (`sprint:NONE`) because no eligible device is available. Hosted CI,
+Intel and synthetic observations never substitute for Apple Silicon.
 
 The registered `nova-macos-acceptance-tests` Verify surface is a synthetic,
 non-native contract check. It validates the record shape and hostile failure
 cases only; it neither reports nor substitutes for native Apple Silicon
 execution evidence.
 
-The exact frozen B5 candidate receives native lifecycle, Full Verify, Security,
-independent high-risk Critic and PO acceptance. Post-gate evidence commits may
-append sanitized evidence only; any runtime/schema/test/gate/configuration
-change invalidates the applicable gates. Every issue gets an individual
-disposition. Nova/Cyborg combined integration remains a later lifecycle.
+The exact frozen B5 candidate receives its applicable Nova Verify, Security,
+independent high-risk Critic and PO acceptance without claiming native macOS.
+The #72 follow-up owns native lifecycle, Apple-Silicon fixtures and its own
+candidate-bound evidence. Post-gate evidence commits may append sanitized
+evidence only; any runtime/schema/test/gate/configuration change invalidates
+the applicable gates. Every issue gets an individual disposition. Nova/Cyborg
+combined integration remains a later lifecycle.
 
 ## 7. Schema and file registry
 
@@ -1032,8 +1050,8 @@ disposition. Nova/Cyborg combined integration remains a later lifecycle.
 | `pipeline.critic-review-lineage.v1` | A5 | Critic integration | course gate/Result |
 | `pipeline.multi-cli-benchmark.v1` | A6 | benchmark runner | report/PO |
 | `pipeline.release-preflight.v1` | A6 | preflight | gate operator |
-| `pipeline.nova-increment-receipt.v1` | A7/B6 | gate assembler | next increment/close |
-| `pipeline.nova-increment-readback.v1` | A7/B6 | independent gate readback | next increment/close |
+| `pipeline.nova-increment-receipt.v1` | A7/B5 | gate assembler | next increment/close |
+| `pipeline.nova-increment-readback.v1` | A7/B5 | independent gate readback | next increment/close |
 | `pipeline.runner-native-continuation.v1` | B0 | continuation adapter | native-goal evaluator/re-entry |
 | `pipeline.local-worker-pool.v1` | B1 | pool supervisor | scheduler/importer |
 | `pipeline.async-execution-journal.v1` | B2 | external boundary | reconciler |
@@ -1045,7 +1063,7 @@ disposition. Nova/Cyborg combined integration remains a later lifecycle.
 | `pipeline.project-onboarding-manifest-repair-plan.v1` | B4R | V4 manifest repair planner | confirmed lifecycle writer |
 | `pipeline.nova-b5-candidate-freeze.v1` | B5 | candidate-freeze compiler | native-gate operator |
 | `pipeline.nova-b5-evidence-manifest.v1` | B5 | evidence-manifest compiler | native-gate operator |
-| `pipeline.macos-acceptance.v1` | B6 | native harness | final gate |
+| `pipeline.macos-acceptance.v1` | B5 | synthetic contract harness | candidate-bound boundary check |
 
 ### 7.2 Closed root shapes and bounds
 
@@ -1202,13 +1220,13 @@ gate with collision review. In this table, “schemas `<name>` under
 | B1-C | `plugins/pipeline-core/lib/local-worker-pool.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/local-worker-pool.schema.json`; `specs/sprint-nova-epic/design/execution-state-authority-proposal.md` | none; pure contract/synthetic reducer only |
 | B1-I | `docs/adr/0048-local-goldfish-supervisor.md`; `plugins/pipeline-core/lib/local-worker-supervisor.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/local-worker-supervisor.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/local-worker-supervisor.schema.json`; `plugins/pipeline-core/scripts/fixtures/local-worker-supervisor-worker.mjs` | `.claude/pipeline-state.json`; `docs/adr/README.md`; `docs/local-supervisor-state-threat-model.md`; `docs/product-capability-inventory.json`; `docs/state.md`; `governance/observation-doc-governance.json`; `harness/scripts/verify.mjs`; `plugins/pipeline-core/lib/local-supervisor-state.mjs`, matching `.test.mjs`, only for ADR-0047 ownership/mode/link-count repair hardening; this Spec; `acceptance.md`; `plans/nova-b.md`; `prd_sprint-nova-epic.md`; append-only `result.md`; `lifecycle.json`, exactly as accepted in ADR-0048 |
 | B2-C | `plugins/pipeline-core/lib/async-execution.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/credential-lease.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/async-execution-journal.schema.json`; `plugins/pipeline-core/scripts/credential-lease.schema.json`; `specs/sprint-nova-epic/evidence/nova-b/execution-state-authority-decision.json` | none; synthetic contract only |
-| B2-I | external broker/remote adapter files fixed by the approved ADR | blocked until separate remote/credential/state-authority ADR and path manifest |
+| B2-I | draft decision and proposed path manifest: `specs/sprint-nova-epic/design/b2-i-gitlab-ci-pilot.md` | blocked until a numbered approved remote/credential/state-authority ADR, accepted path manifest and separate live-pilot authority |
 | B3-R | `specs/sprint-nova-epic/evidence/nova-b/antigravity-contract-decision.json` | `specs/sprint-nova-epic/lifecycle.json`; append-only `specs/sprint-nova-epic/result.md` |
 | B3-A | `plugins/pipeline-core/scripts/antigravity-alpha-adapter.mjs`, matching `.test.mjs` | `GEMINI.md`; this Spec; `acceptance.md`; `plans/nova-b.md`; `plans/integration-and-close.md`; `prd_sprint-nova-epic.md`; append-only `result.md`; `lifecycle.json` |
 | B3-I | blocked until B3-R appends exact paths and migration decision | blocked |
-| B4 | `plugins/pipeline-core/lib/forge-capability.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/gitlab-forge-adapter.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/forge-capability.schema.json`; `plugins/pipeline-core/scripts/external-mutation.schema.json`; design artifact `specs/sprint-nova-epic/design/forge-capability-b4.md` | none before live-operation approval |
+| B4 | current: `plugins/pipeline-core/lib/forge-capability.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/gitlab-forge-adapter.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/forge-capability.schema.json`; `plugins/pipeline-core/scripts/external-mutation.schema.json`; proposed after B4 Design approval: `plugins/pipeline-core/lib/git-transport-contract.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/git-transport-contract.schema.json`; `plugins/pipeline-core/scripts/github-forge-adapter.mjs`, matching `.test.mjs`; design artifact `specs/sprint-nova-epic/design/forge-capability-b4.md` | no new implementation, live operation, credential or network activation before B4 Design approval; live mutation additionally needs its own exact approval |
 | B4R | design artifact `specs/sprint-nova-epic/design/v4-recovery-b4r.md` | `plugins/pipeline-core/lib/project-onboarding-v3.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/project-onboarding-v3.mjs`, `project-onboarding-e2e.test.mjs`; `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`, matching `.test.mjs`; `plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs`; `plugins/pipeline-core/skills/pipeline-start/SKILL.md`, `pipeline-start-v3.test.mjs`; `.claude/pipeline-state.json`; `docs/codex-onboarding-threat-model.md`; this PRD, Spec, Acceptance, Nova B plan, backlog binding, lifecycle manifest and append-only Result |
-| B5/B6 | `plugins/pipeline-core/lib/macos-acceptance.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/macos-acceptance.schema.json`; exact fixtures `plugins/pipeline-core/scripts/fixtures/nova-macos/filesystem.json`, `unicode.json`, `case-folding.json`, `symlink.json`, `permissions.json`, `durability.json`, `process.json`, `tool-resolution.json`; exact evidence `specs/sprint-nova-epic/evidence/nova-b/candidate-freeze.json`, `evidence-manifest.json`, `macos-acceptance.json`, `verify.json`, `security.json`, `critic.json`, `increment-receipt.json`, `increment-readback.json`, `po-close.json`; `docs/runner-support.md`; `docs/macos-support.md` | `harness/scripts/verify.mjs`; `docs/product-capability-inventory.json` only for the explicitly synthetic/non-native Verify disposition; `governance/observation-doc-governance.json` only to classify `docs/runner-support.md` and `docs/macos-support.md` as public-user maintained documents; `specs/sprint-nova-epic/design/backlog-spec-bindings.json` only for canonical `#12`, `#14`, `#15`, `#18` and `#60` acceptance bindings; `specs/sprint-nova-epic/lifecycle.json`; `specs/sprint-nova-epic/plans/nova-b.md`; append-only `specs/sprint-nova-epic/result.md` |
+| B5 / #49 narrowed | `plugins/pipeline-core/lib/macos-acceptance.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/macos-acceptance.schema.json`; exact synthetic fixtures `plugins/pipeline-core/scripts/fixtures/nova-macos/filesystem.json`, `unicode.json`, `case-folding.json`, `symlink.json`, `permissions.json`, `durability.json`, `process.json`, `tool-resolution.json`; candidate boundary evidence `specs/sprint-nova-epic/evidence/nova-b/candidate-freeze.json`, `evidence-manifest.json`, `macos-acceptance.json`, `verify.json`, `security.json`, `critic.json`, `increment-receipt.json`, `increment-readback.json`, `po-close.json` | `harness/scripts/verify.mjs`; `docs/product-capability-inventory.json` only for the explicitly synthetic/non-native Verify disposition; `specs/sprint-nova-epic/design/backlog-spec-bindings.json` for retained B49-5/B49-7/B49-8 bindings; `specs/sprint-nova-epic/lifecycle.json`; `specs/sprint-nova-epic/plans/nova-b.md`; append-only `specs/sprint-nova-epic/result.md`; native Apple-Silicon execution and evidence are exclusively #72 (`sprint:NONE`) |
 
 The remaining deliberately deferred manifests are B2-I, B3-I and live B4
 integration. B1-I is resolved by accepted ADR-0048, but its provider-backed

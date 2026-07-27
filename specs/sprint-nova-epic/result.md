@@ -1,5 +1,16 @@
 # Sprint Nova Epic — Result
 
+## 2026-07-27 — B6 native macOS scope transfer
+
+Status: `native-macos-transferred-to-72; Nova-claim-non-native`.
+
+The PO confirmed that no eligible Apple-Silicon device is currently available.
+Nova therefore retains only the synthetic/non-native macOS contract boundary.
+The complete native bootstrap, lifecycle, runner, Verify, Security, Critic and
+PO-close acceptance transfers to Issue #72 with `sprint:NONE`. This record is
+not native evidence and does not close Issue #49; its original Issue receives
+the exact transfer comment before Nova's narrowed close disposition.
+
 ## 2026-07-27 — B0 Codex blocked-goal continuation correction
 
 Status: `branch-candidate-implemented`.
@@ -720,3 +731,14 @@ implemented in candidate `f365a09ced53b82ea01afc40e75a555e71248a71`
 (`d43e621484ec81b83ea59faef94ea7eae4d81db1`), whose Full Verify and Security
 evidence are both exact and green. All B2-I, B3-I, live B4 and B6 boundaries
 remain unchanged and pending.
+
+## 2026-07-27 — B6 transfer boundary clarification
+
+Status: `native-apple-silicon-transferred; retained-continuity-contracts`.
+
+Issue #72 exclusively owns the native Apple-Silicon clean-host, native fixture,
+native lifecycle and native candidate-evidence acceptance. Nova retains the
+synthetic/non-native boundary plus B49-7's bounded keep-awake contract and
+B49-8's exact-input/resume contract. Neither retained contract represents a
+native macOS completion claim. The original #49 transfer comment remains a
+required external readback before a narrowed Nova close disposition.

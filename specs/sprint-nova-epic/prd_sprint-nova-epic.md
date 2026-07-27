@@ -1,7 +1,7 @@
 # Sprint Nova Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: d26eadd6ae948bb7ffb90d6e76358b2ee034bca2ad587ecdefcfb76cd0e5a41b -->
+<!-- technical-spec-sha256: e5ca2fef371e8c9d8b355052fab3620aba997b77f8bdaab3243308dac75253c9 -->
 
 **Feature ID:** `sprint-nova-epic`
 **Profile / rigor / risk:** Epic / 2 / high
@@ -37,7 +37,7 @@ serial, separately accepted increments:
 | Increment | Product outcome | Issues |
 | --- | --- | --- |
 | **Nova A — Trustworthy execution foundation** | Make backlog state, capability claims, invocation, scheduling, review and release preparation deterministic and evidence-bound before increasing execution capacity. | `#57`, `#7`, `#8`, `#12`, `#14`, `#29`, `#38`, `#54`, `#56` |
-| **Nova B — Bounded continuity, scale and portability** | First bind active Pipeline work to supported runners' native goal continuation, then add supervised local workers, asynchronous execution, bounded credentials, Antigravity with Gemini models, GitLab, V4 recovery safety and native Apple Silicon evidence. | `#60`, `#21`, `#16`, `#18`, `#15`, `#51`, `#63`, `#49` |
+| **Nova B — Bounded continuity, scale and portability** | First bind active Pipeline work to supported runners' native goal continuation, then add supervised local workers, asynchronous execution, bounded credentials, Antigravity with Gemini models, dual-provider GitHub/GitLab support and V4 recovery safety. The native Apple-Silicon close transfers to `#72`. | `#60`, `#21`, `#16`, `#18`, `#15`, `#51`, `#63`, `#49` (narrowed) |
 
 Nova B may begin only from an exact PO-accepted Nova A commit/tree and immutable
 increment receipt. Nova A and Nova B must remain independently verifiable from
@@ -84,10 +84,11 @@ an authorized, idempotent, atomic transition rather than later manual cleanup.
 Unknown, unavailable, cancelled, stale, expired, malformed or undelivered
 outcomes cannot become success.
 
-The final Nova-only candidate has exact Apple Silicon evidence for every
-macOS capability it advertises. Unsupported or unobserved cells remain
-explicit. Post-Sprint Nova/Cyborg integration is a separate lifecycle and
-cannot retroactively redefine either Sprint's acceptance.
+Nova advertises only its synthetic/non-native macOS contract boundary. Exact
+Apple Silicon evidence is transferred to Issue `#72` (`sprint:NONE`) because
+no eligible device is currently available; unsupported or unobserved cells
+remain explicit. Post-Sprint Nova/Cyborg integration is a separate lifecycle
+and cannot retroactively redefine either Sprint's acceptance.
 
 ## Users and stakeholders
 
@@ -260,11 +261,15 @@ cannot retroactively redefine either Sprint's acceptance.
 - Transfer direct executable AGY runner delivery to #69 (`sprint:NONE`) for a
   later dedicated sprint with current-contract, auth and #7 certification.
 
-### B4. GitLab forge support — `#51`
+### B4. GitHub/GitLab transport and forge support — `#51`
 
-- Keep Git as the sole VCS while defining one provider-neutral forge
-  capability contract.
-- Classify GitHub/GitLab behavior as native, emulated, manual or unsupported.
+- Keep Git as the common transport engine and bind GitHub and GitLab as
+  interchangeable remote/forge targets for consumer-selected repositories.
+- Cover exact remote resolution, fetch/ref readback, branch publication and
+  bounded push separately from provider forge operations: projects, issues,
+  change requests, merges, CI, releases and branch protection.
+- Classify every GitHub/GitLab transport and forge cell as native, emulated,
+  manual or unsupported.
 - Require exact target resolution, matching preview confirmation, idempotency,
   readback and typed partial/compensation outcomes for every mutation.
 - Use accepted B2 leases or a separately approved operator-local
@@ -292,16 +297,14 @@ cannot retroactively redefine either Sprint's acceptance.
 - Keep the broader onboarding and documentation program from `#61` in its
   separate Nightwing scope.
 
-### B5. Native macOS assurance — `#49`
+### B5. macOS contract boundary and native-transfer disposition — `#49` → `#72`
 
-- Freeze the final Nova-only candidate before native acceptance.
-- Execute bootstrap, lifecycle, supported runners, Full Verify, Security and
-  final Critic on that same candidate on Apple Silicon.
-- Cover filesystem, Unicode/case behavior, symlinks, permissions, durability,
-  process lifecycle and trusted-tool resolution.
-- Keep Apple Silicon, Intel, hosted CI and synthetic evidence distinct.
-- Any gate- or runtime-affecting byte change after native evidence invalidates
-  the applicable evidence and requires rerun.
+- Retain the synthetic/non-native macOS contract and honest support boundary.
+- Transfer clean-host Apple-Silicon bootstrap, lifecycle, runner, Verify,
+  Security, Critic and PO-close evidence to `#72` (`sprint:NONE`).
+- Keep Apple Silicon, Intel, hosted CI and synthetic evidence distinct; the
+  latter never substitutes for native evidence.
+- Nova makes no native macOS completion claim after this transfer.
 
 ## Sequencing
 
@@ -337,7 +340,10 @@ v0.4.6
               frozen Nova-only candidate
                          |
                          v
-                B5 Apple Silicon gates
+                B5 synthetic macOS boundary
+                         |
+                         v
+             #72 native Apple-Silicon follow-up
 ```
 
 The diagram is precedence, not permission to run implementation packages

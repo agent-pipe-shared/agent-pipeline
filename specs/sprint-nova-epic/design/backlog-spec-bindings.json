@@ -3,7 +3,7 @@
   "featureId": "sprint-nova-epic",
   "specification": {
     "path": "specs/sprint-nova-epic/spec.md",
-    "sha256": "ce1b70456eae416e124d184a5fe14bd16ddcb80f50372ec0107457547cf212e9"
+    "sha256": "e5ca2fef371e8c9d8b355052fab3620aba997b77f8bdaab3243308dac75253c9"
   },
   "backlogSnapshot": {
     "commit": "5ca5a4b292a267ffdfcc52577fda0a0593957a65",
@@ -367,7 +367,6 @@
       "increment": "B",
       "acceptanceIds": [
         "NVA-B21-4",
-        "NVA-B49-2",
         "NVA-B49-8"
       ],
       "closureMode": "candidate-evidence",
@@ -420,10 +419,8 @@
       "issue": 49,
       "increment": "B",
       "acceptanceIds": [
-        "NVA-B49-1",
-        "NVA-B49-2",
-        "NVA-B49-4",
         "NVA-B49-5",
+        "NVA-B49-6",
         "NVA-B49-7"
       ],
       "closureMode": "candidate-evidence",
@@ -454,5 +451,5 @@
       "expiryDisposition": "not-applicable"
     }
   ],
-  "recordSha256": "8aa8310a8ced1c3e7e0181497bb12f91c755ea77e75530fab9f9565bb0307617"
+  "recordSha256": "b406e72949513a9f5a85a529e0f003ad454fd1ff51612f70ae539658d2fb34d2"
 }
