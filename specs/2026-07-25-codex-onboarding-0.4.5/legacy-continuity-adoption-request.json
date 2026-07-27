@@ -1,0 +1,24 @@
+{
+  "expectedRevision": 3,
+  "currentPrd": {
+    "path": "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md",
+    "sha256": "217eff325fffa5d82d5d49f31883c426dca74c42879aaae0a70da87be8e492ae"
+  },
+  "spec": {
+    "path": "specs/2026-07-25-codex-onboarding-0.4.5/spec.md",
+    "sha256": "5a95aa55b393a88e0d7ab1a8006957fc04d80bcae24399b40f3ffa8e4eb3cf70"
+  },
+  "result": {
+    "path": "specs/2026-07-25-codex-onboarding-0.4.5/result.md",
+    "sha256": "ceed30ddce48d921f2afbbb44d02a3fe5301302ad07fab3f41dfbc149f657b73"
+  },
+  "closeEvidence": {
+    "path": "specs/2026-07-25-codex-onboarding-0.4.5/legacy-continuity-close-evidence.md",
+    "sha256": "8fe8c79f464e2a3f93f2e300fb6e74cccf6791f5920f4a857597f516d97917a1"
+  },
+  "history": {
+    "commit": "7a62a4ef9febba844cf5be8a659177b37c6a5da5",
+    "path": "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md",
+    "sha256": "9825ca78a3765dc71ee2793ef9f84f2eaf998bf297086d869be3562d792cdb94"
+  }
+}

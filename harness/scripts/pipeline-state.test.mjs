@@ -85,6 +85,10 @@ function captureConsoleError(action) {
     console.error = original;
   }
 }
+function captureConsole(action) {
+  const original = console.log; const messages = []; console.log = (...args) => messages.push(args.join(" "));
+  try { return { value: action(), text: messages.join("\n") }; } finally { console.log = original; }
+}
 
 const FIXED_NOW = () => "2026-07-07T21:00:00.000Z";
 const FIXED_GIT_HEAD = () => ({ ok: true, commit: "abc123deadbeef" });
@@ -2012,6 +2016,89 @@ if (symlinkCapable) {
   ok("PS51c non-coordinator estimate attribution is refused without mutation", rejected === 2 && readFileSync(statePath(dir), "utf8") === beforeRejected);
   const advanced = run(["set-phase", "--phase", "security-scan"], { dir, now: FIXED_NOW });
   ok("PS51d a later successful state mutation clears the persisted estimate", advanced === 0 && readState(dir).state.gateEstimate === undefined);
+}
+
+// ---- PS52: AC-047-27 legacy continuity adoption planner/apply ----------------------------
+{
+  const dir = freshDir("legacy-adoption-ac047");
+  const legacyRoot = join(dir, "specs", "2026-07-25-codex-onboarding-0.4.5");
+  mkdirSync(legacyRoot, { recursive: true });
+  for (const name of ["prd_codex-onboarding-0.4.5.md", "spec.md", "result.md", "legacy-continuity-close-evidence.md"]) writeFileSync(join(legacyRoot, name), readFileSync(join(process.cwd(), "specs", "2026-07-25-codex-onboarding-0.4.5", name)));
+  const continuity = { schema: "pipeline.continuity.v0", featureId: "codex-onboarding-0.4.5", revision: 3, runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" }, authority: { prd: { path: "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md", sha256: "9825ca78a3765dc71ee2793ef9f84f2eaf998bf297086d869be3562d792cdb94" }, spec: { path: "specs/2026-07-25-codex-onboarding-0.4.5/spec.md", sha256: "5a95aa55b393a88e0d7ab1a8006957fc04d80bcae24399b40f3ffa8e4eb3cf70" }, result: null }, queueHead: { packageId: "continuity-adoption", actionId: "review-active-feature", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null }, blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null, capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } };
+  const stateValue = { schema: SCHEMA_ID, activeFeature: { id: "codex-onboarding-0.4.5", planPath: continuity.authority.prd.path, phase: "implementation" }, planApproved: true, planApproval: { schema: "pipeline.plan-approval.v2", approvedBy: "PO", approvedAt: "2026-07-26T14:08:37.500Z", specBoundBy: "PO", specBoundAt: "2026-07-26T14:08:37.500Z", poGateAuthority: { schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: "2a0f69551b46963d6d49ef0faaf9db5c28d27c4f681a9d4dd0be1a81b297da10", runtimeSha256: "071b0236f6054bbeea2140830320a88d1c6a9e733d7294ad0bb976fd2e28c897", receiptSha256: "c4fc5171dc507a81908b30137bbf537355626f957d1ccbb9bee3a8ae9db02aa2", repositoryFingerprint: "6af2655d04c85a0e2faff67dedc2116a845874502dbe31c20e4c28372ea7885f", planPath: continuity.authority.prd.path, planSha256: "217eff325fffa5d82d5d49f31883c426dca74c42879aaae0a70da87be8e492ae", specPath: "specs/2026-07-25-codex-onboarding-0.4.5/spec.md", specSha256: continuity.authority.spec.sha256 } }, continuity, updatedAt: "2026-07-26T14:08:37.500Z" };
+  delete continuity.closeTransition;
+  mkdirSync(join(dir, ".claude"), { recursive: true }); writeFileSync(statePath(dir), JSON.stringify(stateValue) + "\n");
+  const request = { expectedRevision: 3, currentPrd: { path: continuity.authority.prd.path, sha256: "217eff325fffa5d82d5d49f31883c426dca74c42879aaae0a70da87be8e492ae" }, spec: continuity.authority.spec, result: { path: "specs/2026-07-25-codex-onboarding-0.4.5/result.md", sha256: "ceed30ddce48d921f2afbbb44d02a3fe5301302ad07fab3f41dfbc149f657b73" }, closeEvidence: { path: "specs/2026-07-25-codex-onboarding-0.4.5/legacy-continuity-close-evidence.md", sha256: "8fe8c79f464e2a3f93f2e300fb6e74cccf6791f5920f4a857597f516d97917a1" }, history: { commit: "7a62a4ef9febba844cf5be8a659177b37c6a5da5", path: continuity.authority.prd.path, sha256: continuity.authority.prd.sha256 } };
+  const reqPath = writeRequest(dir, "legacy-request", request); const observed = { head: "9d1b3dc108eb77629ace5b82002120f5539abd8d", tagObject: "78359ae1ba7e0194111e531c060db615e4994e40", commit: "9d1b3dc108eb77629ace5b82002120f5539abd8d", tree: "282a8b5c5b0581e042985bfb373a66be0eb2d08b", remoteCommit: "9d1b3dc108eb77629ace5b82002120f5539abd8d", remoteTagObject: "78359ae1ba7e0194111e531c060db615e4994e40", remoteTagCommit: "9d1b3dc108eb77629ace5b82002120f5539abd8d", historicalPrdSha256: continuity.authority.prd.sha256 };
+  const planned = captureConsole(() => run(["continuity-adoption-plan", "--request-file", reqPath], { dir, legacyGitObservation: () => observed, now: FIXED_NOW })); const payload = JSON.parse(planned.text || "{}");
+  ok("PS52a exact legacy request yields a digest-bound plan", planned.value === 0 && payload.applyAction?.requiresConfirmation === true && payload.applyAction?.mutation === true && payload.applyAction?.requiresHostBoundary === true && payload.planSha256);
+  ok("PS52a1 apply action is absolute and digest/confirmation bound", typeof payload.applyAction?.executable === "string" && payload.applyAction.executable.startsWith("/") && payload.applyAction.argv?.includes("--activate") && payload.applyAction.argv?.includes(payload.planSha256));
+  const before = readFileSync(statePath(dir), "utf8"); ok("PS52b planner is read-only", readFileSync(statePath(dir), "utf8") === before);
+  const rootDrift = JSON.parse(before); rootDrift.updatedAt = "2026-07-26T14:08:37.501Z"; writeFileSync(statePath(dir), JSON.stringify(rootDrift) + "\n");
+  const driftPlan = captureConsoleError(() => run(["continuity-adoption-plan", "--request-file", reqPath], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+  ok("PS52b1 updatedAt/root drift is refused without mutation", driftPlan.value === 2 && readFileSync(statePath(dir), "utf8") === JSON.stringify(rootDrift) + "\n");
+  writeFileSync(statePath(dir), before);
+  const rootMutations = [
+    ["root extra", (s) => { s.extra = true; }], ["activeFeature extra", (s) => { s.activeFeature.extra = true; }],
+    ["activeFeature wrong id", (s) => { s.activeFeature.id = "wrong"; }], ["approval extra", (s) => { s.planApproval.extra = true; }],
+    ["approval actor", (s) => { s.planApproval.approvedBy = "other"; }], ["approval timestamp", (s) => { s.planApproval.approvedAt = "2026-07-26T14:08:37.501Z"; }],
+    ["authority extra", (s) => { s.planApproval.poGateAuthority.extra = true; }], ["authority digest", (s) => { s.planApproval.poGateAuthority.sourceSha256 = A; }],
+  ];
+  for (const [label, mutate] of rootMutations) {
+    const altered = JSON.parse(before); mutate(altered); const bytes = JSON.stringify(altered) + "\n"; writeFileSync(statePath(dir), bytes);
+    const rejectedRoot = captureConsoleError(() => run(["continuity-adoption-plan", "--request-file", reqPath], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+    ok(`PS52-root-${label}`, rejectedRoot.value === 2 && readFileSync(statePath(dir), "utf8") === bytes);
+    writeFileSync(statePath(dir), before);
+  }
+  for (const [label, mutate] of [["head", (o) => { o.head = A.slice(0, 40); }], ["tagObject", (o) => { o.tagObject = A.slice(0, 40); }], ["commit", (o) => { o.commit = A.slice(0, 40); }], ["tree", (o) => { o.tree = A.slice(0, 40); }], ["remoteCommit", (o) => { o.remoteCommit = A.slice(0, 40); }], ["remoteTagObject", (o) => { o.remoteTagObject = A.slice(0, 40); }], ["remoteTagCommit", (o) => { o.remoteTagCommit = A.slice(0, 40); }], ["historical bytes", (o) => { o.historicalPrdSha256 = A; }]]) {
+    const altered = structuredClone(observed); mutate(altered); const rejectedRelease = captureConsoleError(() => run(["continuity-adoption-plan", "--request-file", reqPath], { dir, legacyGitObservation: () => altered, now: FIXED_NOW }));
+    ok(`PS52-release-${label}`, rejectedRelease.value === 2 && readFileSync(statePath(dir), "utf8") === before);
+  }
+  for (const [label, mutate] of [["artifact missing", (r) => { r.result.path = "missing.md"; }], ["artifact hash", (r) => { r.spec.sha256 = A; }], ["history mismatch", (r) => { r.history.commit = A.slice(0, 40); }]]) {
+    const altered = structuredClone(request); mutate(altered); const alteredPath = writeRequest(dir, `legacy-${label.replace(/ /g, "-")}`, altered);
+    const rejectedArtifact = captureConsoleError(() => run(["continuity-adoption-plan", "--request-file", alteredPath], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+    ok(`PS52-artifact-${label}`, rejectedArtifact.value === 2 && readFileSync(statePath(dir), "utf8") === before);
+  }
+  if (symlinkCapable) {
+    const target = join(legacyRoot, "result.md"); const moved = join(legacyRoot, "result.real"); renameSync(target, moved); symlinkSync(moved, target);
+    const symlinkRejected = captureConsoleError(() => run(["continuity-adoption-plan", "--request-file", reqPath], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+    ok("PS52-artifact-symlink", symlinkRejected.value === 2 && readFileSync(statePath(dir), "utf8") === before);
+    rmSync(target); renameSync(moved, target);
+  }
+  const oversized = "{" + "x".repeat(70_000) + "}"; writeFileSync(statePath(dir), oversized);
+  const oversizedRejected = captureConsoleError(() => run(["continuity-adoption-plan", "--request-file", reqPath], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+  ok("PS52-state-oversized", oversizedRejected.value === 2 && readFileSync(statePath(dir), "utf8") === oversized);
+  writeFileSync(statePath(dir), before);
+  const driftedState = JSON.parse(before); driftedState.updatedAt = "2026-07-26T14:08:37.501Z"; writeFileSync(statePath(dir), JSON.stringify(driftedState) + "\n");
+  const staleApply = captureConsoleError(() => run(["continuity-adoption-apply", "--request-file", reqPath, "--plan-sha256", payload.planSha256, "--activate"], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+  ok("PS52c1 State drift between plan/apply is refused byte-null", staleApply.value === 2 && readFileSync(statePath(dir), "utf8") === JSON.stringify(driftedState) + "\n");
+  writeFileSync(statePath(dir), before);
+  const preRename = captureConsoleError(() => run(["continuity-adoption-apply", "--request-file", reqPath, "--plan-sha256", payload.planSha256, "--activate"], { dir, legacyGitObservation: () => observed, now: FIXED_NOW, replaceStateFdContents: () => { throw new Error("injected pre-rename"); } }));
+  ok("PS52c2 pre-rename write failure reports committed=false and zero mutation", preRename.value === 2 && /zero mutation/i.test(preRename.text) && readFileSync(statePath(dir), "utf8") === before);
+  const postRename = captureConsoleError(() => run(["continuity-adoption-apply", "--request-file", reqPath, "--plan-sha256", payload.planSha256, "--activate"], { dir, legacyGitObservation: () => observed, now: FIXED_NOW, syncDirectory: () => ({ ok: false, supported: true }) }));
+  const postState = readState(dir).state;
+  ok("PS52c3 post-rename directory-sync failure reports committed durability and revision4", postRename.value === 2 && /durability|committed/i.test(postRename.text) && !/zero mutation/i.test(postRename.text) && postState.continuity?.revision === 4);
+  writeFileSync(statePath(dir), before);
+  for (const [label, readback] of [["malformed", () => ({ status: "malformed" })], ["drifted", (root) => ({ status: "ok", state: { ...root, updatedAt: "drifted" } })], ["planApproved drift", (root) => ({ status: "ok", state: { ...root, planApproved: false } })], ["planApproval drift", (root) => ({ status: "ok", state: { ...root, planApproval: { ...root.planApproval, approvedBy: "other" } } })]]) {
+    writeFileSync(statePath(dir), before);
+    const injectedReadback = captureConsoleError(() => run(["continuity-adoption-apply", "--request-file", reqPath, "--plan-sha256", payload.planSha256, "--activate"], {
+      dir, legacyGitObservation: () => observed, now: FIXED_NOW,
+      readLegacyAdoptionPostimage: () => readback(readState(dir).state),
+    }));
+    ok(`PS52c4 postimage-${label} readback fails closed without success claim`, injectedReadback.value === 2 && !/CS-LEGACY-ADOPTION-APPLIED.*written/i.test(injectedReadback.text));
+  }
+  writeFileSync(statePath(dir), before);
+  const apply = captureConsoleError(() => run(["continuity-adoption-apply", "--request-file", reqPath, "--plan-sha256", payload.planSha256, "--activate"], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+  ok("PS52c exact apply advances revision and close action", apply.value === 0 && readState(dir).state.continuity.revision === 4 && readState(dir).state.continuity.queueHead.nextAction === "close");
+  const replayBefore = readFileSync(statePath(dir), "utf8"); const replay = captureConsoleError(() => run(["continuity-adoption-apply", "--request-file", reqPath, "--plan-sha256", payload.planSha256, "--activate"], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+  ok("PS52d conflicting replay is refused without mutation", replay.value === 2 && readFileSync(statePath(dir), "utf8") === replayBefore);
+  writeFileSync(statePath(dir), before);
+  const lock = acquireContinuityLock(dir, "ps52-lock", continuityDeps(dir));
+  const locked = captureConsoleError(() => run(["continuity-adoption-apply", "--request-file", reqPath, "--plan-sha256", payload.planSha256, "--activate"], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+  ok("PS52d1 lock contention refuses apply with zero State mutation", locked.value === 2 && readFileSync(statePath(dir), "utf8") === before);
+  releaseContinuityLock(lock);
+  const driftPath = writeRequest(dir, "legacy-drift", { ...request, extra: true }); const rejected = captureConsoleError(() => run(["continuity-adoption-plan", "--request-file", driftPath], { dir, legacyGitObservation: () => observed, now: FIXED_NOW }));
+  ok("PS52e extra request key is rejected", rejected.value === 2 && readFileSync(statePath(dir), "utf8") === before);
 }
 
 // ---- Cleanup ------------------------------------------------------------------------------

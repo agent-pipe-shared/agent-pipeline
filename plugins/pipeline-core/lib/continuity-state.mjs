@@ -82,7 +82,8 @@ const FALLBACK_POLICIES = new Set(["defer", "pre-authorized-mapped-fallback"]);
 const HUMAN_FACING_LANGUAGES = new Set(["de", "en"]);
 const CLOSE_PHASES = new Set(["state-cas", "verified", "delivered", "readback", "closed"]);
 const INTERRUPT_BLOCKER_TYPES = new Set(["authority", "security", "scope"]);
-const MAX_STATE_BYTES = 8_192;
+export const CONTINUITY_STATE_MAX_BYTES = 8_192;
+const MAX_STATE_BYTES = CONTINUITY_STATE_MAX_BYTES;
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -992,7 +993,121 @@ export function clearCourseDecisionReceipt(current, request, activeFeatureId = u
   });
 }
 
+// AC-047-27: the sole legacy continuity adoption transition.  This is
+// intentionally separate from the generic CAS path so ordinary callers cannot
+// widen authority or adopt an arbitrary Result.
+const LEGACY_ADOPTION = Object.freeze({
+  featureId: "codex-onboarding-0.4.5",
+  revision: 3,
+  prdSha256: "9825ca78a3765dc71ee2793ef9f84f2eaf998bf297086d869be3562d792cdb94",
+  specSha256: "5a95aa55b393a88e0d7ab1a8006957fc04d80bcae24399b40f3ffa8e4eb3cf70",
+  currentPrdSha256: "217eff325fffa5d82d5d49f31883c426dca74c42879aaae0a70da87be8e492ae",
+  resultSha256: "ceed30ddce48d921f2afbbb44d02a3fe5301302ad07fab3f41dfbc149f657b73",
+  currentPrdPath: "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md",
+  specPath: "specs/2026-07-25-codex-onboarding-0.4.5/spec.md",
+  resultPath: "specs/2026-07-25-codex-onboarding-0.4.5/result.md",
+  historicalPrdCommit: "7a62a4ef9febba844cf5be8a659177b37c6a5da5",
+  closeEvidencePath: "specs/2026-07-25-codex-onboarding-0.4.5/legacy-continuity-close-evidence.md",
+  closeEvidenceSha256: "8fe8c79f464e2a3f93f2e300fb6e74cccf6791f5920f4a857597f516d97917a1",
+  releaseTag: "v0.4.6",
+  releaseCommit: "9d1b3dc108eb77629ace5b82002120f5539abd8d",
+  releaseTree: "282a8b5c5b0581e042985bfb373a66be0eb2d08b",
+  releaseTagObject: "78359ae1ba7e0194111e531c060db615e4994e40",
+});
+
+function legacyPreimage(current) {
+  const normalized = isObject(current) && !Object.hasOwn(current, "closeTransition")
+    ? { ...current, closeTransition: null } : current;
+  return validateContinuityState(normalized, LEGACY_ADOPTION.featureId).ok
+    && current.featureId === LEGACY_ADOPTION.featureId
+    && current.revision === LEGACY_ADOPTION.revision
+    && current.authority.prd.sha256 === LEGACY_ADOPTION.prdSha256
+    && current.authority.spec.sha256 === LEGACY_ADOPTION.specSha256
+    && current.authority.result === null
+    && current.queueHead.packageId === "continuity-adoption"
+    && current.queueHead.actionId === "review-active-feature"
+    && current.queueHead.nextAction === "review"
+    && current.queueHead.productRetryCount === 0
+    && current.queueHead.environmentRerouteCount === 0
+    && current.queueHead.dispatch === null
+    && current.blocker === null
+    && current.acknowledgedFinal === null
+    && current.recovery === null
+    && current.decisionTxn === null
+    && (current.closeTransition === null || !Object.hasOwn(current, "closeTransition"));
+}
+
+export function planLegacyContinuityAdoption(current, request = {}) {
+  if (!legacyPreimage(current)) return result(false, "CS-LEGACY-PREIMAGE");
+  const requestKeys = ["expectedRevision", "currentPrd", "spec", "result", "closeEvidence", "history"];
+  const exactArtifact = (value) => exactKeys(value, ARTIFACT_KEYS);
+  const exactHistory = (value) => exactKeys(value, new Set(["commit", "path", "sha256"]))
+    && gitOid(value.commit) && safePath(value.path) && digest(value.sha256);
+  if (!isObject(request) || Object.keys(request).length !== requestKeys.length
+    || !requestKeys.every((key) => Object.hasOwn(request, key))
+    || !exactArtifact(request.currentPrd) || !exactArtifact(request.spec)
+    || !exactArtifact(request.result) || !exactArtifact(request.closeEvidence)
+    || !exactHistory(request.history)
+    || request.currentPrd.path !== LEGACY_ADOPTION.currentPrdPath
+    || request.spec.path !== LEGACY_ADOPTION.specPath
+    || request.result.path !== LEGACY_ADOPTION.resultPath
+    || request.closeEvidence.path !== LEGACY_ADOPTION.closeEvidencePath
+    || request.history.path !== LEGACY_ADOPTION.currentPrdPath
+    || request.history.commit !== LEGACY_ADOPTION.historicalPrdCommit
+    || request.history.sha256 !== LEGACY_ADOPTION.prdSha256
+    || request.currentPrd.sha256 !== LEGACY_ADOPTION.currentPrdSha256
+    || request.spec.sha256 !== LEGACY_ADOPTION.specSha256
+    || request.result.sha256 !== LEGACY_ADOPTION.resultSha256
+    || request.closeEvidence.sha256 !== LEGACY_ADOPTION.closeEvidenceSha256
+    || request.expectedRevision !== LEGACY_ADOPTION.revision) {
+    return result(false, "CS-LEGACY-BINDING");
+  }
+  return result(true, "CS-LEGACY-ADOPTION-PLAN", {
+    featureId: LEGACY_ADOPTION.featureId,
+    expectedRevision: LEGACY_ADOPTION.revision,
+    authorityDigests: {
+      historicalPrdSha256: LEGACY_ADOPTION.prdSha256,
+      currentPrdSha256: LEGACY_ADOPTION.currentPrdSha256,
+      specSha256: LEGACY_ADOPTION.specSha256,
+      resultSha256: LEGACY_ADOPTION.resultSha256,
+    },
+  });
+}
+
+export function applyLegacyContinuityAdoption(current, request = {}, activeFeatureId = undefined) {
+  const planned = planLegacyContinuityAdoption(current, request);
+  if (!planned.ok || activeFeatureId !== undefined && activeFeatureId !== LEGACY_ADOPTION.featureId) {
+    return result(false, planned.ok ? "CS-LEGACY-FEATURE" : planned.code);
+  }
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.authority.prd = structuredClone(request.currentPrd);
+  next.authority.result = structuredClone(request.result);
+  next.queueHead.nextAction = "close";
+  const after = validateContinuityState(
+    Object.hasOwn(next, "closeTransition") ? next : { ...next, closeTransition: null },
+    LEGACY_ADOPTION.featureId,
+  );
+  if (!after.ok || next.revision !== current.revision + 1
+    || !sameJson(current.runtime, next.runtime) || !sameJson(current.authority.spec, next.authority.spec)
+    || !sameJson(current.acknowledgedFinal, next.acknowledgedFinal)
+    || next.queueHead.packageId !== current.queueHead.packageId
+    || next.queueHead.actionId !== current.queueHead.actionId
+    || next.queueHead.productRetryCount !== current.queueHead.productRetryCount
+    || next.queueHead.environmentRerouteCount !== current.queueHead.environmentRerouteCount
+    || !sameJson(current.queueHead.dispatch, next.queueHead.dispatch)
+    || !sameJson(current.blocker, next.blocker) || !sameJson(current.resume, next.resume)
+    || !sameJson(current.recovery, next.recovery) || !sameJson(current.decisionTxn, next.decisionTxn)
+    || !sameJson(current.capacity, next.capacity) || !sameJson(current.closeTransition, next.closeTransition)
+    || next.queueHead.nextAction !== "close") return result(false, after.ok ? "CS-LEGACY-SCOPE" : after.code);
+  return result(true, "CS-LEGACY-ADOPTION-APPLIED", next, true);
+}
+
+export const LEGACY_CONTINUITY_ADOPTION = LEGACY_ADOPTION;
+
 export const CONTINUITY_STATE_CODES = Object.freeze([
+  "CS-LEGACY-PREIMAGE", "CS-LEGACY-BINDING", "CS-LEGACY-FEATURE", "CS-LEGACY-SCOPE",
+  "CS-LEGACY-ADOPTION-PLAN", "CS-LEGACY-ADOPTION-APPLIED",
   "CS-INVALID", "CS-STATE-BUDGET", "CS-VALID", "CS-REQUEST", "CS-STALE",
   "CS-SESSION-CLEANUP-REQUEST", "CS-SESSION-CLEANUP-ALREADY-BOUND",
   "CS-SESSION-CLEANUP-PROTECTED", "CS-SESSION-CLEANUP-TOO-LATE",
@@ -1017,5 +1132,3 @@ export const CONTINUITY_STATE_CODES = Object.freeze([
   "CS-CLOSE-DELIVERY-RECORDED", "CS-CLOSE-READBACK-BLOCKED",
   "CS-CLOSE-READBACK-RECORDED", "CS-CLOSE-COMPLETE-BLOCKED", "CS-CLOSE-CLOSED",
 ]);
-
-export const CONTINUITY_STATE_MAX_BYTES = MAX_STATE_BYTES;

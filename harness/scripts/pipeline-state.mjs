@@ -251,6 +251,10 @@ import {
   clearCourseDecisionReceipt,
   clearDecisionSelection,
   compareAndSwapContinuity,
+  planLegacyContinuityAdoption,
+  applyLegacyContinuityAdoption,
+  LEGACY_CONTINUITY_ADOPTION as LEGACY_ADOPTION,
+  CONTINUITY_STATE_MAX_BYTES,
   integrateContinuityFinal,
   recordCourseDecisionBrief,
   validateContinuityState,
@@ -315,6 +319,8 @@ const CONTINUITY_SUBCOMMANDS = new Set([
   "continuity-select-course",
   "continuity-apply-decision",
   "continuity-clear-decision",
+  "continuity-adoption-plan",
+  "continuity-adoption-apply",
 ]);
 const PUBLICATION_SUBCOMMANDS = new Set([
   "publication-prepare",
@@ -2289,6 +2295,170 @@ function defaultGitHead(dir) {
   return { ok: true, commit: res.stdout.trim() };
 }
 
+function legacyRegularArtifact(dir, artifact, expectedPath, expectedSha) {
+  if (!artifact || artifact.path !== expectedPath || artifact.sha256 !== expectedSha) return false;
+  const absolute = resolve(dir, artifact.path);
+  if (relative(resolve(dir), absolute).startsWith(`..${sep}`) || !absolute.startsWith(`${resolve(dir)}${sep}`)) return false;
+  try {
+    const st = lstatSync(absolute);
+    if (!st.isFile()) return false;
+    return sha256Bytes(readFileSync(absolute)) === expectedSha;
+  } catch { return false; }
+}
+
+function exactLegacyRequest(request) {
+  return request && typeof request === "object" && !Array.isArray(request)
+    && Object.keys(request).length === 6
+    && ["expectedRevision", "currentPrd", "spec", "result", "closeEvidence", "history"]
+      .every((key) => Object.prototype.hasOwnProperty.call(request, key));
+}
+
+function legacyGitObservation(dir, deps = {}) {
+  if (deps.legacyGitObservation) return deps.legacyGitObservation(dir);
+  const runGit = (args) => {
+    const r = spawnSync("git", args, { cwd: dir, encoding: "utf8", timeout: args[0] === "ls-remote" ? 30_000 : 5_000 });
+    return r.status === 0 ? r.stdout.trim() : null;
+  };
+  const tagObject = runGit(["rev-parse", "v0.4.6^{tag}"]);
+  const head = runGit(["rev-parse", "HEAD"]);
+  const commit = runGit(["rev-parse", "v0.4.6^{}"]);
+  const tree = commit ? runGit(["rev-parse", `${commit}^{tree}`]) : null;
+  const remote = runGit(["ls-remote", "origin", "refs/heads/main"]);
+  const remoteTag = runGit(["ls-remote", "origin", "refs/tags/v0.4.6"]);
+  const remoteTagDeref = runGit(["ls-remote", "origin", "refs/tags/v0.4.6^{}"]);
+  const historicalRaw = spawnSync("git", ["show", "7a62a4ef9febba844cf5be8a659177b37c6a5:specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md"], { cwd: dir, encoding: null, timeout: 5_000 });
+  return { tagObject, head, commit, tree, remoteCommit: remote ? remote.split(/\s+/)[0] : null,
+    remoteTagObject: remoteTag ? remoteTag.split(/\s+/)[0] : null,
+    remoteTagCommit: remoteTagDeref ? remoteTagDeref.split(/\s+/)[0] : null,
+    historicalPrdSha256: historicalRaw.status === 0 ? sha256Bytes(historicalRaw.stdout) : null };
+}
+
+function validateLegacyAdoptionEnvironment(dir, state, request, deps = {}) {
+  const authority = state.planApproval?.poGateAuthority;
+  const af = state.activeFeature;
+  const a = LEGACY_ADOPTION;
+  const authorityKeys = ["schema","humanFacing","sourceSha256","runtimeSha256","receiptSha256","repositoryFingerprint","planPath","planSha256","specPath","specSha256"];
+  const rootKeys = ["schema","activeFeature","planApproved","updatedAt","planApproval","continuity"];
+  if (Object.keys(state).length !== rootKeys.length || !rootKeys.every((key) => Object.hasOwn(state, key))) return { ok: false, code: "CS-LEGACY-ROOT" };
+  if (!exactObjectKeys(af, ["id","planPath","phase"])
+    || !exactObjectKeys(state.planApproval, ["schema","approvedBy","approvedAt","specBoundBy","specBoundAt","poGateAuthority"])) return { ok: false, code: "CS-LEGACY-ROOT" };
+  if (state.schema !== SCHEMA_ID || !af || af.id !== a.featureId
+    || af.planPath !== a.currentPrdPath || af.phase !== "implementation" || state.planApproved !== true
+    || !authority || Object.keys(authority).length !== authorityKeys.length || !authorityKeys.every((key) => Object.hasOwn(authority, key))
+    || state.updatedAt !== "2026-07-26T14:08:37.500Z"
+    || state.planApproval.schema !== "pipeline.plan-approval.v2"
+    || state.planApproval.approvedBy !== "PO" || state.planApproval.approvedAt !== "2026-07-26T14:08:37.500Z"
+    || state.planApproval.specBoundBy !== "PO" || state.planApproval.specBoundAt !== "2026-07-26T14:08:37.500Z"
+    || authority.schema !== "pipeline.po-gate-authority.v2" || authority.humanFacing !== "en"
+    || authority.sourceSha256 !== "2a0f69551b46963d6d49ef0faaf9db5c28d27c4f681a9d4dd0be1a81b297da10"
+    || authority.runtimeSha256 !== "071b0236f6054bbeea2140830320a88d1c6a9e733d7294ad0bb976fd2e28c897"
+    || authority.receiptSha256 !== "c4fc5171dc507a81908b30137bbf537355626f957d1ccbb9bee3a8ae9db02aa2"
+    || authority.repositoryFingerprint !== "6af2655d04c85a0e2faff67dedc2116a845874502dbe31c20e4c28372ea7885f"
+    || authority.planPath !== af.planPath || authority.planSha256 !== a.currentPrdSha256
+    || authority.specPath !== a.specPath
+    || authority.specSha256 !== a.specSha256
+    || ![authority.sourceSha256, authority.runtimeSha256, authority.receiptSha256, authority.repositoryFingerprint, authority.planSha256, authority.specSha256].every((v) => SHA256_RE.test(v))) return { ok: false, code: "CS-LEGACY-ROOT" };
+  const req = request || {};
+  if (!exactLegacyRequest(req)) return { ok: false, code: "CS-LEGACY-REQUEST" };
+  if (!legacyRegularArtifact(dir, req.currentPrd, a.currentPrdPath, a.currentPrdSha256)
+    || !legacyRegularArtifact(dir, req.spec, a.specPath, a.specSha256)
+    || !legacyRegularArtifact(dir, req.result, a.resultPath, a.resultSha256)
+    || !legacyRegularArtifact(dir, req.closeEvidence, a.closeEvidencePath, a.closeEvidenceSha256)) return { ok: false, code: "CS-LEGACY-ARTIFACT" };
+  const historical = req.history;
+  if (!exactObjectKeys(historical, ["commit", "path", "sha256"])
+    || historical.commit !== a.historicalPrdCommit || historical.path !== a.currentPrdPath || historical.sha256 !== a.prdSha256) return { ok: false, code: "CS-LEGACY-HISTORY" };
+  const observed = legacyGitObservation(dir, deps);
+  if (!observed || observed.head !== a.releaseCommit || observed.tagObject !== a.releaseTagObject || observed.commit !== a.releaseCommit || observed.tree !== a.releaseTree || observed.remoteCommit !== a.releaseCommit || observed.remoteTagObject !== a.releaseTagObject || observed.remoteTagCommit !== a.releaseCommit || observed.historicalPrdSha256 !== a.prdSha256) return { ok: false, code: "CS-LEGACY-RELEASE" };
+  return { ok: true, observed };
+}
+
+function readStateRaw(dir) {
+  try {
+    const raw = readFileSync(statePath(dir));
+    if (raw.byteLength > CONTINUITY_STATE_MAX_BYTES) return { status: "malformed" };
+    const state = JSON.parse(raw.toString("utf8"));
+    if (!state || typeof state !== "object" || Array.isArray(state)
+      || (state.schema !== undefined && state.schema !== SCHEMA_ID)) return { status: "malformed" };
+    return { status: "ok", state, raw };
+  } catch { return { status: "absent" }; }
+}
+
+function buildLegacyAdoptionPlan(dir, request, deps, existing) {
+  const proposal = planLegacyContinuityAdoption(existing.state.continuity, request);
+  if (!proposal.ok) return proposal;
+  const environment = validateLegacyAdoptionEnvironment(dir, existing.state, request, deps);
+  if (!environment.ok) return environment;
+  const payload = {
+    schema: "pipeline.continuity-result-adoption-plan.v0",
+    root: realpathSync(dir),
+    stateSha256: sha256Bytes(existing.raw),
+    stateUpdatedAt: existing.state.updatedAt ?? null,
+    expectedRevision: existing.state.continuity.revision,
+    request,
+    artifacts: { currentPrd: request.currentPrd, spec: request.spec, result: request.result, closeEvidence: request.closeEvidence, history: request.history },
+    release: environment.observed,
+  };
+  return { ok: true, payload, planSha256: sha256Bytes(JSON.stringify(payload)) };
+}
+
+function runLegacyAdoptionCommand(sub, flags, deps) {
+  const dir = deps.dir;
+  const existing = readStateRaw(dir);
+  if (existing.status !== "ok" || !existing.state.continuity) {
+    console.error("Error: legacy continuity adoption requires a valid active continuity state.");
+    return 2;
+  }
+  if (isBlank(flags["request-file"])) {
+    console.error(`Error: ${sub} requires --request-file <repo-relative-json>.`);
+    return 2;
+  }
+  const request = readContinuityRequest(dir, flags["request-file"]);
+  if (!request.ok || !request.value || typeof request.value !== "object") {
+    console.error("Error: legacy adoption request refused.");
+    return 2;
+  }
+  const planned = buildLegacyAdoptionPlan(dir, request.value, deps, existing);
+  if (!planned.ok) { console.error(`Error: legacy adoption refused (${planned.code}); zero mutation.`); return 2; }
+  const planPayload = planned.payload;
+  const planSha256 = planned.planSha256;
+  if (sub === "continuity-adoption-plan") {
+    console.log(JSON.stringify({ ...planPayload, planSha256, applyAction: {
+      executable: process.execPath, argv: [fileURLToPath(import.meta.url), "continuity-adoption-apply", "--request-file", flags["request-file"], "--plan-sha256", planSha256, "--activate"], mutation: true, requiresConfirmation: true, requiresHostBoundary: true,
+    } }, null, 2));
+    return 0;
+  }
+  if (!Object.hasOwn(flags, "activate") || flags["plan-sha256"] !== planSha256) {
+    console.error("Error: legacy adoption apply requires the exact plan digest and --activate confirmation.");
+    return 2;
+  }
+  const lock = acquireContinuityLock(dir, flags["lock-token"] ?? LEGACY_WRITER_LOCK_TOKEN, deps);
+  if (!lock.ok) { console.error(`Error: continuity writer refused (${lock.code}).`); return 2; }
+  try {
+    const current = readStateRaw(dir);
+    if (current.status !== "ok" || !current.state.continuity) { console.error("Error: state changed during adoption; zero mutation."); return 2; }
+    const rebuilt = buildLegacyAdoptionPlan(dir, request.value, deps, current);
+    if (!rebuilt.ok || rebuilt.planSha256 !== planSha256) { console.error("Error: legacy adoption plan is stale; zero mutation."); return 2; }
+    const applied = applyLegacyContinuityAdoption(current.state.continuity, request.value, current.state.activeFeature?.id);
+    if (!applied.ok) { console.error(`Error: legacy adoption refused (${applied.code}); zero mutation.`); return 2; }
+    const writeUpdatedAt = deps.now?.() ?? new Date().toISOString();
+    const expectedPostimage = clearGateEstimateForMutation({ ...current.state, continuity: applied.state, updatedAt: writeUpdatedAt });
+    const written = atomicWriteContinuityState(dir, expectedPostimage, lock, deps);
+    if (!written.ok) {
+      if (written.committed === false) console.error(`Error: legacy adoption refused before commit (${written.code}); zero mutation.`);
+      else if (written.committed === true) console.error(`Error: legacy adoption committed but directory durability is indeterminate (${written.code}); inspect before retry.`);
+      else console.error(`Error: legacy adoption commit disposition is indeterminate (${written.code}); inspect before retry.`);
+      return 2;
+    }
+    const persisted = deps.readLegacyAdoptionPostimage?.(dir) ?? readStateRaw(dir);
+    if (persisted.status !== "ok" || !sameJson(persisted.state, expectedPostimage)) {
+      console.error("Error: legacy adoption postimage could not be freshly validated; persisted outcome is unresolved. Inspect before retry.");
+      return 2;
+    }
+    console.log(`${applied.code}: continuity revision ${applied.state.revision} written.`);
+    return 0;
+  } finally { releaseContinuityLock(lock); }
+}
+
 /**
  * Runs the CLI logic. Never calls process.exit itself (testable); returns the exit
  * code. `deps` allows tests to inject `dir`, `now`, and `gitHead` without touching the
@@ -2303,6 +2473,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   const [sub, ...rest] = argv;
   const flags = parseFlags(rest);
 
+  if (sub === "continuity-adoption-plan" || sub === "continuity-adoption-apply") {
+    return runLegacyAdoptionCommand(sub, flags, { ...deps, dir, now });
+  }
   if (CONTINUITY_SUBCOMMANDS.has(sub)) return runContinuityCommand(sub, flags, { ...deps, dir, now });
   if (PUBLICATION_SUBCOMMANDS.has(sub)) return runPublicationCommand(sub, flags, { ...deps, dir, now });
 

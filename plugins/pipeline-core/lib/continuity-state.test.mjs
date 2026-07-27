@@ -21,6 +21,8 @@ import {
   recordCourseDecisionBrief,
   releaseContinuitySessionCleanup,
   validateContinuityState,
+  planLegacyContinuityAdoption,
+  applyLegacyContinuityAdoption,
 } from "./continuity-state.mjs";
 import { computeContinuityFinalDigest } from "./continuity-host-adapter.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
@@ -219,6 +221,69 @@ check("valid queue state passes runtime and supported schema subset", () => {
   const value = state();
   assert.deepEqual(validateContinuityState(value, FEATURE), { ok: true, code: "CS-VALID" });
   assert.equal(validateAgainstSchema(value, schemaLiteSchema).valid, true);
+});
+
+// AC-047-27 pure adoption contract: the planner is exact, read-only, and the
+// apply transition changes only the approved authority/result and queue action.
+check("legacy adoption plan/apply accepts the exact six-key request", () => {
+  const legacy = state({
+    featureId: "codex-onboarding-0.4.5", revision: 3,
+    authority: {
+      prd: { path: "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md", sha256: "9825ca78a3765dc71ee2793ef9f84f2eaf998bf297086d869be3562d792cdb94" },
+      spec: { path: "specs/2026-07-25-codex-onboarding-0.4.5/spec.md", sha256: "5a95aa55b393a88e0d7ab1a8006957fc04d80bcae24399b40f3ffa8e4eb3cf70" }, result: null,
+    },
+    queueHead: { packageId: "continuity-adoption", actionId: "review-active-feature", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+    capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+  });
+  delete legacy.closeTransition;
+  const request = {
+    expectedRevision: 3,
+    currentPrd: { path: "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md", sha256: "217eff325fffa5d82d5d49f31883c426dca74c42879aaae0a70da87be8e492ae" },
+    spec: { path: "specs/2026-07-25-codex-onboarding-0.4.5/spec.md", sha256: "5a95aa55b393a88e0d7ab1a8006957fc04d80bcae24399b40f3ffa8e4eb3cf70" },
+    result: { path: "specs/2026-07-25-codex-onboarding-0.4.5/result.md", sha256: "ceed30ddce48d921f2afbbb44d02a3fe5301302ad07fab3f41dfbc149f657b73" },
+    closeEvidence: { path: "specs/2026-07-25-codex-onboarding-0.4.5/legacy-continuity-close-evidence.md", sha256: "8fe8c79f464e2a3f93f2e300fb6e74cccf6791f5920f4a857597f516d97917a1" },
+    history: { commit: "7a62a4ef9febba844cf5be8a659177b37c6a5da5", path: "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md", sha256: "9825ca78a3765dc71ee2793ef9f84f2eaf998bf297086d869be3562d792cdb94" },
+  };
+  const planned = planLegacyContinuityAdoption(legacy, request);
+  assert.equal(planned.ok, true);
+  const applied = applyLegacyContinuityAdoption(legacy, request, "codex-onboarding-0.4.5");
+  assert.equal(applied.ok, true);
+  assert.equal(applied.state.revision, 4);
+  assert.equal(applied.state.queueHead.nextAction, "close");
+  assert.deepEqual(applied.state.authority.spec, legacy.authority.spec);
+  assert.deepEqual(applied.state.runtime, legacy.runtime);
+  assert.equal(Object.hasOwn(applied.state, "closeTransition"), false);
+  const forged = structuredClone(legacy);
+  forged.revision += 1;
+  forged.authority.prd.sha256 = "f".repeat(64);
+  assert.equal(compareAndSwapContinuity(legacy, { expectedRevision: 3, next: forged }, "codex-onboarding-0.4.5").code, "CS-PROTECTED-AUTHORITY");
+
+  const requestMutations = [
+    ["top-level extra", (r) => { r.extra = true; }], ["missing history", (r) => { delete r.history; }],
+    ["currentPrd extra", (r) => { r.currentPrd.extra = true; }], ["spec missing sha", (r) => { delete r.spec.sha256; }],
+    ["result extra", (r) => { r.result.extra = true; }], ["closeEvidence missing path", (r) => { delete r.closeEvidence.path; }],
+    ["history extra", (r) => { r.history.extra = true; }], ["wrong feature", (r) => { legacy.featureId = FEATURE; }],
+    ["wrong revision", (r) => { r.expectedRevision = 2; }], ["wrong package", (r) => { legacy.queueHead.packageId = "wrong"; }],
+    ["wrong action", (r) => { legacy.queueHead.actionId = "wrong"; }], ["wrong nextAction", (r) => { legacy.queueHead.nextAction = "close"; }],
+    ["retry drift", (r) => { legacy.queueHead.productRetryCount = 1; }], ["dispatch", (r) => { legacy.queueHead.dispatch = {}; }],
+    ["blocker", (r) => { legacy.blocker = {}; }], ["ack", (r) => { legacy.acknowledgedFinal = {}; }],
+    ["recovery", (r) => { legacy.recovery = {}; }], ["decision", (r) => { legacy.decisionTxn = {}; }],
+    ["close transition", (r) => { legacy.closeTransition = {}; }],
+  ];
+  for (const [label, mutate] of requestMutations) {
+    const pristine = structuredClone(legacy); const req = structuredClone(request); mutate(req, legacy); const supplied = structuredClone(legacy);
+    const result = planLegacyContinuityAdoption(legacy, req);
+    assert.equal(result.ok, false, `mutation rejected: ${label}`);
+    assert.deepEqual(legacy, supplied, `input unchanged: ${label}`);
+    Object.assign(legacy, pristine);
+  }
+});
+
+check("legacy adoption rejects extra request keys and authority/root drift", () => {
+  const base = state({ featureId: "codex-onboarding-0.4.5", revision: 3, closeTransition: null });
+  assert.equal(planLegacyContinuityAdoption(base, { expectedRevision: 3, extra: true }).ok, false);
+  const malformed = structuredClone(base); malformed.closeTransition = undefined;
+  assert.equal(planLegacyContinuityAdoption(malformed, {}).ok, false);
 });
 
 check("runtime may carry only a redacted session-cleanup descriptor handle", () => {
