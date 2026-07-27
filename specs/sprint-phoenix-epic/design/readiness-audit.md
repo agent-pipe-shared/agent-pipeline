@@ -22,7 +22,6 @@ independent review, commit, push, implementation, and final Epic completion.
 | Do not reopen completed 0.4.6 work due stale docs | Product Owner disposition and exclusion rule in [scope-validation.md](scope-validation.md) | PROVEN as scope rule |
 | Include runner-neutral marketplace/freshness | PHX-0 in [../acceptance.md](../acceptance.md), trust-root architecture, and first delivery package | PROVEN in design |
 | Preserve active-design PRD/Spec authority through a sanctioned revision path | `PX0-AC-01..07`, architecture PHX-0 slice A, and [scope-validation.md](scope-validation.md) PX-C | DESIGN REVISED; fresh review pending; existing continuity retains the earlier digest only as a non-dispatch diagnostic |
-| Preserve truthful clean Security evidence across a detached candidate worktree | `EPIC-AC-07`, Spec §7.1, and [RECOVERY.md](../RECOVERY.md) R-13 | DESIGN REVISED; current zero-finding scan ended blocking because candidate binding was not verified |
 | Audit every Pipeline-known external command/script offer, workaround, and recovery safely | External Command Offer profile `R-AC-01..13`, architecture §14, privacy review, and [../RECOVERY.md](../RECOVERY.md) | DESIGN REVISED; fresh review pending |
 | Produce one coherent Epic architecture | Separate canonical streams over one event kernel; dependency graph and one-writer package sequence in [architecture.md](architecture.md) | PROVEN |
 | Remain independent of Nova/Cyborg/Nightwing | Accepted prerequisites and negative dependency gate `EPIC-AC-02` | PROVEN in design; implementation evidence pending |
@@ -47,9 +46,9 @@ independent review, commit, push, implementation, and final Epic completion.
 | ITSM (#24) | `C-AC-01..13` | Designed |
 | Governance export (#32) | `E-AC-01..21` | Designed |
 | External command offer / recovery audit | `R-AC-01..13` | Design revised; fresh review pending |
-| Epic integration | `EPIC-AC-01..07` | Design revised; fresh review pending |
+| Epic integration | `EPIC-AC-01..06` | Design revised; fresh review pending |
 
-The 158 normative criteria are unique, sequential within each group, and
+The 157 normative criteria are unique, sequential within each group, and
 contain no numbering gap. Every criterion remains unimplemented until a later
 approved package maps it to a named automated test/Verify step and exact
 candidate evidence.
@@ -78,7 +77,7 @@ trusted time, destination retention, analyst review, or compliance.
 | UTF-8, final newline, trailing whitespace across the package | pass |
 | Relative Markdown targets | pass; no missing or escaping target |
 | Internal Markdown anchors | pass |
-| Acceptance IDs | 145 unique; no duplicates or sequence gaps |
+| Acceptance IDs | 157 unique; no duplicates or sequence gaps |
 | Live issue coverage | 105 rows; every referenced acceptance ID exists |
 | Public privacy scan | no absolute home/user path, SSH-key path, token pattern, PAT pattern, or bearer credential found |
 | PRD technical-Spec binding | exact SHA-256 marker matches current `spec.md` |

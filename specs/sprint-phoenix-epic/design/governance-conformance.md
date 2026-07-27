@@ -58,7 +58,6 @@ No design-stage deviation from the twelve guidelines is proposed.
 | `PHX-PRIVACY-RESTRICTED-ERASURE` | Phoenix integration-package owner | Before Product Owner gate | RESOLVED 2026-07-26 by fixed-candidate privacy PASS over portable-only append semantics, restricted erasure/key destruction, and Spec-inventory ownership. |
 | `PHX-LIFECYCLE-WRITER-INVENTORY` | Phoenix design owner | Before Product Owner gate | RESOLVED 2026-07-26 by final Critic PASS: only Spec-listed writer files, complete transaction/recovery contract, mandatory PHX-0 slice A, trust-root slice B, then PHX-1..6. |
 | `PHX-DESIGN-CONTINUITY-AUTHORITY-REVISION` | Phoenix design owner; Product Owner for decision authority | Before renewed Product Owner gate | OPEN: generic CAS correctly rejects changed PRD/Spec authority. PHX-0 slice A now owns the dedicated decision-bound writer; the current revision retains the old digest as a diagnostic, not approval or dispatch authority. Fresh review must validate `PX0-AC-01..07`. |
-| `PHX-DESIGN-SECURITY-CANDIDATE-BINDING` | Phoenix integration-package owner | Before renewed Product Owner gate | OPEN: the current Security scan found no scanner findings but returned a blocking unverified-candidate result. EPIC-AC-07 requires a detached-worktree identity fix with a real-drift fail-closed regression suite; no clean claim is permitted before it passes. |
 
 If an open risk reaches its date without disposition, the Phoenix design returns to a
 blocked course gate. The expiry does not authorize the action automatically.

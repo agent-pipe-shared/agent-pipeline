@@ -249,3 +249,34 @@ This PASS closes the comprehensive Phoenix design Critic course gate. It does
 not rewrite any prior FAIL, establish native OS isolation or effective model
 identity, approve the plan, authorize implementation, or perform a remote
 write.
+
+## External-handoff design revision review — corrective verdict
+
+| Field | Value |
+| --- | --- |
+| Candidate commit | `5eb98b99665bb074242d4084bec4839186fd08d5` |
+| Candidate tree | `2a322ca16a7cce1658dcd67e066da90acd360035` |
+| Correction range | `60369c766ddc940925a3eeccc93819423c9d7541..5eb98b99665bb074242d4084bec4839186fd08d5` |
+| Assurance | `functional-equivalent-read-only; OS isolation not asserted` |
+| Reviewer mutation / delegation | none / none |
+| Machine trajectory | inconsistent: exact Security was clean, aggregate Verify failed |
+| Verdict | FAIL |
+
+The fresh independent Critic found three unwaived corrective items:
+
+1. **Blocker:** the exact-candidate aggregate Verify failed because the
+   Recovery record linked a Git-ignored local evidence artifact. Therefore the
+   candidate had no passing aggregate-gate evidence.
+2. **Major:** the canonical handover said that only Product Owner approval
+   remained, while valid Continuity revision `5` named `review` and Recovery
+   required fresh review before a renewed Product Owner gate.
+3. **Major:** R-13 did not bind its earlier blocking Security observation to
+   an exact candidate or artifact identity, while the supplied exact-candidate
+   Security evidence was clean.
+
+No finding is waived. The correction removes the untracked Markdown target,
+reconciles the handover to the persisted review action, and records the two
+Security observations by exact candidate without inferring a product defect or
+adding a speculative Security implementation scope. A fresh Critic must review
+the corrected exact candidate and the new aggregate evidence before a renewed
+Product Owner plan gate.

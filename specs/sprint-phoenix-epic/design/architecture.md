@@ -909,8 +909,7 @@ Delivery waves:
 3. **Dependent records/adapters:** #31 and #23.
 4. **Enterprise consumers:** #24, #32, signed bundle completion, and full #5.
 5. **Migration and integration:** existing authority paths, backlog regression
-   inputs, privacy/security matrix including detached-candidate Security
-   binding, end-to-end Verify, Critic, and operator
+   inputs, privacy/security matrix, end-to-end Verify, Critic, and operator
    documentation.
 
 Repository WIP remains one implementation package at a time. Parallelism is

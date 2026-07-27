@@ -8,7 +8,7 @@
 > implementation dispatch; push, merge, release, external writes, and final
 > acceptance keep their own gates.
 
-<!-- technical-spec-sha256: 0a6f94e732e53283a2ae7d6032e0fbe8bc8afacab641c4463ed2783af229e597 -->
+<!-- technical-spec-sha256: f7f5ec8d32ce8e1047c3607d2fc2ba541ec7aa60644894e5468b3bfcd2136dee -->
 
 The technical approval binds the exact neighboring [spec.md](spec.md).
 Acceptance criteria are maintained in
@@ -88,10 +88,6 @@ internal approval.
   approval. Generic CAS remains unable to rewrite authority; the dedicated
   path requires an exact scoped human decision, old/new artifact digests,
   atomic State readback, and a public-safe audit record.
-- Candidate-bound Security evidence whose clean verdict is reproducible across
-  an immutable detached candidate snapshot and the source checkout. Equivalent
-  repository identity must not be invalidated by worktree-local configuration;
-  any real source/tree/inventory drift remains blocking.
 - A correlated external-handoff, recovery, and workaround profile. Every
   Pipeline-known command or script offered for user execution is recorded
   before presentation, whether Pipeline-initiated or user-requested and
@@ -187,7 +183,6 @@ candidate.
 | Include suitable assigned or unassigned governance backlog | Scope validation with incorporated, fixture-only, and excluded dispositions |
 | Add runner-independent marketplace version/freshness | What, Scope, first delivery wave, and PHX-0 |
 | Rebind a legitimately revised active-design PRD/Spec without a hand-edited State workaround | Scope, PHX-0 slice A, and the lifecycle-authority revision contract |
-| Make a clean Security verdict genuinely candidate-bound across a detached worktree | Scope, security-candidate acceptance, and PHX-6 integration evidence |
 | Audit all Pipeline-known external execution handoffs, recovery, and workarounds safely | Scope, privacy risk control, and External Command Offer profile |
 | Treat completed 0.4.6 work as complete despite stale documentation | Non-goals and scope validation |
 | Do not start one fix before the overall design | Delivery shape and explicit non-goal |

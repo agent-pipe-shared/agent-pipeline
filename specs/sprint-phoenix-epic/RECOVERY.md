@@ -429,11 +429,12 @@ cleanup binding then advanced only the Continuity revision to `5` and created
 no product authority, implementation dispatch, remote write, or execution
 claim.
 
-The request artifact is
-[`evidence/phoenix-audit-handoff-design-revision.json`](evidence/phoenix-audit-handoff-design-revision.json).
-It records only the portable continuity transition. It contains no raw shell
-command, private path, account, credential, terminal output, or machine-local
-session detail.
+The machine-local request artifact is intentionally not a tracked design
+artifact. Its public-safe request digest is
+`c536d09ce53064c723b1cf2bb59bd5df9a472989a3d92d9efecfeb6dd0effadb`.
+The durable record here preserves only the portable continuity transition; it
+contains no raw shell command, private path, account, credential, terminal
+output, or machine-local session detail.
 
 The resulting design revision broadens PX-B into the External Command Offer
 profile: the Pipeline must record an offer before it presents or initiates a
@@ -443,24 +444,25 @@ observed outcome, and readback. This is an audit expansion, not permission to
 perform a bypass. The updated PRD/Spec require a fresh fixed-candidate review
 and renewed exact Product Owner approval before implementation.
 
-## R-13 — Security candidate-binding observation
+## R-13 — Security evidence trajectory observation
 
-The fixed Phoenix design candidate was scanned through the sanctioned local
-Security gate. Gitleaks, Semgrep, and license checks reported no findings; the
-dependency scanner reported its typed no-package-source state. Nevertheless,
-the machine evidence recorded `verifiedBeforeAfter:false` and the gate returned
-blocking status, so Phoenix makes no clean-Security claim. The evidence is
-bound to candidate commit/tree and retained only as local machine evidence;
-this record deliberately excludes its machine-local path and all scanner raw
-output.
+An earlier sanctioned local Security run on candidate
+`60369c766ddc940925a3eeccc93819423c9d7541`, tree
+`5e942cbd684d6f8fc851efd793e5a1f0a1edde83`, returned no scanner findings but
+recorded `verifiedBeforeAfter:false` and blocked. Its overwritten local
+machine-evidence artifact is not used as current-candidate evidence.
 
-Read-only source inspection confirms that the gate's candidate binding compares
-a detached-worktree observation with source-checkout identity. Phoenix now
-includes `EPIC-AC-07`: equivalent immutable candidate identity must not be
-invalidated by worktree-local configuration, while a real source/tree/inventory
-change remains blocking. This is a design observation and scoped PHX-6
-integration requirement, not authorization to change the Security gate before
-the Phoenix plan gate.
+A later sanctioned run on candidate
+`5eb98b99665bb074242d4084bec4839186fd08d5`, tree
+`2a322ca16a7cce1658dcd67e066da90acd360035`, recorded
+`verifiedBeforeAfter:true` and exit `0`. Both artifacts remain machine-local
+and this record deliberately excludes their paths and scanner raw output.
+
+The differing observations are not reproducible proof of a product defect.
+They create no Phoenix implementation scope and no claim that a Security gate
+needs a worktree-identity change. The only durable conclusion is trajectory
+honesty: a later clean result must carry its own exact candidate evidence, and
+an earlier blocked result must never be relabelled as clean.
 
 ## Audit classification
 
