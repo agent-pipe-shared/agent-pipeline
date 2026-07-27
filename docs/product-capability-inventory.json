@@ -695,6 +695,24 @@
       "member": "nova-invocation-reliability-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-b4-git-transport-contract-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-b4-git-transport-contract-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-b4-github-forge-adapter-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-b4-github-forge-adapter-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-b4-gitlab-forge-adapter-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-b4-gitlab-forge-adapter-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-macos-acceptance-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2057,6 +2075,9 @@
         "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
         "verify-phase:harness/scripts/verify.mjs:migrate-backlog-state-tests",
         "verify-phase:harness/scripts/verify.mjs:no-autoupdate-key-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-b4-git-transport-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-b4-github-forge-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-b4-gitlab-forge-adapter-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-backlog-reconciler-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-backlog-reconciliation-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-benchmark-tests",
