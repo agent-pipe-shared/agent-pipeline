@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
-  "planApproved": false,
-  "updatedAt": "2026-07-27T06:22:51.434Z",
+  "planApproved": true,
+  "updatedAt": "2026-07-27T07:39:26.600Z",
   "closedFeatures": [
     {
       "id": "codex-onboarding-0.4.5",
@@ -62,6 +62,25 @@
       "reservedCriticSlots": 1,
       "reservedRecoverySlots": 1,
       "fallbackPolicy": "defer"
+    }
+  },
+  "planApproval": {
+    "schema": "pipeline.plan-approval.v2",
+    "approvedBy": "Phoenix Elephant under explicit PO authority",
+    "approvedAt": "2026-07-27T07:39:26.600Z",
+    "specBoundBy": "Phoenix Elephant under explicit PO authority",
+    "specBoundAt": "2026-07-27T07:39:26.600Z",
+    "poGateAuthority": {
+      "schema": "pipeline.po-gate-authority.v2",
+      "humanFacing": "en",
+      "sourceSha256": "2a0f69551b46963d6d49ef0faaf9db5c28d27c4f681a9d4dd0be1a81b297da10",
+      "runtimeSha256": "071b0236f6054bbeea2140830320a88d1c6a9e733d7294ad0bb976fd2e28c897",
+      "receiptSha256": "738761ed1658e13bbc43280a1362c053d149963c49cea4a34ea15e9de08c611f",
+      "repositoryFingerprint": "92f4f001424af56c17e443aec9969d0ff5ac0e426b8f388fe06d4b1800aa2d35",
+      "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+      "planSha256": "dd1bfe68c054c97330dace9f7938a63a350e95315725ecd844a800989dfa14ce",
+      "specPath": "specs/sprint-phoenix-epic/spec.md",
+      "specSha256": "f7f5ec8d32ce8e1047c3607d2fc2ba541ec7aa60644894e5468b3bfcd2136dee"
     }
   }
 }

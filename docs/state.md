@@ -5,12 +5,12 @@
 
 **Last updated:** 2026-07-27
 **Project status:** ACTIVE
-**Current block:** Sprint Phoenix design complete; renewed Product Owner plan gate
+**Current block:** Sprint Phoenix design approved; PHX-0 slice A dispatch next
 **Branch:** `sprint_phoenix`, based on public `origin/main`
 `9d1b3dc108eb77629ace5b82002120f5539abd8d`
 **Pipeline:** `0.4.6+codex.20260726170452`
-**DoD:** 🟡 not-human-verified — the remaining authority is a renewed exact
-Product Owner `approved` decision
+**DoD:** 🟡 implementation pending — the renewed exact Product Owner `approved`
+decision is recorded as a Plan/Spec-bound approval
 
 ## Operational head
 
@@ -19,11 +19,12 @@ Product Owner `approved` decision
 - Phoenix is the only active feature in this checkout. Its readable plan is
   [the Phoenix PRD](../specs/sprint-phoenix-epic/prd_phoenix-epic.md), bound
   to the immutable [technical Spec](../specs/sprint-phoenix-epic/spec.md).
-- Pipeline state deliberately remains `phase:"design"` and
-  `planApproved:false`. Continuity revision `5` has the known next action
-  `review`; no implementation package is dispatchable. Its earlier PRD/Spec
-  authority digests are diagnostic only and cannot authorize the revised design
-  until PHX-0 supplies a sanctioned revision writer.
+- Pipeline state retains `phase:"design"` while its sanctioned v2
+  Plan/Spec-bound approval records `planApproved:true` at
+  `2026-07-27T07:39:26.600Z`. Continuity revision `5` still names `review`; the
+  transition to the first implementation package must be recorded through the
+  designated lifecycle/dispatch path. Its earlier Continuity PRD/Spec authority
+  digests remain diagnostic only; PHX-0 slice A owns their revision writer.
 - Earlier reviews remain preserved in the append-only
   [Phoenix Result](../specs/sprint-phoenix-epic/result.md). The external-handoff
   correction candidate passed Full Verify, Security, and a fresh independent
@@ -89,31 +90,29 @@ Product Owner `approved` decision
 
 ## Open items and next block
 
-1. The Product Owner reviews the readable Phoenix PRD and replies with a fresh
-   literal `approved` token for its exact bound Spec.
-2. Only after that decision may the sanctioned plan writer record approval and
-   the implementation phase begin.
-3. The first approved work is PHX-0 slice A. It must implement and independently
+1. The Product Owner's fresh literal `approved` decision has been recorded by
+   the sanctioned plan writer and is bound to the exact Phoenix PRD and Spec.
+2. The first approved work is PHX-0 slice A. It must implement and independently
    clear the transactional lifecycle writer before PHX-0 slice B or any later
    package.
-4. Each implementation package must map its criteria to named automated tests,
+3. Each implementation package must map its criteria to named automated tests,
    run focused and aggregate gates, receive the required independent review,
    and retain public-safe evidence.
-5. Remote publication remains a separate, explicitly authorized tail with
+4. Remote publication remains a separate, explicitly authorized tail with
    public-account readback and privacy checks.
-6. The monthly Pipeline tooling-radar run is overdue because no current-month
+5. The monthly Pipeline tooling-radar run is overdue because no current-month
    `tooling-radar` backlog item exists. Dispatch it separately; it is not
    Phoenix implementation authority.
-7. The close ritual could not append the root History and telemetry records:
+6. The close ritual could not append the root History and telemetry records:
    the still-correct Dev-Plan gate classified both as implementation. The
    canonical Handover, Phoenix Recovery audit, self-retro item, Error Register,
    Continuity transition, and all verification evidence remain written. Do not
    bypass or approve the plan merely to fill those two records; reconcile them
    through a sanctioned close-artifact path.
 
-No implementation, lifecycle promotion, or remote action is implied by this
-handover. The previous `approved` cannot authorize a material revision; the
-correct next action is the fresh exact PO gate.
+No remote action is implied by this handover. The recorded approval is limited
+to the exact bound Phoenix PRD and Spec; every later material revision requires
+its own renewed PO gate.
 
 ## Re-entry
 
@@ -123,8 +122,5 @@ correct next action is the fresh exact PO gate.
 2. Read this file, the active Pipeline state, the Phoenix PRD, Spec, readiness
    audit, Result, Recovery record, and latest Critic record.
 3. Confirm branch `sprint_phoenix`, base identity, clean worktree, valid
-   continuity, and `planApproved:false`.
-4. If a fresh exact PO decision is not the literal `approved`, remain in design
-   and do not dispatch implementation.
-5. If it is `approved`, use only the sanctioned plan/lifecycle writers and
-   begin with PHX-0 slice A.
+   continuity, and the v2 Plan/Spec-bound `planApproved:true` record.
+4. Begin only with a sanctioned, briefed Goldfish dispatch for PHX-0 slice A.
