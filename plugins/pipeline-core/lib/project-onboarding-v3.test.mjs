@@ -659,15 +659,16 @@ test("bootstrap inspection of a blank local root offers the portable seed instea
 test("a git-only Codex control mount carries host-managed state through the restart barrier", (t) => {
   if (process.platform === "win32") return;
   const path = root();
+  const runtimeDeps = { codexExecutable: process.execPath };
   try {
     mkdirSync(join(path, ".git"));
     chmodSync(join(path, ".git"), 0o500);
-    const portable = planProjectOnboardingLifecycleV4({ rootDir: path, operation: "portable" });
+    const portable = planProjectOnboardingLifecycleV4({ rootDir: path, operation: "portable", deps: runtimeDeps });
     const portableDigest = portable.nextAction.argv[portable.nextAction.argv.indexOf("--plan-sha256") + 1];
-    assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, operation: "portable", planSha256: portableDigest, activate: true }).status, "runtime-initialization-required");
-    const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, operation: "runtime" });
+    assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, operation: "portable", planSha256: portableDigest, activate: true, deps: runtimeDeps }).status, "runtime-initialization-required");
+    const runtime = planProjectOnboardingLifecycleV4({ rootDir: path, operation: "runtime", deps: runtimeDeps });
     const runtimeDigest = runtime.nextAction.argv[runtime.nextAction.argv.indexOf("--plan-sha256") + 1];
-    assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, operation: "runtime", planSha256: runtimeDigest, activate: true }).status, "restart-required");
+    assert.equal(applyProjectOnboardingLifecycleV4({ rootDir: path, operation: "runtime", planSha256: runtimeDigest, activate: true, deps: runtimeDeps }).status, "restart-required");
     assert.equal(readRestartBarrier({ rootDir: path, repositoryCapability: "host-managed" }).status, "present");
   } finally {
     try { chmodSync(join(path, ".git"), 0o700); } catch {}
