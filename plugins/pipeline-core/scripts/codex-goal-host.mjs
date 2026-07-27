@@ -59,7 +59,7 @@ export async function reconcileCodexGoal(input, { request } = {}) {
           ok: false,
           code: "CGH-BLOCKED-RESUME-REQUIRED",
           status: "blocked",
-          readback: { goalIdSha256: hash(`${goal.threadId}\n${goal.objective}`), generation: input.generation, status: "blocked" },
+          readback: { goalIdSha256: hash(`${goal.threadId}\n${goal.objective}`), generation: input.generation, observedAt: new Date().toISOString(), status: "blocked" },
           notice: renderCodexGoalBlockedNotice(goal),
         };
       }

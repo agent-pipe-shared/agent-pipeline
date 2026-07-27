@@ -25,6 +25,16 @@ check("active pipeline continuity derives a sanitised request and only readback 
   assert.equal(materialized.continuation.subject.planSha256, D);
   assert.equal(validateRunnerNativeContinuation(materialized.continuation).ok, true);
 });
+check("a native blocked readback remains a typed blocker and retains its resume evidence", () => {
+  const request = buildRunnerNativeContinuationRequest({ continuationId: "nova-b0", activeFeature: { id: "nova", phase: "implementation" }, continuity: { featureId: "nova", revision: 3, blocker: null, queueHead: { packageId: "b0", actionId: "implement" }, authority: { prd: { sha256: D }, plan: { sha256: D }, spec: { sha256: D } } }, runner: { runnerId: "codex", adapterVersion: "v2", capability: "available" } });
+  const adapterResult = { ok: false, code: "CGH-BLOCKED-RESUME-REQUIRED", status: "blocked", readback: { goalIdSha256: D, generation: 1, observedAt: "2026-07-25T00:00:00.000Z", status: "blocked" } };
+  const materialized = materializeRunnerNativeContinuation({ request, generation: 1, adapterResult, observedAt: adapterResult.readback.observedAt });
+  assert.equal(materialized.ok, true);
+  assert.equal(materialized.continuation.status, "blocked");
+  assert.equal(materialized.continuation.terminal.kind, "typed-blocker");
+  assert.deepEqual(materialized.continuation.readback, adapterResult.readback);
+  assert.equal(validateRunnerNativeContinuation(materialized.continuation).ok, true);
+});
 check("stale or malformed adapter generations become typed unavailable rather than fresh active evidence", () => {
   const request = buildRunnerNativeContinuationRequest({ continuationId: "nova-b0", activeFeature: { id: "nova", phase: "implementation" }, continuity: { featureId: "nova", revision: 3, blocker: null, queueHead: { packageId: "b0", actionId: "implement" }, authority: { prd: { sha256: D }, plan: { sha256: D }, spec: { sha256: D } } }, runner: { runnerId: "codex", adapterVersion: "v2", capability: "available" } });
   for (const readback of [{ goalIdSha256: D, generation: 0, observedAt: "2026-07-25T00:00:00.000Z", status: "active" }, { goalIdSha256: D, generation: 1, observedAt: "2026-07-25T00:00:00.000Z", status: "paused" }]) {

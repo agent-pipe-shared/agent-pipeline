@@ -91,6 +91,10 @@ function validReadback(value, generation, active, status) {
   // retained. `null` is reserved for a typed unavailable/failed adapter path,
   // which intentionally makes no claim that a native goal was cleared.
   if (value === null) return ["unavailable", "failed"].includes(status);
+  if (status === "blocked") {
+    return exact(value, READBACK) && digest(value.goalIdSha256) && value.generation === generation.number
+      && typeof value.observedAt === "string" && ISO.test(value.observedAt) && value.status === "blocked";
+  }
   return exact(value, new Set(["goalIdSha256", "generation", "status"]))
     && value.goalIdSha256 === null && value.generation === generation.number && value.status === "cleared";
 }
@@ -145,7 +149,11 @@ export function materializeRunnerNativeContinuation({ request, generation, adapt
     && exact(adapterResult.readback, READBACK) && digest(adapterResult.readback.goalIdSha256)
     && adapterResult.readback.generation === generation && adapterResult.readback.status === "active"
     && ISO.test(adapterResult.readback.observedAt) && adapterResult.readback.observedAt === observedAt;
-  const unavailable = !active;
+  const blocked = adapterResult.ok === false && adapterResult.status === "blocked"
+    && exact(adapterResult.readback, READBACK) && digest(adapterResult.readback.goalIdSha256)
+    && adapterResult.readback.generation === generation && ISO.test(adapterResult.readback.observedAt)
+    && adapterResult.readback.status === "blocked";
+  const unavailable = !active && !blocked;
   const value = {
     schema: RUNNER_NATIVE_CONTINUATION_SCHEMA,
     continuationId: request.request.continuationId,
@@ -153,13 +161,13 @@ export function materializeRunnerNativeContinuation({ request, generation, adapt
     objective: request.request.objective,
     acceptance: request.request.acceptance,
     evidence: request.request.evidence,
-    terminal: { kind: unavailable ? "unavailable" : "none", atRevision: request.request.subject.queueRevision },
+    terminal: { kind: blocked ? "typed-blocker" : unavailable ? "unavailable" : "none", atRevision: request.request.subject.queueRevision },
     runner: { ...request.request.runner, capability: unavailable ? "unavailable" : "available" },
     generation: { number: generation, goalSha256: createHash("sha256").update(canonical({ subject: request.request.subject, objective: request.request.objective, runner: request.request.runner, generation }), "utf8").digest("hex") },
-    status: unavailable ? "unavailable" : "active",
+    status: blocked ? "blocked" : unavailable ? "unavailable" : "active",
     progress: request.request.progress,
-    readback: active ? { ...adapterResult.readback } : null,
-    reason: { code: unavailable ? (typeof adapterResult.code === "string" && id(adapterResult.code) ? adapterResult.code : "adapter-unavailable") : reasonCode, evidenceSha256: null },
+    readback: active || blocked ? { ...adapterResult.readback } : null,
+    reason: { code: unavailable || blocked ? (typeof adapterResult.code === "string" && id(adapterResult.code) ? adapterResult.code : "adapter-unavailable") : reasonCode, evidenceSha256: blocked ? request.request.objective.conditionSha256 : null },
     recordSha256: null,
   };
   value.recordSha256 = computeRunnerNativeContinuationDigest(value);
