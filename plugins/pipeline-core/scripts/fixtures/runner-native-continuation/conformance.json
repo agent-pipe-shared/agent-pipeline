@@ -1,13 +1,13 @@
 {
   "schema": "pipeline.runner-native-continuation-fixture.v1",
   "cases": [
-    { "id": "premature-turn-completion", "runners": ["codex", "claude"], "initialStatus": "active", "event": "resume", "expectedAction": "set" },
+    { "id": "premature-turn-completion", "runners": ["codex", "claude"], "initialStatus": "active", "event": "resume", "expectedAction": "none" },
     { "id": "intermediate-question", "runners": ["codex", "claude"], "initialStatus": "active", "event": "additive-question", "expectedAction": "none" },
     { "id": "po-gate-wait", "runners": ["codex", "claude"], "initialStatus": "active", "event": "po-gate", "expectedAction": "clear" },
     { "id": "po-gate-resolution", "runners": ["codex", "claude"], "initialStatus": "paused-po-gate", "event": "po-gate-resolved", "expectedAction": "set" },
     { "id": "typed-blocker", "runners": ["codex", "claude"], "initialStatus": "active", "event": "typed-blocker", "expectedAction": "clear" },
     { "id": "explicit-pause-cancel-replace-redirect", "runners": ["codex", "claude"], "initialStatus": "active", "event": "explicit-control", "expectedAction": "clear" },
-    { "id": "compact-resume", "runners": ["codex", "claude"], "initialStatus": "active", "event": "compact-reentry", "expectedAction": "set" },
+    { "id": "compact-resume", "runners": ["codex", "claude"], "initialStatus": "active", "event": "compact-reentry", "expectedAction": "none" },
     { "id": "read-only-progress", "runners": ["codex", "claude"], "initialStatus": "active", "event": "project-progress", "expectedAction": "none" },
     { "id": "successful-completion", "runners": ["codex", "claude"], "initialStatus": "active", "event": "verified-completion", "expectedAction": "clear" },
     { "id": "unsupported-capability", "runners": ["codex", "claude"], "initialStatus": "active", "event": "capability-unavailable", "expectedAction": "clear" }

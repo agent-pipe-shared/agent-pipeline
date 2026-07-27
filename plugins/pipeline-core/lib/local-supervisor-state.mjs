@@ -10,6 +10,7 @@ const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const REPAIRS = new Set(["create", "readback", "recover-owned", "busy", "recovery-required", "noop", "unavailable"]);
 const LOCK_SCHEMA = "pipeline.local-supervisor-repair-lock.v1";
 const MAX_RECORD_BYTES = 65_536;
+const PROCESS_UID = typeof process.getuid === "function" ? process.getuid() : null;
 const object = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const exact = (value, keys) => object(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
 const digest = (value) => typeof value === "string" && SHA256.test(value);
@@ -53,6 +54,21 @@ export function admitLocalSupervisorCleanup({ record, owner, leaseSha256, manife
   return checked.ok && record.owner !== null && sameOwner(record.owner, owner) && record.lease.leaseSha256 === leaseSha256 && Array.isArray(manifest) && manifest.every(digest) && manifest.includes(record.recordSha256) && Number.isSafeInteger(nowMs) && record.lease.expiresAtMs > nowMs ? { ok: true, code: "LSS-CLEANUP-ADMITTED" } : { ok: false, code: "LSS-CLEANUP-DENIED" };
 }
 
+function trustedAncestor(stat) {
+  // A sticky system directory such as /tmp may host a private descendant, but
+  // every non-sticky ancestor must reject group/world write access.
+  return stat.isDirectory() && !stat.isSymbolicLink()
+    && (((stat.mode & 0o022) === 0) || ((stat.mode & 0o1000) !== 0));
+}
+function ownedStateDirectory(stat) {
+  return trustedAncestor(stat) && Number.isSafeInteger(PROCESS_UID) && stat.uid === PROCESS_UID
+    && (stat.mode & 0o022) === 0;
+}
+function ownedStateFile(stat) {
+  return stat.isFile() && !stat.isSymbolicLink() && Number.isSafeInteger(PROCESS_UID)
+    && stat.uid === PROCESS_UID && (stat.mode & 0o022) === 0 && stat.nlink === 1
+    && stat.size <= MAX_RECORD_BYTES;
+}
 function secureDirectoryChain(root, create, allowMissingTail = false) {
   if (typeof root !== "string" || !isAbsolute(root) || resolve(root) !== root) return false;
   try {
@@ -61,16 +77,16 @@ function secureDirectoryChain(root, create, allowMissingTail = false) {
       current = join(current, part);
       try {
         const stat = lstatSync(current);
-        if (!stat.isDirectory() || stat.isSymbolicLink()) return false;
+        if (!trustedAncestor(stat)) return false;
       } catch {
         if (allowMissingTail) return true;
         if (!create) return false;
         mkdirSync(current, { mode: 0o700 });
         const stat = lstatSync(current);
-        if (!stat.isDirectory() || stat.isSymbolicLink()) return false;
+        if (!ownedStateDirectory(stat)) return false;
       }
     }
-    return true;
+    return ownedStateDirectory(lstatSync(root));
   } catch { return false; }
 }
 function secureDirectory(root) { return secureDirectoryChain(root, true); }
@@ -79,7 +95,7 @@ function secureExistingOrMissingDirectory(root) { return secureDirectoryChain(ro
 function safeFile(path) {
   try {
     const stat = lstatSync(path);
-    return stat.isFile() && !stat.isSymbolicLink() && stat.size <= MAX_RECORD_BYTES ? { present: true, safe: true } : { present: true, safe: false };
+    return ownedStateFile(stat) ? { present: true, safe: true } : { present: true, safe: false };
   } catch { return { present: false, safe: false }; }
 }
 function safeRecord(path) { const entry = safeFile(path); return entry.present && entry.safe ? { ...entry, value: readJson(path) } : { ...entry, value: null }; }

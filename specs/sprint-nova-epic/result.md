@@ -589,3 +589,23 @@ code-candidate gates.
 No merge, release, GitLab validation or Issue `#63` comment occurred. The
 Epic remains active because B2-I, B3-I, live B4 and B5/B6 still require their
 own authority and acceptance evidence.
+
+## 2026-07-27 — Nova continuation and local-supervisor Critic corrections
+
+Status: `critic-findings-corrected; fresh-candidate-evidence-pending`.
+
+The current candidate corrects two Major findings from the independent Nova
+Critic. A Codex `blocked` goal is now current typed-blocker evidence only when
+its exact rendered objective and embedded generation match the requested
+continuation. Resume and compact re-entry retain one long-running active goal
+instead of repeatedly setting short successor goals; only a recorded named
+PO-gate resolution may create a successor. A different blocked goal or active
+user-controlled goal is never overwritten or misreported as current evidence.
+
+The ADR-0047 local supervisor-state repair now rejects ownership, restrictive
+mode and hard-link ambiguity for the machine-local root, records, journal and
+lock. Such drift produces typed unavailable or recovery-required outcomes;
+it cannot become create, noop or recover-owned success. Focused hostile tests
+cover both corrections. This record makes no fresh Full Verify, Security,
+Critic-pass, push, merge, release or Issue-closure claim; those are bound to
+the corrected candidate only after their respective later gates.

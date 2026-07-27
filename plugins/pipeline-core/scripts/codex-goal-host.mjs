@@ -7,6 +7,7 @@ const SHA256 = /^[a-f0-9]{64}$/u;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const ACTIONS = new Set(["set", "clear"]);
 const GOAL_STATES = new Set(["active", "paused", "blocked", "complete"]);
+const PIPELINE_GOAL_PREFIX = "Pipeline continuation: ";
 
 function object(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function exact(value, keys) { return object(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
@@ -41,6 +42,15 @@ export function renderCodexGoalBlockedNotice(goal) {
   return "Codex goal is blocked: automated Pipeline work is stopped. If the same blocker is resolved, resume this goal in the Codex CLI. If the objective or scope changed, set a short replacement with /goal <new objective> instead; mobile/read-only surfaces may not provide either control.";
 }
 
+function sameNativeGoal(goal, threadId, objective) {
+  return object(goal) && goal.threadId === threadId && goal.objective === objective;
+}
+
+function pipelineNativeGoal(goal, threadId) {
+  return object(goal) && goal.threadId === threadId
+    && typeof goal.objective === "string" && goal.objective.startsWith(PIPELINE_GOAL_PREFIX);
+}
+
 /**
  * Execute exactly one requested native goal action followed by `thread/goal/get`.
  * `request` is the already-authenticated App Server JSON-RPC client; this adapter
@@ -54,7 +64,7 @@ export async function reconcileCodexGoal(input, { request } = {}) {
     if (input.action === "set") {
       const current = await request("thread/goal/get", { threadId: input.threadId });
       const goal = current?.goal ?? null;
-      if (object(goal) && goal.threadId === input.threadId && goal.status === "blocked") {
+      if (sameNativeGoal(goal, input.threadId, objective) && goal.status === "blocked") {
         return {
           ok: false,
           code: "CGH-BLOCKED-RESUME-REQUIRED",
@@ -63,7 +73,17 @@ export async function reconcileCodexGoal(input, { request } = {}) {
           notice: renderCodexGoalBlockedNotice(goal),
         };
       }
-      if (!(object(goal) && goal.threadId === input.threadId && goal.objective === objective && goal.status === "active")) {
+      if (object(goal) && goal.threadId === input.threadId && goal.status === "blocked") {
+        return unavailable("CGH-BLOCKED-IDENTITY-MISMATCH");
+      }
+      if (object(goal) && goal.threadId === input.threadId && goal.status === "active" && !pipelineNativeGoal(goal, input.threadId)) {
+        return unavailable("CGH-EXPLICIT-CONTROL-REQUIRED");
+      }
+      // Compact/re-entry preserves one already-active Pipeline objective.  It
+      // may carry an earlier progress generation, but has not crossed a named
+      // PO gate and therefore must not be replaced by a shorter child goal.
+      if (!(sameNativeGoal(goal, input.threadId, objective) && goal.status === "active")
+        && !(pipelineNativeGoal(goal, input.threadId) && goal.status === "active")) {
         const set = await request("thread/goal/set", { threadId: input.threadId, objective, status: "active", tokenBudget: null });
         if (!object(set?.goal)) return unavailable("CGH-SET");
       }
@@ -76,7 +96,7 @@ export async function reconcileCodexGoal(input, { request } = {}) {
     if (input.action === "clear") {
       return goal === null ? { ok: true, code: "CGH-CLEARED", status: "cleared", readback: { goalIdSha256: null, generation: input.generation, status: "cleared" } } : unavailable("CGH-CLEAR-READBACK");
     }
-    if (!object(goal) || goal.threadId !== input.threadId || goal.objective !== objective || goal.status !== "active"
+    if (!object(goal) || goal.threadId !== input.threadId || (!sameNativeGoal(goal, input.threadId, objective) && !pipelineNativeGoal(goal, input.threadId)) || goal.status !== "active"
       || !GOAL_STATES.has(goal.status)) return unavailable("CGH-READBACK");
     return { ok: true, code: "CGH-ACTIVE", status: "active", readback: { goalIdSha256: hash(`${goal.threadId}\n${goal.objective}`), generation: input.generation, observedAt: new Date().toISOString(), status: "active" } };
   } catch { return unavailable("CGH-TRANSPORT"); }

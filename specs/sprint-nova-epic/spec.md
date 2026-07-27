@@ -729,8 +729,10 @@ from phase/revision, deadline, test/dispatch, candidate/evidence and read-only
 artifact observations. Unknown progress remains unknown; no diff is required.
 Codex uses its supported native goal interface; Claude Code uses its supported
 native session-goal interface together with its Stop integration. Resume and
-compact re-entry restore the same active generation or safely establish its
-successor. Neither adapter may synthesize a next turn after a terminal state.
+compact re-entry retain the same active native goal and generation; they do
+not create a short successor goal. A successor may be established only after
+a recorded named PO-gate resolution. Neither adapter may synthesize a next
+turn after a terminal state.
 
 The capability result is `available`, `unavailable` or `failed`. Unsupported
 or version-incompatible native-goal capability must persist a typed
@@ -745,13 +747,16 @@ resume/compact re-entry, read-only progress, successful completion and
 unsupported capability. Tests prove that activation neither changes effective
 permissions nor creates a duplicate native goal.
 
-For Codex, an observed native `blocked` goal is a hard automation stop. The
-adapter must return `CGH-BLOCKED-RESUME-REQUIRED`, name that automated Pipeline
-work cannot continue, and distinguish the two user actions: resume in the
-Codex CLI only when the same blocker is resolved; otherwise set a short
-replacement via `/goal <new objective>`. It may not create a replacement goal,
-silently set the blocked goal active, or claim that a mobile/read-only surface
-can perform either control.
+For Codex, an observed native `blocked` goal is a hard automation stop only
+when its exact rendered objective and embedded generation match the current
+request. That identity-bound observation returns
+`CGH-BLOCKED-RESUME-REQUIRED`, names that automated Pipeline work cannot
+continue, and distinguishes the two user actions: resume in the Codex CLI only
+when the same blocker is resolved; otherwise set a short replacement via
+`/goal <new objective>`. A different blocked goal is typed unavailable rather
+than current blocker evidence. The adapter may not create a replacement goal,
+silently set the blocked goal active, overwrite an active user-controlled goal,
+or claim that a mobile/read-only surface can perform either control.
 
 ### 6.2 B1 — Local worker pool (`#21`)
 

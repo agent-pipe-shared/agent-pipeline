@@ -299,7 +299,9 @@ export function planNativeGoalTransition({ continuation, event }) {
   if (["activate", "resume", "compact-reentry"].includes(event.kind)) {
     if (continuation.status !== "active") return decision("none", continuation.status, continuation.terminal.kind, "not-active", continuation.generation.number);
     if (continuation.runner.capability !== "available") return decision("none", "unavailable", "unavailable", "capability-unavailable", continuation.generation.number);
-    return decision("set", "active", "none", event.kind, continuation.generation.number + 1);
+    // An active native goal spans ordinary resumes and compaction.  Only a
+    // named PO gate clears it and its recorded resolution creates a successor.
+    return decision("none", "active", "none", "active-goal-retained", continuation.generation.number);
   }
   if (continuation.status !== "active") return decision("none", continuation.status, continuation.terminal.kind, "terminal-or-paused", continuation.generation.number);
   const mapping = {

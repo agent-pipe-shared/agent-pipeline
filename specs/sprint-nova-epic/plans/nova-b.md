@@ -34,8 +34,9 @@ watchdog, external supervisor or permission grant.
    private host text;
 3. activate and read back Codex, then Claude Code, native goals using their
    supported host interfaces;
-4. restore the goal on resume and compact re-entry while the same item remains
-   active;
+4. retain the same goal and generation on resume and compact re-entry while
+   the same item remains active; only a recorded PO-gate resolution may create
+   its successor;
 5. pause/clear it for a named PO gate, restore it only after recorded gate
    resolution, and honour explicit pause/cancel/replace/redirect first; and
 6. run cross-runner fixtures for premature completion, intermediate questions,
@@ -51,6 +52,9 @@ typed degraded evidence and leaves no false continuation claim.
 must explicitly tell the user that CLI resume is required; it cannot be
 silently replaced or resumed by the Pipeline. Resume applies only if the same
 blocker is resolved; a changed scope/objective requires `/goal <new objective>`.
+The adapter accepts it as current evidence only after exact rendered-objective
+and generation binding. A different blocked goal, or an active user-controlled
+goal, is never overwritten and never becomes current continuation evidence.
 
 **Stop:** any implied permission expansion, duplicate native activation,
 unbounded retry, unclear native-goal readback, conflict with Stop-hook context

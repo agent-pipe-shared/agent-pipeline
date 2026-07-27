@@ -195,6 +195,12 @@ Nova A is accepted only when:
 - NVA-B60-3: The user-facing notice distinguishes same-blocker CLI resume from
   a changed objective, which requires `/goal <new objective>`; the Pipeline
   never silently resumes or replaces the goal.
+- NVA-B60-4: Resume and compact re-entry retain the active native-goal
+  generation; a successor is created only after a recorded named PO-gate
+  resolution, never to split ordinary autonomous work.
+- NVA-B60-5: A blocked Codex goal becomes current typed-blocker evidence only
+  after exact rendered-objective and generation binding; a different blocked
+  or active user-controlled goal is never overwritten or misreported.
 
 ### `#21` Local worker pool
 
@@ -213,6 +219,10 @@ Nova A is accepted only when:
 - NVA-B21-7: Every worker workspace has exact PO-approved target/base/write
   authority, creation/ownership/lease/cleanup evidence and fail-closed
   wrong-target, stale-owner and orphan cases.
+- NVA-B21-12: Machine-local supervisor root, record, journal and lock require
+  the current owner, restrictive non-group/non-world-writable modes and
+  unambiguous regular-file link count; ownership, mode or hard-link drift is
+  typed unavailable/recovery-required rather than create, noop or recovery.
 - NVA-B21-8: The B1-I functional test wave uses real temporary Git
   repositories, independent no-hardlink local clones and overlapping operating
   system child processes; an in-process reducer or mocked spawn alone cannot

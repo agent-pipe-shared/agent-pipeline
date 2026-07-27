@@ -111,6 +111,12 @@ check("resume creates a fresh generation", () => {
   paused.recordSha256 = computeRunnerNativeContinuationDigest(paused);
   assert.deepEqual(planNativeGoalTransition({ continuation: paused, event: { kind: "po-gate-resolved", atRevision: 5 } }), { ok: true, code: "RNC-SET", action: "set", state: "active", terminal: "none", reasonCode: "po-gate-resolved", generation: 2 });
 });
+check("active resume and compact retain one native goal generation", () => {
+  const active = record();
+  for (const kind of ["resume", "compact-reentry"]) {
+    assert.deepEqual(planNativeGoalTransition({ continuation: active, event: { kind, atRevision: 4 } }), { ok: true, code: "RNC-NOOP", action: "none", state: "active", terminal: "none", reasonCode: "active-goal-retained", generation: 1 });
+  }
+});
 check("PO resolution must strictly follow the recorded named gate", () => {
   const paused = record({ status: "paused-po-gate", terminal: { kind: "named-po-gate", atRevision: 4 }, readback: { goalIdSha256: null, generation: 1, status: "cleared" } }); paused.recordSha256 = computeRunnerNativeContinuationDigest(paused);
   for (const atRevision of [3, 4]) assert.equal(planNativeGoalTransition({ continuation: paused, event: { kind: "po-gate-resolved", atRevision } }).action, "none");

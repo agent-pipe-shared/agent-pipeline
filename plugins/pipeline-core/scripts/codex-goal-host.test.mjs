@@ -35,8 +35,41 @@ await check("blocked native goal stops automation and gives an explicit CLI-resu
   assert.match(result.notice, /\/goal <new objective>/u);
   assert.equal(renderCodexGoalBlockedNotice({ threadId: "thread-1", objective, status: "blocked" }), result.notice);
 });
+await check("a blocked goal with another objective cannot impersonate the requested generation", async () => {
+  const calls = [];
+  const result = await reconcileCodexGoal(input, { request: async (method) => {
+    calls.push(method);
+    return { goal: { threadId: "thread-1", objective: "Pipeline continuation: feature=other", status: "blocked" } };
+  } });
+  assert.deepEqual(calls, ["thread/goal/get"]);
+  assert.deepEqual(result, { ok: false, code: "CGH-BLOCKED-IDENTITY-MISMATCH", status: "unavailable", readback: null });
+});
+await check("an active Pipeline goal survives ordinary compact re-entry without a reset", async () => {
+  const calls = [];
+  const oldObjective = "Pipeline continuation: feature=nova; phase=implementation; package=b0; action=implement; generation=1; condition=old.";
+  const result = await reconcileCodexGoal(input, { request: async (method) => {
+    calls.push(method);
+    return { goal: { threadId: "thread-1", objective: oldObjective, status: "active" } };
+  } });
+  assert.equal(result.ok, true);
+  assert.deepEqual(calls, ["thread/goal/get", "thread/goal/get"]);
+});
+await check("an active user-controlled goal is never overwritten by Pipeline activation", async () => {
+  const calls = [];
+  const result = await reconcileCodexGoal(input, { request: async (method) => {
+    calls.push(method);
+    return { goal: { threadId: "thread-1", objective: "User objective", status: "active" } };
+  } });
+  assert.deepEqual(calls, ["thread/goal/get"]);
+  assert.deepEqual(result, { ok: false, code: "CGH-EXPLICIT-CONTROL-REQUIRED", status: "unavailable", readback: null });
+});
 await check("wrong readback never claims protected continuation", async () => {
-  const result = await reconcileCodexGoal(input, { request: async (method) => method === "thread/goal/set" ? { goal: {} } : { goal: { threadId: "thread-1", objective: "wrong", status: "active" } } });
+  let getCount = 0;
+  const result = await reconcileCodexGoal(input, { request: async (method) => {
+    if (method === "thread/goal/set") return { goal: {} };
+    getCount += 1;
+    return { goal: getCount === 1 ? null : { threadId: "thread-1", objective: "wrong", status: "active" } };
+  } });
   assert.deepEqual(result, { ok: false, code: "CGH-READBACK", status: "unavailable", readback: null });
 });
 await check("clear requires a null goal readback", async () => {
