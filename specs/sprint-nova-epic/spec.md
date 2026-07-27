@@ -832,7 +832,9 @@ idempotency subject.
 The B2-I broker's `submittedAt`, `requestedAt` and `observedAt` use the fixed
 `local-monotonic-ms` clock: local broker monotonic milliseconds. Provider time
 is not mixed into that ordering; provider ordering uses `providerSequence` or
-`not-provided` only.
+`not-provided` only. Later observations and cancellation intents cannot move
+that local clock backward, and every successor preserves its retry attempt and
+retry genesis.
 
 `pipeline.async-execution-journal.v1` appends provider observations with exact
 provider job binding, subject, provider sequence or `not-provided`, observation
