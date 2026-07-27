@@ -619,11 +619,20 @@ objective equality is required for both active and blocked observations. The
 long-running goal is retained by the controller on ordinary resume/compact
 without an adapter set call; a stale prefix-like goal cannot impersonate it.
 
-The local supervisor-state trust boundary now rejects every group- or
-world-writable ancestor, including sticky directories, because ownership does
-not remove the directory-replacement race. The threat model documents that
-rule together with owner, restrictive-mode and single-hard-link requirements
-for root and direct state files. The B1-I exact path manifest explicitly
-records its ADR-0047 repair exception. No new
+The local supervisor-state trust boundary now accepts a writable sticky
+ancestor only when owned by the current user or the local system, and the
+threat model documents that rule together with owner, restrictive-mode and
+single-hard-link requirements for root and direct state files. The B1-I exact
+path manifest explicitly records its ADR-0047 repair exception. No new
 provider, credential, execution, external, push, merge, release or closure
 authority is introduced.
+
+## 2026-07-27 — Amendment: strict sticky-ancestor disposition
+
+This amendment supersedes only the preceding statement that a writable sticky
+ancestor can be admitted based on ownership. The implemented ADR-0047 rule is
+strictly fail-closed: every group- or world-writable ancestor, including a
+sticky directory, is rejected because ownership does not remove the
+directory-replacement race. All other statements in the preceding record
+remain unchanged. This amendment introduces no provider, credential,
+execution, external, push, merge, release or closure authority.
