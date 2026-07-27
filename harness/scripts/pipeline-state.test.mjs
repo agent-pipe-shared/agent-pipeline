@@ -2213,12 +2213,16 @@ if (symlinkCapable) {
   writeFileSync(journalPath, `${canonicalFixtureJson(journal)}\n`);
   const refused = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-02", "--mode", "complete"], bound);
   ok("PHX0A6f self-consistent forged journal postimage cannot complete or change the retained preimage", crashed === 2 && refused === 2 && readFileSync(statePath(dir), "utf8") === before && existsSync(journalPath));
+  // Historical v1 retained its original writer timestamp as a required field.
   journal.schema = "pipeline.continuity-authority-revision-transaction.v1";
+  writeFileSync(journalPath, `${canonicalFixtureJson(journal)}\n`);
+  const missingTimestamp = captureConsoleLog(() => run(["continuity-authority-revision-recover"], bound));
+  journal.updatedAt = JSON.parse(journal.preStateBytes).updatedAt;
   writeFileSync(journalPath, `${canonicalFixtureJson(journal)}\n`);
   const legacyPreview = captureConsoleLog(() => run(["continuity-authority-revision-recover"], bound));
   const legacyComplete = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-03", "--mode", "complete"], bound);
   const legacyRestore = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-04", "--mode", "restore"], bound);
-  ok("PHX0A6g legacy-v1 pending journal is explicitly restore-only and remains recoverable", legacyPreview.value === 2 && legacyPreview.text.includes("recovery-legacy-restore-only") && legacyComplete === 2 && legacyRestore === 0 && readFileSync(statePath(dir), "utf8") === before && !existsSync(journalPath));
+  ok("PHX0A6g v1 requires its historical timestamp and valid legacy journals are explicitly restore-only", missingTimestamp.value === 2 && missingTimestamp.text.includes("recovery-invalid") && legacyPreview.value === 2 && legacyPreview.text.includes("recovery-legacy-restore-only") && legacyComplete === 2 && legacyRestore === 0 && readFileSync(statePath(dir), "utf8") === before && !existsSync(journalPath));
 }
 
 {

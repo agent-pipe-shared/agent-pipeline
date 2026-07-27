@@ -2524,9 +2524,11 @@ function authorityRevisionJournal(request, preStateBytes, postStateBytes) {
   };
 }
 function authorityRevisionJournalKind(value) {
-  const keys = ["schema", "request", "requestSha256", "preStateSha256", "preStateBytesSha256", "preStateBytes", "postStateSha256", "postStateBytesSha256", "postStateBytes"];
-  if (!exactObjectKeys(value, keys) || !["pipeline.continuity-authority-revision-transaction.v1", "pipeline.continuity-authority-revision-transaction.v2"].includes(value.schema)) return null;
-  return value.schema.endsWith(".v1") ? "legacy-v1" : "v2";
+  const core = ["schema", "request", "requestSha256", "preStateSha256", "preStateBytesSha256", "preStateBytes", "postStateSha256", "postStateBytesSha256", "postStateBytes"];
+  if (value?.schema === "pipeline.continuity-authority-revision-transaction.v1"
+    && exactObjectKeys(value, [...core, "updatedAt"]) && safeIso(value.updatedAt)) return "legacy-v1";
+  if (value?.schema === "pipeline.continuity-authority-revision-transaction.v2" && exactObjectKeys(value, core)) return "v2";
+  return null;
 }
 function exactAuthorityRevisionJournal(value) {
   return authorityRevisionJournalKind(value) !== null
