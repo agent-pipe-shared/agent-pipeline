@@ -33,7 +33,7 @@
     {
       "class": "result",
       "path": "specs/sprint-nova-epic/result.md",
-      "sha256": "e56b13a27d09274136be8b4a10c3a4c17f6d52ccfb57f69ddbf06b8e20fc4957",
+      "sha256": "7a28fece79a04edd6e0b1ed116de87d7890e4b491f2dd5d0deb2211b33768649",
       "authority": true,
       "mutability": "append-only",
       "retention": "retain"
@@ -221,8 +221,43 @@
       "authority": false,
       "mutability": "immutable",
       "retention": "retain"
+    },
+    {
+      "class": "candidate-evidence",
+      "path": "specs/sprint-nova-epic/evidence/nova-b/candidate-freeze.json",
+      "sha256": "02f78ceb57dddbc15ba9ae390d0230d26e4817a40ff0cd7116c0f66d176c36a7",
+      "authority": false,
+      "mutability": "immutable",
+      "retention": "retain"
+    },
+    {
+      "class": "candidate-evidence",
+      "path": "specs/sprint-nova-epic/evidence/nova-b/evidence-manifest.json",
+      "sha256": "3716ba6a7137f3fb14844b13dae70b911bba29521780c5d14abf82377cf587c8",
+      "authority": false,
+      "mutability": "immutable",
+      "retention": "retain"
+    },
+    {
+      "class": "candidate-evidence",
+      "path": "specs/sprint-nova-epic/evidence/nova-b/verify.json",
+      "sha256": "b6ef6512df9d35cf426c7c7da3159173dfc5ecfe28b86b0474bd97ad801dfd32",
+      "authority": false,
+      "mutability": "immutable",
+      "retention": "retain"
+    },
+    {
+      "class": "candidate-evidence",
+      "path": "specs/sprint-nova-epic/evidence/nova-b/security.json",
+      "sha256": "310f818fa1681a7facd0964c57fd627d95fd51f24ec1d34fb483ecd7cf0ef66f",
+      "authority": false,
+      "mutability": "immutable",
+      "retention": "retain"
     }
   ],
-  "candidate": null,
+  "candidate": {
+    "commit": "8f765eeec163d12b4142eabc60ddcef384780354",
+    "tree": "4ee64595d6b3e5915d664648be4557e0dfd185cb"
+  },
   "supersedes": null
 }

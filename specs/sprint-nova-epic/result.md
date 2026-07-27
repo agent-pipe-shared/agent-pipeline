@@ -695,3 +695,19 @@ Nova is based on delivered and closed `v0.4.6`. It makes no assertion about
 Cyborg's base and retains the prohibition on consuming unpublished Cyborg
 bytes. This correction does not merge, rebase, integrate, or otherwise read
 from a sibling Sprint.
+
+## 2026-07-27 — B5 Nova-only candidate freeze
+
+Status: `candidate-frozen; external-native-gates-pending`.
+
+The Nova-only candidate `8f765eeec163d12b4142eabc60ddcef384780354`
+(`4ee64595d6b3e5915d664648be4557e0dfd185cb`) is frozen on
+`feat/sprint-nova-codex-v046`, based on delivered and closed `v0.4.6`.
+Its 17-Issue binding, green canonical backlog projection, exact Full Verify and
+Security evidence are retained under `evidence/nova-b/`. No unpublished Cyborg
+bytes are an input.
+
+This is only the B5 candidate assembly record. B2-I, B3-I, live B4 and B6
+remain separate gates; in particular this record does not claim native Apple
+Silicon execution, an independent final Critic, PO close, Issue closure,
+merge, push or release.
