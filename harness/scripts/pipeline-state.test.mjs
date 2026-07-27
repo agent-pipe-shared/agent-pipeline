@@ -322,6 +322,23 @@ function continuityArgs(sub, revision, requestFile, token = "token-00000001") {
   return [sub, "--expected-revision", String(revision), "--request-file", requestFile, "--lock-token", token];
 }
 
+function sameAuthorityRevisionApproval(approval, request) {
+  return JSON.stringify(approval) === JSON.stringify({
+    schema: "pipeline.continuity-authority-revision-approval.v1", featureId: request.featureId, phase: "design",
+    oldAuthority: request.oldAuthority, nextAuthority: request.nextAuthority, decision: request.decision,
+    candidate: request.candidate, evidence: request.evidence, expiresAt: request.expiresAt,
+  });
+}
+
+function authorityRevisionDeps(dir, boundRequest, overrides = {}) {
+  return continuityDeps(dir, {
+    gitBinding: () => ({ ok: true, commit: boundRequest.candidate.commit, tree: boundRequest.candidate.tree }),
+    authorityRevisionApproval: ({ repoRoot, ...approval }) => sameAuthorityRevisionApproval(approval, boundRequest)
+      ? { ok: true, value: approval } : { ok: false, code: "PO-DESIGN-REVISION-STALE" },
+    ...overrides,
+  });
+}
+
 function finalTransactionFixture(dir, name = "txn") {
   seedContinuityRoot(dir);
   const initial = continuityState();
@@ -2104,13 +2121,75 @@ if (symlinkCapable) {
   const stateBefore = readState(dir).state;
   const request = { schema: "pipeline.continuity-authority-revision-request.v1", featureId: CONTINUITY_FEATURE, expectedRevision: 0, preStateSha256: sha256CanonicalJson(stateBefore), oldAuthority: { prd: oldPrd, spec: oldSpec }, nextAuthority: { prd: nextPrd, spec: nextSpec }, decision: { id: "decision-01", sha256: A, scope: { featureId: CONTINUITY_FEATURE, phase: "design" } }, candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, evidence: { sha256: B }, idempotencyKey: "phx-revision-01", expiresAt: "2030-01-01T00:00:00.000Z" };
   const requestFile = writeRequest(dir, "authority-request", request); const requestSha = sha256Canonical(request);
+  const revisionDeps = authorityRevisionDeps(dir, request);
   const generic = structuredClone(initial); generic.revision = 1; generic.authority.prd = nextPrd; generic.authority.spec = nextSpec;
   const genericDenied = run(continuityArgs("continuity-cas", 0, writeRequest(dir, "generic-authority-cas", generic)), continuityDeps(dir));
-  const planned = run(["continuity-authority-revision-plan", "--proposal-file", requestFile], continuityDeps(dir));
-  const applied = run(["continuity-authority-revision-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-authority-lock-01"], continuityDeps(dir));
-  const after = readState(dir).state; const replay = run(["continuity-authority-revision-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-authority-lock-01"], continuityDeps(dir));
-  ok("PHX0A4 generic CAS rejects authority mutation while dedicated exact plan/apply succeeds", genericDenied === 2 && planned === 0 && applied === 0 && after.continuity.authority.prd.sha256 === nextPrd.sha256);
+  const forged = structuredClone(request); forged.decision.sha256 = D;
+  const forgedFile = writeRequest(dir, "forged-authority-request", forged);
+  const forgedDenied = run(["continuity-authority-revision-apply", "--request-file", forgedFile, "--request-sha256", sha256Canonical(forged), "--lock-token", "phx-authority-lock-forged"], revisionDeps);
+  const planned = run(["continuity-authority-revision-plan", "--proposal-file", requestFile], revisionDeps);
+  const applied = run(["continuity-authority-revision-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-authority-lock-01"], revisionDeps);
+  const after = readState(dir).state; const replay = run(["continuity-authority-revision-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-authority-lock-01"], revisionDeps);
+  ok("PHX0A4 generic CAS rejects authority mutation while a forged self-declared decision is refused", genericDenied === 2 && forgedDenied === 2 && planned === 0 && applied === 0 && after.continuity.authority.prd.sha256 === nextPrd.sha256);
   ok("PHX0A5 dedicated authority revision replay is zero-write with a public-safe receipt", replay === 0 && after.continuityAuthorityRevisionReceipts.length === 1 && !JSON.stringify(after.continuityAuthorityRevisionReceipts[0]).includes(dir));
+}
+
+// ---- PHX0A: revision recovery retains only exact pre/postimage-bound state -----------------
+{
+  const dir = freshDir("phx-authority-revision-recovery");
+  seedContinuityRoot(dir);
+  const artifact = (path, bytes) => { writeFileSync(join(dir, path), bytes); return { path, sha256: createHash("sha256").update(bytes).digest("hex") }; };
+  const oldPrd = artifact("specs/recovery-prd.md", "old prd\n"); const oldSpec = artifact("specs/recovery-spec.md", "old spec\n");
+  const nextPrd = artifact("specs/recovery-prd-next.md", "next prd\n"); const nextSpec = artifact("specs/recovery-spec-next.md", "next spec\n");
+  const initial = continuityState({ authority: { prd: oldPrd, spec: oldSpec, result: { path: "specs/result.md", sha256: C } }, queueHead: continuityQueue({ dispatch: null }) });
+  run(continuityArgs("continuity-init", "absent", writeRequest(dir, "recovery-init", initial)), continuityDeps(dir));
+  const before = readFileSync(statePath(dir), "utf8"); const stateBefore = readState(dir).state;
+  const request = { schema: "pipeline.continuity-authority-revision-request.v1", featureId: CONTINUITY_FEATURE, expectedRevision: 0, preStateSha256: sha256CanonicalJson(stateBefore), oldAuthority: { prd: oldPrd, spec: oldSpec }, nextAuthority: { prd: nextPrd, spec: nextSpec }, decision: { id: "decision-recovery-01", sha256: A, scope: { featureId: CONTINUITY_FEATURE, phase: "design" } }, candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, evidence: { sha256: B }, idempotencyKey: "phx-recovery-01", expiresAt: "2030-01-01T00:00:00.000Z" };
+  const requestFile = writeRequest(dir, "recovery-authority-request", request); const requestSha = sha256Canonical(request);
+  const bound = authorityRevisionDeps(dir, request); const crash = authorityRevisionDeps(dir, request, { replaceStateFdContents: () => { throw new Error("injected crash seam"); } });
+  let renameCount = 0;
+  const postCrash = authorityRevisionDeps(dir, request, { renameSync: (from, to) => { renameSync(from, to); if (++renameCount === 2) throw new Error("injected postimage crash seam"); } });
+  const applyArgs = ["continuity-authority-revision-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-recovery-lock-01"];
+  const crashed = run(applyArgs, crash);
+  const preview = captureConsoleLog(() => run(["continuity-authority-revision-recover"], bound));
+  const restore = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-recovery-lock-02", "--mode", "restore"], bound);
+  const restoredPreimage = readFileSync(statePath(dir), "utf8") === before;
+  const postCrashed = run(applyArgs, postCrash);
+  const postRestore = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-recovery-lock-03", "--mode", "restore"], bound);
+  const restoredPostimage = readFileSync(statePath(dir), "utf8") === before;
+  const crashedAgain = run(applyArgs, crash);
+  const complete = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-recovery-lock-04", "--mode", "complete"], bound);
+  const after = readState(dir).state;
+  ok("PHX0A6a crash seam retains a typed preview and restore clears only the retained preimage journal", crashed === 2 && preview.value === 2 && preview.text.includes("recovery-required") && restore === 0 && restoredPreimage);
+  ok("PHX0A6b postimage crash can restore exactly the retained preimage", postCrashed === 2 && postRestore === 0 && restoredPostimage);
+  ok("PHX0A6c a second interrupted transaction completes only the retained postimage", crashedAgain === 2 && complete === 0 && after.continuity.revision === 1 && after.continuity.authority.prd.sha256 === nextPrd.sha256 && !existsSync(join(dir, ".claude", "continuity-authority-revision-transaction.json")));
+}
+
+{
+  const dir = freshDir("phx-authority-revision-recovery-drift");
+  seedContinuityRoot(dir);
+  const artifact = (path, bytes) => { writeFileSync(join(dir, path), bytes); return { path, sha256: createHash("sha256").update(bytes).digest("hex") }; };
+  const oldPrd = artifact("specs/drift-prd.md", "old prd\n"); const oldSpec = artifact("specs/drift-spec.md", "old spec\n");
+  const nextPrd = artifact("specs/drift-prd-next.md", "next prd\n"); const nextSpec = artifact("specs/drift-spec-next.md", "next spec\n");
+  const initial = continuityState({ authority: { prd: oldPrd, spec: oldSpec, result: { path: "specs/result.md", sha256: C } }, queueHead: continuityQueue({ dispatch: null }) });
+  run(continuityArgs("continuity-init", "absent", writeRequest(dir, "drift-init", initial)), continuityDeps(dir));
+  const stateBefore = readState(dir).state;
+  const request = { schema: "pipeline.continuity-authority-revision-request.v1", featureId: CONTINUITY_FEATURE, expectedRevision: 0, preStateSha256: sha256CanonicalJson(stateBefore), oldAuthority: { prd: oldPrd, spec: oldSpec }, nextAuthority: { prd: nextPrd, spec: nextSpec }, decision: { id: "decision-drift-01", sha256: A, scope: { featureId: CONTINUITY_FEATURE, phase: "design" } }, candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, evidence: { sha256: B }, idempotencyKey: "phx-drift-01", expiresAt: "2030-01-01T00:00:00.000Z" };
+  const requestFile = writeRequest(dir, "drift-authority-request", request); const requestSha = sha256Canonical(request);
+  const bound = authorityRevisionDeps(dir, request); const crash = authorityRevisionDeps(dir, request, { replaceStateFdContents: () => { throw new Error("injected crash seam"); } });
+  const crashed = run(["continuity-authority-revision-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-drift-lock-01"], crash);
+  const drifted = { ...readState(dir).state, updatedAt: "2026-07-08T00:00:00.000Z" };
+  writeFileSync(statePath(dir), JSON.stringify(drifted, null, 2) + "\n");
+  const refused = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-drift-lock-02", "--mode", "complete"], bound);
+  ok("PHX0A6d recovery refuses State drift and retains the bound journal without a false completion claim", crashed === 2 && refused === 2 && readState(dir).state.continuity.revision === 0 && existsSync(join(dir, ".claude", "continuity-authority-revision-transaction.json")));
+}
+
+{
+  const dir = freshDir("phx-authority-revision-recovery-invalid");
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  writeFileSync(join(dir, ".claude", "continuity-authority-revision-transaction.json"), "{ invalid journal");
+  const recovery = captureConsoleLog(() => run(["continuity-authority-revision-recover"], continuityDeps(dir)));
+  ok("PHX0A6e malformed retained journals are typed recovery-invalid, never a no-recovery success", recovery.value === 2 && recovery.text.includes("recovery-invalid"));
 }
 
 // ---- Cleanup ------------------------------------------------------------------------------
