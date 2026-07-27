@@ -2,9 +2,11 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { cpSync, mkdtempSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 import { main as planRuntimeProjectionV3Cli } from "../scripts/plan-runtime-projection-v3.mjs";
 import { loadRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
@@ -360,6 +362,111 @@ test("V3 missing or duplicate owned language scalar fails closed", () => {
     } finally {
       rmSync(root, { recursive: true, force: true });
     }
+  }
+});
+
+// ---------------------------------------------------------------------------
+// F4 (Critic review CLAUDE-RUNNER-01, round 2): the committed owned-key
+// manifest is resolved LAZILY, so importing this module never touches disk.
+//
+// The manifest used to be read, parsed and frozen at module scope. A missing,
+// unreadable, or malformed `config/runtime-projection-v3-owned-keys.json`
+// therefore threw during ES-module evaluation -- merely IMPORTING this file
+// crashed, before any function in any importer could run. The fail-closed
+// admission hooks import it, and node's exit 1 is "allow + config warning"
+// under `hooks/hooks.json`, so a config fault DISARMED the gate. The probe
+// below spawns a real child process against a staged plugin copy, because an
+// import-time side effect can only be observed at real module-evaluation time.
+// ---------------------------------------------------------------------------
+
+const PLUGIN_ROOT = fileURLToPath(new URL("..", import.meta.url));
+const OWNED_KEYS_RELATIVE = join("config", "runtime-projection-v3-owned-keys.json");
+
+const LOAD_SAFETY_PROBE = `
+const observed = { importFailure: null, planFailure: null, baselineFailure: null };
+let module = null;
+try {
+  module = await import("./lib/runtime-projection-v3.mjs");
+} catch (error) {
+  observed.importFailure = String(error?.message ?? error);
+}
+if (module) {
+  try {
+    module.planRuntimeProjectionV3({ schema: "pipeline.user.v3" });
+    observed.planFailure = false;
+  } catch (error) {
+    observed.planFailure = String(error?.message ?? error);
+  }
+  try {
+    module.readRuntimeProjectionV3Baselines(process.argv[2]);
+    observed.baselineFailure = false;
+  } catch (error) {
+    observed.baselineFailure = String(error?.message ?? error);
+  }
+}
+process.stdout.write(JSON.stringify(observed));
+`;
+
+/** Stage a self-contained plugin copy, optionally breaking the shipped manifest. */
+function probeStagedManifest(breakManifest) {
+  const stage = mkdtempSync(join(tmpdir(), "runtime-projection-v3-load-"));
+  const fixture = fixtureRoot();
+  try {
+    const withoutTests = (source) => !source.endsWith(".test.mjs");
+    for (const directory of ["config", "lib", "scripts"]) {
+      cpSync(join(PLUGIN_ROOT, directory), join(stage, directory), { recursive: true, filter: withoutTests });
+    }
+    breakManifest(join(stage, OWNED_KEYS_RELATIVE));
+    const probe = join(stage, "load-safety-probe.mjs");
+    writeFileSync(probe, LOAD_SAFETY_PROBE);
+    const run = spawnSync(process.execPath, [probe, fixture], { encoding: "utf8", timeout: 120_000 });
+    assert.equal(run.error, undefined, String(run.error));
+    assert.equal(run.status, 0, `probe exited ${run.status}: ${run.stderr}`);
+    return JSON.parse(run.stdout);
+  } finally {
+    rmSync(stage, { recursive: true, force: true });
+    rmSync(fixture, { recursive: true, force: true });
+  }
+}
+
+test("importing the V3 projector never reads the owned-key manifest from disk", () => {
+  // Control: with the shipped manifest intact the very same probe imports AND
+  // completes both calls, so a reported failure below is the manifest fault
+  // and not an unrelated staging defect.
+  const intact = probeStagedManifest(() => {});
+  assert.equal(intact.importFailure, null);
+  assert.equal(intact.planFailure, false);
+  assert.equal(intact.baselineFailure, false);
+
+  for (const [name, breakManifest] of [
+    ["absent", (path) => unlinkSync(path)],
+    ["invalid-json", (path) => writeFileSync(path, "{ \"schema\": \n")],
+  ]) {
+    const observed = probeStagedManifest(breakManifest);
+    assert.equal(observed.importFailure, null, `${name}: import must not throw`);
+    assert.equal(typeof observed.planFailure, "string", `${name}: planRuntimeProjectionV3 must surface the fault`);
+    assert.equal(typeof observed.baselineFailure, "string", `${name}: readRuntimeProjectionV3Baselines must surface the fault`);
+  }
+});
+
+test("the committed owned-key manifest default parameter resolves at call time", () => {
+  const root = fixtureRoot();
+  try {
+    const baselines = readRuntimeProjectionV3Baselines(root);
+    // The default expression is `frozenOwnedKeys().manifest`; JS evaluates it
+    // per call, so omitting the option must equal passing the committed
+    // manifest explicitly -- byte for byte, diagnostics included.
+    const byDefault = planRuntimeProjectionV3(completeIntent(), { source: "fixture", baselines });
+    const explicit = planRuntimeProjectionV3(completeIntent(), {
+      source: "fixture",
+      baselines,
+      ownedKeyManifest: loadRuntimeProjectionV3OwnedKeys(),
+    });
+    assert.equal(byDefault.status, "ready");
+    assert.deepEqual(explicit, byDefault);
+    assert.equal(byDefault.ownedKeyManifest.schema, loadRuntimeProjectionV3OwnedKeys().schema);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

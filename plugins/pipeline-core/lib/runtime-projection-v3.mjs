@@ -94,8 +94,35 @@ function frozen(value) {
   return value;
 }
 
-const FROZEN_OWNED_KEYS = frozen(JSON.parse(readFileSync(OWNED_KEYS_PATH, "utf8")));
-const FROZEN_OWNED_KEYS_JSON = JSON.stringify(stableValue(FROZEN_OWNED_KEYS));
+let frozenOwnedKeysMemo = null;
+
+/**
+ * Resolve the committed owned-key manifest LAZILY, never as a module-scope
+ * side effect, and memoize the result.
+ *
+ * The manifest is a JSON config read from disk.  Reading and freezing it at
+ * module scope meant a missing, unreadable, or malformed
+ * `config/runtime-projection-v3-owned-keys.json` threw out of this module's
+ * top-level scope -- so merely IMPORTING this file crashed, before any
+ * function in any importer could run.  The fail-closed admission hooks
+ * (`hooks/guard-lifecycle-ready.mjs`, `hooks/codex-pretool-guard.mjs`) import
+ * it, and an ES-module-evaluation throw kills them before `main()` exists:
+ * node exits 1, which `hooks/hooks.json` defines as "allow + config warning".
+ * A config fault therefore DISARMED a deliberately fail-closed gate.
+ *
+ * Deferring the read keeps importing this module free of disk access.  The
+ * failure now surfaces only inside whichever function actually needs the
+ * manifest, at the moment it is called, on that function's existing failure
+ * path -- exactly where its callers already handle errors.  A failed read is
+ * not memoized, so a repaired manifest is picked up by the next call.
+ */
+function frozenOwnedKeys() {
+  if (frozenOwnedKeysMemo === null) {
+    const manifest = frozen(JSON.parse(readFileSync(OWNED_KEYS_PATH, "utf8")));
+    frozenOwnedKeysMemo = { manifest, json: JSON.stringify(stableValue(manifest)) };
+  }
+  return frozenOwnedKeysMemo;
+}
 
 export const RUNTIME_PROJECTION_V3_OWNED_KEYS_PATH = OWNED_KEYS_PATH;
 
@@ -104,8 +131,12 @@ export function loadRuntimeProjectionV3OwnedKeys(path = OWNED_KEYS_PATH) {
 }
 
 function isCommittedManifest(manifest) {
+  // The committed manifest is resolved OUTSIDE the guard below: an unreadable
+  // or malformed shipped manifest is a config fault that must surface, not a
+  // caller-supplied manifest that merely fails to compare.
+  const committedJson = frozenOwnedKeys().json;
   try {
-    return JSON.stringify(stableValue(manifest)) === FROZEN_OWNED_KEYS_JSON;
+    return JSON.stringify(stableValue(manifest)) === committedJson;
   } catch {
     return false;
   }
@@ -640,7 +671,8 @@ function projectValidatedIntent(intent, { source, baselines }) {
     return emptyPlan(compatibility.status, source, diagnostics);
   }
 
-  const manifestTargets = Object.fromEntries(FROZEN_OWNED_KEYS.targets.map((target) => [target.path, target]));
+  const committedOwnedKeys = frozenOwnedKeys();
+  const manifestTargets = Object.fromEntries(committedOwnedKeys.manifest.targets.map((target) => [target.path, target]));
   let targets;
   try {
     targets = compatibility.targets.map((target) => {
@@ -679,7 +711,7 @@ function projectValidatedIntent(intent, { source, baselines }) {
     }]);
   }
 
-  const decisionConflicts = FROZEN_OWNED_KEYS.targets.flatMap((target) => {
+  const decisionConflicts = committedOwnedKeys.manifest.targets.flatMap((target) => {
     if (!target.decision || target.projection !== "codex-custom-agent-v3") return [];
     const bytes = baselineBytes(baselines?.[target.path]);
     if (bytes === null) return [];
@@ -709,9 +741,9 @@ function projectValidatedIntent(intent, { source, baselines }) {
     source,
     intentSha256: sha256(JSON.stringify(stableValue(intent))),
     ownedKeyManifest: {
-      schema: FROZEN_OWNED_KEYS.schema,
-      sha256: sha256(FROZEN_OWNED_KEYS_JSON),
-      targets: FROZEN_OWNED_KEYS.targets.map((target) => ({
+      schema: committedOwnedKeys.manifest.schema,
+      sha256: sha256(committedOwnedKeys.json),
+      targets: committedOwnedKeys.manifest.targets.map((target) => ({
         path: target.path,
         format: target.format,
         projection: target.projection,
@@ -729,7 +761,9 @@ export function planRuntimeProjectionV3(intent, {
   source = "pipeline.user.v3",
   baselines = {},
   registry = loadRunnerProfilesV3Registry(),
-  ownedKeyManifest = FROZEN_OWNED_KEYS,
+  // Evaluated at call time, not at definition time: the committed manifest is
+  // read on demand exactly like every other reference below.
+  ownedKeyManifest = frozenOwnedKeys().manifest,
 } = {}) {
   if (!isCommittedManifest(ownedKeyManifest)) return manifestFailure(source);
   const validation = validatePipelineUserV3(intent, { source, registry });
@@ -749,8 +783,9 @@ export function planRuntimeProjectionV3Json(text, options = {}) {
 
 export function readRuntimeProjectionV3Baselines(rootDir) {
   const baselines = readRuntimeProjectionV2Baselines(rootDir);
-  const target = FROZEN_OWNED_KEYS.targets.find((entry) => entry.path === ".claude/pipeline.json");
-  const advisor = FROZEN_OWNED_KEYS.targets.find((entry) => entry.path === ".codex/agents/consult-advisor.toml");
+  const ownedTargets = frozenOwnedKeys().manifest.targets;
+  const target = ownedTargets.find((entry) => entry.path === ".claude/pipeline.json");
+  const advisor = ownedTargets.find((entry) => entry.path === ".codex/agents/consult-advisor.toml");
   if (!target || !advisor) throw new Error("V3 owned target is missing");
   const root = resolve(rootDir);
   for (const entry of [target, advisor]) {
