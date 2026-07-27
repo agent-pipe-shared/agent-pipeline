@@ -38,7 +38,7 @@ function unavailable(code) { return { ok: false, code, status: "unavailable", re
  */
 export function renderCodexGoalBlockedNotice(goal) {
   if (!object(goal) || typeof goal.threadId !== "string" || typeof goal.objective !== "string" || goal.status !== "blocked") return null;
-  return "Codex goal is blocked: automated Pipeline work is stopped. Resume this goal in the Codex CLI before continuing; mobile/read-only surfaces may not provide resume.";
+  return "Codex goal is blocked: automated Pipeline work is stopped. If the same blocker is resolved, resume this goal in the Codex CLI. If the objective or scope changed, set a short replacement with /goal <new objective> instead; mobile/read-only surfaces may not provide either control.";
 }
 
 /**

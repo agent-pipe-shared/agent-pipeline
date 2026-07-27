@@ -747,9 +747,11 @@ permissions nor creates a duplicate native goal.
 
 For Codex, an observed native `blocked` goal is a hard automation stop. The
 adapter must return `CGH-BLOCKED-RESUME-REQUIRED`, name that automated Pipeline
-work cannot continue, and instruct the user to resume in the Codex CLI. It may
-not create a replacement goal, silently set the blocked goal active, or claim
-that a mobile/read-only surface can resume it.
+work cannot continue, and distinguish the two user actions: resume in the
+Codex CLI only when the same blocker is resolved; otherwise set a short
+replacement via `/goal <new objective>`. It may not create a replacement goal,
+silently set the blocked goal active, or claim that a mobile/read-only surface
+can perform either control.
 
 ### 6.2 B1 — Local worker pool (`#21`)
 

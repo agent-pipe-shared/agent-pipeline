@@ -31,7 +31,8 @@ await check("blocked native goal stops automation and gives an explicit CLI-resu
   assert.equal(result.code, "CGH-BLOCKED-RESUME-REQUIRED");
   assert.equal(result.status, "blocked");
   assert.match(result.notice, /automated Pipeline work is stopped/u);
-  assert.match(result.notice, /Resume this goal in the Codex CLI/u);
+  assert.match(result.notice, /If the same blocker is resolved, resume/u);
+  assert.match(result.notice, /\/goal <new objective>/u);
   assert.equal(renderCodexGoalBlockedNotice({ threadId: "thread-1", objective, status: "blocked" }), result.notice);
 });
 await check("wrong readback never claims protected continuation", async () => {

@@ -49,7 +49,8 @@ typed degraded evidence and leaves no false continuation claim.
 
 **Codex blocked-goal rule:** a native `blocked` observation stops automation and
 must explicitly tell the user that CLI resume is required; it cannot be
-silently replaced or resumed by the Pipeline.
+silently replaced or resumed by the Pipeline. Resume applies only if the same
+blocker is resolved; a changed scope/objective requires `/goal <new objective>`.
 
 **Stop:** any implied permission expansion, duplicate native activation,
 unbounded retry, unclear native-goal readback, conflict with Stop-hook context
