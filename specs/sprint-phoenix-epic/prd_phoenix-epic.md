@@ -3,7 +3,7 @@
 # PRD — Governance Sprint Phoenix
 
 > Product Review Document for the Product Owner gate. Status: `draft — fresh
-> independent review pending`. Task: `sprint-phoenix-epic` · profile
+> independent review passed; renewed Product Owner approval pending`. Task: `sprint-phoenix-epic` · profile
 > `epic` · rigor 2 · risk high. Approval authorizes exactly the first
 > implementation dispatch; push, merge, release, external writes, and final
 > acceptance keep their own gates.
@@ -214,9 +214,9 @@ approval of this PRD.
    this Phoenix PRD in design phase. Exact preimage/postimage, reason, actor,
    and no-remote-write evidence remain in
    [RECOVERY.md](RECOVERY.md).
-3. **After the resulting design candidate is fixed, authorize the PO-only
+3. **After the resulting design candidate is fixed, recognize the PO-only
    independent Critic review because the Advisor route was unavailable?**
-   Recommendation: yes, using only the Phoenix Spec, fixed diff range,
+   Decision: completed with PASS, using only the Phoenix Spec, fixed diff range,
    governance paths, evidence paths, ruleset SHA, and the standing read-only
    functional-equivalent assurance. This does not convert the Advisor outcome
    into a pass.
