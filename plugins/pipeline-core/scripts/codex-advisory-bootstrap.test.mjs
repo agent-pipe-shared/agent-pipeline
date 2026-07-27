@@ -5,7 +5,6 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
 
-import { resolveSystemExecutable } from "../../../harness/scripts/security-readiness/tool-identity.mjs";
 import { derivePoGateRepositoryFingerprint, resolvePoGateRepositoryTopology } from "../lib/po-gate-authority.mjs";
 import {
   PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
@@ -30,7 +29,7 @@ test("closed launcher reads the V3 opt-out authority and constructs one native c
       return { status: "ready" };
     },
     readQuestionBytesFn: async () => Buffer.from("Which bootstrap boundary is safe?", "utf8"),
-    resolveExecutableFn: () => resolveSystemExecutable("codex"),
+    resolveExecutableFn: () => process.execPath,
     runAdvisoryHostBridgeFn: async (argv) => {
       captured = JSON.parse(readFileSync(argv[1], "utf8"));
       return 0;
@@ -64,7 +63,7 @@ test("launcher rejects absent, oversized, or invalid UTF-8 stdin before creating
     await assert.rejects(runCodexAdvisoryBootstrap(argv, {
       requireProjectOnboardingReadyFn: () => ({ status: "ready" }),
       readQuestionBytesFn: async () => bytes,
-      resolveExecutableFn: () => resolveSystemExecutable("codex"),
+      resolveExecutableFn: () => process.execPath,
       runAdvisoryHostBridgeFn: async () => { invoked = true; return 0; },
     }), /advisory/u);
     assert.equal(invoked, false);

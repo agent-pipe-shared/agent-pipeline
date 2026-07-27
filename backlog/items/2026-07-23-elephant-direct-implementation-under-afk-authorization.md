@@ -1,10 +1,10 @@
 ---
-schema: pipeline.backlog-item.v1
-id: pipeline.elephant-direct-implementation-under-afk-authorization
-type: workflow-improvement
-owner: pipeline
-status: open
-created: 2026-07-23
+schema: "pipeline.backlog-item.v1"
+id: "pipeline.elephant-direct-implementation-under-afk-authorization"
+type: "workflow-improvement"
+owner: "pipeline"
+status: "in_progress"
+created: "2026-07-23"
 source: "close-block ritual step 6b authorship check, native-Windows Verify block (see HISTORY.md 2026-07-23 entry, docs/state.md close-ritual authorship-check incident bullet)"
 ---
 

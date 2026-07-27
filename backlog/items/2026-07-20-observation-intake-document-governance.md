@@ -3,10 +3,14 @@ schema: "pipeline.backlog-item.v1"
 id: "pipeline.observation-intake-document-governance"
 type: "workflow-improvement"
 owner: "pipeline"
-status: "in_progress"
+status: "closed"
 created: "2026-07-20"
 source: "PO-approved parallel Sentinel work and Critic scope correction"
 due: "2026-07-20"
+closed_at: "2026-07-24"
+closure_repository: "self"
+closure_commit: "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb"
+closure_evidence: "backlog/evidence/2026-07-24-completed-companion-deliveries.md"
 ---
 
 # Establish canonical observation intake and document governance

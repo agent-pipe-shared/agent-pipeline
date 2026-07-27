@@ -34,6 +34,7 @@ const GOVERNANCE_MARKERS = [
 const READY_RECEIPT_KEYS = ["intent", "schema", "status"];
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
+const V3_BOOTSTRAP_AUTHORITY_SCRIPT = fileURLToPath(new URL("../scripts/v3-bootstrap-authority.mjs", import.meta.url));
 const LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
 const READBACK_SCRIPT = fileURLToPath(new URL("../scripts/codex-project-runtime-readback-host.mjs", import.meta.url));
 const APP_SERVER_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-health.mjs", import.meta.url));
@@ -320,9 +321,9 @@ function sanctionedOnboardingArgs(args, root) {
         && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[4])))) return true;
   if (args[0] === "continuity" && args[1] === "inspect"
     && exactRoot(args, root, 2) && args.length === 4) return true;
-  if (["plan", "plan-runtime", "plan-repair", "plan-readback"].includes(args[0])
+  if (["plan", "plan-runtime", "plan-repair", "plan-readback", "plan-source-recovery", "plan-manifest-repair"].includes(args[0])
     && exactRoot(args, root, 1) && args.length === 3) return true;
-  if (["apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback"].includes(args[0])
+  if (["apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback", "apply-manifest-repair"].includes(args[0])
     && exactRoot(args, root, 1)
     && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
     && args[5] === "--activate" && args.length === 6) return true;
@@ -349,6 +350,9 @@ export function isSanctionedLifecycleCommand(command, root) {
   const [script, ...args] = words.slice(1);
   if (script === ONBOARDING_SCRIPT) return sanctionedOnboardingArgs(args, root);
   if (script === MIGRATION_SCRIPT) return sanctionedMigrationArgs(args, root);
+  if (script === V3_BOOTSTRAP_AUTHORITY_SCRIPT) {
+    return exactRoot(args, root, 0) && args.length === 2;
+  }
   if (script === LAUNCH_SCRIPT) {
     return exactRoot(args, root, 0)
       && args[2] === "--barrier-sha256" && HEX.test(args[3] ?? "")

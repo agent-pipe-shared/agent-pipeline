@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.multi-cli-benchmark.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "benchmarkId", "scoringVersion", "candidate", "fixture", "adapterReportSha256", "subjects", "resourceEnvelope", "warmups", "repetitions", "observations", "score", "recommendation", "recordSha256"],
+  "$defs": {"fixture": {"type": "object", "additionalProperties": false, "required": ["class", "path", "fileSha256", "seed"], "properties": {"class": {"enum": ["mini", "feature", "review", "migration", "failure-recovery"]}, "path": {"type": "string", "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))[A-Za-z0-9._@+/-]{1,512}$"}, "fileSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "seed": {"type": "string", "minLength": 1}}}},
+  "properties": {
+    "schema": {"const": "pipeline.multi-cli-benchmark.v1"}, "benchmarkId": {"type": "string"}, "scoringVersion": {"const": "nova-efficiency-v1"},
+    "candidate": {"type": "object", "additionalProperties": false, "required": ["commit", "tree"], "properties": {"commit": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"}, "tree": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"}}},
+    "fixture": {"type": "array", "minItems": 5, "maxItems": 5, "prefixItems": [{"allOf": [{"$ref": "#/$defs/fixture"}, {"properties": {"class": {"const": "mini"}}}]}, {"allOf": [{"$ref": "#/$defs/fixture"}, {"properties": {"class": {"const": "feature"}}}]}, {"allOf": [{"$ref": "#/$defs/fixture"}, {"properties": {"class": {"const": "review"}}}]}, {"allOf": [{"$ref": "#/$defs/fixture"}, {"properties": {"class": {"const": "migration"}}}]}, {"allOf": [{"$ref": "#/$defs/fixture"}, {"properties": {"class": {"const": "failure-recovery"}}}]}], "items": false},
+    "adapterReportSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "subjects": {"type": "array"}, "resourceEnvelope": {"type": "object"}, "warmups": {"type": "array"}, "repetitions": {"type": "object"}, "observations": {"type": "array"}, "score": {"type": "array"}, "recommendation": {"enum": ["candidate-route-for-observed-envelope", "no-recommendation"]}, "recordSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}

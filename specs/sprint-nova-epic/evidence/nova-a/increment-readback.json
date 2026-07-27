@@ -1,0 +1,13 @@
+{
+  "schema": "pipeline.nova-increment-readback.v1",
+  "increment": {"sprint":"Nova","phase":"A"},
+  "receiptPath": "specs/sprint-nova-epic/evidence/nova-a/increment-receipt.json",
+  "receiptFileSha256": "4865feb0f58e0197b45e49a68deb51427dbe0572e05b0c2b217619bb0617a9ff",
+  "testedCandidate": {"commit":"874323da7f510be3208ee8b6ffc31ef121963ee9","tree":"76de02e71063e574e9728691fad30d2b0c4a6337"},
+  "evidenceCommit": "cb5560e6abe8dd0e1e4a833f1061467a6172fdb5",
+  "evidenceTree": "cb3d18907ec6e9931544e4d1c686b2af915abf61",
+  "evidenceManifestSha256": "3092717d39bcf7ff88ffef9602db69cd87157967c707c5e8a8332e7c9a58640d",
+  "status": "verified",
+  "observedAt": "2026-07-25T13:06:58.000Z",
+  "recordSha256": "a3aff837b0fefdf6779e27176b788444b236617204fdfd696aafae832d83a64f"
+}

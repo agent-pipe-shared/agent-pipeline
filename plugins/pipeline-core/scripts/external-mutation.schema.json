@@ -1,0 +1,383 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.external-mutation.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "mutationId",
+    "provider",
+    "target",
+    "beforeSha256",
+    "patch",
+    "operation",
+    "idempotencyKey",
+    "capabilitySha256",
+    "preview",
+    "confirmation",
+    "state",
+    "remoteReceipt",
+    "readback",
+    "previousSha256",
+    "recordSha256"
+  ],
+  "properties": {
+    "schema": { "const": "pipeline.external-mutation.v1" },
+    "mutationId": { "$ref": "#/$defs/safeId" },
+    "provider": { "enum": ["github", "gitlab"] },
+    "target": { "$ref": "#/$defs/target" },
+    "beforeSha256": { "$ref": "#/$defs/sha256" },
+    "patch": { "$ref": "#/$defs/patch" },
+    "operation": {
+      "enum": [
+        "change-request.create",
+        "change-request.update-content",
+        "ci.pipeline.retry",
+        "issue.create",
+        "issue.update-content"
+      ]
+    },
+    "idempotencyKey": { "$ref": "#/$defs/sha256" },
+    "capabilitySha256": { "$ref": "#/$defs/sha256" },
+    "preview": {
+      "anyOf": [
+        { "$ref": "#/$defs/preview" },
+        { "type": "null" }
+      ]
+    },
+    "confirmation": {
+      "anyOf": [
+        { "$ref": "#/$defs/confirmation" },
+        { "type": "null" }
+      ]
+    },
+    "state": {
+      "enum": [
+        "requested",
+        "previewed",
+        "confirmed",
+        "applied-unverified",
+        "readback-verified",
+        "rejected",
+        "expired",
+        "failed",
+        "partial",
+        "unknown",
+        "mismatch"
+      ]
+    },
+    "remoteReceipt": {
+      "anyOf": [
+        { "$ref": "#/$defs/remoteReceipt" },
+        { "type": "null" }
+      ]
+    },
+    "readback": {
+      "anyOf": [
+        { "$ref": "#/$defs/readback" },
+        { "type": "null" }
+      ]
+    },
+    "previousSha256": {
+      "anyOf": [
+        { "$ref": "#/$defs/sha256" },
+        { "type": "null" }
+      ]
+    },
+    "recordSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "provider": { "const": "github" } } },
+      "then": {
+        "properties": {
+          "target": {
+            "properties": {
+              "provider": { "const": "github" },
+              "baseUrlClass": { "const": "github-com" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "provider": { "const": "gitlab" } } },
+      "then": {
+        "properties": {
+          "target": {
+            "properties": {
+              "provider": { "const": "gitlab" },
+              "baseUrlClass": { "enum": ["gitlab-com", "self-managed"] }
+            }
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "operation": { "enum": ["issue.create", "issue.update-content"] } } },
+      "then": { "properties": { "target": { "properties": { "objectType": { "const": "issue" } } } } }
+    },
+    {
+      "if": { "properties": { "operation": { "enum": ["change-request.create", "change-request.update-content"] } } },
+      "then": { "properties": { "target": { "properties": { "objectType": { "const": "change-request" } } } } }
+    },
+    {
+      "if": { "properties": { "operation": { "const": "ci.pipeline.retry" } } },
+      "then": { "properties": { "target": { "properties": { "objectType": { "const": "ci-pipeline" } } } } }
+    },
+    {
+      "if": { "properties": { "state": { "const": "requested" } } },
+      "then": {
+        "properties": {
+          "preview": { "type": "null" },
+          "confirmation": { "type": "null" },
+          "remoteReceipt": { "type": "null" },
+          "readback": { "type": "null" },
+          "previousSha256": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "previewed" } } },
+      "then": {
+        "properties": {
+          "preview": { "$ref": "#/$defs/preview" },
+          "confirmation": { "type": "null" },
+          "remoteReceipt": { "type": "null" },
+          "readback": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "confirmed" } } },
+      "then": {
+        "properties": {
+          "preview": { "$ref": "#/$defs/preview" },
+          "confirmation": { "$ref": "#/$defs/confirmation" },
+          "remoteReceipt": { "type": "null" },
+          "readback": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "applied-unverified" } } },
+      "then": {
+        "properties": {
+          "preview": { "$ref": "#/$defs/preview" },
+          "confirmation": { "$ref": "#/$defs/confirmation" },
+          "remoteReceipt": {
+            "allOf": [
+              { "$ref": "#/$defs/remoteReceipt" },
+              { "properties": { "status": { "const": "accepted" } } }
+            ]
+          },
+          "readback": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "readback-verified" } } },
+      "then": {
+        "properties": {
+          "preview": { "$ref": "#/$defs/preview" },
+          "confirmation": { "$ref": "#/$defs/confirmation" },
+          "remoteReceipt": {
+            "allOf": [
+              { "$ref": "#/$defs/remoteReceipt" },
+              { "properties": { "status": { "const": "accepted" } } }
+            ]
+          },
+          "readback": {
+            "allOf": [
+              { "$ref": "#/$defs/readback" },
+              { "properties": { "status": { "const": "matching" } } }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "mismatch" } } },
+      "then": {
+        "properties": {
+          "preview": { "$ref": "#/$defs/preview" },
+          "confirmation": { "$ref": "#/$defs/confirmation" },
+          "remoteReceipt": {
+            "allOf": [
+              { "$ref": "#/$defs/remoteReceipt" },
+              { "properties": { "status": { "const": "accepted" } } }
+            ]
+          },
+          "readback": {
+            "allOf": [
+              { "$ref": "#/$defs/readback" },
+              { "properties": { "status": { "const": "mismatch" } } }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "expired" } } },
+      "then": {
+        "properties": {
+          "preview": { "$ref": "#/$defs/preview" },
+          "confirmation": { "type": "null" },
+          "remoteReceipt": { "type": "null" },
+          "readback": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "rejected" } } },
+      "then": {
+        "properties": {
+          "confirmation": { "type": "null" },
+          "remoteReceipt": { "type": "null" },
+          "readback": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "failed" } } },
+      "then": {
+        "properties": {
+          "preview": { "$ref": "#/$defs/preview" },
+          "confirmation": { "$ref": "#/$defs/confirmation" },
+          "remoteReceipt": {
+            "allOf": [
+              { "$ref": "#/$defs/remoteReceipt" },
+              { "properties": { "status": { "const": "rejected" } } }
+            ]
+          },
+          "readback": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "partial" } } },
+      "then": {
+        "properties": {
+          "preview": { "$ref": "#/$defs/preview" },
+          "confirmation": { "$ref": "#/$defs/confirmation" },
+          "remoteReceipt": {
+            "allOf": [
+              { "$ref": "#/$defs/remoteReceipt" },
+              { "properties": { "status": { "const": "partial" } } }
+            ]
+          },
+          "readback": { "type": "null" }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "state": { "const": "unknown" } } },
+      "then": {
+        "properties": {
+          "preview": { "$ref": "#/$defs/preview" },
+          "confirmation": { "$ref": "#/$defs/confirmation" }
+        },
+        "oneOf": [
+          {
+            "properties": {
+              "remoteReceipt": {
+                "allOf": [
+                  { "$ref": "#/$defs/remoteReceipt" },
+                  { "properties": { "status": { "const": "unknown" } } }
+                ]
+              },
+              "readback": { "type": "null" }
+            }
+          },
+          {
+            "properties": {
+              "remoteReceipt": {
+                "allOf": [
+                  { "$ref": "#/$defs/remoteReceipt" },
+                  { "properties": { "status": { "const": "accepted" } } }
+                ]
+              },
+              "readback": {
+                "allOf": [
+                  { "$ref": "#/$defs/readback" },
+                  { "properties": { "status": { "const": "unknown" } } }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    },
+    {
+      "if": { "properties": { "state": { "not": { "const": "requested" } } } },
+      "then": { "properties": { "previousSha256": { "$ref": "#/$defs/sha256" } } }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "safeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "nonNegativeSafeInteger": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provider", "baseUrlClass", "projectCoordinatesSha256", "objectType", "objectIdSha256"],
+      "properties": {
+        "provider": { "enum": ["github", "gitlab"] },
+        "baseUrlClass": { "enum": ["github-com", "gitlab-com", "self-managed"] },
+        "projectCoordinatesSha256": { "$ref": "#/$defs/sha256" },
+        "objectType": { "enum": ["issue", "change-request", "ci-pipeline", "ci-job", "branch-protection", "governance"] },
+        "objectIdSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "patch": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["format", "patchSha256", "expectedPostSha256"],
+      "properties": {
+        "format": { "const": "merge-patch-sha256" },
+        "patchSha256": { "$ref": "#/$defs/sha256" },
+        "expectedPostSha256": { "$ref": "#/$defs/sha256" }
+      }
+    },
+    "preview": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["previewSha256", "expiresAt"],
+      "properties": {
+        "previewSha256": { "$ref": "#/$defs/sha256" },
+        "expiresAt": { "$ref": "#/$defs/nonNegativeSafeInteger" }
+      }
+    },
+    "confirmation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["authoritySha256", "previewSha256", "confirmedAt"],
+      "properties": {
+        "authoritySha256": { "$ref": "#/$defs/sha256" },
+        "previewSha256": { "$ref": "#/$defs/sha256" },
+        "confirmedAt": { "$ref": "#/$defs/nonNegativeSafeInteger" }
+      }
+    },
+    "remoteReceipt": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["providerReceiptSha256", "acceptedAt", "status"],
+      "properties": {
+        "providerReceiptSha256": { "$ref": "#/$defs/sha256" },
+        "acceptedAt": { "$ref": "#/$defs/nonNegativeSafeInteger" },
+        "status": { "enum": ["accepted", "rejected", "partial", "unknown"] }
+      }
+    },
+    "readback": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["observedSha256", "expectedSha256", "status", "observedAt"],
+      "properties": {
+        "observedSha256": { "$ref": "#/$defs/sha256" },
+        "expectedSha256": { "$ref": "#/$defs/sha256" },
+        "status": { "enum": ["matching", "mismatch", "unknown"] },
+        "observedAt": { "$ref": "#/$defs/nonNegativeSafeInteger" }
+      }
+    }
+  }
+}

@@ -10,10 +10,10 @@
 import { createHash, randomBytes } from "node:crypto";
 import {
   accessSync, closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync,
-  readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
+  linkSync, readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { spawnSync } from "node:child_process";
-import { dirname, join, resolve, sep } from "node:path";
+import { basename, dirname, join, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
@@ -49,8 +49,11 @@ const SOURCE = "pipeline.user.yaml";
 const SCHEMA = "pipeline.project-onboarding.v4";
 const LEGACY_SCHEMA = "pipeline.project-onboarding.v3";
 const PLAN_SCHEMA = "pipeline.project-onboarding-plan.v3";
+const SOURCE_RECOVERY_SCHEMA = "pipeline.project-onboarding-source-recovery.v1";
+const MANIFEST_REPAIR_PLAN_SCHEMA = "pipeline.project-onboarding-manifest-repair-plan.v1";
 const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
 const AUTHENTICATED = new WeakMap();
+const AUTHENTICATED_MANIFEST_REPAIRS = new WeakMap();
 const USER_RESERVED_PATHS = new Set([".agents", ".claude", ".codex"]);
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
@@ -59,7 +62,23 @@ const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
 function diagnostic(path, code, message, repair) { return { path, code, message, repair }; }
-function describe(bytes) { return bytes === null ? { status: "absent", sha256: null, byteLength: 0 } : { status: "present", sha256: sha256(bytes), byteLength: Buffer.byteLength(bytes, "utf8") }; }
+function bytesOf(value) { return Buffer.isBuffer(value) ? value : Buffer.from(value, "utf8"); }
+function describe(bytes) {
+  if (bytes === null) return { status: "absent", sha256: null, byteLength: 0 };
+  const raw = bytesOf(bytes);
+  return { status: "present", sha256: sha256(raw), byteLength: raw.byteLength };
+}
+function decodeUtf8Strict(bytes, label) {
+  const raw = bytesOf(bytes);
+  let decoded;
+  try {
+    decoded = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(raw);
+  } catch {
+    throw new Error(`${label} is not valid UTF-8`);
+  }
+  if (Buffer.from(decoded, "utf8").compare(raw) !== 0) throw new Error(`${label} is not canonical UTF-8`);
+  return decoded;
+}
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
   if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]));
@@ -81,7 +100,7 @@ function renderYaml(value, indent = "") {
 function deps(overrides = {}) {
   return {
     accessSync, closeSync, constants, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, openSync,
-    readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
+    linkSync, readdirSync, realpathSync, readFileSync, renameSync, rmSync, rmdirSync, unlinkSync, writeFileSync,
     spawnSync, observeCodexOnboardingCapabilities, observeOnboardingAppServer, ...overrides,
   };
 }
@@ -148,10 +167,126 @@ function sameIdentity(expected, path, fs) {
   }
 }
 
+function sameFileObject(expected, path, fs) {
+  try {
+    const actual = fs.lstatSync(path);
+    return !actual.isSymbolicLink()
+      && actual.isFile()
+      && actual.nlink >= 1
+      && String(actual.dev) === expected.dev
+      && String(actual.ino) === expected.ino;
+  } catch {
+    return false;
+  }
+}
+
 function fileIdentity(info) {
   return info && !info.isSymbolicLink() && info.isFile() && info.nlink === 1
     ? { dev: String(info.dev), ino: String(info.ino) }
     : null;
+}
+
+function directoryIdentity(info) {
+  return info && !info.isSymbolicLink() && info.isDirectory()
+    ? { dev: String(info.dev), ino: String(info.ino) }
+    : null;
+}
+
+function sameDirectoryIdentity(expected, path, fs) {
+  try {
+    const actual = directoryIdentity(fs.lstatSync(path));
+    return actual !== null && actual.dev === expected.dev && actual.ino === expected.ino;
+  } catch {
+    return false;
+  }
+}
+
+function readBoundPhysicalFile(path, fs, { optional = false } = {}) {
+  let fd;
+  try {
+    let before;
+    try { before = fileIdentity(fs.lstatSync(path)); } catch (error) {
+      if (optional && error?.code === "ENOENT") return null;
+      throw error;
+    }
+    if (!before) throw new Error("project file is not a single-link physical file");
+    fd = fs.openSync(path, fs.constants.O_RDONLY | (fs.constants.O_NOFOLLOW ?? 0));
+    const opened = fileIdentity(fs.fstatSync(fd));
+    if (!opened || opened.dev !== before.dev || opened.ino !== before.ino) {
+      throw new Error("project file identity changed before read");
+    }
+    const bytes = fs.readFileSync(fd);
+    const after = fileIdentity(fs.fstatSync(fd));
+    if (!after || after.dev !== opened.dev || after.ino !== opened.ino || !sameIdentity(opened, path, fs)) {
+      throw new Error("project file identity changed during read");
+    }
+    return bytesOf(bytes);
+  } finally {
+    if (fd !== undefined) fs.closeSync(fd);
+  }
+}
+
+function openBoundDirectory(path, fs) {
+  const before = directoryIdentity(fs.lstatSync(path));
+  if (!before || fs.realpathSync(path) !== path) throw new Error("manifest parent is not a physical directory");
+  const fd = fs.openSync(
+    path,
+    fs.constants.O_RDONLY | (fs.constants.O_DIRECTORY ?? 0) | (fs.constants.O_NOFOLLOW ?? 0),
+  );
+  const opened = directoryIdentity(fs.fstatSync(fd));
+  if (!opened || opened.dev !== before.dev || opened.ino !== before.ino || !sameDirectoryIdentity(opened, path, fs)) {
+    fs.closeSync(fd);
+    throw new Error("manifest parent identity changed before publication");
+  }
+  return { fd, identity: opened, path };
+}
+
+function boundDirectoryEntry(directory, name, fs) {
+  if (name !== basename(name) || name === "." || name === "..") throw new Error("manifest entry name is unsafe");
+  const candidates = process.platform === "linux"
+    ? [`/proc/self/fd/${directory.fd}`]
+    : process.platform === "win32" ? [] : [`/dev/fd/${directory.fd}`, `/proc/self/fd/${directory.fd}`];
+  const descriptorRoot = candidates.find((candidate) => {
+    try { return fs.existsSync(candidate); } catch { return false; }
+  });
+  if (descriptorRoot) return join(descriptorRoot, name);
+  if (process.platform === "win32" && sameDirectoryIdentity(directory.identity, directory.path, fs)) {
+    return join(directory.path, name);
+  }
+  throw new Error("fd-relative manifest publication is unavailable");
+}
+
+function syncBoundDirectory(directory, fs) {
+  try {
+    fs.fsyncSync(directory.fd);
+  } catch (error) {
+    if (!(process.platform === "win32"
+      && ["EPERM", "EINVAL", "EISDIR", "EACCES", "ENOTSUP"].includes(error?.code))) throw error;
+  }
+  const after = directoryIdentity(fs.fstatSync(directory.fd));
+  if (!after || after.dev !== directory.identity.dev || after.ino !== directory.identity.ino
+    || !sameDirectoryIdentity(directory.identity, directory.path, fs)) {
+    throw new Error("manifest parent identity changed during publication");
+  }
+}
+
+function quarantineManifestPublication(directory, target, expected, planSha256, fs) {
+  if (!expected || !sameFileObject(expected, target, fs)) return false;
+  const quarantine = boundDirectoryEntry(
+    directory,
+    `.pipeline-manifest-repair-quarantine-${planSha256.slice(0, 24)}-${randomBytes(8).toString("hex")}`,
+    fs,
+  );
+  try {
+    fs.renameSync(target, quarantine);
+  } catch {
+    return false;
+  }
+  if (sameFileObject(expected, quarantine, fs)) return true;
+  try {
+    fs.linkSync(quarantine, target);
+  } catch {}
+  return false;
 }
 
 function recoverProbeIdentity(fd, path, candidate, fs) {
@@ -360,6 +495,9 @@ function legacyInspection(rootDir, fs) {
     const migrated = inspectRunnerProfileMigrationV3({ rootDir: root, deps: fs });
     if (migrated.status === "ready" && ["v0", "v1", "v2"].includes(migrated.sourceKind)) {
       return { schema: LEGACY_SCHEMA, status: "migration-required", root, sourceKind: migrated.sourceKind, diagnostics: [diagnostic("$.source", "legacy_source", "the root has a legacy pipeline authority", "use runner-profile-migration-v3 inspect, plan, then apply --activate")], entries: entries.map((entry) => entry.name) };
+    }
+    if (migrated.status === "ready" && migrated.sourceKind === "v3-refresh") {
+      return { schema: LEGACY_SCHEMA, status: "migration-required", root, sourceKind: migrated.sourceKind, diagnostics: [diagnostic("$.source", "stale_generated_projection", "the V3 source uses a recognized older generated registry projection", "review and apply the closed V3 registry refresh")], entries: entries.map((entry) => entry.name) };
     }
     if (migrated.status === "ready" && migrated.sourceKind === "v3") {
       const authority = validateV3BootstrapAuthority({ rootDir: root, deps: fs });
@@ -886,6 +1024,544 @@ function selectedRunnerIsCodex(root, fs) {
   } catch { return false; }
 }
 
+function sourceRecoveryResult({
+  status,
+  root,
+  category,
+  sourceSha256 = null,
+  nextAction = null,
+  diagnostics = [],
+}) {
+  return {
+    schema: SOURCE_RECOVERY_SCHEMA,
+    status,
+    root: root ?? null,
+    category,
+    sourceSha256,
+    nextAction,
+    diagnostics,
+  };
+}
+
+/**
+ * Diagnose only the source-owning boundary. This read-only planner must end
+ * either in one exact sanctioned workflow or an explicit terminal
+ * disposition; it never edits or guesses source authority.
+ */
+export function planProjectOnboardingSourceRecoveryV4({
+  rootDir = process.cwd(),
+  deps: overrides = {},
+} = {}) {
+  const fs = deps(overrides);
+  let root;
+  try {
+    root = safeRoot(rootDir, fs);
+  } catch {
+    return sourceRecoveryResult({
+      status: "unrepairable",
+      root: null,
+      category: "unavailable-evidence",
+      diagnostics: [lifecycleDiagnostic(
+        "$.root",
+        "source_evidence_unavailable",
+        "the source root cannot be observed safely",
+        "restore read access to the canonical physical project root",
+      )],
+    });
+  }
+  const inspected = inspectRunnerProfileMigrationV3({ rootDir: root, deps: fs });
+  if (inspected.status === "recovery-required") {
+    return sourceRecoveryResult({
+      status: "recoverable",
+      root,
+      category: "unavailable-evidence",
+      nextAction: commandAction(
+        [MIGRATION_SCRIPT, "apply", "--root", root, "--activate"],
+        true,
+        true,
+        "pipeline.runner-profile-migration-plan.v3",
+        ["ready", "noop", "applied"],
+      ),
+      diagnostics: [lifecycleDiagnostic(
+        "$.source",
+        "source_transaction_recovery_required",
+        "a pending V3 transaction prevents current source evidence",
+        "deliver the migration recovery preview and explicitly activate the existing bounded recovery workflow",
+      )],
+    });
+  }
+  if (inspected.status !== "ready") {
+    return sourceRecoveryResult({
+      status: "unrepairable",
+      root,
+      category: "invalid-authority",
+      diagnostics: [lifecycleDiagnostic(
+        "$.source",
+        "source_authority_unrepairable",
+        "the source is not one recognized authority that Public Core can reconstruct safely",
+        "restore or correct pipeline.user.yaml through its external source-owning workflow",
+      )],
+    });
+  }
+  if (inspected.sourceKind === "v3-refresh") {
+    return sourceRecoveryResult({
+      status: "recoverable",
+      root,
+      category: "stale-generated-projection",
+      sourceSha256: inspected.sourceSha256,
+      nextAction: commandAction(
+        [MIGRATION_SCRIPT, "plan", "--root", root],
+        false,
+        false,
+        "pipeline.runner-profile-migration-plan.v3",
+        ["ready", "noop"],
+      ),
+      diagnostics: [lifecycleDiagnostic(
+        "$.source",
+        "source_projection_refresh_available",
+        "the source is a recognized older V3 generated registry projection",
+        "review the closed migration plan before explicit activation",
+      )],
+    });
+  }
+  if (["v0", "v1", "v2"].includes(inspected.sourceKind)) {
+    return sourceRecoveryResult({
+      status: "recoverable",
+      root,
+      category: "unsupported-source-transition",
+      sourceSha256: inspected.sourceSha256,
+      nextAction: commandAction(
+        [MIGRATION_SCRIPT, "inspect", "--root", root],
+        false,
+        false,
+        "pipeline.runner-profile-migration-inspect.v3",
+        ["ready"],
+      ),
+      diagnostics: [lifecycleDiagnostic(
+        "$.source",
+        "legacy_source_transition_required",
+        "the source is a recognized legacy authority",
+        "continue only through the explicit V3 migration workflow",
+      )],
+    });
+  }
+  if (!selectedRunnerIsCodex(root, fs)) {
+    return sourceRecoveryResult({
+      status: "unrepairable",
+      root,
+      category: "unsupported-source-transition",
+      sourceSha256: inspected.sourceSha256,
+      diagnostics: [lifecycleDiagnostic(
+        "$.source.runners.default",
+        "source_runner_transition_unsupported",
+        "the current V4 lifecycle supports only a Codex-selected authority",
+        "change the selected runner through the source-owning workflow; this recovery planner will not rewrite it",
+      )],
+    });
+  }
+  return sourceRecoveryResult({
+    status: "unrepairable",
+    root,
+    category: "current-authority",
+    sourceSha256: inspected.sourceSha256,
+    diagnostics: [lifecycleDiagnostic(
+      "$.source",
+      "source_is_current",
+      "the V3 source is current and is not the controlling recovery failure",
+      "rerun the V4 lifecycle inspection and follow its controlling action",
+    )],
+  });
+}
+
+function manifestRepairBinding(plan) {
+  return {
+    schema: plan.schema,
+    root: plan.root,
+    source: plan.source,
+    target: plan.target,
+  };
+}
+
+function manifestRepairResult({
+  status,
+  root,
+  source = null,
+  target = null,
+  planSha256 = null,
+  applyAction = null,
+  diagnostics = [],
+}) {
+  return {
+    schema: MANIFEST_REPAIR_PLAN_SCHEMA,
+    status,
+    root: root ?? null,
+    source,
+    target,
+    planSha256,
+    applyAction,
+    diagnostics,
+  };
+}
+
+function currentRuntimeBaselines(root, intent, fs) {
+  const baselines = freshBaselines(intent);
+  for (const relative of runtimePaths()) {
+    const target = safePath(root, relative, fs);
+    if (!fs.existsSync(target)) continue;
+    const bytes = readBoundPhysicalFile(target, fs);
+    baselines[relative] = {
+      status: "present",
+      bytes: decodeUtf8Strict(bytes, `runtime target ${relative}`),
+    };
+  }
+  return baselines;
+}
+
+/**
+ * Plan one generated-manifest repair. Only an absent target is reconstructable
+ * by this writer. Every existing target returns a terminal disposition and
+ * remains under its owning workflow.
+ */
+export function planProjectOnboardingManifestRepairV4({
+  rootDir = process.cwd(),
+  deps: overrides = {},
+} = {}) {
+  const fs = deps(overrides);
+  let root;
+  try {
+    root = safeRoot(rootDir, fs);
+  } catch {
+    return manifestRepairResult({
+      status: "unrepairable",
+      root: null,
+      diagnostics: [lifecycleDiagnostic(
+        "$.root",
+        "manifest_repair_root_unavailable",
+        "the project root cannot be observed safely",
+        "restore the canonical physical root before retrying",
+      )],
+    });
+  }
+  const inspection = inspectRunnerProfileMigrationV3({ rootDir: root, deps: fs });
+  if (inspection.status !== "ready" || inspection.sourceKind !== "v3" || !selectedRunnerIsCodex(root, fs)) {
+    return manifestRepairResult({
+      status: "unrepairable",
+      root,
+      diagnostics: [lifecycleDiagnostic(
+        "$.source",
+        "manifest_repair_source_not_current",
+        "manifest repair requires one current Codex-selected V3 source",
+        "complete the source-owning recovery workflow first",
+      )],
+    });
+  }
+  let intent;
+  let projection;
+  let sourceBytes;
+  try {
+    const sourcePath = safePath(root, SOURCE, fs);
+    sourceBytes = readBoundPhysicalFile(sourcePath, fs);
+    if (sha256(sourceBytes) !== inspection.sourceSha256) throw new Error("source changed after migration inspection");
+    intent = parseYaml(decodeUtf8Strict(sourceBytes, SOURCE));
+    const validation = validatePipelineUserV3(intent, { source: SOURCE });
+    if (!validation.ok) throw new Error("source validation changed during manifest planning");
+    projection = planRuntimeProjectionV3(intent, {
+      source: SOURCE,
+      baselines: currentRuntimeBaselines(root, intent, fs),
+    });
+    const sourceAfter = readBoundPhysicalFile(sourcePath, fs);
+    if (sourceAfter.compare(sourceBytes) !== 0 || sha256(sourceAfter) !== inspection.sourceSha256) {
+      throw new Error("source changed during manifest planning");
+    }
+  } catch {
+    return manifestRepairResult({
+      status: "unrepairable",
+      root,
+      source: { path: SOURCE, sha256: inspection.sourceSha256 },
+      diagnostics: [lifecycleDiagnostic(
+        "$.manifest",
+        "manifest_unowned_bytes_unpreservable",
+        "the existing manifest bytes cannot be projected while preserving unowned content",
+        "repair the YAML syntax or restore the generated file from a trusted source, then plan again",
+      )],
+    });
+  }
+  if (projection.status !== "ready") {
+    return manifestRepairResult({
+      status: "unrepairable",
+      root,
+      source: { path: SOURCE, sha256: inspection.sourceSha256 },
+      diagnostics: [lifecycleDiagnostic(
+        "$.manifest",
+        "manifest_unowned_bytes_unpreservable",
+        "the manifest projection is not safely reconstructable",
+        "repair the invalid unowned content through its owning workflow",
+      )],
+    });
+  }
+  const projected = projection.targets.find((entry) => entry.path === ".claude/pipeline.yaml");
+  if (!projected || projected.after?.status !== "present" || typeof projected.after.bytes !== "string") {
+    return manifestRepairResult({
+      status: "unrepairable",
+      root,
+      source: { path: SOURCE, sha256: inspection.sourceSha256 },
+      diagnostics: [lifecycleDiagnostic(
+        "$.manifest",
+        "manifest_projection_unavailable",
+        "the V3 renderer produced no complete manifest target",
+        "repair the runtime ownership manifest before retrying",
+      )],
+    });
+  }
+  let projectedManifest;
+  try {
+    projectedManifest = validateManifest(parseYaml(projected.after.bytes), { rootDir: root });
+  } catch {
+    projectedManifest = { status: "invalid" };
+  }
+  if (projectedManifest.status !== "ok") {
+    return manifestRepairResult({
+      status: "unrepairable",
+      root,
+      source: { path: SOURCE, sha256: inspection.sourceSha256 },
+      diagnostics: [lifecycleDiagnostic(
+        "$.manifest",
+        "manifest_postimage_invalid",
+        "the byte-preserving projection does not produce a valid manifest",
+        "restore the unowned manifest structure through its owning workflow",
+      )],
+    });
+  }
+  const targetPath = safePath(root, ".claude/pipeline.yaml", fs);
+  const beforeBytes = readBoundPhysicalFile(targetPath, fs, { optional: true });
+  if (beforeBytes !== null) {
+    return manifestRepairResult({
+      status: "unrepairable",
+      root,
+      source: { path: SOURCE, sha256: inspection.sourceSha256 },
+      diagnostics: [lifecycleDiagnostic(
+        "$.manifest",
+        "manifest_existing_target_requires_owner_repair",
+        "an existing manifest cannot be replaced with an atomic no-replace publication",
+        "repair or remove the generated manifest through its owning workflow, then create a new digest-bound plan",
+      )],
+    });
+  }
+  const afterBytes = Buffer.from(projected.after.bytes, "utf8");
+  const binding = {
+    schema: MANIFEST_REPAIR_PLAN_SCHEMA,
+    root,
+    source: { path: SOURCE, sha256: inspection.sourceSha256 },
+    target: {
+      path: ".claude/pipeline.yaml",
+      before: describe(beforeBytes),
+      after: describe(afterBytes),
+      preservation: "absent-target-only",
+    },
+  };
+  const planSha256 = sha256(JSON.stringify(stable(binding)));
+  const plan = manifestRepairResult({
+    ...binding,
+    status: "ready",
+    planSha256,
+    applyAction: commandAction(
+      [ONBOARDING_SCRIPT, "apply-manifest-repair", "--root", root, "--plan-sha256", planSha256, "--activate"],
+      true,
+      true,
+      SCHEMA,
+      RESTART_EXPECTED_STATUSES,
+    ),
+  });
+  AUTHENTICATED_MANIFEST_REPAIRS.set(plan, {
+    signature: JSON.stringify(plan),
+    afterBytes,
+  });
+  return plan;
+}
+
+export function applyProjectOnboardingManifestRepairV4({
+  rootDir = process.cwd(),
+  planSha256,
+  activate = false,
+  deps: overrides = {},
+} = {}) {
+  const fs = deps(overrides);
+  if (activate !== true || !/^[a-f0-9]{64}$/u.test(planSha256 ?? "")) {
+    return v4Inspection(rootDir, fs);
+  }
+  const plan = planProjectOnboardingManifestRepairV4({ rootDir, deps: fs });
+  const authenticated = AUTHENTICATED_MANIFEST_REPAIRS.get(plan);
+  if (plan.status !== "ready"
+    || plan.planSha256 !== planSha256
+    || sha256(JSON.stringify(stable(manifestRepairBinding(plan)))) !== planSha256
+    || !authenticated
+    || authenticated.signature !== JSON.stringify(plan)) {
+    return v4Inspection(rootDir, fs);
+  }
+  let source;
+  let parent;
+  let temporary;
+  let boundTarget;
+  let fd;
+  let temporaryIdentity = null;
+  let publicationIdentity = null;
+  let committed = false;
+  let postCommitFailure = null;
+  try {
+    const target = safePath(plan.root, plan.target.path, fs);
+    source = safePath(plan.root, plan.source.path, fs);
+    parent = openBoundDirectory(dirname(target), fs);
+    const temporaryName = `.pipeline-manifest-repair-${plan.planSha256.slice(0, 24)}-${randomBytes(8).toString("hex")}.tmp`;
+    temporary = boundDirectoryEntry(parent, temporaryName, fs);
+    boundTarget = boundDirectoryEntry(parent, basename(target), fs);
+    fd = fs.openSync(
+      temporary,
+      fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | (fs.constants.O_NOFOLLOW ?? 0),
+      0o600,
+    );
+    temporaryIdentity = fileIdentity(fs.fstatSync(fd));
+    if (!temporaryIdentity) throw new Error("manifest temporary identity is unavailable");
+    fs.writeFileSync(fd, authenticated.afterBytes);
+    fs.fsyncSync(fd);
+    fs.closeSync(fd);
+    fd = undefined;
+    if (!sameIdentity(temporaryIdentity, temporary, fs)
+      || !sameDirectoryIdentity(parent.identity, parent.path, fs)) {
+      throw new Error("manifest publication topology changed");
+    }
+    const currentSource = readBoundPhysicalFile(source, fs);
+    if (sha256(currentSource) !== plan.source.sha256) throw new Error("source preimage changed after planning");
+    fs.linkSync(temporary, boundTarget);
+    committed = true;
+    publicationIdentity = temporaryIdentity;
+    if (!sameFileObject(temporaryIdentity, temporary, fs)
+      || !sameFileObject(temporaryIdentity, boundTarget, fs)) {
+      postCommitFailure = {
+        code: "manifest_repair_target_changed_after_commit",
+        message: "the atomically published manifest changed identity before readback",
+        repair: "stop and restore the generated manifest through its owning workflow before any readiness claim",
+      };
+      throw new Error("manifest target changed during publication");
+    }
+    if (!sameDirectoryIdentity(parent.identity, parent.path, fs)) {
+      postCommitFailure = {
+        code: "manifest_repair_parent_changed_after_commit",
+        message: "the pinned manifest parent changed after atomic publication",
+        repair: "stop and restore the canonical physical .claude directory before any readiness claim",
+      };
+      throw new Error("manifest parent changed during publication");
+    }
+    const sourceAfter = readBoundPhysicalFile(source, fs);
+    if (sha256(sourceAfter) !== plan.source.sha256) {
+      postCommitFailure = {
+        code: "manifest_repair_source_changed_after_commit",
+        message: "the V3 source changed during atomic manifest publication",
+        repair: "stop and create a new source-bound repair plan before any readiness claim",
+      };
+      throw new Error("source changed during manifest publication");
+    }
+    if (fs.fsyncDirectory) fs.fsyncDirectory(parent.path);
+    else syncBoundDirectory(parent, fs);
+    const durableSource = readBoundPhysicalFile(source, fs);
+    if (sha256(durableSource) !== plan.source.sha256) {
+      postCommitFailure = {
+        code: "manifest_repair_source_changed_after_commit",
+        message: "the V3 source changed during manifest durability confirmation",
+        repair: "stop and create a new source-bound repair plan before any readiness claim",
+      };
+      throw new Error("source changed during manifest durability confirmation");
+    }
+    if (!sameDirectoryIdentity(parent.identity, parent.path, fs)) {
+      postCommitFailure = {
+        code: "manifest_repair_parent_changed_after_commit",
+        message: "the pinned manifest parent changed during durability confirmation",
+        repair: "stop and restore the canonical physical .claude directory before any readiness claim",
+      };
+      throw new Error("manifest parent changed during durability confirmation");
+    }
+    if (!sameFileObject(publicationIdentity, boundTarget, fs)) {
+      postCommitFailure = {
+        code: "manifest_repair_target_changed_after_commit",
+        message: "the published manifest changed identity during durability confirmation",
+        repair: "stop and restore the generated manifest through its owning workflow before any readiness claim",
+      };
+      throw new Error("manifest target changed during durability confirmation");
+    }
+    fs.unlinkSync(temporary);
+    temporaryIdentity = null;
+    if (fs.fsyncDirectory) fs.fsyncDirectory(parent.path);
+    else syncBoundDirectory(parent, fs);
+    const finalSource = readBoundPhysicalFile(source, fs);
+    if (sha256(finalSource) !== plan.source.sha256) {
+      postCommitFailure = {
+        code: "manifest_repair_source_changed_after_commit",
+        message: "the V3 source changed before final manifest readback",
+        repair: "stop and create a new source-bound repair plan before any readiness claim",
+      };
+      throw new Error("source changed before final manifest readback");
+    }
+    if (!sameDirectoryIdentity(parent.identity, parent.path, fs)) {
+      postCommitFailure = {
+        code: "manifest_repair_parent_changed_after_commit",
+        message: "the pinned manifest parent changed before final readback",
+        repair: "stop and restore the canonical physical .claude directory before any readiness claim",
+      };
+      throw new Error("manifest parent changed before final readback");
+    }
+    if (!sameFileObject(publicationIdentity, boundTarget, fs)) {
+      postCommitFailure = {
+        code: "manifest_repair_target_changed_after_commit",
+        message: "the published manifest changed identity before final readback",
+        repair: "stop and restore the generated manifest through its owning workflow before any readiness claim",
+      };
+      throw new Error("manifest target changed before final readback");
+    }
+  } catch {
+    if (fd !== undefined) {
+      try { fs.closeSync(fd); } catch {}
+    }
+    try {
+      if (temporaryIdentity && temporary && sameIdentity(temporaryIdentity, temporary, fs)) fs.unlinkSync(temporary);
+    } catch {}
+    if (committed) {
+      let quarantined = true;
+      if (postCommitFailure) {
+        quarantined = quarantineManifestPublication(parent, boundTarget, publicationIdentity, plan.planSha256, fs);
+      }
+      const observed = v4Inspection(rootDir, fs);
+      const failure = postCommitFailure && quarantined ? postCommitFailure : postCommitFailure ? {
+        code: "manifest_repair_rollback_incomplete",
+        message: "publication drift occurred and the exact manifest postimage could not be quarantined",
+        repair: "stop and inspect the physical manifest target before any readiness claim",
+      } : {
+        code: "manifest_repair_durability_unavailable",
+        message: "the manifest postimage was published but directory durability could not be confirmed",
+        repair: "stop and re-observe the physical project before any readiness claim",
+      };
+      return lifecycleResult({
+        status: "partial",
+        root: observed.root,
+        runner: observed.runner,
+        intent: observed.intent,
+        repository: observed.repository,
+        runtime: observed.runtime,
+        continuity: observed.continuity,
+        appServer: observed.appServer,
+        diagnostics: [lifecycleDiagnostic(
+          "$.manifest",
+          failure.code,
+          failure.message,
+          failure.repair,
+        )],
+      });
+    }
+    return v4Inspection(rootDir, fs);
+  } finally {
+    try { if (parent) fs.closeSync(parent.fd); } catch {}
+  }
+  return v4Inspection(rootDir, fs);
+}
+
 const REPOSITORY_FAILURES = {
   "control-path-read-only": {
     status: "repository-mount-read-only",
@@ -1022,11 +1698,23 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
     });
   }
   if (legacy.status === "migration-required") {
+    const refresh = legacy.sourceKind === "v3-refresh";
     return lifecycleResult({
       status: "migration-required", root: legacy.root, intent, repository,
       runtime: emptyRuntime(),
-      nextAction: commandAction([MIGRATION_SCRIPT, "inspect", "--root", legacy.root], false, false, "pipeline.runner-profile-migration-inspect.v3", ["ready", "invalid-root", "recovery-required", "invalid-source"]),
-      diagnostics: [lifecycleDiagnostic("$.source", "migration_required", "the project has a legacy Pipeline source", "inspect the V3 migration")],
+      nextAction: commandAction(
+        [MIGRATION_SCRIPT, refresh ? "plan" : "inspect", "--root", legacy.root],
+        false,
+        false,
+        refresh ? "pipeline.runner-profile-migration-plan.v3" : "pipeline.runner-profile-migration-inspect.v3",
+        refresh ? ["ready", "noop"] : ["ready", "invalid-root", "recovery-required", "invalid-source"],
+      ),
+      diagnostics: [lifecycleDiagnostic(
+        "$.source",
+        refresh ? "stale_generated_projection" : "migration_required",
+        refresh ? "the project has a recognized stale V3 generated registry projection" : "the project has a legacy Pipeline source",
+        refresh ? "review the closed V3 refresh plan" : "inspect the V3 migration",
+      )],
     });
   }
   if (legacy.status === "partial") {
@@ -1034,18 +1722,21 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
     if (sourcePath && fs.existsSync(sourcePath)) {
       const migrated = inspectRunnerProfileMigrationV3({ rootDir: legacy.root, deps: fs });
       if (migrated.status !== "ready") {
-        return lifecycleResult({ status: "invalid", root: legacy.root, runner: null, intent, repository, runtime: emptyRuntime(), nextAction: null,
-          diagnostics: [lifecycleDiagnostic("$.source", "source_invalid", "pipeline.user.yaml is not a valid V3 source", "repair the source through its owning workflow")] });
+        return lifecycleResult({ status: "invalid", root: legacy.root, runner: null, intent, repository, runtime: emptyRuntime(),
+          nextAction: commandAction([ONBOARDING_SCRIPT, "plan-source-recovery", "--root", legacy.root], false, false, SOURCE_RECOVERY_SCHEMA, ["recoverable", "unrepairable"]),
+          diagnostics: [lifecycleDiagnostic("$.source", "source_invalid", "pipeline.user.yaml is not a valid V3 source", "review the closed source recovery disposition")] });
       }
       if (migrated.sourceKind === "v3") {
         if (!selectedRunnerIsCodex(legacy.root, fs)) {
-          return lifecycleResult({ status: "invalid", root: legacy.root, runner: null, intent, repository, runtime: emptyRuntime(), nextAction: null,
-            diagnostics: [lifecycleDiagnostic("$.source.runners.default", "source_invalid", "the selected runner is not Codex", "select Codex through the source authority") ] });
+          return lifecycleResult({ status: "invalid", root: legacy.root, runner: null, intent, repository, runtime: emptyRuntime(),
+            nextAction: commandAction([ONBOARDING_SCRIPT, "plan-source-recovery", "--root", legacy.root], false, false, SOURCE_RECOVERY_SCHEMA, ["recoverable", "unrepairable"]),
+            diagnostics: [lifecycleDiagnostic("$.source.runners.default", "source_invalid", "the selected runner is not Codex", "review the unsupported source transition disposition") ] });
         }
         const manifest = loadManifest(legacy.root);
         if (manifest.status !== "ok") {
-          return lifecycleResult({ status: "partial", root: legacy.root, intent, repository, runtime: emptyRuntime(), nextAction: null,
-            diagnostics: [lifecycleDiagnostic("$.manifest", "manifest_invalid", "the generated pipeline manifest is absent or invalid", "regenerate it only through the lifecycle writer")] });
+          return lifecycleResult({ status: "partial", root: legacy.root, intent, repository, runtime: emptyRuntime(),
+            nextAction: commandAction([ONBOARDING_SCRIPT, "plan-manifest-repair", "--root", legacy.root], false, false, MANIFEST_REPAIR_PLAN_SCHEMA, ["ready", "unrepairable"]),
+            diagnostics: [lifecycleDiagnostic("$.manifest", "manifest_invalid", "the generated pipeline manifest is absent or invalid", "review the digest-bound manifest-only repair plan")] });
         }
         // Codex reserves this directory inside its sandbox. The installed
         // plugin supplies the runtime there; a consumer project must not be
@@ -1265,23 +1956,6 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
 function ensurePreimage(root, expectedState, fs) {
   const now = legacyInspection(root, fs);
   if (now.status !== expectedState) throw new Error(`root changed since planning (${now.status})`);
-}
-function directoryIdentity(info) {
-  return info && !info.isSymbolicLink() && info.isDirectory()
-    ? { dev: String(info.dev), ino: String(info.ino) }
-    : null;
-}
-
-function sameDirectoryIdentity(expected, path, fs) {
-  try {
-    const actual = fs.lstatSync(path);
-    return !actual.isSymbolicLink()
-      && actual.isDirectory()
-      && String(actual.dev) === expected.dev
-      && String(actual.ino) === expected.ino;
-  } catch {
-    return false;
-  }
 }
 
 function physicalTreeSnapshot(path, fs) {
@@ -1528,7 +2202,12 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate) {
   })).sort((left, right) => left.path.localeCompare(right.path));
   let persisted;
   try {
-    const binding = prepareRuntimeRestartBinding({ rootDir: plan.root, sourceSha256: plan.sourceSha256, runtimeTargets });
+    const binding = prepareRuntimeRestartBinding({
+      rootDir: plan.root,
+      sourceSha256: plan.sourceSha256,
+      runtimeTargets,
+      codexExecutable: deps.codexExecutable,
+    });
     // The barrier is durable before the target transaction begins. A crash in
     // either direction therefore blocks rather than claiming a loaded runtime.
     persisted = persistRestartBarrier({ rootDir: plan.root, repositoryCapability: beforeApply.repository.mode, binding, deps: fs });

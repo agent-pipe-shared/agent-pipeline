@@ -41,7 +41,14 @@ function nonAncestorRevision() {
   // directly -- unreachable from HEAD by construction, no branch/tag/working-tree
   // side effects, deterministic on every host and every repo state.
   const emptyTree = execFileSync("git", ["hash-object", "-t", "tree", "--stdin"], { cwd: repoRoot, encoding: "utf8", input: "" }).trim();
-  const commit = execFileSync("git", ["commit-tree", emptyTree, "-m", "non-ancestor fixture root"], { cwd: repoRoot, encoding: "utf8" }).trim();
+  const fixtureIdentity = {
+    ...process.env,
+    GIT_AUTHOR_NAME: "pipeline-fixture",
+    GIT_AUTHOR_EMAIL: "pipeline-fixture@example.invalid",
+    GIT_COMMITTER_NAME: "pipeline-fixture",
+    GIT_COMMITTER_EMAIL: "pipeline-fixture@example.invalid",
+  };
+  const commit = execFileSync("git", ["commit-tree", emptyTree, "-m", "non-ancestor fixture root"], { cwd: repoRoot, encoding: "utf8", env: fixtureIdentity }).trim();
   return revision(commit);
 }
 

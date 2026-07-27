@@ -5,7 +5,7 @@ import { execFileSync, spawn as spawnProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { EventEmitter } from "node:events";
 import { readFileSync } from "node:fs";
-import { chmod, link, lstat, mkdir, mkdtemp, open, readFile, rm, symlink, truncate, unlink, writeFile } from "node:fs/promises";
+import { chmod, link, lstat, mkdir, mkdtemp, open, readFile, rename, rm, symlink, truncate, unlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { PassThrough } from "node:stream";
@@ -512,7 +512,9 @@ await check("trace verification detects truncation, mutation, replacement and mo
         await writeFile(tracePath, changed);
         await assert.rejects(() => verifySecureTraceStore({ ...options, binding: store.binding }), /hash|predecessor/u);
       } else if (fault === "replacement") {
-        await unlink(tracePath); await writeFile(tracePath, original, { mode: 0o600 });
+        const replacement = `${tracePath}.replacement`;
+        await writeFile(replacement, original, { mode: 0o600 });
+        await rename(replacement, tracePath);
         await assert.rejects(() => verifySecureTraceStore({ ...options, binding: store.binding }), /device\/inode/u);
       } else {
         await chmod(tracePath, 0o640);

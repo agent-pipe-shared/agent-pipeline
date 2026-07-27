@@ -1,16 +1,26 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Pure validation and transition proposals for pipeline.continuity.v0. */
 import { normalizeContinuityHostObservation } from "./continuity-host-adapter.mjs";
+import {
+  buildRunnerNativeContinuationRequest,
+  materializeRunnerNativeContinuation,
+  materializeRunnerNativeTerminal,
+  planNativeGoalTransition,
+  projectRunnerNativeProgress,
+  recordRunnerNativeAdditiveInput,
+  validateRunnerNativeContinuation,
+} from "./runner-native-continuation.mjs";
 
 const ROOT_KEYS = new Set([
   "schema", "featureId", "revision", "runtime", "authority", "queueHead", "blocker",
   "acknowledgedFinal", "resume", "recovery", "decisionTxn", "capacity",
   "closeTransition",
+  "nativeContinuation",
 ]);
 const RUNTIME_KEYS = new Set(["humanFacingLanguage", "activeDuty", "sessionCleanup"]);
 const SESSION_CLEANUP_KEYS = new Set(["sessionId", "descriptorSha256"]);
 const ARTIFACT_KEYS = new Set(["path", "sha256"]);
-const AUTHORITY_KEYS = new Set(["prd", "spec", "result"]);
+const AUTHORITY_KEYS = new Set(["prd", "spec", "result", "plan"]);
 const QUEUE_KEYS = new Set([
   "packageId", "actionId", "nextAction", "productRetryCount",
   "environmentRerouteCount", "dispatch",
@@ -128,10 +138,21 @@ function validArtifact(value) {
 }
 
 function validAuthority(value) {
-  return exactKeys(value, AUTHORITY_KEYS)
+  return allowedKeys(value, AUTHORITY_KEYS, ["prd", "spec", "result"])
     && validArtifact(value.prd)
     && validArtifact(value.spec)
-    && (value.result === null || validArtifact(value.result));
+    && (value.result === null || validArtifact(value.result))
+    && (value.plan === undefined || validArtifact(value.plan));
+}
+
+function validNativeContinuationBinding(value, state) {
+  if (value === undefined || value === null) return true;
+  return validateRunnerNativeContinuation(value).ok
+    && value.subject.featureId === state.featureId
+    && state.authority.plan !== undefined
+    && value.subject.planSha256 === state.authority.plan.sha256
+    && value.subject.specSha256 === state.authority.spec.sha256
+    && value.subject.queueRevision <= state.revision;
 }
 
 function validRuntime(value) {
@@ -356,7 +377,7 @@ function result(ok, code, state = null, mutated = false) {
 
 /** Validate one bounded continuity object. */
 export function validateContinuityState(value, activeFeatureId = undefined) {
-  if (!allowedKeys(value, ROOT_KEYS, [...ROOT_KEYS].filter((key) => key !== "closeTransition"))
+  if (!allowedKeys(value, ROOT_KEYS, [...ROOT_KEYS].filter((key) => key !== "closeTransition" && key !== "nativeContinuation"))
     || value.schema !== "pipeline.continuity.v0"
     || !safeId(value.featureId)
     || !safeInteger(value.revision)
@@ -371,7 +392,8 @@ export function validateContinuityState(value, activeFeatureId = undefined) {
     || !validRecovery(value.recovery, value)
     || !validDecisionTxn(value.decisionTxn, value.revision)
     || !validCapacity(value.capacity)
-    || !validCloseTransition(value.closeTransition, value)) {
+    || !validCloseTransition(value.closeTransition, value)
+    || !validNativeContinuationBinding(value.nativeContinuation, value)) {
     return { ok: false, code: "CS-INVALID" };
   }
   let bytes;
@@ -445,6 +467,7 @@ function compareAndSwap(current, request, activeFeatureId, {
   allowDecisionChange = false,
   allowResultAuthorityChange = false,
   allowCloseTransitionChange = false,
+  allowNativeContinuationChange = false,
 } = {}) {
   const before = validateContinuityState(current, activeFeatureId);
   if (!before.ok || !exactKeys(request, CAS_KEYS) || !safeInteger(request.expectedRevision)) {
@@ -460,6 +483,9 @@ function compareAndSwap(current, request, activeFeatureId, {
   if (!allowCloseTransitionChange
     && !sameJson(current.closeTransition ?? null, request.next.closeTransition ?? null)) {
     return result(false, "CS-PROTECTED-CLOSE-TRANSITION");
+  }
+  if (!allowNativeContinuationChange && !sameJson(current.nativeContinuation ?? null, request.next.nativeContinuation ?? null)) {
+    return result(false, "CS-PROTECTED-NATIVE-CONTINUATION");
   }
   if (!sameJson(current.runtime, request.next.runtime)
     || !sameJson(current.authority.prd, request.next.authority.prd)
@@ -483,6 +509,47 @@ function compareAndSwap(current, request, activeFeatureId, {
 /** Validate a pure compare-and-swap proposal; performs no I/O. */
 export function compareAndSwapContinuity(current, request, activeFeatureId = undefined) {
   return compareAndSwap(current, request, activeFeatureId);
+}
+
+/** Apply a controller-produced runner-native continuation projection. */
+export function applyRunnerNativeContinuation(current, request, activeFeatureId = undefined) {
+  const applied = compareAndSwap(current, request, activeFeatureId, { allowNativeContinuationChange: true });
+  if (!applied.ok) return applied;
+  return { ...applied, continuation: structuredClone(request.next.nativeContinuation ?? null) };
+}
+
+/** Runner-native continuation controller; adapter remains the caller's authority. */
+export async function reconcileRunnerNativeContinuation({ continuity, activeFeature, continuationId, runner, acceptance = [], evidence = [], event, additiveInput = null, adapter } = {}) {
+  if (typeof adapter !== "function" || !isObject(activeFeature) || !safeId(activeFeature.id) || !safeId(continuationId)
+    || !validateContinuityState(continuity, activeFeature.id).ok) return { ok: false, code: "RNC-CONTROLLER-INPUT" };
+  const current = continuity.nativeContinuation ?? null;
+  if (additiveInput !== null) {
+    if (current === null) return { ok: false, code: "RNC-CONTROLLER-INPUT" };
+    const added = recordRunnerNativeAdditiveInput({ continuation: current, input: additiveInput });
+    if (!added.ok) return { ok: false, code: added.code };
+    const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = added.continuation;
+    return { ok: true, code: added.code, action: "none", expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
+  }
+  if (!isObject(event) || !safeId(event.kind) || !safeInteger(event.atRevision) || event.atRevision !== continuity.revision) return { ok: false, code: "RNC-CONTROLLER-EVENT" };
+  if (current === null) {
+    const progress = projectRunnerNativeProgress({ continuity, acceptance, evidence });
+    if (!progress.ok) return { ok: false, code: progress.code };
+    const request = buildRunnerNativeContinuationRequest({ continuationId, activeFeature, continuity, runner, acceptance, evidence, progress: progress.progress });
+    if (!request.ok) return { ok: false, code: request.code };
+    const adapterResult = await adapter({ action: "set", generation: 0, subject: request.request.subject, objective: request.request.objective });
+    const materialized = materializeRunnerNativeContinuation({ request, generation: 0, adapterResult, observedAt: adapterResult?.readback?.observedAt, reasonCode: event.kind });
+    if (!materialized.ok) return { ok: false, code: materialized.code };
+    const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = materialized.continuation;
+    return { ok: true, code: "RNC-SET", action: "set", expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
+  }
+  const transition = planNativeGoalTransition({ continuation: current, event });
+  if (!transition.ok) return { ok: false, code: transition.code };
+  if (transition.action === "none") return { ok: true, code: transition.code, action: "none", expectedRevision: continuity.revision, next: structuredClone(continuity), continuation: structuredClone(current) };
+  const adapterResult = await adapter({ action: "clear", generation: current.generation.number, subject: current.subject, objective: current.objective });
+  const terminal = materializeRunnerNativeTerminal({ continuation: current, transition, event, adapterResult });
+  if (!terminal.ok) return { ok: false, code: terminal.code };
+  const next = structuredClone(continuity); next.revision += 1; next.nativeContinuation = terminal.continuation;
+  return { ok: true, code: terminal.code, action: "clear", expectedRevision: continuity.revision, next, continuation: next.nativeContinuation };
 }
 
 /**

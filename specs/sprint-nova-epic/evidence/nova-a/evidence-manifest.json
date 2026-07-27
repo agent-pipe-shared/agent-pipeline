@@ -1,0 +1,14 @@
+{
+  "schema": "pipeline.nova-a-evidence-manifest.v1",
+  "candidate": {"commit":"874323da7f510be3208ee8b6ffc31ef121963ee9","tree":"76de02e71063e574e9728691fad30d2b0c4a6337"},
+  "candidateTreeListingSha256": "f8e6a46587b3d9e103bd575c851007831aec6fa261f3ffb815d3c0b2a29013f4",
+  "sources": [
+    {"path":"specs/sprint-nova-epic/spec.md","sha256":"bb6c2851cfc0cd86525bf132b8c77a6fa735334252193cb83105de667bdfb35f"},
+    {"path":"specs/sprint-nova-epic/acceptance.md","sha256":"69779547a926df01768e7c518158e030ee777cb51ee82a66d009631d431d9f2c"},
+    {"path":"specs/sprint-nova-epic/design/cyborg-collision-matrix.md","sha256":"1c25ff5f9e62b0d82e50fd13a48469e343ebf545e128901fc597136b98684d25"},
+    {"path":"backlog/index.json","sha256":"f0c6ed61b2fa914104ad20c8519c7791ffb26e683d8d9445c08581c83a65ef3b"},
+    {"path":"evidence/verify-latest.json","sha256":"1899d17cb34b82050d25cacbb9f8019932c940942269fb355973756a6b9b9e63"},
+    {"path":"evidence/security-latest.json","sha256":"d3abfde19be0b7d5196ef02390075313ef83cb01d063a09e4b8711927c3ee4b6"}
+  ],
+  "reconstruction": {"kind":"fresh-verification-after-authorized-remediation","notHistoricalBackfill":true,"scopeAuthorization":"PO-directed A7 Gitleaks scope reconciliation — 2026-07-25"}
+}

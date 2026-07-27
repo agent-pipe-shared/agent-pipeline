@@ -1,0 +1,15 @@
+{
+  "schema": "pipeline.nova-b-integration-critic.v1",
+  "candidate": {
+    "commit": "4b96d95d2e527cd8ef68f88f4d7b2a3412297362",
+    "tree": "5da462b9f632828dfdbb61ed3d813c769a71f10f"
+  },
+  "review": {
+    "runner": "codex",
+    "assurance": "functional-equivalent-read-only; OS isolation not asserted",
+    "status": "pass",
+    "findings": [],
+    "trajectory": "consistent"
+  },
+  "verdict": "PASS"
+}

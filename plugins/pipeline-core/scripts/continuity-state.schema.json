@@ -49,6 +49,12 @@
           "required": ["path", "sha256"],
           "properties": { "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*\\\\)(?!.*\\u0000)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//).{1,240}$" }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } }
         },
+        "plan": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "sha256"],
+          "properties": { "path": { "type": "string", "minLength": 1, "maxLength": 240, "pattern": "^(?!/)(?!.*\\\\)(?!.*\\u0000)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*//).{1,240}$" }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } }
+        },
         "result": {
           "type": ["object", "null"],
           "additionalProperties": false,
@@ -93,6 +99,12 @@
           }
         }
       }
+    },
+    "nativeContinuation": {
+      "anyOf": [
+        { "type": "null" },
+        { "$ref": "runner-native-continuation.schema.json" }
+      ]
     },
     "blocker": {
       "type": ["object", "null"],

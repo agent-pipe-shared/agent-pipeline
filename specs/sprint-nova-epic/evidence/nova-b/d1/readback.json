@@ -1,0 +1,35 @@
+{
+  "schema": "pipeline.nova-b-d1.gate-readback.v1",
+  "scope": "adr-0047-local-supervisor-state-and-setup-baseline",
+  "productCandidate": {
+    "commit": "ec97a6ef72c7dfd43dd3072dd56f089a5ab33324",
+    "tree": "db366d1ef3f0b9a4e4e315087fe4892e2c78528c"
+  },
+  "gates": {
+    "verify": {
+      "path": "specs/sprint-nova-epic/evidence/nova-b/d1/verify.json",
+      "sha256": "afa010ed2d6e10478382d72b3e4dfab5f8a5c043d0b130a004e69d7115a7c5f4",
+      "exitCode": 0,
+      "binding": "exact"
+    },
+    "security": {
+      "path": "specs/sprint-nova-epic/evidence/nova-b/d1/security.json",
+      "sha256": "3ce58716939e544b028de6c36dbc526a3df3609419e065a126eac2dca9e1ddd6",
+      "exitCode": 0,
+      "binding": "exact"
+    }
+  },
+  "criticReadback": {
+    "source": "PO continuation handoff (2026-07-25)",
+    "reportedMode": "fresh independent Critic",
+    "reportedVerdict": "PASS",
+    "reportedFindings": [],
+    "rawReceipt": "not supplied; this is a transparent readback, not a raw Critic receipt"
+  },
+  "status": "passed",
+  "limitations": [
+    "functional-equivalent-read-only; OS isolation not asserted",
+    "No claim of external execution, child-process execution, active supervisor, model identity, or secret persistence."
+  ],
+  "note": "Evidence persistence is intentionally separate from the verified product candidate and does not change its binding."
+}

@@ -1,0 +1,33 @@
+{
+  "schema": "pipeline.nova-phase-activation-reconciliation.v1",
+  "recordedAt": "2026-07-24T20:50:49Z",
+  "authorizedBy": "Product Owner",
+  "decision": "Implementation may proceed through all Nova A steps and must stop at the PO gate.",
+  "featureId": "sprint-nova-epic",
+  "reason": "The repository PO-gate writer requires one prd_*.md authority with exact language and neighboring Spec digest markers.",
+  "changesProductScope": false,
+  "changesAcceptance": false,
+  "changesImplementationSlices": false,
+  "bindings": {
+    "approvedPrdContentBaselineSha256": "879423cdb24d542b7f9275bc9da4591fcdfd38145fdddee9142ce82eee53402e",
+    "activationPrdPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+    "activationPrdSha256": "65c0843df3d76f712fe1d2bce70f54c7600e2a0b9a2aa5dc27abdbc2c22ce3fb",
+    "approvedSpecSha256": "47a952040fd3a50ba2b02c04d4b4c7c0d3b7a32d58e4a736858d19fda1eae8b9",
+    "activationSpecSha256": "bb6c2851cfc0cd86525bf132b8c77a6fa735334252193cb83105de667bdfb35f",
+    "acceptanceSha256": "69779547a926df01768e7c518158e030ee777cb51ee82a66d009631d431d9f2c"
+  },
+  "execution": {
+    "coordinatorModel": "gpt-5.6-sol",
+    "coordinatorEffort": "high",
+    "stopAt": "nova-a-po-gate"
+  },
+  "doesNotAuthorize": [
+    "nova-b-implementation",
+    "external-mutation",
+    "backlog-transition-apply-before-a1-authorization",
+    "github-issue-mutation",
+    "merge",
+    "push",
+    "release"
+  ]
+}

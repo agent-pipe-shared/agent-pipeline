@@ -1,0 +1,78 @@
+{
+  "schema": "pipeline.nova-spec-readiness.v1",
+  "observedAt": "2026-07-24T20:25:30Z",
+  "featureId": "sprint-nova-epic",
+  "branch": "feat/sprint-nova-codex",
+  "parentHead": {
+    "commit": "66f506a87b92f804077d6eeea2bcb6535d0e0f6a",
+    "tree": "42d0162b29743b268476eac068f3a75aa224a1ba"
+  },
+  "productBase": {
+    "tag": "v0.4.1",
+    "commit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
+    "tree": "ec4fcf2e84b15a580dbc13d98198204e8cfca429"
+  },
+  "authorities": {
+    "prdSha256": "879423cdb24d542b7f9275bc9da4591fcdfd38145fdddee9142ce82eee53402e",
+    "prdApprovalSha256": "59b38e54ca64cd94c8ae02bd4844ee082b2202a88beb17965cab13bba361571d",
+    "specSha256": "47a952040fd3a50ba2b02c04d4b4c7c0d3b7a32d58e4a736858d19fda1eae8b9",
+    "acceptanceSha256": "69779547a926df01768e7c518158e030ee777cb51ee82a66d009631d431d9f2c",
+    "backlogSpecBindingsSha256": "fe21dd49b652212612101f76a5db01b5c665597f77d9dc8d8b102c6951961408",
+    "advisorDispositionSha256": "c3c4bf07fb9838441100f687c6ab3a71677643909ce9cd55b0127cdbe9341711"
+  },
+  "acceptanceTechnicalAmendment": {
+    "previousSha256": "f15c417360fd8757ce42a410f3735f61b7cd17f9ff165c59fb65257e9103c855",
+    "currentSha256": "69779547a926df01768e7c518158e030ee777cb51ee82a66d009631d431d9f2c",
+    "changes": [
+      "NVA-G05 now matches the approved independent-branch collision boundary",
+      "NVA-A29-6 requires a non-vacuous positive selected-child receipt",
+      "NVA-B16-5 binds unattended assumption authority",
+      "NVA-B21-7 binds worker workspace authority and lifecycle",
+      "NVA-B49-7 and NVA-B49-8 bind keep-awake and interaction continuity"
+    ],
+    "scopeChange": false,
+    "requiresSpecGateApproval": true
+  },
+  "backlog": {
+    "snapshotCommit": "5ca5a4b292a267ffdfcc52577fda0a0593957a65",
+    "subtree": "832bf98e22e9a147dad88c952c0b794f3ee44fe7",
+    "transitionHead": "36dd616d3aa5bc21e49e138f6b8a9a17a9de25321998304306e4fa47289de562",
+    "bindingCount": 14,
+    "canonicalItemCount": 35
+  },
+  "readiness": {
+    "novaAExactPathManifest": true,
+    "novaAClosedSchemaContracts": true,
+    "statefulCrashRecoveryDefined": true,
+    "frozenContractsRemainUnmodified": true,
+    "novaBProductionStateStoreBlockedByAdr": true,
+    "antigravityImplementationBlockedByResearchDecision": true,
+    "liveExternalMutationBlockedByAuthority": true,
+    "advisorFindingCount": 13,
+    "advisorUndispositionedCount": 0
+  },
+  "gateBoundary": {
+    "state": "awaiting-spec-approval",
+    "approvalMustBind": [
+      "specSha256",
+      "acceptanceSha256",
+      "backlogSpecBindingsSha256",
+      "advisorDispositionSha256",
+      "thisBaselineSha256"
+    ],
+    "approvalWouldAuthorize": [
+      "nova-a-implementation-dispatch"
+    ],
+    "approvalWouldNotAuthorize": [
+      "nova-b-production-supervisor",
+      "new-mutable-state-store",
+      "remote-execution",
+      "credential-use",
+      "antigravity-live-implementation",
+      "external-mutation",
+      "merge",
+      "push",
+      "release"
+    ]
+  }
+}

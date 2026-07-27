@@ -1,0 +1,10 @@
+{
+  "schema": "pipeline.nova-a-critic-observation.v1",
+  "candidate": {"commit":"874323da7f510be3208ee8b6ffc31ef121963ee9","tree":"76de02e71063e574e9728691fad30d2b0c4a6337"},
+  "assurance": "functional-equivalent-read-only; OS isolation not asserted",
+  "verdict": "pass",
+  "status": "accepted",
+  "findings": [],
+  "checked": ["A2 terminal fingerprint suppression","A5 complete changed-path coverage","A7 exact scope reconciliation","candidate-bound Verify and Security evidence"],
+  "reviewedAt": "2026-07-25T13:02:00.000Z"
+}

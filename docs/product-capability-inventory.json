@@ -563,6 +563,12 @@
       "member": "check-ownership-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:claude-goal-host-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "claude-goal-host-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:claude-critic-host-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -579,6 +585,120 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "codex-advisory-bootstrap-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:local-supervisor-setup-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "local-supervisor-setup-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:local-supervisor-state-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "local-supervisor-state-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:local-worker-supervisor-cli-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "local-worker-supervisor-cli-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:local-worker-supervisor-core-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "local-worker-supervisor-core-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-backlog-reconciler-cli-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-backlog-reconciler-cli-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-backlog-reconciliation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-backlog-reconciliation-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-benchmark-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-benchmark-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-critic-lineage-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-critic-lineage-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-critic-packet-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-critic-packet-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-execution-plane-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-execution-plane-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-increment-receipt-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-increment-receipt-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-invocation-preflight-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-invocation-preflight-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-invocation-reliability-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-invocation-reliability-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-release-preflight-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-release-preflight-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-runner-capability-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-runner-capability-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-sandbox-disposition-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-sandbox-disposition-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-scheduling-lifecycle-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-scheduling-lifecycle-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:runner-native-continuation-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "runner-native-continuation-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-goal-host-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-goal-host-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-app-server-health-tests",
@@ -1565,11 +1685,13 @@
         "verify-phase:harness/scripts/verify.mjs:capture-observation-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:check-ownership-tests",
         "verify-phase:harness/scripts/verify.mjs:claude-critic-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:claude-goal-host-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-advisory-app-server-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-advisory-bootstrap-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-app-server-health-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-critic-host-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-critic-isolation-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-goal-host-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-host-advisor-route-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-host-repository-init-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-isolated-critic-contract-tests",
@@ -1623,9 +1745,26 @@
         "verify-phase:harness/scripts/verify.mjs:license-contract-check",
         "verify-phase:harness/scripts/verify.mjs:license-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:lifecycle-ready-enforcement-tests",
+        "verify-phase:harness/scripts/verify.mjs:local-supervisor-setup-tests",
+        "verify-phase:harness/scripts/verify.mjs:local-supervisor-state-tests",
+        "verify-phase:harness/scripts/verify.mjs:local-worker-supervisor-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:local-worker-supervisor-core-tests",
         "verify-phase:harness/scripts/verify.mjs:main-session-route-tests",
         "verify-phase:harness/scripts/verify.mjs:migrate-backlog-state-tests",
         "verify-phase:harness/scripts/verify.mjs:no-autoupdate-key-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-backlog-reconciler-cli-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-backlog-reconciliation-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-benchmark-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-critic-lineage-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-critic-packet-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-execution-plane-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-increment-receipt-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-invocation-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-invocation-reliability-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-release-preflight-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-runner-capability-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-sandbox-disposition-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-scheduling-lifecycle-tests",
         "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-continuity-tests",
         "verify-phase:harness/scripts/verify.mjs:p3b-runner-conformance-tests",
@@ -1664,6 +1803,7 @@
         "verify-phase:harness/scripts/verify.mjs:routing-projection-check",
         "verify-phase:harness/scripts/verify.mjs:routing-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:ruleset-freshness-tests",
+        "verify-phase:harness/scripts/verify.mjs:runner-native-continuation-tests",
         "verify-phase:harness/scripts/verify.mjs:runner-profile-migration-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:runner-profile-migration-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:runner-profiles-v2-tests",

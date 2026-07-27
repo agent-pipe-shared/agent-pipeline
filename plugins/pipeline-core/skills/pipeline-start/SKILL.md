@@ -346,6 +346,34 @@ not plan an unrelated runtime initialization or request an untyped restart.
   history. If the plan returns `continuity_repair_unavailable` with
   `nextAction:null`, stop; do not repeat the plan, invent hashes, or edit
   `.claude/pipeline-state.json` directly.
+- **`partial` with controlling diagnostic `manifest_invalid`:** execute only
+  its exact read-only `plan-manifest-repair` action. Accept only schema
+  `pipeline.project-onboarding-manifest-repair-plan.v1`. `ready` must bind the
+  exact root, current raw `pipeline.user.yaml` SHA-256, absent manifest
+  preimage, manifest postimage and one 64-hex `planSha256`; its sole
+  `applyAction` must target only `.claude/pipeline.yaml`, carry that digest and
+  `--activate`, and declare `mutation:true` plus
+  `requiresConfirmation:true`. Present it and wait for explicit confirmation.
+  After confirmation run only that exact action and re-enter from its V4
+  readback. Publication is atomic no-replace; source or parent drift at that
+  boundary quarantines the exact generated inode before readback.
+  `unrepairable` is terminal for every existing manifest: preserve all bytes,
+  report its disposition, and require the manifest-owning workflow.
+- **`invalid` with controlling diagnostic `source_invalid`:** execute only its
+  exact read-only `plan-source-recovery` action. Accept only schema
+  `pipeline.project-onboarding-source-recovery.v1` and category exactly
+  `invalid-authority`, `stale-generated-projection`,
+  `unsupported-source-transition`, `unavailable-evidence`, or
+  `current-authority`. A `recoverable` result may expose only its returned
+  fixed V3 inspect/plan or preview-gated transaction recovery action; every
+  mutation still requires its own explicit confirmation. `unrepairable` is an
+  explicit terminal disposition, not permission to edit `pipeline.user.yaml`.
+  Never infer, regenerate, or select source authority.
+- The Pipeline-shipped
+  `v3-bootstrap-authority.mjs --root "$PWD"` validator is a separately
+  authorized read-only lifecycle diagnostic before readiness. Its root and
+  argv must be exact. Extra flags, another root, chaining, redirection, or a
+  different script remain blocked.
 - **`partial|invalid|unsafe|migration-required|adoption-required|repository-mount-read-only|repository-control-path-invalid|git-capability-unavailable|project-root-read-only|repository-mode-unsupported|repository-observation-unavailable|session-capability-unavailable|worktree-capability-unavailable|runtime-target-read-only|runtime-readback-unavailable|projection-drift|continuity-damaged|continuity-observation-unavailable|app-server-execution-denied|app-server-not-running|app-server-unavailable`:**
   stop with no confirmation and report the exact diagnostics and closed
   `nextAction`. A read-only action may run only when its schema, executable,

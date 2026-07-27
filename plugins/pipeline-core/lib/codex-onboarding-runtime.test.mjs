@@ -94,7 +94,7 @@ function configReadChildTransportFixture({
   beforeConfigReadResponse = [remoteControlNotification()],
 } = {}) {
   return function childTransport(executable, argv, options) {
-    assert.equal(executable, resolveRuntimeExecutable());
+    assert.equal(executable, process.execPath);
     assert.deepEqual(argv, ["--strict-config", "app-server", "--listen", "stdio://"]);
     assert.equal(options.shell, false);
     assert.deepEqual(options.stdio, ["pipe", "pipe", "pipe"]);
@@ -182,8 +182,13 @@ test("the launch wrapper preserves the interactive Codex process contract withou
   const priorTicketId = process.env.PIPELINE_CODEX_ONBOARDING_TICKET_ID;
   const priorToken = process.env.PIPELINE_CODEX_ONBOARDING_TOKEN;
   const priorSentinel = process.env.PIPELINE_ONBOARDING_HOST_ENV_SENTINEL;
+  const priorPath = process.env.PATH;
   try {
-    const executable = resolveRuntimeExecutable();
+    const executable = process.execPath;
+    const bin = join(successPath, "fixture-bin");
+    mkdirSync(bin);
+    symlinkSync(executable, join(bin, "codex"));
+    process.env.PATH = `${bin}${process.platform === "win32" ? ";" : ":"}${priorPath ?? ""}`;
     const prepare = (path, random) => {
       git(path);
       const binding = prepareRuntimeRestartBinding({
@@ -298,9 +303,9 @@ test("the launch wrapper preserves the interactive Codex process contract withou
     assert.equal(Number.isSafeInteger(unavailable.retryAfterEpochMs), true);
 
     let tuiCalls = 0;
-    const tuiFailure = invoke(tuiFailurePath, tuiFailureBarrier, (childExecutable) => {
+    const tuiFailure = invoke(tuiFailurePath, tuiFailureBarrier, (childExecutable, argv) => {
       tuiCalls += 1;
-      if (childExecutable === process.execPath) {
+      if (childExecutable === process.execPath && argv[0] === HELPER_PATH) {
         return {
           status: 0,
           signal: null,
@@ -342,6 +347,8 @@ test("the launch wrapper preserves the interactive Codex process contract withou
     else process.env.PIPELINE_CODEX_ONBOARDING_TOKEN = priorToken;
     if (priorSentinel === undefined) delete process.env.PIPELINE_ONBOARDING_HOST_ENV_SENTINEL;
     else process.env.PIPELINE_ONBOARDING_HOST_ENV_SENTINEL = priorSentinel;
+    if (priorPath === undefined) delete process.env.PATH;
+    else process.env.PATH = priorPath;
     dispose(successPath);
     dispose(failurePath);
     dispose(readbackFailurePath);
@@ -354,7 +361,7 @@ test("a barrier permits only one live issued ticket while expired history remain
   try {
     git(path);
     const fixture = seeded(path);
-    const executable = resolveRuntimeExecutable();
+    const executable = process.execPath;
     const binding = prepareRuntimeRestartBinding({
       rootDir: path, ...fixture, codexExecutable: executable, random: counterRandom(0x05, 0x06),
     });
@@ -488,7 +495,7 @@ test("duplicate, malformed, and unsafe ticket-set entries fail authentication an
   try {
     git(path);
     const fixture = seeded(path);
-    const executable = resolveRuntimeExecutable();
+    const executable = process.execPath;
     const binding = prepareRuntimeRestartBinding({
       rootDir: path, ...fixture, codexExecutable: executable, random: counterRandom(0x0c, 0x0d),
     });
@@ -677,7 +684,7 @@ test("the strict host helper requires a bound executable, ticket, fresh generati
 test("native config/read accepts only the exact post-initialize remote-control status notification", async () => {
   const path = root();
   try {
-    const executable = resolveRuntimeExecutable();
+    const executable = process.execPath;
     for (const status of ["disabled", "connecting", "connected", "errored"]) {
       const observed = await readNativeConfig({
         executable,
@@ -726,8 +733,10 @@ test("the productive main performs native config/read without a config/evidence 
   try {
     git(path);
     const fixture = seeded(path);
-    const executable = resolveRuntimeExecutable();
-    const bin = dirname(executable);
+    const executable = process.execPath;
+    const bin = join(path, "fixture-bin");
+    mkdirSync(bin);
+    symlinkSync(executable, join(bin, "codex"));
     const binding = prepareRuntimeRestartBinding({
       rootDir: path, ...fixture, codexExecutable: executable, random: counterRandom(0x61, 0x62),
     });

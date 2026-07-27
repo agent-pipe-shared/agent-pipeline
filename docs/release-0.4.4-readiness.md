@@ -1,6 +1,10 @@
 # Release 0.4.4
 
-**Status:** sealed local hotfix candidate — not tagged, pushed, published, or
+> **Historical preparation record (superseded).** `v0.4.6` is delivered and
+> closed; the sequence below is retained as provenance only, not current work
+> or authority.
+
+**Historical status:** sealed local hotfix candidate — not tagged, pushed, published, or
 read back from either marketplace.
 
 ## Scope

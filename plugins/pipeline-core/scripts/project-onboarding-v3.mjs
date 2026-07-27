@@ -3,16 +3,19 @@
 
 import { pathToFileURL } from "node:url";
 import {
+  applyProjectOnboardingManifestRepairV4,
   applyProjectOnboardingKickoffV4,
   applyProjectOnboardingLifecycleV4,
   inspectProjectOnboardingV3,
+  planProjectOnboardingManifestRepairV4,
   planProjectOnboardingKickoffV4,
   planProjectOnboardingLifecycleV4,
+  planProjectOnboardingSourceRecoveryV4,
 } from "../lib/project-onboarding-v3.mjs";
 
 function usage() {
   return [
-    "Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--plan-sha256 <sha256>] [--activate]",
+    "Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback|plan-source-recovery|plan-manifest-repair|apply-manifest-repair> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>",
   ].join("\n");
@@ -28,7 +31,7 @@ function parse(args) {
     if (args[1] !== "inspect") return { error: "continuity requires inspect" };
     output.command = "continuity-inspect";
     start = 2;
-  } else if (["inspect", "plan", "apply-portable-seed", "plan-runtime", "initialize-runtime", "plan-repair", "apply-repair", "plan-readback", "apply-readback"].includes(args[0])) {
+  } else if (["inspect", "plan", "apply-portable-seed", "plan-runtime", "initialize-runtime", "plan-repair", "apply-repair", "plan-readback", "apply-readback", "plan-source-recovery", "plan-manifest-repair", "apply-manifest-repair"].includes(args[0])) {
     output.command = args[0];
     start = 1;
   }
@@ -46,7 +49,7 @@ function parse(args) {
   if (!output.help && !output.root) return { error: "--root is required" };
   if (output.command?.startsWith("kickoff-") && output.goal === undefined) return { error: "kickoff plan/apply requires --goal <text>" };
   if (!output.command?.startsWith("kickoff-") && output.goal !== undefined) return { error: "--goal is only valid for kickoff plan/apply" };
-  if (output.activate && !["apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback", "kickoff-apply"].includes(output.command)) return { error: "--activate is only valid for an apply command" };
+  if (output.activate && !["apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback", "apply-manifest-repair", "kickoff-apply"].includes(output.command)) return { error: "--activate is only valid for an apply command" };
   return output;
 }
 export function main(args = process.argv.slice(2), {
@@ -65,6 +68,14 @@ export function main(args = process.argv.slice(2), {
     else if (options.command === "plan-runtime") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "runtime" });
     else if (options.command === "plan-repair") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "repair" });
     else if (options.command === "plan-readback") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "readback" });
+    else if (options.command === "plan-source-recovery") output = planProjectOnboardingSourceRecoveryV4({ rootDir: options.root, deps });
+    else if (options.command === "plan-manifest-repair") output = planProjectOnboardingManifestRepairV4({ rootDir: options.root, deps });
+    else if (options.command === "apply-manifest-repair") output = applyProjectOnboardingManifestRepairV4({
+      rootDir: options.root,
+      planSha256: options.planSha256,
+      activate: options.activate,
+      deps,
+    });
     else if (options.command === "kickoff-plan") output = planProjectOnboardingKickoffV4({
       rootDir: options.root,
       goal: options.goal,
@@ -101,6 +112,12 @@ export function main(args = process.argv.slice(2), {
   }
   write(`${JSON.stringify(output, null, 2)}\n`);
   if (output.schema === "pipeline.codex-onboarding-kickoff-plan.v1") return 0;
+  if (output.schema === "pipeline.project-onboarding-source-recovery.v1") {
+    return ["recoverable", "unrepairable"].includes(output.status) ? 0 : 1;
+  }
+  if (output.schema === "pipeline.project-onboarding-manifest-repair-plan.v1") {
+    return ["ready", "unrepairable"].includes(output.status) ? 0 : 1;
+  }
   return ["portable-seed-required", "runtime-initialization-required", "runtime-attestation-required", "restart-required", "kickoff-required", "host-repository-init-required", "ready", "migration-required", "adoption-required", "projection-drift"].includes(output.status) ? 0 : 1;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exit(main());

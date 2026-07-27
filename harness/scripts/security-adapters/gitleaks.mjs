@@ -16,8 +16,12 @@
  * the optional `env` param (defaults to `process.env`) -- this lets a unit test call run()
  * in isolation with a fixture env object, without needing the runner's glue.
  *
- * INVOCATION: `gitleaks detect --source <root> --report-format json --report-path <tmp>
- * --no-banner --exit-code 0`. The report is written to a temp JSON file (a fresh
+ * INVOCATION: `gitleaks detect --source . --no-git --report-format json --report-path <tmp>
+ * --no-banner --exit-code 0`, with `cwd` set to the candidate root. `--no-git` is required:
+ * the runner gives this adapter a detached candidate worktree, and default detect mode would
+ * otherwise rescan its Git history rather than the candidate tree's bytes. `--source .` keeps
+ * finding paths relative, so exact path/rule/line ignore fingerprints remain rebase-stable.
+ * The report is written to a temp JSON file (a fresh
  * `mkdtempSync` dir per run, removed again after parsing) rather than parsed from stdout --
  * gitleaks does not print a stable, parseable JSON stream to stdout across versions, but its
  * `--report-path` file is the documented, stable contract. `--exit-code 0` forces gitleaks
@@ -122,7 +126,8 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
   const args = [
     "detect",
     "--source",
-    rootDir,
+    ".",
+    "--no-git",
     "--report-format",
     "json",
     "--report-path",

@@ -248,6 +248,7 @@ import { fileURLToPath } from "node:url";
 import {
   applyCourseDecisionIntent,
   applyDecisionSelection,
+  applyRunnerNativeContinuation,
   clearCourseDecisionReceipt,
   clearDecisionSelection,
   compareAndSwapContinuity,
@@ -308,7 +309,7 @@ const RESULT_APPEND_COLLECTIONS = new Set([
   "finalIntegrations",
 ]);
 const CONTINUITY_SUBCOMMANDS = new Set([
-  "continuity-init",
+  "continuity-init", "continuity-native-goal",
   "continuity-cas",
   "continuity-integrate-final",
   "continuity-record-course-brief",
@@ -1794,9 +1795,18 @@ function runCourseSelectionTransaction(dir, existing, expectedRevision, request,
 function continuityTransition(sub, base, expectedRevision, request) {
   const featureId = base.activeFeature?.id;
   if (typeof featureId !== "string" || featureId.trim() === "") return { ok: false, code: "PS-CONTINUITY-NO-ACTIVE-FEATURE" };
+  const planAuthority = base.planApproval?.poGateAuthority;
+  const bindsApprovedPlan = (candidate) => candidate?.authority?.plan !== undefined
+    && base.planApproved === true
+    && planAuthority?.planPath === base.activeFeature?.planPath
+    && /^[a-f0-9]{64}$/.test(planAuthority?.planSha256 ?? "")
+    && candidate.authority.plan.path === planAuthority.planPath
+    && candidate.authority.plan.sha256 === planAuthority.planSha256
+    && candidate.authority.spec?.sha256 === planAuthority.specSha256;
   if (sub === "continuity-init") {
     if (expectedRevision !== "absent" || base.continuity !== undefined) return { ok: false, code: "PS-CONTINUITY-STALE" };
     const valid = validateContinuityState(request, featureId);
+    if (request.authority?.plan !== undefined && !bindsApprovedPlan(request)) return { ok: false, code: "PS-CONTINUITY-PLAN-AUTHORITY" };
     return valid.ok && request.revision === 0
       ? { ok: true, code: "PS-CONTINUITY-INITIALIZED", state: structuredClone(request), mutated: true }
       : { ok: false, code: valid.ok ? "PS-CONTINUITY-REVISION" : valid.code };
@@ -1805,6 +1815,10 @@ function continuityTransition(sub, base, expectedRevision, request) {
   if (expectedRevision === "absent") return { ok: false, code: "PS-CONTINUITY-REVISION" };
   if (sub === "continuity-cas") {
     return compareAndSwapContinuity(base.continuity, { expectedRevision, next: request }, featureId);
+  }
+  if (sub === "continuity-native-goal") {
+    if (!bindsApprovedPlan(base.continuity) || !bindsApprovedPlan(request)) return { ok: false, code: "PS-CONTINUITY-PLAN-AUTHORITY" };
+    return applyRunnerNativeContinuation(base.continuity, { expectedRevision, next: request }, featureId);
   }
   if (sub === "continuity-integrate-final") {
     if (!exactObjectKeys(request, ["observation", "next"])) return { ok: false, code: "PS-CONTINUITY-REQUEST" };

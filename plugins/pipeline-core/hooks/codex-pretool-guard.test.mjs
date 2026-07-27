@@ -168,6 +168,34 @@ check("runtime-only V3 targets activate lifecycle enforcement in the outer adapt
   }
 });
 
+check("Codex outer adapter admits only the exact pre-ready V4 recovery diagnostics", () => {
+  const root = fixture();
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const onboarding = join(pluginRoot, "scripts", "project-onboarding-v3.mjs");
+  const authority = join(pluginRoot, "scripts", "v3-bootstrap-authority.mjs");
+  const digest = "d".repeat(64);
+  for (const command of [
+    `node '${onboarding}' plan-source-recovery --root '${root}'`,
+    `node '${onboarding}' plan-manifest-repair --root '${root}'`,
+    `node '${onboarding}' apply-manifest-repair --root '${root}' --plan-sha256 ${digest} --activate`,
+    `node '${authority}' --root '${root}'`,
+  ]) {
+    const result = run({ tool_name: "Bash", tool_input: { command } }, root);
+    assert.equal(result.status, 0, `${command}\n${result.stderr}`);
+    assert.equal(result.stdout, "", command);
+  }
+  for (const command of [
+    `node '${onboarding}' apply-manifest-repair --root '${root}' --activate`,
+    `node '${onboarding}' apply-manifest-repair --root '${root}' --plan-sha256 ${digest} --activate $(touch bypassed)`,
+    `node '${authority}' --root '${root}' --extra`,
+    `node '${authority}' --root '${root}'; touch bypassed`,
+  ]) {
+    const output = decision(run({ tool_name: "Bash", tool_input: { command } }, root));
+    assert.equal(output.permissionDecision, "deny", command);
+    assert.match(output.permissionDecisionReason, /guard-lifecycle-ready/u, command);
+  }
+});
+
 check("Codex native cwd wins over a stale inherited CLAUDE_PROJECT_DIR", () => {
   const current = mkdtempSync(join(tmpdir(), "codex-pretool-current-"));
   const stale = fixture();

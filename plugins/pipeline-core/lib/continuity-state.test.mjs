@@ -6,6 +6,7 @@ import {
   CONTINUITY_STATE_CODES,
   applyCourseDecisionIntent,
   applyDecisionSelection,
+  applyRunnerNativeContinuation,
   beginCloseTransition,
   bindContinuitySessionCleanup,
   clearCourseDecisionReceipt,
@@ -19,10 +20,12 @@ import {
   recordCloseFinalVerify,
   recordCloseReadback,
   recordCourseDecisionBrief,
+  reconcileRunnerNativeContinuation,
   releaseContinuitySessionCleanup,
   validateContinuityState,
 } from "./continuity-state.mjs";
 import { computeContinuityFinalDigest } from "./continuity-host-adapter.mjs";
+import { computeRunnerNativeContinuationDigest } from "./runner-native-continuation.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 
 let passed = 0;
@@ -106,6 +109,7 @@ function state(overrides = {}) {
       prd: { path: "specs/prd.md", sha256: A },
       spec: { path: "specs/spec.md", sha256: B },
       result: { path: "specs/result.md", sha256: C },
+      plan: { path: "plans/plan.md", sha256: D },
     },
     queueHead: queueHead(),
     blocker: null,
@@ -717,7 +721,7 @@ for (const [name, mutate] of [
 
 function decisionTxn() {
   return {
-    idempotencyKey: "decision-txn-01",
+    idempotencyKey: "decision-txn-01", // gitleaks:allow -- deterministic test fixture, not a credential
     briefSha256: B,
     intentSha256: C,
     selectedOptionId: "defer",
@@ -779,7 +783,8 @@ check("matching durable decision receipt clears marker at dispatchable revision"
     resume: { mode: "resume-on-next-turn", sourceRevision: 1, reasonCode: "blocker" },
   });
   const receipt = {
-    idempotencyKey: "decision-txn-01", briefSha256: B, intentSha256: C,
+    idempotencyKey: "decision-txn-01", // gitleaks:allow -- deterministic test fixture, not a credential
+    briefSha256: B, intentSha256: C,
     selectedOptionId: "defer", receiptSha256: D, selectedRevision: 1, dispatchableRevision: 2,
   };
   const cleared = clearDecisionSelection(current, { expectedRevision: 1, receipt }, FEATURE);
@@ -804,7 +809,8 @@ check("mismatched decision receipt is zero mutation", () => {
 
 check("clearing without a live decision marker never claims replay", () => {
   const receipt = {
-    idempotencyKey: "decision-txn-01", briefSha256: B, intentSha256: C,
+    idempotencyKey: "decision-txn-01", // gitleaks:allow -- deterministic test fixture, not a credential
+    briefSha256: B, intentSha256: C,
     selectedOptionId: "defer", receiptSha256: D, selectedRevision: 1, dispatchableRevision: 2,
   };
   const result = clearDecisionSelection(state(), { expectedRevision: 0, receipt }, FEATURE);
@@ -1150,6 +1156,60 @@ check("persisted close transition fails closed on authority or delivery-candidat
 check("closed code vocabulary has no raw-data channel", () => {
   assert.equal(new Set(CONTINUITY_STATE_CODES).size, CONTINUITY_STATE_CODES.length);
   assert.equal(CONTINUITY_STATE_CODES.every((code) => /^CS-[A-Z0-9-]+$/.test(code)), true);
+});
+
+const NATIVE_NOW = "2026-07-25T12:00:00.000Z";
+const nativeRunner = { runnerId: "codex", adapterVersion: "v2", capability: "available" };
+function nativeState(overrides = {}) {
+  return state({
+    revision: 3,
+    queueHead: queueHead({ packageId: "b0", actionId: "implement", nextAction: "verify", dispatch: null }),
+    resume: { mode: "immediate", sourceRevision: 3, reasonCode: "active-turn" },
+    ...overrides,
+  });
+}
+function nativeAdapter(calls) {
+  return async ({ action, generation }) => {
+    calls.push({ action, generation });
+    if (action === "clear") return { ok: true, code: "CGH-CLEARED", status: "cleared", readback: { goalIdSha256: null, generation, status: "cleared" } };
+    return { ok: true, code: "CGH-ACTIVE", status: "active", readback: { goalIdSha256: D, generation, observedAt: NATIVE_NOW, status: "active" } };
+  };
+}
+async function asyncCheck(name, fn) { await fn(); passed += 1; process.stdout.write(`ok ${passed} - ${name}\n`); }
+
+await asyncCheck("native goal activation returns an adapter-readback-bound CAS successor", async () => {
+  const calls = []; const current = nativeState();
+  const result = await reconcileRunnerNativeContinuation({ continuity: current, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, acceptance: [{ criterionId: "native-goal", status: "pending", evidenceSha256: null }], evidence: [{ kind: "test", path: "evidence/verify.json", fileSha256: D, recordSha256: null }], event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
+  assert.equal(result.ok, true); assert.deepEqual(calls, [{ action: "set", generation: 0 }]);
+  assert.equal(result.next.nativeContinuation.status, "active");
+  assert.equal(compareAndSwapContinuity(current, { expectedRevision: result.expectedRevision, next: result.next }, FEATURE).code, "CS-PROTECTED-NATIVE-CONTINUATION");
+  assert.equal(applyRunnerNativeContinuation(current, { expectedRevision: result.expectedRevision, next: result.next }, FEATURE).ok, true);
+});
+
+await asyncCheck("additive input persists a bounded digest and continues without duplicate goal activation", async () => {
+  const calls = [];
+  const activated = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
+  const added = await reconcileRunnerNativeContinuation({ continuity: activated.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, additiveInput: { kind: "question", evidenceSha256: D }, adapter: nativeAdapter(calls) });
+  assert.equal(added.ok, true); assert.equal(added.action, "none"); assert.equal(calls.length, 1);
+  assert.equal(added.next.nativeContinuation.progress.at(-1).kind, "input-question");
+});
+
+await asyncCheck("verified completion requires acceptance evidence and unsupported capability persists degraded evidence", async () => {
+  const calls = [];
+  const activated = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, acceptance: [{ criterionId: "native-goal", status: "passed", evidenceSha256: D }], event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
+  const complete = await reconcileRunnerNativeContinuation({ continuity: activated.next, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "verified-completion", atRevision: 4, evidenceSha256: D }, adapter: nativeAdapter(calls) });
+  assert.equal(complete.continuation.status, "achieved");
+  const unavailable = await reconcileRunnerNativeContinuation({ continuity: nativeState(), activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: { runnerId: "claude", adapterVersion: "v1", capability: "available" }, event: { kind: "activate", atRevision: 3 }, adapter: async () => ({ ok: false, code: "CLG-CAPABILITY", status: "unavailable", readback: null }) });
+  assert.equal(unavailable.ok, true); assert.equal(unavailable.continuation.status, "unavailable");
+});
+
+await asyncCheck("generic CAS cannot forge or replace native readback evidence", async () => {
+  const calls = []; const current = nativeState();
+  const activated = await reconcileRunnerNativeContinuation({ continuity: current, activeFeature: { id: FEATURE, phase: "implementation" }, continuationId: "nova-b0", runner: nativeRunner, event: { kind: "activate", atRevision: 3 }, adapter: nativeAdapter(calls) });
+  const forged = structuredClone(activated.next);
+  forged.nativeContinuation.readback.goalIdSha256 = E;
+  forged.nativeContinuation.recordSha256 = computeRunnerNativeContinuationDigest(forged.nativeContinuation);
+  assert.equal(compareAndSwapContinuity(current, { expectedRevision: 3, next: forged }, FEATURE).code, "CS-PROTECTED-NATIVE-CONTINUATION");
 });
 
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);

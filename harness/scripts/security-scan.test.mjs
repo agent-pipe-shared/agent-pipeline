@@ -32,6 +32,28 @@ import * as licenseCheckAdapter from "./security-adapters/license-check.mjs";
 import { runSecurityScan } from "./security-scan.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./security-scan.mjs", import.meta.url));
+const REPO_ROOT = join(dirname(SCRIPT), "..", "..");
+const NOVA_A1_NO_GIT_IGNORES = Object.freeze([
+  "backlog/transitions.ndjson:generic-api-key:73",
+  "backlog/transitions.ndjson:generic-api-key:74",
+  "specs/sprint-nova-epic/evidence/backlog/2026-07-24-unreachable-evidence-disposition.md:generic-api-key:1",
+  "backlog/receipts/7ac4c1dd233bdbfbec854f3f818464ebed2850144c42da6816557112af743570.json:generic-api-key:1",
+  "backlog/receipts/9367a90e2516ec6f621b5710ffabef67cbbf27116f7f46cef8f1f0dd69aebc25.json:generic-api-key:1",
+  "specs/sprint-nova-epic/evidence/backlog/event-39-amendment-intent.json:generic-api-key:1",
+  "backlog/receipts/f33b8d45db38e7b9061dde268405d86123fc90afc24330a626afba2507650281.json:generic-api-key:1",
+  "specs/sprint-nova-epic/evidence/backlog/event-40-amendment-intent.json:generic-api-key:1",
+  "specs/sprint-nova-epic/evidence/backlog/event-39-delivery-intent.json:generic-api-key:1",
+  "backlog/receipts/d311a66737ff088e2ae324df5f3525b08cefd4c9f58787d09870d3bd26961363.json:generic-api-key:1",
+  "specs/sprint-nova-epic/evidence/backlog/event-40-delivery-intent.json:generic-api-key:1",
+  "specs/sprint-nova-epic/evidence/backlog/issue-57-assign-intent.json:generic-api-key:1",
+  "specs/sprint-nova-epic/evidence/backlog/issue-57-bootstrap-intent.json:generic-api-key:1",
+]);
+const OBSOLETE_NO_GIT_FIXTURE_IGNORES = Object.freeze([
+  "plugins/pipeline-core/lib/review-economy.test.mjs:generic-api-key:278",
+  "plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:628",
+  "plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:690",
+  "plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:715",
+]);
 
 let pass = 0;
 const failures = [];
@@ -446,6 +468,38 @@ process.exit(0);
   assertTrue("gitleaks isInstalled: env override to existing fixture", inst.installed === true && inst.path === gitleaksClean, JSON.stringify(inst));
 }
 {
+  const ignoreLines = readFileSync(join(REPO_ROOT, ".gitleaksignore"), "utf8")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
+  assertEqual(
+    "gitleaks ignore: Nova A1 entries are exact, rebase-stable no-git fingerprints",
+    NOVA_A1_NO_GIT_IGNORES.map((entry) => ({
+      entry,
+      present: ignoreLines.includes(entry),
+      onlyExact: ignoreLines.filter((line) => line.endsWith(entry)).every((line) => line === entry),
+    })),
+    NOVA_A1_NO_GIT_IGNORES.map((entry) => ({ entry, present: true, onlyExact: true })),
+  );
+}
+{
+  const ignoreLines = readFileSync(join(REPO_ROOT, ".gitleaksignore"), "utf8")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("#"));
+  const reviewEconomy = readFileSync(join(REPO_ROOT, "plugins", "pipeline-core", "lib", "review-economy.test.mjs"), "utf8");
+  const continuityState = readFileSync(join(REPO_ROOT, "plugins", "pipeline-core", "lib", "continuity-state.test.mjs"), "utf8");
+  assertEqual(
+    "gitleaks ignore: stale fixture fingerprints are replaced by inline exact suppressions",
+    {
+      staleEntriesPresent: OBSOLETE_NO_GIT_FIXTURE_IGNORES.filter((entry) => ignoreLines.includes(entry)),
+      reviewEconomyAllowCount: (reviewEconomy.match(/idempotencyKey: "decision-key-01", \/\/ gitleaks:allow/g) ?? []).length,
+      continuityStateAllowCount: (continuityState.match(/idempotencyKey: "decision-txn-01",.*\/\/ gitleaks:allow/g) ?? []).length,
+    },
+    { staleEntriesPresent: [], reviewEconomyAllowCount: 1, continuityStateAllowCount: 3 },
+  );
+}
+{
   const inst = gitleaksAdapter.isInstalled({ PIPELINE_GITLEAKS_PATH: join(FIXTURE_ROOT, "does-not-exist.cmd") });
   assertTrue(
     "gitleaks isInstalled: env override to nonexistent path -> not installed",
@@ -462,6 +516,27 @@ process.exit(0);
   const rootDir = makeRootDir("gitleaks-clean-root");
   const result = await gitleaksAdapter.run({ rootDir, config: { binaryPath: gitleaksClean }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
   assertEqual("gitleaks run: clean fixture -> PASS, 0 findings", { status: result.status, count: result.findings.length }, { status: "PASS", count: 0 });
+}
+{
+  const rootDir = makeRootDir("gitleaks-candidate-tree-root");
+  let invocation;
+  const result = await gitleaksAdapter.run({
+    rootDir,
+    config: { binaryPath: gitleaksClean },
+    timeoutMs: 5000,
+    spawnFn(cmd, args, opts) {
+      invocation = { cmd, args, opts };
+      writeFileSync(args[args.indexOf("--report-path") + 1], "[]");
+      return { status: 0, stdout: "", stderr: "" };
+    },
+  });
+  assertEqual("gitleaks run: candidate tree uses explicit no-git invocation", invocation.args, [
+    "detect", "--source", ".", "--no-git", "--report-format", "json",
+    "--report-path", invocation.args[invocation.args.indexOf("--report-path") + 1], "--no-banner", "--exit-code", "0",
+  ]);
+  assertEqual("gitleaks run: candidate tree source resolves from candidate cwd", invocation.opts.cwd, rootDir);
+  assertEqual("gitleaks run: candidate tree no-git invocation remains shell-free", invocation.opts.shell, false);
+  assertEqual("gitleaks run: candidate tree no-git fixture -> PASS", result.status, "PASS");
 }
 {
   const rootDir = makeRootDir("gitleaks-findings-root");

@@ -3,15 +3,67 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-07-25
+**Last updated:** 2026-07-26
 **Project status:** ACTIVE
-**Current block:** `0.4.4` Codex managed-workspace onboarding hotfix; final
-candidate verification, independent review, and authorized publication pending
-**Repair baseline:** `e4d62646f842e2dfd7ab8ef48457ea676fceecd3`
-**Release version:** `0.4.3` released; `0.4.4` local hotfix candidate
+**Current block:** Nova adaptation on delivered and closed `v0.4.6`
+**Technical adaptation commit:** `7f313c22d4311f7d5f0469131e3d0deae4364e11`
+**Release disposition:** all `0.4.x` release, installation, and pipeline-start
+work is closed; no `0.4.x` task is open
 
 ## Operational head
 
+- Nova is adapted on top of the exact delivered `v0.4.6` base. Fresh Full
+  Verify, Security, and Critic checks for the resulting Nova integration
+  candidate are pending; these are Nova integration gates only, not release
+  gates.
+- Older `0.4.4`, `0.4.5`, and `0.4.6` preparation entries below are retained
+  as historical provenance and are superseded, not current work or authority.
+- The former restart/hotfix TODO and candidate-preparation language below is
+  historical and must not be resumed as an operational instruction.
+
+- **Historical (superseded) session checkpoint:** the B1-I correction was frozen at
+  commit `1c1e7ab11641b810515bae185f28def78fef19a9`, tree
+  `a8163bef2947a3853af69c00e3f066d5772797ad`. Its safe-path repro was red
+  before the fix; focused core, state and pool suites are green, and the real
+  host process/clone suite is 9/9 green. The attempted Full Verify was
+  deliberately aborted after 7.6 seconds for this restart and provides no
+  gate claim; no Verify process remains. Security and the independent
+  Re-Critic have not run on this candidate.
+- **Historical restart procedure (superseded):** the then-planned session would
+  have started with
+  `pipeline-core:pipeline-start`; confirm branch/head and a clean worktree;
+  run Full Verify and Security and require exact candidate-bound receipts;
+  then run a fresh independent Critic over the corrected B1-I diff. After that,
+  finish B3-R with only Antigravity as the Google runtime and Gemini only as
+  its model selectors, and finish the provider-neutral B4 design. Update the
+  existing local `pipeline-core` plugin through the cachebuster/reinstall flow
+  and use the required fresh thread boundary. Do not run `close-block`.
+- Live provider activation, capability advertisement, credentials, push,
+  merge, release and Issue `#21` closure remain blocked.
+- **Nova B1-I / ADR-0048:** the PO accepted the exact 20-path functional
+  supervisor manifest plus the bounded EL-01/EL-16 and Advisor-fallback
+  exceptions. The implementation has closed request/plan/record/result/cancel
+  contracts, independent private no-hardlink clones, exact Linux child
+  identity, heartbeat/orphan/timeout/cancel handling, source/write-set
+  validation and exact cleanup. Local fixture tests use real Git repositories
+  and child processes. They do not activate Codex/provider execution and do
+  not advertise local-pool capability or close Issue `#21`.
+- The first exact implementation candidate is
+  `b14a5f04ff1617bf7196260fbd74adad29704dd2`, tree
+  `95e03b560f16de05d5d750f4305ffa0ddf7df6e8`. Its 10/10 core and 9/9 real
+  process/clone scenarios pass, and clean-bound Full Verify plus Security exit
+  `0`. Every later documentation-binding commit requires the same-command
+  clean-candidate rerun before any delivery claim; the generated ignored
+  receipts are the current authority. No push is authorized.
+- The ADR-0048 bootstrap is technically green at the required host boundary:
+  onboarding `ready`, runtime `readback-current`, App Server `CAS-READY`, V3
+  authority `ready/noop/current`, Toolchain `TCP-READY`, repository freshness
+  `ahead`, and Manifest/PO/document-governance checks green. The normal Host
+  Advisor attestation remained unavailable and is recorded only under the
+  explicit PO fallback exception; no attestation is fabricated.
+- `.claude/guard-override.log.jsonl` is committed at
+  `1ef8e6a6b27884312591217fe429080438d24983`; its five records and unique
+  tokens validate, and it is no longer user-owned or unstaged residue.
 - Project calibration: [`.claude/pipeline.json`](../.claude/pipeline.json).
 - Required gate: `node harness/scripts/verify.mjs`.
 - **0.4.4 managed-workspace hotfix:** Codex may create a writable fresh root
@@ -222,6 +274,149 @@ candidate verification, independent review, and authorized publication pending
   Guard-Bypass.
 
 ## Open items and next block
+
+### 2026-07-25 Nova rebase and implementation handover — current
+
+`feat/sprint-nova-codex` was cleanly rebased onto Public `main` / `v0.4.3` at
+`e4d62646f842e2dfd7ab8ef48457ea676fceecd3`; the rebased Nova head is
+`8c9ccd1e999480c4e2dc64c23cfb1e69cc3c5bcc` before this handover commit.
+All 37 Nova commits were replayed without a conflict. The requested fresh
+Codex Advisor launch was attempted once, but its host bridge returned the
+typed non-success `advisory_receipt_insecure`; no answer, fallback or advisory
+success claim exists. The actual rebase plan was therefore the normal
+read-only remote/tag verification, clean rebase and fresh candidate gates.
+No `main` rewrite, merge or release action occurred. The post-rebase Full
+Verify bound commit `fa8178044c11c3565fc3494c6092192ab1bafae3` and ran 157
+steps, but returned exit `2` solely because its embedded Security scan found
+14 blocking Gitleaks findings. A separate Security run reproduced that result;
+OSV was correctly skipped for absent package sources, while Semgrep and the
+license check were clean. Do not push the rewritten Nova branch or create E1/
+E2 evidence until a fresh session triages those findings against the 0.4.3
+baseline and reruns the complete candidate gates.
+
+Nova A1/#57 is now applied through the sanctioned append-only reconciliation
+writer. Events 73 and 74 amend the unreachable evidence of historical events
+39 and 40 without altering their bytes; events 75 and 76 initialize and assign
+`pipeline.backlog-delivery-status-reconciliation` to `in_progress`. The strict
+default backlog checker is green, the frozen binding remains unchanged, and
+the versioned A1 companion binding plus transaction receipts provide the
+candidate-bound readback. No history rewrite was performed.
+
+Nova A2–A6 have delivered their isolated contract surfaces:
+capability/selected-sandbox disposition, invocation reliability and preflight,
+execution-plane/scheduling lifecycle, and closed Critic-review lineage. A5
+binds an independently evidenced pending Critic lane to the exact prepared
+packet before claim, preserves typed terminal verdict/finding records, and
+projects the existing 4-round/3-correction course limits without launching a
+worker. Their focused contract and regression suites pass; they do not claim a
+real worker launch, native selected-sandbox availability, a Nova A Result, or
+Nova B activation. A7 has registered all 13 completed focused suites through
+the one-time PO-authorized TP-3 action; the matching capability-inventory rows
+are required for Full Verify coverage. The receipt/readback compiler has
+closed schemas and now validates the external E1/E2 gate-only ancestry and PO
+receipt-digest binding without self-binding either record.
+
+The correction candidate `357abf3c8d70e854f529f18622d697e2daabb266` closes
+the final observed fixture-path boundary discrepancy: runtime and Schema now
+both cap a safe path at 512 characters, with a 513-character rejection test.
+Earlier candidate evidence is invalidated by this correction. Focused
+benchmark tests and artifact topology are green; the new candidate still
+requires fresh Full Verify, Security and Critic evidence with the Nova-A plan
+included. No increment receipt, issue/backlog transition, remote action, PO
+activation, or Nova B start has occurred.
+
+The active feature remains `sprint-nova-epic` in `implementation`; PRD and
+Spec approvals remain in force. The next session starts with
+`pipeline-core:pipeline-start`, verifies the Nova checkpoint, completes the
+correction round and runs fresh candidate-bound Verify, Security and Critic
+gates before requesting the PO decision. The guard-override audit residue was
+removed under PO authorization after the `0.4.2` hotfix work moved to its own
+fresh directory.
+
+- **0.4.3 rebase disposition, PO signal 2026-07-25:** superseded. The completed
+  Public `v0.4.3` baseline is now integrated into Nova as recorded above. Any
+  future Public hotfix requires a new explicit baseline and continuation signal.
+
+### 2026-07-24 Nova/Cyborg backlog checkpoint — authoritative latest
+
+The PO closed the complete Sentinel sprint, accepted closure of the delivered
+observation-governance and private-overlay activation companions, assigned six
+absorbed packages to Cyborg, and assigned thirteen execution/tooling/quality
+packages to Nova. Confirmed Nightwing and Phoenix packages remain `open`; they
+are assigned proposals, not active sprint claims.
+
+The exact canonical snapshot is commit
+`5ca5a4b292a267ffdfcc52577fda0a0593957a65`, repository tree
+`8684dd499539e49eea5a36e97f2cf386fd166007`, and backlog subtree
+`832bf98e22e9a147dad88c952c0b794f3ee44fe7`. Its canonical transition head is
+`36dd616d3aa5bc21e49e138f6b8a9a17a9de25321998304306e4fa47289de562`;
+the generated projection is exactly `6 open / 19 in_progress / 10 closed`.
+The PO disposition and complete assignment lists are recorded in
+[`2026-07-24-po-sentinel-closure-disposition.md`](../backlog/evidence/2026-07-24-po-sentinel-closure-disposition.md),
+[`2026-07-24-completed-companion-deliveries.md`](../backlog/evidence/2026-07-24-completed-companion-deliveries.md),
+and
+[`2026-07-24-sprint-portfolio-assignment.md`](../backlog/evidence/2026-07-24-sprint-portfolio-assignment.md).
+
+Cyborg must record this as a manual, read-only mirror. It must not recreate,
+reorder, or independently amend canonical ledger events. The mirror contains
+the authority repository/branch, snapshot identifiers, transition head,
+counts, and these complete portfolio assignments:
+
+- **Cyborg — `in_progress` (6):**
+  `pipeline.recovery-preview-callback-attestation`,
+  `pipeline.critic-context-isolation`, `pipeline.dispatch-provenance`,
+  `pipeline.cross-repository-override-ledger-binding`,
+  `pipeline.elephant-direct-implementation-under-afk-authorization`, and
+  `pipeline.verify-gate-scoped-registration`.
+- **Nova — `in_progress` (13):**
+  `pipeline.afk-assumption-mode`, `pipeline.execution-model-switchback`,
+  `pipeline.multi-cli-efficiency-pilots`, `pipeline.session-keep-awake`,
+  `pipeline.nonblocking-interaction-continuity`,
+  `pipeline.closed-input-channel-review-economics`,
+  `pipeline.evidence-bound-review-retry-economics`,
+  `pipeline.canonical-worktree-lifecycle`,
+  `pipeline.po-gate-worktree-authority`,
+  `pipeline.codex-plugin-validator-host-parity`,
+  `pipeline.codex-sandbox-critic-longterm`,
+  `pipeline.t1-governance-path-preflight`, and
+  `pipeline.project-scoped-github-issue-operations`.
+- **Nightwing — `open` (2):**
+  `pipeline.documentation-information-architecture` and
+  `pipeline.dual-channel-publication`.
+- **Phoenix — `open` (4):** `pipeline.regulated-document-hooks`,
+  `pipeline.spec-retention-on-close`,
+  `pipeline.close-spec-retention-and-consent`, and
+  `pipeline.stateful-design-contract-template`.
+- **Closed (10):** `pipeline.source-available-commercial-licensing`,
+  `pipeline.windows-runtime-baseline-containment`,
+  `pipeline.sentinel-go-live-completion`,
+  `pipeline.push-guard-worktree-target`,
+  `pipeline.windows-directory-durability`,
+  `pipeline.windows-private-state-assurance`,
+  `pipeline.windows-trusted-tool-resolution`,
+  `pipeline.windows-verify-reproducibility`,
+  `pipeline.observation-intake-document-governance`, and
+  `pipeline.private-overlay-activation-bridge`.
+
+Cyborg may update its local handover projection as work progresses, but every
+canonical status change is returned to this repository and applied here
+through the sanctioned writer. If a later shared Git transfer becomes
+available, it starts from the canonical transition head above; it never
+replays events 41–72 manually.
+
+The normal checker has one bounded inherited defect: historical events 39 and
+40 reference commits that are absent from all reachable Public refs. No
+rewrite is permitted. Validation with `checkCommit:false` is green; the
+default checker must report only those two findings until the repair designed
+in Issue [#57](https://github.com/agent-pipe-shared/agent-pipeline/issues/57)
+is delivered.
+
+Issue #57 is the P0 Nova work package for automatic Spec-bound backlog
+reconciliation, idempotent status transitions, atomic evidence, shared
+Nova/Cyborg snapshots, and append-only repair of the historical reachability
+defect. It is currently a GitHub Issue with `sprint:nova`; the present ledger
+has no generic sanctioned item initializer, so no fabricated canonical item
+was added.
 
 ### 2026-07-24 release-candidate checkpoint — authoritative latest
 

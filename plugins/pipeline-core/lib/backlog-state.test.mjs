@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 
 import {
+  EVIDENCE_AMENDMENT_SCHEMA,
   ITEM_SCHEMA,
   PROJECT_CLOSURE_READBACK_SCHEMA,
   TRANSITION_SCHEMA,
+  TRANSITION_V2_SCHEMA,
   canonicalJson,
   parseBacklogItem,
   parseTransitionLedger,
@@ -19,6 +21,7 @@ import {
   projectBacklog,
   renderBacklogItem,
   transitionHash,
+  validateBacklogEvidenceAmendment,
   validateBacklogItem,
   validateProjectClosureReadback,
   validateSentinelRecoveryCatalog,
@@ -31,6 +34,7 @@ import {
   applySentinelBacklogRecovery,
   applySentinelScopeExtension,
   checkBacklogState,
+  loadBacklogState,
   planSentinelBacklogRecovery,
   planSentinelScopeExtension,
   recoverBacklogTransaction,
@@ -40,6 +44,11 @@ import {
 let passed = 0;
 let failed = 0;
 const roots = [];
+const DISPOSITION_BYTES = Buffer.from('{"decision":"approved","kind":"backlog-evidence-repair"}\n', "utf8");
+const DISPOSITION_SHA256 = createHash("sha256").update(DISPOSITION_BYTES).digest("hex");
+const AUTHORITY_VALID = Object.freeze({ ok: true, code: "AUTHORITY:VALID" });
+const AUTHORIZE_AMENDMENT = () => AUTHORITY_VALID;
+const V2_DOMAIN_PREFIX = /^(?:SHAPE|SCHEMA|BOUND|AUTHORITY|CAS|STALE|REPLAY|CONFLICT|UNAVAILABLE|DURABILITY|READBACK|INTERNAL):/u;
 function check(name, condition, detail = "") {
   if (condition) {
     passed += 1;
@@ -71,6 +80,184 @@ function event(overrides = {}) {
   };
   value.entryHash = transitionHash(value);
   return value;
+}
+function v2OperationEvent(overrides = {}) {
+  const value = {
+    schema: TRANSITION_V2_SCHEMA,
+    sequence: 1,
+    id: "pipeline.example",
+    from: null,
+    to: "open",
+    at: "2026-07-24",
+    actor: "nova-reconciliation",
+    reason: "Apply an authorized canonical backlog transition.",
+    evidence: {
+      kind: "nova-reconciliation",
+      commit: "a".repeat(40),
+      reference: "specs/sprint-nova-epic/evidence/backlog/reconciliation.json",
+    },
+    previousHash: null,
+    entryHash: "",
+    ...overrides,
+  };
+  value.entryHash = transitionHash(value);
+  return value;
+}
+function v2AmendmentEvent({ sequence, id, status, target, replacementCommit, previousHash, idempotencyKey, reference }) {
+  const value = {
+    schema: TRANSITION_V2_SCHEMA,
+    sequence,
+    id,
+    from: status,
+    to: status,
+    at: "2026-07-24",
+    actor: "nova-evidence-repair",
+    reason: "Bind reachable replacement evidence without changing backlog status.",
+    evidence: {
+      schema: EVIDENCE_AMENDMENT_SCHEMA,
+      kind: "evidence-amendment",
+      targetSequence: target.sequence,
+      targetEntryHash: target.entryHash,
+      targetCommit: target.evidence.commit,
+      replacementCommit,
+      reference,
+      dispositionSha256: DISPOSITION_SHA256,
+      idempotencyKey,
+    },
+    previousHash,
+    entryHash: "",
+  };
+  value.entryHash = transitionHash(value);
+  return value;
+}
+function mixedTransitionFixture() {
+  const event39Commit = "726b83681abc1b6366333c70a6a401b88016e5d4";
+  const event40Commit = "2ddf3592ea004bd6e2a830a61bb02c931238070f";
+  const progressCommit = "1".repeat(40);
+  const priorClosureCommit = "2".repeat(40);
+  const event39Replacement = "3".repeat(40);
+  const event40Replacement = "4".repeat(40);
+  const afk = item({
+    id: AFK_REPAIR_ID,
+    status: "in_progress",
+    created: "2026-07-23",
+    type: "workflow-improvement",
+    source: AFK_REPAIR_SOURCE,
+  });
+  afk.path = "backlog/items/2026-07-23-elephant-direct-implementation-under-afk-authorization.md";
+  const licensing = item({
+    id: "pipeline.source-available-commercial-licensing",
+    status: "closed",
+    closed_at: "2026-07-23",
+    closure_repository: "self",
+    closure_commit: event40Replacement,
+    closure_evidence: "specs/sprint-nova-epic/evidence/backlog/event-40-amendment-intent.json",
+  });
+  licensing.path = "backlog/items/source-available-commercial-licensing.md";
+  const event39 = event({
+    id: AFK_REPAIR_ID,
+    at: "2026-07-23",
+    actor: "sentinel-recovery",
+    reason: "Repair the single missing initial ledger event for the existing open AFK-authorization process item; no status change or completion is claimed.",
+    evidence: {
+      kind: "missing-initial-ledger-repair",
+      commit: event39Commit,
+      reference: afk.path,
+      sourceSha256: createHash("sha256").update(AFK_REPAIR_SOURCE).digest("hex"),
+    },
+  });
+  const inProgress = event({
+    sequence: 2,
+    id: AFK_REPAIR_ID,
+    from: "open",
+    to: "in_progress",
+    at: "2026-07-24",
+    actor: "nova-activation",
+    reason: "Activate the accepted Nova work package.",
+    evidence: { kind: "nova-activation", commit: progressCommit, reference: "specs/sprint-nova-epic/plans/nova-a.md" },
+    previousHash: event39.entryHash,
+  });
+  const initialClosure = event({
+    sequence: 3,
+    id: licensing.metadata.id,
+    from: null,
+    to: "closed",
+    at: "2026-07-23",
+    actor: "sentinel-licensing",
+    reason: "Record the accepted licensing result.",
+    evidence: { kind: "implementation", commit: priorClosureCommit, reference: "specs/initial-result.md" },
+    previousHash: inProgress.entryHash,
+  });
+  const event40 = event({
+    sequence: 4,
+    id: licensing.metadata.id,
+    from: "closed",
+    to: "closed",
+    at: "2026-07-23",
+    actor: "sentinel-licensing",
+    reason: "Bind the approved candidate-specific SNT-1 Result and the private/public license-gate projections without rewriting historical closure evidence.",
+    evidence: {
+      kind: "evidence-amendment",
+      resultSha256: "5".repeat(64),
+      privateLicenseGateSha256: "6".repeat(64),
+      neutralPublicLicenseGateSha256: "7".repeat(64),
+      commit: event40Commit,
+      reference: "backlog/evidence/2026-07-23-snt-1-activation-result.json",
+      previousClosureCommit: priorClosureCommit,
+    },
+    previousHash: initialClosure.entryHash,
+  });
+  const amend39 = v2AmendmentEvent({
+    sequence: 5,
+    id: AFK_REPAIR_ID,
+    status: "in_progress",
+    target: event39,
+    replacementCommit: event39Replacement,
+    previousHash: event40.entryHash,
+    idempotencyKey: "8".repeat(64),
+    reference: "specs/sprint-nova-epic/evidence/backlog/event-39-amendment-intent.json",
+  });
+  const amend40 = v2AmendmentEvent({
+    sequence: 6,
+    id: licensing.metadata.id,
+    status: "closed",
+    target: event40,
+    replacementCommit: event40Replacement,
+    previousHash: amend39.entryHash,
+    idempotencyKey: "9".repeat(64),
+    reference: "specs/sprint-nova-epic/evidence/backlog/event-40-amendment-intent.json",
+  });
+  return {
+    items: [afk, licensing],
+    events: [event39, inProgress, initialClosure, event40, amend39, amend40],
+    reachable: new Set([progressCommit, priorClosureCommit, event39Replacement, event40Replacement]),
+    commits: { event39Commit, event40Commit, event39Replacement, event40Replacement },
+  };
+}
+function v2CheckerFixture() {
+  const root = fixtureRoot();
+  const fixture = mixedTransitionFixture();
+  write(root, "backlog/schemas/transition-v2.schema.json", `${JSON.stringify({ $id: TRANSITION_V2_SCHEMA })}\n`);
+  for (const record of fixture.items) write(root, record.path, renderBacklogItem(record));
+  write(root, "backlog/transitions.ndjson", `${fixture.events.map((entry) => canonicalJson(entry)).join("\n")}\n`);
+  for (const amendment of fixture.events.filter((entry) => entry.schema === TRANSITION_V2_SCHEMA)) {
+    write(root, amendment.evidence.reference, DISPOSITION_BYTES);
+  }
+  const projection = projectBacklog(fixture.items, fixture.events);
+  write(root, "backlog/STATUS.md", projection.statusText);
+  write(root, "backlog/index.json", projection.indexText);
+  return { root, fixture };
+}
+function rechain(events) {
+  let previousHash = null;
+  return events.map((source, index) => {
+    const value = structuredClone(source);
+    value.sequence = index + 1;
+    value.previousHash = previousHash;
+    value.entryHash = transitionHash(value);
+    previousHash = value.entryHash;
+    return value;
+  });
 }
 function item(overrides = {}) {
   return {
@@ -710,6 +897,857 @@ function afkRepairInput(overrides = {}) {
       && invalid.findings.some((finding) => finding.includes("closure_repository must match the configured item project binding"))
       && invalid.findings.some((finding) => finding.includes("project closure requires closure_readback"))
       && invalid.findings.some((finding) => finding.includes("first ledger event may only initialize open or in-progress work")), invalid.findings.join("; "));
+}
+
+{
+  const historical39 = {
+    schema: TRANSITION_SCHEMA,
+    sequence: 39,
+    id: AFK_REPAIR_ID,
+    from: null,
+    to: "open",
+    at: "2026-07-23",
+    actor: "sentinel-recovery",
+    reason: "Repair the single missing initial ledger event for the existing open AFK-authorization process item; no status change or completion is claimed.",
+    evidence: {
+      kind: "missing-initial-ledger-repair",
+      commit: "726b83681abc1b6366333c70a6a401b88016e5d4",
+      reference: "backlog/items/2026-07-23-elephant-direct-implementation-under-afk-authorization.md",
+      sourceSha256: "abb09db5b6fe9fe36e58e995cbe3d93e05f3b8c7958270f43a670269fe9a2976",
+    },
+    previousHash: "92e42ed2e83f2820f6aac609bb96996f5e9fdd6e12a2878d9340ebc359c9002f",
+    entryHash: "84d2128467224ca61aa980c088e92473b9dda27959ecd29600cf8d4a72b83d3b",
+  };
+  check("BS18 frozen v1 event bytes retain the historical event-39 hash domain",
+    transitionHash(historical39) === historical39.entryHash);
+}
+
+{
+  const fixture = mixedTransitionFixture();
+  const errors = validateTransitionLedger(fixture.events, fixture.items, {
+    commitExists: (oid) => fixture.reachable.has(oid),
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const projection = projectBacklog(fixture.items, fixture.events);
+  const wrongDomain = { ...fixture.events[4], schema: TRANSITION_SCHEMA, entryHash: "" };
+  check("BS19 mixed v1/v2 replay binds the first v2 event to the v1 head and repairs event-39/event-40-shaped evidence without status mutation",
+    errors.length === 0
+      && fixture.events[4].previousHash === fixture.events[3].entryHash
+      && fixture.events[4].entryHash !== transitionHash(wrongDomain)
+      && fixture.events[4].from === "in_progress" && fixture.events[4].to === "in_progress"
+      && fixture.events[5].from === "closed" && fixture.events[5].to === "closed"
+      && fixture.items[0].metadata.status === "in_progress"
+      && fixture.items[1].metadata.closure_commit === fixture.commits.event40Replacement
+      && projection.index.generatedFrom.transitionHead === fixture.events[5].entryHash
+      && projection.index.counts.in_progress === 1 && projection.index.counts.closed === 1,
+    errors.join("; "));
+}
+
+{
+  const fixture = mixedTransitionFixture();
+  const evidence = fixture.events[4].evidence;
+  const extra = { ...evidence, authorityProse: "approve it" };
+  const missing = { ...evidence }; delete missing.dispositionSha256;
+  const wrongSchema = { ...evidence, schema: "pipeline.backlog-evidence-amendment.v2" };
+  const wrongPath = { ...evidence, reference: "../private/decision.json" };
+  const options = {
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  };
+  const extraErrors = validateBacklogEvidenceAmendment(extra, options);
+  const missingErrors = validateBacklogEvidenceAmendment(missing, options);
+  const wrongSchemaErrors = validateBacklogEvidenceAmendment(wrongSchema, options);
+  const wrongPathErrors = validateBacklogEvidenceAmendment(wrongPath, options);
+  check("BS20 v2 evidence amendment runtime validation is closed and authority-bound",
+    validateBacklogEvidenceAmendment(evidence, options).length === 0
+      && extraErrors.some((error) => error.includes("unsupported field authorityProse"))
+      && missingErrors.some((error) => error.includes("missing dispositionSha256"))
+      && wrongSchemaErrors.some((error) => error.includes("schema must equal"))
+      && wrongPathErrors.some((error) => error.includes("safe repository-relative path"))
+      && [...extraErrors, ...missingErrors, ...wrongSchemaErrors, ...wrongPathErrors]
+        .every((error) => V2_DOMAIN_PREFIX.test(error)));
+}
+
+{
+  const evidenceSchema = JSON.parse(readFileSync(new URL("../scripts/backlog-evidence-amendment.schema.json", import.meta.url), "utf8"));
+  const scriptTransitionSchema = JSON.parse(readFileSync(new URL("../scripts/backlog-transition-v2.schema.json", import.meta.url), "utf8"));
+  const backlogTransitionSchema = JSON.parse(readFileSync(new URL("../../../backlog/schemas/transition-v2.schema.json", import.meta.url), "utf8"));
+  const transitionKeys = ["schema", "sequence", "id", "from", "to", "at", "actor", "reason", "evidence", "previousHash", "entryHash"].sort();
+  const evidenceKeys = ["schema", "kind", "targetSequence", "targetEntryHash", "targetCommit", "replacementCommit", "reference", "dispositionSha256", "idempotencyKey"].sort();
+  const ordinaryEvidenceKeys = ["kind", "commit", "reference"].sort();
+  const isClosedAmendmentBranch = (branch) =>
+    branch?.$ref === "backlog-evidence-amendment.schema.json"
+      || (branch?.additionalProperties === false
+        && branch?.required?.toSorted().join(",") === evidenceKeys.join(",")
+        && branch?.properties?.schema?.const === EVIDENCE_AMENDMENT_SCHEMA
+        && branch?.properties?.kind?.const === "evidence-amendment");
+  const isClosedOrdinaryBranch = (branch) =>
+    branch?.additionalProperties === false
+      && branch?.required?.toSorted().join(",") === ordinaryEvidenceKeys.join(",")
+      && branch?.properties?.kind?.not?.const === "evidence-amendment"
+      && branch?.properties?.commit?.pattern === "^[a-f0-9]{40}$"
+      && typeof branch?.properties?.reference?.pattern === "string";
+  const hasClosedEvidenceUnion = (schema) => {
+    const evidence = schema.properties?.evidence;
+    return Array.isArray(evidence?.oneOf)
+      && evidence.oneOf.length === 2
+      && evidence.oneOf.filter(isClosedAmendmentBranch).length === 1
+      && evidence.oneOf.filter(isClosedOrdinaryBranch).length === 1
+      && !Object.hasOwn(evidence, "$ref")
+      && !Object.hasOwn(evidence, "required")
+      && !Object.hasOwn(evidence, "additionalProperties");
+  };
+  check("BS21 v2 JSON schemas close the exact event envelope and dispatch evidence through two closed branches",
+    evidenceSchema.$id === EVIDENCE_AMENDMENT_SCHEMA
+      && evidenceSchema.additionalProperties === false
+      && evidenceSchema.required.toSorted().join(",") === evidenceKeys.join(",")
+      && scriptTransitionSchema.$id === TRANSITION_V2_SCHEMA
+      && scriptTransitionSchema.additionalProperties === false
+      && scriptTransitionSchema.required.toSorted().join(",") === transitionKeys.join(",")
+      && hasClosedEvidenceUnion(scriptTransitionSchema)
+      && backlogTransitionSchema.$id === TRANSITION_V2_SCHEMA
+      && backlogTransitionSchema.additionalProperties === false
+      && backlogTransitionSchema.required.toSorted().join(",") === transitionKeys.join(",")
+      && hasClosedEvidenceUnion(backlogTransitionSchema));
+}
+
+{
+  const fixture = mixedTransitionFixture();
+  const malformed = structuredClone(fixture.events);
+  malformed[4].evidence.unreviewed = true;
+  const malformedEvents = rechain(malformed);
+  const malformedErrors = validateTransitionLedger(malformedEvents, fixture.items, {
+    commitExists: (oid) => fixture.reachable.has(oid),
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const forward = structuredClone(fixture.events);
+  forward[4].evidence.targetSequence = 6;
+  const forwardEvents = rechain(forward);
+  const forwardErrors = validateTransitionLedger(forwardEvents, fixture.items, {
+    commitExists: (oid) => fixture.reachable.has(oid),
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  check("BS22 malformed and forward-referencing amendments cannot tolerate unreachable history",
+    malformedErrors.some((error) => error.includes("unsupported field unreviewed"))
+      && malformedErrors.some((error) => error.includes("ledger event 1: evidence.commit is not a reachable"))
+      && forwardErrors.some((error) => error.includes("must target an earlier physical event"))
+      && forwardErrors.some((error) => error.includes("ledger event 1: evidence.commit is not a reachable")),
+    [...malformedErrors, ...forwardErrors].join("; "));
+}
+
+{
+  const fixture = mixedTransitionFixture();
+  const wrongTarget = structuredClone(fixture.events);
+  Object.assign(wrongTarget[4].evidence, {
+    targetSequence: fixture.events[3].sequence,
+    targetEntryHash: fixture.events[3].entryHash,
+    targetCommit: fixture.events[3].evidence.commit,
+  });
+  const wrongTargetErrors = validateTransitionLedger(rechain(wrongTarget), fixture.items, {
+    commitExists: (oid) => fixture.reachable.has(oid),
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const wrongHash = structuredClone(fixture.events);
+  wrongHash[4].evidence.targetEntryHash = "0".repeat(64);
+  const wrongHashErrors = validateTransitionLedger(rechain(wrongHash), fixture.items, {
+    commitExists: (oid) => fixture.reachable.has(oid),
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const wrongCommit = structuredClone(fixture.events);
+  wrongCommit[4].evidence.targetCommit = "a".repeat(40);
+  const wrongCommitErrors = validateTransitionLedger(rechain(wrongCommit), fixture.items, {
+    commitExists: (oid) => fixture.reachable.has(oid),
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  check("BS23 amendment target sequence, entry hash, commit, and item must bind the same earlier event",
+    wrongTargetErrors.some((error) => error.includes("id does not match the target event id"))
+      && wrongHashErrors.some((error) => error.includes("targetEntryHash does not bind"))
+      && wrongCommitErrors.some((error) => error.includes("targetCommit does not bind")),
+    [...wrongTargetErrors, ...wrongHashErrors, ...wrongCommitErrors].join("; "));
+}
+
+{
+  const fixture = mixedTransitionFixture();
+  const duplicate = v2AmendmentEvent({
+    sequence: 7,
+    id: fixture.events[0].id,
+    status: "in_progress",
+    target: fixture.events[0],
+    replacementCommit: "5".repeat(40),
+    previousHash: fixture.events.at(-1).entryHash,
+    idempotencyKey: "a".repeat(64),
+    reference: "specs/sprint-nova-epic/evidence/backlog/event-39-conflict.json",
+  });
+  const reachable = new Set([...fixture.reachable, "5".repeat(40)]);
+  const duplicateErrors = validateTransitionLedger([...fixture.events, duplicate], fixture.items, {
+    commitExists: (oid) => reachable.has(oid),
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const reusedKey = structuredClone(fixture.events);
+  reusedKey[5].evidence.idempotencyKey = reusedKey[4].evidence.idempotencyKey;
+  const reusedKeyErrors = validateTransitionLedger(rechain(reusedKey), fixture.items, {
+    commitExists: (oid) => fixture.reachable.has(oid),
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  check("BS24 duplicate targets, conflicting replacements, and replayed idempotency keys fail closed",
+    duplicateErrors.filter((error) => error.includes("duplicate or conflicting evidence amendment")).length >= 2
+      && duplicateErrors.some((error) => error.includes("ledger event 1: evidence.commit is not a reachable"))
+      && reusedKeyErrors.filter((error) => error.includes("idempotencyKey is duplicated")).length >= 2,
+    [...duplicateErrors, ...reusedKeyErrors].join("; "));
+}
+
+{
+  const fixture = mixedTransitionFixture();
+  const chainInvalid = structuredClone(fixture.events);
+  chainInvalid[4].previousHash = "f".repeat(64);
+  chainInvalid[4].entryHash = transitionHash(chainInvalid[4]);
+  chainInvalid[5].previousHash = chainInvalid[4].entryHash;
+  chainInvalid[5].entryHash = transitionHash(chainInvalid[5]);
+  const chainErrors = validateTransitionLedger(chainInvalid, fixture.items, {
+    commitExists: (oid) => fixture.reachable.has(oid),
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const statusMutation = structuredClone(fixture.events);
+  statusMutation[4].to = "closed";
+  const statusErrors = validateTransitionLedger(rechain(statusMutation), fixture.items, {
+    commitExists: (oid) => fixture.reachable.has(oid),
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  check("BS25 chain-invalid amendments and status-mutating amendments cannot repair evidence",
+    chainErrors.some((error) => error.includes("previousHash does not bind"))
+      && chainErrors.some((error) => error.includes("ledger event 1: evidence.commit is not a reachable"))
+      && statusErrors.some((error) => error.includes("must preserve one canonical status"))
+      && statusErrors.some((error) => error.includes("must not mutate status")),
+    [...chainErrors, ...statusErrors].join("; "));
+}
+
+{
+  const fixture = mixedTransitionFixture();
+  const replacementMissing = new Set(fixture.reachable);
+  replacementMissing.delete(fixture.commits.event39Replacement);
+  const replacementErrors = validateTransitionLedger(fixture.events, fixture.items, {
+    commitExists: (oid) => replacementMissing.has(oid),
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const targetReachable = new Set([...fixture.reachable, fixture.commits.event39Commit]);
+  const reachableTargetErrors = validateTransitionLedger(fixture.events, fixture.items, {
+    commitExists: (oid) => targetReachable.has(oid),
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  check("BS26 reachability tolerance requires an unreachable target and a reachable replacement",
+    replacementErrors.some((error) => error.includes("replacementCommit is not a reachable"))
+      && replacementErrors.some((error) => error.includes("ledger event 1: evidence.commit is not a reachable"))
+      && reachableTargetErrors.some((error) => error.includes("targetCommit is already reachable")),
+    [...replacementErrors, ...reachableTargetErrors].join("; "));
+}
+
+{
+  const fixture = mixedTransitionFixture();
+  const evidence = fixture.events[4].evidence;
+  const callbackReferences = [];
+  const exactBufferErrors = validateBacklogEvidenceAmendment(evidence, {
+    readDispositionBytes: (reference) => {
+      callbackReferences.push(reference);
+      return DISPOSITION_BYTES;
+    },
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const exactStringErrors = validateBacklogEvidenceAmendment(evidence, {
+    readDispositionBytes: () => DISPOSITION_BYTES.toString("utf8"),
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const exactUint8ArrayErrors = validateBacklogEvidenceAmendment(evidence, {
+    readDispositionBytes: () => new Uint8Array(DISPOSITION_BYTES),
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const missingErrors = validateBacklogEvidenceAmendment(evidence, {
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const unreadableErrors = validateBacklogEvidenceAmendment(evidence, {
+    readDispositionBytes: () => null,
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const wrongTypeErrors = validateBacklogEvidenceAmendment(evidence, {
+    readDispositionBytes: () => 42,
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const throwingErrors = validateBacklogEvidenceAmendment(evidence, {
+    readDispositionBytes: () => {
+      throw new Error("synthetic unreadable disposition");
+    },
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const mismatchErrors = validateBacklogEvidenceAmendment(evidence, {
+    readDispositionBytes: () => Buffer.from("tampered disposition bytes", "utf8"),
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const missingLedgerErrors = validateTransitionLedger(fixture.events, fixture.items, {
+    commitExists: (oid) => fixture.reachable.has(oid),
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const exactLedgerErrors = validateTransitionLedger(fixture.events, fixture.items, {
+    commitExists: (oid) => fixture.reachable.has(oid),
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  check("BS27 v2 amendments require exact referenced disposition bytes through the pure validator callback",
+    exactBufferErrors.length === 0
+      && exactStringErrors.length === 0
+      && exactUint8ArrayErrors.length === 0
+      && callbackReferences.join(",") === evidence.reference
+      && missingErrors.length > 0
+      && unreadableErrors.length > 0
+      && wrongTypeErrors.length > 0
+      && throwingErrors.length > 0
+      && mismatchErrors.length > 0
+      && missingLedgerErrors.length > 0
+      && exactLedgerErrors.length === 0,
+    [
+      `exactBuffer=${exactBufferErrors.join("|")}`,
+      `exactString=${exactStringErrors.join("|")}`,
+      `exactUint8Array=${exactUint8ArrayErrors.join("|")}`,
+      `missing=${missingErrors.join("|")}`,
+      `unreadable=${unreadableErrors.join("|")}`,
+      `wrongType=${wrongTypeErrors.join("|")}`,
+      `throwing=${throwingErrors.join("|")}`,
+      `mismatch=${mismatchErrors.join("|")}`,
+      `missingLedger=${missingLedgerErrors.join("|")}`,
+      `exactLedger=${exactLedgerErrors.join("|")}`,
+    ].join("; "));
+}
+
+{
+  const initial = v2OperationEvent();
+  const assigned = v2OperationEvent({
+    sequence: 2,
+    from: "open",
+    to: "in_progress",
+    evidence: {
+      kind: "nova-assignment",
+      commit: "b".repeat(40),
+      reference: "specs/sprint-nova-epic/evidence/backlog/assignment.json",
+    },
+    previousHash: initial.entryHash,
+  });
+  const closed = v2OperationEvent({
+    sequence: 3,
+    from: "in_progress",
+    to: "closed",
+    evidence: {
+      kind: "nova-closure",
+      commit: "c".repeat(40),
+      reference: "specs/sprint-nova-epic/evidence/backlog/closure.json",
+    },
+    previousHash: assigned.entryHash,
+  });
+  const closedItem = item({
+    status: "closed",
+    closed_at: "2026-07-24",
+    closure_repository: "self",
+    closure_commit: closed.evidence.commit,
+    closure_evidence: closed.evidence.reference,
+  });
+  const ordinaryOptions = { authorizeOrdinaryEvidence: () => AUTHORITY_VALID };
+  const validErrors = validateTransitionLedger([initial, assigned, closed], [closedItem], ordinaryOptions);
+  const openItem = item();
+  const sameStatus = v2OperationEvent({
+    sequence: 2,
+    from: "open",
+    to: "open",
+    evidence: {
+      kind: "nova-reconciliation",
+      commit: "d".repeat(40),
+      reference: "specs/sprint-nova-epic/evidence/backlog/repeated-open.json",
+    },
+    previousHash: initial.entryHash,
+  });
+  const sameStatusErrors = validateTransitionLedger([initial, sameStatus], [openItem], ordinaryOptions);
+  const extraEvidence = v2OperationEvent({
+    sequence: 2,
+    from: "open",
+    to: "in_progress",
+    evidence: {
+      kind: "nova-assignment",
+      commit: "b".repeat(40),
+      reference: "specs/sprint-nova-epic/evidence/backlog/assignment.json",
+      authorityProse: "trust me",
+    },
+    previousHash: initial.entryHash,
+  });
+  const extraEvidenceErrors = validateTransitionLedger(
+    [initial, extraEvidence],
+    [item({ status: "in_progress" })],
+    ordinaryOptions,
+  );
+  const scriptTransitionSchema = JSON.parse(readFileSync(new URL("../scripts/backlog-transition-v2.schema.json", import.meta.url), "utf8"));
+  const backlogTransitionSchema = JSON.parse(readFileSync(new URL("../../../backlog/schemas/transition-v2.schema.json", import.meta.url), "utf8"));
+  const schemaSupportsOperations = (schema) => {
+    const fromShape = JSON.stringify(schema.properties?.from);
+    const evidenceShape = schema.properties?.evidence;
+    const transitionShape = JSON.stringify(schema);
+    return fromShape.includes('"null"')
+      && Array.isArray(evidenceShape?.oneOf)
+      && evidenceShape.oneOf.length >= 2
+      && transitionShape.includes('"from":{"const":null}')
+      && transitionShape.includes('"from":{"const":"open"}')
+      && transitionShape.includes('"to":{"const":"in_progress"}')
+      && transitionShape.includes('"from":{"const":"in_progress"}')
+      && transitionShape.includes('"to":{"const":"closed"}');
+  };
+  check("BS28 v2 supports initialize, assign, and close with closed ordinary evidence while reserving same-status for amendments",
+    validErrors.length === 0
+      && sameStatusErrors.some((error) => error.includes("transition must change status"))
+      && extraEvidenceErrors.some((error) => error.includes("unsupported field authorityProse"))
+      && schemaSupportsOperations(scriptTransitionSchema)
+      && schemaSupportsOperations(backlogTransitionSchema),
+    [
+      `valid=${validErrors.join("|")}`,
+      `sameStatus=${sameStatusErrors.join("|")}`,
+      `extraEvidence=${extraEvidenceErrors.join("|")}`,
+      `scriptSchema=${JSON.stringify(scriptTransitionSchema.properties?.evidence)}`,
+      `backlogSchema=${JSON.stringify(backlogTransitionSchema.properties?.evidence)}`,
+    ].join("; "));
+}
+
+{
+  const duplicateEnvelope = '{"schema":"pipeline.backlog-transition.v1","schema":"pipeline.backlog-transition.v2"}\n';
+  const duplicateNested = '{"schema":"pipeline.backlog-transition.v2","evidence":{"kind":"first","kind":"second"}}\n';
+  const escapedDuplicateNested = '{"schema":"pipeline.backlog-transition.v2","evidence":{"kind":"first","k\\u0069nd":"second"}}\n';
+  const envelopeResult = parseTransitionLedger(duplicateEnvelope);
+  const nestedResult = parseTransitionLedger(duplicateNested);
+  const escapedNestedResult = parseTransitionLedger(escapedDuplicateNested);
+  const rejectsDuplicate = (result) => !result.ok
+    && result.events.length === 0
+    && result.errors.some((error) => error.includes("duplicate JSON key"))
+    && result.errors.every((error) => V2_DOMAIN_PREFIX.test(error));
+  check("BS29 ledger parsing rejects duplicate envelope and nested evidence keys when the final parsed schema is v2",
+    rejectsDuplicate(envelopeResult)
+      && rejectsDuplicate(nestedResult)
+      && rejectsDuplicate(escapedNestedResult),
+    [
+      `envelope=${JSON.stringify(envelopeResult)}`,
+      `nested=${JSON.stringify(nestedResult)}`,
+      `escapedNested=${JSON.stringify(escapedNestedResult)}`,
+    ].join("; "));
+}
+
+{
+  const fixture = mixedTransitionFixture();
+  const evidence = fixture.events[4].evidence;
+  const invalidReferences = [".", "./x", "a/./b", "a//b", "a/", "../x", "a/../b", "a\\b"];
+  const validReference = "specs/sprint-nova-epic/evidence/backlog/event-39-amendment-intent.json";
+  const runtimeResults = invalidReferences.map((reference) => {
+    let callbackCalls = 0;
+    const errors = validateBacklogEvidenceAmendment({ ...evidence, reference }, {
+      readDispositionBytes: () => {
+        callbackCalls += 1;
+        return DISPOSITION_BYTES;
+      },
+      authorizeAmendment: AUTHORIZE_AMENDMENT,
+    });
+    return { reference, callbackCalls, errors };
+  });
+  const runtimeRejects = runtimeResults.every(({ callbackCalls, errors }) =>
+    callbackCalls === 0 && errors.some((error) => error.includes("safe repository-relative path")));
+  let validCallbackCalls = 0;
+  const validErrors = validateBacklogEvidenceAmendment({ ...evidence, reference: validReference }, {
+    readDispositionBytes: (reference) => {
+      validCallbackCalls += 1;
+      return reference === validReference ? DISPOSITION_BYTES : null;
+    },
+    authorizeAmendment: AUTHORIZE_AMENDMENT,
+  });
+  const schemaUrls = [
+    new URL("../scripts/backlog-evidence-amendment.schema.json", import.meta.url),
+    new URL("../scripts/backlog-transition-v2.schema.json", import.meta.url),
+    new URL("../../../backlog/schemas/transition-v2.schema.json", import.meta.url),
+  ];
+  const collectReferencePatterns = (schemaUrl, seen = new Set()) => {
+    if (seen.has(schemaUrl.href)) return [];
+    seen.add(schemaUrl.href);
+    const schema = JSON.parse(readFileSync(schemaUrl, "utf8"));
+    const patterns = [];
+    const visit = (node) => {
+      if (node === null || typeof node !== "object") return;
+      if (typeof node.properties?.reference?.pattern === "string") patterns.push(node.properties.reference.pattern);
+      if (typeof node.$ref === "string" && !node.$ref.startsWith("#") && !node.$ref.includes("://")) {
+        const [relativePath] = node.$ref.split("#");
+        patterns.push(...collectReferencePatterns(new URL(relativePath, schemaUrl), seen));
+      }
+      for (const value of Object.values(node)) visit(value);
+    };
+    visit(schema);
+    return patterns;
+  };
+  const patternSets = schemaUrls.map((schemaUrl) =>
+    collectReferencePatterns(schemaUrl).map((pattern) => new RegExp(pattern, "u")));
+  const schemasMatchRuntime = patternSets.every((patterns) =>
+    patterns.length > 0
+      && patterns.every((pattern) =>
+        pattern.test(validReference) && invalidReferences.every((reference) => !pattern.test(reference))));
+  check("BS30 evidence references and both JSON schema patterns require one canonical repository file path",
+    runtimeRejects
+      && validErrors.length === 0
+      && validCallbackCalls === 1
+      && schemasMatchRuntime,
+    [
+      `runtime=${runtimeResults.map(({ reference, callbackCalls, errors }) => `${reference}:${callbackCalls}:${errors.join("|")}`).join(",")}`,
+      `valid=${validErrors.join("|")}`,
+      `validCallbackCalls=${validCallbackCalls}`,
+      `patterns=${patternSets.map((patterns) => patterns.map(String).join(",")).join(";")}`,
+    ].join("; "));
+}
+
+{
+  const fixture = mixedTransitionFixture();
+  const evidence = fixture.events[4].evidence;
+  const contexts = [];
+  const valid = validateBacklogEvidenceAmendment(evidence, {
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: (context) => {
+      contexts.push(context);
+      return AUTHORITY_VALID;
+    },
+  });
+  let invalidPathCalls = 0;
+  const invalidPath = validateBacklogEvidenceAmendment({ ...evidence, reference: "specs/../private.json" }, {
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: () => {
+      invalidPathCalls += 1;
+      return AUTHORITY_VALID;
+    },
+  });
+  let digestMismatchCalls = 0;
+  const digestMismatch = validateBacklogEvidenceAmendment(evidence, {
+    readDispositionBytes: () => Buffer.from("different bytes\n", "utf8"),
+    authorizeAmendment: () => {
+      digestMismatchCalls += 1;
+      return AUTHORITY_VALID;
+    },
+  });
+  const failures = [
+    validateBacklogEvidenceAmendment(evidence, {
+      authorizeAmendment: () => AUTHORITY_VALID,
+    }),
+    validateBacklogEvidenceAmendment(evidence, {
+      readDispositionBytes: () => null,
+      authorizeAmendment: () => AUTHORITY_VALID,
+    }),
+    validateBacklogEvidenceAmendment(evidence, {
+      readDispositionBytes: () => { throw new Error("disposition unavailable"); },
+      authorizeAmendment: () => AUTHORITY_VALID,
+    }),
+    validateBacklogEvidenceAmendment(evidence, { readDispositionBytes: () => DISPOSITION_BYTES }),
+    validateBacklogEvidenceAmendment(evidence, {
+      readDispositionBytes: () => DISPOSITION_BYTES,
+      authorizeAmendment: () => { throw new Error("authority unavailable"); },
+    }),
+    validateBacklogEvidenceAmendment(evidence, {
+      readDispositionBytes: () => DISPOSITION_BYTES,
+      authorizeAmendment: () => true,
+    }),
+    validateBacklogEvidenceAmendment(evidence, {
+      readDispositionBytes: () => DISPOSITION_BYTES,
+      authorizeAmendment: () => false,
+    }),
+    validateBacklogEvidenceAmendment(evidence, {
+      readDispositionBytes: () => DISPOSITION_BYTES,
+      authorizeAmendment: () => ({ ok: false, code: "AUTHORITY:DENIED" }),
+    }),
+    validateBacklogEvidenceAmendment(evidence, {
+      readDispositionBytes: () => DISPOSITION_BYTES,
+      authorizeAmendment: () => ({ ...AUTHORITY_VALID, detail: "not closed" }),
+    }),
+  ];
+  const context = contexts[0];
+  check("BS31 amendment authority runs only after canonical path and exact disposition digest validation",
+    valid.length === 0
+      && contexts.length === 1
+      && Object.keys(context ?? {}).toSorted().join(",") === "dispositionBytes,dispositionSha256,evidence"
+      && context.evidence === evidence
+      && Buffer.from(context.dispositionBytes).equals(DISPOSITION_BYTES)
+      && context.dispositionSha256 === DISPOSITION_SHA256
+      && invalidPathCalls === 0
+      && digestMismatchCalls === 0
+      && invalidPath.length > 0
+      && invalidPath.every((error) => V2_DOMAIN_PREFIX.test(error))
+      && digestMismatch.length > 0
+      && digestMismatch.every((error) => V2_DOMAIN_PREFIX.test(error)),
+    [...valid, ...invalidPath, ...digestMismatch].join("; "));
+  check("BS32 amendment authority requires the exact typed success result and stable authority/unavailable codes",
+    failures.every((errors) => errors.length > 0
+      && errors.every((error) => /^(?:AUTHORITY|UNAVAILABLE):/u.test(error))),
+    failures.map((errors) => errors.join("|")).join("; "));
+}
+
+{
+  const initialized = v2OperationEvent();
+  const assigned = v2OperationEvent({
+    sequence: 2,
+    from: "open",
+    to: "in_progress",
+    evidence: {
+      kind: "nova-assignment",
+      commit: "b".repeat(40),
+      reference: "specs/sprint-nova-epic/evidence/backlog/assignment.json",
+    },
+    previousHash: initialized.entryHash,
+  });
+  const closed = v2OperationEvent({
+    sequence: 3,
+    from: "in_progress",
+    to: "closed",
+    evidence: {
+      kind: "nova-closure",
+      commit: "c".repeat(40),
+      reference: "specs/sprint-nova-epic/evidence/backlog/closure.json",
+    },
+    previousHash: assigned.entryHash,
+  });
+  const closedItem = item({
+    status: "closed",
+    closed_at: "2026-07-24",
+    closure_repository: "self",
+    closure_commit: closed.evidence.commit,
+    closure_evidence: closed.evidence.reference,
+  });
+  const ordinaryContexts = [];
+  const valid = validateTransitionLedger([initialized, assigned, closed], [closedItem], {
+    authorizeOrdinaryEvidence: (context) => {
+      ordinaryContexts.push(context);
+      return AUTHORITY_VALID;
+    },
+  });
+  const missing = validateTransitionLedger([initialized, assigned, closed], [closedItem]);
+  const thrown = validateTransitionLedger([initialized, assigned, closed], [closedItem], {
+    authorizeOrdinaryEvidence: () => { throw new Error("ordinary authority unavailable"); },
+  });
+  const malformed = validateTransitionLedger([initialized, assigned, closed], [closedItem], {
+    authorizeOrdinaryEvidence: () => ({ ok: true, code: "AUTHORITY:VALID", extra: true }),
+  });
+  const denied = validateTransitionLedger([initialized, assigned, closed], [closedItem], {
+    authorizeOrdinaryEvidence: () => false,
+  });
+  let invalidEvidenceCalls = 0;
+  const invalidEvidence = structuredClone(initialized);
+  invalidEvidence.evidence.authorityProse = "trust me";
+  invalidEvidence.entryHash = transitionHash(invalidEvidence);
+  const invalidEvidenceErrors = validateTransitionLedger([invalidEvidence], [item()], {
+    authorizeOrdinaryEvidence: () => {
+      invalidEvidenceCalls += 1;
+      return AUTHORITY_VALID;
+    },
+  });
+  check("BS33 every ordinary v2 event requires exact typed authority and receives only event/evidence",
+    valid.length === 0
+      && ordinaryContexts.length === 3
+      && ordinaryContexts.every((context, index) =>
+        Object.keys(context).toSorted().join(",") === "event,evidence"
+          && context.event === [initialized, assigned, closed][index]
+          && context.evidence === context.event.evidence)
+      && missing.some((error) => error.startsWith("AUTHORITY:"))
+      && thrown.some((error) => error.startsWith("UNAVAILABLE:"))
+      && malformed.some((error) => error.startsWith("AUTHORITY:"))
+      && denied.some((error) => error.startsWith("AUTHORITY:"))
+      && invalidEvidenceCalls === 0,
+    [...valid, ...missing, ...thrown, ...malformed, ...denied, ...invalidEvidenceErrors].join("; "));
+  const wrongPrevious = structuredClone(initialized);
+  wrongPrevious.previousHash = "f".repeat(64);
+  wrongPrevious.entryHash = transitionHash(wrongPrevious);
+  const wrongSequence = structuredClone(initialized);
+  wrongSequence.sequence = 2;
+  wrongSequence.entryHash = transitionHash(wrongSequence);
+  const longReason = structuredClone(initialized);
+  longReason.reason = "x".repeat(513);
+  longReason.entryHash = transitionHash(longReason);
+  const skippedStatus = structuredClone(initialized);
+  skippedStatus.to = "closed";
+  skippedStatus.entryHash = transitionHash(skippedStatus);
+  const skippedClosedItem = item({
+    status: "closed",
+    closed_at: "2026-07-24",
+    closure_repository: "self",
+    closure_commit: skippedStatus.evidence.commit,
+    closure_evidence: skippedStatus.evidence.reference,
+  });
+  const authorize = { authorizeOrdinaryEvidence: () => AUTHORITY_VALID };
+  const structuralFindings = [
+    validateTransitionLedger([wrongPrevious], [item()], authorize),
+    validateTransitionLedger([wrongSequence], [item()], authorize),
+    validateTransitionLedger([longReason], [item()], authorize),
+    validateTransitionLedger([skippedStatus], [skippedClosedItem], authorize),
+  ].flat();
+  const v2Findings = [
+    ...missing,
+    ...thrown,
+    ...malformed,
+    ...denied,
+    ...invalidEvidenceErrors,
+    ...structuralFindings,
+  ];
+  check("BS34 every v2-originated public validator finding uses one Spec section 7.2 domain prefix",
+    v2Findings.length > 0 && v2Findings.every((error) => V2_DOMAIN_PREFIX.test(error)),
+    v2Findings.join("; "));
+}
+
+{
+  const invalid = event({ reason: "" });
+  const findings = validateTransitionLedger([invalid], [item()]);
+  check("BS35 frozen v1 validation findings remain byte-compatible",
+    JSON.stringify(findings) === JSON.stringify(["ledger event 1: reason must be non-empty"]),
+    JSON.stringify(findings));
+}
+
+{
+  const v1 = event();
+  const v2 = v2OperationEvent();
+  const v1EnvelopeLastWins = canonicalJson(v1)
+    .replace(`"schema":"${TRANSITION_SCHEMA}"`, `"schema":"${TRANSITION_V2_SCHEMA}","schema":"${TRANSITION_SCHEMA}"`);
+  const v1NestedLastWins = canonicalJson(v1)
+    .replace('"kind":"baseline-migration"', '"kind":"ignored","kind":"baseline-migration"');
+  const v2EnvelopeDuplicate = canonicalJson(v2)
+    .replace(`"schema":"${TRANSITION_V2_SCHEMA}"`, `"schema":"${TRANSITION_SCHEMA}","schema":"${TRANSITION_V2_SCHEMA}"`);
+  const v2NestedDuplicate = canonicalJson(v2)
+    .replace('"kind":"nova-reconciliation"', '"kind":"ignored","k\\u0069nd":"nova-reconciliation"');
+  const parsedV1Envelope = parseTransitionLedger(`${v1EnvelopeLastWins}\n`);
+  const parsedV1Nested = parseTransitionLedger(`${v1NestedLastWins}\n`);
+  const parsedV2Envelope = parseTransitionLedger(`${v2EnvelopeDuplicate}\n`);
+  const parsedV2Nested = parseTransitionLedger(`${v2NestedDuplicate}\n`);
+  check("BS36 duplicate-key rejection is v2-only and preserves frozen v1 last-key-wins parsing",
+    parsedV1Envelope.ok
+      && parsedV1Envelope.events[0].schema === TRANSITION_SCHEMA
+      && validateTransitionLedger(parsedV1Envelope.events, [item()]).length === 0
+      && parsedV1Nested.ok
+      && parsedV1Nested.events[0].evidence.kind === "baseline-migration"
+      && validateTransitionLedger(parsedV1Nested.events, [item()]).length === 0
+      && !parsedV2Envelope.ok
+      && parsedV2Envelope.errors.some((error) => error.includes("duplicate JSON key"))
+      && parsedV2Envelope.errors.every((error) => V2_DOMAIN_PREFIX.test(error))
+      && !parsedV2Nested.ok
+      && parsedV2Nested.errors.some((error) => error.includes("duplicate JSON key"))
+      && parsedV2Nested.errors.every((error) => V2_DOMAIN_PREFIX.test(error)),
+    [parsedV1Envelope, parsedV1Nested, parsedV2Envelope, parsedV2Nested]
+      .map((value) => JSON.stringify(value)).join("; "));
+}
+
+{
+  const fixture = mixedTransitionFixture();
+  const valid = validateTransitionLedger(fixture.events, fixture.items, {
+    commitExists: (oid) => fixture.reachable.has(oid),
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: () => AUTHORITY_VALID,
+  });
+  const mismatchItems = structuredClone(fixture.items);
+  mismatchItems[1].metadata.closure_evidence = "specs/sprint-nova-epic/evidence/backlog/wrong-amendment.json";
+  const mismatch = validateTransitionLedger(fixture.events, mismatchItems, {
+    commitExists: (oid) => fixture.reachable.has(oid),
+    readDispositionBytes: () => DISPOSITION_BYTES,
+    authorizeAmendment: () => AUTHORITY_VALID,
+  });
+  check("BS37 a final closed amendment binds both replacementCommit and the amendment reference",
+    valid.length === 0
+      && mismatch.some((error) => V2_DOMAIN_PREFIX.test(error) && error.includes("closure_evidence")),
+    [...valid, ...mismatch].join("; "));
+}
+
+{
+  const { root, fixture } = v2CheckerFixture();
+  let authorityCalls = 0;
+  const options = {
+    checkCommit: false,
+    authorizeAmendment: () => {
+      authorityCalls += 1;
+      return AUTHORITY_VALID;
+    },
+  };
+  const loaded = loadBacklogState(root, options);
+  const checked = checkBacklogState(root, options);
+  const untrusted = checkBacklogState(root, { checkCommit: false });
+  check("BS38 default backlog loading registers transition-v2 and reads regular disposition bytes with authority under checkCommit false",
+    loaded.ok && checked.ok && authorityCalls === 4
+      && loaded.events.at(-1).entryHash === fixture.events.at(-1).entryHash
+      && !untrusted.ok
+      && untrusted.findings.some((finding) => finding.startsWith("AUTHORITY:")),
+    [...loaded.findings, ...checked.findings, ...untrusted.findings].join("; "));
+}
+
+{
+  const missingSchema = v2CheckerFixture();
+  rmSync(join(missingSchema.root, "backlog/schemas/transition-v2.schema.json"));
+  const missingSchemaResult = checkBacklogState(missingSchema.root, {
+    checkCommit: false,
+    authorizeAmendment: () => AUTHORITY_VALID,
+  });
+  const driftedSchema = v2CheckerFixture();
+  write(driftedSchema.root, "backlog/schemas/transition-v2.schema.json", `${JSON.stringify({ $id: TRANSITION_SCHEMA })}\n`);
+  const driftedSchemaResult = checkBacklogState(driftedSchema.root, {
+    checkCommit: false,
+    authorizeAmendment: () => AUTHORITY_VALID,
+  });
+
+  const missingDisposition = v2CheckerFixture();
+  const missingReference = missingDisposition.fixture.events[4].evidence.reference;
+  rmSync(join(missingDisposition.root, missingReference));
+  const missingDispositionResult = checkBacklogState(missingDisposition.root, {
+    checkCommit: false,
+    authorizeAmendment: () => AUTHORITY_VALID,
+  });
+
+  const symlinkDisposition = v2CheckerFixture();
+  const symlinkReference = symlinkDisposition.fixture.events[4].evidence.reference;
+  rmSync(join(symlinkDisposition.root, symlinkReference));
+  write(symlinkDisposition.root, "specs/sprint-nova-epic/evidence/backlog/symlink-target.json", DISPOSITION_BYTES);
+  symlinkSync("symlink-target.json", join(symlinkDisposition.root, symlinkReference));
+  const symlinkDispositionResult = checkBacklogState(symlinkDisposition.root, {
+    checkCommit: false,
+    authorizeAmendment: () => AUTHORITY_VALID,
+  });
+
+  const nonFileDisposition = v2CheckerFixture();
+  const nonFileReference = nonFileDisposition.fixture.events[4].evidence.reference;
+  rmSync(join(nonFileDisposition.root, nonFileReference));
+  mkdirSync(join(nonFileDisposition.root, nonFileReference));
+  const nonFileDispositionResult = checkBacklogState(nonFileDisposition.root, {
+    checkCommit: false,
+    authorizeAmendment: () => AUTHORITY_VALID,
+  });
+
+  const digestMismatch = v2CheckerFixture();
+  write(digestMismatch.root, digestMismatch.fixture.events[4].evidence.reference, "tampered disposition\n");
+  const digestMismatchResult = checkBacklogState(digestMismatch.root, {
+    checkCommit: false,
+    authorizeAmendment: () => AUTHORITY_VALID,
+  });
+  const dispositionResults = [
+    missingDispositionResult,
+    symlinkDispositionResult,
+    nonFileDispositionResult,
+    digestMismatchResult,
+  ];
+  check("BS39 v2 checker fails closed for missing/drifted schema and missing, symlinked, non-file, or digest-mismatched dispositions",
+    !missingSchemaResult.ok
+      && missingSchemaResult.findings.some((finding) => finding.includes("transition-v2.schema.json"))
+      && !driftedSchemaResult.ok
+      && driftedSchemaResult.findings.some((finding) => finding.includes(`$id ${TRANSITION_V2_SCHEMA}`))
+      && dispositionResults.every((result) => !result.ok
+        && result.findings.some((finding) => V2_DOMAIN_PREFIX.test(finding))),
+    [
+      ...missingSchemaResult.findings,
+      ...driftedSchemaResult.findings,
+      ...dispositionResults.flatMap((result) => result.findings),
+    ].join("; "));
 }
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });

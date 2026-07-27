@@ -1,0 +1,38 @@
+{
+  "schema": "pipeline.nova-b-integration-gate-readback.v1",
+  "scope": "nova-a-evidence-chain-into-0.4.4-nova-b-r5",
+  "productCandidate": {
+    "commit": "4b96d95d2e527cd8ef68f88f4d7b2a3412297362",
+    "tree": "5da462b9f632828dfdbb61ed3d813c769a71f10f"
+  },
+  "productBase": {
+    "commit": "874323da7f510be3208ee8b6ffc31ef121963ee9",
+    "tree": "76de02e71063e574e9728691fad30d2b0c4a6337"
+  },
+  "validatedNovaAEvidence": {
+    "e1": "cb5560e6abe8dd0e1e4a833f1061467a6172fdb5",
+    "e2": "48d49deccb29c150fbbaf85418836db77d3f1d21",
+    "receiptSha256": "b087e6dd087396fa887a14e4fb022ca02cc672510b9245de3690a30b8e5c8fec"
+  },
+  "gates": {
+    "verify": {
+      "path": "specs/sprint-nova-epic/evidence/nova-b/integration-0.4.4-r5/verify.json",
+      "sha256": "47c35b9fd072e01cdc80c7b0daa5f1f7ae971dda77c2f9b8af8762defac5480b",
+      "exitCode": 0
+    },
+    "security": {
+      "path": "specs/sprint-nova-epic/evidence/nova-b/integration-0.4.4-r5/security.json",
+      "sha256": "a164928c2674cf9fdc7674362f1aff8fdf0e571ff088849ec489426d997a55d3",
+      "exitCode": 0
+    },
+    "critic": {
+      "path": "specs/sprint-nova-epic/evidence/nova-b/integration-0.4.4-r5/critic.json",
+      "sha256": "d89763bd58b6883d4dc76bf0efe07545f92fce8ecd0fcb3f9e8cdee8b477e549",
+      "verdict": "PASS"
+    }
+  },
+  "status": "verified",
+  "limitations": [
+    "functional-equivalent-read-only; OS isolation not asserted"
+  ]
+}

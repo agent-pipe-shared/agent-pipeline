@@ -5,19 +5,22 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
   chmodSync, closeSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync,
-  openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync,
+  linkSync, openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  applyProjectOnboardingManifestRepairV4,
   applyProjectOnboardingKickoffV4,
   applyProjectOnboardingLifecycleV4,
   applyProjectOnboardingV3,
   inspectProjectOnboardingV3,
+  planProjectOnboardingManifestRepairV4,
   planProjectOnboardingKickoffV4,
   planProjectOnboardingLifecycleV4,
+  planProjectOnboardingSourceRecoveryV4,
   planProjectOnboardingV3,
   renderProjectOnboardingAction,
 } from "./project-onboarding-v3.mjs";
@@ -80,6 +83,7 @@ function fakeAppServer({ intent }) {
 }
 const fakeDeps = {
   spawnSync: fakeGit,
+  codexExecutable: process.execPath,
   observeCodexOnboardingCapabilities: fakeCapabilities,
   observeOnboardingAppServer: fakeAppServer,
 };
@@ -1689,8 +1693,9 @@ test("portable rollback preserves a target whose identity changed after exclusiv
         writeFileSync(target, bytes, options);
         return;
       }
-      unlinkSync(firstTarget);
-      writeFileSync(firstTarget, "foreign bytes\n", { flag: "wx", mode: 0o600 });
+      const foreign = `${firstTarget}.foreign`;
+      writeFileSync(foreign, "foreign bytes\n", { flag: "wx", mode: 0o600 });
+      renameSync(foreign, firstTarget);
       throw new Error("synthetic identity race");
     },
   };
@@ -1745,8 +1750,345 @@ test("an invalid generated manifest is never accepted as a current fresh authori
     assert.equal(inspected.schema, "pipeline.project-onboarding.v4");
     assert.equal(inspected.status, "partial");
     assertDiagnostic(inspected, "manifest_invalid");
-    assert.equal(inspected.nextAction, null);
+    assert.deepEqual(inspected.nextAction.argv, [
+      ONBOARDING_SCRIPT,
+      "plan-manifest-repair",
+      "--root",
+      path,
+    ]);
+    const disposition = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    assert.equal(disposition.status, "unrepairable");
+    assertDiagnostic(disposition, "manifest_unowned_bytes_unpreservable");
   } finally { dispose(path); }
+});
+
+test("manifest-only repair is source/preimage/plan bound, confirmed, and read back", () => {
+  const path = root();
+  try {
+    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    unlinkSync(manifestPath);
+    const invalid = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(invalid.status, "partial");
+    assertDiagnostic(invalid, "manifest_invalid");
+
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    assert.equal(plan.target.path, ".claude/pipeline.yaml");
+    assert.equal(plan.target.preservation, "absent-target-only");
+    assert.match(plan.planSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(plan.applyAction.mutation, true);
+    assert.equal(plan.applyAction.requiresConfirmation, true);
+    assert.deepEqual(plan.applyAction.argv, [
+      ONBOARDING_SCRIPT,
+      "apply-manifest-repair",
+      "--root",
+      path,
+      "--plan-sha256",
+      plan.planSha256,
+      "--activate",
+    ]);
+
+    const wrong = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: "0".repeat(64),
+      activate: true,
+      deps: fakeDeps,
+    });
+    assert.equal(wrong.status, "partial");
+    assert.equal(existsSync(manifestPath), false);
+
+    writeFileSync(manifestPath, "foreign: manifest bytes\n");
+    const drifted = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: fakeDeps,
+    });
+    assert.equal(drifted.status, "partial");
+    assert.equal(readFileSync(manifestPath, "utf8"), "foreign: manifest bytes\n");
+    unlinkSync(manifestPath);
+
+    const repaired = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: fakeDeps,
+    });
+    assert.equal(repaired.status, "runtime-initialization-required");
+    assert.equal(readFileSync(manifestPath, "utf8").includes("human_facing: en"), true);
+  } finally { dispose(path); }
+});
+
+test("manifest repair never claims ready when post-publication durability is unavailable", () => {
+  const path = root();
+  try {
+    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    unlinkSync(join(path, ".claude", "pipeline.yaml"));
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    const result = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        ...fakeDeps,
+        fsyncDirectory() { throw new Error("synthetic durability failure"); },
+      },
+    });
+    assert.equal(result.status, "partial");
+    assertDiagnostic(result, "manifest_repair_durability_unavailable");
+    assert.equal(existsSync(join(path, ".claude", "pipeline.yaml")), true);
+  } finally { dispose(path); }
+});
+
+test("manifest repair rejects non-UTF-8 unowned bytes without rewriting them", () => {
+  const path = root();
+  try {
+    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    const original = Buffer.concat([
+      readFileSync(manifestPath),
+      Buffer.from("# invalid-unowned-byte: ", "utf8"),
+      Buffer.from([0xff]),
+      Buffer.from("\n", "utf8"),
+    ]);
+    writeFileSync(manifestPath, original);
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    assert.equal(plan.status, "unrepairable");
+    assertDiagnostic(plan, "manifest_unowned_bytes_unpreservable");
+    assert.equal(readFileSync(manifestPath).compare(original), 0);
+  } finally { dispose(path); }
+});
+
+test("manifest repair rejects source drift before publication and leaves the manifest absent", () => {
+  const path = root();
+  try {
+    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    const sourcePath = join(path, "pipeline.user.yaml");
+    unlinkSync(manifestPath);
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    let injected = false;
+    const result = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        ...fakeDeps,
+        openSync(target, ...args) {
+          const fd = openSync(target, ...args);
+          if (!injected && String(target).includes(".pipeline-manifest-repair-")) {
+            injected = true;
+            writeFileSync(sourcePath, `${readFileSync(sourcePath, "utf8")}# concurrent source drift\n`);
+          }
+          return fd;
+        },
+      },
+    });
+    assert.equal(result.status, "partial");
+    assertDiagnostic(result, "manifest_invalid");
+    assert.equal(existsSync(manifestPath), false);
+    assert.equal(injected, true);
+  } finally { dispose(path); }
+});
+
+test("manifest repair stays inside its pinned parent when the pathname becomes a symlink", () => {
+  const path = root();
+  const outside = root();
+  try {
+    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    const parent = join(path, ".claude");
+    const displaced = join(path, ".claude-displaced");
+    unlinkSync(join(parent, "pipeline.yaml"));
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    let injected = false;
+    const result = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        ...fakeDeps,
+        linkSync(source, target) {
+          if (!injected && String(source).includes(".pipeline-manifest-repair-")) {
+            injected = true;
+            renameSync(parent, displaced);
+            symlinkSync(outside, parent, "dir");
+          }
+          linkSync(source, target);
+        },
+      },
+    });
+    assert.equal(result.status, "partial");
+    assertDiagnostic(result, "manifest_repair_parent_changed_after_commit");
+    assert.equal(injected, true);
+    assert.equal(existsSync(join(outside, "pipeline.yaml")), false);
+    assert.equal(existsSync(join(displaced, "pipeline.yaml")), false);
+    assert.equal(readdirSync(displaced).some((name) => name.startsWith(".pipeline-manifest-repair-quarantine-")), true);
+  } finally { dispose(path); dispose(outside); }
+});
+
+test("manifest repair quarantines a publication-boundary source race", () => {
+  const path = root();
+  try {
+    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    const sourcePath = join(path, "pipeline.user.yaml");
+    unlinkSync(manifestPath);
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    let injected = false;
+    const result = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        ...fakeDeps,
+        linkSync(source, target) {
+          linkSync(source, target);
+          if (!injected && String(source).includes(".pipeline-manifest-repair-")) {
+            injected = true;
+            writeFileSync(sourcePath, `${readFileSync(sourcePath, "utf8")}# publication-boundary drift\n`);
+          }
+        },
+      },
+    });
+    assert.equal(result.status, "partial");
+    assertDiagnostic(result, "manifest_repair_source_changed_after_commit");
+    assert.equal(injected, true);
+    assert.equal(existsSync(manifestPath), false);
+  } finally { dispose(path); }
+});
+
+test("manifest repair retains its publication binding through final durability readback", () => {
+  const path = root();
+  try {
+    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    const sourcePath = join(path, "pipeline.user.yaml");
+    unlinkSync(manifestPath);
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    let syncs = 0;
+    const result = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        ...fakeDeps,
+        fsyncDirectory() {
+          syncs += 1;
+          if (syncs === 2) {
+            writeFileSync(sourcePath, `${readFileSync(sourcePath, "utf8")}# final-readback drift\n`);
+          }
+        },
+      },
+    });
+    assert.equal(result.status, "partial");
+    assertDiagnostic(result, "manifest_repair_source_changed_after_commit");
+    assert.equal(syncs, 2);
+    assert.equal(existsSync(manifestPath), false);
+  } finally { dispose(path); }
+});
+
+test("manifest repair atomically preserves a target that appears at publication", () => {
+  const path = root();
+  try {
+    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    unlinkSync(manifestPath);
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    let injected = false;
+    const result = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        ...fakeDeps,
+        linkSync(source, target) {
+          if (!injected && String(target).endsWith("/pipeline.yaml")) {
+            injected = true;
+            writeFileSync(manifestPath, "foreign: publication race\n", { flag: "wx" });
+          }
+          linkSync(source, target);
+        },
+      },
+    });
+    assert.equal(result.status, "partial");
+    assert.equal(injected, true);
+    assert.equal(readFileSync(manifestPath, "utf8"), "foreign: publication race\n");
+  } finally { dispose(path); }
+});
+
+test("manifest repair never quarantines a foreign post-publication target", () => {
+  const path = root();
+  try {
+    const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    unlinkSync(manifestPath);
+    const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
+    let injected = false;
+    const result = applyProjectOnboardingManifestRepairV4({
+      rootDir: path,
+      planSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        ...fakeDeps,
+        linkSync(source, target) {
+          linkSync(source, target);
+          if (!injected && String(target).endsWith("/pipeline.yaml")) {
+            injected = true;
+            unlinkSync(target);
+            writeFileSync(manifestPath, "foreign: post-publication swap\n", { flag: "wx" });
+          }
+        },
+      },
+    });
+    assert.equal(result.status, "partial");
+    assertDiagnostic(result, "manifest_repair_rollback_incomplete");
+    assert.equal(injected, true);
+    assert.equal(readFileSync(manifestPath, "utf8"), "foreign: post-publication swap\n");
+    assert.equal(
+      readdirSync(join(path, ".claude")).some((name) => name.startsWith(".pipeline-manifest-repair-quarantine-")),
+      false,
+    );
+  } finally { dispose(path); }
+});
+
+test("source recovery planner distinguishes invalid authority and unsupported runner transitions", () => {
+  const invalid = root(); const unsupported = root();
+  try {
+    writeFileSync(join(invalid, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+    const observedInvalid = inspectProjectOnboardingV3({ rootDir: invalid, deps: fakeDeps });
+    assert.equal(observedInvalid.status, "invalid");
+    assert.deepEqual(observedInvalid.nextAction.argv, [
+      ONBOARDING_SCRIPT,
+      "plan-source-recovery",
+      "--root",
+      invalid,
+    ]);
+    const invalidPlan = planProjectOnboardingSourceRecoveryV4({ rootDir: invalid, deps: fakeDeps });
+    assert.equal(invalidPlan.status, "unrepairable");
+    assert.equal(invalidPlan.category, "invalid-authority");
+    assertDiagnostic(invalidPlan, "source_authority_unrepairable");
+
+    const seed = planProjectOnboardingV3({ rootDir: unsupported, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(seed, { rootDir: unsupported, activate: true, deps: fakeDeps }).status, "applied");
+    const sourcePath = join(unsupported, "pipeline.user.yaml");
+    writeFileSync(sourcePath, readFileSync(sourcePath, "utf8").replace(/default: "?codex"?/u, "default: \"claude\""));
+    const observedUnsupported = inspectProjectOnboardingV3({ rootDir: unsupported, deps: fakeDeps });
+    assert.equal(observedUnsupported.status, "invalid");
+    const unsupportedPlan = planProjectOnboardingSourceRecoveryV4({ rootDir: unsupported, deps: fakeDeps });
+    assert.equal(unsupportedPlan.status, "unrepairable");
+    assert.equal(unsupportedPlan.category, "unsupported-source-transition");
+    assertDiagnostic(unsupportedPlan, "source_runner_transition_unsupported");
+  } finally { dispose(invalid); dispose(unsupported); }
 });
 
 test("owned runtime drift and invalid V3 sources stay in closed lifecycle classifications", () => {
@@ -1780,6 +2122,7 @@ test("owned runtime drift and invalid V3 sources stay in closed lifecycle classi
     assert.equal(observedInvalid.status, "invalid");
     assert.equal(observedInvalid.runner, null);
     assert.equal(observedInvalid.diagnostics[0].code, "source_invalid");
+    assert.equal(observedInvalid.nextAction.argv[1], "plan-source-recovery");
   } finally { dispose(drifted); dispose(invalid); }
 });
 

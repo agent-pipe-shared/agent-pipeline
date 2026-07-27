@@ -1,55 +1,68 @@
 {
   "schema": "pipeline.state.v0",
+  "planApproved": true,
+  "updatedAt": "2026-07-26T23:13:18.481Z",
+  "closedFeatures": [
+    {
+      "id": "sprint-sentinel-epic",
+      "planPath": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "phaseAtClose": "implementation",
+      "closedAt": "2026-07-24T20:49:16.791Z",
+      "closedBy": "Nova Elephant (PO-directed)",
+      "forCommit": null
+    }
+  ],
   "activeFeature": {
-    "id": "codex-onboarding-0.4.5",
-    "planPath": "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md",
+    "id": "sprint-nova-epic",
+    "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
     "phase": "implementation"
   },
-  "planApproved": true,
-  "updatedAt": "2026-07-26T14:08:37.500Z",
   "planApproval": {
     "schema": "pipeline.plan-approval.v2",
-    "approvedBy": "PO",
-    "approvedAt": "2026-07-26T14:08:37.500Z",
-    "specBoundBy": "PO",
-    "specBoundAt": "2026-07-26T14:08:37.500Z",
+    "approvedBy": "Product Owner (2026-07-26 Issue #63 B4R Publication CAS correction)",
+    "approvedAt": "2026-07-26T23:13:18.481Z",
+    "specBoundBy": "Product Owner (2026-07-26 Issue #63 B4R Publication CAS correction)",
+    "specBoundAt": "2026-07-26T23:13:18.481Z",
     "poGateAuthority": {
       "schema": "pipeline.po-gate-authority.v2",
       "humanFacing": "en",
       "sourceSha256": "2a0f69551b46963d6d49ef0faaf9db5c28d27c4f681a9d4dd0be1a81b297da10",
       "runtimeSha256": "071b0236f6054bbeea2140830320a88d1c6a9e733d7294ad0bb976fd2e28c897",
-      "receiptSha256": "c4fc5171dc507a81908b30137bbf537355626f957d1ccbb9bee3a8ae9db02aa2",
-      "repositoryFingerprint": "6af2655d04c85a0e2faff67dedc2116a845874502dbe31c20e4c28372ea7885f",
-      "planPath": "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md",
-      "planSha256": "217eff325fffa5d82d5d49f31883c426dca74c42879aaae0a70da87be8e492ae",
-      "specPath": "specs/2026-07-25-codex-onboarding-0.4.5/spec.md",
-      "specSha256": "5a95aa55b393a88e0d7ab1a8006957fc04d80bcae24399b40f3ffa8e4eb3cf70"
+      "receiptSha256": "d3c4d4b3b952d44e64c2b33164e96ad61652ac25d99425e6ffe9a6fb9c10aebb",
+      "repositoryFingerprint": "3f74c2558c19687097f1285753400a03fde3953ec6a3496820ddbe1f25196f7d",
+      "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+      "planSha256": "2601a303cfc2cce12125e1ff252df79de956ed58888edb904a1da0d1d3661ebc",
+      "specPath": "specs/sprint-nova-epic/spec.md",
+      "specSha256": "930b41b06615c539fd9f05c25c933e7e2cf88cc0f05f114ed18d82eb05d6eca3"
     }
   },
   "continuity": {
     "schema": "pipeline.continuity.v0",
-    "featureId": "codex-onboarding-0.4.5",
-    "revision": 2,
+    "featureId": "sprint-nova-epic",
+    "revision": 1,
     "runtime": {
       "humanFacingLanguage": "en",
-      "activeDuty": "Coordinator",
-      "sessionCleanup": null
+      "activeDuty": "Elephant",
+      "sessionCleanup": {
+        "sessionId": "session-cd863c7d90b9712421b6fd8e",
+        "descriptorSha256": "e0f05c5c636728e5dc1b680e7872e6c51ff89988e4702320b951d0741a17973c"
+      }
     },
     "authority": {
       "prd": {
-        "path": "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md",
-        "sha256": "9825ca78a3765dc71ee2793ef9f84f2eaf998bf297086d869be3562d792cdb94"
+        "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+        "sha256": "00fb53ceb53639bc43ee7024b42ebb97a65452ce8669460a465062fbb695ff1c"
       },
       "spec": {
-        "path": "specs/2026-07-25-codex-onboarding-0.4.5/spec.md",
-        "sha256": "5a95aa55b393a88e0d7ab1a8006957fc04d80bcae24399b40f3ffa8e4eb3cf70"
+        "path": "specs/sprint-nova-epic/spec.md",
+        "sha256": "76586a185a2c07aaaea01f54c535206281babfa751b6a279d420d63fcbe17d72"
       },
       "result": null
     },
     "queueHead": {
-      "packageId": "continuity-adoption",
-      "actionId": "review-active-feature",
-      "nextAction": "review",
+      "packageId": "nova-b0",
+      "actionId": "runner-native-continuation",
+      "nextAction": "dispatch",
       "productRetryCount": 0,
       "environmentRerouteCount": 0,
       "dispatch": null
@@ -64,10 +77,11 @@
     "recovery": null,
     "decisionTxn": null,
     "capacity": {
-      "concurrencyLimit": 4,
+      "concurrencyLimit": 2,
       "reservedCriticSlots": 1,
       "reservedRecoverySlots": 1,
       "fallbackPolicy": "defer"
-    }
+    },
+    "closeTransition": null
   }
 }

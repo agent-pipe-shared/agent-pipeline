@@ -1,0 +1,14 @@
+{
+  "schema": "pipeline.nova-b2-c.critic-evidence.v1",
+  "candidate": {
+    "commit": "be77f50e44500b4eba5e4c95f2bcb08da773bdc9",
+    "tree": "4777b77e3272db08cb9675a8994916a955ad457d"
+  },
+  "review": {
+    "mode": "fresh independent critic",
+    "assurance": "functional-equivalent-read-only; OS isolation not asserted",
+    "verdict": "pass",
+    "findings": []
+  },
+  "status": "passed"
+}

@@ -181,6 +181,30 @@ starting a new Codex thread; it does not rewrite consumer authority. Existing
 restart-required private state remains controlling until its exact readback or
 an explicit, independently reviewed recovery handles it.
 
+## V4 invalid-authority recovery boundary
+
+Issue #63 adds four exact pre-ready command shapes: read-only source and
+manifest planners, the digest-bound manifest writer, and the Pipeline-shipped
+V3 authority validator. The shell exemption remains parser-exact: the physical
+project root, command name, argument order, 64-lowercase-hex digest and literal
+`--activate` must match, while aliases, extra arguments, redirection, chaining,
+backticks and command substitution fail closed. No general pre-ready writer is
+authorized.
+
+The only new writer targets an absent `.claude/pipeline.yaml`; every existing
+manifest is terminal `unrepairable` and remains byte-identical. Planning and
+apply read the V3 source through no-follow, identity-bound descriptors and bind
+raw source/target digests. Apply recomputes the plan, opens `.claude` with
+no-follow directory semantics, addresses entries through that pinned
+descriptor where available, and uses an atomic hard-link no-replace
+publication. A concurrently appearing target therefore cannot be overwritten.
+Source or parent drift at the publication boundary atomically captures the
+exact generated inode under a non-authoritative quarantine name before
+readback. Directory identity and durability are rechecked throughout;
+uncertainty is typed `partial`, never readiness. On Windows, the open directory
+handle plus repeated physical-identity checks is the platform-equivalent
+boundary.
+
 The v2 host-init receipt is the first release candidate that carries the
 physical Git postimage. The earlier v1 shape existed only in unpublished local
 0.4.5 test candidates and is deliberately non-authoritative under this
@@ -193,7 +217,7 @@ unbound postimage. Released 0.4.4 issued no host-init receipt.
 |---|---|---|
 | Raw launch tokens necessarily exist in the directly invoked helper environment until consumed or expired. The helper removes them before starting the strict App Server child. Process inspection by the same fully compromised OS account is outside the protection offered here. | `pipeline-core` security maintainers | 2026-10-31 |
 | Directory durability has platform-specific limits already represented by the private-state assurance layer; unsupported assurance never becomes a strong success claim. | `pipeline-core` runtime maintainers | 2026-10-31 |
-| The Bash exemption recognizes only exact plugin-local remediation command shapes. Novel legitimate recovery commands remain blocked and require a reviewed lifecycle change or manual PO execution rather than a broad shell bypass. | `pipeline-core` guardrail maintainers | 2026-10-31 |
+| The Bash exemption recognizes only exact plugin-local remediation command shapes, including the four reviewed V4 recovery/validation shapes above. Novel legitimate recovery commands remain blocked and require a reviewed lifecycle change or manual PO execution rather than a broad shell bypass. | `pipeline-core` guardrail maintainers | 2026-10-31 |
 | The Push-Gate accepts the documented override prefix only when its assignment is a literal shell value. Dynamic Bash or PowerShell assignment forms remain part of the raw command and fail the one-standalone-command parser, preventing command substitution from piggybacking on an approved push. | `pipeline-core` guardrail maintainers | 2026-10-31 |
 | One fresh host initialization retains five small writer-owned transaction captures below private `.claude/.runtime/agent-pipeline/.host-init-quarantine-*` directories. They are non-authoritative and avoid an ungrounded inode-safe deletion claim; bounded garbage collection requires a future native identity-bound host primitive. | `pipeline-core` runtime maintainers | 2026-10-31 |
 

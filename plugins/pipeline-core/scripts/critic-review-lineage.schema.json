@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.critic-review-lineage.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "reviewId", "parentReviewId", "candidate", "diff", "references", "packages", "coverage", "request", "lane", "verdict", "findings", "correction", "invalidation", "course", "previousSha256", "recordSha256"],
+  "properties": {
+    "schema": {"const": "pipeline.critic-review-lineage.v1"},
+    "reviewId": {"type": "string"}, "parentReviewId": {"type": ["string", "null"]},
+    "candidate": {"$ref": "#/$defs/candidate"},
+    "diff": {"type": "object", "additionalProperties": false, "required": ["sha256", "paths"], "properties": {"sha256": {"$ref": "#/$defs/digest"}, "paths": {"$ref": "#/$defs/paths"}}},
+    "references": {"type": "object", "additionalProperties": false, "required": ["packetSha256", "requestSha256", "diffPathsSha256", "governanceSha256"], "properties": {"packetSha256": {"$ref": "#/$defs/digest"}, "requestSha256": {"$ref": "#/$defs/digest"}, "diffPathsSha256": {"$ref": "#/$defs/digest"}, "governanceSha256": {"$ref": "#/$defs/digest"}}},
+    "packages": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "subjectSha256"], "properties": {"id": {"type": "string"}, "subjectSha256": {"$ref": "#/$defs/digest"}}}},
+    "coverage": {"type": "object", "additionalProperties": false, "required": ["paths", "acceptanceIds", "integrationEdges", "complete"], "properties": {"paths": {"$ref": "#/$defs/paths"}, "acceptanceIds": {"type": "array", "items": {"type": "string"}}, "integrationEdges": {"type": "array", "items": {"type": "string"}}, "complete": {"const": true}}},
+    "request": {"type": "object", "additionalProperties": false, "required": ["packetId", "requestSha256", "compiledSha256"], "properties": {"packetId": {"type": "string", "pattern": "^[a-f0-9]{32}$"}, "requestSha256": {"$ref": "#/$defs/digest"}, "compiledSha256": {"$ref": "#/$defs/digest"}}},
+    "lane": {"type": "object", "additionalProperties": false, "required": ["laneId", "independent", "evidenceSha256", "freshFromReviewId"], "properties": {"laneId": {"type": "string"}, "independent": {"const": true}, "evidenceSha256": {"$ref": "#/$defs/digest"}, "freshFromReviewId": {"type": ["string", "null"]}}},
+    "verdict": {"type": "object", "additionalProperties": false, "required": ["status", "schemaValid", "resultSha256", "failure"], "properties": {"status": {"enum": ["pending", "no-findings", "findings", "invalid"]}, "schemaValid": {"type": "boolean"}, "resultSha256": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]}, "failure": {"enum": [null, "transport", "parse", "truncated", "infrastructure"]}}},
+    "findings": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "status", "evidenceSha256", "priorFindingId"], "properties": {"id": {"type": "string"}, "status": {"enum": ["open", "fixed", "withdrawn", "superseded"]}, "evidenceSha256": {"$ref": "#/$defs/digest"}, "priorFindingId": {"type": ["string", "null"]}}}},
+    "correction": {"anyOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["commit", "deltaSha256", "impactSha256"], "properties": {"commit": {"$ref": "#/$defs/oid"}, "deltaSha256": {"$ref": "#/$defs/digest"}, "impactSha256": {"$ref": "#/$defs/digest"}}}]},
+    "invalidation": {"type": "object", "additionalProperties": false, "required": ["kind", "evidenceSha256"], "properties": {"kind": {"enum": ["none", "full-review-required"]}, "evidenceSha256": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]}}},
+    "course": {"type": "object", "additionalProperties": false, "required": ["round", "correctionCommits", "mode", "code", "outcome"], "properties": {"round": {"type": "integer", "minimum": 1}, "correctionCommits": {"type": "integer", "minimum": 0}, "mode": {"enum": ["full", "delta", "none"]}, "code": {"type": "string"}, "outcome": {"enum": ["admitted", "po-course-gate"]}}},
+    "previousSha256": {"anyOf": [{"$ref": "#/$defs/digest"}, {"type": "null"}]},
+    "recordSha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "oid": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"},
+    "candidate": {"type": "object", "additionalProperties": false, "required": ["base", "commit", "tree"], "properties": {"base": {"$ref": "#/$defs/oid"}, "commit": {"$ref": "#/$defs/oid"}, "tree": {"$ref": "#/$defs/oid"}}},
+    "paths": {"type": "array", "items": {"type": "string", "pattern": "^(?!/)(?!.*\\\\)[A-Za-z0-9._/-]{1,240}$"}}
+  }
+}

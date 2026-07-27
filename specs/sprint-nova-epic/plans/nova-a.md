@@ -1,0 +1,253 @@
+# Nova A plan — Foundation and Reliability
+
+## Entry gate
+
+- PRD approval and the later technical Spec/readiness approval are both
+  durably recorded.
+- Branch remains `feat/sprint-nova-codex` at the approved base or an explicitly
+  accepted descendant.
+- The package has exact Nova write paths/resources and does not share a
+  physical workspace or global runtime resource concurrently with Cyborg.
+- Implementation is dispatched to a fresh Goldfish; the Elephant does not
+  implement production code.
+
+## Design D0 — Boundary freeze and test inventory
+
+**Outcome:** before the technical Spec/readiness gate, turn the approved PRD
+into exact package briefs, filenames, producers/consumers, state/projection
+tables, path/resource ownership, schema names, digest rules, test commands and
+ADR decisions.
+
+**Deliverables:**
+
+- source/test path manifest;
+- schema/version registry;
+- focused test inventory;
+- Nova physical-resource check and later-integration collision inventory;
+- ADR reservation for foundational decisions; and
+- readiness report.
+
+**Stop:** any unresolved frozen-schema edit, shared-path conflict or missing
+acceptance mapping.
+
+## Slice A1 — Canonical delivery/status reconciliation
+
+**Issue:** `#57`
+
+**Outcome:** one sanctioned, append-only, idempotent Spec-to-delivery-to-backlog
+transition path and byte-bound parallel-runner snapshot.
+
+**Order:**
+
+1. delivery binding and generic item-initialization contracts;
+2. preview/CAS/authority and collision checks;
+3. atomic item/ledger/index/STATUS writer transaction;
+4. interruption recovery and exact readback;
+5. append-only evidence repair for events 39/40; and
+6. create/read back the canonical #57 item through the new initializer.
+
+**DoD:**
+
+- NVA-A57 criteria pass;
+- the default backlog checker is green;
+- no prior ledger event byte changed; and
+- Nova/Cyborg snapshots bind identical canonical content while authority
+  remains singular.
+
+## Slice A2 — Capability and selected-sandbox foundation
+
+**Issues:** `#7`, `#29`
+
+**Outcome:** one runner-capability report contract and one fingerprinted,
+no-repeat selected-sandbox disposition used by deterministic fixtures.
+
+**Order:**
+
+1. capability schema/validator and synthetic runner fixtures;
+2. selected-sandbox fingerprint/disposition;
+3. nonce-bound positive selected-child receipt plus no-child/wrong-child/
+   replay negative corpus;
+4. invalidation/force-reprobe and assurance projection;
+5. integrate sandbox cases into conformance; and
+6. focused privacy/fuzz tests.
+
+**DoD:**
+
+- NVA-A7 and NVA-A29 criteria pass;
+- no native success is inferred from CAS health or fallback;
+- terminal probe repeats are prevented per fingerprint; and
+- no shared Verify registration yet.
+
+## Slice A3 — Invocation reliability
+
+**Issue:** `#38`
+
+**Outcome:** closed invocation/preflight/attempt contracts plus session-scoped
+one-probe resolution memory.
+
+**Order:**
+
+1. invocation contract registry;
+2. request builder and chain validator;
+3. attempt/failure taxonomy;
+4. atomic session resolution memory;
+5. recurrence summary and remediation candidate; and
+6. privacy/cardinality/property tests.
+
+**DoD:**
+
+- corrected, unchanged-invalid, unavailable, denied, transient, malformed and
+  internal-failure histories reconcile exactly;
+- concurrent duplicate probes are prevented;
+- no workaround becomes authority; and
+- `pipeline.dispatch-provenance` is mapped but not closed without evidence.
+
+## Slice A4 — Execution contract and scheduling lifecycle
+
+**Issues:** `#14`, `#12`
+
+**Outcome:** a versioned execution-plane companion and deterministic
+planner-to-executor handoff without worker launch.
+
+**Order:**
+
+1. execution request/state/cancel/result schemas;
+2. synthetic adapter and outcome normalization;
+3. planner receipt binding and lifecycle replan;
+4. immutable in-process fixture consumer from ADR-0044; and
+5. stale/replay/cancel/failure tests.
+
+**DoD:**
+
+- frozen exchange and planner algorithm stay unchanged;
+- every handoff binds authority/candidate/dispatch;
+- no execution/provider/state store is hidden in the planner; and
+- all false-success negative cases pass.
+
+## Slice A5 — Critic convergence
+
+**Issue:** `#54`
+
+**Dependencies:** accepted A2 and A3 contracts.
+
+**Outcome:** preflight-valid Critic requests, complete first-pass coverage and
+bounded delta review lineages.
+
+**Order:**
+
+1. request compiler/admission;
+2. coverage and verdict contracts;
+3. finding lineage;
+4. delta/impact invalidation;
+5. hard review/correction course budgets; and
+6. reconciliation fixtures for the named backlog items.
+
+**DoD:**
+
+- valid `No findings` is distinct from every transport/failure class;
+- fresh Critic independence remains unchanged;
+- broad rerun requires typed invalidation; and
+- budget exhaustion stops at a PO gate.
+
+## Slice A6 — Benchmark and release preflight
+
+**Issues:** `#8`, `#56`
+
+**Outcome:** freeze reproducible scoring and detect deterministic release gaps
+before final gates.
+
+**Order:**
+
+1. fixture/task/scoring schema;
+2. serial and runner-native benchmark baselines;
+3. stage/usage/intervention reporting;
+4. release-preflight local contract;
+5. GG-03, documentation, retention and version fixtures; and
+6. Cyborg extension registration boundary.
+
+**DoD:**
+
+- unknown usage remains unknown;
+- no universal performance claim is made;
+- preflight `ready` is not a final gate pass; and
+- Cyborg output is neither guessed nor imported.
+
+**Compatibility and rollout:** `pipeline.multi-cli-benchmark.v1` is a new,
+unmerged Nova-A contract. The in-repository compiler and its focused suite are
+the only current consumers; no persisted or published v1 benchmark receipt is
+admitted before the A7 PO gate. The schema and runtime validator ship
+atomically in the same candidate and require the same ordered five-fixture
+structural shape. JSON Schema protects the portable closed shape; the runtime
+remains mandatory for cross-field, ordering and envelope semantics that JSON
+Schema cannot express alone, before recommendation or persistence.
+Existing serial execution remains the unchanged baseline and receives no
+benchmark record. A later external consumer must bind all five fixtures and
+use the closed v1 schema; a format change requires a new version, not a v1
+relaxation. Rollback is the A6/A7 forward-revert path below.
+
+## Slice A7 — Nova A integration and gate
+
+**Outcome:** one candidate-bound Nova A Result.
+
+**Shared later-integration resources:** central Verify registration, ADR
+register, state/history and any post-V3 generated projections. Nova may change
+its own branch; possible Cyborg merge collisions are recorded for the separate
+post-Sprint integration lifecycle.
+
+**Checks:**
+
+- focused suites;
+- `git diff --check`;
+- one configured Full Verify;
+- Security;
+- fresh high-risk Critic;
+- default-green backlog readback and per-item reconciliation preview; and
+- exact tested product candidate/tree and evidence-manifest Result;
+- gate-only `E1` increment receipt and independent readback; and
+- gate-only `E2` PO activation record with structurally validated ancestry.
+
+**Stop:** any missing criterion, unresolved Critic finding, shared-path drift,
+or candidate mismatch. Nova B does not start until the PO accepts this Result.
+The receipt never binds its own file or enclosing commit; the readback binds
+`E1`, and Nova B separates the accepted product candidate from the validated
+gate-only continuation head.
+
+**Rollback:** Before PO acceptance, abandon the candidate and create an
+ordinary forward revert commit for the affected Nova slice; do not rewrite the
+branch or ledger history. If an `E1` evidence commit already exists, invalidate
+its receipt through a new gate-only evidence record before reverting code.
+`E2`/PO activation is never manufactured as rollback. The TP-3 registration,
+capability inventory and operational-state exception revert together with the
+associated Nova contract commit; a subsequent candidate reruns Verify,
+Security and Critic from the new exact tree. No production flag, migration or
+remote state is introduced by Nova A.
+
+### PO-directed A7 integration exception — 2026-07-25
+
+The Product Owner explicitly directed that the repository operational state
+remain current during Nova implementation and authorized the one-time TP-3
+Verify registration. Registering the completed focused suites makes
+`docs/product-capability-inventory.json` fail closed unless it inventories the
+same 13 Verify surfaces. The operational handover in `docs/state.md` must then
+record the actual A7/gate status rather than leave an obsolete unregistered
+state.
+
+These two documentation updates are therefore a narrow, reviewed integration
+exception to the A7 exact-path table: they neither alter a Nova contract nor
+claim gate/PO completion. They are limited to the exact Verify surfaces and
+the Nova handover paragraph, were added only after the TP-3 action, and require
+the complete candidate Verify/Security/Critic tail. They are recorded here for
+the separate Spec-gate collision review; no Nova B activation or Result
+acceptance is implied.
+
+### PO-directed A7 Gitleaks scope reconciliation — 2026-07-25
+
+The Product Owner authorized the already-required remediation of the fourteen
+candidate-tree Gitleaks false positives only on `.gitleaksignore`,
+`harness/scripts/security-adapters/gitleaks.mjs`, and
+`harness/scripts/security-scan.test.mjs`. This records the narrow
+cross-Sprint collision reconciliation for the historical scanner surface: it
+does not weaken scanner semantics, skip Security, add a path/rule-wide
+allowance, or authorize further security files. The resulting repair remains
+part of the product candidate and requires a fresh Verify/Security/Critic tail
+before any A7 receipt or Nova B activation.

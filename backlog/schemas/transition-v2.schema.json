@@ -1,0 +1,168 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.backlog-transition.v2",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "sequence",
+    "id",
+    "from",
+    "to",
+    "at",
+    "actor",
+    "reason",
+    "evidence",
+    "previousHash",
+    "entryHash"
+  ],
+  "properties": {
+    "schema": { "const": "pipeline.backlog-transition.v2" },
+    "sequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+    },
+    "from": {
+      "oneOf": [
+        { "type": "null" },
+        { "enum": ["open", "in_progress", "closed"] }
+      ]
+    },
+    "to": { "enum": ["open", "in_progress", "closed"] },
+    "at": { "type": "string", "format": "date" },
+    "actor": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128,
+      "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$"
+    },
+    "reason": { "type": "string", "minLength": 1, "maxLength": 512, "pattern": "\\S" },
+    "evidence": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "schema",
+            "kind",
+            "targetSequence",
+            "targetEntryHash",
+            "targetCommit",
+            "replacementCommit",
+            "reference",
+            "dispositionSha256",
+            "idempotencyKey"
+          ],
+          "properties": {
+            "schema": { "const": "pipeline.backlog-evidence-amendment.v1" },
+            "kind": { "const": "evidence-amendment" },
+            "targetSequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+            "targetEntryHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "targetCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+            "replacementCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+            "reference": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^(?!/)(?!.*\\\\)(?!.*//)(?!.*\\/$)(?!\\.{1,2}$)(?!\\.{1,2}/)(?!.*/\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
+            },
+            "dispositionSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+            "idempotencyKey": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "commit", "reference"],
+          "properties": {
+            "kind": {
+              "type": "string",
+              "minLength": 1,
+              "not": { "const": "evidence-amendment" }
+            },
+            "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+            "reference": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^(?!/)(?!.*\\\\)(?!.*//)(?!.*\\/$)(?!\\.{1,2}$)(?!\\.{1,2}/)(?!.*/\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
+            },
+            "legacyStatus": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "previousHash": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      ]
+    },
+    "entryHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  },
+  "oneOf": [
+    {
+      "properties": {
+        "from": { "const": null },
+        "to": { "const": "open" },
+        "evidence": {
+          "properties": { "kind": { "not": { "const": "evidence-amendment" } } },
+          "required": ["kind"]
+        }
+      }
+    },
+    {
+      "properties": {
+        "from": { "const": "open" },
+        "to": { "const": "in_progress" },
+        "evidence": {
+          "properties": { "kind": { "not": { "const": "evidence-amendment" } } },
+          "required": ["kind"]
+        }
+      }
+    },
+    {
+      "properties": {
+        "from": { "const": "in_progress" },
+        "to": { "const": "closed" },
+        "evidence": {
+          "properties": { "kind": { "not": { "const": "evidence-amendment" } } },
+          "required": ["kind"]
+        }
+      }
+    },
+    {
+      "properties": {
+        "from": { "const": "open" },
+        "to": { "const": "open" },
+        "evidence": {
+          "properties": { "kind": { "const": "evidence-amendment" } },
+          "required": ["kind"]
+        }
+      }
+    },
+    {
+      "properties": {
+        "from": { "const": "in_progress" },
+        "to": { "const": "in_progress" },
+        "evidence": {
+          "properties": { "kind": { "const": "evidence-amendment" } },
+          "required": ["kind"]
+        }
+      }
+    },
+    {
+      "properties": {
+        "from": { "const": "closed" },
+        "to": { "const": "closed" },
+        "evidence": {
+          "properties": { "kind": { "const": "evidence-amendment" } },
+          "required": ["kind"]
+        }
+      }
+    }
+  ]
+}

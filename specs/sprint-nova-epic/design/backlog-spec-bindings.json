@@ -1,0 +1,139 @@
+{
+  "schema": "pipeline.backlog-spec-binding.v1",
+  "featureId": "sprint-nova-epic",
+  "specification": {
+    "path": "specs/sprint-nova-epic/spec.md",
+    "sha256": "cacf045a9d849b52d0a7958bf2923a1d9f8f08e4f0efdc97de413a0f0e0634d5"
+  },
+  "backlogSnapshot": {
+    "commit": "5ca5a4b292a267ffdfcc52577fda0a0593957a65",
+    "subtree": "832bf98e22e9a147dad88c952c0b794f3ee44fe7",
+    "transitionHead": "36dd616d3aa5bc21e49e138f6b8a9a17a9de25321998304306e4fa47289de562",
+    "indexSha256": "a81a976e35eddd16efc31620b1d79b2c9d43600b16a3f695ea31c7879ec79e3d",
+    "statusSha256": "7cb91d921d23f16b9cb0dee24b223feeb4c2bd5ac47ec3c42c82642af35d6cb4",
+    "transitionsSha256": "5cc9a6d23740c45f5b7ee5c762f5fedbfa6fe627e83a98cdf93db430cf899b6d"
+  },
+  "bindings": [
+    {
+      "id": "pipeline.backlog-delivery-status-reconciliation",
+      "issue": 57,
+      "increment": "A",
+      "acceptanceIds": ["NVA-A57-1", "NVA-A57-2", "NVA-A57-3", "NVA-A57-4", "NVA-A57-5", "NVA-A57-6"],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.closed-input-channel-review-economics",
+      "issue": 54,
+      "increment": "A",
+      "acceptanceIds": ["NVA-A54-1", "NVA-A54-2", "NVA-A54-4", "NVA-A54-7"],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "revalidate:2026-08-17"
+    },
+    {
+      "id": "pipeline.codex-plugin-validator-host-parity",
+      "issue": 7,
+      "increment": "A",
+      "acceptanceIds": ["NVA-A7-1", "NVA-A7-2", "NVA-A7-3", "NVA-A7-4", "NVA-A7-5"],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.codex-sandbox-critic-longterm",
+      "issue": 29,
+      "increment": "A",
+      "acceptanceIds": ["NVA-A29-1", "NVA-A29-2", "NVA-A29-3", "NVA-A29-4", "NVA-A29-5", "NVA-A29-6"],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.evidence-bound-review-retry-economics",
+      "issue": 54,
+      "increment": "A",
+      "acceptanceIds": ["NVA-A54-3", "NVA-A54-4", "NVA-A54-5", "NVA-A54-6", "NVA-A54-7"],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "revalidate:2026-08-10"
+    },
+    {
+      "id": "pipeline.execution-model-switchback",
+      "issue": 38,
+      "increment": "A",
+      "acceptanceIds": ["NVA-A7-1", "NVA-A7-2", "NVA-A7-3", "NVA-A7-4", "NVA-A7-5", "NVA-A38-1", "NVA-A38-2", "NVA-A38-3", "NVA-A38-4", "NVA-A38-5", "NVA-A38-6"],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.multi-cli-efficiency-pilots",
+      "issue": 8,
+      "increment": "A",
+      "acceptanceIds": ["NVA-A8-1", "NVA-A8-2", "NVA-A8-3", "NVA-A8-4", "NVA-A8-5"],
+      "closureMode": "separate-pilot-required",
+      "expiryDisposition": "revalidate:2026-08-17"
+    },
+    {
+      "id": "pipeline.t1-governance-path-preflight",
+      "issue": 56,
+      "increment": "A",
+      "acceptanceIds": ["NVA-A54-1", "NVA-A54-2", "NVA-A54-7", "NVA-A56-1", "NVA-A56-2", "NVA-A56-3", "NVA-A56-4", "NVA-A56-5", "NVA-A56-6"],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.afk-assumption-mode",
+      "issue": 16,
+      "increment": "B",
+      "acceptanceIds": ["NVA-B16-1", "NVA-B16-2", "NVA-B16-3", "NVA-B16-4", "NVA-B16-5"],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.canonical-worktree-lifecycle",
+      "issue": 21,
+      "increment": "B",
+      "acceptanceIds": ["NVA-B21-4", "NVA-B21-5", "NVA-B21-6", "NVA-B21-7"],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.nonblocking-interaction-continuity",
+      "issue": 49,
+      "increment": "B",
+      "acceptanceIds": ["NVA-B21-4", "NVA-B49-2", "NVA-B49-8"],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.po-gate-worktree-authority",
+      "issue": 21,
+      "increment": "B",
+      "acceptanceIds": ["NVA-B21-2", "NVA-B21-3", "NVA-B21-7"],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.project-scoped-github-issue-operations",
+      "issue": 51,
+      "increment": "B",
+      "acceptanceIds": ["NVA-B51-1", "NVA-B51-2", "NVA-B51-3", "NVA-B51-4", "NVA-B51-5", "NVA-B51-6", "NVA-B51-7"],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "revalidate:2026-08-17"
+    },
+    {
+      "id": "pipeline.session-keep-awake",
+      "issue": 49,
+      "increment": "B",
+      "acceptanceIds": ["NVA-B49-1", "NVA-B49-2", "NVA-B49-4", "NVA-B49-5", "NVA-B49-7"],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.v4-recovery-deadlock-correction",
+      "issue": 63,
+      "increment": "B",
+      "acceptanceIds": ["NVA-B63-1", "NVA-B63-10", "NVA-B63-11", "NVA-B63-12", "NVA-B63-13", "NVA-B63-14", "NVA-B63-15", "NVA-B63-2", "NVA-B63-3", "NVA-B63-4", "NVA-B63-5", "NVA-B63-6", "NVA-B63-7", "NVA-B63-8", "NVA-B63-9"],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    }
+  ],
+  "recordSha256": "02a5d2738794f2060a859b2841aa1bdb0eb3e630782e62fd85f4f100cd6424b2"
+}

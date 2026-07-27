@@ -1,0 +1,46 @@
+{
+  "schema": "pipeline.nova-design-baseline.v1",
+  "observedAt": "2026-07-24T18:11:33Z",
+  "repository": "agent-pipe-shared/agent-pipeline",
+  "release": {
+    "tag": "v0.4.1",
+    "publishedAt": "2026-07-24T17:37:25Z",
+    "draft": false,
+    "prerelease": false,
+    "commit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
+    "tree": "ec4fcf2e84b15a580dbc13d98198204e8cfca429"
+  },
+  "branch": {
+    "name": "feat/sprint-nova-codex",
+    "upstream": null,
+    "baseTag": "v0.4.1",
+    "baseCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb"
+  },
+  "issues": {
+    "nova": {
+      "label": "sprint:nova",
+      "state": "OPEN",
+      "numbers": [7, 8, 12, 14, 15, 16, 18, 21, 29, 38, 49, 51, 54, 56]
+    },
+    "cyborg": {
+      "label": "sprint:cyborg",
+      "state": "OPEN",
+      "numbers": [39, 41, 42, 43, 44, 45, 46, 47, 48]
+    }
+  },
+  "backlog": {
+    "open": 30,
+    "inProgress": 3,
+    "closed": 2,
+    "total": 35
+  },
+  "advisor": {
+    "bootstrapStatusSha256": "d75e3fc0d4c9fdbd507e68aae425f6f4380f99375fc11b2942fbf57d899b095b",
+    "assurance": "host-bound-consult; no attested selected-sandbox execution; OS isolation and model identity are not asserted"
+  },
+  "mutations": {
+    "github": false,
+    "backlog": false,
+    "productionImplementation": false
+  }
+}

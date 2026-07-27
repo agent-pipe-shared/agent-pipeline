@@ -28,6 +28,7 @@ import {
 
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
+const V3_BOOTSTRAP_AUTHORITY_SCRIPT = fileURLToPath(new URL("../scripts/v3-bootstrap-authority.mjs", import.meta.url));
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 
@@ -418,7 +419,23 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const hostApply = `node '${HOST_REPOSITORY_INIT_SCRIPT}' apply --root '${path}' --plan-sha256 ${"b".repeat(64)} --activate`;
     const kickoffPlan = `node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --goal 'Build one HTML game'`;
     const kickoffApply = `node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --goal 'Build one HTML game' --plan-sha256 ${"c".repeat(64)} --activate`;
-    for (const command of [inspect, apply, preflight, hostPlan, hostApply, kickoffPlan, kickoffApply]) {
+    const sourceRecovery = `node '${ONBOARDING_SCRIPT}' plan-source-recovery --root '${path}'`;
+    const manifestPlan = `node '${ONBOARDING_SCRIPT}' plan-manifest-repair --root '${path}'`;
+    const manifestApply = `node '${ONBOARDING_SCRIPT}' apply-manifest-repair --root '${path}' --plan-sha256 ${"d".repeat(64)} --activate`;
+    const v3Authority = `node '${V3_BOOTSTRAP_AUTHORITY_SCRIPT}' --root '${path}'`;
+    for (const command of [
+      inspect,
+      apply,
+      preflight,
+      hostPlan,
+      hostApply,
+      kickoffPlan,
+      kickoffApply,
+      sourceRecovery,
+      manifestPlan,
+      manifestApply,
+      v3Authority,
+    ]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
       assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
         projectDir: path,
@@ -435,6 +452,15 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
       `node '${ONBOARDING_SCRIPT}' plan-kickoff --root '${path}' --goal 'Build one HTML game'`,
       `node '${ONBOARDING_SCRIPT}' plan --root '${path}' --goal 'Build one HTML game'`,
       `node '${ONBOARDING_SCRIPT}' kickoff --root '${path}' --goal 'Build one HTML game'`,
+      `node '${ONBOARDING_SCRIPT}' apply-manifest-repair --root '${path}' --activate`,
+      `node '${ONBOARDING_SCRIPT}' apply-manifest-repair --root '${path}' --plan-sha256 ${"d".repeat(64)}`,
+      `node '${ONBOARDING_SCRIPT}' apply-manifest-repair --root /tmp/other --plan-sha256 ${"d".repeat(64)} --activate`,
+      `${manifestApply} && touch bypass`,
+      `${manifestApply} $(touch bypass)`,
+      `${manifestApply} \`touch bypass\``,
+      `node '${V3_BOOTSTRAP_AUTHORITY_SCRIPT}' --root /tmp/other`,
+      `node '${V3_BOOTSTRAP_AUTHORITY_SCRIPT}' --root '${path}' --extra`,
+      `${v3Authority}; touch bypass`,
       `node -e 'require("node:fs").writeFileSync("bypass","x")'`,
     ]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), false, command);

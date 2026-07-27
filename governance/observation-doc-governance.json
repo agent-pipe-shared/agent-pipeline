@@ -106,6 +106,7 @@
           "docs/contributor-gate-security.md",
           "docs/critic-isolation-threat-model.md",
           "docs/github-actions-token-permissions.md",
+          "docs/local-supervisor-state-threat-model.md",
           "docs/marketplace-supply-chain-threat-model.md",
           "docs/next-session-setup-prompt.md",
           "docs/release-0.4-readiness.md",
@@ -168,6 +169,8 @@
           "docs/adr/0044-control-execution-boundary.md",
           "docs/adr/0045-canonical-artifact-topology.md",
           "docs/adr/0046-project-authority-layering.md",
+          "docs/adr/0047-local-supervisor-state-authority.md",
+          "docs/adr/0048-local-goldfish-supervisor.md",
           "docs/adr/README.md"
         ]
       },
