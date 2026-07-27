@@ -81,3 +81,11 @@ That renewed dispatch restored the rules without a code commit after the
 repository topology validator exposed stale authority digests in the existing
 Phoenix draft lifecycle manifest. The pending worktree remains subject to a
 separate exact PO disposition for that manifest reconciliation.
+
+The PO subsequently authorized PHX-0A to include that manifest and reconcile
+only its stale PRD, Spec, acceptance, and architecture digests through the new
+writer's preview → exact PO-bound apply → readback path. After the revised
+Plan/Spec gate was renewed, this same session exception reactivated only
+TP-1, TP-3, and TP-5 for the single Goldfish completion dispatch. It remains
+limited to the listed writer/topology/test work and must again be restored
+before any independent review, aggregate final gate, or remote action.
