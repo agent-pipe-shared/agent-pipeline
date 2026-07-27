@@ -711,3 +711,12 @@ This is only the B5 candidate assembly record. B2-I, B3-I, live B4 and B6
 remain separate gates; in particular this record does not claim native Apple
 Silicon execution, an independent final Critic, PO close, Issue closure,
 merge, push or release.
+
+## 2026-07-27 — B5 freeze rebind after local contract completion
+
+The preceding B5 freeze is superseded only as to its candidate identity. The
+closed freeze/manifest contracts and their registered Full Verify suite are
+implemented in candidate `f365a09ced53b82ea01afc40e75a555e71248a71`
+(`d43e621484ec81b83ea59faef94ea7eae4d81db1`), whose Full Verify and Security
+evidence are both exact and green. All B2-I, B3-I, live B4 and B6 boundaries
+remain unchanged and pending.

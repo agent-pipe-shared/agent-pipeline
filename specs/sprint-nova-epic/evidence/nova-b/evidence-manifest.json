@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.nova-b5-evidence-manifest.v1",
   "candidate": {
-    "commit": "8f765eeec163d12b4142eabc60ddcef384780354",
-    "tree": "4ee64595d6b3e5915d664648be4557e0dfd185cb"
+    "commit": "f365a09ced53b82ea01afc40e75a555e71248a71",
+    "tree": "d43e621484ec81b83ea59faef94ea7eae4d81db1"
   },
   "sources": [
     {
@@ -23,17 +23,17 @@
     },
     {
       "path": "specs/sprint-nova-epic/evidence/nova-b/candidate-freeze.json",
-      "sha256": "02f78ceb57dddbc15ba9ae390d0230d26e4817a40ff0cd7116c0f66d176c36a7"
+      "sha256": "3699e2e25c5daa09f688ba5e86851ae9b6da1d5abacbb4382b46cb34b53503f1"
     },
     {
       "path": "specs/sprint-nova-epic/evidence/nova-b/security.json",
-      "sha256": "310f818fa1681a7facd0964c57fd627d95fd51f24ec1d34fb483ecd7cf0ef66f"
+      "sha256": "753955f2f5f13e105e0f42e2fdd6891df68e77c2e252efc2361090f5ac9c4ad6"
     },
     {
       "path": "specs/sprint-nova-epic/evidence/nova-b/verify.json",
-      "sha256": "b6ef6512df9d35cf426c7c7da3159173dfc5ecfe28b86b0474bd97ad801dfd32"
+      "sha256": "2d1848b76981d873d21a201b8262d00e03553a82641d90d0a8e2408a44f72578"
     }
   ],
   "scope": "candidate-freeze-only; native Apple Silicon, independent Critic and PO close remain pending",
-  "recordSha256": "b88a1b4723fb6743e9055904eefab9df67c3ebb89b685068b147c10cbf9a83bf"
+  "recordSha256": "f05905efc610e74850b98271688bc2f464d745d5a948aed707f03c0327e3aa3f"
 }

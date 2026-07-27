@@ -2,15 +2,15 @@
   "schema": "pipeline.security-evidence.v1",
   "project": "agent-pipeline",
   "command": "node harness/scripts/security-scan.mjs",
-  "commit": "8f765eeec163d12b4142eabc60ddcef384780354",
+  "commit": "f365a09ced53b82ea01afc40e75a555e71248a71",
   "candidate": {
     "status": "clean",
-    "commit": "8f765eeec163d12b4142eabc60ddcef384780354",
-    "tree": "4ee64595d6b3e5915d664648be4557e0dfd185cb",
-    "inputSha256": "b2d835cb4eb12576bac7efbe2430cb869e4b08a5f2b16ae4c61408c070993dd2",
+    "commit": "f365a09ced53b82ea01afc40e75a555e71248a71",
+    "tree": "d43e621484ec81b83ea59faef94ea7eae4d81db1",
+    "inputSha256": "45817848e75f4c9fb11d8e978f348c904e112d73877f85c57484e2b3310b80d0",
     "repositorySha256": "b6137fe69f388c729e9c782159a75c7f1dbf9e3749281fda9f840031e72dfa85",
     "inventory": {
-      "entries": 936,
+      "entries": 944,
       "symlinkPolicy": "reject",
       "submodulePolicy": "reject"
     },
@@ -20,7 +20,7 @@
       "verifiedBeforeAfter": true
     }
   },
-  "finishedAt": "2026-07-27T12:18:56.704Z",
+  "finishedAt": "2026-07-27T12:40:26.491Z",
   "thresholds": {
     "block_on": [
       "critical",
@@ -100,6 +100,5 @@
   ],
   "findings": [],
   "exitCode": 0,
-  "payloadSha256": "5c003ce78e331f24a9524f1ce1b3341c3d3abedc42bf42ee1167bd36a05c636f"
+  "payloadSha256": "dd5285a424800e7afd9f9050f1d07ac416741006061421177c555d2fc385d2c6"
 }
-

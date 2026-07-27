@@ -1,8 +1,8 @@
 {
   "schema": "pipeline.nova-b5-candidate-freeze.v1",
   "candidate": {
-    "commit": "8f765eeec163d12b4142eabc60ddcef384780354",
-    "tree": "4ee64595d6b3e5915d664648be4557e0dfd185cb",
+    "commit": "f365a09ced53b82ea01afc40e75a555e71248a71",
+    "tree": "d43e621484ec81b83ea59faef94ea7eae4d81db1",
     "branch": "feat/sprint-nova-codex-v046"
   },
   "base": {
@@ -24,13 +24,13 @@
   "gates": {
     "verify": {
       "path": "specs/sprint-nova-epic/evidence/nova-b/verify.json",
-      "sha256": "b6ef6512df9d35cf426c7c7da3159173dfc5ecfe28b86b0474bd97ad801dfd32",
+      "sha256": "2d1848b76981d873d21a201b8262d00e03553a82641d90d0a8e2408a44f72578",
       "exitCode": 0,
       "binding": "exact-clean-candidate"
     },
     "security": {
       "path": "specs/sprint-nova-epic/evidence/nova-b/security.json",
-      "sha256": "310f818fa1681a7facd0964c57fd627d95fd51f24ec1d34fb483ecd7cf0ef66f",
+      "sha256": "753955f2f5f13e105e0f42e2fdd6891df68e77c2e252efc2361090f5ac9c4ad6",
       "exitCode": 0,
       "binding": "clean-exact-candidate"
     }
@@ -42,5 +42,5 @@
     "B6 native Apple Silicon lifecycle, Critic and PO close"
   ],
   "status": "frozen-awaiting-external-native-gates",
-  "recordSha256": "149a3e0342581b4d9496b6c286c584bc73f8dfe7abab539782ae116d103d375d"
+  "recordSha256": "6b7c2eff10e4cbc7af9a415f045909fac5d0623eac5db39ae83a8407d91d4e85"
 }

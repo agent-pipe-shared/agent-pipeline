@@ -2,22 +2,22 @@
   "schema": "pipeline.verify-evidence.v0",
   "project": "agent-pipeline",
   "command": "node harness/scripts/verify.mjs",
-  "commit": "8f765eeec163d12b4142eabc60ddcef384780354",
-  "tree": "4ee64595d6b3e5915d664648be4557e0dfd185cb",
+  "commit": "f365a09ced53b82ea01afc40e75a555e71248a71",
+  "tree": "d43e621484ec81b83ea59faef94ea7eae4d81db1",
   "candidate": {
     "start": {
       "status": "clean",
-      "commit": "8f765eeec163d12b4142eabc60ddcef384780354",
-      "tree": "4ee64595d6b3e5915d664648be4557e0dfd185cb"
+      "commit": "f365a09ced53b82ea01afc40e75a555e71248a71",
+      "tree": "d43e621484ec81b83ea59faef94ea7eae4d81db1"
     },
     "finish": {
       "status": "clean",
-      "commit": "8f765eeec163d12b4142eabc60ddcef384780354",
-      "tree": "4ee64595d6b3e5915d664648be4557e0dfd185cb"
+      "commit": "f365a09ced53b82ea01afc40e75a555e71248a71",
+      "tree": "d43e621484ec81b83ea59faef94ea7eae4d81db1"
     },
     "binding": "exact"
   },
-  "finishedAt": "2026-07-27T12:18:56.719Z",
+  "finishedAt": "2026-07-27T12:40:26.505Z",
   "steps": [
     {
       "name": "setup-tests",
@@ -704,6 +704,10 @@
       "exitCode": 0
     },
     {
+      "name": "nova-candidate-freeze-tests",
+      "exitCode": 0
+    },
+    {
       "name": "scoped-verify-registration-tests",
       "exitCode": 0
     },
@@ -738,4 +742,3 @@
   ],
   "exitCode": 0
 }
-

@@ -33,7 +33,7 @@
     {
       "class": "result",
       "path": "specs/sprint-nova-epic/result.md",
-      "sha256": "7a28fece79a04edd6e0b1ed116de87d7890e4b491f2dd5d0deb2211b33768649",
+      "sha256": "2e962bc9565c26a18b9c276486a97a3dcb5f8392e95aa79b64a49b7762a0712f",
       "authority": true,
       "mutability": "append-only",
       "retention": "retain"
@@ -225,7 +225,7 @@
     {
       "class": "candidate-evidence",
       "path": "specs/sprint-nova-epic/evidence/nova-b/candidate-freeze.json",
-      "sha256": "2f8c0ed36cda9c9d5d87469cc84e46bc91b2bd8d7c99b2329586318f0f72a273",
+      "sha256": "3699e2e25c5daa09f688ba5e86851ae9b6da1d5abacbb4382b46cb34b53503f1",
       "authority": false,
       "mutability": "immutable",
       "retention": "retain"
@@ -233,7 +233,7 @@
     {
       "class": "candidate-evidence",
       "path": "specs/sprint-nova-epic/evidence/nova-b/evidence-manifest.json",
-      "sha256": "6ef0f344f10dfd5ae274b895a9885013b7e36e1845291a00b9e632186a95fd58",
+      "sha256": "aa2e3ead4724a0af974adefb01cf7a698bb11aa8d28770a22745290b0f7b8f2b",
       "authority": false,
       "mutability": "immutable",
       "retention": "retain"
@@ -241,7 +241,7 @@
     {
       "class": "candidate-evidence",
       "path": "specs/sprint-nova-epic/evidence/nova-b/verify.json",
-      "sha256": "b6ef6512df9d35cf426c7c7da3159173dfc5ecfe28b86b0474bd97ad801dfd32",
+      "sha256": "2d1848b76981d873d21a201b8262d00e03553a82641d90d0a8e2408a44f72578",
       "authority": false,
       "mutability": "immutable",
       "retention": "retain"
@@ -249,15 +249,15 @@
     {
       "class": "candidate-evidence",
       "path": "specs/sprint-nova-epic/evidence/nova-b/security.json",
-      "sha256": "310f818fa1681a7facd0964c57fd627d95fd51f24ec1d34fb483ecd7cf0ef66f",
+      "sha256": "753955f2f5f13e105e0f42e2fdd6891df68e77c2e252efc2361090f5ac9c4ad6",
       "authority": false,
       "mutability": "immutable",
       "retention": "retain"
     }
   ],
   "candidate": {
-    "commit": "8f765eeec163d12b4142eabc60ddcef384780354",
-    "tree": "4ee64595d6b3e5915d664648be4557e0dfd185cb"
+    "commit": "f365a09ced53b82ea01afc40e75a555e71248a71",
+    "tree": "d43e621484ec81b83ea59faef94ea7eae4d81db1"
   },
   "supersedes": null
 }
