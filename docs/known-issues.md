@@ -103,3 +103,8 @@ patch to the writer receipt and `pipeline-state` suite; it does not authorize a
 Gitleaks allowlist expansion, unrelated scanner suppression, or a lifecycle
 manifest change. TP-5 must be restored before the rerun of Security, Verify,
 and independent review.
+
+The bounded writer sanitation patch committed a replay-generated public receipt
+with a compact correlation fingerprint, retained the exact internal authority
+checks, and left the lifecycle manifest unchanged. TP-5 is restored before
+Security and Verify are rerun; no scanner suppression was added.

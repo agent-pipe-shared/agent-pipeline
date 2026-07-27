@@ -19,6 +19,11 @@
       "id": "TP-4",
       "pattern": "plugins/pipeline-core/hooks/hooks\\.json$",
       "reason": "hooks.json wires the guard family itself (git-guard union, E11) — no ad-hoc edits outside a briefed test-change task."
+    },
+    {
+      "id": "TP-5",
+      "pattern": "(?:plugins/pipeline-core/hooks/guard-push|harness/scripts/pipeline-state)\\.test\\.mjs$",
+      "reason": "guard-push test suite gates the release/deploy push-enforcement hook, and pipeline-state test suite gates the deployApprovals state writer (E5/QG-04) — no ad-hoc edits outside a briefed test-change task."
     }
   ]
 }
