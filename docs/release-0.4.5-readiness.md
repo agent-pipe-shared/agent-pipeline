@@ -1,6 +1,10 @@
 # Release 0.4.5
 
-**Status:** local candidate preparation — no push, tag, merge, GitHub Release,
+> **Historical preparation record (superseded).** `v0.4.6` is delivered and
+> closed; the sequence below is retained as provenance only, not current work
+> or authority.
+
+**Historical status:** local candidate preparation — no push, tag, merge, GitHub Release,
 marketplace publication, Issue closure, or remote readback is authorized before
 the final PO push gate.
 

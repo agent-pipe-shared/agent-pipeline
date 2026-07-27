@@ -1,0 +1,15 @@
+{
+  "schema": "pipeline.nova-b2-c.verify-evidence.v1",
+  "candidate": {
+    "commit": "be77f50e44500b4eba5e4c95f2bcb08da773bdc9",
+    "tree": "4777b77e3272db08cb9675a8994916a955ad457d"
+  },
+  "commands": [
+    { "command": "node plugins/pipeline-core/lib/async-execution.test.mjs", "exitCode": 0, "checks": 4 },
+    { "command": "node plugins/pipeline-core/lib/credential-lease.test.mjs", "exitCode": 0, "checks": 4 },
+    { "command": "git diff --check be77f50^..be77f50", "exitCode": 0 },
+    { "command": "node harness/scripts/verify.mjs", "exitCode": 0 }
+  ],
+  "status": "passed",
+  "scope": "B2-C synthetic contracts only; no provider, broker, credential secret, filesystem store or external job was invoked."
+}

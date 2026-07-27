@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
 
 import {
+  EVIDENCE_AMENDMENT_SCHEMA,
   ITEM_SCHEMA,
   PROJECT_CLOSURE_READBACK_SCHEMA,
   TRANSITION_SCHEMA,
+  TRANSITION_V2_SCHEMA,
   canonicalJson,
   parseBacklogItem,
   parseTransitionLedger,
@@ -21,6 +23,7 @@ import {
   projectBacklog,
   renderBacklogItem,
   transitionHash,
+  validateBacklogEvidenceAmendment,
   validateBacklogItem,
   validateProjectClosureReadback,
   validateSentinelRecoveryCatalog,
@@ -44,6 +47,11 @@ import {
 let passed = 0;
 let failed = 0;
 const roots = [];
+const DISPOSITION_BYTES = Buffer.from('{"decision":"approved","kind":"backlog-evidence-repair"}\n', "utf8");
+const DISPOSITION_SHA256 = createHash("sha256").update(DISPOSITION_BYTES).digest("hex");
+const AUTHORITY_VALID = Object.freeze({ ok: true, code: "AUTHORITY:VALID" });
+const AUTHORIZE_AMENDMENT = () => AUTHORITY_VALID;
+const V2_DOMAIN_PREFIX = /^(?:SHAPE|SCHEMA|BOUND|AUTHORITY|CAS|STALE|REPLAY|CONFLICT|UNAVAILABLE|DURABILITY|READBACK|INTERNAL):/u;
 function check(name, condition, detail = "") {
   if (condition) {
     passed += 1;
@@ -75,6 +83,184 @@ function event(overrides = {}) {
   };
   value.entryHash = transitionHash(value);
   return value;
+}
+function v2OperationEvent(overrides = {}) {
+  const value = {
+    schema: TRANSITION_V2_SCHEMA,
+    sequence: 1,
+    id: "pipeline.example",
+    from: null,
+    to: "open",
+    at: "2026-07-24",
+    actor: "nova-reconciliation",
+    reason: "Apply an authorized canonical backlog transition.",
+    evidence: {
+      kind: "nova-reconciliation",
+      commit: "a".repeat(40),
+      reference: "specs/sprint-nova-epic/evidence/backlog/reconciliation.json",
+    },
+    previousHash: null,
+    entryHash: "",
+    ...overrides,
+  };
+  value.entryHash = transitionHash(value);
+  return value;
+}
+function v2AmendmentEvent({ sequence, id, status, target, replacementCommit, previousHash, idempotencyKey, reference }) {
+  const value = {
+    schema: TRANSITION_V2_SCHEMA,
+    sequence,
+    id,
+    from: status,
+    to: status,
+    at: "2026-07-24",
+    actor: "nova-evidence-repair",
+    reason: "Bind reachable replacement evidence without changing backlog status.",
+    evidence: {
+      schema: EVIDENCE_AMENDMENT_SCHEMA,
+      kind: "evidence-amendment",
+      targetSequence: target.sequence,
+      targetEntryHash: target.entryHash,
+      targetCommit: target.evidence.commit,
+      replacementCommit,
+      reference,
+      dispositionSha256: DISPOSITION_SHA256,
+      idempotencyKey,
+    },
+    previousHash,
+    entryHash: "",
+  };
+  value.entryHash = transitionHash(value);
+  return value;
+}
+function mixedTransitionFixture() {
+  const event39Commit = "726b83681abc1b6366333c70a6a401b88016e5d4";
+  const event40Commit = "2ddf3592ea004bd6e2a830a61bb02c931238070f";
+  const progressCommit = "1".repeat(40);
+  const priorClosureCommit = "2".repeat(40);
+  const event39Replacement = "3".repeat(40);
+  const event40Replacement = "4".repeat(40);
+  const afk = item({
+    id: AFK_REPAIR_ID,
+    status: "in_progress",
+    created: "2026-07-23",
+    type: "workflow-improvement",
+    source: AFK_REPAIR_SOURCE,
+  });
+  afk.path = "backlog/items/2026-07-23-elephant-direct-implementation-under-afk-authorization.md";
+  const licensing = item({
+    id: "pipeline.source-available-commercial-licensing",
+    status: "closed",
+    closed_at: "2026-07-23",
+    closure_repository: "self",
+    closure_commit: event40Replacement,
+    closure_evidence: "specs/sprint-nova-epic/evidence/backlog/event-40-amendment-intent.json",
+  });
+  licensing.path = "backlog/items/source-available-commercial-licensing.md";
+  const event39 = event({
+    id: AFK_REPAIR_ID,
+    at: "2026-07-23",
+    actor: "sentinel-recovery",
+    reason: "Repair the single missing initial ledger event for the existing open AFK-authorization process item; no status change or completion is claimed.",
+    evidence: {
+      kind: "missing-initial-ledger-repair",
+      commit: event39Commit,
+      reference: afk.path,
+      sourceSha256: createHash("sha256").update(AFK_REPAIR_SOURCE).digest("hex"),
+    },
+  });
+  const inProgress = event({
+    sequence: 2,
+    id: AFK_REPAIR_ID,
+    from: "open",
+    to: "in_progress",
+    at: "2026-07-24",
+    actor: "nova-activation",
+    reason: "Activate the accepted Nova work package.",
+    evidence: { kind: "nova-activation", commit: progressCommit, reference: "specs/sprint-nova-epic/plans/nova-a.md" },
+    previousHash: event39.entryHash,
+  });
+  const initialClosure = event({
+    sequence: 3,
+    id: licensing.metadata.id,
+    from: null,
+    to: "closed",
+    at: "2026-07-23",
+    actor: "sentinel-licensing",
+    reason: "Record the accepted licensing result.",
+    evidence: { kind: "implementation", commit: priorClosureCommit, reference: "specs/initial-result.md" },
+    previousHash: inProgress.entryHash,
+  });
+  const event40 = event({
+    sequence: 4,
+    id: licensing.metadata.id,
+    from: "closed",
+    to: "closed",
+    at: "2026-07-23",
+    actor: "sentinel-licensing",
+    reason: "Bind the approved candidate-specific SNT-1 Result and the private/public license-gate projections without rewriting historical closure evidence.",
+    evidence: {
+      kind: "evidence-amendment",
+      resultSha256: "5".repeat(64),
+      privateLicenseGateSha256: "6".repeat(64),
+      neutralPublicLicenseGateSha256: "7".repeat(64),
+      commit: event40Commit,
+      reference: "backlog/evidence/2026-07-23-snt-1-activation-result.json",
+      previousClosureCommit: priorClosureCommit,
+    },
+    previousHash: initialClosure.entryHash,
+  });
+  const amend39 = v2AmendmentEvent({
+    sequence: 5,
+    id: AFK_REPAIR_ID,
+    status: "in_progress",
+    target: event39,
+    replacementCommit: event39Replacement,
+    previousHash: event40.entryHash,
+    idempotencyKey: "8".repeat(64),
+    reference: "specs/sprint-nova-epic/evidence/backlog/event-39-amendment-intent.json",
+  });
+  const amend40 = v2AmendmentEvent({
+    sequence: 6,
+    id: licensing.metadata.id,
+    status: "closed",
+    target: event40,
+    replacementCommit: event40Replacement,
+    previousHash: amend39.entryHash,
+    idempotencyKey: "9".repeat(64),
+    reference: "specs/sprint-nova-epic/evidence/backlog/event-40-amendment-intent.json",
+  });
+  return {
+    items: [afk, licensing],
+    events: [event39, inProgress, initialClosure, event40, amend39, amend40],
+    reachable: new Set([progressCommit, priorClosureCommit, event39Replacement, event40Replacement]),
+    commits: { event39Commit, event40Commit, event39Replacement, event40Replacement },
+  };
+}
+function v2CheckerFixture() {
+  const root = fixtureRoot();
+  const fixture = mixedTransitionFixture();
+  write(root, "backlog/schemas/transition-v2.schema.json", `${JSON.stringify({ $id: TRANSITION_V2_SCHEMA })}\n`);
+  for (const record of fixture.items) write(root, record.path, renderBacklogItem(record));
+  write(root, "backlog/transitions.ndjson", `${fixture.events.map((entry) => canonicalJson(entry)).join("\n")}\n`);
+  for (const amendment of fixture.events.filter((entry) => entry.schema === TRANSITION_V2_SCHEMA)) {
+    write(root, amendment.evidence.reference, DISPOSITION_BYTES);
+  }
+  const projection = projectBacklog(fixture.items, fixture.events);
+  write(root, "backlog/STATUS.md", projection.statusText);
+  write(root, "backlog/index.json", projection.indexText);
+  return { root, fixture };
+}
+function rechain(events) {
+  let previousHash = null;
+  return events.map((source, index) => {
+    const value = structuredClone(source);
+    value.sequence = index + 1;
+    value.previousHash = previousHash;
+    value.entryHash = transitionHash(value);
+    previousHash = value.entryHash;
+    return value;
+  });
 }
 function item(overrides = {}) {
   return {

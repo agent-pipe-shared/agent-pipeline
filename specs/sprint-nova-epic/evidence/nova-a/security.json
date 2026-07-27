@@ -1,0 +1,10 @@
+{
+  "schema": "pipeline.nova-a-gate-observation.v1",
+  "gate": "security",
+  "candidate": {"commit":"874323da7f510be3208ee8b6ffc31ef121963ee9","tree":"76de02e71063e574e9728691fad30d2b0c4a6337"},
+  "source": {"path":"evidence/security-latest.json","sha256":"d3abfde19be0b7d5196ef02390075313ef83cb01d063a09e4b8711927c3ee4b6"},
+  "status": "passed",
+  "exitCode": 0,
+  "findings": 0,
+  "observedAt": "2026-07-25T13:00:25.375Z"
+}

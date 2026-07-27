@@ -1,0 +1,178 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.forge-capability.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "reportId",
+    "provider",
+    "baseUrlClass",
+    "projectCoordinatesSha256",
+    "authenticationMode",
+    "cells",
+    "governance",
+    "evidence",
+    "recordSha256"
+  ],
+  "properties": {
+    "schema": { "const": "pipeline.forge-capability.v1" },
+    "reportId": { "$ref": "#/$defs/safeId" },
+    "provider": { "enum": ["github", "gitlab"] },
+    "baseUrlClass": { "enum": ["github-com", "gitlab-com", "self-managed"] },
+    "projectCoordinatesSha256": { "$ref": "#/$defs/sha256" },
+    "authenticationMode": { "enum": ["none", "operator-local", "credential-lease", "unavailable"] },
+    "cells": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/cell" }
+    },
+    "governance": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/governance" }
+    },
+    "evidence": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/evidence" }
+    },
+    "recordSha256": { "$ref": "#/$defs/sha256" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "provider": { "const": "github" } } },
+      "then": { "properties": { "baseUrlClass": { "const": "github-com" } } }
+    },
+    {
+      "if": { "properties": { "provider": { "const": "gitlab" } } },
+      "then": { "properties": { "baseUrlClass": { "enum": ["gitlab-com", "self-managed"] } } }
+    }
+  ],
+  "$defs": {
+    "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "safeId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$" },
+    "path": {
+      "type": "string",
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*//)(?!.*\\/$)(?!\\.{1,2}(?:\\/|$))(?!.*\\/\\.{1,2}(?:\\/|$))[A-Za-z0-9._\\/@:-]{1,512}$"
+    },
+    "mode": { "enum": ["native", "emulated", "manual", "unsupported", "unavailable"] },
+    "status": { "enum": ["certified", "observed", "not-observed", "unsupported", "unavailable"] },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "path", "fileSha256", "recordSha256"],
+      "properties": {
+        "kind": { "$ref": "#/$defs/safeId" },
+        "path": {
+          "anyOf": [
+            { "$ref": "#/$defs/path" },
+            { "type": "null" }
+          ]
+        },
+        "fileSha256": { "$ref": "#/$defs/sha256" },
+        "recordSha256": {
+          "anyOf": [
+            { "$ref": "#/$defs/sha256" },
+            { "type": "null" }
+          ]
+        }
+      }
+    },
+    "cell": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capabilityId", "mode", "status", "evidence"],
+      "properties": {
+        "capabilityId": {
+          "enum": [
+            "branch-protection.observe",
+            "change-request.mutate",
+            "change-request.read",
+            "ci.job.read",
+            "ci.pipeline.mutate",
+            "ci.pipeline.read",
+            "governance.observe",
+            "issue.mutate",
+            "issue.read"
+          ]
+        },
+        "mode": { "$ref": "#/$defs/mode" },
+        "status": { "$ref": "#/$defs/status" },
+        "evidence": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/evidence" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "mode": { "const": "unsupported" } } },
+          "then": {
+            "properties": {
+              "status": { "const": "unsupported" },
+              "evidence": { "maxItems": 0 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "unavailable" } } },
+          "then": { "properties": { "status": { "const": "unavailable" } } }
+        },
+        {
+          "if": { "properties": { "mode": { "enum": ["native", "emulated", "manual"] } } },
+          "then": { "properties": { "status": { "enum": ["certified", "observed", "not-observed"] } } }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["certified", "observed"] } } },
+          "then": { "properties": { "evidence": { "minItems": 1 } } }
+        }
+      ]
+    },
+    "governance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["controlId", "mode", "status", "tier", "evidence"],
+      "properties": {
+        "controlId": { "$ref": "#/$defs/safeId" },
+        "mode": { "$ref": "#/$defs/mode" },
+        "status": { "$ref": "#/$defs/status" },
+        "tier": { "enum": ["baseline", "advanced", "enterprise", "unknown", "not-applicable"] },
+        "evidence": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": { "$ref": "#/$defs/evidence" }
+        }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "mode": { "const": "unsupported" } } },
+          "then": {
+            "properties": {
+              "status": { "const": "unsupported" },
+              "evidence": { "maxItems": 0 }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "mode": { "const": "unavailable" } } },
+          "then": { "properties": { "status": { "const": "unavailable" } } }
+        },
+        {
+          "if": { "properties": { "mode": { "enum": ["native", "emulated", "manual"] } } },
+          "then": { "properties": { "status": { "enum": ["certified", "observed", "not-observed"] } } }
+        },
+        {
+          "if": { "properties": { "status": { "enum": ["certified", "observed"] } } },
+          "then": { "properties": { "evidence": { "minItems": 1 } } }
+        }
+      ]
+    }
+  }
+}

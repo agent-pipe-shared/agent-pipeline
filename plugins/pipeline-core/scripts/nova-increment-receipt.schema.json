@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.nova-increment-receipt.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "increment", "base", "candidate", "specification", "acceptance", "issues", "backlog", "packages", "gates", "critic", "collisions", "evidenceManifest", "result", "createdAt", "receiptSha256"],
+  "properties": {
+    "schema": {"const": "pipeline.nova-increment-receipt.v1"},
+    "increment": {"type": "object", "additionalProperties": false, "required": ["sprint", "phase"], "properties": {"sprint": {"const": "Nova"}, "phase": {"const": "A"}}},
+    "base": {"$ref": "#/$defs/candidate"}, "candidate": {"$ref": "#/$defs/candidate"},
+    "specification": {"$ref": "#/$defs/specification"}, "acceptance": {"$ref": "#/$defs/acceptance"},
+    "issues": {"type": "array", "minItems": 9, "maxItems": 9, "items": {"$ref": "#/$defs/issue"}},
+    "backlog": {"type": "object", "additionalProperties": false, "required": ["status", "evidence"], "properties": {"status": {"const": "green"}, "evidence": {"$ref": "#/$defs/evidence"}}},
+    "packages": {"type": "array", "minItems": 7, "maxItems": 7, "items": {"$ref": "#/$defs/package"}},
+    "gates": {"type": "array", "minItems": 2, "maxItems": 2, "items": {"$ref": "#/$defs/gate"}},
+    "critic": {"type": "object", "additionalProperties": false, "required": ["candidate", "evidence", "lineageSha256", "status"], "properties": {"candidate": {"$ref": "#/$defs/candidate"}, "evidence": {"$ref": "#/$defs/evidence"}, "lineageSha256": {"$ref": "#/$defs/digest"}, "status": {"const": "accepted"}}},
+    "collisions": {"type": "object", "additionalProperties": false, "required": ["status", "entries"], "properties": {"status": {"enum": ["none", "reconciled"]}, "entries": {"type": "array", "maxItems": 256, "items": {"$ref": "#/$defs/collision"}}}},
+    "evidenceManifest": {"type": "object", "additionalProperties": false, "required": ["path", "fileSha256", "treeDigest"], "properties": {"path": {"$ref": "#/$defs/path"}, "fileSha256": {"$ref": "#/$defs/digest"}, "treeDigest": {"$ref": "#/$defs/digest"}}},
+    "result": {"type": "object", "additionalProperties": false, "required": ["candidate", "evidence"], "properties": {"candidate": {"$ref": "#/$defs/candidate"}, "evidence": {"$ref": "#/$defs/evidence"}}},
+    "createdAt": {"type": "string", "format": "date-time"}, "receiptSha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "oid": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"}, "path": {"type": "string", "pattern": "^(?!/)(?!.*\\\\)[A-Za-z0-9._@+/-]{1,512}$"},
+    "candidate": {"type": "object", "additionalProperties": false, "required": ["commit", "tree"], "properties": {"commit": {"$ref": "#/$defs/oid"}, "tree": {"$ref": "#/$defs/oid"}}},
+    "evidence": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "fileSha256", "recordSha256"], "properties": {"kind": {"type": "string"}, "path": {"$ref": "#/$defs/path"}, "fileSha256": {"$ref": "#/$defs/digest"}, "recordSha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"}}},
+    "specification": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "sha256"], "properties": {"kind": {"const": "specification"}, "path": {"$ref": "#/$defs/path"}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "acceptance": {"type": "object", "additionalProperties": false, "required": ["kind", "path", "sha256"], "properties": {"kind": {"const": "acceptance"}, "path": {"$ref": "#/$defs/path"}, "sha256": {"$ref": "#/$defs/digest"}}},
+    "issue": {"type": "object", "additionalProperties": false, "required": ["issue", "acceptanceIds", "status", "evidenceSha256"], "properties": {"issue": {"enum": [7, 8, 12, 14, 29, 38, 54, 56, 57]}, "acceptanceIds": {"type": "array", "minItems": 1, "maxItems": 256, "items": {"type": "string"}}, "status": {"const": "complete"}, "evidenceSha256": {"$ref": "#/$defs/digest"}}},
+    "package": {"type": "object", "additionalProperties": false, "required": ["id", "status", "evidenceSha256"], "properties": {"id": {"enum": ["nova-a1", "nova-a2", "nova-a3", "nova-a4", "nova-a5", "nova-a6", "nova-a7"]}, "status": {"const": "complete"}, "evidenceSha256": {"$ref": "#/$defs/digest"}}},
+    "gate": {"type": "object", "additionalProperties": false, "required": ["gate", "candidate", "evidence", "status"], "properties": {"gate": {"enum": ["security", "verify"]}, "candidate": {"$ref": "#/$defs/candidate"}, "evidence": {"$ref": "#/$defs/evidence"}, "status": {"const": "passed"}}},
+    "collision": {"type": "object", "additionalProperties": false, "required": ["path", "status", "evidenceSha256"], "properties": {"path": {"$ref": "#/$defs/path"}, "status": {"const": "reconciled"}, "evidenceSha256": {"$ref": "#/$defs/digest"}}}
+  }
+}

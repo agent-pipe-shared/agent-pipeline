@@ -12,6 +12,8 @@ import { createHash } from "node:crypto";
 
 export const ITEM_SCHEMA = "pipeline.backlog-item.v1";
 export const TRANSITION_SCHEMA = "pipeline.backlog-transition.v1";
+export const TRANSITION_V2_SCHEMA = "pipeline.backlog-transition.v2";
+export const EVIDENCE_AMENDMENT_SCHEMA = "pipeline.backlog-evidence-amendment.v1";
 export const INDEX_SCHEMA = "pipeline.backlog-index.v1";
 export const SENTINEL_RECOVERY_CATALOG_SCHEMA = "pipeline.sentinel-backlog-recovery.v1";
 export const PROJECT_CLOSURE_READBACK_SCHEMA = "pipeline.project-closure-readback.v1";
@@ -28,6 +30,7 @@ const PROJECT_REPOSITORY = /^project:[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/u;
 const DATE = /^\d{4}-\d{2}-\d{2}$/u;
 const OID = /^[a-f0-9]{40}$/u;
 const SAFE_REPOSITORY_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+$/u;
+const CANONICAL_REPOSITORY_FILE_PATH = /^(?!\/)(?!.*\\)(?!.*\/\/)(?!.*\/$)(?!\.{1,2}$)(?!\.{1,2}\/)(?!.*\/\.{1,2}(?:\/|$))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
 const HASH = /^[a-f0-9]{64}$/u;
 const EVIDENCE_AMENDMENT_KEYS = new Set(["kind", "commit", "reference", "previousClosureCommit", "resultSha256", "privateLicenseGateSha256", "neutralPublicLicenseGateSha256"]);
 const REACHABILITY_AMENDMENT_KEYS = new Set(["kind", "commit", "reference", "supersedesSequence", "supersedesEntryHash", "referenceBlobOid", "referenceSha256"]);
@@ -78,6 +81,17 @@ function isPlainObject(value) {
 
 function asString(value) {
   return typeof value === "string" ? value : "";
+}
+
+function v2Finding(domain, message) {
+  return `${domain}: ${message}`;
+}
+
+function typedAuthority(result) {
+  return isPlainObject(result)
+    && Object.keys(result).length === 2
+    && result.ok === true
+    && result.code === "AUTHORITY:VALID";
 }
 
 function validDate(value) {
@@ -267,6 +281,147 @@ export function transitionHash(event) {
   return createHash("sha256").update(canonicalJson(copy)).digest("hex");
 }
 
+/** Validate the closed, authority-bound evidence repair carried by v2 events. */
+export function validateBacklogEvidenceAmendment(evidence, { label = "evidence amendment", readDispositionBytes = null, authorizeAmendment = null } = {}) {
+  const errors = [];
+  if (!isPlainObject(evidence)) return [v2Finding("SHAPE", `${label}: evidence must be an object`)];
+  for (const key of V2_EVIDENCE_AMENDMENT_KEYS) {
+    if (!own(evidence, key)) errors.push(v2Finding("SHAPE", `${label}: missing ${key}`));
+  }
+  for (const key of Object.keys(evidence)) {
+    if (!V2_EVIDENCE_AMENDMENT_KEYS.has(key)) errors.push(v2Finding("SHAPE", `${label}: unsupported field ${key}`));
+  }
+  if (evidence.schema !== EVIDENCE_AMENDMENT_SCHEMA) errors.push(v2Finding("SCHEMA", `${label}: schema must equal ${EVIDENCE_AMENDMENT_SCHEMA}`));
+  if (evidence.kind !== "evidence-amendment") errors.push(v2Finding("SHAPE", `${label}: kind must equal evidence-amendment`));
+  if (!Number.isSafeInteger(evidence.targetSequence) || evidence.targetSequence < 1) errors.push(v2Finding("BOUND", `${label}: targetSequence must be a positive integer`));
+  if (!HASH.test(asString(evidence.targetEntryHash))) errors.push(v2Finding("SHAPE", `${label}: targetEntryHash must be a SHA-256 hex digest`));
+  if (!OID.test(asString(evidence.targetCommit))) errors.push(v2Finding("SHAPE", `${label}: targetCommit must be a full lowercase Git commit OID`));
+  if (!OID.test(asString(evidence.replacementCommit))) errors.push(v2Finding("SHAPE", `${label}: replacementCommit must be a full lowercase Git commit OID`));
+  if (!CANONICAL_REPOSITORY_FILE_PATH.test(asString(evidence.reference)) || evidence.reference.length > 512) errors.push(v2Finding("BOUND", `${label}: reference must be a safe repository-relative path of at most 512 characters`));
+  if (!HASH.test(asString(evidence.dispositionSha256))) errors.push(v2Finding("SHAPE", `${label}: dispositionSha256 must be a SHA-256 hex digest`));
+  if (!HASH.test(asString(evidence.idempotencyKey))) errors.push(v2Finding("SHAPE", `${label}: idempotencyKey must be a SHA-256 hex digest`));
+  if (errors.length > 0) return errors;
+  if (typeof readDispositionBytes !== "function") {
+    errors.push(v2Finding("UNAVAILABLE", `${label}: disposition bytes reader is required`));
+    return errors;
+  }
+  let dispositionBytes;
+  try {
+    dispositionBytes = readDispositionBytes(evidence.reference);
+  } catch {
+    errors.push(v2Finding("UNAVAILABLE", `${label}: referenced disposition bytes are unavailable`));
+    return errors;
+  }
+  if (typeof dispositionBytes === "string") dispositionBytes = Buffer.from(dispositionBytes, "utf8");
+  if (!(dispositionBytes instanceof Uint8Array)) {
+    errors.push(v2Finding("UNAVAILABLE", `${label}: referenced disposition bytes must be a string, Buffer, or Uint8Array`));
+    return errors;
+  }
+  const dispositionSha256 = createHash("sha256").update(dispositionBytes).digest("hex");
+  if (dispositionSha256 !== evidence.dispositionSha256) errors.push(v2Finding("BOUND", `${label}: dispositionSha256 does not bind the referenced disposition bytes`));
+  if (errors.length > 0) return errors;
+  if (typeof authorizeAmendment !== "function") return [v2Finding("AUTHORITY", `${label}: amendment authority is required`)];
+  let authority;
+  try {
+    authority = authorizeAmendment({ evidence, dispositionBytes, dispositionSha256 });
+  } catch {
+    return [v2Finding("UNAVAILABLE", `${label}: amendment authority is unavailable`)];
+  }
+  if (!typedAuthority(authority)) return [v2Finding("AUTHORITY", `${label}: amendment authority is not the exact typed approval`)];
+  return errors;
+}
+
+function parseJsonWithDuplicateKeys(source) {
+  let offset = 0;
+  const duplicates = [];
+  const duplicate = (key) => duplicates.push(key);
+  const invalid = () => {
+    throw new SyntaxError("invalid JSON");
+  };
+  const whitespace = () => {
+    while (offset < source.length && /[\t\n\r ]/u.test(source[offset])) offset += 1;
+  };
+  const string = () => {
+    if (source[offset] !== '"') invalid();
+    const start = offset;
+    offset += 1;
+    while (offset < source.length) {
+      if (source[offset] === '"') {
+        offset += 1;
+        return JSON.parse(source.slice(start, offset));
+      }
+      if (source[offset] === "\\") {
+        offset += 2;
+      } else {
+        offset += 1;
+      }
+    }
+    invalid();
+  };
+  const value = () => {
+    whitespace();
+    const token = source[offset];
+    if (token === "{") {
+      offset += 1;
+      whitespace();
+      const keys = new Set();
+      if (source[offset] === "}") {
+        offset += 1;
+        return;
+      }
+      while (offset < source.length) {
+        const key = string();
+        if (keys.has(key)) duplicate(key);
+        keys.add(key);
+        whitespace();
+        if (source[offset] !== ":") invalid();
+        offset += 1;
+        value();
+        whitespace();
+        if (source[offset] === "}") {
+          offset += 1;
+          return;
+        }
+        if (source[offset] !== ",") invalid();
+        offset += 1;
+        whitespace();
+      }
+      invalid();
+    }
+    if (token === "[") {
+      offset += 1;
+      whitespace();
+      if (source[offset] === "]") {
+        offset += 1;
+        return;
+      }
+      while (offset < source.length) {
+        value();
+        whitespace();
+        if (source[offset] === "]") {
+          offset += 1;
+          return;
+        }
+        if (source[offset] !== ",") invalid();
+        offset += 1;
+      }
+      invalid();
+    }
+    if (token === '"') {
+      string();
+      return;
+    }
+    const remainder = source.slice(offset);
+    const primitive = remainder.match(/^(?:true|false|null|-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?)/u);
+    if (!primitive) invalid();
+    offset += primitive[0].length;
+  };
+  value();
+  whitespace();
+  if (offset !== source.length) invalid();
+  return { value: JSON.parse(source), duplicates };
+}
+
 /** Parse newline-delimited transition records without accepting blank or malformed rows. */
 export function parseTransitionLedger(text, { path = "backlog/transitions.ndjson" } = {}) {
   const errors = [];
@@ -281,15 +436,36 @@ export function parseTransitionLedger(text, { path = "backlog/transitions.ndjson
       continue;
     }
     try {
-      events.push(JSON.parse(line));
-    } catch {
+      const parsed = parseJsonWithDuplicateKeys(line);
+      if (parsed.value?.schema === TRANSITION_V2_SCHEMA && parsed.duplicates.length > 0) {
+        errors.push(v2Finding("SCHEMA", `${path}: line ${index + 1} has duplicate JSON key ${JSON.stringify(parsed.duplicates[0])}`));
+        continue;
+      }
+      events.push(parsed.value);
+    } catch (error) {
       errors.push(`${path}: line ${index + 1} is not valid JSON`);
     }
   }
   return { ok: errors.length === 0, errors, events };
 }
 
-function validateTransitionShape(event, label) {
+function validateV2OrdinaryEvidence(evidence, label) {
+  const errors = [];
+  if (!isPlainObject(evidence)) return [v2Finding("SHAPE", `${label}: evidence must be an object`)];
+  for (const key of ["kind", "commit", "reference"]) {
+    if (!own(evidence, key)) errors.push(v2Finding("SHAPE", `${label}: missing ${key}`));
+  }
+  for (const key of Object.keys(evidence)) {
+    if (!V2_ORDINARY_EVIDENCE_KEYS.has(key)) errors.push(v2Finding("SHAPE", `${label}: unsupported field ${key}`));
+  }
+  if (typeof evidence.kind !== "string" || evidence.kind.length === 0 || evidence.kind === "evidence-amendment") errors.push(v2Finding("SHAPE", `${label}: kind must be a non-amendment string`));
+  if (!OID.test(asString(evidence.commit))) errors.push(v2Finding("SHAPE", `${label}: commit must be a full lowercase Git commit OID`));
+  if (!CANONICAL_REPOSITORY_FILE_PATH.test(asString(evidence.reference)) || asString(evidence.reference).length > 512) errors.push(v2Finding("BOUND", `${label}: reference must be a safe repository-relative path of at most 512 characters`));
+  if (own(evidence, "legacyStatus") && typeof evidence.legacyStatus !== "string") errors.push(v2Finding("SHAPE", `${label}: legacyStatus must be a string`));
+  return errors;
+}
+
+function validateTransitionShape(event, label, { readDispositionBytes = null, authorizeAmendment = null, authorizeOrdinaryEvidence = null } = {}) {
   const errors = [];
   const allowed = new Set(["schema", "sequence", "id", "from", "to", "at", "actor", "reason", "evidence", "previousHash", "entryHash"]);
   if (!isPlainObject(event)) return [`${label}: event must be an object`];
@@ -297,7 +473,8 @@ function validateTransitionShape(event, label) {
     if (!own(event, key)) errors.push(`${label}: missing ${key}`);
   }
   for (const key of Object.keys(event)) if (!allowed.has(key)) errors.push(`${label}: unsupported field ${key}`);
-  if (event.schema !== TRANSITION_SCHEMA) errors.push(`${label}: schema must equal ${TRANSITION_SCHEMA}`);
+  const isV2 = event.schema === TRANSITION_V2_SCHEMA;
+  if (event.schema !== TRANSITION_SCHEMA && !isV2) errors.push(`${label}: schema must equal ${TRANSITION_SCHEMA}`);
   if (!Number.isSafeInteger(event.sequence) || event.sequence < 1) errors.push(`${label}: sequence must be a positive integer`);
   if (!ITEM_ID.test(asString(event.id))) errors.push(`${label}: id must be a lowercase stable identifier`);
   if (!(event.from === null || BACKLOG_STATUSES.includes(event.from))) errors.push(`${label}: from must be null or a canonical status`);
@@ -311,7 +488,26 @@ function validateTransitionShape(event, label) {
   if (!validDate(asString(event.at))) errors.push(`${label}: at must be an ISO calendar date`);
   if (!ITEM_ID.test(asString(event.actor))) errors.push(`${label}: actor must be a lowercase stable identifier`);
   if (asString(event.reason).trim().length === 0) errors.push(`${label}: reason must be non-empty`);
+  if (isV2 && asString(event.id).length > 128) errors.push(`${label}: id must be at most 128 characters`);
+  if (isV2 && asString(event.actor).length > 128) errors.push(`${label}: actor must be at most 128 characters`);
+  if (isV2 && asString(event.reason).length > 512) errors.push(`${label}: reason must be at most 512 characters`);
   if (!isPlainObject(event.evidence)) errors.push(`${label}: evidence must be an object`);
+  else if (v2Amendment) {
+    errors.push(...validateBacklogEvidenceAmendment(event.evidence, { label: `${label}: evidence`, readDispositionBytes, authorizeAmendment }));
+  }
+  else if (isV2) {
+    errors.push(...validateV2OrdinaryEvidence(event.evidence, `${label}: evidence`));
+    if (errors.length === 0) {
+      if (typeof authorizeOrdinaryEvidence !== "function") errors.push(v2Finding("AUTHORITY", `${label}: ordinary evidence authority is required`));
+      else {
+        try {
+          if (!typedAuthority(authorizeOrdinaryEvidence({ event, evidence: event.evidence }))) errors.push(v2Finding("AUTHORITY", `${label}: ordinary evidence authority is not the exact typed approval`));
+        } catch {
+          errors.push(v2Finding("UNAVAILABLE", `${label}: ordinary evidence authority is unavailable`));
+        }
+      }
+    }
+  }
   else {
     const evidenceKeys = amendment
       ? EVIDENCE_AMENDMENT_KEYS
@@ -360,7 +556,16 @@ function validateTransitionShape(event, label) {
   if (!(event.previousHash === null || HASH.test(asString(event.previousHash)))) errors.push(`${label}: previousHash must be null or a SHA-256 hex digest`);
   if (!HASH.test(asString(event.entryHash))) errors.push(`${label}: entryHash must be a SHA-256 hex digest`);
   else if (event.entryHash !== transitionHash(event)) errors.push(`${label}: entryHash does not match canonical event content`);
-  return errors;
+  return isV2 ? errors.map((error) => /^(?:SHAPE|SCHEMA|BOUND|AUTHORITY|CAS|STALE|REPLAY|CONFLICT|UNAVAILABLE|DURABILITY|READBACK|INTERNAL):/u.test(error) ? error : v2Finding("SHAPE", error)) : errors;
+}
+
+function isV2EvidenceAmendment(event) {
+  return event?.schema === TRANSITION_V2_SCHEMA && event?.evidence?.kind === "evidence-amendment";
+}
+
+function projectedClosureCommit(event) {
+  if (isV2EvidenceAmendment(event)) return event.evidence.replacementCommit;
+  return event?.evidence?.commit;
 }
 
 /**
@@ -368,8 +573,16 @@ function validateTransitionShape(event, label) {
  * current status with its final event.  `commitExists` is optional so pure
  * callers can validate shape without a Git repository.
  */
-export function validateTransitionLedger(events, items, { commitExists = null } = {}) {
+export function validateTransitionLedger(events, items, { commitExists = null, readDispositionBytes = null, authorizeAmendment = null, authorizeOrdinaryEvidence = null } = {}) {
   const errors = [];
+  const eventValidity = Array.from({ length: events.length }, () => true);
+  const mark = (index, message) => {
+    const isV2 = events[index]?.schema === TRANSITION_V2_SCHEMA;
+    errors.push(isV2 && !/^(?:SHAPE|SCHEMA|BOUND|AUTHORITY|CAS|STALE|REPLAY|CONFLICT|UNAVAILABLE|DURABILITY|READBACK|INTERNAL):/u.test(message)
+      ? v2Finding("BOUND", message)
+      : message);
+    if (index >= 0 && index < eventValidity.length) eventValidity[index] = false;
+  };
   const itemById = new Map();
   for (const item of items) {
     const id = item?.metadata?.id;
@@ -400,23 +613,28 @@ export function validateTransitionLedger(events, items, { commitExists = null } 
     }
   }
   let previousHash = null;
+  let seenV2 = false;
   for (const [index, event] of events.entries()) {
     const label = `ledger event ${index + 1}`;
-    errors.push(...validateTransitionShape(event, label));
+    const shapeErrors = validateTransitionShape(event, label, { readDispositionBytes, authorizeAmendment, authorizeOrdinaryEvidence });
+    for (const error of shapeErrors) mark(index, error);
     if (!isPlainObject(event)) continue;
-    if (event.sequence !== index + 1) errors.push(`${label}: sequence must equal physical ledger order`);
-    if (event.previousHash !== previousHash) errors.push(`${label}: previousHash does not bind the preceding ledger event`);
-    if (!itemById.has(event.id)) errors.push(`${label}: id does not name a current backlog item`);
+    if (event.schema === TRANSITION_V2_SCHEMA) seenV2 = true;
+    else if (seenV2 && event.schema === TRANSITION_SCHEMA) mark(index, `${label}: v1 transition must not follow a v2 transition`);
+    if (event.sequence !== index + 1) mark(index, `${label}: sequence must equal physical ledger order`);
+    if (event.previousHash !== previousHash) mark(index, `${label}: previousHash does not bind the preceding ledger event`);
+    if (!itemById.has(event.id)) mark(index, `${label}: id does not name a current backlog item`);
     const item = itemById.get(event.id);
     if (event?.evidence?.kind === "missing-initial-ledger-repair" && event.evidence.sourceSha256 && event.evidence.sourceSha256 !== createHash("sha256").update(asString(item?.metadata?.source)).digest("hex")) errors.push(`${label}: sourceSha256 does not bind the current item source`);
     const prior = stateById.get(event.id);
+    const v2Amendment = isV2EvidenceAmendment(event);
     if (prior === undefined) {
-      if (event.from !== null) errors.push(`${label}: an item's first ledger event must start from null`);
+      if (event.from !== null) mark(index, `${label}: an item's first ledger event must start from null`);
       else if (event.to !== "open" && event.to !== "in_progress" && !(event.to === "closed" && item?.metadata?.owner === "pipeline" && item.metadata.closure_repository === "self")) {
-        errors.push(`${label}: first ledger event may only initialize open or in-progress work, or record a self closure`);
+        mark(index, `${label}: first ledger event may only initialize open or in-progress work, or record a self closure`);
       }
     } else {
-      if (event.from !== prior) errors.push(`${label}: from does not match that item's prior ledger status`);
+      if (event.from !== prior) mark(index, `${label}: from does not match that item's prior ledger status`);
       if (prior === "closed") {
         const closureAmendment = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "evidence-amendment";
         const reachabilityAmendment = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "reachability-amendment";
@@ -442,6 +660,97 @@ export function validateTransitionLedger(events, items, { commitExists = null } 
     }
     previousHash = typeof event.entryHash === "string" ? event.entryHash : previousHash;
   }
+
+  const amendments = [];
+  for (const [index, event] of events.entries()) {
+    if (!isV2EvidenceAmendment(event)) continue;
+    const label = `ledger event ${index + 1}`;
+    const evidence = event.evidence;
+    const amendment = { index, targetIndex: -1, relationValid: true };
+    if (!Number.isSafeInteger(evidence.targetSequence) || evidence.targetSequence >= index + 1) {
+      mark(index, `${label}: evidence amendment must target an earlier physical event`);
+      amendment.relationValid = false;
+    } else {
+      amendment.targetIndex = evidence.targetSequence - 1;
+      const target = events[amendment.targetIndex];
+      if (!isPlainObject(target) || target.sequence !== evidence.targetSequence) {
+        mark(index, `${label}: targetSequence does not identify its physical target event`);
+        amendment.relationValid = false;
+      } else {
+        if (target.entryHash !== evidence.targetEntryHash) {
+          mark(index, `${label}: targetEntryHash does not bind the target event`);
+          amendment.relationValid = false;
+        }
+        if (target?.evidence?.commit !== evidence.targetCommit) {
+          mark(index, `${label}: targetCommit does not bind the target event evidence`);
+          amendment.relationValid = false;
+        }
+        if (target.id !== event.id) {
+          mark(index, `${label}: evidence amendment id does not match the target event id`);
+          amendment.relationValid = false;
+        }
+      }
+    }
+    amendments.push(amendment);
+  }
+
+  const amendmentsByTarget = new Map();
+  const amendmentsByIdempotency = new Map();
+  for (const amendment of amendments) {
+    const event = events[amendment.index];
+    const targetKey = event?.evidence?.targetSequence;
+    if (Number.isSafeInteger(targetKey)) {
+      const prior = amendmentsByTarget.get(targetKey);
+      if (prior !== undefined) {
+        mark(prior, `ledger event ${prior + 1}: duplicate or conflicting evidence amendment for target sequence ${targetKey}`);
+        mark(amendment.index, `ledger event ${amendment.index + 1}: duplicate or conflicting evidence amendment for target sequence ${targetKey}`);
+      } else {
+        amendmentsByTarget.set(targetKey, amendment.index);
+      }
+    }
+    const idempotencyKey = event?.evidence?.idempotencyKey;
+    if (HASH.test(asString(idempotencyKey))) {
+      const prior = amendmentsByIdempotency.get(idempotencyKey);
+      if (prior !== undefined) {
+        mark(prior, `ledger event ${prior + 1}: evidence amendment idempotencyKey is duplicated`);
+        mark(amendment.index, `ledger event ${amendment.index + 1}: evidence amendment idempotencyKey is duplicated`);
+      } else {
+        amendmentsByIdempotency.set(idempotencyKey, amendment.index);
+      }
+    }
+  }
+
+  if (typeof commitExists === "function") {
+    const reachability = new Map();
+    const reachable = (oid) => {
+      if (!reachability.has(oid)) reachability.set(oid, Boolean(commitExists(oid)));
+      return reachability.get(oid);
+    };
+    const acceptedByTarget = new Map();
+    for (const amendment of amendments) {
+      const event = events[amendment.index];
+      const evidence = event.evidence;
+      const targetValid = amendment.targetIndex >= 0 && eventValidity[amendment.targetIndex];
+      const uniqueTarget = amendmentsByTarget.get(evidence.targetSequence) === amendment.index;
+      const uniqueIdempotency = amendmentsByIdempotency.get(evidence.idempotencyKey) === amendment.index;
+      if (!amendment.relationValid || !eventValidity[amendment.index] || !targetValid || !uniqueTarget || !uniqueIdempotency) continue;
+      if (reachable(evidence.targetCommit)) {
+        mark(amendment.index, `ledger event ${amendment.index + 1}: evidence amendment targetCommit is already reachable`);
+        continue;
+      }
+      if (!reachable(evidence.replacementCommit)) {
+        mark(amendment.index, `ledger event ${amendment.index + 1}: evidence amendment replacementCommit is not a reachable local Git commit`);
+        continue;
+      }
+      acceptedByTarget.set(evidence.targetSequence, amendment.index);
+    }
+    for (const record of localEvidenceCommits) {
+      if (reachable(record.commit)) continue;
+      if (acceptedByTarget.has(record.index + 1)) continue;
+      mark(record.index, `ledger event ${record.index + 1}: evidence.commit is not a reachable local Git commit`);
+    }
+  }
+
   for (const [id, item] of itemById) {
     const current = stateById.get(id);
     if (current === undefined) errors.push(`items: ${id} has no transition-ledger entry`);

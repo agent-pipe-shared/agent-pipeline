@@ -1,0 +1,37 @@
+{
+  "schema": "pipeline.nova-prd-approval.v1",
+  "recordedAt": "2026-07-24T19:47:29Z",
+  "approvedBy": "Product Owner",
+  "decision": "PRD approved",
+  "featureId": "sprint-nova-epic",
+  "bindings": {
+    "productBaseCommit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
+    "productBaseTree": "ec4fcf2e84b15a580dbc13d98198204e8cfca429",
+    "prdSha256": "879423cdb24d542b7f9275bc9da4591fcdfd38145fdddee9142ce82eee53402e",
+    "acceptanceSha256": "f15c417360fd8757ce42a410f3735f61b7cd17f9ff165c59fb65257e9103c855",
+    "prdGateBaselineSha256": "bf4a94154fce487f2bc8b75311f9ca33e0b599aa666513fcf9c4ece798ea2f9a",
+    "backlogTransitionHead": "36dd616d3aa5bc21e49e138f6b8a9a17a9de25321998304306e4fa47289de562"
+  },
+  "approvedScope": {
+    "novaIssueCount": 15,
+    "novaAIssueCount": 9,
+    "novaBIssueCount": 6,
+    "includesIssue57": true,
+    "canonicalBacklogRepository": "this-repository",
+    "cyborgRelationship": "manual-read-only-mirror-and-independent-sprint"
+  },
+  "authorizes": [
+    "technical-spec-design",
+    "readiness-preparation"
+  ],
+  "doesNotAuthorize": [
+    "technical-spec-approval",
+    "production-implementation",
+    "external-access",
+    "credentials",
+    "mutation",
+    "merge",
+    "push",
+    "release"
+  ]
+}

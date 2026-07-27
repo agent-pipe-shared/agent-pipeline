@@ -1,0 +1,18 @@
+{
+  "schema": "pipeline.nova-b1-c.critic-evidence.v1",
+  "candidate": {
+    "commit": "b8a2540a4666719fca466e9f64267f62ad785bc7",
+    "tree": "151e16ce739f911b9a378818f6d07c59a39dd987"
+  },
+  "review": {
+    "mode": "fresh independent critic",
+    "assurance": "functional-equivalent-read-only; OS isolation not asserted",
+    "verdict": "pass",
+    "findings": []
+  },
+  "reviewedPaths": [
+    "plugins/pipeline-core/lib/local-worker-pool.mjs",
+    "plugins/pipeline-core/lib/local-worker-pool.test.mjs",
+    "plugins/pipeline-core/scripts/local-worker-pool.schema.json"
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "schema": "pipeline.nova-prd-gate-baseline.v1",
+  "observedAt": "2026-07-24T19:40:46Z",
+  "repository": "agent-pipe-shared/agent-pipeline",
+  "productBase": {
+    "tag": "v0.4.1",
+    "commit": "81cc5f1a6cb384057fd49dd1a340e93c3aec3efb",
+    "tree": "ec4fcf2e84b15a580dbc13d98198204e8cfca429"
+  },
+  "authorityRepository": {
+    "branch": "feat/sprint-nova-codex",
+    "handoverCommit": "6fe8e97736f04b9f60ef21db6193eb957e56a2bc"
+  },
+  "issues": {
+    "label": "sprint:nova",
+    "state": "OPEN",
+    "count": 15,
+    "numbers": [
+      7,
+      8,
+      12,
+      14,
+      15,
+      16,
+      18,
+      21,
+      29,
+      38,
+      49,
+      51,
+      54,
+      56,
+      57
+    ]
+  },
+  "backlog": {
+    "snapshotCommit": "5ca5a4b292a267ffdfcc52577fda0a0593957a65",
+    "subtree": "832bf98e22e9a147dad88c952c0b794f3ee44fe7",
+    "transitionHead": "36dd616d3aa5bc21e49e138f6b8a9a17a9de25321998304306e4fa47289de562",
+    "counts": {
+      "open": 6,
+      "inProgress": 19,
+      "closed": 10,
+      "total": 35
+    },
+    "digests": {
+      "indexSha256": "a81a976e35eddd16efc31620b1d79b2c9d43600b16a3f695ea31c7879ec79e3d",
+      "statusSha256": "7cb91d921d23f16b9cb0dee24b223feeb4c2bd5ac47ec3c42c82642af35d6cb4",
+      "transitionsSha256": "5cc9a6d23740c45f5b7ee5c762f5fedbfa6fe627e83a98cdf93db430cf899b6d"
+    }
+  },
+  "gateBoundary": {
+    "approves": [
+      "product-scope",
+      "product-outcomes",
+      "nova-a-b-allocation",
+      "sprint-independence",
+      "success-measures"
+    ],
+    "doesNotApprove": [
+      "technical-spec",
+      "implementation",
+      "external-access",
+      "credentials",
+      "mutation",
+      "merge",
+      "push",
+      "release"
+    ]
+  }
+}

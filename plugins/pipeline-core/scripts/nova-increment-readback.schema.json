@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.nova-increment-readback.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "increment", "receiptPath", "receiptFileSha256", "testedCandidate", "evidenceCommit", "evidenceTree", "evidenceManifestSha256", "status", "observedAt", "recordSha256"],
+  "properties": {
+    "schema": {"const": "pipeline.nova-increment-readback.v1"},
+    "increment": {"type": "object", "additionalProperties": false, "required": ["sprint", "phase"], "properties": {"sprint": {"const": "Nova"}, "phase": {"const": "A"}}},
+    "receiptPath": {"type": "string", "pattern": "^(?!/)(?!.*\\\\)[A-Za-z0-9._@+/-]{1,512}$"}, "receiptFileSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "testedCandidate": {"type": "object", "additionalProperties": false, "required": ["commit", "tree"], "properties": {"commit": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"}, "tree": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"}}},
+    "evidenceCommit": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"}, "evidenceTree": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"}, "evidenceManifestSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "status": {"const": "verified"}, "observedAt": {"type": "string", "format": "date-time"}, "recordSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+  }
+}

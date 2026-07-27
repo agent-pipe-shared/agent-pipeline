@@ -18,8 +18,15 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { main as onboardingCli } from "./project-onboarding-v3.mjs";
 import { main as authorityCli } from "./v3-bootstrap-authority.mjs";
+import { main as migrationCli } from "./runner-profile-migration-v3.mjs";
 import { inspectRepositoryFreshness } from "./repository-freshness.mjs";
 import { applyProjectOnboardingKickoffV4, planProjectOnboardingKickoffV4 } from "../lib/project-onboarding-v3.mjs";
+import {
+  consumeRuntimeReadback,
+  issueLaunchTicket,
+  readRestartBarrier,
+  sha256,
+} from "../lib/codex-onboarding-runtime.mjs";
 import { ProjectOnboardingReadyError } from "../lib/project-onboarding-ready-gate.mjs";
 import { applyHostRepositoryInit, planHostRepositoryInit } from "./codex-host-repository-init.mjs";
 import { evaluateLifecycleReadyGuard } from "../hooks/guard-lifecycle-ready.mjs";
@@ -35,6 +42,7 @@ import {
 const here = dirname(fileURLToPath(import.meta.url));
 const onboarding = join(here, "project-onboarding-v3.mjs");
 const authority = join(here, "v3-bootstrap-authority.mjs");
+const migration = join(here, "runner-profile-migration-v3.mjs");
 
 // The shipped plugin cache is intentionally read-only. Keep disposable
 // repositories in the platform temp directory so this process-level harness
@@ -82,12 +90,20 @@ function cliGit(command, args, options = {}) {
 }
 function run(script, args, cwd) {
   let stdout = "";
-  const main = script === onboarding ? onboardingCli : script === authority ? authorityCli : null;
+  const main = script === onboarding
+    ? onboardingCli
+    : script === authority
+      ? authorityCli
+      : script === migration
+        ? migrationCli
+        : null;
   assert.ok(main, `unsupported CLI entry point: ${script}`);
   const status = main(args, {
     write: (chunk) => { stdout += chunk; },
+    writePreview: () => {},
     deps: {
       spawnSync: cliGit,
+      codexExecutable: process.execPath,
       observeOnboardingAppServer: ({ intent }) => intent === "onboarding"
         ? { required: false, status: "not-requested", code: null }
         : { required: true, status: "running", code: "CAS-READY" },
@@ -98,6 +114,53 @@ function run(script, args, cwd) {
 function actionArgs(result) {
   assert.equal(result.nextAction?.kind, "command");
   return result.nextAction.argv.slice(1);
+}
+
+function makeReady(path) {
+  const portable = run(onboarding, ["plan", "--root", path], path);
+  assert.equal(run(onboarding, actionArgs(portable.json), path).json.status, "runtime-initialization-required");
+  const runtime = run(onboarding, ["plan-runtime", "--root", path], path);
+  assert.equal(run(onboarding, actionArgs(runtime.json), path).json.status, "restart-required");
+  const barrier = readRestartBarrier({ rootDir: path, spawn: cliGit });
+  const issued = issueLaunchTicket({
+    rootDir: path,
+    barrierSha256: barrier.rawSha256,
+    now: 50_000,
+    spawn: cliGit,
+  });
+  consumeRuntimeReadback({
+    rootDir: path,
+    ticketId: issued.ticketId,
+    token: issued.token,
+    now: 50_001,
+    spawn: cliGit,
+    receipt: {
+      schema: "pipeline.codex-project-runtime-readback.v1",
+      barrierSha256: barrier.rawSha256,
+      repositoryFingerprint: barrier.barrier.repositoryFingerprint,
+      sourceSha256: barrier.barrier.sourceSha256,
+      runtimeTargetsSha256: barrier.barrier.runtimeTargetsSha256,
+      readerGenerationSha256: sha256(Buffer.alloc(32, 0xb6)),
+      effectiveConfigSha256: sha256("e2e-effective"),
+      validatedAgentsSha256: sha256("e2e-agents"),
+      ticketId: issued.ticketId,
+      observedAtEpochMs: 50_001,
+    },
+  });
+  const goal = "Recover one governed project";
+  const kickoff = planProjectOnboardingKickoffV4({
+    rootDir: path,
+    goal,
+    deps: { spawnSync: cliGit },
+  });
+  const ready = applyProjectOnboardingKickoffV4({
+    rootDir: path,
+    goal,
+    planSha256: kickoff.planSha256,
+    activate: true,
+    deps: { spawnSync: cliGit },
+  });
+  assert.equal(ready.status, "ready");
 }
 function git(args, cwd) {
   const result = spawnSync("git", args, { cwd, encoding: "utf8" });
@@ -356,4 +419,44 @@ test("an existing linked Git worktree is adopted without replacing its .git poin
     assert.equal(readback.status, 1);
     assert.equal(readback.json.status, "restart-required");
   } finally { dispose(container); }
+});
+
+test("ready roots recover a missing manifest and a governed V3 registry checkout through shipped CLIs", () => {
+  const path = root();
+  try {
+    makeReady(path);
+    assert.equal(run(onboarding, ["inspect", "--root", path], path).json.status, "ready");
+
+    const manifestPath = join(path, ".claude", "pipeline.yaml");
+    unlinkSync(manifestPath);
+    const missing = run(onboarding, ["inspect", "--root", path], path);
+    assert.equal(missing.json.status, "partial");
+    assert.equal(missing.json.diagnostics[0].code, "manifest_invalid");
+    const manifestPlan = run(onboarding, actionArgs(missing.json), path);
+    assert.equal(manifestPlan.json.status, "ready");
+    assert.equal(manifestPlan.json.target.path, ".claude/pipeline.yaml");
+    const manifestApplied = run(onboarding, manifestPlan.json.applyAction.argv.slice(1), path);
+    assert.equal(manifestApplied.json.status, "ready");
+
+    const sourcePath = join(path, "pipeline.user.yaml");
+    const currentSource = readFileSync(sourcePath, "utf8");
+    const governedCheckout = currentSource.replace(
+      /^critic_export:\r?\n(?:[ \t].*(?:\r?\n|$))*/mu,
+      "",
+    );
+    assert.notEqual(governedCheckout, currentSource);
+    writeFileSync(sourcePath, governedCheckout);
+    const stale = run(onboarding, ["inspect", "--root", path], path);
+    assert.equal(stale.json.status, "migration-required");
+    assert.equal(stale.json.diagnostics[0].code, "stale_generated_projection");
+    assert.equal(stale.json.nextAction.argv[0], migration);
+    assert.equal(stale.json.nextAction.argv[1], "plan");
+    const migrationInspection = run(migration, ["inspect", "--root", path], path);
+    assert.equal(migrationInspection.json.sourceKind, "v3-refresh");
+    const migrationPlan = run(migration, actionArgs(stale.json), path);
+    assert.equal(migrationPlan.json.status, "ready");
+    const migrated = run(migration, ["apply", "--root", path, "--activate"], path);
+    assert.equal(migrated.json.status, "applied");
+    assert.equal(run(onboarding, ["inspect", "--root", path], path).json.status, "ready");
+  } finally { dispose(path); }
 });

@@ -1,0 +1,166 @@
+{
+  "schema": "pipeline.antigravity-contract-decision.v1",
+  "decisionId": "nova-b3-antigravity-contract-research",
+  "sources": [
+    {
+      "url": "https://antigravity.google/docs/cli/install",
+      "retrievedAt": "2026-07-26T00:00:00.000Z",
+      "contentSha256": "a89df008d8a5f6854969d61e436d61e92fc685ac95748c977fc2da5beb96acf2"
+    },
+    {
+      "url": "https://antigravity.google/docs/cli-overview",
+      "retrievedAt": "2026-07-26T00:00:00.000Z",
+      "contentSha256": "e0bb8327bcaf3e3479a9660ee8d2cb138e265f8f7fbce1ac9cfd26a0ba82a5d4"
+    },
+    {
+      "url": "https://antigravity.google/docs/cli/permissions",
+      "retrievedAt": "2026-07-26T00:00:00.000Z",
+      "contentSha256": "d8a58bf2b84f59e795a703b00a8cb50b42578849210148b77904ae45ad2cf708"
+    },
+    {
+      "url": "https://antigravity.google/docs/cli/reference",
+      "retrievedAt": "2026-07-26T00:00:00.000Z",
+      "contentSha256": "99d4938ff892375c7c4db95a7351553a24d35aead6fa47aefaf3e25ff517eee7"
+    }
+  ],
+  "retrievedAt": "2026-07-26T00:00:00.000Z",
+  "cli": {
+    "version": "not-observed",
+    "executableSha256": null,
+    "versionOutputSha256": null
+  },
+  "provenance": {
+    "documentationVersion": "1.1.7",
+    "documentationVersionStatus": "documentation-observed",
+    "supportedAntigravityVersionRange": {
+      "value": "1.1.7",
+      "status": "documentation-observed",
+      "localCompatibilityCertification": "not-observed"
+    },
+    "installer": "agy",
+    "installerObservation": "official-documentation",
+    "localInstallerReadback": "not-observed",
+    "localVersionReadback": {
+      "status": "unavailable",
+      "command": "command -v agy",
+      "observedAt": "2026-07-26T15:35:00.000Z",
+      "reason": "agy executable unavailable"
+    }
+  },
+  "authentication": {
+    "documentedModes": ["keyring-browser", "ssh-manual-oauth"],
+    "localAuthenticationReadback": "not-observed",
+    "credentials": "not-observed"
+  },
+  "models": {
+    "runtime": "Antigravity only",
+    "selectorCategory": "Gemini models only",
+    "requestedSelector": {
+      "status": "not-observed",
+      "value": null
+    },
+    "cliReportedModel": {
+      "status": "unavailable",
+      "value": null
+    },
+    "independentAttestation": {
+      "status": "not-observed",
+      "value": null
+    }
+  },
+  "input": [
+    {
+      "capability": "json-envelope",
+      "status": "not-observed",
+      "evidence": null
+    }
+  ],
+  "output": [
+    {
+      "capability": "json-envelope",
+      "status": "not-observed",
+      "evidence": null
+    }
+  ],
+  "usage": [
+    {
+      "capability": "token-fields",
+      "status": "not-observed",
+      "evidence": null
+    }
+  ],
+  "streaming": [
+    {
+      "capability": "transport",
+      "status": "not-observed",
+      "evidence": null
+    }
+  ],
+  "cancellation": [
+    {
+      "capability": "adapter",
+      "status": "not-observed",
+      "evidence": null
+    },
+    {
+      "capability": "ctrl-c",
+      "status": "not-observed",
+      "evidence": null
+    },
+    {
+      "capability": "escape",
+      "status": "not-observed",
+      "evidence": null
+    }
+  ],
+  "errors": [
+    {
+      "capability": "false-success",
+      "status": "unsupported",
+      "evidence": null
+    },
+    {
+      "capability": "taxonomy",
+      "status": "not-observed",
+      "evidence": null
+    }
+  ],
+  "sandbox": [
+    {
+      "capability": "credentials",
+      "status": "not-observed",
+      "evidence": null
+    },
+    {
+      "capability": "filesystem",
+      "status": "not-observed",
+      "evidence": null
+    },
+    {
+      "capability": "network",
+      "status": "not-observed",
+      "evidence": null
+    }
+  ],
+  "cells": {
+    "sourceResearch": "manual",
+    "implementation": "unsupported",
+    "live": "unsupported",
+    "advisor": "unsupported",
+    "review": "unsupported",
+    "write": "unsupported",
+    "b3rDeferral": {
+      "owner": "Nova Product Owner",
+      "expiresAt": "2026-08-09T00:00:00.000Z",
+      "stopConditions": [
+        "no activation authority",
+        "no credentials authority",
+        "no network authority",
+        "no push authority",
+        "no release authority"
+      ]
+    }
+  },
+  "status": "blocked",
+  "recordSha256": "9120650892a34b8e4ac51b369a16f523d5e52354146775f54fa00be2469b6f9d"
+}

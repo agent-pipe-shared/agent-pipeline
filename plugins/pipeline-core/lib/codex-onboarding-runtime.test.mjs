@@ -348,6 +348,7 @@ test("the launch wrapper preserves the interactive Codex process contract withou
   const priorTicketId = process.env.PIPELINE_CODEX_ONBOARDING_TICKET_ID;
   const priorToken = process.env.PIPELINE_CODEX_ONBOARDING_TOKEN;
   const priorSentinel = process.env.PIPELINE_ONBOARDING_HOST_ENV_SENTINEL;
+  const priorPath = process.env.PATH;
   try {
     const executable = resolveRuntimeExecutable().physicalPath;
     const prepare = (path, random) => {
@@ -486,9 +487,9 @@ test("the launch wrapper preserves the interactive Codex process contract withou
     assert.equal(unavailableTicket.failure.code, "transport-unavailable");
 
     let tuiCalls = 0;
-    const tuiFailure = invoke(tuiFailurePath, tuiFailureBarrier, (childExecutable) => {
+    const tuiFailure = invoke(tuiFailurePath, tuiFailureBarrier, (childExecutable, argv) => {
       tuiCalls += 1;
-      if (childExecutable === process.execPath) {
+      if (childExecutable === process.execPath && argv[0] === HELPER_PATH) {
         return {
           status: 0,
           signal: null,
@@ -530,6 +531,8 @@ test("the launch wrapper preserves the interactive Codex process contract withou
     else process.env.PIPELINE_CODEX_ONBOARDING_TOKEN = priorToken;
     if (priorSentinel === undefined) delete process.env.PIPELINE_ONBOARDING_HOST_ENV_SENTINEL;
     else process.env.PIPELINE_ONBOARDING_HOST_ENV_SENTINEL = priorSentinel;
+    if (priorPath === undefined) delete process.env.PATH;
+    else process.env.PATH = priorPath;
     dispose(successPath);
     dispose(failurePath);
     dispose(readbackFailurePath);

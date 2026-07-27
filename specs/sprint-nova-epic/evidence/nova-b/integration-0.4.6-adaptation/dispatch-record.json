@@ -1,0 +1,29 @@
+{
+  "dispatchId": "NOVA-046-ADAPT",
+  "outcome": "completed",
+  "base": { "tag": "v0.4.6", "commit": "9d1b3dc108eb77629ace5b82002120f5539abd8d" },
+  "source": { "commit": "d7795565562d85ce043f13f0d484b391c7e65223" },
+  "candidate": { "commit": "c8cd19e1edfd350d683bb39ad49edc98b5371bb2" },
+  "changedPaths": [
+    ".claude/guard-override.log.jsonl",
+    "docs/product-capability-inventory.json",
+    "governance/observation-doc-governance.json",
+    "harness/scripts/verify.mjs",
+    "plugins/pipeline-core/lib/continuity-state.mjs",
+    "plugins/pipeline-core/lib/continuity-state.test.mjs",
+    "plugins/pipeline-core/lib/critic-review-lineage.mjs",
+    "plugins/pipeline-core/lib/critic-review-lineage.test.mjs",
+    "plugins/pipeline-core/lib/selected-sandbox-disposition.mjs",
+    "plugins/pipeline-core/lib/selected-sandbox-disposition.test.mjs",
+    "specs/sprint-nova-epic/plans/nova-a.md"
+  ],
+  "tests": [
+    "node plugins/pipeline-core/lib/continuity-state.test.mjs",
+    "node harness/scripts/check-product-capability-inventory.mjs",
+    "node harness/scripts/check-product-capability-inventory.test.mjs",
+    "node harness/scripts/check-observation-governance.test.mjs",
+    "node --check plugins/pipeline-core/lib/continuity-state.mjs",
+    "git diff --check"
+  ],
+  "conflictDisposition": "Preserved all 0.4.6 session-cleanup APIs/tests and merged Nova runner-native continuation coverage; five Nova-only source files remain blob-identical to source. Inventory and governance are exact additive unions."
+}

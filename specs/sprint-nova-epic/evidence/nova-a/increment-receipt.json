@@ -1,0 +1,39 @@
+{
+  "schema": "pipeline.nova-increment-receipt.v1",
+  "increment": {"sprint":"Nova","phase":"A"},
+  "base": {"commit":"e4d62646f842e2dfd7ab8ef48457ea676fceecd3","tree":"ed5c28d72b7a7820eb53703d68c9a1cced94cb3b"},
+  "candidate": {"commit":"874323da7f510be3208ee8b6ffc31ef121963ee9","tree":"76de02e71063e574e9728691fad30d2b0c4a6337"},
+  "specification": {"kind":"specification","path":"specs/sprint-nova-epic/spec.md","sha256":"bb6c2851cfc0cd86525bf132b8c77a6fa735334252193cb83105de667bdfb35f"},
+  "acceptance": {"kind":"acceptance","path":"specs/sprint-nova-epic/acceptance.md","sha256":"69779547a926df01768e7c518158e030ee777cb51ee82a66d009631d431d9f2c"},
+  "issues": [
+    {"issue":7,"acceptanceIds":["NVA-A7-1","NVA-A7-2","NVA-A7-3","NVA-A7-4","NVA-A7-5"],"status":"complete","evidenceSha256":"62ce899b78d7675e7fcc7502a77214f7e8c6d690afbdc397c94053e4125689dc"},
+    {"issue":8,"acceptanceIds":["NVA-A8-1","NVA-A8-2","NVA-A8-3","NVA-A8-4","NVA-A8-5"],"status":"complete","evidenceSha256":"f91cb6a9ad4148d8b1418ab01ecbfe544def982045e086c9422f540ceb742403"},
+    {"issue":12,"acceptanceIds":["NVA-A12-1","NVA-A12-2","NVA-A12-3","NVA-A12-4"],"status":"complete","evidenceSha256":"c0caf6544b37ec75c19b80d6d25330d0916799be3bfbb6df0256a9c6a3434ee8"},
+    {"issue":14,"acceptanceIds":["NVA-A14-1","NVA-A14-2","NVA-A14-3","NVA-A14-4","NVA-A14-5"],"status":"complete","evidenceSha256":"ec16957435d8e957406e79363865fcae192c8ca5b8fd8c4254a9a1a11decd625"},
+    {"issue":29,"acceptanceIds":["NVA-A29-1","NVA-A29-2","NVA-A29-3","NVA-A29-4","NVA-A29-5","NVA-A29-6"],"status":"complete","evidenceSha256":"7a980391dc68fcd057671df3f15d38f11a4f13062a34aee4cc6f5b778645a246"},
+    {"issue":38,"acceptanceIds":["NVA-A38-1","NVA-A38-2","NVA-A38-3","NVA-A38-4","NVA-A38-5","NVA-A38-6"],"status":"complete","evidenceSha256":"56543e8e15dc442f3f011f4413efb5eec4ca3520ea342aa9755bd6583f2f4f62"},
+    {"issue":54,"acceptanceIds":["NVA-A54-1","NVA-A54-2","NVA-A54-3","NVA-A54-4","NVA-A54-5","NVA-A54-6","NVA-A54-7","NVA-A54-8"],"status":"complete","evidenceSha256":"b543f8b94fc5a0e45f01323f7998e3907f79e508d671ff86d27bbb137f50fc20"},
+    {"issue":56,"acceptanceIds":["NVA-A56-1","NVA-A56-2","NVA-A56-3","NVA-A56-4","NVA-A56-5","NVA-A56-6"],"status":"complete","evidenceSha256":"8abcc185603f16b035aab3daebefa1895155589881721b196ce63d67d7dd24c0"},
+    {"issue":57,"acceptanceIds":["NVA-A57-1","NVA-A57-2","NVA-A57-3","NVA-A57-4","NVA-A57-5","NVA-A57-6"],"status":"complete","evidenceSha256":"e54811eb2a9fe4e5ed195d42990be5330244df3856167e522964cf9370cf9ebc"}
+  ],
+  "backlog": {"status":"green","evidence":{"kind":"backlog","path":"backlog/index.json","fileSha256":"f0c6ed61b2fa914104ad20c8519c7791ffb26e683d8d9445c08581c83a65ef3b","recordSha256":null}},
+  "packages": [
+    {"id":"nova-a1","status":"complete","evidenceSha256":"e54811eb2a9fe4e5ed195d42990be5330244df3856167e522964cf9370cf9ebc"},
+    {"id":"nova-a2","status":"complete","evidenceSha256":"7a980391dc68fcd057671df3f15d38f11a4f13062a34aee4cc6f5b778645a246"},
+    {"id":"nova-a3","status":"complete","evidenceSha256":"56543e8e15dc442f3f011f4413efb5eec4ca3520ea342aa9755bd6583f2f4f62"},
+    {"id":"nova-a4","status":"complete","evidenceSha256":"c0caf6544b37ec75c19b80d6d25330d0916799be3bfbb6df0256a9c6a3434ee8"},
+    {"id":"nova-a5","status":"complete","evidenceSha256":"b543f8b94fc5a0e45f01323f7998e3907f79e508d671ff86d27bbb137f50fc20"},
+    {"id":"nova-a6","status":"complete","evidenceSha256":"8abcc185603f16b035aab3daebefa1895155589881721b196ce63d67d7dd24c0"},
+    {"id":"nova-a7","status":"complete","evidenceSha256":"c186a8cd821c75b5f0148c9f5c6248cb3efeef4dd7ee7344a2adb2fd08645e07"}
+  ],
+  "gates": [
+    {"gate":"security","candidate":{"commit":"874323da7f510be3208ee8b6ffc31ef121963ee9","tree":"76de02e71063e574e9728691fad30d2b0c4a6337"},"evidence":{"kind":"security","path":"specs/sprint-nova-epic/evidence/nova-a/security.json","fileSha256":"2d09d8cdb3162728a06cb86bf60fc8d9c8152ce3c609ad8512eb398443ee97a8","recordSha256":null},"status":"passed"},
+    {"gate":"verify","candidate":{"commit":"874323da7f510be3208ee8b6ffc31ef121963ee9","tree":"76de02e71063e574e9728691fad30d2b0c4a6337"},"evidence":{"kind":"verify","path":"specs/sprint-nova-epic/evidence/nova-a/verify.json","fileSha256":"0f18894aff70fae947f6f7fd2817b4e6cbb66fc7819282bd6004199e1df6f173","recordSha256":null},"status":"passed"}
+  ],
+  "critic": {"candidate":{"commit":"874323da7f510be3208ee8b6ffc31ef121963ee9","tree":"76de02e71063e574e9728691fad30d2b0c4a6337"},"evidence":{"kind":"critic","path":"specs/sprint-nova-epic/evidence/nova-a/critic.json","fileSha256":"64c2303cd3ad07025f8d45dcd3942d828d5ef7bb7f17bc36bbd778d4371b4760","recordSha256":null},"lineageSha256":"64c2303cd3ad07025f8d45dcd3942d828d5ef7bb7f17bc36bbd778d4371b4760","status":"accepted"},
+  "collisions": {"status":"none","entries":[]},
+  "evidenceManifest": {"path":"specs/sprint-nova-epic/evidence/nova-a/evidence-manifest.json","fileSha256":"3092717d39bcf7ff88ffef9602db69cd87157967c707c5e8a8332e7c9a58640d","treeDigest":"f8e6a46587b3d9e103bd575c851007831aec6fa261f3ffb815d3c0b2a29013f4"},
+  "result": {"candidate":{"commit":"874323da7f510be3208ee8b6ffc31ef121963ee9","tree":"76de02e71063e574e9728691fad30d2b0c4a6337"},"evidence":{"kind":"result","path":"specs/sprint-nova-epic/result.md","fileSha256":"db16ed6e36c67cf23cf31e5956f638f12af874f52fac1fd978c9694fa0b47d87","recordSha256":null}},
+  "createdAt": "2026-07-25T13:03:03.000Z",
+  "receiptSha256": "b087e6dd087396fa887a14e4fb022ca02cc672510b9245de3690a30b8e5c8fec"
+}

@@ -15,6 +15,7 @@ import {
   recordCandidateResult,
 } from "./critic-packet-preflight.mjs";
 import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
+import { compileCriticReviewLineage } from "../lib/critic-review-lineage.mjs";
 
 let passed = 0;
 async function check(name, fn) {
@@ -79,6 +80,21 @@ function options(f, packetId = "1".repeat(32)) {
 function expectCode(code) {
   return (error) => error instanceof CriticPacketError && error.code === code;
 }
+function lineage(packet, reviewId = "nova-a5-review") {
+  return compileCriticReviewLineage({
+    packet,
+    reviewId,
+    parent: null,
+    packages: [{ id: "nova-a5", subjectSha256: "a".repeat(64) }],
+    coverage: { paths: [...packet.diffPaths], acceptanceIds: ["NVA-A54-1"], integrationEdges: ["critic-packet-claim"] },
+    lane: { laneId: "independent-critic", evidenceSha256: "b".repeat(64) },
+    verdict: { status: "pending", schemaValid: false, resultSha256: null, failure: null },
+    findings: [],
+    correction: null,
+    invalidation: { kind: "none", evidenceSha256: null },
+    reviewAttempt: { round: 1, correctionCommits: 0, requestedMode: "full" },
+  });
+}
 
 await check("prepares a canonical no-remote packet with sorted diff and explicit empty governance", () => {
   const f = fixture();
@@ -142,4 +158,18 @@ await check("detects materialized diff mutation before a claim", () => {
   } finally { rmSync(f.root, { recursive: true, force: true }); }
 });
 
-process.stdout.write(`${passed}/5 checks passed.\n`);
+await check("binds an admissible closed Nova A5 lineage at claim and rejects a forged binding", () => {
+  const f = fixture();
+  try {
+    const prepared = prepareCandidatePacket(options(f, "6".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 12) });
+    const admitted = lineage(prepared.packet);
+    const claim = claimCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId, adapter: prepared.packet.route.adapter, claimantNonce: "1".repeat(64), lineage: admitted }, { now: new Date("2026-07-18T12:01:00.000Z") });
+    assert.equal(claim.claim.body.criticReviewLineageSha256, admitted.recordSha256);
+    const second = prepareCandidatePacket(options(f, "7".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 13) });
+    const forged = structuredClone(lineage(second.packet));
+    forged.recordSha256 = "0".repeat(64);
+    assert.throws(() => claimCandidatePacket({ controlRoot: f.control, packetId: second.packet.packetId, adapter: second.packet.route.adapter, claimantNonce: "2".repeat(64), lineage: forged }, { now: new Date("2026-07-18T12:01:00.000Z") }), expectCode("CPP-LINEAGE"));
+  } finally { rmSync(f.root, { recursive: true, force: true }); }
+});
+
+process.stdout.write(`${passed}/6 checks passed.\n`);

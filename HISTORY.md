@@ -1,5 +1,15 @@
 # History
 
+## 2026-07-26 — v0.4.6 delivered; Nova adaptation rebased
+
+- The `v0.4.6` release is fully delivered and closed. There is no open work in
+  the `0.4.x` release, installation, or pipeline-start line.
+- Nova is adapted on its isolated branch on the exact delivered `v0.4.6` base;
+  technical adaptation commit is `7f313c22d4311f7d5f0469131e3d0deae4364e11`.
+- Fresh Full Verify, Security, and Critic checks for the resulting Nova
+  integration candidate remain pending and are Nova integration gates only,
+  not release gates. No push, merge, or release action is claimed here.
+
 ## 2026-07-25 — Codex managed-workspace onboarding hotfix prepared
 
 - Corrected fresh-project onboarding for the bounded Codex host layout with
@@ -21,11 +31,40 @@
   order. Any candidate mutation after a gate requires a new gate, not a prose
   assertion that prior evidence still applies.
 
-### Open / next
+### Historical / superseded — Open / next
 
 Run the final Full Verify and independent Critic against the one committed
 0.4.4 candidate, then publish only if their commit/tree readbacks match the
 authorized release identity.
+
+## 2026-07-24 — Shared Nova/Cyborg backlog baseline
+
+- Reconciled the canonical backlog from the released `v0.4.1` base through the
+  sanctioned append-only writer. The PO closed the complete Sentinel sprint
+  and two delivered companion packages, activated six Cyborg and thirteen Nova
+  packages, and retained six confirmed Nightwing/Phoenix packages as open.
+- Froze the exact canonical state at commit
+  `5ca5a4b292a267ffdfcc52577fda0a0593957a65`, backlog subtree
+  `832bf98e22e9a147dad88c952c0b794f3ee44fe7`, transition head
+  `36dd616d3aa5bc21e49e138f6b8a9a17a9de25321998304306e4fa47289de562`,
+  and projection `6 open / 19 in_progress / 10 closed`. Cyborg consumes a
+  manual read-only mirror; this repository remains the only backlog authority.
+- Created Issue #57 for automatic Spec-bound delivery/status reconciliation
+  and append-only repair of the two inherited unreachable evidence commits.
+  The structural checker is green with explicit `checkCommit:false`; the
+  normal checker continues to report only historical events 39 and 40.
+
+### Lessons
+
+- Parallel sprint branches need one cryptographically bound backlog authority;
+  a manual sibling handoff must be explicitly read-only and non-canonical.
+- A delivered Spec should drive an authorized, idempotent backlog transition;
+  relying on sprint-close cleanup is late and drift-prone.
+
+### Open / next
+
+See the canonical [handover](docs/state.md) for the exact Cyborg adoption and
+readback procedure. Nova PRD/Spec and slicing resume from that shared baseline.
 
 ## 2026-07-23 — Native-Windows Verify block: portability sweep and delivery
 

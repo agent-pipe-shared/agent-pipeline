@@ -1,0 +1,16 @@
+{
+  "schema": "pipeline.nova-a-po-activation.v1",
+  "authorizedBy": "Product Owner",
+  "decision": "accepted",
+  "receipt": {
+    "path": "specs/sprint-nova-epic/evidence/nova-a/increment-receipt.json",
+    "receiptSha256": "b087e6dd087396fa887a14e4fb022ca02cc672510b9245de3690a30b8e5c8fec"
+  },
+  "candidate": {
+    "commit": "874323da7f510be3208ee8b6ffc31ef121963ee9",
+    "tree": "76de02e71063e574e9728691fad30d2b0c4a6337"
+  },
+  "activation": "nova-b-implementation",
+  "authority": "PO authorized the recommended repair and generation of the resulting approval.",
+  "recordedAt": "2026-07-25T13:06:58.000Z"
+}

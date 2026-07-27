@@ -1,0 +1,25 @@
+{
+  "schema": "pipeline.dispatch-record.v1",
+  "dispatchId": "NOVA-046-GATES",
+  "date": "2026-07-26",
+  "outcome": "closed 0.4.6 adaptation verification gates",
+  "baseCommit": "23d9165af80685c12ba092c1f34dd767e3ab6181",
+  "paths": [
+    "plugins/pipeline-core/lib/continuity-state.test.mjs",
+    "plugins/pipeline-core/scripts/codex-goal-host.mjs",
+    "specs/sprint-nova-epic/lifecycle.json",
+    "specs/sprint-nova-epic/evidence/nova-b/integration-0.4.6-gate-fixes/dispatch-record.json"
+  ],
+  "checks": [
+    "continuity-state test",
+    "codex-goal-host test",
+    "security scan and security-scan.test",
+    "artifact topology check",
+    "git diff --check"
+  ],
+  "claims": {
+    "pipelineStateSha256": "93ece041d0442e52988bb0bfcd09d4121f9b64de5e8bb51a5f7beab65a23cfe0",
+    "pipelineStateModified": false,
+    "freshVerifySecurityCritic": false
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema": "pipeline.nova-b2-c.gate-readback.v1",
+  "candidate": {
+    "commit": "be77f50e44500b4eba5e4c95f2bcb08da773bdc9",
+    "tree": "4777b77e3272db08cb9675a8994916a955ad457d"
+  },
+  "artifacts": {
+    "verify": "specs/sprint-nova-epic/evidence/nova-b/b2-c/verify.json",
+    "security": "specs/sprint-nova-epic/evidence/nova-b/b2-c/security.json",
+    "critic": "specs/sprint-nova-epic/evidence/nova-b/b2-c/critic.json"
+  },
+  "status": "passed",
+  "note": "Clean-clone focused tests, complete Verify, Security and fresh independent Critic all passed; B2-I remains separately deferred behind D1 ADR and live-pilot authority."
+}

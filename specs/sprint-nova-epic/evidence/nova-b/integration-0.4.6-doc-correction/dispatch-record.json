@@ -1,0 +1,29 @@
+{
+  "schema": "pipeline.dispatch-record.v1",
+  "dispatchId": "NOVA-046-DOCS",
+  "date": "2026-07-26",
+  "outcome": "documentation corrected to record delivered and closed v0.4.6 as Nova integration basis",
+  "poDisposition": "v0.4.6 is fully delivered and closed; no open 0.4.x release, installation, or pipeline-start work",
+  "baseCommit": "9d1b3dc108eb77629ace5b82002120f5539abd8d",
+  "adaptationCommit": "7f313c22d4311f7d5f0469131e3d0deae4364e11",
+  "paths": [
+    "docs/state.md",
+    "HISTORY.md",
+    "docs/release-0.4.4-readiness.md",
+    "docs/release-0.4.5-readiness.md",
+    "docs/release-0.4.6-readiness.md",
+    "specs/sprint-nova-epic/plans/nova-b.md",
+    "specs/sprint-nova-epic/result.md",
+    "specs/sprint-nova-epic/evidence/nova-b/integration-0.4.6-doc-correction/dispatch-record.json"
+  ],
+  "checks": [
+    "git diff --check",
+    "PRD/spec/state SHA-256 retention verification",
+    "relevant Verify doc-contract/spec-retention/observation-governance checks"
+  ],
+  "claims": {
+    "freshVerifySecurityCritic": false,
+    "pushMergeRelease": false,
+    "authorityDocHashMutation": false
+  }
+}

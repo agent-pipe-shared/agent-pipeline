@@ -40,7 +40,7 @@ test("closed launcher requires a concrete reason and constructs one demand-bound
       return { status: "ready" };
     },
     readQuestionBytesFn: async () => Buffer.from("Which bootstrap boundary is safe?", "utf8"),
-    resolveExecutableFn: () => resolveSystemExecutable("codex"),
+    resolveExecutableFn: () => process.execPath,
     runAdvisoryHostBridgeFn: async (argv) => {
       captured = JSON.parse(readFileSync(argv[1], "utf8"));
       return 0;
@@ -81,7 +81,7 @@ test("launcher rejects absent, oversized, or invalid UTF-8 stdin before creating
     await assert.rejects(runCodexAdvisoryBootstrap(argv, {
       requireProjectOnboardingReadyFn: () => ({ status: "ready" }),
       readQuestionBytesFn: async () => bytes,
-      resolveExecutableFn: () => resolveSystemExecutable("codex"),
+      resolveExecutableFn: () => process.execPath,
       runAdvisoryHostBridgeFn: async () => { invoked = true; return 0; },
     }), /advisory/u);
     assert.equal(invoked, false);

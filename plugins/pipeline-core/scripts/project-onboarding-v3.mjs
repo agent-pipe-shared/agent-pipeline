@@ -3,6 +3,7 @@
 
 import { pathToFileURL } from "node:url";
 import {
+  applyProjectOnboardingManifestRepairV4,
   applyProjectOnboardingKickoffV4,
   applyProjectOnboardingKickoffPromotionV4,
   applyProjectOnboardingLifecycleV4,
@@ -13,6 +14,7 @@ import {
   planProjectOnboardingKickoffV4,
   planProjectOnboardingKickoffPromotionV4,
   planProjectOnboardingLifecycleV4,
+  planProjectOnboardingSourceRecoveryV4,
 } from "../lib/project-onboarding-v3.mjs";
 
 function usage() {
@@ -86,6 +88,14 @@ export function main(args = process.argv.slice(2), {
     else if (options.command === "plan-runtime") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "runtime" });
     else if (options.command === "plan-repair") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "repair" });
     else if (options.command === "plan-readback") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "readback" });
+    else if (options.command === "plan-source-recovery") output = planProjectOnboardingSourceRecoveryV4({ rootDir: options.root, deps });
+    else if (options.command === "plan-manifest-repair") output = planProjectOnboardingManifestRepairV4({ rootDir: options.root, deps });
+    else if (options.command === "apply-manifest-repair") output = applyProjectOnboardingManifestRepairV4({
+      rootDir: options.root,
+      planSha256: options.planSha256,
+      activate: options.activate,
+      deps,
+    });
     else if (options.command === "kickoff-plan") output = planProjectOnboardingKickoffV4({
       rootDir: options.root,
       goal: options.goal,

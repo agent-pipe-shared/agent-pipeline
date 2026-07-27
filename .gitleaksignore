@@ -15,11 +15,6 @@ f06d6b57f3cd5d06e8ab3a5e5389aa4a6e5b0f26:specs/2026-07-11-plugin-scope-kanon/prd
 5add084a1be90f0ec780c07d671d68927eeac634:harness/scripts/pipeline-state.test.mjs:generic-api-key:1601
 5add084a1be90f0ec780c07d671d68927eeac634:harness/scripts/pipeline-state.test.mjs:generic-api-key:1726
 5add084a1be90f0ec780c07d671d68927eeac634:harness/scripts/pipeline-state.test.mjs:generic-api-key:1774
-# Equivalent exact fingerprints for the current worktree scanner mode.
-plugins/pipeline-core/lib/review-economy.test.mjs:generic-api-key:278
-plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:628
-plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:690
-plugins/pipeline-core/lib/continuity-state.test.mjs:generic-api-key:715
 # Historical false positives from the recovered Sentinel spec metadata. The
 # current Public files contain no inherited digest values; these exact
 # commit/path/rule/line fingerprints are retained narrowly for history scans.
@@ -35,7 +30,7 @@ aaeb698ff8440b745e15141e2206567afdc7afa8:specs/2026-07-19-sprint-sentinel-epic/s
 e32f34c5aa03f2498844a7fa5d35be5b612c051b:harness/scripts/pipeline-state.test.mjs:generic-api-key:1601
 e32f34c5aa03f2498844a7fa5d35be5b612c051b:harness/scripts/pipeline-state.test.mjs:generic-api-key:1726
 e32f34c5aa03f2498844a7fa5d35be5b612c051b:harness/scripts/pipeline-state.test.mjs:generic-api-key:1774
-# Nova A1 deterministic digest/idempotency records. These exact historical
+# Nova A1 deterministic digest/idempotency records. These no-git candidate-tree
 # fingerprints are non-secret evidence values; do not widen to a path or rule.
 9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:backlog/transitions.ndjson:generic-api-key:73
 9dd9c5b10d16d32cd7c41aba75d495fd25d7cf97:backlog/transitions.ndjson:generic-api-key:74

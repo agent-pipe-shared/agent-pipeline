@@ -1,0 +1,19 @@
+{
+  "schema": "pipeline.security-evidence.v1",
+  "candidate": {
+    "commit": "be77f50e44500b4eba5e4c95f2bcb08da773bdc9",
+    "tree": "4777b77e3272db08cb9675a8994916a955ad457d",
+    "snapshot": "git-detached-worktree.v1",
+    "verifiedBeforeAfter": true
+  },
+  "command": "node harness/scripts/security-scan.mjs --root <clean-clone>",
+  "result": {
+    "exitCode": 0,
+    "verdict": "clean",
+    "gitleaks": { "status": "pass", "findings": 0 },
+    "osvScanner": { "status": "skipped", "reason": "no package sources in project" },
+    "semgrep": { "status": "pass", "findings": 0 },
+    "licenseCheck": { "status": "pass", "findings": 0 }
+  },
+  "sourcePayloadSha256": "2b18db074975fb4a5a49e6c2e44b2d615568f60504fc92b62dffe12e18475c05"
+}

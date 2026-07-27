@@ -1,0 +1,19 @@
+{
+  "schema": "pipeline.nova-b1-c.verify-evidence.v1",
+  "candidate": {
+    "commit": "b8a2540a4666719fca466e9f64267f62ad785bc7",
+    "tree": "151e16ce739f911b9a378818f6d07c59a39dd987"
+  },
+  "command": "node plugins/pipeline-core/lib/local-worker-pool.test.mjs",
+  "result": {
+    "exitCode": 0,
+    "checks": 6,
+    "status": "passed"
+  },
+  "diffCheck": {
+    "command": "git diff --check b8a2540^..b8a2540",
+    "exitCode": 0,
+    "status": "passed"
+  },
+  "scope": "B1-C focused contract verification; no production supervisor, durable state store, process launch, or workspace creation was exercised."
+}

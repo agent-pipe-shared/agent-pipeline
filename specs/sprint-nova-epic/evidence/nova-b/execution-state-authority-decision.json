@@ -1,0 +1,22 @@
+{
+  "schema": "pipeline.execution-state-authority-decision.v1",
+  "status": "po-approved",
+  "approvedAt": "2026-07-25",
+  "authority": {
+    "d1LocalSupervisor": "approved-for-feature-branch-live-testing",
+    "b2RemoteBroker": "deferred-pending-concrete-broker-live-pilot-decision",
+    "productionPromotion": "requires-final-native-evidence"
+  },
+  "decisions": {
+    "stateRoot": "platform-specific versioned per-repository root; no repository, .git, shared cache or undeclared temporary fallback",
+    "ownership": "owner nonce plus PID, process-start token and privacy-safe boot digest",
+    "durability": "lock/CAS/prepared journal/atomic rename/readback; weaker directory durability is process-crash-only",
+    "cleanup": "exact manifest/lease/process identity only; no broad process or path cleanup",
+    "secrets": "external broker with ephemeral delivery only; secret bytes never durable"
+  },
+  "onboardingAndStart": {
+    "requirement": "onboarding and pipeline-start must expose typed, idempotent repair plans and retry without recursive repair/deadlock",
+    "testsRequired": ["interrupted-repair-resume", "concurrent-repair-busy", "stale-owner-recovery", "repair-readback", "repeated-start-idempotence"]
+  },
+  "forbidden": ["silent-permission-expansion", "OS-isolation-claim-without-evidence", "broad-cleanup", "secret-persistence"]
+}

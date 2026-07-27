@@ -1,0 +1,18 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+import assert from "node:assert/strict";
+import { planParallelDispatch } from "./parallel-dispatch-planner.mjs";
+import { createExecutionSubject, executionSubjectDigest } from "./execution-plane-contract.mjs";
+import { composeSchedulingLifecycle, schedulingLifecycleDigest } from "./scheduling-lifecycle.mjs";
+const A="a".repeat(64), O="1".repeat(40), auth=[{kind:"spec",sha256:A}];
+const packages=[{id:"a",dependencies:[],writePaths:["src/a.mjs"],resources:[],kind:"implementation"},{id:"b",dependencies:["a"],writePaths:["src/b.mjs"],resources:[],kind:"test"},{id:"c",dependencies:[],writePaths:["src/c.mjs"],resources:[],kind:"review"}];
+const subjects=packages.map((p) => createExecutionSubject({repository:{identitySha256:A},baseCommit:O,baseTree:O,candidateCommit:O,candidateTree:O,packageId:p.id,dispatchId:`dispatch-${p.id}`,attempt:`attempt-${p.id}`,queueRevision:0,authorityDigests:auth,writePaths:p.writePaths,resources:p.resources}));
+const queue=(revision) => ({queueId:"nova",candidate:{commit:O,tree:O},revision,packagesSha256:A});
+const plannerInput=(completed=[])=>({schema:"pipeline.parallel-dispatch-input.v1",maxParallel:2,reservedSlots:0,completed,packages});
+let passed=0; const check=(name,fn)=>{fn();passed+=1;console.log(`PASS SLC${String(passed).padStart(2,"0")} ${name}`);};
+function compose(revision, completed, prior=null, outcomes=[]) { const input=plannerInput(completed); const terminal=new Set(outcomes.filter((x)=>x.state!=="verified").map((x)=>x.packageId)); let changed=true; while(changed){changed=false;for(const p of packages)if(!terminal.has(p.id)&&p.dependencies.some((d)=>terminal.has(d))){terminal.add(p.id);changed=true;}} const active={...input,packages:packages.filter((p)=>!terminal.has(p.id))}; return composeSchedulingLifecycle({queue:queue(revision),plannerInput:input,plannerReceipt:planParallelDispatch(active),subjects,authorityDigests:auth,prior,terminalOutcomes:outcomes}); }
+check("binds an exact frozen receipt and preserves explicit blocked reasons",()=>{const l=compose(0,[]);assert.deepEqual(l.selected.map(x=>x.packageId),["a","c"]);assert.deepEqual(l.blocked.map(x=>x.reason),["PDP-BLOCKED-DEPENDENCY:a"]);});
+check("rejects handwritten or stale planner receipts before lifecycle creation",()=>{const input=plannerInput([]);assert.throws(()=>composeSchedulingLifecycle({queue:queue(0),plannerInput:input,plannerReceipt:{...planParallelDispatch(input),selected:[]},subjects,authorityDigests:auth,prior:null,terminalOutcomes:[]}));});
+check("imports only verified outcomes as completed and binds the replan chain",()=>{const first=compose(0,[]);const prior={lifecycle:first,lifecycleSha256:schedulingLifecycleDigest(first)};const l=compose(1,["a"],prior,[{packageId:"a",state:"verified",evidenceSha256:A,subjectSha256:executionSubjectDigest(subjects[0])}]);assert.deepEqual(l.completed.map(x=>x.packageId),["a"]);assert.equal(l.previousSha256,prior.lifecycleSha256);assert.deepEqual(l.selected.map(x=>x.packageId),["b","c"]);});
+check("propagates failed upstream terminal state while unrelated work remains ready",()=>{const first=compose(0,[]);const prior={lifecycle:first,lifecycleSha256:schedulingLifecycleDigest(first)};const l=compose(1,[],prior,[{packageId:"a",state:"failed",evidenceSha256:A,subjectSha256:executionSubjectDigest(subjects[0])}]);assert.deepEqual(l.failed.map(x=>[x.packageId,x.reason]),[["a","failed"],["b","upstream-failed:a"]]);assert.deepEqual(l.selected.map(x=>x.packageId),["c"]);assert.deepEqual(l.completed,[]);});
+console.log(`${passed}/4 checks passed.`);

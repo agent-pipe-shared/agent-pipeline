@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.backlog-evidence-amendment.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "kind",
+    "targetSequence",
+    "targetEntryHash",
+    "targetCommit",
+    "replacementCommit",
+    "reference",
+    "dispositionSha256",
+    "idempotencyKey"
+  ],
+  "properties": {
+    "schema": { "const": "pipeline.backlog-evidence-amendment.v1" },
+    "kind": { "const": "evidence-amendment" },
+    "targetSequence": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "targetEntryHash": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "targetCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "replacementCommit": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+    "reference": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*\\\\)(?!.*//)(?!.*\\/$)(?!\\.{1,2}$)(?!\\.{1,2}/)(?!.*/\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$"
+    },
+    "dispositionSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "idempotencyKey": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}
