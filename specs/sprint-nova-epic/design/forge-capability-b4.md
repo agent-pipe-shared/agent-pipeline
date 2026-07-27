@@ -1,5 +1,10 @@
 # B4 forge capability design
 
+**Status:** PO-approved design. The local common transport contract and
+GitHub/GitLab adapter implementation are permitted only on this Nova branch.
+No live provider operation, credential use, project migration, merge, release,
+setting or permission mutation is permitted by this approval.
+
 ## Purpose and boundary
 
 `pipeline.forge-capability.v1` is a provider-neutral observation contract.

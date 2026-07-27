@@ -1,16 +1,5 @@
 # Sprint Nova Epic — Result
 
-## 2026-07-27 — B6 native macOS scope transfer
-
-Status: `native-macos-transferred-to-72; Nova-claim-non-native`.
-
-The PO confirmed that no eligible Apple-Silicon device is currently available.
-Nova therefore retains only the synthetic/non-native macOS contract boundary.
-The complete native bootstrap, lifecycle, runner, Verify, Security, Critic and
-PO-close acceptance transfers to Issue #72 with `sprint:NONE`. This record is
-not native evidence and does not close Issue #49; its original Issue receives
-the exact transfer comment before Nova's narrowed close disposition.
-
 ## 2026-07-27 — B0 Codex blocked-goal continuation correction
 
 Status: `branch-candidate-implemented`.
@@ -742,3 +731,30 @@ synthetic/non-native boundary plus B49-7's bounded keep-awake contract and
 B49-8's exact-input/resume contract. Neither retained contract represents a
 native macOS completion claim. The original #49 transfer comment remains a
 required external readback before a narrowed Nova close disposition.
+
+## 2026-07-27 — B6 native macOS scope transfer
+
+Status: `native-macos-transferred-to-72; Nova-claim-non-native`.
+
+The PO confirmed that no eligible Apple-Silicon device is currently available.
+Nova therefore retains only the synthetic/non-native macOS contract boundary.
+The complete native bootstrap, lifecycle, runner, Verify, Security, Critic and
+PO-close acceptance transfers to Issue #72 with `sprint:NONE`. This record is
+not native evidence and does not close Issue #49; its original Issue receives
+the exact transfer comment before Nova's narrowed close disposition.
+
+## 2026-07-27 — #49 transfer readback and B2/B4 local contract progress
+
+Status: `transfer-comment-readback; local-contracts-implemented; live-gates-pending`.
+
+The exact narrowed-scope transfer comment is published and read back on #49 as
+`agent-pipe-shared` comment `5092523484`. It leaves #49 and #72 open and
+unchanged in label/state. ADR-0049 records the B2-I constrained GitLab-CI
+design and its threat model; no credential, job, provider mutation or pilot
+invocation has occurred.
+
+The B4 candidate adds only deterministic local contracts: a provider-neutral
+Git fetch/new-branch state machine and a GitHub.com target/observation adapter,
+alongside the existing GitLab adapter. The recorded GitLab test-target push
+remains transport evidence only. This entry makes no live capability, merge,
+release, migration, Issue closure, final Critic, PO-close or delivery claim.

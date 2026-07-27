@@ -1,0 +1,8 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.git-transport-operation.v1",
+  "type": "object",
+  "required": ["schema", "operationId", "provider", "remote", "operation", "sourceCommit", "destinationRef", "expectedRemoteOid", "preview", "confirmation", "remoteReceipt", "readback", "state", "previousSha256", "recordSha256"],
+  "additionalProperties": false,
+  "properties": { "schema": {"const": "pipeline.git-transport-operation.v1"}, "operationId": {"type": "string"}, "provider": {"enum": ["github", "gitlab"]}, "remote": {"type": "object"}, "operation": {"enum": ["ref.fetch", "branch.publish"]}, "sourceCommit": {"pattern": "^[a-f0-9]{40}$"}, "destinationRef": {"pattern": "^refs/heads/"}, "expectedRemoteOid": {"type": ["string", "null"]}, "preview": {"type": ["object", "null"]}, "confirmation": {"type": ["object", "null"]}, "remoteReceipt": {"type": ["object", "null"]}, "readback": {"type": ["object", "null"]}, "state": {"type": "string"}, "previousSha256": {"type": ["string", "null"]}, "recordSha256": {"pattern": "^[a-f0-9]{64}$"} }
+}

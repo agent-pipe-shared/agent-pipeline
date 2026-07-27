@@ -1,7 +1,8 @@
-# B2-I D1 — GitLab CI constrained remote-executor pilot (ADR draft)
+# B2-I D1 — GitLab CI constrained remote-executor pilot
 
-**Status:** Draft for PO approval; no implementation or provider mutation is
-authorized by this document.
+**Status:** Decision accepted as ADR-0049. It authorizes the exact local
+contract implementation manifest below, but no provider mutation, credential
+use, CI job, project setting, branch or live-pilot invocation.
 
 ## Decision proposed
 
@@ -60,10 +61,9 @@ outlive the bound request. A new request needs a new PO-authorized preview.
 
 ## Exact implementation manifest proposed for approval
 
-Implementation may begin only after this draft is promoted to a numbered ADR
-and the following manifest is accepted as one set:
+The PO accepted this manifest as one set through ADR-0049:
 
-- `docs/adr/NNNN-gitlab-ci-constrained-remote-executor-pilot.md`
+- `docs/adr/0049-gitlab-ci-constrained-remote-executor-pilot.md`
 - `docs/adr/README.md`
 - `specs/sprint-nova-epic/design/b2-i-gitlab-ci-pilot.md`
 - `plugins/pipeline-core/lib/gitlab-ci-execution-broker.mjs` and its test
@@ -80,13 +80,11 @@ fixture is in this manifest.
 
 ## PO gates before execution
 
-1. Approve this decision and the exact numbered ADR path; `NNNN` is reserved
-   only at that time to avoid collisions with parallel Sprint work.
-2. Approve the exact target digest, the two-job YAML preview, the requested
+1. Approve the exact target digest, the two-job YAML preview, the requested
    operator capability and the job-token push prohibition readback.
-3. Approve each provider mutation separately. The first pilot invocation and
+2. Approve each provider mutation separately. The first pilot invocation and
    cancellation each require their own exact preview and post-action readback.
-4. Before any B2-I completion claim, bind focused tests, Full Verify, Security
+3. Before any B2-I completion claim, bind focused tests, Full Verify, Security
    and independent Critic evidence to the exact candidate; a provider success
    alone is insufficient.
 

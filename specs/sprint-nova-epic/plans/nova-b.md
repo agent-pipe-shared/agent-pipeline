@@ -215,10 +215,9 @@ with synthetic brokers/jobs only.
 **Entry:** D1 ADR approved with exact remote/broker path manifest and separate
 live-pilot authority.
 
-**Design status:** `design/b2-i-gitlab-ci-pilot.md` is the unapproved
-GitLab-CI constrained-executor proposal. It supplies no credential, CI job,
-provider mutation or implementation authority until its numbered ADR and path
-manifest are expressly approved.
+**Design status:** ADR-0049 accepts the exact local B2-I contract manifest in
+`design/b2-i-gitlab-ci-pilot.md`. It supplies no credential, CI job, provider
+mutation, project-setting, branch or live-pilot authority.
 
 **Outcome:** add external/asynchronous execution only through the accepted
 execution-plane contract and short-lived bounded authority.
