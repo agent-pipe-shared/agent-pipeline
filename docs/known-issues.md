@@ -89,3 +89,9 @@ Plan/Spec gate was renewed, this same session exception reactivated only
 TP-1, TP-3, and TP-5 for the single Goldfish completion dispatch. It remains
 limited to the listed writer/topology/test work and must again be restored
 before any independent review, aggregate final gate, or remote action.
+
+That Goldfish dispatch completed its exact writer preview → PO-bound apply →
+readback transaction and committed the corresponding public-safe receipt. The
+TP-1, TP-3, and TP-5 rules are restored before aggregate verification and any
+independent review; the exception grants no further implementation or remote
+authority.
