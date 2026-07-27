@@ -2213,17 +2213,24 @@ if (symlinkCapable) {
   writeFileSync(journalPath, `${canonicalFixtureJson(journal)}\n`);
   const refused = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-02", "--mode", "complete"], bound);
   ok("PHX0A6f self-consistent forged journal postimage cannot complete or change the retained preimage", crashed === 2 && refused === 2 && readFileSync(statePath(dir), "utf8") === before && existsSync(journalPath));
-  // Historical v1 has only the nine core fields; an added field is malformed.
-  journal.schema = "pipeline.continuity-authority-revision-transaction.v1";
-  journal.updatedAt = JSON.parse(journal.preStateBytes).updatedAt;
-  writeFileSync(journalPath, `${canonicalFixtureJson(journal)}\n`);
-  const extraTimestamp = captureConsoleLog(() => run(["continuity-authority-revision-recover"], bound));
-  delete journal.updatedAt;
-  writeFileSync(journalPath, `${canonicalFixtureJson(journal)}\n`);
-  const legacyPreview = captureConsoleLog(() => run(["continuity-authority-revision-recover"], bound));
-  const legacyComplete = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-03", "--mode", "complete"], bound);
-  const legacyRestore = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-04", "--mode", "restore"], bound);
-  ok("PHX0A6g v1 requires its historical core shape and valid legacy journals are explicitly restore-only", extraTimestamp.value === 2 && extraTimestamp.text.includes("recovery-invalid") && legacyPreview.value === 2 && legacyPreview.text.includes("recovery-legacy-restore-only") && legacyComplete === 2 && legacyRestore === 0 && readFileSync(statePath(dir), "utf8") === before && !existsSync(journalPath));
+  const legacyTen = structuredClone(journal); legacyTen.schema = "pipeline.continuity-authority-revision-transaction.v1";
+  legacyTen.updatedAt = JSON.parse(legacyTen.preStateBytes).updatedAt;
+  writeFileSync(journalPath, `${canonicalFixtureJson(legacyTen)}\n`);
+  const legacyTenPreview = captureConsoleLog(() => run(["continuity-authority-revision-recover"], bound));
+  const legacyTenComplete = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-03", "--mode", "complete"], bound);
+  const legacyTenRestore = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-04", "--mode", "restore"], bound);
+  const legacyNine = structuredClone(journal); legacyNine.schema = "pipeline.continuity-authority-revision-transaction.v1";
+  writeFileSync(journalPath, `${canonicalFixtureJson(legacyNine)}\n`);
+  const legacyNinePreview = captureConsoleLog(() => run(["continuity-authority-revision-recover"], bound));
+  const legacyNineComplete = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-05", "--mode", "complete"], bound);
+  const legacyNineRestore = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-06", "--mode", "restore"], bound);
+  const malformedExtra = { ...legacyNine, unexpected: "rejected" };
+  writeFileSync(journalPath, `${canonicalFixtureJson(malformedExtra)}\n`);
+  const extraPreview = captureConsoleLog(() => run(["continuity-authority-revision-recover"], bound));
+  const malformedMissing = structuredClone(legacyNine); delete malformedMissing.postStateBytes;
+  writeFileSync(journalPath, `${canonicalFixtureJson(malformedMissing)}\n`);
+  const missingPreview = captureConsoleLog(() => run(["continuity-authority-revision-recover"], bound));
+  ok("PHX0A6g both historical v1 forms are restore-only; malformed extra/missing variants are invalid", legacyTenPreview.value === 2 && legacyTenPreview.text.includes("recovery-legacy-restore-only") && legacyTenComplete === 2 && legacyTenRestore === 0 && legacyNinePreview.value === 2 && legacyNinePreview.text.includes("recovery-legacy-restore-only") && legacyNineComplete === 2 && legacyNineRestore === 0 && extraPreview.value === 2 && extraPreview.text.includes("recovery-invalid") && missingPreview.value === 2 && missingPreview.text.includes("recovery-invalid") && readFileSync(statePath(dir), "utf8") === before);
 }
 
 {
