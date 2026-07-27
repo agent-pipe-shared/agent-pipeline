@@ -265,6 +265,7 @@ import {
 import { validatePoGateAuthorityForRepository } from "../../plugins/pipeline-core/lib/po-gate-authority.mjs";
 import {
   bindPlanSpecApproval,
+  canonicalJson as canonicalPhxJson,
   revokePlanV2,
   sha256CanonicalJson,
 } from "../lib/plan-spec-state-v2.mjs";
@@ -287,6 +288,10 @@ import {
   startPublicationReadback,
 } from "../../plugins/pipeline-core/lib/publication-authority.mjs";
 import { publicationDigest } from "../../plugins/pipeline-core/lib/publication-bundle.mjs";
+import {
+  planFeaturePackageBootstrap,
+  validateFeaturePackage,
+} from "../../plugins/pipeline-core/lib/feature-package-topology.mjs";
 
 export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
@@ -316,6 +321,21 @@ const CONTINUITY_SUBCOMMANDS = new Set([
   "continuity-apply-decision",
   "continuity-clear-decision",
 ]);
+const FEATURE_PACKAGE_SUBCOMMANDS = new Set([
+  "feature-package-inspect",
+  "feature-package-plan",
+  "feature-package-apply",
+  "feature-package-status",
+  "feature-package-recover",
+]);
+const CONTINUITY_AUTHORITY_REVISION_SUBCOMMANDS = new Set([
+  "continuity-authority-revision-plan",
+  "continuity-authority-revision-apply",
+  "continuity-authority-revision-recover",
+]);
+const FEATURE_PACKAGE_REQUEST_SCHEMA = "pipeline.feature-package-transition-request.v1";
+const CONTINUITY_AUTHORITY_REVISION_REQUEST_SCHEMA = "pipeline.continuity-authority-revision-request.v1";
+const FEATURE_PACKAGE_REQUEST_MAX_BYTES = 65_536;
 const PUBLICATION_SUBCOMMANDS = new Set([
   "publication-prepare",
   "publication-approve",
@@ -2174,6 +2194,306 @@ function runPublicationCommand(sub, flags, deps) {
   } finally { releaseContinuityLock(lock); }
 }
 
+function readClosedJsonFile(dir, requestFile, maxBytes = FEATURE_PACKAGE_REQUEST_MAX_BYTES) {
+  if (typeof requestFile !== "string" || requestFile.length < 1 || requestFile.length > 240
+    || isAbsolute(requestFile) || requestFile.includes("\\") || requestFile.includes("\0")) return { ok: false, code: "PS-PHX-REQUEST-FILE" };
+  const parts = requestFile.split("/");
+  if (parts.some((part) => part === "" || part === "." || part === "..")) return { ok: false, code: "PS-PHX-REQUEST-FILE" };
+  const path = resolve(dir, requestFile);
+  try {
+    const stat = lstatSync(path);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 2 || stat.size > maxBytes) return { ok: false, code: "PS-PHX-REQUEST-FILE" };
+    const real = realpathSync(path); const root = realpathSync(dir); const rel = relative(root, real);
+    if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return { ok: false, code: "PS-PHX-REQUEST-FILE" };
+    const bytes = readFileSync(real, "utf8"); const value = JSON.parse(bytes);
+    return value !== null && typeof value === "object" && !Array.isArray(value)
+      ? { ok: true, value, bytes, sha256: sha256Bytes(bytes) }
+      : { ok: false, code: "PS-PHX-REQUEST" };
+  } catch { return { ok: false, code: "PS-PHX-REQUEST" }; }
+}
+
+function safePhxId(value) { return typeof value === "string" && /^[a-z0-9][a-z0-9._-]{7,79}$/u.test(value); }
+function safeIso(value) { return typeof value === "string" && /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/u.test(value) && !Number.isNaN(Date.parse(value)); }
+function safeOid(value) { return typeof value === "string" && /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u.test(value); }
+function safeRepoArtifact(dir, value) { return hashBoundRepoFile(dir, value, 1_048_576); }
+function featureArtifactSetSha256(artifacts) {
+  return sha256Bytes(canonicalPhxJson(artifacts.map(({ class: artifactClass, path, authority, mutability, retention }) => ({ class: artifactClass, path, authority, mutability, retention }))));
+}
+function currentRepoArtifact(dir, path) {
+  if (typeof path !== "string" || path.length < 1 || path.length > 240 || isAbsolute(path) || path.includes("\\") || path.includes("\0")) return null;
+  const parts = path.split("/");
+  if (parts.some((part) => part === "" || part === "." || part === "..")) return null;
+  try {
+    const root = realpathSync(dir); const candidate = resolve(root, path); const rel = relative(root, candidate);
+    if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return null;
+    const stat = lstatSync(candidate);
+    if (!stat.isFile() || stat.isSymbolicLink() || stat.size < 1 || stat.size > 1_048_576) return null;
+    const real = realpathSync(candidate); const realRel = relative(root, real);
+    if (realRel === "" || realRel === ".." || realRel.startsWith(`..${sep}`) || isAbsolute(realRel)) return null;
+    return { path, sha256: sha256Bytes(readFileSync(real)) };
+  } catch { return null; }
+}
+function poApprovalDecision(dir, manifest, deps) {
+  const state = readState(dir);
+  const approval = state.status === "ok" ? state.state.planApproval : null;
+  const authority = approval?.poGateAuthority;
+  if (state.status !== "ok" || state.state.planApproved !== true || state.state.activeFeature?.id === undefined
+    || state.state.activeFeature.id !== manifest.feature.id || state.state.activeFeature.planPath !== authority?.planPath
+    || !exactObjectKeys(approval, ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority"])
+    || approval.schema !== "pipeline.plan-approval.v2"
+    || !exactObjectKeys(authority, ["schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256", "repositoryFingerprint", "planPath", "planSha256", "specPath", "specSha256"])) return null;
+  const observed = (deps.poGateAuthority ?? ((request) => validatePoGateAuthorityForRepository(request)))({ repoRoot: dir, expectedPlanSha256: authority.planSha256, expectedSpecSha256: authority.specSha256 });
+  if (!observed?.ok || !samePhxJson(observed.value, authority)) return null;
+  return { planPath: authority.planPath, planSha256: authority.planSha256, specPath: authority.specPath, specSha256: authority.specSha256, approvalSha256: sha256CanonicalJson(approval) };
+}
+function exactPoDecision(value) {
+  return exactObjectKeys(value, ["planPath", "planSha256", "specPath", "specSha256", "approvalSha256"])
+    && typeof value.planPath === "string" && typeof value.specPath === "string"
+    && SHA256_RE.test(value.planSha256) && SHA256_RE.test(value.specSha256) && SHA256_RE.test(value.approvalSha256);
+}
+function exactFeatureRequest(value) {
+  const shared = exactObjectKeys(value, ["schema", "operation", "manifest", "manifestPreimage", "targetState", "manifestBytes", "planReceipt", "authority", "candidate", "evidence", "idempotencyKey", "expiresAt", "artifactSetSha256"])
+    && value.schema === FEATURE_PACKAGE_REQUEST_SCHEMA && value.targetState === "draft"
+    && typeof value.manifest === "string" && typeof value.manifestBytes === "string"
+    && SHA256_RE.test(value.artifactSetSha256) && value.candidate === null && value.evidence === null
+    && safePhxId(value.idempotencyKey) && safeIso(value.expiresAt);
+  if (!shared || !exactObjectKeys(value.authority, ["class", "decision"])) return false;
+  return (value.operation === "bootstrap-draft" && value.manifestPreimage === "absent"
+    && value.authority.class === "lifecycle-bootstrap" && value.authority.decision === null)
+    || (value.operation === "reconcile-draft" && SHA256_RE.test(value.manifestPreimage)
+      && value.authority.class === "po-plan-approval" && exactPoDecision(value.authority.decision));
+}
+function samePhxJson(left, right) { return canonicalPhxJson(left) === canonicalPhxJson(right); }
+function featureJournalPath(dir) { return join(dir, ".claude", "feature-package-transaction.json"); }
+function writeBoundFile(path, bytes, lock, directory, deps = {}) {
+  const tmp = `${path}.tmp.${lock.ownerNonce}`; let fd; let renamed = false;
+  try {
+    if (!assertContinuityLockOwned(lock)) return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
+    mkdirSync(directory, { recursive: true });
+    fd = openSync(tmp, "wx", 0o600); (deps.replaceFdContents ?? replaceFdContents)(fd, bytes); closeSync(fd); fd = undefined;
+    if (!assertContinuityLockOwned(lock)) return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
+    (deps.renameSync ?? renameSync)(tmp, path); renamed = true;
+    const synced = deps.syncDirectory?.(directory) ?? syncDirectory(directory);
+    return synced.ok ? { ok: true } : { ok: false, code: "PS-PHX-DURABILITY-UNKNOWN", committed: true };
+  } catch {
+    return renamed ? { ok: false, code: "PS-PHX-COMMIT-INDETERMINATE", committed: null } : { ok: false, code: "PS-PHX-WRITE-IO", committed: false };
+  } finally { if (fd !== undefined) closeSync(fd); if (!renamed) safeUnlink(tmp); }
+}
+function featureReceiptPath(request) {
+  const base = request.manifest.slice(0, -"lifecycle.json".length);
+  return `${base}evidence/lifecycle/feature-package-${request.idempotencyKey}.json`;
+}
+function featureReceipt(request, outcome) {
+  return {
+    schema: "pipeline.feature-package-lifecycle-receipt.v1", operation: request.operation, outcome,
+    manifestSha256: sha256Bytes(request.manifestBytes), featureId: request.planReceipt.featureId,
+    decision: request.authority.decision, candidate: null, evidence: null, idempotencyKey: request.idempotencyKey,
+  };
+}
+function reconcileDraftPreview(dir, manifestPath) {
+  const manifest = typeof manifestPath === "string" ? manifestPath : "";
+  if (isAbsolute(manifest) || manifest.includes("\\") || manifest.includes("\0") || manifest.split("/").some((part) => part === "" || part === "." || part === "..")) return { ok: false, code: "PS-FEATURE-PREIMAGE" };
+  const target = resolve(dir, manifest);
+  let bytes; let value;
+  try { bytes = readFileSync(target, "utf8"); value = JSON.parse(bytes); } catch { return { ok: false, code: "PS-FEATURE-PREIMAGE" }; }
+  const id = manifest.slice("specs/".length, -"/lifecycle.json".length);
+  if (!manifest.startsWith("specs/") || !manifest.endsWith("/lifecycle.json") || !safePhxId(id)
+    || !exactObjectKeys(value, ["schema", "feature", "state", "artifacts", "candidate", "supersedes"])
+    || !exactObjectKeys(value.feature, ["id", "rigor"]) || value.feature.id !== id || value.state !== "draft"
+    || !Array.isArray(value.artifacts) || value.candidate !== null || value.supersedes !== null) return { ok: false, code: "PS-FEATURE-PREIMAGE" };
+  const expected = [
+    ["prd", `${manifest.slice(0, -"lifecycle.json".length)}prd_phoenix-epic.md`],
+    ["spec", `${manifest.slice(0, -"lifecycle.json".length)}spec.md`],
+    ["acceptance", `${manifest.slice(0, -"lifecycle.json".length)}acceptance.md`],
+    ["design", `${manifest.slice(0, -"lifecycle.json".length)}design/architecture.md`],
+  ];
+  const replacements = [];
+  for (const [artifactClass, path] of expected) {
+    const matches = value.artifacts.filter((artifact) => artifact?.class === artifactClass && artifact.path === path);
+    if (matches.length !== 1 || !exactObjectKeys(matches[0], ["class", "path", "sha256", "authority", "mutability", "retention"]) || !SHA256_RE.test(matches[0].sha256)) return { ok: false, code: "PS-FEATURE-RECONCILE-SHAPE" };
+    const current = currentRepoArtifact(dir, path);
+    if (!current || current.sha256 === matches[0].sha256) return { ok: false, code: "PS-FEATURE-RECONCILE-NOOP" };
+    replacements.push({ old: matches[0].sha256, next: current.sha256 });
+  }
+  let nextBytes = bytes;
+  for (const replacement of replacements) {
+    const token = `"sha256": "${replacement.old}"`;
+    if (nextBytes.split(token).length !== 2) return { ok: false, code: "PS-FEATURE-RECONCILE-BYTES" };
+    nextBytes = nextBytes.replace(replacement.old, replacement.next);
+  }
+  let next;
+  try { next = JSON.parse(nextBytes); } catch { return { ok: false, code: "PS-FEATURE-RECONCILE-BYTES" }; }
+  const changed = value.artifacts.map((artifact, index) => artifact.sha256 === next.artifacts[index]?.sha256 ? 0 : 1).reduce((total, count) => total + count, 0);
+  if (changed !== 4 || featureArtifactSetSha256(value.artifacts) !== featureArtifactSetSha256(next.artifacts)) return { ok: false, code: "PS-FEATURE-RECONCILE-BYTES" };
+  return { ok: true, manifest, bytes, value, nextBytes, next, preimage: sha256Bytes(bytes), artifactSetSha256: featureArtifactSetSha256(value.artifacts), receipt: { schema: "pipeline.feature-package-receipt.v1", manifest, manifestSha256: sha256Bytes(nextBytes), featureId: id, state: "draft", candidate: null, artifactCount: next.artifacts.length, findingCount: 0 } };
+}
+function validateFeatureRequest(dir, request, deps = {}) {
+  if (!exactFeatureRequest(request)) return { ok: false, code: "PS-FEATURE-REQUEST" };
+  if (request.operation === "bootstrap-draft") {
+    const preview = planFeaturePackageBootstrap(dir, request.manifest, { targetState: request.targetState, manifestBytes: request.manifestBytes });
+    if (preview.status !== "bootstrap-preview" || !samePhxJson(preview.receipt, request.planReceipt) || featureArtifactSetSha256(JSON.parse(request.manifestBytes).artifacts) !== request.artifactSetSha256) return { ok: false, code: "PS-FEATURE-PLAN-BINDING" };
+    return { ok: true, preview };
+  }
+  const preview = reconcileDraftPreview(dir, request.manifest);
+  if (!preview.ok || preview.preimage !== request.manifestPreimage || preview.nextBytes !== request.manifestBytes
+    || preview.artifactSetSha256 !== request.artifactSetSha256 || !samePhxJson(preview.receipt, request.planReceipt)
+    || !samePhxJson(poApprovalDecision(dir, preview.value, deps) ?? {}, request.authority.decision)) return { ok: false, code: "PS-FEATURE-PLAN-BINDING" };
+  return { ok: true, preview };
+}
+function runFeaturePackageCommand(sub, argv, deps) {
+  const dir = deps.dir ?? projectDir();
+  if (sub === "feature-package-inspect") {
+    const parsed = parseExactFlags(argv, new Set(["manifest"]));
+    if (!parsed.ok) return 2;
+    const checked = validateFeaturePackage(dir, parsed.value.manifest);
+    console.log(JSON.stringify({ schema: "pipeline.feature-package-inspection.v1", status: checked.ok ? "valid" : "rejected", receipt: checked.receipt, findings: checked.findings }));
+    return checked.ok ? 0 : 2;
+  }
+  if (sub === "feature-package-plan") {
+    const parsed = parseExactFlags(argv, new Set(["manifest", "proposal-file", "idempotency-key", "expires-at"]));
+    if (!parsed.ok || !safePhxId(parsed.value["idempotency-key"]) || !safeIso(parsed.value["expires-at"])) return 2;
+    const source = readClosedJsonFile(dir, parsed.value["proposal-file"]);
+    if (!source.ok || source.value.targetState !== "draft") return 2;
+    let request;
+    if (source.value.operation === "bootstrap-draft") {
+      if (!exactObjectKeys(source.value, ["operation", "targetState", "manifestBytes"]) || typeof source.value.manifestBytes !== "string") return 2;
+      const preview = planFeaturePackageBootstrap(dir, parsed.value.manifest, { targetState: source.value.targetState, manifestBytes: source.value.manifestBytes });
+      if (preview.status !== "bootstrap-preview") { console.error(`Error: feature package plan refused (${preview.reason}).`); return 2; }
+      let proposed; try { proposed = JSON.parse(source.value.manifestBytes); } catch { return 2; }
+      request = { schema: FEATURE_PACKAGE_REQUEST_SCHEMA, operation: "bootstrap-draft", manifest: preview.manifest, manifestPreimage: "absent", targetState: "draft", manifestBytes: source.value.manifestBytes, planReceipt: preview.receipt, artifactSetSha256: featureArtifactSetSha256(proposed.artifacts), authority: { class: "lifecycle-bootstrap", decision: null }, candidate: null, evidence: null, idempotencyKey: parsed.value["idempotency-key"], expiresAt: parsed.value["expires-at"] };
+    } else if (source.value.operation === "reconcile-draft") {
+      if (!exactObjectKeys(source.value, ["operation", "targetState"])) return 2;
+      const preview = reconcileDraftPreview(dir, parsed.value.manifest);
+      if (!preview.ok) { console.error(`Error: feature package plan refused (${preview.code}).`); return 2; }
+      const decision = poApprovalDecision(dir, preview.value, deps);
+      if (decision === null) { console.error("Error: feature package plan refused (PS-FEATURE-PO-APPROVAL)."); return 2; }
+      request = { schema: FEATURE_PACKAGE_REQUEST_SCHEMA, operation: "reconcile-draft", manifest: preview.manifest, manifestPreimage: preview.preimage, targetState: "draft", manifestBytes: preview.nextBytes, planReceipt: preview.receipt, artifactSetSha256: preview.artifactSetSha256, authority: { class: "po-plan-approval", decision }, candidate: null, evidence: null, idempotencyKey: parsed.value["idempotency-key"], expiresAt: parsed.value["expires-at"] };
+    } else return 2;
+    console.log(JSON.stringify({ schema: "pipeline.feature-package-plan.v1", status: "ready", request, requestSha256: sha256Bytes(canonicalPhxJson(request)) }));
+    return 0;
+  }
+  if (sub === "feature-package-status") {
+    const journal = featureJournalPath(dir);
+    const recovery = existsSync(journal);
+    console.log(JSON.stringify({ schema: "pipeline.feature-package-status.v1", status: recovery ? "recovery-required" : "ready" }));
+    return recovery ? 2 : 0;
+  }
+  const parsed = parseExactFlags(argv, new Set(["request-file", "request-sha256", "lock-token"]));
+  if (!parsed.ok || !SHA256_RE.test(parsed.value["request-sha256"]) || !LOCK_TOKEN_RE.test(parsed.value["lock-token"])) return 2;
+  const loaded = readClosedJsonFile(dir, parsed.value["request-file"]);
+  if (!loaded.ok || sha256Bytes(canonicalPhxJson(loaded.value)) !== parsed.value["request-sha256"]) return 2;
+  const request = loaded.value;
+  if (sub === "feature-package-recover") {
+    const journal = readClosedJsonFile(dir, ".claude/feature-package-transaction.json");
+    if (!journal.ok || !samePhxJson(journal.value.request, request)) return 2;
+  }
+  const lock = acquireContinuityLock(dir, parsed.value["lock-token"], deps);
+  if (!lock.ok) return 2;
+  try {
+    const target = resolve(dir, request.manifest ?? "");
+    const existing = existsSync(target);
+    if (existing) {
+      try {
+        const postimage = readFileSync(target, "utf8") === request.manifestBytes && validateFeaturePackage(dir, request.manifest).ok;
+        const poCurrent = request.operation !== "reconcile-draft" || samePhxJson(poApprovalDecision(dir, JSON.parse(readFileSync(target, "utf8")), deps) ?? {}, request.authority?.decision);
+        if (postimage && poCurrent) {
+          const receiptPath = resolve(dir, featureReceiptPath(request));
+          if (!existsSync(receiptPath)) return 2;
+          safeUnlink(featureJournalPath(dir));
+          console.log("PS-FEATURE-DUPLICATE: accepted with zero manifest mutation.");
+          return 0;
+        }
+      } catch { /* fall through to conflict */ }
+      if (request.operation !== "reconcile-draft") return 2;
+    }
+    const valid = validateFeatureRequest(dir, request, deps);
+    if (!valid.ok || Date.parse(request.expiresAt) < Date.now()) return 2;
+    const journal = { schema: "pipeline.feature-package-transaction.v1", request: structuredClone(request), requestSha256: sha256Bytes(canonicalPhxJson(request)) };
+    const journalWrite = writeBoundFile(featureJournalPath(dir), `${canonicalPhxJson(journal)}\n`, lock, join(dir, ".claude"), deps);
+    if (!journalWrite.ok) return 2;
+    const manifestWrite = writeBoundFile(target, request.manifestBytes, lock, dirname(target), deps);
+    if (!manifestWrite.ok) return 2;
+    const checked = validateFeaturePackage(dir, request.manifest);
+    if (!checked.ok) return 2;
+    const receiptPath = resolve(dir, featureReceiptPath(request));
+    const receiptWrite = writeBoundFile(receiptPath, `${canonicalPhxJson(featureReceipt(request, "committed"))}\n`, lock, dirname(receiptPath), deps);
+    if (!receiptWrite.ok) return 2;
+    safeUnlink(featureJournalPath(dir));
+    console.log("PS-FEATURE-COMMITTED: manifest and public-safe receipt read back.");
+    return 0;
+  } finally { releaseContinuityLock(lock); }
+}
+
+function exactAuthorityRevisionRequest(value) {
+  return exactObjectKeys(value, ["schema", "featureId", "expectedRevision", "preStateSha256", "oldAuthority", "nextAuthority", "decision", "candidate", "evidence", "idempotencyKey", "expiresAt"])
+    && value.schema === CONTINUITY_AUTHORITY_REVISION_REQUEST_SCHEMA && typeof value.featureId === "string"
+    && Number.isSafeInteger(value.expectedRevision) && SHA256_RE.test(value.preStateSha256 ?? "")
+    && exactObjectKeys(value.oldAuthority, ["prd", "spec"]) && exactObjectKeys(value.nextAuthority, ["prd", "spec"])
+    && exactObjectKeys(value.decision, ["id", "sha256", "scope"]) && safePhxId(value.decision.id) && SHA256_RE.test(value.decision.sha256)
+    && exactObjectKeys(value.decision.scope, ["featureId", "phase"]) && value.decision.scope.featureId === value.featureId && value.decision.scope.phase === "design"
+    && exactObjectKeys(value.candidate, ["commit", "tree"]) && safeOid(value.candidate.commit) && safeOid(value.candidate.tree)
+    && exactObjectKeys(value.evidence, ["sha256"]) && SHA256_RE.test(value.evidence.sha256)
+    && safePhxId(value.idempotencyKey) && safeIso(value.expiresAt);
+}
+function authorityReceipt(request, outcome) {
+  return { schema: "pipeline.continuity-authority-revision-receipt.v1", operation: "design-revision", outcome,
+    oldArtifactDigests: { prd: request.oldAuthority.prd.sha256, spec: request.oldAuthority.spec.sha256 },
+    newArtifactDigests: { prd: request.nextAuthority.prd.sha256, spec: request.nextAuthority.spec.sha256 },
+    decision: { id: request.decision.id, sha256: request.decision.sha256 }, candidate: request.candidate, evidence: request.evidence,
+    idempotencyKey: request.idempotencyKey };
+}
+function runContinuityAuthorityRevisionCommand(sub, argv, deps) {
+  const dir = deps.dir ?? projectDir();
+  if (sub === "continuity-authority-revision-plan") {
+    const parsed = parseExactFlags(argv, new Set(["proposal-file"]));
+    const proposal = parsed.ok ? readClosedJsonFile(dir, parsed.value["proposal-file"]) : null;
+    const existing = readState(dir);
+    if (!proposal?.ok || existing.status !== "ok" || !exactAuthorityRevisionRequest(proposal.value)) return 2;
+    const request = proposal.value; const current = existing.state.continuity;
+    if (!current || existing.state.activeFeature?.id !== request.featureId || existing.state.activeFeature?.phase !== "design" || existing.state.planApproved === true
+      || current.revision !== request.expectedRevision || sha256CanonicalJson(existing.state) !== request.preStateSha256
+      || !samePhxJson({ prd: current.authority.prd, spec: current.authority.spec }, request.oldAuthority)
+      || !safeRepoArtifact(dir, request.oldAuthority.prd) || !safeRepoArtifact(dir, request.oldAuthority.spec)
+      || !safeRepoArtifact(dir, request.nextAuthority.prd) || !safeRepoArtifact(dir, request.nextAuthority.spec)) return 2;
+    console.log(JSON.stringify({ schema: "pipeline.continuity-authority-revision-plan.v1", status: "ready", request, requestSha256: sha256Bytes(canonicalPhxJson(request)) }));
+    return 0;
+  }
+  if (sub === "continuity-authority-revision-recover") { console.log(JSON.stringify({ schema: "pipeline.continuity-authority-revision-recovery.v1", status: "no-recovery" })); return 0; }
+  const parsed = parseExactFlags(argv, new Set(["request-file", "request-sha256", "lock-token"]));
+  const loaded = parsed.ok ? readClosedJsonFile(dir, parsed.value["request-file"]) : null;
+  if (!parsed.ok || !SHA256_RE.test(parsed.value["request-sha256"]) || !LOCK_TOKEN_RE.test(parsed.value["lock-token"])
+    || !loaded?.ok || sha256Bytes(canonicalPhxJson(loaded.value)) !== parsed.value["request-sha256"] || !exactAuthorityRevisionRequest(loaded.value)) return 2;
+  const request = loaded.value; const lock = acquireContinuityLock(dir, parsed.value["lock-token"], deps);
+  if (!lock.ok) return 2;
+  try {
+    const existing = readState(dir); const current = existing.status === "ok" ? existing.state.continuity : null;
+    if (existing.status !== "ok" || !current) return 2;
+    const receipt = authorityReceipt(request, "committed");
+    if (current.revision === request.expectedRevision + 1 && samePhxJson({ prd: current.authority.prd, spec: current.authority.spec }, request.nextAuthority)
+      && existing.state.continuityAuthorityRevisionReceipts?.some((entry) => samePhxJson(entry, receipt))) { console.log("PS-CONTINUITY-AUTHORITY-REPLAY: accepted with zero mutation."); return 0; }
+    if (existing.state.activeFeature?.id !== request.featureId || existing.state.activeFeature?.phase !== "design" || existing.state.planApproved === true
+      || current.revision !== request.expectedRevision || sha256CanonicalJson(existing.state) !== request.preStateSha256
+      || !samePhxJson({ prd: current.authority.prd, spec: current.authority.spec }, request.oldAuthority)
+      || !safeRepoArtifact(dir, request.oldAuthority.prd) || !safeRepoArtifact(dir, request.oldAuthority.spec)
+      || !safeRepoArtifact(dir, request.nextAuthority.prd) || !safeRepoArtifact(dir, request.nextAuthority.spec)
+      || Date.parse(request.expiresAt) < Date.now()) return 2;
+    const nextContinuity = structuredClone(current); nextContinuity.revision++;
+    nextContinuity.authority.prd = structuredClone(request.nextAuthority.prd); nextContinuity.authority.spec = structuredClone(request.nextAuthority.spec);
+    if (nextContinuity.queueHead?.dispatch) {
+      nextContinuity.queueHead.dispatch.queueRevision = nextContinuity.revision;
+      nextContinuity.queueHead.dispatch.authorityDigests.prdSha256 = request.nextAuthority.prd.sha256;
+      nextContinuity.queueHead.dispatch.authorityDigests.specSha256 = request.nextAuthority.spec.sha256;
+    }
+    if (!validateContinuityState(nextContinuity, request.featureId).ok) return 2;
+    const receipts = [...(existing.state.continuityAuthorityRevisionReceipts ?? []), receipt];
+    const next = { ...existing.state, continuity: nextContinuity, continuityAuthorityRevisionReceipts: receipts, updatedAt: (deps.now ?? (() => new Date().toISOString()))() };
+    const written = atomicWriteContinuityState(dir, next, lock, deps);
+    if (!written.ok) return 2;
+    console.log("PS-CONTINUITY-AUTHORITY-COMMITTED: public-safe receipt read back.");
+    return 0;
+  } finally { releaseContinuityLock(lock); }
+}
+
 /** Minimal `--flag value` argv parser (subcommand already stripped by the caller). */
 function parseFlags(argv) {
   const out = {};
@@ -2303,6 +2623,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   const [sub, ...rest] = argv;
   const flags = parseFlags(rest);
 
+  if (FEATURE_PACKAGE_SUBCOMMANDS.has(sub)) return runFeaturePackageCommand(sub, rest, { ...deps, dir, now });
+  if (CONTINUITY_AUTHORITY_REVISION_SUBCOMMANDS.has(sub)) return runContinuityAuthorityRevisionCommand(sub, rest, { ...deps, dir, now });
   if (CONTINUITY_SUBCOMMANDS.has(sub)) return runContinuityCommand(sub, flags, { ...deps, dir, now });
   if (PUBLICATION_SUBCOMMANDS.has(sub)) return runPublicationCommand(sub, flags, { ...deps, dir, now });
 
@@ -2759,7 +3081,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, set-phase, set-gate-estimate, approve-plan, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, continuity-init, continuity-cas, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, publication-prepare, publication-approve, publication-authorize, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, set-phase, set-gate-estimate, approve-plan, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, feature-package-inspect, feature-package-plan, feature-package-apply, feature-package-status, feature-package-recover, continuity-init, continuity-cas, continuity-authority-revision-plan, continuity-authority-revision-apply, continuity-authority-revision-recover, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, publication-prepare, publication-approve, publication-authorize, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
       );
       return 2;
     }

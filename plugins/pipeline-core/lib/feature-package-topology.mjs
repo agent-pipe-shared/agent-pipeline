@@ -129,6 +129,62 @@ export function planFeaturePackageTransition(rootDir = process.cwd(), manifestPa
   return { schema: "pipeline.feature-package-transition-plan.v1", status: "preview", manifest: checked.receipt.manifest, from: checked.receipt.state, to: nextState, changes: [{ path: checked.receipt.manifest, operation: "replace-manifest-state" }], requiredAuthority: nextState === "awaiting-approval" ? "po" : "lifecycle" };
 }
 
+/**
+ * Preview the sole permitted absent-manifest transition.  This deliberately
+ * validates proposed bytes in memory: callers cannot create a temporary
+ * lifecycle manifest and then treat its presence as authority.
+ */
+export function planFeaturePackageBootstrap(rootDir = process.cwd(), manifestPath, proposal) {
+  const root = resolve(rootDir);
+  const manifest = canonicalRelative(root, manifestPath);
+  if (!manifest || !manifest.startsWith("specs/") || !manifest.endsWith("/lifecycle.json")) {
+    return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-bootstrap-manifest", findings: [] };
+  }
+  if (existsSync(join(root, manifest))) {
+    return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "manifest-already-exists", findings: [] };
+  }
+  if (!exact(proposal, ["manifestBytes", "targetState"])
+    || proposal.targetState !== "draft"
+    || typeof proposal.manifestBytes !== "string"
+    || Buffer.byteLength(proposal.manifestBytes, "utf8") < 2
+    || Buffer.byteLength(proposal.manifestBytes, "utf8") > 65_536) {
+    return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-bootstrap-proposal", findings: [] };
+  }
+  let value;
+  try { value = JSON.parse(proposal.manifestBytes); }
+  catch { return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-bootstrap-proposal", findings: ["FTP-MANIFEST: invalid JSON"] }; }
+  const pathId = manifest.slice("specs/".length, -"/lifecycle.json".length);
+  const findings = [];
+  if (!exact(value, ["schema", "feature", "state", "artifacts", "candidate", "supersedes"])) findings.push("FTP-MANIFEST: closed schema keys are required");
+  if (value?.schema !== FEATURE_PACKAGE_SCHEMA) findings.push("FTP-MANIFEST: unsupported schema");
+  if (!exact(value?.feature, ["id", "rigor"]) || !SAFE_ID.test(value?.feature?.id ?? "") || value.feature.id !== pathId || ![1, 2].includes(value?.feature?.rigor)) findings.push("FTP-FEATURE: bootstrap feature id and rigor are invalid");
+  if (value?.state !== "draft") findings.push("FTP-STATE: bootstrap target must be draft");
+  if (!Array.isArray(value?.artifacts) || value.artifacts.length === 0) findings.push("FTP-ARTIFACTS: draft bootstrap requires artifacts");
+  if (value?.candidate !== null || value?.supersedes !== null) findings.push("FTP-BOOTSTRAP: draft bootstrap forbids candidate and supersedes bindings");
+  for (const [index, artifact] of (Array.isArray(value?.artifacts) ? value.artifacts : []).entries()) {
+    const label = `FTP-ARTIFACT-${index}`;
+    if (!exact(artifact, ["class", "path", "sha256", "authority", "mutability", "retention"])) { findings.push(`${label}: closed artifact keys are required`); continue; }
+    if (artifact.class !== "prd" || artifact.authority !== true || artifact.mutability !== "mutable" || artifact.retention !== "active") findings.push(`${label}: draft bootstrap permits only an active mutable authoritative prd`);
+    if (packageRelative(pathId, artifact.path) === null || !canonicalRelative(root, artifact.path) || !SHA256.test(artifact.sha256 ?? "")) findings.push(`${label}: artifact binding is invalid`);
+    else {
+      const bound = regularFile(root, artifact.path, findings, label);
+      if (bound && digest(readFileSync(join(root, bound))) !== artifact.sha256) findings.push(`${label}: digest does not bind file bytes`);
+    }
+  }
+  if (findings.length > 0) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-bootstrap-proposal", findings };
+  const manifestSha256 = digest(proposal.manifestBytes);
+  return {
+    schema: "pipeline.feature-package-transition-plan.v1",
+    status: "bootstrap-preview",
+    manifest,
+    from: "absent",
+    to: "draft",
+    changes: [{ path: manifest, operation: "create-manifest" }],
+    requiredAuthority: "lifecycle-bootstrap",
+    receipt: { schema: "pipeline.feature-package-receipt.v1", manifest, manifestSha256, featureId: pathId, state: "draft", candidate: null, artifactCount: value.artifacts.length, findingCount: 0 },
+  };
+}
+
 export function validateFeatureTopology(rootDir = process.cwd()) {
   const root = resolve(rootDir); const inventory = inventoryFeaturePackages(root); const findings = [];
   const receipts = inventory.packages.map((manifest) => {

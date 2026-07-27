@@ -5,5 +5,11 @@
   "states": ["draft", "awaiting-approval", "approved", "implementing", "verifying", "completed", "superseded", "abandoned", "retained"],
   "classes": [
     "prd", "spec", "design", "plan", "acceptance", "result", "candidate-evidence", "adr", "release", "backlog", "state", "handover", "retention", "supply-chain", "private-local"
-  ]
+  ],
+  "lifecycleAuthority": {
+    "featurePackageRequests": "repo-relative caller input; never canonical authority; existing-draft reconciliation binds the active PO approval and exact manifest preimage",
+    "featurePackageReceiptRoot": "specs/<feature-id>/evidence/lifecycle/",
+    "transactionJournal": "private-local; never portable authority",
+    "continuityAuthorityReceipt": "state; public-safe correlated receipt only"
+  }
 }

@@ -5,7 +5,7 @@ import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { planFeaturePackageTransition, validateFeatureTopology } from "./feature-package-topology.mjs";
+import { planFeaturePackageBootstrap, planFeaturePackageTransition, validateFeatureTopology } from "./feature-package-topology.mjs";
 
 const root = mkdtempSync(join(tmpdir(), "feature-topology-"));
 const hash = (value) => createHash("sha256").update(value).digest("hex");
@@ -19,7 +19,24 @@ try {
   file(`${base}/lifecycle.json`, `${JSON.stringify(manifest)}\n`);
   assert.equal(validateFeatureTopology(root).ok, true);
   assert.equal(planFeaturePackageTransition(root, `${base}/lifecycle.json`, "completed").status, "preview");
+  const bootstrapId = "bootstrap-feature";
+  const bootstrapBase = `specs/${bootstrapId}`;
+  const bootstrapPrd = file(`${bootstrapBase}/prd.md`, "# Bootstrap PRD\n");
+  const bootstrapManifest = {
+    schema: "pipeline.feature-package.v1", feature: { id: bootstrapId, rigor: 1 }, state: "draft",
+    artifacts: [{ class: "prd", ...bootstrapPrd, authority: true, mutability: "mutable", retention: "active" }], candidate: null, supersedes: null,
+  };
+  const bootstrapPath = `${bootstrapBase}/lifecycle.json`;
+  const proposal = { targetState: "draft", manifestBytes: `${JSON.stringify(bootstrapManifest)}\n` };
+  const first = planFeaturePackageBootstrap(root, bootstrapPath, proposal);
+  const second = planFeaturePackageBootstrap(root, bootstrapPath, structuredClone(proposal));
+  assert.equal(first.status, "bootstrap-preview");
+  assert.deepEqual(first, second);
+  assert.equal(first.receipt.manifestSha256, hash(proposal.manifestBytes));
+  assert.equal(planFeaturePackageBootstrap(root, bootstrapPath, { ...proposal, targetState: "approved" }).reason, "invalid-bootstrap-proposal");
+  assert.equal(planFeaturePackageBootstrap(root, bootstrapPath, { targetState: "draft" }).reason, "invalid-bootstrap-proposal");
+  assert.equal(planFeaturePackageBootstrap(root, `${bootstrapBase}/other.json`, proposal).reason, "invalid-bootstrap-manifest");
   manifest.artifacts[1].sha256 = "0".repeat(64); writeFileSync(join(root, `${base}/lifecycle.json`), JSON.stringify(manifest));
   assert.match(validateFeatureTopology(root).findings.join("\n"), /digest does not bind/u);
-  console.log("feature-package-topology: 3 passed, 0 failed");
+  console.log("feature-package-topology: 9 passed, 0 failed");
 } finally { rmSync(root, { recursive: true, force: true }); }

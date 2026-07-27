@@ -25,3 +25,22 @@ or evidence is invented.
 `planFeaturePackageTransition()` produces a deterministic, non-mutating
 preview of the manifest change and required authority. It intentionally does
 not convert a preview into a write or a PO approval.
+
+For PHX-0A, an absent manifest has exactly one planner path: a proposed
+`draft` manifest is validated in memory and receives a deterministic receipt
+before the lifecycle writer can act. The writer retains only a public-safe
+receipt at `specs/<feature-id>/evidence/lifecycle/`; its write-ahead journal is
+private-local and is never authority. A dedicated active-design continuity
+revision similarly records only old/new artifact digests, decision/candidate/
+evidence references, an idempotency key, and a typed outcome in State. Generic
+continuity CAS cannot change the PRD or Spec authority pair. Neither route
+accepts a chat preview, handover, guessed path, temporary file, or raw command
+as authority.
+
+The inherited Phoenix draft may additionally use the same transaction only to
+reconcile its PRD, Spec, acceptance, and architecture digest bindings. Its
+planner derives the four current file digests from the exact manifest preimage,
+preserves every other manifest byte, and binds the active repository PO
+approval. Apply rechecks that approval and preimage under the writer lock;
+the committed public-safe receipt and manifest readback are the only success
+evidence.

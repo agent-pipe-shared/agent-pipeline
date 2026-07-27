@@ -34,6 +34,8 @@ import { computeContinuityFinalDigest } from "../../plugins/pipeline-core/lib/co
 import { loadManifestSafe } from "../../plugins/pipeline-core/lib/manifest.mjs";
 import { loadStateSafe, resolveSuggestion } from "../../plugins/pipeline-core/hooks/stop-suggest.mjs";
 import { COURSE_KINDS, buildCourseDecisionBrief, sha256Canonical } from "../../plugins/pipeline-core/lib/review-economy.mjs";
+import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
+import { planFeaturePackageBootstrap } from "../../plugins/pipeline-core/lib/feature-package-topology.mjs";
 import {
   PO_GATE_AUTHORITY_EVIDENCE_SCHEMA,
   PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA,
@@ -83,6 +85,17 @@ function captureConsoleError(action) {
     return { value: action(), text: messages.join("\n") };
   } finally {
     console.error = original;
+  }
+}
+
+function captureConsoleLog(action) {
+  const original = console.log;
+  const messages = [];
+  console.log = (...args) => messages.push(args.join(" "));
+  try {
+    return { value: action(), text: messages.join("\n") };
+  } finally {
+    console.log = original;
   }
 }
 
@@ -2012,6 +2025,91 @@ if (symlinkCapable) {
   ok("PS51c non-coordinator estimate attribution is refused without mutation", rejected === 2 && readFileSync(statePath(dir), "utf8") === beforeRejected);
   const advanced = run(["set-phase", "--phase", "security-scan"], { dir, now: FIXED_NOW });
   ok("PS51d a later successful state mutation clears the persisted estimate", advanced === 0 && readState(dir).state.gateEstimate === undefined);
+}
+
+// ---- PHX0A: closed feature bootstrap and design-authority revision writers ----------------
+{
+  const dir = freshDir("phx-feature-bootstrap");
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  const id = "phx-feature"; const base = `specs/${id}`;
+  const prdBytes = "# PHX bootstrap\n"; const prdPath = `${base}/prd.md`;
+  mkdirSync(join(dir, base), { recursive: true }); writeFileSync(join(dir, prdPath), prdBytes);
+  const manifestBytes = `${JSON.stringify({
+    schema: "pipeline.feature-package.v1", feature: { id, rigor: 1 }, state: "draft",
+    artifacts: [{ class: "prd", path: prdPath, sha256: createHash("sha256").update(prdBytes).digest("hex"), authority: true, mutability: "mutable", retention: "active" }], candidate: null, supersedes: null,
+  })}\n`;
+  const manifestPath = `${base}/lifecycle.json`;
+  const preview = planFeaturePackageBootstrap(dir, manifestPath, { targetState: "draft", manifestBytes });
+  const request = { schema: "pipeline.feature-package-transition-request.v1", operation: "bootstrap-draft", manifest: manifestPath, manifestPreimage: "absent", targetState: "draft", manifestBytes, planReceipt: preview.receipt, artifactSetSha256: sha256Canonical(JSON.parse(manifestBytes).artifacts.map(({ class: artifactClass, path, authority, mutability, retention }) => ({ class: artifactClass, path, authority, mutability, retention }))), authority: { class: "lifecycle-bootstrap", decision: null }, candidate: null, evidence: null, idempotencyKey: "phx-test-01", expiresAt: "2030-01-01T00:00:00.000Z" };
+  const requestFile = writeRequest(dir, "feature-request", request);
+  const requestSha = sha256Canonical(request);
+  const planned = run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", writeRequest(dir, "feature-proposal", { operation: "bootstrap-draft", targetState: "draft", manifestBytes }), "--idempotency-key", "phx-test-01", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir });
+  const applied = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-feature-lock-01"], { dir });
+  const beforeReplay = readFileSync(join(dir, manifestPath), "utf8");
+  const replay = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-feature-lock-01"], { dir });
+  const changed = { ...request, manifestBytes: manifestBytes.replace('"draft"', '"conflict"') };
+  const conflict = run(["feature-package-apply", "--request-file", writeRequest(dir, "feature-conflict", changed), "--request-sha256", sha256Canonical(changed), "--lock-token", "phx-feature-lock-01"], { dir });
+  ok("PHX0A1 absent manifest draft preview is consumed by exact bound apply", planned === 0 && applied === 0 && readFileSync(join(dir, manifestPath), "utf8") === manifestBytes);
+  ok("PHX0A2 feature bootstrap replay is verified zero-write and conflict fails closed", replay === 0 && readFileSync(join(dir, manifestPath), "utf8") === beforeReplay && conflict === 2);
+  const receipt = JSON.parse(readFileSync(join(dir, `${base}/evidence/lifecycle/feature-package-phx-test-01.json`), "utf8"));
+  ok("PHX0A3 feature receipt is public-safe and contains no machine path", receipt.outcome === "committed" && !JSON.stringify(receipt).includes(dir));
+}
+
+{
+  const dir = freshDir("phx-feature-reconcile");
+  const id = "sprint-phoenix-epic"; const base = `specs/${id}`; const planPath = `${base}/prd_phoenix-epic.md`;
+  const artifact = (artifactClass, path, bytes, authority = false) => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true }); writeFileSync(join(dir, path), bytes);
+    return { class: artifactClass, path, sha256: createHash("sha256").update(`stale:${path}`).digest("hex"), authority, mutability: "mutable", retention: artifactClass === "design" ? "retain" : "active" };
+  };
+  const artifacts = [
+    artifact("prd", planPath, "# Phoenix PRD\n", true),
+    artifact("spec", `${base}/spec.md`, "# Phoenix Spec\n", true),
+    artifact("acceptance", `${base}/acceptance.md`, "# Phoenix Acceptance\n", true),
+    artifact("design", `${base}/design/architecture.md`, "# Phoenix Architecture\n"),
+  ];
+  const manifestPath = `${base}/lifecycle.json`;
+  const manifest = { schema: "pipeline.feature-package.v1", feature: { id, rigor: 2 }, state: "draft", artifacts, candidate: null, supersedes: null };
+  const before = `${JSON.stringify(manifest, null, 2)}\n`;
+  writeFileSync(join(dir, manifestPath), before);
+  const poGateAuthority = injectedPoGateAuthority(planPath); const authority = poGateAuthority().value;
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  const approval = { schema: "pipeline.plan-approval.v2", approvedBy: "PO", approvedAt: "2026-07-27T00:00:00.000Z", specBoundBy: "PO", specBoundAt: "2026-07-27T00:00:00.000Z", poGateAuthority: authority };
+  writeFileSync(statePath(dir), `${JSON.stringify({ schema: SCHEMA_ID, activeFeature: { id, planPath, phase: "implementation" }, planApproved: true, planApproval: approval }, null, 2)}\n`);
+  const proposed = writeRequest(dir, "reconcile-proposal", { operation: "reconcile-draft", targetState: "draft" });
+  const planned = captureConsoleLog(() => run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", proposed, "--idempotency-key", "phx-reconcile-01", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir, poGateAuthority }));
+  const plan = JSON.parse(planned.text); const request = plan.request;
+  const requestFile = writeRequest(dir, "reconcile-request", request);
+  const denied = { ...request, authority: { ...request.authority, decision: { ...request.authority.decision, approvalSha256: A } } };
+  const deniedCode = run(["feature-package-apply", "--request-file", writeRequest(dir, "reconcile-denied", denied), "--request-sha256", sha256Canonical(denied), "--lock-token", "phx-reconcile-lock-01"], { dir, poGateAuthority });
+  const deniedPreserved = readFileSync(join(dir, manifestPath), "utf8") === before;
+  const applied = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "phx-reconcile-lock-01"], { dir, poGateAuthority });
+  const after = readFileSync(join(dir, manifestPath), "utf8"); const afterValue = JSON.parse(after);
+  const changedDigests = manifest.artifacts.filter((entry, index) => entry.sha256 !== afterValue.artifacts[index].sha256).length;
+  const replay = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "phx-reconcile-lock-01"], { dir, poGateAuthority });
+  ok("PHX0A4 existing draft plan binds exactly the active PO approval", planned.value === 0 && request.operation === "reconcile-draft" && request.manifestPreimage === createHash("sha256").update(before).digest("hex") && request.authority.decision.approvalSha256 === sha256CanonicalJson(approval));
+  ok("PHX0A5 existing draft reconciliation rejects a mismatched PO decision without mutation", deniedCode === 2 && deniedPreserved);
+  ok("PHX0A6 existing draft reconciliation changes only the four planned digest bindings and replays zero-write", applied === 0 && changedDigests === 4 && afterValue.state === "draft" && JSON.stringify(afterValue.feature) === JSON.stringify(manifest.feature) && JSON.stringify(afterValue.candidate) === "null" && JSON.stringify(afterValue.supersedes) === "null" && replay === 0 && readFileSync(join(dir, manifestPath), "utf8") === after);
+}
+
+{
+  const dir = freshDir("phx-authority-revision");
+  seedContinuityRoot(dir);
+  const artifact = (path, bytes) => { writeFileSync(join(dir, path), bytes); return { path, sha256: createHash("sha256").update(bytes).digest("hex") }; };
+  const oldPrd = artifact("specs/prd.md", "old prd\n"); const oldSpec = artifact("specs/spec.md", "old spec\n");
+  const nextPrd = artifact("specs/prd-next.md", "next prd\n"); const nextSpec = artifact("specs/spec-next.md", "next spec\n");
+  const initial = continuityState({ authority: { prd: oldPrd, spec: oldSpec, result: { path: "specs/result.md", sha256: C } }, queueHead: continuityQueue({ dispatch: null }) });
+  run(continuityArgs("continuity-init", "absent", writeRequest(dir, "phx-init", initial)), continuityDeps(dir));
+  const stateBefore = readState(dir).state;
+  const request = { schema: "pipeline.continuity-authority-revision-request.v1", featureId: CONTINUITY_FEATURE, expectedRevision: 0, preStateSha256: sha256CanonicalJson(stateBefore), oldAuthority: { prd: oldPrd, spec: oldSpec }, nextAuthority: { prd: nextPrd, spec: nextSpec }, decision: { id: "decision-01", sha256: A, scope: { featureId: CONTINUITY_FEATURE, phase: "design" } }, candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, evidence: { sha256: B }, idempotencyKey: "phx-revision-01", expiresAt: "2030-01-01T00:00:00.000Z" };
+  const requestFile = writeRequest(dir, "authority-request", request); const requestSha = sha256Canonical(request);
+  const generic = structuredClone(initial); generic.revision = 1; generic.authority.prd = nextPrd; generic.authority.spec = nextSpec;
+  const genericDenied = run(continuityArgs("continuity-cas", 0, writeRequest(dir, "generic-authority-cas", generic)), continuityDeps(dir));
+  const planned = run(["continuity-authority-revision-plan", "--proposal-file", requestFile], continuityDeps(dir));
+  const applied = run(["continuity-authority-revision-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-authority-lock-01"], continuityDeps(dir));
+  const after = readState(dir).state; const replay = run(["continuity-authority-revision-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-authority-lock-01"], continuityDeps(dir));
+  ok("PHX0A4 generic CAS rejects authority mutation while dedicated exact plan/apply succeeds", genericDenied === 2 && planned === 0 && applied === 0 && after.continuity.authority.prd.sha256 === nextPrd.sha256);
+  ok("PHX0A5 dedicated authority revision replay is zero-write with a public-safe receipt", replay === 0 && after.continuityAuthorityRevisionReceipts.length === 1 && !JSON.stringify(after.continuityAuthorityRevisionReceipts[0]).includes(dir));
 }
 
 // ---- Cleanup ------------------------------------------------------------------------------
