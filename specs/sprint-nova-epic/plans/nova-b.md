@@ -228,6 +228,13 @@ execution-plane contract and short-lived bounded authority.
 **Stop:** any need to persist secrets, expose private coordinates, let a worker
 widen scope or treat provider attestation as Pipeline acceptance.
 
+**Rollback:** before any separately authorized live pilot, a B2-I contract
+regression is rolled back by reverting the bounded local broker commit and
+rerunning Full Verify and Security. The contract owns no provider state,
+credential, migration or feature flag, so there is no remote or persisted
+state to unwind. A live-pilot rollback, if later authorized, must be specified
+in that pilot's own exact preview.
+
 ## Slice B3-R — Antigravity with Gemini models research decision
 
 **Issue:** `#15`
