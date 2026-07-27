@@ -66,3 +66,8 @@ authorized temporary removal of TP-1, TP-3, and TP-5 only. The authorization
 is limited to the briefed Goldfish scope and must be restored before its
 independent Critic review and final gates; it does not authorize any other
 guard-config change, a bypass of Verify, or a remote action.
+
+The temporary PHX-0A exception was restored without an implementation change
+when the accepted #22 planner rejected the required absent-manifest draft
+bootstrap. The next attempt requires a PO-approved resolution of that planner
+contract before another writer dispatch.
