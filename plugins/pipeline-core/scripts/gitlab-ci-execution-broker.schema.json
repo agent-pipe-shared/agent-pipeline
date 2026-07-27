@@ -4,7 +4,7 @@
   "$comment": "This schema owns the closed structural record contract. The broker runtime additionally verifies candidate admission, digests, recursive predecessor/retry lineage, allowed transitions, ordering and relational timing; CLI acceptance requires both checks.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "requestId", "candidate", "target", "attempt", "retryOf", "job", "idempotencyKey", "state", "cancellation", "observations", "predecessor", "previousSha256", "recordSha256"],
+  "required": ["schema", "requestId", "candidate", "target", "clock", "attempt", "retryOf", "job", "idempotencyKey", "state", "cancellation", "observations", "predecessor", "previousSha256", "recordSha256"],
   "properties": {
     "schema": {"const": "pipeline.gitlab-ci-execution-broker.v1"},
     "requestId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$"},
@@ -27,6 +27,7 @@
         "operatorAuthoritySha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
       }
     },
+    "clock": {"const": "local-monotonic-ms", "description": "All submittedAt, requestedAt and observedAt values are local broker monotonic milliseconds; provider order is represented only by providerSequence."},
     "attempt": {"type": "integer", "minimum": 0},
     "retryOf": {"anyOf": [{"type": "null"}, {"$ref": "#"}]},
     "job": {

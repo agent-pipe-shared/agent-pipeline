@@ -829,6 +829,11 @@ pending record. A retry has a new attempt number and can start only from the
 exact reconciled preceding attempt with the same candidate, target and
 idempotency subject.
 
+The B2-I broker's `submittedAt`, `requestedAt` and `observedAt` use the fixed
+`local-monotonic-ms` clock: local broker monotonic milliseconds. Provider time
+is not mixed into that ordering; provider ordering uses `providerSequence` or
+`not-provided` only.
+
 `pipeline.async-execution-journal.v1` appends provider observations with exact
 provider job binding, subject, provider sequence or `not-provided`, observation
 digest, normalized state and prior entry digest. The reconciler handles
@@ -1116,7 +1121,7 @@ binary evidence is represented only by a digest/path, never inline.
 | local worker pool | `schema,poolId,candidate,queueRevision,capacity,workers,admission,state,cleanup,previousSha256,recordSha256` |
 | async journal | `schema,journalId,providerJob,subject,providerSequence,observationSha256,state,reason,observedAt,previousSha256,entrySha256` |
 | credential lease | `schema,leaseId,broker,subjectSha256,repository,operations,targets,issuedAt,expiresAt,revocationHandleSha256,credentialClass,status,readbackSha256,recordSha256` |
-| GitLab-CI broker | `schema,requestId,candidate,target,attempt,retryOf,job,idempotencyKey,state,cancellation,observations,predecessor,previousSha256,recordSha256` |
+| GitLab-CI broker | `schema,requestId,candidate,target,clock,attempt,retryOf,job,idempotencyKey,state,cancellation,observations,predecessor,previousSha256,recordSha256` |
 | Antigravity decision | `schema,decisionId,sources,retrievedAt,cli,provenance,authentication,models,input,output,usage,streaming,cancellation,errors,sandbox,cells,status,recordSha256` |
 | forge capability | `schema,reportId,provider,baseUrlClass,projectCoordinatesSha256,authenticationMode,cells,governance,evidence,recordSha256` |
 | external mutation | `schema,mutationId,provider,target,beforeSha256,patch,operation,idempotencyKey,capabilitySha256,preview,confirmation,state,remoteReceipt,readback,previousSha256,recordSha256` |

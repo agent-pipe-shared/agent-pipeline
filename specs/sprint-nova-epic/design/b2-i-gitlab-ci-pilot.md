@@ -65,6 +65,10 @@ idempotency subject; there is no implicit retry.
 Fixed-base admission is internal to the public reducer contract. No caller may
 replace, relax or inject an alternative candidate-admission predicate.
 
+`submittedAt`, `requestedAt` and `observedAt` are local broker monotonic
+milliseconds (`local-monotonic-ms`), never provider wall-clock values. Provider
+ordering remains the separate `providerSequence` / `not-provided` contract.
+
 No background retry, credential renewal, remote cleanup or host process may
 outlive the bound request. A new request needs a new PO-authorized preview.
 
