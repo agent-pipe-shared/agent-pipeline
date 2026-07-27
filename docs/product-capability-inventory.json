@@ -197,6 +197,12 @@
       "member": "PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-devplan.mjs\""
     },
     {
+      "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\"",
+      "kind": "hook",
+      "path": "plugins/pipeline-core/hooks/hooks.json",
+      "member": "PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\""
+    },
+    {
       "surfaceId": "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
       "kind": "hook",
       "path": "plugins/pipeline-core/hooks/hooks.json",
@@ -1498,7 +1504,7 @@
       "id": "claude-hook-safety",
       "publicName": "Command and write-path guardrails",
       "problem": "Dangerous commands and unverified changes need deterministic local policy checks.",
-      "benefit": "Configured hook families enforce command, write-path, plan, test-path, and push safeguards.",
+      "benefit": "Configured hook families enforce command, write-path, plan, test-path, push, and onboarding-lifecycle-readiness safeguards.",
       "status": "shipped",
       "surfaceIds": [
         "guard:plugins/pipeline-core/hooks/guard-apply-patch.mjs:guard-apply-patch",
@@ -1509,6 +1515,7 @@
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-git.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Bash|PowerShell:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-push.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-devplan.mjs\"",
+        "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-lifecycle-ready.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:PreToolUse:Edit|Write:node \"${CLAUDE_PLUGIN_ROOT}/hooks/guard-testpath.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:compact:node \"${CLAUDE_PLUGIN_ROOT}/hooks/post-compact-reground.mjs\"",
         "hook:plugins/pipeline-core/hooks/hooks.json:SessionStart:startup|resume|clear:node \"${CLAUDE_PLUGIN_ROOT}/hooks/codex-session-start-hint.mjs\"",
@@ -1544,12 +1551,14 @@
         "plugins/pipeline-core/hooks/guard-apply-patch.mjs",
         "plugins/pipeline-core/hooks/guard-devplan.mjs",
         "plugins/pipeline-core/hooks/guard-git.mjs",
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
         "plugins/pipeline-core/hooks/guard-push.mjs",
         "plugins/pipeline-core/hooks/guard-testpath.mjs",
         "plugins/pipeline-core/hooks/hooks.json"
       ],
       "testEvidence": [
-        "plugins/pipeline-core/hooks/guard-git.test.mjs"
+        "plugins/pipeline-core/hooks/guard-git.test.mjs",
+        "plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs"
       ],
       "targets": [
         {
