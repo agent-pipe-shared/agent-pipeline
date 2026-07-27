@@ -1043,6 +1043,8 @@ disposition. Nova/Cyborg combined integration remains a later lifecycle.
 | `pipeline.external-mutation.v1` | B4 | forge operation | operator/readback |
 | `pipeline.project-onboarding-source-recovery.v1` | B4R | V4 source recovery planner | Pipeline start/operator |
 | `pipeline.project-onboarding-manifest-repair-plan.v1` | B4R | V4 manifest repair planner | confirmed lifecycle writer |
+| `pipeline.nova-b5-candidate-freeze.v1` | B5 | candidate-freeze compiler | native-gate operator |
+| `pipeline.nova-b5-evidence-manifest.v1` | B5 | evidence-manifest compiler | native-gate operator |
 | `pipeline.macos-acceptance.v1` | B6 | native harness | final gate |
 
 ### 7.2 Closed root shapes and bounds

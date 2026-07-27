@@ -41,5 +41,6 @@
     "live B4 forge operation",
     "B6 native Apple Silicon lifecycle, Critic and PO close"
   ],
-  "status": "frozen-awaiting-external-native-gates"
+  "status": "frozen-awaiting-external-native-gates",
+  "recordSha256": "149a3e0342581b4d9496b6c286c584bc73f8dfe7abab539782ae116d103d375d"
 }

@@ -17,7 +17,7 @@
     {
       "class": "spec",
       "path": "specs/sprint-nova-epic/spec.md",
-      "sha256": "ce1b70456eae416e124d184a5fe14bd16ddcb80f50372ec0107457547cf212e9",
+      "sha256": "814b9c02b3415607cce601a73147f6ff9449551ff3d5b53829f032b9de98eb5e",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -225,7 +225,7 @@
     {
       "class": "candidate-evidence",
       "path": "specs/sprint-nova-epic/evidence/nova-b/candidate-freeze.json",
-      "sha256": "02f78ceb57dddbc15ba9ae390d0230d26e4817a40ff0cd7116c0f66d176c36a7",
+      "sha256": "2f8c0ed36cda9c9d5d87469cc84e46bc91b2bd8d7c99b2329586318f0f72a273",
       "authority": false,
       "mutability": "immutable",
       "retention": "retain"
@@ -233,7 +233,7 @@
     {
       "class": "candidate-evidence",
       "path": "specs/sprint-nova-epic/evidence/nova-b/evidence-manifest.json",
-      "sha256": "3716ba6a7137f3fb14844b13dae70b911bba29521780c5d14abf82377cf587c8",
+      "sha256": "6ef0f344f10dfd5ae274b895a9885013b7e36e1845291a00b9e632186a95fd58",
       "authority": false,
       "mutability": "immutable",
       "retention": "retain"

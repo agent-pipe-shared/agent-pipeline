@@ -34,5 +34,6 @@
       "sha256": "b6ef6512df9d35cf426c7c7da3159173dfc5ecfe28b86b0474bd97ad801dfd32"
     }
   ],
-  "scope": "candidate-freeze-only; native Apple Silicon, independent Critic and PO close remain pending"
+  "scope": "candidate-freeze-only; native Apple Silicon, independent Critic and PO close remain pending",
+  "recordSha256": "b88a1b4723fb6743e9055904eefab9df67c3ebb89b685068b147c10cbf9a83bf"
 }
