@@ -629,3 +629,10 @@ architecture prose or an implementation briefing.
 - **EPIC-AC-06:** WHEN the implementation is ready for the first dispatch, THE
   SYSTEM SHALL require the Product Owner's literal `approved` against the
   readable PRD and bound Spec; design work alone SHALL NOT authorize code.
+- **EPIC-AC-07:** WHEN a Security scan materializes a detached candidate
+  worktree, THE SYSTEM SHALL bind its clean verdict to exact commit, tree,
+  tracked-input inventory, and source identity observed before and after scan.
+  It SHALL treat equivalent detached-worktree identity as valid despite
+  worktree-local configuration differences, while any actual source/tree/
+  inventory drift remains a typed blocking result; scanner success with an
+  unverified candidate SHALL NOT exit clean.

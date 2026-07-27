@@ -9,7 +9,7 @@
     {
       "class": "prd",
       "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-      "sha256": "f8c4f2a40073ce5682cd87c309aa9ea93405551aaeda6a862b904ac31126f1a7",
+      "sha256": "f0d076a679a74267d4b249e0a9213850bfaca3fff1cda9e5285a373a8e086913",
       "authority": true,
       "mutability": "immutable",
       "retention": "active"
@@ -17,7 +17,7 @@
     {
       "class": "spec",
       "path": "specs/sprint-phoenix-epic/spec.md",
-      "sha256": "f7f5ec8d32ce8e1047c3607d2fc2ba541ec7aa60644894e5468b3bfcd2136dee",
+      "sha256": "0a6f94e732e53283a2ae7d6032e0fbe8bc8afacab641c4463ed2783af229e597",
       "authority": true,
       "mutability": "immutable",
       "retention": "active"
@@ -25,7 +25,7 @@
     {
       "class": "acceptance",
       "path": "specs/sprint-phoenix-epic/acceptance.md",
-      "sha256": "84b507e6ef7dfe3fb859673a743fa9a0a77875b5feeb5ff883a1f0cc5789ae82",
+      "sha256": "5d0fc84f7415e9a166001c86afb73bb8d5aab06f46a583edb641fd9ba2eaeaeb",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -33,7 +33,7 @@
     {
       "class": "design",
       "path": "specs/sprint-phoenix-epic/RECOVERY.md",
-      "sha256": "985c9609a291555a4adf1a8e4a0cd3828715cb9e3be4efd71f7b57a1b66be807",
+      "sha256": "bb2b8686ea172614d3c1c84c7c667dae3cdf24ee97a4f1ca82506f2d52d45285",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
@@ -57,7 +57,7 @@
     {
       "class": "design",
       "path": "specs/sprint-phoenix-epic/design/architecture.md",
-      "sha256": "e2db8fad9d821bb4b693263185453de6a9bda1812d24a4a55ea6937c9dd986d4",
+      "sha256": "a5bf254c3a8a735ced84a583a365e1b726061720f3d761f76a111e380472cbe8",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
@@ -73,7 +73,7 @@
     {
       "class": "design",
       "path": "specs/sprint-phoenix-epic/design/governance-conformance.md",
-      "sha256": "7a4262ceaf08d6ccd53942b0fcff8d287f9b35a673490957c039c2f2ba52038d",
+      "sha256": "d9a88849029d9a2b196ecac26437fa374051560b319186e43ed0d13bb8ea8d75",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
@@ -97,7 +97,7 @@
     {
       "class": "design",
       "path": "specs/sprint-phoenix-epic/design/readiness-audit.md",
-      "sha256": "a34401c386282273348511374d6ba05aa548f22b6ec5777dd87fc68aa6a40021",
+      "sha256": "bc69b75a7522be9b617eb344f866292fd522a87bc26058b2d5d61257db5a028b",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"

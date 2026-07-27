@@ -443,6 +443,25 @@ observed outcome, and readback. This is an audit expansion, not permission to
 perform a bypass. The updated PRD/Spec require a fresh fixed-candidate review
 and renewed exact Product Owner approval before implementation.
 
+## R-13 — Security candidate-binding observation
+
+The fixed Phoenix design candidate was scanned through the sanctioned local
+Security gate. Gitleaks, Semgrep, and license checks reported no findings; the
+dependency scanner reported its typed no-package-source state. Nevertheless,
+the machine evidence recorded `verifiedBeforeAfter:false` and the gate returned
+blocking status, so Phoenix makes no clean-Security claim. The evidence is
+bound to candidate commit/tree and retained only as local machine evidence;
+this record deliberately excludes its machine-local path and all scanner raw
+output.
+
+Read-only source inspection confirms that the gate's candidate binding compares
+a detached-worktree observation with source-checkout identity. Phoenix now
+includes `EPIC-AC-07`: equivalent immutable candidate identity must not be
+invalidated by worktree-local configuration, while a real source/tree/inventory
+change remains blocking. This is a design observation and scoped PHX-6
+integration requirement, not authorization to change the Security gate before
+the Phoenix plan gate.
+
 ## Audit classification
 
 These records illustrate the Phoenix recovery profile:

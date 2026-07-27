@@ -351,6 +351,8 @@ files are excepted only when their path is already declared here.
 | `docs/product-capability-inventory.json` | register new public capabilities/surfaces | Preserve capability governance. |
 | `.claude/pipeline.yaml` | register new Verify/security/governance paths only through its authoritative source workflow | Make new contracts enforceable without direct generated-file edits. |
 | `harness/scripts/verify.mjs` | add scoped Phoenix suite registrations | One Verify gate must cover every package. |
+| `harness/scripts/security-scan.mjs` | preserve exact source-candidate identity across its detached scan worktree; distinguish stable repository identity from worktree-local configuration and fail closed on actual source/tree/inventory drift | Make blocking Security evidence reproducible and honest. |
+| `harness/scripts/security-scan.test.mjs` | add detached-worktree identity, clean-before/after, real-drift, and false-clean regression fixtures | Prove a zero-finding scan can reach a truthful exit-0 verdict only on its exact candidate. |
 | `harness/definition-of-done.md` | add governance-stream/privacy/external-projection closure checks | Make Epic completion auditable. |
 
 ### 7.2 Ruleset-source trust root
@@ -645,6 +647,9 @@ No migration fabricates historical decisions or deletes legacy evidence.
   fail-closed behavior for material actions, privacy rejection, and the
   distinction between offer, authority, attempt, user assertion, and verified
   readback.
+- Security fixtures prove detached-worktree equivalence, exact clean
+  before/after candidate binding, and fail-closed source/tree/inventory drift;
+  a zero-finding scanner report with unverified candidate binding is not clean.
 - Privacy/security threat model and prohibited-content matrix pass before any
   external live test.
 - Full Verify, blocking Security, and high-risk Critic pass on the exact
