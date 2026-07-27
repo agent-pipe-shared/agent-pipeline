@@ -10,6 +10,13 @@ check("sealed new-branch publication requires preview, confirmation, and matchin
   const requested = branch(); const previewed = previewGitBranch(requested, { expiresAt: 200 }).transport; const confirmed = confirmGitBranch(previewed, { authoritySha256: A, previewSha256: previewed.preview.previewSha256, confirmedAt: 100 }).transport; const applied = applyGitTransport(confirmed, { providerReceiptSha256: D, acceptedAt: 101, status: "accepted" }).transport; const done = readbackGitTransport(applied, { observedOid: C, expectedOid: C, status: "matching", observedAt: 102 }).transport;
   assert.equal(done.state, "readback-verified"); assert.deepEqual(validateGitTransport(done), { ok: true, code: null });
 });
+check("branch publication rejects apply until the exact preview is confirmed", () => {
+  const requested = branch();
+  const previewed = previewGitBranch(requested, { expiresAt: 200 }).transport;
+  const receipt = { providerReceiptSha256: D, acceptedAt: 101, status: "accepted" };
+  assert.deepEqual(applyGitTransport(requested, receipt), { ok: false, code: "AUTHORITY:transport-apply", transport: null });
+  assert.deepEqual(applyGitTransport(previewed, receipt), { ok: false, code: "AUTHORITY:transport-apply", transport: null });
+});
 check("read-only fetch has no confirmation path but still requires exact ref readback", () => {
   const applied = applyGitTransport(fetch(), { providerReceiptSha256: D, acceptedAt: 1, status: "accepted" }).transport; const done = readbackGitTransport(applied, { observedOid: C, expectedOid: C, status: "matching", observedAt: 2 }).transport; assert.equal(done.state, "readback-verified");
 });

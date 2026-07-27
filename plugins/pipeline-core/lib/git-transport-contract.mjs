@@ -106,7 +106,8 @@ export function confirmGitBranch(record, confirmation) {
   const next = clone(record); next.confirmation = clone(confirmation); next.state = "confirmed"; next.previousSha256 = record.recordSha256; return { ok: true, code: null, transport: seal(next) };
 }
 export function applyGitTransport(record, receipt) {
-  if (!validateGitTransport(record).ok || !["confirmed", "requested"].includes(record.state) || !exact(receipt, ["providerReceiptSha256", "acceptedAt", "status"])) return { ok: false, code: "AUTHORITY:transport-apply", transport: null };
+  const allowedState = record?.operation === "branch.publish" ? "confirmed" : "requested";
+  if (!validateGitTransport(record).ok || record.state !== allowedState || !exact(receipt, ["providerReceiptSha256", "acceptedAt", "status"])) return { ok: false, code: "AUTHORITY:transport-apply", transport: null };
   if (!SHA256.test(receipt.providerReceiptSha256 ?? "") || !Number.isSafeInteger(receipt.acceptedAt) || receipt.acceptedAt < 0 || !["accepted", "rejected", "unknown"].includes(receipt.status)) return { ok: false, code: "SHAPE:transport-receipt", transport: null };
   const next = clone(record); next.remoteReceipt = clone(receipt); next.previousSha256 = record.recordSha256; next.state = receipt.status === "accepted" ? "applied-unverified" : receipt.status === "rejected" ? "failed" : "unknown"; return { ok: true, code: null, transport: seal(next) };
 }
