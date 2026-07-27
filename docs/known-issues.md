@@ -108,3 +108,11 @@ The bounded writer sanitation patch committed a replay-generated public receipt
 with a compact correlation fingerprint, retained the exact internal authority
 checks, and left the lifecycle manifest unchanged. TP-5 is restored before
 Security and Verify are rerun; no scanner suppression was added.
+
+The subsequent Security scan proved that the remaining false positives are
+immutable local-history findings from the earlier R3 receipt and fixture
+commits. The current receipt and fixture are minimized, but a historical scan
+cannot remove prior commit contents without prohibited history rewriting. TP-5
+is restored while the PO decides whether to authorize exact, immutable-history
+fingerprints in `.gitleaksignore`; no broad allowlist or scanner bypass is
+permitted.
