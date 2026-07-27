@@ -1,5 +1,21 @@
 # History
 
+## 2026-07-27 — Nova B4R / Issue #63 branch-local closeout
+
+- Recorded the completed V4 recovery correction on the isolated Nova branch.
+  The implementation candidate is `ddd0d6ab89ba7579d28d4b4273feb7896b35f10c`,
+  tree `b34931aac6734f20e9656d8ab6ceff782f0abe74`, on delivered `v0.4.6`.
+  Its exact Full Verify, Security, and fresh independent Critic evidence are
+  retained in the B4R candidate record.
+- Added the append-only Result entry and lifecycle binding without changing
+  `main`, opening a release, running GitLab validation, or commenting Issue
+  `#63`. PR `#64` remains Draft; its normal feature-branch update awaits the
+  separately authorized push/readback.
+- The branch-local documentation candidate
+  `5d5b68dd0a7155276bbe1fbe8b15a41d7c068d43` passed Full Verify (178 steps)
+  and Security cleanly. The overall Nova Epic remains active: B2-I, B3-I,
+  live B4 and B5/B6 retain their individual authority and evidence gates.
+
 ## 2026-07-26 — v0.4.6 delivered; Nova adaptation rebased
 
 - The `v0.4.6` release is fully delivered and closed. There is no open work in
