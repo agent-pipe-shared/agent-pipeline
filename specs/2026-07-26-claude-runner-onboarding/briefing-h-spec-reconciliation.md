@@ -1,13 +1,12 @@
 # Prepared Goldfish briefing — CLAUDE-RUNNER-01h: reconcile spec.md with what shipped
 
-> **Status: NOT YET DISPATCHED — depends on CLAUDE-RUNNER-01f and
-> CLAUDE-RUNNER-01g landing first** (this task documents the FINAL touched-
-> file set and diagnostic wording across the whole package; dispatching it
-> before f/g land would make it document a stale, incomplete state). Closes
-> Critic findings F5 (minor) and F6 (minor) from the CLAUDE-RUNNER-01
+> **Status: READY TO DISPATCH.** (f) and (g) have both landed and been
+> independently verified (`609b50e`, `984ebb5`) — this task now documents the
+> FINAL touched-file set and diagnostic wording across the whole package.
+> Closes Critic findings F5 (minor) and F6 (minor) from the CLAUDE-RUNNER-01
 > review, bundled as one coherent documentation-reconciliation work package
 > (GIT-02) since both are "bring spec.md in line with what shipped".
-> Ruleset SHA placeholder: refresh to (g)'s landing commit before dispatch.
+> Ruleset SHA: `99cfd9c` on `feat/sprint-cyborg-claude` (2026-07-27).
 > **Worktree: no** — run directly in the main checkout.
 
 ---
@@ -19,7 +18,7 @@ handover/state files or session history — this briefing replaces them.
 
 First output line (compact bootstrap confirmation):
 
-> Bootstrap check passed: ruleset <REFRESH-SHA> loaded · Project agent-pipeline · Calibration .claude/pipeline.json · State briefing CLAUDE-RUNNER-01h/2026-07-27 · Role Goldfish
+> Bootstrap check passed: ruleset 99cfd9c loaded · Project agent-pipeline · Calibration .claude/pipeline.json · State briefing CLAUDE-RUNNER-01h/2026-07-27 · Role Goldfish
 
 ---
 
@@ -154,8 +153,7 @@ rather than trusting this briefing's paraphrase.
 
 ### 8. Dispatch metadata
 
-- Ruleset SHA/version: refresh to (g)'s landing commit before dispatch —
-  placeholder, do not dispatch unrefreshed.
+- Ruleset SHA/version: `99cfd9c` on `feat/sprint-cyborg-claude`.
 - Model/effort: Implement-tier / standard. Rationale: mechanical
   documentation reconciliation against verifiable git evidence, no design
   decision beyond wording clarity.
