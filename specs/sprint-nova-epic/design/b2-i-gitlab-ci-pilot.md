@@ -53,10 +53,12 @@ The planned broker record is closed and digest-bound. Its states are
 `reconciled`, `cancel-requested`, `cancelled`, `failed`, `unavailable` and
 `expired`. Genesis is only `requested`; every successor embeds and verifies
 its sealed predecessor as well as its predecessor digest, so a standalone
-terminal record cannot invent a history. A cancellation action binds the exact provider job identity and
+terminal record cannot invent a history. `expired` is an explicit sealed
+terminal transition from an admitted pending record. A cancellation action binds the exact provider job identity and
 pre-state, then requires metadata readback; a cancel request is never reported
-as cancellation success. Retry is permitted only for the same idempotency
-subject after reconciling the preceding attempt.
+as cancellation success. A retry is a separate, attempt-numbered genesis only
+when it embeds the exact reconciled preceding attempt with the same immutable
+idempotency subject; there is no implicit retry.
 
 No background retry, credential renewal, remote cleanup or host process may
 outlive the bound request. A new request needs a new PO-authorized preview.

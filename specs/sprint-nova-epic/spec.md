@@ -822,7 +822,10 @@ sealed predecessor and must reproduce its exact permitted transition. A
 provider `success` is never final on its first observation: reconciliation
 requires a second matching observation. Raw credential fields, early
 observations, job substitution, self-declared bases and forged terminal
-lineages fail closed.
+lineages fail closed. Expiry is an explicit sealed terminal transition from a
+pending record. A retry has a new attempt number and can start only from the
+exact reconciled preceding attempt with the same candidate, target and
+idempotency subject.
 
 `pipeline.async-execution-journal.v1` appends provider observations with exact
 provider job binding, subject, provider sequence or `not-provided`, observation
