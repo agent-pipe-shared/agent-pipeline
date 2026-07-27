@@ -684,3 +684,14 @@ now reflects the exact approved 17-Issue Nova portfolio. This is a
 documentation reconciliation only; it does not create acceptance evidence,
 close an Issue, alter a label, consume Cyborg input or satisfy candidate
 freeze, native macOS, Critic or PO gates.
+
+## 2026-07-27 — B5 independent-branch base reconciliation
+
+Status: `nova-base-projection-corrected; freeze-pending`.
+
+The B5 audit also found an obsolete `v0.4.1` statement in the Nova/Cyborg
+collision matrix. The matrix now states only the established Nova fact:
+Nova is based on delivered and closed `v0.4.6`. It makes no assertion about
+Cyborg's base and retains the prohibition on consuming unpublished Cyborg
+bytes. This correction does not merge, rebase, integrate, or otherwise read
+from a sibling Sprint.

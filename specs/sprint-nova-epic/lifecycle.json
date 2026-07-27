@@ -33,7 +33,7 @@
     {
       "class": "result",
       "path": "specs/sprint-nova-epic/result.md",
-      "sha256": "f145f8f6f4be85c53a45d1b2d902bd4866214af30551a1a6c98b6f618825857a",
+      "sha256": "e56b13a27d09274136be8b4a10c3a4c17f6d52ccfb57f69ddbf06b8e20fc4957",
       "authority": true,
       "mutability": "append-only",
       "retention": "retain"
@@ -57,7 +57,7 @@
     {
       "class": "design",
       "path": "specs/sprint-nova-epic/design/cyborg-collision-matrix.md",
-      "sha256": "1c25ff5f9e62b0d82e50fd13a48469e343ebf545e128901fc597136b98684d25",
+      "sha256": "12ff5b230f728eecb0cb3b9f54909cd7eedfa4316bedf88d8cd0192a825179c5",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"

@@ -7,9 +7,11 @@ another runner. No Cyborg branch or candidate OID was visible at the Nova
 branch cut. Cyborg is therefore an external workstream. Nova acceptance does
 not wait for a Cyborg base, branch/OID, write-path manifest or Result.
 
-Both Sprints start from published `v0.4.1`. Neither may consume unpublished
-bytes from the other. A later integration candidate must reconcile the exact
-accepted Nova and Cyborg OIDs and rerun all applicable gates.
+Nova's current base is the delivered and closed `v0.4.6` release. Cyborg
+remains an independent external workstream whose base is not asserted here.
+Neither Sprint may consume unpublished bytes from the other. A later
+integration candidate must reconcile the exact accepted Nova and Cyborg OIDs
+and rerun all applicable gates.
 
 The same rule applies to backlog authority: this Nova repository is canonical;
 Cyborg has a manual read-only mirror of transition head `36dd616d…`. The
@@ -89,8 +91,8 @@ A package may not widen from its declared paths.
 
 Before every implementation dispatch, compare the package write paths and
 runtime resources with Nova's own active work. An identical repository path on
-independent `v0.4.1` branches is a recorded later merge collision, not a
-current execution collision and not isolation evidence.
+independent Sprint branches is a recorded later merge collision, not a current
+execution collision and not isolation evidence.
 
 `NVA-CYBORG-COLLISION` blocks only when both Sprints would mutate one physical
 workspace/global resource concurrently, or during a combined integration
