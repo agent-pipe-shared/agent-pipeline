@@ -71,3 +71,8 @@ The temporary PHX-0A exception was restored without an implementation change
 when the accepted #22 planner rejected the required absent-manifest draft
 bootstrap. The next attempt requires a PO-approved resolution of that planner
 contract before another writer dispatch.
+
+After that PO-approved contract revision received its renewed Plan/Spec gate,
+the same session authorization reactivated only TP-1, TP-3, and TP-5 for the
+single renewed PHX-0A dispatch. The rules remain subject to the same immediate
+restoration requirement before independent review and final gates.
