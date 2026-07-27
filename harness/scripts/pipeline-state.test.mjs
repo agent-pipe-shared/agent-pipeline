@@ -2080,7 +2080,7 @@ if (symlinkCapable) {
   const planned = captureConsoleLog(() => run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", proposed, "--idempotency-key", "phx-reconcile-01", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir, poGateAuthority }));
   const plan = JSON.parse(planned.text); const request = plan.request;
   const requestFile = writeRequest(dir, "reconcile-request", request);
-  const denied = { ...request, authority: { ...request.authority, decision: { ...request.authority.decision, approvalSha256: A } } };
+  const denied = { ...request, authority: { ...request.authority, decision: { ...request.authority.decision, approvalSha256: createHash("sha256").update("mismatched approval").digest("hex") } } };
   const deniedCode = run(["feature-package-apply", "--request-file", writeRequest(dir, "reconcile-denied", denied), "--request-sha256", sha256Canonical(denied), "--lock-token", "phx-reconcile-lock-01"], { dir, poGateAuthority });
   const deniedPreserved = readFileSync(join(dir, manifestPath), "utf8") === before;
   const applied = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "phx-reconcile-lock-01"], { dir, poGateAuthority });
@@ -2089,7 +2089,8 @@ if (symlinkCapable) {
   const replay = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "phx-reconcile-lock-01"], { dir, poGateAuthority });
   ok("PHX0A4 existing draft plan binds exactly the active PO approval", planned.value === 0 && request.operation === "reconcile-draft" && request.manifestPreimage === createHash("sha256").update(before).digest("hex") && request.authority.decision.approvalSha256 === sha256CanonicalJson(approval));
   ok("PHX0A5 existing draft reconciliation rejects a mismatched PO decision without mutation", deniedCode === 2 && deniedPreserved);
-  ok("PHX0A6 existing draft reconciliation changes only the four planned digest bindings and replays zero-write", applied === 0 && changedDigests === 4 && afterValue.state === "draft" && JSON.stringify(afterValue.feature) === JSON.stringify(manifest.feature) && JSON.stringify(afterValue.candidate) === "null" && JSON.stringify(afterValue.supersedes) === "null" && replay === 0 && readFileSync(join(dir, manifestPath), "utf8") === after);
+  const receipt = JSON.parse(readFileSync(join(dir, `${base}/evidence/lifecycle/feature-package-phx-reconcile-01.json`), "utf8"));
+  ok("PHX0A6 existing draft reconciliation changes only the four planned digest bindings and replays zero-write", applied === 0 && changedDigests === 4 && afterValue.state === "draft" && JSON.stringify(afterValue.feature) === JSON.stringify(manifest.feature) && JSON.stringify(afterValue.candidate) === "null" && JSON.stringify(afterValue.supersedes) === "null" && replay === 0 && readFileSync(join(dir, manifestPath), "utf8") === after && /^fp-[a-f0-9]{16}$/.test(receipt.correlation) && !/[a-f0-9]{32}/.test(JSON.stringify(receipt)));
 }
 
 {
