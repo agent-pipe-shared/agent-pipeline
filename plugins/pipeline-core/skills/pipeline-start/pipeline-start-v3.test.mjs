@@ -293,6 +293,14 @@ const cases = [
     assert.match(skill, /after that re-entry, automatically continue the persisted next action without waiting/u);
     assert.match(skill, /Only an explicit pause\/cancel\/replace\/redirect, a named gate, completion or a typed blocker may stop/u);
   }],
+  ["Approved plans continue internal implementation without slice-level PO pauses", () => {
+    assert.match(skill, /Approved-plan continuation/u);
+    assert.match(skill, /an internal implementation slice or package is not a PO gate/u);
+    assert.match(skill, /complete its required evidence gates, Critic review and\s+finding disposition, then autonomously continue with the next package/u);
+    assert.match(skill, /Ask\s+for a PO gate only for a typed blocker, a material scope or authority change,\s+a push or other remote action, or final feature\/epic acceptance/u);
+    assert.match(skill, /does\s+not weaken the initial readable-PRD approval requirement or any evidence\s+gate/u);
+    assert.match(skill, /a completed\s+internal slice\/package is ordinary continuity, not a named PO gate/u);
+  }],
   ["Cleanup startup reuses one CAS-bound descriptor and exposes only typed rotation/recovery", () => {
     assert.match(skill, /command owns the entire First-bind CAS/u);
     assert.match(skill, /WT-SESSION-REUSED/u);

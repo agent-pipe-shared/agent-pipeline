@@ -99,6 +99,14 @@ normative shape is:
    readable PRD and wait for explicit approval before implementation.
    Approval is recorded before the first implementation dispatch; it is never
    inferred from chat, an old plan, or an implementor's confidence.
+   **Post-approval continuation.** Once that required plan gate is recorded,
+   internal implementation slices and packages within its approved scope
+   continue autonomously. Dispatch, required evidence gates, Critic review and
+   finding disposition are delivery work, not repeated PO pauses. Do not ask
+   for a new PO gate merely because a slice completes. A PO gate is required
+   only for a typed blocker, a material scope or authority change, a push or
+   other remote action, or final feature/epic acceptance. This preserves the
+   initial plan gate; it does not weaken any required evidence gate.
 5. **Dispatch.** Give a Goldfish one outcome, exact context paths, DoD checks,
    prohibitions, stop conditions and route metadata. Independent tasks may run
    in parallel when their files and state do not conflict.
@@ -337,6 +345,15 @@ Die normative Form lautet:
    Die Freigabe wird vor dem ersten Implementierungs-Dispatch aufgezeichnet;
    sie wird nie aus Chat, einem alten Plan oder Zuversicht der implementierenden
    Person abgeleitet.
+   **Fortsetzung nach Freigabe.** Sobald dieses nötige Plan-Gate aufgezeichnet
+   ist, laufen interne Implementierungs-Slices und -Pakete innerhalb seines
+   freigegebenen Scopes autonom weiter. Dispatch, nötige Evidenz-Gates,
+   Critic-Review und Befund-Disposition sind Auslieferungsarbeit, keine
+   wiederholten PO-Pausen. Nicht allein wegen des Abschlusses eines Slices ein
+   neues PO-Gate einholen. Ein PO-Gate ist nur bei einem typisierten Blocker,
+   einer materiellen Scope- oder Autoritätsänderung, einem Push oder einer
+   anderen Remote-Aktion oder der finalen Feature-/Epic-Abnahme erforderlich.
+   Das erhält das anfängliche Plan-Gate und schwächt kein nötiges Evidenz-Gate.
 5. **Dispatch.** Einem Goldfish genau ein Outcome, Kontextpfade, DoD-Checks,
    Verbote, Stop-Bedingungen und Route-Metadaten geben. Unabhängige Aufgaben
    dürfen parallel laufen, wenn Dateien und Zustand nicht kollidieren.

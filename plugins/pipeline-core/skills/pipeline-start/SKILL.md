@@ -25,6 +25,14 @@ general lifecycle. Earlier working names `/pipeline:start` and
 - **NEVER print the confirmation line without actually performing the steps.** That is the documented main failure mode "reported done, but not verified", and a Critic audits trajectories.
 - Normal bootstrap commands below are read-only (git `ls-remote`/`rev-parse`/`log`, file reads). Step 0 may execute only a schema-valid read-only lifecycle action; every mutating lifecycle action is separately confirmed and ends this bootstrap with no confirmation line.
 - **Compact continuity:** Compact MUST rerun `pipeline-start` as a continuation re-entry; after that re-entry, automatically continue the persisted next action without waiting. Compact preserves the active task. Only an explicit pause/cancel/replace/redirect, a named gate, completion or a typed blocker may stop continuation.
+- **Approved-plan continuation:** After the required plan approval is recorded,
+  an internal implementation slice or package is not a PO gate. Within the
+  approved scope, complete its required evidence gates, Critic review and
+  finding disposition, then autonomously continue with the next package. Ask
+  for a PO gate only for a typed blocker, a material scope or authority change,
+  a push or other remote action, or final feature/epic acceptance. This does
+  not weaken the initial readable-PRD approval requirement or any evidence
+  gate.
 
 **Role:** take the role from `$ARGUMENTS` (default when empty: `elephant`).
 
@@ -662,6 +670,11 @@ This step ends in a **third mandatory confirmation line** (verbatim, printed dir
 - Extract the last-updated date for the confirmation line.
 - Drift check (default threshold): warn when the repo's last commit is NEWER than the handover state AND the delta since then contains at least one non-docs commit (docs-only deltas do not trigger the warning; merge-completion gate). A project MAY override via the `$driftThreshold` comment key in `.claude/pipeline.json` (default applies if absent).
 - **Interaction-continuity re-entry:** run the read-only `node "${PIPELINE_PLUGIN_ROOT}/scripts/continuity-status.mjs" --root "$PWD"`. When it reports active, nonblocked work with a known next action, bootstrap treats that action as mandatory continuation: answer ordinary informational messages and record additive input, then execute the same persisted next action. Startup, resume, crash recovery and automatic/manual compact are not terminal task boundaries. Only an explicit pause/cancel/replace/redirect, a named gate, completion or a typed blocker may stop. The compact hook projects the same duty through `interaction-continuity.mjs`; never reconstruct it from chat history.
+- In implementation after a recorded required plan approval, a completed
+  internal slice/package is ordinary continuity, not a named PO gate. Continue
+  after its applicable evidence and Critic path unless the situation is a typed
+  blocker, a material scope or authority change, a push or other remote action,
+  or final feature/epic acceptance.
 - **Local cleanup session (Elephant only):** before the first pipeline-created temporary resource, run `node "${PIPELINE_PLUGIN_ROOT}/scripts/session-cleanup.mjs" start --repo "$PWD"`. The command owns the entire First-bind CAS: when `continuity.runtime.sessionCleanup` is null it refuses any unbound active descriptor, creates one private descriptor, atomically persists only its `sessionId` plus `descriptorSha256`, and retires the new descriptor again if persistence fails. When the tuple is already bound, `start` validates and returns that exact descriptor with code `WT-SESSION-REUSED`; it MUST NOT create or persist another nonce. Bootstrap and compact recovery reuse the same tuple. A normal close cleans and retires that descriptor, proves its closure receipt and atomically releases the exact State tuple so a later genuine session can bind a new one. If cleanup committed but tuple release was interrupted, use `release-binding`; it accepts only the exact completed closure. If both descriptor and closure receipt are absent, run the read-only `plan-recovery` and present its digest-bound `apply-recovery` action for explicit PO confirmation; an active descriptor is never PO-force-replaced. On Codex, use the host-authorized repository-local execution boundary directly when the workspace sandbox forbids nested Git subprocesses; do not first run a known-to-fail sandbox probe. The nonce stays solely in the private Git-common-dir descriptor. Never accept a changed tuple, edit State directly, or infer a cleanup target from a path prefix.
 
 ## Step 5 — Verify gate available
