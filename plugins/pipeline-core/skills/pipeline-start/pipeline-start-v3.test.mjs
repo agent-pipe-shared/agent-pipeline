@@ -297,8 +297,10 @@ const cases = [
     assert.match(skill, /Approved-plan continuation/u);
     assert.match(skill, /an internal implementation slice or package is not a PO gate/u);
     assert.match(skill, /complete its required evidence gates, Critic review and\s+finding disposition, then autonomously continue with the next package/u);
-    assert.match(skill, /Ask\s+for a PO gate only for a typed blocker, a material scope or authority change,\s+a push or other remote action, or final feature\/epic acceptance/u);
-    assert.match(skill, /does\s+not weaken the initial readable-PRD approval requirement or any evidence\s+gate/u);
+    assert.match(skill, /Ask\s+for a PO gate only for a typed blocker, a material scope or authority change,\s+a push or other remote action not already admitted by repository-calibrated,\s+candidate- or work-package-bound standing authority, or final feature\/epic\s+acceptance/u);
+    assert.match(skill, /does\s+not weaken the initial readable-PRD approval\s+requirement or any evidence gate/u);
+    assert.match(skill, /completed\s+internal slice\/package is ordinary continuity[\s\S]*push or other remote action\s+not already admitted by repository-calibrated, candidate- or work-package-\s+bound standing authority/u);
+    assert.doesNotMatch(skill, /a push or other remote action, or final feature\/epic acceptance/u);
     assert.match(skill, /a completed\s+internal slice\/package is ordinary continuity, not a named PO gate/u);
   }],
   ["Cleanup startup reuses one CAS-bound descriptor and exposes only typed rotation/recovery", () => {

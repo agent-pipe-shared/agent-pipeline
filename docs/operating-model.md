@@ -105,8 +105,10 @@ normative shape is:
    finding disposition are delivery work, not repeated PO pauses. Do not ask
    for a new PO gate merely because a slice completes. A PO gate is required
    only for a typed blocker, a material scope or authority change, a push or
-   other remote action, or final feature/epic acceptance. This preserves the
-   initial plan gate; it does not weaken any required evidence gate.
+   other remote action not already admitted by repository-calibrated,
+   candidate- or work-package-bound standing authority, or final feature/epic
+   acceptance. This preserves the initial plan gate; it does not weaken any
+   required evidence gate.
 5. **Dispatch.** Give a Goldfish one outcome, exact context paths, DoD checks,
    prohibitions, stop conditions and route metadata. Independent tasks may run
    in parallel when their files and state do not conflict.
@@ -352,8 +354,10 @@ Die normative Form lautet:
    wiederholten PO-Pausen. Nicht allein wegen des Abschlusses eines Slices ein
    neues PO-Gate einholen. Ein PO-Gate ist nur bei einem typisierten Blocker,
    einer materiellen Scope- oder Autoritätsänderung, einem Push oder einer
-   anderen Remote-Aktion oder der finalen Feature-/Epic-Abnahme erforderlich.
-   Das erhält das anfängliche Plan-Gate und schwächt kein nötiges Evidenz-Gate.
+   anderen Remote-Aktion, die nicht bereits durch eine repository-kalibrierte,
+   kandidaten- oder arbeitspaketgebundene Standing Authority zugelassen ist,
+   oder der finalen Feature-/Epic-Abnahme erforderlich. Das erhält das
+   anfängliche Plan-Gate und schwächt kein nötiges Evidenz-Gate.
 5. **Dispatch.** Einem Goldfish genau ein Outcome, Kontextpfade, DoD-Checks,
    Verbote, Stop-Bedingungen und Route-Metadaten geben. Unabhängige Aufgaben
    dürfen parallel laufen, wenn Dateien und Zustand nicht kollidieren.

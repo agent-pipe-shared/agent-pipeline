@@ -30,9 +30,10 @@ general lifecycle. Earlier working names `/pipeline:start` and
   approved scope, complete its required evidence gates, Critic review and
   finding disposition, then autonomously continue with the next package. Ask
   for a PO gate only for a typed blocker, a material scope or authority change,
-  a push or other remote action, or final feature/epic acceptance. This does
-  not weaken the initial readable-PRD approval requirement or any evidence
-  gate.
+  a push or other remote action not already admitted by repository-calibrated,
+  candidate- or work-package-bound standing authority, or final feature/epic
+  acceptance. This does not weaken the initial readable-PRD approval
+  requirement or any evidence gate.
 
 **Role:** take the role from `$ARGUMENTS` (default when empty: `elephant`).
 
@@ -673,8 +674,9 @@ This step ends in a **third mandatory confirmation line** (verbatim, printed dir
 - In implementation after a recorded required plan approval, a completed
   internal slice/package is ordinary continuity, not a named PO gate. Continue
   after its applicable evidence and Critic path unless the situation is a typed
-  blocker, a material scope or authority change, a push or other remote action,
-  or final feature/epic acceptance.
+  blocker, a material scope or authority change, a push or other remote action
+  not already admitted by repository-calibrated, candidate- or work-package-
+  bound standing authority, or final feature/epic acceptance.
 - **Local cleanup session (Elephant only):** before the first pipeline-created temporary resource, run `node "${PIPELINE_PLUGIN_ROOT}/scripts/session-cleanup.mjs" start --repo "$PWD"`. The command owns the entire First-bind CAS: when `continuity.runtime.sessionCleanup` is null it refuses any unbound active descriptor, creates one private descriptor, atomically persists only its `sessionId` plus `descriptorSha256`, and retires the new descriptor again if persistence fails. When the tuple is already bound, `start` validates and returns that exact descriptor with code `WT-SESSION-REUSED`; it MUST NOT create or persist another nonce. Bootstrap and compact recovery reuse the same tuple. A normal close cleans and retires that descriptor, proves its closure receipt and atomically releases the exact State tuple so a later genuine session can bind a new one. If cleanup committed but tuple release was interrupted, use `release-binding`; it accepts only the exact completed closure. If both descriptor and closure receipt are absent, run the read-only `plan-recovery` and present its digest-bound `apply-recovery` action for explicit PO confirmation; an active descriptor is never PO-force-replaced. On Codex, use the host-authorized repository-local execution boundary directly when the workspace sandbox forbids nested Git subprocesses; do not first run a known-to-fail sandbox probe. The nonce stays solely in the private Git-common-dir descriptor. Never accept a changed tuple, edit State directly, or infer a cleanup target from a path prefix.
 
 ## Step 5 — Verify gate available
