@@ -672,3 +672,15 @@ direct AGY capability claim.
 
 This is not native macOS evidence, a runner activation, an external operation,
 an Issue mutation, a push, merge, release or sprint-closure claim.
+
+## 2026-07-27 — B5 intake-scope reconciliation
+
+Status: `17-issue-design-projection-corrected; freeze-pending`.
+
+The B5 readiness audit found that `design/issue-intake.md` still rendered the
+original 15-Issue observation even though the approved PRD, Spec, Acceptance
+and canonical binding already include `#60` and `#63`. Its allocation table
+now reflects the exact approved 17-Issue Nova portfolio. This is a
+documentation reconciliation only; it does not create acceptance evidence,
+close an Issue, alter a label, consume Cyborg input or satisfy candidate
+freeze, native macOS, Critic or PO gates.

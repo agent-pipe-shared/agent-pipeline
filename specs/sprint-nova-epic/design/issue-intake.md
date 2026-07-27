@@ -2,15 +2,16 @@
 
 ## Snapshot
 
-Observed on 2026-07-24 from
-`agent-pipe-shared/agent-pipeline`. All 15 records below are open and carry
-`sprint:nova`. Issue bodies are design inputs, not authority over the accepted
-Operating Model or ADRs.
+The initial 15-record observation occurred on 2026-07-24 from
+`agent-pipe-shared/agent-pipeline`. The PO subsequently added the scoped
+continuation baseline `#60` and the P0/M recovery blocker `#63`; the approved
+Nova set is therefore exactly 17 Issues. Issue bodies are design inputs, not
+authority over the accepted Operating Model or ADRs.
 
 ADR-0043 originally listed only `#7,#8,#12,#14,#16,#18,#21`; later issue work
-expanded the label to 15. The PO has now explicitly retained the full current
-label set. This package resolves the expanded portfolio by Nova A/B sequencing
-rather than by silently dropping labels.
+expanded the observed label set to 15, and the PO then explicitly added `#60`
+and `#63` to Nova. This package resolves the full 17-Issue portfolio by Nova
+A/B sequencing rather than by silently dropping scope.
 
 ## Allocation
 
@@ -25,11 +26,13 @@ rather than by silently dropping labels.
 | [#38](https://github.com/agent-pipe-shared/agent-pipeline/issues/38) Invocation reliability | P1 / L | Nova A | Supplies generic preflight/attempt/resolution contracts; telemetry never becomes authority. |
 | [#54](https://github.com/agent-pipe-shared/agent-pipeline/issues/54) Critic convergence | P1 / L | Nova A | Consumes `#38` and `#29`; fresh review remains mandatory and hard budgets become executable. |
 | [#56](https://github.com/agent-pipe-shared/agent-pipeline/issues/56) Release preflight | shared release gate | Nova A | Provider-neutral core only; Cyborg requirements enter through a later approved extension. |
+| [#60](https://github.com/agent-pipe-shared/agent-pipeline/issues/60) Runner-native continuation | P0 / continuation baseline | Nova B | Bind active executable work to one generation-bound native goal/readback without a watchdog or automatic unblock claim. |
 | [#21](https://github.com/agent-pipe-shared/agent-pipeline/issues/21) Local Goldfish pool | P1 / XL | Nova B | Starts only after accepted `#7/#8/#12/#14`; serial fallback and reserved capacity are product requirements. |
 | [#16](https://github.com/agent-pipe-shared/agent-pipeline/issues/16) Async remote adapter | P2 / L | Nova B | Extends the accepted local-first contract; no provider is required for core tests. |
 | [#18](https://github.com/agent-pipe-shared/agent-pipeline/issues/18) Credential leases | P1 / XL | Nova B | Activates only after the execution boundary; secrets remain broker-owned. |
 | [#15](https://github.com/agent-pipe-shared/agent-pipeline/issues/15) Antigravity/Gemini | P0 / XL / release gate | Nova B | Current official contract is pinned at implementation time; only conformance-certified cells are exposed. |
 | [#51](https://github.com/agent-pipe-shared/agent-pipeline/issues/51) GitLab forge | P1 / XL | Nova B | Independent forge lane after Nova A; Git stays the VCS and weaker provider controls stay explicit. |
+| [#63](https://github.com/agent-pipe-shared/agent-pipeline/issues/63) V4 recovery deadlock correction | P0 / M / release blocker | Nova B | Complete safe recovery actions for `source_invalid` and `manifest_invalid` while preserving the pre-ready write denial. |
 | [#49](https://github.com/agent-pipe-shared/agent-pipeline/issues/49) Native macOS assurance | P0 / XL / final release gate | Nova B close | Runs last on the exact integrated candidate; Apple Silicon evidence does not imply Intel support. |
 
 ## Issues considered but not added
@@ -53,6 +56,7 @@ receive a common, bounded amendment that records:
 - per-issue close evidence requirement; and
 - the rule that incomplete criteria remain open.
 
-The `sprint:nova` label stays on all 15 by PO decision. New `nova:a` /
-`nova:b` labels are not required; if the PO later wants them, their names,
-descriptions and colors need a separate exact preview and approval.
+The original `sprint:nova` label observation is not a substitute for the
+PO-approved 17-Issue allocation above. New `nova:a` / `nova:b` labels are not
+required; if the PO later wants them, their names, descriptions and colors
+need a separate exact preview and approval.
