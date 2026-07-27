@@ -1,7 +1,6 @@
 # Sprint Phoenix design readiness audit
 
-Status: design revision in progress; fresh fixed-candidate review and renewed
-Product Owner gate required
+Status: design complete; renewed Product Owner gate required
 
 Date: 2026-07-26
 
@@ -21,21 +20,21 @@ independent review, commit, push, implementation, and final Epic completion.
 | Include fitting Phoenix/unassigned governance backlog | [scope-validation.md](scope-validation.md) separates incorporated inputs, conformance fixtures, and excluded sibling/legacy work | PROVEN |
 | Do not reopen completed 0.4.6 work due stale docs | Product Owner disposition and exclusion rule in [scope-validation.md](scope-validation.md) | PROVEN as scope rule |
 | Include runner-neutral marketplace/freshness | PHX-0 in [../acceptance.md](../acceptance.md), trust-root architecture, and first delivery package | PROVEN in design |
-| Preserve active-design PRD/Spec authority through a sanctioned revision path | `PX0-AC-01..07`, architecture PHX-0 slice A, and [scope-validation.md](scope-validation.md) PX-C | DESIGN REVISED; fresh review pending; existing continuity retains the earlier digest only as a non-dispatch diagnostic |
-| Audit every Pipeline-known external command/script offer, workaround, and recovery safely | External Command Offer profile `R-AC-01..13`, architecture §14, privacy review, and [../RECOVERY.md](../RECOVERY.md) | DESIGN REVISED; fresh review pending |
+| Preserve active-design PRD/Spec authority through a sanctioned revision path | `PX0-AC-01..07`, architecture PHX-0 slice A, and [scope-validation.md](scope-validation.md) PX-C | REVIEWED; existing continuity retains the earlier digest only as a non-dispatch diagnostic until PHX-0 implementation |
+| Audit every Pipeline-known external command/script offer, workaround, and recovery safely | External Command Offer profile `R-AC-01..13`, architecture §14, privacy review, and [../RECOVERY.md](../RECOVERY.md) | REVIEWED; implementation evidence pending |
 | Produce one coherent Epic architecture | Separate canonical streams over one event kernel; dependency graph and one-writer package sequence in [architecture.md](architecture.md) | PROVEN |
 | Remain independent of Nova/Cyborg/Nightwing | Accepted prerequisites and negative dependency gate `EPIC-AC-02` | PROVEN in design; implementation evidence pending |
 | Use Advisor help | Approved bounded routes attempted; primaries timed out, earlier fallbacks timed out, and the latest exact fast-fallback role was unavailable in the adapter; workspace digests remained unchanged; [advisor-review.md](advisor-review.md) | ATTEMPTED / UNAVAILABLE, never passed |
-| Obtain independent semantic review | Initial and correction candidates received uncontaminated read-only Critic verdicts; [critic-review.md](critic-review.md) | PROVEN; every original, privacy, inventory, and PHX-0 sequencing finding cleared by fresh fixed-candidate review |
+| Obtain independent semantic review | Initial and correction candidates received uncontaminated read-only Critic verdicts; [critic-review.md](critic-review.md) | PROVEN; the renewed external-handoff candidate passed a fresh fixed-candidate Critic with no findings |
 | Satisfy the data-privacy policy gate | [privacy-review.md](privacy-review.md) inventories processing, normative Spec interpretation, repository-wide portable access/retention, fail-closed non-personal admission, restricted local erasure in Spec-listed files, external boundaries, and fixtures | PROVEN for design by final fixed-candidate PASS; implementation evidence remains pending |
-| Produce readable PRD and exact Spec binding | [../prd_phoenix-epic.md](../prd_phoenix-epic.md) plus its `technical-spec-sha256` marker | DESIGN REVISED; digest rebinding, fresh review, and renewed approval pending |
+| Produce readable PRD and exact Spec binding | [../prd_phoenix-epic.md](../prd_phoenix-epic.md) plus its `technical-spec-sha256` marker | REVIEWED; renewed Product Owner approval pending |
 | No implementation before literal `approved` | Only the design package, lifecycle state, and recovery audit are changed; no product source/schema/test is created | PROVEN for current workspace |
 
 ## Design completeness
 
 | Surface | Normative evidence | Status |
 | --- | --- | --- |
-| Lifecycle-authority revision + runner-neutral trust root | `PX0-AC-01..17` | Design revised; fresh review pending |
+| Lifecycle-authority revision + runner-neutral trust root | `PX0-AC-01..17` | Reviewed; implementation pending |
 | Governance event kernel | `K-AC-01..10` | Designed |
 | Human decision ledger (#30) | `H-AC-01..15` | Designed |
 | Agent journal (#31) | `A-AC-01..16` | Designed |
@@ -45,8 +44,8 @@ independent review, commit, push, implementation, and final Epic completion.
 | Traceability/publication (#23) | `X-AC-01..15` | Designed |
 | ITSM (#24) | `C-AC-01..13` | Designed |
 | Governance export (#32) | `E-AC-01..21` | Designed |
-| External command offer / recovery audit | `R-AC-01..13` | Design revised; fresh review pending |
-| Epic integration | `EPIC-AC-01..06` | Design revised; fresh review pending |
+| External command offer / recovery audit | `R-AC-01..13` | Reviewed; implementation pending |
+| Epic integration | `EPIC-AC-01..06` | Reviewed; implementation pending |
 
 The 157 normative criteria are unique, sequential within each group, and
 contain no numbering gap. Every criterion remains unimplemented until a later
@@ -99,6 +98,9 @@ trusted time, destination retention, analyst review, or compliance.
 | Final PHX-0 sequencing correction re-review on `49c1a167c70a83e7e45422ee4407bfd8293d387d` | PASS with no findings; PHX-CR-05S and direct regressions cleared; machine trajectory consistent; no write or delegation |
 | Close Stage-1 Full Verify on `8db528d60cc8bd1129b5adebafb8c065a90ee98b` | exit 0; machine evidence SHA-256 `b8d52a74ad1317a5da86ba43f9006bf511c3a1133fafdd2cb2774f9baeaaf363` |
 | Close Stage-1 integrated Security on the same candidate | exit 0 / CLEAN; machine evidence SHA-256 `1bf956d1c17bb8793cf4d7583df7bf73ed1e866a47c7644248a80170969fc6a4` |
+| External-handoff correction Full Verify | exit 0 at `5406430684d685077aa9a1c917079fbc31878833`, tree `b24b7aacbdbded4a751dea63f01e7538024d0128`; evidence SHA-256 `9ba56d5e718ab32e6f397ea97f6e3e24809a6d11c9c7786b44ade828ae045fc3` |
+| External-handoff correction integrated Security | exit 0 / CLEAN at the same candidate/tree; evidence SHA-256 `53fb2100727f1d9c8fec1edbed87e9d528f928267a6dfc6494e689b039fb9ecd` |
+| External-handoff correction independent Critic | PASS with no findings under `functional-equivalent-read-only; OS isolation not asserted`; all three prior correction findings cleared |
 
 The machine files are Git-ignored by repository policy and are passed directly
 as evidence paths to the next gate. Their command, exit code, timestamp,
@@ -121,10 +123,13 @@ platform evidence, issue closure, and Product Owner approval remain unclaimed.
    evidence-gated findings; no finding was waived.
 6. Full Verify and integrated Security subsequently passed on that exact
    unchanged candidate through the required host boundary.
+7. The external-handoff correction then passed Full Verify, Security, and a
+   fresh protocol-compliant fixed-candidate Critic. The Product Owner gate is
+   the only remaining design authority.
 
 ## Product Owner gate
 
-The complete readable PRD is now presented for the literal Product Owner
+The complete readable PRD is ready for the renewed literal Product Owner
 `approved` decision. Pipeline State deliberately remains
 `phase:"design"`/`planApproved:false`; the active feature remains open and no
 implementation package is dispatchable. The exact post-close deterministic

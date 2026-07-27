@@ -1,7 +1,6 @@
 # Sprint Phoenix governance conformance
 
-Status: design revision in progress; fresh independent review and renewed
-Product Owner gate pending
+Status: design complete; renewed Product Owner gate pending
 
 Date: 2026-07-26
 
@@ -57,7 +56,7 @@ No design-stage deviation from the twelve guidelines is proposed.
 | `PHX-PRIVACY-PORTABLE-TRUST-ZONE` | Phoenix integration-package owner | Before Product Owner gate | RESOLVED 2026-07-26 by fixed-candidate privacy PASS over the normative Spec §§4.4–4.5 interpretation and repository-wide admission. |
 | `PHX-PRIVACY-RESTRICTED-ERASURE` | Phoenix integration-package owner | Before Product Owner gate | RESOLVED 2026-07-26 by fixed-candidate privacy PASS over portable-only append semantics, restricted erasure/key destruction, and Spec-inventory ownership. |
 | `PHX-LIFECYCLE-WRITER-INVENTORY` | Phoenix design owner | Before Product Owner gate | RESOLVED 2026-07-26 by final Critic PASS: only Spec-listed writer files, complete transaction/recovery contract, mandatory PHX-0 slice A, trust-root slice B, then PHX-1..6. |
-| `PHX-DESIGN-CONTINUITY-AUTHORITY-REVISION` | Phoenix design owner; Product Owner for decision authority | Before renewed Product Owner gate | OPEN: generic CAS correctly rejects changed PRD/Spec authority. PHX-0 slice A now owns the dedicated decision-bound writer; the current revision retains the old digest as a diagnostic, not approval or dispatch authority. Fresh review must validate `PX0-AC-01..07`. |
+| `PHX-DESIGN-CONTINUITY-AUTHORITY-REVISION` | Phoenix design owner; Product Owner for decision authority | Before implementation | REVIEWED: generic CAS correctly rejects changed PRD/Spec authority. PHX-0 slice A owns the dedicated decision-bound writer; the current revision retains the old digest as a diagnostic, not approval or dispatch authority. The fixed-candidate Critic validated `PX0-AC-01..07`; Product Owner approval remains required. |
 
 If an open risk reaches its date without disposition, the Phoenix design returns to a
 blocked course gate. The expiry does not authorize the action automatically.

@@ -280,3 +280,29 @@ Security observations by exact candidate without inferring a product defect or
 adding a speculative Security implementation scope. A fresh Critic must review
 the corrected exact candidate and the new aggregate evidence before a renewed
 Product Owner plan gate.
+
+## External-handoff design revision re-review — final verdict
+
+| Field | Value |
+| --- | --- |
+| Candidate commit | `5406430684d685077aa9a1c917079fbc31878833` |
+| Candidate tree | `b24b7aacbdbded4a751dea63f01e7538024d0128` |
+| Correction range | `5eb98b99665bb074242d4084bec4839186fd08d5..5406430684d685077aa9a1c917079fbc31878833` |
+| Verify evidence SHA-256 | `9ba56d5e718ab32e6f397ea97f6e3e24809a6d11c9c7786b44ade828ae045fc3` |
+| Security evidence SHA-256 | `53fb2100727f1d9c8fec1edbed87e9d528f928267a6dfc6494e689b039fb9ecd` |
+| Assurance | `functional-equivalent-read-only; OS isolation not asserted` |
+| Reviewer mutation / delegation | none / none |
+| Machine trajectory | consistent |
+| Verdict | PASS |
+
+The fresh independently briefed Critic passed with no findings. It confirmed
+that the ignored local-evidence target is removed, Continuity's `review`
+action is accurately reflected in the canonical handover, and R-13 separates
+the earlier blocked and later clean Security observations by exact candidate
+without claiming a Security product defect. It also cleared direct scope,
+test-integrity, failure-path, privacy/security, dependency, language, and
+governance regressions.
+
+This PASS closes the renewed fixed-candidate Critic gate. It does not alter
+the still-open active-design authority binding, record Product Owner approval,
+authorize implementation, or authorize a remote write.

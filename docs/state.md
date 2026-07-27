@@ -5,12 +5,12 @@
 
 **Last updated:** 2026-07-27
 **Project status:** ACTIVE
-**Current block:** Sprint Phoenix design correction and fixed-candidate review
+**Current block:** Sprint Phoenix design complete; renewed Product Owner plan gate
 **Branch:** `sprint_phoenix`, based on public `origin/main`
 `9d1b3dc108eb77629ace5b82002120f5539abd8d`
 **Pipeline:** `0.4.6+codex.20260726170452`
-**DoD:** 🟡 not ready for Product Owner approval — the current design correction
-requires aggregate Verify and a fresh independent Critic review
+**DoD:** 🟡 not-human-verified — the remaining authority is a renewed exact
+Product Owner `approved` decision
 
 ## Operational head
 
@@ -25,10 +25,10 @@ requires aggregate Verify and a fresh independent Critic review
   authority digests are diagnostic only and cannot authorize the revised design
   until PHX-0 supplies a sanctioned revision writer.
 - Earlier reviews remain preserved in the append-only
-  [Phoenix Result](../specs/sprint-phoenix-epic/result.md). The latest
-  independent fixed-candidate Critic recorded one blocker (failed aggregate
-  Verify) and two major handover/evidence findings. They are being corrected;
-  no passing Critic verdict is claimed for the revised candidate.
+  [Phoenix Result](../specs/sprint-phoenix-epic/result.md). The external-handoff
+  correction candidate passed Full Verify, Security, and a fresh independent
+  fixed-candidate Critic with no findings. Earlier failed reviews remain
+  preserved and were not reclassified.
 - The approved bounded Advisor route was exhausted without an answer in this
   session and earlier attempts were likewise unavailable. No Advisor pass,
   effective model identity, native selected-sandbox execution, or OS isolation
@@ -89,27 +89,22 @@ requires aggregate Verify and a fresh independent Critic review
 
 ## Open items and next block
 
-1. Correct the broken local-evidence link, reconcile the canonical handover,
-   and preserve the R-13 candidate-specific trajectory without inventing a
-   Security implementation requirement.
-2. Commit the exact corrected candidate, run aggregate Verify and Security, and
-   obtain a fresh independent Critic review of that exact candidate.
-3. Only after those gates may the Product Owner review the readable Phoenix PRD
-   and reply with a fresh literal `approved` token for that exact bound Spec.
-4. Only after that decision may the sanctioned plan writer record approval and
+1. The Product Owner reviews the readable Phoenix PRD and replies with a fresh
+   literal `approved` token for its exact bound Spec.
+2. Only after that decision may the sanctioned plan writer record approval and
    the implementation phase begin.
-5. The first approved work is PHX-0 slice A. It must implement and independently
+3. The first approved work is PHX-0 slice A. It must implement and independently
    clear the transactional lifecycle writer before PHX-0 slice B or any later
    package.
-6. Each implementation package must map its criteria to named automated tests,
+4. Each implementation package must map its criteria to named automated tests,
    run focused and aggregate gates, receive the required independent review,
    and retain public-safe evidence.
-7. Remote publication remains a separate, explicitly authorized tail with
+5. Remote publication remains a separate, explicitly authorized tail with
    public-account readback and privacy checks.
-8. The monthly Pipeline tooling-radar run is overdue because no current-month
+6. The monthly Pipeline tooling-radar run is overdue because no current-month
    `tooling-radar` backlog item exists. Dispatch it separately; it is not
    Phoenix implementation authority.
-9. The close ritual could not append the root History and telemetry records:
+7. The close ritual could not append the root History and telemetry records:
    the still-correct Dev-Plan gate classified both as implementation. The
    canonical Handover, Phoenix Recovery audit, self-retro item, Error Register,
    Continuity transition, and all verification evidence remain written. Do not
@@ -118,7 +113,7 @@ requires aggregate Verify and a fresh independent Critic review
 
 No implementation, lifecycle promotion, or remote action is implied by this
 handover. The previous `approved` cannot authorize a material revision; the
-correct next action is the persisted review, followed by a fresh exact PO gate.
+correct next action is the fresh exact PO gate.
 
 ## Re-entry
 
@@ -129,9 +124,7 @@ correct next action is the persisted review, followed by a fresh exact PO gate.
    audit, Result, Recovery record, and latest Critic record.
 3. Confirm branch `sprint_phoenix`, base identity, clean worktree, valid
    continuity, and `planApproved:false`.
-4. Run the exact candidate Verify/Security evidence and fresh Critic review
-   before presenting a material revision to the Product Owner.
-5. If a fresh exact PO decision is not the literal `approved`, remain in design
+4. If a fresh exact PO decision is not the literal `approved`, remain in design
    and do not dispatch implementation.
-6. If it is `approved`, use only the sanctioned plan/lifecycle writers and
+5. If it is `approved`, use only the sanctioned plan/lifecycle writers and
    begin with PHX-0 slice A.
