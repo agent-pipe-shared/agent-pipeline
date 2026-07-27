@@ -31,35 +31,70 @@ admission therefore SHALL make direct clone/read exposure safe before the
 first durable byte. This interpretation is normative and cannot be weakened by
 architecture prose or an implementation briefing.
 
-## PX0 — Runner-neutral ruleset source and freshness
+## PX0 — Lifecycle-authority revision and runner-neutral ruleset source/freshness
 
-- **PX0-AC-01:** WHEN bootstrap resolves a loaded Pipeline distribution, THE
+- **PX0-AC-01:** WHEN an active design's PRD or Spec candidate changes after
+  continuity initialization and before plan approval, THE SYSTEM SHALL reject
+  a generic continuity CAS that changes either authority binding and SHALL NOT
+  permit a hand-edited State workaround.
+- **PX0-AC-02:** WHEN a scoped human design-revision decision is presented,
+  THE SYSTEM SHALL produce one closed read-only continuity-authority revision
+  request bound to the active feature, exact State revision, current and
+  proposed PRD/Spec paths and digests, decision reference, candidate/evidence
+  binding, idempotency key, and expiry.
+- **PX0-AC-03:** WHEN the dedicated revision request is applied, THE SYSTEM
+  SHALL recheck the State preimage, old authority, current proposed artifact
+  bytes, exact decision scope/validity, and candidate/evidence tuple under the
+  lifecycle writer lock before atomically publishing and reading back the new
+  State authority.
+- **PX0-AC-04:** IF the feature, phase, plan path, State revision, old/new
+  digest, decision scope, expiry, candidate/evidence binding, or idempotency
+  tuple is absent, stale, mismatched, reused with different intent, or
+  otherwise invalid, THEN THE SYSTEM SHALL fail closed without changing State
+  or claiming a revised authority.
+- **PX0-AC-05:** WHEN a continuity-authority revision succeeds, THE SYSTEM
+  SHALL retain one public-safe correlated lifecycle/audit receipt containing
+  stable operation and reason classes, old/new public artifact digests,
+  decision/candidate/evidence references, and typed outcome; it SHALL NOT
+  persist raw commands, private paths, prompts, user/account data, or private
+  machine identifiers.
+- **PX0-AC-06:** WHEN the revision is interrupted after a durable stage, THE
+  SYSTEM SHALL expose a typed recovery-required state and permit recovery only
+  to the exact retained preimage or intended postimage after fresh binding
+  checks; it SHALL NOT select a new candidate or infer success from a temporary
+  file.
+- **PX0-AC-07:** WHEN the exact same completed revision request is replayed,
+  THE SYSTEM SHALL return a verified zero-write replay; a conflicting replay
+  or a second writer SHALL fail closed and preserve the first read-back
+  authority.
+
+- **PX0-AC-08:** WHEN bootstrap resolves a loaded Pipeline distribution, THE
   SYSTEM SHALL emit one closed runner-neutral source observation containing
   runner, selected plugin, version, source class, and the strongest available
   loaded/installed identity.
-- **PX0-AC-02:** WHEN a valid Codex-only consumer has no
+- **PX0-AC-09:** WHEN a valid Codex-only consumer has no
   `.claude/settings.json`, THE SYSTEM SHALL resolve marketplace source through
   the native Codex registry without reporting `marketplace-unavailable`.
-- **PX0-AC-03:** WHEN a valid consumer repository is pre-HEAD, THE SYSTEM SHALL
+- **PX0-AC-10:** WHEN a valid consumer repository is pre-HEAD, THE SYSTEM SHALL
   compare the loaded plugin identity rather than requiring consumer `HEAD`.
-- **PX0-AC-04:** WHEN Claude, Codex, self-application, or local-development
+- **PX0-AC-11:** WHEN Claude, Codex, self-application, or local-development
   supplies a source observation, THE SYSTEM SHALL validate it through the same
   common closed contract before freshness evaluation.
-- **PX0-AC-05:** IF loaded, installed, source, or remote identity is missing or
+- **PX0-AC-12:** IF loaded, installed, source, or remote identity is missing or
   disagrees, THEN THE SYSTEM SHALL return a distinct typed status and SHALL NOT
   infer equality.
-- **PX0-AC-06:** WHEN remote freshness needs networking on a host with a known
+- **PX0-AC-13:** WHEN remote freshness needs networking on a host with a known
   network-denied workspace sandbox, THE SYSTEM SHALL use the selected
   network-open/read-only host transport without consuming a known-failing
   sandbox attempt.
-- **PX0-AC-07:** WHEN source/freshness diagnostics are rendered or persisted,
+- **PX0-AC-14:** WHEN source/freshness diagnostics are rendered or persisted,
   THE SYSTEM SHALL omit tokens, credentials, home paths, cache paths, private
   remotes, SSH key paths, and account coordinates.
-- **PX0-AC-08:** WHEN the ruleset source is private or local, THE SYSTEM SHALL
+- **PX0-AC-15:** WHEN the ruleset source is private or local, THE SYSTEM SHALL
   preserve its classification without exporting its coordinates.
-- **PX0-AC-09:** WHEN source equality is claimed, THE SYSTEM SHALL bind the
+- **PX0-AC-16:** WHEN source equality is claimed, THE SYSTEM SHALL bind the
   claim to the exact loaded identity and exact observed public remote identity.
-- **PX0-AC-10:** IF a runner adapter emits unknown keys, ambiguous selectors, or
+- **PX0-AC-17:** IF a runner adapter emits unknown keys, ambiguous selectors, or
   more than one selected Pipeline plugin, THEN THE SYSTEM SHALL fail closed.
 
 ## K — Governance event kernel
@@ -511,34 +546,70 @@ architecture prose or an implementation briefing.
   provide a maintained threat model, data-flow diagram, mapping/loss guide,
   retention guidance, operator runbook, and incident/recovery procedures.
 
-## R — Workaround and recovery audit profile
+## R — External command offer, workaround, and recovery audit profile
 
-- **R-AC-01:** WHEN a sanctioned path is rejected and an alternative recovery
-  is considered, THE SYSTEM SHALL record the trigger, typed rejection,
-  evidence gap, candidate alternatives, and selected recovery as an agent
-  event.
-- **R-AC-02:** WHEN recovery changes authority or bypasses a normal guard path,
-  THE SYSTEM SHALL require and correlate an exact human-ledger decision before
-  the mutation.
-- **R-AC-03:** WHEN recovery mutates local state, THE SYSTEM SHALL record a
+- **R-AC-01:** WHEN THE PIPELINE knowingly offers an external command or script
+  for execution, including a Pipeline-initiated offer or a user-requested,
+  Pipeline-supplied offer, THE SYSTEM SHALL append a privacy-safe
+  `command-offer` agent-journal event before presentation or initiation. The
+  event SHALL bind offer origin, stable operation/tool/script class and version
+  or independently public-safe governed-artifact identity, public-safe
+  target/candidate binding, side-effect and authority class, policy/redaction
+  digests, selected alternative/reason codes, required decision reference or
+  `not-required`, execution-assurance requirement, and typed omissions.
+- **R-AC-02:** WHEN a sanctioned path is rejected or an alternative recovery is
+  considered, THE SYSTEM SHALL correlate its trigger, typed rejection, evidence
+  gap, candidate alternatives, and selected recovery to the existing offer or
+  a distinct agent event.
+- **R-AC-03:** WHEN an offer or recovery changes authority, invokes a defined
+  override, bypasses a normal guard, is destructive, or policy requires
+  authorization, THE SYSTEM SHALL validate and correlate an exact
+  scope/candidate/target/validity-bound human-ledger decision before initiation.
+  A standard non-authoritative offer SHALL remain an agent selection and SHALL
+  NOT imply approval.
+- **R-AC-04:** WHEN recovery mutates local state, THE SYSTEM SHALL record a
   stable operation class, public-safe target binding, exact pre/post evidence
   digests, recoverability, and required cleanup/readback.
-- **R-AC-04:** IF a recovery record would expose a credential, token, account,
-  SSH key, private path, private coordinate, raw command, transcript, prompt,
-  or unrestricted output, THEN THE SYSTEM SHALL omit/redact it before any
-  canonical or export persistence.
-- **R-AC-05:** WHEN recovery apply, rollback, cleanup, or readback occurs, THE
+- **R-AC-05:** IF any offer, recovery, preview, canonical record, export,
+  outbox, diagnostic, receipt, or crash artifact would expose a credential,
+  token, account, SSH key, private path/coordinate, raw command/script text or
+  arguments, shell history, transcript, prompt, unrestricted output, or a
+  digest derived from arbitrary private command text, THEN THE SYSTEM SHALL
+  reject or redact it before every durable boundary. A digest is permitted only
+  for an independently public-safe governed script artifact.
+- **R-AC-06:** WHEN an offer is displayed, acknowledged, authorized, copied,
+  generated, or asserted by a user, THE SYSTEM SHALL record only that exact
+  state and SHALL NOT label it `executed`, `completed`, or `succeeded`.
+- **R-AC-07:** WHEN THE PIPELINE initiates execution, THE SYSTEM SHALL append
+  `attempted` and may append `observed-completed` or `readback-verified` only
+  when bounded evidence supports the respective fact. A user-executed command
+  SHALL remain `execution-unobserved` unless an allowed independent evidence
+  interface verifies it; failed, partial, cancelled, unknown, unavailable, and
+  readback-mismatch outcomes SHALL remain distinct.
+- **R-AC-08:** WHEN recovery apply, rollback, cleanup, or readback occurs, THE
   SYSTEM SHALL append a lifecycle event and SHALL NOT rewrite the original
-  proposal or authorization.
-- **R-AC-06:** IF recovery completion cannot be read back, THEN THE SYSTEM SHALL
-  retain an indeterminate/partial state and SHALL NOT claim success.
-- **R-AC-07:** WHEN a private-only recovery detail is necessary operationally,
-  THE SYSTEM SHALL store it only in sanctioned machine-local state and expose
-  a public-safe typed omission/commitment if policy permits.
-- **R-AC-08:** WHEN the motivating Phoenix bootstrap trajectory is encoded as a
+  offer, proposal, or authorization.
+- **R-AC-09:** IF a required offer, authority link, candidate/policy binding,
+  or outcome evidence is missing, stale, duplicated, substituted,
+  cross-repository, or contradictory, THEN replay and every dependent outcome
+  SHALL render it `unknown` or `invalid`, never successful.
+- **R-AC-10:** IF journaling an offer is unavailable, THEN the system SHALL
+  fail closed before presenting or initiating a material, destructive,
+  authority-changing, or policy-required external action; policy may define a
+  typed non-material exception that still never claims execution.
+- **R-AC-11:** WHEN a private-only handoff detail is operationally necessary,
+  THE SYSTEM SHALL store it only in sanctioned machine-local state and expose a
+  public-safe typed omission/commitment if policy permits.
+- **R-AC-12:** WHEN the motivating Phoenix bootstrap trajectory is encoded as a
   fixture, THE SYSTEM SHALL demonstrate rejected guard path, attended local
   repair, unchanged public-privacy boundary, successful readback, and no remote
   write without embedding machine-specific values.
+- **R-AC-13:** THE implementation SHALL provide fixtures for Pipeline-initiated
+  and user-requested/Pipeline-supplied offers; approval-without-run;
+  user-run-without-report; failed, partial, cancelled, and readback-mismatch
+  results; duplicate/retry and substitution; guard override; arbitrary
+  secret-bearing command rejection; independently public-safe governed script
+  identity; and malicious external command-content rejection.
 
 ## Epic integration and release
 

@@ -2,13 +2,13 @@
 
 # PRD — Governance Sprint Phoenix
 
-> Product Review Document for the Product Owner gate. Status: `draft —
-> independent review not yet authorized`. Task: `sprint-phoenix-epic` · profile
+> Product Review Document for the Product Owner gate. Status: `draft — fresh
+> independent review pending`. Task: `sprint-phoenix-epic` · profile
 > `epic` · rigor 2 · risk high. Approval authorizes exactly the first
 > implementation dispatch; push, merge, release, external writes, and final
 > acceptance keep their own gates.
 
-<!-- technical-spec-sha256: 4bb3bbc47aade0d7c9c71fc4a43dafe196573c222c4d5643c8ee1be7686e2c3e -->
+<!-- technical-spec-sha256: f7f5ec8d32ce8e1047c3607d2fc2ba541ec7aa60644894e5468b3bfcd2136dee -->
 
 The technical approval binds the exact neighboring [spec.md](spec.md).
 Acceptance criteria are maintained in
@@ -37,7 +37,8 @@ must not fail merely because a Claude-specific file or consumer commit is
 absent.
 
 *Technical scope: public issues #5, #9, #17, #23, #24, #30, #31, and #32;
-PO additions PHX-0 ruleset source/freshness and the recovery-audit profile.*
+PO additions PHX-0 lifecycle-authority revision and ruleset source/freshness,
+plus the external-handoff, workaround, and recovery audit profile.*
 
 ## Why
 
@@ -82,9 +83,16 @@ internal approval.
   stable idempotency, and honest acknowledgement states.
 - Runner-neutral ruleset source and freshness for Codex, Claude,
   self-application, local development, offline, and pre-commit states.
-- A correlated recovery profile that records rejected routes, decisions,
-  application, rollback, cleanup, and readback without retaining private
-  machine details.
+- A sanctioned, evidence-bound continuity-authority revision path for an active
+  design whose immutable PRD/Spec candidate has legitimately changed before
+  approval. Generic CAS remains unable to rewrite authority; the dedicated
+  path requires an exact scoped human decision, old/new artifact digests,
+  atomic State readback, and a public-safe audit record.
+- A correlated external-handoff, recovery, and workaround profile. Every
+  Pipeline-known command or script offered for user execution is recorded
+  before presentation, whether Pipeline-initiated or user-requested and
+  Pipeline-supplied; offer, authorization, observed execution, and readback
+  remain separate without retaining private machine details or raw commands.
 - Migration of existing authority consumers without inventing historical
   approvals or deleting legacy evidence.
 
@@ -111,6 +119,8 @@ summarized in [design/readiness-audit.md](design/readiness-audit.md).
 - Claiming legal compliance, verified identity, trusted time, destination
   retention, analyst review, or exactly-once delivery without separate
   evidence.
+- Treating a command offer, preview, approval, generated script, copy action,
+  or user assertion as proof of execution or success.
 - Reopening completed 0.4.6 recovery work because historical backlog or
   documentation status is stale.
 - Taking ownership of Nova execution/isolation, Cyborg work, Nightwing's
@@ -172,7 +182,8 @@ candidate.
 | Validate issue ideas instead of copying them | Architecture separation, policy merge rules, external authority boundary, and Alternatives |
 | Include suitable assigned or unassigned governance backlog | Scope validation with incorporated, fixture-only, and excluded dispositions |
 | Add runner-independent marketplace version/freshness | What, Scope, first delivery wave, and PHX-0 |
-| Audit necessary recovery/workarounds safely | Scope, privacy risk control, and Recovery record |
+| Rebind a legitimately revised active-design PRD/Spec without a hand-edited State workaround | Scope, PHX-0 slice A, and the lifecycle-authority revision contract |
+| Audit all Pipeline-known external execution handoffs, recovery, and workarounds safely | Scope, privacy risk control, and External Command Offer profile |
 | Treat completed 0.4.6 work as complete despite stale documentation | Non-goals and scope validation |
 | Do not start one fix before the overall design | Delivery shape and explicit non-goal |
 | Use Advisor help | Bounded primary/fallback attempts and honest unavailable result in [design/advisor-review.md](design/advisor-review.md) |

@@ -7,7 +7,7 @@
 | Status | draft |
 | Date | 2026-07-26 |
 | Profile / phase | epic / design |
-| Readiness check | deterministic design audit passed; Advisor unavailable; pending PO-authorized fixed-candidate Critic |
+| Readiness check | design revision in progress; bounded Advisor input un-attested; fresh fixed-candidate Critic pending |
 | Product gate | [prd_phoenix-epic.md](prd_phoenix-epic.md) |
 | Normative acceptance | [acceptance.md](acceptance.md) |
 | Design | [design/architecture.md](design/architecture.md) |
@@ -54,8 +54,13 @@ depending on unpublished Nova, Cyborg, or Nightwing work.
    queued destinations.
 8. Make ruleset source/freshness independent of a runner-specific project path
    and valid for pre-HEAD consumers.
-9. Make recovery/workaround trajectories auditable without persisting private
-   machine details or raw reasoning.
+9. Make every Pipeline-known external command/script offer, recovery, and
+   workaround trajectory auditable without persisting private machine details,
+   raw command content, or raw reasoning, and without converting an offer or
+   assertion into an execution-success claim.
+10. Preserve immutable PRD/Spec authority across a legitimate active-design
+    revision through a dedicated, decision-bound lifecycle transition, never a
+    generic CAS or hand-edited State workaround.
 
 ## 3. Non-goals
 
@@ -149,7 +154,7 @@ authority resolver.
 Implementation follows the dependency graph in
 [design/architecture.md](design/architecture.md):
 
-1. PHX-0 runner-neutral ruleset trust root;
+1. PHX-0 lifecycle-authority revision writer and runner-neutral ruleset trust root;
 2. PHX-1 governance event kernel and topology;
 3. PHX-2 human decision ledger;
 4. PHX-3 lifecycle stream/replay and organization policy foundation;
@@ -219,10 +224,14 @@ No package may defer its matrix to implementation prose.
 
 ### 5.5 Bootstrap and self-update
 
-PHX-0 lands before other packages depend on new event claims. Bootstrap
-readback binds the loaded ruleset source through the new normalized contract.
-Self-application and installed-plugin paths use the same shape. A plugin update
-cannot rewrite or reinterpret an existing v1 governance event.
+PHX-0 lands before other packages depend on new event claims. Its mandatory
+slice A adds the sanctioned continuity-authority revision writer: a legitimate
+active-design PRD/Spec change stays blocked from generic CAS and can advance
+only through one exact scoped human decision, pre/post artifact bindings,
+atomic State readback, and public-safe audit record. Slice B then binds
+bootstrap readback to the loaded ruleset source through the normalized
+contract. Self-application and installed-plugin paths use the same shape. A
+plugin update cannot rewrite or reinterpret an existing v1 governance event.
 
 ### 5.6 Binary candidate/evidence binding
 
@@ -531,9 +540,15 @@ criteria are:
 - **PHX-AC-07:** WHEN external traceability, ITSM, or export is configured, THE
   SYSTEM SHALL preserve local offline authority and keep credentials/private
   coordinates machine-local.
-- **PHX-AC-08:** WHEN a recovery/workaround occurs, THE SYSTEM SHALL correlate
-  agent selection, human authority, lifecycle mutation, privacy, rollback,
-  cleanup, and readback without storing prohibited raw details.
+- **PHX-AC-08:** WHEN THE PIPELINE knowingly offers an external command or
+  script for execution, including a Pipeline-initiated offer and a
+  user-requested, Pipeline-supplied offer, THE SYSTEM SHALL append a
+  privacy-safe correlated offer before presentation or initiation; it SHALL
+  keep offer, authority, attempt, observed outcome, user assertion, readback,
+  rollback, and cleanup distinct, require exact human authority only for a
+  policy-gated/authority-changing/guard-bypassing/destructive action, and
+  SHALL NOT store prohibited raw or derived private command details or claim
+  execution/success without bounded evidence.
 - **PHX-AC-09:** WHEN Phoenix claims complete, THE SYSTEM SHALL satisfy every
   issue and acceptance row or carry an explicit PO-approved residual with
   owner/expiry and no false completion claim.
@@ -611,7 +626,7 @@ No migration fabricates historical decisions or deletes legacy evidence.
 | Export raw records and redact downstream | Leaks before the first controlled boundary. |
 | Depend on Nova #14 for #17 | Violates independent Sprint closure; #10 is sufficient. |
 | Fix only the observed Codex path | Repeats runner-specific drift; the source contract must be runner-neutral. |
-| Treat workaround audit as free-form command logging | Leaks private data and recreates hidden-reasoning/transcript retention risk. |
+| Treat external-handoff/workaround audit as free-form command logging | Leaks private data and recreates hidden-reasoning/transcript retention risk. |
 
 ## 13. Definition of Done
 
@@ -619,9 +634,17 @@ No migration fabricates historical decisions or deletes legacy evidence.
   step and exact evidence.
 - Every public issue #5/#9/#17/#23/#24/#30/#31/#32 has a complete, independently
   reviewable closure mapping.
-- PHX-0 trust-root behavior is verified on Codex, Claude, self-application,
-  local-development, pre-HEAD, offline, stale, and ambiguous fixtures.
+- PHX-0 continuity-authority revision behavior is verified for generic-CAS
+  rejection, exact decision/preimage/candidate binding, success/readback,
+  conflicting replay, concurrent writer, crash recovery, and public-safe
+  receipt fixtures; its trust-root behavior is verified on Codex, Claude,
+  self-application, local-development, pre-HEAD, offline, stale, and ambiguous
+  fixtures.
 - Stateful package crash/recovery matrices are implemented and tested.
+- External command-offer fixtures prove both offer origins, no-offer/no-display
+  fail-closed behavior for material actions, privacy rejection, and the
+  distinction between offer, authority, attempt, user assertion, and verified
+  readback.
 - Privacy/security threat model and prohibited-content matrix pass before any
   external live test.
 - Full Verify, blocking Security, and high-risk Critic pass on the exact

@@ -22,6 +22,10 @@ The Product Owner supplied two additional binding inputs:
 2. workarounds and recovery actions must be represented in the governance audit
    model without leaking private paths, credentials, raw commands, prompts, or
    unrestricted tool output.
+3. every external command or script that the Pipeline knowingly recommends or
+   supplies for user execution, including user-requested supplied commands,
+   must be audited with override/decision rigor without falsely claiming that
+   it ran.
 
 The Product Owner also confirmed that the work planned for the 0.4.6 recovery
 line is complete and operational. Stale historical documentation or backlog
@@ -89,23 +93,44 @@ each runner adapter prove its own loaded/installed/source observations.
 This addition does not authorize an isolated early fix. It is designed and
 implemented as the Phoenix trust-root package.
 
-### PX-B — Auditable workaround and recovery decisions
+### PX-B — Auditable external handoffs, workaround, and recovery decisions
 
 Accepted as a cross-cutting acceptance contract, not as a fourth competing log.
-A recovery trajectory is represented through correlated events:
+An external-execution trajectory is represented through correlated events:
 
-- a non-authoritative agent decision records the proposed/selected recovery and
-  its evidence gap;
-- a human ledger decision records any authority-changing exception or bypass;
-- a lifecycle event records attempted, rejected, applied, read-back, rolled
-  back, or cleaned-up state;
+- a non-authoritative agent journal records every Pipeline-known command/script
+  offer before it is presented, with origin `pipeline-initiated` or
+  `user-requested/pipeline-supplied`, a stable operation class, public-safe
+  artifact identity where one exists, and its evidence gap/selection;
+- a human ledger decision records only a policy-gated, authority-changing,
+  destructive, or guard-bypassing offer/execution;
+- a lifecycle event records Pipeline initiation, attempt, observed result,
+  read-back, rollback, or cleanup; a user-run command remains typed
+  `execution-unobserved` until independently evidenced;
 - governed evidence carries public-safe digests and reason codes.
 
-The record must cover trigger, rejected guard path, human action, exact local
-mutation class, privacy boundary, recoverability, cleanup, and readback. It
-must not retain raw command text when an operation code is sufficient, raw
-prompts, transcripts, credentials, private filesystem paths, account details,
-or unrestricted tool output.
+The record must cover offer origin, trigger, selected alternative, authority
+class/decision reference or `not-required`, side-effect class, public-safe
+target/candidate binding, privacy boundary, execution-assurance requirement,
+recoverability, cleanup, and readback. It must not retain raw command text,
+arguments, shell history, raw prompts, transcripts, credentials, private
+filesystem paths, account details, unrestricted tool output, or a digest
+derived from arbitrary private command text. A digest is permitted only for an
+independently public-safe governed script artifact.
+
+### PX-C — Active-design continuity-authority revision
+
+The current generic Continuity CAS correctly protects bound PRD and Spec
+digests. A later legitimate design revision therefore cannot be represented by
+editing State, reusing generic CAS, or silently treating changed files as the
+old authority. Phoenix incorporates the missing narrow writer as PHX-0 slice A:
+a read-only preview and a separately applied, decision-bound transition that
+binds the exact prior State revision, old/new public artifact digests,
+candidate/evidence, expiry, and idempotency. Its recovery is limited to that
+retained preimage/postimage and emits a public-safe receipt. Until PHX-0 is
+implemented, the retained pre-revision continuity binding is diagnostic only;
+the repository-scoped PO gate must re-read the current candidate and no
+implementation dispatch may rely on a stale continuity digest.
 
 ## Local backlog validation
 

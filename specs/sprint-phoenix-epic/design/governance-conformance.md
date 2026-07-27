@@ -1,6 +1,7 @@
 # Sprint Phoenix governance conformance
 
-Status: design governance complete; presented at Product Owner gate
+Status: design revision in progress; fresh independent review and renewed
+Product Owner gate pending
 
 Date: 2026-07-26
 
@@ -21,9 +22,9 @@ contract. It does not claim that future implementation or evidence exists.
 | 2 | Dependency direction | MET (design) | Stable neutral schemas/kernel never import provider adapters. Provider profiles depend on the core. |
 | 3 | Intent naming | MET (design) | Contract, operation, schema, and package names describe governance domains and actions rather than mechanics. |
 | 4 | Error handling | MET (design) | Unknown, unavailable, invalid, partial, stale, conflict, fork, and reconciliation states remain typed at their first boundary. |
-| 5 | Logging | MET (design) | Work-unit correlation is explicit; secrets, full PII/private coordinates, prompts, and unrestricted output are prohibited before persistence. |
+| 5 | Logging | MET (design) | Work-unit correlation includes every Pipeline-known external command offer before presentation; offer, authority, attempt, user assertion, and readback remain distinct, while secrets, private coordinates, raw command content, prompts, and unrestricted output are prohibited before persistence. |
 | 6 | API versioning | MET (design) | Closed v1 schema/profile family; breaking reinterpretation requires a new version and explicit migration. |
-| 7 | Single responsibility | MET (design) | Human ledger, agent journal, lifecycle stream, policy, viewer, adapters, ITSM, and export remain separate modules/streams. The missing #22 manifest mutation is placed in the existing sanctioned repository lifecycle state writer, not the event store or a new out-of-inventory module. |
+| 7 | Single responsibility | MET (design) | Human ledger, agent journal, lifecycle stream, policy, viewer, adapters, ITSM, and export remain separate modules/streams. The missing #22 manifest mutation and narrow continuity-authority revision are placed in the existing sanctioned repository lifecycle state writer, not the event store or a new out-of-inventory module. |
 | 8 | Configuration | MET (design) | Portable intent/policy is separate from machine-local endpoints, credentials, actor bindings, queues, and runtime settings. |
 | 9 | Idempotency | MET (design) | Canonical writer, adapters, ITSM, outbox, and external mutations have explicit idempotency and conflicting-replay behavior. |
 | 10 | Test placement | MET (design) | The implementation inventory colocates each planned `*.test.mjs` with its source area and registers it with Verify. |
@@ -56,6 +57,7 @@ No design-stage deviation from the twelve guidelines is proposed.
 | `PHX-PRIVACY-PORTABLE-TRUST-ZONE` | Phoenix integration-package owner | Before Product Owner gate | RESOLVED 2026-07-26 by fixed-candidate privacy PASS over the normative Spec §§4.4–4.5 interpretation and repository-wide admission. |
 | `PHX-PRIVACY-RESTRICTED-ERASURE` | Phoenix integration-package owner | Before Product Owner gate | RESOLVED 2026-07-26 by fixed-candidate privacy PASS over portable-only append semantics, restricted erasure/key destruction, and Spec-inventory ownership. |
 | `PHX-LIFECYCLE-WRITER-INVENTORY` | Phoenix design owner | Before Product Owner gate | RESOLVED 2026-07-26 by final Critic PASS: only Spec-listed writer files, complete transaction/recovery contract, mandatory PHX-0 slice A, trust-root slice B, then PHX-1..6. |
+| `PHX-DESIGN-CONTINUITY-AUTHORITY-REVISION` | Phoenix design owner; Product Owner for decision authority | Before renewed Product Owner gate | OPEN: generic CAS correctly rejects changed PRD/Spec authority. PHX-0 slice A now owns the dedicated decision-bound writer; the current revision retains the old digest as a diagnostic, not approval or dispatch authority. Fresh review must validate `PX0-AC-01..07`. |
 
 If an open risk reaches its date without disposition, the Phoenix design returns to a
 blocked course gate. The expiry does not authorize the action automatically.

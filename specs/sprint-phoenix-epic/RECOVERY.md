@@ -417,6 +417,32 @@ Recovery entry, the canonical handover, Error Register, and self-retro item;
 the root records remain an explicitly open close-routine residual requiring a
 sanctioned close-artifact path, not premature plan approval.
 
+## R-12 — Authorized Phoenix design-review reopening and external-handoff scope
+
+The Product Owner authorized one narrow Phoenix Continuity CAS to reopen the
+typed design-review queue after adding the requirement that every
+Pipeline-known external command/script offer be auditable. The request bound
+the prior public-safe State preimage, active feature, unchanged PRD/Spec
+authority, revision `3`, next review action, and `planApproved:false`; the
+sanctioned writer accepted it as `CS-CAS-APPLIED` at revision `4`. The required
+cleanup binding then advanced only the Continuity revision to `5` and created
+no product authority, implementation dispatch, remote write, or execution
+claim.
+
+The request artifact is
+[`evidence/phoenix-audit-handoff-design-revision.json`](evidence/phoenix-audit-handoff-design-revision.json).
+It records only the portable continuity transition. It contains no raw shell
+command, private path, account, credential, terminal output, or machine-local
+session detail.
+
+The resulting design revision broadens PX-B into the External Command Offer
+profile: the Pipeline must record an offer before it presents or initiates a
+known external command/script, retain the origin and public-safe operation
+facts, and distinguish offer, authorization, attempt, user assertion,
+observed outcome, and readback. This is an audit expansion, not permission to
+perform a bypass. The updated PRD/Spec require a fresh fixed-candidate review
+and renewed exact Product Owner approval before implementation.
+
 ## Audit classification
 
 These records illustrate the Phoenix recovery profile:

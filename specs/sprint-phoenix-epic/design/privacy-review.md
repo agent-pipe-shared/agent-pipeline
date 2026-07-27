@@ -42,10 +42,11 @@ artifacts.
 | Portable human decision | Reconstruct a scoped non-personal authority decision | non-identifying actor/authority class, assurance, outcome, scope, stable reason code; no person reference, pseudonym, free text, or local join handle | repository-wide access/retention; append is denied when stream policy is stricter |
 | Restricted human decision | Reconstruct a decision that contains personal attribution, joinable pseudonym, free-form rationale, or other restricted content | complete encrypted event outside Git; no portable counterpart, digest, mapping, or join handle | owner-only per-stream local root; explicit expiry/erase/key destruction; authorized local query only |
 | Agent declaration | Preserve a material declared assumption/selection without hidden reasoning | role/route reference, selected option, evidence class/gaps, status and revalidation trigger | repository-wide retention when portable; independently filtered downstream; never authority |
-| Lifecycle correlation | Reconstruct execution, verification, review, recovery, and delivery states | feature/package/request/dispatch/candidate/evidence identifiers and typed outcomes | repository-wide retention when portable; no raw model/tool content |
+| Lifecycle correlation | Reconstruct execution, verification, review, recovery, delivery, and sanctioned authority-revision states | feature/package/request/dispatch/candidate/evidence identifiers, public artifact pre/post digests, stable operation/reason classes, and typed outcomes | repository-wide retention when portable; no raw model/tool content, raw command, private path, or machine identifier |
 | External reference or ITSM observation | Reconcile a governed external object without importing its content as authority | canonical target class, allowlisted public-safe reference, capability/revision/content digests | destination-specific policy; inbound content stays untrusted |
 | Export delivery state | Retry and reconcile one-way sanitized projections | machine-local destination binding, cursor, idempotency key, payload digest, typed acknowledgement | machine-local queue; destination-specific expiry; never portable authority |
 | Recovery evidence | Prove a bounded workaround or repair without exposing the host | stable reason/status codes, public-safe operation class, pre/post digests, candidate binding, typed omissions | lifecycle/recovery retention; raw command, path and private configuration excluded |
+| External command offer | Prove a Pipeline-known offer without treating it as execution | offer origin, stable operation/tool/script class, public-safe governed-artifact identity when available, target/candidate/policy/redaction bindings, execution-assurance class, typed omissions | agent/lifecycle retention; no raw command/script/arguments/history/output or arbitrary private-content digest |
 
 Direct or pseudonymous personal identifiers and free-form rationale are
 prohibited in the portable v1 schema. An adopting organization that needs
@@ -69,6 +70,7 @@ the restricted store into Public Core data.
 | projection → machine-local outbox | generate one-way minimal payload before queue persistence; keep endpoint/tenant/credential local | classification or redaction failure blocks enqueue |
 | outbox → destination | enforce capability, target allowlist, consent, idempotency, TLS and acknowledgement/readback policy | no false success; partial/unknown stays retryable or blocked |
 | recovery → stream/projection | disclose only public-safe operation/digests; require retained checkpoint and decision where authority changes | no generic cleanup, deletion, history fabrication, or raw host trace |
+| Pipeline command offer → user external terminal | append the filtered offer before presentation; retain offer origin and assurance requirement separately from user acknowledgement | offer/copy/assertion is never execution; unobserved user execution remains typed and raw command content never crosses a durable boundary |
 
 Feedback from viewer, SIEM, document, issue, ITSM, or delivery systems cannot
 flow back into canonical authority. A new sanitized inbound observation must
@@ -122,7 +124,8 @@ pass the same capture policy and still cannot grant human authority.
 The implementation cannot close until candidate-bound tests prove:
 
 - secret, token, credential, private-key, private-path, private-remote,
-  endpoint, tenant, actor-mapping, prompt, transcript, command/output, and
+  endpoint, tenant, actor-mapping, prompt, transcript, raw command/script,
+  arguments, command-derived private digest, shell history, output, and
   high-cardinality injection rejection before every durable boundary;
 - nested, encoded, Unicode-confusable, multiline, oversized, malformed,
   external-content, and error-path variants;

@@ -83,6 +83,25 @@ There was no attested selected-sandbox execution; OS isolation and model
 identity are not asserted. No output was auto-applied and no Advisor finding
 exists to accept or reject.
 
+### External-command-offer design revision
+
+After the Product Owner authorized reopening the Phoenix design review, a fresh
+primary timed out at 60 seconds and was interrupted once. The fresh policy
+fallback returned bounded read-only design guidance within its 45-second limit;
+the workspace digest was unchanged before, between, and after both attempts.
+The answer was treated as non-authoritative design input, not an Advisor pass,
+because this runner path did not produce the required candidate-/launch- /
+question-bound `pipeline.host-advisor-status.v1` receipt.
+
+It recommended a correlated External Command Offer profile rather than a
+fourth log: agent-journal capture before every Pipeline-known offer, a human
+decision only for policy-gated/authority-changing/guard-bypassing/destructive
+actions, lifecycle facts only for initiation/attempt/observed outcome/readback,
+and strict separation of offer, user assertion, and execution evidence. Its
+required privacy boundary excludes raw command/script content, arguments,
+shell history, outputs, private paths, and arbitrary private-content digests.
+The adopted acceptance contract is `R-AC-01..13`.
+
 ## Authorized compensating review
 
 Before the PRD is presented for approval:

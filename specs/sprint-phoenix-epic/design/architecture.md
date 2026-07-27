@@ -455,7 +455,7 @@ An agent event is required when a declared assumption or selection can affect:
 - runner/model/profile/role routing;
 - work decomposition or package boundaries;
 - verification or review scope;
-- recovery/fallback;
+- recovery/fallback or an external command/script offer;
 - release readiness or resulting implementation.
 
 Formatting choices, token-level reasoning, routine reads, and repeated
@@ -492,6 +492,8 @@ The lifecycle stream normalizes only governance-significant events:
 - candidate and authority change/invalidation;
 - verification and independent review outcomes;
 - gate request/decision references;
+- external command/script offer, Pipeline initiation, attempt, observed
+  outcome, user assertion, and independently verified readback;
 - recovery proposal/rejection/apply/readback/rollback/cleanup;
 - external projection and reconciliation outcomes.
 
@@ -754,21 +756,54 @@ A pre-HEAD consumer is valid. Diagnostics expose no token, private registry
 path, home directory, private remote, or account coordinate. A private
 marketplace source is classified but not exported.
 
-## 14. Workaround and recovery audit profile
+## 14. External command offer, workaround, and recovery audit profile
 
-PX-B defines a correlation profile, not a new authority store.
+PX-B defines a correlation profile, not a fourth authority store. Its event
+boundary is the moment the Pipeline knowingly offers a command or script for
+execution, whether it selected the handoff itself or supplied it in response to
+a user request. The event is appended before presentation or initiation; a
+displayed/copyable handoff without a required offer event is refused for a
+material action.
+
+`command-offer` is an agent-journal declaration, never an authority or an
+execution receipt. It carries only origin (`pipeline-initiated` or
+`user-requested/pipeline-supplied`), stable operation/tool/script class and
+version, public-safe target/candidate binding, side-effect/authority class,
+policy and redaction digests, selected alternative/reason codes, decision
+reference or `not-required`, execution-assurance requirement, and typed
+omissions. A public script may be named through an independently governed
+artifact identity; arbitrary raw command/script bytes and a digest derived from
+them are prohibited because they can disclose or become a join handle for
+private content.
 
 | Required fact | Canonical record |
 | --- | --- |
+| Pipeline-known command/script offer before presentation | agent journal `command-offer` |
+| offer origin, operation class, public-safe artifact/target/candidate and policy binding | agent journal |
 | trigger and evidence gap | agent journal |
 | original sanctioned path and typed rejection | agent journal + lifecycle event |
 | proposed alternatives and selection | agent journal |
-| human exception/authorization | human ledger |
+| human exception/authorization, only when policy/authority requires it | human ledger |
+| Pipeline initiation/attempt, observed result, or independently verified readback | lifecycle event |
+| user assertion or copy acknowledgement | agent journal; never execution evidence |
 | mutation operation class and public-safe target binding | lifecycle event |
 | preimage/postimage digests and candidate binding | governed evidence reference |
 | private-data boundary and omitted fields | redaction-policy digest + typed omissions |
 | rollback/recovery authority | human decision or existing policy reference |
 | applied/read-back/rolled-back/cleaned-up result | lifecycle event |
+
+The state progression is deliberately non-collapsing:
+
+`offered → authorized? → attempted? → observed-completed? → readback-verified?`
+
+An offer, preview, approval, generated script, copy action, or user assertion
+does not advance to `attempted`, `observed-completed`, or
+`readback-verified`. A user-executed command remains
+`execution-unobserved` unless an allowed independent evidence interface proves
+otherwise. Failure, partial, cancelled, unknown, unavailable, and
+readback-mismatch are terminal typed facts, not aliases for success. Missing or
+contradictory correlation invalidates dependent replay rather than filling a
+gap.
 
 For the bootstrap recovery that motivated this requirement, the portable audit
 record may say that a protected lifecycle repair was rejected, a human
@@ -861,9 +896,10 @@ Delivery waves:
 1. **PHX-0, then kernel:** create the reviewed Phoenix lifecycle manifest now.
    PHX-0 remains implementation package 1 exactly as bound Spec §4.6 requires.
    Its blocking slice A first delivers the transactional feature-package
-   manifest writer missing from the #22 base through the already inventoried
-   Pipeline state writer; only after slice A passes focused Verify and Critic
-   may PHX-0 slice B deliver the runner-neutral ruleset trust root. PHX-1 then
+   manifest writer and narrow continuity-authority revision writer through the
+   already inventoried Pipeline state writer; only after slice A passes focused
+   Verify and Critic may PHX-0 slice B deliver the runner-neutral ruleset trust
+   root. PHX-1 then
    delivers the shared envelope, event store, checkpoint verifier, recovery command,
    repository-public-safe admission, the restricted machine-local storage
    profile within the same Spec-listed kernel, policy hooks, and topology
@@ -899,15 +935,16 @@ the closed manifest and returns a non-mutating transition plan.
 
 The sanctioned `pipeline-state.mjs` module already owns repository lifecycle
 state mutations, exact preimages, authority checks, continuity/publication
-transactions, and readback. Feature-package manifest transitions are the same
-lifecycle-state responsibility, not event-stream storage, so this placement
-preserves the single-writer boundary without expanding the governance event
-kernel. PHX-0 slice A owns this exact closed inventory:
+transactions, and readback. Feature-package manifest transitions and the
+narrow active-design authority revision are the same lifecycle-state
+responsibility, not event-stream storage, so this placement preserves the
+single-writer boundary without expanding the governance event kernel. PHX-0
+slice A owns this exact closed inventory:
 
 | File | Contract |
 | --- | --- |
-| `harness/scripts/pipeline-state.mjs` | add `feature-package-inspect`, `feature-package-plan`, `feature-package-apply`, `feature-package-status`, and `feature-package-recover`; consume the accepted #22 validator/planner; validate the repo-relative package root, closed request, exact request and manifest preimages, legal transition, authority class/decision, artifact digests, candidate/evidence binding, idempotency key and recovery journal; publish by exclusive same-directory transaction and exact readback |
-| `harness/scripts/pipeline-state.test.mjs` | cover absent/existing manifests, draft bootstrap, noop/conflicting replay, request/manifest drift, illegal transitions, wrong or stale authority, missing candidate/evidence, symlink/case/path/cross-repository rejection, concurrent writers, every crash seam, bounded recovery, sanitized output, and proof that preview/chat/handover cannot become write authority |
+| `harness/scripts/pipeline-state.mjs` | add `feature-package-inspect`, `feature-package-plan`, `feature-package-apply`, `feature-package-status`, `feature-package-recover`, plus closed `continuity-authority-revision-plan`, `continuity-authority-revision-apply`, and `continuity-authority-revision-recover`; consume the accepted #22 validator/planner; validate repo-relative package and authority artifacts, closed requests, exact preimages, legal transition, decision, candidate/evidence bindings, idempotency and recovery journal; publish by exclusive same-directory transaction and exact readback |
+| `harness/scripts/pipeline-state.test.mjs` | cover absent/existing manifests, draft bootstrap, noop/conflicting replay, request/manifest and continuity-authority drift, illegal transitions, wrong or stale decision, missing candidate/evidence, symlink/case/path/cross-repository rejection, concurrent writers, every crash seam, bounded recovery, sanitized output, and proof that preview/chat/handover cannot become write authority |
 | `governance/artifact-topology.json` | register the lifecycle request, transaction journal, sanitized receipt and candidate-evidence classes at their sole canonical roots without making temporary journals portable authority |
 | `docs/artifact-topology.md` | document discovery, state/authority mapping, bootstrap limitation, transaction/recovery sequence, retention and the prohibition on legacy/path-guess authority |
 | `harness/scripts/verify.mjs` | register the focused writer/recovery suite and the topology validator in the single repository Verify gate |
@@ -933,6 +970,18 @@ transaction remains `recovery-required`, never success.
 recovery request and may only finish the exact intended postimage or restore
 the exact retained preimage; it cannot select a new state, delete authority
 artifacts, or infer success from a temporary file.
+
+The matching `continuity-authority-revision-plan` is also read-only. It emits
+a closed request binding active feature/design phase, exact continuity revision
+and current authority, old and proposed PRD/Spec bytes, scoped human decision
+reference, candidate/evidence tuple, idempotency key, and expiry. Generic
+`continuity-cas` continues to reject PRD/Spec mutation. Its dedicated apply
+locks the existing State writer, rechecks every binding, atomically publishes
+and reads back only the proposed authority pair, and emits a public-safe
+correlated receipt. Interrupted State remains recovery-required; recovery can
+only restore the retained preimage or finish the exact retained postimage. No
+current design document or human assertion is itself authority to rewrite
+State.
 
 The bootstrap manifest remains `draft` through the Product Owner design gate:
 it inventories the reviewed design but is not itself approval authority.

@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": false,
-  "updatedAt": "2026-07-27T00:05:18.417Z",
+  "updatedAt": "2026-07-27T06:22:51.434Z",
   "closedFeatures": [
     {
       "id": "codex-onboarding-0.4.5",
@@ -20,11 +20,14 @@
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "sprint-phoenix-epic",
-    "revision": 3,
+    "revision": 5,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Coordinator",
-      "sessionCleanup": null
+      "sessionCleanup": {
+        "sessionId": "session-9f23c4518498836030e271fe",
+        "descriptorSha256": "b127463daf226ba3f7b2e26d031f158dba1833514c604afd5586f3ed023ebb09"
+      }
     },
     "authority": {
       "prd": {
@@ -37,21 +40,20 @@
       },
       "result": null
     },
-    "queueHead": null,
-    "blocker": {
-      "type": "authority",
-      "signature": "phoenix-po-plan-approval-pending",
-      "resumeCondition": {
-        "kind": "po-decision",
-        "evidenceSha256": null
-      },
-      "decisionBrief": null
+    "queueHead": {
+      "packageId": "phoenix-design",
+      "actionId": "audit-handoff-design-revision",
+      "nextAction": "review",
+      "productRetryCount": 0,
+      "environmentRerouteCount": 0,
+      "dispatch": null
     },
+    "blocker": null,
     "acknowledgedFinal": null,
     "resume": {
-      "mode": "resume-on-next-turn",
-      "sourceRevision": 2,
-      "reasonCode": "blocker"
+      "mode": "immediate",
+      "sourceRevision": 3,
+      "reasonCode": "active-turn"
     },
     "recovery": null,
     "decisionTxn": null,
