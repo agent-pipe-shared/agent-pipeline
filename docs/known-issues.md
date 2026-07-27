@@ -95,3 +95,11 @@ readback transaction and committed the corresponding public-safe receipt. The
 TP-1, TP-3, and TP-5 rules are restored before aggregate verification and any
 independent review; the exception grants no further implementation or remote
 authority.
+
+The aggregate Security gate then identified two `generic-api-key` false
+positives in the PHX-0A receipt and its negative fixture. The PO's existing
+session exception reactivates only TP-5 for one bounded Goldfish sanitation
+patch to the writer receipt and `pipeline-state` suite; it does not authorize a
+Gitleaks allowlist expansion, unrelated scanner suppression, or a lifecycle
+manifest change. TP-5 must be restored before the rerun of Security, Verify,
+and independent review.
