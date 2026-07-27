@@ -814,11 +814,15 @@ accepts the narrow local GitLab-CI contract and exact path manifest in
 blocked by its separate exact live-pilot authority; the ADR is not credential,
 provider-mutation or job-execution authority.
 
-The local B2-I broker is a network-free state machine. It binds the candidate,
-closed target digest, CI-job-token-only mode and hashed job identity; it records
-only bounded provider metadata. A provider `success` is never final on its
-first observation: reconciliation requires a second matching observation. Raw
-credential fields, early observations and job substitution fail closed.
+The local B2-I broker is a network-free state machine. It binds the candidate
+to the fixed Nova base commit and matching base tree, a closed target digest,
+CI-job-token-only mode and hashed job identity; it records only bounded
+provider metadata. Genesis is only `requested`; every later record carries a
+sealed predecessor and must reproduce its exact permitted transition. A
+provider `success` is never final on its first observation: reconciliation
+requires a second matching observation. Raw credential fields, early
+observations, job substitution, self-declared bases and forged terminal
+lineages fail closed.
 
 `pipeline.async-execution-journal.v1` appends provider observations with exact
 provider job binding, subject, provider sequence or `not-provided`, observation

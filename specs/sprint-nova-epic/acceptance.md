@@ -250,9 +250,11 @@ Nova A is accepted only when:
 - NVA-B16-5: Unattended assumptions use a closed task-scoped set with explicit
   expiry, stop/escalation behavior and no delegation, approval, credential,
   mutation, merge or release authority.
-- NVA-B16-6: The B2-I broker binds candidate, closed target digest and job
-  identity; provider `success` remains `succeeded-unverified` until a second
-  matching metadata observation reconciles it.
+- NVA-B16-6: The B2-I broker binds candidate to the fixed Nova base commit and
+  tree, closed target digest and job identity; every non-genesis record proves
+  its sealed predecessor and exact allowed transition; provider `success`
+  remains `succeeded-unverified` until a second matching metadata observation
+  reconciles it.
 
 ### `#18` Credential leases
 

@@ -28,7 +28,7 @@ artifact/cache, printed, or represented in machine evidence.
 | Credential | The job's `CI_JOB_TOKEN` only; its GitLab lifecycle/revocation remains provider-owned. No user personal token reaches the job. |
 | Git transport | Read-only fetch/ref observation only in B2-I. A B4 preview-bound branch publication is a separate operation contract. |
 | Observation | API metadata and bounded state transition readback only; logs, trace output, artifacts, caches and raw provider credentials are out of scope. |
-| Result | Provider completion is `succeeded-unverified` until the exact candidate, job identity, target digest and allowed observation chain reconcile. |
+| Result | Provider completion is `succeeded-unverified` until the exact candidate, job identity, target digest and allowed observation chain reconcile. The candidate must descend from the fixed Nova base commit and matching base tree; it cannot self-declare a different base. |
 
 ## Required denials
 
@@ -51,7 +51,9 @@ The broker and observer reject or leave unobserved:
 The planned broker record is closed and digest-bound. Its states are
 `requested`, `submitted`, `provider-running`, `succeeded-unverified`,
 `reconciled`, `cancel-requested`, `cancelled`, `failed`, `unavailable` and
-`expired`. A cancellation action binds the exact provider job identity and
+`expired`. Genesis is only `requested`; every successor embeds and verifies
+its sealed predecessor as well as its predecessor digest, so a standalone
+terminal record cannot invent a history. A cancellation action binds the exact provider job identity and
 pre-state, then requires metadata readback; a cancel request is never reported
 as cancellation success. Retry is permitted only for the same idempotency
 subject after reconciling the preceding attempt.
