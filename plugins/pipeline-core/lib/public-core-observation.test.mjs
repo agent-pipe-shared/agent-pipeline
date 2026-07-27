@@ -310,7 +310,16 @@ test("rejects a file identity swap during installed enumeration", (t) => {
   rejected(result, "SNT-A2-PLUGIN-CHANGED");
 });
 
-test("rejects detached and unsafe origins", () => {
+test("observes a syntactically safe SSH Git origin", (t) => {
+  const origin = "git@github-public:agent-pipe-shared/agent-pipeline.git";
+  const repo = fixture(origin);
+  t.after(repo.cleanup);
+  const result = observePublicCoreIdentity(repo.input());
+  assert.equal(result.status, "ready");
+  assert.equal(result.candidate.repository, origin);
+});
+
+test("rejects detached and unsafe origins without leaking private credentials", () => {
   const detached = fixture();
   try {
     git(detached.sourceRoot, ["checkout", "--detach"]);
@@ -319,10 +328,17 @@ test("rejects detached and unsafe origins", () => {
   for (const origin of [
     "https://user:secret@example.test/owner/public-core.git",
     "https://example.test/owner/public-core.git?token=secret",
-    "git@example.test:owner/public-core.git",
+    "git@github-public:agent-pipe-shared/agent-pipeline.git?token=secret",
+    "git@user@github-public:agent-pipe-shared/agent-pipeline.git",
+    "git@github-public:agent-pipe-shared//agent-pipeline.git",
   ]) {
     const repo = fixture(origin);
-    try { rejected(observePublicCoreIdentity(repo.input()), "SNT-A2-GIT-ORIGIN-INVALID"); }
+    try {
+      const result = observePublicCoreIdentity(repo.input());
+      rejected(result, "SNT-A2-GIT-ORIGIN-INVALID");
+      assert.equal(JSON.stringify(result).includes(origin), false);
+      assert.equal(JSON.stringify(result).includes("secret"), false);
+    }
     finally { repo.cleanup(); }
   }
 });

@@ -18,6 +18,10 @@ const MAX_BUFFER = 128 * 1024;
 // can still be a private marketplace, so only the one reviewed Public-Core
 // marketplace may become marketplace-public.
 const PUBLIC_MARKETPLACE_URL = "https://github.com/agent-pipe-shared/agent-pipeline.git";
+const PUBLIC_SELF_APPLICATION_ORIGINS = new Set([
+  PUBLIC_MARKETPLACE_URL,
+  "git@github-public:agent-pipe-shared/agent-pipeline.git",
+]);
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -239,7 +243,14 @@ export function observeCodexRulesetSource({
     if (!isObject(self) || self.schema !== "pipeline.public-core-observation.v1" || self.status !== "ready") {
       return adapterResult("self-application-unattested");
     }
-    if (self.candidate?.commit !== loadedIdentity.value || !CONTENT_SHA256.test(self.plugin?.contentSha256)) {
+    // The general observer admits credential-free HTTPS and syntactically safe
+    // SSH Git origins.  Self-application is narrower: only these reviewed
+    // Public Core identities may gain public authority.  A private clone must
+    // never inherit freshness/write authority merely because its local plugin
+    // layout, HEAD, and content happen to match.
+    if (!PUBLIC_SELF_APPLICATION_ORIGINS.has(self.candidate?.repository)
+      || self.candidate?.commit !== loadedIdentity.value
+      || !CONTENT_SHA256.test(self.plugin?.contentSha256)) {
       return adapterResult("self-application-unattested");
     }
   }

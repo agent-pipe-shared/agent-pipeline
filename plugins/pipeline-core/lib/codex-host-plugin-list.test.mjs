@@ -13,6 +13,8 @@ const BIN_ROOT = join(FIXTURE_ROOT, "bin");
 const LOADED_ROOT = join(FIXTURE_ROOT, "loaded", "plugins", "pipeline-core");
 const INSTALLED_ROOT = join(FIXTURE_ROOT, "installed", "plugins", "pipeline-core");
 const LOCAL_ROOT = join(FIXTURE_ROOT, "local");
+const PUBLIC_ORIGIN = "https://github.com/agent-pipe-shared/agent-pipeline.git";
+const PUBLIC_SSH_ORIGIN = "git@github-public:agent-pipe-shared/agent-pipeline.git";
 
 function pluginEntry({
   pluginId = "pipeline-core@agent-pipeline",
@@ -43,6 +45,7 @@ function observe({
   installed = [pluginEntry()],
   loadedPluginRoot = LOADED_ROOT,
   selfApplicationRoot = undefined,
+  selfApplicationRepository = PUBLIC_ORIGIN,
   heads = new Map([[LOADED_ROOT, SHA], [INSTALLED_ROOT, SHA]]),
   spawnCalls = undefined,
   gitCalls = undefined,
@@ -69,7 +72,10 @@ function observe({
       return {
         schema: "pipeline.public-core-observation.v1",
         status: "ready",
-        candidate: { commit: heads.get(input.sourcePluginRoot) },
+        candidate: {
+          repository: selfApplicationRepository,
+          commit: heads.get(input.sourcePluginRoot),
+        },
         plugin: { contentSha256: "c".repeat(64) },
       };
     },
@@ -150,6 +156,67 @@ test("a local selected root is self-application only when it is the loaded check
   });
   assert.equal(localDevelopment.status, "ready");
   assert.equal(localDevelopment.observation.source.class, "local-development");
+});
+
+test("self-application accepts only reviewed Public Core HTTPS or SSH origins", () => {
+  const root = `${LOCAL_ROOT}/plugins/pipeline-core`;
+  const local = pluginEntry({
+    pluginId: "pipeline-core@agent-pipeline-local",
+    path: root,
+    sourceType: "local",
+    source: LOCAL_ROOT,
+  });
+  const privateOrigin = "https://git.example.invalid/private/agent-pipeline.git";
+  const privateClone = observe({
+    installed: [local],
+    loadedPluginRoot: root,
+    selfApplicationRoot: LOCAL_ROOT,
+    selfApplicationRepository: privateOrigin,
+    heads: new Map([[root, SHA]]),
+  });
+  assert.deepEqual(privateClone, {
+    schema: "pipeline.codex-ruleset-source-observation.v1",
+    status: "self-application-unattested",
+    observation: null,
+  });
+  assertSafe(privateClone, [root, LOCAL_ROOT, privateOrigin, "git.example.invalid"]);
+
+  const privateSshOrigin = "git@github-private:company/agent-pipeline.git";
+  const privateSshClone = observe({
+    installed: [local],
+    loadedPluginRoot: root,
+    selfApplicationRoot: LOCAL_ROOT,
+    selfApplicationRepository: privateSshOrigin,
+    heads: new Map([[root, SHA]]),
+  });
+  assert.deepEqual(privateSshClone, {
+    schema: "pipeline.codex-ruleset-source-observation.v1",
+    status: "self-application-unattested",
+    observation: null,
+  });
+  assertSafe(privateSshClone, [root, LOCAL_ROOT, privateSshOrigin, "github-private"]);
+
+  const publicClone = observe({
+    installed: [local],
+    loadedPluginRoot: root,
+    selfApplicationRoot: LOCAL_ROOT,
+    selfApplicationRepository: PUBLIC_ORIGIN,
+    heads: new Map([[root, SHA]]),
+  });
+  assert.equal(publicClone.status, "ready");
+  assert.equal(publicClone.observation.source.class, "self-application");
+  assertSafe(publicClone, [root, LOCAL_ROOT]);
+
+  const publicSshClone = observe({
+    installed: [local],
+    loadedPluginRoot: root,
+    selfApplicationRoot: LOCAL_ROOT,
+    selfApplicationRepository: PUBLIC_SSH_ORIGIN,
+    heads: new Map([[root, SHA]]),
+  });
+  assert.equal(publicSshClone.status, "ready");
+  assert.equal(publicSshClone.observation.source.class, "self-application");
+  assertSafe(publicSshClone, [root, LOCAL_ROOT, PUBLIC_SSH_ORIGIN, "github-public"]);
 });
 
 test("missing and ambiguous Pipeline selections have distinct typed outcomes", () => {
