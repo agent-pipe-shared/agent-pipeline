@@ -25,15 +25,31 @@ general lifecycle. Earlier working names `/pipeline:start` and
 - **NEVER print the confirmation line without actually performing the steps.** That is the documented main failure mode "reported done, but not verified", and a Critic audits trajectories.
 - Normal bootstrap commands below are read-only (git `ls-remote`/`rev-parse`/`log`, file reads). Step 0 may execute only a schema-valid read-only lifecycle action; every mutating lifecycle action is separately confirmed and ends this bootstrap with no confirmation line.
 - **Compact continuity:** Compact MUST rerun `pipeline-start` as a continuation re-entry; after that re-entry, automatically continue the persisted next action without waiting. Compact preserves the active task. Only an explicit pause/cancel/replace/redirect, a named gate, completion or a typed blocker may stop continuation.
+- **Standing remote-authority contract:** Continuation never infers a remote
+  exception from `autonomy`, an old approval or a generic standing authority.
+  Before any exception, require the explicit, current, repository-calibrated
+  record from Operating Model §4 to bind exactly one action, remote, ref and
+  candidate (or named work package with its immutable candidate). Stop before
+  execution for a missing or ambiguous binding, expiry, revocation or authority
+  change. Its sole lifetime ends at successful exact remote readback or an
+  explicit revocation/authority change. Read back the exact remote ref against
+  the bound candidate, then update only the local public evidence/audit path;
+  never include private data or claim success before that readback. Before
+  readback, abort. After publication, never force-push or automatically
+  reverse: only new explicit PO authority may name a compensating remote
+  action, remote and ref. **Authorization/trust-boundary threat-model
+  assessment:** deny an unbound, stale, ambiguous or changed remote action;
+  only the exact bound record is authority. Remote readback is observation,
+  never authority, and the audit path is public-safe.
 - **Approved-plan continuation:** After the required plan approval is recorded,
   an internal implementation slice or package is not a PO gate. Within the
   approved scope, complete its required evidence gates, Critic review and
   finding disposition, then autonomously continue with the next package. Ask
   for a PO gate only for a typed blocker, a material scope or authority change,
   a push or other remote action not already admitted by repository-calibrated,
-  candidate- or work-package-bound standing authority, or final feature/epic
-  acceptance. This does not weaken the initial readable-PRD approval
-  requirement or any evidence gate.
+  candidate- or work-package-bound standing authority under the Standing
+  remote-authority contract, or final feature/epic acceptance. This does not
+  weaken the initial readable-PRD approval requirement or any evidence gate.
 
 **Role:** take the role from `$ARGUMENTS` (default when empty: `elephant`).
 
@@ -676,7 +692,9 @@ This step ends in a **third mandatory confirmation line** (verbatim, printed dir
   after its applicable evidence and Critic path unless the situation is a typed
   blocker, a material scope or authority change, a push or other remote action
   not already admitted by repository-calibrated, candidate- or work-package-
-  bound standing authority, or final feature/epic acceptance.
+  bound standing authority under the Standing remote-authority contract, or
+  final feature/epic acceptance. This check applies again at every compact or
+  continuation re-entry; never carry a remote exception forward by inference.
 - **Local cleanup session (Elephant only):** before the first pipeline-created temporary resource, run `node "${PIPELINE_PLUGIN_ROOT}/scripts/session-cleanup.mjs" start --repo "$PWD"`. The command owns the entire First-bind CAS: when `continuity.runtime.sessionCleanup` is null it refuses any unbound active descriptor, creates one private descriptor, atomically persists only its `sessionId` plus `descriptorSha256`, and retires the new descriptor again if persistence fails. When the tuple is already bound, `start` validates and returns that exact descriptor with code `WT-SESSION-REUSED`; it MUST NOT create or persist another nonce. Bootstrap and compact recovery reuse the same tuple. A normal close cleans and retires that descriptor, proves its closure receipt and atomically releases the exact State tuple so a later genuine session can bind a new one. If cleanup committed but tuple release was interrupted, use `release-binding`; it accepts only the exact completed closure. If both descriptor and closure receipt are absent, run the read-only `plan-recovery` and present its digest-bound `apply-recovery` action for explicit PO confirmation; an active descriptor is never PO-force-replaced. On Codex, use the host-authorized repository-local execution boundary directly when the workspace sandbox forbids nested Git subprocesses; do not first run a known-to-fail sandbox probe. The nonce stays solely in the private Git-common-dir descriptor. Never accept a changed tuple, edit State directly, or infer a cleanup target from a path prefix.
 
 ## Step 5 — Verify gate available

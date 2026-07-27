@@ -106,9 +106,28 @@ normative shape is:
    for a new PO gate merely because a slice completes. A PO gate is required
    only for a typed blocker, a material scope or authority change, a push or
    other remote action not already admitted by repository-calibrated,
-   candidate- or work-package-bound standing authority, or final feature/epic
-   acceptance. This preserves the initial plan gate; it does not weaken any
-   required evidence gate.
+   candidate- or work-package-bound standing authority under the Standing
+   remote-authority contract, or final feature/epic acceptance. This preserves
+   the initial plan gate; it does not weaken any required evidence gate.
+   **Standing remote-authority contract (policy and rollback plan).** This is
+   the only exception for a remote action: an explicit, current,
+   repository-calibrated standing-authority record must bind exactly one
+   action, remote and ref, and exactly one candidate or one named work package
+   with its immutable candidate. It authorizes no action variant, other remote
+   action, remote, ref, candidate or work package. Before execution, stop if
+   any binding is missing or ambiguous, or if the authority is expired,
+   revoked or changed. The authority lasts only until successful exact remote
+   readback, or until an explicit revocation or authority change. After the
+   action, compare the exact remote ref with the bound candidate and update
+   the local public evidence/audit path with the binding and observed ref;
+   never include private data or claim success without that readback.
+   **Authorization/trust-boundary threat-model assessment.** An unbound,
+   stale, ambiguous or changed remote action is denied: only the exact bound
+   record is authority. Remote readback is observation, never authority; the
+   audit trail is public-safe and contains no private data.
+   **Rollback.** Before the readback, abort the action. After publication,
+   never force-push or automatically reverse it: a compensating remote action
+   needs new explicit PO authority that names that action, remote and ref.
 5. **Dispatch.** Give a Goldfish one outcome, exact context paths, DoD checks,
    prohibitions, stop conditions and route metadata. Independent tasks may run
    in parallel when their files and state do not conflict.
@@ -356,8 +375,31 @@ Die normative Form lautet:
    einer materiellen Scope- oder Autoritätsänderung, einem Push oder einer
    anderen Remote-Aktion, die nicht bereits durch eine repository-kalibrierte,
    kandidaten- oder arbeitspaketgebundene Standing Authority zugelassen ist,
-   oder der finalen Feature-/Epic-Abnahme erforderlich. Das erhält das
-   anfängliche Plan-Gate und schwächt kein nötiges Evidenz-Gate.
+   die dem Standing-Remote-Authority-Vertrag entspricht, oder der finalen
+   Feature-/Epic-Abnahme erforderlich. Das erhält das anfängliche Plan-Gate
+   und schwächt kein nötiges Evidenz-Gate.
+   **Standing-Remote-Authority-Vertrag (Policy und Rollback-Plan).** Dies ist
+   die einzige Ausnahme für eine Remote-Aktion: Ein expliziter, aktueller,
+   repository-kalibrierter Standing-Authority-Record muss genau eine Aktion,
+   ein Remote und einen Ref sowie genau einen Kandidaten oder ein benanntes
+   Arbeitspaket mit seinem unveränderlichen Kandidaten binden. Er autorisiert
+   keine Aktionsvariante, andere Remote-Aktion, kein anderes Remote, keinen
+   anderen Ref, Kandidaten oder kein anderes Arbeitspaket. Vor der Ausführung
+   bei fehlender oder mehrdeutiger Bindung sowie bei abgelaufener, widerrufener
+   oder geänderter Authority stoppen. Die Authority gilt nur bis zum
+   erfolgreichen exakten Remote-Readback oder bis zu einem ausdrücklichen
+   Widerruf oder einer Authority-Änderung. Nach der Aktion den exakten
+   Remote-Ref mit dem gebundenen Kandidaten vergleichen und den lokalen,
+   öffentlichen Evidenz-/Auditpfad mit Bindung und beobachtetem Ref
+   aktualisieren; niemals private Daten aufnehmen oder ohne diesen Readback
+   Erfolg behaupten. **Authorization-/Trust-Boundary-Threat-Model-Bewertung.**
+   Eine ungebundene, veraltete, mehrdeutige oder geänderte Remote-Aktion wird
+   verweigert: Nur der exakt gebundene Record ist Authority. Remote-Readback
+   ist Beobachtung, nie Authority; der Auditpfad ist public-safe und enthält
+   keine privaten Daten. **Rollback.** Vor dem Readback die Aktion abbrechen. Nach
+   der Veröffentlichung niemals force-pushen oder automatisch zurückbauen:
+   Eine gegensteuernde Remote-Aktion benötigt neue ausdrückliche PO-Autorität,
+   die Aktion, Remote und Ref benennt.
 5. **Dispatch.** Einem Goldfish genau ein Outcome, Kontextpfade, DoD-Checks,
    Verbote, Stop-Bedingungen und Route-Metadaten geben. Unabhängige Aufgaben
    dürfen parallel laufen, wenn Dateien und Zustand nicht kollidieren.

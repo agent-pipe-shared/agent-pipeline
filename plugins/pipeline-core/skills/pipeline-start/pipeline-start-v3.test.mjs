@@ -12,6 +12,7 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const skill = readFileSync(join(HERE, "SKILL.md"), "utf8");
+const operatingModel = readFileSync(join(HERE, "../../../../docs/operating-model.md"), "utf8");
 
 const cases = [
   ["V4 bootstrap inspection is checked before Git or ordinary V3 authority", () => {
@@ -297,11 +298,37 @@ const cases = [
     assert.match(skill, /Approved-plan continuation/u);
     assert.match(skill, /an internal implementation slice or package is not a PO gate/u);
     assert.match(skill, /complete its required evidence gates, Critic review and\s+finding disposition, then autonomously continue with the next package/u);
-    assert.match(skill, /Ask\s+for a PO gate only for a typed blocker, a material scope or authority change,\s+a push or other remote action not already admitted by repository-calibrated,\s+candidate- or work-package-bound standing authority, or final feature\/epic\s+acceptance/u);
-    assert.match(skill, /does\s+not weaken the initial readable-PRD approval\s+requirement or any evidence gate/u);
+    assert.match(skill, /Ask\s+for a PO gate only for a typed blocker, a material scope or authority change,\s+a push or other remote action not already admitted by repository-calibrated,\s+candidate- or work-package-bound standing authority under the Standing\s+remote-authority contract, or final feature\/epic acceptance/u);
+    assert.match(skill, /does\s+not\s+weaken the initial readable-PRD approval\s+requirement or any evidence gate/u);
     assert.match(skill, /completed\s+internal slice\/package is ordinary continuity[\s\S]*push or other remote action\s+not already admitted by repository-calibrated, candidate- or work-package-\s+bound standing authority/u);
     assert.doesNotMatch(skill, /a push or other remote action, or final feature\/epic acceptance/u);
     assert.match(skill, /a completed\s+internal slice\/package is ordinary continuity, not a named PO gate/u);
+  }],
+  ["Standing remote authority is closed, expiring, auditable and non-destructive", () => {
+    assert.match(operatingModel, /Standing remote-authority contract \(policy and rollback plan\)/u);
+    assert.match(operatingModel, /explicit, current,\s+repository-calibrated standing-authority record must bind exactly one\s+action, remote and ref, and exactly one candidate or one named work package\s+with its immutable candidate/u);
+    assert.match(operatingModel, /authorizes no action variant, other remote\s+action, remote, ref, candidate or work package/u);
+    assert.match(operatingModel, /stop if\s+any binding is missing or ambiguous, or if the authority is expired,\s+revoked or changed/u);
+    assert.match(operatingModel, /only until successful exact remote\s+readback, or until an explicit revocation or authority change/u);
+    assert.match(operatingModel, /compare the exact remote ref with the bound candidate and update\s+the local public evidence\/audit path with the binding and observed ref;\s+never include private data or claim success without that readback/u);
+    assert.match(operatingModel, /Before the readback, abort the action\. After publication,\s+never force-push or automatically reverse it: a compensating remote action\s+needs new explicit PO authority that names that action, remote and ref/u);
+    assert.match(operatingModel, /Standing-Remote-Authority-Vertrag \(Policy und Rollback-Plan\)/u);
+    assert.match(operatingModel, /Before the readback, abort the action\. After publication,\s+never force-push or automatically reverse it: a compensating remote action\s+needs new explicit PO authority that names that action, remote and ref/u);
+    assert.match(operatingModel, /Standing-Remote-Authority-Vertrag \(Policy und Rollback-Plan\)/u);
+    assert.match(operatingModel, /genau eine Aktion,\s+ein Remote und einen Ref sowie genau einen Kandidaten oder ein benanntes\s+Arbeitspaket mit seinem unveränderlichen Kandidaten binden/u);
+    assert.match(operatingModel, /nur bis zum\s+erfolgreichen exakten Remote-Readback oder bis zu einem ausdrücklichen\s+Widerruf oder einer Authority-Änderung/u);
+    assert.match(operatingModel, /Vor dem Readback die Aktion abbrechen\. Nach\s+der Veröffentlichung niemals force-pushen oder automatisch zurückbauen/u);
+    assert.match(operatingModel, /Authorization\/trust-boundary threat-model assessment\.\*\* An unbound,\s+stale, ambiguous or changed remote action is denied: only the exact bound\s+record is authority\. Remote readback is observation, never authority; the\s+audit trail is public-safe and contains no private data/u);
+    assert.match(operatingModel, /Authorization-\/Trust-Boundary-Threat-Model-Bewertung\.\*\*\s+Eine ungebundene, veraltete, mehrdeutige oder geänderte Remote-Aktion wird\s+verweigert: Nur der exakt gebundene Record ist Authority\. Remote-Readback\s+ist Beobachtung, nie Authority; der Auditpfad ist public-safe und enthält\s+keine privaten Daten/u);
+    assert.match(skill, /Continuation never infers a remote\s+exception from `autonomy`, an old approval or a generic standing authority/u);
+    assert.match(skill, /bind exactly one action, remote, ref and\s+candidate \(or named work package with its immutable candidate\)/u);
+    assert.match(skill, /Stop before\s+execution for a missing or ambiguous binding, expiry, revocation or authority\s+change/u);
+    assert.match(skill, /sole lifetime ends at successful exact remote readback or an\s+explicit revocation\/authority change/u);
+    assert.match(skill, /Read back the exact remote ref against\s+the bound candidate, then update only the local public evidence\/audit path;\s+never include private data or claim success before that readback/u);
+    assert.match(skill, /Before\s+readback, abort\. After publication, never force-push or automatically\s+reverse: only new explicit PO authority may name a compensating remote\s+action, remote and ref/u);
+    assert.match(skill, /Authorization\/trust-boundary threat-model\s+assessment:\*\* deny an unbound, stale, ambiguous or changed remote action;\s+only the exact bound record is authority\. Remote readback is observation,\s+never authority, and the audit path is public-safe/u);
+    assert.match(skill, /This check applies again at every compact or\s+continuation re-entry; never carry a remote exception forward by inference/u);
+    assert.doesNotMatch(skill, /other remote action not already admitted by repository-calibrated,\s+candidate- or work-package-bound standing authority, or final feature\/epic/u);
   }],
   ["Cleanup startup reuses one CAS-bound descriptor and exposes only typed rotation/recovery", () => {
     assert.match(skill, /command owns the entire First-bind CAS/u);
