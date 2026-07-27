@@ -745,6 +745,12 @@ resume/compact re-entry, read-only progress, successful completion and
 unsupported capability. Tests prove that activation neither changes effective
 permissions nor creates a duplicate native goal.
 
+For Codex, an observed native `blocked` goal is a hard automation stop. The
+adapter must return `CGH-BLOCKED-RESUME-REQUIRED`, name that automated Pipeline
+work cannot continue, and instruct the user to resume in the Codex CLI. It may
+not create a replacement goal, silently set the blocked goal active, or claim
+that a mobile/read-only surface can resume it.
+
 ### 6.2 B1 — Local worker pool (`#21`)
 
 B1-C implements only the pure schema/reducer and synthetic fault corpus.

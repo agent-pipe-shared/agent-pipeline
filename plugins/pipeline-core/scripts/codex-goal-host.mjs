@@ -6,7 +6,7 @@ import { reconcileRunnerNativeContinuation } from "../lib/continuity-state.mjs";
 const SHA256 = /^[a-f0-9]{64}$/u;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const ACTIONS = new Set(["set", "clear"]);
-const GOAL_STATES = new Set(["active", "paused", "complete"]);
+const GOAL_STATES = new Set(["active", "paused", "blocked", "complete"]);
 
 function object(value) { return value !== null && typeof value === "object" && !Array.isArray(value); }
 function exact(value, keys) { return object(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key)); }
@@ -32,6 +32,16 @@ function validInput(value) {
 function unavailable(code) { return { ok: false, code, status: "unavailable", readback: null }; }
 
 /**
+ * A native blocked goal is a host-control stop, never an invitation to create
+ * a replacement goal or silently continue work. The caller must surface this
+ * exact operator action before another automatic pipeline step is attempted.
+ */
+export function renderCodexGoalBlockedNotice(goal) {
+  if (!object(goal) || typeof goal.threadId !== "string" || typeof goal.objective !== "string" || goal.status !== "blocked") return null;
+  return "Codex goal is blocked: automated Pipeline work is stopped. Resume this goal in the Codex CLI before continuing; mobile/read-only surfaces may not provide resume.";
+}
+
+/**
  * Execute exactly one requested native goal action followed by `thread/goal/get`.
  * `request` is the already-authenticated App Server JSON-RPC client; this adapter
  * intentionally does not start a second host or change its policy.
@@ -44,6 +54,15 @@ export async function reconcileCodexGoal(input, { request } = {}) {
     if (input.action === "set") {
       const current = await request("thread/goal/get", { threadId: input.threadId });
       const goal = current?.goal ?? null;
+      if (object(goal) && goal.threadId === input.threadId && goal.status === "blocked") {
+        return {
+          ok: false,
+          code: "CGH-BLOCKED-RESUME-REQUIRED",
+          status: "blocked",
+          readback: { goalIdSha256: hash(`${goal.threadId}\n${goal.objective}`), generation: input.generation, status: "blocked" },
+          notice: renderCodexGoalBlockedNotice(goal),
+        };
+      }
       if (!(object(goal) && goal.threadId === input.threadId && goal.objective === objective && goal.status === "active")) {
         const set = await request("thread/goal/set", { threadId: input.threadId, objective, status: "active", tokenBudget: null });
         if (!object(set?.goal)) return unavailable("CGH-SET");

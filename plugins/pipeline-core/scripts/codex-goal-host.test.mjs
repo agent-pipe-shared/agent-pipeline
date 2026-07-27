@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { reconcileCodexGoal, reconcileCodexNativeContinuation, renderCodexGoalObjective } from "./codex-goal-host.mjs";
+import { reconcileCodexGoal, reconcileCodexNativeContinuation, renderCodexGoalBlockedNotice, renderCodexGoalObjective } from "./codex-goal-host.mjs";
 const D = "a".repeat(64);
 const input = { threadId: "thread-1", action: "set", subject: { featureId: "nova", phase: "implementation", packageId: "b0", actionId: "implement" }, generation: 2, objective: { conditionSha256: D } };
 let passed = 0;
@@ -19,6 +19,20 @@ await check("matching active goal is read back without a duplicate set", async (
   const calls = [];
   const result = await reconcileCodexGoal(input, { request: async (method) => { calls.push(method); return { goal: { threadId: "thread-1", objective, status: "active" } }; } });
   assert.equal(result.ok, true); assert.deepEqual(calls, ["thread/goal/get", "thread/goal/get"]);
+});
+await check("blocked native goal stops automation and gives an explicit CLI-resume notice", async () => {
+  const calls = [];
+  const result = await reconcileCodexGoal(input, { request: async (method) => {
+    calls.push(method);
+    return { goal: { threadId: "thread-1", objective, status: "blocked" } };
+  } });
+  assert.deepEqual(calls, ["thread/goal/get"]);
+  assert.equal(result.ok, false);
+  assert.equal(result.code, "CGH-BLOCKED-RESUME-REQUIRED");
+  assert.equal(result.status, "blocked");
+  assert.match(result.notice, /automated Pipeline work is stopped/u);
+  assert.match(result.notice, /Resume this goal in the Codex CLI/u);
+  assert.equal(renderCodexGoalBlockedNotice({ threadId: "thread-1", objective, status: "blocked" }), result.notice);
 });
 await check("wrong readback never claims protected continuation", async () => {
   const result = await reconcileCodexGoal(input, { request: async (method) => method === "thread/goal/set" ? { goal: {} } : { goal: { threadId: "thread-1", objective: "wrong", status: "active" } } });

@@ -47,6 +47,10 @@ blocker, or explicit user control may end an active goal. Intermediate input
 is answered/recorded and continuation resumes. Unsupported capability produces
 typed degraded evidence and leaves no false continuation claim.
 
+**Codex blocked-goal rule:** a native `blocked` observation stops automation and
+must explicitly tell the user that CLI resume is required; it cannot be
+silently replaced or resumed by the Pipeline.
+
 **Stop:** any implied permission expansion, duplicate native activation,
 unbounded retry, unclear native-goal readback, conflict with Stop-hook context
 protection, or a need for an external watchdog/recovery supervisor.
