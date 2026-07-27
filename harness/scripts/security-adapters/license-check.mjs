@@ -30,6 +30,13 @@
  * dependencies"). Otherwise: for every declared dependency whose `license` is NOT in
  * `allow` (or IS explicitly in `deny`), emit one finding, severity fixed "high" (briefing:
  * "license-check violations -> high"). No violations -> PASS.
+ *
+ * CAPABILITY_CONTRACT_V2 (CYB-2D, additive): a frozen, machine-readable transcription of the
+ * behavior documented above, exported for CYB-2E's later aggregator work to read a uniform
+ * contract across all four scanner adapters without re-deriving it from prose comments. Per
+ * CYB-1F's ratified F-4, this file's `kind` is `"control"` (not `"capability"`) -- license-check
+ * is a catalog control, never a `cap.*` capability family. Purely additive data -- does not
+ * change any existing behavior in this file.
  */
 import { existsSync, readFileSync } from "node:fs";
 
@@ -137,3 +144,46 @@ export async function run({ config = {} } = {}) {
 
   return { status: findings.length > 0 ? "FINDINGS" : "PASS", findings, raw: { allowlist, declared } };
 }
+
+/**
+ * CAPABILITY_CONTRACT_V2 -- machine-readable capability-contract descriptor (CYB-2D). A pure,
+ * static, additive transcription of behavior this file already has and already documents in its
+ * header comment above -- consumed by CYB-2E's later aggregator work to read a uniform contract
+ * across all four adapters without re-deriving it from prose. Adding this export changes none of
+ * `run()`/`isInstalled()`'s existing behavior.
+ *
+ * `kind: "control"` / `capabilityId: null` (NOT `"capability"` / a `cap.*` id) per CYB-1F's
+ * ratified F-4: license-check is a catalog control, never a fourteenth capability family.
+ */
+export const CAPABILITY_CONTRACT_V2 = Object.freeze({
+  contractVersion: "v2",
+  tool: name,
+  kind: "control",
+  capabilityId: null,
+  controlRef: null,
+  controlRefNote:
+    "no matching control entry exists in governance/security-controls/catalog.json today; F-4 ratifies the principle that license-check is a catalog control, not that a concrete entry currently exists",
+  supportedEcosystems: null,
+  toolVersionConstraint: null,
+  networkBehavior: "offline",
+  requiredInputs: Object.freeze(["config.allowlistPath", "config.declaredPath"]),
+  severityNormalization: Object.freeze({
+    source: "fixed",
+    value: "high",
+    rationale: "every license-check violation (explicitly denied or not in the allowlist) is a fixed \"high\" severity finding -- there is no signal in the declared dependency data this could instead be derived from",
+  }),
+  confidenceNormalization: null,
+  coverageLimitations: Object.freeze([
+    "only covers dependencies explicitly declared in the project's own third-party-licenses.json -- an unlisted/undeclared dependency's license is invisible to this check entirely; run() never cross-references a lockfile or package manifest of any kind, it purely trusts the declared file's dependencies[] array as-is",
+    "either input file being absent (allowlistPath or declaredPath) resolves to SKIPPED with zero findings, not an error or a block -- a misconfigured/missing path silently produces no signal rather than an actionable gap",
+  ]),
+  exitCodeMapping: null,
+  exitCodeMappingNote:
+    "this adapter never spawns a child process (no external binary), so no OS exit-code contract applies; its result derivation is entirely in-process file-read + JSON-parse + comparison logic",
+  timeoutContract: Object.freeze({
+    defaultMs: null,
+    cancellable: false,
+    mechanism: "none -- no child process is spawned, nothing to time out or cancel",
+  }),
+  evidenceFields: Object.freeze(["tool", "severity", "rule", "path", "line", "msg"]),
+});
