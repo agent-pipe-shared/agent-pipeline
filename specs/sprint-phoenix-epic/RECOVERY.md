@@ -464,6 +464,24 @@ needs a worktree-identity change. The only durable conclusion is trajectory
 honesty: a later clean result must carry its own exact candidate evidence, and
 an earlier blocked result must never be relabelled as clean.
 
+## R-14 — PHX-0B ruleset-source rollback
+
+The PHX-0B runner-neutral ruleset-source contract is additive and unconsumed
+until an adapter integration explicitly selects it. Until then it changes no
+existing source path and creates no freshness, delivery, or remote-action
+claim.
+
+Any validation, privacy, or compatibility defect—including one observed on a
+supported platform (macOS, Windows, or Linux) or runner (Claude, Codex, or the
+developing AGY)—stops every integration and every freshness claim that would
+depend on the contract. The pre-existing source paths remain intact.
+
+Recovery before integration is one new, local, tested compensating revert
+commit that removes only PHX-0B commits `a12ffa9` and `015d495`. It is never a
+reset, force-push, automatic remote rollback, or remote action. After a later
+integration, any rollback additionally requires fresh candidate-bound Verify,
+Security, and Critic evidence, plus any required Product Owner authority.
+
 ## Audit classification
 
 These records illustrate the Phoenix recovery profile:
