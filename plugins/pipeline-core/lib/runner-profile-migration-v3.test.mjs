@@ -418,6 +418,49 @@ record("stale, wrong-plan, and replayed recovery authorizations fail closed", ()
   }
 });
 
+record("a cached preview acknowledgement cannot authorize a second recovery", () => {
+  const root = fixture(yaml(v2Intent()));
+  try {
+    const plan = planRunnerProfileMigrationV3({ rootDir: root });
+    assert.equal(applyRunnerProfileMigrationV3(plan, {
+      rootDir: root,
+      activate: true,
+      interruptAfterRename: ({ index }) => index === 1,
+    }).status, "interrupted");
+    const recoveryPlan = planPendingTransactionRecoveryV3({ rootDir: root });
+    assert.equal(recoveryPlan.status, "ready");
+    const pending = durableSnapshot(root);
+
+    let cachedAcknowledgement; let firstInvocationId;
+    const authorization = authorizePendingTransactionRecoveryV3(recoveryPlan, {
+      deliverPreview: (_preview, invocation) => {
+        firstInvocationId = invocation.invocationId;
+        cachedAcknowledgement = previewAck(invocation, "ack-cached");
+        return cachedAcknowledgement;
+      },
+    });
+    assert.equal(authorization.status, "authorized");
+
+    let secondInvocationId;
+    const replayed = authorizePendingTransactionRecoveryV3(recoveryPlan, {
+      deliverPreview: (_preview, invocation) => {
+        secondInvocationId = invocation.invocationId;
+        return cachedAcknowledgement;
+      },
+    });
+    assert.notEqual(replayed.status, "authorized", "a cached acknowledgement never earns a fresh authorization");
+    assert.equal(replayed.status, "preview-failed");
+    assert.notEqual(secondInvocationId, firstInvocationId, "every authorization attempt binds a fresh invocation identity");
+    assert.equal(replayed.diagnostics[0].code, "rp-invocation-mismatch");
+    assert.deepEqual(durableSnapshot(root), pending, "a rejected preview performs no recovery mutation");
+    assert.equal(applyPendingTransactionRecoveryV3(recoveryPlan, {
+      rootDir: root,
+      authorization: replayed,
+    }).status, "authorization-required");
+    assert.deepEqual(durableSnapshot(root), pending);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 record("stale source invalidates a reviewed plan before staging", () => {
   const root = fixture(yaml(v2Intent()));
   try {

@@ -8,7 +8,7 @@
  * an explicit activation flag.  All runtime projections are renamed before
  * pipeline.user.yaml, and every handled failure restores every preimage.
  */
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import {
   accessSync,
   closeSync,
@@ -914,8 +914,15 @@ export function authorizePendingTransactionRecoveryV3(plan, { deliverPreview } =
   if (typeof deliverPreview !== "function") return recoveryResult("preview-required", [diagnostic("$.preWritePreview", "preview_required", "recovery requires caller-delivered pre-write preview acknowledgement", "deliver the complete recovery preview and return its exact acknowledgement")]);
   const preview = recoveryPreWritePreview(plan);
   const previewSha256 = sha256(JSON.stringify(stable(preview)));
+  // The invocation identity must be fresh per authorization attempt, not a
+  // function of journal state: a deterministic id lets a caller replay a
+  // cached acknowledgement from an earlier delivery for the same unchanged
+  // journal and earn an unauthorized "authorized". The random nonce makes a
+  // stale acknowledgement fail RP-INVOCATION-MISMATCH; the journal-digest
+  // prefix is retained only for correlation. Both parts stay inside SAFE_ID's
+  // 100-character bound with room for caller-side `ack-`/`cli-` prefixes.
   const invocation = createRecoveryPreviewInvocation({
-    invocationId: `recovery-${state.journalSha256}`,
+    invocationId: `recovery-${state.journalSha256.slice(0, 32)}-${randomUUID()}`,
     previewDigest: previewSha256,
   });
   const delivery = attestRecoveryPreviewDelivery({
