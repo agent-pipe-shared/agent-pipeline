@@ -4,7 +4,7 @@
  * guard-push — PreToolUse guard enforcing the Push-Gate for Bash|PowerShell.
  *
  * Plugin: pipeline-core (Agent-Pipeline). Canon: `.claude/pipeline.yaml`
- * gate "push" (this repo: blocking/human/standing-approved, E15/ADR-0017), `.claude/
+ * gate "push" (this repo: blocking/human/required during the PHX-2 transition), `.claude/
  * plans/2026-07-07-ap1-pipeline-tuning.md` Governing Decision 3 ("Gates check EVIDENCE
  * freshness, never compute it themselves").
  *
@@ -51,9 +51,8 @@
  *        (b) `evidence/security-latest.json` — SAME freshness checks as (a) — but
  *            ONLY evaluated when `gates.security` exists in the manifest AND its
  *            `mode !== "off"` (skipped entirely otherwise).
- *        (c) approval: `gates.push.approval === "standing-approved"` auto-passes
- *            (no state needed at all); `"required"` (or the field simply absent —
- *            treated as the safer default) requires
+ *        (c) approval: `"required"`, legacy `"standing-approved"`, or an absent
+ *            field all require
  *            `state.pushApproval.lastApproved.forCommit === source OID` — a malformed
  *            `.claude/pipeline-state.json` at THIS point (only reached when the
  *            state file is actually needed) is its own WARN exit 1, same as (3).
@@ -1249,13 +1248,15 @@ if (securityGate && securityGate.mode !== "off") {
 // the actual network operation, then fetches the pushed ref from a fresh repository.
 failures.push(...checkAnonymousPublicPush(pushBinding, sourceCommit));
 
-// (c) approval.
-if (pushGate.approval === "standing-approved") {
-  // auto-pass, no state needed at all.
-} else {
-  // "required", or the field absent entirely -- treated as the safer default (a push
-  // gate that is active at all, with no explicit standing-approval, should not
-  // silently skip the approval check).
+// (c) approval. PHX-2 is the only intended source of a future standing remote
+// authority. Until its Human Governance Decision Ledger and Authority Resolver
+// exist, a legacy manifest spelling of "standing-approved" remains fail-closed and
+// requires the same exact-commit PO approval as "required". This is runner- and
+// platform-neutral: it depends only on repository state, not shell, host, or
+// Claude/Codex/AGY integration.
+{
+  // "required", legacy "standing-approved", or the field absent entirely all use
+  // the safer explicit approval check.
   const statePath = join(projectDir, ".claude", "pipeline-state.json");
   let stateRaw;
   let stateExists = true;

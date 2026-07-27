@@ -49,6 +49,18 @@ function writeState(dir, obj) {
   mkdirSync(join(dir, ".claude"), { recursive: true });
   writeFileSync(join(dir, ".claude", "pipeline-state.json"), typeof obj === "string" ? obj : JSON.stringify(obj));
 }
+function writePushApproval(dir, forCommit) {
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    pushApproval: {
+      lastApproved: {
+        approvedBy: "po-test",
+        approvedAt: "2026-07-27T00:00:00.000Z",
+        forCommit,
+      },
+    },
+  });
+}
 function writeEvidence(dir, relPath, obj) {
   const full = join(dir, relPath);
   mkdirSync(join(full, ".."), { recursive: true });
@@ -116,6 +128,7 @@ function prepareAnonymousPublicPush(dir, branch = "feat/v0.3-phase2.6-multi-cli"
   const head = anonymousCommit(dir);
   writeManifest(dir, manifestPush({ approval: "standing-approved" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writePushApproval(dir, head);
   const bin = join(dir, "fake-ssh-bin");
   mkdirSync(bin, { recursive: true });
   const fakeSsh = join(bin, "ssh");
@@ -194,6 +207,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   const { dir, head } = freshRepo("inline-override-prefix");
   writeManifest(dir, manifestPush({ approval: "standing-approved" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writePushApproval(dir, head);
   check(
     "PG03a allow  documented inline override prefix still binds the one explicit push",
     `PIPELINE_GUARD_OVERRIDE="GG-03|20260726-test|PO-approved fixture" git push origin ${head}:refs/heads/main`,
@@ -282,16 +296,19 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   const { dir, head } = freshRepo("security-skipped");
   writeManifest(dir, manifestPush({ approval: "standing-approved", security: "off" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writePushApproval(dir, head);
   // security-latest.json absent, but security gate is off -> must NOT be reported, all-green.
   check("PG09 allow  security evidence skipped when gates.security mode=off", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
 }
 
-// ---- PG10 standing-approved passes without any state file ------------------------------
+// ---- PG10 legacy standing-approved remains fail-closed until PHX-2 ----------------------
 {
   const { dir, head } = freshRepo("standing-approved");
   writeManifest(dir, manifestPush({ approval: "standing-approved" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
-  check("PG10 allow  standing-approved passes without any state file", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
+  check("PG10 block  standing-approved needs exact PO approval until PHX-2", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["Push approval missing"],
+  });
 }
 
 // ---- PG11a required + absent approval (no state file at all) -> exit 2 -----------------
@@ -337,6 +354,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   const tree = gitAt(dir, "rev-parse", "HEAD^{tree}").stdout.trim();
   writeEvidence(dir, "evidence/security-latest.json", exactSecurityEvidence({ head, tree }));
+  writePushApproval(dir, head);
   check("PG13 allow  all-green (verify + security fresh, standing-approved)", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
 }
 
@@ -386,6 +404,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   });
   writeEvidence(target.dir, "evidence/verify-latest.json", { exitCode: 0, commit: target.head });
   writeEvidence(decoy.dir, "evidence/verify-latest.json", { exitCode: 1, commit: decoy.head });
+  writePushApproval(target.dir, target.head);
   check("PG17b allow  git -C target uses target evidence despite red session repo", `git -C ${target.dir} push origin main`, decoy.dir, ALLOW, {
     cwd: decoy.dir,
     projectDir: decoy.dir,
@@ -404,6 +423,8 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   writeManifest(targetDir, manifestPush({ approval: "standing-approved" }));
   writeEvidence(primary.dir, "evidence/verify-latest.json", { exitCode: 0, commit: primary.head });
   writeEvidence(targetDir, "evidence/verify-latest.json", { exitCode: 0, commit: targetHead });
+  writePushApproval(targetDir, targetHead);
+  writePushApproval(primary.dir, targetHead);
   check(
     "PG17bb allow  explicit attached source branch resolves evidence from its target worktree",
     "git push origin refs/heads/target:refs/heads/target",
@@ -424,6 +445,8 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   writeManifest(dir, manifestPush({ approval: "standing-approved" }));
   writeManifest(verifiedDir, manifestPush({ approval: "standing-approved" }));
   writeEvidence(verifiedDir, "evidence/verify-latest.json", { exitCode: 0, commit: verifiedOid });
+  writePushApproval(verifiedDir, verifiedOid);
+  writePushApproval(dir, verifiedOid);
   check("PG17c allow  attached short source binds its worktree evidence, not checkout HEAD", "git push origin verified", dir, ALLOW, { stderrEmpty: true });
   writeEvidence(verifiedDir, "evidence/verify-latest.json", { exitCode: 0, commit: laterOid });
   check("PG17d block  checkout-HEAD evidence cannot authorize another source", "git push origin verified", dir, BLOCK, {
@@ -478,6 +501,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
     check(`${id} is structurally blocked`, command, dir, BLOCK, { stderrIncludes: ["not unambiguous"] });
   }
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: gitAt(dir, "rev-parse", "HEAD").stdout.trim() });
+  writePushApproval(dir, gitAt(dir, "rev-parse", "HEAD").stdout.trim());
   check("PG17q allow  safe set-upstream flag preserves one-source binding", "git push -u origin main", dir, ALLOW, {
     stderrEmpty: true,
   });
