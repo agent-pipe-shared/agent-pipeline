@@ -609,3 +609,20 @@ it cannot become create, noop or recover-owned success. Focused hostile tests
 cover both corrections. This record makes no fresh Full Verify, Security,
 Critic-pass, push, merge, release or Issue-closure claim; those are bound to
 the corrected candidate only after their respective later gates.
+
+## 2026-07-27 — Re-Critic scope and trust-boundary corrections
+
+Status: `recritic-findings-corrected; fresh-candidate-evidence-pending`.
+
+The correction tightens active Codex-goal evidence further: exact rendered
+objective equality is required for both active and blocked observations. The
+long-running goal is retained by the controller on ordinary resume/compact
+without an adapter set call; a stale prefix-like goal cannot impersonate it.
+
+The local supervisor-state trust boundary now accepts a writable sticky
+ancestor only when owned by the current user or the local system, and the
+threat model documents that rule together with owner, restrictive-mode and
+single-hard-link requirements for root and direct state files. The B1-I exact
+path manifest explicitly records its ADR-0047 repair exception. No new
+provider, credential, execution, external, push, merge, release or closure
+authority is introduced.

@@ -55,10 +55,10 @@ export function admitLocalSupervisorCleanup({ record, owner, leaseSha256, manife
 }
 
 function trustedAncestor(stat) {
-  // A sticky system directory such as /tmp may host a private descendant, but
-  // every non-sticky ancestor must reject group/world write access.
-  return stat.isDirectory() && !stat.isSymbolicLink()
-    && (((stat.mode & 0o022) === 0) || ((stat.mode & 0o1000) !== 0));
+  // Sticky mode does not make a directory-owner race safe: that owner may
+  // still replace a checked child. Every ancestor is therefore non-writable
+  // by group or world, rather than relying on a special /tmp exception.
+  return stat.isDirectory() && !stat.isSymbolicLink() && (stat.mode & 0o022) === 0;
 }
 function ownedStateDirectory(stat) {
   return trustedAncestor(stat) && Number.isSafeInteger(PROCESS_UID) && stat.uid === PROCESS_UID

@@ -56,6 +56,13 @@ The adapter accepts it as current evidence only after exact rendered-objective
 and generation binding. A different blocked goal, or an active user-controlled
 goal, is never overwritten and never becomes current continuation evidence.
 
+**Long-running-goal boundary:** an ordinary resume or compact continuation is
+not a new goal. The controller retains the already-bound active generation
+without calling a native set operation. If an adapter is asked to set, its
+readback must still match the exact rendered objective; a stale prefix-like
+goal is typed unavailable rather than retained. A new native goal is permitted
+only after a named PO-gate resolution has cleared its predecessor.
+
 **Stop:** any implied permission expansion, duplicate native activation,
 unbounded retry, unclear native-goal readback, conflict with Stop-hook context
 protection, or a need for an external watchdog/recovery supervisor.
@@ -118,6 +125,13 @@ manifest in ADR-0048.
 
 **Outcome:** supervise separately bound local Goldfish workspaces within
 deterministic capacity and authority limits, without inferring OS isolation.
+
+**ADR-0047 repair hardening:** the B1-I correction may adjust only the
+existing local-supervisor-state implementation and matching test to preserve
+the accepted D1 authority boundary: current-user-owned, restrictive root and
+direct files, no group/world-writable ancestor (including sticky paths), and
+one-link regular state/journal/lock files. Any mismatch is typed unavailable or
+recovery-required, never a create/noop/recover-owned success.
 
 The published JSON Schema validates closed structural shape and all
 representable constraints. The exported runtime validator is the canonical

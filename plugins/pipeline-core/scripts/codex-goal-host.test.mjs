@@ -44,15 +44,15 @@ await check("a blocked goal with another objective cannot impersonate the reques
   assert.deepEqual(calls, ["thread/goal/get"]);
   assert.deepEqual(result, { ok: false, code: "CGH-BLOCKED-IDENTITY-MISMATCH", status: "unavailable", readback: null });
 });
-await check("an active Pipeline goal survives ordinary compact re-entry without a reset", async () => {
+await check("a stale active Pipeline goal cannot impersonate the current continuation", async () => {
   const calls = [];
   const oldObjective = "Pipeline continuation: feature=nova; phase=implementation; package=b0; action=implement; generation=1; condition=old.";
   const result = await reconcileCodexGoal(input, { request: async (method) => {
     calls.push(method);
     return { goal: { threadId: "thread-1", objective: oldObjective, status: "active" } };
   } });
-  assert.equal(result.ok, true);
-  assert.deepEqual(calls, ["thread/goal/get", "thread/goal/get"]);
+  assert.deepEqual(calls, ["thread/goal/get"]);
+  assert.deepEqual(result, { ok: false, code: "CGH-ACTIVE-IDENTITY-MISMATCH", status: "unavailable", readback: null });
 });
 await check("an active user-controlled goal is never overwritten by Pipeline activation", async () => {
   const calls = [];
@@ -61,7 +61,7 @@ await check("an active user-controlled goal is never overwritten by Pipeline act
     return { goal: { threadId: "thread-1", objective: "User objective", status: "active" } };
   } });
   assert.deepEqual(calls, ["thread/goal/get"]);
-  assert.deepEqual(result, { ok: false, code: "CGH-EXPLICIT-CONTROL-REQUIRED", status: "unavailable", readback: null });
+  assert.deepEqual(result, { ok: false, code: "CGH-ACTIVE-IDENTITY-MISMATCH", status: "unavailable", readback: null });
 });
 await check("wrong readback never claims protected continuation", async () => {
   let getCount = 0;
