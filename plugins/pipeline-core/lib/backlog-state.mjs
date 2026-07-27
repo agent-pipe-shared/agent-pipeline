@@ -50,6 +50,12 @@ const REACHABILITY_REPAIR_TARGETS = Object.freeze({
   }),
 });
 const AFK_REPAIR_EVIDENCE_KEYS = new Set(["kind", "commit", "reference", "sourceSha256"]);
+const AFK_REPAIR_DATE = "2026-07-23";
+const AFK_REPAIR_ACTOR = "sentinel-recovery";
+const AFK_REPAIR_REASON = "Repair the single missing initial ledger event for the existing open AFK-authorization process item; no status change or completion is claimed.";
+const MANAGED_ONBOARDING_REPAIR_DATE = "2026-07-25";
+const MANAGED_ONBOARDING_REPAIR_ACTOR = "backlog-ledger-repair";
+const MANAGED_ONBOARDING_REPAIR_REASON = "Repair the single missing initial ledger event for the existing open managed-onboarding success-contract item; no status change or completion is claimed.";
 const PROJECT_CLOSURE_READBACK_KEYS = new Set(["schema", "repository", "commit", "readbackCommit"]);
 const SENTINEL_RECOVERY_CATALOG_KEYS = new Set(["schema", "source", "recoveredAt", "items"]);
 const SENTINEL_RECOVERY_ITEM_KEYS = new Set(["id", "status", "type"]);
@@ -495,6 +501,10 @@ function validateTransitionShape(event, label, { readDispositionBytes = null, au
   else if (v2Amendment) {
     errors.push(...validateBacklogEvidenceAmendment(event.evidence, { label: `${label}: evidence`, readDispositionBytes, authorizeAmendment }));
   }
+  else if (isV2 && managedOnboardingRepair) {
+    for (const key of Object.keys(event.evidence)) if (!AFK_REPAIR_EVIDENCE_KEYS.has(key)) errors.push(v2Finding("SHAPE", `${label}: evidence has unsupported field ${key}`));
+    if (!HASH.test(asString(event.evidence.sourceSha256))) errors.push(v2Finding("SHAPE", `${label}: sourceSha256 must be a SHA-256 hex digest`));
+  }
   else if (isV2) {
     errors.push(...validateV2OrdinaryEvidence(event.evidence, `${label}: evidence`));
     if (errors.length === 0) {
@@ -904,12 +914,12 @@ export function planElephantAfkLedgerRepair(items, events, input) {
   const expectedKeys = ["id", "at", "actor", "evidenceCommit", "source"];
   if (!isPlainObject(input) || Object.keys(input).sort().join("\n") !== expectedKeys.sort().join("\n")) return { ok: false, errors: ["AFK ledger repair input shape is invalid"], items, events, projection: null };
   const record = items.find((entry) => entry?.metadata?.id === AFK_REPAIR_ID);
-  if (input.id !== AFK_REPAIR_ID || input.at !== "2026-07-23" || input.actor !== "sentinel-recovery") errors.push("AFK ledger repair authority binding is invalid");
+  if (input.id !== AFK_REPAIR_ID || input.at !== AFK_REPAIR_DATE || input.actor !== AFK_REPAIR_ACTOR) errors.push("AFK ledger repair authority binding is invalid");
   if (!record || record.metadata.status !== "open" || input.source !== record.metadata.source) errors.push("AFK ledger repair item/source binding is invalid");
   if (!OID.test(asString(input.evidenceCommit))) errors.push("AFK ledger repair evidence commit is invalid");
   if (events.some((event) => event?.id === AFK_REPAIR_ID)) errors.push("AFK ledger repair event already exists");
   if (errors.length) return { ok: false, errors, items, events, projection: null };
-  const event = { schema: TRANSITION_SCHEMA, sequence: events.length + 1, id: AFK_REPAIR_ID, from: null, to: "open", at: input.at, actor: input.actor, reason: "Repair the single missing initial ledger event for the existing open AFK-authorization process item; no status change or completion is claimed.", evidence: { kind: "missing-initial-ledger-repair", commit: input.evidenceCommit, reference: record.path, sourceSha256: createHash("sha256").update(record.metadata.source).digest("hex") }, previousHash: events.at(-1)?.entryHash ?? null, entryHash: "" };
+  const event = { schema: TRANSITION_SCHEMA, sequence: events.length + 1, id: AFK_REPAIR_ID, from: null, to: "open", at: input.at, actor: input.actor, reason: AFK_REPAIR_REASON, evidence: { kind: "missing-initial-ledger-repair", commit: input.evidenceCommit, reference: record.path, sourceSha256: createHash("sha256").update(record.metadata.source).digest("hex") }, previousHash: events.at(-1)?.entryHash ?? null, entryHash: "" };
   event.entryHash = transitionHash(event);
   const nextEvents = [...events, event];
   errors.push(...validateTransitionLedger(nextEvents, items));

@@ -337,6 +337,8 @@ function recoveryFixture(catalog = sentinelCatalog()) {
 }
 const AFK_REPAIR_ID = "pipeline.elephant-direct-implementation-under-afk-authorization";
 const AFK_REPAIR_SOURCE = "close-block ritual step 6b authorship check, native-Windows Verify block (see HISTORY.md 2026-07-23 entry, docs/state.md close-ritual authorship-check incident bullet)";
+const MANAGED_ONBOARDING_REPAIR_ID = "pipeline.managed-onboarding-success-contract";
+const MANAGED_ONBOARDING_REPAIR_SOURCE = "close-block self-retro, 0.4.4 managed-workspace onboarding hotfix";
 function afkRepairFixture() {
   const root = fixtureRoot();
   const other = item();
@@ -548,6 +550,33 @@ function managedRepairInput(root, overrides = {}) {
   const state = checkBacklogState(root, { checkCommit: false });
   const wrong = planElephantAfkLedgerRepair(state.items, state.events, afkRepairInput({ id: "pipeline.other" }));
   check("BS16 AFK repair rejects another target or any additional finding with zero mutation", !rejected.ok && !wrong.ok && readFileSync(join(root, "backlog/transitions.ndjson"), "utf8") === before);
+}
+
+{
+  const root = managedOnboardingRepairFixture();
+  const ledgerBefore = readFileSync(join(root, "backlog/transitions.ndjson"), "utf8");
+  const current = checkBacklogState(root, { checkCommit: false });
+  const preview = planManagedOnboardingLedgerRepair(current.items, current.events, managedOnboardingRepairInput());
+  const applied = applyManagedOnboardingLedgerRepair(root, managedOnboardingRepairInput(), { checkCommit: false });
+  const valid = checkBacklogState(root, { checkCommit: false });
+  const replay = applyManagedOnboardingLedgerRepair(root, managedOnboardingRepairInput(), { checkCommit: false });
+  check("BS16a managed-onboarding repair admits only its exact missing initial event",
+    current.findings.length === 1 && preview.ok && applied.ok && applied.wrote
+      && readFileSync(join(root, "backlog/transitions.ndjson"), "utf8").startsWith(ledgerBefore)
+      && applied.transition.id === MANAGED_ONBOARDING_REPAIR_ID
+      && applied.transition.from === null && applied.transition.to === "open"
+      && applied.transition.evidence.sourceSha256 === createHash("sha256").update(MANAGED_ONBOARDING_REPAIR_SOURCE).digest("hex")
+      && valid.ok && !replay.ok,
+    [...preview.errors, ...applied.findings, ...valid.findings, ...replay.findings].join("; "));
+}
+
+{
+  const root = managedOnboardingRepairFixture();
+  const before = readFileSync(join(root, "backlog/transitions.ndjson"), "utf8");
+  const wrong = applyManagedOnboardingLedgerRepair(root, managedOnboardingRepairInput({ actor: "other-repair" }), { checkCommit: false });
+  const sourceDrift = applyManagedOnboardingLedgerRepair(root, managedOnboardingRepairInput({ source: "other source" }), { checkCommit: false });
+  check("BS16b managed-onboarding repair rejects actor or source drift with zero mutation",
+    !wrong.ok && !sourceDrift.ok && readFileSync(join(root, "backlog/transitions.ndjson"), "utf8") === before);
 }
 
 {
