@@ -2110,6 +2110,78 @@ if (symlinkCapable) {
   ok("PHX0A6 existing draft reconciliation changes only the four planned digest bindings and replays zero-write", applied === 0 && changedDigests === 4 && afterValue.state === "draft" && JSON.stringify(afterValue.feature) === JSON.stringify(manifest.feature) && JSON.stringify(afterValue.candidate) === "null" && JSON.stringify(afterValue.supersedes) === "null" && replay === 0 && readFileSync(join(dir, manifestPath), "utf8") === after && /^fp-[a-f0-9]{16}$/.test(receipt.correlation) && !/[a-f0-9]{32}/.test(JSON.stringify(receipt)));
 }
 
+// ---- PHX0A: one explicit mutable non-authority design-artifact reconciliation ----
+{
+  const dir = freshDir("phx-mutable-design-reconcile");
+  const id = "sprint-phoenix-design"; const base = `specs/${id}`; const planPath = `${base}/prd_phoenix-epic.md`;
+  const designPath = `${base}/design/architecture.md`;
+  const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  const artifact = (artifactClass, path, bytes, { authority = false, mutability = "mutable" } = {}) => {
+    mkdirSync(dirname(join(dir, path)), { recursive: true }); writeFileSync(join(dir, path), bytes);
+    return { class: artifactClass, path, sha256: digest(`stale:${path}`), authority, mutability, retention: artifactClass === "design" ? "retain" : "active" };
+  };
+  const artifacts = [
+    artifact("prd", planPath, "# Phoenix PRD\n", { authority: true }),
+    artifact("spec", `${base}/spec.md`, "# Phoenix Spec\n", { authority: true }),
+    artifact("acceptance", `${base}/acceptance.md`, "# Phoenix Acceptance\n", { authority: true }),
+    artifact("design", designPath, "# Mutable architecture\n"),
+  ];
+  artifacts[0].sha256 = digest("# Phoenix PRD\n");
+  const manifestPath = `${base}/lifecycle.json`;
+  const manifest = { schema: "pipeline.feature-package.v1", feature: { id, rigor: 2 }, state: "draft", artifacts, candidate: null, supersedes: null };
+  const before = `${JSON.stringify(manifest, null, 2)}\n`;
+  writeFileSync(join(dir, manifestPath), before);
+  const poGateAuthority = injectedPoGateAuthority(planPath); const authority = poGateAuthority().value;
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  const approval = { schema: "pipeline.plan-approval.v2", approvedBy: "PO", approvedAt: "2026-07-27T00:00:00.000Z", specBoundBy: "PO", specBoundAt: "2026-07-27T00:00:00.000Z", poGateAuthority: authority };
+  writeFileSync(statePath(dir), `${JSON.stringify({ schema: SCHEMA_ID, activeFeature: { id, planPath, phase: "implementation" }, planApproved: true, planApproval: approval }, null, 2)}\n`);
+  const planArgs = (entry, key = "phx-mutable-design-01") => ["feature-package-plan", "--manifest", manifestPath, "--proposal-file", writeRequest(dir, `mutable-proposal-${key}`, entry), "--idempotency-key", key, "--expires-at", "2030-01-01T00:00:00.000Z"];
+  const proposal = { operation: "reconcile-mutable-design", targetState: "draft", artifactPath: designPath };
+  const wrongPath = run(planArgs({ ...proposal, artifactPath: "../escape.md" }, "phx-mutable-design-path"), { dir, poGateAuthority });
+  const wrongShape = (change, key) => {
+    const variant = structuredClone(manifest); change(variant.artifacts[3]);
+    writeFileSync(join(dir, manifestPath), `${JSON.stringify(variant, null, 2)}\n`);
+    const result = run(planArgs(proposal, key), { dir, poGateAuthority });
+    writeFileSync(join(dir, manifestPath), before);
+    return result;
+  };
+  const wrongClass = wrongShape((entry) => { entry.class = "plan"; }, "phx-mutable-design-class");
+  const wrongMutability = wrongShape((entry) => { entry.mutability = "immutable"; }, "phx-mutable-design-mutability");
+  const wrongAuthority = wrongShape((entry) => { entry.authority = true; }, "phx-mutable-design-authority");
+  const noopManifest = structuredClone(manifest); noopManifest.artifacts[3].sha256 = digest("# Mutable architecture\n");
+  writeFileSync(join(dir, manifestPath), `${JSON.stringify(noopManifest, null, 2)}\n`);
+  const noop = run(planArgs(proposal, "phx-mutable-design-noop"), { dir, poGateAuthority });
+  writeFileSync(join(dir, manifestPath), before);
+  const planned = captureConsoleLog(() => run(planArgs(proposal), { dir, poGateAuthority }));
+  const request = JSON.parse(planned.text).request;
+  const requestFile = writeRequest(dir, "mutable-design-request", request);
+  writeFileSync(join(dir, manifestPath), `${before}\n`);
+  const drift = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "phx-mutable-design-drift"], { dir, poGateAuthority });
+  const driftPreserved = readFileSync(join(dir, manifestPath), "utf8") === `${before}\n`;
+  writeFileSync(join(dir, manifestPath), before);
+  const mismatched = structuredClone(request); mismatched.authority.decision.approvalSha256 = digest("wrong approval");
+  const denied = run(["feature-package-apply", "--request-file", writeRequest(dir, "mutable-design-denied", mismatched), "--request-sha256", sha256Canonical(mismatched), "--lock-token", "phx-mutable-design-denied"], { dir, poGateAuthority });
+  const deniedPreserved = readFileSync(join(dir, manifestPath), "utf8") === before;
+  const applied = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "phx-mutable-design-apply"], { dir, poGateAuthority });
+  const after = readFileSync(join(dir, manifestPath), "utf8"); const afterValue = JSON.parse(after);
+  const changedDigests = manifest.artifacts.map((entry, index) => entry.sha256 === afterValue.artifacts[index].sha256 ? 0 : 1);
+  const receiptPath = join(dir, `${base}/evidence/lifecycle/feature-package-phx-mutable-design-01.json`);
+  const receipt = JSON.parse(readFileSync(receiptPath, "utf8"));
+  const replay = run(["feature-package-apply", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "phx-mutable-design-apply"], { dir, poGateAuthority });
+  const journalPath = join(dir, ".claude/feature-package-transaction.json");
+  const journal = { schema: "pipeline.feature-package-transaction.v1", request, requestSha256: sha256Canonical(request) };
+  writeFileSync(journalPath, `${JSON.stringify(journal)}\n`);
+  const recovery = run(["feature-package-recover", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "phx-mutable-design-recover"], { dir, poGateAuthority });
+  const recoveryReplayed = recovery === 0 && !existsSync(journalPath) && readFileSync(join(dir, manifestPath), "utf8") === after;
+  writeFileSync(journalPath, `${JSON.stringify(journal)}\n`); writeFileSync(join(dir, manifestPath), `${after}\n`);
+  const recoveryDrift = run(["feature-package-recover", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "phx-mutable-design-recover-drift"], { dir, poGateAuthority });
+  ok("PHX0A7 mutable-design plan binds exactly one explicit non-authority mutable design artifact", planned.value === 0 && request.operation === "reconcile-mutable-design" && request.artifactPath === designPath && request.manifestPreimage === digest(before) && request.authority.decision.approvalSha256 === sha256CanonicalJson(approval));
+  ok("PHX0A8 mutable-design plan rejects traversal, wrong class, immutable, authority, and noop proposals without manifest mutation", wrongPath === 2 && wrongClass === 2 && wrongMutability === 2 && wrongAuthority === 2 && noop === 2);
+  ok("PHX0A9 mutable-design apply rejects manifest preimage drift and a mismatched PO approval without mutation", drift === 2 && driftPreserved && denied === 2 && deniedPreserved);
+  ok("PHX0A10 mutable-design apply/readback changes exactly its one digest and preserves every other lifecycle binding", applied === 0 && changedDigests.reduce((total, changed) => total + changed, 0) === 1 && changedDigests[3] === 1 && afterValue.artifacts[3].sha256 === digest("# Mutable architecture\n") && JSON.stringify(afterValue.feature) === JSON.stringify(manifest.feature) && afterValue.state === manifest.state && afterValue.candidate === null && afterValue.supersedes === null && receipt.operation === "reconcile-mutable-design");
+  ok("PHX0A11 mutable-design retry is zero-write; exact journal recovery replays and drifted recovery fails closed", replay === 0 && readFileSync(receiptPath, "utf8") === `${JSON.stringify(receipt)}\n` && recoveryReplayed && recoveryDrift === 2 && existsSync(journalPath));
+}
+
 {
   const dir = freshDir("phx-authority-revision");
   seedContinuityRoot(dir);

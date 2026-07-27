@@ -2252,18 +2252,27 @@ function exactPoDecision(value) {
     && SHA256_RE.test(value.planSha256) && SHA256_RE.test(value.specSha256) && SHA256_RE.test(value.approvalSha256);
 }
 function exactFeatureRequest(value) {
-  const shared = exactObjectKeys(value, ["schema", "operation", "manifest", "manifestPreimage", "targetState", "manifestBytes", "planReceipt", "authority", "candidate", "evidence", "idempotencyKey", "expiresAt", "artifactSetSha256"])
+  const mutableDesign = value?.operation === "reconcile-mutable-design";
+  const shared = exactObjectKeys(value, mutableDesign
+    ? ["schema", "operation", "manifest", "manifestPreimage", "targetState", "manifestBytes", "planReceipt", "authority", "candidate", "evidence", "idempotencyKey", "expiresAt", "artifactSetSha256", "artifactPath"]
+    : ["schema", "operation", "manifest", "manifestPreimage", "targetState", "manifestBytes", "planReceipt", "authority", "candidate", "evidence", "idempotencyKey", "expiresAt", "artifactSetSha256"])
     && value.schema === FEATURE_PACKAGE_REQUEST_SCHEMA && value.targetState === "draft"
-    && typeof value.manifest === "string" && typeof value.manifestBytes === "string"
+    && currentRepoArtifactPath(value.manifest) && typeof value.manifestBytes === "string"
     && SHA256_RE.test(value.artifactSetSha256) && value.candidate === null && value.evidence === null
-    && safePhxId(value.idempotencyKey) && safeIso(value.expiresAt);
+    && safePhxId(value.idempotencyKey) && safeIso(value.expiresAt)
+    && (!mutableDesign || currentRepoArtifactPath(value.artifactPath));
   if (!shared || !exactObjectKeys(value.authority, ["class", "decision"])) return false;
   return (value.operation === "bootstrap-draft" && value.manifestPreimage === "absent"
     && value.authority.class === "lifecycle-bootstrap" && value.authority.decision === null)
-    || (["reconcile-draft", "readback-replay"].includes(value.operation) && SHA256_RE.test(value.manifestPreimage)
+    || (["reconcile-draft", "readback-replay", "reconcile-mutable-design"].includes(value.operation) && SHA256_RE.test(value.manifestPreimage)
       && value.authority.class === "po-plan-approval" && exactPoDecision(value.authority.decision));
 }
 function samePhxJson(left, right) { return canonicalPhxJson(left) === canonicalPhxJson(right); }
+function currentRepoArtifactPath(path) {
+  return typeof path === "string" && path.length > 0 && path.length <= 240
+    && !isAbsolute(path) && !path.includes("\\") && !path.includes("\0")
+    && !path.split("/").some((part) => part === "" || part === "." || part === "..");
+}
 function featureJournalPath(dir) { return join(dir, ".claude", "feature-package-transaction.json"); }
 function writeBoundFile(path, bytes, lock, directory, deps = {}) {
   const tmp = `${path}.tmp.${lock.ownerNonce}`; let fd; let renamed = false;
@@ -2328,6 +2337,51 @@ function reconcileDraftPreview(dir, manifestPath) {
   if (changed !== 4 || featureArtifactSetSha256(value.artifacts) !== featureArtifactSetSha256(next.artifacts)) return { ok: false, code: "PS-FEATURE-RECONCILE-BYTES" };
   return { ok: true, manifest, bytes, value, nextBytes, next, preimage: sha256Bytes(bytes), artifactSetSha256: featureArtifactSetSha256(value.artifacts), receipt: { schema: "pipeline.feature-package-receipt.v1", manifest, manifestSha256: sha256Bytes(nextBytes), featureId: id, state: "draft", candidate: null, artifactCount: next.artifacts.length, findingCount: 0 } };
 }
+function reconcileMutableDesignPreview(dir, manifestPath, artifactPath) {
+  const manifest = typeof manifestPath === "string" ? manifestPath : "";
+  if (!currentRepoArtifactPath(manifest) || !currentRepoArtifactPath(artifactPath)) return { ok: false, code: "PS-FEATURE-MUTABLE-DESIGN-PREIMAGE" };
+  const target = resolve(dir, manifest);
+  let bytes; let value;
+  try { bytes = readFileSync(target, "utf8"); value = JSON.parse(bytes); } catch { return { ok: false, code: "PS-FEATURE-MUTABLE-DESIGN-PREIMAGE" }; }
+  const id = manifest.slice("specs/".length, -"/lifecycle.json".length);
+  if (!manifest.startsWith("specs/") || !manifest.endsWith("/lifecycle.json") || !safePhxId(id)
+    || !exactObjectKeys(value, ["schema", "feature", "state", "artifacts", "candidate", "supersedes"])
+    || !exactObjectKeys(value.feature, ["id", "rigor"]) || value.feature.id !== id || value.state !== "draft"
+    || !Array.isArray(value.artifacts) || value.candidate !== null || value.supersedes !== null) return { ok: false, code: "PS-FEATURE-MUTABLE-DESIGN-PREIMAGE" };
+  const matches = value.artifacts.filter((artifact) => artifact?.path === artifactPath);
+  if (matches.length !== 1 || !exactObjectKeys(matches[0], ["class", "path", "sha256", "authority", "mutability", "retention"])
+    || matches[0].class !== "design" || matches[0].authority !== false || matches[0].mutability !== "mutable" || !SHA256_RE.test(matches[0].sha256)) return { ok: false, code: "PS-FEATURE-MUTABLE-DESIGN-ARTIFACT" };
+  const current = currentRepoArtifact(dir, artifactPath);
+  if (!current) return { ok: false, code: "PS-FEATURE-MUTABLE-DESIGN-ARTIFACT" };
+  if (current.sha256 === matches[0].sha256) return { ok: false, code: "PS-FEATURE-MUTABLE-DESIGN-NOOP" };
+  const token = `"sha256": "${matches[0].sha256}"`;
+  if (bytes.split(token).length !== 2) return { ok: false, code: "PS-FEATURE-MUTABLE-DESIGN-BYTES" };
+  const nextBytes = bytes.replace(matches[0].sha256, current.sha256);
+  let next;
+  try { next = JSON.parse(nextBytes); } catch { return { ok: false, code: "PS-FEATURE-MUTABLE-DESIGN-BYTES" }; }
+  const changed = value.artifacts.map((artifact, index) => artifact.sha256 === next.artifacts[index]?.sha256 ? 0 : 1);
+  const targetIndex = value.artifacts.indexOf(matches[0]);
+  if (changed.reduce((total, count) => total + count, 0) !== 1 || changed[targetIndex] !== 1
+    || featureArtifactSetSha256(value.artifacts) !== featureArtifactSetSha256(next.artifacts)
+    || !samePhxJson(value.feature, next.feature) || value.state !== next.state || value.candidate !== next.candidate || value.supersedes !== next.supersedes) return { ok: false, code: "PS-FEATURE-MUTABLE-DESIGN-BYTES" };
+  return { ok: true, manifest, artifactPath, bytes, value, nextBytes, next, preimage: sha256Bytes(bytes), artifactSetSha256: featureArtifactSetSha256(value.artifacts), receipt: { schema: "pipeline.feature-package-receipt.v1", manifest, manifestSha256: sha256Bytes(nextBytes), featureId: id, state: "draft", candidate: null, artifactCount: next.artifacts.length, findingCount: 0 } };
+}
+function mutableDesignPostimage(dir, request) {
+  if (!exactFeatureRequest(request) || request.operation !== "reconcile-mutable-design") return false;
+  let value;
+  try { value = JSON.parse(request.manifestBytes); } catch { return false; }
+  const id = request.manifest.slice("specs/".length, -"/lifecycle.json".length);
+  if (!request.manifest.startsWith("specs/") || !request.manifest.endsWith("/lifecycle.json") || !safePhxId(id)
+    || !exactObjectKeys(value, ["schema", "feature", "state", "artifacts", "candidate", "supersedes"])
+    || !exactObjectKeys(value.feature, ["id", "rigor"]) || value.feature.id !== id || value.state !== "draft"
+    || !Array.isArray(value.artifacts) || value.candidate !== null || value.supersedes !== null) return false;
+  const matches = value.artifacts.filter((artifact) => artifact?.path === request.artifactPath);
+  const current = currentRepoArtifact(dir, request.artifactPath);
+  return matches.length === 1 && exactObjectKeys(matches[0], ["class", "path", "sha256", "authority", "mutability", "retention"])
+    && matches[0].class === "design" && matches[0].authority === false && matches[0].mutability === "mutable"
+    && current !== null && current.sha256 === matches[0].sha256 && featureArtifactSetSha256(value.artifacts) === request.artifactSetSha256
+    && samePhxJson({ schema: "pipeline.feature-package-receipt.v1", manifest: request.manifest, manifestSha256: sha256Bytes(request.manifestBytes), featureId: id, state: "draft", candidate: null, artifactCount: value.artifacts.length, findingCount: 0 }, request.planReceipt);
+}
 function existingDraftReadbackPreview(dir, manifestPath) {
   const checked = validateFeaturePackage(dir, manifestPath);
   if (!checked.ok || checked.receipt?.state !== "draft") return { ok: false, code: "PS-FEATURE-READBACK-PREIMAGE" };
@@ -2346,6 +2400,13 @@ function validateFeatureRequest(dir, request, deps = {}) {
   if (request.operation === "readback-replay") {
     const preview = existingDraftReadbackPreview(dir, request.manifest);
     if (!preview.ok || preview.preimage !== request.manifestPreimage || preview.bytes !== request.manifestBytes
+      || preview.artifactSetSha256 !== request.artifactSetSha256 || !samePhxJson(preview.receipt, request.planReceipt)
+      || !samePhxJson(poApprovalDecision(dir, preview.value, deps) ?? {}, request.authority.decision)) return { ok: false, code: "PS-FEATURE-PLAN-BINDING" };
+    return { ok: true, preview };
+  }
+  if (request.operation === "reconcile-mutable-design") {
+    const preview = reconcileMutableDesignPreview(dir, request.manifest, request.artifactPath);
+    if (!preview.ok || preview.preimage !== request.manifestPreimage || preview.nextBytes !== request.manifestBytes
       || preview.artifactSetSha256 !== request.artifactSetSha256 || !samePhxJson(preview.receipt, request.planReceipt)
       || !samePhxJson(poApprovalDecision(dir, preview.value, deps) ?? {}, request.authority.decision)) return { ok: false, code: "PS-FEATURE-PLAN-BINDING" };
     return { ok: true, preview };
@@ -2384,6 +2445,13 @@ function runFeaturePackageCommand(sub, argv, deps) {
       const decision = poApprovalDecision(dir, preview.value, deps);
       if (decision === null) { console.error("Error: feature package plan refused (PS-FEATURE-PO-APPROVAL)."); return 2; }
       request = { schema: FEATURE_PACKAGE_REQUEST_SCHEMA, operation: "reconcile-draft", manifest: preview.manifest, manifestPreimage: preview.preimage, targetState: "draft", manifestBytes: preview.nextBytes, planReceipt: preview.receipt, artifactSetSha256: preview.artifactSetSha256, authority: { class: "po-plan-approval", decision }, candidate: null, evidence: null, idempotencyKey: parsed.value["idempotency-key"], expiresAt: parsed.value["expires-at"] };
+    } else if (source.value.operation === "reconcile-mutable-design") {
+      if (!exactObjectKeys(source.value, ["operation", "targetState", "artifactPath"]) || !currentRepoArtifactPath(source.value.artifactPath)) return 2;
+      const preview = reconcileMutableDesignPreview(dir, parsed.value.manifest, source.value.artifactPath);
+      if (!preview.ok) { console.error(`Error: feature package plan refused (${preview.code}).`); return 2; }
+      const decision = poApprovalDecision(dir, preview.value, deps);
+      if (decision === null) { console.error("Error: feature package plan refused (PS-FEATURE-PO-APPROVAL)."); return 2; }
+      request = { schema: FEATURE_PACKAGE_REQUEST_SCHEMA, operation: "reconcile-mutable-design", manifest: preview.manifest, manifestPreimage: preview.preimage, targetState: "draft", manifestBytes: preview.nextBytes, planReceipt: preview.receipt, artifactSetSha256: preview.artifactSetSha256, authority: { class: "po-plan-approval", decision }, candidate: null, evidence: null, idempotencyKey: parsed.value["idempotency-key"], expiresAt: parsed.value["expires-at"], artifactPath: preview.artifactPath };
     } else if (source.value.operation === "readback-replay") {
       if (!exactObjectKeys(source.value, ["operation", "targetState"])) return 2;
       const preview = existingDraftReadbackPreview(dir, parsed.value.manifest);
@@ -2406,6 +2474,7 @@ function runFeaturePackageCommand(sub, argv, deps) {
   const loaded = readClosedJsonFile(dir, parsed.value["request-file"]);
   if (!loaded.ok || sha256Bytes(canonicalPhxJson(loaded.value)) !== parsed.value["request-sha256"]) return 2;
   const request = loaded.value;
+  if (!exactFeatureRequest(request)) return 2;
   if (sub === "feature-package-recover") {
     const journal = readClosedJsonFile(dir, ".claude/feature-package-transaction.json");
     if (!journal.ok || !samePhxJson(journal.value.request, request)) return 2;
@@ -2417,8 +2486,10 @@ function runFeaturePackageCommand(sub, argv, deps) {
     const existing = existsSync(target);
     if (existing) {
       try {
-        const postimage = readFileSync(target, "utf8") === request.manifestBytes && validateFeaturePackage(dir, request.manifest).ok;
-        const poCurrent = request.operation !== "reconcile-draft" || samePhxJson(poApprovalDecision(dir, JSON.parse(readFileSync(target, "utf8")), deps) ?? {}, request.authority?.decision);
+        const postimage = readFileSync(target, "utf8") === request.manifestBytes
+          && (request.operation === "reconcile-mutable-design" ? mutableDesignPostimage(dir, request) : validateFeaturePackage(dir, request.manifest).ok);
+        const poCurrent = !["reconcile-draft", "reconcile-mutable-design"].includes(request.operation)
+          || samePhxJson(poApprovalDecision(dir, JSON.parse(readFileSync(target, "utf8")), deps) ?? {}, request.authority?.decision);
         if (postimage && poCurrent) {
           const receiptPath = resolve(dir, featureReceiptPath(request));
           const receiptBytes = `${canonicalPhxJson(featureReceipt(request, "committed"))}\n`;
@@ -2433,7 +2504,7 @@ function runFeaturePackageCommand(sub, argv, deps) {
           return 0;
         }
       } catch { /* fall through to conflict */ }
-      if (request.operation !== "reconcile-draft") return 2;
+      if (!["reconcile-draft", "reconcile-mutable-design"].includes(request.operation)) return 2;
     }
     const valid = validateFeatureRequest(dir, request, deps);
     if (!valid.ok || Date.parse(request.expiresAt) < Date.now()) return 2;
@@ -2442,8 +2513,10 @@ function runFeaturePackageCommand(sub, argv, deps) {
     if (!journalWrite.ok) return 2;
     const manifestWrite = writeBoundFile(target, request.manifestBytes, lock, dirname(target), deps);
     if (!manifestWrite.ok) return 2;
-    const checked = validateFeaturePackage(dir, request.manifest);
-    if (!checked.ok) return 2;
+    const readbackOk = request.operation === "reconcile-mutable-design"
+      ? mutableDesignPostimage(dir, request)
+      : validateFeaturePackage(dir, request.manifest).ok;
+    if (!readbackOk) return 2;
     const receiptPath = resolve(dir, featureReceiptPath(request));
     const receiptWrite = writeBoundFile(receiptPath, `${canonicalPhxJson(featureReceipt(request, "committed"))}\n`, lock, dirname(receiptPath), deps);
     if (!receiptWrite.ok) return 2;
