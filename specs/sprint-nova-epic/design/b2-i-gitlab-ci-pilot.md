@@ -70,7 +70,8 @@ milliseconds (`local-monotonic-ms`), never provider wall-clock values. Provider
 ordering remains the separate `providerSequence` / `not-provided` contract;
 each later local observation and cancellation intent is non-decreasing against
 the preceding local observation. Every successor of a retry preserves that
-attempt number and exact retry genesis.
+attempt number and exact retry genesis; its first submission is no earlier than
+the reconciled preceding attempt's final observation.
 
 No background retry, credential renewal, remote cleanup or host process may
 outlive the bound request. A new request needs a new PO-authorized preview.

@@ -834,7 +834,8 @@ The B2-I broker's `submittedAt`, `requestedAt` and `observedAt` use the fixed
 is not mixed into that ordering; provider ordering uses `providerSequence` or
 `not-provided` only. Later observations and cancellation intents cannot move
 that local clock backward, and every successor preserves its retry attempt and
-retry genesis.
+retry genesis. A retry's first submission is no earlier than the final observed
+time of its reconciled preceding attempt.
 
 `pipeline.async-execution-journal.v1` appends provider observations with exact
 provider job binding, subject, provider sequence or `not-provided`, observation
