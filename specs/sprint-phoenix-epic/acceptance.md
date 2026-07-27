@@ -336,6 +336,12 @@ architecture prose or an implementation briefing.
   planner and its existing suite only with the read-only absent-manifest
   `draft` bootstrap preview required to bind initial creation; it SHALL NOT
   introduce a separate planner or bypass the resulting receipt. This writer
+  SHALL also reconcile the inherited Phoenix `draft` manifest's stale PRD,
+  Spec, acceptance, and architecture digests only through an
+  existing-manifest preview, exact PO-bound apply, and readback, with no
+  lifecycle-state, artifact-set, candidate, or other authority-byte change.
+  It SHALL NOT permit manual digest replacement to stand in for that
+  transaction. This writer
   closure SHALL be the
   mandatory first slice inside Spec §4.6 package PHX-0, not a separate package
   before PHX-0; PHX-0 SHALL NOT proceed to its ruleset-trust-root slice and

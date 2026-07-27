@@ -354,6 +354,7 @@ files are excepted only when their path is already declared here.
 | `harness/definition-of-done.md` | add governance-stream/privacy/external-projection closure checks | Make Epic completion auditable. |
 | `plugins/pipeline-core/lib/feature-package-topology.mjs` | extend the accepted #22 planner with a read-only absent-manifest `draft` bootstrap preview | Let PHX-0 bind its initial manifest plan to the canonical topology planner without a temporary or hand-written authority file. |
 | `plugins/pipeline-core/lib/feature-package-topology.test.mjs` | add absent-manifest draft-bootstrap, rejection, and receipt fixtures | Prove the planner extension is closed, deterministic, and does not weaken existing-manifest validation. |
+| `specs/sprint-phoenix-epic/lifecycle.json` | reconcile only the existing draft manifest's stale PRD, Spec, acceptance, and architecture digest bindings through the PHX-0A feature-package writer | Keep the reviewed artifact set and `draft` state intact while replacing no authority bytes except the four writer-planned current digest values; forbid manual editing, direct hash replacement, or a state transition. |
 
 ### 7.2 Ruleset-source trust root
 

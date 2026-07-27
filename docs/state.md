@@ -5,12 +5,12 @@
 
 **Last updated:** 2026-07-27
 **Project status:** ACTIVE
-**Current block:** PHX-0A planner-bootstrap revision approved; Goldfish dispatch next
+**Current block:** PHX-0A lifecycle-manifest reconciliation scope revision awaiting renewed PO approval
 **Branch:** `sprint_phoenix`, based on public `origin/main`
 `9d1b3dc108eb77629ace5b82002120f5539abd8d`
 **Pipeline:** `0.4.6+codex.20260726170452`
-**DoD:** 🟡 implementation pending — the PHX-0A planner-bootstrap revision is
-recorded as a renewed Plan/Spec-bound approval
+**DoD:** 🟡 implementation pending — the prior PHX-0A approval was revoked for
+the PO-authorized lifecycle-manifest reconciliation scope revision
 
 ## Operational head
 
@@ -19,8 +19,9 @@ recorded as a renewed Plan/Spec-bound approval
 - Phoenix is the only active feature in this checkout. Its readable plan is
   [the Phoenix PRD](../specs/sprint-phoenix-epic/prd_phoenix-epic.md), bound
   to the immutable [technical Spec](../specs/sprint-phoenix-epic/spec.md).
-- Pipeline state is in `phase:"implementation"` with a renewed v2
-  Plan/Spec-bound approval for the PHX-0A scope revision. The canonical #22
+- Pipeline state is in `phase:"design"` with `planApproved:false` while the
+  explicit PO-authorized PHX-0A lifecycle-manifest reconciliation scope
+  revision receives its renewed Plan/Spec-bound gate. The canonical #22
   planner may receive only its narrow read-only absent-manifest `draft`
   bootstrap preview and existing-suite coverage. Continuity revision `5` still
   names `review`; the first implementation package must be recorded through the
@@ -91,9 +92,12 @@ recorded as a renewed Plan/Spec-bound approval
 
 ## Open items and next block
 
-1. The PO authorized and renewed the Plan/Spec-bound gate for the narrow
-   PHX-0A #22 planner correction: only a read-only absent-manifest `draft`
-   bootstrap preview and its existing-suite coverage.
+1. The PO authorized PHX-0A to add the existing Phoenix `lifecycle.json` to
+   its bounded scope and reconcile only its stale PRD, Spec, acceptance, and
+   architecture digests through preview → exact PO-bound apply → readback.
+   This is now a material scope revision: the prior plan approval is revoked
+   and renewed literal approval is required after the revised candidate passes
+   its design checks.
 2. The first approved work is PHX-0 slice A. It must implement and independently
    clear the transactional lifecycle writer before PHX-0 slice B or any later
    package.

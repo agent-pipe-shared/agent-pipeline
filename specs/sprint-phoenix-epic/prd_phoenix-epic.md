@@ -2,13 +2,13 @@
 
 # PRD — Governance Sprint Phoenix
 
-> Product Review Document for the Product Owner gate. Status: `draft — fresh
-> independent review passed; renewed Product Owner approval pending`. Task: `sprint-phoenix-epic` · profile
+> Product Review Document for the Product Owner gate. Status: `draft — PHX-0A
+> lifecycle-manifest reconciliation scope revision awaiting renewed Product Owner approval`. Task: `sprint-phoenix-epic` · profile
 > `epic` · rigor 2 · risk high. Approval authorizes exactly the first
 > implementation dispatch; push, merge, release, external writes, and final
 > acceptance keep their own gates.
 
-<!-- technical-spec-sha256: ce0b1091de3d26f855feb30a71506b7fe62fb080041b111975a1daa38215870c -->
+<!-- technical-spec-sha256: 3db999a271adb066aa3ae4572ad1db42a8a001e4c0fce838b80376d9a1a24520 -->
 
 The technical approval binds the exact neighboring [spec.md](spec.md).
 Acceptance criteria are maintained in
@@ -88,6 +88,10 @@ internal approval.
   approval. Generic CAS remains unable to rewrite authority; the dedicated
   path requires an exact scoped human decision, old/new artifact digests,
   atomic State readback, and a public-safe audit record.
+- A single writer-bound reconciliation of the inherited Phoenix `draft`
+  lifecycle manifest's stale PRD, Spec, acceptance, and architecture digests.
+  It preserves state and artifact inventory, requires an exact preview and
+  PO-bound apply/readback, and prohibits manual manifest edits.
 - A correlated external-handoff, recovery, and workaround profile. Every
   Pipeline-known command or script offered for user execution is recorded
   before presentation, whether Pipeline-initiated or user-requested and
@@ -183,6 +187,7 @@ candidate.
 | Include suitable assigned or unassigned governance backlog | Scope validation with incorporated, fixture-only, and excluded dispositions |
 | Add runner-independent marketplace version/freshness | What, Scope, first delivery wave, and PHX-0 |
 | Rebind a legitimately revised active-design PRD/Spec without a hand-edited State workaround | Scope, PHX-0 slice A, and the lifecycle-authority revision contract |
+| Reconcile stale Phoenix lifecycle-manifest authority digests without a hand edit | Scope, PHX-0A writer transaction, and P-AC-08 |
 | Audit all Pipeline-known external execution handoffs, recovery, and workarounds safely | Scope, privacy risk control, and External Command Offer profile |
 | Treat completed 0.4.6 work as complete despite stale documentation | Non-goals and scope validation |
 | Do not start one fix before the overall design | Delivery shape and explicit non-goal |
