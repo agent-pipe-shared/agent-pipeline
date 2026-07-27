@@ -60,3 +60,9 @@ history rewrite.
 TP-3 and TP-5 were temporarily removed under explicit PO authorization solely
 for these briefed edits and restored exactly before the final gates. This narrow
 course authorization is not a Critic PASS, review verdict, or release approval.
+
+For the PHX-0A lifecycle-writer implementation session, the PO explicitly
+authorized temporary removal of TP-1, TP-3, and TP-5 only. The authorization
+is limited to the briefed Goldfish scope and must be restored before its
+independent Critic review and final gates; it does not authorize any other
+guard-config change, a bypass of Verify, or a remote action.
