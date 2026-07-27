@@ -504,7 +504,7 @@ check("BDR01 exports the exact A1 schema identities", [
     ...binding,
     bindings: [{ ...binding.bindings[0], acceptanceIds: ["NVA-A57-1", "NVA-A57-1"] }],
   });
-  const incrementB = { ...binding.bindings[0], id: "pipeline.alpha", issue: 7, increment: "B", acceptanceIds: ["NVA-A7-1"] };
+  const incrementB = { ...binding.bindings[0], id: "pipeline.alpha", issue: 60, increment: "B", acceptanceIds: ["NVA-B60-1"] };
   const orderedByIncrementThenId = rebindSpecBinding({ ...binding, bindings: [binding.bindings[0], incrementB] });
   const orderedOnlyById = rebindSpecBinding({ ...binding, bindings: [incrementB, binding.bindings[0]] });
   check("BDR05 Spec bindings and acceptance sets are unique and sorted canonically by (increment,id)",

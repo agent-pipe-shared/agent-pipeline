@@ -636,3 +636,24 @@ sticky directory, is rejected because ownership does not remove the
 directory-replacement race. All other statements in the preceding record
 remain unchanged. This amendment introduces no provider, credential,
 execution, external, push, merge, release or closure authority.
+
+## 2026-07-27 — B5/B6 inventory and canonical-binding amendment
+
+Status: `local-contract-corrected; native-evidence-pending`.
+
+The PO authorized the B5/B6 product-capability inventory update and the
+canonical acceptance bindings for Issues `#12`, `#14`, `#15`, `#18` and `#60`.
+The registered `nova-macos-acceptance-tests` surface is explicitly a
+synthetic, non-native contract check; it does not claim or replace native
+Apple Silicon execution evidence.
+
+`design/backlog-spec-bindings.json` now binds all 17 accepted Nova Issues
+against its retained historical canonical backlog snapshot. The correction
+also makes B-increment acceptance identifiers valid under the closed binding
+contract and retains the explicit Alpha-only, no-direct-AGY disposition for
+Issue `#15`.
+
+This amendment is local design and verification plumbing only. It creates no
+native macOS evidence, external broker or credential authority, live runner
+execution, GitLab operation, Issue mutation, push, merge, release or sprint
+closure claim.

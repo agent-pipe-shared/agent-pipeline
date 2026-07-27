@@ -3,22 +3,184 @@
   "featureId": "sprint-nova-epic",
   "specification": {
     "path": "specs/sprint-nova-epic/spec.md",
-    "sha256": "cacf045a9d849b52d0a7958bf2923a1d9f8f08e4f0efdc97de413a0f0e0634d5"
+    "sha256": "57e27b8d72d036b9f07df2d6c70541effa5c9cf1386f0c3d0088ead889730116"
   },
   "backlogSnapshot": {
     "commit": "5ca5a4b292a267ffdfcc52577fda0a0593957a65",
-    "subtree": "832bf98e22e9a147dad88c952c0b794f3ee44fe7",
-    "transitionHead": "36dd616d3aa5bc21e49e138f6b8a9a17a9de25321998304306e4fa47289de562",
-    "indexSha256": "a81a976e35eddd16efc31620b1d79b2c9d43600b16a3f695ea31c7879ec79e3d",
-    "statusSha256": "7cb91d921d23f16b9cb0dee24b223feeb4c2bd5ac47ec3c42c82642af35d6cb4",
-    "transitionsSha256": "5cc9a6d23740c45f5b7ee5c762f5fedbfa6fe627e83a98cdf93db430cf899b6d"
+    "tree": "8684dd499539e49eea5a36e97f2cf386fd166007",
+    "backlogSubtree": "d8bb36663dbdac0cea1cdc87b7ca8f5bbfb64d75fa611934c91c4f9f7ca6d1cc",
+    "ledgerHead": "36dd616d3aa5bc21e49e138f6b8a9a17a9de25321998304306e4fa47289de562",
+    "indexFileSha256": "a81a976e35eddd16efc31620b1d79b2c9d43600b16a3f695ea31c7879ec79e3d",
+    "statusFileSha256": "7cb91d921d23f16b9cb0dee24b223feeb4c2bd5ac47ec3c42c82642af35d6cb4",
+    "itemFileSha256": [
+      {
+        "id": "pipeline.afk-assumption-mode",
+        "sha256": "45e10a6506790763071c4624e1d9227c967017c208c1196a2073c93895b16f2d"
+      },
+      {
+        "id": "pipeline.canonical-worktree-lifecycle",
+        "sha256": "d8320c7d5f4572ebd04ae1cd820b6e683a3c6b17d978dad498d71bb1e33aca2a"
+      },
+      {
+        "id": "pipeline.close-spec-retention-and-consent",
+        "sha256": "159fc3ccd8a4c1181b8e5ca58297cb1c99f9de5d61acd582a56dd6101c4fc291"
+      },
+      {
+        "id": "pipeline.closed-input-channel-review-economics",
+        "sha256": "d4591ff5973808e061bd9aa953c63e4f531e88e77922cc1871a1db805cb1799a"
+      },
+      {
+        "id": "pipeline.codex-plugin-validator-host-parity",
+        "sha256": "187b765846a7e95e4520566c1dd46227bb1489290049745637bb04701577eb6d"
+      },
+      {
+        "id": "pipeline.codex-sandbox-critic-longterm",
+        "sha256": "58fb6176639b6587753a72cf8b058516f2b03138b9926e6fb6d28a97970c5409"
+      },
+      {
+        "id": "pipeline.critic-context-isolation",
+        "sha256": "e0a35706ee6bb91ecdf866d966a6a5e3d5a1bc201c699555d4e093c77f91ec83"
+      },
+      {
+        "id": "pipeline.cross-repository-override-ledger-binding",
+        "sha256": "7b9e4b8d8f52d2e4ae333f462b626a7fb66c46ed3efe70657f288329f7ab2f10"
+      },
+      {
+        "id": "pipeline.dispatch-provenance",
+        "sha256": "afd9f62a024c52b44e7e4e66fa255812c3c3f67aea49e9ca3cc3cce92028f15a"
+      },
+      {
+        "id": "pipeline.documentation-information-architecture",
+        "sha256": "53ab65f2da4c9920cfa347bb33f86efedb8a085e455a8931a67503dd9aa1550a"
+      },
+      {
+        "id": "pipeline.dual-channel-publication",
+        "sha256": "7e9ce85a995a1cddca8de814b3747b239141e298a353540e8f77a96973f64002"
+      },
+      {
+        "id": "pipeline.elephant-direct-implementation-under-afk-authorization",
+        "sha256": "d494f0bfe734ee931d315a2e4d039707c4932f5f09a28729cd70171f76bbc2c8"
+      },
+      {
+        "id": "pipeline.evidence-bound-review-retry-economics",
+        "sha256": "afa742e5c9a8eb7dd0df30898afa0852436b264e99f60ea1ff85ae872968ef36"
+      },
+      {
+        "id": "pipeline.execution-model-switchback",
+        "sha256": "4a9e39d27933aab5754d12798f4ac691fa8e41a01ff65039c2f823d33d0c5a2a"
+      },
+      {
+        "id": "pipeline.multi-cli-efficiency-pilots",
+        "sha256": "d9bfe134fd42cf62235015243b1da67ba1b00df97c1329d1720844fc489b9b90"
+      },
+      {
+        "id": "pipeline.nonblocking-interaction-continuity",
+        "sha256": "e1ee35e24d455ce80785ba056f1d923afd553c5f5e75dfd60247fb7649250b1a"
+      },
+      {
+        "id": "pipeline.observation-intake-document-governance",
+        "sha256": "85e185101098b29eb85b2f6054007a741fc652c329793c4ba7e61e57d9d7e701"
+      },
+      {
+        "id": "pipeline.po-gate-worktree-authority",
+        "sha256": "7489c130bad6354cc91d4cb6937cfa68593b31a1fa987ab948d8ef0f9c9d18d3"
+      },
+      {
+        "id": "pipeline.private-overlay-activation-bridge",
+        "sha256": "7a09cb7de1c581d06c431166f8ef5e246cf34b634a6bc70cddb1a43ab474dd2f"
+      },
+      {
+        "id": "pipeline.project-scoped-github-issue-operations",
+        "sha256": "8497d7f492762be52f61574c76df9019b8141b61bcf98b49011072960c1df8eb"
+      },
+      {
+        "id": "pipeline.push-guard-worktree-target",
+        "sha256": "9a041b86dbc4212155e84a4042e352520da1c31fdd58e863789ed034c5f8df7b"
+      },
+      {
+        "id": "pipeline.recovery-preview-callback-attestation",
+        "sha256": "35e0912cfc63f6e7d94e687977093b0d3625392051ba1dbf14256ca512eda39f"
+      },
+      {
+        "id": "pipeline.regulated-document-hooks",
+        "sha256": "bf7335eac24a4b92a070f8406254de0f54ed9641ceb804dfe378db600cf81b2e"
+      },
+      {
+        "id": "pipeline.sentinel-go-live-completion",
+        "sha256": "d4c7680f27dbb453a5e3a43821542196237d38b0a994f0be605b4fc87de0cd80"
+      },
+      {
+        "id": "pipeline.session-keep-awake",
+        "sha256": "de5409539c9d922d50bc991c466997038279eeb0760e35d8fdbeee2ef482738f"
+      },
+      {
+        "id": "pipeline.source-available-commercial-licensing",
+        "sha256": "eeb487d4e0897461ad1273a3c7dcebcfa0735ebacb9986cb4356c2915b116fef"
+      },
+      {
+        "id": "pipeline.spec-retention-on-close",
+        "sha256": "ed62a636ab8f2c5067b195b7249ac2d755588128f067e57ddb146bfba3fd0844"
+      },
+      {
+        "id": "pipeline.stateful-design-contract-template",
+        "sha256": "3d19b864531d88e1b28b7f5dbfe3291dad06948561446b8fe8e3e530a40fa5f1"
+      },
+      {
+        "id": "pipeline.t1-governance-path-preflight",
+        "sha256": "a64f0839ba907f29ee30fc205c84070089371b0b44cd36b2026d0e135fbf12e3"
+      },
+      {
+        "id": "pipeline.verify-gate-scoped-registration",
+        "sha256": "2238427c8e785405b4beaff6ba3efdbd8ae9abd93b2dec8e75ab15fc16b5c5a5"
+      },
+      {
+        "id": "pipeline.windows-directory-durability",
+        "sha256": "59ad5dd56c5a16ca20cfeeec08de8b43911ce34abecf50630815efa4c01bdb86"
+      },
+      {
+        "id": "pipeline.windows-private-state-assurance",
+        "sha256": "08a4367f48bbbeda0bf560d91caa3896760d4c153687ff4f61332f3d9bb09b17"
+      },
+      {
+        "id": "pipeline.windows-runtime-baseline-containment",
+        "sha256": "62ac9ead2e3d87d91e3f436778c3f5b73fc6e30ce244044c0da97b105d823dd3"
+      },
+      {
+        "id": "pipeline.windows-trusted-tool-resolution",
+        "sha256": "67ed62667ef72bff6f497edc20d6a244b8b13c762b1cbf9ad269ccb66ad8172b"
+      },
+      {
+        "id": "pipeline.windows-verify-reproducibility",
+        "sha256": "05e2743a7f780eb89bd699f6667cdf9f8eaefb6b4e1e9560939e838fdbd7b005"
+      }
+    ]
   },
   "bindings": [
     {
       "id": "pipeline.backlog-delivery-status-reconciliation",
       "issue": 57,
       "increment": "A",
-      "acceptanceIds": ["NVA-A57-1", "NVA-A57-2", "NVA-A57-3", "NVA-A57-4", "NVA-A57-5", "NVA-A57-6"],
+      "acceptanceIds": [
+        "NVA-A57-1",
+        "NVA-A57-2",
+        "NVA-A57-3",
+        "NVA-A57-4",
+        "NVA-A57-5",
+        "NVA-A57-6"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.bounded-scheduling",
+      "issue": 12,
+      "increment": "A",
+      "acceptanceIds": [
+        "NVA-A12-1",
+        "NVA-A12-2",
+        "NVA-A12-3",
+        "NVA-A12-4"
+      ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "not-applicable"
     },
@@ -26,7 +188,12 @@
       "id": "pipeline.closed-input-channel-review-economics",
       "issue": 54,
       "increment": "A",
-      "acceptanceIds": ["NVA-A54-1", "NVA-A54-2", "NVA-A54-4", "NVA-A54-7"],
+      "acceptanceIds": [
+        "NVA-A54-1",
+        "NVA-A54-2",
+        "NVA-A54-4",
+        "NVA-A54-7"
+      ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "revalidate:2026-08-17"
     },
@@ -34,7 +201,13 @@
       "id": "pipeline.codex-plugin-validator-host-parity",
       "issue": 7,
       "increment": "A",
-      "acceptanceIds": ["NVA-A7-1", "NVA-A7-2", "NVA-A7-3", "NVA-A7-4", "NVA-A7-5"],
+      "acceptanceIds": [
+        "NVA-A7-1",
+        "NVA-A7-2",
+        "NVA-A7-3",
+        "NVA-A7-4",
+        "NVA-A7-5"
+      ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "not-applicable"
     },
@@ -42,7 +215,14 @@
       "id": "pipeline.codex-sandbox-critic-longterm",
       "issue": 29,
       "increment": "A",
-      "acceptanceIds": ["NVA-A29-1", "NVA-A29-2", "NVA-A29-3", "NVA-A29-4", "NVA-A29-5", "NVA-A29-6"],
+      "acceptanceIds": [
+        "NVA-A29-1",
+        "NVA-A29-2",
+        "NVA-A29-3",
+        "NVA-A29-4",
+        "NVA-A29-5",
+        "NVA-A29-6"
+      ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "not-applicable"
     },
@@ -50,7 +230,13 @@
       "id": "pipeline.evidence-bound-review-retry-economics",
       "issue": 54,
       "increment": "A",
-      "acceptanceIds": ["NVA-A54-3", "NVA-A54-4", "NVA-A54-5", "NVA-A54-6", "NVA-A54-7"],
+      "acceptanceIds": [
+        "NVA-A54-3",
+        "NVA-A54-4",
+        "NVA-A54-5",
+        "NVA-A54-6",
+        "NVA-A54-7"
+      ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "revalidate:2026-08-10"
     },
@@ -58,7 +244,33 @@
       "id": "pipeline.execution-model-switchback",
       "issue": 38,
       "increment": "A",
-      "acceptanceIds": ["NVA-A7-1", "NVA-A7-2", "NVA-A7-3", "NVA-A7-4", "NVA-A7-5", "NVA-A38-1", "NVA-A38-2", "NVA-A38-3", "NVA-A38-4", "NVA-A38-5", "NVA-A38-6"],
+      "acceptanceIds": [
+        "NVA-A38-1",
+        "NVA-A38-2",
+        "NVA-A38-3",
+        "NVA-A38-4",
+        "NVA-A38-5",
+        "NVA-A38-6",
+        "NVA-A7-1",
+        "NVA-A7-2",
+        "NVA-A7-3",
+        "NVA-A7-4",
+        "NVA-A7-5"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.execution-plane-contract",
+      "issue": 14,
+      "increment": "A",
+      "acceptanceIds": [
+        "NVA-A14-1",
+        "NVA-A14-2",
+        "NVA-A14-3",
+        "NVA-A14-4",
+        "NVA-A14-5"
+      ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "not-applicable"
     },
@@ -66,7 +278,13 @@
       "id": "pipeline.multi-cli-efficiency-pilots",
       "issue": 8,
       "increment": "A",
-      "acceptanceIds": ["NVA-A8-1", "NVA-A8-2", "NVA-A8-3", "NVA-A8-4", "NVA-A8-5"],
+      "acceptanceIds": [
+        "NVA-A8-1",
+        "NVA-A8-2",
+        "NVA-A8-3",
+        "NVA-A8-4",
+        "NVA-A8-5"
+      ],
       "closureMode": "separate-pilot-required",
       "expiryDisposition": "revalidate:2026-08-17"
     },
@@ -74,7 +292,17 @@
       "id": "pipeline.t1-governance-path-preflight",
       "issue": 56,
       "increment": "A",
-      "acceptanceIds": ["NVA-A54-1", "NVA-A54-2", "NVA-A54-7", "NVA-A56-1", "NVA-A56-2", "NVA-A56-3", "NVA-A56-4", "NVA-A56-5", "NVA-A56-6"],
+      "acceptanceIds": [
+        "NVA-A54-1",
+        "NVA-A54-2",
+        "NVA-A54-7",
+        "NVA-A56-1",
+        "NVA-A56-2",
+        "NVA-A56-3",
+        "NVA-A56-4",
+        "NVA-A56-5",
+        "NVA-A56-6"
+      ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "not-applicable"
     },
@@ -82,7 +310,28 @@
       "id": "pipeline.afk-assumption-mode",
       "issue": 16,
       "increment": "B",
-      "acceptanceIds": ["NVA-B16-1", "NVA-B16-2", "NVA-B16-3", "NVA-B16-4", "NVA-B16-5"],
+      "acceptanceIds": [
+        "NVA-B16-1",
+        "NVA-B16-2",
+        "NVA-B16-3",
+        "NVA-B16-4",
+        "NVA-B16-5"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.antigravity-alpha-boundary",
+      "issue": 15,
+      "increment": "B",
+      "acceptanceIds": [
+        "NVA-B15-1",
+        "NVA-B15-2",
+        "NVA-B15-3",
+        "NVA-B15-4",
+        "NVA-B15-5",
+        "NVA-B15-6"
+      ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "not-applicable"
     },
@@ -90,7 +339,25 @@
       "id": "pipeline.canonical-worktree-lifecycle",
       "issue": 21,
       "increment": "B",
-      "acceptanceIds": ["NVA-B21-4", "NVA-B21-5", "NVA-B21-6", "NVA-B21-7"],
+      "acceptanceIds": [
+        "NVA-B21-4",
+        "NVA-B21-5",
+        "NVA-B21-6",
+        "NVA-B21-7"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
+    },
+    {
+      "id": "pipeline.credential-leases",
+      "issue": 18,
+      "increment": "B",
+      "acceptanceIds": [
+        "NVA-B18-1",
+        "NVA-B18-2",
+        "NVA-B18-3",
+        "NVA-B18-4"
+      ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "not-applicable"
     },
@@ -98,7 +365,11 @@
       "id": "pipeline.nonblocking-interaction-continuity",
       "issue": 49,
       "increment": "B",
-      "acceptanceIds": ["NVA-B21-4", "NVA-B49-2", "NVA-B49-8"],
+      "acceptanceIds": [
+        "NVA-B21-4",
+        "NVA-B49-2",
+        "NVA-B49-8"
+      ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "not-applicable"
     },
@@ -106,7 +377,11 @@
       "id": "pipeline.po-gate-worktree-authority",
       "issue": 21,
       "increment": "B",
-      "acceptanceIds": ["NVA-B21-2", "NVA-B21-3", "NVA-B21-7"],
+      "acceptanceIds": [
+        "NVA-B21-2",
+        "NVA-B21-3",
+        "NVA-B21-7"
+      ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "not-applicable"
     },
@@ -114,15 +389,43 @@
       "id": "pipeline.project-scoped-github-issue-operations",
       "issue": 51,
       "increment": "B",
-      "acceptanceIds": ["NVA-B51-1", "NVA-B51-2", "NVA-B51-3", "NVA-B51-4", "NVA-B51-5", "NVA-B51-6", "NVA-B51-7"],
+      "acceptanceIds": [
+        "NVA-B51-1",
+        "NVA-B51-2",
+        "NVA-B51-3",
+        "NVA-B51-4",
+        "NVA-B51-5",
+        "NVA-B51-6",
+        "NVA-B51-7"
+      ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "revalidate:2026-08-17"
+    },
+    {
+      "id": "pipeline.runner-native-continuation",
+      "issue": 60,
+      "increment": "B",
+      "acceptanceIds": [
+        "NVA-B60-1",
+        "NVA-B60-2",
+        "NVA-B60-3",
+        "NVA-B60-4",
+        "NVA-B60-5"
+      ],
+      "closureMode": "candidate-evidence",
+      "expiryDisposition": "not-applicable"
     },
     {
       "id": "pipeline.session-keep-awake",
       "issue": 49,
       "increment": "B",
-      "acceptanceIds": ["NVA-B49-1", "NVA-B49-2", "NVA-B49-4", "NVA-B49-5", "NVA-B49-7"],
+      "acceptanceIds": [
+        "NVA-B49-1",
+        "NVA-B49-2",
+        "NVA-B49-4",
+        "NVA-B49-5",
+        "NVA-B49-7"
+      ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "not-applicable"
     },
@@ -130,10 +433,26 @@
       "id": "pipeline.v4-recovery-deadlock-correction",
       "issue": 63,
       "increment": "B",
-      "acceptanceIds": ["NVA-B63-1", "NVA-B63-10", "NVA-B63-11", "NVA-B63-12", "NVA-B63-13", "NVA-B63-14", "NVA-B63-15", "NVA-B63-2", "NVA-B63-3", "NVA-B63-4", "NVA-B63-5", "NVA-B63-6", "NVA-B63-7", "NVA-B63-8", "NVA-B63-9"],
+      "acceptanceIds": [
+        "NVA-B63-1",
+        "NVA-B63-10",
+        "NVA-B63-11",
+        "NVA-B63-12",
+        "NVA-B63-13",
+        "NVA-B63-14",
+        "NVA-B63-15",
+        "NVA-B63-2",
+        "NVA-B63-3",
+        "NVA-B63-4",
+        "NVA-B63-5",
+        "NVA-B63-6",
+        "NVA-B63-7",
+        "NVA-B63-8",
+        "NVA-B63-9"
+      ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "not-applicable"
     }
   ],
-  "recordSha256": "02a5d2738794f2060a859b2841aa1bdb0eb3e630782e62fd85f4f100cd6424b2"
+  "recordSha256": "21384b8eb3facec4378cdf645fe2df28520b6bc9232594bf1f74059f1d3b4083"
 }

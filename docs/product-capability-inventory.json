@@ -689,6 +689,12 @@
       "member": "nova-invocation-reliability-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-macos-acceptance-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-macos-acceptance-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-release-preflight-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1945,7 +1951,7 @@
       "id": "deterministic-verification",
       "publicName": "Deterministic verification",
       "problem": "A delivery needs reproducible evidence instead of an informal test claim.",
-      "benefit": "One registered Verify entry point runs the declared suites and records machine-readable results.",
+      "benefit": "One registered Verify entry point runs the declared suites and records machine-readable results; the macOS-acceptance suite is a synthetic, non-native contract check and never substitutes for Apple Silicon evidence.",
       "status": "shipped",
       "surfaceIds": [
         "verify-phase:harness/scripts/verify.mjs:advisor-capability-preflight-tests",
@@ -2054,6 +2060,7 @@
         "verify-phase:harness/scripts/verify.mjs:nova-increment-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-invocation-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-invocation-reliability-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-macos-acceptance-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-release-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-runner-capability-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-sandbox-disposition-tests",

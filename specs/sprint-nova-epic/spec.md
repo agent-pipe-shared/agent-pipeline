@@ -996,6 +996,11 @@ case-folding, symlinks, permissions, durability, process behavior and
 tool-resolution. Hosted CI, Intel and synthetic observations never substitute
 for Apple Silicon.
 
+The registered `nova-macos-acceptance-tests` Verify surface is a synthetic,
+non-native contract check. It validates the record shape and hostile failure
+cases only; it neither reports nor substitutes for native Apple Silicon
+execution evidence.
+
 The exact frozen B5 candidate receives native lifecycle, Full Verify, Security,
 independent high-risk Critic and PO acceptance. Post-gate evidence commits may
 append sanitized evidence only; any runtime/schema/test/gate/configuration
@@ -1201,7 +1206,7 @@ gate with collision review. In this table, “schemas `<name>` under
 | B3-I | blocked until B3-R appends exact paths and migration decision | blocked |
 | B4 | `plugins/pipeline-core/lib/forge-capability.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/gitlab-forge-adapter.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/forge-capability.schema.json`; `plugins/pipeline-core/scripts/external-mutation.schema.json`; design artifact `specs/sprint-nova-epic/design/forge-capability-b4.md` | none before live-operation approval |
 | B4R | design artifact `specs/sprint-nova-epic/design/v4-recovery-b4r.md` | `plugins/pipeline-core/lib/project-onboarding-v3.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/project-onboarding-v3.mjs`, `project-onboarding-e2e.test.mjs`; `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`, matching `.test.mjs`; `plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs`; `plugins/pipeline-core/skills/pipeline-start/SKILL.md`, `pipeline-start-v3.test.mjs`; `.claude/pipeline-state.json`; `docs/codex-onboarding-threat-model.md`; this PRD, Spec, Acceptance, Nova B plan, backlog binding, lifecycle manifest and append-only Result |
-| B5/B6 | `plugins/pipeline-core/lib/macos-acceptance.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/macos-acceptance.schema.json`; exact fixtures `plugins/pipeline-core/scripts/fixtures/nova-macos/filesystem.json`, `unicode.json`, `case-folding.json`, `symlink.json`, `permissions.json`, `durability.json`, `process.json`, `tool-resolution.json`; exact evidence `specs/sprint-nova-epic/evidence/nova-b/candidate-freeze.json`, `evidence-manifest.json`, `macos-acceptance.json`, `verify.json`, `security.json`, `critic.json`, `increment-receipt.json`, `increment-readback.json`, `po-close.json`; `docs/runner-support.md`; `docs/macos-support.md` | `harness/scripts/verify.mjs`; `specs/sprint-nova-epic/lifecycle.json`; `specs/sprint-nova-epic/plans/nova-b.md`; append-only `specs/sprint-nova-epic/result.md` |
+| B5/B6 | `plugins/pipeline-core/lib/macos-acceptance.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/macos-acceptance.schema.json`; exact fixtures `plugins/pipeline-core/scripts/fixtures/nova-macos/filesystem.json`, `unicode.json`, `case-folding.json`, `symlink.json`, `permissions.json`, `durability.json`, `process.json`, `tool-resolution.json`; exact evidence `specs/sprint-nova-epic/evidence/nova-b/candidate-freeze.json`, `evidence-manifest.json`, `macos-acceptance.json`, `verify.json`, `security.json`, `critic.json`, `increment-receipt.json`, `increment-readback.json`, `po-close.json`; `docs/runner-support.md`; `docs/macos-support.md` | `harness/scripts/verify.mjs`; `docs/product-capability-inventory.json` only for the explicitly synthetic/non-native Verify disposition; `specs/sprint-nova-epic/design/backlog-spec-bindings.json` only for canonical `#12`, `#14`, `#15`, `#18` and `#60` acceptance bindings; `specs/sprint-nova-epic/lifecycle.json`; `specs/sprint-nova-epic/plans/nova-b.md`; append-only `specs/sprint-nova-epic/result.md` |
 
 The remaining deliberately deferred manifests are B2-I, B3-I and live B4
 integration. B1-I is resolved by accepted ADR-0048, but its provider-backed

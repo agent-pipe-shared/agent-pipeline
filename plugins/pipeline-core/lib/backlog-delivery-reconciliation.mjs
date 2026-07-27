@@ -131,7 +131,7 @@ function validateBinding(value, index, errors) {
   checkString(value.id, ID, `bindings[${index}].id`, errors, "SHAPE", 128);
   if (!Number.isSafeInteger(value.issue) || value.issue < 1) errors.push(finding("BOUND", `bindings[${index}].issue is invalid`));
   if (!/^[A-Z]$/u.test(value.increment ?? "")) errors.push(finding("SHAPE", `bindings[${index}].increment is invalid`));
-  if (!Array.isArray(value.acceptanceIds) || value.acceptanceIds.length === 0 || !sortedUnique(value.acceptanceIds) || !value.acceptanceIds.every((id) => /^NVA-A\d+-\d+$/u.test(id))) errors.push(finding("BOUND", `bindings[${index}].acceptanceIds must be sorted and unique`));
+  if (!Array.isArray(value.acceptanceIds) || value.acceptanceIds.length === 0 || !sortedUnique(value.acceptanceIds) || !value.acceptanceIds.every((id) => /^NVA-[AB]\d+-\d+$/u.test(id))) errors.push(finding("BOUND", `bindings[${index}].acceptanceIds must be sorted and unique`));
   if (!(["candidate-evidence", "separate-pilot-required", "cyborg-input-only", "later-sprint-input-only"].includes(value.closureMode))) errors.push(finding("BOUND", `bindings[${index}].closureMode is invalid`));
   if (!(value.expiryDisposition === "not-applicable" || /^revalidate:\d{4}-\d{2}-\d{2}$/u.test(value.expiryDisposition ?? ""))) errors.push(finding("BOUND", `bindings[${index}].expiryDisposition is invalid`));
 }

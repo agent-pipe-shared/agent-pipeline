@@ -17,7 +17,7 @@
     {
       "class": "spec",
       "path": "specs/sprint-nova-epic/spec.md",
-      "sha256": "d26eadd6ae948bb7ffb90d6e76358b2ee034bca2ad587ecdefcfb76cd0e5a41b",
+      "sha256": "57e27b8d72d036b9f07df2d6c70541effa5c9cf1386f0c3d0088ead889730116",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -33,7 +33,7 @@
     {
       "class": "result",
       "path": "specs/sprint-nova-epic/result.md",
-      "sha256": "bed517ee8ed581088fc1d39b4e6a0637e0bcc22c4c1b6ca16cd0f35edcc166f3",
+      "sha256": "ab40e5babd573336a3cdb244944ba66cae0dd225518cf44626116784d7ed30b8",
       "authority": true,
       "mutability": "append-only",
       "retention": "retain"
@@ -49,7 +49,7 @@
     {
       "class": "design",
       "path": "specs/sprint-nova-epic/design/backlog-spec-bindings.json",
-      "sha256": "12b51a1c464a48262120b7020e064889f049d4195ec0a11f0c81e294af214d27",
+      "sha256": "ca0715884585b9232fd73ec7377f60f794f3708607baab743140853c0df73c7a",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
