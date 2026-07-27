@@ -56,7 +56,8 @@ its sealed predecessor as well as its predecessor digest, so a standalone
 terminal record cannot invent a history. `expired` is an explicit sealed
 terminal transition from an admitted pending record. A cancellation action binds the exact provider job identity and
 pre-state before either `cancel-requested` or `cancelled` provider metadata is
-accepted; a provider cancellation claim without that sealed local intent is
+accepted; persisted validation proves that pre-state is the exact predecessor
+digest, and a provider cancellation claim without that sealed local intent is
 rejected. A cancel request is never reported as cancellation success. A retry is a separate, attempt-numbered genesis only
 when it embeds the exact reconciled preceding attempt with the same immutable
 idempotency subject; there is no implicit retry.

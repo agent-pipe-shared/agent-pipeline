@@ -17,7 +17,7 @@
     {
       "class": "spec",
       "path": "specs/sprint-nova-epic/spec.md",
-      "sha256": "93c6213b5c67c4699ceffe9b4ff9121ae880862b779a7bb9f18d03ee5c92ad62",
+      "sha256": "1972c4ae8f651a749c08f17f001ed7619d09318ec359b8b76a83121f42457ca1",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -25,7 +25,7 @@
     {
       "class": "acceptance",
       "path": "specs/sprint-nova-epic/acceptance.md",
-      "sha256": "9c9889c26772bc730fa69fcbbfc5214aa214111fdeb068ecad25d8a1f8b9f3db",
+      "sha256": "144a35202d3716b6c80b4299def16559b5d20b610fc98df579b83aac58fd3431",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -65,7 +65,7 @@
     {
       "class": "design",
       "path": "specs/sprint-nova-epic/design/b2-i-gitlab-ci-pilot.md",
-      "sha256": "6f2ddde31a100e2c9a91b37107bdd7f3a6ce8c00cf49bc69f4543d1b73f46282",
+      "sha256": "2f4d5e8bf578cd569e9203b76d30f6728e321d015475fcefe7bbaf810e3839a8",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"

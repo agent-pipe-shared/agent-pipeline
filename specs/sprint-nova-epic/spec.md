@@ -818,7 +818,9 @@ The local B2-I broker is a network-free state machine. It binds the candidate
 to the fixed Nova base commit and matching base tree, a closed target digest,
 CI-job-token-only mode and hashed job identity; it records only bounded
 provider metadata. Genesis is only `requested`; every later record carries a
-sealed predecessor and must reproduce its exact permitted transition. A
+sealed predecessor and must reproduce its exact permitted transition; a
+cancellation intent also binds its `preStateSha256` to that exact predecessor.
+A
 provider `success` is never final on its first observation: reconciliation
 requires a second matching observation. Raw credential fields, early
 observations, job substitution, self-declared bases and forged terminal
@@ -1068,6 +1070,7 @@ combined integration remains a later lifecycle.
 | `pipeline.local-worker-pool.v1` | B1 | pool supervisor | scheduler/importer |
 | `pipeline.async-execution-journal.v1` | B2 | external boundary | reconciler |
 | `pipeline.credential-lease.v1` | B2 | external broker adapter | worker/revoker |
+| `pipeline.gitlab-ci-execution-broker.v1` | B2-I | local GitLab-CI broker reducer | broker CLI/observer |
 | `pipeline.antigravity-contract-decision.v1` | B3-R | research slice | ADR/PO gate |
 | `pipeline.forge-capability.v1` | B4 | forge adapters | operations/conformance |
 | `pipeline.external-mutation.v1` | B4 | forge operation | operator/readback |
@@ -1113,6 +1116,7 @@ binary evidence is represented only by a digest/path, never inline.
 | local worker pool | `schema,poolId,candidate,queueRevision,capacity,workers,admission,state,cleanup,previousSha256,recordSha256` |
 | async journal | `schema,journalId,providerJob,subject,providerSequence,observationSha256,state,reason,observedAt,previousSha256,entrySha256` |
 | credential lease | `schema,leaseId,broker,subjectSha256,repository,operations,targets,issuedAt,expiresAt,revocationHandleSha256,credentialClass,status,readbackSha256,recordSha256` |
+| GitLab-CI broker | `schema,requestId,candidate,target,attempt,retryOf,job,idempotencyKey,state,cancellation,observations,predecessor,previousSha256,recordSha256` |
 | Antigravity decision | `schema,decisionId,sources,retrievedAt,cli,provenance,authentication,models,input,output,usage,streaming,cancellation,errors,sandbox,cells,status,recordSha256` |
 | forge capability | `schema,reportId,provider,baseUrlClass,projectCoordinatesSha256,authenticationMode,cells,governance,evidence,recordSha256` |
 | external mutation | `schema,mutationId,provider,target,beforeSha256,patch,operation,idempotencyKey,capabilitySha256,preview,confirmation,state,remoteReceipt,readback,previousSha256,recordSha256` |

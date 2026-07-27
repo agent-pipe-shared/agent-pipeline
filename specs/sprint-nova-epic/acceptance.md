@@ -252,7 +252,8 @@ Nova A is accepted only when:
   mutation, merge or release authority.
 - NVA-B16-6: The B2-I broker binds candidate to the fixed Nova base commit and
   tree, closed target digest and job identity; every non-genesis record proves
-  its sealed predecessor and exact allowed transition; provider `success`
+  its sealed predecessor, exact allowed transition and, for cancellation, the
+  exact predecessor pre-state digest; provider `success`
   remains `succeeded-unverified` until a second matching metadata observation
   reconciles it.
 

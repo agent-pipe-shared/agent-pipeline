@@ -35,7 +35,7 @@ function validSuccessor(record) {
   const oneObservation = record.observations.length === previous.observations.length + 1 && same(record.observations.slice(0, -1), previous.observations);
   if (record.state === "expired") return ["submitted", "provider-running", "cancel-requested"].includes(previous.state) && same(record.job, previous.job) && same(record.cancellation, previous.cancellation) && sameObservations;
   if (record.state === "submitted") return previous.state === "requested" && !same(record.job, previous.job) && same(record.cancellation, previous.cancellation) && sameObservations;
-  if (record.state === "cancel-requested" && !same(record.cancellation, previous.cancellation)) return ["submitted", "provider-running"].includes(previous.state) && same(record.job, previous.job) && sameObservations;
+  if (record.state === "cancel-requested" && !same(record.cancellation, previous.cancellation)) return ["submitted", "provider-running"].includes(previous.state) && record.cancellation?.preStateSha256 === previous.recordSha256 && same(record.job, previous.job) && sameObservations;
   if (record.state === "reconciled") return previous.state === "succeeded-unverified" && same(record.job, previous.job) && same(record.cancellation, previous.cancellation) && oneObservation;
   return ["provider-running", "succeeded-unverified", "cancel-requested", "cancelled", "failed", "unavailable"].includes(record.state) && ["submitted", "provider-running", "cancel-requested"].includes(previous.state) && same(record.job, previous.job) && same(record.cancellation, previous.cancellation) && oneObservation;
 }
