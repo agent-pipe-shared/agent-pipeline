@@ -2,8 +2,8 @@
 
 # PRD — Governance Sprint Phoenix
 
-> Product Review Document for the Product Owner gate. Status: `draft — PHX-0A
-> lifecycle-manifest reconciliation scope revision awaiting renewed Product Owner approval`. Task: `sprint-phoenix-epic` · profile
+> Product Review Document for the Product Owner gate. Status: `approved — PHX-0A
+> lifecycle-manifest reconciliation scope revision bound for implementation`. Task: `sprint-phoenix-epic` · profile
 > `epic` · rigor 2 · risk high. Approval authorizes exactly the first
 > implementation dispatch; push, merge, release, external writes, and final
 > acceptance keep their own gates.
