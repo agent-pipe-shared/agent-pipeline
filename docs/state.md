@@ -23,10 +23,12 @@ work is closed; no `0.4.x` task is open
 - The branch-local closeout metadata commit is
   `5d5b68dd0a7155276bbe1fbe8b15a41d7c068d43`, tree
   `c7300bcb249edec150a88405c099be31c0c34b2a`. Full Verify (178 steps) and
-  Security both exit `0` on this clean exact candidate. The remote branch and
-  Draft PR `#64` still name the prior code candidate until a separately
-  authorized normal feature-branch push; `main` remains the delivered
-  `v0.4.6` commit and is not changed in this session.
+  Security both exit `0` on this clean exact candidate. A subsequent normal
+  feature-branch push and public readback observed Draft PR `#64` at
+  `ece3ae95cd7b358cd727ac5cc015938bbbf64305`; `main` remains the delivered
+  `v0.4.6` commit and is not changed in this session. The retained B4R receipt
+  amendment corrects the former operational `latest` pointers without changing
+  the original candidate record.
 - This is not an Epic close: B2-I, B3-I, live B4/GitLab capability work and
   B5/B6 native macOS acceptance retain their own accepted authority, target
   and evidence gates. In particular, no GitLab target was selected and no
