@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://agent-pipeline.dev/schemas/pipeline.ruleset-source.v1.json",
+  "title": "Pipeline ruleset source observation v1",
+  "description": "Closed, runner-neutral and coordinate-free observation of the selected Pipeline distribution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "runner",
+    "selectedPlugin",
+    "source",
+    "loadedIdentity",
+    "installedIdentity"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.ruleset-source.v1"
+    },
+    "runner": {
+      "enum": ["claude", "codex", "agy"]
+    },
+    "selectedPlugin": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._@-]{0,159}$"
+        },
+        "version": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9][A-Za-z0-9._+-]{0,127}$"
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class"],
+      "properties": {
+        "class": {
+          "enum": [
+            "marketplace-public",
+            "marketplace-private",
+            "self-application",
+            "local-development",
+            "unavailable"
+          ]
+        }
+      }
+    },
+    "loadedIdentity": { "$ref": "#/$defs/identity" },
+    "installedIdentity": { "$ref": "#/$defs/identity" }
+  },
+  "$defs": {
+    "identity": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status", "algorithm", "value"],
+          "properties": {
+            "status": { "const": "available" },
+            "algorithm": {
+              "enum": ["git-sha1", "git-sha256", "content-sha256"]
+            },
+            "value": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{40}([0-9a-f]{24})?$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["status"],
+          "properties": {
+            "status": { "const": "unavailable" }
+          }
+        }
+      ]
+    }
+  }
+}
