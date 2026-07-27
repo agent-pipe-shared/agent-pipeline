@@ -3,7 +3,7 @@
   "featureId": "sprint-nova-epic",
   "specification": {
     "path": "specs/sprint-nova-epic/spec.md",
-    "sha256": "57e27b8d72d036b9f07df2d6c70541effa5c9cf1386f0c3d0088ead889730116"
+    "sha256": "ce1b70456eae416e124d184a5fe14bd16ddcb80f50372ec0107457547cf212e9"
   },
   "backlogSnapshot": {
     "commit": "5ca5a4b292a267ffdfcc52577fda0a0593957a65",
@@ -454,5 +454,5 @@
       "expiryDisposition": "not-applicable"
     }
   ],
-  "recordSha256": "21384b8eb3facec4378cdf645fe2df28520b6bc9232594bf1f74059f1d3b4083"
+  "recordSha256": "8aa8310a8ced1c3e7e0181497bb12f91c755ea77e75530fab9f9565bb0307617"
 }

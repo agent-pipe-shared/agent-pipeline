@@ -74,8 +74,10 @@
           "docs/design/export-template.md",
           "docs/github-issue-operations.md",
           "docs/licensing.md",
+          "docs/macos-support.md",
           "docs/observation-intake.md",
           "docs/operating-model.md",
+          "docs/runner-support.md",
           "docs/runtime-boundary.md",
           "docs/v3-consumer-onboarding.md",
           "docs/whats-new-0.5.0.md"

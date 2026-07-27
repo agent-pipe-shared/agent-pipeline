@@ -657,3 +657,18 @@ This amendment is local design and verification plumbing only. It creates no
 native macOS evidence, external broker or credential authority, live runner
 execution, GitLab operation, Issue mutation, push, merge, release or sprint
 closure claim.
+
+## 2026-07-27 — B5/B6 support-boundary documentation
+
+Status: `documentation-boundaries-recorded; native-evidence-pending`.
+
+The PO explicitly authorized `docs/macos-support.md` and
+`docs/runner-support.md` as public-user maintained documentation and authorized
+their exact classification in `governance/observation-doc-governance.json`.
+The documents record only the current boundary: Nova's macOS suite is
+synthetic and non-native, native Apple Silicon closure remains separately
+evidence-gated, and Antigravity remains documentation-only Alpha scope with no
+direct AGY capability claim.
+
+This is not native macOS evidence, a runner activation, an external operation,
+an Issue mutation, a push, merge, release or sprint-closure claim.
