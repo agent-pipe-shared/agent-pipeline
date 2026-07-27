@@ -118,8 +118,13 @@ normative shape is:
    candidate or work package. The decision record must not originate from an
    agent, Git history, state, cache, agent journal, lifecycle event, readback,
    runner or AGY. Until this PHX-2 path exists, or whenever its Resolver or
-   proof is unavailable, missing or ambiguous, every remote action is an
-   explicit PO gate. Before execution, also stop if the decision is expired,
+   proof is unavailable, missing or ambiguous, this Pipeline has no executable
+   remote-action exception: every remote action remains an explicit PO gate,
+   while a PO decision is only proposed Ledger input, never executable
+   authority. It must not be promoted, copied or inferred from mutable
+   `pushApproval` or other state, CLI input, Git history or metadata, cache,
+   journal, lifecycle/readback record, agent record, runner or AGY value.
+   Before execution, also stop if the decision is expired,
    revoked, consumed or changed. Its sole lifetime ends at successful exact
    remote readback, or at an explicit revocation or authority change. This
    semantics is platform- and runner-neutral: it applies equally on macOS,
@@ -395,8 +400,14 @@ Die normative Form lautet:
    kein anderes Arbeitspaket. Der Decision-Record darf nicht aus einem Agent,
    Git-History, State, Cache, Agent-Journal, Lifecycle-Event, Readback, Runner
    oder AGY stammen. Solange dieser PHX-2-Pfad nicht existiert oder sein
-   Resolver bzw. Nachweis nicht verfügbar, fehlend oder mehrdeutig ist, ist
-   jede Remote-Aktion ein ausdrückliches PO-Gate. Vor der Ausführung auch bei
+   Resolver bzw. Nachweis nicht verfügbar, fehlend oder mehrdeutig ist,
+   existiert für diese Pipeline keine ausführbare Remote-Aktionsausnahme:
+   Jede Remote-Aktion bleibt ein ausdrückliches PO-Gate, während eine
+   PO-Decision nur vorgeschlagener Ledger-Eingang und nie ausführbare
+   Authority ist. Sie darf nicht aus mutablem `pushApproval` oder anderem
+   State, CLI-Input, Git-History oder -Metadaten, Cache, Journal,
+   Lifecycle-/Readback-Record, Agent-Record, Runner oder AGY heraufgestuft,
+   kopiert oder abgeleitet werden. Vor der Ausführung auch bei
    abgelaufener, widerrufener, verbrauchter oder geänderter Decision stoppen.
    Ihre einzige Laufzeit endet mit erfolgreichem exaktem Remote-Readback oder
    einem ausdrücklichen Widerruf bzw. einer Authority-Änderung. Diese Semantik

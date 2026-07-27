@@ -51,12 +51,12 @@
  *        (b) `evidence/security-latest.json` — SAME freshness checks as (a) — but
  *            ONLY evaluated when `gates.security` exists in the manifest AND its
  *            `mode !== "off"` (skipped entirely otherwise).
- *        (c) approval: `"required"`, legacy `"standing-approved"`, or an absent
- *            field all require
- *            `state.pushApproval.lastApproved.forCommit === source OID` — a malformed
- *            `.claude/pipeline-state.json` at THIS point (only reached when the
- *            state file is actually needed) is its own WARN exit 1, same as (3).
- *   6. All checks pass -> exit 0 (allow).
+ *        (c) before PHX-2 is implemented, an active Push-Gate always records a
+ *            fail-closed transition finding. A mutable pipeline State approval,
+ *            whether `required` or legacy `standing-approved`, is never authority.
+ *            The future Human Governance Decision Ledger plus Authority Resolver
+ *            owns the only authority path.
+ *   6. All checks passing before (c) still block during the PHX-2 transition.
  *   7. Any check failed -> mode "blocking" -> exit 2; mode "warn" -> exit 1. Same
  *      collected message either way.
  *
@@ -1248,48 +1248,18 @@ if (securityGate && securityGate.mode !== "off") {
 // the actual network operation, then fetches the pushed ref from a fresh repository.
 failures.push(...checkAnonymousPublicPush(pushBinding, sourceCommit));
 
-// (c) approval. PHX-2 is the only intended source of a future standing remote
-// authority. Until its Human Governance Decision Ledger and Authority Resolver
-// exist, a legacy manifest spelling of "standing-approved" remains fail-closed and
-// requires the same exact-commit PO approval as "required". This is runner- and
-// platform-neutral: it depends only on repository state, not shell, host, or
-// Claude/Codex/AGY integration.
-{
-  // "required", legacy "standing-approved", or the field absent entirely all use
-  // the safer explicit approval check.
-  const statePath = join(projectDir, ".claude", "pipeline-state.json");
-  let stateRaw;
-  let stateExists = true;
-  try {
-    stateRaw = readFileSync(statePath, "utf8");
-  } catch {
-    stateExists = false;
-  }
-  if (!stateExists) {
-    failures.push(`Push approval missing: .claude/pipeline-state.json does not exist (never recorded via approve-push).`);
-  } else {
-    let state;
-    try {
-      state = JSON.parse(stateRaw);
-    } catch (e) {
-      emit(1, [
-        `[guard-push] WARN: .claude/pipeline-state.json contains invalid JSON (${e.message}).`,
-        `Push-Gate is being skipped (fail-open, never silently marked blocking/passing) -- please fix ` +
-          `(rewrite only via harness/scripts/pipeline-state.mjs, never by hand).`,
-      ]);
-    }
-    const forCommit = state?.pushApproval?.lastApproved?.forCommit;
-    if (!forCommit || forCommit !== sourceCommit) {
-      failures.push(
-        `Push approval missing or stale: state.pushApproval.lastApproved.forCommit=${JSON.stringify(
-          forCommit ?? null,
-        )}, expected pushed source commit=${JSON.stringify(sourceCommit)}. Record: node harness/scripts/pipeline-state.mjs approve-push --by <name>.`,
-      );
-    }
-  }
-}
+// (c) PHX-2 transition. The current pipeline State is intentionally excluded:
+// it is mutable local coordination data and cannot prove a PO decision. Until
+// the Human Governance Decision Ledger and Authority Resolver exist, every active
+// Push-Gate is therefore blocked even when legacy or required State approval fields
+// match the source commit. This is runner- and platform-neutral: no shell, host,
+// Claude, Codex, or AGY integration can turn the local State into authority.
+failures.push(
+  "PHX-2 authority unavailable: mutable pipeline State approvals cannot authorize a push; " +
+    "require the Human Governance Decision Ledger and Authority Resolver.",
+);
 
-if (failures.length === 0) process.exit(0); // all-green -- allow
+if (failures.length === 0) process.exit(0); // defensive: active Push-Gates add the PHX-2 transition finding
 
 const message = [
   invalidityNote, // case B: non-null only for a semantic-invalid manifest with a release

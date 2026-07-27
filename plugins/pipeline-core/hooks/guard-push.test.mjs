@@ -209,11 +209,11 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   writePushApproval(dir, head);
   check(
-    "PG03a allow  documented inline override prefix still binds the one explicit push",
+    "PG03a block  documented inline override cannot turn mutable approval into PHX-2 authority",
     `PIPELINE_GUARD_OVERRIDE="GG-03|20260726-test|PO-approved fixture" git push origin ${head}:refs/heads/main`,
     dir,
-    ALLOW,
-    { stderrEmpty: true },
+    BLOCK,
+    { stderrIncludes: ["PHX-2 authority unavailable"] },
   );
   check(
     "PG03a block  dynamic inline override prefix stays inside the strict shell grammar",
@@ -297,31 +297,33 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   writeManifest(dir, manifestPush({ approval: "standing-approved", security: "off" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   writePushApproval(dir, head);
-  // security-latest.json absent, but security gate is off -> must NOT be reported, all-green.
-  check("PG09 allow  security evidence skipped when gates.security mode=off", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
+  // Security evidence is skipped, but mutable approval still cannot authorize a pre-PHX-2 push.
+  check("PG09 block  security-off evidence plus mutable approval cannot authorize before PHX-2", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["PHX-2 authority unavailable"],
+  });
 }
 
-// ---- PG10 legacy standing-approved remains fail-closed until PHX-2 ----------------------
+// ---- PG10 legacy standing-approved cannot authorize until PHX-2 -------------------------
 {
   const { dir, head } = freshRepo("standing-approved");
   writeManifest(dir, manifestPush({ approval: "standing-approved" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
-  check("PG10 block  standing-approved needs exact PO approval until PHX-2", PUSH_CMD, dir, BLOCK, {
-    stderrIncludes: ["Push approval missing"],
+  check("PG10 block  standing-approved cannot authorize without the PHX-2 ledger", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["PHX-2 authority unavailable"],
   });
 }
 
-// ---- PG11a required + absent approval (no state file at all) -> exit 2 -----------------
+// ---- PG11a required + absent mutable approval remains blocked before PHX-2 --------------
 {
   const { dir, head } = freshRepo("required-absent");
   writeManifest(dir, manifestPush({ approval: "required" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
-  check("PG11a block  required approval, no state file at all", PUSH_CMD, dir, BLOCK, {
-    stderrIncludes: ["Push approval missing"],
+  check("PG11a block  required approval, no state file cannot authorize before PHX-2", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["PHX-2 authority unavailable"],
   });
 }
 
-// ---- PG11b required + stale approval (state present, wrong commit) -> exit 2 -----------
+// ---- PG11b required + stale mutable approval remains blocked before PHX-2 --------------
 {
   const { dir, head } = freshRepo("required-stale");
   writeManifest(dir, manifestPush({ approval: "required" }));
@@ -330,12 +332,12 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
     schema: "pipeline.state.v0",
     pushApproval: { lastApproved: { approvedBy: "po-test", approvedAt: "2020-01-01T00:00:00.000Z", forCommit: "deadbeef" } },
   });
-  check("PG11b block  required approval, state present but stale forCommit", PUSH_CMD, dir, BLOCK, {
-    stderrIncludes: ["Push approval missing or stale"],
+  check("PG11b block  required approval, stale mutable forCommit cannot authorize before PHX-2", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["PHX-2 authority unavailable"],
   });
 }
 
-// ---- PG12 required + fresh approval -> allow -------------------------------------------
+// ---- PG12 required + fresh mutable approval remains blocked before PHX-2 ---------------
 {
   const { dir, head } = freshRepo("required-fresh");
   writeManifest(dir, manifestPush({ approval: "required" }));
@@ -344,10 +346,12 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
     schema: "pipeline.state.v0",
     pushApproval: { lastApproved: { approvedBy: "po-test", approvedAt: "2026-07-07T20:00:00.000Z", forCommit: head } },
   });
-  check("PG12 allow  required approval, fresh forCommit matches HEAD", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
+  check("PG12 block  required approval, fresh mutable forCommit cannot authorize before PHX-2", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["PHX-2 authority unavailable"],
+  });
 }
 
-// ---- PG13 all-green (standing-approved + verify + security both fresh) -> allow --------
+// ---- PG13 all-green evidence plus standing State approval remains blocked pre-PHX-2 -----
 {
   const { dir, head } = freshRepo("all-green");
   writeManifest(dir, manifestPush({ approval: "standing-approved", security: "blocking" }));
@@ -355,7 +359,9 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   const tree = gitAt(dir, "rev-parse", "HEAD^{tree}").stdout.trim();
   writeEvidence(dir, "evidence/security-latest.json", exactSecurityEvidence({ head, tree }));
   writePushApproval(dir, head);
-  check("PG13 allow  all-green (verify + security fresh, standing-approved)", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
+  check("PG13 block  all-green evidence plus standing State approval cannot authorize before PHX-2", PUSH_CMD, dir, BLOCK, {
+    stderrIncludes: ["PHX-2 authority unavailable"],
+  });
 }
 
 {
@@ -405,10 +411,10 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   writeEvidence(target.dir, "evidence/verify-latest.json", { exitCode: 0, commit: target.head });
   writeEvidence(decoy.dir, "evidence/verify-latest.json", { exitCode: 1, commit: decoy.head });
   writePushApproval(target.dir, target.head);
-  check("PG17b allow  git -C target uses target evidence despite red session repo", `git -C ${target.dir} push origin main`, decoy.dir, ALLOW, {
+  check("PG17b block  git -C target evidence plus mutable approval cannot authorize before PHX-2", `git -C ${target.dir} push origin main`, decoy.dir, BLOCK, {
     cwd: decoy.dir,
     projectDir: decoy.dir,
-    stderrEmpty: true,
+    stderrIncludes: ["PHX-2 authority unavailable"],
   });
 }
 {
@@ -426,11 +432,11 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   writePushApproval(targetDir, targetHead);
   writePushApproval(primary.dir, targetHead);
   check(
-    "PG17bb allow  explicit attached source branch resolves evidence from its target worktree",
+    "PG17bb block  explicit attached source evidence plus mutable approval cannot authorize before PHX-2",
     "git push origin refs/heads/target:refs/heads/target",
     primary.dir,
-    ALLOW,
-    { stderrEmpty: true },
+    BLOCK,
+    { stderrIncludes: ["PHX-2 authority unavailable"] },
   );
 }
 {
@@ -447,7 +453,9 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   writeEvidence(verifiedDir, "evidence/verify-latest.json", { exitCode: 0, commit: verifiedOid });
   writePushApproval(verifiedDir, verifiedOid);
   writePushApproval(dir, verifiedOid);
-  check("PG17c allow  attached short source binds its worktree evidence, not checkout HEAD", "git push origin verified", dir, ALLOW, { stderrEmpty: true });
+  check("PG17c block  attached short source evidence plus mutable approval cannot authorize before PHX-2", "git push origin verified", dir, BLOCK, {
+    stderrIncludes: ["PHX-2 authority unavailable"],
+  });
   writeEvidence(verifiedDir, "evidence/verify-latest.json", { exitCode: 0, commit: laterOid });
   check("PG17d block  checkout-HEAD evidence cannot authorize another source", "git push origin verified", dir, BLOCK, {
     stderrIncludes: [verifiedOid, "pushed source commit"],
@@ -502,8 +510,8 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   }
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: gitAt(dir, "rev-parse", "HEAD").stdout.trim() });
   writePushApproval(dir, gitAt(dir, "rev-parse", "HEAD").stdout.trim());
-  check("PG17q allow  safe set-upstream flag preserves one-source binding", "git push -u origin main", dir, ALLOW, {
-    stderrEmpty: true,
+  check("PG17q block  safe set-upstream evidence plus mutable approval cannot authorize before PHX-2", "git push -u origin main", dir, BLOCK, {
+    stderrIncludes: ["PHX-2 authority unavailable"],
   });
 }
 {
@@ -929,7 +937,9 @@ function deployApprovalState(forArtifact, forEnvironment) {
 {
   const { dir } = freshRepo("anonymous-public-green");
   const { command, env } = prepareAnonymousPublicPush(dir);
-  check("PG26a allow  calibrated anonymous feature-branch range", command, dir, ALLOW, { stderrEmpty: true, env });
+  check("PG26a block  calibrated anonymous feature branch plus mutable approval cannot authorize before PHX-2", command, dir, BLOCK, {
+    stderrIncludes: ["PHX-2 authority unavailable"], env,
+  });
 }
 {
   const { dir } = freshRepo("anonymous-public-malformed-host-alias");

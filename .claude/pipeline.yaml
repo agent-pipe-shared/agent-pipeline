@@ -25,9 +25,12 @@ phases:
     condition: has_ui
 
 # Exactly 2 blocking human gates (dev-plan, push) plus 1 blocking automated gate
-# (security). Until PHX-2 provides the Human Governance Decision Ledger and
-# Authority Resolver, each push remains bound to an explicit PO approval for its
-# exact source commit. `standing-approved` is intentionally not an automatic pass.
+# (security). `approval: required` expresses the future PHX-2 human gate; it is
+# not push authority by itself. Until PHX-2 provides the Human Governance
+# Decision Ledger and Authority Resolver, guard-push blocks every active-gate
+# push, including a matching legacy or required approval in mutable State.
+# This contract is runner- and platform-neutral (Claude, Codex, AGY; macOS,
+# Windows, Linux).
 gates:
   dev-plan:
     mode: blocking

@@ -34,8 +34,13 @@ general lifecycle. Earlier working names `/pipeline:start` and
   candidate and named work package. The record must not originate from an
   agent, Git history, state, cache, agent journal, lifecycle event, readback,
   runner or AGY. Until that Ledger/Resolver path exists, or whenever the
-  Resolver or proof is unavailable, missing or ambiguous, every remote action
-  is an explicit PO gate. Stop before execution also for expiry, revocation,
+  Resolver or proof is unavailable, missing or ambiguous, this Pipeline has
+  no executable remote-action exception: every remote action remains an
+  explicit PO gate, while a PO decision is only proposed Ledger input, never
+  executable authority. Never promote, copy or infer it from mutable
+  `pushApproval` or other state, CLI input, Git history or metadata, cache,
+  journal, lifecycle/readback record, agent record, runner or AGY value. Stop
+  before execution also for expiry, revocation,
   consumption or authority change. Its sole lifetime ends at successful exact
   remote readback or an explicit revocation/authority change. Read back the
   exact remote ref against the bound candidate, then update only the local
