@@ -359,6 +359,7 @@ const TEST_SUITES = [
   { name: "nova-benchmark-tests", file: join(libDir, "multi-cli-benchmark.test.mjs") },
   { name: "nova-release-preflight-tests", file: join(pluginScriptsDir, "release-preflight.test.mjs") },
   { name: "nova-increment-receipt-tests", file: join(libDir, "nova-increment-receipt.test.mjs") },
+  { name: "nova-macos-acceptance-tests", file: join(libDir, "macos-acceptance.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects with `.claude/pipeline.yaml`
