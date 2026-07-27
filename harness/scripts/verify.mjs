@@ -360,6 +360,8 @@ const TEST_SUITES = [
   { name: "nova-release-preflight-tests", file: join(pluginScriptsDir, "release-preflight.test.mjs") },
   { name: "nova-increment-receipt-tests", file: join(libDir, "nova-increment-receipt.test.mjs") },
   { name: "nova-macos-acceptance-tests", file: join(libDir, "macos-acceptance.test.mjs") },
+  { name: "nova-b2-gitlab-ci-broker-core-tests", file: join(libDir, "gitlab-ci-execution-broker.test.mjs") },
+  { name: "nova-b2-gitlab-ci-broker-cli-tests", file: join(pluginScriptsDir, "gitlab-ci-execution-broker.test.mjs") },
   { name: "nova-b4-git-transport-contract-tests", file: join(libDir, "git-transport-contract.test.mjs") },
   { name: "nova-b4-github-forge-adapter-tests", file: join(pluginScriptsDir, "github-forge-adapter.test.mjs") },
   { name: "nova-b4-gitlab-forge-adapter-tests", file: join(pluginScriptsDir, "gitlab-forge-adapter.test.mjs") },

@@ -758,3 +758,19 @@ Git fetch/new-branch state machine and a GitHub.com target/observation adapter,
 alongside the existing GitLab adapter. The recorded GitLab test-target push
 remains transport evidence only. This entry makes no live capability, merge,
 release, migration, Issue closure, final Critic, PO-close or delivery claim.
+
+## 2026-07-27 — B2-I local GitLab-CI broker contract
+
+Status: `local-contract-implemented; live-pilot-pending`.
+
+The B2-I local contract is a deterministic, network-free broker state machine.
+It retains no token or raw project coordinate, permits only CI-job-token mode,
+binds each observation to the exact candidate, target and hashed job identity,
+and makes provider success `succeeded-unverified` until a second matching
+metadata observation reconciles it. Hostile tests cover early observations,
+job substitution and raw credential shape injection.
+
+This is not a GitLab CI invocation, credential use, provider observation,
+remote write, capability certification, Issue mutation, merge, release or
+delivery claim. The B2-I live pilot remains subject to its own exact
+target/YAML/credential preview, PO confirmation and readback.

@@ -1,0 +1,42 @@
+// SPDX-License-Identifier: SUL-1.0
+
+/** Closed, network-free B2-I GitLab CI broker state machine. */
+import { createHash } from "node:crypto";
+import { canonicalForgeJson } from "./forge-capability.mjs";
+
+export const GITLAB_CI_BROKER_SCHEMA = "pipeline.gitlab-ci-execution-broker.v1";
+const SHA256 = /^[a-f0-9]{64}$/u;
+const OID = /^[a-f0-9]{40}$/u;
+const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{2,127}$/u;
+const STATES = new Set(["requested", "submitted", "provider-running", "succeeded-unverified", "reconciled", "cancel-requested", "cancelled", "failed", "unavailable", "expired"]);
+const ROOT = ["schema", "requestId", "candidate", "target", "job", "idempotencyKey", "state", "observations", "previousSha256", "recordSha256"];
+const exact = (value, keys) => value !== null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
+const clone = (value) => structuredClone(value);
+const freeze = (value) => { if (value && typeof value === "object" && !Object.isFrozen(value)) { Object.values(value).forEach(freeze); Object.freeze(value); } return value; };
+const digest = (value) => createHash("sha256").update(`${GITLAB_CI_BROKER_SCHEMA}\0${canonicalForgeJson(value)}`, "utf8").digest("hex");
+const obsDigest = (value) => createHash("sha256").update(`pipeline.gitlab-ci-execution-observation.v1\0${canonicalForgeJson(value)}`, "utf8").digest("hex");
+
+function validCandidate(value) { return exact(value, ["commit", "tree"]) && OID.test(value.commit ?? "") && OID.test(value.tree ?? ""); }
+function validTarget(value) { return exact(value, ["baseUrlClass", "projectCoordinatesSha256", "operatorAuthoritySha256"]) && ["gitlab-com", "self-managed"].includes(value.baseUrlClass) && SHA256.test(value.projectCoordinatesSha256 ?? "") && SHA256.test(value.operatorAuthoritySha256 ?? ""); }
+function validJob(value) { return value === null || (exact(value, ["jobIdSha256", "tokenMode", "submittedAt"]) && SHA256.test(value.jobIdSha256 ?? "") && value.tokenMode === "ci-job-token-only" && Number.isSafeInteger(value.submittedAt) && value.submittedAt >= 0); }
+function validObservation(value) { return exact(value, ["sequence", "providerState", "jobIdSha256", "candidateCommit", "targetSha256", "observedAt", "observationSha256"]) && Number.isSafeInteger(value.sequence) && value.sequence >= 1 && ["queued", "running", "success", "failed", "cancel-requested", "cancelled", "unavailable"].includes(value.providerState) && SHA256.test(value.jobIdSha256 ?? "") && OID.test(value.candidateCommit ?? "") && SHA256.test(value.targetSha256 ?? "") && Number.isSafeInteger(value.observedAt) && value.observedAt >= 0 && SHA256.test(value.observationSha256 ?? ""); }
+function targetDigest(target) { return digest(target); }
+function check(record, verify = true) {
+  if (!exact(record, ROOT) || record.schema !== GITLAB_CI_BROKER_SCHEMA || !SAFE_ID.test(record.requestId ?? "") || !validCandidate(record.candidate) || !validTarget(record.target) || !validJob(record.job) || !SHA256.test(record.idempotencyKey ?? "") || !STATES.has(record.state) || !(record.previousSha256 === null || SHA256.test(record.previousSha256 ?? "")) || !SHA256.test(record.recordSha256 ?? "") || !Array.isArray(record.observations) || !record.observations.every(validObservation)) return "SHAPE:broker";
+  const targetSha = targetDigest(record.target);
+  let previous = 0;
+  for (const observation of record.observations) { if (observation.sequence !== previous + 1 || observation.targetSha256 !== targetSha || observation.candidateCommit !== record.candidate.commit || (record.job && observation.jobIdSha256 !== record.job.jobIdSha256) || observation.observationSha256 !== obsDigest({ ...observation, observationSha256: undefined })) return "BOUND:broker-observation"; previous = observation.sequence; }
+  const last = record.observations.at(-1)?.providerState ?? null;
+  const phase = { requested: record.job === null && !last, submitted: record.job !== null && !last, "provider-running": last === "queued" || last === "running", "succeeded-unverified": last === "success", reconciled: last === "success", "cancel-requested": last === "cancel-requested", cancelled: last === "cancelled", failed: last === "failed", unavailable: last === "unavailable", expired: record.job === null && !last };
+  if (!phase[record.state]) return "CONFLICT:broker-state";
+  if (record.state === "reconciled" && record.observations.length < 2) return "BOUND:broker-reconciliation";
+  if (verify && brokerDigest(record) !== record.recordSha256) return "CONFLICT:broker-digest";
+  return null;
+}
+function seal(record) { const next = clone(record); next.recordSha256 = "0".repeat(64); next.recordSha256 = brokerDigest(next); return freeze(next); }
+export function brokerDigest(record) { if (!record || typeof record !== "object") return null; const { recordSha256, ...semantic } = record; return digest(semantic); }
+export function validateGitLabCiBroker(record) { const code = check(record); return code ? { ok: false, code } : { ok: true, code: null }; }
+export function createGitLabCiBrokerRequest(input) { if (!exact(input, ["requestId", "candidate", "target", "idempotencyKey"])) throw new Error("SHAPE:broker-request"); const record = { schema: GITLAB_CI_BROKER_SCHEMA, ...clone(input), job: null, state: "requested", observations: [], previousSha256: null, recordSha256: "0".repeat(64) }; const code = check(record, false); if (code) throw new Error(code); return seal(record); }
+export function submitGitLabCiBroker(record, submission) { if (!validateGitLabCiBroker(record).ok || record.state !== "requested" || !exact(submission, ["jobIdSha256", "tokenMode", "submittedAt"]) || !validJob(submission)) return { ok: false, code: "AUTHORITY:broker-submit", broker: null }; const next = clone(record); next.job = clone(submission); next.state = "submitted"; next.previousSha256 = record.recordSha256; return { ok: true, code: null, broker: seal(next) }; }
+export function observeGitLabCiBroker(record, input) { if (!validateGitLabCiBroker(record).ok || !["submitted", "provider-running", "succeeded-unverified", "cancel-requested"].includes(record.state) || !exact(input, ["providerState", "observedAt"]) || !record.job || !["queued", "running", "success", "failed", "cancel-requested", "cancelled", "unavailable"].includes(input.providerState) || !Number.isSafeInteger(input.observedAt) || input.observedAt < record.job.submittedAt) return { ok: false, code: "AUTHORITY:broker-observation", broker: null }; const observation = { sequence: record.observations.length + 1, providerState: input.providerState, jobIdSha256: record.job.jobIdSha256, candidateCommit: record.candidate.commit, targetSha256: targetDigest(record.target), observedAt: input.observedAt, observationSha256: "" }; observation.observationSha256 = obsDigest({ ...observation, observationSha256: undefined }); const next = clone(record); next.observations.push(observation); next.previousSha256 = record.recordSha256; next.state = input.providerState === "success" ? "succeeded-unverified" : input.providerState === "failed" ? "failed" : input.providerState === "cancelled" ? "cancelled" : input.providerState === "unavailable" ? "unavailable" : input.providerState === "cancel-requested" ? "cancel-requested" : "provider-running"; return { ok: true, code: null, broker: seal(next) }; }
+export function reconcileGitLabCiBroker(record, { observedAt }) { if (!validateGitLabCiBroker(record).ok || record.state !== "succeeded-unverified" || !Number.isSafeInteger(observedAt) || observedAt < record.observations.at(-1).observedAt) return { ok: false, code: "AUTHORITY:broker-reconcile", broker: null }; const result = observeGitLabCiBroker(record, { providerState: "success", observedAt }); if (!result.ok) return result; const next = clone(result.broker); next.state = "reconciled"; return { ok: true, code: null, broker: seal(next) }; }

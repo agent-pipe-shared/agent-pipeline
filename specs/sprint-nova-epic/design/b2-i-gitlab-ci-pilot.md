@@ -75,7 +75,7 @@ The PO accepted this manifest as one set through ADR-0049:
 - `plugins/pipeline-core/scripts/fixtures/nova-b2-gitlab/` exact
   request/observation/cancellation fixtures
 - only the necessary B2 acceptance, Spec, Nova B plan, lifecycle, Result and
-  Verify registrations.
+  Verify/inventory registrations.
 
 No new dependency, generic CI adapter, provider-wide token store, external
 callback service, GitLab project creation, project setting change, or secret

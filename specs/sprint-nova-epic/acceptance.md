@@ -250,6 +250,9 @@ Nova A is accepted only when:
 - NVA-B16-5: Unattended assumptions use a closed task-scoped set with explicit
   expiry, stop/escalation behavior and no delegation, approval, credential,
   mutation, merge or release authority.
+- NVA-B16-6: The B2-I broker binds candidate, closed target digest and job
+  identity; provider `success` remains `succeeded-unverified` until a second
+  matching metadata observation reconciles it.
 
 ### `#18` Credential leases
 
@@ -259,6 +262,9 @@ Nova A is accepted only when:
   credential, home, SSH or global Git state.
 - NVA-B18-3: Canary tests prove forbidden access is denied.
 - NVA-B18-4: Logs/evidence contain no secret values or private coordinates.
+- NVA-B18-5: The B2-I local contract represents no personal token, accepts
+  only `CI_JOB_TOKEN` job mode and rejects raw credential fields, substituted
+  jobs and pre-submission observations.
 
 ### `#15` Antigravity with Gemini models
 

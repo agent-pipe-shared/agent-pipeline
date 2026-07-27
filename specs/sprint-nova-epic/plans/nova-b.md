@@ -219,6 +219,9 @@ live-pilot authority.
 `design/b2-i-gitlab-ci-pilot.md`. It supplies no credential, CI job, provider
 mutation, project-setting, branch or live-pilot authority.
 
+**Local contract status:** implemented and Verify-registered as a token-free,
+network-free broker reducer. It is not a provider capability or pilot result.
+
 **Outcome:** add external/asynchronous execution only through the accepted
 execution-plane contract and short-lived bounded authority.
 

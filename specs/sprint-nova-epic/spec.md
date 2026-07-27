@@ -814,6 +814,12 @@ accepts the narrow local GitLab-CI contract and exact path manifest in
 blocked by its separate exact live-pilot authority; the ADR is not credential,
 provider-mutation or job-execution authority.
 
+The local B2-I broker is a network-free state machine. It binds the candidate,
+closed target digest, CI-job-token-only mode and hashed job identity; it records
+only bounded provider metadata. A provider `success` is never final on its
+first observation: reconciliation requires a second matching observation. Raw
+credential fields, early observations and job substitution fail closed.
+
 `pipeline.async-execution-journal.v1` appends provider observations with exact
 provider job binding, subject, provider sequence or `not-provided`, observation
 digest, normalized state and prior entry digest. The reconciler handles
@@ -1219,7 +1225,7 @@ gate with collision review. In this table, “schemas `<name>` under
 | B1-C | `plugins/pipeline-core/lib/local-worker-pool.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/local-worker-pool.schema.json`; `specs/sprint-nova-epic/design/execution-state-authority-proposal.md` | none; pure contract/synthetic reducer only |
 | B1-I | `docs/adr/0048-local-goldfish-supervisor.md`; `plugins/pipeline-core/lib/local-worker-supervisor.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/local-worker-supervisor.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/local-worker-supervisor.schema.json`; `plugins/pipeline-core/scripts/fixtures/local-worker-supervisor-worker.mjs` | `.claude/pipeline-state.json`; `docs/adr/README.md`; `docs/local-supervisor-state-threat-model.md`; `docs/product-capability-inventory.json`; `docs/state.md`; `governance/observation-doc-governance.json`; `harness/scripts/verify.mjs`; `plugins/pipeline-core/lib/local-supervisor-state.mjs`, matching `.test.mjs`, only for ADR-0047 ownership/mode/link-count repair hardening; this Spec; `acceptance.md`; `plans/nova-b.md`; `prd_sprint-nova-epic.md`; append-only `result.md`; `lifecycle.json`, exactly as accepted in ADR-0048 |
 | B2-C | `plugins/pipeline-core/lib/async-execution.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/credential-lease.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/async-execution-journal.schema.json`; `plugins/pipeline-core/scripts/credential-lease.schema.json`; `specs/sprint-nova-epic/evidence/nova-b/execution-state-authority-decision.json` | none; synthetic contract only |
-| B2-I | ADR-0049 plus exact local manifest: `specs/sprint-nova-epic/design/b2-i-gitlab-ci-pilot.md`; `docs/gitlab-ci-pilot-threat-model.md`; its exact `governance/observation-doc-governance.json` classification | local contract only; live pilot needs exact target/YAML/credential preview, confirmation and readback |
+| B2-I | ADR-0049 plus exact local manifest: `specs/sprint-nova-epic/design/b2-i-gitlab-ci-pilot.md`; `docs/gitlab-ci-pilot-threat-model.md`; its exact `governance/observation-doc-governance.json` classification; `plugins/pipeline-core/lib/gitlab-ci-execution-broker.mjs`, matching test; `plugins/pipeline-core/scripts/gitlab-ci-execution-broker.mjs`, matching test; `plugins/pipeline-core/scripts/gitlab-ci-execution-broker-observation.schema.json`; exact synthetic fixtures under `plugins/pipeline-core/scripts/fixtures/nova-b2-gitlab/` | `harness/scripts/verify.mjs`; `docs/product-capability-inventory.json`; this Spec; `acceptance.md`; `plans/nova-b.md`; `lifecycle.json`; append-only `result.md`; local contract only; live pilot needs exact target/YAML/credential preview, confirmation and readback |
 | B3-R | `specs/sprint-nova-epic/evidence/nova-b/antigravity-contract-decision.json` | `specs/sprint-nova-epic/lifecycle.json`; append-only `specs/sprint-nova-epic/result.md` |
 | B3-A | `plugins/pipeline-core/scripts/antigravity-alpha-adapter.mjs`, matching `.test.mjs` | `GEMINI.md`; this Spec; `acceptance.md`; `plans/nova-b.md`; `plans/integration-and-close.md`; `prd_sprint-nova-epic.md`; append-only `result.md`; `lifecycle.json` |
 | B3-I | blocked until B3-R appends exact paths and migration decision | blocked |
