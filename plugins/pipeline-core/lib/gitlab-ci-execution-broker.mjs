@@ -26,12 +26,14 @@ function compareProviderObservation(last, input) { if (!last) return "next"; if 
 function check(record, verify = true) {
   if (!exact(record, ROOT) || record.schema !== GITLAB_CI_BROKER_SCHEMA || !SAFE_ID.test(record.requestId ?? "") || !validCandidate(record.candidate) || !validTarget(record.target) || !validJob(record.job) || !SHA256.test(record.idempotencyKey ?? "") || !STATES.has(record.state) || !(record.previousSha256 === null || SHA256.test(record.previousSha256 ?? "")) || !SHA256.test(record.recordSha256 ?? "") || !Array.isArray(record.observations) || !record.observations.every(validObservation)) return "SHAPE:broker";
   const targetSha = targetDigest(record.target);
-  let previous = 0;
-  for (const observation of record.observations) { if (observation.sequence !== previous + 1 || observation.targetSha256 !== targetSha || observation.candidateCommit !== record.candidate.commit || (record.job && observation.jobIdSha256 !== record.job.jobIdSha256) || observation.observationSha256 !== obsDigest({ ...observation, observationSha256: undefined })) return "BOUND:broker-observation"; previous = observation.sequence; }
+  let previous = 0, priorObservation = null;
+  for (const observation of record.observations) { if (observation.sequence !== previous + 1 || observation.targetSha256 !== targetSha || observation.candidateCommit !== record.candidate.commit || !record.job || observation.jobIdSha256 !== record.job.jobIdSha256 || observation.observedAt < record.job.submittedAt || (priorObservation && compareProviderObservation(priorObservation, observation) !== "next") || observation.observationSha256 !== obsDigest({ ...observation, observationSha256: undefined })) return "BOUND:broker-observation"; previous = observation.sequence; priorObservation = observation; }
   const last = record.observations.at(-1)?.providerState ?? null;
   const phase = { requested: record.job === null && !last, submitted: record.job !== null && !last, "provider-running": last === "queued" || last === "running", "succeeded-unverified": last === "success", reconciled: last === "success", "cancel-requested": last === "cancel-requested", cancelled: last === "cancelled", failed: last === "failed", unavailable: last === "unavailable", expired: record.job === null && !last };
   if (!phase[record.state]) return "CONFLICT:broker-state";
+  if (record.state === "succeeded-unverified" && record.observations.at(-2)?.providerState === "success") return "BOUND:broker-reconciliation";
   if (record.state === "reconciled" && record.observations.length < 2) return "BOUND:broker-reconciliation";
+  if (record.state === "reconciled" && record.observations.at(-2)?.providerState !== "success") return "BOUND:broker-reconciliation";
   if (verify && brokerDigest(record) !== record.recordSha256) return "CONFLICT:broker-digest";
   return null;
 }
