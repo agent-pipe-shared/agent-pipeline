@@ -242,16 +242,17 @@ Nova A is accepted only when:
 
 ### `#15` Antigravity with Gemini models
 
-- NVA-B15-1: Implementation binds the current official Antigravity contract and
-  post-V3 migration decision.
-- NVA-B15-2: Every advertised Antigravity cell and Gemini model selector
-  passes `#7`.
-- NVA-B15-3: Unsupported Advisor/review/write cells remain unavailable.
-- NVA-B15-4: Requested and observed model identity and usage semantics remain
-  distinct.
-- NVA-B15-5: Claude/Codex frozen fixtures remain green.
-- NVA-B15-6: A separately accepted current-contract research decision and an
-  approved credential/authentication boundary precede live implementation.
+- NVA-B15-1: The Alpha descriptor identifies Antigravity as the third runner,
+  Gemini as its model family and `alpha-documentation-only` status.
+- NVA-B15-2: Selection fails closed and no AGY discovery/install/auth/network/
+  invocation or advertised execution capability is present.
+- NVA-B15-3: The descriptor binds the reviewed B3-R decision and direct AGY
+  delivery is tracked separately in #69 with `sprint:NONE`.
+- NVA-B15-4: Unsupported Advisor/review/write cells remain unavailable.
+- NVA-B15-5: Claude/Codex frozen fixtures and hostile no-execution tests remain
+  green.
+- NVA-B15-6: Sprint-close evidence for #15 explicitly says that direct AGY
+  implementation is not delivered.
 
 ### `#51` GitLab forge
 
