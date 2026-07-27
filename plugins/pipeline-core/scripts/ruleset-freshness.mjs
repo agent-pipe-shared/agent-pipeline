@@ -25,6 +25,7 @@ export const RULESET_FRESHNESS_SCHEMA = "pipeline.ruleset-freshness.v1";
 export const PUBLIC_MARKETPLACE_URL = "https://github.com/agent-pipe-shared/agent-pipeline.git";
 const SHA = /^[0-9a-f]{40,64}$/iu;
 const DEFAULT_TIMEOUT_MS = 30_000;
+const CODEX_CLAUDE_FALLBACK_STATUS = "codex-plugin-list-unavailable";
 
 function run(command, args, options = {}) {
   return (options.spawn ?? spawnSync)(command, args, {
@@ -98,6 +99,25 @@ export function observePublicRemoteIdentity({ remoteUrl = PUBLIC_MARKETPLACE_URL
 function validRemoteObservation(value) {
   if (value?.status === "ready" && value.identity?.status === "available") return value;
   return { status: "remote-unavailable", identity: null, reason: value?.reason === "timeout" ? "timeout" : "remote-unavailable" };
+}
+
+function classifyClaudeMarketplaceUrl(value) {
+  // The compatibility resolver is intentionally stricter than URL parsing:
+  // only the reviewed literal coordinate carries the public-source authority.
+  if (value === PUBLIC_MARKETPLACE_URL) return "marketplace-public";
+  if (typeof value !== "string" || value.length === 0 || value.length > 2048) return null;
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:"
+      || url.username !== ""
+      || url.password !== ""
+      || url.search !== ""
+      || url.hash !== ""
+      || url.hostname.length === 0) return null;
+  } catch {
+    return null;
+  }
+  return "marketplace-private";
 }
 
 function compareSelfApplication(pluginRoot, loadedSha, remoteSha, options = {}) {
@@ -174,7 +194,14 @@ export function inspectRulesetFreshness(repoPath, options = {}) {
 export function inspectClaudeRulesetFreshness(repoPath, options = {}) {
   const repo = resolve(repoPath);
   const remoteUrl = options.remoteUrl ?? resolveMarketplaceUrl({ settingsPath: options.settingsPath ?? join(repo, ".claude", "settings.json") });
-  if (!remoteUrl) return result("source-unavailable", { reason: "claude-marketplace-unavailable" });
+  const marketplaceSource = classifyClaudeMarketplaceUrl(remoteUrl);
+  if (!marketplaceSource) return result("source-unavailable", { reason: "claude-marketplace-unavailable" });
+  // A private setting is not a public-freshness transport and therefore must
+  // not probe the consumer checkout merely to construct an identity.
+  if (marketplaceSource === "marketplace-private") {
+    return result("marketplace-private", { source: marketplaceSource, reason: "public-remote-not-selected" });
+  }
+  const sourceClass = options.selfApplication ? "self-application" : marketplaceSource;
   const loaded = options.loadedSha ? { status: 0, stdout: options.loadedSha } : git(repo, ["rev-parse", "--verify", "HEAD"], options);
   const value = String(loaded.stdout ?? "").trim().toLowerCase();
   if (loaded.status !== 0 || !SHA.test(value)) return result("loaded-identity-unavailable", { reason: "claude-loaded-identity-unavailable" });
@@ -182,11 +209,31 @@ export function inspectClaudeRulesetFreshness(repoPath, options = {}) {
     schema: "pipeline.ruleset-source.v1",
     runner: "claude",
     selectedPlugin: { id: "pipeline-core@agent-pipeline", version: options.version ?? "compatibility" },
-    source: { class: options.selfApplication ? "self-application" : "marketplace-public" },
+    source: { class: sourceClass },
     loadedIdentity: { status: "available", algorithm: value.length === 40 ? "git-sha1" : "git-sha256", value },
     installedIdentity: { status: "available", algorithm: value.length === 40 ? "git-sha1" : "git-sha256", value },
   };
   return inspectRulesetFreshness(repo, { ...options, sourceObservation, loadedPluginRoot: options.loadedPluginRoot ?? repo, remoteUrl });
+}
+
+/**
+ * Keep Codex discovery authoritative. Claude compatibility is available only
+ * when Codex itself could not be discovered, never for another typed Codex
+ * outcome (including pre-HEAD and source-attestation failures).
+ */
+export function inspectCliRulesetFreshness({ repoPath, loadedSha, loadedPluginRoot, codexObservation, inspectClaude = inspectClaudeRulesetFreshness } = {}) {
+  if (codexObservation?.status === "ready") {
+    return inspectRulesetFreshness(repoPath, {
+      sourceObservation: codexObservation.observation,
+      loadedPluginRoot,
+    });
+  }
+  if (codexObservation?.status === CODEX_CLAUDE_FALLBACK_STATUS) {
+    return inspectClaude(repoPath, { loadedSha });
+  }
+  return result(codexObservation?.status ?? "invalid-input", {
+    source: codexObservation?.observation?.source?.class ?? null,
+  });
 }
 
 function parseArgs(argv) {
@@ -211,11 +258,12 @@ if (isCli) {
     loadedPluginRoot,
     selfApplicationRoot: resolve(loadedPluginRoot, "..", ".."),
   });
-  // Native Codex readback is the primary path.  Claude's old source adapter is
-  // only selected when that host readback is unavailable.
-  const inspected = codex.status === "ready"
-    ? inspectRulesetFreshness(parsed.repo, { sourceObservation: codex.observation, loadedPluginRoot })
-    : inspectClaudeRulesetFreshness(parsed.repo, { loadedSha: parsed.loadedSha });
+  const inspected = inspectCliRulesetFreshness({
+    repoPath: parsed.repo,
+    loadedSha: parsed.loadedSha,
+    loadedPluginRoot,
+    codexObservation: codex,
+  });
   process.stdout.write(`${JSON.stringify(inspected)}\n`);
   process.exit(inspected.status === "equal" || inspected.status === "ahead" || inspected.status === "remote-unavailable" ? 0 : 2);
 }

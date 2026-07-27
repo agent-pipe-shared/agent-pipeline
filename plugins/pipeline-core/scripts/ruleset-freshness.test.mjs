@@ -8,7 +8,14 @@ import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
-import { inspectRulesetFreshness, observePublicRemoteIdentity, PUBLIC_MARKETPLACE_URL, RULESET_FRESHNESS_SCHEMA } from "./ruleset-freshness.mjs";
+import {
+  inspectClaudeRulesetFreshness,
+  inspectCliRulesetFreshness,
+  inspectRulesetFreshness,
+  observePublicRemoteIdentity,
+  PUBLIC_MARKETPLACE_URL,
+  RULESET_FRESHNESS_SCHEMA,
+} from "./ruleset-freshness.mjs";
 
 const roots = [];
 function git(cwd, ...args) {
@@ -166,4 +173,113 @@ test("freshness diagnostics never include private remote coordinates", () => {
   });
   assert.equal(JSON.stringify(value).includes(privateRemote), false);
   assert.equal(JSON.stringify(value).includes("private.example.invalid"), false);
+});
+
+test("Claude compatibility treats only the exact reviewed marketplace as public", () => {
+  const { root, source } = fixture("claude-marketplace-source");
+  const loaded = git(source, "rev-parse", "HEAD");
+  const settings = join(root, "settings.json");
+  let remoteCalls = 0;
+  for (const sourceConfig of [
+    { source: "gitlab", host: "git.internal.example", repo: "platform/agent-pipeline" },
+    { source: "github", repo: "another-org/agent-pipeline" },
+  ]) {
+    writeFileSync(settings, JSON.stringify({ extraKnownMarketplaces: { "agent-pipeline": { source: sourceConfig } } }));
+    const value = inspectClaudeRulesetFreshness(source, {
+      settingsPath: settings,
+      spawn() { remoteCalls += 1; throw new Error("private marketplace must not be queried"); },
+    });
+    assert.equal(value.status, "marketplace-private");
+    assert.equal(value.writePermitted, false);
+    assert.equal(value.reason, "public-remote-not-selected");
+  }
+  assert.equal(remoteCalls, 0);
+
+  writeFileSync(settings, JSON.stringify({
+    extraKnownMarketplaces: { "agent-pipeline": { source: { source: "github", repo: "agent-pipe-shared/agent-pipeline" } } },
+  }));
+  const publicValue = inspectClaudeRulesetFreshness(source, {
+    settingsPath: settings,
+    loadedSha: loaded,
+    remoteObservation: remoteObservation(loaded),
+  });
+  assert.equal(publicValue.status, "equal");
+  assert.equal(publicValue.writePermitted, true);
+});
+
+test("Claude compatibility rejects unsafe marketplace coordinates", () => {
+  const { source } = fixture("claude-unsafe-marketplace");
+  const value = inspectClaudeRulesetFreshness(source, {
+    remoteUrl: "http://marketplace.example/agent-pipeline.git",
+    spawn() { throw new Error("unsafe marketplace must not be queried"); },
+  });
+  assert.equal(value.status, "source-unavailable");
+  assert.equal(value.writePermitted, false);
+  assert.equal(value.reason, "claude-marketplace-unavailable");
+});
+
+test("CLI preserves typed Codex results without entering the Claude adapter", () => {
+  const { root } = fixture("codex-typed-results");
+  let readyClaudeCalls = 0;
+  const ready = inspectCliRulesetFreshness({
+    repoPath: join(root, "valid-but-pre-head-consumer"),
+    codexObservation: { status: "ready", observation: sourceObservation("a".repeat(40), "marketplace-private") },
+    inspectClaude() { readyClaudeCalls += 1; throw new Error("Claude fallback must not run"); },
+  });
+  assert.equal(ready.status, "marketplace-private");
+  assert.equal(ready.writePermitted, false);
+  assert.equal(readyClaudeCalls, 0);
+
+  const preHead = {
+    ...sourceObservation("a".repeat(40)),
+    loadedIdentity: { status: "unavailable" },
+    installedIdentity: { status: "unavailable" },
+  };
+  const typed = [
+    { status: "pre-head", observation: preHead },
+    { status: "codex-plugin-list-ambiguous", observation: null },
+    { status: "loaded-installed-mismatch", observation: sourceObservation("a".repeat(40), "marketplace-public", "b".repeat(40)) },
+    { status: "self-application-unattested", observation: null },
+    { status: "invalid-input", observation: null },
+  ];
+  for (const codexObservation of typed) {
+    let claudeCalls = 0;
+    const value = inspectCliRulesetFreshness({
+      repoPath: join(root, "valid-but-pre-head-consumer"),
+      codexObservation,
+      inspectClaude() { claudeCalls += 1; throw new Error("Claude fallback must not run"); },
+    });
+    assert.equal(value.status, codexObservation.status);
+    assert.equal(value.writePermitted, false);
+    assert.equal(claudeCalls, 0);
+  }
+});
+
+test("CLI falls back to Claude only for a genuine unavailable Codex discovery", () => {
+  const expected = {
+    schema: RULESET_FRESHNESS_SCHEMA,
+    status: "marketplace-private",
+    source: "marketplace-private",
+    loadedSha: null,
+    remoteSha: null,
+    ahead: null,
+    behind: null,
+    writePermitted: false,
+    reason: "public-remote-not-selected",
+  };
+  let received = null;
+  const value = inspectCliRulesetFreshness({
+    repoPath: "C:\\portable\\consumer",
+    loadedSha: "a".repeat(40),
+    codexObservation: { status: "codex-plugin-list-unavailable", observation: null },
+    inspectClaude(repo, options) {
+      received = { repo, options };
+      return expected;
+    },
+  });
+  assert.equal(value, expected);
+  assert.deepEqual(received, {
+    repo: "C:\\portable\\consumer",
+    options: { loadedSha: "a".repeat(40) },
+  });
 });
