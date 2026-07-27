@@ -33,7 +33,7 @@
     {
       "class": "result",
       "path": "specs/sprint-nova-epic/result.md",
-      "sha256": "f2d448bfa1e1d73225bd882c8a9c267735fa971fd6fe7346ff2eea18e2cd47e0",
+      "sha256": "b3491beee56b475d95b0467309c7ba60224d5e820c7ab3d54e1bebacc998721c",
       "authority": true,
       "mutability": "append-only",
       "retention": "retain"
@@ -186,6 +186,14 @@
       "class": "candidate-evidence",
       "path": "specs/sprint-nova-epic/evidence/nova-b/antigravity-contract-decision-amendment-v1.json",
       "sha256": "cbd12aedac2df6c9d3901338f1334a13501b4305a9d2f6a0b604db97765093c2",
+      "authority": false,
+      "mutability": "immutable",
+      "retention": "retain"
+    },
+    {
+      "class": "candidate-evidence",
+      "path": "specs/sprint-nova-epic/evidence/nova-b/b4r/candidate-evidence.json",
+      "sha256": "0a5885cf8e847b270b9e31b573b5595fce967955d3a6425739ffe2c55a6122c9",
       "authority": false,
       "mutability": "immutable",
       "retention": "retain"
