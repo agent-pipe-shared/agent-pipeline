@@ -464,6 +464,28 @@ needs a worktree-identity change. The only durable conclusion is trajectory
 honesty: a later clean result must carry its own exact candidate evidence, and
 an earlier blocked result must never be relabelled as clean.
 
+## R-14 — PHX-0B productive rollback path
+
+If a trust, privacy, or platform/runner regression is found after delivery of
+the PHX-0B adapter, freshness, or bootstrap integration, the sole rollback
+path is a new local compensating `git revert` commit for the complete set of
+PHX-0B integration commits. It must not use reset, history rewriting,
+force-push, or an automatic remote operation.
+
+The compensating candidate requires new exact Verify, Security, and independent
+Critic evidence before it may be described as a successful rollback. Those
+checks are bound to that candidate and the observed regression; creating a
+revert commit, a rejected operation, a timeout, or unchanged workspace state
+is not a rollback-pass claim. The record retains only public-safe reason codes
+and digests, never credentials, account or host details, private coordinates,
+prompts, transcripts, raw output, or session identifiers.
+
+This path is runner- and platform-neutral for Claude, Codex, and AGY on macOS,
+Windows, and Linux. It introduces no runner-specific fallback, release,
+re-enable, bypass, or remote authority. Other than the compensating local
+commit and its fresh evidence, ordinary local development and normal code
+paths remain untouched.
+
 ## Audit classification
 
 These records illustrate the Phoenix recovery profile:

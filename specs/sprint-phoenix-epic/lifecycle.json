@@ -33,7 +33,7 @@
     {
       "class": "design",
       "path": "specs/sprint-phoenix-epic/RECOVERY.md",
-      "sha256": "42ce72ac90dc9e1d06a2067146387c2aaa068cb77014dc26ae8030b4b8c74a17",
+      "sha256": "89a6bca8af792110e27f40cb93ac0d8d6a4d78afa97756c9f74bddd50283878f",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
