@@ -1,0 +1,48 @@
+{
+  "schema": "pipeline.nova-b4r-candidate-evidence.v1",
+  "slice": "B4R",
+  "issue": {
+    "number": 63,
+    "disposition": "implemented-and-verified-on-feature-branch",
+    "mergeCommit": null,
+    "issueComment": "deferred-until-an-actual-delivery-merge-commit-exists"
+  },
+  "base": {
+    "release": "v0.4.6",
+    "commit": "9d1b3dc108eb77629ace5b82002120f5539abd8d"
+  },
+  "candidate": {
+    "commit": "ddd0d6ab89ba7579d28d4b4273feb7896b35f10c",
+    "tree": "b34931aac6734f20e9656d8ab6ceff782f0abe74",
+    "branch": "feat/sprint-nova-codex-v046",
+    "remoteReadback": "origin/feat/sprint-nova-codex-v046 at the same commit"
+  },
+  "gates": {
+    "verify": {
+      "path": "evidence/verify-latest.json",
+      "commit": "ddd0d6ab89ba7579d28d4b4273feb7896b35f10c",
+      "tree": "b34931aac6734f20e9656d8ab6ceff782f0abe74",
+      "exitCode": 0,
+      "binding": "exact"
+    },
+    "security": {
+      "path": "evidence/security-latest.json",
+      "commit": "ddd0d6ab89ba7579d28d4b4273feb7896b35f10c",
+      "tree": "b34931aac6734f20e9656d8ab6ceff782f0abe74",
+      "exitCode": 0,
+      "binding": "clean-exact-candidate"
+    },
+    "independentCritic": {
+      "verdict": "PASS",
+      "findingCount": 0,
+      "assurance": "functional-equivalent-read-only; OS isolation not asserted"
+    }
+  },
+  "delivery": {
+    "pullRequest": 64,
+    "pullRequestState": "draft",
+    "mainChanged": false,
+    "gitlabValidation": "not-run-no-explicit-target",
+    "nightwingIssue61": "out-of-scope"
+  }
+}

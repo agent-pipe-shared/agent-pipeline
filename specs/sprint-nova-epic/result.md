@@ -508,3 +508,33 @@ The sanctioned State writer recorded the exact PO approval at
 `381ae863abcde52612387f0c66a6d5a8e8af775979e82d982baf63884a219013`
 and Spec SHA-256
 `cacf045a9d849b52d0a7958bf2923a1d9f8f08e4f0efdc97de413a0f0e0634d5`.
+
+## 2026-07-27 — B4R / Issue #63 implementation and candidate evidence
+
+Status: `b4r-implemented-and-verified-on-isolated-feature-branch`.
+
+The B4R correction is implemented on `feat/sprint-nova-codex-v046`, based on
+the delivered and closed `v0.4.6` commit
+`9d1b3dc108eb77629ace5b82002120f5539abd8d`. Its implementation candidate is
+commit `ddd0d6ab89ba7579d28d4b4273feb7896b35f10c`, tree
+`b34931aac6734f20e9656d8ab6ceff782f0abe74`. The candidate completes the
+closed recovery actions for `source_invalid` and `manifest_invalid`, the
+digest-bound, explicitly activated manifest-only repair, the narrowly
+authorized read-only lifecycle diagnostics, and hostile/process-level
+recovery coverage. It does not weaken the readiness guard or authorize
+arbitrary pre-ready writes.
+
+The generated Full Verify and Security evidence both bind that exact clean
+candidate and exit `0`. A fresh independent Critic returned `PASS` with no
+findings under the literal assurance
+`functional-equivalent-read-only; OS isolation not asserted`. The durable
+candidate summary is
+[`evidence/nova-b/b4r/candidate-evidence.json`](evidence/nova-b/b4r/candidate-evidence.json).
+
+PR `#64` remains Draft and `main` remains at delivered `v0.4.6`; no merge,
+release or GitLab validation is claimed. The required Issue `#63` comment is
+deferred until an actual delivery merge commit exists, when it must name that
+merge commit and the relevant exact-candidate verification results. The
+broader Nightwing `#61` onboarding scope remains excluded. This records the
+B4R slice only; it does not close the Nova Epic or its remaining B2-I, B3-I,
+live-B4, B5 and B6 acceptance obligations.
