@@ -653,6 +653,12 @@
       "member": "nova-benchmark-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-candidate-freeze-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-candidate-freeze-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-critic-lineage-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2054,6 +2060,7 @@
         "verify-phase:harness/scripts/verify.mjs:nova-backlog-reconciler-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-backlog-reconciliation-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-benchmark-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-candidate-freeze-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-critic-lineage-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-critic-packet-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-execution-plane-tests",
