@@ -252,16 +252,13 @@ cannot retroactively redefine either Sprint's acceptance.
 
 ### B3. Antigravity with Gemini models — `#15`
 
-- First complete a separately approved research/compatibility decision for
-  the current official Antigravity runtime, authentication, output,
-  cancellation and usage contracts. Gemini appears only as the supported
-  model selectors inside Antigravity.
-- Add only post-V3 capability cells certified through `#7`.
-- Preserve requested versus observed model identity and native usage
-  semantics.
-- Require an accepted B2 credential boundary or a separately approved
-  operator-local authentication boundary before live access.
+- Provide a documentation-bound Alpha integration boundary for Antigravity as
+  the visible third runner; Gemini remains its model family.
+- Keep selection fail-closed and label the adapter Alpha; it has no AGY install,
+  discovery, authentication, network, invocation or advertised execution.
 - Keep unsupported Advisor/review/write cells unavailable.
+- Transfer direct executable AGY runner delivery to #69 (`sprint:NONE`) for a
+  later dedicated sprint with current-contract, auth and #7 certification.
 
 ### B4. GitLab forge support — `#51`
 

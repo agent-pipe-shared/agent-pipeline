@@ -838,7 +838,7 @@ Production remote execution or a live credential lease is blocked until a
 separate ADR and explicit live-pilot authority approve the broker,
 authentication, egress, revocation and incident boundaries.
 
-### 6.4 B3-R / B3-I — Antigravity with Gemini models (`#15`)
+### 6.4 B3-A / B3-R / B3-I — Antigravity with Gemini models (`#15`)
 
 B3-R is a separately accepted research artifact, not implementation:
 `pipeline.antigravity-contract-decision.v1`. It records official source URLs,
@@ -862,9 +862,20 @@ B3-I remains blocked until:
   and
 - existing Claude/Codex frozen fixtures are selected as regressions.
 
-Only then may an Antigravity adapter implement invocation, cancellation,
-result, usage and conformance cells. Advisor/review/write capabilities stay
-unsupported unless independently certified.
+**B3-A** is Nova's accepted Alpha third-runner boundary. It is a versioned,
+documentation-bound descriptor that identifies `antigravity`, Gemini as its
+model family, and a typed fail-closed selection result. It may expose only its
+own descriptor cell. It must explicitly state Alpha status and may not discover
+or install `agy`, authenticate, access a provider/network, invoke a runtime,
+advertise execution, or add Antigravity to active runner mappings/profiles.
+
+The direct implementation is transferred to Issue #69 with `sprint:NONE` for a
+later dedicated AGY sprint. B3-A closes #15 only under this narrowed Nova
+acceptance; it does not claim B3-I or direct AGY delivery.
+
+Only B3-I may implement invocation, cancellation, result, usage and
+conformance cells after its listed gates. Advisor/review/write capabilities
+stay unsupported unless independently certified.
 
 ### 6.5 B4 — Provider-neutral forge and GitLab (`#51`)
 
@@ -1173,6 +1184,7 @@ gate with collision review. In this table, “schemas `<name>` under
 | B2-C | `plugins/pipeline-core/lib/async-execution.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/credential-lease.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/async-execution-journal.schema.json`; `plugins/pipeline-core/scripts/credential-lease.schema.json`; `specs/sprint-nova-epic/evidence/nova-b/execution-state-authority-decision.json` | none; synthetic contract only |
 | B2-I | external broker/remote adapter files fixed by the approved ADR | blocked until separate remote/credential/state-authority ADR and path manifest |
 | B3-R | `specs/sprint-nova-epic/evidence/nova-b/antigravity-contract-decision.json` | `specs/sprint-nova-epic/lifecycle.json`; append-only `specs/sprint-nova-epic/result.md` |
+| B3-A | `plugins/pipeline-core/scripts/antigravity-alpha-adapter.mjs`, matching `.test.mjs` | `GEMINI.md`; this Spec; `acceptance.md`; `plans/nova-b.md`; `plans/integration-and-close.md`; `prd_sprint-nova-epic.md`; append-only `result.md`; `lifecycle.json` |
 | B3-I | blocked until B3-R appends exact paths and migration decision | blocked |
 | B4 | `plugins/pipeline-core/lib/forge-capability.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/gitlab-forge-adapter.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/forge-capability.schema.json`; `plugins/pipeline-core/scripts/external-mutation.schema.json`; design artifact `specs/sprint-nova-epic/design/forge-capability-b4.md` | none before live-operation approval |
 | B4R | design artifact `specs/sprint-nova-epic/design/v4-recovery-b4r.md` | `plugins/pipeline-core/lib/project-onboarding-v3.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/project-onboarding-v3.mjs`, `project-onboarding-e2e.test.mjs`; `plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`, matching `.test.mjs`; `plugins/pipeline-core/hooks/codex-pretool-guard.test.mjs`; `plugins/pipeline-core/skills/pipeline-start/SKILL.md`, `pipeline-start-v3.test.mjs`; `.claude/pipeline-state.json`; `docs/codex-onboarding-threat-model.md`; this PRD, Spec, Acceptance, Nova B plan, backlog binding, lifecycle manifest and append-only Result |

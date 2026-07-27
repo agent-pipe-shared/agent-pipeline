@@ -1,5 +1,20 @@
 # Sprint Nova Epic — Result
 
+## 2026-07-27 — B3-A Antigravity Alpha scope adjustment
+
+Status: `approved-alpha-boundary; direct-agy-follow-up-open`.
+
+The PO narrowed Nova Issue #15 to a documentation-bound Alpha third-runner
+boundary. The public scope-adjustment comment on #15 records the precise
+non-live boundary; Issue #69 is the separately created direct AGY follow-up
+with `sprint:NONE`. #15 remains open until Nova close and its close evidence
+must not claim direct AGY delivery.
+
+The reusable Nova close rule is recorded in
+`plans/integration-and-close.md`: a material removed scope creates a new
+`sprint:NONE` Issue, receives a precise comment on the original in-sprint
+Issue, and the original closes only with its narrowed candidate/evidence.
+
 ## 2026-07-24 — Design package created
 
 Status: `awaiting-approval`.

@@ -50,6 +50,16 @@ Before closure, every Nova issue comment must name:
 
 Bulk closure is forbidden.
 
+## Approved scope adjustments
+
+When PO-approved work removes a material portion of an in-scope Issue, create
+one new GitHub follow-up Issue for the removed scope and assign `sprint:NONE`.
+Before implementation continues, add a precise comment to the original
+in-sprint Issue naming the narrowed Nova scope, the new Issue number and what
+the future scope alone owns. The original Issue remains open and is closed only
+at Sprint close with its exact candidate/evidence; that closure must not claim
+the transferred work. This rule applies to every later Nova scope adjustment.
+
 ## Backlog accounting
 
 Backlog state is changed only through the canonical transition mechanism.

@@ -9,7 +9,7 @@
     {
       "class": "prd",
       "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-      "sha256": "2601a303cfc2cce12125e1ff252df79de956ed58888edb904a1da0d1d3661ebc",
+      "sha256": "cd6ecc676d2e29a7a9ad1e54a1b6bcfff66fc0c99a515f1acae9bc52e05bb57b",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -17,7 +17,7 @@
     {
       "class": "spec",
       "path": "specs/sprint-nova-epic/spec.md",
-      "sha256": "930b41b06615c539fd9f05c25c933e7e2cf88cc0f05f114ed18d82eb05d6eca3",
+      "sha256": "ea8503d1c5fe90715d07a8052c6f614dbd98d83390d41c183b0c061728ee0828",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -25,7 +25,7 @@
     {
       "class": "acceptance",
       "path": "specs/sprint-nova-epic/acceptance.md",
-      "sha256": "db5dbcd8c45508f93495b3e0a95ff16dfcd045ad5d9e8d616bedc628e3e010b4",
+      "sha256": "4df1e83798d2e77c7c0219847cc2ce6cf7e2892f84e5cb87ccfde9c0082b51f3",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -33,7 +33,7 @@
     {
       "class": "result",
       "path": "specs/sprint-nova-epic/result.md",
-      "sha256": "1624f792ca7eb334537e431b37479485be4f3f152455184fe4239ee1c0a70982",
+      "sha256": "8d1e0c922fa6c89c2bba2ca685bb7797b23858d85a58542f13468148f9d1023b",
       "authority": true,
       "mutability": "append-only",
       "retention": "retain"
@@ -97,7 +97,7 @@
     {
       "class": "plan",
       "path": "specs/sprint-nova-epic/plans/integration-and-close.md",
-      "sha256": "971be222ad9c287d458be791ff86ba58b3f92b930b2a2e256df496dff2841918",
+      "sha256": "d9cb699b18b872585bcb2f30902d0fcaff4f9c2bde11bb5906c5d0c9f3f67298",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
@@ -113,7 +113,7 @@
     {
       "class": "plan",
       "path": "specs/sprint-nova-epic/plans/nova-b.md",
-      "sha256": "7dc30f9688ee8b2630a53e5e29755f62373e887942626996b719391579d0e8d4",
+      "sha256": "2378a2b729a3084cee1277f1edd3d6f6ca01e06a651bbd51a05f4dde3f5b0cf2",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"

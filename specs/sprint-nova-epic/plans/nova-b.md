@@ -219,6 +219,22 @@ compatibility/ADR decision.
 reported as attested, unsafe authentication boundary or required in-place V3
 edit.
 
+## Slice B3-A — Antigravity third-runner Alpha boundary
+
+**Issue:** `#15`; direct AGY follow-up: `#69` (`sprint:NONE`).
+
+**Outcome:** register Antigravity visibly as the third-runner Alpha boundary,
+backed only by the reviewed documentation decision. It returns a typed
+fail-closed non-selection and keeps Gemini as the model family inside that
+runner.
+
+**Allowed:** descriptor, capability matrix, Alpha documentation and hostile
+tests proving no AGY discovery/install/auth/network/invocation primitive.
+
+**Stop:** any active runner profile/mapping, AGY execution, auth, network
+access, capability certification, or claim that the direct runner is shipped.
+Those belong solely to #69's later dedicated AGY sprint.
+
 ## Slice B3-I — Antigravity with Gemini models implementation
 
 **Entry:** B3-R is approved and either accepted B2-I leases or a separately
