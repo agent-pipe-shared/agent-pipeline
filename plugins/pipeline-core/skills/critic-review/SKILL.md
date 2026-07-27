@@ -101,6 +101,14 @@ tool or mutating command, do not delegate, and report the exposure as a
 residual host limitation. No staleness check (the dispatch fixed the SHA); no
 handover, no history — ever.
 
+**Lifecycle-Guard inspection form (hard):** When the functional-equivalent
+lane runs under a Lifecycle Guard, perform each repository inspection as one
+simple, direct, read-only command. Do not use shell pipelines, redirects,
+compound commands, or output-shaping helpers such as `head`/`tail`; set output
+limits in the invoking tool instead. This is an invocation-shape requirement,
+not a Guard relaxation or an OS-isolation claim, and applies identically on
+macOS, Windows, and Linux for Claude, Codex, and AGY.
+
 ## 3. Construct your own input
 
 Run these yourself (your trajectory must show it — that makes the review auditable and reproducible):
