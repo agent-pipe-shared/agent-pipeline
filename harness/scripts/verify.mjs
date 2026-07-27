@@ -208,6 +208,7 @@ const TEST_SUITES = [
   { name: "codex-onboarding-capabilities-tests", file: join(libDir, "codex-onboarding-capabilities.test.mjs") },
   { name: "onboarding-continuity-tests", file: join(libDir, "onboarding-continuity.test.mjs") },
   { name: "codex-onboarding-app-server-tests", file: join(libDir, "codex-onboarding-app-server.test.mjs") },
+  { name: "v3-bootstrap-authority-tests", file: join(pluginScriptsDir, "v3-bootstrap-authority.test.mjs") },
   { name: "project-onboarding-e2e-tests", file: join(pluginScriptsDir, "project-onboarding-e2e.test.mjs") },
   { name: "project-authority-tests", file: join(libDir, "project-authority.test.mjs") },
   { name: "project-authority-migration-cli-tests", file: join(pluginScriptsDir, "project-authority-migration.test.mjs") },
