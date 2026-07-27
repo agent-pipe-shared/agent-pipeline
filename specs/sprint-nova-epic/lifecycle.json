@@ -65,7 +65,7 @@
     {
       "class": "design",
       "path": "specs/sprint-nova-epic/design/b2-i-gitlab-ci-pilot.md",
-      "sha256": "2f4d5e8bf578cd569e9203b76d30f6728e321d015475fcefe7bbaf810e3839a8",
+      "sha256": "92596ef9f814ac95bf02044f023942bb19b4234473ae989e47c6268cf1b95747",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"

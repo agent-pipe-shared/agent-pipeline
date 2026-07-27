@@ -62,6 +62,9 @@ rejected. A cancel request is never reported as cancellation success. A retry is
 when it embeds the exact reconciled preceding attempt with the same immutable
 idempotency subject; there is no implicit retry.
 
+Fixed-base admission is internal to the public reducer contract. No caller may
+replace, relax or inject an alternative candidate-admission predicate.
+
 No background retry, credential renewal, remote cleanup or host process may
 outlive the bound request. A new request needs a new PO-authorized preview.
 
