@@ -55,8 +55,9 @@ The planned broker record is closed and digest-bound. Its states are
 its sealed predecessor as well as its predecessor digest, so a standalone
 terminal record cannot invent a history. `expired` is an explicit sealed
 terminal transition from an admitted pending record. A cancellation action binds the exact provider job identity and
-pre-state, then requires metadata readback; a cancel request is never reported
-as cancellation success. A retry is a separate, attempt-numbered genesis only
+pre-state before either `cancel-requested` or `cancelled` provider metadata is
+accepted; a provider cancellation claim without that sealed local intent is
+rejected. A cancel request is never reported as cancellation success. A retry is a separate, attempt-numbered genesis only
 when it embeds the exact reconciled preceding attempt with the same immutable
 idempotency subject; there is no implicit retry.
 
@@ -75,6 +76,7 @@ The PO accepted this manifest as one set through ADR-0049:
 - `specs/sprint-nova-epic/design/b2-i-gitlab-ci-pilot.md`
 - `plugins/pipeline-core/lib/gitlab-ci-execution-broker.mjs` and its test
 - `plugins/pipeline-core/scripts/gitlab-ci-execution-broker.mjs` and its test
+- `plugins/pipeline-core/scripts/gitlab-ci-execution-broker.schema.json`
 - `plugins/pipeline-core/scripts/gitlab-ci-execution-broker-observation.schema.json`
 - `plugins/pipeline-core/scripts/fixtures/nova-b2-gitlab/` exact
   request/observation/cancellation fixtures
