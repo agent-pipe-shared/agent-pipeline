@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-07-27T10:47:40.104Z",
+  "updatedAt": "2026-07-27T11:00:46.272Z",
   "closedFeatures": [
     {
       "id": "codex-onboarding-0.4.5",
@@ -66,10 +66,10 @@
   },
   "planApproval": {
     "schema": "pipeline.plan-approval.v2",
-    "approvedBy": "Phoenix Elephant under renewed explicit PO approval",
-    "approvedAt": "2026-07-27T10:47:33.152Z",
-    "specBoundBy": "Phoenix Elephant under renewed explicit PO approval",
-    "specBoundAt": "2026-07-27T10:47:33.152Z",
+    "approvedBy": "Phoenix Elephant under prior explicit PO approval; nonmaterial status-binding correction",
+    "approvedAt": "2026-07-27T11:00:39.086Z",
+    "specBoundBy": "Phoenix Elephant under prior explicit PO approval; nonmaterial status-binding correction",
+    "specBoundAt": "2026-07-27T11:00:39.086Z",
     "poGateAuthority": {
       "schema": "pipeline.po-gate-authority.v2",
       "humanFacing": "en",
@@ -78,7 +78,7 @@
       "receiptSha256": "738761ed1658e13bbc43280a1362c053d149963c49cea4a34ea15e9de08c611f",
       "repositoryFingerprint": "92f4f001424af56c17e443aec9969d0ff5ac0e426b8f388fe06d4b1800aa2d35",
       "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-      "planSha256": "a714222067ead125ce1b198bc216b6347449ca93f092cd546b388136edd8c774",
+      "planSha256": "c67cb1cfd4b22b92630be8b6b668aa72d3e2a4b4221ce7f11e878a75b7a59e8f",
       "specPath": "specs/sprint-phoenix-epic/spec.md",
       "specSha256": "3db999a271adb066aa3ae4572ad1db42a8a001e4c0fce838b80376d9a1a24520"
     }
