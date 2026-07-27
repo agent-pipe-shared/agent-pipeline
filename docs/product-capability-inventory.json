@@ -1013,6 +1013,12 @@
       "member": "ruleset-freshness-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:ruleset-source-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "ruleset-source-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:runner-profile-migration-v2-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1664,6 +1670,7 @@
         "verify-phase:harness/scripts/verify.mjs:routing-projection-check",
         "verify-phase:harness/scripts/verify.mjs:routing-projection-tests",
         "verify-phase:harness/scripts/verify.mjs:ruleset-freshness-tests",
+        "verify-phase:harness/scripts/verify.mjs:ruleset-source-tests",
         "verify-phase:harness/scripts/verify.mjs:runner-profile-migration-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:runner-profile-migration-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:runner-profiles-v2-tests",
