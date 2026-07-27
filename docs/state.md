@@ -3,19 +3,35 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-07-26
+**Last updated:** 2026-07-27
 **Project status:** ACTIVE
-**Current block:** Nova adaptation on delivered and closed `v0.4.6`
+**Current block:** Nova Epic remains active after the isolated B4R/#63 closeout
 **Technical adaptation commit:** `7f313c22d4311f7d5f0469131e3d0deae4364e11`
 **Release disposition:** all `0.4.x` release, installation, and pipeline-start
 work is closed; no `0.4.x` task is open
 
 ## Operational head
 
-- Nova is adapted on top of the exact delivered `v0.4.6` base. Fresh Full
-  Verify, Security, and Critic checks for the resulting Nova integration
-  candidate are pending; these are Nova integration gates only, not release
-  gates.
+- Nova B4R / Issue `#63` is implemented on the isolated
+  `feat/sprint-nova-codex-v046` branch. Its code candidate is
+  `ddd0d6ab89ba7579d28d4b4273feb7896b35f10c`, tree
+  `b34931aac6734f20e9656d8ab6ceff782f0abe74`, on the exact delivered
+  `v0.4.6` base `9d1b3dc108eb77629ace5b82002120f5539abd8d`. Full Verify,
+  Security, and the fresh independent Critic are green for that code
+  candidate; its durable B4R record is
+  [`candidate-evidence.json`](../specs/sprint-nova-epic/evidence/nova-b/b4r/candidate-evidence.json).
+- The branch-local closeout metadata commit is
+  `5d5b68dd0a7155276bbe1fbe8b15a41d7c068d43`, tree
+  `c7300bcb249edec150a88405c099be31c0c34b2a`. Full Verify (178 steps) and
+  Security both exit `0` on this clean exact candidate. The remote branch and
+  Draft PR `#64` still name the prior code candidate until a separately
+  authorized normal feature-branch push; `main` remains the delivered
+  `v0.4.6` commit and is not changed in this session.
+- This is not an Epic close: B2-I, B3-I, live B4/GitLab capability work and
+  B5/B6 native macOS acceptance retain their own accepted authority, target
+  and evidence gates. In particular, no GitLab target was selected and no
+  Apple Silicon evidence is fabricated. Issue `#63` receives its required
+  comment only after an actual delivery merge commit exists.
 - Older `0.4.4`, `0.4.5`, and `0.4.6` preparation entries below are retained
   as historical provenance and are superseded, not current work or authority.
 - The former restart/hotfix TODO and candidate-preparation language below is
