@@ -5,12 +5,12 @@
 
 **Last updated:** 2026-07-27
 **Project status:** ACTIVE
-**Current block:** PHX-0A planner-bootstrap design revision; renewed PO plan gate
+**Current block:** PHX-0A planner-bootstrap revision approved; Goldfish dispatch next
 **Branch:** `sprint_phoenix`, based on public `origin/main`
 `9d1b3dc108eb77629ace5b82002120f5539abd8d`
 **Pipeline:** `0.4.6+codex.20260726170452`
-**DoD:** 🟡 not-human-verified — the PHX-0A planner-bootstrap revision requires
-a renewed exact Product Owner `approved` decision
+**DoD:** 🟡 implementation pending — the PHX-0A planner-bootstrap revision is
+recorded as a renewed Plan/Spec-bound approval
 
 ## Operational head
 
@@ -19,13 +19,13 @@ a renewed exact Product Owner `approved` decision
 - Phoenix is the only active feature in this checkout. Its readable plan is
   [the Phoenix PRD](../specs/sprint-phoenix-epic/prd_phoenix-epic.md), bound
   to the immutable [technical Spec](../specs/sprint-phoenix-epic/spec.md).
-- Pipeline state is back in `phase:"design"` with `planApproved:false` after
-  the PO-authorized PHX-0A Scope revision: the canonical #22 planner now needs
-  a narrow read-only absent-manifest `draft` bootstrap preview and its existing
-  suite. Continuity revision `5` still names `review`; no implementation package
-  is dispatchable until the revised Spec receives its fresh Plan/Spec-bound gate.
-  Its earlier Continuity PRD/Spec authority digests remain diagnostic only;
-  PHX-0 slice A owns their revision writer.
+- Pipeline state is in `phase:"implementation"` with a renewed v2
+  Plan/Spec-bound approval for the PHX-0A scope revision. The canonical #22
+  planner may receive only its narrow read-only absent-manifest `draft`
+  bootstrap preview and existing-suite coverage. Continuity revision `5` still
+  names `review`; the first implementation package must be recorded through the
+  designated lifecycle/dispatch path. Its earlier Continuity PRD/Spec authority
+  digests remain diagnostic only; PHX-0 slice A owns their revision writer.
 - Earlier reviews remain preserved in the append-only
   [Phoenix Result](../specs/sprint-phoenix-epic/result.md). The external-handoff
   correction candidate passed Full Verify, Security, and a fresh independent
@@ -91,12 +91,10 @@ a renewed exact Product Owner `approved` decision
 
 ## Open items and next block
 
-1. The PO authorized a narrow PHX-0A design correction: extend the existing
-   #22 planner and suite with only a read-only absent-manifest `draft` bootstrap
-   preview. The prior Plan/Spec-bound approval was revoked through the sanctioned
-   writer; the revised Spec needs a fresh literal `approved` decision.
-2. After that fresh gate, the first approved work is PHX-0 slice A. It must
-   implement and independently
+1. The PO authorized and renewed the Plan/Spec-bound gate for the narrow
+   PHX-0A #22 planner correction: only a read-only absent-manifest `draft`
+   bootstrap preview and its existing-suite coverage.
+2. The first approved work is PHX-0 slice A. It must implement and independently
    clear the transactional lifecycle writer before PHX-0 slice B or any later
    package.
 3. Each implementation package must map its criteria to named automated tests,
@@ -114,9 +112,9 @@ a renewed exact Product Owner `approved` decision
    bypass or approve the plan merely to fill those two records; reconcile them
    through a sanctioned close-artifact path.
 
-No remote action is implied by this handover. The former approval was limited
-to its exact bound Phoenix PRD and Spec and has been revoked for this material
-revision; the revised design requires its own renewed PO gate.
+No remote action is implied by this handover. The renewed approval remains
+limited to the exact bound Phoenix PRD and Spec; every later material revision
+requires its own renewed PO gate.
 
 ## Re-entry
 
@@ -126,6 +124,5 @@ revision; the revised design requires its own renewed PO gate.
 2. Read this file, the active Pipeline state, the Phoenix PRD, Spec, readiness
    audit, Result, Recovery record, and latest Critic record.
 3. Confirm branch `sprint_phoenix`, base identity, clean worktree, valid
-   continuity, and `planApproved:false` with the recorded plan revocation.
-4. Present the revised PHX-0A planner-bootstrap contract and wait for a fresh
-   literal `approved`; only then begin a sanctioned Goldfish dispatch.
+   continuity, and the renewed v2 Plan/Spec-bound `planApproved:true` record.
+4. Begin only with a sanctioned, briefed Goldfish dispatch for PHX-0 slice A.
