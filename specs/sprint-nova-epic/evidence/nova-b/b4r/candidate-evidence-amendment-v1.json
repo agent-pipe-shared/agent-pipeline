@@ -1,0 +1,51 @@
+{
+  "schema": "pipeline.nova-b4r-candidate-evidence-amendment.v1",
+  "amends": {
+    "path": "specs/sprint-nova-epic/evidence/nova-b/b4r/candidate-evidence.json",
+    "sha256": "0a5885cf8e847b270b9e31b573b5595fce967955d3a6425739ffe2c55a6122c9"
+  },
+  "reason": "The original record named workspace-scoped evidence/verify-latest.json and evidence/security-latest.json. Those operational latest pointers are intentionally overwritten by later candidates and therefore cannot retain exact B4R gate bytes.",
+  "candidate": {
+    "commit": "ddd0d6ab89ba7579d28d4b4273feb7896b35f10c",
+    "tree": "b34931aac6734f20e9656d8ab6ceff782f0abe74",
+    "base": "9d1b3dc108eb77629ace5b82002120f5539abd8d"
+  },
+  "reproducedGates": {
+    "verify": {
+      "path": "specs/sprint-nova-epic/evidence/nova-b/b4r/verify.json",
+      "sha256": "f3a2c1d7456c19ac7dfef8cd6b8c4939c7f9cb084273808aed147da3cf032c83",
+      "command": "node harness/scripts/verify.mjs",
+      "finishedAt": "2026-07-27T07:44:12.359Z",
+      "exitCode": 0,
+      "steps": 178,
+      "binding": "exact-clean-candidate"
+    },
+    "security": {
+      "path": "specs/sprint-nova-epic/evidence/nova-b/b4r/security.json",
+      "sha256": "9f509a11913a2fbb5605e5467cd121335a29e4ae668a3f2a80d06e5544cedf0c",
+      "command": "node harness/scripts/security-scan.mjs",
+      "finishedAt": "2026-07-27T07:44:12.344Z",
+      "exitCode": 0,
+      "binding": "clean-exact-candidate",
+      "findings": 0
+    }
+  },
+  "audit": {
+    "reproductionTopology": "detached worktree outside the OS temporary root; the first /tmp checkout was discarded because it violated an isolation test's own OS-temp topology invariant",
+    "publicReadback": {
+      "pullRequest": 64,
+      "state": "draft",
+      "merged": false,
+      "headAtReadback": "ece3ae95cd7b358cd727ac5cc015938bbbf64305",
+      "baseAtReadback": "9d1b3dc108eb77629ace5b82002120f5539abd8d",
+      "mergeableState": "clean",
+      "claAndDco": "success"
+    }
+  },
+  "scope": {
+    "issue63Comment": "deferred until an actual delivery merge commit exists",
+    "gitlabValidation": "not-run; no explicit target",
+    "nightwingIssue61": "out-of-scope",
+    "epicClose": "not-claimed; B2-I, B3-I, live B4 and B5/B6 remain separately gated"
+  }
+}

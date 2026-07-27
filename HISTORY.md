@@ -9,8 +9,9 @@
   retained in the B4R candidate record.
 - Added the append-only Result entry and lifecycle binding without changing
   `main`, opening a release, running GitLab validation, or commenting Issue
-  `#63`. PR `#64` remains Draft; its normal feature-branch update awaits the
-  separately authorized push/readback.
+  `#63`. PR `#64` remains Draft; its normal feature-branch update was
+  subsequently pushed and read back at
+  `ece3ae95cd7b358cd727ac5cc015938bbbf64305`.
 - The branch-local documentation candidate
   `5d5b68dd0a7155276bbe1fbe8b15a41d7c068d43` passed Full Verify (178 steps)
   and Security cleanly. The overall Nova Epic remains active: B2-I, B3-I,

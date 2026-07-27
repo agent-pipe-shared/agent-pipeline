@@ -538,3 +538,30 @@ merge commit and the relevant exact-candidate verification results. The
 broader Nightwing `#61` onboarding scope remains excluded. This records the
 B4R slice only; it does not close the Nova Epic or its remaining B2-I, B3-I,
 live-B4, B5 and B6 acceptance obligations.
+
+## 2026-07-27 — B4R durable gate-receipt audit amendment
+
+Status: `b4r-exact-gate-receipts-retained; epic-remains-active`.
+
+The original B4R candidate summary correctly named the implementation commit
+and tree, but its `evidence/*-latest.json` references were operational pointers
+rather than retained candidate bytes. They were therefore replaced only by the
+append-only amendment
+[`candidate-evidence-amendment-v1.json`](evidence/nova-b/b4r/candidate-evidence-amendment-v1.json),
+which preserves the original record and retains fresh, exact-bound copies of
+the Full Verify and Security receipts for
+`ddd0d6ab89ba7579d28d4b4273feb7896b35f10c`, tree
+`b34931aac6734f20e9656d8ab6ceff782f0abe74`.
+
+The reproduction used a detached worktree outside the OS temporary root. Full
+Verify completed all 178 steps with exit `0`; Security completed cleanly with
+zero findings and exit `0`. The public readback observed Draft PR `#64` at
+documentation head `ece3ae95cd7b358cd727ac5cc015938bbbf64305`, based on
+unchanged `main` / `v0.4.6` commit
+`9d1b3dc108eb77629ace5b82002120f5539abd8d`; its current CLA/DCO gate was
+successful. That readback is delivery state, not a substitution of the B4R
+code-candidate gates.
+
+No merge, release, GitLab validation or Issue `#63` comment occurred. The
+Epic remains active because B2-I, B3-I, live B4 and B5/B6 still require their
+own authority and acceptance evidence.

@@ -33,7 +33,7 @@
     {
       "class": "result",
       "path": "specs/sprint-nova-epic/result.md",
-      "sha256": "b3491beee56b475d95b0467309c7ba60224d5e820c7ab3d54e1bebacc998721c",
+      "sha256": "1624f792ca7eb334537e431b37479485be4f3f152455184fe4239ee1c0a70982",
       "authority": true,
       "mutability": "append-only",
       "retention": "retain"
@@ -194,6 +194,30 @@
       "class": "candidate-evidence",
       "path": "specs/sprint-nova-epic/evidence/nova-b/b4r/candidate-evidence.json",
       "sha256": "0a5885cf8e847b270b9e31b573b5595fce967955d3a6425739ffe2c55a6122c9",
+      "authority": false,
+      "mutability": "immutable",
+      "retention": "retain"
+    },
+    {
+      "class": "candidate-evidence",
+      "path": "specs/sprint-nova-epic/evidence/nova-b/b4r/candidate-evidence-amendment-v1.json",
+      "sha256": "4048789e041ca5c14bfbed046cbe809972ddb8d9c5eee1a5bff81bd2428cc497",
+      "authority": false,
+      "mutability": "immutable",
+      "retention": "retain"
+    },
+    {
+      "class": "candidate-evidence",
+      "path": "specs/sprint-nova-epic/evidence/nova-b/b4r/verify.json",
+      "sha256": "f3a2c1d7456c19ac7dfef8cd6b8c4939c7f9cb084273808aed147da3cf032c83",
+      "authority": false,
+      "mutability": "immutable",
+      "retention": "retain"
+    },
+    {
+      "class": "candidate-evidence",
+      "path": "specs/sprint-nova-epic/evidence/nova-b/b4r/security.json",
+      "sha256": "9f509a11913a2fbb5605e5467cd121335a29e4ae668a3f2a80d06e5544cedf0c",
       "authority": false,
       "mutability": "immutable",
       "retention": "retain"
