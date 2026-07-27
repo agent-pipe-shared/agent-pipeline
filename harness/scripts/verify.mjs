@@ -219,6 +219,7 @@ const TEST_SUITES = [
   { name: "codex-advisory-app-server-tests", file: join(pluginScriptsDir, "codex-advisory-app-server.test.mjs") },
   { name: "codex-advisory-bootstrap-tests", file: join(pluginScriptsDir, "codex-advisory-bootstrap.test.mjs") },
   { name: "codex-host-advisor-route-tests", file: join(pluginScriptsDir, "codex-host-advisor-route.test.mjs") },
+  { name: "codex-host-plugin-list-tests", file: join(libDir, "codex-host-plugin-list.test.mjs") },
   { name: "codex-host-repository-init-tests", file: join(pluginScriptsDir, "codex-host-repository-init.test.mjs") },
   { name: "host-advisor-status-tests", file: join(libDir, "host-advisor-status.test.mjs") },
   { name: "host-advisor-workspace-tests", file: join(pluginScriptsDir, "host-advisor-workspace.test.mjs") },

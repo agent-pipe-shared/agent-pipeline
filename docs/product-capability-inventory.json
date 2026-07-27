@@ -659,6 +659,12 @@
       "member": "codex-host-advisor-route-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-host-plugin-list-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "codex-host-plugin-list-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-host-repository-init-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1577,6 +1583,7 @@
         "verify-phase:harness/scripts/verify.mjs:codex-critic-host-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-critic-isolation-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-host-advisor-route-tests",
+        "verify-phase:harness/scripts/verify.mjs:codex-host-plugin-list-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-host-repository-init-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-isolated-critic-contract-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-onboarding-app-server-tests",
