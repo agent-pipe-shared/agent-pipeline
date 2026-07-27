@@ -6,6 +6,7 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { observeCodexRulesetSource } from "../lib/codex-host-plugin-list.mjs";
 
 export const SCHEMA = "pipeline.start-preflight.v1";
 const PLUGIN_ID = "pipeline-core@agent-pipeline";
@@ -76,6 +77,7 @@ export function observePipelineStartPreflight({
   env = process.env,
   pluginList = readInstalledPluginList,
   read = readFileSync,
+  observeRulesetSource = observeCodexRulesetSource,
   scriptUrl = import.meta.url,
   cwd = process.cwd(),
 } = {}) {
@@ -91,6 +93,18 @@ export function observePipelineStartPreflight({
   }
   const installedIdentity = installedPipelineIdentity(pluginList);
   const installedVersion = installedIdentity?.version ?? null;
+  let rulesetSource;
+  try {
+    rulesetSource = observeRulesetSource({
+      loadedPluginRoot: pluginRoot,
+      selfApplicationRoot: resolve(pluginRoot, "..", ".."),
+    });
+  } catch {
+    rulesetSource = { schema: "pipeline.codex-ruleset-source-observation.v1", status: "codex-plugin-list-unavailable", observation: null };
+  }
+  const sourceReady = rulesetSource?.schema === "pipeline.codex-ruleset-source-observation.v1"
+    && rulesetSource.status === "ready"
+    && rulesetSource.observation !== null;
   const ticket = Object.prototype.hasOwnProperty.call(env, "PIPELINE_CODEX_ONBOARDING_TICKET_ID")
     && String(env.PIPELINE_CODEX_ONBOARDING_TICKET_ID) !== "";
   const token = Object.prototype.hasOwnProperty.call(env, "PIPELINE_CODEX_ONBOARDING_TOKEN")
@@ -100,7 +114,7 @@ export function observePipelineStartPreflight({
   const executionBoundary = wsl ? "host-authorized-wsl" : "default";
   const status = !version
     ? "plugin-identity-unavailable"
-    : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version
+    : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version || !sourceReady
       ? "plugin-refresh-required"
       : "ready";
   return {
@@ -109,6 +123,10 @@ export function observePipelineStartPreflight({
     version,
     installedVersion,
     installedSource: installedIdentity?.source ?? "unknown",
+    rulesetSource: {
+      status: typeof rulesetSource?.status === "string" ? rulesetSource.status : "codex-plugin-list-unavailable",
+      observation: sourceReady ? rulesetSource.observation : null,
+    },
     executionBoundary,
     pluginRoot,
     handoff: ticket && token ? "ready" : ticket || token ? "malformed" : "none",

@@ -5,11 +5,26 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight,
+  installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight as observeActual,
   pipelineStartPreflightExitCode, SCHEMA,
 } from "./pipeline-start-preflight.mjs";
 
 const manifest = JSON.stringify({ version: "0.4.5+test" });
+const source = (status = "ready") => ({
+  schema: "pipeline.codex-ruleset-source-observation.v1",
+  status,
+  observation: status === "ready" ? {
+    schema: "pipeline.ruleset-source.v1",
+    runner: "codex",
+    selectedPlugin: { id: "pipeline-core@agent-pipeline", version: "0.4.5+test" },
+    source: { class: "marketplace-public" },
+    loadedIdentity: { status: "available", algorithm: "git-sha1", value: "a".repeat(40) },
+    installedIdentity: { status: "available", algorithm: "git-sha1", value: "a".repeat(40) },
+  } : null,
+});
+function observePipelineStartPreflight(options) {
+  return observeActual({ observeRulesetSource: () => source(), ...options });
+}
 const pluginList = (
   version = "0.4.5+test",
   sourceType = "git",
@@ -45,7 +60,7 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
   });
   assert.deepEqual(Object.keys(result).sort(), [
     "executionBoundary", "handoff", "installedSource", "installedVersion",
-    "nextAction", "pluginRoot", "schema", "status", "version",
+    "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "version",
   ]);
   assert.equal(result.schema, SCHEMA);
   assert.equal(result.status, "ready");
@@ -54,6 +69,7 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
   assert.equal(result.installedSource, "remote");
   assert.equal(result.executionBoundary, "default");
   assert.equal(result.handoff, "none");
+  assert.deepEqual(result.rulesetSource, { status: "ready", observation: source().observation });
   assert.deepEqual(result.nextAction, {
     kind: "command",
     executable: "node",
@@ -193,6 +209,30 @@ test("unavailable registry remains non-blocking when the loaded identity is cohe
     assert.equal(result.status, "ready");
     assert.equal(result.installedVersion, null);
     assert.equal(result.installedSource, "unknown");
+  }
+});
+
+test("preflight binds the normalized Codex observation and fails closed on its disagreement", () => {
+  const ready = observeActual({
+    env: {},
+    pluginList: pluginList(),
+    read: () => manifest,
+    observeRulesetSource: () => source(),
+  });
+  assert.equal(ready.status, "ready");
+  assert.equal(ready.rulesetSource.observation.source.class, "marketplace-public");
+  assert.equal(JSON.stringify(ready).includes("/cache/agent-pipeline"), false);
+
+  for (const status of ["loaded-installed-mismatch", "self-application-unattested", "codex-plugin-list-unavailable"]) {
+    const rejected = observeActual({
+      env: {},
+      pluginList: pluginList(),
+      read: () => manifest,
+      observeRulesetSource: () => source(status),
+    });
+    assert.equal(rejected.status, "plugin-refresh-required");
+    assert.deepEqual(rejected.rulesetSource, { status, observation: null });
+    assert.equal(rejected.nextAction, null);
   }
 });
 

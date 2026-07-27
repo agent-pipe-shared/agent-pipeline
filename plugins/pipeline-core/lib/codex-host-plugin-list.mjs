@@ -4,14 +4,20 @@
 import { execFileSync as nodeExecFileSync, spawnSync as nodeSpawnSync } from "node:child_process";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { normalizeRulesetSource, RULESET_SOURCE_SCHEMA } from "./ruleset-source.mjs";
+import { observePublicCoreIdentity } from "./public-core-observation.mjs";
 import { resolveTrustedSystemExecutable } from "./trusted-tool-resolution.mjs";
 
 const PLUGIN_VERSION = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$/u;
 const GIT_SHA1 = /^[0-9a-f]{40}$/u;
 const GIT_SHA256 = /^[0-9a-f]{64}$/u;
+const CONTENT_SHA256 = /^[0-9a-f]{64}$/u;
 const MAX_JSON_BYTES = 64 * 1024;
 const TIMEOUT_MS = 5000;
 const MAX_BUFFER = 128 * 1024;
+// This is an identity, not a prefix rule.  A credential-free HTTPS Git source
+// can still be a private marketplace, so only the one reviewed Public-Core
+// marketplace may become marketplace-public.
+const PUBLIC_MARKETPLACE_URL = "https://github.com/agent-pipe-shared/agent-pipeline.git";
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -30,16 +36,17 @@ function localAbsolute(path) {
     && resolve(path) === path;
 }
 
-function safeGitMarketplaceSource(value) {
+function classifyGitMarketplaceSource(value) {
   if (typeof value !== "string" || value.length === 0 || value.length > 2048) return false;
   try {
     const url = new URL(value);
-    return url.protocol === "https:"
+    if (!(url.protocol === "https:"
       && url.username === ""
       && url.password === ""
       && url.search === ""
       && url.hash === ""
-      && url.hostname.length > 0;
+      && url.hostname.length > 0)) return false;
+    return url.href === PUBLIC_MARKETPLACE_URL ? "marketplace-public" : "marketplace-private";
   } catch {
     return false;
   }
@@ -47,7 +54,7 @@ function safeGitMarketplaceSource(value) {
 
 function safeMarketplaceSource(value, pluginRoot) {
   if (!exactObject(value, ["sourceType", "source"])) return false;
-  if (value.sourceType === "git") return safeGitMarketplaceSource(value.source);
+  if (value.sourceType === "git") return classifyGitMarketplaceSource(value.source);
   // A local marketplace is the sanctioned SHA-phase development topology. It
   // is not a general local-path allowance: it must name precisely the
   // repository root containing the selected plugin source.
@@ -85,14 +92,15 @@ function selectedPluginRecord(document) {
   if (!exactObject(entry.source, ["source", "path"])
     || entry.source.source !== "local"
     || !localAbsolute(entry.source.path)) return null;
-  if (!safeMarketplaceSource(entry.marketplaceSource, entry.source.path)) return null;
+  const sourceClass = safeMarketplaceSource(entry.marketplaceSource, entry.source.path);
+  if (!sourceClass) return null;
   if (entry.pluginId === "pipeline-core@agent-pipeline-local"
     && entry.marketplaceSource.sourceType !== "local") return null;
   return Object.freeze({
     path: entry.source.path,
     pluginId: entry.pluginId,
     version: entry.version,
-    sourceClass: entry.marketplaceSource.sourceType === "git" ? "marketplace-public" : "local-development",
+    sourceClass: entry.marketplaceSource.sourceType === "git" ? sourceClass : "local-development",
   });
 }
 
@@ -195,8 +203,9 @@ export function observeCodexRulesetSource({
   spawnSync = nodeSpawnSync,
   execFileSync = nodeExecFileSync,
   resolveExecutable = resolveTrustedSystemExecutable,
+  observeSelfApplication = observePublicCoreIdentity,
 } = {}) {
-  if (typeof spawnSync !== "function" || typeof execFileSync !== "function" || typeof resolveExecutable !== "function"
+  if (typeof spawnSync !== "function" || typeof execFileSync !== "function" || typeof resolveExecutable !== "function" || typeof observeSelfApplication !== "function"
     || !localAbsolute(loadedPluginRoot)
     || selfApplicationRoot !== undefined && !localAbsolute(selfApplicationRoot)) {
     return adapterResult("invalid-input");
@@ -215,11 +224,26 @@ export function observeCodexRulesetSource({
   };
   const loadedIdentity = identityFor(loadedPluginRoot);
   const installedIdentity = identityFor(listed.record.path);
-  const sourceClass = listed.record.sourceClass === "local-development"
+  const isSelfApplication = listed.record.sourceClass === "local-development"
     && loadedPluginRoot === listed.record.path
     && selfApplicationRoot === dirname(dirname(listed.record.path))
-    ? "self-application"
-    : listed.record.sourceClass;
+  if (isSelfApplication) {
+    // Git equality alone is insufficient: a dirty loaded root can have the
+    // expected HEAD while serving changed plugin bytes.  The established Public
+    // Core observer verifies the exact checkout layout, clean Git state, and a
+    // stable full content snapshot without placing either path in our output.
+    const self = observeSelfApplication({
+      sourcePluginRoot: loadedPluginRoot,
+      installedPluginRoot: listed.record.path,
+    }, { execFileSync });
+    if (!isObject(self) || self.schema !== "pipeline.public-core-observation.v1" || self.status !== "ready") {
+      return adapterResult("self-application-unattested");
+    }
+    if (self.candidate?.commit !== loadedIdentity.value || !CONTENT_SHA256.test(self.plugin?.contentSha256)) {
+      return adapterResult("self-application-unattested");
+    }
+  }
+  const sourceClass = isSelfApplication ? "self-application" : listed.record.sourceClass;
   const source = {
     schema: RULESET_SOURCE_SCHEMA,
     runner: "codex",

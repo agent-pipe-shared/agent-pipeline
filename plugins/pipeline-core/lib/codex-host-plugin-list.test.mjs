@@ -19,7 +19,7 @@ function pluginEntry({
   version = "0.4.6+codex.test",
   path = INSTALLED_ROOT,
   sourceType = "git",
-  source = "https://github.example.invalid/agent-pipeline.git",
+  source = "https://github.com/agent-pipe-shared/agent-pipeline.git",
 } = {}) {
   return {
     pluginId,
@@ -64,6 +64,14 @@ function observe({
       const root = args[1];
       if (!heads.has(root)) throw new Error("pre-head private detail");
       return `${heads.get(root)}\n`;
+    },
+    observeSelfApplication(input) {
+      return {
+        schema: "pipeline.public-core-observation.v1",
+        status: "ready",
+        candidate: { commit: heads.get(input.sourcePluginRoot) },
+        plugin: { contentSha256: "c".repeat(64) },
+      };
     },
   });
 }
@@ -114,7 +122,7 @@ test("Codex-only readback yields a normalized public marketplace observation", (
       options: { encoding: "utf8", shell: false, stdio: ["ignore", "pipe", "pipe"] },
     },
   ]);
-  assertSafe(result, [LOADED_ROOT, INSTALLED_ROOT, "github.example.invalid"]);
+  assertSafe(result, [LOADED_ROOT, INSTALLED_ROOT, "github.com"]);
 });
 
 test("a local selected root is self-application only when it is the loaded checkout", () => {
@@ -178,6 +186,47 @@ test("private coordinates and malformed host records fail closed without a leak"
     observation: null,
   });
   assertSafe(result, [secret, privatePath, "private.example.invalid"]);
+});
+
+test("only the reviewed Public Core marketplace is public; safe other Git sources stay private", () => {
+  const privateRemote = "https://git.example.invalid/company/agent-pipeline.git";
+  const privateResult = observe({ installed: [pluginEntry({ source: privateRemote })] });
+  assert.equal(privateResult.status, "ready");
+  assert.equal(privateResult.observation.source.class, "marketplace-private");
+  assertSafe(privateResult, [privateRemote, "git.example.invalid"]);
+
+  const ssh = "git@github.com:agent-pipe-shared/agent-pipeline.git";
+  const unsafe = observe({ installed: [pluginEntry({ source: ssh })] });
+  assert.equal(unsafe.status, "codex-plugin-list-unavailable");
+  assertSafe(unsafe, [ssh]);
+});
+
+test("self application rejects a dirty or content-drifted checkout without output paths", () => {
+  const root = `${LOCAL_ROOT}/plugins/pipeline-core`;
+  const local = pluginEntry({
+    pluginId: "pipeline-core@agent-pipeline-local",
+    path: root,
+    sourceType: "local",
+    source: LOCAL_ROOT,
+  });
+  const result = observeCodexRulesetSource({
+    loadedPluginRoot: root,
+    selfApplicationRoot: LOCAL_ROOT,
+    resolveExecutable(name) {
+      if (name === "codex") return { ok: true, path: join(BIN_ROOT, "codex") };
+      if (name === "git") return { ok: true, path: join(BIN_ROOT, "git") };
+      return { ok: false };
+    },
+    spawnSync() { return { status: 0, signal: null, stdout: pluginList([local]), stderr: "" }; },
+    execFileSync(_path, args) { return `${args[1] === root ? SHA : ""}\n`; },
+    observeSelfApplication() { return { schema: "pipeline.public-core-observation.v1", status: "rejected" }; },
+  });
+  assert.deepEqual(result, {
+    schema: "pipeline.codex-ruleset-source-observation.v1",
+    status: "self-application-unattested",
+    observation: null,
+  });
+  assertSafe(result, [root, LOCAL_ROOT]);
 });
 
 test("invalid caller roots are rejected without observing the host", () => {
