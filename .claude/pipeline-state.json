@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
-  "planApproved": true,
-  "updatedAt": "2026-07-27T07:42:16.914Z",
+  "planApproved": false,
+  "updatedAt": "2026-07-27T08:58:51.224Z",
   "closedFeatures": [
     {
       "id": "codex-onboarding-0.4.5",
@@ -15,7 +15,7 @@
   "activeFeature": {
     "id": "sprint-phoenix-epic",
     "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-    "phase": "implementation"
+    "phase": "design"
   },
   "continuity": {
     "schema": "pipeline.continuity.v0",
@@ -82,5 +82,14 @@
       "specPath": "specs/sprint-phoenix-epic/spec.md",
       "specSha256": "f7f5ec8d32ce8e1047c3607d2fc2ba541ec7aa60644894e5468b3bfcd2136dee"
     }
+  },
+  "planRevocation": {
+    "schema": "pipeline.plan-revocation.v2",
+    "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+    "planSha256": "dd1bfe68c054c97330dace9f7938a63a350e95315725ecd844a800989dfa14ce",
+    "specPath": "specs/sprint-phoenix-epic/spec.md",
+    "specSha256": "f7f5ec8d32ce8e1047c3607d2fc2ba541ec7aa60644894e5468b3bfcd2136dee",
+    "revokedBy": "Phoenix Elephant under explicit PO scope-change authority",
+    "revokedAt": "2026-07-27T08:58:51.188Z"
   }
 }

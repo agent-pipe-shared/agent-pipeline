@@ -930,8 +930,12 @@ capability over the accepted #22 topology validator and transition planner; it
 does not prove that #22 already shipped a mutating implementation or authorize
 new files. Phoenix closes that capability only through files already listed in
 bound Spec §§7.1 and 7.4. The existing #22
-`feature-package-topology.mjs` remains an unmodified dependency: it validates
-the closed manifest and returns a non-mutating transition plan.
+`feature-package-topology.mjs` remains the canonical non-mutating planner, but
+PHX-0 slice A extends it and its existing suite with one closed
+absent-manifest `draft` bootstrap preview. The extension accepts no free-form
+authority: it derives a deterministic proposed manifest/receipt from the bound
+package path and proposed bytes, rejects every non-`draft` bootstrap target,
+and leaves existing-manifest validation and transition behavior unchanged.
 
 The sanctioned `pipeline-state.mjs` module already owns repository lifecycle
 state mutations, exact preimages, authority checks, continuity/publication
@@ -945,6 +949,8 @@ slice A owns this exact closed inventory:
 | --- | --- |
 | `harness/scripts/pipeline-state.mjs` | add `feature-package-inspect`, `feature-package-plan`, `feature-package-apply`, `feature-package-status`, `feature-package-recover`, plus closed `continuity-authority-revision-plan`, `continuity-authority-revision-apply`, and `continuity-authority-revision-recover`; consume the accepted #22 validator/planner; validate repo-relative package and authority artifacts, closed requests, exact preimages, legal transition, decision, candidate/evidence bindings, idempotency and recovery journal; publish by exclusive same-directory transaction and exact readback |
 | `harness/scripts/pipeline-state.test.mjs` | cover absent/existing manifests, draft bootstrap, noop/conflicting replay, request/manifest and continuity-authority drift, illegal transitions, wrong or stale decision, missing candidate/evidence, symlink/case/path/cross-repository rejection, concurrent writers, every crash seam, bounded recovery, sanitized output, and proof that preview/chat/handover cannot become write authority |
+| `plugins/pipeline-core/lib/feature-package-topology.mjs` | add only the read-only absent-manifest `draft` bootstrap preview needed for `feature-package-plan`; it returns the same closed #22 plan/receipt shape and cannot write, infer authority, or transition an existing manifest |
+| `plugins/pipeline-core/lib/feature-package-topology.test.mjs` | prove deterministic absent-manifest draft preview, rejection of every other absent-manifest target and malformed proposal, and unchanged existing-manifest planning |
 | `governance/artifact-topology.json` | register the lifecycle request, transaction journal, sanitized receipt and candidate-evidence classes at their sole canonical roots without making temporary journals portable authority |
 | `docs/artifact-topology.md` | document discovery, state/authority mapping, bootstrap limitation, transaction/recovery sequence, retention and the prohibition on legacy/path-guess authority |
 | `harness/scripts/verify.mjs` | register the focused writer/recovery suite and the topology validator in the single repository Verify gate |
@@ -954,7 +960,10 @@ slice A owns this exact closed inventory:
 binds package ID/path, exact manifest preimage (`absent` or digest), source and
 target state, complete proposed bytes, #22 validation receipt, artifact-set
 digest, candidate/evidence tuple where required, authority class and decision
-reference, idempotency key, and expiry. `feature-package-apply` accepts only
+reference, idempotency key, and expiry. For an absent preimage, it first uses
+the #22 extension's exact `draft` bootstrap preview; no temporary repository
+file, generic validator substitute, or later apply-stage validation may stand
+in for that receipt. `feature-package-apply` accepts only
 that repo-relative request plus its exact digest and expected current preimage;
 it never accepts free-form manifest bytes.
 

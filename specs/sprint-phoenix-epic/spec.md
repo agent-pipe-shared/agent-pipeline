@@ -352,6 +352,8 @@ files are excepted only when their path is already declared here.
 | `.claude/pipeline.yaml` | register new Verify/security/governance paths only through its authoritative source workflow | Make new contracts enforceable without direct generated-file edits. |
 | `harness/scripts/verify.mjs` | add scoped Phoenix suite registrations | One Verify gate must cover every package. |
 | `harness/definition-of-done.md` | add governance-stream/privacy/external-projection closure checks | Make Epic completion auditable. |
+| `plugins/pipeline-core/lib/feature-package-topology.mjs` | extend the accepted #22 planner with a read-only absent-manifest `draft` bootstrap preview | Let PHX-0 bind its initial manifest plan to the canonical topology planner without a temporary or hand-written authority file. |
+| `plugins/pipeline-core/lib/feature-package-topology.test.mjs` | add absent-manifest draft-bootstrap, rejection, and receipt fixtures | Prove the planner extension is closed, deterministic, and does not weaken existing-manifest validation. |
 
 ### 7.2 Ruleset-source trust root
 

@@ -332,8 +332,11 @@ architecture prose or an implementation briefing.
   capability SHALL be implemented by the feature-package command family in
   the already inventoried `harness/scripts/pipeline-state.mjs`, covered by
   `harness/scripts/pipeline-state.test.mjs`, and SHALL consume the accepted
-  #22 topology validator/transition planner rather than introducing an
-  implementation file outside bound Spec §7. This writer closure SHALL be the
+  #22 topology validator/transition planner. PHX-0 slice A SHALL extend that
+  planner and its existing suite only with the read-only absent-manifest
+  `draft` bootstrap preview required to bind initial creation; it SHALL NOT
+  introduce a separate planner or bypass the resulting receipt. This writer
+  closure SHALL be the
   mandatory first slice inside Spec §4.6 package PHX-0, not a separate package
   before PHX-0; PHX-0 SHALL NOT proceed to its ruleset-trust-root slice and
   PHX-1 SHALL NOT start until the writer slice passes its focused Verify and
