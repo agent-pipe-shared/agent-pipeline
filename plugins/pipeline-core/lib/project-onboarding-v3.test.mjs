@@ -177,6 +177,7 @@ function clearRuntimeBarrier(path, barrier) {
     barrierSha256: barrier.rawSha256,
     now: 40_000,
     spawn: fakeGit,
+    codexExecutable: process.execPath,
   });
   consumeRuntimeReadback({
     rootDir: path,
@@ -2559,7 +2560,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
     assert.equal(existsSync(join(path, "docs/state.md")), false, "handover stays a project decision; normal bootstrap deliberately remains F4 until it exists");
     const barrier = readRestartBarrier({ rootDir: path, spawn: fakeGit });
     const issued = issueLaunchTicket({
-      rootDir: path, barrierSha256: barrier.rawSha256, now: 40_000, spawn: fakeGit,
+      rootDir: path, barrierSha256: barrier.rawSha256, now: 40_000, spawn: fakeGit, codexExecutable: process.execPath,
     });
     consumeRuntimeReadback({
       rootDir: path,

@@ -2629,7 +2629,7 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
       try {
         const barrier = readRestartBarrier({ rootDir: legacy.root, repositoryCapability: repository.mode, deps: fs });
         if (barrier.status === "present" && barrier.barrier.state === "restart-required") {
-          if (!runtimeRestartBindingCurrent(barrier.barrier)) {
+          if (!runtimeRestartBindingCurrent(barrier.barrier, { codexExecutable: fs.codexExecutable })) {
             return lifecycleResult({
               status: "runtime-attestation-required",
               root: legacy.root,

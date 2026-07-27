@@ -127,6 +127,7 @@ function makeReady(path) {
     barrierSha256: barrier.rawSha256,
     now: 50_000,
     spawn: cliGit,
+    codexExecutable: process.execPath,
   });
   consumeRuntimeReadback({
     rootDir: path,
