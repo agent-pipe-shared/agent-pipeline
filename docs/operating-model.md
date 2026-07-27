@@ -105,26 +105,33 @@ normative shape is:
    finding disposition are delivery work, not repeated PO pauses. Do not ask
    for a new PO gate merely because a slice completes. A PO gate is required
    only for a typed blocker, a material scope or authority change, a push or
-   other remote action not already admitted by repository-calibrated,
-   candidate- or work-package-bound standing authority under the Standing
-   remote-authority contract, or final feature/epic acceptance. This preserves
+   other remote action not already admitted by the PHX-2 Human Governance
+   Decision Ledger and Authority Resolver contract below, or final feature/epic
+   acceptance. This preserves
    the initial plan gate; it does not weaken any required evidence gate.
-   **Standing remote-authority contract (policy and rollback plan).** This is
-   the only exception for a remote action: an explicit, current,
-   repository-calibrated standing-authority record must bind exactly one
-   action, remote and ref, and exactly one candidate or one named work package
-   with its immutable candidate. It authorizes no action variant, other remote
-   action, remote, ref, candidate or work package. Before execution, stop if
-   any binding is missing or ambiguous, or if the authority is expired,
-   revoked or changed. The authority lasts only until successful exact remote
-   readback, or until an explicit revocation or authority change. After the
-   action, compare the exact remote ref with the bound candidate and update
-   the local public evidence/audit path with the binding and observed ref;
-   never include private data or claim success without that readback.
+   **PHX-2 Human Governance Decision Ledger and Authority Resolver transition
+   (policy and rollback plan).** The sole possible exception for a remote
+   action is a secure Ledger/Resolver proof of one valid, unconsumed,
+   unrevoked, unexpired and integrity-bound PO decision. The Resolver must bind
+   that decision exactly to one action, remote, ref, candidate and named work
+   package; it authorizes no action variant, other remote action, remote, ref,
+   candidate or work package. The decision record must not originate from an
+   agent, Git history, state, cache, agent journal, lifecycle event, readback,
+   runner or AGY. Until this PHX-2 path exists, or whenever its Resolver or
+   proof is unavailable, missing or ambiguous, every remote action is an
+   explicit PO gate. Before execution, also stop if the decision is expired,
+   revoked, consumed or changed. Its sole lifetime ends at successful exact
+   remote readback, or at an explicit revocation or authority change. This
+   semantics is platform- and runner-neutral: it applies equally on macOS,
+   Windows and Linux and to Claude, Codex and AGY, without making AGY a
+   prerequisite. After the action, compare the exact remote ref with the bound
+   candidate and update the local public evidence/audit path with the binding
+   and observed ref; never include private data or claim success without that
+   readback.
    **Authorization/trust-boundary threat-model assessment.** An unbound,
-   stale, ambiguous or changed remote action is denied: only the exact bound
-   record is authority. Remote readback is observation, never authority; the
-   audit trail is public-safe and contains no private data.
+   stale, ambiguous or changed remote action is denied: only the PHX-2
+   Ledger/Resolver proof is authority. Remote readback is observation, never
+   authority; the audit trail is public-safe and contains no private data.
    **Rollback.** Before the readback, abort the action. After publication,
    never force-push or automatically reverse it: a compensating remote action
    needs new explicit PO authority that names that action, remote and ref.
@@ -373,29 +380,35 @@ Die normative Form lautet:
    wiederholten PO-Pausen. Nicht allein wegen des Abschlusses eines Slices ein
    neues PO-Gate einholen. Ein PO-Gate ist nur bei einem typisierten Blocker,
    einer materiellen Scope- oder Autoritätsänderung, einem Push oder einer
-   anderen Remote-Aktion, die nicht bereits durch eine repository-kalibrierte,
-   kandidaten- oder arbeitspaketgebundene Standing Authority zugelassen ist,
-   die dem Standing-Remote-Authority-Vertrag entspricht, oder der finalen
-   Feature-/Epic-Abnahme erforderlich. Das erhält das anfängliche Plan-Gate
+   anderen Remote-Aktion, die nicht bereits durch den unten stehenden PHX-2
+   Human Governance Decision Ledger und Authority Resolver zugelassen ist,
+   oder der finalen Feature-/Epic-Abnahme erforderlich. Das erhält das anfängliche Plan-Gate
    und schwächt kein nötiges Evidenz-Gate.
-   **Standing-Remote-Authority-Vertrag (Policy und Rollback-Plan).** Dies ist
-   die einzige Ausnahme für eine Remote-Aktion: Ein expliziter, aktueller,
-   repository-kalibrierter Standing-Authority-Record muss genau eine Aktion,
-   ein Remote und einen Ref sowie genau einen Kandidaten oder ein benanntes
-   Arbeitspaket mit seinem unveränderlichen Kandidaten binden. Er autorisiert
-   keine Aktionsvariante, andere Remote-Aktion, kein anderes Remote, keinen
-   anderen Ref, Kandidaten oder kein anderes Arbeitspaket. Vor der Ausführung
-   bei fehlender oder mehrdeutiger Bindung sowie bei abgelaufener, widerrufener
-   oder geänderter Authority stoppen. Die Authority gilt nur bis zum
-   erfolgreichen exakten Remote-Readback oder bis zu einem ausdrücklichen
-   Widerruf oder einer Authority-Änderung. Nach der Aktion den exakten
-   Remote-Ref mit dem gebundenen Kandidaten vergleichen und den lokalen,
-   öffentlichen Evidenz-/Auditpfad mit Bindung und beobachtetem Ref
+   **PHX-2 Human Governance Decision Ledger und Authority-Resolver-Übergang
+   (Policy und Rollback-Plan).** Die einzige mögliche Ausnahme für eine
+   Remote-Aktion ist ein sicherer Ledger-/Resolver-Nachweis einer gültigen,
+   unverbrauchten, nicht widerrufenen, nicht abgelaufenen und
+   integritätsgebundenen PO-Decision. Der Resolver muss diese Decision genau
+   an eine Aktion, ein Remote, einen Ref, einen Kandidaten und ein benanntes
+   Arbeitspaket binden; sie autorisiert keine Aktionsvariante, andere
+   Remote-Aktion, kein anderes Remote, keinen anderen Ref, Kandidaten oder
+   kein anderes Arbeitspaket. Der Decision-Record darf nicht aus einem Agent,
+   Git-History, State, Cache, Agent-Journal, Lifecycle-Event, Readback, Runner
+   oder AGY stammen. Solange dieser PHX-2-Pfad nicht existiert oder sein
+   Resolver bzw. Nachweis nicht verfügbar, fehlend oder mehrdeutig ist, ist
+   jede Remote-Aktion ein ausdrückliches PO-Gate. Vor der Ausführung auch bei
+   abgelaufener, widerrufener, verbrauchter oder geänderter Decision stoppen.
+   Ihre einzige Laufzeit endet mit erfolgreichem exaktem Remote-Readback oder
+   einem ausdrücklichen Widerruf bzw. einer Authority-Änderung. Diese Semantik
+   ist plattform- und runnerneutral: Sie gilt gleich für macOS, Windows und
+   Linux sowie Claude, Codex und AGY, ohne AGY vorauszusetzen. Nach der Aktion
+   den exakten Remote-Ref mit dem gebundenen Kandidaten vergleichen und den
+   lokalen, öffentlichen Evidenz-/Auditpfad mit Bindung und beobachtetem Ref
    aktualisieren; niemals private Daten aufnehmen oder ohne diesen Readback
    Erfolg behaupten. **Authorization-/Trust-Boundary-Threat-Model-Bewertung.**
    Eine ungebundene, veraltete, mehrdeutige oder geänderte Remote-Aktion wird
-   verweigert: Nur der exakt gebundene Record ist Authority. Remote-Readback
-   ist Beobachtung, nie Authority; der Auditpfad ist public-safe und enthält
+   verweigert: Nur der PHX-2-Ledger-/Resolver-Nachweis ist Authority.
+   Remote-Readback ist Beobachtung, nie Authority; der Auditpfad ist public-safe und enthält
    keine privaten Daten. **Rollback.** Vor dem Readback die Aktion abbrechen. Nach
    der Veröffentlichung niemals force-pushen oder automatisch zurückbauen:
    Eine gegensteuernde Remote-Aktion benötigt neue ausdrückliche PO-Autorität,
