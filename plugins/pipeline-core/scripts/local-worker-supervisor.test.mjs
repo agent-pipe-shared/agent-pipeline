@@ -15,7 +15,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { tmpdir, uptime } from "node:os";
+import { uptime } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -178,7 +178,9 @@ function createRequest(sourceRoot, stateRoot, commit, options = {}) {
 }
 
 function fixture() {
-  const root = mkdtempSync(join(tmpdir(), "pipeline-b1i-"));
+  // `/tmp` is intentionally untrusted for durable supervisor state. Keep this
+  // integration fixture in a private checkout-local directory instead.
+  const root = mkdtempSync(join(process.cwd(), ".pipeline-b1i-"));
   const sourceRoot = join(root, "source");
   const stateBase = join(root, "state");
   mkdirSync(sourceRoot);
