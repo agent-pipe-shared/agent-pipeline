@@ -1,16 +1,17 @@
 # Prepared Goldfish briefing — CLAUDE-RUNNER-01c: Claude-side `guard-lifecycle-ready` wiring
 
-> **Status: NOT YET DISPATCHED — depends on CLAUDE-RUNNER-01a and
-> CLAUDE-RUNNER-01b landing and verifying first** (this task wires the
-> lifecycle-readiness gate that (a)/(b) made runner-conditional; it does not
-> itself change lifecycle logic). Do not dispatch this briefing until both
-> land and their own DoD checks pass. PO gate answered "freigeben" for
-> `prd_claude-runner-onboarding.md`/`spec.md` (2026-07-26, recorded in
-> `docs/state.md`), which explicitly includes AC-8 (this task) and the PRD's
-> Decision point 1 ("ja, gleichwertige Durchsetzung für den `Edit|Write`-Fall").
-> Ruleset SHA placeholder: refresh to (b)'s landing commit before dispatch.
+> **Status: READY TO DISPATCH — (a), (b), and (d) have landed and were
+> independently verified** (this task wires the lifecycle-readiness gate
+> that (a)/(b)/(d) made runner-conditional and actually reachable through the
+> real entrypoint; it does not itself change lifecycle logic). PO gate
+> answered "freigeben" for `prd_claude-runner-onboarding.md`/`spec.md`
+> (2026-07-26, recorded in `docs/state.md`), which explicitly includes AC-8
+> (this task) and the PRD's Decision point 1 ("ja, gleichwertige Durchsetzung
+> für den `Edit|Write`-Fall").
+> Ruleset SHA: refreshed to (d)'s landing commit `e6e8f5b` on
+> `feat/sprint-cyborg-claude` (2026-07-27).
 > **Worktree: no** — run directly in the main checkout, same reasoning as
-> (a)/(b).
+> (a)/(b)/(d).
 >
 > **`hooks.json` protection note:** `plugins/pipeline-core/hooks/hooks.json`
 > is TP-4-protected per `.claude/guard-config.json`
@@ -31,7 +32,7 @@ files or session history — this briefing replaces them.
 
 First output line (compact bootstrap confirmation):
 
-> Bootstrap check passed: ruleset <REFRESH-SHA> loaded · Project agent-pipeline · Calibration .claude/pipeline.json · State briefing CLAUDE-RUNNER-01c/2026-07-26 · Role Goldfish (deep)
+> Bootstrap check passed: ruleset e6e8f5b loaded · Project agent-pipeline · Calibration .claude/pipeline.json · State briefing CLAUDE-RUNNER-01c/2026-07-26 · Role Goldfish (deep)
 
 ---
 
@@ -223,8 +224,8 @@ your reasoning, in your report. Do NOT silently assume either way.
 
 ### 6. Dispatch metadata
 
-- Ruleset SHA/version: refresh to (b)'s landing commit SHA before dispatch —
-  placeholder, do not dispatch unrefreshed.
+- Ruleset SHA/version: `e6e8f5b` ((d)'s landing commit on
+  `feat/sprint-cyborg-claude`).
 - Model/effort: `goldfish-deep` / xhigh. Rationale: rigor 2 / risk class
   high per Spec header; this task modifies a TP-4-protected guard-wiring
   file and makes a genuine design call (registration shape) with real
