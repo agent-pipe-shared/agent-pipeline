@@ -1,6 +1,6 @@
 # Sprint Phoenix governance conformance
 
-Status: design governance review met; Product Owner gate pending
+Status: design governance complete; presented at Product Owner gate
 
 Date: 2026-07-26
 
@@ -42,7 +42,7 @@ No design-stage deviation from the twelve guidelines is proposed.
 | 4 | Rollback path documented | MET (design) | `spec.md` migration/compatibility, stateful recovery checklist, architecture crash matrices, and `RECOVERY.md` define recovery authority and no-history-fabrication. |
 | 5 | Third-party license compliance | NOT APPLICABLE to current design | No package dependency is added. Any implementation dependency/profile library requires exact registry identity, pin, license allowlist check, and evidence before dispatch/merge. |
 | 6 | Secrets handling reviewed | MET (design) | Default-deny schemas, pre-persistence redaction, machine-local secret bindings, endpoint restrictions, and prohibited-content tests are normative. |
-| 7 | Backward compatibility assessed | MET (corrected design; re-review pending) | Every direct plan/push/deploy/release/override reader is now inventoried; dual-read is ledger-first, disagreement fails closed, the integration-package owner is named, and the window expires no later than 2026-10-31. |
+| 7 | Backward compatibility assessed | MET (corrected and re-reviewed design) | Every direct plan/push/deploy/release/override reader is now inventoried; dual-read is ledger-first, disagreement fails closed, the integration-package owner is named, and the window expires no later than 2026-10-31. |
 | 8 | Deferred-risk owner/expiry | MET for current design record | The current course-gate risks are owned and dated below; implementation residuals cannot close without the same treatment. |
 
 ## Current course-gate risks
@@ -51,7 +51,7 @@ No design-stage deviation from the twelve guidelines is proposed.
 | --- | --- | --- | --- |
 | `PHX-DESIGN-ADVISORY-UNAVAILABLE` | Phoenix Elephant, with PO authority for review dispatch | 2026-07-31 | RESOLVED for design readiness by the authorized compensating review chain: all original, privacy, writer-inventory, and PHX-0 sequencing findings cleared. Advisor itself remains unavailable and is never claimed passed. |
 | `PHX-DESIGN-INHERITED-CONTINUITY` | Product Owner for exception authority; Phoenix Elephant for exact execution/readback | 2026-07-31 | RESOLVED 2026-07-26 through the documented exact repair, sanctioned writers, Phoenix continuity initialization, cleanup, and full bootstrap readback. |
-| `PHX-DESIGN-HANDOVER-DRIFT` | Phoenix close owner; Product Owner controls scope | 2026-07-31 | Reconcile the canonical handover at close without reopening Product Owner-dispositioned 0.4.6 implementation. |
+| `PHX-DESIGN-HANDOVER-DRIFT` | Phoenix close owner; Product Owner controls scope | 2026-07-31 | RESOLVED 2026-07-26 by replacing the stale operational head with the Phoenix design-gate handover without reopening Product Owner-dispositioned 0.4.6 implementation. |
 | `PHX-LEGACY-AUTHORITY-COMPATIBILITY` | Phoenix integration-package owner | Earlier of Phoenix integration close or 2026-10-31 | Migrate every direct mutable authority reader, dual-evaluate ledger/state, block disagreement, and prohibit compatibility removal or Phoenix completion while any reader remains unmigrated. |
 | `PHX-PRIVACY-PORTABLE-TRUST-ZONE` | Phoenix integration-package owner | Before Product Owner gate | RESOLVED 2026-07-26 by fixed-candidate privacy PASS over the normative Spec §§4.4–4.5 interpretation and repository-wide admission. |
 | `PHX-PRIVACY-RESTRICTED-ERASURE` | Phoenix integration-package owner | Before Product Owner gate | RESOLVED 2026-07-26 by fixed-candidate privacy PASS over portable-only append semantics, restricted erasure/key destruction, and Spec-inventory ownership. |

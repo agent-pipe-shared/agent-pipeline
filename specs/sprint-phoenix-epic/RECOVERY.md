@@ -56,6 +56,12 @@ execution. Its topology, criterion-count, whitespace, and status checks were
 then run as separate repository-relative commands and passed. No guard was
 bypassed and no rejected command mutated state.
 
+The close reconciliation reproduced the class again for a combined inventory
+and design-status read. It was rejected before execution and replaced with
+separate repository-relative reads. The recurrence is recorded as one
+sanitized workflow-improvement class; it neither expands the approved design
+scope nor authorizes an early guard change.
+
 ## R-03 — Advisor route exhausted
 
 | Field | Value |
@@ -378,6 +384,39 @@ closes the review course gate only; it creates no Advisor-pass claim, Product
 Owner approval, implementation authority, push, merge, release, external
 write, or final-Epic completion.
 
+## R-11 — Design close reached the Product Owner gate
+
+The close Stage-1 aggregate gate ran on commit
+`8db528d60cc8bd1129b5adebafb8c065a90ee98b`, tree
+`6c253cf45797911b297e7617f403550a8067ee97`. Full Verify returned exit 0
+with evidence digest
+`b8d52a74ad1317a5da86ba43f9006bf511c3a1133fafdd2cb2774f9baeaaf363`;
+integrated Security returned exit 0 / CLEAN with evidence digest
+`1bf956d1c17bb8793cf4d7583df7bf73ed1e866a47c7644248a80170969fc6a4`.
+
+The descriptor-bound hygiene pass first found one exact disposable
+capability-probe residue from verification. Its type, single-link identity,
+size, and restrictive mode matched the known probe contract; only that
+untracked probe file was removed. The repeated hygiene readback passed with
+one canonical worktree, no active manifest, and no owned residue. The
+sanctioned cleanup then completed with zero registered, removed, or blocked
+resources and released the exact Continuity cleanup binding.
+
+The canonical handover now presents Phoenix as design-complete and
+`not-human-verified`. The active feature remains in `phase:"design"`,
+`planApproved:false`, with exact PRD/Spec authority and a typed
+Product-Owner-decision blocker. No implementation, plan approval, lifecycle
+promotion, push, merge, tag, release, issue mutation, or other remote write is
+claimed.
+
+The same unapproved-plan guard correctly continued to protect product files
+but also rejected the close ritual's root History and telemetry targets as
+implementation. Those two optional-to-product but mandatory-to-ritual writes
+were not bypassed. Their intended sanitized content is represented by this
+Recovery entry, the canonical handover, Error Register, and self-retro item;
+the root records remain an explicitly open close-routine residual requiring a
+sanctioned close-artifact path, not premature plan approval.
+
 ## Audit classification
 
 These records illustrate the Phoenix recovery profile:
@@ -398,7 +437,7 @@ profile.
 | --- | --- | --- | --- |
 | Advisor route unavailable | Phoenix Elephant; Product Owner controls Critic dispatch | 2026-07-31 | RESOLVED for design readiness through the authorized fixed-candidate review chain; Advisor remains unavailable and unclaimed |
 | Inherited 0.4.6 continuity could not close through the exposed sanctioned route | Product Owner controlled exception authority; Phoenix Elephant controlled exact execution/readback | 2026-07-31 | RESOLVED 2026-07-26; exact repair, close, Phoenix initialization, cleanup, and V4 readback recorded |
-| Canonical handover lags the current released implementation | Phoenix close owner; Product Owner controls any scope change | 2026-07-31 | OPEN documentation drift; completed 0.4.6 work remains excluded from Phoenix product scope |
+| Canonical handover lags the current released implementation | Phoenix close owner; Product Owner controls any scope change | 2026-07-31 | RESOLVED 2026-07-26 by the Phoenix design-gate handover; completed 0.4.6 work remains excluded from Phoenix product scope |
 | Mutable authority-reader compatibility could remain indefinite | Phoenix integration-package owner | Earlier of Phoenix integration close or 2026-10-31 | Direct readers inventoried; dual-read fail-closed migration and expiry now normative; implementation evidence pending |
 | #22 lifecycle writer was assigned to files outside the bound Spec inventory | Phoenix design owner | Before Product Owner gate | RESOLVED by final Critic PASS over Spec-listed ownership, transactional semantics, and mandatory PHX-0 slice sequencing |
 

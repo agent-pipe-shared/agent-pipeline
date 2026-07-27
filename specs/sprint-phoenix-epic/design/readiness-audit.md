@@ -1,6 +1,6 @@
 # Sprint Phoenix design readiness audit
 
-Status: design review passed; close reconciliation and Product Owner gate pending
+Status: design complete; presented at Product Owner gate
 
 Date: 2026-07-26
 
@@ -95,33 +95,37 @@ trusted time, destination retention, analyst review, or compliance.
 | Comprehensive original-finding re-review on `4dad856c216e3a55cba658ee1ea9d9752144674a` | FAIL with one major; PHX-CR-01..04/06 and PHX-PR-01..05 cleared; PHX-CR-05R accepted and corrected without a Spec edit or out-of-inventory implementation file |
 | Lifecycle-writer inventory correction re-review on `df0387a2b62e85e5cc881e6a41ddff596fe42db3` | FAIL with one major; inventory/transaction design accepted; PHX-CR-05S package-sequence conflict accepted and corrected by making writer closure mandatory PHX-0 slice A |
 | Final PHX-0 sequencing correction re-review on `49c1a167c70a83e7e45422ee4407bfd8293d387d` | PASS with no findings; PHX-CR-05S and direct regressions cleared; machine trajectory consistent; no write or delegation |
+| Close Stage-1 Full Verify on `8db528d60cc8bd1129b5adebafb8c065a90ee98b` | exit 0; machine evidence SHA-256 `b8d52a74ad1317a5da86ba43f9006bf511c3a1133fafdd2cb2774f9baeaaf363` |
+| Close Stage-1 integrated Security on the same candidate | exit 0 / CLEAN; machine evidence SHA-256 `1bf956d1c17bb8793cf4d7583df7bf73ed1e866a47c7644248a80170969fc6a4` |
 
 The machine files are Git-ignored by repository policy and are passed directly
-as evidence paths to the next Critic. Their command, exit code, timestamp,
+as evidence paths to the next gate. Their command, exit code, timestamp,
 candidate commit/tree, before/after cleanliness, and step/scanner outcomes are
-machine written. Privacy sign-off, implementation tests, native platform
-evidence, issue closure, and Product Owner approval remain unclaimed.
+machine written. Implementation privacy sign-off, implementation tests, native
+platform evidence, issue closure, and Product Owner approval remain unclaimed.
 
 ## Completed pre-review authority transitions
 
 1. The inherited completed 0.4.6 feature was repaired and closed without
    inventing a Result.
 2. Phoenix is the active design feature with valid continuity initialized at
-   revision 0 (current revision 1 after cleanup binding), exact PRD/Spec
-   authority, `result:null`, and `nextAction:"review"`.
+   revision 0, exact PRD/Spec authority, and `result:null`. The close releases
+   the exact cleanup binding and changes only the continuity projection from
+   review work to the typed Product Owner decision blocker.
 3. The Product Owner explicitly authorized the fixed-candidate Critic.
 4. A repeated full bootstrap passed under Pipeline 0.4.6. The canonical
-   handover's 2026-07-25 date remains a visible documentation-drift warning.
+   handover is reconciled to the Phoenix Product Owner gate.
 5. The first fixed candidate was committed and received a FAIL verdict with six
    evidence-gated findings; no finding was waived.
 6. Full Verify and integrated Security subsequently passed on that exact
    unchanged candidate through the required host boundary.
 
-## Remaining authority gates
+## Product Owner gate
 
-1. Reconcile the canonical handover and design-gate continuity projection.
-2. Run the exact post-close deterministic and repository gates.
-3. Present the readable PRD and wait for the literal Product Owner
-   `approved` implementation gate.
+The complete readable PRD is now presented for the literal Product Owner
+`approved` decision. Pipeline State deliberately remains
+`phase:"design"`/`planApproved:false`; the active feature remains open and no
+implementation package is dispatchable. The exact post-close deterministic
+and repository gates are the final local evidence tail for this presentation.
 
-No remote write is needed for these design-readiness steps.
+No remote write is needed or authorized for this design gate.
