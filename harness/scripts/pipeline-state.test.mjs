@@ -2213,6 +2213,35 @@ if (symlinkCapable) {
   writeFileSync(journalPath, `${canonicalFixtureJson(journal)}\n`);
   const refused = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-02", "--mode", "complete"], bound);
   ok("PHX0A6f self-consistent forged journal postimage cannot complete or change the retained preimage", crashed === 2 && refused === 2 && readFileSync(statePath(dir), "utf8") === before && existsSync(journalPath));
+  journal.schema = "pipeline.continuity-authority-revision-transaction.v1";
+  writeFileSync(journalPath, `${canonicalFixtureJson(journal)}\n`);
+  const legacyPreview = captureConsoleLog(() => run(["continuity-authority-revision-recover"], bound));
+  const legacyComplete = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-03", "--mode", "complete"], bound);
+  const legacyRestore = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-forgery-lock-04", "--mode", "restore"], bound);
+  ok("PHX0A6g legacy-v1 pending journal is explicitly restore-only and remains recoverable", legacyPreview.value === 2 && legacyPreview.text.includes("recovery-legacy-restore-only") && legacyComplete === 2 && legacyRestore === 0 && readFileSync(statePath(dir), "utf8") === before && !existsSync(journalPath));
+}
+
+{
+  const dir = freshDir("phx-authority-revision-recovery-timestamp-forgery");
+  seedContinuityRoot(dir);
+  const artifact = (path, bytes) => { writeFileSync(join(dir, path), bytes); return { path, sha256: createHash("sha256").update(bytes).digest("hex") }; };
+  const oldPrd = artifact("specs/time-prd.md", "old prd\n"); const oldSpec = artifact("specs/time-spec.md", "old spec\n");
+  const nextPrd = artifact("specs/time-prd-next.md", "next prd\n"); const nextSpec = artifact("specs/time-spec-next.md", "next spec\n");
+  const initial = continuityState({ authority: { prd: oldPrd, spec: oldSpec, result: { path: "specs/result.md", sha256: C } }, queueHead: continuityQueue({ dispatch: null }) });
+  run(continuityArgs("continuity-init", "absent", writeRequest(dir, "time-init", initial)), continuityDeps(dir));
+  const before = readFileSync(statePath(dir), "utf8"); const stateBefore = readState(dir).state;
+  const request = { schema: "pipeline.continuity-authority-revision-request.v1", featureId: CONTINUITY_FEATURE, expectedRevision: 0, preStateSha256: sha256CanonicalJson(stateBefore), oldAuthority: { prd: oldPrd, spec: oldSpec }, nextAuthority: { prd: nextPrd, spec: nextSpec }, decision: { id: "decision-time-01", sha256: A, scope: { featureId: CONTINUITY_FEATURE, phase: "design" } }, candidate: { commit: "a".repeat(40), tree: "b".repeat(40) }, evidence: { sha256: B }, idempotencyKey: "phx-time-01", expiresAt: "2030-01-01T00:00:00.000Z" };
+  const requestFile = writeRequest(dir, "time-authority-request", request); const requestSha = sha256Canonical(request);
+  const bound = authorityRevisionDeps(dir, request); const crash = authorityRevisionDeps(dir, request, { replaceStateFdContents: () => { throw new Error("injected crash seam"); } });
+  const crashed = run(["continuity-authority-revision-apply", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-time-lock-01"], crash);
+  const journalPath = join(dir, ".claude", "continuity-authority-revision-transaction.json"); const journal = JSON.parse(readFileSync(journalPath, "utf8"));
+  const forgedPost = JSON.parse(journal.postStateBytes); forgedPost.updatedAt = "2029-12-31T00:00:00.000Z";
+  journal.postStateBytes = JSON.stringify(forgedPost, null, 2) + "\n";
+  journal.postStateBytesSha256 = createHash("sha256").update(journal.postStateBytes).digest("hex");
+  journal.postStateSha256 = sha256CanonicalJson(forgedPost);
+  writeFileSync(journalPath, `${canonicalFixtureJson(journal)}\n`);
+  const refused = run(["continuity-authority-revision-recover", "--request-file", requestFile, "--request-sha256", requestSha, "--lock-token", "phx-time-lock-02", "--mode", "complete"], bound);
+  ok("PHX0A6h timestamp-only self-consistent postimage forgery is refused without State mutation", crashed === 2 && refused === 2 && readFileSync(statePath(dir), "utf8") === before && existsSync(journalPath));
 }
 
 // ---- Cleanup ------------------------------------------------------------------------------

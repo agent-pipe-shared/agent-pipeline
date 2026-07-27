@@ -2492,9 +2492,16 @@ function authorityRevisionLiveBindings(dir, state, current, request, deps, autho
   return authorityRevisionCommonBindings(dir, state, request, deps)
     && samePhxJson({ prd: current.authority.prd, spec: current.authority.spec }, authority);
 }
-function authorityRevisionExpectedPostStateBytes(preStateBytes, request, updatedAt) {
+function authorityRevisionTransactionAt(preStateBytes, request) {
+  try {
+    const state = JSON.parse(preStateBytes);
+    return safeIso(state?.updatedAt) ? state.updatedAt : request.expiresAt;
+  } catch { return null; }
+}
+function authorityRevisionExpectedPostStateBytes(preStateBytes, request) {
   try {
     const previous = JSON.parse(preStateBytes); const current = previous?.continuity;
+    const updatedAt = authorityRevisionTransactionAt(preStateBytes, request);
     if (!current || !safeIso(updatedAt) || !samePhxJson({ prd: current.authority?.prd, spec: current.authority?.spec }, request.oldAuthority)) return null;
     const nextContinuity = structuredClone(current); nextContinuity.revision++;
     nextContinuity.authority.prd = structuredClone(request.nextAuthority.prd); nextContinuity.authority.spec = structuredClone(request.nextAuthority.spec);
@@ -2508,21 +2515,25 @@ function authorityRevisionExpectedPostStateBytes(preStateBytes, request, updated
     return JSON.stringify(clearGateEstimateForMutation({ ...previous, continuity: nextContinuity, continuityAuthorityRevisionReceipts: receipts, updatedAt }), null, 2) + "\n";
   } catch { return null; }
 }
-function authorityRevisionJournal(request, preStateBytes, postStateBytes, updatedAt) {
+function authorityRevisionJournal(request, preStateBytes, postStateBytes) {
   return {
-    schema: "pipeline.continuity-authority-revision-transaction.v1", request: structuredClone(request),
+    schema: "pipeline.continuity-authority-revision-transaction.v2", request: structuredClone(request),
     requestSha256: sha256Bytes(canonicalPhxJson(request)), preStateSha256: request.preStateSha256,
     preStateBytesSha256: sha256Bytes(preStateBytes), preStateBytes,
-    updatedAt, postStateSha256: sha256CanonicalJson(JSON.parse(postStateBytes)), postStateBytesSha256: sha256Bytes(postStateBytes), postStateBytes,
+    postStateSha256: sha256CanonicalJson(JSON.parse(postStateBytes)), postStateBytesSha256: sha256Bytes(postStateBytes), postStateBytes,
   };
 }
+function authorityRevisionJournalKind(value) {
+  const keys = ["schema", "request", "requestSha256", "preStateSha256", "preStateBytesSha256", "preStateBytes", "postStateSha256", "postStateBytesSha256", "postStateBytes"];
+  if (!exactObjectKeys(value, keys) || !["pipeline.continuity-authority-revision-transaction.v1", "pipeline.continuity-authority-revision-transaction.v2"].includes(value.schema)) return null;
+  return value.schema.endsWith(".v1") ? "legacy-v1" : "v2";
+}
 function exactAuthorityRevisionJournal(value) {
-  return exactObjectKeys(value, ["schema", "request", "requestSha256", "preStateSha256", "preStateBytesSha256", "preStateBytes", "updatedAt", "postStateSha256", "postStateBytesSha256", "postStateBytes"])
-    && value.schema === "pipeline.continuity-authority-revision-transaction.v1"
+  return authorityRevisionJournalKind(value) !== null
     && exactAuthorityRevisionRequest(value.request) && value.requestSha256 === sha256Bytes(canonicalPhxJson(value.request))
     && value.preStateSha256 === value.request.preStateSha256 && SHA256_RE.test(value.preStateBytesSha256)
     && SHA256_RE.test(value.postStateSha256) && SHA256_RE.test(value.postStateBytesSha256)
-    && typeof value.preStateBytes === "string" && typeof value.postStateBytes === "string" && safeIso(value.updatedAt)
+    && typeof value.preStateBytes === "string" && typeof value.postStateBytes === "string"
     && sha256Bytes(value.preStateBytes) === value.preStateBytesSha256 && sha256Bytes(value.postStateBytes) === value.postStateBytesSha256
     && (() => { try { return sha256CanonicalJson(JSON.parse(value.preStateBytes)) === value.preStateSha256 && sha256CanonicalJson(JSON.parse(value.postStateBytes)) === value.postStateSha256; } catch { return false; } })();
 }
@@ -2551,7 +2562,8 @@ function runContinuityAuthorityRevisionCommand(sub, argv, deps) {
     const journalPath = authorityRevisionJournalPath(dir); const exists = existsSync(journalPath);
     const journal = exists ? readClosedJsonFile(dir, ".claude/continuity-authority-revision-transaction.json") : null;
     const pending = journal?.ok && exactAuthorityRevisionJournal(journal.value);
-    console.log(JSON.stringify({ schema: "pipeline.continuity-authority-revision-recovery.v1", status: !exists ? "no-recovery" : pending ? "recovery-required" : "recovery-invalid", requestSha256: pending ? journal.value.requestSha256 : null }));
+    const kind = pending ? authorityRevisionJournalKind(journal.value) : null;
+    console.log(JSON.stringify({ schema: "pipeline.continuity-authority-revision-recovery.v1", status: !exists ? "no-recovery" : kind === "legacy-v1" ? "recovery-legacy-restore-only" : pending ? "recovery-required" : "recovery-invalid", requestSha256: pending ? journal.value.requestSha256 : null }));
     return exists ? 2 : 0;
   }
   const names = sub === "continuity-authority-revision-recover"
@@ -2569,17 +2581,19 @@ function runContinuityAuthorityRevisionCommand(sub, argv, deps) {
     if (sub === "continuity-authority-revision-recover") {
       if (!(["complete", "restore"].includes(parsed.value.mode)) || !journal.ok || !exactAuthorityRevisionJournal(journal.value)
         || !samePhxJson(journal.value.request, request)) return 2;
-      const expectedPostStateBytes = authorityRevisionExpectedPostStateBytes(journal.value.preStateBytes, request, journal.value.updatedAt);
-      if (expectedPostStateBytes === null || expectedPostStateBytes !== journal.value.postStateBytes
+      const journalKind = authorityRevisionJournalKind(journal.value);
+      const expectedPostStateBytes = journalKind === "v2" ? authorityRevisionExpectedPostStateBytes(journal.value.preStateBytes, request) : null;
+      if (journalKind === "v2" && (expectedPostStateBytes === null || expectedPostStateBytes !== journal.value.postStateBytes
         || sha256Bytes(expectedPostStateBytes) !== journal.value.postStateBytesSha256
-        || sha256CanonicalJson(JSON.parse(expectedPostStateBytes)) !== journal.value.postStateSha256) return 2;
+        || sha256CanonicalJson(JSON.parse(expectedPostStateBytes)) !== journal.value.postStateSha256)) return 2;
+      if (journalKind === "legacy-v1" && parsed.value.mode !== "restore") return 2;
       let observedBytes;
       try { observedBytes = readFileSync(statePath(dir), "utf8"); } catch { return 2; }
       const existing = readState(dir); const current = existing.status === "ok" ? existing.state.continuity : null;
       if (!current || !authorityRevisionCommonBindings(dir, existing.state, request, deps)) return 2;
       const atPreimage = observedBytes === journal.value.preStateBytes && current.revision === request.expectedRevision
         && sha256CanonicalJson(existing.state) === request.preStateSha256;
-      const atPostimage = observedBytes === journal.value.postStateBytes && current.revision === request.expectedRevision + 1
+      const atPostimage = journalKind === "v2" && observedBytes === journal.value.postStateBytes && current.revision === request.expectedRevision + 1
         && sha256CanonicalJson(existing.state) === journal.value.postStateSha256;
       if (!atPreimage && !atPostimage) return 2;
       if ((atPreimage && !authorityRevisionLiveBindings(dir, existing.state, current, request, deps))
@@ -2617,10 +2631,11 @@ function runContinuityAuthorityRevisionCommand(sub, argv, deps) {
     }
     if (!validateContinuityState(nextContinuity, request.featureId).ok) return 2;
     const receipts = [...(existing.state.continuityAuthorityRevisionReceipts ?? []), receipt];
-    const updatedAt = (deps.now ?? (() => new Date().toISOString()))();
+    const updatedAt = authorityRevisionTransactionAt(readFileSync(statePath(dir), "utf8"), request);
+    if (updatedAt === null) return 2;
     const next = clearGateEstimateForMutation({ ...existing.state, continuity: nextContinuity, continuityAuthorityRevisionReceipts: receipts, updatedAt });
     const preStateBytes = readFileSync(statePath(dir), "utf8"); const postStateBytes = JSON.stringify(next, null, 2) + "\n";
-    const transaction = authorityRevisionJournal(request, preStateBytes, postStateBytes, updatedAt);
+    const transaction = authorityRevisionJournal(request, preStateBytes, postStateBytes);
     const journalWrite = writeBoundFile(journalPath, `${canonicalPhxJson(transaction)}\n`, lock, join(dir, ".claude"), deps);
     if (!journalWrite.ok) return 2;
     const written = atomicWriteContinuityState(dir, next, lock, deps);
