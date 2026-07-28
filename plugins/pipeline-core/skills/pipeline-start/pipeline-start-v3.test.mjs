@@ -14,6 +14,14 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const skill = readFileSync(join(HERE, "SKILL.md"), "utf8");
 
 const cases = [
+  ["bootstrap command grammar failures retry without revoking lifecycle readiness", () => {
+    assert.match(skill, /Run each bootstrap shell observation as one simple read-only command/u);
+    assert.match(skill, /Do not use `\| sort`, `&&`, `;`, `tee`, `xargs`, command substitution, or output redirection/u);
+    assert.match(skill, /read with `rg --files` and sort the returned paths in agent memory/u);
+    assert.match(skill, /exact bounded `rg … \| head -n 1\.\.500` diagnostic form/u);
+    assert.match(skill, /does not invalidate an already observed V4 `ready` lifecycle result/u);
+    assert.match(skill, /Retry the observation in an admitted form and continue the same bootstrap/u);
+  }],
   ["V4 bootstrap inspection is checked before Git or ordinary V3 authority", () => {
     const onboarding = skill.indexOf("## Step 0 — Consumer-root onboarding state");
     const loadedState = skill.indexOf("## Step 1 — Ruleset presence + loaded state");

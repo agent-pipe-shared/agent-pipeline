@@ -482,6 +482,8 @@ test("redirect-looking quoted data stays argv while hostile composition is typed
       });
       assert.equal(result.exitCode, 2, command);
       assert.match(result.stderr, new RegExp(code, "u"), command);
+      assert.doesNotMatch(result.stderr, /exact V4 ready result/u, command);
+      assert.match(result.stderr, /separate simple read-only commands|Retry without redirection/u, command);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });

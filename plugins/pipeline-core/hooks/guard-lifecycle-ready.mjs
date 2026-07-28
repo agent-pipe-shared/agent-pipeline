@@ -65,12 +65,30 @@ function exactReadyReceipt(value) {
 }
 
 function blocked(code = "GUARD-LIFECYCLE-NOT-READY") {
+  const grammarGuidance = {
+    "GUARD-PARSE-UNSUPPORTED": [
+      "The command is outside the closed Pipeline shell grammar.",
+      "Retry the observation as separate simple read-only commands without shell composition.",
+    ],
+    "GUARD-OPERATOR-UNAPPROVED": [
+      "The command contains an unapproved shell operator.",
+      "Retry as separate simple read-only commands; only the exact bounded rg-to-head diagnostic pipeline is admitted.",
+    ],
+    "GUARD-REDIRECT-UNAPPROVED": [
+      "The command contains an unapproved shell redirection.",
+      "Retry without redirection; only the platform null redirect in the exact bounded rg-to-head diagnostic pipeline is admitted.",
+    ],
+  };
+  const guidance = grammarGuidance[code] ?? [
+    "Pipeline-governed project writes require an exact V4 ready result for session intent.",
+    "Repair or complete onboarding through the typed lifecycle action before retrying.",
+  ];
   return verdict(
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
       + `${code}: `
-      + "Pipeline-governed project writes require an exact V4 ready result for session intent.\n"
-      + "Repair or complete onboarding through the typed lifecycle action before retrying.\n",
+      + `${guidance[0]}\n`
+      + `${guidance[1]}\n`,
   );
 }
 
