@@ -203,6 +203,10 @@ const cases = [
   ["Codex locked projects use only the loaded plugin status wrapper", () => {
     assert.match(skill, /\.agent-pipeline\/core\.lock\.json/u);
     assert.match(skill, /currently loaded `pipeline-core` plugin/u);
+    assert.match(skill, /node "\$\{PIPELINE_PLUGIN_ROOT\}\/scripts\/codex-private-overlay-activation\.mjs" route --project-root "\$PWD"/u);
+    assert.match(skill, /Do not substitute a silent `test -f`/u);
+    assert.match(skill, /status `public` with sole reason `SNT-A-ROUTE-PUBLIC`/u);
+    assert.match(skill, /status `locked` with sole reason `SNT-A-ROUTE-LOCKED`/u);
     assert.match(skill, /node "\$\{PIPELINE_PLUGIN_ROOT\}\/scripts\/codex-private-overlay-activation\.mjs" status --project-root "\$PWD"/u);
     assert.match(skill, /node "\$\{PIPELINE_PLUGIN_ROOT\}\/scripts\/codex-private-overlay-activation\.mjs" load-context --project-root "\$PWD"/u);
     assert.match(skill, /Never select a wrapper under `\$PWD`/u);

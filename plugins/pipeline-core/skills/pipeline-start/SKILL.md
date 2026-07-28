@@ -380,11 +380,26 @@ actual route authority:
 
 ### Codex private-overlay activation bridge
 
-For Codex, first test whether the governed project root contains the exact file
-`.agent-pipeline/core.lock.json`. If it does, this locked-project branch is a
-mandatory alternative to the ordinary public-project V3 source/runtime check
-below. After an authenticated `activated` result and actual context delivery,
-continue at Step 1b; do not also execute the numbered public-project branch:
+For Codex, first run the loaded plugin's explicit, output-bearing route check
+through the host-authorized local read-only execution boundary:
+
+`node "${PIPELINE_PLUGIN_ROOT}/scripts/codex-private-overlay-activation.mjs" route --project-root "$PWD"`
+
+Do not substitute a silent `test -f`, infer presence from empty stdout, or call
+the activation status operation before this route result. Accept only exact
+schema `pipeline.codex-private-overlay-route.v1`:
+
+- status `public` with sole reason `SNT-A-ROUTE-PUBLIC`: skip this private
+  bridge and use the ordinary public-project V3 source/runtime check below;
+- status `locked` with sole reason `SNT-A-ROUTE-LOCKED`: continue with the
+  numbered private-overlay steps below;
+- status `rejected`, malformed output, a non-zero exit, or any other value:
+  fail closed before selecting either source-authority branch.
+
+The locked-project branch is a mandatory alternative to the ordinary
+public-project V3 source/runtime check below. After an authenticated `activated`
+result and actual context delivery, continue at Step 1b; do not also execute
+the numbered public-project branch:
 
 1. Resolve the absolute root of the **currently loaded `pipeline-core` plugin**
    from this skill's own loaded location. In the command below
@@ -439,8 +454,9 @@ projection and private-input authentication. It does **not** satisfy or replace
 the project-specific Step 3 calibration/denies, Step 4 handover, or Step 5
 verify checks; those remain separate and retain their F4 behavior.
 
-When `.agent-pipeline/core.lock.json` is absent, use the ordinary public-project
-V3 source/runtime check:
+When `.agent-pipeline/core.lock.json` is absent, the route operation must return
+the exact `public` result; use the ordinary public-project V3 source/runtime
+check:
 
 1. `pipeline.user.yaml` must exist and declare `schema: pipeline.user.v3`.
    Neither a V1/V2 compatibility projection nor the installed plugin cache is

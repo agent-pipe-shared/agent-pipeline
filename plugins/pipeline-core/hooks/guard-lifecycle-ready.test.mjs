@@ -35,6 +35,7 @@ const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboard
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
+const PRIVATE_OVERLAY_SCRIPT = fileURLToPath(new URL("../scripts/codex-private-overlay-activation.mjs", import.meta.url));
 
 function root() {
   const path = mkdtempSync(join(tmpdir(), "guard-lifecycle-ready-"));
@@ -558,7 +559,8 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const hostApply = `node '${HOST_REPOSITORY_INIT_SCRIPT}' apply --root '${path}' --plan-sha256 ${"b".repeat(64)} --activate`;
     const kickoffPlan = `node '${ONBOARDING_SCRIPT}' kickoff plan --root '${path}' --goal 'Build one HTML game'`;
     const kickoffApply = `node '${ONBOARDING_SCRIPT}' kickoff apply --root '${path}' --goal 'Build one HTML game' --plan-sha256 ${"c".repeat(64)} --activate`;
-    for (const command of [inspect, apply, preflight, hostPlan, hostApply, kickoffPlan, kickoffApply]) {
+    const overlayRoute = `node '${PRIVATE_OVERLAY_SCRIPT}' route --project-root '${path}'`;
+    for (const command of [inspect, apply, preflight, hostPlan, hostApply, kickoffPlan, kickoffApply, overlayRoute]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
       assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
         projectDir: path,
@@ -575,6 +577,8 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
       `node '${ONBOARDING_SCRIPT}' plan-kickoff --root '${path}' --goal 'Build one HTML game'`,
       `node '${ONBOARDING_SCRIPT}' plan --root '${path}' --goal 'Build one HTML game'`,
       `node '${ONBOARDING_SCRIPT}' kickoff --root '${path}' --goal 'Build one HTML game'`,
+      `node '${PRIVATE_OVERLAY_SCRIPT}' route --project-root /tmp/other`,
+      `node '${PRIVATE_OVERLAY_SCRIPT}' status --project-root '${path}'`,
       `node -e 'require("node:fs").writeFileSync("bypass","x")'`,
     ]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), false, command);

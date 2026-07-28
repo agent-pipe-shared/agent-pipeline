@@ -45,6 +45,7 @@ const APP_SERVER_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-hea
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
+const PRIVATE_OVERLAY_SCRIPT = fileURLToPath(new URL("../scripts/codex-private-overlay-activation.mjs", import.meta.url));
 const HEX = /^[a-f0-9]{64}$/u;
 const HOST_INIT_CROSS_VIEW_STATUSES = new Set([
   "repository-mount-read-only",
@@ -416,6 +417,12 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
   if (script === READBACK_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
   if (script === START_PREFLIGHT_SCRIPT) return args.length === 0;
   if (script === SESSION_CLEANUP_SCRIPT) return sanctionedSessionCleanupArgs(args, root);
+  if (script === PRIVATE_OVERLAY_SCRIPT) {
+    return args[0] === "route"
+      && args[1] === "--project-root"
+      && args[2] === root
+      && args.length === 3;
+  }
   if (script === HOST_REPOSITORY_INIT_SCRIPT) {
     if (args[0] === "plan") return exactRoot(args, root, 1) && args.length === 3;
     return args[0] === "apply"
