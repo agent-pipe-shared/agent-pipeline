@@ -71,7 +71,7 @@ function seedPoAuthorityRebind(prefix = "po-rebind") {
   const continuity = {
     schema: "pipeline.continuity.v0", featureId: "nova-shaped", revision: 3,
     runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" },
-    authority: { prd: { path: planPath, sha256: "d".repeat(64) }, spec: { path: specPath, sha256: oldSpecSha }, result: null },
+    authority: { prd: { path: planPath, sha256: planSha }, spec: { path: specPath, sha256: oldSpecSha }, result: null },
     queueHead: { packageId: "nova", actionId: "rebind", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
     blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null,
     capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
@@ -102,7 +102,7 @@ function runPoAuthorityRebindTests() {
   const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps));
   const plan = JSON.parse(planned.text || "{}");
   ok("PS53a Nova-shaped stale marker yields a closed digest-bound plan", planned.value === 0 && plan.schema === "pipeline.po-authority-rebind-plan.v1" && plan.planSha256 && plan.applyAction?.requiresConfirmation === true && plan.applyAction?.argv?.includes("--updated-at"));
-  ok("PS53b planning binds distinct approval/continuity preimages without writes", plan.preimage?.planApproval?.poGateAuthority?.planSha256 && plan.preimage?.continuityAuthority?.prd?.sha256 !== plan.preimage?.prd?.sha256 && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === beforePrd && readFileSync(statePath(fixture.dir), "utf8") === beforeState);
+  ok("PS53b planning binds matching stale authority preimages without writes", plan.preimage?.planApproval?.poGateAuthority?.planSha256 === plan.preimage?.continuityAuthority?.prd?.sha256 && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === beforePrd && readFileSync(statePath(fixture.dir), "utf8") === beforeState);
   const missingConfirmation = captureConsoleError(() => run(["po-authority-rebind-apply", "--plan-sha256", plan.planSha256, "--updated-at", plan.plannedAt], fixture.deps));
   ok("PS53c apply rejects a missing explicit confirmation byte-null", missingConfirmation.value === 2 && readFileSync(statePath(fixture.dir), "utf8") === beforeState);
   const applied = captureConsole(() => run(plan.applyAction.argv.slice(1), fixture.deps));
@@ -115,12 +115,19 @@ function runPoAuthorityRebindTests() {
 }
 
 {
+  const fixture = seedPoAuthorityRebind("po-rebind-mismatched-authority");
+  const state = readState(fixture.dir).state; state.continuity.authority.prd.sha256 = "d".repeat(64);
+  writeFileSync(statePath(fixture.dir), JSON.stringify(state, null, 2) + "\n");
+  const rejected = captureConsoleError(() => run(["po-authority-rebind-plan"], fixture.deps));
+  ok("PS53f mismatched stale Continuity PRD authority is not a repair target", rejected.value === 2);
+}
+{
   const fixture = seedPoAuthorityRebind("po-rebind-drift");
   const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const plan = JSON.parse(planned.text || "{}");
   writeFileSync(join(fixture.dir, fixture.specPath), "# changed after plan\n");
   const before = readFileSync(statePath(fixture.dir), "utf8");
   const drift = captureConsoleError(() => run(plan.applyAction.argv.slice(1), fixture.deps));
-  ok("PS53f Spec preimage drift blocks apply before mutation", drift.value === 2 && readFileSync(statePath(fixture.dir), "utf8") === before);
+  ok("PS53g Spec preimage drift blocks apply before mutation", drift.value === 2 && readFileSync(statePath(fixture.dir), "utf8") === before);
 }
 
 {

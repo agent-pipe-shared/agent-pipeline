@@ -181,6 +181,36 @@ starting a new Codex thread; it does not rewrite consumer authority. Existing
 restart-required private state remains controlling until its exact readback or
 an explicit, independently reviewed recovery handles it.
 
+## PO authority rebind transaction
+
+The narrow PO-authority rebind accepts only one stale authority shape: the
+current physical PRD, the approved PO-gate PRD digest, and the Continuity PRD
+authority must all name the same old PRD bytes, while their Spec binding equals
+the one older PRD marker. A mismatched Continuity PRD authority is corruption,
+not a repair candidate. This prevents the rebind command from becoming a
+general State-authority editor.
+
+Before replacing either authority file, apply durably publishes one private,
+single-link transaction record below `.claude/`. It contains the exact
+confirmed plan digest and the authenticated preimage bytes/digests/modes for
+the PRD and State together with their intended postimage digests. PRD and
+State replacements use same-directory temporary files, file fsync, atomic
+rename, and directory fsync. The record remains authoritative until both
+postimages pass PO-gate, Continuity, and V4 readback, after which it is removed
+and the containing directory is synced.
+
+If a process stops between the two replacements, a replay of the same exact
+confirmed action first authenticates the transaction record and accepts only
+the recorded preimage/postimage combinations. It restores both files to the
+recorded preimages, removes the record only after verified rollback, and
+requires a newly observed plan and PO confirmation. An unknown, linked,
+hard-linked, drifted, malformed, or wrong-plan record fails closed and is
+preserved. On Windows the existing repository PO-profile receipt supplies the
+native owner/DACL assurance before any transaction is admitted; POSIX retains
+the private State/journal modes. No replay can widen authority, silently
+complete a mixed transaction, force-close a feature, or convert a manual State
+edit into a valid rebind.
+
 The v2 host-init receipt is the first release candidate that carries the
 physical Git postimage. The earlier v1 shape existed only in unpublished local
 0.4.5 test candidates and is deliberately non-authoritative under this

@@ -2472,7 +2472,10 @@ function runLegacyAdoptionCommand(sub, flags, deps) {
 
 const PO_REBIND_PLAN_SCHEMA = "pipeline.po-authority-rebind-plan.v1";
 const PO_REBIND_LOCK_TOKEN = "pipeline-po-authority-rebind-v1";
+const PO_REBIND_TXN_SCHEMA = "pipeline.po-authority-rebind-transaction.v1";
 const TECHNICAL_SPEC_MARKER_RE = /^<!-- technical-spec-sha256: ([a-f0-9]{64}) -->$/gmu;
+
+function rebindTransactionPath(dir) { return join(dir, ".claude", "pipeline-state.json.po-authority-rebind.v1"); }
 
 function physicalRebindFile(dir, relativePath) {
   if (typeof relativePath !== "string" || relativePath.length < 1 || relativePath.length > 240
@@ -2539,11 +2542,12 @@ function validRebindApproval(state, prd, spec, profile) {
   return authority;
 }
 
-function eligibleRebindContinuity(state, prd, spec, oldSpecSha256) {
+function eligibleRebindContinuity(state, prd, spec, oldAuthority) {
   const continuity = state?.continuity;
   if (!continuity || !validateContinuityState(continuity, state.activeFeature?.id).ok
     || continuity.authority.prd.path !== prd.path || continuity.authority.spec.path !== spec.path
-    || continuity.authority.spec.sha256 !== oldSpecSha256 || continuity.authority.prd.sha256 === prd.sha256
+    || continuity.authority.prd.sha256 !== oldAuthority.planSha256
+    || continuity.authority.spec.sha256 !== oldAuthority.specSha256
     || continuity.queueHead?.dispatch !== null || continuity.blocker !== null
     || continuity.decisionTxn !== null || continuity.closeTransition != null
     || continuity.revision === Number.MAX_SAFE_INTEGER) return null;
@@ -2573,7 +2577,7 @@ function buildPoAuthorityRebindPlan(dir, deps, existing, plannedAt = deps.now?.(
   const profile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
   const oldAuthority = validRebindApproval(state, prd, spec, profile);
   if (oldAuthority === null || oldAuthority.specSha256 !== marker.digest || oldAuthority.specSha256 === spec.sha256) return { ok: false, code: "PO-REBIND-APPROVAL" };
-  const continuity = eligibleRebindContinuity(state, prd, spec, marker.digest);
+  const continuity = eligibleRebindContinuity(state, prd, spec, oldAuthority);
   if (continuity === null) return { ok: false, code: "PO-REBIND-CONTINUITY" };
   const nextPrdBytes = replaceRebindMarker(prd.bytes, marker, spec.sha256);
   if (nextPrdBytes === null) return { ok: false, code: "PO-REBIND-PRD-MARKER" };
@@ -2663,10 +2667,82 @@ function restoreRebindFile(target, bytes, mode, nonce, deps) {
   try { return Buffer.compare(readFileSync(target), bytes) === 0; } catch { return false; }
 }
 
+function parseRebindTransaction(raw) {
+  let value;
+  try { value = JSON.parse(raw); } catch { return null; }
+  const fileKeys = ["path", "sha256", "postSha256", "bytesBase64", "mode"];
+  if (!exactObjectKeys(value, ["schema", "planSha256", "prd", "state"])
+    || value.schema !== PO_REBIND_TXN_SCHEMA || !SHA256_RE.test(value.planSha256)
+    || !exactObjectKeys(value.prd, fileKeys) || !exactObjectKeys(value.state, fileKeys)) return null;
+  for (const file of [value.prd, value.state]) {
+    if (typeof file.path !== "string" || !SHA256_RE.test(file.sha256) || !SHA256_RE.test(file.postSha256) || typeof file.bytesBase64 !== "string"
+      || !Number.isSafeInteger(file.mode) || file.mode < 0 || file.mode > 0o777) return null;
+    let bytes; try { bytes = Buffer.from(file.bytesBase64, "base64"); } catch { return null; }
+    if (sha256Bytes(bytes) !== file.sha256 || bytes.toString("base64") !== file.bytesBase64) return null;
+  }
+  return value;
+}
+
+function publishRebindTransaction(dir, transaction, nonce) {
+  const target = rebindTransactionPath(dir);
+  if (existsSync(target)) return { ok: false, code: "PO-REBIND-RECOVERY-PENDING" };
+  const bytes = Buffer.from(JSON.stringify(transaction) + "\n", "utf8");
+  const replace = (fd, content) => { ftruncateSync(fd, 0); let offset = 0; while (offset < content.length) offset += writeSync(fd, content, offset, content.length - offset, offset); fsyncSync(fd); };
+  const result = writeRebindFile(target, bytes, 0o600, `${nonce}.txn`, replace, renameSync, syncDirectory);
+  return result.ok ? { ok: true, path: target } : { ok: false, code: result.code };
+}
+
+function clearRebindTransaction(dir) {
+  const target = rebindTransactionPath(dir);
+  try { unlinkSync(target); return syncDirectory(dirname(target)).ok; } catch { return false; }
+}
+
+function recoverRebindTransaction(dir, planSha256, nonce, io, stateIo) {
+  const target = rebindTransactionPath(dir);
+  if (!existsSync(target)) return { ok: true, kind: "none" };
+  const journal = physicalRebindFile(dir, ".claude/pipeline-state.json.po-authority-rebind.v1");
+  const transaction = journal === null ? null : parseRebindTransaction(journal.bytes.toString("utf8"));
+  if (transaction === null || transaction.planSha256 !== planSha256) return { ok: false, code: "PO-REBIND-RECOVERY-PENDING" };
+  const prd = physicalRebindFile(dir, transaction.prd.path);
+  const state = physicalRebindFile(dir, transaction.state.path);
+  if (prd === null || state === null) return { ok: false, code: "PO-REBIND-RECOVERY-IDENTITY" };
+  const prdPre = Buffer.from(transaction.prd.bytesBase64, "base64");
+  const statePre = Buffer.from(transaction.state.bytesBase64, "base64");
+  // A postimage pair was fully written before interruption: it is a verified
+  // idempotent replay, not a second authority transition.
+  if (prd.sha256 !== transaction.prd.sha256 || state.sha256 !== transaction.state.sha256) {
+    const prdAllowed = prd.sha256 === transaction.prd.sha256 || prd.sha256 === transaction.prd.postSha256;
+    const stateAllowed = state.sha256 === transaction.state.sha256 || state.sha256 === transaction.state.postSha256;
+    if (!prdAllowed || !stateAllowed) return { ok: false, code: "PO-REBIND-RECOVERY-DRIFT" };
+    const stateBack = state.sha256 === transaction.state.sha256 || restoreRebindFile(state.absolute, statePre, transaction.state.mode, nonce, stateIo);
+    const prdBack = prd.sha256 === transaction.prd.sha256 || restoreRebindFile(prd.absolute, prdPre, transaction.prd.mode, nonce, io);
+    if (!stateBack || !prdBack || !clearRebindTransaction(dir)) return { ok: false, code: "PO-REBIND-RECOVERY-ROLLBACK" };
+    return { ok: true, kind: "rolled-back" };
+  }
+  return clearRebindTransaction(dir) ? { ok: true, kind: "committed" } : { ok: false, code: "PO-REBIND-RECOVERY-ROLLBACK" };
+}
+
 function runPoAuthorityRebindCommand(sub, rest, deps) {
   if (sub === "po-authority-rebind-plan" && rest.length !== 0) { console.error("Error: PO authority rebind plan takes no arguments."); return 2; }
   const apply = sub === "po-authority-rebind-apply" ? parsePoRebindApply(rest) : null;
   if (sub === "po-authority-rebind-apply" && apply === null) { console.error("Error: PO authority rebind apply requires --plan-sha256 <sha256> --updated-at <ISO-8601> --activate."); return 2; }
+  if (sub === "po-authority-rebind-plan" && existsSync(rebindTransactionPath(deps.dir))) {
+    console.error("Error: PO authority rebind recovery is pending; replay the exact previously confirmed apply action.");
+    return 2;
+  }
+  if (sub === "po-authority-rebind-apply") {
+    const lock = acquireContinuityLock(deps.dir, PO_REBIND_LOCK_TOKEN, deps);
+    if (!lock.ok) { console.error(`Error: PO authority rebind refused (${lock.code}); zero mutation.`); return 2; }
+    try {
+      const io = { replace: deps.replaceRebindPrdFdContents ?? ((fd, bytes) => { ftruncateSync(fd, 0); let offset = 0; while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset, offset); fsyncSync(fd); }), rename: deps.renameRebindPrd ?? renameSync, sync: deps.syncRebindDirectory ?? syncDirectory };
+      const stateIo = { replace: deps.replaceRebindStateFdContents ?? io.replace, rename: deps.renameRebindState ?? renameSync, sync: deps.syncRebindDirectory ?? syncDirectory };
+      const recovered = recoverRebindTransaction(deps.dir, apply.planSha256, lock.ownerNonce, io, stateIo);
+      if (!recovered.ok) { console.error(`Error: PO authority rebind recovery refused (${recovered.code}); zero new mutation.`); return 2; }
+      if (recovered.kind === "committed") { console.log("PO-REBIND-REPLAY-NOOP: prior committed transaction read back."); return 0; }
+      if (recovered.kind === "rolled-back") { console.error("Error: PO authority rebind recovered its interrupted transaction; regenerate and confirm a new plan."); return 2; }
+      return runPoAuthorityRebindApply(apply, deps, lock, io, stateIo);
+    } finally { releaseContinuityLock(lock); }
+  }
   const existing = readStateRaw(deps.dir);
   const planned = buildPoAuthorityRebindPlan(deps.dir, deps, existing, apply?.plannedAt);
   if (!planned.ok) {
@@ -2681,9 +2757,12 @@ function runPoAuthorityRebindCommand(sub, rest, deps) {
     } }, null, 2));
     return 0;
   }
-  if (apply.planSha256 !== planned.planSha256) { console.error("Error: PO authority rebind plan is stale; zero mutation."); return 2; }
-  const lock = acquireContinuityLock(deps.dir, PO_REBIND_LOCK_TOKEN, deps);
-  if (!lock.ok) { console.error(`Error: PO authority rebind refused (${lock.code}); zero mutation.`); return 2; }
+}
+
+function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo) {
+  const existing = readStateRaw(deps.dir);
+  const planned = buildPoAuthorityRebindPlan(deps.dir, deps, existing, apply.plannedAt);
+  if (!planned.ok || apply.planSha256 !== planned.planSha256) { console.error("Error: PO authority rebind plan is stale; zero mutation."); return 2; }
   try {
     const current = readStateRaw(deps.dir);
     const rebuilt = buildPoAuthorityRebindPlan(deps.dir, deps, current, apply.plannedAt);
@@ -2696,20 +2775,16 @@ function runPoAuthorityRebindCommand(sub, rest, deps) {
       || !sameJson(stateFile.identity, rebuilt.payload.preimage.state.identity)) {
       console.error("Error: PO authority rebind preimage identity drifted; zero mutation."); return 2;
     }
-    const io = {
-      replace: deps.replaceRebindPrdFdContents ?? ((fd, bytes) => { ftruncateSync(fd, 0); let offset = 0; while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset, offset); fsyncSync(fd); }),
-      rename: deps.renameRebindPrd ?? renameSync,
-      sync: deps.syncRebindDirectory ?? syncDirectory,
-    };
-    const stateIo = {
-      replace: deps.replaceRebindStateFdContents ?? io.replace,
-      rename: deps.renameRebindState ?? renameSync,
-      sync: deps.syncRebindDirectory ?? syncDirectory,
-    };
+    const transaction = { schema: PO_REBIND_TXN_SCHEMA, planSha256: planned.planSha256,
+      prd: { path: prd.path, sha256: prd.sha256, postSha256: planned.payload.postimage.prd.sha256, bytesBase64: prd.bytes.toString("base64"), mode: prd.identity.mode },
+      state: { path: ".claude/pipeline-state.json", sha256: stateFile.sha256, postSha256: planned.payload.postimage.state.sha256, bytesBase64: stateFile.bytes.toString("base64"), mode: stateFile.identity.mode } };
+    const published = publishRebindTransaction(deps.dir, transaction, lock.ownerNonce);
+    if (!published.ok) { console.error(`Error: PO authority rebind transaction prepare failed (${published.code}); zero authority mutation.`); return 2; }
     const wrotePrd = writeRebindFile(prd.absolute, rebuilt.nextPrdBytes, prd.identity.mode, lock.ownerNonce, io.replace, io.rename, io.sync);
     if (!wrotePrd.ok) {
       const rolledBack = wrotePrd.committed === false || restoreRebindFile(prd.absolute, prd.bytes, prd.identity.mode, lock.ownerNonce, io);
-      console.error(`Error: PO authority rebind PRD write failed (${wrotePrd.code}); ${rolledBack ? "rollback verified" : "rollback unresolved"}.`);
+      const cleared = clearRebindTransaction(deps.dir);
+      console.error(`Error: PO authority rebind PRD write failed (${wrotePrd.code}); ${rolledBack && cleared ? "rollback verified" : "rollback unresolved"}.`);
       return 2;
     }
     const stateBytes = Buffer.from(JSON.stringify(rebuilt.nextState, null, 2) + "\n", "utf8");
@@ -2717,7 +2792,8 @@ function runPoAuthorityRebindCommand(sub, rest, deps) {
     if (!wroteState.ok) {
       const stateRolledBack = wroteState.committed === false || restoreRebindFile(stateFile.absolute, stateFile.bytes, stateFile.identity.mode, lock.ownerNonce, stateIo);
       const prdRolledBack = restoreRebindFile(prd.absolute, prd.bytes, prd.identity.mode, lock.ownerNonce, io);
-      console.error(`Error: PO authority rebind State write failed (${wroteState.code}); ${stateRolledBack && prdRolledBack ? "rollback verified" : "rollback unresolved"}.`);
+      const cleared = clearRebindTransaction(deps.dir);
+      console.error(`Error: PO authority rebind State write failed (${wroteState.code}); ${stateRolledBack && prdRolledBack && cleared ? "rollback verified" : "rollback unresolved"}.`);
       return 2;
     }
     const postPrd = physicalRebindFile(deps.dir, rebuilt.payload.postimage.prd.path);
@@ -2734,12 +2810,19 @@ function runPoAuthorityRebindCommand(sub, rest, deps) {
     if (!postOk) {
       const stateRollback = restoreRebindFile(stateFile.absolute, stateFile.bytes, stateFile.identity.mode, lock.ownerNonce, stateIo);
       const prdRollback = restoreRebindFile(prd.absolute, prd.bytes, prd.identity.mode, lock.ownerNonce, io);
-      console.error(`Error: PO authority rebind postimage readback failed; ${stateRollback && prdRollback ? "rollback verified" : "rollback unresolved"}.`);
+      const cleared = clearRebindTransaction(deps.dir);
+      console.error(`Error: PO authority rebind postimage readback failed; ${stateRollback && prdRollback && cleared ? "rollback verified" : "rollback unresolved"}.`);
+      return 2;
+    }
+    if (!clearRebindTransaction(deps.dir)) {
+      const stateRollback = restoreRebindFile(stateFile.absolute, stateFile.bytes, stateFile.identity.mode, lock.ownerNonce, stateIo);
+      const prdRollback = restoreRebindFile(prd.absolute, prd.bytes, prd.identity.mode, lock.ownerNonce, io);
+      console.error(`Error: PO authority rebind transaction close failed; ${stateRollback && prdRollback && clearRebindTransaction(deps.dir) ? "rollback verified" : "rollback unresolved"}.`);
       return 2;
     }
     console.log(`PO-REBIND-APPLIED: continuity revision ${rebuilt.nextState.continuity.revision} written.`);
     return 0;
-  } finally { releaseContinuityLock(lock); }
+  } catch { console.error("Error: PO authority rebind transaction failed; recovery journal retained."); return 2; }
 }
 
 /**
