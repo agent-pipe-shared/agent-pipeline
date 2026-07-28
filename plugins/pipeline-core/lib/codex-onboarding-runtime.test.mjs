@@ -89,6 +89,19 @@ function remoteControlNotification(overrides = {}) {
     ...topLevelOverrides,
   };
 }
+function configWarningNotification(overrides = {}) {
+  const { params: paramsOverrides = {}, ...topLevelOverrides } = overrides;
+  return {
+    emittedAtMs: 1_700_000_000_000,
+    method: "configWarning",
+    params: {
+      details: null,
+      summary: "fixture warning",
+      ...paramsOverrides,
+    },
+    ...topLevelOverrides,
+  };
+}
 function configReadChildTransportFixture({
   beforeInitializeResponse = [],
   beforeConfigReadResponse = [remoteControlNotification()],
@@ -860,7 +873,7 @@ test("the strict host helper requires a bound executable, ticket, fresh generati
   } finally { dispose(path); }
 });
 
-test("native config/read accepts only the exact post-initialize remote-control status notification", async () => {
+test("native config/read admits exact Codex 0.145 config warnings and requires the remote-control status", async () => {
   const path = root();
   try {
     const executable = resolveRuntimeExecutable().physicalPath;
@@ -870,11 +883,35 @@ test("native config/read accepts only the exact post-initialize remote-control s
         cwd: path,
         includeLayers: true,
         spawnChild: configReadChildTransportFixture({
-          beforeConfigReadResponse: [remoteControlNotification({ params: { status } })],
+          beforeConfigReadResponse: [
+            configWarningNotification(),
+            remoteControlNotification({ params: { status } }),
+          ],
         }),
       });
       assert.deepEqual(Object.keys(observed).sort(), ["config", "layers", "origins"]);
     }
+    const completeWarning = await readNativeConfig({
+      executable,
+      cwd: path,
+      includeLayers: true,
+      spawnChild: configReadChildTransportFixture({
+        beforeConfigReadResponse: [
+          configWarningNotification({
+            params: {
+              details: "bounded fixture details",
+              path: "/fixture/config.toml",
+              range: {
+                start: { line: 1, column: 1 },
+                end: { line: 1, column: 2 },
+              },
+            },
+          }),
+          remoteControlNotification(),
+        ],
+      }),
+    });
+    assert.deepEqual(Object.keys(completeWarning).sort(), ["config", "layers", "origins"]);
     const invalidTransports = [
       ["missing", configReadChildTransportFixture({ beforeConfigReadResponse: [] })],
       ["duplicate", configReadChildTransportFixture({
@@ -882,6 +919,16 @@ test("native config/read accepts only the exact post-initialize remote-control s
       })],
       ["unknown method", configReadChildTransportFixture({
         beforeConfigReadResponse: [remoteControlNotification({ method: "account/updated" })],
+      })],
+      ["malformed config warning", configReadChildTransportFixture({
+        beforeConfigReadResponse: [configWarningNotification({ params: { summary: 42 } })],
+      })],
+      ["config warning with an unknown field", configReadChildTransportFixture({
+        beforeConfigReadResponse: [configWarningNotification({ params: { secret: "unexpected" } })],
+      })],
+      ["config warning before initialize", configReadChildTransportFixture({
+        beforeInitializeResponse: [configWarningNotification()],
+        beforeConfigReadResponse: [remoteControlNotification()],
       })],
       ["out of sequence", configReadChildTransportFixture({
         beforeInitializeResponse: [remoteControlNotification()],

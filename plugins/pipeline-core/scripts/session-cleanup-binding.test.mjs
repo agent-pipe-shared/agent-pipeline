@@ -19,6 +19,7 @@ import {
   cleanupSession,
   listActiveSessionDescriptors,
   loadSessionDescriptor,
+  registerTemporaryIntent,
   retireSessionDescriptor,
   startSessionDescriptor,
 } from "../lib/worktree-lifecycle.mjs";
@@ -55,6 +56,15 @@ function invoke(argv, dependencies = {}) {
     ...dependencies,
   });
   return { code, output: output === "" ? null : JSON.parse(output) };
+}
+
+function rewriteAsLegacyDescriptor(root, sessionId) {
+  const loaded = loadSessionDescriptor(root, sessionId);
+  const descriptor = JSON.parse(readFileSync(loaded.path, "utf8"));
+  descriptor.schema = "pipeline.session-descriptor.v1";
+  delete descriptor.ownerRuntime;
+  writeFileSync(loaded.path, `${JSON.stringify(descriptor, null, 2)}\n`, { mode: 0o600 });
+  return loadSessionDescriptor(root, sessionId);
 }
 
 test("start binds once, resumes the exact descriptor and rotates only after closure", () => {
@@ -370,6 +380,92 @@ test("a single unbound descriptor requires an activated digest-bound rebind", ()
     assert.deepEqual(readOnboardingSessionCleanupBinding({ rootDir: root }).sessionCleanup, plan.sessionCleanup);
     assert.deepEqual(listActiveSessionDescriptors(root), [plan.sessionCleanup]);
     assert.equal(invoke(["start", "--repo", root]).output.code, "WT-SESSION-REUSED");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("multiple empty legacy orphans require one exact activated Human retirement", () => {
+  const root = fixture("legacy-orphan-retirement");
+  try {
+    const first = startSessionDescriptor(root, {
+      sessionId: "session-binding-legacy-orphan-a",
+    });
+    const second = startSessionDescriptor(root, {
+      sessionId: "session-binding-legacy-orphan-b",
+    });
+    const legacyFirst = rewriteAsLegacyDescriptor(root, first.sessionId);
+    const legacySecond = rewriteAsLegacyDescriptor(root, second.sessionId);
+    const plan = invoke(["plan-recovery", "--repo", root]).output;
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.recovery, "retire-orphans");
+    assert.equal(plan.closure, "unbound-orphans");
+    assert.equal(plan.activeDescriptorCount, 2);
+    assert.equal(plan.sessionCleanup, null);
+    assert.deepEqual(plan.orphanDescriptors, [
+      {
+        sessionId: legacyFirst.sessionId,
+        descriptorSha256: legacyFirst.descriptorSha256,
+        ownerStatus: "unobserved",
+      },
+      {
+        sessionId: legacySecond.sessionId,
+        descriptorSha256: legacySecond.descriptorSha256,
+        ownerStatus: "unobserved",
+      },
+    ]);
+    assert.equal(plan.applyAction.requiresConfirmation, true);
+    assert.deepEqual(plan.applyAction.expected.statuses, ["retired"]);
+    assert.throws(
+      () => invoke([
+        "apply-recovery", "--repo", root,
+        "--plan-sha256", plan.planSha256,
+      ]),
+      (error) => error?.code === "WT-SESSION-RECOVERY-ACTIVATION",
+    );
+    const applied = invoke([
+      "apply-recovery", "--repo", root,
+      "--plan-sha256", plan.planSha256,
+      "--activate",
+    ]).output;
+    assert.equal(applied.status, "retired");
+    assert.equal(applied.retiredDescriptorCount, 2);
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
+    assert.deepEqual(listActiveSessionDescriptors(root), []);
+    assert.equal(invoke([
+      "start", "--repo", root, "--session", "session-binding-after-retirement",
+    ]).output.code, "WT-SESSION-STARTED");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("multiple legacy orphans remain blocked when any cleanup manifest is active", () => {
+  const root = fixture("legacy-orphan-active-manifest");
+  try {
+    const first = startSessionDescriptor(root, {
+      sessionId: "session-binding-legacy-active-a",
+    });
+    const second = startSessionDescriptor(root, {
+      sessionId: "session-binding-legacy-active-b",
+    });
+    registerTemporaryIntent(root, {
+      sessionId: first.sessionId,
+      ownerNonce: first.ownerNonce,
+      resourceId: "legacy-active-resource",
+      type: "scratch-file",
+      path: join(root, "legacy-active-resource"),
+      contentClass: "scratch",
+      soleCopy: false,
+      cleanupPolicy: "unlink-file",
+    });
+    rewriteAsLegacyDescriptor(root, first.sessionId);
+    rewriteAsLegacyDescriptor(root, second.sessionId);
+    assert.deepEqual(invoke(["plan-recovery", "--repo", root]).output, {
+      schema: "pipeline.session-cleanup-recovery-plan.v1",
+      status: "orphan-recovery-unavailable",
+      activeDescriptorCount: 2,
+    });
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

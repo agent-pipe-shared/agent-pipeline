@@ -82,6 +82,12 @@ const fakeDeps = {
   spawnSync: fakeGit,
   observeCodexOnboardingCapabilities: fakeCapabilities,
   observeOnboardingAppServer: fakeAppServer,
+  planSessionCleanupRecovery() {
+    return {
+      schema: "pipeline.session-cleanup-recovery-plan.v1",
+      status: "not-needed",
+    };
+  },
 };
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
@@ -446,6 +452,96 @@ test("App Server is observed only on the ready path and exactly once for require
       assert.deepEqual(observed.appServer, { required: true, status: "running", code: "CAS-READY" }, intent);
       assert.equal(calls, 1, intent);
     }
+  } finally { dispose(path); }
+});
+
+test("runtime-current bootstrap exposes cleanup recovery before App Server or session start", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const applyAction = {
+      kind: "command",
+      executable: "node",
+      argv: [
+        "/fixture/session-cleanup.mjs",
+        "apply-recovery",
+        "--repo",
+        path,
+        "--plan-sha256",
+        "a".repeat(64),
+        "--activate",
+      ],
+      mutation: true,
+      requiresConfirmation: true,
+      expected: {
+        schema: "pipeline.session-cleanup-recovery-apply.v1",
+        statuses: ["retired"],
+      },
+    };
+    const observed = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "bootstrap",
+      deps: {
+        ...fakeDeps,
+        observeOnboardingAppServer() {
+          throw new Error("cleanup recovery must precede App Server observation");
+        },
+        planSessionCleanupRecovery({ rootDir, scriptPath }) {
+          assert.equal(rootDir, path);
+          assert.equal(scriptPath.endsWith("/scripts/session-cleanup.mjs"), true);
+          return {
+            schema: "pipeline.session-cleanup-recovery-plan.v1",
+            status: "ready",
+            recovery: "retire-orphans",
+            applyAction,
+          };
+        },
+      },
+    });
+    assert.equal(observed.status, "partial");
+    assert.equal(observed.runtime.status, "readback-current");
+    assert.deepEqual(observed.nextAction, applyAction);
+    assertDiagnostic(observed, "cleanup_recovery_required");
+
+    const unavailable = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "bootstrap",
+      deps: {
+        ...fakeDeps,
+        observeOnboardingAppServer() {
+          throw new Error("unavailable cleanup recovery must precede App Server observation");
+        },
+        planSessionCleanupRecovery() {
+          return {
+            schema: "pipeline.session-cleanup-recovery-plan.v1",
+            status: "orphan-recovery-unavailable",
+            activeDescriptorCount: 2,
+          };
+        },
+      },
+    });
+    assert.equal(unavailable.status, "partial");
+    assert.equal(unavailable.nextAction, null);
+    assertDiagnostic(unavailable, "cleanup_recovery_unavailable");
+
+    const unobserved = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "bootstrap",
+      deps: {
+        ...fakeDeps,
+        observeOnboardingAppServer() {
+          throw new Error("failed cleanup observation must precede App Server observation");
+        },
+        planSessionCleanupRecovery() {
+          throw new Error("private cleanup state unreadable");
+        },
+      },
+    });
+    assert.equal(unobserved.status, "partial");
+    assert.equal(unobserved.nextAction, null);
+    assertDiagnostic(unobserved, "cleanup_recovery_observation_unavailable");
   } finally { dispose(path); }
 });
 
@@ -1599,14 +1695,20 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(applied.status, "applied");
     assert.equal(applied.git.mode, "host-managed");
     assert.equal(applied.authority.runtimeProjection, "missing");
-    const postSeed = inspectProjectOnboardingV3({ rootDir: path });
+    const cleanupNotNeededDeps = {
+      planSessionCleanupRecovery: fakeDeps.planSessionCleanupRecovery,
+    };
+    const postSeed = inspectProjectOnboardingV3({
+      rootDir: path,
+      deps: cleanupNotNeededDeps,
+    });
     assert.equal(postSeed.status, "kickoff-required");
     assert.equal(postSeed.runtime.status, "plugin-managed-unattested");
     assert.equal(postSeed.nextAction.kind, "collect-input");
     const kickoff = completeKickoff(
       path,
       "Build one small HTML game from the supplied design",
-      {},
+      cleanupNotNeededDeps,
       "host-repository-init-required",
     );
     assert.equal(kickoff.repositoryCapability, "host-managed");
@@ -1615,6 +1717,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
       rootDir: path,
       intent: "bootstrap",
       deps: {
+        ...cleanupNotNeededDeps,
         observeOnboardingAppServer() {
           appServerCalls += 1;
           throw new Error("pre-init App-Server observation must not run");
@@ -1646,6 +1749,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
       rootDir: path,
       intent: "session",
       deps: {
+        ...cleanupNotNeededDeps,
         observeCodexOnboardingCapabilities: fakeCapabilities,
         classifyOnboardingContinuity: () => postKickoff.continuity,
         observeOnboardingAppServer() {

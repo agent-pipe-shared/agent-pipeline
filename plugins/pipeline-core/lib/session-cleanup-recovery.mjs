@@ -11,9 +11,11 @@ import {
   releaseOnboardingSessionCleanup,
 } from "./onboarding-continuity.mjs";
 import {
+  inspectSessionRetirement,
   inspectSessionClosure,
   listActiveSessionDescriptors,
   loadSessionDescriptor,
+  retireSessionDescriptor,
 } from "./worktree-lifecycle.mjs";
 
 export const SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA = "pipeline.session-cleanup-recovery-plan.v1";
@@ -52,7 +54,7 @@ function digest(value) {
 }
 
 function recoveryBinding(plan) {
-  return {
+  const binding = {
     schema: plan.schema,
     root: plan.root,
     stateSha256: plan.stateSha256,
@@ -63,11 +65,19 @@ function recoveryBinding(plan) {
     recovery: plan.recovery,
     releaseProof: plan.releaseProof ?? null,
   };
+  if (Object.hasOwn(plan, "orphanDescriptors")) {
+    binding.orphanDescriptors = plan.orphanDescriptors;
+  }
+  return binding;
 }
 
 function readyRecoveryPlan(partial, scriptPath) {
   const planSha256 = digest(recoveryBinding(partial));
-  const status = partial.recovery === "bind-orphan" ? "rebound" : "recovered";
+  const status = partial.recovery === "bind-orphan"
+    ? "rebound"
+    : partial.recovery === "retire-orphans"
+      ? "retired"
+      : "recovered";
   const applyAction = {
     kind: "command",
     executable: "node",
@@ -96,11 +106,15 @@ function readyRecoveryPlan(partial, scriptPath) {
 }
 
 /**
- * Plan only the two crash residues that can be reconciled without replacing or
- * deleting a descriptor: a single validated unbound active descriptor can be
- * rebound through explicit PO confirmation, while a bound handle whose private
- * descriptor and closure receipt are both absent can be released. Active bound
- * descriptors still require ordinary cleanup and closed ones release-binding.
+ * Plan only closed crash residues. A single validated unbound active
+ * descriptor can be rebound through explicit PO confirmation. Multiple exact
+ * descriptors may be retired only when every descriptor has no cleanup
+ * manifest and its owner is proven non-live/reused or is a legacy V1 owner
+ * whose liveness is deliberately unobserved; that legacy case is therefore a
+ * Human-only, digest-bound recovery rather than an automatic cleanup. A bound
+ * handle whose private descriptor and closure receipt are both absent can be
+ * released. Active bound descriptors still require ordinary cleanup and closed
+ * ones release-binding.
  */
 export function planSessionCleanupRecovery({
   rootDir,
@@ -110,6 +124,8 @@ export function planSessionCleanupRecovery({
   const readBinding = deps.readOnboardingSessionCleanupBindingFn
     ?? readOnboardingSessionCleanupBinding;
   const inspectClosure = deps.inspectSessionClosureFn ?? inspectSessionClosure;
+  const inspectRetirement = deps.inspectSessionRetirementFn
+    ?? inspectSessionRetirement;
   const listDescriptors = deps.listActiveSessionDescriptorsFn
     ?? listActiveSessionDescriptors;
   const binding = readBinding({ rootDir });
@@ -171,6 +187,36 @@ export function planSessionCleanupRecovery({
         schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
         status: "not-needed",
       };
+    }
+    if (activeDescriptors.length > 1) {
+      const orphanDescriptors = activeDescriptors.map((descriptor) => inspectRetirement(
+        binding.root,
+        descriptor.sessionId,
+        { expectedDescriptorSha256: descriptor.descriptorSha256 },
+      ));
+      if (orphanDescriptors.some((descriptor) => descriptor.status !== "retirable")) {
+        return {
+          schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+          status: "orphan-recovery-unavailable",
+          activeDescriptorCount: activeDescriptors.length,
+        };
+      }
+      return readyRecoveryPlan({
+        schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+        root: binding.root,
+        stateSha256: binding.stateSha256,
+        revision: binding.revision,
+        sessionCleanup: null,
+        closure: "unbound-orphans",
+        activeDescriptorCount: activeDescriptors.length,
+        recovery: "retire-orphans",
+        orphanDescriptors: orphanDescriptors.map((descriptor) => ({
+          sessionId: descriptor.sessionId,
+          descriptorSha256: descriptor.descriptorSha256,
+          ownerStatus: descriptor.ownerStatus,
+        })),
+        applyAction: null,
+      }, scriptPath);
     }
     if (activeDescriptors.length !== 1) {
       return {
@@ -297,6 +343,53 @@ export function applySessionCleanupRecovery({
       planSha256: plan.planSha256,
       stateSha256: result.stateSha256,
       revision: result.revision,
+    };
+  }
+  if (plan.recovery === "retire-orphans") {
+    const inspectRetirement = deps.inspectSessionRetirementFn
+      ?? inspectSessionRetirement;
+    const loadDescriptor = deps.loadSessionDescriptorFn ?? loadSessionDescriptor;
+    const retireDescriptor = deps.retireSessionDescriptorFn
+      ?? retireSessionDescriptor;
+    const listDescriptors = deps.listActiveSessionDescriptorsFn
+      ?? listActiveSessionDescriptors;
+    const prepared = plan.orphanDescriptors.map((expected) => {
+      const observed = inspectRetirement(plan.root, expected.sessionId, {
+        expectedDescriptorSha256: expected.descriptorSha256,
+      });
+      if (observed.status !== "retirable"
+        || observed.ownerStatus !== expected.ownerStatus
+        || observed.descriptorSha256 !== expected.descriptorSha256) {
+        fail("WT-SESSION-RECOVERY-PLAN", "orphan descriptor retirement binding changed");
+      }
+      return loadDescriptor(plan.root, expected.sessionId, {
+        expectedDescriptorSha256: expected.descriptorSha256,
+      });
+    });
+    for (const descriptor of prepared) {
+      retireDescriptor(plan.root, {
+        sessionId: descriptor.sessionId,
+        descriptorSha256: descriptor.descriptorSha256,
+        ownerNonce: descriptor.ownerNonce,
+      });
+    }
+    if (listDescriptors(plan.root).length !== 0) {
+      fail("WT-SESSION-RECOVERY-READBACK", "orphan descriptor retirement did not clear the exact active set");
+    }
+    const readback = readBinding({ rootDir: plan.root });
+    if (readback.status !== "unbound"
+      || readback.stateSha256 !== plan.stateSha256
+      || readback.revision !== plan.revision) {
+      fail("WT-SESSION-RECOVERY-READBACK", "orphan descriptor retirement changed continuity authority");
+    }
+    return {
+      schema: SESSION_CLEANUP_RECOVERY_APPLY_SCHEMA,
+      status: "retired",
+      root: plan.root,
+      planSha256: plan.planSha256,
+      stateSha256: readback.stateSha256,
+      revision: readback.revision,
+      retiredDescriptorCount: prepared.length,
     };
   }
   if (plan.recovery === "release-closed-feature") {

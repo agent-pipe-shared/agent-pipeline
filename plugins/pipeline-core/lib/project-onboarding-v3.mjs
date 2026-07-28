@@ -460,9 +460,18 @@ function emptyContinuity() { return { status: "unavailable", stateSha256: null, 
 
 function emptyAppServer() { return { required: false, status: "not-requested", code: null }; }
 
-function partialCleanupRecoveryResult({ root, intent, repository }) {
+function partialCleanupRecoveryResult({
+  root,
+  intent,
+  repository,
+  runtime = emptyRuntime(),
+  deps = {},
+  strict = false,
+}) {
   try {
-    const recovery = planSessionCleanupRecovery({
+    const planCleanupRecovery = deps.planSessionCleanupRecovery
+      ?? planSessionCleanupRecovery;
+    const recovery = planCleanupRecovery({
       rootDir: root,
       scriptPath: SESSION_CLEANUP_SCRIPT,
     });
@@ -477,33 +486,53 @@ function partialCleanupRecoveryResult({ root, intent, repository }) {
         root,
         intent,
         repository,
-        runtime: emptyRuntime(),
+        runtime,
         nextAction,
         diagnostics: [lifecycleDiagnostic(
           "$.authority.sessionCleanup",
-          "cleanup_release_required",
-          "an exact retained cleanup binding blocks authority completion",
+          "cleanup_recovery_required",
+          "exact retained cleanup residue blocks authority completion",
           "apply only the descriptor- and digest-bound cleanup recovery action",
         )],
       });
     }
-    if (recovery.status === "closed-recovery-unavailable") {
+    if (new Set([
+      "closed-recovery-unavailable",
+      "orphan-cleanup-required",
+      "orphan-recovery-unavailable",
+    ]).has(recovery.status)) {
       return lifecycleResult({
         status: "partial",
         root,
         intent,
         repository,
-        runtime: emptyRuntime(),
+        runtime,
         nextAction: null,
         diagnostics: [lifecycleDiagnostic(
           "$.authority.sessionCleanup",
-          "cleanup_release_recovery_unavailable",
-          "closed cleanup residue lacks sufficient exact release proof",
-          "retain the state and request an explicit authority decision; do not guess a descriptor",
+          "cleanup_recovery_unavailable",
+          "cleanup residue lacks sufficient exact recovery proof",
+          "retain the state and request an explicit authority decision; do not guess, replace, or delete a descriptor",
         )],
       });
     }
   } catch {
+    if (strict) {
+      return lifecycleResult({
+        status: "partial",
+        root,
+        intent,
+        repository,
+        runtime,
+        nextAction: null,
+        diagnostics: [lifecycleDiagnostic(
+          "$.authority.sessionCleanup",
+          "cleanup_recovery_observation_unavailable",
+          "cleanup recovery authority could not be observed safely",
+          "repair private cleanup-state read access before retrying",
+        )],
+      });
+    }
     // Other partial-authority states remain owned by their existing typed
     // source/manifest diagnostics. Never infer cleanup authority from failure.
   }
@@ -972,6 +1001,15 @@ function afterRuntimeLifecycleResult({ root, intent, repository, runtime }, fs) 
   } catch {
     continuity = emptyContinuity();
   }
+  const cleanupRecovery = partialCleanupRecoveryResult({
+    root,
+    intent,
+    repository,
+    runtime,
+    deps: fs,
+    strict: true,
+  });
+  if (cleanupRecovery !== null) return cleanupRecovery;
   return readyLifecycleResult({ root, intent, repository, runtime, continuity }, fs);
 }
 

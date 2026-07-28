@@ -45,6 +45,7 @@ export const SESSION_DESCRIPTOR_SCHEMA = "pipeline.session-descriptor.v2";
 export const LEGACY_SESSION_DESCRIPTOR_SCHEMA = "pipeline.session-descriptor.v1";
 export const SESSION_OWNER_RUNTIME_SCHEMA = "pipeline.session-owner-runtime.v1";
 export const SESSION_OWNER_STATUS_SCHEMA = "pipeline.session-owner-status.v1";
+export const SESSION_RETIREMENT_STATUS_SCHEMA = "pipeline.session-retirement-status.v1";
 
 const SAFE_COMPONENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/;
@@ -639,6 +640,33 @@ export function inspectSessionOwnerRuntime(startPath, sessionId, options = {}) {
     ...base,
     status: observedStartId === loaded.ownerRuntime.processStartId ? "live" : "reused",
   };
+}
+
+/**
+ * Determine whether an exact unbound descriptor may enter the explicit Human
+ * recovery path. This exposes no nonce or process coordinate. A live or
+ * unobservable V2 owner and every active cleanup manifest remain blocking;
+ * legacy V1 descriptors are deliberately classified as Human-only
+ * `unobserved` rather than guessed dead.
+ */
+export function inspectSessionRetirement(startPath, sessionId, options = {}) {
+  const loaded = loadSessionDescriptor(startPath, sessionId, options);
+  const owner = inspectSessionOwnerRuntime(startPath, sessionId, {
+    ...options,
+    expectedDescriptorSha256: loaded.descriptorSha256,
+  });
+  const base = {
+    schema: SESSION_RETIREMENT_STATUS_SCHEMA,
+    sessionId: loaded.sessionId,
+    descriptorSha256: loaded.descriptorSha256,
+    ownerStatus: owner.status,
+  };
+  if (existsSync(cleanupManifestPath(loaded.repo, loaded.sessionId))) {
+    return { ...base, status: "cleanup-required" };
+  }
+  if (owner.status === "live") return { ...base, status: "owner-live" };
+  if (owner.status === "unavailable") return { ...base, status: "owner-unavailable" };
+  return { ...base, status: "retirable" };
 }
 
 /**
