@@ -11,6 +11,7 @@
  */
 import assert from "node:assert/strict";
 import { chmodSync, existsSync, lstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
@@ -35,11 +36,11 @@ const here = dirname(fileURLToPath(import.meta.url));
 const onboarding = join(here, "project-onboarding-v3.mjs");
 const authority = join(here, "v3-bootstrap-authority.mjs");
 
-// Keep every disposable root below this checked-out test directory. Codex's
-// workspace sandbox grants the test process its project tree, whereas a
-// child whose cwd is an unrelated OS temp directory loses Git capability
-// before the shipped CLI can exercise its own behavior.
-function root() { return mkdtempSync(join(here, ".pipeline onboarding e2e with spaces-")); }
+// The shipped plugin cache is intentionally read-only. Keep disposable
+// repositories in the platform temp directory so this process-level harness
+// remains runnable from source checkouts and installed Linux, macOS and
+// Windows plugin caches alike.
+function root() { return mkdtempSync(join(tmpdir(), "pipeline onboarding e2e with spaces-")); }
 function dispose(path) { rmSync(path, { recursive: true, force: true }); }
 function cliGit(command, args, options = {}) {
   if (command !== "git") return { status: 1, stderr: "unexpected program" };
