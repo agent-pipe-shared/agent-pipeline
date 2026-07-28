@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { EventEmitter } from "node:events";
 import * as nativeFs from "node:fs";
-import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, readdirSync, realpathSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -94,7 +94,7 @@ function configReadChildTransportFixture({
   beforeConfigReadResponse = [remoteControlNotification()],
 } = {}) {
   return function childTransport(executable, argv, options) {
-    assert.equal(executable, resolveRuntimeExecutable());
+    assert.equal(executable, resolveRuntimeExecutable().physicalPath);
     assert.deepEqual(argv, ["--strict-config", "app-server", "--listen", "stdio://"]);
     assert.equal(options.shell, false);
     assert.deepEqual(options.stdio, ["pipe", "pipe", "pipe"]);
@@ -170,8 +170,161 @@ test("the PATH resolver selects the first symlinked Codex entry and binds its ph
     const bin = join(path, "bin");
     mkdirSync(bin);
     symlinkSync(process.execPath, join(bin, "codex"));
-    assert.equal(resolveRuntimeExecutable("codex", bin), realpathSync(process.execPath));
+    assert.deepEqual(resolveRuntimeExecutable("codex", bin), {
+      schema: "pipeline.codex-runtime-executable.v1",
+      platform: process.platform,
+      requestedName: "codex",
+      physicalPath: realpathSync(process.execPath),
+      sha256: sha256(readFileSync(realpathSync(process.execPath))),
+      resolution: "posix-path-direct",
+    });
   } finally { dispose(path); }
+});
+
+test("native Windows resolution admits only a physical codex.exe through controlled PATHEXT", () => {
+  const path = root();
+  try {
+    const first = join(path, "first");
+    const second = join(path, "second");
+    mkdirSync(first); mkdirSync(second);
+    writeFileSync(join(first, "codex.cmd"), "wrapper");
+    writeFileSync(join(first, "codex.bat"), "wrapper");
+    writeFileSync(join(second, "codex.exe"), "physical executable");
+    const descriptor = resolveRuntimeExecutable("codex", `${first};${second}`, {
+      platform: "win32",
+      pathext: ".CMD;.EXE;.BAT",
+    });
+    assert.equal(descriptor.schema, "pipeline.codex-runtime-executable.v1");
+    assert.equal(descriptor.platform, "win32");
+    assert.equal(descriptor.requestedName, "codex");
+    assert.equal(descriptor.physicalPath, realpathSync(join(second, "codex.exe")));
+    assert.equal(descriptor.sha256, sha256("physical executable"));
+    assert.equal(descriptor.resolution, "windows-pathext-exe");
+    assert.throws(
+      () => resolveRuntimeExecutable("codex.cmd", `${first};${second}`, {
+        platform: "win32",
+        pathext: ".CMD;.EXE;.BAT",
+      }),
+      (error) => error?.code === "runtime-executable-unsafe"
+        && error?.phase === "runtime-executable-resolution",
+    );
+    assert.throws(
+      () => resolveRuntimeExecutable("codex", second, {
+        platform: "win32",
+        pathext: ".CMD;.BAT",
+      }),
+      (error) => error?.code === "runtime-executable-unavailable",
+    );
+    unlinkSync(join(second, "codex.exe"));
+    symlinkSync(process.execPath, join(second, "codex.exe"));
+    assert.throws(
+      () => resolveRuntimeExecutable("codex", second, {
+        platform: "win32",
+        pathext: ".EXE",
+      }),
+      (error) => error?.code === "runtime-executable-unsafe",
+    );
+  } finally { dispose(path); }
+});
+
+test("Linux and macOS retain the direct physical extensionless executable contract", () => {
+  const path = root();
+  try {
+    const bin = join(path, "bin");
+    mkdirSync(bin);
+    symlinkSync(process.execPath, join(bin, "codex"));
+    for (const platform of ["linux", "darwin"]) {
+      const descriptor = resolveRuntimeExecutable("codex", bin, { platform });
+      assert.equal(descriptor.platform, platform);
+      assert.equal(descriptor.requestedName, "codex");
+      assert.equal(descriptor.physicalPath, realpathSync(process.execPath));
+      assert.equal(descriptor.resolution, "posix-path-direct");
+    }
+    assert.throws(
+      () => resolveRuntimeExecutable("codex.exe", bin, { platform: "darwin" }),
+      (error) => error?.code === "runtime-executable-unavailable",
+    );
+  } finally { dispose(path); }
+});
+
+test("native Windows restart state consumes owner-DACL assurance instead of projected mode bits", () => {
+  const path = root();
+  try {
+    git(path);
+    const fixture = seeded(path);
+    const binding = prepareRuntimeRestartBinding({
+      rootDir: path,
+      ...fixture,
+      codexExecutable: process.execPath,
+      random: counterRandom(0x91, 0x92),
+    });
+    const hardened = [];
+    const assessed = [];
+    const projectedMode = (target) => {
+      const info = nativeFs.lstatSync(target);
+      return {
+        ...info,
+        mode: (info.mode & ~0o777) | 0o777,
+        isDirectory: () => info.isDirectory(),
+        isFile: () => info.isFile(),
+        isSymbolicLink: () => info.isSymbolicLink(),
+      };
+    };
+    const deps = {
+      platform: "win32",
+      spawnSync: gitCommon(path),
+      lstatSync: projectedMode,
+      hardenWindowsPrivateDirectoryFn(target) {
+        hardened.push(target);
+        return { status: "secure" };
+      },
+      assessWindowsPrivatePathFn(target) {
+        assessed.push(target);
+        return { status: "secure" };
+      },
+    };
+    const stored = persistRestartBarrier({ rootDir: path, binding, deps });
+    assert.equal(stored.barrier.state, "restart-required");
+    assert.equal(hardened.some((target) => target.endsWith("agent-pipeline")), true);
+    assert.equal(hardened.some((target) => target.endsWith("onboarding")), true);
+    assert.equal(hardened.some((target) => target.endsWith(".writer-lock")), true);
+    assert.equal(assessed.some((target) => target.endsWith(".tmp")), true);
+    assert.equal(assessed.some((target) => target.endsWith("restart-barrier.json")), true);
+    assert.equal(readRestartBarrier({ rootDir: path, deps }).status, "present");
+  } finally { dispose(path); }
+});
+
+test("unavailable or insecure Windows private-state assurance fails before barrier publication", () => {
+  for (const status of ["unavailable", "insecure"]) {
+    const path = root();
+    try {
+      git(path);
+      const fixture = seeded(path);
+      const binding = prepareRuntimeRestartBinding({
+        rootDir: path,
+        ...fixture,
+        codexExecutable: process.execPath,
+        random: counterRandom(0x93, 0x94),
+      });
+      assert.throws(
+        () => persistRestartBarrier({
+          rootDir: path,
+          binding,
+          deps: {
+            platform: "win32",
+            spawnSync: gitCommon(path),
+            hardenWindowsPrivateDirectoryFn: () => ({ status }),
+            assessWindowsPrivatePathFn: () => ({ status }),
+          },
+        }),
+        (error) => error?.phase === "private-root-assurance"
+          && error?.code === (status === "insecure"
+            ? "private-state-object-unsafe"
+            : "private-state-assurance-unavailable"),
+      );
+      assert.equal(nativeFs.existsSync(join(path, ".git", "agent-pipeline", "onboarding", "restart-barrier.json")), false);
+    } finally { dispose(path); }
+  }
 });
 
 test("the launch wrapper preserves the interactive Codex process contract without exposing its token", () => {
@@ -183,7 +336,7 @@ test("the launch wrapper preserves the interactive Codex process contract withou
   const priorToken = process.env.PIPELINE_CODEX_ONBOARDING_TOKEN;
   const priorSentinel = process.env.PIPELINE_ONBOARDING_HOST_ENV_SENTINEL;
   try {
-    const executable = resolveRuntimeExecutable();
+    const executable = resolveRuntimeExecutable().physicalPath;
     const prepare = (path, random) => {
       git(path);
       const binding = prepareRuntimeRestartBinding({
@@ -354,7 +507,7 @@ test("a barrier permits only one live issued ticket while expired history remain
   try {
     git(path);
     const fixture = seeded(path);
-    const executable = resolveRuntimeExecutable();
+    const executable = resolveRuntimeExecutable().physicalPath;
     const binding = prepareRuntimeRestartBinding({
       rootDir: path, ...fixture, codexExecutable: executable, random: counterRandom(0x05, 0x06),
     });
@@ -488,7 +641,7 @@ test("duplicate, malformed, and unsafe ticket-set entries fail authentication an
   try {
     git(path);
     const fixture = seeded(path);
-    const executable = resolveRuntimeExecutable();
+    const executable = resolveRuntimeExecutable().physicalPath;
     const binding = prepareRuntimeRestartBinding({
       rootDir: path, ...fixture, codexExecutable: executable, random: counterRandom(0x0c, 0x0d),
     });
@@ -677,7 +830,7 @@ test("the strict host helper requires a bound executable, ticket, fresh generati
 test("native config/read accepts only the exact post-initialize remote-control status notification", async () => {
   const path = root();
   try {
-    const executable = resolveRuntimeExecutable();
+    const executable = resolveRuntimeExecutable().physicalPath;
     for (const status of ["disabled", "connecting", "connected", "errored"]) {
       const observed = await readNativeConfig({
         executable,
@@ -726,7 +879,7 @@ test("the productive main performs native config/read without a config/evidence 
   try {
     git(path);
     const fixture = seeded(path);
-    const executable = resolveRuntimeExecutable();
+    const executable = resolveRuntimeExecutable().physicalPath;
     const bin = dirname(executable);
     const binding = prepareRuntimeRestartBinding({
       rootDir: path, ...fixture, codexExecutable: executable, random: counterRandom(0x61, 0x62),

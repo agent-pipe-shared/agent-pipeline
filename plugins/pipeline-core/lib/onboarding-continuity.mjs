@@ -55,6 +55,8 @@ export const KICKOFF_GOAL_MAX_BYTES = 160;
 export const CONTINUITY_REPAIR_PLAN_SCHEMA = "pipeline.codex-onboarding-continuity-repair-plan.v1";
 export const CONTINUITY_REPAIR_APPLY_SCHEMA = "pipeline.codex-onboarding-continuity-repair-apply.v1";
 export const SESSION_CLEANUP_BIND_SCHEMA = "pipeline.codex-onboarding-session-cleanup-bind.v1";
+export const SESSION_CLEANUP_RELEASE_PROOF_SCHEMA = "pipeline.session-cleanup-release-proof.v1";
+export const SESSION_CLEANUP_RELEASE_RECEIPT_SCHEMA = "pipeline.session-cleanup-release-receipt.v1";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ONBOARDING_SCRIPT = join(HERE, "..", "scripts", "project-onboarding-v3.mjs");
@@ -675,7 +677,7 @@ export function applyOnboardingContinuityRepair({
   }
 }
 
-function observeSessionCleanupState(rootDir) {
+function observeMachineState(rootDir) {
   const root = physicalRoot(rootDir);
   const path = absoluteProjectPath(root, STATE_RELATIVE_PATH, "Pipeline machine state");
   assertPhysicalChain(root, path, { leafMayBeAbsent: false });
@@ -686,23 +688,128 @@ function observeSessionCleanupState(rootDir) {
   } catch {
     fail("SESSION-CLEANUP-STATE-MALFORMED", "Pipeline machine state is malformed");
   }
-  if (!isObject(state)
-    || state.schema !== "pipeline.state.v0"
-    || !isObject(state.activeFeature)
+  if (!isObject(state) || state.schema !== "pipeline.state.v0") {
+    fail("SESSION-CLEANUP-STATE-MALFORMED", "Pipeline machine state is malformed");
+  }
+  return { root, path, raw, state, stateSha256: sha256(raw) };
+}
+
+function validateClosedArtifact(root, binding) {
+  if (!isObject(binding) || !SHA256_RE.test(binding.sha256 ?? "")) return false;
+  try {
+    const observed = observeOptionalProjectFile(root, binding.path, "closed continuity artifact");
+    return observed.status === "present" && observed.sha256 === binding.sha256;
+  } catch {
+    return false;
+  }
+}
+
+function closedReleaseProof(root, state, entry, entryIndex, spawn) {
+  if (!isObject(entry)
+    || typeof entry.id !== "string"
+    || typeof entry.planPath !== "string"
+    || !/^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(entry.forCommit ?? "")
+    || !isObject(entry.continuityClose)
+    || entry.continuityClose.schema !== "pipeline.continuity-close.v0"
+    || entry.continuityClose.featureId !== entry.id
+    || !Number.isSafeInteger(entry.continuityClose.expectedRevision)
+    || !validateClosedArtifact(root, entry.continuityClose.result)
+    || !validateClosedArtifact(root, entry.continuityClose.closeEvidence)) return null;
+  const result = spawn(
+    "git",
+    ["show", `${entry.forCommit}:${STATE_RELATIVE_PATH}`],
+    { cwd: root, encoding: "utf8", shell: false, maxBuffer: 2 * 1024 * 1024 },
+  );
+  if (result?.error || result?.status !== 0) return null;
+  const raw = Buffer.from(String(result.stdout ?? ""), "utf8");
+  let prior;
+  try { prior = JSON.parse(raw); } catch { return null; }
+  if (!isObject(prior)
+    || prior.schema !== "pipeline.state.v0"
+    || prior.activeFeature?.id !== entry.id
+    || prior.activeFeature?.planPath !== entry.planPath
+    || !isObject(prior.continuity)
+    || prior.continuity.revision !== entry.continuityClose.expectedRevision
+    || prior.continuity.authority?.result?.path !== entry.continuityClose.result.path
+    || prior.continuity.authority?.result?.sha256 !== entry.continuityClose.result.sha256
+    || !validateContinuityState(prior.continuity, entry.id).ok) return null;
+  const sessionCleanup = prior.continuity.runtime.sessionCleanup ?? null;
+  const closeRequestSha256 = canonicalSha256(entry.continuityClose);
+  const closeEntrySha256 = canonicalSha256(entry);
+  const proof = {
+    schema: SESSION_CLEANUP_RELEASE_PROOF_SCHEMA,
+    featureId: entry.id,
+    continuityRevision: prior.continuity.revision,
+    sessionCleanup: structuredClone(sessionCleanup),
+    forCommit: entry.forCommit,
+    preimageStateSha256: sha256(raw),
+    closeRequestSha256,
+    closeEntrySha256,
+    closedEntryIndex: entryIndex,
+  };
+  return { prior, sessionCleanup, proof };
+}
+
+function sameReleaseProof(receipt, proof) {
+  return isObject(receipt)
+    && receipt.schema === SESSION_CLEANUP_RELEASE_RECEIPT_SCHEMA
+    && receipt.featureId === proof.featureId
+    && receipt.continuityRevision === proof.continuityRevision
+    && canonicalJson(receipt.sessionCleanup) === canonicalJson(proof.sessionCleanup)
+    && receipt.forCommit === proof.forCommit
+    && receipt.preimageStateSha256 === proof.preimageStateSha256
+    && receipt.closeRequestSha256 === proof.closeRequestSha256
+    && receipt.closeEntrySha256 === proof.closeEntrySha256;
+}
+
+function observeSessionCleanupState(rootDir, spawn = defaultGitSpawn) {
+  const observed = observeMachineState(rootDir);
+  const { state } = observed;
+  if (!isObject(state.activeFeature)
     || typeof state.activeFeature.id !== "string"
     || !isObject(state.continuity)) {
-    fail("SESSION-CLEANUP-STATE-MALFORMED", "Pipeline machine state cannot own a cleanup descriptor");
+    if (!Array.isArray(state.closedFeatures)) {
+      fail("SESSION-CLEANUP-STATE-MALFORMED", "Pipeline machine state cannot prove a cleanup descriptor");
+    }
+    const candidates = state.closedFeatures
+      .map((entry, index) => closedReleaseProof(observed.root, state, entry, index, spawn))
+      .filter((entry) => entry !== null);
+    const bound = candidates.filter((entry) => entry.sessionCleanup !== null);
+    if (bound.length > 1) {
+      fail("SESSION-CLEANUP-RELEASE-AMBIGUOUS", "multiple closed cleanup bindings remain provable");
+    }
+    if (bound.length === 0) {
+      return {
+        ...observed,
+        mode: "closed",
+        revision: null,
+        activeFeatureId: null,
+        sessionCleanup: null,
+        releaseProof: null,
+        released: false,
+      };
+    }
+    const candidate = bound[0];
+    const receipts = Array.isArray(state.cleanupReleases) ? state.cleanupReleases : [];
+    const releaseReceipt = receipts.find((receipt) => sameReleaseProof(receipt, candidate.proof)) ?? null;
+    return {
+      ...observed,
+      mode: "closed",
+      revision: candidate.prior.continuity.revision,
+      activeFeatureId: candidate.prior.activeFeature.id,
+      sessionCleanup: candidate.sessionCleanup,
+      releaseProof: candidate.proof,
+      released: releaseReceipt !== null,
+      releaseReceipt,
+    };
   }
   const validation = validateContinuityState(state.continuity, state.activeFeature.id);
   if (!validation.ok) {
     fail("SESSION-CLEANUP-CONTINUITY-INVALID", `continuity state rejected cleanup binding (${validation.code})`);
   }
   return {
-    root,
-    path,
-    raw,
-    state,
-    stateSha256: sha256(raw),
+    ...observed,
+    mode: "active",
     revision: state.continuity.revision,
     activeFeatureId: state.activeFeature.id,
     sessionCleanup: state.continuity.runtime.sessionCleanup ?? null,
@@ -713,16 +820,155 @@ function observeSessionCleanupState(rootDir) {
  * Read the exact persisted cleanup tuple and its CAS preimage without writing.
  * The owner nonce remains solely in the repository-private descriptor.
  */
-export function readOnboardingSessionCleanupBinding({ rootDir } = {}) {
-  const observed = observeSessionCleanupState(rootDir);
+export function readOnboardingSessionCleanupBinding({ rootDir, spawn = defaultGitSpawn } = {}) {
+  const observed = observeSessionCleanupState(rootDir, spawn);
+  const status = observed.mode === "active"
+    ? (observed.sessionCleanup === null ? "unbound" : "bound")
+    : observed.released
+      ? "released"
+      : observed.sessionCleanup === null
+        ? "closed-unbound"
+        : "closed-bound";
   return {
     schema: SESSION_CLEANUP_BIND_SCHEMA,
-    status: observed.sessionCleanup === null ? "unbound" : "bound",
+    status,
     root: observed.root,
     stateSha256: observed.stateSha256,
     revision: observed.revision,
     sessionCleanup: structuredClone(observed.sessionCleanup),
+    ...(observed.releaseProof ? { releaseProof: structuredClone(observed.releaseProof) } : {}),
+    ...(observed.releaseReceipt ? {
+      releasePlanSha256: observed.releaseReceipt.recoveryPlanSha256,
+      closureReceiptSha256: observed.releaseReceipt.closureReceiptSha256,
+    } : {}),
   };
+}
+
+/**
+ * Record that one exact historical close binding has a matching durable
+ * closure receipt. This does not recreate continuity or authorize a new
+ * descriptor; it only consumes the proof retained by close-feature.
+ */
+export function recordClosedOnboardingSessionCleanupRelease({
+  rootDir,
+  expectedStateSha256,
+  releaseProof,
+  closureReceiptSha256,
+  recoveryPlanSha256,
+  releasedAt = new Date().toISOString(),
+  deps = {},
+} = {}) {
+  if (!SHA256_RE.test(expectedStateSha256 ?? "")
+    || !isObject(releaseProof)
+    || releaseProof.schema !== SESSION_CLEANUP_RELEASE_PROOF_SCHEMA
+    || !SHA256_RE.test(closureReceiptSha256 ?? "")
+    || !SHA256_RE.test(recoveryPlanSha256 ?? "")
+    || typeof releasedAt !== "string"
+    || Number.isNaN(Date.parse(releasedAt))) {
+    fail("SESSION-CLEANUP-CLOSED-RELEASE-REQUEST", "closed cleanup release request is invalid");
+  }
+  const spawn = deps.spawn ?? defaultGitSpawn;
+  const initial = observeSessionCleanupState(rootDir, spawn);
+  if (initial.released
+    && canonicalJson(initial.releaseProof) === canonicalJson(releaseProof)
+    && initial.releaseReceipt.closureReceiptSha256 === closureReceiptSha256
+    && initial.releaseReceipt.recoveryPlanSha256 === recoveryPlanSha256) {
+    return {
+      schema: SESSION_CLEANUP_BIND_SCHEMA,
+      status: "released",
+      root: initial.root,
+      stateSha256: initial.stateSha256,
+      revision: initial.revision,
+      sessionCleanup: null,
+      mutated: false,
+    };
+  }
+  if (initial.mode !== "closed"
+    || initial.stateSha256 !== expectedStateSha256
+    || canonicalJson(initial.releaseProof) !== canonicalJson(releaseProof)) {
+    fail("SESSION-CLEANUP-CLOSED-RELEASE-CAS", "closed cleanup release preimage changed");
+  }
+  const token = `session-cleanup-closed-release-${expectedStateSha256.slice(0, 32)}`;
+  const lock = acquireLock(`${initial.path}.lock`, "pipeline.continuity-lock.v0", token, {
+    nowMs: deps.nowMs ?? Date.now,
+    lockStaleMs: deps.lockStaleMs ?? 30_000,
+  });
+  let temporaryRecord;
+  let committed = false;
+  try {
+    const current = observeSessionCleanupState(initial.root, spawn);
+    if (current.released
+      && canonicalJson(current.releaseProof) === canonicalJson(releaseProof)
+      && current.releaseReceipt.closureReceiptSha256 === closureReceiptSha256
+      && current.releaseReceipt.recoveryPlanSha256 === recoveryPlanSha256) {
+      return {
+        schema: SESSION_CLEANUP_BIND_SCHEMA,
+        status: "released",
+        root: current.root,
+        stateSha256: current.stateSha256,
+        revision: current.revision,
+        sessionCleanup: null,
+        mutated: false,
+      };
+    }
+    if (current.stateSha256 !== expectedStateSha256
+      || canonicalJson(current.releaseProof) !== canonicalJson(releaseProof)) {
+      fail("SESSION-CLEANUP-CLOSED-RELEASE-CAS", "closed cleanup release preimage changed");
+    }
+    const receipt = {
+      schema: SESSION_CLEANUP_RELEASE_RECEIPT_SCHEMA,
+      featureId: releaseProof.featureId,
+      continuityRevision: releaseProof.continuityRevision,
+      sessionCleanup: structuredClone(releaseProof.sessionCleanup),
+      forCommit: releaseProof.forCommit,
+      preimageStateSha256: releaseProof.preimageStateSha256,
+      closeRequestSha256: releaseProof.closeRequestSha256,
+      closeEntrySha256: releaseProof.closeEntrySha256,
+      closureReceiptSha256,
+      recoveryPlanSha256,
+      releasedAt,
+    };
+    const next = structuredClone(current.state);
+    next.cleanupReleases = [...(Array.isArray(next.cleanupReleases) ? next.cleanupReleases : []), receipt];
+    const stateBytes = expectedStateBytes(next);
+    const suffixSource = (deps.randomUUID ?? randomUUID)();
+    const temporary = join(
+      dirname(current.path),
+      `.${basename(current.path)}.closed-cleanup-release-${suffixSource.replaceAll("-", "")}.tmp`,
+    );
+    temporaryRecord = writeExclusiveSynced(temporary, stateBytes, 0o600);
+    if (sha256(readPhysicalFile(current.path, "Pipeline machine state")) !== expectedStateSha256) {
+      fail("SESSION-CLEANUP-CLOSED-RELEASE-CAS", "closed cleanup release preimage changed");
+    }
+    renameSync(temporary, current.path);
+    temporaryRecord = null;
+    committed = true;
+    fsyncDirectory(dirname(current.path));
+    const readback = observeSessionCleanupState(current.root, spawn);
+    if (!readback.released
+      || readback.stateSha256 !== sha256(stateBytes)
+      || readback.releaseReceipt.closureReceiptSha256 !== closureReceiptSha256
+      || readback.releaseReceipt.recoveryPlanSha256 !== recoveryPlanSha256) {
+      fail("SESSION-CLEANUP-CLOSED-RELEASE-READBACK", "closed cleanup release readback is invalid", { committed: true });
+    }
+    return {
+      schema: SESSION_CLEANUP_BIND_SCHEMA,
+      status: "released",
+      root: readback.root,
+      stateSha256: readback.stateSha256,
+      revision: readback.revision,
+      sessionCleanup: null,
+      mutated: true,
+    };
+  } catch (error) {
+    if (!committed && temporaryRecord) {
+      try { unlinkOwned(temporaryRecord); } catch {}
+    }
+    if (error instanceof KickoffError) throw error;
+    fail("SESSION-CLEANUP-CLOSED-RELEASE-WRITE", "closed cleanup release failed", { committed });
+  } finally {
+    releaseLock(lock);
+  }
 }
 
 /**

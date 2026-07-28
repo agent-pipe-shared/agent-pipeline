@@ -23,6 +23,10 @@ import {
   hasCodexExistingGitControlMount,
   readCodexHostRepositoryInitAdmission,
 } from "../lib/codex-host-layout.mjs";
+import {
+  isBoundedReadOnlyPipeline,
+  parseGuardCommand,
+} from "./guard-command-grammar.mjs";
 
 const GOVERNANCE_MARKERS = [
   ".agent-pipeline/core.lock.json",
@@ -39,6 +43,7 @@ const READBACK_SCRIPT = fileURLToPath(new URL("../scripts/codex-project-runtime-
 const APP_SERVER_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-health.mjs", import.meta.url));
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
+const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
 const HEX = /^[a-f0-9]{64}$/u;
 const HOST_INIT_CROSS_VIEW_STATUSES = new Set([
   "repository-mount-read-only",
@@ -59,10 +64,11 @@ function exactReadyReceipt(value) {
     && value.intent === "session";
 }
 
-function blocked() {
+function blocked(code = "GUARD-LIFECYCLE-NOT-READY") {
   return verdict(
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+      + `${code}: `
       + "Pipeline-governed project writes require an exact V4 ready result for session intent.\n"
       + "Repair or complete onboarding through the typed lifecycle action before retrying.\n",
   );
@@ -91,6 +97,7 @@ function crossRepositoryMutationBlocked() {
   return verdict(
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+      + "GUARD-CROSS-REPO-MUTATION: "
       + "A governed consumer session may write only inside its own physical project root.\n"
       + "Pipeline source, another repository, marketplace metadata, cachebuster updates, "
       + "and plugin installation require a separate session rooted at the exact target "
@@ -119,79 +126,13 @@ export function isProjectWritePath(filePath, root, dependencies = {}) {
   }
 }
 
-function parseSimpleShellWords(command, root) {
-  if (typeof command !== "string" || command.trim() === "" || /[\0\r\n]/u.test(command)) return null;
-  const words = [];
-  let value = "";
-  let mode = "plain";
-  let started = false;
-  let expands = false;
-  const finish = () => {
-    if (!started) return;
-    if (expands) {
-      if (value === "$PWD" || value === "${PWD}") value = root;
-      else throw new Error("unsupported shell expansion");
-    }
-    words.push(value);
-    value = "";
-    started = false;
-    expands = false;
-  };
-  try {
-    for (let index = 0; index < command.length; index += 1) {
-      const char = command[index];
-      if (mode === "single") {
-        if (char === "'") mode = "plain";
-        else value += char;
-        started = true;
-        continue;
-      }
-      if (mode === "double") {
-        if (char === "\"") {
-          mode = "plain";
-        } else if (char === "\\") {
-          index += 1;
-          if (index >= command.length) return null;
-          value += command[index];
-        } else {
-          if (char === "$" || char === "`") expands = true;
-          value += char;
-        }
-        started = true;
-        continue;
-      }
-      if (/\s/u.test(char)) {
-        finish();
-        continue;
-      }
-      if (char === "'") {
-        mode = "single";
-        started = true;
-        continue;
-      }
-      if (char === "\"") {
-        mode = "double";
-        started = true;
-        continue;
-      }
-      if (char === "\\") {
-        index += 1;
-        if (index >= command.length) return null;
-        value += command[index];
-        started = true;
-        continue;
-      }
-      if (/[;&|<>()]/u.test(char)) return null;
-      if (char === "$" || char === "`") expands = true;
-      value += char;
-      started = true;
-    }
-    if (mode !== "plain") return null;
-    finish();
-  } catch {
-    return null;
-  }
-  return words;
+function simpleWords(command, root, options = {}) {
+  const parsed = parseGuardCommand(command, root, options);
+  if (parsed.parseStatus !== "accepted"
+    || parsed.segments.length !== 1
+    || parsed.operators.length !== 0
+    || parsed.redirects.length !== 0) return null;
+  return [parsed.segments[0].executable, ...parsed.segments[0].argv];
 }
 
 function exactRoot(args, root, index) {
@@ -205,7 +146,9 @@ function exactRoot(args, root, index) {
  * substitution.
  */
 export function isReadOnlyDiagnosticCommand(command, root) {
-  const words = parseSimpleShellWords(command, root);
+  const parsed = parseGuardCommand(command, root);
+  if (isBoundedReadOnlyPipeline(parsed, root)) return true;
+  const words = simpleWords(command, root);
   if (!words || words.length === 0) return false;
   const executable = basename(words[0]).toLowerCase();
   const args = words.slice(1);
@@ -247,21 +190,54 @@ function commandPath(value, root) {
   return resolve(root, value);
 }
 
+function hasExternalOutputRedirect(command, root) {
+  let quote = null;
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index];
+    if (quote !== null) {
+      if (char === quote) quote = null;
+      else if (quote === "\"" && char === "\\") index += 1;
+      continue;
+    }
+    if (char === "'" || char === "\"") {
+      quote = char;
+      continue;
+    }
+    if (char !== ">") continue;
+    if (command[index + 1] === ">" || command[index + 1] === "&") continue;
+    let cursor = index + 1;
+    while (cursor < command.length && /\s/u.test(command[cursor])) cursor += 1;
+    let target = "";
+    while (cursor < command.length && !/\s/u.test(command[cursor])
+      && !"|;&<>()".includes(command[cursor])) {
+      target += command[cursor];
+      cursor += 1;
+    }
+    const resolved = commandPath(target, root);
+    if (resolved !== null && !pathInside(root, resolved)) return true;
+  }
+  return false;
+}
+
 /**
  * Identify the concrete cross-repository mutation patterns involved in local
  * plugin development. Read-only commands remain handled by the diagnostic
  * allowlist; unknown commands do not gain mutation authority from this helper.
  */
 export function isForbiddenCrossRepositoryMutation(command, root, dependencies = {}) {
-  const words = parseSimpleShellWords(command, root);
-  // The simple-word parser intentionally rejects redirection.  Detect an
-  // unquoted redirect before its rejection can turn into a ready-session
-  // escape from the project root.  The guard deliberately does not attempt
-  // to parse shell descriptor chaining: only the constrained simple-command
-  // form has project-scoped ready-session authority.
-  if (!words || words.length === 0) {
-    return /[<>]/u.test(command);
+  const parsed = parseGuardCommand(command, root);
+  if (isBoundedReadOnlyPipeline(parsed, root)) return false;
+  if (parsed.parseStatus !== "accepted" && hasExternalOutputRedirect(command, root)) return true;
+  if (parsed.parseStatus === "accepted" && parsed.redirects.length > 0) {
+    return parsed.redirects.some((redirect) => {
+      if (redirect.fd === 2
+        && (redirect.target === "/dev/null" || redirect.target.toLowerCase() === "nul")) return false;
+      const target = commandPath(redirect.target, root);
+      return target !== null && !pathInside(root, target);
+    });
   }
+  const words = simpleWords(command, root);
+  if (!words || words.length === 0) return false;
   const exists = dependencies.existsSyncFn ?? existsSync;
   const executable = basename(words[0]).toLowerCase();
   const args = words.slice(1);
@@ -343,9 +319,30 @@ function sanctionedMigrationArgs(args, root) {
     || (args.length === 5 && args[3] === "--initialize-missing-runtime" && args[4] === "--activate");
 }
 
-export function isSanctionedLifecycleCommand(command, root) {
-  const words = parseSimpleShellWords(command, root);
-  if (!words || words.length < 2 || !["node", process.execPath].includes(words[0])) return false;
+function sanctionedSessionCleanupArgs(args, root) {
+  if (["status", "release-binding", "plan-recovery"].includes(args[0])) {
+    return args[1] === "--repo" && args[2] === root && args.length === 3;
+  }
+  if (args[0] === "apply-recovery") {
+    return args[1] === "--repo" && args[2] === root
+      && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
+      && args[5] === "--activate" && args.length === 6;
+  }
+  return args[0] === "cleanup"
+    && args[1] === "--repo" && args[2] === root
+    && args[3] === "--session-descriptor"
+    && /^[A-Za-z0-9._-]{1,80}$/u.test(args[4] ?? "")
+    && args[5] === "--expected-descriptor-sha256"
+    && HEX.test(args[6] ?? "")
+    && args.length === 7;
+}
+
+export function isSanctionedLifecycleCommand(command, root, options = {}) {
+  const words = simpleWords(command, root, options);
+  const platform = options.platform ?? process.platform;
+  const directNode = platform === "win32" ? ["node", "node.exe"] : ["node"];
+  const trustedNode = options.processExecPath ?? process.execPath;
+  if (!words || words.length < 2 || ![...directNode, trustedNode].includes(words[0])) return false;
   const [script, ...args] = words.slice(1);
   if (script === ONBOARDING_SCRIPT) return sanctionedOnboardingArgs(args, root);
   if (script === MIGRATION_SCRIPT) return sanctionedMigrationArgs(args, root);
@@ -356,6 +353,7 @@ export function isSanctionedLifecycleCommand(command, root) {
   }
   if (script === READBACK_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
   if (script === START_PREFLIGHT_SCRIPT) return args.length === 0;
+  if (script === SESSION_CLEANUP_SCRIPT) return sanctionedSessionCleanupArgs(args, root);
   if (script === HOST_REPOSITORY_INIT_SCRIPT) {
     if (args[0] === "plan") return exactRoot(args, root, 1) && args.length === 3;
     return args[0] === "apply"
@@ -410,6 +408,15 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   }
   if (toolName === "Bash" && isReadOnlyDiagnosticCommand(input.tool_input.command, root)) {
     return verdict(0);
+  }
+  if (toolName === "Bash") {
+    const parsed = parseGuardCommand(input.tool_input.command, root);
+    if (parsed.parseStatus !== "accepted") return blocked("GUARD-PARSE-UNSUPPORTED");
+    if (parsed.operators.length > 0 || parsed.redirects.length > 0) {
+      return blocked(parsed.redirects.length > 0
+        ? "GUARD-REDIRECT-UNAPPROVED"
+        : "GUARD-OPERATOR-UNAPPROVED");
+    }
   }
   if (toolName === "Bash" && input.tool_input.command.includes(LAUNCH_SCRIPT)) {
     return externalRestartOnly();

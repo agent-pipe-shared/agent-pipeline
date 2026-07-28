@@ -25,11 +25,16 @@ import {
   isReadOnlyDiagnosticCommand,
   isSanctionedLifecycleCommand,
 } from "./guard-lifecycle-ready.mjs";
+import {
+  isBoundedReadOnlyPipeline,
+  parseGuardCommand,
+} from "./guard-command-grammar.mjs";
 
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
+const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
 
 function root() {
   const path = mkdtempSync(join(tmpdir(), "guard-lifecycle-ready-"));
@@ -407,6 +412,80 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("closed command grammar preserves native Windows paths and direct node.exe identity", () => {
+  const windowsRoot = "C:\\Users\\Pipeline User\\consumer";
+  const script = "C:\\Pipeline Plugin\\scripts\\project-onboarding-v3.mjs";
+  const parsed = parseGuardCommand(
+    `node.exe "${script}" inspect --root "${windowsRoot}" --intent bootstrap`,
+    windowsRoot,
+    { platform: "win32" },
+  );
+  assert.equal(parsed.parseStatus, "accepted");
+  assert.equal(parsed.dialect, "windows-direct");
+  assert.deepEqual(parsed.segments[0], {
+    executable: "node.exe",
+    argv: [script, "inspect", "--root", windowsRoot, "--intent", "bootstrap"],
+  });
+  assert.equal(isSanctionedLifecycleCommand(
+    `node.exe "${ONBOARDING_SCRIPT}" inspect --root "${windowsRoot}" --intent bootstrap`,
+    windowsRoot,
+    { platform: "win32", processExecPath: "C:\\Program Files\\nodejs\\node.exe" },
+  ), true);
+});
+
+test("only the bounded rg-to-head pipeline and platform null redirect are read-only", () => {
+  const path = root();
+  try {
+    for (const command of [
+      "rg -n -S lifecycle plugins 2>/dev/null | head -n 280",
+      "rg --files --hidden --max-depth 3 . | head -n 500",
+    ]) {
+      const parsed = parseGuardCommand(command, path);
+      assert.equal(isBoundedReadOnlyPipeline(parsed, path), true, command);
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
+      assert.equal(isForbiddenCrossRepositoryMutation(command, path), false, command);
+    }
+    const windows = "rg.exe -n lifecycle . 2>NUL | head.exe -n 20";
+    const parsedWindows = parseGuardCommand(windows, path, { platform: "win32" });
+    assert.equal(isBoundedReadOnlyPipeline(parsedWindows, path), true);
+    for (const command of [
+      "rg -n lifecycle . | head -n 0",
+      "rg -n lifecycle . | head -n 050",
+      "rg -n lifecycle . | head -n 501",
+      "rg -n lifecycle . 2>diagnostic.log | head -n 20",
+      "rg -n lifecycle . | tee output",
+      "rg -n lifecycle . | head -n 20 | wc -l",
+      "rg --pre worker lifecycle . | head -n 20",
+      "rg -n lifecycle .. | head -n 20",
+      "rg -n lifecycle . && head -n 20",
+    ]) {
+      assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("redirect-looking quoted data stays argv while hostile composition is typed and denied", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const quoted = parseGuardCommand("node -e 'console.log(\"a>b\")'", path);
+    assert.equal(quoted.parseStatus, "accepted");
+    assert.equal(quoted.redirects.length, 0);
+    for (const [command, code] of [
+      ["rg -n lifecycle . > output.txt | head -n 20", "GUARD-REDIRECT-UNAPPROVED"],
+      ["rg -n lifecycle . | tee output.txt", "GUARD-OPERATOR-UNAPPROVED"],
+      ["rg -n lifecycle . && touch output.txt", "GUARD-PARSE-UNSUPPORTED"],
+    ]) {
+      const result = evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+      });
+      assert.equal(result.exitCode, 2, command);
+      assert.match(result.stderr, new RegExp(code, "u"), command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("non-ready Bash permits only exact plugin-local lifecycle remediation argv", () => {
   const path = root();
   try {
@@ -442,6 +521,36 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
         projectDir: path,
         requireProjectOnboardingReadyFn() { deny("runtime-attestation-required"); },
       }).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("non-ready cleanup recovery admits only exact root, descriptor and digest bindings", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    const digest = "a".repeat(64);
+    const commands = [
+      `node '${SESSION_CLEANUP_SCRIPT}' status --repo '${path}'`,
+      `node '${SESSION_CLEANUP_SCRIPT}' plan-recovery --repo '${path}'`,
+      `node '${SESSION_CLEANUP_SCRIPT}' release-binding --repo '${path}'`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-recovery --repo '${path}' --plan-sha256 ${digest} --activate`,
+      `node '${SESSION_CLEANUP_SCRIPT}' cleanup --repo '${path}' --session-descriptor session-01 --expected-descriptor-sha256 ${digest}`,
+    ];
+    for (const command of commands) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+      }).exitCode, 0, command);
+    }
+    for (const command of [
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-recovery --repo /tmp/other --plan-sha256 ${digest} --activate`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-recovery --repo '${path}' --plan-sha256 ${digest}`,
+      `node '${SESSION_CLEANUP_SCRIPT}' cleanup --repo '${path}' --session-descriptor ../foreign --expected-descriptor-sha256 ${digest}`,
+      `node '${SESSION_CLEANUP_SCRIPT}' start --repo '${path}'`,
+    ]) {
+      assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });

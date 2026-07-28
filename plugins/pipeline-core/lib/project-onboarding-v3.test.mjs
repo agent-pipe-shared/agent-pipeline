@@ -27,7 +27,7 @@ import { parseYaml } from "./yaml-lite.mjs";
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { main as onboardingCli } from "../scripts/project-onboarding-v3.mjs";
 import {
-  canonicalJson, consumeRuntimeReadback, issueLaunchTicket, readCurrentRuntimeReadback, readRestartBarrier,
+  canonicalJson, CodexOnboardingRuntimeError, consumeRuntimeReadback, issueLaunchTicket, readCurrentRuntimeReadback, readRestartBarrier,
   removeRestartBarrierCas, sha256,
 } from "./codex-onboarding-runtime.mjs";
 import { observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
@@ -1124,9 +1124,63 @@ test("invalid current runtime readback maps exactly and exposes no action", () =
       barrierSha256: null,
       readbackSha256: null,
     });
-    assertDiagnostic(observed, "runtime_readback_unavailable");
+    assertDiagnostic(observed, "native_runtime_readback_unavailable");
+    assert.equal(observed.diagnostics[0].path, "$.runtime.native-runtime-readback");
     assert.equal(observed.nextAction, null);
   } finally { dispose(path); }
+});
+
+test("runtime initialization preserves the exact executable and private-state failure phase", () => {
+  for (const failure of [
+    {
+      code: "runtime-executable-unavailable",
+      phase: "runtime-executable-resolution",
+      diagnostic: "runtime_executable_unavailable",
+      inject: "prepareRuntimeRestartBinding",
+    },
+    {
+      code: "private-state-assurance-unavailable",
+      phase: "private-root-assurance",
+      diagnostic: "private_state_assurance_unavailable",
+      inject: "persistRestartBarrier",
+    },
+  ]) {
+    const path = root();
+    try {
+      const seed = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+      assert.equal(applyProjectOnboardingV3(seed, {
+        rootDir: path,
+        activate: true,
+        deps: fakeDeps,
+      }).status, "applied");
+      const plan = planProjectOnboardingLifecycleV4({
+        rootDir: path,
+        deps: fakeDeps,
+        operation: "runtime",
+      });
+      const digest = plan.nextAction.argv[plan.nextAction.argv.indexOf("--plan-sha256") + 1];
+      const injectedDeps = {
+        ...fakeDeps,
+        [failure.inject]() {
+          throw new CodexOnboardingRuntimeError(failure.code, failure.phase, "private fixture detail");
+        },
+      };
+      const observed = applyProjectOnboardingLifecycleV4({
+        rootDir: path,
+        deps: injectedDeps,
+        operation: "runtime",
+        planSha256: digest,
+        activate: true,
+      });
+      assert.equal(observed.status, "runtime-readback-unavailable");
+      assert.equal(observed.nextAction, null);
+      assert.equal(observed.diagnostics.length, 1);
+      assert.equal(observed.diagnostics[0].code, failure.diagnostic);
+      assert.equal(observed.diagnostics[0].path, `$.runtime.${failure.phase}`);
+      assert.equal(JSON.stringify(observed).includes("private fixture detail"), false);
+      assert.equal(existsSync(join(path, ".git", "agent-pipeline", "onboarding", "restart-barrier.json")), false);
+    } finally { dispose(path); }
+  }
 });
 
 test("runtime plan preimage drift preserves external bytes and maps to exact projection repair", () => {
@@ -1732,6 +1786,26 @@ test("a fresh portable seed remains non-ready until its missing Codex runtime is
     assert.equal(inspected.schema, "pipeline.project-onboarding.v4");
     assert.equal(inspected.status, "runtime-initialization-required");
     assert.equal(inspected.runtime.status, "missing");
+  } finally { dispose(path); }
+});
+
+test("Codex bootstrap accepts a dual-runner source whose default runner is Claude", () => {
+  const path = root();
+  try {
+    const plan = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(applyProjectOnboardingV3(plan, {
+      rootDir: path,
+      activate: true,
+      deps: fakeDeps,
+    }).status, "applied");
+    const sourcePath = join(path, "pipeline.user.yaml");
+    const source = readFileSync(sourcePath, "utf8")
+      .replace('  default: "codex"\n', '  default: "claude"\n');
+    writeFileSync(sourcePath, source);
+    const inspected = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
+    assert.equal(inspected.status, "runtime-initialization-required");
+    assert.equal(inspected.runtime.status, "missing");
+    assert.equal(inspected.runner, "codex");
   } finally { dispose(path); }
 });
 

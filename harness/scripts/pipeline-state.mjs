@@ -278,6 +278,7 @@ import {
   readGateEstimateEvidence,
 } from "../../plugins/pipeline-core/lib/gate-estimate.mjs";
 import { observeGitSource } from "../../plugins/pipeline-core/lib/source-observation.mjs";
+import { inspectSessionClosure } from "../../plugins/pipeline-core/lib/worktree-lifecycle.mjs";
 import {
   PUBLICATION_AUTHORITY_REFERENCE_SCHEMA,
   approvePublicationAuthority,
@@ -2782,6 +2783,23 @@ export function run(argv = process.argv.slice(2), deps = {}) {
           return 2;
         }
         continuityClose = structuredClone(closeRequest.value);
+        const sessionCleanup = base.continuity.runtime?.sessionCleanup ?? null;
+        if (sessionCleanup !== null) {
+          let closure;
+          try {
+            const inspectClosure = deps.inspectSessionClosureFn ?? inspectSessionClosure;
+            closure = inspectClosure(dir, sessionCleanup.sessionId, {
+              expectedDescriptorSha256: sessionCleanup.descriptorSha256,
+            });
+          } catch {
+            console.error("Error: continuity-bound feature close could not prove the exact cleanup closure; zero mutation.");
+            return 2;
+          }
+          if (closure?.status !== "closed") {
+            console.error("Error: continuity-bound feature close requires the exact cleanup descriptor to be closed before continuity removal.");
+            return 2;
+          }
+        }
       }
       // DEVIATION vs. approve-push (declared in the header): a git failure here is NOT fatal --
       // forCommit becomes null, a warning goes to stderr, and the close proceeds (exit 0).

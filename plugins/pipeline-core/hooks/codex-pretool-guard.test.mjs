@@ -197,6 +197,7 @@ check("governed bootstrap can read only its loaded pipeline-start skill and curr
     `sed -n '1,260p' '${skill}'`,
     `cat -- "${skill}"`,
     `Get-Content -LiteralPath "${skill}"`,
+    `Get-Content -LiteralPath "${skill}" -Raw`,
     "pwd",
     "pwd -P",
   ]) {
@@ -210,6 +211,35 @@ check("governed bootstrap can read only its loaded pipeline-start skill and curr
   }, root));
   assert.equal(chained.permissionDecision, "deny");
   assert.match(chained.permissionDecisionReason, /guard-lifecycle-ready/);
+  for (const command of [
+    `gc -LiteralPath "${skill}" -Raw`,
+    `Get-Content -Path "${skill}" -Raw`,
+    `Get-Content -LiteralPath "${skill}" -Encoding utf8`,
+    `Get-Content -LiteralPath "${skill}" -Raw | Select-Object -First 1`,
+  ]) {
+    const output = decision(run({ tool_name: "Bash", tool_input: { command } }, root));
+    assert.equal(output.permissionDecision, "deny", command);
+  }
+});
+
+check("outer Codex routing admits the exact bounded diagnostic pipeline while non-ready", () => {
+  const root = fixture();
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const allowed = run({
+    tool_name: "Bash",
+    tool_input: { command: "rg -n lifecycle . 2>/dev/null | head -n 40" },
+  }, root);
+  assert.equal(allowed.status, 0, allowed.stderr);
+  assert.equal(allowed.stdout, "");
+  for (const command of [
+    "rg -n lifecycle . 2>diagnostic.log | head -n 40",
+    "rg -n lifecycle . | head -n 0",
+    "rg -n lifecycle . | tee diagnostic.log",
+  ]) {
+    const output = decision(run({ tool_name: "Bash", tool_input: { command } }, root));
+    assert.equal(output.permissionDecision, "deny", command);
+    assert.match(output.permissionDecisionReason, /GUARD-(?:REDIRECT|OPERATOR|LIFECYCLE)/u, command);
+  }
 });
 
 check("lifecycle readiness is additive and aggregates with existing write guards", () => {

@@ -1931,6 +1931,66 @@ if (symlinkCapable) {
   ok("PS48f closed audit entry persists the exact close request", JSON.stringify(final.closedFeatures?.at(-1)?.continuityClose) === JSON.stringify(closeRequest));
 }
 
+// ---- PS48G: bound cleanup must close before continuity can be removed -------------------------
+{
+  const prepareBoundClose = (name) => {
+    const dir = freshDir(name);
+    seedContinuityRoot(dir);
+    mkdirSync(join(dir, "specs"), { recursive: true });
+    mkdirSync(join(dir, "evidence"), { recursive: true });
+    writeFileSync(join(dir, "specs", "result.md"), RESULT_FIXTURE);
+    writeFileSync(join(dir, "evidence", "close.json"), "bound cleanup close evidence\n");
+    const resultSha256 = createHash("sha256").update(RESULT_FIXTURE).digest("hex");
+    const closeEvidenceSha256 = createHash("sha256").update("bound cleanup close evidence\n").digest("hex");
+    const closeReady = continuityState();
+    closeReady.authority.result.sha256 = resultSha256;
+    closeReady.queueHead = continuityQueue({ nextAction: "close", dispatch: null });
+    closeReady.runtime.sessionCleanup = {
+      sessionId: "session-bound-close",
+      descriptorSha256: "e".repeat(64),
+    };
+    run(continuityArgs("continuity-init", "absent", writeRequest(dir, "bound-close-init", closeReady)), continuityDeps(dir));
+    const closeRequest = {
+      schema: "pipeline.continuity-close.v0",
+      featureId: CONTINUITY_FEATURE,
+      expectedRevision: 0,
+      result: { path: "specs/result.md", sha256: resultSha256 },
+      closeEvidence: { path: "evidence/close.json", sha256: closeEvidenceSha256 },
+    };
+    return { dir, closeRequestFile: writeRequest(dir, "bound-close-request", closeRequest) };
+  };
+
+  const active = prepareBoundClose("continuity-bound-cleanup-active");
+  const activeBefore = readFileSync(statePath(active.dir), "utf8");
+  const refused = run([
+    "close-feature", "--by", "po-test", "--continuity-close-request", active.closeRequestFile,
+  ], {
+    dir: active.dir,
+    now: FIXED_NOW,
+    gitHead: FIXED_GIT_HEAD,
+    inspectSessionClosureFn: () => ({ status: "active", closedAt: null }),
+  });
+  ok("PS48g close-feature refuses to discard an active cleanup binding", refused === 2);
+  ok("PS48h refused bound close is byte-identical", readFileSync(statePath(active.dir), "utf8") === activeBefore);
+
+  const closed = prepareBoundClose("continuity-bound-cleanup-closed");
+  const accepted = run([
+    "close-feature", "--by", "po-test", "--continuity-close-request", closed.closeRequestFile,
+  ], {
+    dir: closed.dir,
+    now: FIXED_NOW,
+    gitHead: FIXED_GIT_HEAD,
+    inspectSessionClosureFn: (root, sessionId, options) => {
+      ok("PS48i close binds the exact descriptor identity", root === closed.dir
+        && sessionId === "session-bound-close"
+        && options.expectedDescriptorSha256 === "e".repeat(64));
+      return { status: "closed", closedAt: FIXED_NOW(), receiptSha256: "f".repeat(64) };
+    },
+  });
+  ok("PS48j close-feature atomically consumes an already-closed cleanup binding", accepted === 0);
+  ok("PS48k accepted bound close removes active continuity", readState(closed.dir).state.continuity === undefined);
+}
+
 // ---- PS49: post-rename durability failure is never mislabeled as zero mutation ---------------
 {
   const dir = freshDir("continuity-post-rename");

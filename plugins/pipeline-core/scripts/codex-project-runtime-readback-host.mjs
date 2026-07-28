@@ -342,7 +342,7 @@ export async function produceRuntimeReadback({
   const { target: configTarget } = validateConfigPostimage(root, barrier.value);
   let executablePath;
   try {
-    executablePath = runtimeOptions.codexExecutablePath ?? resolveRuntimeExecutable();
+    executablePath = runtimeOptions.codexExecutablePath ?? resolveRuntimeExecutable().physicalPath;
   } catch (error) {
     throw typed("executable-unavailable", "Codex executable is unavailable", error);
   }

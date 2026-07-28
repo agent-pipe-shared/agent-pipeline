@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 
 import { evaluateLifecycleReadyGuard, isSanctionedLifecycleCommand } from "./guard-lifecycle-ready.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
+import { parseGuardCommand } from "./guard-command-grammar.mjs";
 
 const DEBUG_PREFIX = "[pipeline.codex-pretool.v1]";
 const PLUGIN_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
@@ -94,35 +95,31 @@ const lifecycleGoverned = [
 ].some((marker) => existsSync(join(projectRoot, marker)));
 const isLifecycleTool = toolName === "Bash" && isSanctionedLifecycleCommand(command, projectRoot);
 
-function unquote(value) {
-  const trimmed = value.trim();
-  if (trimmed.length >= 2
-    && ((trimmed.startsWith("\"") && trimmed.endsWith("\""))
-      || (trimmed.startsWith("'") && trimmed.endsWith("'")))) {
-    return trimmed.slice(1, -1);
-  }
-  return trimmed;
-}
-
 /** Permit only the bootstrap's own immutable identity/read step. */
 export function isBootstrapReadCommand(value, {
   pipelineStartSkill = PIPELINE_START_SKILL,
   platform = process.platform,
 } = {}) {
-  if (typeof value !== "string" || value.trim() === "" || /[\0\r\n;&|<>()`]/u.test(value)) return false;
+  if (typeof value !== "string" || value.trim() === "") return false;
   const command = value.trim();
   if (/^pwd(?:\s+-P)?$/u.test(command)) return true;
+  const parsed = parseGuardCommand(command, process.cwd(), { platform });
+  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
+    || parsed.operators.length !== 0 || parsed.redirects.length !== 0) return false;
+  const { executable, argv } = parsed.segments[0];
   let target = null;
-  const sed = command.match(/^sed\s+-n\s+["']?\d+(?:,\d+)?p["']?\s+(.+)$/u);
-  if (sed) target = sed[1];
-  const cat = command.match(/^cat\s+(?:--\s+)?(.+)$/u);
-  if (!target && cat) target = cat[1];
-  const powerShell = command.match(/^(?:Get-Content|gc)\s+(?:(?:-LiteralPath|-Path)\s+)?(.+)$/iu);
-  if (!target && powerShell) target = powerShell[1];
-  const cmdType = platform === "win32" ? command.match(/^type\s+(.+)$/iu) : null;
-  if (!target && cmdType) target = cmdType[1];
+  if (executable === "sed" && argv.length === 3 && argv[0] === "-n"
+    && /^\d+(?:,\d+)?p$/u.test(argv[1])) target = argv[2];
+  if (executable === "cat" && (argv.length === 1 || (argv.length === 2 && argv[0] === "--"))) {
+    target = argv.at(-1);
+  }
+  if (/^Get-Content$/iu.test(executable)
+    && (argv.length === 2 || argv.length === 3)
+    && /^-LiteralPath$/iu.test(argv[0])
+    && (argv.length === 2 || /^-Raw$/iu.test(argv[2]))) target = argv[1];
+  if (platform === "win32" && /^type$/iu.test(executable) && argv.length === 1) target = argv[0];
   if (!target) return false;
-  try { return resolve(unquote(target)) === resolve(pipelineStartSkill); }
+  try { return resolve(target) === resolve(pipelineStartSkill); }
   catch { return false; }
 }
 

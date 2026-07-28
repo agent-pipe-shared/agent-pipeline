@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { mkdtempSync, rmSync, unlinkSync, writeFileSync, mkdirSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -13,6 +14,7 @@ import {
   planOnboardingKickoff,
   readOnboardingSessionCleanupBinding,
 } from "../lib/onboarding-continuity.mjs";
+import { validateContinuityState } from "../lib/continuity-state.mjs";
 import {
   cleanupSession,
   listActiveSessionDescriptors,
@@ -115,6 +117,136 @@ test("release-binding completes an interrupted post-cleanup State release", () =
     assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+function gitRun(root, args) {
+  const result = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(result.status, 0, result.stderr);
+  return String(result.stdout).trim();
+}
+
+function legacyClosedCleanupFixture(name) {
+  const root = fixture(name);
+  const started = invoke(["start", "--repo", root, "--session", `session-${name}`]);
+  const statePath = join(root, ".claude", "pipeline-state.json");
+  const state = JSON.parse(readFileSync(statePath, "utf8"));
+  mkdirSync(join(root, "specs"), { recursive: true });
+  mkdirSync(join(root, "evidence"), { recursive: true });
+  const resultBytes = "legacy cleanup result\n";
+  const evidenceBytes = "legacy cleanup close evidence\n";
+  writeFileSync(join(root, "specs", "legacy-cleanup-result.md"), resultBytes);
+  writeFileSync(join(root, "evidence", "legacy-cleanup-close.md"), evidenceBytes);
+  state.continuity.authority.result = {
+    path: "specs/legacy-cleanup-result.md",
+    sha256: createHash("sha256").update(resultBytes).digest("hex"),
+  };
+  state.continuity.queueHead = {
+    ...state.continuity.queueHead,
+    nextAction: "close",
+    dispatch: null,
+  };
+  assert.equal(validateContinuityState(state.continuity, state.activeFeature.id).ok, true);
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  gitRun(root, ["config", "user.email", "fixture@example.invalid"]);
+  gitRun(root, ["config", "user.name", "Fixture"]);
+  gitRun(root, ["add", ".claude/pipeline-state.json", "specs/legacy-cleanup-result.md", "evidence/legacy-cleanup-close.md"]);
+  gitRun(root, ["commit", "-q", "-m", "fixture: retain legacy cleanup binding"]);
+  const forCommit = gitRun(root, ["rev-parse", "HEAD"]);
+  const closeRequest = {
+    schema: "pipeline.continuity-close.v0",
+    featureId: state.activeFeature.id,
+    expectedRevision: state.continuity.revision,
+    result: structuredClone(state.continuity.authority.result),
+    closeEvidence: {
+      path: "evidence/legacy-cleanup-close.md",
+      sha256: createHash("sha256").update(evidenceBytes).digest("hex"),
+    },
+  };
+  const loaded = loadSessionDescriptor(root, started.output.sessionId, {
+    expectedDescriptorSha256: started.output.descriptorSha256,
+  });
+  assert.equal(cleanupSession(root, loaded, { allowAbsent: true }).ok, true);
+  retireSessionDescriptor(root, loaded);
+  const closed = {
+    ...state,
+    closedFeatures: [{
+      id: state.activeFeature.id,
+      planPath: state.activeFeature.planPath,
+      phaseAtClose: state.activeFeature.phase,
+      closedAt: "2026-07-28T12:00:00.000Z",
+      closedBy: "legacy-writer",
+      forCommit,
+      continuityClose: closeRequest,
+    }],
+    planApproved: false,
+    updatedAt: "2026-07-28T12:00:00.000Z",
+  };
+  delete closed.activeFeature;
+  delete closed.planApproval;
+  delete closed.planRevocation;
+  delete closed.continuity;
+  writeFileSync(statePath, `${JSON.stringify(closed, null, 2)}\n`);
+  return { root, statePath, sessionCleanup: {
+    sessionId: started.output.sessionId,
+    descriptorSha256: started.output.descriptorSha256,
+  } };
+}
+
+test("legacy post-close binding is recovered only from exact Git and closure proof", () => {
+  const fixtureState = legacyClosedCleanupFixture("legacy-closed-release");
+  try {
+    const binding = readOnboardingSessionCleanupBinding({ rootDir: fixtureState.root });
+    assert.equal(binding.status, "closed-bound");
+    assert.deepEqual(binding.sessionCleanup, fixtureState.sessionCleanup);
+    assert.equal(binding.releaseProof.schema, "pipeline.session-cleanup-release-proof.v1");
+    const plan = invoke(["plan-recovery", "--repo", fixtureState.root]).output;
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.recovery, "release-closed-feature");
+    assert.equal(plan.closure.status, "closed");
+    assert.match(plan.closure.receiptSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(plan.applyAction.requiresConfirmation, true);
+    const applied = invoke([
+      "apply-recovery", "--repo", fixtureState.root,
+      "--plan-sha256", plan.planSha256,
+      "--activate",
+    ]).output;
+    assert.equal(applied.status, "recovered");
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: fixtureState.root }).status, "released");
+    const state = JSON.parse(readFileSync(fixtureState.statePath, "utf8"));
+    assert.equal(state.cleanupReleases.length, 1);
+    assert.equal(state.cleanupReleases[0].recoveryPlanSha256, plan.planSha256);
+    const replay = invoke([
+      "apply-recovery", "--repo", fixtureState.root,
+      "--plan-sha256", plan.planSha256,
+      "--activate",
+    ]).output;
+    assert.equal(replay.status, "recovered");
+    assert.equal(replay.mutated, false);
+    assert.equal(JSON.parse(readFileSync(fixtureState.statePath, "utf8")).cleanupReleases.length, 1);
+  } finally {
+    rmSync(fixtureState.root, { recursive: true, force: true });
+  }
+});
+
+test("legacy post-close recovery rejects close-entry drift after planning", () => {
+  const fixtureState = legacyClosedCleanupFixture("legacy-closed-drift");
+  try {
+    const plan = invoke(["plan-recovery", "--repo", fixtureState.root]).output;
+    const drifted = JSON.parse(readFileSync(fixtureState.statePath, "utf8"));
+    drifted.closedFeatures[0].closedBy = "foreign-writer";
+    writeFileSync(fixtureState.statePath, `${JSON.stringify(drifted, null, 2)}\n`);
+    assert.throws(
+      () => invoke([
+        "apply-recovery", "--repo", fixtureState.root,
+        "--plan-sha256", plan.planSha256,
+        "--activate",
+      ]),
+      (error) => error?.code === "WT-SESSION-RECOVERY-PLAN",
+    );
+    assert.equal(JSON.parse(readFileSync(fixtureState.statePath, "utf8")).cleanupReleases, undefined);
+  } finally {
+    rmSync(fixtureState.root, { recursive: true, force: true });
   }
 });
 

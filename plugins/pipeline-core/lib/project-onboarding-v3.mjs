@@ -40,10 +40,12 @@ import { loadManifest, validateManifest } from "./manifest.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { codexCustomAgentSeed, loadRuntimeProjectionV3OwnedKeys, planRuntimeProjectionV3 } from "./runtime-projection-v3.mjs";
 import {
+  CodexOnboardingRuntimeError,
   prepareRuntimeRestartBinding, persistRestartBarrier, readCurrentRuntimeReadback,
   readRestartBarrier, removeRestartBarrierCas, runtimeRestartBindingCurrent,
 } from "./codex-onboarding-runtime.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
+import { planSessionCleanupRecovery } from "./session-cleanup-recovery.mjs";
 
 const SOURCE = "pipeline.user.yaml";
 const SCHEMA = "pipeline.project-onboarding.v4";
@@ -55,6 +57,7 @@ const USER_RESERVED_PATHS = new Set([".agents", ".claude", ".codex"]);
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
+const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
 
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
@@ -400,9 +403,112 @@ function emptyRuntime(status = "not-observed") {
   return { status, sourceSha256: null, targetsSha256: null, barrierSha256: null, readbackSha256: null };
 }
 
+const RUNTIME_FAILURES = Object.freeze({
+  "runtime-executable-unavailable": {
+    code: "runtime_executable_unavailable",
+    message: "the trusted Codex runtime executable is unavailable",
+    guidance: "install or expose the physical platform executable before retrying",
+  },
+  "runtime-executable-unsafe": {
+    code: "runtime_executable_unsafe",
+    message: "the discovered Codex runtime executable is unsafe",
+    guidance: "remove linked or wrapper candidates and expose the physical platform executable",
+  },
+  "private-state-assurance-unavailable": {
+    code: "private_state_assurance_unavailable",
+    message: "private restart-state assurance is unavailable",
+    guidance: "restore the platform owner/access inspector before retrying",
+  },
+  "private-state-object-unsafe": {
+    code: "private_state_object_unsafe",
+    message: "a private restart-state object is unsafe",
+    guidance: "repair the owner-only physical private-state boundary before retrying",
+  },
+  "writer-lock-unavailable": {
+    code: "writer_lock_unavailable",
+    message: "the private restart-state writer lock is unavailable",
+    guidance: "inspect the typed writer-lock state before retrying",
+  },
+});
+
+function runtimeFailureResult(base, error, {
+  phase,
+  code,
+  message,
+  guidance,
+} = {}) {
+  const typed = error instanceof CodexOnboardingRuntimeError ? RUNTIME_FAILURES[error.code] : null;
+  const failurePhase = error instanceof CodexOnboardingRuntimeError ? error.phase : phase;
+  const failure = typed ?? { code, message, guidance };
+  return lifecycleResult({
+    status: "runtime-readback-unavailable",
+    root: base.root,
+    intent: base.intent,
+    repository: base.repository,
+    runtime: emptyRuntime("readback-unavailable"),
+    nextAction: null,
+    diagnostics: [lifecycleDiagnostic(
+      `$.runtime.${failurePhase}`,
+      failure.code,
+      failure.message,
+      failure.guidance,
+    )],
+  });
+}
+
 function emptyContinuity() { return { status: "unavailable", stateSha256: null, handoverSha256: null, historySha256: null }; }
 
 function emptyAppServer() { return { required: false, status: "not-requested", code: null }; }
+
+function partialCleanupRecoveryResult({ root, intent, repository }) {
+  try {
+    const recovery = planSessionCleanupRecovery({
+      rootDir: root,
+      scriptPath: SESSION_CLEANUP_SCRIPT,
+    });
+    const nextAction = recovery.status === "ready"
+      ? recovery.applyAction
+      : new Set(["cleanup-required", "release-ready"]).has(recovery.status)
+        ? recovery.nextAction
+        : null;
+    if (nextAction !== null) {
+      return lifecycleResult({
+        status: "partial",
+        root,
+        intent,
+        repository,
+        runtime: emptyRuntime(),
+        nextAction,
+        diagnostics: [lifecycleDiagnostic(
+          "$.authority.sessionCleanup",
+          "cleanup_release_required",
+          "an exact retained cleanup binding blocks authority completion",
+          "apply only the descriptor- and digest-bound cleanup recovery action",
+        )],
+      });
+    }
+    if (recovery.status === "closed-recovery-unavailable") {
+      return lifecycleResult({
+        status: "partial",
+        root,
+        intent,
+        repository,
+        runtime: emptyRuntime(),
+        nextAction: null,
+        diagnostics: [lifecycleDiagnostic(
+          "$.authority.sessionCleanup",
+          "cleanup_release_recovery_unavailable",
+          "closed cleanup residue lacks sufficient exact release proof",
+          "retain the state and request an explicit authority decision; do not guess a descriptor",
+        )],
+      });
+    }
+  } catch {
+    // Other partial-authority states remain owned by their existing typed
+    // source/manifest diagnostics. Never infer cleanup authority from failure.
+  }
+  return null;
+}
 
 function runtimeTargetReadOnlyResult({ root, intent, repository }) {
   return lifecycleResult({
@@ -879,10 +985,11 @@ function lifecyclePlanDigest(plan) {
   return sha256(JSON.stringify(stable({ root: plan.root, state: plan.state ?? plan.sourceKind, intentSha256: plan.intentSha256, sourceSha256: plan.sourceSha256, git: plan.git, targets: plan.targets })));
 }
 
-function selectedRunnerIsCodex(root, fs) {
+function sourceEnablesCodex(root, fs) {
   try {
     const parsed = parseYaml(fs.readFileSync(safePath(root, SOURCE, fs), "utf8"));
-    return parsed?.runners?.default === "codex";
+    return Array.isArray(parsed?.runners?.enabled)
+      && parsed.runners.enabled.includes("codex");
   } catch { return false; }
 }
 
@@ -1038,9 +1145,9 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
           diagnostics: [lifecycleDiagnostic("$.source", "source_invalid", "pipeline.user.yaml is not a valid V3 source", "repair the source through its owning workflow")] });
       }
       if (migrated.sourceKind === "v3") {
-        if (!selectedRunnerIsCodex(legacy.root, fs)) {
+        if (!sourceEnablesCodex(legacy.root, fs)) {
           return lifecycleResult({ status: "invalid", root: legacy.root, runner: null, intent, repository, runtime: emptyRuntime(), nextAction: null,
-            diagnostics: [lifecycleDiagnostic("$.source.runners.default", "source_invalid", "the selected runner is not Codex", "select Codex through the source authority") ] });
+            diagnostics: [lifecycleDiagnostic("$.source.runners.enabled", "source_invalid", "Codex is not enabled by the source authority", "enable Codex through the source authority") ] });
         }
         const manifest = loadManifest(legacy.root);
         if (manifest.status !== "ok") {
@@ -1106,6 +1213,8 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
         }
       }
     }
+    const cleanupRecovery = partialCleanupRecoveryResult({ root: legacy.root, intent, repository });
+    if (cleanupRecovery !== null) return cleanupRecovery;
     return lifecycleResult({ status: "partial", root: legacy.root, intent, repository, runtime: emptyRuntime(), nextAction: null,
       diagnostics: [lifecycleDiagnostic("$.authority", "partial_authority", "the project has an incomplete Pipeline authority", "inspect the existing source and generated targets")] });
   }
@@ -1225,13 +1334,17 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
           });
         }
       } catch (error) {
-        return lifecycleResult({ status: "runtime-readback-unavailable", root: legacy.root, intent, repository,
-          runtime: emptyRuntime("readback-unavailable"), nextAction: null,
-          diagnostics: [lifecycleDiagnostic("$.runtime", "runtime_readback_unavailable", "private restart state could not be observed safely", "restart/readback capability is unavailable in this environment")],
+        return runtimeFailureResult({ root: legacy.root, intent, repository }, error, {
+          phase: "native-runtime-readback",
+          code: "native_runtime_readback_unavailable",
+          message: "private runtime readback state could not be observed safely",
+          guidance: "repair the platform private-state/readback capability before retrying",
         });
       }
     }
   }
+  const cleanupRecovery = partialCleanupRecoveryResult({ root: legacy.root, intent, repository });
+  if (cleanupRecovery !== null) return cleanupRecovery;
   return lifecycleResult({ status: "partial", root: legacy.root, intent, repository, runtime: emptyRuntime(), nextAction: null,
     diagnostics: [lifecycleDiagnostic("$.authority", "partial_authority", "the Pipeline authority is incomplete", "inspect the source and generated targets")] });
 }
@@ -1526,24 +1639,49 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate) {
   const runtimeTargets = plan.targets.filter((target) => target.kind === "runtime" && target.path.startsWith(".codex/")).map((target) => ({
     path: target.path, beforeSha256: target.before.sha256, afterSha256: target.after.sha256,
   })).sort((left, right) => left.path.localeCompare(right.path));
+  let binding;
+  try {
+    binding = (fs.prepareRuntimeRestartBinding ?? prepareRuntimeRestartBinding)({
+      rootDir: plan.root,
+      sourceSha256: plan.sourceSha256,
+      runtimeTargets,
+    });
+  } catch (error) {
+    return runtimeFailureResult(beforeApply, error, {
+      phase: "runtime-executable-binding",
+      code: "runtime_executable_binding_failed",
+      message: "the trusted Codex runtime executable could not be bound",
+      guidance: "repair executable discovery and retry the unchanged digest-bound plan",
+    });
+  }
   let persisted;
   try {
-    const binding = prepareRuntimeRestartBinding({ rootDir: plan.root, sourceSha256: plan.sourceSha256, runtimeTargets });
     // The barrier is durable before the target transaction begins. A crash in
     // either direction therefore blocks rather than claiming a loaded runtime.
-    persisted = persistRestartBarrier({ rootDir: plan.root, repositoryCapability: beforeApply.repository.mode, binding, deps: fs });
-  } catch {
-    const observed = v4Inspection(rootDir, fs);
-    return lifecycleResult({ status: "runtime-readback-unavailable", root: observed.root, intent: observed.intent, repository: observed.repository,
-      runtime: emptyRuntime("readback-unavailable"), nextAction: null,
-      diagnostics: [lifecycleDiagnostic("$.runtime", "runtime_readback_unavailable", "restart barrier could not be persisted before runtime mutation", "restart/readback capability is unavailable in this environment")],
+    persisted = (fs.persistRestartBarrier ?? persistRestartBarrier)({
+      rootDir: plan.root,
+      repositoryCapability: beforeApply.repository.mode,
+      binding,
+      deps: fs,
+    });
+  } catch (error) {
+    return runtimeFailureResult(beforeApply, error, {
+      phase: "restart-barrier-persist",
+      code: "restart_barrier_publication_failed",
+      message: "the restart barrier could not be published before runtime mutation",
+      guidance: "repair private restart-state persistence before retrying",
     });
   }
   if (operation === "readback") return v4Inspection(rootDir, fs);
   const applied = applyRunnerProfileMigrationV3(plan, { rootDir, activate: true, deps: fs });
   if (applied.status !== "applied" && persisted.written) {
     try {
-      removeRestartBarrierCas({ rootDir: plan.root, repositoryCapability: beforeApply.repository.mode, expectedRawSha256: persisted.rawSha256, deps: fs });
+      (fs.removeRestartBarrierCas ?? removeRestartBarrierCas)({
+        rootDir: plan.root,
+        repositoryCapability: beforeApply.repository.mode,
+        expectedRawSha256: persisted.rawSha256,
+        deps: fs,
+      });
       for (const directory of [...(persisted.createdDirectories ?? [])].reverse()) {
         if (!fs.existsSync(directory)) continue;
         const info = fs.lstatSync(directory);
@@ -1552,24 +1690,24 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate) {
         fsyncDirectory(dirname(directory), fs);
       }
     } catch {
-      return lifecycleResult({
-        status: "runtime-readback-unavailable",
-        root: beforeApply.root,
-        intent: beforeApply.intent,
-        repository: beforeApply.repository,
-        runtime: emptyRuntime("readback-unavailable"),
-        nextAction: null,
-        diagnostics: [lifecycleDiagnostic(
-          "$.runtime",
-          "runtime_readback_unavailable",
-          "failed runtime activation could not remove its exact restart barrier",
-          "inspect private restart state before retrying",
-        )],
+      return runtimeFailureResult(beforeApply, null, {
+        phase: "runtime-target-transaction",
+        code: "exact_rollback_failed",
+        message: "failed runtime activation could not restore its exact restart-state preimage",
+        guidance: "inspect the typed private restart state before retrying",
       });
     }
   }
   if (applied.status !== "applied" && applied.failureClass === "runtime-target-read-only") {
     return runtimeTargetReadOnlyResult(beforeApply);
+  }
+  if (applied.status !== "applied") {
+    return runtimeFailureResult(beforeApply, null, {
+      phase: "runtime-target-transaction",
+      code: "runtime_target_mutation_failed",
+      message: "the runtime target transaction failed after durable barrier publication",
+      guidance: "repair the target transaction failure and retry from the observed barrier state",
+    });
   }
   return v4Inspection(rootDir, fs);
 }

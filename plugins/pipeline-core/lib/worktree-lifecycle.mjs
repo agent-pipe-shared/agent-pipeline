@@ -710,8 +710,9 @@ export function inspectSessionClosure(startPath, sessionId, options = {}) {
   const receiptPath = cleanupReceiptPath(repo, sessionId);
   if (!existsSync(receiptPath)) return { status: "unknown", closedAt: null };
   assertPrivateRegularFile(receiptPath, "WT-SESSION-CLOSURE", "session cleanup receipt");
+  const receiptBytes = readFileSync(receiptPath);
   let receipt;
-  try { receipt = JSON.parse(readFileSync(receiptPath, "utf8")); } catch { fail("WT-SESSION-CLOSURE", "session cleanup receipt is malformed"); }
+  try { receipt = JSON.parse(receiptBytes.toString("utf8")); } catch { fail("WT-SESSION-CLOSURE", "session cleanup receipt is malformed"); }
   const expectedKeys = ["schema", "sessionSha256", "status", "counts", "outcomes", "completedAt"];
   if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)
     || JSON.stringify(Object.keys(receipt).sort()) !== JSON.stringify(expectedKeys.sort())
@@ -722,7 +723,7 @@ export function inspectSessionClosure(startPath, sessionId, options = {}) {
     || Number.isNaN(Date.parse(receipt.completedAt))) {
     fail("WT-SESSION-CLOSURE", "session cleanup receipt is not a completed closure record");
   }
-  return { status: "closed", closedAt: receipt.completedAt };
+  return { status: "closed", closedAt: receipt.completedAt, receiptSha256: rawSha256(receiptBytes) };
 }
 
 function processIdentityAlive(pid, startId) {
