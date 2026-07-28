@@ -316,6 +316,33 @@ test("an unbound continuity state without descriptors needs no recovery", () => 
   }
 });
 
+test("a closed transition remains fail-closed when an unbound descriptor survives", () => {
+  const root = fixture("closed-transition-orphan");
+  try {
+    const closedAt = "2026-07-29T08:00:00.000Z";
+    writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+      schema: "pipeline.state.v0",
+      planApproved: false,
+      updatedAt: closedAt,
+      closedFeatures: [{
+        id: "closed-transition",
+        planPath: "specs/closed/prd.md",
+        phaseAtClose: "implementation",
+        closedAt,
+        closedBy: "PO",
+        forCommit: null,
+      }],
+    }, null, 2)}\n`);
+    startSessionDescriptor(root, { sessionId: "session-closed-transition-orphan" });
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "closed-unbound");
+    const plan = invoke(["plan-recovery", "--repo", root]).output;
+    assert.equal(plan.status, "orphan-recovery-unavailable");
+    assert.equal(plan.activeDescriptorCount, 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("status lists sanitized descriptor owner observations in sorted order", () => {
   const root = fixture("owner-status");
   try {

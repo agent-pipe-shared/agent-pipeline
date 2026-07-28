@@ -2734,39 +2734,16 @@ function recoverRebindTransaction(dir, planSha256, nonce, io, stateIo) {
       ? { ok: true, kind: "prepared" }
       : { ok: false, code: "PO-REBIND-RECOVERY-ROLLBACK" };
   }
-  // A complete postimage remains journal-bound until the caller validates the
-  // authority surfaces and V4 readback. Only then may replay become a no-op.
-  if (prdAtPostimage && stateAtPostimage) {
-    return { ok: true, kind: "committed", transaction };
-  }
+  // No interrupted postimage is accepted as a committed replay. The journal
+  // binds only the preimage identities: after a crash, an attacker or another
+  // process can replace either pathname with a different inode containing the
+  // same postimage bytes. Byte equality therefore cannot prove that the
+  // writer-owned objects survived. Restore both bound preimage byte/mode
+  // surfaces, retire the journal durably, and require a freshly observed plan.
   const stateBack = stateAtPreimage || restoreRebindFile(state.absolute, statePre, transaction.state.mode, nonce, stateIo);
   const prdBack = prdAtPreimage || restoreRebindFile(prd.absolute, prdPre, transaction.prd.mode, nonce, io);
   if (!stateBack || !prdBack || !clearRebindTransaction(dir)) return { ok: false, code: "PO-REBIND-RECOVERY-ROLLBACK" };
   return { ok: true, kind: "rolled-back" };
-}
-
-function validateCommittedPoRebindReplay(deps, transaction) {
-  const existing = readStateRaw(deps.dir);
-  const prd = physicalRebindFile(deps.dir, transaction.prd.path);
-  const stateFile = physicalRebindFile(deps.dir, transaction.state.path);
-  if (existing.status !== "ok" || prd === null || stateFile === null
-    || prd.sha256 !== transaction.prd.postSha256 || stateFile.sha256 !== transaction.state.postSha256
-    || sha256Bytes(existing.raw) !== stateFile.sha256) return false;
-  const state = existing.state;
-  const authority = state.planApproval?.poGateAuthority;
-  const spec = physicalRebindFile(deps.dir, authority?.specPath);
-  const profile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: deps.dir });
-  let marker;
-  try { marker = rebindMarker(new TextDecoder("utf-8", { fatal: true }).decode(prd.bytes)); } catch { return false; }
-  if (spec === null || marker === null || marker.digest !== spec.sha256
-    || validRebindApproval(state, prd, spec, profile) === null
-    || authority.specSha256 !== spec.sha256
-    || eligibleRebindContinuity(state, prd, spec, authority) === null) return false;
-  const observedAuthority = (deps.poGateAuthority ?? ((request) => validatePoGateAuthorityForRepository(request)))({
-    repoRoot: deps.dir, expectedPlanSha256: prd.sha256, expectedSpecSha256: spec.sha256,
-  });
-  const v4 = (deps.v4Inspection ?? ((request) => inspectProjectOnboardingV3(request)))({ rootDir: deps.dir, intent: "po-authority-rebind-replay" });
-  return observedAuthority?.ok && sameJson(observedAuthority.value, authority) && v4?.status === "ready";
 }
 
 function runPoAuthorityRebindCommand(sub, rest, deps) {
@@ -2785,14 +2762,6 @@ function runPoAuthorityRebindCommand(sub, rest, deps) {
       const stateIo = { replace: deps.replaceRebindStateFdContents ?? io.replace, rename: deps.renameRebindState ?? renameSync, sync: deps.syncRebindDirectory ?? syncDirectory };
       const recovered = recoverRebindTransaction(deps.dir, apply.planSha256, lock.ownerNonce, io, stateIo);
       if (!recovered.ok) { console.error(`Error: PO authority rebind recovery refused (${recovered.code}); zero new mutation.`); return 2; }
-      if (recovered.kind === "committed") {
-        if (!validateCommittedPoRebindReplay(deps, recovered.transaction) || !clearRebindTransaction(deps.dir)) {
-          console.error("Error: PO authority rebind committed recovery could not be proven; journal retained.");
-          return 2;
-        }
-        console.log("PO-REBIND-REPLAY-NOOP: prior committed transaction read back.");
-        return 0;
-      }
       if (recovered.kind === "rolled-back") { console.error("Error: PO authority rebind recovered its interrupted transaction; regenerate and confirm a new plan."); return 2; }
       return runPoAuthorityRebindApply(apply, deps, lock, io, stateIo);
     } finally { releaseContinuityLock(lock); }

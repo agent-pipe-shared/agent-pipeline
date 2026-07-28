@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.continuity-close.v0",
   "featureId": "codex-onboarding-0.4.5",
-  "expectedRevision": 4,
+  "expectedRevision": 5,
   "result": {
     "path": "specs/2026-07-25-codex-onboarding-0.4.5/result.md",
     "sha256": "ceed30ddce48d921f2afbbb44d02a3fe5301302ad07fab3f41dfbc149f657b73"

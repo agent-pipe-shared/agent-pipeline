@@ -94,6 +94,7 @@ const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migrat
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
 const APP_SERVER_HEALTH_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-health.mjs", import.meta.url));
+const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../../../harness/scripts/pipeline-state.mjs", import.meta.url));
 function names(path) { return readdirSync(path).sort(); }
 function yaml(value, indent = "") {
   return Object.entries(value).map(([key, child]) => {
@@ -1578,6 +1579,57 @@ test("current runtime exposes closed continuity outcomes while required App Serv
     assert.equal(unreadable.continuity.status, "unavailable");
     assert.equal(unreadable.nextAction, null);
   } finally { dispose(pristine); dispose(unavailable); }
+});
+
+test("closed feature re-entry stays ready through the sanctioned set-feature transition", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    const closedAt = "2026-07-29T08:00:00.000Z";
+    writeFileSync(join(path, ".claude", "pipeline-state.json"), `${JSON.stringify({
+      schema: "pipeline.state.v0",
+      planApproved: false,
+      updatedAt: closedAt,
+      closedFeatures: [{
+        id: "previous-feature",
+        planPath: "specs/previous/prd.md",
+        phaseAtClose: "implementation",
+        closedAt,
+        closedBy: "PO",
+        forCommit: null,
+      }],
+    }, null, 2)}\n`);
+    const closed = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "bootstrap",
+      deps: fakeDeps,
+    });
+    assert.equal(closed.status, "ready");
+    assert.equal(closed.continuity.status, "valid");
+
+    const selected = spawnSync(process.execPath, [
+      PIPELINE_STATE_SCRIPT,
+      "set-feature",
+      "--id", "next-feature",
+      "--plan-path", "specs/next/prd.md",
+    ], {
+      cwd: path,
+      encoding: "utf8",
+      shell: false,
+      env: { ...process.env, CLAUDE_PROJECT_DIR: path },
+    });
+    assert.equal(selected.status, 0, selected.stderr);
+    const design = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "bootstrap",
+      deps: fakeDeps,
+    });
+    assert.equal(design.status, "ready");
+    assert.equal(design.continuity.status, "valid");
+  } finally {
+    dispose(path);
+  }
 });
 
 test("portable seed is manifest-valid, then onboarding owns the runtime initialization transaction", () => {

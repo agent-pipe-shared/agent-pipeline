@@ -9,7 +9,7 @@
 > `9d1b3dc108eb77629ace5b82002120f5539abd8d`. Acceptance criteria:
 > [spec.md](spec.md).
 
-<!-- technical-spec-sha256: 9459345cc652ced766986f7967fde6c706f2762d9165ebff8be27da33abcd2bf -->
+<!-- technical-spec-sha256: 34319bc7f7b342a7c717e0c29c0ccb91a0337251b1d861e9820d44f551dc719d -->
 
 Approval authorizes the first implementation dispatch for this design. It does
 not authorize push, merge, tag, release, Issue mutation, or Pull Request
@@ -82,7 +82,13 @@ exceptions.
   PRD marker and matching stale PO-gate/Continuity bindings receives one
   read-only, digest-bound, explicitly PO-confirmed cross-platform rebind. It
   updates all three authority surfaces atomically or rolls back completely;
-  it never becomes a generic authority repair or force-close route.
+  it never becomes a generic authority repair or force-close route. An
+  interrupted complete postimage is rolled back and replanned because matching
+  bytes cannot authenticate a replaced inode.
+- **Closed-feature re-entry:** the exact writer-generated closed audit and the
+  immediately following unapproved `design` selection are valid lifecycle
+  boundaries. This permits the normal close-to-next-feature flow without
+  treating arbitrary inactive State as pristine or bypassing cleanup recovery.
 - **Portable guard and restart:** one closed command grammar supports native
   Windows paths, the exact PowerShell bootstrap read, and the bounded
   read-only diagnostic pipeline while retaining all mutation and pre-readiness
@@ -164,7 +170,7 @@ exceptions.
 
 ## DoD
 
-Product completion requires AC-047-01 through AC-047-27 in
+Product completion requires AC-047-01 through AC-047-29 in
 [spec.md](spec.md), including focused/native-platform tests, Full Verify,
 blocking Security, fresh independent Critic review, packaged/installed plugin
 readback, a candidate-bound standard-vs-compatible IPC probe pair, version

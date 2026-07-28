@@ -118,6 +118,78 @@ check("present inactive state is damaged rather than pristine", () => {
   assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
 });
 
+check("writer-shaped closed state is a valid feature re-entry boundary", () => {
+  const root = fixture("closed-feature-transition");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T08:00:00.000Z",
+    closedFeatures: [{
+      id: "previous-feature",
+      planPath: "specs/previous/prd.md",
+      phaseAtClose: "implementation",
+      closedAt: "2026-07-29T08:00:00.000Z",
+      closedBy: "PO",
+      forCommit: null,
+    }],
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+  assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "closed-unbound");
+});
+
+check("writer-shaped unapproved design state remains valid before continuity initialization", () => {
+  const root = fixture("design-feature-transition");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    activeFeature: {
+      id: "next-feature",
+      planPath: "specs/next/prd.md",
+      phase: "design",
+    },
+    planApproved: false,
+    updatedAt: "2026-07-29T08:01:00.000Z",
+  }, null, 2)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
+  assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
+});
+
+check("inactive and design transition lookalikes remain damaged", () => {
+  const root = fixture("transition-lookalikes");
+  const closed = {
+    schema: "pipeline.state.v0",
+    planApproved: false,
+    updatedAt: "2026-07-29T08:00:00.000Z",
+    closedFeatures: [{
+      id: "previous-feature",
+      planPath: "specs/previous/prd.md",
+      phaseAtClose: "implementation",
+      closedAt: "2026-07-29T07:59:59.000Z",
+      closedBy: "PO",
+      forCommit: null,
+    }],
+  };
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify(closed)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+  closed.closedFeatures[0].closedAt = closed.updatedAt;
+  closed.planApproval = {};
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify(closed)}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "next-feature", planPath: "specs/next/prd.md", phase: "implementation" },
+    planApproved: false,
+    updatedAt: "2026-07-29T08:01:00.000Z",
+  })}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+  writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "next-feature", planPath: "../outside.md", phase: "design" },
+    planApproved: false,
+    updatedAt: "2026-07-29T08:01:00.000Z",
+  })}\n`);
+  assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "damaged");
+});
+
 check("orphan continuity and invalid active feature are damaged", () => {
   const root = fixture("orphan-state");
   writeFileSync(join(root, ".claude", "pipeline-state.json"), JSON.stringify({

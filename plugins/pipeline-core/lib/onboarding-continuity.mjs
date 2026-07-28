@@ -121,6 +121,70 @@ function exactKeys(value, expected) {
     && Object.keys(value).every((key) => expected.has(key));
 }
 
+function canonicalIsoTimestamp(value) {
+  return typeof value === "string"
+    && Number.isFinite(Date.parse(value))
+    && new Date(value).toISOString() === value;
+}
+
+function validClosedFeatureEntry(root, entry) {
+  const baseKeys = new Set(["id", "planPath", "phaseAtClose", "closedAt", "closedBy", "forCommit"]);
+  const expectedKeys = entry?.continuityClose === undefined
+    ? baseKeys
+    : new Set([...baseKeys, "continuityClose"]);
+  if (!exactKeys(entry, expectedKeys)
+    || typeof entry.id !== "string" || entry.id.length === 0
+    || typeof entry.planPath !== "string" || entry.planPath.length === 0
+    || !(entry.phaseAtClose === null || typeof entry.phaseAtClose === "string")
+    || !canonicalIsoTimestamp(entry.closedAt)
+    || typeof entry.closedBy !== "string" || entry.closedBy.length === 0
+    || !(entry.forCommit === null || /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(entry.forCommit))) return false;
+  try { safeRelativePath(entry.planPath, "closed feature plan"); } catch { return false; }
+  if (entry.continuityClose === undefined) return true;
+  const close = entry.continuityClose;
+  if (!exactKeys(close, new Set(["schema", "featureId", "expectedRevision", "result", "closeEvidence"]))
+    || close.schema !== "pipeline.continuity-close.v0"
+    || close.featureId !== entry.id
+    || !Number.isSafeInteger(close.expectedRevision) || close.expectedRevision < 0
+    || !exactKeys(close.result, new Set(["path", "sha256"]))
+    || !exactKeys(close.closeEvidence, new Set(["path", "sha256"]))
+    || !validateClosedArtifact(root, close.result)
+    || !validateClosedArtifact(root, close.closeEvidence)) return false;
+  return true;
+}
+
+function validClosedTransitionState(root, state) {
+  return isObject(state)
+    && state.schema === "pipeline.state.v0"
+    && state.activeFeature === undefined
+    && state.continuity === undefined
+    && state.planApproval === undefined
+    && state.planRevocation === undefined
+    && state.planApproved === false
+    && canonicalIsoTimestamp(state.updatedAt)
+    && Array.isArray(state.closedFeatures)
+    && state.closedFeatures.length > 0
+    && state.closedFeatures.every((entry) => validClosedFeatureEntry(root, entry))
+    && state.closedFeatures.at(-1).closedAt === state.updatedAt;
+}
+
+function validDesignTransitionState(state) {
+  const valid = isObject(state)
+    && state.schema === "pipeline.state.v0"
+    && exactKeys(state.activeFeature, new Set(["id", "planPath", "phase"]))
+    && typeof state.activeFeature.id === "string" && state.activeFeature.id.length > 0
+    && typeof state.activeFeature.planPath === "string" && state.activeFeature.planPath.length > 0
+    && state.activeFeature.phase === "design"
+    && state.continuity === undefined
+    && state.planApproval === undefined
+    && state.planRevocation === undefined
+    && state.planApproved === false
+    && canonicalIsoTimestamp(state.updatedAt);
+  if (!valid) return false;
+  try { safeRelativePath(state.activeFeature.planPath, "active feature plan"); } catch { return false; }
+  return true;
+}
+
 function canonicalJson(value) {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
   if (isObject(value)) {
@@ -349,6 +413,10 @@ function observeDetailed({
     const projected = projectReadContinuityStatus({ status: "ok", state });
     let status;
     if (projected.code === "CS-STATUS-ACTIVE" && projected.continuity.status === "valid") {
+      status = "valid";
+    } else if (projected.code === "CS-STATUS-INACTIVE" && validClosedTransitionState(root, state)) {
+      status = "valid";
+    } else if (projected.code === "CS-STATUS-ACTIVE-NO-CONTINUITY" && validDesignTransitionState(state)) {
       status = "valid";
     } else if (new Set([
       "CS-STATUS-ACTIVE-NO-CONTINUITY",
@@ -768,7 +836,19 @@ function observeSessionCleanupState(rootDir, spawn = defaultGitSpawn) {
   if (!isObject(state.activeFeature)
     || typeof state.activeFeature.id !== "string"
     || !isObject(state.continuity)) {
-    if (!Array.isArray(state.closedFeatures)) {
+    if (isObject(state.activeFeature) && state.continuity === undefined) {
+      if (!validDesignTransitionState(state)) {
+        fail("SESSION-CLEANUP-STATE-MALFORMED", "Pipeline machine state cannot prove a cleanup descriptor");
+      }
+      return {
+        ...observed,
+        mode: "active",
+        revision: null,
+        activeFeatureId: state.activeFeature.id,
+        sessionCleanup: null,
+      };
+    }
+    if (!validClosedTransitionState(observed.root, state)) {
       fail("SESSION-CLEANUP-STATE-MALFORMED", "Pipeline machine state cannot prove a cleanup descriptor");
     }
     const candidates = state.closedFeatures

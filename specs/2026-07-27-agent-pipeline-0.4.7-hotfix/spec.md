@@ -190,11 +190,24 @@ later technical sections explain how the system satisfies them.
   postimage set, then read them back through PO-gate authority, Continuity and
   V4 inspection. Drift, identity/permission/DACL failure, write failure,
   partial durability, mixed postimage, or unauthorized replay SHALL roll back
-  completely and fail closed; a verified identical replay may report only a
-  typed no-op. The transition SHALL use existing cross-platform private-state
-  assurance, reject links/reparse points and non-regular files, and SHALL NOT
-  widen generic authority, force-close a feature, or permit a manual State
-  repair.
+  completely and fail closed. An interrupted pair of complete postimage bytes
+  SHALL also roll back to the journal-bound preimage bytes and require a fresh
+  plan; postimage byte equality cannot authenticate path identity after a
+  same-bytes inode replacement. The transition SHALL use existing
+  cross-platform private-state assurance, reject links/reparse points and
+  non-regular files, and SHALL NOT widen generic authority, force-close a
+  feature, or permit a manual State repair.
+- **AC-047-29 — Closed-feature re-entry:** WHEN the sanctioned State writer
+  has completed `close-feature` and removed active Continuity, THE SYSTEM SHALL
+  classify that exact closed audit shape as a valid re-entry boundary rather
+  than damaged Continuity. After the sanctioned `set-feature` writer selects
+  the next feature, its exact unapproved `design` shape without Continuity
+  SHALL remain valid while PRD/Spec approval is prepared. Bare inactive State,
+  malformed closed audit entries, active non-design shapes, lingering
+  approval/Continuity fields, cleanup residue, or invalid close artifacts
+  SHALL remain fail-closed. The complete
+  `close-feature -> V4 ready -> set-feature -> V4 ready` path SHALL be covered
+  by a process-level test without a manual State edit or guard bypass.
 
 ## 2. Change boundary
 
@@ -294,10 +307,12 @@ artifact, binds the existing Result artifact, and changes only
 Spec, package/action identifiers, counters, resume, capacity, and all null
 control fields remain byte-equivalent.
 
-After atomic durable write/readback, the existing
-`pipeline.continuity-close.v0` request binds the new revision, the same Result,
-and close evidence, and the ordinary `close-feature` writer removes the old
-active feature and continuity. The normal writers then set
+After atomic durable write/readback, descriptor-bound session cleanup writes
+its closure receipt and CAS-releases the exact runtime binding, advancing
+Continuity once more to revision `5`. The existing
+`pipeline.continuity-close.v0` request binds that post-cleanup revision, the
+same Result, and close evidence, and the ordinary `close-feature` writer
+removes the old active feature and continuity. The normal writers then set
 `agent-pipeline-0.4.7-hotfix`, bind the final PRD and Spec hashes, record PO
 approval, set phase `implementation`, and read back repository-scoped PO
 authority. Neither the adoption transition nor close automatically activates
@@ -741,10 +756,30 @@ assurance requirements, and a `planSha256`. Apply must re-observe every bound
 identity, publish the PRD and State changes as one recoverable transaction,
 and perform PO-gate, Continuity, and V4 readback before reporting success.
 Fixtures cover the exact Nova preimage, plan, PO-confirmed apply, postimage,
-verified replay/no-op or closed replay refusal, preimage drift, each transaction
-write failure and full rollback, link/path identity and permission failures,
-native-Windows DACL assurance, and read-only planning against the Nova checkout.
-No Nova file or stash is an apply target.
+interrupted post/post rollback including same-bytes inode replacement, closed
+replay refusal and fresh replanning, preimage drift, each transaction write
+failure and full rollback, link/path identity and permission failures,
+native-Windows DACL assurance, and read-only planning against the Nova
+checkout. No Nova file or stash is an apply target.
+
+### 6.8 Closed-feature re-entry
+
+Continuity classification admits two and only two writer-owned transition
+shapes in addition to an active valid Continuity:
+
+1. an inactive State with `planApproved:false`, no active feature, approval or
+   Continuity fields, a non-empty structurally valid `closedFeatures` audit,
+   and `updatedAt` equal to the final close timestamp; and
+2. the subsequent `set-feature` State with one exact
+   `{id,planPath,phase:"design"}` active feature, `planApproved:false`, and no
+   approval or Continuity fields.
+
+Cleanup observation treats the first as closed/unbound and the second as
+active/unbound, so retained descriptors still flow through the existing
+typed cleanup-recovery planner. Every inactive lookalike, invalid close
+artifact, non-design active transition, orphan Continuity, or retained
+approval is still damaged. A process-level fixture executes the real State
+writer between two V4 inspections and requires `ready` on both sides.
 
 ## 7. H4 — WSL IPC compatibility (#71)
 

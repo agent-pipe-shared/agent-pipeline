@@ -12,7 +12,7 @@
  * for `approve-push` end to end (spawnSync the actual CLI as a subprocess, mirroring
  * how a Goldfish/Elephant would invoke it).
  */
-import { chmodSync, linkSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync, renameSync, symlinkSync, writeSync } from "node:fs";
+import { chmodSync, linkSync, lstatSync, mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync, readdirSync, renameSync, symlinkSync, writeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
@@ -182,18 +182,25 @@ function runPoAuthorityRebindTests() {
   const fixture = seedPoAuthorityRebind("po-rebind-crash-committed");
   const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const plan = JSON.parse(planned.text || "{}");
   const journal = join(fixture.dir, ".claude", "pipeline-state.json.po-authority-rebind.v1");
+  const prdPath = join(fixture.dir, fixture.planPath); const stateFilePath = statePath(fixture.dir);
+  const prdBefore = readFileSync(prdPath, "utf8"); const stateBefore = readFileSync(stateFilePath, "utf8");
   const interrupted = captureConsoleError(() => run(plan.applyAction.argv.slice(1), {
     ...fixture.deps, afterRebindStateWritten: () => { throw new Error("injected crash after State commit"); },
   }));
-  const postPrd = readFileSync(join(fixture.dir, fixture.planPath), "utf8"); const postState = readFileSync(statePath(fixture.dir), "utf8");
+  const postPrd = readFileSync(prdPath); const postState = readFileSync(stateFilePath);
   ok("PS53o committed-journal crash retains both postimages and its recovery anchor", interrupted.value === 2 && existsSync(journal)
     && postPrd.includes(fixture.newSpecSha) && readState(fixture.dir).state.continuity.revision === 4);
-  const unproven = captureConsoleError(() => run(plan.applyAction.argv.slice(1), { ...fixture.deps, v4Inspection: () => ({ status: "partial" }) }));
-  const retainedAfterUnprovenReplay = existsSync(journal);
-  const replay = captureConsole(() => run(plan.applyAction.argv.slice(1), fixture.deps));
-  ok("PS53p committed replay is a no-op only after authority and V4 readback", unproven.value === 2 && retainedAfterUnprovenReplay
-    && replay.value === 0 && /PO-REBIND-REPLAY-NOOP/.test(replay.text) && !existsSync(journal)
-    && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === postPrd && readFileSync(statePath(fixture.dir), "utf8") === postState);
+  const postPrdIdentity = lstatSync(prdPath); const postStateIdentity = lstatSync(stateFilePath);
+  writeFileSync(`${prdPath}.replacement`, postPrd); renameSync(`${prdPath}.replacement`, prdPath);
+  writeFileSync(`${stateFilePath}.replacement`, postState); renameSync(`${stateFilePath}.replacement`, stateFilePath);
+  const replacedPrdIdentity = lstatSync(prdPath); const replacedStateIdentity = lstatSync(stateFilePath);
+  const replay = captureConsoleError(() => run(plan.applyAction.argv.slice(1), fixture.deps));
+  const replanned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps));
+  ok("PS53p same-byte postimage inode replacement is rolled back and requires a fresh plan",
+    postPrdIdentity.ino !== replacedPrdIdentity.ino && postStateIdentity.ino !== replacedStateIdentity.ino
+    && replay.value === 2 && /recovered its interrupted transaction/i.test(replay.text) && !existsSync(journal)
+    && readFileSync(prdPath, "utf8") === prdBefore && readFileSync(stateFilePath, "utf8") === stateBefore
+    && replanned.value === 0);
 }
 
 if (symlinkCapable) {

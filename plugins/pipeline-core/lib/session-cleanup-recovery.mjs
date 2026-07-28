@@ -129,11 +129,48 @@ export function planSessionCleanupRecovery({
   const listDescriptors = deps.listActiveSessionDescriptorsFn
     ?? listActiveSessionDescriptors;
   const binding = readBinding({ rootDir });
-  if (new Set(["released", "closed-unbound"]).has(binding.status)) {
+  if (binding.status === "released") {
     return {
       schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
       status: "not-needed",
     };
+  }
+  if (binding.status === "closed-unbound") {
+    const activeDescriptors = listDescriptors(binding.root);
+    if (activeDescriptors.length === 0) {
+      return {
+        schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+        status: "not-needed",
+      };
+    }
+    const orphanDescriptors = activeDescriptors.map((descriptor) => inspectRetirement(
+      binding.root,
+      descriptor.sessionId,
+      { expectedDescriptorSha256: descriptor.descriptorSha256 },
+    ));
+    if (orphanDescriptors.some((descriptor) => descriptor.status !== "retirable")) {
+      return {
+        schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+        status: "orphan-recovery-unavailable",
+        activeDescriptorCount: activeDescriptors.length,
+      };
+    }
+    return readyRecoveryPlan({
+      schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+      root: binding.root,
+      stateSha256: binding.stateSha256,
+      revision: binding.revision,
+      sessionCleanup: null,
+      closure: "unbound-orphans",
+      activeDescriptorCount: activeDescriptors.length,
+      recovery: "retire-orphans",
+      orphanDescriptors: orphanDescriptors.map((descriptor) => ({
+        sessionId: descriptor.sessionId,
+        descriptorSha256: descriptor.descriptorSha256,
+        ownerStatus: descriptor.ownerStatus,
+      })),
+      applyAction: null,
+    }, scriptPath);
   }
   if (binding.status === "closed-bound") {
     const closure = inspectClosure(binding.root, binding.sessionCleanup.sessionId, {

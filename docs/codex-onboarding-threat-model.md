@@ -206,14 +206,27 @@ committed, transaction: replay durably clears the record, revalidates the
 original closed plan, republishes the record, and performs the authorized
 transition. A mixed pair is restored to both recorded preimages; the record is
 removed only after verified rollback, and a newly observed plan and PO
-confirmation are then required. Two exact postimages become a no-op only after
-fresh PO-gate, Continuity, and V4 readback. An unknown, linked, hard-linked,
-identity-drifted, malformed, wrong-plan, or unprovable record fails closed and
-is preserved. On Windows the existing repository PO-profile receipt supplies
-the native owner/DACL assurance before any transaction is admitted; POSIX
-retains the private State/journal modes. No replay can widen authority,
-silently accept stale preimages, force-close a feature, or convert a manual
-State edit into a valid rebind.
+confirmation are then required. Two exact postimages are also restored to both
+recorded preimages and require a new plan: after a process stop, matching bytes
+cannot prove that the writer-owned inodes were not replaced with same-byte
+objects. An unknown, linked, hard-linked, identity-drifted, malformed,
+wrong-plan, or unprovable record fails closed and is preserved. On Windows the
+existing repository PO-profile receipt supplies the native owner/DACL
+assurance before any transaction is admitted; POSIX retains the private
+State/journal modes. No replay can widen authority, silently accept stale
+preimages, force-close a feature, or convert a manual State edit into a valid
+rebind.
+
+## Closed-feature re-entry
+
+The normal State writer deliberately removes active Continuity when it closes
+the current feature. That is a transition boundary, not pristine state and not
+damaged Continuity. Bootstrap admits only the complete writer-shaped closed
+audit and the immediately following unapproved `design` state produced by
+`set-feature`. Cleanup recovery remains active in both shapes, so an orphan or
+retained descriptor still blocks. Bare inactive state, malformed audit
+entries, invalid close artifacts, a non-design active feature, lingering
+approval, or orphan Continuity remains fail-closed.
 
 The v2 host-init receipt is the first release candidate that carries the
 physical Git postimage. The earlier v1 shape existed only in unpublished local
