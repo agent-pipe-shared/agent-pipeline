@@ -343,6 +343,57 @@ test("a closed transition remains fail-closed when an unbound descriptor survive
   }
 });
 
+test("a closed transition retires exact legacy orphans and preserves its closed authority", () => {
+  const root = fixture("closed-transition-legacy-retirement");
+  try {
+    const closedAt = "2026-07-29T08:00:00.000Z";
+    writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+      schema: "pipeline.state.v0",
+      planApproved: false,
+      updatedAt: closedAt,
+      closedFeatures: [{
+        id: "closed-transition",
+        planPath: "specs/closed/prd.md",
+        phaseAtClose: "implementation",
+        closedAt,
+        closedBy: "PO",
+        forCommit: null,
+      }],
+    }, null, 2)}\n`);
+    const created = startSessionDescriptor(root, {
+      sessionId: "session-closed-transition-legacy-orphan",
+    });
+    const legacy = rewriteAsLegacyDescriptor(root, created.sessionId);
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "closed-unbound");
+
+    const plan = invoke(["plan-recovery", "--repo", root]).output;
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.recovery, "retire-orphans");
+    assert.equal(plan.expectedBindingStatus, "closed-unbound");
+    assert.deepEqual(plan.orphanDescriptors, [{
+      sessionId: legacy.sessionId,
+      descriptorSha256: legacy.descriptorSha256,
+      ownerStatus: "unobserved",
+    }]);
+
+    const applied = invoke([
+      "apply-recovery", "--repo", root,
+      "--plan-sha256", plan.planSha256,
+      "--activate",
+    ]).output;
+    assert.equal(applied.status, "retired");
+    assert.equal(applied.retiredDescriptorCount, 1);
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "closed-unbound");
+    assert.deepEqual(listActiveSessionDescriptors(root), []);
+    assert.deepEqual(invoke(["plan-recovery", "--repo", root]).output, {
+      schema: "pipeline.session-cleanup-recovery-plan.v1",
+      status: "not-needed",
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("status lists sanitized descriptor owner observations in sorted order", () => {
   const root = fixture("owner-status");
   try {

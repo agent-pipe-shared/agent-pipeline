@@ -68,6 +68,9 @@ function recoveryBinding(plan) {
   if (Object.hasOwn(plan, "orphanDescriptors")) {
     binding.orphanDescriptors = plan.orphanDescriptors;
   }
+  if (Object.hasOwn(plan, "expectedBindingStatus")) {
+    binding.expectedBindingStatus = plan.expectedBindingStatus;
+  }
   return binding;
 }
 
@@ -164,6 +167,7 @@ export function planSessionCleanupRecovery({
       closure: "unbound-orphans",
       activeDescriptorCount: activeDescriptors.length,
       recovery: "retire-orphans",
+      expectedBindingStatus: "closed-unbound",
       orphanDescriptors: orphanDescriptors.map((descriptor) => ({
         sessionId: descriptor.sessionId,
         descriptorSha256: descriptor.descriptorSha256,
@@ -247,6 +251,7 @@ export function planSessionCleanupRecovery({
         closure: "unbound-orphans",
         activeDescriptorCount: activeDescriptors.length,
         recovery: "retire-orphans",
+        expectedBindingStatus: "unbound",
         orphanDescriptors: orphanDescriptors.map((descriptor) => ({
           sessionId: descriptor.sessionId,
           descriptorSha256: descriptor.descriptorSha256,
@@ -414,7 +419,8 @@ export function applySessionCleanupRecovery({
       fail("WT-SESSION-RECOVERY-READBACK", "orphan descriptor retirement did not clear the exact active set");
     }
     const readback = readBinding({ rootDir: plan.root });
-    if (readback.status !== "unbound"
+    if (!new Set(["unbound", "closed-unbound"]).has(plan.expectedBindingStatus)
+      || readback.status !== plan.expectedBindingStatus
       || readback.stateSha256 !== plan.stateSha256
       || readback.revision !== plan.revision) {
       fail("WT-SESSION-RECOVERY-READBACK", "orphan descriptor retirement changed continuity authority");

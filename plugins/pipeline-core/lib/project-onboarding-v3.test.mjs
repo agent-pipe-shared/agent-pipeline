@@ -1586,20 +1586,39 @@ test("closed feature re-entry stays ready through the sanctioned set-feature tra
   try {
     const barrier = initializeRestartRequiredRoot(path);
     clearRuntimeBarrier(path, barrier);
-    const closedAt = "2026-07-29T08:00:00.000Z";
-    writeFileSync(join(path, ".claude", "pipeline-state.json"), `${JSON.stringify({
-      schema: "pipeline.state.v0",
-      planApproved: false,
-      updatedAt: closedAt,
-      closedFeatures: [{
-        id: "previous-feature",
-        planPath: "specs/previous/prd.md",
-        phaseAtClose: "implementation",
-        closedAt,
-        closedBy: "PO",
-        forCommit: null,
-      }],
-    }, null, 2)}\n`);
+    for (const authorityPath of [
+      join(path, ".claude", "pipeline-state.json"),
+      join(path, "docs", "state.md"),
+      join(path, ".git", "agent-pipeline", "onboarding", "continuity-history.json"),
+    ]) {
+      if (existsSync(authorityPath)) unlinkSync(authorityPath);
+    }
+    const runStateCommand = (...args) => spawnSync(process.execPath, [
+      PIPELINE_STATE_SCRIPT,
+      ...args,
+    ], {
+      cwd: path,
+      encoding: "utf8",
+      shell: false,
+      env: { ...process.env, CLAUDE_PROJECT_DIR: path },
+    });
+
+    const initial = runStateCommand(
+      "set-feature",
+      "--id", "previous-feature",
+      "--plan-path", "specs/previous/prd.md",
+    );
+    assert.equal(initial.status, 0, initial.stderr);
+    const designBeforeClose = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "bootstrap",
+      deps: fakeDeps,
+    });
+    assert.equal(designBeforeClose.status, "ready");
+    assert.equal(designBeforeClose.continuity.status, "valid");
+
+    const closedByWriter = runStateCommand("close-feature", "--by", "PO");
+    assert.equal(closedByWriter.status, 0, closedByWriter.stderr);
     const closed = inspectProjectOnboardingV3({
       rootDir: path,
       intent: "bootstrap",
@@ -1608,17 +1627,11 @@ test("closed feature re-entry stays ready through the sanctioned set-feature tra
     assert.equal(closed.status, "ready");
     assert.equal(closed.continuity.status, "valid");
 
-    const selected = spawnSync(process.execPath, [
-      PIPELINE_STATE_SCRIPT,
+    const selected = runStateCommand(
       "set-feature",
       "--id", "next-feature",
       "--plan-path", "specs/next/prd.md",
-    ], {
-      cwd: path,
-      encoding: "utf8",
-      shell: false,
-      env: { ...process.env, CLAUDE_PROJECT_DIR: path },
-    });
+    );
     assert.equal(selected.status, 0, selected.stderr);
     const design = inspectProjectOnboardingV3({
       rootDir: path,
