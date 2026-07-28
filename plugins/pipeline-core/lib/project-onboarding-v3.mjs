@@ -478,7 +478,7 @@ function partialCleanupRecoveryResult({
     const nextAction = recovery.status === "ready"
       ? recovery.applyAction
       : new Set(["cleanup-required", "release-ready"]).has(recovery.status)
-        ? recovery.nextAction
+        ? recovery.nextAction ?? null
         : null;
     if (nextAction !== null) {
       return lifecycleResult({

@@ -375,13 +375,19 @@ test("exact session readiness allows an arbitrary Bash command while non-ready B
 
 test("non-ready governed roots retain a narrow simple-command read-only diagnostic lane", () => {
   const path = root();
+  const outside = mkdtempSync(join(tmpdir(), "guard-lifecycle-node-check-outside-"));
   try {
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    mkdirSync(join(path, "harness", "scripts"), { recursive: true });
+    writeFileSync(join(path, "harness", "scripts", "verify.mjs"), "\n");
+    symlinkSync(outside, join(path, "linked-outside"));
     for (const command of [
       "pwd -P",
       "ls -la",
       "rg -n repository-control-path-invalid plugins",
       "sed -n '1,80p' pipeline.user.yaml",
+      "node --check harness/scripts/verify.mjs",
+      "node.exe --check harness/scripts/verify.mjs",
       "git status --short --branch",
       "git diff --check",
       "git rev-parse HEAD",
@@ -400,6 +406,10 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
       "git branch new-branch",
       "git config user.name changed",
       "git status && touch bypass",
+      "node --check ../../outside.mjs",
+      "node --check linked-outside/verify.mjs",
+      "node --check harness/scripts/verify.mjs --eval bypass",
+      "node -e 'process.exit(0)'",
     ]) {
       assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
       assert.equal(evaluateLifecycleReadyGuard(bash(command), {
@@ -409,7 +419,10 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
         hasCodexExistingGitControlMountFn: () => false,
       }).exitCode, 2, command);
     }
-  } finally { rmSync(path, { recursive: true, force: true }); }
+  } finally {
+    rmSync(path, { recursive: true, force: true });
+    rmSync(outside, { recursive: true, force: true });
+  }
 });
 
 test("closed command grammar preserves native Windows paths and direct node.exe identity", () => {

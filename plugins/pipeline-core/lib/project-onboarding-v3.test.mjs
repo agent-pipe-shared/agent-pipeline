@@ -505,6 +505,28 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
     assert.deepEqual(observed.nextAction, applyAction);
     assertDiagnostic(observed, "cleanup_recovery_required");
 
+    let activeSessionAppServerCalls = 0;
+    const activeSession = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "session",
+      deps: {
+        ...fakeDeps,
+        observeOnboardingAppServer(options) {
+          activeSessionAppServerCalls += 1;
+          return fakeAppServer(options);
+        },
+        planSessionCleanupRecovery() {
+          return {
+            schema: "pipeline.session-cleanup-recovery-plan.v1",
+            status: "cleanup-required",
+          };
+        },
+      },
+    });
+    assert.equal(activeSession.status, "ready");
+    assert.equal(activeSession.nextAction, null);
+    assert.equal(activeSessionAppServerCalls, 1);
+
     const unavailable = inspectProjectOnboardingV3({
       rootDir: path,
       intent: "bootstrap",

@@ -171,6 +171,12 @@ export function isReadOnlyDiagnosticCommand(command, root) {
   const executable = basename(words[0]).toLowerCase();
   const args = words.slice(1);
   if (executable === "pwd") return args.length === 0 || (args.length === 1 && args[0] === "-P");
+  if (["node", "node.exe"].includes(executable)) {
+    return args.length === 2
+      && args[0] === "--check"
+      && !args[1].startsWith("-")
+      && isProjectWritePath(args[1], root);
+  }
   if (["ls", "rg", "grep", "cat", "head", "tail", "wc", "stat", "file"].includes(executable)) {
     return !args.some((arg) => arg === "--files-with-matches" && executable === "grep");
   }
