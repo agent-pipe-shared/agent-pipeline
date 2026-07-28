@@ -882,6 +882,22 @@ function readyLifecycleResult({ root, intent, repository, runtime, continuity = 
       )],
     });
   }
+  // Cleanup descriptors are meaningful only after local Git and valid
+  // continuity authority both exist. A fresh/host-managed bootstrap must first
+  // complete its typed repository initialization; probing the protected host
+  // control mount here would turn that legitimate transition into a false
+  // cleanup-observation failure.
+  if (repository.mode === "local" && continuity.status === "valid") {
+    const cleanupRecovery = partialCleanupRecoveryResult({
+      root,
+      intent,
+      repository,
+      runtime,
+      deps: fs,
+      strict: true,
+    });
+    if (cleanupRecovery !== null) return cleanupRecovery;
+  }
   // Runtime projection and App-Server health are distinct authorities. A
   // plugin-managed projection still requires the same single, read-only
   // App-Server observation as a project-local projection before bootstrap,
@@ -1001,15 +1017,6 @@ function afterRuntimeLifecycleResult({ root, intent, repository, runtime }, fs) 
   } catch {
     continuity = emptyContinuity();
   }
-  const cleanupRecovery = partialCleanupRecoveryResult({
-    root,
-    intent,
-    repository,
-    runtime,
-    deps: fs,
-    strict: true,
-  });
-  if (cleanupRecovery !== null) return cleanupRecovery;
   return readyLifecycleResult({ root, intent, repository, runtime, continuity }, fs);
 }
 
