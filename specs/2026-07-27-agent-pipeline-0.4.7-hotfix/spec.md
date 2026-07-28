@@ -7,6 +7,27 @@ This specification implements the neighboring
 `9d1b3dc108eb77629ace5b82002120f5539abd8d`. It is intentionally independent
 of Sprint Nova and Pull Request #64.
 
+## 0. Candidate audit baseline — 2026-07-28
+
+The audited candidate is `af71c2e18226da8527c94a359fbd343500c6d5b0` on
+`hotfix/issue-73`, observed 15 commits ahead of and zero commits behind
+`origin/main` at the declared base. This baseline records implementation state;
+it is not a plan approval, release claim, or authorization to dispatch.
+
+- `047-LCY` is present with focused host evidence. Its first independent
+  Critic round failed for missing persisted-State postimage validation and a
+  rollback path; the follow-up adds both. That follow-up still requires a fresh
+  candidate-bound Critic review and all applicable candidate gates.
+- H3 and H4 remain planned work: the current tree does not yet expose the
+  specified `plan-source-recovery`, `plan-manifest-repair`,
+  `apply-manifest-repair`, or WSL IPC compatibility controller surfaces.
+- H5 remains incomplete: the active host-Advisor route still declares
+  60,000/45,000 ms attempts, not the required 180,000/90,000 ms policy.
+
+Every acceptance criterion below therefore remains required. No existing
+focused evidence may be reused as candidate, release, platform, or approval
+evidence after any subsequent candidate change.
+
 ## 1. Invariants
 
 The implementation must preserve these release-wide invariants:
@@ -156,6 +177,24 @@ later technical sections explain how the system satisfies them.
   bind the Result, and advance the queue to `close`; any drift, broader state,
   missing evidence, replay conflict, or durability ambiguity SHALL fail
   closed without a false zero-mutation or success claim.
+- **AC-047-28 — PO authority rebind:** WHEN a regular in-root PRD has a valid
+  older `technical-spec-sha256` marker while the current regular in-root Spec
+  is newer and `planApproval.poGateAuthority` plus `continuity.authority`
+  retain the older PRD/Spec bindings, THE SYSTEM SHALL offer one read-only,
+  closed `pipeline.po-authority-rebind-plan.v1` plan that binds the current
+  PRD and marker, current Spec, State revision, plan-approval/PO-gate and
+  continuity authority, and every file/State preimage. Only an explicit PO
+  confirmation of that exact plan SHA-256 may run its complete apply action.
+  Apply SHALL atomically rewrite the PRD marker, planApproval and
+  poGateAuthority bindings, and continuity PRD/Spec bindings to one matching
+  postimage set, then read them back through PO-gate authority, Continuity and
+  V4 inspection. Drift, identity/permission/DACL failure, write failure,
+  partial durability, mixed postimage, or unauthorized replay SHALL roll back
+  completely and fail closed; a verified identical replay may report only a
+  typed no-op. The transition SHALL use existing cross-platform private-state
+  assurance, reject links/reparse points and non-regular files, and SHALL NOT
+  widen generic authority, force-close a feature, or permit a manual State
+  repair.
 
 ## 2. Change boundary
 
@@ -691,6 +730,21 @@ Focused tests cover:
 - outer Codex guard behavior; and
 - process fixtures for `ready -> source transition -> diagnose/recover ->
   ready` and `current V3 + absent manifest -> plan/apply/readback -> ready`.
+
+### 6.7 PO authority rebind
+
+Add one repository-owned read-only planner and its digest-bound confirmed
+apply action for the narrow stale-PRD-marker case in AC-047-28. The planner is
+admitted only after it proves an exact current State/PRD/Spec/approval/
+Continuity preimage and returns complete argv, expected postimages, platform
+assurance requirements, and a `planSha256`. Apply must re-observe every bound
+identity, publish the PRD and State changes as one recoverable transaction,
+and perform PO-gate, Continuity, and V4 readback before reporting success.
+Fixtures cover the exact Nova preimage, plan, PO-confirmed apply, postimage,
+verified replay/no-op or closed replay refusal, preimage drift, each transaction
+write failure and full rollback, link/path identity and permission failures,
+native-Windows DACL assurance, and read-only planning against the Nova checkout.
+No Nova file or stash is an apply target.
 
 ## 7. H4 — WSL IPC compatibility (#71)
 

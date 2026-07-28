@@ -8,11 +8,26 @@
 > `9d1b3dc108eb77629ace5b82002120f5539abd8d`. Acceptance criteria:
 > [spec.md](spec.md).
 
-<!-- technical-spec-sha256: d2a163b1d90a306ac6be7b7d9aa8fd4fe5be6da5f01311e5071781f280698901 -->
+<!-- technical-spec-sha256: 4e7d84ef26adba239d1fdb6ea484ecfdfbb5b2c4b55dfdbe7a6b6d823b6d8c96 -->
 
 Approval authorizes the first implementation dispatch for this design. It does
 not authorize push, merge, tag, release, Issue mutation, or Pull Request
 operation.
+
+## Candidate audit status — 2026-07-28
+
+The audited `hotfix/issue-73` candidate is 15 commits ahead of and zero commits
+behind `origin/main` at the declared 0.4.6 base. The PO approved this PRD/Spec
+scope on 2026-07-28; it is not a release approval and the candidate remains
+subject to all required implementation and verification gates.
+
+`047-LCY` has focused host checks, but its first independent Critic round found
+missing persisted-State postimage validation and a rollback path. The follow-up
+addresses those findings, yet still needs a fresh candidate-bound Critic and
+the complete candidate gates. The source tree does not yet implement the H3
+source/manifest-recovery or H4 WSL-IPC surfaces, and the H5 Advisor route still
+uses 60/45-second rather than 180/90-second attempts. These are remaining
+delivery obligations, not accepted scope reductions.
 
 ## What
 
@@ -62,6 +77,11 @@ exceptions.
   ending in one sanctioned route or an honest terminal explanation. A missing
   generated manifest receives confirmed absent-target-only repair; existing
   manifest bytes are never overwritten.
+- **PO authority rebind:** a legitimate later Spec change that leaves an older
+  PRD marker and matching stale PO-gate/Continuity bindings receives one
+  read-only, digest-bound, explicitly PO-confirmed cross-platform rebind. It
+  updates all three authority surfaces atomically or rolls back completely;
+  it never becomes a generic authority repair or force-close route.
 - **Portable guard and restart:** one closed command grammar supports native
   Windows paths, the exact PowerShell bootstrap read, and the bounded
   read-only diagnostic pipeline while retaining all mutation and pre-readiness
