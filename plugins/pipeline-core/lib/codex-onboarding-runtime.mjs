@@ -32,16 +32,18 @@ const NATIVE_FS = {
 };
 const HEX = /^[a-f0-9]{64}$/u;
 const ID = /^[A-Za-z0-9._-]{1,80}$/u;
-const BARRIER_KEYS = [
+const LEGACY_BARRIER_KEYS = [
   "schema", "revision", "priorStateSha256", "repositoryFingerprint", "sourceSha256",
   "runtimeTargets", "runtimeTargetsSha256", "transactionId", "writerGenerationSha256",
-  "launcherSha256", "helperSha256", "codexExecutablePath", "codexExecutableSha256", "state",
+  "launcherSha256", "helperSha256", "codexExecutableSha256", "state",
 ];
-const TICKET_KEYS = [
+const BARRIER_KEYS = [...LEGACY_BARRIER_KEYS, "codexExecutablePath"];
+const LEGACY_TICKET_KEYS = [
   "schema", "ticketId", "revision", "priorStateSha256", "issuedAtEpochMs", "expiresAtEpochMs",
   "barrierSha256", "repositoryFingerprint", "expectedSourceSha256", "expectedRuntimeTargetsSha256",
   "writerGenerationSha256", "tokenSha256", "state", "consumedBy",
 ];
+const TICKET_KEYS = [...LEGACY_TICKET_KEYS, "failure"];
 const READBACK_KEYS = [
   "schema", "barrierSha256", "repositoryFingerprint", "sourceSha256", "runtimeTargetsSha256",
   "readerGenerationSha256", "effectiveConfigSha256", "validatedAgentsSha256", "ticketId", "observedAtEpochMs",
@@ -383,11 +385,15 @@ export function validateRuntimeTargets(runtimeTargets) {
   return true;
 }
 export function validateRestartBarrier(value) {
-  exactKeys(value, BARRIER_KEYS, "restart barrier");
+  const keys = Object.hasOwn(value ?? {}, "codexExecutablePath")
+    ? BARRIER_KEYS
+    : LEGACY_BARRIER_KEYS;
+  exactKeys(value, keys, "restart barrier");
   if (value.schema !== BARRIER_SCHEMA || !Number.isSafeInteger(value.revision) || value.revision < 0) throw new Error("restart barrier schema/revision invalid");
   if (value.revision === 0 ? value.priorStateSha256 !== null : !HEX.test(value.priorStateSha256 ?? "")) throw new Error("restart barrier CAS predecessor invalid");
   for (const key of ["repositoryFingerprint", "sourceSha256", "runtimeTargetsSha256", "writerGenerationSha256", "launcherSha256", "helperSha256", "codexExecutableSha256"]) expectHex(value[key], key);
-  if (typeof value.codexExecutablePath !== "string" || !isAbsolute(value.codexExecutablePath)) {
+  if (Object.hasOwn(value, "codexExecutablePath")
+    && (typeof value.codexExecutablePath !== "string" || !isAbsolute(value.codexExecutablePath))) {
     throw new Error("Codex executable path is invalid");
   }
   expectId(value.transactionId, "transactionId"); validateRuntimeTargets(value.runtimeTargets);
@@ -396,17 +402,30 @@ export function validateRestartBarrier(value) {
   return true;
 }
 export function validateLaunchTicket(value) {
-  exactKeys(value, TICKET_KEYS, "launch ticket");
+  const keys = Object.hasOwn(value ?? {}, "failure") ? TICKET_KEYS : LEGACY_TICKET_KEYS;
+  exactKeys(value, keys, "launch ticket");
   if (value.schema !== TICKET_SCHEMA || !Number.isSafeInteger(value.revision) || value.revision < 0) throw new Error("launch ticket schema/revision invalid");
   if (value.revision === 0 ? value.priorStateSha256 !== null : !HEX.test(value.priorStateSha256 ?? "")) throw new Error("launch ticket CAS predecessor invalid");
   expectId(value.ticketId, "ticketId"); expectEpoch(value.issuedAtEpochMs, "issuedAtEpochMs"); expectEpoch(value.expiresAtEpochMs, "expiresAtEpochMs");
   if (value.expiresAtEpochMs !== value.issuedAtEpochMs + 300000) throw new Error("launch ticket expiry invalid");
   for (const key of ["barrierSha256", "repositoryFingerprint", "expectedSourceSha256", "expectedRuntimeTargetsSha256", "writerGenerationSha256", "tokenSha256"]) expectHex(value[key], key);
-  if (!new Set(["issued", "consumed"]).has(value.state)) throw new Error("launch ticket state invalid");
-  if (value.state === "issued" ? value.consumedBy !== null : !value.consumedBy || typeof value.consumedBy !== "object") throw new Error("launch ticket consumer invalid");
+  if (!new Set(["issued", "consumed", "failed"]).has(value.state)) throw new Error("launch ticket state invalid");
+  if (value.state === "consumed"
+    ? !value.consumedBy || typeof value.consumedBy !== "object"
+    : value.consumedBy !== null) throw new Error("launch ticket consumer invalid");
   if (value.state === "consumed") {
     exactKeys(value.consumedBy, ["readerGenerationSha256", "effectiveConfigSha256", "validatedAgentsSha256"], "launch ticket consumer");
     for (const key of Object.keys(value.consumedBy)) expectHex(value.consumedBy[key], key);
+  }
+  if (Object.hasOwn(value, "failure")) {
+    if (value.state === "failed") {
+      exactKeys(value.failure, ["code", "failedAtEpochMs"], "launch ticket failure");
+      if (typeof value.failure.code !== "string"
+        || !/^[a-z][a-z0-9-]{0,63}$/u.test(value.failure.code)) throw new Error("launch ticket failure code invalid");
+      expectEpoch(value.failure.failedAtEpochMs, "failedAtEpochMs");
+    } else if (value.failure !== null) throw new Error("launch ticket failure must be null");
+  } else if (value.state === "failed") {
+    throw new Error("legacy launch ticket cannot claim failed state");
   }
   return true;
 }
@@ -526,6 +545,7 @@ export function prepareRuntimeRestartBinding({
 }
 export function runtimeRestartBindingCurrent(barrier, { codexExecutable = undefined, runtimeOptions = {} } = {}) {
   validateRestartBarrier(barrier);
+  if (!Object.hasOwn(barrier, "codexExecutablePath")) return false;
   const executable = boundExecutable(codexExecutable, runtimeOptions);
   return executable.physicalPath === barrier.codexExecutablePath
     && executable.sha256 === barrier.codexExecutableSha256
@@ -682,7 +702,7 @@ export function issueLaunchTicket({ rootDir, repositoryCapability = "local", bar
       schema: TICKET_SCHEMA, ticketId, revision: 0, priorStateSha256: null, issuedAtEpochMs: now, expiresAtEpochMs: now + 300000,
       barrierSha256, repositoryFingerprint: barrier.repositoryFingerprint, expectedSourceSha256: barrier.sourceSha256,
       expectedRuntimeTargetsSha256: barrier.runtimeTargetsSha256, writerGenerationSha256: barrier.writerGenerationSha256,
-      tokenSha256: sha256(token), state: "issued", consumedBy: null,
+      tokenSha256: sha256(token), state: "issued", consumedBy: null, failure: null,
     };
     validateLaunchTicket(ticket);
     writeAtomic(
@@ -693,6 +713,55 @@ export function issueLaunchTicket({ rootDir, repositoryCapability = "local", bar
       { status: "absent" },
     );
     return { ticketId, token, expiresAtEpochMs: ticket.expiresAtEpochMs, executable: executable.physicalPath, barrier };
+  }, fs);
+}
+export function failLaunchTicket({
+  rootDir,
+  repositoryCapability = "local",
+  barrierSha256,
+  ticketId,
+  token,
+  failureCode,
+  now = Date.now(),
+  ...options
+} = {}) {
+  expectHex(barrierSha256, "barrierSha256");
+  expectId(ticketId, "ticketId");
+  if (!Buffer.isBuffer(token) || token.length !== 32) throw new Error("launch token is invalid");
+  if (typeof failureCode !== "string"
+    || !/^[a-z][a-z0-9-]{0,63}$/u.test(failureCode)) throw new Error("launch failure code is invalid");
+  expectEpoch(now, "clock");
+  const fs = runtimeFilesystem(options.deps);
+  const paths = privatePaths(rootDir, repositoryCapability, options);
+  return withWriterLock(paths, () => {
+    const barrier = readStored(paths.barrier, validateRestartBarrier, "restart barrier", fs);
+    if (barrier.rawSha256 !== barrierSha256) throw new Error("restart barrier changed before launch failure");
+    const ticket = readSoleLiveLaunchTicket(paths, barrier.rawSha256, ticketId, now, fs);
+    if (ticket.value.state !== "issued"
+      || ticket.value.tokenSha256 !== sha256(token)
+      || now < ticket.value.issuedAtEpochMs
+      || now >= ticket.value.expiresAtEpochMs) throw new Error("launch ticket is unavailable or replayed");
+    const failed = {
+      ...ticket.value,
+      revision: ticket.value.revision + 1,
+      priorStateSha256: ticket.rawSha256,
+      state: "failed",
+      consumedBy: null,
+      failure: { code: failureCode, failedAtEpochMs: now },
+    };
+    validateLaunchTicket(failed);
+    const rawSha256 = writeAtomic(
+      ticketPath(paths, ticketId),
+      failed,
+      fs,
+      null,
+      { status: "present", ...ticket },
+    );
+    return {
+      ticket: failed,
+      rawSha256,
+      retryAllowed: true,
+    };
   }, fs);
 }
 export function authenticateLaunchTicket({ rootDir, repositoryCapability = "local", ticketId, token, now = Date.now(), ...options } = {}) {

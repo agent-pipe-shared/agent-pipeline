@@ -204,7 +204,10 @@ function assertBoundedRestartCopyCommand(action) {
     assert.equal(command.split("\n").every((line) => line.length <= copy.maxColumns), true);
   }
   if (process.platform !== "win32") {
-    const assignments = copy.posix.split("\n").slice(0, -4).join("\n");
+    const lines = copy.posix.split("\n");
+    const assignments = lines.slice(0, -1).join("\n");
+    assert.equal(lines.at(-1), 'node "$P" --root "$R" --barrier-sha256 "$B" --activate');
+    assert.equal(lines.some((line) => line.endsWith("\\")), false);
     const probe = spawnSync("bash", ["-c", `${assignments}\nprintf '%s\\0%s\\0%s' "$P" "$R" "$B"`], {
       encoding: "buffer",
       shell: false,
@@ -216,6 +219,9 @@ function assertBoundedRestartCopyCommand(action) {
       action.launch.argv[4],
     ]);
   }
+  const powershellLines = copy.powershell.split("\n");
+  assert.equal(powershellLines.at(-1), "& node $P --root $R --barrier-sha256 $B --activate");
+  assert.equal(powershellLines.some((line) => line.endsWith("`")), false);
   return copy;
 }
 
@@ -924,10 +930,12 @@ test("a stale pending restart binding yields a replaceable readback plan", () =>
   const path = root();
   try {
     const stale = initializeRestartRequiredRoot(path);
-    writeFileSync(stale.paths.barrier, canonicalJson({
+    const legacyBarrier = {
       ...stale.barrier,
       launcherSha256: "f".repeat(64),
-    }));
+    };
+    delete legacyBarrier.codexExecutablePath;
+    writeFileSync(stale.paths.barrier, canonicalJson(legacyBarrier));
 
     const observed = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
     assert.equal(observed.status, "runtime-attestation-required");
@@ -957,6 +965,7 @@ test("a stale pending restart binding yields a replaceable readback plan", () =>
     const rebound = readRestartBarrier({ rootDir: path, spawn: fakeGit });
     assert.notEqual(rebound.rawSha256, stale.rawSha256);
     assert.notEqual(rebound.barrier.launcherSha256, "f".repeat(64));
+    assert.equal(rebound.barrier.codexExecutablePath, stale.barrier.codexExecutablePath);
   } finally {
     dispose(path);
   }

@@ -696,19 +696,13 @@ function restartCopyCommands(executable, argv) {
     ...boundedAssignmentLines("P", launcher),
     ...boundedAssignmentLines("R", root),
     ...boundedAssignmentLines("B", barrierSha256),
-    'node "$P" \\',
-    '  --root "$R" \\',
-    '  --barrier-sha256 "$B" \\',
-    "  --activate",
+    'node "$P" --root "$R" --barrier-sha256 "$B" --activate',
   ];
   const powershell = [
     ...boundedAssignmentLines("$P", launcher, true),
     ...boundedAssignmentLines("$R", root, true),
     ...boundedAssignmentLines("$B", barrierSha256, true),
-    "& node $P `",
-    "  --root $R `",
-    "  --barrier-sha256 $B `",
-    "  --activate",
+    "& node $P --root $R --barrier-sha256 $B --activate",
   ];
   for (const line of [...posix, ...powershell]) {
     if (line.length > COPY_COMMAND_MAX_COLUMNS) throw new TypeError("copy command line exceeds its bound");

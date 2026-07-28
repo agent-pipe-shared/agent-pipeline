@@ -8,12 +8,14 @@ import {
   HELPER_PATH,
   TICKET_SCHEMA,
   canonicalJson,
+  failLaunchTicket,
   issueLaunchTicket,
 } from "../lib/codex-onboarding-runtime.mjs";
 import { READBACK_STATUS_SCHEMA } from "./codex-project-runtime-readback-host.mjs";
 
 const READBACK_TIMEOUT_MS = 35_000;
 const READBACK_MAX_BUFFER = 128 * 1024;
+const FAILURE_CODE = /^[a-z][a-z0-9-]{0,63}$/u;
 
 function parse(argv) {
   if (argv.length !== 5 || argv[0] !== "--root" || argv[2] !== "--barrier-sha256" || argv[4] !== "--activate"
@@ -27,8 +29,41 @@ export function main(argv = process.argv.slice(2), {
 } = {}) {
   let issued;
   let readbackProduced = false;
+  let options;
+  const reportFailure = (fallbackCode, readback = null) => {
+    let code = fallbackCode;
+    try {
+      const observed = JSON.parse(String(readback?.stdout ?? ""));
+      if (observed?.schema === READBACK_STATUS_SCHEMA
+        && observed.status === "unavailable"
+        && FAILURE_CODE.test(observed.code ?? "")) code = observed.code;
+    } catch {}
+    let retryAllowed = false;
+    if (issued && options) {
+      try {
+        retryAllowed = failLaunchTicket({
+          rootDir: options.rootDir,
+          barrierSha256: options.barrierSha256,
+          ticketId: issued.ticketId,
+          token: issued.token,
+          failureCode: code,
+        }).retryAllowed === true;
+      } catch {}
+    }
+    write(`${canonicalJson({
+      schema: TICKET_SCHEMA,
+      status: "readback-unavailable",
+      code,
+      ...(issued ? {
+        ticketId: issued.ticketId,
+        retryAllowed,
+        ...(retryAllowed ? {} : { retryAfterEpochMs: issued.expiresAtEpochMs }),
+      } : {}),
+    })}\n`);
+    return 2;
+  };
   try {
-    const options = parse(argv);
+    options = parse(argv);
     if (typeof env.CODEX_THREAD_ID === "string" && env.CODEX_THREAD_ID !== "") {
       write(`${canonicalJson({ schema: TICKET_SCHEMA, status: "external-launch-required" })}\n`);
       return 2;
@@ -57,13 +92,7 @@ export function main(argv = process.argv.slice(2), {
       || readback?.error !== undefined
       || readback?.stdout !== expectedReadback
       || readback?.stderr !== "") {
-      write(`${canonicalJson({
-        schema: TICKET_SCHEMA,
-        status: "readback-unavailable",
-        ticketId: issued.ticketId,
-        retryAfterEpochMs: issued.expiresAtEpochMs,
-      })}\n`);
-      return 2;
+      return reportFailure("runtime-readback-unavailable", readback);
     }
     readbackProduced = true;
     const cleanEnvironment = { ...env };
@@ -80,6 +109,7 @@ export function main(argv = process.argv.slice(2), {
     })}\n`);
     return 0;
   } catch {
+    if (issued && !readbackProduced) return reportFailure("transport-unavailable");
     write(`${canonicalJson({
       schema: TICKET_SCHEMA,
       status: readbackProduced ? "readback-produced" : "launch-unavailable",

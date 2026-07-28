@@ -420,14 +420,29 @@ test("the launch wrapper preserves the interactive Codex process contract withou
     assert.equal(failure.status, 2);
     const failed = JSON.parse(failure.stdout);
     assert.deepEqual(Object.keys(failed).sort(), [
-      "retryAfterEpochMs", "schema", "status", "ticketId",
+      "code", "retryAllowed", "schema", "status", "ticketId",
     ]);
     assert.equal(failed.schema, "pipeline.codex-onboarding-launch.v1");
-    assert.equal(failed.status, "launch-unavailable");
+    assert.equal(failed.status, "readback-unavailable");
+    assert.equal(failed.code, "transport-unavailable");
+    assert.equal(failed.retryAllowed, true);
     assert.match(failed.ticketId, /^[A-Za-z0-9._-]{1,80}$/u);
-    assert.equal(Number.isSafeInteger(failed.retryAfterEpochMs), true);
     assert.equal(failure.stdout.includes(failedToken), false);
     assert.equal(failure.stdout.includes("sensitive child failure"), false);
+    const failedTicket = JSON.parse(readFileSync(join(
+      failureBarrier.paths.tickets,
+      `${failed.ticketId}.json`,
+    ), "utf8"));
+    assert.equal(failedTicket.state, "failed");
+    assert.equal(failedTicket.failure.code, "transport-unavailable");
+    const immediateRetry = issueLaunchTicket({
+      rootDir: failurePath,
+      barrierSha256: failureBarrier.rawSha256,
+      codexExecutable: executable,
+      now: failedTicket.failure.failedAtEpochMs + 1,
+      random: counterRandom(0x35, 0x36),
+    });
+    assert.equal(immediateRetry.ticketId.length > 0, true);
 
     let readbackFailureCalls = 0;
     const readbackFailure = invoke(readbackFailurePath, readbackFailureBarrier, () => {
@@ -447,8 +462,15 @@ test("the launch wrapper preserves the interactive Codex process contract withou
     assert.equal(readbackFailure.status, 2);
     const unavailable = JSON.parse(readbackFailure.stdout);
     assert.equal(unavailable.status, "readback-unavailable");
+    assert.equal(unavailable.code, "transport-unavailable");
+    assert.equal(unavailable.retryAllowed, true);
     assert.match(unavailable.ticketId, /^[A-Za-z0-9._-]{1,80}$/u);
-    assert.equal(Number.isSafeInteger(unavailable.retryAfterEpochMs), true);
+    const unavailableTicket = JSON.parse(readFileSync(join(
+      readbackFailureBarrier.paths.tickets,
+      `${unavailable.ticketId}.json`,
+    ), "utf8"));
+    assert.equal(unavailableTicket.state, "failed");
+    assert.equal(unavailableTicket.failure.code, "transport-unavailable");
 
     let tuiCalls = 0;
     const tuiFailure = invoke(tuiFailurePath, tuiFailureBarrier, (childExecutable) => {
@@ -653,6 +675,17 @@ test("duplicate, malformed, and unsafe ticket-set entries fail authentication an
     });
     const originalPath = join(stored.paths.tickets, `${issued.ticketId}.json`);
     const original = JSON.parse(readFileSync(originalPath, "utf8"));
+    const legacy = structuredClone(original);
+    delete legacy.failure;
+    writeFileSync(originalPath, canonicalJson(legacy), { mode: 0o600 });
+    assert.equal(authenticateLaunchTicket({
+      rootDir: path,
+      ticketId: issued.ticketId,
+      token: issued.token,
+      now: 400_001,
+      spawn: host,
+    }).ticket.value.state, "issued", "a live 0.4.6 ticket remains readable after the hotfix");
+    writeFileSync(originalPath, canonicalJson(original), { mode: 0o600 });
     const foreignId = "foreign-duplicate";
     const foreignPath = join(stored.paths.tickets, `${foreignId}.json`);
     writeFileSync(foreignPath, canonicalJson({
