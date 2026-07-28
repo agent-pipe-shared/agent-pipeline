@@ -147,19 +147,68 @@ function runPoAuthorityRebindTests() {
   ok("PS53j postimage V4 failure rolls both authority surfaces back", readbackFault.value === 2 && /rollback verified/i.test(readbackFault.text) && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === prdBefore && readFileSync(statePath(fixture.dir), "utf8") === stateBefore);
 }
 
+{
+  const fixture = seedPoAuthorityRebind("po-rebind-crash-prepared");
+  const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const plan = JSON.parse(planned.text || "{}");
+  const prdBefore = readFileSync(join(fixture.dir, fixture.planPath), "utf8"); const stateBefore = readFileSync(statePath(fixture.dir), "utf8");
+  const journal = join(fixture.dir, ".claude", "pipeline-state.json.po-authority-rebind.v1");
+  const interrupted = captureConsoleError(() => run(plan.applyAction.argv.slice(1), {
+    ...fixture.deps, afterRebindTransactionPrepared: () => { throw new Error("injected crash after journal prepare"); },
+  }));
+  ok("PS53k prepared-journal crash retains exact preimages and its recovery anchor", interrupted.value === 2 && existsSync(journal)
+    && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === prdBefore && readFileSync(statePath(fixture.dir), "utf8") === stateBefore);
+  const resumed = captureConsole(() => run(plan.applyAction.argv.slice(1), fixture.deps));
+  const after = readState(fixture.dir).state;
+  ok("PS53l exact confirmed replay resumes a prepared transaction without a false no-op", resumed.value === 0 && /PO-REBIND-APPLIED/.test(resumed.text)
+    && !existsSync(journal) && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha && after.continuity.revision === 4);
+}
+{
+  const fixture = seedPoAuthorityRebind("po-rebind-crash-mixed");
+  const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const plan = JSON.parse(planned.text || "{}");
+  const prdBefore = readFileSync(join(fixture.dir, fixture.planPath), "utf8"); const stateBefore = readFileSync(statePath(fixture.dir), "utf8");
+  const journal = join(fixture.dir, ".claude", "pipeline-state.json.po-authority-rebind.v1");
+  const interrupted = captureConsoleError(() => run(plan.applyAction.argv.slice(1), {
+    ...fixture.deps, afterRebindPrdWritten: () => { throw new Error("injected crash after PRD commit"); },
+  }));
+  ok("PS53m mixed-journal crash preserves the journal and exposes no success", interrupted.value === 2 && existsSync(journal)
+    && readFileSync(join(fixture.dir, fixture.planPath), "utf8") !== prdBefore && readFileSync(statePath(fixture.dir), "utf8") === stateBefore);
+  const recovered = captureConsoleError(() => run(plan.applyAction.argv.slice(1), fixture.deps));
+  const replanned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps));
+  ok("PS53n mixed replay rolls back completely and permits a fresh closed plan", recovered.value === 2 && /recovered its interrupted transaction/i.test(recovered.text)
+    && !existsSync(journal) && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === prdBefore
+    && readFileSync(statePath(fixture.dir), "utf8") === stateBefore && replanned.value === 0);
+}
+{
+  const fixture = seedPoAuthorityRebind("po-rebind-crash-committed");
+  const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const plan = JSON.parse(planned.text || "{}");
+  const journal = join(fixture.dir, ".claude", "pipeline-state.json.po-authority-rebind.v1");
+  const interrupted = captureConsoleError(() => run(plan.applyAction.argv.slice(1), {
+    ...fixture.deps, afterRebindStateWritten: () => { throw new Error("injected crash after State commit"); },
+  }));
+  const postPrd = readFileSync(join(fixture.dir, fixture.planPath), "utf8"); const postState = readFileSync(statePath(fixture.dir), "utf8");
+  ok("PS53o committed-journal crash retains both postimages and its recovery anchor", interrupted.value === 2 && existsSync(journal)
+    && postPrd.includes(fixture.newSpecSha) && readState(fixture.dir).state.continuity.revision === 4);
+  const unproven = captureConsoleError(() => run(plan.applyAction.argv.slice(1), { ...fixture.deps, v4Inspection: () => ({ status: "partial" }) }));
+  const retainedAfterUnprovenReplay = existsSync(journal);
+  const replay = captureConsole(() => run(plan.applyAction.argv.slice(1), fixture.deps));
+  ok("PS53p committed replay is a no-op only after authority and V4 readback", unproven.value === 2 && retainedAfterUnprovenReplay
+    && replay.value === 0 && /PO-REBIND-REPLAY-NOOP/.test(replay.text) && !existsSync(journal)
+    && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === postPrd && readFileSync(statePath(fixture.dir), "utf8") === postState);
+}
+
 if (symlinkCapable) {
   const fixture = seedPoAuthorityRebind("po-rebind-link");
   const prd = join(fixture.dir, fixture.planPath); const real = `${prd}.real`;
   renameSync(prd, real); symlinkSync(real, prd);
   const rejected = captureConsoleError(() => run(["po-authority-rebind-plan"], fixture.deps));
-  ok("PS53k linked PRD is refused before any plan or mutation", rejected.value === 2 && readFileSync(statePath(fixture.dir), "utf8").includes("nova-shaped"));
+  ok("PS53q linked PRD is refused before any plan or mutation", rejected.value === 2 && readFileSync(statePath(fixture.dir), "utf8").includes("nova-shaped"));
 }
 {
   const fixture = seedPoAuthorityRebind("po-rebind-hardlink");
   const prd = join(fixture.dir, fixture.planPath);
   linkSync(prd, `${prd}.hard`);
   const rejected = captureConsoleError(() => run(["po-authority-rebind-plan"], fixture.deps));
-  ok("PS53l hard-linked PRD is refused before any plan or mutation", rejected.value === 2 && readFileSync(statePath(fixture.dir), "utf8").includes("nova-shaped"));
+  ok("PS53r hard-linked PRD is refused before any plan or mutation", rejected.value === 2 && readFileSync(statePath(fixture.dir), "utf8").includes("nova-shaped"));
 }
 {
   const fixture = seedPoAuthorityRebind("po-rebind-permission-drift");
@@ -167,13 +216,13 @@ if (symlinkCapable) {
   const beforePrd = readFileSync(join(fixture.dir, fixture.planPath), "utf8"); const beforeState = readFileSync(statePath(fixture.dir), "utf8");
   chmodSync(join(fixture.dir, fixture.planPath), 0o600);
   const rejected = captureConsoleError(() => run(plan.applyAction.argv.slice(1), fixture.deps));
-  ok("PS53m permission/identity drift blocks apply before mutation", rejected.value === 2 && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === beforePrd && readFileSync(statePath(fixture.dir), "utf8") === beforeState);
+  ok("PS53s permission/identity drift blocks apply before mutation", rejected.value === 2 && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === beforePrd && readFileSync(statePath(fixture.dir), "utf8") === beforeState);
 }
 {
   const fixture = seedPoAuthorityRebind("po-rebind-profile-security");
   const before = readFileSync(statePath(fixture.dir), "utf8");
   const rejected = captureConsoleError(() => run(["po-authority-rebind-plan"], { ...fixture.deps, poGateProfile: () => ({ ok: false, code: "PO-PROFILE-AUTHORITY-UNAVAILABLE" }) }));
-  ok("PS53n failed existing PO-profile DACL assurance blocks planning byte-null", rejected.value === 2 && readFileSync(statePath(fixture.dir), "utf8") === before);
+  ok("PS53t failed existing PO-profile DACL assurance blocks planning byte-null", rejected.value === 2 && readFileSync(statePath(fixture.dir), "utf8") === before);
 }
 }
 

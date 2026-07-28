@@ -2,13 +2,14 @@
 
 # PRD — Agent Pipeline 0.4.7 hotfix
 
-> Product Review Document for the PO gate. Status: `draft; awaiting PO approval`.
+> Product Review Document for the PO gate. Status:
+> `approved by PO on 2026-07-28; implementation authorized`.
 > Task: `agent-pipeline-0.4.7-hotfix` · Feature · Rigor 2 · Risk high.
 > Base: public 0.4.6 release at
 > `9d1b3dc108eb77629ace5b82002120f5539abd8d`. Acceptance criteria:
 > [spec.md](spec.md).
 
-<!-- technical-spec-sha256: 4e7d84ef26adba239d1fdb6ea484ecfdfbb5b2c4b55dfdbe7a6b6d823b6d8c96 -->
+<!-- technical-spec-sha256: 9459345cc652ced766986f7967fde6c706f2762d9165ebff8be27da33abcd2bf -->
 
 Approval authorizes the first implementation dispatch for this design. It does
 not authorize push, merge, tag, release, Issue mutation, or Pull Request

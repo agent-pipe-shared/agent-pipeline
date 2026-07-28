@@ -199,17 +199,21 @@ rename, and directory fsync. The record remains authoritative until both
 postimages pass PO-gate, Continuity, and V4 readback, after which it is removed
 and the containing directory is synced.
 
-If a process stops between the two replacements, a replay of the same exact
-confirmed action first authenticates the transaction record and accepts only
-the recorded preimage/postimage combinations. It restores both files to the
-recorded preimages, removes the record only after verified rollback, and
-requires a newly observed plan and PO confirmation. An unknown, linked,
-hard-linked, drifted, malformed, or wrong-plan record fails closed and is
-preserved. On Windows the existing repository PO-profile receipt supplies the
-native owner/DACL assurance before any transaction is admitted; POSIX retains
-the private State/journal modes. No replay can widen authority, silently
-complete a mixed transaction, force-close a feature, or convert a manual State
-edit into a valid rebind.
+If a process stops during the transaction, a replay of the same exact confirmed
+action first authenticates the record and accepts only the recorded
+preimage/postimage combinations. Two unchanged preimages are a prepared, not a
+committed, transaction: replay durably clears the record, revalidates the
+original closed plan, republishes the record, and performs the authorized
+transition. A mixed pair is restored to both recorded preimages; the record is
+removed only after verified rollback, and a newly observed plan and PO
+confirmation are then required. Two exact postimages become a no-op only after
+fresh PO-gate, Continuity, and V4 readback. An unknown, linked, hard-linked,
+identity-drifted, malformed, wrong-plan, or unprovable record fails closed and
+is preserved. On Windows the existing repository PO-profile receipt supplies
+the native owner/DACL assurance before any transaction is admitted; POSIX
+retains the private State/journal modes. No replay can widen authority,
+silently accept stale preimages, force-close a feature, or convert a manual
+State edit into a valid rebind.
 
 The v2 host-init receipt is the first release candidate that carries the
 physical Git postimage. The earlier v1 shape existed only in unpublished local

@@ -1,6 +1,6 @@
 # Technical specification — Agent Pipeline 0.4.7 hotfix
 
-Status: `draft; awaiting PO approval`.
+Status: `approved by PO on 2026-07-28; implementation authorized`.
 
 This specification implements the neighboring
 [PRD](prd_agent-pipeline-0.4.7-hotfix.md) against exact base
