@@ -2,6 +2,7 @@
 
 /** Observe the selected Pipeline plugin directly from the Codex host. */
 import { spawnSync as nodeSpawnSync } from "node:child_process";
+import { realpathSync as nodeRealpathSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { resolveTrustedSystemExecutable } from "./trusted-tool-resolution.mjs";
 
@@ -25,6 +26,18 @@ function localAbsolute(path) {
     && !path.includes("\0")
     && isAbsolute(path)
     && resolve(path) === path;
+}
+
+/** Resolve only the already schema-bound local marketplace entry to its physical source. */
+export function resolveCodexLocalMarketplacePluginPath(
+  path,
+  realpathSync = nodeRealpathSync,
+) {
+  if (!localAbsolute(path) || typeof realpathSync !== "function") return null;
+  let physical;
+  try { physical = realpathSync(path); }
+  catch { return null; }
+  return localAbsolute(physical) ? physical : null;
 }
 
 function safeGitMarketplaceSource(value) {
@@ -53,7 +66,7 @@ function safeMarketplaceSource(value, pluginRoot) {
     && value.source === dirname(dirname(pluginRoot));
 }
 
-function selectedPlugin(document) {
+function selectedPlugin(document, realpathSync) {
   if (!exactObject(document, ["installed", "available"])
     || !Array.isArray(document.installed)
     || !Array.isArray(document.available)) return null;
@@ -85,15 +98,26 @@ function selectedPlugin(document) {
   if (!safeMarketplaceSource(entry.marketplaceSource, entry.source.path)) return null;
   if (entry.pluginId === "pipeline-core@agent-pipeline-local"
     && entry.marketplaceSource.sourceType !== "local") return null;
-  return Object.freeze({ path: entry.source.path, version: entry.version });
+  let sourcePath = entry.source.path;
+  if (entry.marketplaceSource.sourceType === "local") {
+    sourcePath = resolveCodexLocalMarketplacePluginPath(sourcePath, realpathSync);
+    if (sourcePath === null) return null;
+  }
+  return Object.freeze({ path: sourcePath, version: entry.version });
 }
 
 /**
  * The version is intentionally not an input. It is observed only by executing
  * the fixed Codex host command with a closed environment and schema.
  */
-export function observeSelectedCodexPipelinePlugin({ spawnSync = nodeSpawnSync, resolveExecutable = resolveTrustedSystemExecutable } = {}) {
-  if (typeof spawnSync !== "function" || typeof resolveExecutable !== "function") return null;
+export function observeSelectedCodexPipelinePlugin({
+  spawnSync = nodeSpawnSync,
+  resolveExecutable = resolveTrustedSystemExecutable,
+  realpathSync = nodeRealpathSync,
+} = {}) {
+  if (typeof spawnSync !== "function"
+    || typeof resolveExecutable !== "function"
+    || typeof realpathSync !== "function") return null;
   let executable;
   try { executable = resolveExecutable("codex"); } catch { return null; }
   if (!isObject(executable) || executable.ok !== true || !localAbsolute(executable.path)) return null;
@@ -122,6 +146,6 @@ export function observeSelectedCodexPipelinePlugin({ spawnSync = nodeSpawnSync, 
     || typeof result.stdout !== "string"
     || Buffer.byteLength(result.stdout, "utf8") === 0
     || Buffer.byteLength(result.stdout, "utf8") > MAX_JSON_BYTES) return null;
-  try { return selectedPlugin(JSON.parse(result.stdout)); }
+  try { return selectedPlugin(JSON.parse(result.stdout), realpathSync); }
   catch { return null; }
 }

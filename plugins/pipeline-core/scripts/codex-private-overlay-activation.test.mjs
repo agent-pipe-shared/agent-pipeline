@@ -119,17 +119,37 @@ test("never forwards the host plugin-list version to an activation argument", ()
 });
 
 test("accepts only a local marketplace root that exactly contains the selected plugin", () => {
+  const physicalSource = resolve("/physical/source/plugins/pipeline-core");
   const result = capture(["inspect", "--project-root", PROJECT_ROOT], {
     spawnSync: successfulSpawn(document([pluginEntry({
       marketplaceSource: { sourceType: "local", source: resolve("/local/marketplace") },
     })])),
+    realpathSync(path) {
+      assert.equal(path, SOURCE_PLUGIN_ROOT);
+      return physicalSource;
+    },
   });
   assert.deepEqual(result, {
     code: 0,
     stdout: "",
     stderr: "",
-    calls: [["inspect", "--project-root", PROJECT_ROOT, "--source-plugin-root", SOURCE_PLUGIN_ROOT]],
+    calls: [["inspect", "--project-root", PROJECT_ROOT, "--source-plugin-root", physicalSource]],
   });
+});
+
+test("rejects a local marketplace source whose physical target cannot be resolved safely", () => {
+  for (const realpathSync of [
+    () => { throw new Error("missing target"); },
+    () => "relative/target",
+  ]) {
+    const result = capture(["inspect", "--project-root", PROJECT_ROOT], {
+      spawnSync: successfulSpawn(document([pluginEntry({
+        marketplaceSource: { sourceType: "local", source: resolve("/local/marketplace") },
+      })])),
+      realpathSync,
+    });
+    assert.deepEqual(result, { code: 2, stdout: REJECTION, stderr: "", calls: [] });
+  }
 });
 
 test("rejects simultaneous isolated local-development and official installations", () => {

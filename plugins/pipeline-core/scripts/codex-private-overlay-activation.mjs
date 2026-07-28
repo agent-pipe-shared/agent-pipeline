@@ -4,6 +4,9 @@
 import { spawnSync as nodeSpawnSync } from "node:child_process";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  resolveCodexLocalMarketplacePluginPath,
+} from "../lib/codex-host-plugin-list.mjs";
 import { resolveTrustedSystemExecutable } from "../lib/trusted-tool-resolution.mjs";
 
 import { mainCodexHost as activationMain } from "./private-overlay-activation.mjs";
@@ -20,7 +23,14 @@ const PLUGIN_VERSION = /^[A-Za-z0-9][A-Za-z0-9.+_-]{0,127}$/u;
 const MAX_JSON_BYTES = 64 * 1024;
 const TIMEOUT_MS = 5000;
 const MAX_BUFFER = 128 * 1024;
-const DEPENDENCY_KEYS = Object.freeze(["spawnSync", "resolveExecutable", "activationMain", "write", "writeError"]);
+const DEPENDENCY_KEYS = Object.freeze([
+  "spawnSync",
+  "resolveExecutable",
+  "realpathSync",
+  "activationMain",
+  "write",
+  "writeError",
+]);
 
 function isObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -61,11 +71,17 @@ function dependencies(overrides) {
   const selected = {
     spawnSync: overrides.spawnSync ?? nodeSpawnSync,
     resolveExecutable: overrides.resolveExecutable ?? resolveTrustedSystemExecutable,
+    realpathSync: overrides.realpathSync,
     activationMain: overrides.activationMain ?? activationMain,
     write: overrides.write ?? process.stdout.write.bind(process.stdout),
     writeError: overrides.writeError ?? process.stderr.write.bind(process.stderr),
   };
-  return Object.values(selected).every((value) => typeof value === "function") ? selected : null;
+  return Object.entries(selected).every(([key, value]) =>
+    key === "realpathSync"
+      ? value === undefined || typeof value === "function"
+      : typeof value === "function")
+    ? selected
+    : null;
 }
 
 function safeWrite(overrides, channel, value) {
@@ -108,7 +124,7 @@ function safeMarketplaceSource(value, pluginRoot) {
     && value.source === dirname(dirname(pluginRoot));
 }
 
-function sourcePluginRoot(document) {
+function sourcePluginRoot(document, realpathSync) {
   if (!exactObject(document, ["installed", "available"])
     || !Array.isArray(document.installed)
     || !Array.isArray(document.available)) return null;
@@ -137,10 +153,15 @@ function sourcePluginRoot(document) {
   if (!safeMarketplaceSource(entry.marketplaceSource, entry.source.path)) return null;
   if (entry.pluginId === "pipeline-core@agent-pipeline-local"
     && entry.marketplaceSource.sourceType !== "local") return null;
-  return { path: entry.source.path, version: entry.version };
+  let sourcePath = entry.source.path;
+  if (entry.marketplaceSource.sourceType === "local") {
+    sourcePath = resolveCodexLocalMarketplacePluginPath(sourcePath, realpathSync);
+    if (sourcePath === null) return null;
+  }
+  return { path: sourcePath, version: entry.version };
 }
 
-function resolveSourceRoot(spawn, resolveExecutable) {
+function resolveSourceRoot(spawn, resolveExecutable, realpathSync) {
   let executable;
   try { executable = resolveExecutable("codex"); } catch { return null; }
   if (!isObject(executable) || executable.ok !== true || !localAbsolute(executable.path)) return null;
@@ -171,7 +192,7 @@ function resolveSourceRoot(spawn, resolveExecutable) {
     || Buffer.byteLength(result.stdout, "utf8") > MAX_JSON_BYTES) return null;
   let document;
   try { document = JSON.parse(result.stdout); } catch { return null; }
-  return sourcePluginRoot(document);
+  return sourcePluginRoot(document, realpathSync);
 }
 
 function activationArgv(parsed, sourceRoot) {
@@ -196,7 +217,11 @@ export function main(argv, dependencyOverrides = {}) {
     safeWrite(dependencyOverrides, "write", canonicalLine(REJECTION));
     return 2;
   }
-  const hostPlugin = resolveSourceRoot(deps.spawnSync, deps.resolveExecutable);
+  const hostPlugin = resolveSourceRoot(
+    deps.spawnSync,
+    deps.resolveExecutable,
+    deps.realpathSync,
+  );
   if (hostPlugin === null) {
     safeWrite(dependencyOverrides, "write", canonicalLine(REJECTION));
     return 2;

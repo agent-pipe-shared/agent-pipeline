@@ -380,6 +380,8 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     mkdirSync(join(path, "harness", "scripts"), { recursive: true });
     writeFileSync(join(path, "harness", "scripts", "verify.mjs"), "\n");
+    mkdirSync(join(path, "specs"), { recursive: true });
+    writeFileSync(join(path, "specs", "hotfix.md"), "hotfix\n");
     symlinkSync(outside, join(path, "linked-outside"));
     for (const command of [
       "pwd -P",
@@ -388,6 +390,12 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
       "sed -n '1,80p' pipeline.user.yaml",
       "node --check harness/scripts/verify.mjs",
       "node.exe --check harness/scripts/verify.mjs",
+      "sha256sum specs/hotfix.md",
+      "sha256sum -- specs/hotfix.md",
+      "shasum -a 256 specs/hotfix.md",
+      "shasum --algorithm 256 specs/hotfix.md",
+      "certutil -hashfile specs/hotfix.md SHA256",
+      "certutil.exe -hashfile specs/hotfix.md sha256",
       "git status --short --branch",
       "git diff --check",
       "git rev-parse HEAD",
@@ -410,6 +418,15 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
       "node --check linked-outside/verify.mjs",
       "node --check harness/scripts/verify.mjs --eval bypass",
       "node -e 'process.exit(0)'",
+      "sha256sum ../../outside.md",
+      "sha256sum linked-outside/outside.md",
+      "sha256sum specs/hotfix.md pipeline.user.yaml",
+      "sha256sum -c specs/hotfix.md",
+      "shasum -a 1 specs/hotfix.md",
+      "shasum -a 256 specs/hotfix.md pipeline.user.yaml",
+      "certutil -urlcache specs/hotfix.md SHA256",
+      "certutil -hashfile ../../outside.md SHA256",
+      "certutil -hashfile specs/hotfix.md SHA1",
     ]) {
       assert.equal(isReadOnlyDiagnosticCommand(command, path), false, command);
       assert.equal(evaluateLifecycleReadyGuard(bash(command), {
@@ -423,6 +440,35 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
     rmSync(path, { recursive: true, force: true });
     rmSync(outside, { recursive: true, force: true });
   }
+});
+
+test("non-ready write denials surface only the typed lifecycle status and recovery route", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const status of PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES) {
+      const result = evaluateLifecycleReadyGuard(edit(), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny(status); },
+      });
+      assert.equal(result.exitCode, 2, status);
+      assert.match(result.stderr, new RegExp(`session readiness is ${status}`, "u"), status);
+      assert.match(result.stderr, /project-onboarding-v3 inspection with intent session/u, status);
+      assert.equal(result.stderr.includes("/private/root"), false, status);
+      assert.equal(result.stderr.includes(path), false, status);
+    }
+
+    const unknown = evaluateLifecycleReadyGuard(edit(), {
+      projectDir: path,
+      requireProjectOnboardingReadyFn() {
+        throw new Error("private unknown failure /private/root");
+      },
+    });
+    assert.equal(unknown.exitCode, 2);
+    assert.doesNotMatch(unknown.stderr, /private unknown|\/private\/root/u);
+    assert.doesNotMatch(unknown.stderr, /session readiness is/u);
+    assert.match(unknown.stderr, /project-onboarding-v3 session inspection/u);
+  } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
 test("closed command grammar preserves native Windows paths and direct node.exe identity", () => {

@@ -15,6 +15,7 @@ import {
 import { fileURLToPath } from "node:url";
 
 import {
+  PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
   ProjectOnboardingReadyError,
   requireProjectOnboardingReady,
 } from "../lib/project-onboarding-ready-gate.mjs";
@@ -49,6 +50,9 @@ const HOST_INIT_CROSS_VIEW_STATUSES = new Set([
   "repository-mount-read-only",
   "repository-control-path-invalid",
 ]);
+const CONTROLLING_NON_READY_STATUSES = new Set(
+  PROJECT_ONBOARDING_CONTROLLING_NON_READY_STATUSES,
+);
 
 function verdict(exitCode, stderr = "") {
   return { exitCode, stderr };
@@ -64,7 +68,7 @@ function exactReadyReceipt(value) {
     && value.intent === "session";
 }
 
-function blocked(code = "GUARD-LIFECYCLE-NOT-READY") {
+function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null) {
   const grammarGuidance = {
     "GUARD-PARSE-UNSUPPORTED": [
       "The command is outside the closed Pipeline shell grammar.",
@@ -79,10 +83,20 @@ function blocked(code = "GUARD-LIFECYCLE-NOT-READY") {
       "Retry without redirection; only the platform null redirect in the exact bounded rg-to-head diagnostic pipeline is admitted.",
     ],
   };
-  const guidance = grammarGuidance[code] ?? [
-    "Pipeline-governed project writes require an exact V4 ready result for session intent.",
-    "Repair or complete onboarding through the typed lifecycle action before retrying.",
-  ];
+  const typedLifecycleStatus = code === "GUARD-LIFECYCLE-NOT-READY"
+    && CONTROLLING_NON_READY_STATUSES.has(lifecycleStatus)
+    ? lifecycleStatus
+    : null;
+  const guidance = grammarGuidance[code]
+    ?? (typedLifecycleStatus === null
+      ? [
+        "Pipeline-governed project writes require an exact V4 ready result for session intent.",
+        "Re-run the typed project-onboarding-v3 session inspection and use only its returned nextAction.",
+      ]
+      : [
+        `Pipeline session readiness is ${typedLifecycleStatus}.`,
+        "Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.",
+      ]);
   return verdict(
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
@@ -175,6 +189,30 @@ export function isReadOnlyDiagnosticCommand(command, root) {
     return args.length === 2
       && args[0] === "--check"
       && !args[1].startsWith("-")
+      && isProjectWritePath(args[1], root);
+  }
+  if (executable === "sha256sum") {
+    const path = args.length === 1
+      ? args[0]
+      : args.length === 2 && args[0] === "--"
+        ? args[1]
+        : null;
+    return typeof path === "string"
+      && !path.startsWith("-")
+      && isProjectWritePath(path, root);
+  }
+  if (executable === "shasum") {
+    return args.length === 3
+      && ["-a", "--algorithm"].includes(args[0])
+      && args[1] === "256"
+      && !args[2].startsWith("-")
+      && isProjectWritePath(args[2], root);
+  }
+  if (["certutil", "certutil.exe"].includes(executable)) {
+    return args.length === 3
+      && args[0].toLowerCase() === "-hashfile"
+      && !args[1].startsWith("-")
+      && args[2].toUpperCase() === "SHA256"
       && isProjectWritePath(args[1], root);
   }
   if (["ls", "rg", "grep", "cat", "head", "tail", "wc", "stat", "file"].includes(executable)) {
@@ -482,7 +520,14 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
     return toolName === "Bash"
       && isSanctionedLifecycleCommand(input.tool_input.command, root)
       ? verdict(0)
-      : blocked();
+      : blocked(
+        "GUARD-LIFECYCLE-NOT-READY",
+        error instanceof ProjectOnboardingReadyError
+          && error.code === "PORG-NOT-READY"
+          && error.intent === "session"
+          ? error.lifecycleStatus
+          : null,
+      );
   }
   return exactReadyReceipt(receipt) ? verdict(0) : blocked();
 }
