@@ -125,6 +125,12 @@
       "member": "guard-apply-patch"
     },
     {
+      "surfaceId": "guard:plugins/pipeline-core/hooks/guard-command-grammar.mjs:guard-command-grammar",
+      "kind": "guard",
+      "path": "plugins/pipeline-core/hooks/guard-command-grammar.mjs",
+      "member": "guard-command-grammar"
+    },
+    {
       "surfaceId": "guard:plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:guard-lifecycle-ready",
       "kind": "guard",
       "path": "plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs",
@@ -1490,6 +1496,7 @@
       "benefit": "A Codex-native hook bridge applies the available command and write-path policy without promising controls the host cannot provide.",
       "status": "host-dependent",
       "surfaceIds": [
+        "guard:plugins/pipeline-core/hooks/guard-command-grammar.mjs:guard-command-grammar",
         "guard:plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs:guard-lifecycle-ready",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:Bash:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
         "hook:plugins/pipeline-core/hooks/codex-hooks.json:PreToolUse:apply_patch|Edit|Write:node \"${PLUGIN_ROOT}/hooks/codex-pretool-guard.mjs\"",
