@@ -84,6 +84,19 @@ import * as osvScannerAdapter from "./security-adapters/osv-scanner.mjs";
 import * as semgrepAdapter from "./security-adapters/semgrep.mjs";
 import * as licenseCheckAdapter from "./security-adapters/license-check.mjs";
 
+// CYB-2E -- additive `pipeline.security-evidence.v2` policy-complete emission. Import-only:
+// none of these modules is edited by this task; every one is a pure, side-effect-free library.
+import {
+  evaluateAllCapabilities,
+  aggregateVerdict,
+  projectRunOutcomeToControlResult,
+  validateSecurityEvidenceV2,
+  SECURITY_EVIDENCE_V2_SCHEMA,
+  FINDING_SEVERITIES,
+} from "../../plugins/pipeline-core/lib/security-evidence-evaluator.mjs";
+import { buildCapabilityPlan } from "../../plugins/pipeline-core/lib/security-capability-plan-builder.mjs";
+import { resolveApplicableControls } from "../../plugins/pipeline-core/lib/security-policy-resolver.mjs";
+
 const DEFAULT_TIMEOUT_MS = 60000;
 const PREFLIGHT_TIMEOUT_MS = 5000;
 const DEFAULT_BLOCK_ON = ["critical", "high"];
@@ -387,6 +400,256 @@ function scannerEntry(adapter, result, executableSha256 = null) {
   return entry;
 }
 
+// =============================================================================================
+// CYB-2E -- additive `pipeline.security-evidence.v2` emission (EXIT-NEUTRAL; Option B / D9).
+//
+// Everything in this section reads ALREADY-COMPUTED v1 scan results and NEVER influences the
+// process exit code (finalized by the unchanged v1 blocking logic before any of this runs).
+// The v2 policy-complete `aggregateVerdict` is recorded for REPORTING ONLY this wave; the
+// exit-authority switch to it is CYB-2F. The whole build is additionally guarded at the call
+// site so a v2-construction fault degrades to a diagnostic and can never move the exit code.
+//
+// Envelope shape is dictated entirely by the imported (never edited) validators in
+// security-evidence-evaluator.mjs -- the closed v2 schema has no slot for the aggregate
+// verdict or a control-lane record, so those reporting-only artifacts are written to a
+// companion `security-latest.v2.verdict.json` and the envelope file itself stays a directly
+// `validateSecurityEvidenceV2`-passing document.
+// =============================================================================================
+
+function isNonEmptyStr(value) {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+// CYB-1F §3 grammar: cap.<family> or cap.<family>.<technique>; the plan operates on roots.
+function familyRoot(capabilityId) {
+  const dot = capabilityId.indexOf(".", "cap.".length);
+  return dot === -1 ? capabilityId : capabilityId.slice(0, dot);
+}
+
+const V2_RULE_PACK_REF = Object.freeze({
+  gitleaks: "gitleaks:builtin-default",
+  "osv-scanner": "osv-scanner:auto-detect",
+});
+
+/** Non-empty rule-pack/config ref per scanner (AC4 identity); semgrep's tracks its rules_dir. */
+function rulePackRefFor(key, manifest) {
+  if (key === "semgrep") {
+    const rel = manifest?.security?.scanners?.semgrep?.rules_dir;
+    return `semgrep:${isNonEmptyStr(rel) ? rel : "auto"}`;
+  }
+  return V2_RULE_PACK_REF[key] ?? `${key}:default`;
+}
+
+/**
+ * DESIGN LATITUDE (CYB-2E field-1 note): sources the L2 capability plan from the repo control
+ * catalog (governance/security-controls/catalog.json) at a baseline assurance default,
+ * activating exactly the modules whose controls require a capability THIS four-scanner suite
+ * can assess -- so the required set aligns with what the suite measures rather than surfacing
+ * capabilities (cap.dast/cap.container/...) no scanner here provides. Evidence-only under
+ * Option B: the plan never affects the exit code, so a non-empty required set showing
+ * `required-capability-missing` on a binary-less machine is the honest record, not a failure.
+ * Degrades to an empty plan (never throws) when the catalog is absent/malformed/unresolvable.
+ */
+function sourceCapabilityPlan(rootDir, suiteCapabilityIds) {
+  const emptyPlan = (source) => ({ plan: { required: [], optional: [], planDigest: null }, source, resolvedPolicyDigest: null });
+  let catalog;
+  try {
+    catalog = JSON.parse(readFileSync(join(rootDir, "governance", "security-controls", "catalog.json"), "utf8"));
+  } catch {
+    return emptyPlan("catalog-unavailable");
+  }
+  if (!catalog || !Array.isArray(catalog.controls) || !Array.isArray(catalog.moduleAttribution)) {
+    return emptyPlan("catalog-malformed");
+  }
+  const attrById = new Map(catalog.moduleAttribution.map((a) => [a?.controlId, a]));
+  const catalogEntries = [];
+  for (const control of catalog.controls) {
+    const attr = attrById.get(control?.id);
+    if (!attr) continue; // a control lacking module attribution cannot form a CatalogEntry
+    catalogEntries.push({ control, minAssuranceLevel: attr.minAssuranceLevel, module: attr.module });
+  }
+  const suite = new Set(suiteCapabilityIds);
+  const activated = new Set();
+  for (const { control, module } of catalogEntries) {
+    if (module === null) continue; // universal controls resolve at baseline regardless
+    const reqs = Array.isArray(control?.capabilityRequirements) ? control.capabilityRequirements : [];
+    if (reqs.some((id) => suite.has(familyRoot(id)))) activated.add(module);
+  }
+  try {
+    const resolved = resolveApplicableControls({
+      assuranceLevel: "baseline",
+      activatedModules: [...activated],
+      // Truthful for a real Git working tree; does NOT affect the plan's required/optional set
+      // (buildCapabilityPlan design-decision 4 ignores applicability), only the resolved-policy digest.
+      applicabilityInputs: { "repo.gitHistory": true },
+      catalogEntries,
+    });
+    return { plan: buildCapabilityPlan(resolved), source: "repo-catalog", resolvedPolicyDigest: resolved.digest };
+  } catch (err) {
+    return emptyPlan(`catalog-resolve-error: ${err?.message ?? err}`);
+  }
+}
+
+/** Coerces a v1 finding to a CLOSED, `validateFindingEnvelope`-passing v2 finding record. */
+function toV2Finding(f) {
+  return {
+    tool: isNonEmptyStr(f?.tool) ? f.tool : "unknown-tool",
+    severity: FINDING_SEVERITIES.includes(f?.severity) ? f.severity : "info",
+    rule: isNonEmptyStr(f?.rule) ? f.rule : "unknown-rule",
+    path: isNonEmptyStr(f?.path) ? f.path : "unknown-path",
+    line: Number.isInteger(f?.line) && f.line >= 1 ? f.line : null,
+    msg: isNonEmptyStr(f?.msg) ? f.msg : "finding",
+  };
+}
+
+/** Builds a CLOSED, `validateCoverageRecord`-passing coverage record (every AC6 key present). */
+function v2Coverage(entry, snapshotAt) {
+  const exclusions = Array.isArray(entry?.coverage?.exclusions)
+    ? entry.coverage.exclusions.filter((x) => typeof x === "string")
+    : [];
+  return {
+    subject: isNonEmptyStr(entry?.coverage?.subject) ? entry.coverage.subject : "candidate-tree",
+    exclusions,
+    ignored: [],
+    unsupportedScope: [],
+    truncation: { truncated: false, scannedFileCount: null, totalEligibleFileCount: null },
+    dataAge: { ageSeconds: 0, snapshotAt: isNonEmptyStr(snapshotAt) ? snapshotAt : null },
+  };
+}
+
+/** Builds one CLOSED, `validateCapabilityRecord`-passing per-capability record. */
+function v2CapabilityRecord(entry, capabilityId, rulePackRef, allFindings, snapshotAt) {
+  return {
+    capabilityId,
+    tool: { name: entry.tool, version: null },
+    rulePack: { ref: rulePackRef, digest: null },
+    status: entry.status,
+    classification: isNonEmptyStr(entry.classification) ? entry.classification : "unspecified",
+    findings: allFindings.filter((f) => f?.tool === entry.tool).map(toV2Finding),
+    coverage: v2Coverage(entry, snapshotAt),
+    reason: entry.reason ?? null,
+  };
+}
+
+/**
+ * Control-lane status -> RUN_OUTCOMES translation for a kind:"control" adapter (license-check:
+ * capabilityId null, not a cap.* the capability evaluator processes). DELIBERATELY mirrors the
+ * sanctioned evaluateCapability() status switch verbatim (a fidelity test in the new suite
+ * asserts equivalence to catch drift); kept separate rather than shoehorning a control through
+ * the capability evaluator with a synthetic id. Always returns a RUN_OUTCOMES member.
+ */
+function controlRunOutcome(entry, { required, candidateUncertain, raw }) {
+  if (candidateUncertain) return "invalid";
+  if (entry.classification === "unsupported_ecosystem") return "unsupported";
+  if (entry.classification === "execution_environment") return "execution-unavailable";
+  switch (entry.status) {
+    case "SKIPPED": return required ? "required-capability-missing" : "not-applicable";
+    case "ERROR": return raw != null ? "invalid" : "execution-unavailable";
+    case "FINDINGS": return "findings";
+    case "PASS": return "pass";
+    default: return "invalid";
+  }
+}
+
+/**
+ * Assembles the additive v2 artifacts from already-computed v1 results. Returns
+ * `{ emitted, envelope?, verdict?, valid?, validationErrors?, reason? }`. Pure w.r.t. the
+ * process (no exit/exitCode access); the only IO is reading the repo catalog (via
+ * sourceCapabilityPlan). Emits nothing when there is no Git candidate identity (the v2 `input`
+ * identity fields would be absent) or no capability-kind scanner ran (a valid envelope needs
+ * >= 1 capability record).
+ */
+function buildSecurityEvidenceV2({ rootDir, evidence, exitCode, scanners, findings, manifest, candidateUncertain, platform, rawByTool }) {
+  const candidate = evidence.candidate ?? {};
+  if (!isNonEmptyStr(candidate.commit) || !isNonEmptyStr(candidate.tree) || !isNonEmptyStr(candidate.inputSha256)) {
+    return { emitted: false, reason: "no Git candidate identity (commit/tree/inputSha256); v2 input identity is unavailable" };
+  }
+
+  // Partition the ATTEMPTED scanners into capability vs control lanes via each adapter's
+  // CAPABILITY_CONTRACT_V2 (gitleaks->cap.secrets, osv-scanner->cap.sca, semgrep->cap.sast,
+  // license-check-> kind:"control"/capabilityId:null).
+  const capabilityDefs = [];
+  const controlDefs = [];
+  for (const { key, adapter } of SCANNER_DEFS) {
+    const contract = adapter.CAPABILITY_CONTRACT_V2;
+    const entry = scanners.find((s) => s.tool === adapter.name);
+    if (!entry || !contract) continue; // disabled / not attempted
+    if (contract.kind === "capability") capabilityDefs.push({ key, entry, contract });
+    else if (contract.kind === "control") controlDefs.push({ key, entry, contract });
+  }
+  if (capabilityDefs.length === 0) {
+    return { emitted: false, reason: "no capability-kind scanner attempted; a valid v2 envelope requires >= 1 capability record" };
+  }
+
+  const snapshotAt = evidence.finishedAt;
+  const { plan, source: planSource, resolvedPolicyDigest } = sourceCapabilityPlan(rootDir, capabilityDefs.map((d) => d.contract.capabilityId));
+
+  // v1-shaped evaluator candidate -> per-capability L3 outcomes -> aggregate verdict.
+  // A candidate the plan can no longer be trusted against (dirty / mutated / uncertain) poisons
+  // every capability to "invalid" via candidateBinding (matches the evaluator's own AC1 rule).
+  const evalCandidate = {
+    capabilities: capabilityDefs.map(({ entry, contract }) => ({
+      id: contract.capabilityId,
+      tool: entry.tool,
+      status: entry.status,
+      classification: entry.classification,
+      findings: findings.filter((f) => f?.tool === entry.tool),
+      raw: rawByTool[entry.tool] ?? null,
+      reason: entry.reason ?? null,
+    })),
+  };
+  if (candidateUncertain) {
+    evalCandidate.candidateBinding = { matches: false, plannedTree: candidate.tree ?? null, observedTree: null };
+  }
+  const capabilityOutcomes = evaluateAllCapabilities(evalCandidate, plan);
+  const verdict = aggregateVerdict(capabilityOutcomes, plan);
+
+  // The closed, validated v2 envelope (per-capability records only).
+  const envelope = {
+    schema: SECURITY_EVIDENCE_V2_SCHEMA,
+    policy: { configurationSha256: evidence.policy?.configurationSha256 },
+    input: { commit: candidate.commit, tree: candidate.tree, inputSha256: candidate.inputSha256 },
+    environment: { platform, nodeVersion: process.version },
+    capabilities: capabilityDefs.map(({ key, entry, contract }) =>
+      v2CapabilityRecord(entry, contract.capabilityId, rulePackRefFor(key, manifest), findings, snapshotAt)),
+  };
+  const validation = validateSecurityEvidenceV2(envelope);
+
+  // Control lane (license-check): run-outcome -> control-result projection. `required` is
+  // derived from whether the adapter's contract binds a catalog control (controlRef); today
+  // license-check has no catalog control (its own contract's controlRef is null).
+  const controls = controlDefs.map(({ entry, contract }) => {
+    const required = contract.controlRef != null;
+    const runOutcome = controlRunOutcome(entry, { required, candidateUncertain, raw: rawByTool[entry.tool] ?? null });
+    return {
+      control: entry.tool,
+      tool: entry.tool,
+      capabilityId: contract.capabilityId,
+      controlRef: contract.controlRef ?? null,
+      required,
+      status: entry.status,
+      classification: entry.classification,
+      runOutcome,
+      controlResult: projectRunOutcomeToControlResult(runOutcome, { required }),
+      reason: entry.reason ?? null,
+    };
+  });
+
+  const verdictDoc = {
+    schema: "pipeline.security-verdict.v2",
+    producedFrom: SECURITY_EVIDENCE_V2_SCHEMA,
+    exitAuthority: "v1-blocking-logic",
+    note: "CYB-2E Option B (D9): this policy-complete v2 verdict is evidence/reporting only and does NOT govern the process exit code this wave; the exit-authority switch to the v2 verdict is CYB-2F.",
+    v1ExitCode: exitCode,
+    plan: { required: plan.required, optional: plan.optional, planDigest: plan.planDigest, source: planSource, resolvedPolicyDigest },
+    capabilityOutcomes,
+    verdict,
+    controls,
+  };
+
+  return { emitted: true, envelope, verdict: verdictDoc, valid: validation.valid, validationErrors: validation.errors ?? null };
+}
+
 // ---------------------------------------------------------------------------------------------
 // Orchestration core (exported: the CLI's own main() is a thin wrapper around this).
 // ---------------------------------------------------------------------------------------------
@@ -439,6 +702,11 @@ export async function runSecurityScan({
 
   const scanners = [];
   const findings = [];
+  // CYB-2E: captured per-tool raw scanner output, used ONLY by the downstream (exit-neutral)
+  // v2 evaluator to distinguish an ERROR that produced malformed output (`raw != null` ->
+  // "invalid") from one that never produced output (`raw == null` -> "execution-unavailable").
+  // Never read by the v1 evidence or the exit-code logic.
+  const rawByTool = {};
   const childProcessPreflight = scanRoot
     ? runChildProcessPreflight({ rootDir: scanRoot, timeoutMs, spawnFn })
     : { status: "ERROR", classification: "candidate_snapshot", reason: snapshot.reason };
@@ -489,6 +757,7 @@ export async function runSecurityScan({
         const runArgs = { rootDir: scanRoot, config: adapterConfig, timeoutMs, env };
         if (spawnFn) runArgs.spawnFn = spawnFn;
         const result = await adapter.run(runArgs);
+        rawByTool[adapter.name] = result.raw ?? null; // CYB-2E: additive capture (see decl above)
         entry = scannerEntry(adapter, result, fileSha256(inst.path));
         findings.push(...result.findings);
       }
@@ -561,7 +830,30 @@ export async function runSecurityScan({
   mkdirSync(evidenceDir, { recursive: true });
   writeFileSync(join(evidenceDir, "security-latest.json"), JSON.stringify(evidence, null, 2) + "\n");
 
-  return { evidence, exitCode };
+  // -------------------------------------------------------------------------------------------
+  // CYB-2E -- additive, EXIT-NEUTRAL v2 emission. `exitCode` above is already final and is NOT
+  // reassigned anywhere below. The v2 policy-complete verdict is recorded for REPORTING ONLY
+  // (Option B / D9). Guarded so any v2 fault degrades to a diagnostic without moving the exit
+  // code or crashing the run (runSecurityScan's "never throws" contract, on which verify.mjs
+  // and guard-push.mjs depend).
+  // -------------------------------------------------------------------------------------------
+  let evidenceV2 = null;
+  let verdictV2 = null;
+  try {
+    const v2 = buildSecurityEvidenceV2({ rootDir, evidence, exitCode, scanners, findings, manifest, candidateUncertain, platform, rawByTool });
+    if (v2.emitted && v2.valid) {
+      evidenceV2 = v2.envelope;
+      verdictV2 = v2.verdict;
+      writeFileSync(join(evidenceDir, "security-latest.v2.json"), JSON.stringify(v2.envelope, null, 2) + "\n");
+      writeFileSync(join(evidenceDir, "security-latest.v2.verdict.json"), JSON.stringify(v2.verdict, null, 2) + "\n");
+    } else if (v2.emitted && !v2.valid) {
+      process.stderr.write(`security-scan: v2 envelope failed self-validation, not written: ${JSON.stringify(v2.validationErrors)}\n`);
+    }
+  } catch (err) {
+    process.stderr.write(`security-scan: v2 evidence emission skipped (non-fatal, exit code unchanged): ${err?.message ?? err}\n`);
+  }
+
+  return { evidence, exitCode, evidenceV2, verdictV2 };
 }
 
 function statusLabel(status) {
@@ -627,9 +919,17 @@ export async function main(argv = process.argv.slice(2)) {
     return;
   }
 
-  const { evidence, exitCode } = await runSecurityScan({ rootDir, timeoutMs: opts.timeoutMs });
+  const { evidence, exitCode, evidenceV2, verdictV2 } = await runSecurityScan({ rootDir, timeoutMs: opts.timeoutMs });
   printSummary(evidence);
   console.log(`Evidence written: ${join(rootDir, "evidence", "security-latest.json")}`);
+  if (evidenceV2) {
+    console.log(`v2 evidence written: ${join(rootDir, "evidence", "security-latest.v2.json")}`);
+    const b = verdictV2?.verdict;
+    console.log(
+      `v2 policy-complete verdict (reporting-only, does NOT affect exit ${exitCode}): ` +
+        `${b?.blocking ? "BLOCKING" : "clean"} (${b?.offendingCapabilities?.length ?? 0} offending required capabilities)`,
+    );
+  }
   process.exitCode = exitCode;
 }
 
