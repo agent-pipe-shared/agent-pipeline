@@ -1,6 +1,7 @@
 # ADR-0038: Runner-neutral advisory duty v3
 
-**Status:** accepted · **Date:** 2026-07-19
+**Status:** accepted route registry; session-trigger semantics superseded by
+ADR-0047 · **Date:** 2026-07-19
 
 ## Context
 
@@ -40,10 +41,10 @@ V2 is not activated. A one-way V3 migration replaces it:
 ## Consequences
 
 ADR-0036 remains the historical V2 record but is not an activation authority.
-Fresh sessions must validate `pipeline.user.v3`, a no-op runtime projection,
-the selected V3 profile, and the advisory receipt before writable work. Missing
-or invalid advisory evidence fails closed and cannot create a review, readiness,
-gate, or conformance claim.
+The V3 route/fallback registry remains frozen. ADR-0047 supersedes the
+requirement for fresh sessions to execute that route or require a consultation
+receipt before writable work. Fresh sessions instead produce model-free
+capability evidence; only a concrete demand may execute the V3 route.
 
 ## Discarded alternatives
 

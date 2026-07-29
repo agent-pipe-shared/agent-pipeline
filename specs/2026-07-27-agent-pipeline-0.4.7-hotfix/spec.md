@@ -1,19 +1,137 @@
 # Technical specification — Agent Pipeline 0.4.7 hotfix
 
-Status: `multi-generation authority recovery approved and implemented on
-2026-07-29; focused State-writer and V4 regressions are green; final
-digest-bound authority, Critic and local installed readback remain gated`.
+Status: `expanded 0.4.7 corrective implementation candidate in progress on
+2026-07-29; the final stabilized PRD/Spec bytes require a fresh digest-bound
+PO selection before candidate freeze`.
 
 This specification implements the neighboring
 [PRD](prd_agent-pipeline-0.4.7-hotfix.md) against exact base
 `9d1b3dc108eb77629ace5b82002120f5539abd8d`. It is intentionally independent
 of Sprint Nova and Pull Request #64.
 
-## 0. Superseding candidate truth — 2026-07-29
+## 0. Final expanded release authority — 2026-07-29
 
-This section and AC-047-30 through AC-047-50 supersede conflicting candidate,
-scope, and delivery statements below. The older sections remain as historical
-design/audit context so removed scope is explicit rather than silently erased.
+This section supersedes the historical narrowed disposition in section 0A and
+every conflicting historical status statement below. The Human/PO activated
+this scope; after the implementation documents stop changing, their exact
+final digests must be selected again through the sanctioned authority writer.
+
+Implementation continues from the published corrective baseline
+`41c09045e73b95988a335bcf1c476734f7785302`. The following criteria are
+normative release requirements:
+
+| Scope | Normative acceptance |
+| --- | --- |
+| Issue #70, backlog admission | AC-047-01–02 and H1 |
+| Issue #63, V4 source/manifest recovery | AC-047-03–08 and H3 |
+| Issue #73 retained bootstrap/runtime/cleanup repair | AC-047-09–15, AC-047-27–50 and H2/retained lifecycle slices |
+| Issue #71, reactive WSL IPC compatibility | AC-047-16–23 and H4 |
+| Discovered kickoff-authority classification | AC-047-51 |
+| Issue #77, unified close ordering | AC-047-52–60 and H5 |
+| Issue #80, Advisor lifecycle split | AC-047-24, AC-047-61–68 and H6 |
+
+The Host Advisor policy uses 180,000/90,000 ms only for a valid on-demand
+consultation. Bootstrap uses a separate model-free preflight with no prompt,
+child, export, receipt or consultation budget. Issue #72/native Apple Silicon
+remains a non-gating follow-up.
+
+Because this scope changes security, lifecycle, generated-authority and
+machine-local configuration surfaces, the final immutable commit/tree requires
+fresh candidate-bound Full Verify, blocking Security and independent high-risk
+Critic evidence. No earlier Full-Verify/Security run can authorize the expanded
+candidate.
+
+### AC-047-51 — Unapproved kickoff authority
+
+WHEN the sanctioned kickoff writer produces `planApproved:false` and omits the
+approval object, THE onboarding classifier SHALL treat persisted PO authority
+as absent and continue the valid unapproved design boundary. WHEN approval is
+true, contradictory, malformed, or only partially present, THE classifier
+SHALL remain fail-closed. The production observer and a process fixture SHALL
+cover both paths.
+
+### AC-047-52–60 — Unified close coordinator (#77)
+
+- **AC-047-52 — One close state model:** THE SYSTEM SHALL expose one
+  versioned transition table for session checkpoint, feature close, tracked
+  close finalization, candidate freeze, final Verify, optional publication,
+  exact readback, cleanup, local/delivered terminal state, and later
+  release/promotion.
+- **AC-047-53 — Checkpoint separation:** WHEN unfinished work is checkpointed
+  or a session ends, THE SYSTEM SHALL preserve the active feature and SHALL
+  NOT require commit, feature completion, publication, or cleanup beyond the
+  exact session-owned resources selected by the checkpoint.
+- **AC-047-54 — Freeze ordering:** WHEN a feature is completed, every tracked
+  Result, backlog, handover, history, telemetry, retrospective and close-State
+  mutation SHALL occur before the single final candidate commit/tree is frozen.
+- **AC-047-55 — Exact final Verify:** WHEN the candidate is frozen, final
+  Verify/Security SHALL bind that exact immutable commit/tree. Any later
+  tracked mutation invalidates the verified phase and blocks publication.
+- **AC-047-56 — Optional publication:** WHEN publication is absent,
+  unconfigured, or not authorized, THE coordinator SHALL terminate as
+  `closed-local` without a remote effect; `final-verify-green` is the durable
+  ready-to-publish posture before that local terminal. WHEN publication is
+  authorized, it SHALL push at most the exact verified candidate and require
+  matching fetch/readback before `delivered`.
+- **AC-047-57 — Independent human gates:** Implementation, commit,
+  publication, merge, release and promotion authorizations SHALL remain
+  distinct and SHALL NOT be inferred from session end or another transition.
+- **AC-047-58 — Cleanup ordering:** Cleanup SHALL release only exact
+  session-owned resources and SHALL NOT mutate the tracked candidate after
+  final Verify or delivery. Cleanup uncertainty is typed and cannot fabricate
+  a delivered or closed terminal.
+- **AC-047-59 — Restart-safe idempotency:** Interrupted or repeated
+  checkpoint, close, Verify, publication, readback and cleanup operations SHALL
+  resume from the last durable phase and SHALL create at most one final
+  candidate commit and one publication per authorized channel.
+- **AC-047-60 — Unified UX and fixtures:** `close-feature`, `close-block`,
+  Stop-hook guidance, session-close checklist, publication journal and session
+  cleanup SHALL consume the same transition order. Process fixtures SHALL
+  cover unfinished checkpoint, local-only close, commit/no-push, authorized
+  delivery, push failure, readback mismatch, post-Verify mutation,
+  interruption, replay and optional release/promotion.
+
+### AC-047-61–68 — Model-free Advisor preflight and on-demand consultation (#80)
+
+- **AC-047-61 — Versioned authority split:** THE SYSTEM SHALL retain the
+  frozen `pipeline.runner-profiles.v3` route/fallback meaning and SHALL add a
+  closed versioned lifecycle authority rather than reinterpret V3 in place.
+- **AC-047-62 — Zero-model bootstrap:** WHEN Epic or Feature bootstrap,
+  restart, resume, re-entry or Compact observes Advisor capability, THE SYSTEM
+  SHALL launch zero Advisor children, make zero model requests, export no
+  question, create no consultation receipt and consume zero consultation
+  budget. Mini or declined consent SHALL be disabled before those effects.
+- **AC-047-63 — Honest bounded capability:** THE model-free preflight SHALL
+  report exactly `available|degraded|unavailable|disabled|unknown`, explicit
+  assurance and primary/fallback disposition bound to both lifecycle-policy
+  and V3 route digests. A configured but unprobed route SHALL be `unknown`.
+- **AC-047-64 — Concrete demand gate:** WHEN consultation is requested, THE
+  SYSTEM SHALL require exactly one concrete question, one allowlisted reason,
+  bounded evidence and a closed demand binding their digests to runner,
+  profile, dispatch candidate, lifecycle policy and V3 route before any model
+  effect.
+- **AC-047-65 — Closed non-triggers:** Session start, profile selection,
+  restart, resume, re-entry, Compact, unchanged handover, configured route and
+  consent alone SHALL NOT create a consultation demand or invoke an adapter.
+- **AC-047-66 — Reuse and drift:** WHEN a prior consultation record has the
+  same reuse-key digest, THE SYSTEM SHALL make no repeat model request. A
+  changed question, reason, evidence, candidate or route-policy digest SHALL
+  invalidate reuse and require a new demand.
+- **AC-047-67 — Runner-neutral semantics:** Claude and Codex SHALL share the
+  same demand/non-trigger/reuse semantics while retaining their registered
+  same-runner adapters, isolation, consent and sanitized evidence contracts.
+  Only an actual Codex consultation MAY consume the AC-047-24 budgets.
+- **AC-047-68 — Process evidence:** Unit, contract and process fixtures SHALL
+  prove zero model effects for bootstrap/resume/re-entry/Compact, fail-closed
+  demand mismatch, no-repeat reuse, material-drift invalidation, and one
+  valid demand reaching each runner-specific route without making capability
+  state a consultation or readiness claim.
+
+## 0A. Historical narrowed candidate truth — 2026-07-29
+
+This section records the earlier narrowed scope and is superseded by section 0.
+It remains as historical design/audit context so the prior deferral is not
+silently erased.
 
 The implementation baseline is commit
 `0f36072f5250708e59d200ef802bdfdba92adccf`, tree
@@ -85,17 +203,17 @@ cases; both changed-file syntax checks and `git diff --check` passed. These are
 focused correction-delta results, not a replacement or rerun of the retained
 `0f36072` Full Verify/Security baseline.
 
-### 0.1 Deferred-work register
+### 0.1 Historical deferred-work register (fully superseded)
 
-| Deferred acceptance criteria | Accountable owner | Mandatory re-decision |
-| --- | --- | --- |
-| AC-047-01–02 | Agent Pipeline Human/PO | 2026-08-15, or earlier at 0.4.8 planning |
-| AC-047-03–08 | Agent Pipeline Human/PO plus Pipeline security reviewer | 2026-08-15, or earlier at 0.4.8 planning |
-| AC-047-16–23 | Agent Pipeline Human/PO plus Windows/WSL platform owner | 2026-08-15, or immediately after a reproduced native IPC blocker |
-| AC-047-24 | Agent Pipeline Human/PO plus runtime owner | 2026-08-15, or before an Advisor routing change |
+| Formerly deferred acceptance criteria | Current disposition |
+| --- | --- |
+| AC-047-01–02 | Activated in 0.4.7 by the final expanded authority; H1 is required. |
+| AC-047-03–08 | Activated in 0.4.7 by the final expanded authority; H3 is required. |
+| AC-047-16–23 | Activated in 0.4.7 by the final expanded authority; H4 is required. |
+| AC-047-24 | Activated with Issue #80; H6 is required and its budgets are consultation-only. |
 
-At the deadline each owner must admit the item into a fresh approved design or
-renew the deferral with a new date and rationale.
+All earlier deferrals are historical provenance and grant no omission from
+this candidate.
 
 ### AC-047-30–34 — Candidate-preserving PO authority decision
 
@@ -275,6 +393,12 @@ release, packaging, installation or platform-evidence claim.
 | `047-ORG` | AC-047-39–40 | `plugins/pipeline-core/hooks/guard-push.mjs` | AC-047-39 implemented and covered; AC-047-40 remains the post-push real-origin readback gate |
 | `047-HOV` | AC-047-41–47 | `plugins/pipeline-core/lib/human-guard-override.mjs`, `plugins/pipeline-core/scripts/guard-human-override.mjs`, central Codex guard adapter | Implemented; plan/authorize/single consume, authenticated private audit, exclusions and platform-assurance fixtures covered |
 | `047-ARB-MG` | AC-047-48–50 | `plugins/pipeline-core/scripts/pipeline-state.mjs`, authority-decision fixtures and V4 lifecycle readback | Implemented; historical surfaces are structurally validated, current profile/documents remain strict, Phoenix/Nova convergence and negative fixtures pass |
+| `047-BLG` | AC-047-01–02 | canonical backlog event/projection writer and checker | Implemented; exact initial event, projection CAS, rollback/replay and focused checker readback covered |
+| `047-SMR` | AC-047-03–08 | V4 source diagnosis, absent-manifest planner/apply and lifecycle guard | Implemented; closed source categories, absent-only publication, race rollback and ready readback covered |
+| `047-IPC` | AC-047-16–23 | typed sandbox failure, fixed probe, profile transaction and session controller | Implemented; unit/process coverage is green and the pre-install native WSL standard probe is current; confirmed apply and post-install paired native evidence remain Human-gated |
+| `047-KOF` | AC-047-51 | V4 onboarding authority classifier | Implemented; unapproved kickoff remains a valid design boundary while contradictory approval fails closed |
+| `047-CLO` | AC-047-52–60 | private close coordinator, State bridge, Stop guidance and compatibility skills | Implemented; local/delivery process fixtures, replay, drift, cleanup uncertainty, readback and separate release/promotion gates are green |
+| `047-ADV` | AC-047-24, AC-047-61–68 | V2 Advisor lifecycle, model-free preflight, demand/reuse coordinator and skills | In progress; zero-model bootstrap and demand-only runner contracts are implemented, focused evidence remains to be finalized |
 | `047-INT` | AC-047-26 | Verify registration, threat model, package/version/readback evidence | Verify registration and threat model present; immutable-candidate Verify/Security/Critic/package/install evidence remains open |
 
 The attended override threat model is
@@ -293,17 +417,20 @@ it is not a plan approval, release claim, or authorization to dispatch.
   Critic round failed for missing persisted-State postimage validation and a
   rollback path; the follow-up adds both. That follow-up still requires a fresh
   candidate-bound Critic review and all applicable candidate gates.
-- H3 and H4 remain planned work: the current tree does not yet expose the
+- At that historical baseline, H3 and H4 remained planned work: that tree did
+  not yet expose the
   specified `plan-source-recovery`, `plan-manifest-repair`,
   `apply-manifest-repair`, or WSL IPC compatibility controller surfaces.
-- H5 remains incomplete: the active host-Advisor route still declares
-  60,000/45,000 ms attempts, not the required 180,000/90,000 ms policy.
+- The later H5 close coordinator was not yet present. The separate H6 Advisor
+  proposal had not been accepted at that historical baseline; it was
+  subsequently activated through Issue #80 and section 0.
 
 This subsection and the detailed historical design below are retained as
 provenance. They do not override the dispositions in section 0. In particular,
-AC-047-01–08 and AC-047-16–24 are deferred and are not current release
-requirements. No focused evidence may be reused as immutable-candidate,
-release, platform, or approval evidence after any candidate byte changes.
+AC-047-01–68, including AC-047-24, are now current release requirements. No
+focused evidence may be reused as
+immutable-candidate, release, platform, or approval evidence after any
+candidate byte changes.
 
 ## 1. Invariants
 
@@ -343,13 +470,15 @@ The implementation must preserve these release-wide invariants:
     but only a neutral plan plus an explicitly confirmed digest-bound writer
     may converge them; structural validation is never relaxed for current
     documents, paths, profiles, State or Continuity.
+15. Bootstrap Advisor capability observation is model-free and cannot create
+    a consultation demand, child, model request, export, receipt or timeout
+    spend. Actual consultation requires a current V2 demand.
 
 ## Historical acceptance-criterion definitions (EARS)
 
 These original definitions preserve identifier history. Their current
-normative disposition is the table in section 0: only AC-047-09–15 and
-AC-047-25–29 are retained from this block; AC-047-01–08 and AC-047-16–24 are
-deferred. AC-047-30–50 above are the new normative repair contract.
+normative disposition is the table in section 0: AC-047-01–68, including
+AC-047-24, are required for 0.4.7.
 
 - **AC-047-01 — Backlog admission:** WHEN the canonical backlog checker reads
   the 0.4.7 candidate, THE SYSTEM SHALL find exactly one valid initial
@@ -405,16 +534,19 @@ deferred. AC-047-30–50 above are the new normative repair contract.
   persistence, barrier, launch-ticket, or readback fails, THE SYSTEM SHALL
   preserve a distinct sanitized phase/code and SHALL NOT misattribute every
   failure to barrier persistence.
-- **AC-047-16 — Native-first session:** WHEN a new WSL session starts, THE
-  SYSTEM SHALL route its first eligible real operation through the native
-  standard sandbox regardless of platform/version, installed fallback profile,
-  or prior-session evidence.
+- **AC-047-16 — Nested-standard-first Elephant session:** WHEN a new Elephant
+  session under WSL starts, THE SYSTEM SHALL route its first eligible real
+  nested operation through the Codex standard sandbox regardless of
+  platform/version, installed fallback profile, direct-host observations, or
+  prior-session evidence.
 - **AC-047-17 — Reactive IPC trigger:** WHEN and only when the current session's
-  real native operation returns either the typed
+  real operation at execution boundary `nested-codex-sandbox` under the native
+  standard posture returns either the typed
   `unix_socket_bind_denied` cause or a structurally plausible
   `sandbox_permission_denied_unknown` with OS code `EPERM`, THE SYSTEM SHALL
   preserve that original result and run the fixed model-free compatibility
-  verifier without parsing stderr.
+  verifier without parsing stderr. A direct-host success or failure SHALL NOT
+  activate, pre-activate, suppress, or consume this trigger.
 - **AC-047-18 — IPC confirmation:** WHEN the verifier runs, THE SYSTEM SHALL
   classify the workaround as confirmed only if workspace temporary-file
   creation succeeds and AF_UNIX listen/bind reproduces a structured
@@ -437,17 +569,21 @@ deferred. AC-047-30–50 above are the new normative repair contract.
   of partial effects, THE SYSTEM MAY retry it once under the validated profile;
   OTHERWISE THE SYSTEM SHALL preserve the original non-success and use the
   profile only for a later eligible operation.
-- **AC-047-22 — Automatic retirement:** WHEN a later session's native sandbox
-  succeeds because Codex or the environment is fixed, THE SYSTEM SHALL not run
-  the verifier or select the dormant compatibility profile.
+- **AC-047-22 — Automatic non-use after repair:** WHEN a later new Elephant
+  session's first eligible nested operation succeeds in the standard sandbox
+  because Codex, WSL, or the environment is fixed, THE SYSTEM SHALL not run the
+  verifier or select the dormant compatibility profile. No version heuristic,
+  direct-host probe, or uninstall is required for that session-level
+  retirement.
 - **AC-047-23 — Narrow-duty isolation:** WHEN Advisor, readiness, Critic,
   review, validation, or security duties run, THE SYSTEM SHALL use their
   independently required narrow profiles and SHALL NOT inherit the WSL
   compatibility profile.
-- **AC-047-24 — Advisor budgets:** WHEN bootstrap invokes the Codex Advisor,
-  THE SYSTEM SHALL allow one 180,000 ms primary attempt and one 90,000 ms
-  fallback attempt while retaining the existing models, efforts, isolation,
-  digest checks, maximum attempt count, and non-blocking exhaustion result.
+- **AC-047-24 — Advisor budgets:** WHEN a valid on-demand Codex consultation
+  invokes the Advisor, THE SYSTEM SHALL allow one 180,000 ms primary attempt
+  and one 90,000 ms fallback attempt while retaining the existing models,
+  efforts, isolation, digest checks, maximum attempt count, and non-blocking
+  exhaustion result. Bootstrap SHALL consume neither budget.
 - **AC-047-25 — Nova exclusion:** WHEN the 0.4.7 candidate diff is audited, THE
   SYSTEM SHALL contain none of PR #64's Nova state, lifecycle, specs, backlog
   evidence, candidate evidence, or unrelated implementation.
@@ -1103,10 +1239,12 @@ The result binds:
 - session activation status; and
 - next action.
 
-Every new session begins in `standard`; persisted profile presence does not
-imply active fallback. The first eligible real operation is routed through the
-native standard sandbox. The controller does not run an eager probe or select
-by platform/version.
+Every new Elephant session begins in `standard`; persisted profile presence
+does not imply active fallback. The first eligible real nested operation is
+routed through the native standard Codex sandbox. Direct-host observations are
+outside this activation boundary and do not consume the nested-standard-first
+attempt. The controller does not run an eager probe or select by
+platform/version.
 
 Closed operation classes are:
 
@@ -1141,6 +1279,7 @@ plausible-unknown:
 
 both:
   originLayer = native-standard
+  executionBoundary = nested-codex-sandbox
   session = current
 ```
 
@@ -1149,7 +1288,8 @@ error properties. The unknown form is eligible only when the invoking
 operation contract already declares local IPC as a capability; free-form
 stderr cannot establish plausibility. A generic process exit, filesystem
 permission error, platform/version match, historical receipt, or string
-containing `EPERM` is not a trigger.
+containing `EPERM` is not a trigger. A structurally identical result observed
+at `host-direct` or an unknown execution boundary is also not a trigger.
 
 The verifier is a fixed shipped payload invoked through the same native
 standard sandbox
@@ -1198,6 +1338,7 @@ locationClass
 runnerClass
 adapterTrace[]
 originLayer
+executionBoundary
 permissionPosture
 evidenceSource
 probeVersion
@@ -1218,6 +1359,7 @@ resourceClass = af-unix-socket
 locationClass = system-temp
 runnerClass = codex
 originLayer = native-standard
+executionBoundary = nested-codex-sandbox
 permissionPosture = standard
 evidenceSource = direct|fixed-probe
 ```
@@ -1271,22 +1413,47 @@ the exact resolved `CODEX_HOME`:
 
 1. `plan-profile` reads and validates current config/profile state;
 2. preview shows the exact owned-key addition, preimage digest, postimage
-   digest, dangerous-key warning, and unchanged-key proof;
+   digest, dangerous-key warning, unchanged-key proof, and the exact strict
+   inline-profile sandbox validator;
+   when the active configuration omits `default_permissions`, the plan must
+   also show the owned materialization `default_permissions = ":workspace"`
+   that Codex requires before it accepts a named profile; the probe-bound
+   effective standard remains `:workspace`, and the compatibility profile
+   must never become the default;
 3. apply requires exact plan digest and explicit confirmation;
 4. apply preserves unrelated bytes/keys and refuses ambiguous or unsupported
    configuration;
-5. atomic write/readback validates Codex's own strict configuration parser;
+5. atomic write/readback re-reads and digest-checks the actually published
+   bytes, loads an exact copy through Codex's strict configuration parser in
+   an empty private temporary `CODEX_HOME`, and then loads the published
+   profile through a bounded local sandbox no-op; the strict Doctor therefore
+   cannot scan the operator's active network, auth, databases, updates,
+   app-server or rollout inventory;
 6. profile definition is installed but not selected as
-   `default_permissions`; and
+   `default_permissions`; an absent default may only be materialized as the
+   equivalent standard `:workspace` value; and
 7. successful readback publishes an operator-approval receipt bound to the
    profile name, exact config pre/postimage digests, profile digest, dangerous
    key set, approval actor, and approval time; and
 8. failure restores the exact preimage or returns typed recovery state.
 
 The custom profile reproduces the standard workspace filesystem permissions
-using supported permission-profile primitives and adds only Unix-socket
-compatibility. It defines no allowed external domain, non-loopback listener,
-upstream proxy, SOCKS widening, credential path, or additional workspace root.
+using supported permission-profile primitives and adds only
+`network.enabled = true` plus Unix-socket compatibility. Codex requires the
+network policy to be enabled before the Unix-socket rule can take effect.
+Because the profile defines no domain `allow` entry, `allow_local_binding`,
+non-loopback listener, upstream-proxy override, SOCKS widening, credential
+path, or additional workspace root, it permits no external destination.
+
+If an earlier Pipeline-owned 0.4.7 candidate installed the exact profile block
+without `network.enabled`, the planner may return an `upgrade` only when the
+physical private approval receipt exactly binds that legacy block, current
+config, Codex executable, effective `:workspace` default, and legacy profile
+digest. The new plan binds the prior receipt digest and exact replacement
+block. Apply atomically replaces only the Pipeline-owned block and receipt;
+failure restores both exact preimages. Any unknown block, missing/drifted
+receipt, link, duplicate profile, or non-owned field fails closed as
+`recovery-required` or `validation-required`.
 
 The currently documented broad fallback key
 `dangerously_allow_all_unix_sockets = true` is permitted only when:
@@ -1299,8 +1466,10 @@ The currently documented broad fallback key
 
 This key permits the sandboxed command to reach local Unix-socket daemons that
 the standard allowlist would block. It does not by itself allow external
-network domains, but the local-daemon exposure is material and must appear in
-the preview, approval receipt, PRD risk, and session activation readback.
+network domains. `network.enabled = true` changes the sandbox network policy,
+but with no domain allow entries Codex continues to deny every external
+destination. The local-daemon exposure remains material and must appear in the
+preview, approval receipt, PRD risk, and session activation readback.
 
 ### 7.5 Session activation
 
@@ -1344,12 +1513,15 @@ selected narrow profiles. A read-only command inside an eligible general
 workspace class is not one of those duties; it may qualify for the single safe
 retry above.
 
-Every later session resets routing to native standard. If native execution
-succeeds after a Codex, config, host, or probe-version change, there is no
-matching trigger and activation is not offered. The installed dormant profile
-may remain until an explicit separate removal operation, but it has no active
-effect. A deliberate diagnostic may report `not-required`; ordinary successful
-operation need not run the verifier merely to produce that state.
+Every later Elephant session resets routing to native standard. If its first
+eligible nested standard-sandbox operation succeeds after a Codex, WSL,
+config, host, or probe-version repair, there is no matching trigger and the
+compatibility profile is not used at all in that session. The installed
+dormant profile may remain until an explicit separate removal operation, but
+it has no active effect. Neither a Codex/WSL version heuristic nor a
+direct-host probe may pre-activate or retire it. A deliberate diagnostic may
+report `not-required`; ordinary successful nested operation need not run the
+verifier merely to produce that state.
 
 ### 7.6 Reproduced design baseline
 
@@ -1381,6 +1553,8 @@ stderr spelling is runtime activation authority.
 Tests cover:
 
 - first eligible operation always uses native standard;
+- direct-host success/failure never activates, suppresses, or consumes the
+  nested-standard trigger;
 - native operation success causes no verifier call and no profile selection;
 - direct `unix_socket_bind_denied` and structurally plausible local-IPC
   `sandbox_permission_denied_unknown` each trigger exactly one verifier;
@@ -1399,51 +1573,193 @@ Tests cover:
 - exact dangerous-key warning and consent;
 - activation for later operations in the same session, guarded retry of the
   original read-only/no-partial-effect operation, no retry for ambiguous or
-  effectful operations, next-session native reset, Codex/config/probe drift,
+  effectful operations, next-Elephant-session native reset, Codex/config/probe
+  drift, successful nested standard operation after a WSL/Codex repair,
   built-in recovery without verifier execution, and `not-required`; and
 - narrow-duty non-inheritance.
 
 Native WSL evidence is required. Synthetic Linux tests alone cannot establish
 the WSL acceptance cell. The native evidence contains the paired fixed-probe
 results under the built-in standard posture and approved compatibility
-profile, using the same candidate, Codex/config digest, probe version, and
-workspace class.
+profile. After profile installation, the standard probe is rerun so both
+receipts bind the same post-install config digest, candidate, Codex binary,
+probe version, session and workspace class. The standard receipt names
+`:workspace` and binds its standard-profile digest; the compatible receipt
+names only `pipeline-wsl-ipc-compat` and binds the approved profile digest.
+Any profile-name substitution, pre-/post-config mixture or otherwise
+unpaired receipt blocks activation.
 
-## 8. H5 — Advisor timeout policy
+## 8. H5 — Unified close coordinator (#77)
 
-Change `HOST_ADVISOR_POLICY` to:
+### 8.1 Canonical state machine
+
+Extend the publication-close journal into the single close coordinator
+authority. Its closed phases are:
 
 ```text
-maxAttempts = 2
-primary.timeoutMs = 180000
-fallback.timeoutMs = 90000
+active
+checkpointed
+feature-close-prepared
+tracked-close-finalized
+candidate-frozen
+final-verify-green
+publication-authorized
+published
+readback-confirmed
+cleanup-complete
+closed-local | delivered
+release-eligible
+promoted
 ```
 
-All other primary/fallback fields remain byte-for-byte semantically
-equivalent:
+`checkpointed` is a resumable non-completion state. `closed-local` and
+`delivered` are terminal feature-close states; release and promotion are
+separate optional descendants. Each transition binds the prior state digest,
+feature/Result/authority identity, exact input and observed postimage, and the
+candidate OID/tree when one exists. Unsupported skips and conflicting replays
+fail closed.
 
-- primary `consult-advisor`, `gpt-5.6-sol`, `max`;
-- fallback `consult-advisor-fast`, `gpt-5.6-terra`, `high`,
-  `forkTurns:none`;
-- one monotonic deadline per attempt;
-- interrupt at the deadline;
-- workspace digest before/between/after;
-- no third attempt; and
-- continue as `advisory-unavailable` after exhaustion.
+### 8.2 Tracked mutation and candidate freeze
 
-Update:
+`feature-close-prepared` owns the exact feature-close intent. Before
+`tracked-close-finalized`, the coordinator executes or validates all tracked
+Result, backlog, handover, HISTORY, telemetry, retrospective and Pipeline-State
+effects. Only then may the project policy authorize one final commit and bind
+its exact OID/tree as `candidate-frozen`.
 
-- `codex-host-advisor-route.mjs`;
-- its focused test;
-- pipeline-start skill wording; and
-- pipeline-start contract tests.
+Final Verify and Security consume only that frozen OID/tree. The coordinator
+rechecks Git status, OID and tree before advancing to `final-verify-green`.
+Any tracked mutation, candidate replacement or evidence drift invalidates the
+phase; it never silently creates a second candidate.
 
-Search-based acceptance proves no maintained bootstrap instruction or test
-still asserts the old 60/45-second policy.
+### 8.3 Optional publication and readback
 
-## 9. Integration and collision control
+Publication is a distinct Human/policy action. With no configured or approved
+channel, `final-verify-green` is the durable ready-to-publish posture and a
+verified feature may advance through cleanup to `closed-local` without a push.
+With authorization, the existing publication
+bundle imports at most one receipt per channel and only for the exact verified
+OID/tree. `published` is not delivery; `readback-confirmed` requires exact
+remote/ref/OID/tree observation before `delivered`.
 
-### 9.1 Bounded implementation slices
+The coordinator cannot mint authorization. Commit, publication, merge, release
+and promotion remain separate typed gates. A push failure or readback mismatch
+keeps a resumable non-delivered phase.
+
+### 8.4 Cleanup
+
+Session cleanup runs after the candidate is frozen and may run before or after
+optional publication only when it changes no tracked candidate byte. It
+consumes the exact cleanup descriptor/handoff already bound by the lifecycle,
+records a digest-only private outcome, and advances to `cleanup-complete`.
+Uncertain cleanup blocks a clean terminal claim but never rewrites or republishes
+the candidate.
+
+The #73 close-time cleanup-release prevention/recovery remains the authority
+for continuity-bound descriptor release. H5 orders that transition; it does
+not create a second cleanup binding or generic recovery writer.
+
+### 8.5 Compatibility entry points and guidance
+
+- `close-feature` becomes one coordinator transition, not an independent
+  completion universe.
+- `close-block` remains a compatibility entry point for checkpoint/finalize
+  planning but cannot require push and cannot maintain a parallel ritual.
+- Stop-hook output derives the exact next transition from coordinator/State and
+  becomes silent at the applicable terminal.
+- `harness/checklists/session-close.md`, `PIPELINE_FLOW.md`, README and the
+  operating model point to the same transition table; the stale
+  `v0.1.0-draft` authority is removed or explicitly archived.
+- Tool declarations include only operations reachable in the selected
+  transition. No prose instruction grants a missing tool capability.
+
+### 8.6 Verification
+
+Unit and process fixtures cover every AC-047-52–60 transition, conflicting
+replay, crash recovery, candidate/evidence drift, local-only repositories,
+commit-required/no-push policy, exact authorized publication, push failure,
+readback mismatch, cleanup uncertainty and optional release/promotion. Existing
+State, Stop-hook, publication, cleanup, Verify and Security suites remain
+registered and green.
+
+## 9. H6 — Model-free Advisor preflight and on-demand consultation (#80)
+
+### 9.1 Versioned contracts
+
+`pipeline.runner-profiles.v3` remains byte-semantically frozen route authority.
+The new `pipeline.advisory-lifecycle-policy.v2` is a separate trigger contract:
+
+- bootstrap mode `capability-preflight-only`;
+- consultation mode `on-demand`;
+- five closed capability states;
+- closed trigger reasons and lifecycle non-trigger events; and
+- reuse invalidation over question, reason, evidence, candidate and
+  route-policy bindings.
+
+ADR-0047 explicitly supersedes ADR-0038's session-trigger/mandatory-receipt
+meaning while retaining its registered Claude/Codex route topology.
+
+### 9.2 Model-free bootstrap
+
+`advisor-capability-preflight.mjs` accepts only runner, profile and consent. It
+loads and validates the committed V2 policy and frozen V3 registry, returns one
+`pipeline.advisory-capability-preflight.v2`, and has no prompt/model adapter.
+Its effects object is closed at zero child launches, model requests, question
+exports, receipts and consultation-budget milliseconds.
+
+Absent stronger model-free observation, a configured route is `unknown` with
+the assurance that model availability and identity were not probed. Optional
+bounded observations map primary/fallback state to available, degraded,
+unavailable or unknown without invoking either adapter. Mini and declined
+consent are disabled.
+
+`pipeline-start` executes only this preflight. Session start, profile
+selection, restart, resume, re-entry, Compact, unchanged handover, configured
+route and consent never invoke the legacy-named consultation launcher.
+
+### 9.3 Demand and reuse
+
+`pipeline.advisory-demand.v2` contains no raw question. It binds:
+
+- runner, Epic/Feature profile and one allowlisted reason;
+- question and bounded-evidence SHA-256;
+- dispatch ID/revision and candidate commit/tree; and
+- V2 policy and frozen V3 registry SHA-256.
+
+The derived `reuseKeySha256` covers every material binding. A matching
+`pipeline.advisory-consultation-record.v2` returns
+`advisory_reused_no_repeat` without adapter invocation. Any changed binding
+permits a new consultation. Missing or mismatched demand fails before
+workspace observation or a child.
+
+### 9.4 Runner adapters and budgets
+
+Only after a valid demand:
+
+- Claude uses the unchanged same-runner V3 order: bounded native Fable, native
+  Opus after repeated Fable failure, then one fresh read-only Claude consult;
+- Codex uses the registered Host Advisor route with at most two fresh attempts;
+- Codex primary remains `consult-advisor`, `gpt-5.6-sol`, `max`, now with one
+  monotonic 180,000 ms deadline;
+- Codex fallback remains `consult-advisor-fast`, `gpt-5.6-terra`, `high`,
+  `forkTurns:none`, with one monotonic 90,000 ms deadline; and
+- before/between/after workspace digest, interrupt-once, no-third-attempt,
+  same-runner, consent, isolation, sanitized receipt and non-blocking
+  exhaustion semantics remain unchanged.
+
+No bootstrap path consumes these budgets.
+
+### 9.5 Verification
+
+Focused fixtures cover both runners' model-free preflight, every state,
+disabled routes, malformed contracts, all lifecycle non-triggers, valid demand,
+question/policy/evidence/candidate drift, no-repeat reuse, route preservation,
+consultation-only 180/90 budgets and the absence of model effects before the
+demand gate.
+
+## 10. Integration and collision control
+
+### 10.1 Bounded implementation slices
 
 The current hotfix is partitioned into these reviewable slices. Same-file
 slices remain serial; the immutable candidate is not formed until every slice
@@ -1458,11 +1774,17 @@ and the final document authority are stable.
 | `047-ORG` | portable cleanup-binding publication guard | AC-047-39 green; AC-047-40 reserved for separately authorized real-origin readback |
 | `047-HOV` | Human override capability, audit store, CLI and central adapter | AC-047-41–47; exact denial through single consumption and protected exclusions green |
 | `047-ARB-MG` | multi-generation neutral authority planning and confirmed convergence | AC-047-48–50; Phoenix- and Nova-shaped historical-surface fixtures, drift/replay negatives and three-intent readback green |
+| `047-BLG` | canonical missing-initial backlog event and projection transaction | AC-047-01–02; exact open item, ledger CAS, rollback/replay and checker readback green |
+| `047-SMR` | source diagnosis, absent-manifest plan/apply and pre-ready guard lane | AC-047-03–08; category matrix, races, hostile aliases and process readback green |
+| `047-IPC` | typed reactive WSL IPC verifier, profile transaction and session router | AC-047-16–23; native WSL paired probes, adapter propagation, opt-in apply and next-session reset green |
+| `047-KOF` | unapproved kickoff authority classification | AC-047-51; real writer output ready and approved/malformed negative fail-closed |
+| `047-CLO` | unified close coordinator, compatibility entry points and process fixtures | AC-047-52–60; checkpoint/local close/delivery/retry/order matrix green |
+| `047-ADV` | V2 Advisor lifecycle policy, model-free preflight, demand/reuse coordinator, runner skills and ADR | AC-047-24 and AC-047-61–68; zero-model bootstrap and demand-only route matrix green |
 | `047-INT` | Verify registration, threat model, result/evidence, package/version/readback surfaces | AC-047-25–26; every final gate binds one immutable commit/tree |
 
-AC-047-01–08 and AC-047-16–24 have no implementation slice in this hotfix.
+AC-047-24 is implemented only within `047-ADV`; it never applies to bootstrap.
 
-### 9.2 Nova rebase
+### 10.2 Nova rebase
 
 After 0.4.7 reaches the approved integration commit:
 
@@ -1489,19 +1811,24 @@ Expected collision paths include:
 No automated conflict resolution may choose Nova or hotfix wholesale for those
 paths.
 
-### 9.3 Other Sprint rebases
+### 10.3 Other Sprint rebases
 
 For each of the three Sprint branches rebasing onto 0.4.7, produce a
 machine-generated changed-path intersection and a human disposition for every
 overlap. A successful textual rebase is not acceptance; each Sprint reruns its
 own focused and full gates against its new exact candidate.
 
-## 10. Verification gates
+## 11. Verification gates
 
-### 10.1 Focused gates
+### 11.1 Focused gates
 
 Required focused suites:
 
+- canonical backlog ledger/projection admission and recoverable writer;
+- source/manifest recovery planners, confirmed apply, pre-ready guard and
+  consumer process fixtures;
+- WSL IPC structured failure propagation, fixed probe, profile transaction,
+  session routing/retirement and native paired-probe evidence;
 - legacy continuity adoption, State writer, normal close-feature, narrow
   stale-marker rebind, neutral authority decision, and multi-generation
   authority-surface recovery;
@@ -1511,11 +1838,13 @@ Required focused suites:
 - Codex onboarding runtime and Windows private-state assurance;
 - portable push/publication baseline guard;
 - attended Human override and authenticated-audit tamper/replay tests; and
+- unified close coordinator, compatibility entry points, Stop guidance and
+  end-to-end checkpoint/local/delivery/retry fixtures; and
 - pipeline-start/preflight contract regressions.
 
 Every new focused suite is registered in the single Verify gate.
 
-### 10.2 Platform gates
+### 11.2 Platform gates
 
 Required platform evidence:
 
@@ -1531,17 +1860,17 @@ Required platform evidence:
 
 Issue #72 and native Apple Silicon are not platform gates for this release.
 
-### 10.3 Candidate gates
+### 11.3 Candidate gates
 
 The exact final candidate commit and tree are reported by Git and package
 readback rather than embedded recursively in their own document bytes. They
 must carry:
 
 1. all focused suites;
-2. the green Full Verify evidence for baseline `0f36072`;
-3. the green blocking Security evidence for baseline `0f36072`;
-4. a fresh independent Critic review restricted to the complete
-   `0f36072..final` correction delta and this updated design;
+2. fresh Full Verify evidence for the exact final candidate;
+3. fresh blocking Security evidence for the exact final candidate;
+4. a fresh independent high-risk Critic review of the complete expanded
+   candidate against this updated design;
 5. packaged Claude and Codex plugin validation;
 6. installed-plugin readback;
 7. native platform evidence above;
@@ -1550,13 +1879,11 @@ must carry:
 10. after separately authorized publication, the AC-047-40 real-origin clone
     and bootstrap readback.
 
-Any focused or diff-Critic rerun after a correction byte changes binds the new
-delta. The PO explicitly waived another full-run cycle for this correction
-delta; no statement may misrepresent the baseline Full Verify/Security as
-having run on later bytes. Evidence from PR #64 or any Nova candidate is
-inadmissible.
+Any correction byte after final evidence invalidates the affected evidence and
+requires a new exact-candidate run. Evidence from PR #64 or any Nova candidate
+is inadmissible.
 
-## 11. Release evidence
+## 12. Release evidence
 
 Create hotfix-owned result/evidence under this design directory. It records:
 
@@ -1565,8 +1892,8 @@ Create hotfix-owned result/evidence under this design directory. It records:
   evidence, and 0.4.7 plan-activation readback;
 - authority-decision plan/selection/apply, composite cleanup crash/replay,
   portable-baseline and attended-override evidence;
-- retained Issue #73 and legacy-lifecycle mapping;
-- explicit deferred-scope, #72, PR #64 and downstream-state exclusion;
+- exact #70, #63, #71, #73, kickoff-correction and #77 acceptance mapping;
+- explicit #24/#80, #72, PR #64 and downstream-state exclusion;
 - focused/platform/Verify/Security/Critic commands and results;
 - installed plugin versions and readback;
 - version and release surface digests;

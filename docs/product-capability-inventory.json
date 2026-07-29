@@ -509,6 +509,18 @@
       "member": "advisor-consult-v3-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisor-capability-preflight-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "advisor-capability-preflight-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisory-lifecycle-v2-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "advisory-lifecycle-v2-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:advisory-coordinator-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -573,6 +585,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "claude-critic-host-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:close-coordinator-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "close-coordinator-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:codex-advisory-app-server-tests",
@@ -1193,6 +1211,12 @@
       "member": "workflow-writer-preflight-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:wsl-ipc-compatibility-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "wsl-ipc-compatibility-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:yaml-lite-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1562,9 +1586,11 @@
       "benefit": "One registered Verify entry point runs the declared suites and records machine-readable results.",
       "status": "shipped",
       "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:advisor-capability-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:advisor-consult-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-coordinator-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-host-bridge-tests",
+        "verify-phase:harness/scripts/verify.mjs:advisory-lifecycle-v2-tests",
         "verify-phase:harness/scripts/verify.mjs:advisory-receipt-tests",
         "verify-phase:harness/scripts/verify.mjs:afk-ledger-tests",
         "verify-phase:harness/scripts/verify.mjs:agents-adapter-migration-check",
@@ -1578,6 +1604,7 @@
         "verify-phase:harness/scripts/verify.mjs:capture-observation-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:check-ownership-tests",
         "verify-phase:harness/scripts/verify.mjs:claude-critic-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:close-coordinator-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-advisory-app-server-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-advisory-bootstrap-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-app-server-health-tests",
@@ -1714,6 +1741,7 @@
         "verify-phase:harness/scripts/verify.mjs:workflow-runner-boundary-tests",
         "verify-phase:harness/scripts/verify.mjs:workflow-writer-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:worktree-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:wsl-ipc-compatibility-tests",
         "verify-phase:harness/scripts/verify.mjs:yaml-lite-tests"
       ],
       "runners": [

@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
-/** Model-free authority for the direct Codex host consult. */
+/** Model-free route authority used only after a valid on-demand trigger. */
+import { pathToFileURL } from "node:url";
 export const ROUTES = Object.freeze({
   HOST: "host-bound-consult",
   NO_CONSENT: "disabled-no-consent",
@@ -14,13 +15,13 @@ export const HOST_ADVISOR_POLICY = Object.freeze({
     agentName: "consult-advisor",
     model: "gpt-5.6-sol",
     effort: "max",
-    timeoutMs: 60_000,
+    timeoutMs: 180_000,
   }),
   fallback: Object.freeze({
     agentName: "consult-advisor-fast",
     model: "gpt-5.6-terra",
     effort: "high",
-    timeoutMs: 45_000,
+    timeoutMs: 90_000,
     forkTurns: "none",
   }),
   workspaceGuard: "sha256-before-between-after",
@@ -77,7 +78,7 @@ function writeRoute(input, write) {
   write(`${JSON.stringify(resolveHostAdvisorRoute(input))}\n`);
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const argv = process.argv.slice(2);
   if (argv.length > 0) {
     if (argv.length === 1 && argv[0] === "--help") {

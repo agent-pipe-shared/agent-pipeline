@@ -16,6 +16,7 @@ import {
   planBacklogEvidenceAmendment,
   planBacklogTransition,
   planElephantAfkLedgerRepair,
+  planManagedOnboardingLedgerRepair,
   projectBacklog,
   renderBacklogItem,
   transitionHash,
@@ -28,6 +29,7 @@ import {
   applyBacklogEvidenceAmendment,
   applyBacklogTransition,
   applyElephantAfkLedgerRepair,
+  applyManagedOnboardingLedgerRepair,
   applySentinelBacklogRecovery,
   applySentinelScopeExtension,
   checkBacklogState,
@@ -162,6 +164,23 @@ function afkRepairFixture() {
 function afkRepairInput(overrides = {}) {
   return { id: AFK_REPAIR_ID, at: "2026-07-23", actor: "sentinel-recovery", evidenceCommit: "a".repeat(40), source: AFK_REPAIR_SOURCE, ...overrides };
 }
+const MANAGED_REPAIR_ID = "pipeline.managed-onboarding-success-contract";
+function managedRepairFixture() {
+  const root = fixtureRoot();
+  const other = item();
+  write(root, "backlog/items/example.md", renderBacklogItem(other));
+  write(root, "backlog/transitions.ndjson", `${canonicalJson(event())}\n`);
+  writeBacklogProjections(root, { checkCommit: false });
+  const missing = item({ id: MANAGED_REPAIR_ID, type: "workflow-improvement", created: "2026-07-25", source: "close-block self-retro, 0.4.4 managed-workspace onboarding hotfix" });
+  missing.path = "backlog/items/2026-07-25-managed-onboarding-success-contract.md";
+  write(root, missing.path, renderBacklogItem(missing));
+  return root;
+}
+function managedRepairInput(root, overrides = {}) {
+  const path = join(root, "backlog/items/2026-07-25-managed-onboarding-success-contract.md");
+  const itemSha256 = createHash("sha256").update(readFileSync(path)).digest("hex");
+  return { id: MANAGED_REPAIR_ID, at: "2026-07-29", actor: "hotfix-047-missing-initial-ledger-repair", evidenceCommit: "a".repeat(40), itemSha256, ...overrides };
+}
 
 {
   const source = renderBacklogItem(item({ source: "A source: with punctuation" }));
@@ -276,6 +295,61 @@ function afkRepairInput(overrides = {}) {
       && readFileSync(join(root, "backlog/items/2026-07-23-elephant-direct-implementation-under-afk-authorization.md"), "utf8") === itemBefore
       && applied.transition.from === null && applied.transition.to === "open" && applied.transition.evidence.sourceSha256 === createHash("sha256").update(AFK_REPAIR_SOURCE).digest("hex")
       && valid.ok && !replay.ok && JSON.stringify(snapshot) === JSON.stringify(replaySnapshot), [...preview.errors, ...applied.findings, ...valid.findings, ...replay.findings].join("; "));
+}
+
+{
+  const root = managedRepairFixture();
+  const input = managedRepairInput(root);
+  const before = ["backlog/items/2026-07-25-managed-onboarding-success-contract.md", "backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"].map((path) => readFileSync(join(root, path), "utf8"));
+  const current = checkBacklogState(root, { checkCommit: false });
+  const preview = planManagedOnboardingLedgerRepair(current.items, current.events, input);
+  const applied = applyManagedOnboardingLedgerRepair(root, input, { checkCommit: false });
+  const after = checkBacklogState(root, { checkCommit: false });
+  const replay = applyManagedOnboardingLedgerRepair(root, input, { checkCommit: false });
+  check("BS18 managed-onboarding exact repair admits one open item and replay is idempotent",
+    current.findings.length === 1 && preview.ok && applied.ok && applied.wrote && after.ok
+      && applied.transition.from === null && applied.transition.to === "open"
+      && after.items.find((entry) => entry.metadata.id === MANAGED_REPAIR_ID)?.metadata.status === "open"
+      && !replay.ok && JSON.stringify(before.slice(0, 1)) === JSON.stringify([readFileSync(join(root, "backlog/items/2026-07-25-managed-onboarding-success-contract.md"), "utf8")]), [...preview.errors, ...applied.findings, ...after.findings, ...replay.findings].join("; "));
+}
+
+{
+  const root = managedRepairFixture();
+  const input = managedRepairInput(root);
+  const before = readFileSync(join(root, "backlog/transitions.ndjson"), "utf8");
+  const wrongId = applyManagedOnboardingLedgerRepair(root, { ...input, id: "pipeline.other" }, { checkCommit: false });
+  const wrongDigest = applyManagedOnboardingLedgerRepair(root, { ...input, itemSha256: "0".repeat(64) }, { checkCommit: false });
+  write(root, "backlog/items/2026-07-25-managed-onboarding-success-contract.md", renderBacklogItem(item({ id: MANAGED_REPAIR_ID, status: "in_progress", type: "workflow-improvement", created: "2026-07-25" })));
+  const wrongStatus = applyManagedOnboardingLedgerRepair(root, input, { checkCommit: false });
+  check("BS19 managed repair rejects wrong id, digest, and status without ledger mutation",
+    !wrongId.ok && !wrongDigest.ok && !wrongStatus.ok && readFileSync(join(root, "backlog/transitions.ndjson"), "utf8") === before);
+}
+
+{
+  const root = managedRepairFixture();
+  const input = managedRepairInput(root);
+  write(root, "backlog/items/additional-missing.md", renderBacklogItem(item({ id: "pipeline.additional-missing" })));
+  const before = readFileSync(join(root, "backlog/transitions.ndjson"), "utf8");
+  const rejected = applyManagedOnboardingLedgerRepair(root, input, { checkCommit: false });
+  const headRoot = managedRepairFixture();
+  const headInput = managedRepairInput(headRoot);
+  const headBefore = readFileSync(join(headRoot, "backlog/transitions.ndjson"), "utf8");
+  write(headRoot, "backlog/transitions.ndjson", `${headBefore.replace(/("entryHash":")[a-f0-9]/u, "$1f")}\n`);
+  const headRejected = applyManagedOnboardingLedgerRepair(headRoot, headInput, { checkCommit: false });
+  check("BS20 managed repair rejects additional checker findings and ledger-head drift", !rejected.ok && !headRejected.ok
+    && readFileSync(join(root, "backlog/transitions.ndjson"), "utf8") === before
+    && readFileSync(join(headRoot, "backlog/transitions.ndjson"), "utf8").includes('"entryHash":"f'), [...rejected.findings, ...headRejected.findings].join("; "));
+}
+
+{
+  const root = managedRepairFixture();
+  const input = managedRepairInput(root);
+  const paths = ["backlog/items/2026-07-25-managed-onboarding-success-contract.md", "backlog/transitions.ndjson", "backlog/STATUS.md", "backlog/index.json"];
+  const before = paths.map((path) => readFileSync(join(root, path), "utf8"));
+  let writes = 0;
+  const failedApply = applyManagedOnboardingLedgerRepair(root, input, { checkCommit: false, atomicWrite(path, content) { writeFileSync(path, content); if (++writes === 2) throw new Error("simulated interruption"); } });
+  const after = paths.map((path) => readFileSync(join(root, path), "utf8"));
+  check("BS21 managed repair interruption restores all preimages", !failedApply.ok && JSON.stringify(before) === JSON.stringify(after) && !existsSync(join(root, "backlog/.state-transaction.json")), failedApply.findings.join("; "));
 }
 
 {

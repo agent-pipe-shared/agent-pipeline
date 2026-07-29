@@ -298,6 +298,10 @@ import {
   startPublicationReadback,
 } from "../lib/publication-authority.mjs";
 import { publicationDigest } from "../lib/publication-bundle.mjs";
+import {
+  lifecycleDigest as closeCoordinatorDigest,
+  readCloseCoordinator,
+} from "./publication-close-journal.mjs";
 
 export const SCHEMA_ID = "pipeline.state.v0";
 export const CONTINUITY_LOCK_SCHEMA_ID = "pipeline.continuity-lock.v0";
@@ -3603,6 +3607,46 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error('Error: existing closedFeatures is not an array -- aborting WITHOUT changes (no silent overwrite).');
         return 2;
       }
+      let coordinatorClose;
+      const coordinatorLifecycle = flags["coordinator-lifecycle"];
+      const coordinatorSha256 = flags["coordinator-sha256"];
+      if (coordinatorLifecycle !== undefined || coordinatorSha256 !== undefined) {
+        if (isBlank(coordinatorLifecycle) || !/^[A-Za-z0-9._-]{1,100}$/u.test(coordinatorLifecycle)
+          || !/^[0-9a-f]{64}$/u.test(coordinatorSha256 ?? "")) {
+          console.error("Error: close-feature coordinator binding requires exact --coordinator-lifecycle and --coordinator-sha256 values.");
+          return 2;
+        }
+        const common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir);
+        if (!common?.ok) {
+          console.error("Error: close-feature coordinator Git common directory is unavailable.");
+          return 2;
+        }
+        let stored;
+        try { stored = (deps.readCloseCoordinator ?? readCloseCoordinator)(common.path, coordinatorLifecycle); }
+        catch {
+          console.error("Error: close-feature coordinator state is unavailable or unsafe.");
+          return 2;
+        }
+        const coordinator = stored?.coordinator;
+        if (coordinator?.phase !== "feature-close-prepared"
+          || coordinator.lifecycleId !== coordinatorLifecycle
+          || coordinator.featureId !== activeFeature.id
+          || coordinator.activeFeature?.id !== activeFeature.id
+          || coordinator.activeFeature?.planPath !== activeFeature.planPath
+          || coordinator.authority?.pipelineStateSha256
+            !== sha256Bytes(readFileSync(statePath(dir)))
+          || closeCoordinatorDigest(coordinator) !== coordinatorSha256) {
+          console.error("Error: close-feature coordinator is not bound to this exact feature-close-prepared State transition.");
+          return 2;
+        }
+        coordinatorClose = {
+          schema: "pipeline.close-coordinator-reference.v1",
+          lifecycleId: coordinatorLifecycle,
+          stateSha256: coordinatorSha256,
+          revision: coordinator.revision,
+          phase: coordinator.phase,
+        };
+      }
       let continuityClose;
       if (base.continuity !== undefined) {
         const closeRequest = readContinuityRequest(dir, flags["continuity-close-request"]);
@@ -3650,6 +3694,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         forCommit,
       };
       if (continuityClose !== undefined) closedEntry.continuityClose = continuityClose;
+      if (coordinatorClose !== undefined) closedEntry.coordinatorClose = coordinatorClose;
       const next = {
         ...base,
         schema: SCHEMA_ID,

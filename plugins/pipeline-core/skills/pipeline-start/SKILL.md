@@ -1,6 +1,6 @@
 ---
 name: pipeline-start
-description: "Mandatory session bootstrap for Agent-Pipeline projects (ADR-0010). Run FIRST in every new session and after /clear/plugin refresh. Verifies the V4 lifecycle/native runtime readback, ruleset SHA, pipeline.user.v3 authority, profile/advisory status, model/effort, staleness, calibration, handover and verify before printing the auditable confirmation. Optional role: elephant (default), goldfish or critic."
+description: "Mandatory session bootstrap for Agent-Pipeline projects (ADR-0010). Run FIRST in every new session and after /clear/plugin refresh. Verifies V4 lifecycle/native runtime readback, ruleset SHA, pipeline.user.v3 authority, model-free Advisor capability, profile, model/effort, staleness, calibration, handover and verify before the auditable confirmation. Optional role: elephant (default), goldfish or critic."
 argument-hint: "[elephant|goldfish|critic]"
 ---
 
@@ -479,9 +479,9 @@ check:
    authority. It accepts no V3 registry-refresh, V1/V2, legacy, or other
    runtime-projection fallback.
    A valid source with missing/default or declined `advisor_export` consent
-   remains a successful read-only check. Missing/default enables the bounded
-   Codex Host Advisor without a prompt; the configuration command is
-   informational only and must not write consent.
+   remains a successful read-only check. Missing/default enables only the
+   model-free Advisor capability preflight without a prompt; the configuration
+   command is informational only and must not write consent.
 3. Treat every non-zero result, migration-required result, invalid V3 source,
    missing runtime baseline, or changed V3-owned projection as **F5**. Do not
    repair drift during bootstrap, do not fall back to V2/V1 routing, and do not
@@ -489,8 +489,9 @@ check:
    the explicit V3 migration/apply workflow owns authority changes.
 
 The successful no-op projection plus current native readback is the evidence
-that a fresh session sees the same V3 source and permitted runtime boundary. It is not effective-model evidence; Claude
-receipts and Codex Host-Advisor status remain separate requirements.
+that a fresh session sees the same V3 source and permitted runtime boundary. It
+is not effective-model or consultation evidence. Advisor capability preflight
+and any later, demand-bound consultation evidence remain separate contracts.
 
 ## Step 1b — Model/effort (Elephant only)
 
@@ -550,46 +551,41 @@ repository. It is deliberately outside this read-only bootstrap step. A failed
 recovery keeps the exact `CAS-*` code and the operator guidance for
 `codex doctor` visible.
 
-### V3 advisory duty at session start
+### V2 Advisor capability preflight at session start
 
-- Read the validated V3 `advisorExport` resolution before any Advisory action.
-  Missing consent is the enabled `default`, with no per-run question; only
-  `declined` disables before a child, export or status. `mini` is disabled.
-- For Codex Epic/Feature, run exactly
-  `node "${PIPELINE_PLUGIN_ROOT}/scripts/codex-host-advisor-route.mjs" --runner codex --profile "{{PROFILE}}" --consent "{{CONSENT}}"`.
-  Accept exactly JSON keys `route|policy`; do not pass `--root`, probe `--help`,
-  inspect the script, or retry through stdin. For route `host-bound-consult`,
-  require policy `pipeline.codex-host-advisor-policy.v1`: launch the primary
-  once for at most 60 seconds, interrupt it at that single monotonic deadline,
-  verify the unchanged workspace digest, then launch at most one fresh
-  `gpt-5.6-terra` / `high` fallback for at most 45 seconds with `forkTurns:none`.
-  Polling must never reset either deadline. Interrupt an overrun once; never
-  start a third attempt.
-  Do not make any selected-sandbox, App-Server, native or other advisory probe
-  before or after it. The child receives one question and
-  allowlisted repository evidence only; it has no inherited chat/handover/
-  memory, mutation, persistence, auto-apply, gate decision, separate network
-  tool or third-party export.
-- The Elephant, not the child, creates the one-use launch and validates the
-  candidate-/launch-/question-bound `pipeline.host-advisor-status.v1` against
-  before/between/after workspace observation. An answered unchanged status
-  from attempt one or two is Codex `host-bound-consult` success. If both
-  bounded attempts are unavailable with an unchanged workspace, record
-  `advisory-unavailable` and continue bootstrap without an Advisory-pass
-  claim; this advisory exhaustion is not a session blocker. Workspace mutation
-  remains a hard integrity stop. It emits no `pipeline.advisory-receipt.v1` and
-  every claim retains `no attested selected-sandbox execution; OS isolation and
-  model identity are not asserted`.
+- Read the validated V3 `advisorExport` resolution before the preflight.
+  Missing consent resolves to `default`; `declined` and `mini` are disabled
+  before any child, model request, export, receipt or consultation budget.
+- Run exactly one local, model-free command for Claude or Codex:
+
+  `node "${PIPELINE_PLUGIN_ROOT}/scripts/advisor-capability-preflight.mjs" --runner "{{RUNNER}}" --profile "{{PROFILE}}" --consent "{{CONSENT}}"`
+
+  Accept only schema `pipeline.advisory-capability-preflight.v2` bound to the
+  frozen `pipeline.runner-profiles.v3` route digest and the versioned
+  `pipeline.advisory-lifecycle-policy.v2` digest. Its state is exactly
+  `available|degraded|unavailable|disabled|unknown`; retain its explicit
+  assurance and primary/fallback disposition. The ordinary configured,
+  unprobed route is honestly `unknown`, not an availability claim.
+- This bootstrap command receives no question and its effects must be exactly
+  zero child launches, model requests, question exports, receipts and
+  consultation-budget milliseconds. Do not run
+  `codex-host-advisor-route.mjs`, `codex-advisory-bootstrap.mjs`, a Claude
+  native Advisor, a consult child, selected-sandbox or App-Server probe as an
+  Advisor availability substitute.
+- Session start, profile selection, restart, resume, re-entry, Compact,
+  unchanged handover, a configured route and consent alone are explicitly
+  non-triggering lifecycle events. They never create a prompt, demand,
+  consultation receipt or timeout wait.
+- A real consultation is permitted only later through `advisor-consult`, for
+  exactly one concrete question with an allowed reason and bounded evidence.
+  It must carry a current `pipeline.advisory-demand.v2` binding the question
+  digest, reason, evidence, candidate and both route-policy digests. An
+  unchanged reuse key is `reuse-no-repeat`; material drift invalidates it.
+- The frozen V3 Claude chain and Codex route remain consultation-only
+  fallback authorities. They are not reinterpreted as bootstrap behavior.
 - The selected-sandbox host bridge
   `sandboxed-readonly-host-bridge.mjs` remains mandatory only for Codex
   Readiness and Critic duties; it is not an Advisor route.
-- **Claude:** native Fable is tried for the coordinator's bounded repeated
-  attempts. Only after those failures may native Opus run; only after the
-  native adapters fail may the same-runner fresh read-only consult run. The
-  order is `Fable × bounded repeat → Opus → Claude consult`, never an automatic
-  main-model or runner switch.
-- Claude retains its existing coordinator receipt and fallback rules. No raw
-  question, answer, prompt, trace or adapter error is persisted.
 
 ## Step 1c — Spend/usage check (Elephant only; recommended)
 
@@ -734,12 +730,11 @@ Role variants of the "State" field:
   `functional-equivalent-read-only; OS isolation not asserted` and invokes no
   write tool, mutating command, or delegation)
 
-Elephant adds a V3 authority/advisory line directly below. Default-enabled
-Epic/Feature may name only an `answered`, current, schema-valid receipt.
-Explicitly declined consent and Mini are accepted disabled states and must not
-name a receipt:
+Elephant adds a V3 authority/V2 Advisor-capability line directly below. This
+line reports only the model-free preflight; it must never name an answer,
+consultation receipt or consultation success:
 
-> V3 authority: pipeline.user.v3 · Runtime projection {{noop|host-managed-codex}} · Profile {{epic|feature|mini}} · Advisory {{host-bound-consult|disabled-no-consent|disabled-by-profile}} · Status {{STATUS_SHA256|n/a}}
+> V3 authority: pipeline.user.v3 · Runtime projection {{noop|host-managed-codex}} · Profile {{epic|feature|mini}} · Advisor capability {{available|degraded|unavailable|disabled|unknown}} · Assurance {{ASSURANCE}} · Preflight {{PREFLIGHT_SHA256}}
 
 Elephant adds the model/effort line directly below (MP-17):
 

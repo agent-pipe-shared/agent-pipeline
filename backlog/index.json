@@ -3,10 +3,10 @@
   "generatedFrom": {
     "items": "backlog/items/*.md",
     "ledger": "backlog/transitions.ndjson",
-    "transitionHead": "2849de19fb7f0d0f34d6f2cbe6ed6d5171445abb09fa02132bc9a1d0d707e2b1"
+    "transitionHead": "48d371f383d42919d565cdb3caab6e4f51ba9803d1fbbfd29c0e44339fe32a5e"
   },
   "counts": {
-    "open": 30,
+    "open": 31,
     "in_progress": 3,
     "closed": 2
   },
@@ -129,6 +129,14 @@
       "created": "2026-07-19",
       "source": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
       "tracking": "Sentinel recovery baseline; no completion claim."
+    },
+    {
+      "id": "pipeline.managed-onboarding-success-contract",
+      "status": "open",
+      "type": "workflow-improvement",
+      "owner": "pipeline",
+      "created": "2026-07-25",
+      "source": "close-block self-retro, 0.4.4 managed-workspace onboarding hotfix"
     },
     {
       "id": "pipeline.multi-cli-efficiency-pilots",

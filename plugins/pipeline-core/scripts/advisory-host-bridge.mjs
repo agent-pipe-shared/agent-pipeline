@@ -16,6 +16,11 @@ import { createInterface } from "node:readline";
 import { pathToFileURL } from "node:url";
 
 import { coordinateAdvisory } from "../lib/advisory-coordinator.mjs";
+import {
+  advisoryConsultationDisposition,
+  createAdvisoryConsultationRecord,
+  validateAdvisoryDemand,
+} from "../lib/advisory-lifecycle-v2.mjs";
 import { validateAdvisoryReceipt } from "../lib/advisory-receipt.mjs";
 import { AdvisoryReceiptAssuranceError, persistAdvisoryReceipt } from "../lib/advisory-receipt-assurance.mjs";
 import { canonicalJson } from "../lib/codex-sandbox-compatibility.mjs";
@@ -29,7 +34,7 @@ import { observeHostAdvisorWorkspace } from "./host-advisor-workspace.mjs";
 const USAGE = "usage: advisory-host-bridge.mjs --input <json> --receipt <json> [--timeout-ms <1000..600000>]";
 
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
-function advisoryReceiptBytes(receipt) { return Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, "utf8"); }
+function jsonBytes(value) { return Buffer.from(`${JSON.stringify(value, null, 2)}\n`, "utf8"); }
 function exactKeys(value, keys, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)
     || JSON.stringify(Object.keys(value).sort()) !== JSON.stringify([...keys].sort())) throw new Error(`${label} is not closed`);
@@ -160,6 +165,29 @@ function matchesSelectedHostExecution(value, selected) {
  * execution receipt and its selected dispatch bind exactly to that child.
  */
 export async function runSelectedAdvisoryHost(input, transport = undefined) {
+  const demand = validateAdvisoryDemand(input?.demand, {
+    runner: input?.runner,
+    profile: input?.profile,
+    question: input?.question,
+    dispatch: input?.dispatch,
+  });
+  if (!demand.ok) return demandRejected(demand.code);
+  const disposition = advisoryConsultationDisposition(input.demand, input.priorConsultation);
+  if (!disposition.ok) return demandRejected(disposition.code);
+  if (disposition.disposition === "reuse-no-repeat") {
+    return {
+      advisoryResult: {
+        ok: true,
+        code: "advisory_reused_no_repeat",
+        answer: null,
+        receipt: null,
+        consultationRecord: structuredClone(input.priorConsultation),
+        attempts: [],
+      },
+      execution: null,
+      sandboxBinding: null,
+    };
+  }
   const selectedHost = selectedAdvisoryHostBridge(input, { invokeAppServer: transport?.invokeCodexAdvisoryAppServer ?? invokeCodexAdvisoryAppServer });
   let dependencies = transport?.dependencies;
   if (dependencies !== undefined) {
@@ -228,6 +256,28 @@ function disabledHostAdvisory(route) {
   };
 }
 
+function demandRejected(code) {
+  return {
+    advisoryResult: { ok: false, code, answer: null, receipt: null, consultationRecord: null, attempts: [] },
+    execution: null,
+    sandboxBinding: null,
+  };
+}
+
+function bindConsultationRecord(input, outcome) {
+  const result = outcome.advisoryResult;
+  if (result.consultationRecord || !result.receipt) return outcome;
+  const record = createAdvisoryConsultationRecord({
+    demand: input.demand,
+    receipt: result.receipt,
+    outcome: result.receipt.observed.status,
+    completedAtMs: Date.now(),
+  });
+  return record.ok
+    ? { ...outcome, advisoryResult: { ...result, consultationRecord: record.record } }
+    : demandRejected(record.code);
+}
+
 /**
  * Production Codex advisory call path. The coordinator cannot see an adapter
  * until an exact selector record has been read back by the generic bridge.
@@ -235,18 +285,43 @@ function disabledHostAdvisory(route) {
 export async function runCodexAdvisoryThroughSelectedSandbox(input, adapter, transport = {}) {
   const route = selectHostAdvisorRoute(hostRouteInput(input));
   if (route !== ROUTES.HOST) return disabledHostAdvisory(route);
+  const demand = validateAdvisoryDemand(input?.demand, {
+    runner: input?.runner,
+    profile: input?.profile,
+    question: input?.question,
+    dispatch: input?.dispatch,
+  });
+  if (!demand.ok) return demandRejected(demand.code);
+  const disposition = advisoryConsultationDisposition(input.demand, input.priorConsultation);
+  if (!disposition.ok) return demandRejected(disposition.code);
+  if (disposition.disposition === "reuse-no-repeat") {
+    return {
+      advisoryResult: {
+        ok: true,
+        code: "advisory_reused_no_repeat",
+        answer: null,
+        receipt: null,
+        consultationRecord: structuredClone(input.priorConsultation),
+        attempts: [],
+      },
+      execution: null,
+      sandboxBinding: null,
+    };
+  }
   const root = transport.repoRoot ?? process.cwd();
   const observe = transport.observeWorkspace ?? observeHostAdvisorWorkspace;
   let before;
-  try { before = observe(root); } catch { return unavailable(input, "host-observation-unavailable"); }
+  try { before = observe(root); } catch { return bindConsultationRecord(input, unavailable(input, "host-observation-unavailable")); }
   // A JSON reply from a host adapter carries neither an exact sandbox selection
   // nor a child/identity attestation. It is intentionally ignored.
   void adapter;
   const outcome = await runSelectedAdvisoryHost(input, transport);
   let after;
-  try { after = observe(root); } catch { return unavailable(input, "host-observation-unavailable", outcome.execution); }
-  if (before.workspaceSha256 !== after.workspaceSha256) return unavailable(input, "workspace-drift-unavailable", outcome.execution);
-  return outcome;
+  try { after = observe(root); } catch { return bindConsultationRecord(input, unavailable(input, "host-observation-unavailable", outcome.execution)); }
+  if (before.workspaceSha256 !== after.workspaceSha256) {
+    return bindConsultationRecord(input, unavailable(input, "workspace-drift-unavailable", outcome.execution));
+  }
+  return bindConsultationRecord(input, outcome);
 }
 
 /** Compatibility export retained for callers of the former composition seam. */
@@ -317,10 +392,10 @@ function makeHostAdapter(iterator, timeoutMs) {
   };
 }
 
-function writeReceiptAtomic(path, receipt) {
+function writeJsonAtomic(path, value) {
   const target = resolve(path);
   const temporaryName = `.${basename(target)}.tmp-${process.pid}-${randomUUID()}`;
-  return persistAdvisoryReceipt({ target, bytes: advisoryReceiptBytes(receipt), temporaryName });
+  return persistAdvisoryReceipt({ target, bytes: jsonBytes(value), temporaryName });
 }
 
 export async function runAdvisoryHostBridge(argv = process.argv.slice(2), dependencies = {}) {
@@ -331,6 +406,14 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
   // timeouts and host-protocol errors cannot strand the question on disk.
   await unlink(inputPath);
   const input = JSON.parse(rawInput);
+  const consultationRecordPath = resolve(`${args.receipt}.consultation-v2.json`);
+  if (input.priorConsultation === undefined) {
+    try {
+      input.priorConsultation = JSON.parse(await readFile(consultationRecordPath, "utf8"));
+    } catch (error) {
+      if (error?.code !== "ENOENT") throw error;
+    }
+  }
   const lines = createInterface({ input: process.stdin, crlfDelay: Infinity });
   const iterator = lines[Symbol.asyncIterator]();
   try {
@@ -350,18 +433,32 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
     let receiptPath = null;
     let directoryDurability = null;
     if (execution?.schema === "pipeline.host-advisor-status.v1") {
-      const persisted = writeReceiptAtomic(args.receipt, execution);
+      const persisted = writeJsonAtomic(args.receipt, execution);
       receiptPath = resolve(args.receipt);
       directoryDurability = persisted?.directoryDurability ?? null;
     } else if (result.receipt) {
       try {
-        const persisted = writeReceiptAtomic(args.receipt, result.receipt);
+        const persisted = writeJsonAtomic(args.receipt, result.receipt);
         receiptPath = resolve(args.receipt);
         directoryDurability = persisted?.directoryDurability ?? null;
       } catch (error) {
         if (!(error instanceof AdvisoryReceiptAssuranceError)) throw error;
-        reported = { ...result, ok: false, code: `advisory_receipt_${error.status}`, answer: null, receipt: null };
+        reported = {
+          ...result,
+          ok: false,
+          code: `advisory_receipt_${error.status}`,
+          answer: null,
+          receipt: null,
+          consultationRecord: null,
+        };
       }
+    }
+    let persistedConsultationRecordPath = null;
+    if (reported.consultationRecord && reported.code !== "advisory_reused_no_repeat") {
+      writeJsonAtomic(consultationRecordPath, reported.consultationRecord);
+      persistedConsultationRecordPath = consultationRecordPath;
+    } else if (reported.consultationRecord) {
+      persistedConsultationRecordPath = consultationRecordPath;
     }
     emit({
       schema: "pipeline.advisory-host.v1",
@@ -372,6 +469,8 @@ export async function runAdvisoryHostBridge(argv = process.argv.slice(2), depend
       receiptPath,
       directoryDurability,
       attempts: reported.attempts,
+      consultationRecord: reported.consultationRecord ?? null,
+      consultationRecordPath: persistedConsultationRecordPath,
       sandboxBinding: sandboxBinding ?? null,
     });
     return reported.ok ? 0 : 2;

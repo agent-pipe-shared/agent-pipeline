@@ -729,3 +729,21 @@ test("every in-root Edit or Write requires readiness while outside targets stop 
     assert.equal(calls, (filePaths.length - 1) * 2);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
+
+test("H3 recovery commands admit only exact plugin-local argv and reject lookalikes", () => {
+  const path = root();
+  const digest = "a".repeat(64);
+  try {
+    const base = `node ${ONBOARDING_SCRIPT}`;
+    assert.equal(isSanctionedLifecycleCommand(`${base} plan-source-recovery --root ${path}`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`${base} plan-manifest-repair --root ${path}`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`${base} apply-manifest-repair --root ${path} --plan-sha256 ${digest} --activate`, path), true);
+    for (const hostile of [
+      `${base} plan-manifest-repair --root ${path} --activate`,
+      `${base} apply-manifest-repair --root ${path} --plan-sha256 ${digest}`,
+      `${base} apply-manifest-repair --root ${path}/.. --plan-sha256 ${digest} --activate`,
+      `${base} plan-manifest-repair --root ${path}; touch ${path}/x`,
+      `node ${join(path, "plugins/pipeline-core/scripts/project-onboarding-v3.mjs")} plan-manifest-repair --root ${path}`,
+    ]) assert.equal(isSanctionedLifecycleCommand(hostile, path), false, hostile);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});

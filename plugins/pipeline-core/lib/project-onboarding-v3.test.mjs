@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import {
   chmodSync, closeSync, existsSync, fstatSync, fsyncSync, lstatSync, mkdirSync, mkdtempSync,
-  openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, unlinkSync, writeFileSync,
+  openSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, linkSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -14,8 +14,11 @@ import { fileURLToPath } from "node:url";
 import {
   applyProjectOnboardingKickoffV4,
   applyProjectOnboardingLifecycleV4,
+  applyProjectOnboardingManifestRepair,
   applyProjectOnboardingV3,
   inspectProjectOnboardingV3,
+  planProjectOnboardingManifestRepair,
+  planProjectOnboardingSourceRecovery,
   planProjectOnboardingKickoffV4,
   planProjectOnboardingLifecycleV4,
   planProjectOnboardingV3,
@@ -2374,6 +2377,206 @@ test("owned runtime drift and invalid V3 sources stay in closed lifecycle classi
     assert.equal(observedInvalid.runner, null);
     assert.equal(observedInvalid.diagnostics[0].code, "source_invalid");
   } finally { dispose(drifted); dispose(invalid); }
+});
+
+test("H3 recovery planners are typed, read-only, and closed on invalid source evidence", () => {
+  const path = root();
+  try {
+    const before = readdirSync(path);
+    const source = planProjectOnboardingSourceRecovery({ rootDir: path, deps: fakeDeps });
+    assert.equal(source.schema, "pipeline.project-onboarding-source-recovery.v1");
+    assert.equal(source.status, "unrepairable");
+    assert.equal(source.category, "invalid-authority");
+    assert.equal(source.nextAction, null);
+    const manifest = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
+    assert.equal(manifest.schema, "pipeline.project-onboarding-manifest-repair-plan.v1");
+    assert.equal(manifest.status, "unrepairable");
+    assert.deepEqual(readdirSync(path), before);
+  } finally { dispose(path); }
+});
+
+test("H3 manifest repair uses a real V3 authority fixture and returns ready readback", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path, fakeDeps);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path, "H3 manifest repair ready readback", fakeDeps);
+    const ready = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent: "bootstrap" });
+    assert.equal(ready.status, "ready");
+    unlinkSync(join(path, ".claude", "pipeline.yaml"));
+    const before = names(path);
+    const plan = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
+    assert.equal(plan.status, "ready");
+    assert.deepEqual(names(path), before);
+    const repeat = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
+    assert.equal(repeat.planSha256, plan.planSha256);
+    const applied = applyProjectOnboardingManifestRepair({ rootDir: path, planSha256: plan.planSha256, activate: true, deps: fakeDeps });
+    assert.equal(applied.status, "ready", JSON.stringify(applied));
+    assert.equal(applied.readback.status, "ready");
+    assert.equal(inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps, intent: "bootstrap" }).status, "ready");
+  } finally { dispose(path); }
+});
+
+function readyManifestFixture() {
+  const path = root();
+  const barrier = initializeRestartRequiredRoot(path, fakeDeps);
+  clearRuntimeBarrier(path, barrier);
+  completeKickoff(path, "H3 manifest repair authority", fakeDeps);
+  unlinkSync(join(path, ".claude", "pipeline.yaml"));
+  return path;
+}
+
+test("H3 manifest repair rejects wrong digest and missing activation without writes", () => {
+  const path = readyManifestFixture();
+  try {
+    const plan = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
+    const before = names(path);
+    assert.equal(applyProjectOnboardingManifestRepair({ rootDir: path, planSha256: "0".repeat(64), activate: true, deps: fakeDeps }).status, "invalid-plan");
+    assert.equal(applyProjectOnboardingManifestRepair({ rootDir: path, planSha256: plan.planSha256, activate: false, deps: fakeDeps }).status, "activation-required");
+    assert.deepEqual(names(path), before);
+  } finally { dispose(path); }
+});
+
+test("H3 manifest repair preserves absent target after source drift and target appearance races", () => {
+  const drift = readyManifestFixture();
+  try {
+    const plan = planProjectOnboardingManifestRepair({ rootDir: drift, deps: fakeDeps });
+    writeFileSync(join(drift, "pipeline.user.yaml"), `${readFileSync(join(drift, "pipeline.user.yaml"), "utf8")}\n# drift\n`);
+    const result = applyProjectOnboardingManifestRepair({ rootDir: drift, planSha256: plan.planSha256, activate: true, deps: fakeDeps });
+    assert.equal(result.status, "invalid-plan");
+    assert.equal(existsSync(join(drift, ".claude", "pipeline.yaml")), false);
+  } finally { dispose(drift); }
+  for (const kind of ["file", "symlink", "hardlink"]) {
+    const path = readyManifestFixture();
+    try {
+      const plan = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
+      const target = join(path, ".claude", "pipeline.yaml");
+      if (kind === "file") writeFileSync(target, "foreign\n");
+      else if (kind === "symlink") symlinkSync(join(path, "pipeline.user.yaml"), target);
+      else linkSync(join(path, "pipeline.user.yaml"), target);
+      const result = applyProjectOnboardingManifestRepair({ rootDir: path, planSha256: plan.planSha256, activate: true, deps: fakeDeps });
+      assert.equal(result.status, "invalid-plan");
+      assert.equal(lstatSync(target).isSymbolicLink(), kind === "symlink");
+    } finally { dispose(path); }
+  }
+});
+
+test("H3 manifest repair rolls back only owned output on fsync and publication races", () => {
+  const fsyncRoot = readyManifestFixture();
+  try {
+    const plan = planProjectOnboardingManifestRepair({ rootDir: fsyncRoot, deps: fakeDeps });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    const failing = { ...fakeDeps, fsyncSync() { throw new Error("injected fsync failure"); } };
+    const result = applyProjectOnboardingManifestRepair({ rootDir: fsyncRoot, planSha256: plan.planSha256, activate: true, deps: failing });
+    assert.equal(result.status, "rolled-back", JSON.stringify({
+      result,
+      planned: plan,
+      replanned: planProjectOnboardingManifestRepair({ rootDir: fsyncRoot, deps: failing }),
+    }));
+    assert.equal(existsSync(join(fsyncRoot, ".claude", "pipeline.yaml")), false);
+  } finally { dispose(fsyncRoot); }
+  const raceRoot = readyManifestFixture();
+  try {
+    const plan = planProjectOnboardingManifestRepair({ rootDir: raceRoot, deps: fakeDeps });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    const nativeLink = linkSync; const nativeLstat = lstatSync; let linked = false; let swapped = false;
+    const target = join(raceRoot, ".claude", "pipeline.yaml");
+    const race = {
+      ...fakeDeps,
+      linkSync(temp, destination) { nativeLink(temp, destination); linked = true; },
+      lstatSync(candidate) {
+        const info = nativeLstat(candidate);
+        if (linked && !swapped && candidate === target) {
+          swapped = true;
+          unlinkSync(candidate);
+          writeFileSync(candidate, "foreign publication\n");
+        }
+        return info;
+      },
+    };
+    const result = applyProjectOnboardingManifestRepair({ rootDir: raceRoot, planSha256: plan.planSha256, activate: true, deps: race });
+    assert.equal(result.status, "rolled-back", JSON.stringify({
+      result,
+      planned: plan,
+      replanned: planProjectOnboardingManifestRepair({ rootDir: raceRoot, deps: race }),
+    }));
+    assert.equal(readFileSync(join(raceRoot, ".claude", "pipeline.yaml"), "utf8"), "foreign publication\n");
+  } finally { dispose(raceRoot); }
+});
+
+test("H3 manifest repair fails closed on V4 readback failure and physical-root symlink", () => {
+  const path = readyManifestFixture();
+  try {
+    const plan = planProjectOnboardingManifestRepair({ rootDir: path, deps: fakeDeps });
+    assert.equal(plan.status, "ready", JSON.stringify(plan));
+    const failingReadback = { ...fakeDeps, inspectProjectOnboardingV3() { return { status: "partial", diagnostics: [] }; } };
+    const result = applyProjectOnboardingManifestRepair({ rootDir: path, planSha256: plan.planSha256, activate: true, deps: failingReadback });
+    assert.equal(result.status, "rolled-back", JSON.stringify({
+      result,
+      planned: plan,
+      replanned: planProjectOnboardingManifestRepair({ rootDir: path, deps: failingReadback }),
+    }));
+    assert.equal(existsSync(join(path, ".claude", "pipeline.yaml")), false);
+  } finally { dispose(path); }
+  const real = readyManifestFixture(); const link = `${real}-link`;
+  try {
+    symlinkSync(real, link);
+    const result = planProjectOnboardingManifestRepair({ rootDir: link, deps: fakeDeps });
+    assert.equal(result.status, "unrepairable");
+  } finally { dispose(real); try { unlinkSync(link); } catch {} }
+});
+
+test("H3 source recovery exposes authentic invalid, unsupported, and current categories", () => {
+  const invalid = root();
+  try { assert.equal(planProjectOnboardingSourceRecovery({ rootDir: invalid, deps: fakeDeps }).category, "invalid-authority"); } finally { dispose(invalid); }
+  const unsupported = root();
+  try {
+    writeFileSync(join(unsupported, "pipeline.user.yaml"), yaml(v0Source()));
+    assert.equal(planProjectOnboardingSourceRecovery({ rootDir: unsupported, deps: fakeDeps }).category, "unsupported-source-transition");
+  } finally { dispose(unsupported); }
+  const current = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(current, fakeDeps); clearRuntimeBarrier(current, barrier); completeKickoff(current, "H3 current authority", fakeDeps);
+    assert.equal(planProjectOnboardingSourceRecovery({ rootDir: current, deps: fakeDeps }).category, "current-authority");
+  } finally { dispose(current); }
+});
+
+test("H3 source recovery distinguishes stale generated projection from unavailable evidence", () => {
+  const stale = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(stale, fakeDeps);
+    clearRuntimeBarrier(stale, barrier);
+    completeKickoff(stale, "H3 stale projection authority", fakeDeps);
+    unlinkSync(join(stale, ".claude", "pipeline.yaml"));
+    const inspected = inspectProjectOnboardingV3({ rootDir: stale, deps: fakeDeps });
+    assert.notEqual(inspected.status, "ready", JSON.stringify(inspected));
+    const plan = planProjectOnboardingSourceRecovery({ rootDir: stale, deps: fakeDeps });
+    assert.equal(plan.category, "stale-generated-projection");
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.nextAction?.mutation, false);
+  } finally { dispose(stale); }
+
+  const unavailable = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(unavailable, fakeDeps);
+    clearRuntimeBarrier(unavailable, barrier);
+    completeKickoff(unavailable, "H3 unavailable evidence authority", fakeDeps);
+    const unavailableDeps = {
+      ...fakeDeps,
+      classifyOnboardingContinuity: () => ({
+        status: "damaged",
+        stateSha256: null,
+        handoverSha256: null,
+        historySha256: null,
+      }),
+    };
+    const inspected = inspectProjectOnboardingV3({ rootDir: unavailable, deps: unavailableDeps });
+    assert.equal(inspected.status, "continuity-damaged", JSON.stringify(inspected));
+    const plan = planProjectOnboardingSourceRecovery({ rootDir: unavailable, deps: unavailableDeps });
+    assert.equal(plan.category, "unavailable-evidence");
+    assert.equal(plan.status, "unrepairable");
+    assert.equal(plan.nextAction, null);
+  } finally { dispose(unavailable); }
 });
 
 console.log(`\nproject-onboarding-v3: ${passed} passed, ${failures.length} failed`);

@@ -1,8 +1,18 @@
 # Checklist — Session Close / Block End
 
-> Agent-Pipeline v0.1.0-draft · Phase 3 · Compact operative reference for the Elephant; why + verification live in `docs/operating-model.md` §5–§7, `policies/model-policy.md` MP-16/MP-19/MP-20, ADR-0012. Executable form: close skill (`close-block`) in `plugins/pipeline-core` (authored in parallel).
+> Agent-Pipeline · Compact operative reference for the Elephant; why + verification live in `docs/operating-model.md` §5–§7, `policies/model-policy.md` MP-16/MP-19/MP-20, ADR-0012. Executable form: the unified close coordinator plus the compatibility skills in `plugins/pipeline-core`.
 
 ## Close the block honestly
+
+### H5 close coordinator (single authority)
+
+- [ ] Close state follows `active → checkpointed → feature-close-prepared → tracked-close-finalized → candidate-frozen → final-verify-green`.
+- [ ] Checkpoint preserves `activeFeature`; every tracked Result/backlog/handover/HISTORY/telemetry/retrospective/State mutation precedes the one frozen commit.
+- [ ] Final Verify and Security bind the exact frozen OID/tree; any tracked drift invalidates evidence and never creates a second candidate.
+- [ ] No publication is a valid local terminal path (`cleanup-complete → closed-local`); authorized delivery alone follows `publication-authorized → published → readback-confirmed → cleanup-complete → delivered`.
+- [ ] Cleanup is descriptor-bound and candidate-neutral; uncertainty blocks terminal claims. Release/promotion remain optional descendants.
+- [ ] Every post-freeze Verify, authorization, publication, readback and cleanup receipt is stored below the coordinator-private evidence directory returned by `apply-start`/`inspect`, never as a new tracked candidate byte.
+- [ ] Active Continuity close uses the coordinator-returned State action including its exact `--continuity-close-request`; State byte drift or a reconstructed argv is refused.
 
 - [ ] Block/task boundary reached — no close mid-task unless forced (then note why)
 - [ ] DoD status assigned per task: done / 🟡 not-human-verified / blocked (`harness/definition-of-done.md` §3)

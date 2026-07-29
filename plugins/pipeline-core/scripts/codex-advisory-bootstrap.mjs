@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 
-/** Closed bootstrap launcher: V3 opt-out authority -> one native Codex advisory. */
+/**
+ * Compatibility-named launcher for one concrete on-demand Codex consultation.
+ * Session bootstrap never invokes this command.
+ */
 import { createHash, randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
@@ -10,6 +13,7 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { TextDecoder } from "node:util";
 
+import { createAdvisoryDemand } from "../lib/advisory-lifecycle-v2.mjs";
 import { derivePoGateRepositoryFingerprint, resolvePoGateRepositoryTopology } from "../lib/po-gate-authority.mjs";
 import {
   ProjectOnboardingReadyError,
@@ -21,7 +25,7 @@ import { resolveSystemExecutable } from "./tool-identity.mjs";
 import { runAdvisoryHostBridge } from "./advisory-host-bridge.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
-const USAGE = "usage: codex-advisory-bootstrap.mjs --profile <epic|feature> --dispatch-id <id> --queue-revision <n> --session-id <id> --expected-descriptor-sha256 <sha256> --receipt <path> [--reference <repo-relative-path>] < question.txt";
+const USAGE = "usage: codex-advisory-bootstrap.mjs --profile <epic|feature> --reason <trigger> --evidence-sha256 <sha256> --dispatch-id <id> --queue-revision <n> --session-id <id> --expected-descriptor-sha256 <sha256> --receipt <path> [--reference <repo-relative-path>] < question.txt";
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 
@@ -53,6 +57,8 @@ function parseArgs(argv) {
     if (next === undefined) throw new Error(USAGE);
     if (token === "--reference") value.references.push(next);
     else if (token === "--profile") value.profile = next;
+    else if (token === "--reason") value.reason = next;
+    else if (token === "--evidence-sha256") value.evidenceSha256 = next;
     else if (token === "--dispatch-id") value.dispatchId = next;
     else if (token === "--queue-revision") value.queueRevision = Number(next);
     else if (token === "--session-id") value.sessionId = next;
@@ -60,7 +66,9 @@ function parseArgs(argv) {
     else if (token === "--receipt") value.receipt = next;
     else throw new Error(USAGE);
   }
-  if (!["epic", "feature"].includes(value.profile) || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(value.dispatchId ?? "")
+  if (!["epic", "feature"].includes(value.profile)
+    || !/^[a-z][a-z0-9-]{0,63}$/.test(value.reason ?? "") || !SHA256.test(value.evidenceSha256 ?? "")
+    || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(value.dispatchId ?? "")
     || !Number.isSafeInteger(value.queueRevision) || value.queueRevision < 0
     || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(value.sessionId ?? "") || !SHA256.test(value.descriptorSha256 ?? "")
     || typeof value.receipt !== "string" || value.receipt.length === 0
@@ -97,11 +105,22 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
   const temp = realpathSync((dependencies.mkdtempFn ?? mkdtempSync)(join(tmpdir(), "pipeline-codex-advisory-")));
   const inputPath = join(temp, `${randomUUID()}.json`);
   try {
+    const dispatch = { dispatchId: args.dispatchId, queueRevision: args.queueRevision, candidateCommit, candidateTree };
+    const demand = createAdvisoryDemand({
+      runner: "codex",
+      profile: args.profile,
+      reason: args.reason,
+      question,
+      evidenceSha256: args.evidenceSha256,
+      dispatch,
+    });
+    if (!demand.ok) throw new Error(demand.code);
     const input = {
       profile: args.profile,
       runner: "codex",
       question,
-      dispatch: { dispatchId: args.dispatchId, queueRevision: args.queueRevision, candidateCommit, candidateTree },
+      dispatch,
+      demand: demand.demand,
       references: [...args.references],
       advisorExport: source.advisor_export ?? { consent: "default" },
       sandboxContext: { repoFingerprint, referenceSetSha256: sha256(JSON.stringify([...new Set(args.references)].sort())) },

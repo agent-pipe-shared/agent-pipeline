@@ -3,8 +3,42 @@ name: close-block
 description: "Session/block close ritual, parametrized by the project's .claude/pipeline.json (operating-model §8): run close.pre extensions, verify + machine evidence, drift checks (handover freshness, CLAUDE.md length gate, memory mirror, stale worktrees), handover + HISTORY sync (single source), telemetry line (MP-20), mandatory self-retro, close.post extensions, final commit. Invoke at a block/task boundary or before a planned session cut."
 disable-model-invocation: true
 argument-hint: "[block-id or short session label]"
-allowed-tools: Bash(git add:*), Bash(git commit:*), Bash(git log:*), Bash(git diff:*)
+allowed-tools: Bash(git add:*), Bash(git commit:*), Bash(git log:*), Bash(git diff:*), Bash(node plugins/pipeline-core/scripts/close-coordinator.mjs:*)
 ---
+
+H5 compatibility rule: close-block delegates checkpoint/finalization planning
+to the unified close coordinator. It must not maintain a parallel completion
+state or require push; inspect → plan-transition → confirmed `--activate`
+apply, with publication and release handled as separate gates.
+
+## Mandatory H5 dispatcher
+
+The coordinator decides which close mode is legal. The numbered ritual below
+supplies tracked effects and evidence to that one state machine; it is not an
+independent sequence and must not advance when its coordinator phase is stale.
+
+1. Run `close-coordinator.mjs inspect` for the active lifecycle and use only a
+   phase listed in its `next` result.
+2. For a **checkpoint**, plan `checkpointed`, present its exact plan digest and
+   returned action, and apply it only after confirmation. Stop there:
+   `activeFeature` remains active; do not close State, create a final close
+   commit, publish, release, or run cleanup.
+3. For **completion**, advance in this exact order:
+   `feature-close-prepared` (then execute only its returned, separately
+   confirmed State-writer action, including any continuity close request) →
+   complete the ritual's tracked Result/backlog/handover/HISTORY/telemetry/
+   retrospective effects → bind them as `tracked-close-finalized` → create the
+   one final tracked commit → `candidate-frozen` → persist exact private
+   Verify/Security evidence → `final-verify-green`.
+4. After `final-verify-green`, a no-push close uses confirmed descriptor-bound
+   cleanup and ends at `closed-local`. Publication is a separate authorization
+   branch (`publication-authorized` → `published` → `readback-confirmed` →
+   cleanup → `delivered`). Release eligibility and promotion each require
+   another independent authorization; neither is implied by close or push.
+5. Every transition is first a read-only `plan-transition`. Show the exact
+   request/action digest and execute only the returned `--activate` action
+   after confirmation. A changed plan, State byte, candidate OID/tree,
+   evidence file, destination, or coordinator CAS requires a new plan.
 
 # close-block — session close ritual (parametrized)
 

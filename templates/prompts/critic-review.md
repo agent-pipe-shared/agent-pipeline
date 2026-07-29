@@ -143,7 +143,7 @@ Dispatch metadata (operating-model §2.3 field 6, critic variant):
 - Ruleset SHA: {{RULESET_SHA}} (echo in your confirmation line)
 - Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "guardrail diff → higher-capability review model at max + selected runner native isolation" or "standard → review-tier model at max" or "class-mittel cascade → review-tier model at max first, escalate to the higher-capability review model only on major finding / A-G-S touch / contested verdict" or "mechanical auto-pass (T0) → no critic dispatched"}}
 - T1 isolation/assurance: {{T1_ASSURANCE e.g. "runner-native: <runner adapter/capability>; OS-isolation claim only as evidenced" or "functional-equivalent-read-only; OS isolation not asserted"}}
-- {{ADVISOR_SESSION_LINE: if this dispatch runs inside an `advisor`-profile Elephant session, include verbatim: "Advisor sessions: do not consult the advisor" (MP-26d) — else delete this line.}}
+- {{ADVISOR_DEMAND_LINE: if the Elephant has a current bounded Advisor demand, include verbatim: "Do not invoke or reuse the Advisor; consultation ownership remains with the Elephant" (MP-26) — else delete this line.}}
 
 If anything else was handed to you (explanations, "background", implementor
 justifications, summaries of intent beyond the spec): do not read its content.

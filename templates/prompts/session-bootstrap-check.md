@@ -9,11 +9,13 @@ Language: English (agent-facing prompt, ADR-0011); the confirmation line is
 the canonical audit string the PO and hooks check literally ("the line begins
 literally with 'Bootstrap check passed:'").
 
-STATUS: TRANSITIONAL. This prompt exists for projects where the plugin skill
-(`/pipeline-core:pipeline-start`) is not yet installed. Once the skill works in
-the project, use the skill — not this prompt. OPEN (Phase 4): retire this file
-once `/pipeline-core:pipeline-start` (shipped in plugins/pipeline-core) is
-verified on both machines (two-machine validation, ADR-0010).
+STATUS: COMPATIBILITY-ONLY. For `pipeline.user.v3`, do not execute the legacy
+`advisor|design-first` profile or startup-Advisor passages below. Use
+`epic|feature|mini`, and perform only the model-free
+`pipeline.advisory-capability-preflight.v2`; session start, resume, re-entry
+and Compact never launch a consultation (ADR-0047). If the current
+`/pipeline-core:pipeline-start` skill is unavailable, stop as F1 rather than
+using this historical prompt to create an Advisor model request.
 
 USAGE (the PO or Elephant)
 1. Paste everything below the marker at the start of a session (or after the

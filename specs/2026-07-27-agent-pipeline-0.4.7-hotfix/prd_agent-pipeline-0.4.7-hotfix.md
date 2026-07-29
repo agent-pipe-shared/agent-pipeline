@@ -3,15 +3,15 @@
 # PRD — Agent Pipeline 0.4.7 hotfix
 
 > Product Review Document for the PO gate. Status:
-> `multi-generation authority recovery approved and implemented on 2026-07-29;
-> focused regressions are green; final digest-bound authority, Critic and
-> local installed readback remain gated`.
+> `expanded 0.4.7 corrective implementation candidate in progress on
+> 2026-07-29; the final stabilized PRD/Spec bytes require a fresh digest-bound
+> PO selection before candidate freeze`.
 > Task: `agent-pipeline-0.4.7-hotfix` · Feature · Rigor 2 · Risk high.
 > Base: public 0.4.6 release at
 > `9d1b3dc108eb77629ace5b82002120f5539abd8d`. Acceptance criteria:
 > [spec.md](spec.md).
 
-<!-- technical-spec-sha256: 1d05524ce10d6ac29d9522c7e3edb488c58ca103e82defdeeb24814c751a9ded -->
+<!-- technical-spec-sha256: 3fd30e11c99923721cc42fb6bf75a26c3be1356c9a738f716a20539457105a89 -->
 
 The 2026-07-28 approval remains historical evidence for the already
 implemented slices. The Human/PO explicitly directed implementation of the
@@ -20,10 +20,52 @@ repository-local implementation and verification only; it does not authorize
 push, merge, tag, release, Issue mutation, Pull Request operation, or mutation
 of a downstream Sprint checkout.
 
-## Superseding candidate truth — 2026-07-29
+## Final expanded release authority — 2026-07-29
 
-This section supersedes every broader or older candidate-status and delivery
-statement below where they conflict.
+This section supersedes every narrower historical scope and deferral below.
+The Human/PO activated this expanded scope; once the implementation documents
+stop changing, their exact final digests must be selected again through the
+sanctioned authority writer.
+
+The already published corrective baseline is
+`41c09045e73b95988a335bcf1c476734f7785302`. It is the implementation base for
+the remaining work, not a complete `0.4.7` release candidate. The final release
+scope is:
+
+- Issue #70 / AC-047-01–02: canonical backlog ledger admission while the item
+  remains open;
+- Issue #63 / AC-047-03–08: typed V4 source diagnosis plus absent-manifest
+  plan/confirmed apply/readback;
+- Issue #73 / AC-047-09–15 and AC-047-27–50: retained guarded bootstrap,
+  cross-platform runtime/private-state, authority, cleanup, publication and
+  attended-override repairs;
+- Issue #71 / AC-047-16–23: reactive, typed WSL AF_UNIX incompatibility
+  detection plus an opt-in, digest-bound, session-only compatibility profile;
+- the discovered kickoff correction / AC-047-51: an explicitly unapproved
+  writer-shaped kickoff state with an omitted approval object is not persisted
+  PO authority, while approved/malformed lookalikes remain fail-closed; and
+- Issue #77 / AC-047-52–60: one restart-safe close coordinator separating
+  checkpoint, feature close, candidate freeze, final Verify, optional
+  publication/readback, cleanup and later release/promotion; and
+- Issue #80 / AC-047-24 and AC-047-61–68: a versioned split between immediate
+  model-free Advisor capability preflight and concrete, demand-bound
+  consultation, with no model child or timeout wait during bootstrap.
+
+The 180,000/90,000 ms Advisor budgets apply only after a valid on-demand
+consultation trigger. Issue #72/native Apple Silicon remains a follow-up and
+is not a `0.4.7` platform gate.
+
+The expanded scope reopens security, lifecycle, generated-authority and
+machine-local configuration surfaces. Therefore the immutable final candidate
+requires fresh candidate-bound Full Verify, blocking Security and independent
+high-risk Critic evidence. Earlier full-run evidence remains historical only.
+Candidate freeze and final evidence may not start until the stabilized revised
+PRD/Spec bytes are selected again through the sanctioned authority writer.
+
+## Historical narrowed candidate truth — 2026-07-29
+
+This section records the previously approved narrowed scope and is superseded
+by “Final expanded release authority” above.
 
 The implementation baseline is commit
 `0f36072f5250708e59d200ef802bdfdba92adccf`, tree
@@ -45,8 +87,8 @@ green full-run evidence remains the baseline and is not rerun. Exact candidate
 identity is reported by Git and package readback rather than embedded
 recursively in its own document bytes.
 
-The current product truth is deliberately narrower than the original
-aggregate 0.4.7 plan:
+At this historical narrowed baseline, the product truth was deliberately
+narrower than the original aggregate 0.4.7 plan:
 
 - implemented and retained: the closed guard grammar, cross-platform restart
   and private-state fixes, exact legacy continuity adoption, transactional
@@ -64,21 +106,20 @@ aggregate 0.4.7 plan:
   packaging/version consistency, installed readback, and a clean
   lifecycle/readback state.
 
-### Deferred-work ownership and expiry
+### Historical deferral ownership and expiry (fully superseded)
 
-Deferral does not mean silent abandonment. The following register is part of
-the approved product boundary:
+This register records the former narrowed decision. The final expanded
+authority later activated H1, H3, H4 and H6:
 
-| Deferred work | Accountable owner | Deferral expires |
-| --- | --- | --- |
-| AC-047-01–02 backlog admission | Agent Pipeline Human/PO | 2026-08-15, or earlier when 0.4.8 planning opens |
-| AC-047-03–08 generic source/manifest recovery | Agent Pipeline Human/PO with Pipeline security reviewer | 2026-08-15, or earlier when 0.4.8 planning opens |
-| AC-047-16–23 WSL IPC compatibility/profile | Agent Pipeline Human/PO with Windows/WSL platform owner | 2026-08-15, or earlier on a reproduced native IPC blocker |
-| AC-047-24 Advisor 180/90-second budgets | Agent Pipeline Human/PO with runtime owner | 2026-08-15, or earlier when Advisor routing changes |
+| Formerly deferred work | Current disposition |
+| --- | --- |
+| AC-047-01–02 backlog admission | Activated in 0.4.7; H1 is required. |
+| AC-047-03–08 generic source/manifest recovery | Activated in 0.4.7; H3 is required. |
+| AC-047-16–23 WSL IPC compatibility/profile | Activated in 0.4.7; H4 is required. |
+| AC-047-24 Advisor 180/90-second budgets | Activated with #80 in 0.4.7; budgets are consultation-only and never consumed by bootstrap. |
 
-At expiry the owner must either admit the item into a separately approved
-plan with fresh acceptance criteria or explicitly renew the deferral with a
-new dated rationale. This hotfix makes no completion claim for these items.
+All earlier deferrals are provenance, not permission to omit required release
+slices.
 
 The first repaired defect is distinct from the previously implemented narrow
 stale-marker repair. It includes both divergent document bytes and the common
@@ -136,16 +177,14 @@ the revised Spec. AC-047-30 through AC-047-50 define the new repairs.
 
 ### Product decisions to bind to the reconciled bytes
 
-1. Approve the current commit/tree as the design baseline, not as release
-   evidence.
-2. Approve removal of AC-047-01–08 and AC-047-16–24 from this hotfix; they
-   remain deferred work and are not claimed complete.
-3. Approve AC-047-30–50 as the new product implementation scope: neutral
-   authority selection, composite cleanup recovery, portable publication
-   baselines, the attended one-action guard override, and multi-generation
-   authority recovery.
-4. Keep push, merge, tag, release, marketplace, Issue, Pull Request, and
-   downstream Sprint operations separately gated.
+1. Bind AC-047-01–68, including AC-047-24, as the complete 0.4.7 corrective
+   implementation scope.
+2. Bind the current PRD and Spec bytes as design authority only, not as release
+   evidence or an immutable candidate claim.
+3. Require candidate-bound focused regressions, two independent Critic views,
+   Full Verify/Security, package/readback and local installed/live evidence.
+4. Keep publication, main update, merge, final `0.4.7` version, tag, release,
+   marketplace mutation and downstream Sprint operations separately gated.
 
 ## Historical candidate audit status — 2026-07-28 (non-normative)
 
@@ -171,6 +210,9 @@ evidence.
   cleanup handle; and
 - lets an attended Human authorize exactly one eligible denied action through
   an expiring, single-use, tamper-evident capability without disabling guards.
+- makes bootstrap Advisor observation immediate and model-free, while a real
+  consultation requires one reasoned, digest-bound question and is not
+  repeated without material drift.
 
 The release becomes the clean common base for three active Sprint branches. It
 contains no Sprint feature work.
@@ -229,6 +271,12 @@ The hotfix replaces each lockout with an exact, auditable state machine.
   read-only diagnostic pipeline while retaining all mutation and pre-readiness
   denials. Native Windows uses a physical trusted Codex executable and the
   shared owner-private state assurance.
+- **Advisor lifecycle:** preserve the frozen V3 runner routes while a V2
+  lifecycle contract makes Epic/Feature bootstrap a zero-model capability
+  preflight. Consultation requires one allowlisted reason, question/evidence
+  digests and exact candidate/policy binding; unchanged demand is not repeated.
+  Claude and Codex retain their same-runner adapters, and only actual Codex
+  consultation may consume the 180/90-second budgets.
 - **Release evidence:** produce independent 0.4.7 focused, platform,
   verification, security, Critic, packaging, and installed-readback evidence
   against one immutable final candidate. Sprint integration remains a later,
@@ -243,10 +291,9 @@ The hotfix replaces each lockout with an exact, auditable state machine.
 - No general shell/PowerShell interpreter or new arbitrary pre-ready authority.
 - No generic continuity migration, force close, arbitrary Result adoption, or
   manual edit of `.claude/pipeline-state.json`.
-- No backlog-admission repair, generic V4 source/manifest recovery, WSL IPC
-  compatibility profile, or Advisor 180/90-second timeout change in 0.4.7.
+- No broader close-system redesign beyond #77's minimum corrective slice.
 - No guessed replacement of an existing manifest.
-- No eager/global WSL workaround, external network allowance, credential
+- No eager/global WSL workaround, external destination allowlist, credential
   access, or additional private path.
 
 ## Risks and mitigation
@@ -260,8 +307,10 @@ The hotfix replaces each lockout with an exact, auditable state machine.
 | Human override becomes a guard-disable switch. | Exact denial/tool/repository/preimage binding, short expiry, single consumption, authenticated private audit, and a closed non-overridable invariant set. |
 | Guard parsing authorizes writes. | Closed grammar, per-segment validation, typed denials, hostile and outer-hook tests. |
 | Manifest repair replaces foreign data. | Absent targets only; bind source, parent, plan, publication identity, and final readback. |
-| WSL workaround exposes local daemons or becomes permanent. | PO-approved warning for `dangerously_allow_all_unix_sockets`; native-first per session; exact failure proof; never default; narrow duties isolated. |
+| WSL workaround exposes local daemons, external destinations, or becomes permanent. | PO-approved warning for `dangerously_allow_all_unix_sockets`; the required `network.enabled` has no domain allow entries; every new WSL Elephant session is nested-standard-first; only a matching `nested-codex-sandbox` failure may activate the profile later in that same session; direct-host observations are never activation authority; a successful nested standard operation after a WSL/Codex fix leaves the dormant profile wholly unused; the profile is never default and narrow duties stay isolated; legacy candidate upgrades require the exact prior private receipt and atomic two-preimage rollback. |
 | IPC troubleshooting log leaks machine-local data or becomes an activation oracle. | Closed sanitized schema, owner-private bounded local retention, no raw paths/commands/stderr, and activation consumes typed runtime results rather than log text. |
+| Bootstrap capability observation silently becomes a model probe or consultation. | Closed V2 policy/CLI, zero-effects evidence, explicit non-trigger events and process tests proving no prompt, child, receipt or timeout budget. |
+| An unchanged or stale Advisor question is repeated or reused across material drift. | Demand and consultation-record digests bind question, reason, evidence, candidate and route policies; identical keys do not launch, drift requires a fresh demand. |
 | Windows reports false privacy or runs a wrapper. | Owner/DACL assurance, physical direct executable, digest binding, no shell. |
 | Sprint rebases keep conflicting implementations. | Changed-path intersection, manual disposition, renewed candidate gates. |
 
@@ -287,26 +336,27 @@ The hotfix replaces each lockout with an exact, auditable state machine.
 | Multi-generation authority drift | AC-047-48–50; required Phoenix-/Nova-shaped synthetic fixtures and confirmed convergence, with Human Override prohibited |
 | Issue #73 retained repairs | AC-047-09–15; retained from the implementation base |
 | Released 0.4.6 continuity | Dedicated one-shot Result/PRD reconciliation followed by the existing close gate |
-| Backlog, generic source/manifest recovery, WSL IPC profile, Advisor 180/90 | Deferred and excluded from this hotfix |
+| Backlog, generic source/manifest recovery and WSL IPC profile | Activated by the final expanded release authority as #70, #63 and #71 |
+| Unified close ordering | Activated as the bounded #77 minimum corrective slice |
+| Advisor capability/consultation lifecycle | Activated as #80; AC-047-24 and AC-047-61–68, with zero-model bootstrap and consultation-only 180/90 budgets |
 | Pull Request #64 | Not integrated or operated on |
 | Downstream Sprints | No mutation in this hotfix session; later integration is separately authorized |
 
 ## DoD
 
-Product completion requires the retained dispositions of AC-047-09–15 and
-AC-047-25–29 plus AC-047-30–50 in [spec.md](spec.md). AC-047-01–08 and
-AC-047-16–24 are explicitly not release requirements for this hotfix.
+Product completion requires AC-047-01–68, including AC-047-24, in
+[spec.md](spec.md).
 Completion still requires one immutable candidate commit/tree, all focused
-tests, the green `0f36072` Full-Verify/Security baseline, a fresh independent
-diff-bounded high-risk Critic over every post-baseline correction,
+tests, fresh candidate-bound Full Verify/Security, a fresh independent
+high-risk Critic over the complete expanded candidate,
 packaged/installed plugin readback, version consistency, required platform
 semantics, and clean lifecycle/readback. Nova/Phoenix or PR #64 evidence is
 inadmissible.
 
 ## Decision points
 
-1. The expanded implementation scope and deferrals in this PRD are approved;
-   release is not approved.
+1. The expanded implementation scope for #70, #63, #71, #73, the kickoff
+   correction, #77 and #80 is approved; release is not approved.
 2. Final PRD/Spec bytes require one matching digest-bound authority decision.
 3. The immutable candidate requires the bound green Full-Verify/Security
    baseline, focused correction-delta regressions, diff-bounded Critic,

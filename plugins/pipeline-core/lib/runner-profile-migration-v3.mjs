@@ -91,7 +91,7 @@ const LEGACY_V3_RUNTIME_SEEDS = Object.freeze({
   // legacy project must derive its public runtime projection from its source.
   ".claude/settings.json": "{}\n",
   ".claude/pipeline.json": "{}\n",
-  ".claude/pipeline.yaml": "language:\n  human_facing: en\nmodelRouting:\n  legacy:\n    model: legacy\n    effort: low\n",
+  ".claude/pipeline.yaml": "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nmodelRouting:\n  legacy:\n    model: legacy\n    effort: low\n",
   ".codex/config.toml": "",
   ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"),
   ".codex/agents/critic.toml": codexCustomAgentSeed("critic"),
@@ -119,7 +119,7 @@ const SLIM_V3_RUNTIME_SEEDS = Object.freeze({
     stakes: "private-overlay",
     constraints: ["Public Core owns the runtime projection; private overlay policy may add constraints."],
   }, null, 2)}\n`,
-  ".claude/pipeline.yaml": "language:\n  human_facing: en\nmodelRouting:\n  legacy:\n    model: legacy\n    effort: low\n",
+  ".claude/pipeline.yaml": "schema: pipeline.manifest.v0\nlanguage:\n  human_facing: en\nmodelRouting:\n  legacy:\n    model: legacy\n    effort: low\n",
   ".codex/config.toml": "",
   ".codex/agents/implementor.toml": codexCustomAgentSeed("implementor"),
   ".codex/agents/critic.toml": codexCustomAgentSeed("critic"),
@@ -555,6 +555,27 @@ export function planRunnerProfileMigrationV3({
     root, sourceKind: classified.kind, sourceSha256: sha256(classified.source.bytes), intentSha256: sha256(JSON.stringify(stable(classified.intent))), compatibilityDeltas: classified.compatibilityDeltas, decisionConflicts: projection.decisionConflicts ?? [], runtimeMode: hostManagedCodex ? "host-managed-codex" : "standard", targets, changes,
     activation: { required: true, command: "apply --activate", sourceCommittedLast: true },
   }), internal);
+}
+
+/**
+ * Render the canonical V3 manifest from the authenticated source and slim
+ * runtime seeds. This is deliberately read-only and is used by recovery when
+ * the manifest target alone is absent.
+ */
+export function renderCanonicalV3Manifest({ rootDir = process.cwd(), deps: overrides = {} } = {}) {
+  const plan = planRunnerProfileMigrationV3({ rootDir, deps: overrides, initializeMissingRuntimeForSlimV3: true });
+  if (plan.status === "noop") {
+    try {
+      const path = join(realpathSync(rootDir), ".claude/pipeline.yaml");
+      const bytes = readFileSync(path, "utf8");
+      return { status: "ready", bytes, sha256: sha256(bytes), byteLength: Buffer.byteLength(bytes, "utf8") };
+    } catch (error) { return { status: "invalid-baseline", diagnostics: [{ path: "$.targets", code: "manifest_render_missing", message: error.message, repair: "repair the complete V3 runtime projection" }] }; }
+  }
+  if (plan.status !== "ready") return { status: plan.status, diagnostics: plan.diagnostics ?? [] };
+  const authenticatedPlan = authenticated(plan);
+  const target = authenticatedPlan?.targets?.find((entry) => entry.path === ".claude/pipeline.yaml");
+  if (!target || typeof target.bytes !== "string") return { status: "invalid-baseline", diagnostics: [{ path: "$.targets", code: "manifest_render_missing", message: "canonical V3 manifest projection is unavailable", repair: "repair the complete V3 runtime projection" }] };
+  return { status: "ready", bytes: target.bytes, sha256: target.after.sha256, byteLength: target.after.byteLength };
 }
 
 // "r+", not "r": a Windows handle opened read-only has no write-back to flush, so

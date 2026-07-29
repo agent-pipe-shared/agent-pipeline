@@ -13,11 +13,13 @@ import {
 } from "../lib/project-onboarding-ready-gate.mjs";
 import { runCodexAdvisoryBootstrap } from "./codex-advisory-bootstrap.mjs";
 
-test("closed launcher reads the V3 opt-out authority and constructs one native candidate-bound request without node -e", async () => {
+test("closed launcher requires a concrete reason and constructs one demand-bound request without node -e", async () => {
   let captured;
   const gateCalls = [];
   const code = await runCodexAdvisoryBootstrap([
     "--profile", "epic",
+    "--reason", "risk-review",
+    "--evidence-sha256", "e".repeat(64),
     "--dispatch-id", "bootstrap-test",
     "--queue-revision", "2",
     "--session-id", "session-test",
@@ -41,6 +43,9 @@ test("closed launcher reads the V3 opt-out authority and constructs one native c
   assert.deepEqual(captured.advisorExport, { consent: "approved" });
   assert.equal(captured.runner, "codex");
   assert.equal(captured.question, "Which bootstrap boundary is safe?");
+  assert.equal(captured.demand.schema, "pipeline.advisory-demand.v2");
+  assert.equal(captured.demand.reason, "risk-review");
+  assert.equal(captured.demand.evidenceSha256, "e".repeat(64));
   assert.deepEqual(captured.references, ["plugins/pipeline-core/scripts/advisory-host-bridge.mjs"]);
   assert.equal(captured.dispatch.queueRevision, 2);
   assert.match(captured.dispatch.candidateCommit, /^[a-f0-9]{40}$/u);
@@ -55,7 +60,8 @@ test("closed launcher reads the V3 opt-out authority and constructs one native c
 
 test("launcher rejects absent, oversized, or invalid UTF-8 stdin before creating an advisory request", async () => {
   const argv = [
-    "--profile", "feature", "--dispatch-id", "bootstrap-stdin-test", "--queue-revision", "0",
+    "--profile", "feature", "--reason", "risk-review", "--evidence-sha256", "e".repeat(64),
+    "--dispatch-id", "bootstrap-stdin-test", "--queue-revision", "0",
     "--session-id", "session-test", "--expected-descriptor-sha256", "a".repeat(64),
     "--receipt", "/tmp/bootstrap-stdin-test-receipt.json",
   ];
@@ -73,7 +79,8 @@ test("launcher rejects absent, oversized, or invalid UTF-8 stdin before creating
 
 test("dispatch readiness failure precedes question, temporary input, executable resolution, and host consult", async () => {
   const argv = [
-    "--profile", "feature", "--dispatch-id", "bootstrap-ready-gate", "--queue-revision", "0",
+    "--profile", "feature", "--reason", "risk-review", "--evidence-sha256", "e".repeat(64),
+    "--dispatch-id", "bootstrap-ready-gate", "--queue-revision", "0",
     "--session-id", "session-test", "--expected-descriptor-sha256", "a".repeat(64),
     "--receipt", "/tmp/bootstrap-ready-gate-receipt.json",
   ];

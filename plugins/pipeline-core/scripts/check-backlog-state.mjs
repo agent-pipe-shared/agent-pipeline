@@ -25,6 +25,7 @@ import {
   planBacklogEvidenceAmendment,
   planBacklogTransition,
   planElephantAfkLedgerRepair,
+  planManagedOnboardingLedgerRepair,
   projectBacklog,
   renderBacklogItem,
   transitionHash,
@@ -243,6 +244,7 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true } = {
   if (itemNames.length === 0) findings.push(`${ITEMS_DIR} must contain at least one current item`);
 
   const items = [];
+  const itemBytes = new Map();
   for (const name of itemNames) {
     const repoPath = `${ITEMS_DIR}/${name}`;
     const text = readText(join(root, repoPath), findings, repoPath);
@@ -254,6 +256,7 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true } = {
     // project an item without a canonical id would otherwise throw and hide the
     // fail-closed backlog diagnosis behind a TypeError.
     if (parsed.item && parsed.ok) items.push(parsed.item);
+    if (parsed.item && parsed.ok) itemBytes.set(parsed.item.metadata.id, text);
   }
 
   const ledgerText = readText(join(root, LEDGER_PATH), findings, LEDGER_PATH);
@@ -261,6 +264,12 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true } = {
   findings.push(...ledger.errors);
   const commitExists = checkCommit ? (oid) => localCommitExists(root, oid) : null;
   findings.push(...validateTransitionLedger(ledger.events, items, { commitExists }));
+  for (const event of ledger.events) {
+    if (event?.id === "pipeline.managed-onboarding-success-contract" && event?.evidence?.kind === "missing-initial-ledger-repair") {
+      const bytes = itemBytes.get(event.id);
+      if (typeof bytes !== "string" || event.evidence.itemSha256 !== createHash("sha256").update(bytes).digest("hex")) findings.push(`ledger event ${event.sequence}: itemSha256 does not bind the current item bytes`);
+    }
+  }
 
   for (const item of items) {
     const metadata = item.metadata;
@@ -568,6 +577,29 @@ export function applyElephantAfkLedgerRepair(root = DEFAULT_ROOT, input, options
   if (current.findings.length !== 1 || current.findings[0] !== expectedFinding) return { ...current, ok: false, findings: ["AFK ledger repair requires its single exact missing-event finding", ...current.findings], wrote: false, transition: null };
   if (options.checkCommit !== false && !localCommitExists(root, input?.evidenceCommit)) return { ...current, ok: false, findings: ["AFK ledger repair evidence commit is not reachable"], wrote: false, transition: null };
   const planned = planElephantAfkLedgerRepair(current.items, current.events, input);
+  if (!planned.ok) return { ...current, ok: false, findings: planned.errors, wrote: false, transition: null };
+  const item = current.items.find((entry) => entry.metadata.id === input.id);
+  const ledgerBefore = readFileSync(join(root, LEDGER_PATH), "utf8");
+  const targets = [
+    { path: item.path, after: readFileSync(join(root, item.path), "utf8") },
+    { path: LEDGER_PATH, after: `${ledgerBefore}${JSON.stringify(planned.event)}\n` },
+    { path: STATUS_PATH, after: planned.projection.statusText },
+    { path: INDEX_PATH, after: planned.projection.indexText },
+  ];
+  const transaction = writeBacklogTransaction(root, targets, options);
+  return transaction.ok ? { ...current, ok: true, findings: [], wrote: true, transition: planned.event } : { ...current, ok: false, findings: transaction.findings, wrote: false, transition: null };
+}
+
+/** Repair exactly the one missing 0.4.7 managed-onboarding initial event. */
+export function applyManagedOnboardingLedgerRepair(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  const expectedFinding = "items: pipeline.managed-onboarding-success-contract has no transition-ledger entry";
+  if (current.findings.length !== 1 || current.findings[0] !== expectedFinding) return { ...current, ok: false, findings: ["managed onboarding ledger repair requires its single exact missing-event finding", ...current.findings], wrote: false, transition: null };
+  if (options.checkCommit !== false && !localCommitExists(root, input?.evidenceCommit)) return { ...current, ok: false, findings: ["managed onboarding ledger repair evidence commit is not reachable"], wrote: false, transition: null };
+  const managedItem = current.items.find((entry) => entry.metadata.id === input?.id);
+  const managedBytes = managedItem ? readFileSync(join(root, managedItem.path)) : null;
+  if (!managedBytes || createHash("sha256").update(managedBytes).digest("hex") !== input?.itemSha256) return { ...current, ok: false, findings: ["managed onboarding ledger repair item bytes changed"], wrote: false, transition: null };
+  const planned = planManagedOnboardingLedgerRepair(current.items, current.events, input);
   if (!planned.ok) return { ...current, ok: false, findings: planned.errors, wrote: false, transition: null };
   const item = current.items.find((entry) => entry.metadata.id === input.id);
   const ledgerBefore = readFileSync(join(root, LEDGER_PATH), "utf8");

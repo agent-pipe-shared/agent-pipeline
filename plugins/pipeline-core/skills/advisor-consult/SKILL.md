@@ -1,68 +1,81 @@
 ---
 name: advisor-consult
-description: "Consent-gated fresh read-only Advisor for Epic and Feature. Codex uses one bounded primary plus one smaller fallback; Claude retains its Fable/Opus/consult chain."
-argument-hint: "<exactly one advisory question>"
+description: "On-demand, consent-gated fresh read-only Advisor for one concrete Epic/Feature question. Requires a reason and digest-bound evidence; never runs merely because bootstrap, resume, Compact, a route, or consent occurred."
+argument-hint: "<exactly one concrete advisory question>"
 ---
 
-# advisor-consult — bounded advisory duty
+# advisor-consult — demand-bound advisory duty
 
-The V3 registry is normative. Advisory is a duty, never a profile phase or a
-Critic verdict. `epic` and `feature` are eligible; `mini` is disabled.
-Missing consent resolves to `default` and is enabled without a per-run prompt;
-only `declined` disables before any child, export or status.
+Use this skill only when the Elephant has one concrete question whose answer
+would materially improve a current decision. The frozen V3 registry remains
+the route/fallback authority. The versioned
+`pipeline.advisory-lifecycle-policy.v2` controls when consultation is allowed.
+Advisory is a duty, never a profile phase or a Critic verdict.
 
-## Codex
+## Trigger gate
 
-Resolve exactly `{ runner: "codex", profile, consent }` through this one
-productive CLI call:
+Before any child, model request, prompt export or timeout:
+
+1. Require profile `epic` or `feature`, repository Advisor-export consent that
+   is not `declined`, exactly one bounded UTF-8 question, bounded allowlisted
+   evidence and exactly one reason:
+   `architecture-tradeoff|decision-ambiguity|evidence-conflict|recovery-choice|risk-review`.
+2. Bind runner, profile, reason, question SHA-256, evidence SHA-256, dispatch
+   ID/revision, candidate commit/tree, V2 policy digest and frozen V3 route
+   digest in one closed `pipeline.advisory-demand.v2`. Never persist the raw
+   question or answer in that demand.
+3. Reject session start, profile selection, restart, resume, re-entry, Compact,
+   unchanged handover, a configured route or consent alone. They are not
+   consultation reasons.
+4. Compare any prior `pipeline.advisory-consultation-record.v2`. The same
+   `reuseKeySha256` is `reuse-no-repeat`: launch no child and make no model
+   request. A changed question, reason, evidence, candidate or route-policy
+   digest is material drift and requires a new demand.
+
+Missing, malformed, stale or mismatched demand is
+`advisory_demand_required`/`advisory_demand_binding_mismatch`, never Advisory
+unavailable and never permission to invoke an adapter.
+
+## Codex consultation
+
+After the trigger gate, resolve exactly `{ runner: "codex", profile, consent }`
+through:
 
 `node "${PIPELINE_PLUGIN_ROOT}/scripts/codex-host-advisor-route.mjs" --runner codex --profile "{{PROFILE}}" --consent "{{CONSENT}}"`
 
-Accept exactly one JSON line with exactly `route|policy`. Route is one of
-`host-bound-consult|disabled-no-consent|disabled-by-profile`; policy is null
-for disabled routes and otherwise must be
-`pipeline.codex-host-advisor-policy.v1`. Do not pass `--root`, probe `--help`,
-inspect the script, or retry with stdin. Empty output, nonzero exit, free text,
-or a malformed route is an Advisor route adapter failure, recorded as
-Advisory unavailable rather than consent or a pass.
+Accept exactly one JSON line with exactly `route|policy`. For
+`host-bound-consult`, require `pipeline.codex-host-advisor-policy.v1`. Launch
+the primary once with one monotonic 180-second deadline. Polling never resets
+it. If needed, interrupt exactly once, recompute the same workspace SHA-256,
+then launch exactly one fresh `gpt-5.6-terra` / `high` fallback with
+`forkTurns:none` and one monotonic 90-second deadline. Never start a third
+attempt.
 
-For `host-bound-consult`, execute the returned policy literally. Record one
-monotonic deadline for the complete attempt; polling never resets it. Launch
-the primary `consult-advisor` once and wait at most its `timeoutMs`. If it has
-not answered, interrupt it exactly once. Recompute the same workspace SHA-256
-used at launch before doing anything else. Any workspace drift is a hard
-Advisory integrity failure and stops bootstrap. With an unchanged workspace,
-launch exactly one fresh fallback using the returned `agentName`, `model`,
-`effort`, and `forkTurns`, the identical candidate/question/allowlisted
-evidence, and no inherited chat. Wait at most its `timeoutMs`, then interrupt
-it exactly once if still active. Never start a third attempt or continue
-polling either child after its deadline.
+The primary and fallback are fresh project-scoped advisory agents. Each
+receives only the bound question and allowlisted evidence, has no inherited
+chat, handover or memory, and may not mutate, persist, auto-apply, decide a
+gate, use a separate network tool or export to a third party. Workspace drift
+is a hard integrity failure. An exhausted unchanged route is
+`advisory-unavailable`; the Elephant retains the decision duty.
 
-The primary and fallback are fresh project-scoped advisory agents, each
-without a selected-sandbox, App-Server, native-adapter or other advisory
-probe. Each agent has fresh context, is read-only, receives one supplied question and
-allowlisted repository evidence, and has no inherited chat, handover or
-memory; no mutation, persistence, auto-apply, gate decision, separate network
-tool or third-party export is allowed. The configured export to the configured
-Codex provider is the sole export boundary.
+The Elephant creates the one-use launch and validates
+`pipeline.host-advisor-status.v1` against the demand and before/between/after
+workspace observations. Codex never turns a raw host-adapter answer into
+success. Every claim says:
+`no attested selected-sandbox execution; OS isolation and model identity are not asserted`.
 
-The Elephant creates a one-use launch, observes the workspace before, between,
-and after attempts, and validates the resulting
-`pipeline.host-advisor-status.v1`. An `answered`,
-candidate-/launch-/question-bound, unchanged-workspace status from attempt one
-or two satisfies Codex Advisory as `host-bound-consult`. If both bounded
-attempts fail or time out with an unchanged workspace, emit
-`advisory-unavailable` and continue bootstrap without an Advisory-pass claim;
-Advisory is non-blocking and the Elephant retains its ordinary judgment duty.
-Mutation or observed separate export remains a hard failure. Codex never
-creates `pipeline.advisory-receipt.v1`.
-Every claim says: `no attested selected-sandbox execution; OS isolation and model identity are not asserted`.
+## Claude consultation
 
-Codex selected-sandbox policy for Readiness and Critic is not Advisory policy
-and remains unchanged.
+After the same trigger gate, Claude uses the unchanged V3 same-runner chain:
+bounded native Fable, native Opus only after repeated Fable failure, then one
+fresh read-only Claude consult only after native-adapter failure. It never
+switches runner or main model. The coordinator persists only the sanitized
+`pipeline.advisory-receipt.v1` plus the V2 consultation record; raw question,
+answer, prompt, trace and adapter error remain runtime-only.
 
-## Claude
+## Separation from bootstrap
 
-Claude uses the existing coordinator chain: bounded native Fable, then native
-Opus, then the fresh read-only Claude consult. Its candidate-bound
-`pipeline.advisory-receipt.v1` and fallback semantics remain unchanged.
+`pipeline-start` owns only `pipeline.advisory-capability-preflight.v2`. It never
+invokes this skill, either runner's Advisor route, `codex-advisory-bootstrap.mjs`,
+or a consultation budget. Capability state is not consultation success, and a
+consultation receipt is not bootstrap readiness.

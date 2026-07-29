@@ -19,6 +19,7 @@
 | pipeline.elephant-direct-implementation-under-afk-authorization | open | workflow-improvement | pipeline | 2026-07-23 | — |
 | pipeline.evidence-bound-review-retry-economics | open | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.execution-model-switchback | open | workflow-improvement | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
+| pipeline.managed-onboarding-success-contract | open | workflow-improvement | pipeline | 2026-07-25 | — |
 | pipeline.multi-cli-efficiency-pilots | open | workflow-improvement | pipeline | 2026-07-20 | — |
 | pipeline.nonblocking-interaction-continuity | open | defect | pipeline | 2026-07-19 | Sentinel recovery baseline; no completion claim. |
 | pipeline.observation-intake-document-governance | in_progress | workflow-improvement | pipeline | 2026-07-20 | — |
@@ -43,6 +44,6 @@
 
 ## Counts
 
-- open: 30
+- open: 31
 - in_progress: 3
 - closed: 2

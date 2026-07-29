@@ -49,15 +49,16 @@ The candidate ADR-1…9 correspond to 0001…0009; the "ADR-10/ADR-11" required 
 | [0035](0035-codex-native-normal-critic.md) | Codex normal Critic through a native host boundary | accepted | 2026-07-15 |
 | [0036](0036-runner-honest-profiles-v2.md) | Runner-honest profiles and usage contracts v2 | accepted | 2026-07-17 |
 | [0037](0037-batman-bounded-assurance.md) | Batman bounded assurance, static Verify extension and typed delivery | accepted | 2026-07-18 |
-| [0038](0038-runner-neutral-advisory-v3.md) | Runner-neutral advisory duty v3 | accepted | 2026-07-19 |
+| [0038](0038-runner-neutral-advisory-v3.md) | Runner-neutral advisory duty v3 | accepted route registry; session trigger superseded by 0047 | 2026-07-19 |
 | [0039](0039-hawkeye-lifecycle-boundaries.md) | Hawkeye lifecycle boundaries for session power and regulated documents | proposed | 2026-07-19 |
-| [0040](0040-advisor-consent-and-readonly-bash.md) | Explicit advisor export consent and sandbox-bound Bash | accepted; partially superseded by 0041 | 2026-07-19 |
-| [0041](0041-po-authorized-codex-functional-equivalent.md) | PO-authorized Codex functional-equivalent gate pass | accepted | 2026-07-20 |
+| [0040](0040-advisor-consent-and-readonly-bash.md) | Explicit advisor export consent and sandbox-bound Bash | accepted; partially superseded by 0041 and 0047 | 2026-07-19 |
+| [0041](0041-po-authorized-codex-functional-equivalent.md) | PO-authorized Codex functional-equivalent gate pass | accepted transport; trigger governed by 0047 | 2026-07-20 |
 | [0042](0042-global-observation-and-document-governance.md) | Global observation intake and document-lifecycle governance | accepted | 2026-07-20 |
 | [0043](0043-post-go-live-sprint-model.md) | Post-go-live Sprint model and common-base branch rule | accepted | 2026-07-22 |
 | [0044](0044-control-execution-boundary.md) | Provider-neutral control/execution boundary | accepted | 2026-07-23 |
 | [0045](0045-canonical-artifact-topology.md) | Canonical artifact topology | accepted | 2026-07-24 |
 | [0046](0046-project-authority-layering.md) | Project authority layering | accepted | 2026-07-24 |
+| [0047](0047-model-free-advisor-preflight-v2.md) | Model-free Advisor preflight and on-demand consultation v2 | accepted | 2026-07-29 |
 
 ### Resubmissions
 
@@ -122,15 +123,16 @@ Architecture Decision Records der Agent-Pipeline. Die ADRs formalisieren das kan
 | [0035](0035-codex-native-normal-critic.md) | Normaler Codex-Critic über eine native Host-Grenze | akzeptiert | 2026-07-15 |
 | [0036](0036-runner-honest-profiles-v2.md) | Runner-ehrliche Profile und Usage-Verträge v2 | akzeptiert | 2026-07-17 |
 | [0037](0037-batman-bounded-assurance.md) | Batman — begrenzte Absicherung, statische Verify-Erweiterung und typisierte Auslieferung | akzeptiert | 2026-07-18 |
-| [0038](0038-runner-neutral-advisory-v3.md) | Runner-neutrale Advisory-Duty v3 | akzeptiert | 2026-07-19 |
+| [0038](0038-runner-neutral-advisory-v3.md) | Runner-neutrale Advisory-Duty v3 | akzeptierte Route Registry; Session-Trigger durch 0047 ersetzt | 2026-07-19 |
 | [0039](0039-hawkeye-lifecycle-boundaries.md) | Hawkeye-Lifecycle-Grenzen für Wachhalten und regulierte Dokumente | vorgeschlagen | 2026-07-19 |
-| [0040](0040-advisor-consent-and-readonly-bash.md) | Explizite Advisor-Exportfreigabe und Sandbox-gebundenes Bash | akzeptiert; teilweise durch 0041 ersetzt | 2026-07-19 |
-| [0041](0041-po-authorized-codex-functional-equivalent.md) | PO-autorisierter Codex-Funktionsäquivalenz-Pass für Gates | akzeptiert | 2026-07-20 |
+| [0040](0040-advisor-consent-and-readonly-bash.md) | Explizite Advisor-Exportfreigabe und Sandbox-gebundenes Bash | akzeptiert; teilweise durch 0041 und 0047 ersetzt | 2026-07-19 |
+| [0041](0041-po-authorized-codex-functional-equivalent.md) | PO-autorisierter Codex-Funktionsäquivalenz-Pass für Gates | akzeptierter Transport; Trigger durch 0047 geregelt | 2026-07-20 |
 | [0042](0042-global-observation-and-document-governance.md) | Globale Observation-Aufnahme und Dokument-Lifecycle-Governance | akzeptiert | 2026-07-20 |
 | [0043](0043-post-go-live-sprint-model.md) | Post-Go-live-Sprint-Modell und Common-Base-Branch-Regel | akzeptiert | 2026-07-22 |
 | [0044](0044-control-execution-boundary.md) | Anbieterneutrale Kontroll-/Ausführungsgrenze | akzeptiert | 2026-07-23 |
 | [0045](0045-canonical-artifact-topology.md) | Kanonische Artefakt-Topologie | akzeptiert | 2026-07-24 |
 | [0046](0046-project-authority-layering.md) | Projekt-Authority-Layering | akzeptiert | 2026-07-24 |
+| [0047](0047-model-free-advisor-preflight-v2.md) | Modellfreier Advisor-Preflight und On-demand-Consultation v2 | akzeptiert | 2026-07-29 |
 
 ## Wiedervorlagen
 

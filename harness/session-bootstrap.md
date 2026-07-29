@@ -4,7 +4,14 @@
 
 > Agent-Pipeline v0.1.0-draft · Sprint 0 Phase 2 · as of 2026-07-03
 
-**Status:** Binding harness protocol. Fulfills the mission requirement "bootstrap docs" — show the plugin state (SHA/version), check it against the remote state, and define offline behavior and the refresh ritual. Applies to **every new session in every connected project** (`<PROJECT_A>`, `<PROJECT_B>`, `<PROJECT_C>`, the Pipeline repo itself), on both machines, independent of local paths. The executable form is built in Phase 3 as a skill (agent-facing, English — → ADR-0011 Language, in `docs/adr/`); this document is the human-readable spec and is the reference on any discrepancy.
+**Status:** Historical harness protocol plus maintained bootstrap rationale.
+For every `pipeline.user.v3` project, the executable
+`plugins/pipeline-core/skills/pipeline-start/SKILL.md` and ADR-0047 are
+authoritative on profiles and Advisor behavior. All later
+`advisor|design-first|speed`, startup Advisor, Advisor-hygiene and MP-26g probe
+passages in this historical protocol are superseded and must not be executed.
+V3 uses `epic|feature|mini`; bootstrap performs only model-free Advisor
+capability preflight and never launches a consultation.
 
 ---
 
@@ -53,43 +60,22 @@ Implemented as a skill (Phase 3): **`/pipeline-core:pipeline-start`** (canonical
 2. **One line in the project's CLAUDE.md** ("Run `/pipeline-core:pipeline-start` first") as an advisory fallback. If the skill invocation fails ("unknown skill"), that is precisely the evidence of case **F1** (ruleset missing) — the fallback thus detects the absence of the main layer.
 3. The **confirmation line** (Step 6) makes execution auditable for the PO and for hooks.
 
-#### V3 advisor-export override (ADR-0040)
+#### V2 Advisor lifecycle override (ADR-0047)
 
-For `pipeline.user.v3`, validate `advisor_export` before every advisory action.
-Missing consent and `consent: declined` are valid, accepted Advisory-off
-states: bootstrap performs no adapter probe, selected-sandbox lookup, child,
-export, or receipt, and may complete with `Advisory disabled-no-consent ·
-Receipt n/a`. The read-only `node setup.mjs` check never writes this decision;
-it prints the exact explicit workflow command
-`node setup.mjs --configure-advisor-export`, whose disclosure names the single
-question and allowlisted repository candidate material and defaults to decline.
+For `pipeline.user.v3`, validate `advisor_export`, but do not invoke the frozen
+V3 route during bootstrap. Epic/Feature runs only the local
+`pipeline.advisory-capability-preflight.v2`; Mini and declined consent are
+disabled. The preflight has no question and exactly zero child launches, model
+requests, exports, receipts and consultation-budget milliseconds. It reports
+`available|degraded|unavailable|disabled|unknown` with explicit assurance.
 
-With `consent: approved`, Epic/Feature invokes only the registered same-runner
-primary duty. Claude routing and Read/Grep/Glob consult tools are unchanged.
-Codex uses the repository-owned closed launcher (never a raw `node -e` export)
-and one ephemeral native App-Server turn on `openai/gpt-5.6-sol`; standing V3
-consent replaces per-run export approval. Its one bounded UTF-8 question is
-passed only on stdin, never in launcher argv. Codex receives exactly
-Read/Grep/Glob/Bash only inside the exact selected
-`network-open/read-only` transport; an unbound host shell/consult is not a
-fallback. No-child, wrong identity, missing profile readback, incomplete stdio
-or incomplete cleanup remains non-success without a duplicate consult. Such a
-primary failure is printed as `Advisory degraded-direct-subagent · Receipt n/a
-· Reason CODE`; bootstrap may complete and run one separate fresh read-only
-direct subagent. That degraded fallback emits no Pipeline Advisory receipt or
-attestation, satisfies no review/readiness/gate claim, and is never
-auto-applied. A
-missing configured tool result must name the blocked claim, include a copyable
-platform-appropriate install command whose own installer prerequisites were
-verified or embedded in the command, and report `installAttempted:false`;
-bootstrap never runs that command automatically. npm is not a substitute for
-Gitleaks, OSV-Scanner, or Semgrep. Standard user-local pipx/Go binary locations
-are recognized explicitly, and probe scratch must use bounded temporary
-storage instead of being mistaken for a missing installation.
-`execution_environment`, `probe_timeout`, and `probe_error` are host-boundary
-observations, not missing installations: rerun no-flag setup/self-application
-preflight through the host-authorized local read-only boundary and never
-recommend reinstalling from those statuses.
+Session start, profile selection, restart, resume, re-entry, Compact, unchanged
+handover, configured route and consent are not consultation triggers. A real
+same-runner consultation requires one concrete question, allowlisted reason,
+bounded evidence and a current digest-bound `pipeline.advisory-demand.v2`.
+Identical consultation records are not repeated; material question, reason,
+evidence, candidate or route-policy drift requires a fresh demand. ADR-0040
+continues to govern consent and tool/export boundaries.
 
 ### Step 1 — Determine plugin presence + loaded state
 
@@ -455,32 +441,24 @@ Als Skill implementiert (Phase 3): **`/pipeline-core:pipeline-start`** (kanonisc
 2. **Eine Zeile in der Projekt-CLAUDE.md** („Führe zuerst `/pipeline-core:pipeline-start` aus") als advisory Fallback. Schlägt die Skill-Invokation fehl („unknown skill"), ist genau das der Nachweis von Fall **F1** (Regelwerk fehlt) — der Fallback detektiert also die Abwesenheit der Hauptschicht.
 3. Die **Bestätigungszeile** (Schritt 6) macht den Vollzug für den PO und für Hooks prüfbar.
 
-#### V3-Override für Advisor-Export (ADR-0040)
+#### V2-Override für den Advisor-Lifecycle (ADR-0047)
 
-Bei `pipeline.user.v3` wird `advisor_export` vor jeder Advisory-Aktion
-validiert. Fehlende Zustimmung und `consent: declined` sind gültige,
-akzeptierte Advisory-aus-Zustände: Der Bootstrap startet weder Adapter-Probe,
-Sandbox-Auswahl, Kind noch Export oder Receipt und darf mit `Advisory
-disabled-no-consent · Receipt n/a` abschließen. Der Read-only-Check
-`node setup.mjs` schreibt diese Entscheidung nie, sondern zeigt den exakten
-expliziten Befehl `node setup.mjs --configure-advisor-export`; dessen
-Offenlegung nennt die einzelne Frage und das allowlist-begrenzte
-Repository-Kandidatenmaterial und lehnt standardmäßig ab.
+Bei `pipeline.user.v3` wird `advisor_export` validiert, die eingefrorene
+V3-Route im Bootstrap aber nicht aufgerufen. Epic/Feature führt ausschließlich
+den lokalen `pipeline.advisory-capability-preflight.v2` aus; Mini und abgelehnte
+Zustimmung sind deaktiviert. Der Preflight hat keine Frage und exakt null
+Kindstarts, Modellrequests, Exporte, Receipts und Consultation-Budget. Er
+meldet `available|degraded|unavailable|disabled|unknown` mit ausdrücklicher
+Assurance.
 
-Mit `consent: approved` läuft für Epic/Feature ausschließlich die registrierte
-Same-Runner-Duty. Claude-Routing und Read/Grep/Glob bleiben unverändert. Codex
-erhält Read/Grep/Glob/Bash ausschließlich im exakt ausgewählten
-`network-open/read-only`-Transport; eine ungebundene Host-Shell bzw. ein
-ungebundener Consult ist kein Fallback. No-child, falsche Identität, fehlendes
-Profil-Readback oder unvollständige stdio-/Cleanup-Evidenz bleibt ohne
-doppelten Consult ein Nicht-Erfolg. Ein fehlendes konfiguriertes Werkzeug nennt
-den blockierten Claim und einen kopierbaren plattformgerechten Installbefehl,
-dessen Installer-Voraussetzungen geprüft oder im Befehl enthalten sind, sowie
-`installAttempted:false`; der Bootstrap führt ihn nie automatisch aus. npm ist
-kein Ersatz für Gitleaks, OSV-Scanner oder Semgrep. Standardmäßige lokale
-pipx-/Go-Binary-Verzeichnisse werden explizit erkannt; Probe-Scratch liegt in
-gebundenem temporärem Speicher und darf nicht als fehlende Installation
-fehlklassifiziert werden.
+Session-Start, Profilwahl, Restart, Resume, Re-entry, Compact, unverändertes
+Handover, konfigurierte Route und Zustimmung sind keine Consultation-Trigger.
+Eine echte Same-Runner-Consultation braucht genau eine konkrete Frage, einen
+erlaubten Grund, begrenzte Evidenz und einen aktuellen Digest-gebundenen
+`pipeline.advisory-demand.v2`. Identische Consultation-Records werden nicht
+wiederholt; materieller Drift bei Frage, Grund, Evidenz, Kandidat oder
+Route-Policy verlangt einen neuen Demand. ADR-0040 regelt weiterhin Consent
+und Tool-/Exportgrenzen.
 
 ### Schritt 1 — Plugin-Präsenz + geladenen Stand ermitteln
 

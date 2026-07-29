@@ -68,8 +68,8 @@ person or model:
 | Profile | Use it for | Process effect |
 | --- | --- | --- |
 | `mini` | A genuinely small, bounded, reversible change. | Light process; advisory is disabled. Deterministic checks still apply. |
-| `feature` | One coherent product or engineering change. | Full feature lifecycle; advisory is required. |
-| `epic` | Multi-block, architectural or cross-cutting work. | Full lifecycle and advisory; plan work is decomposed into smaller deliverable blocks. |
+| `feature` | One coherent product or engineering change. | Full feature lifecycle; model-free Advisor capability preflight is required and consultation is on demand. |
+| `epic` | Multi-block, architectural or cross-cutting work. | Full lifecycle; model-free Advisor capability preflight is required, consultation is on demand, and plan work is decomposed into smaller deliverable blocks. |
 
 Every profile has a `design_phase` and an `execution_phase`. A **phase** is a
 lifecycle state; it is not a profile. A **Sprint** is a planning window that
@@ -79,9 +79,10 @@ groups work. Neither term changes a runner or authorizes a shortcut.
 
 The route registry distinguishes duties such as `implement`, `mechanic`,
 `deep`, `test_author`, `readiness`, `critic_normal`, `critic_high_risk` and
-`advisory`. Optional duties are opt-in. Advisory is required for `feature` and
-`epic`, disabled for `mini`, and emits a bound advisory receipt rather than an
-implementation decision.
+`advisory`. Optional duties are opt-in. Advisor capability preflight is
+model-free for `feature` and `epic` and disabled for `mini`. Actual Advisory is
+on demand: one concrete question, reason and digest-bound evidence produce a
+sanitized receipt rather than an implementation decision.
 
 ## 4. The lifecycle
 
@@ -210,7 +211,8 @@ bounded triage content; it is not briefing context for a Goldfish or Critic.
 ## 10. Glossary
 
 - **Acceptance criteria / DoD:** observable checks that define completion.
-- **Advisory:** a fresh, bounded second opinion for Feature/Epic; not approval.
+- **Advisory:** an on-demand, fresh, bounded second opinion for one concrete
+  Feature/Epic question; not bootstrap and not approval.
 - **Calibration:** the repo-local configuration that adapts the shared model.
 - **Critic:** independent fresh-context read-only reviewer.
 - **Duty:** a routed unit of work, such as implement or readiness.
@@ -302,8 +304,8 @@ und kein Modell:
 | Profil | Verwende es für | Prozesseffekt |
 | --- | --- | --- |
 | `mini` | Eine wirklich kleine, begrenzte und reversible Änderung. | Leichter Prozess; Advisory ist deaktiviert. Deterministische Checks bleiben Pflicht. |
-| `feature` | Eine zusammenhängende Produkt- oder Engineering-Änderung. | Voller Feature-Lifecycle; Advisory ist erforderlich. |
-| `epic` | Mehrblock-, Architektur- oder querschnittliche Arbeit. | Voller Lifecycle und Advisory; der Plan wird in kleinere lieferbare Blöcke zerlegt. |
+| `feature` | Eine zusammenhängende Produkt- oder Engineering-Änderung. | Voller Feature-Lifecycle; modellfreier Advisor-Capability-Preflight ist erforderlich, Consultation läuft on demand. |
+| `epic` | Mehrblock-, Architektur- oder querschnittliche Arbeit. | Voller Lifecycle; modellfreier Advisor-Capability-Preflight ist erforderlich, Consultation läuft on demand, der Plan wird in kleinere lieferbare Blöcke zerlegt. |
 
 Jedes Profil hat eine `design_phase` und eine `execution_phase`. Eine **Phase**
 ist ein Lifecycle-Zustand, kein Profil. Ein **Sprint** ist ein
@@ -314,9 +316,10 @@ Abkürzung.
 
 Die Route Registry unterscheidet Duties wie `implement`, `mechanic`, `deep`,
 `test_author`, `readiness`, `critic_normal`, `critic_high_risk` und
-`advisory`. Optionale Duties sind Opt-in. Advisory ist für `feature` und
-`epic` erforderlich, für `mini` deaktiviert und erzeugt eine gebundene
-Advisory-Receipt statt einer Implementierungsentscheidung.
+`advisory`. Optionale Duties sind Opt-in. Der Advisor-Capability-Preflight ist
+für `feature` und `epic` modellfrei und für `mini` deaktiviert. Echte Advisory
+läuft on demand: Eine konkrete Frage, ein Grund und digest-gebundene Evidenz
+erzeugen eine sanitierte Receipt statt einer Implementierungsentscheidung.
 
 ## 4. Der Lifecycle
 
@@ -459,8 +462,16 @@ Briefing-Kontext.
 
 ## 10. Glossar
 
+### H5 Close-Koordinator
+
+Feature-Schließen folgt einer einzigen, wiederaufnahmefähigen Zustandsmaschine
+mit Checkpoint, getrackten Abschlussmutationen, Kandidaten-Freeze und exakt
+gebundener Verifikation. Lokales Schließen (`closed-local`) benötigt keinen
+Push; Veröffentlichung und Readback sind getrennte, autorisierte Übergänge.
+
 - **Acceptance Criteria / DoD:** Beobachtbare Checks, die Abschluss definieren.
-- **Advisory:** Frische, begrenzte zweite Meinung für Feature/Epic, keine Freigabe.
+- **Advisory:** On-demand, frische und begrenzte zweite Meinung zu genau einer
+  konkreten Feature-/Epic-Frage; weder Bootstrap noch Freigabe.
 - **Calibration:** Repo-lokale Konfiguration zur Anpassung des gemeinsamen Modells.
 - **Critic:** Unabhängiger Read-only-Reviewer mit frischem Kontext.
 - **Duty:** Geroutete Arbeitseinheit, etwa Implementierung oder Readiness.

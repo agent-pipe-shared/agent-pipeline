@@ -41,14 +41,18 @@ requested model is not proof of the model that actually ran.
 flowchart TD
     I[Intent: feature, fix, or refactor] --> B[Bootstrap session]
     B --> P{Choose V3 profile}
-    P -->|Epic or Feature| A[Fresh read-only advisory]
+    P -->|Epic or Feature| A[Model-free Advisor capability preflight]
     P -->|Mini| T[Triage]
     A --> T
     T --> D{Design useful or required?}
     D -->|yes| DS[Design phase: options and acceptance criteria]
     D -->|no| RR[Rigor and risk recorded]
     DS --> RR
-    RR --> S[PRD and Spec as required]
+    RR --> AQ{Concrete Advisor question and reason?}
+    AQ -->|yes| AC[Demand-bound fresh read-only consultation]
+    AQ -->|no| S
+    AC --> S
+    S[PRD and Spec as required]
     S --> R{Readiness required or elected?}
     R -->|yes| RD[Fresh read-only readiness review]
     RD -->|gaps| S
@@ -91,8 +95,8 @@ returns.
 
 | Profile | Enter it when | Owner | Evidence / guard | Rejoin or stop |
 |---|---|---|---|---|
-| `epic` | Work spans architecture, several blocks, or a broad coordinated outcome. | Elephant; human decides material scope. | Registered V3 `epic` route and an answered fresh read-only advisory receipt. | Continue to triage. Missing or stale advisory evidence stops writable work. |
-| `feature` | A bounded product change still needs normal design and delivery discipline. | Elephant. | Registered V3 `feature` route and an answered fresh read-only advisory receipt. | Continue to triage. Missing or stale advisory evidence stops writable work. |
+| `epic` | Work spans architecture, several blocks, or a broad coordinated outcome. | Elephant; human decides material scope. | Registered V3 `epic` route plus model-free V2 capability state and assurance. Consultation exists only for one concrete demand. | Continue to triage immediately; capability `unknown` or `unavailable` is honest evidence, not a bootstrap timeout or consultation result. |
+| `feature` | A bounded product change still needs normal design and delivery discipline. | Elephant. | Registered V3 `feature` route plus model-free V2 capability state and assurance. Consultation exists only for one concrete demand. | Continue to triage immediately; session start, resume and Compact never launch an Advisor. |
 | `mini` | A genuinely small, tightly bounded feature or hotfix. | Elephant. | V3 `mini` route; advisory is deliberately disabled. The light boundary is about five files, no guardrail/canonical files, and no new dependency. | Continue on the light path. If scope grows or a protected surface appears, escalate to `feature` or `epic` and re-enter the full path. |
 
 Profile comes from the active feature and task shape, not from an old
@@ -433,6 +437,16 @@ Check klassifiziert; sein Plugin-eigener Pfad `project-onboarding-v3` mit
 inspect → plan → explizitem `apply --activate` ist der einzige Initialisierer.
 Eine explizite Bitte, das Projekt zu erstellen/initialisieren, autorisiert Apply;
 partielle Roots schlagen geschlossen fehl und werden nie überschrieben.
+
+## Unified close coordinator (H5)
+
+Feature close uses one restart-safe coordinator: `active → checkpointed →
+feature-close-prepared → tracked-close-finalized → candidate-frozen →
+final-verify-green`. A local close proceeds through cleanup to `closed-local`
+without push. Separately authorized publication/readback is
+`publication-authorized → published → readback-confirmed → delivered`.
+`release-eligible` and `promoted` are optional descendants; Stop guidance names
+the next coordinator transition and is silent at feature terminals.
 
 ## Supportgrenze und aktueller Scope
 

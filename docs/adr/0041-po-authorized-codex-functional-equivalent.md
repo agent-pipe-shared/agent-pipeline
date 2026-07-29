@@ -1,6 +1,7 @@
 # ADR-0041: PO-authorized Codex selected-sandbox Advisor
 
-**Status:** accepted · **Date:** 2026-07-20 · **Amended:** 2026-07-23
+**Status:** accepted transport; trigger semantics governed by ADR-0047 ·
+**Date:** 2026-07-20 · **Amended:** 2026-07-29
 
 ## Context
 
@@ -17,6 +18,11 @@ For every Codex `epic` or `feature` Advisory entry, the model-free
 first creates and durably reads back an exact selected `network-open/read-only`
 sandbox record, then launches one App-Server child through that record.
 `declined` disables before any child or export; `mini` is disabled.
+
+ADR-0047 defines when such an Advisory entry exists. Bootstrap, restart,
+resume, re-entry, Compact, a configured route and consent alone never create
+one. The transport below is reachable only after a valid, concrete
+`pipeline.advisory-demand.v2`.
 
 The custom agent is fresh and read-only, receives exactly one question and
 allowlisted repository evidence, and inherits no chat, handover or memory. It
@@ -60,3 +66,5 @@ den Advisor ohne Kind oder Export. Erfolg ist ausschließlich eine kandidaten-
 und fragegebundene Advisory-Receipt zusammen mit der exakt gebundenen Sandbox-
 Execution-Receipt, attestierter Sol-Identität und vollständigem Cleanup.
 Claude-Receipt und Claude-Fallback bleiben unverändert.
+ADR-0047 beschränkt diesen Transport auf einen konkreten, gültigen
+`pipeline.advisory-demand.v2`; Bootstrap-/Lifecycle-Ereignisse starten ihn nie.

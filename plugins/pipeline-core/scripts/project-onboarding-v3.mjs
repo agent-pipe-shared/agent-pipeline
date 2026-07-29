@@ -5,14 +5,17 @@ import { pathToFileURL } from "node:url";
 import {
   applyProjectOnboardingKickoffV4,
   applyProjectOnboardingLifecycleV4,
+  applyProjectOnboardingManifestRepair,
   inspectProjectOnboardingV3,
+  planProjectOnboardingManifestRepair,
+  planProjectOnboardingSourceRecovery,
   planProjectOnboardingKickoffV4,
   planProjectOnboardingLifecycleV4,
 } from "../lib/project-onboarding-v3.mjs";
 
 function usage() {
   return [
-    "Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--plan-sha256 <sha256>] [--activate]",
+    "Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>",
   ].join("\n");
@@ -28,7 +31,7 @@ function parse(args) {
     if (args[1] !== "inspect") return { error: "continuity requires inspect" };
     output.command = "continuity-inspect";
     start = 2;
-  } else if (["inspect", "plan", "apply-portable-seed", "plan-runtime", "initialize-runtime", "plan-repair", "apply-repair", "plan-readback", "apply-readback"].includes(args[0])) {
+  } else if (["inspect", "plan", "plan-source-recovery", "plan-manifest-repair", "apply-manifest-repair", "apply-portable-seed", "plan-runtime", "initialize-runtime", "plan-repair", "apply-repair", "plan-readback", "apply-readback"].includes(args[0])) {
     output.command = args[0];
     start = 1;
   }
@@ -46,7 +49,7 @@ function parse(args) {
   if (!output.help && !output.root) return { error: "--root is required" };
   if (output.command?.startsWith("kickoff-") && output.goal === undefined) return { error: "kickoff plan/apply requires --goal <text>" };
   if (!output.command?.startsWith("kickoff-") && output.goal !== undefined) return { error: "--goal is only valid for kickoff plan/apply" };
-  if (output.activate && !["apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback", "kickoff-apply"].includes(output.command)) return { error: "--activate is only valid for an apply command" };
+  if (output.activate && !["apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback", "apply-manifest-repair", "kickoff-apply"].includes(output.command)) return { error: "--activate is only valid for an apply command" };
   return output;
 }
 export function main(args = process.argv.slice(2), {
@@ -60,6 +63,9 @@ export function main(args = process.argv.slice(2), {
   let output;
   try {
     if (options.command === "inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: options.intent });
+    else if (options.command === "plan-source-recovery") output = planProjectOnboardingSourceRecovery({ rootDir: options.root, deps });
+    else if (options.command === "plan-manifest-repair") output = planProjectOnboardingManifestRepair({ rootDir: options.root, deps });
+    else if (options.command === "apply-manifest-repair") output = applyProjectOnboardingManifestRepair({ rootDir: options.root, planSha256: options.planSha256, activate: options.activate, deps });
     else if (options.command === "continuity-inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: "onboarding" });
     else if (options.command === "plan") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "portable" });
     else if (options.command === "plan-runtime") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "runtime" });

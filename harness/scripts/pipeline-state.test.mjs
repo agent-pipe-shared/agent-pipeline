@@ -45,6 +45,11 @@ import {
   serializePoGateProfileReceipt,
 } from "../../plugins/pipeline-core/lib/po-gate-authority.mjs";
 import { hardenWindowsPrivateDirectory } from "../../plugins/pipeline-core/lib/windows-private-state.mjs";
+import {
+  advanceCloseCoordinator,
+  createCloseCoordinator,
+  lifecycleDigest as closeCoordinatorDigest,
+} from "../../plugins/pipeline-core/scripts/publication-close-journal.mjs";
 
 const CLI = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
 const ALL_DIRS = [];
@@ -1198,6 +1203,79 @@ function canonicalFixtureJson(value) {
     JSON.stringify(state.closedFeatures),
   );
   ok("PS18g pushApproval preserved", state.pushApproval?.lastApproved?.forCommit === "abc123deadbeef");
+}
+
+// ---- PS19: close-feature best-effort on a git failure (DEVIATION vs. approve-push) -----
+{
+  const dir = freshDir("close-feature-coordinator");
+  run(["set-feature", "--id", "f-coordinated", "--plan-path", "specs/f/plan.md"], { dir, now: FIXED_NOW });
+  const activeFeature = readState(dir).state.activeFeature;
+  const coordinatedStateSha256 = createHash("sha256")
+    .update(readFileSync(statePath(dir)))
+    .digest("hex");
+  let coordinator = createCloseCoordinator({
+    lifecycleId: "close-f-coordinated",
+    featureId: activeFeature.id,
+    activeFeature,
+    authority: {
+      implementationResultSha256: null,
+      pipelineStateSha256: coordinatedStateSha256,
+      planSha256: B,
+      prdSha256: C,
+      specSha256: D,
+    },
+  });
+  for (const phase of ["checkpointed", "feature-close-prepared"]) {
+    coordinator = advanceCloseCoordinator(coordinator, {
+      expectedRevision: coordinator.revision,
+      expectedStateSha256: closeCoordinatorDigest(coordinator),
+      phase,
+      inputDigest: A,
+      observedDigest: B,
+      operationSha256: D,
+      ...(phase === "feature-close-prepared"
+        ? { authority: { ...coordinator.authority, implementationResultSha256: D } }
+        : {}),
+    });
+  }
+  const digest = closeCoordinatorDigest(coordinator);
+  const deps = {
+    dir,
+    now: FIXED_NOW,
+    gitHead: FIXED_GIT_HEAD,
+    gitCommonDir: () => ({ ok: true, path: dir }),
+    readCloseCoordinator: () => ({ coordinator, rawDigest: C }),
+  };
+  const rejected = run([
+    "close-feature", "--by", "po-test",
+    "--coordinator-lifecycle", coordinator.lifecycleId,
+    "--coordinator-sha256", D,
+  ], deps);
+  ok("PS18h close-feature rejects a stale coordinator digest", rejected === 2, `got ${rejected}`);
+  const exactStateBytes = readFileSync(statePath(dir), "utf8");
+  const driftedState = JSON.parse(exactStateBytes);
+  driftedState.updatedAt = "2026-07-07T21:00:01.000Z";
+  writeFileSync(statePath(dir), JSON.stringify(driftedState, null, 2) + "\n");
+  const stateDriftRejected = run([
+    "close-feature", "--by", "po-test",
+    "--coordinator-lifecycle", coordinator.lifecycleId,
+    "--coordinator-sha256", digest,
+  ], deps);
+  ok("PS18i coordinator-bound close rejects byte-level Pipeline State drift", stateDriftRejected === 2);
+  writeFileSync(statePath(dir), exactStateBytes);
+  const code = run([
+    "close-feature", "--by", "po-test",
+    "--coordinator-lifecycle", coordinator.lifecycleId,
+    "--coordinator-sha256", digest,
+  ], deps);
+  const closed = readState(dir).state.closedFeatures?.[0]?.coordinatorClose;
+  ok("PS18j exact feature-close-prepared coordinator permits the State sub-effect", code === 0, `got ${code}`);
+  ok("PS18k close audit binds the exact coordinator lifecycle/revision/digest",
+    closed?.lifecycleId === coordinator.lifecycleId
+      && closed?.revision === coordinator.revision
+      && closed?.stateSha256 === digest
+      && closed?.phase === "feature-close-prepared",
+    JSON.stringify(closed));
 }
 
 // ---- PS19: close-feature best-effort on a git failure (DEVIATION vs. approve-push) -----

@@ -40,6 +40,7 @@ import { fileURLToPath } from "node:url";
 import { loadManifestSafe } from "../lib/manifest.mjs";
 import {
   PHASE_GATE_MAP,
+  loadCloseCoordinatorSafe,
   loadStateSafe,
   resolveSuggestion,
   decideOutput,
@@ -64,6 +65,10 @@ import {
   applyPersistenceGuard,
   CONTEXT_REARM_STEP_TOKENS,
 } from "./stop-suggest.mjs";
+import {
+  createCloseCoordinator,
+  storeCloseCoordinator,
+} from "../scripts/publication-close-journal.mjs";
 
 const SCRIPT = fileURLToPath(new URL("./stop-suggest.mjs", import.meta.url));
 
@@ -1560,6 +1565,52 @@ try {
   rmSync(WORKDIR, { recursive: true, force: true });
 } catch {
   // best-effort cleanup; leftover temp dirs never fail the suite
+}
+
+{
+  const root = fixtureDir("h5-private-coordinator");
+  mkdirSync(join(root, ".git"), { recursive: true });
+  const coordinator = createCloseCoordinator({
+    lifecycleId: "close-f1",
+    featureId: "F1",
+    activeFeature: { id: "F1", planPath: "specs/f1/prd.md", phase: "implementation" },
+    authority: {
+      implementationResultSha256: null,
+      pipelineStateSha256: "1".repeat(64),
+      planSha256: "2".repeat(64),
+      prdSha256: "3".repeat(64),
+      specSha256: "4".repeat(64),
+    },
+  });
+  storeCloseCoordinator({
+    gitCommonDir: join(root, ".git"),
+    coordinator,
+    expectedRawSha256: null,
+  });
+  const discovered = loadCloseCoordinatorSafe(root, stateFixture("implementation"));
+  ok("H5 Stop discovery reads the exact private coordinator", discovered?.lifecycleId === "close-f1");
+  const message = resolveSuggestion(manifestFixture(), stateFixture("implementation"), discovered);
+  ok("H5 Stop discovery names the durable next transition", message?.includes("checkpointed"), message);
+  const forgedProjection = resolveSuggestion(
+    manifestFixture(),
+    stateFixture("implementation", { coordinatorPhase: "closed-local" }),
+  );
+  ok("H5 project State cannot forge a terminal coordinator phase", forgedProjection?.includes("security-scan"), forgedProjection);
+}
+
+{
+  const coordinatorSuggestion = resolveSuggestion(
+    manifestFixture(),
+    stateFixture("implementation"),
+    { phase: "candidate-frozen" },
+  );
+  ok("coordinator phase names exact next transition", coordinatorSuggestion.includes("final-verify-green"));
+  const terminalSuggestion = resolveSuggestion(
+    manifestFixture(),
+    stateFixture("implementation"),
+    { phase: "closed-local" },
+  );
+  ok("coordinator terminal is silent", terminalSuggestion === null);
 }
 
 console.log(`\n${pass} passed, ${failures.length} failed`);

@@ -246,23 +246,20 @@ const cases = [
     assert.match(skill, /Ask only when[\s\S]*genuinely\s+ambiguous/u);
     assert.doesNotMatch(skill, /profile question repeats at EVERY bootstrap/u);
   }],
-  ["Epic and Feature Codex advisory defaults on while Mini disables it", () => {
-    assert.match(skill, /Missing consent is the enabled `default`, with no per-run question/u);
-    assert.match(skill, /`declined` disables before a child, export or status/u);
-    assert.match(skill, /`mini` is disabled/u);
+  ["Epic and Feature run only model-free Advisor preflight while Mini and declined disable it", () => {
+    assert.match(skill, /Missing consent resolves to `default`/u);
+    assert.match(skill, /`declined` and `mini` are disabled\s+before any child, model request, export, receipt or consultation budget/u);
+    assert.match(skill, /advisor-capability-preflight\.mjs/u);
+    assert.match(skill, /pipeline\.advisory-capability-preflight\.v2/u);
+    assert.match(skill, /available\|degraded\|unavailable\|disabled\|unknown/u);
   }],
-  ["Codex starts one bounded Host Advisor sequence", () => {
-    assert.match(skill, /codex-host-advisor-route\.mjs/u);
-    assert.match(skill, /--runner codex --profile "\{\{PROFILE\}\}" --consent "\{\{CONSENT\}\}"/u);
-    assert.match(skill, /Accept exactly JSON keys `route\|policy`/u);
-    assert.match(skill, /do not pass `--root`, probe `--help`,\s+inspect the script, or retry through stdin/u);
-    assert.match(skill, /pipeline\.codex-host-advisor-policy\.v1/u);
-    assert.match(skill, /primary\s+once for at most 60 seconds/u);
-    assert.match(skill, /`gpt-5\.6-terra` \/ `high` fallback for at most 45 seconds/u);
-    assert.match(skill, /Polling must never reset either deadline/u);
-    assert.match(skill, /never\s+start a third attempt/u);
-    assert.match(skill, /Do not make any selected-sandbox, App-Server, native or\s+other advisory probe/u);
-    assert.match(skill, /pipeline\.host-advisor-status\.v1/u);
+  ["bootstrap starts no Advisor sequence and requires demand only later", () => {
+    assert.match(skill, /effects must be exactly\s+zero child launches, model requests, question exports, receipts and\s+consultation-budget milliseconds/u);
+    assert.match(skill, /Do not run\s+`codex-host-advisor-route\.mjs`, `codex-advisory-bootstrap\.mjs`/u);
+    assert.match(skill, /Session start, profile selection, restart, resume, re-entry, Compact,\s+unchanged handover, a configured route and consent alone are explicitly\s+non-triggering/u);
+    assert.match(skill, /pipeline\.advisory-demand\.v2/u);
+    assert.match(skill, /unchanged reuse key is `reuse-no-repeat`/u);
+    assert.match(skill, /frozen V3 Claude chain and Codex route remain consultation-only/u);
   }],
   ["Verify availability never executes the calibrated gate", () => {
     assert.match(skill, /Confirm the project's ONE verify command[\s\S]*without invoking that command/u);
@@ -271,21 +268,10 @@ const cases = [
     assert.match(skill, /resolve only the executable\s+path/u);
     assert.match(skill, /Run no full gate and create no\s+evidence at bootstrap/u);
   }],
-  ["Claude fallback order is bounded Fable then Opus then consult", () => {
-    const chain = skill.match(/order is `([^`]+)`/u)?.[1] ?? "";
-    assert.match(chain, /Fable/u);
-    assert.ok(chain.indexOf("Fable") < chain.indexOf("Opus"));
-    assert.ok(chain.indexOf("Opus") < chain.indexOf("Claude consult"));
-    assert.match(skill, /same-runner fresh read-only consult/u);
-  }],
-  ["Codex status is bounded gate capability while Claude receipts remain separate", () => {
-    assert.match(skill, /An answered unchanged status\s+from attempt one or two is Codex `host-bound-consult` success/u);
-    assert.match(skill, /record\s+`advisory-unavailable` and continue bootstrap without an Advisory-pass\s+claim/u);
-    assert.match(skill, /advisory exhaustion is not a session blocker/u);
-    assert.match(skill, /Workspace mutation\s+remains a hard integrity stop/u);
-    assert.match(skill, /It emits no `pipeline\.advisory-receipt\.v1`/u);
-    assert.match(skill, /Claude retains its existing coordinator receipt/u);
-    assert.match(skill, /no attested\s+selected-sandbox execution; OS isolation and\s+model identity are not\s+asserted/u);
+  ["Advisor confirmation reports capability assurance without consultation claims", () => {
+    assert.match(skill, /Advisor capability \{\{available\|degraded\|unavailable\|disabled\|unknown\}\}/u);
+    assert.match(skill, /reports only the model-free preflight/u);
+    assert.match(skill, /must never name an answer,\s+consultation receipt or consultation success/u);
   }],
   ["existing provenance and Elephant role checks remain", () => {
     assert.match(skill, /git rev-parse HEAD/u);

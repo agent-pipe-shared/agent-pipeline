@@ -169,6 +169,7 @@
           "docs/adr/0044-control-execution-boundary.md",
           "docs/adr/0045-canonical-artifact-topology.md",
           "docs/adr/0046-project-authority-layering.md",
+          "docs/adr/0047-model-free-advisor-preflight-v2.md",
           "docs/adr/README.md"
         ]
       },

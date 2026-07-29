@@ -9,6 +9,11 @@
  */
 import { createHash, randomUUID } from "node:crypto";
 
+import {
+  advisoryConsultationDisposition,
+  createAdvisoryConsultationRecord,
+  validateAdvisoryDemand,
+} from "./advisory-lifecycle-v2.mjs";
 import { validateAdvisoryReceipt } from "./advisory-receipt.mjs";
 import { loadRunnerProfilesV3Registry, validateRunnerProfilesV3Registry } from "./runner-profiles-v3.mjs";
 
@@ -243,6 +248,30 @@ export async function coordinateAdvisory(input, {
   if (eligibility !== "required") {
     return { ok: false, code: "advisory_disabled", answer: null, receipt: null, attempts: [] };
   }
+  const demand = validateAdvisoryDemand(input.demand, {
+    runner: input.runner,
+    profile: input.profile,
+    question: input.question,
+    dispatch: input.dispatch,
+    registry,
+  });
+  if (!demand.ok) {
+    return { ok: false, code: demand.code, answer: null, receipt: null, consultationRecord: null, attempts: [] };
+  }
+  const disposition = advisoryConsultationDisposition(input.demand, input.priorConsultation);
+  if (!disposition.ok) {
+    return { ok: false, code: disposition.code, answer: null, receipt: null, consultationRecord: null, attempts: [] };
+  }
+  if (disposition.disposition === "reuse-no-repeat") {
+    return {
+      ok: true,
+      code: "advisory_reused_no_repeat",
+      answer: null,
+      receipt: null,
+      consultationRecord: copy(input.priorConsultation),
+      attempts: [],
+    };
+  }
   // Codex host-consult is owned by the host launch/status flow.  The
   // coordinator must not invoke an adapter or manufacture the legacy receipt.
   if (input.runner === "codex" && contract?.codex?.adapter === "host-consult") {
@@ -273,11 +302,18 @@ export async function coordinateAdvisory(input, {
       lastStep = step;
       if (result.status === SUCCESS) {
         const fallbackReason = priorNativeFailure === null ? "none" : failureReason("native", priorNativeFailure);
+        const receipt = makeReceipt({ input, step, result, fallbackReason, emittedAtMs: now(), receiptId: makeReceiptId() });
         return {
           ok: true,
           code: SUCCESS,
           answer: result.answer,
-          receipt: makeReceipt({ input, step, result, fallbackReason, emittedAtMs: now(), receiptId: makeReceiptId() }),
+          receipt,
+          consultationRecord: createAdvisoryConsultationRecord({
+            demand: input.demand,
+            receipt,
+            outcome: result.status,
+            completedAtMs: now(),
+          }).record,
           attempts,
         };
       }
@@ -286,11 +322,18 @@ export async function coordinateAdvisory(input, {
   }
 
   const fallbackReason = failureReason(lastStep.kind, last.status);
+  const receipt = makeReceipt({ input, step: lastStep, result: last, fallbackReason, emittedAtMs: now(), receiptId: makeReceiptId() });
   return {
     ok: false,
     code: last.code,
     answer: null,
-    receipt: makeReceipt({ input, step: lastStep, result: last, fallbackReason, emittedAtMs: now(), receiptId: makeReceiptId() }),
+    receipt,
+    consultationRecord: createAdvisoryConsultationRecord({
+      demand: input.demand,
+      receipt,
+      outcome: last.status,
+      completedAtMs: now(),
+    }).record,
     attempts,
   };
 }

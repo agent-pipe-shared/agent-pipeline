@@ -363,6 +363,12 @@ function sanctionedOnboardingArgs(args, root) {
     && exactRoot(args, root, 2) && args.length === 4) return true;
   if (["plan", "plan-runtime", "plan-repair", "plan-readback"].includes(args[0])
     && exactRoot(args, root, 1) && args.length === 3) return true;
+  if (["plan-source-recovery", "plan-manifest-repair"].includes(args[0])
+    && exactRoot(args, root, 1) && args.length === 3) return true;
+  if (args[0] === "apply-manifest-repair"
+    && exactRoot(args, root, 1)
+    && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
+    && args[5] === "--activate" && args.length === 6) return true;
   if (["apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback"].includes(args[0])
     && exactRoot(args, root, 1)
     && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
