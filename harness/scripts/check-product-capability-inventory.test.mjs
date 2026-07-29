@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { execFileSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -27,10 +27,34 @@ function validated(document, phase = "inventory") {
   return validateInventory({ root: repoRoot, phase, document });
 }
 
+function gitText(args, options = {}, spawn = spawnSync) {
+  const result = spawn("git", args, {
+    cwd: repoRoot,
+    encoding: "utf8",
+    ...options,
+  });
+  const successfulEperm = result?.error?.code === "EPERM"
+    && result.status === 0
+    && result.signal === null
+    && typeof result.stdout === "string"
+    && result.stdout.length > 0;
+  if (result?.error && !successfulEperm) throw result.error;
+  if (result?.status !== 0 || result.signal !== null || typeof result.stdout !== "string" || result.stdout.length === 0) {
+    const stderr = typeof result?.stderr === "string" && result.stderr.trim().length > 0
+      ? `; stderr=${JSON.stringify(result.stderr.trim())}`
+      : "";
+    throw new Error(
+      `Git fixture observation failed: git ${args.join(" ")}; status=${String(result?.status)}; `
+      + `signal=${String(result?.signal)}; stdout=${typeof result?.stdout}${stderr}`,
+    );
+  }
+  return result.stdout.trim();
+}
+
 function revision(ref) {
   return {
-    commit: execFileSync("git", ["rev-parse", "--verify", `${ref}^{commit}`], { cwd: repoRoot, encoding: "utf8" }).trim(),
-    tree: execFileSync("git", ["rev-parse", "--verify", `${ref}^{tree}`], { cwd: repoRoot, encoding: "utf8" }).trim(),
+    commit: gitText(["rev-parse", "--verify", `${ref}^{commit}`]),
+    tree: gitText(["rev-parse", "--verify", `${ref}^{tree}`]),
   };
 }
 
@@ -40,10 +64,45 @@ function nonAncestorRevision() {
   // concern. `commit-tree` creates a real, resolvable, parentless commit object
   // directly -- unreachable from HEAD by construction, no branch/tag/working-tree
   // side effects, deterministic on every host and every repo state.
-  const emptyTree = execFileSync("git", ["hash-object", "-t", "tree", "--stdin"], { cwd: repoRoot, encoding: "utf8", input: "" }).trim();
-  const commit = execFileSync("git", ["commit-tree", emptyTree, "-m", "non-ancestor fixture root"], { cwd: repoRoot, encoding: "utf8" }).trim();
+  const emptyTree = gitText(["hash-object", "-t", "tree", "--stdin"], { input: "" });
+  const commit = gitText([
+    "-c", "user.name=Agent Pipeline Fixture",
+    "-c", "user.email=fixture@example.invalid",
+    "commit-tree", emptyTree, "-m", "non-ancestor fixture root",
+  ]);
   return revision(commit);
 }
+
+check("HAW-A00 accepts only a status-zero Git EPERM false positive with observed output", () => {
+  const accepted = () => ({
+    status: 0,
+    signal: null,
+    error: Object.assign(new Error("sandbox false positive"), { code: "EPERM" }),
+    stdout: "observed\n",
+    stderr: "",
+  });
+  assert.equal(gitText(["rev-parse", "HEAD"], {}, accepted), "observed");
+
+  const rejected = () => ({
+    status: null,
+    signal: null,
+    error: Object.assign(new Error("sandbox denied"), { code: "EPERM" }),
+    stdout: "",
+    stderr: "",
+  });
+  assert.throws(() => gitText(["rev-parse", "HEAD"], {}, rejected), /sandbox denied/);
+
+  const failed = () => ({
+    status: 128,
+    signal: null,
+    stdout: "",
+    stderr: "fatal: bad revision",
+  });
+  assert.throws(
+    () => gitText(["rev-parse", "missing"], {}, failed),
+    /git rev-parse missing; status=128; signal=null; stdout=string; stderr="fatal: bad revision"/,
+  );
+});
 
 check("HAW-A01 discovers the complete current direct product surface", () => {
   const discovered = discoverSurfaces(repoRoot);
