@@ -1,8 +1,8 @@
 # Technical specification — Agent Pipeline 0.4.7 hotfix
 
-Status: `implementation scope approved on 2026-07-29; post-Critic corrective
-document bytes await renewed digest-bound PO selection; release remains
-gated`.
+Status: `multi-generation authority recovery approved and implemented on
+2026-07-29; focused State-writer and V4 regressions are green; final
+digest-bound authority, Critic and local installed readback remain gated`.
 
 This specification implements the neighboring
 [PRD](prd_agent-pipeline-0.4.7-hotfix.md) against exact base
@@ -11,7 +11,7 @@ of Sprint Nova and Pull Request #64.
 
 ## 0. Superseding candidate truth — 2026-07-29
 
-This section and AC-047-30 through AC-047-47 supersede conflicting candidate,
+This section and AC-047-30 through AC-047-50 supersede conflicting candidate,
 scope, and delivery statements below. The older sections remain as historical
 design/audit context so removed scope is explicit rather than silently erased.
 
@@ -68,6 +68,22 @@ workspace-sandbox `EPERM` observations are not product failures. These focused
 results are design/audit evidence. The existing `0f36072` Full Verify and
 Security results remain the full-run baseline; post-Critic changes require
 focused regressions, diff-Critic, packaging, and installed readback.
+
+Two later read-only consumer bootstrap observations exposed one remaining
+closed-path defect in the neutral authority decision. A Phoenix-shaped
+consumer has coherent current PRD/Spec bytes while Continuity binds an older
+document generation. A Nova-shaped consumer has four independently drifted
+surfaces: the current PRD marker, persisted PO-gate authority, Continuity
+authority, and current PRD/Spec bytes. Both fail before a plan with
+`PO-DECISION-PRIOR-AUTHORITY`, leaving V4 `partial` with `nextAction:null`.
+The Human override correctly refuses this State/authority path; the repair
+belongs in the typed neutral planner and confirmed State writer.
+
+The approved implementation is now present in the source worktree. Independent
+focused readback passed 296/296 State-writer cases and 43/43 V4 onboarding
+cases; both changed-file syntax checks and `git diff --check` passed. These are
+focused correction-delta results, not a replacement or rerun of the retained
+`0f36072` Full Verify/Security baseline.
 
 ### 0.1 Deferred-work register
 
@@ -211,6 +227,40 @@ The normative threat analysis for this capability is
   protected non-overridable actions, adapter failure, and an attended smoke
   from initial denial through successful exact action and subsequent denial.
 
+### AC-047-48–50 — Multi-generation PO authority recovery
+
+- **AC-047-48 — Structurally valid historical surfaces:** WHEN the current
+  regular in-root PRD and Spec are readable but the PRD marker, persisted
+  `planApproval.poGateAuthority`, and `continuity.authority` represent two or
+  more distinct document/profile generations, THE neutral decision planner
+  SHALL accept each historical authority surface only if its schema, exact
+  canonical PRD/Spec paths, lowercase SHA-256 values, and required provenance
+  fields are structurally valid. Historical digests and PO-profile provenance
+  SHALL NOT be required to equal the current document bytes or current
+  profile. The current PO profile and current documents SHALL still pass their
+  independent full validation before a plan is available.
+- **AC-047-49 — Complete neutral disclosure:** WHEN those independently valid
+  surfaces differ, THE SYSTEM SHALL return the same read-only,
+  candidate-preserving decision contract rather than
+  `PO-DECISION-PRIOR-AUTHORITY` or `nextAction:null`. The plan digest SHALL
+  bind and disclose the current PRD marker and documents, persisted PO-gate
+  authority, Continuity authority, and both historical and current
+  PO-profile provenance. It SHALL make no authority choice. A malformed
+  schema, non-canonical path, invalid digest, unsafe file, unavailable current
+  profile, or invalid Continuity SHALL remain a typed zero-mutation refusal.
+- **AC-047-50 — Confirmed convergence and regression shapes:** WHEN the PO
+  selects the current Spec and confirms the exact plan/selection-bound apply,
+  THE sanctioned writer SHALL reobserve every preimage, converge the PRD
+  marker, PO-gate authority and Continuity authority to the current PRD/Spec
+  bytes and current PO profile, increment Continuity exactly once, preserve
+  its unrelated payload, return the active feature to `design`, and make all
+  three V4 intents `ready`. Replay or any drift SHALL fail closed or return
+  only the exact idempotent completed result. Focused fixtures SHALL cover a
+  Phoenix-shaped state with coherent current documents and older Continuity,
+  and a Nova-shaped state where marker, PO gate, Continuity and current
+  documents are independently drifted. Human Guard Override SHALL remain
+  unavailable for every authority, State, Runtime and Continuity operation.
+
 ## 0.1 Current implementation map
 
 This table is the current code-to-contract map. “Implemented” means present in
@@ -224,6 +274,7 @@ release, packaging, installation or platform-evidence claim.
 | `047-CLG` | AC-047-38 | lifecycle and outer Codex guards | Implemented; only exact status/plan/returned apply grammar admitted while non-ready |
 | `047-ORG` | AC-047-39–40 | `plugins/pipeline-core/hooks/guard-push.mjs` | AC-047-39 implemented and covered; AC-047-40 remains the post-push real-origin readback gate |
 | `047-HOV` | AC-047-41–47 | `plugins/pipeline-core/lib/human-guard-override.mjs`, `plugins/pipeline-core/scripts/guard-human-override.mjs`, central Codex guard adapter | Implemented; plan/authorize/single consume, authenticated private audit, exclusions and platform-assurance fixtures covered |
+| `047-ARB-MG` | AC-047-48–50 | `plugins/pipeline-core/scripts/pipeline-state.mjs`, authority-decision fixtures and V4 lifecycle readback | Implemented; historical surfaces are structurally validated, current profile/documents remain strict, Phoenix/Nova convergence and negative fixtures pass |
 | `047-INT` | AC-047-26 | Verify registration, threat model, package/version/readback evidence | Verify registration and threat model present; immutable-candidate Verify/Security/Critic/package/install evidence remains open |
 
 The attended override threat model is
@@ -288,13 +339,17 @@ The implementation must preserve these release-wide invariants:
 13. A Human guard override is denial-bound, expiring, one-use and
     tamper-evident; it never authorizes protected invariants or disables a
     guard.
+14. Historical PO-gate and Continuity authority may be independently stale,
+    but only a neutral plan plus an explicitly confirmed digest-bound writer
+    may converge them; structural validation is never relaxed for current
+    documents, paths, profiles, State or Continuity.
 
 ## Historical acceptance-criterion definitions (EARS)
 
 These original definitions preserve identifier history. Their current
 normative disposition is the table in section 0: only AC-047-09–15 and
 AC-047-25–29 are retained from this block; AC-047-01–08 and AC-047-16–24 are
-deferred. AC-047-30–47 above are the new normative repair contract.
+deferred. AC-047-30–50 above are the new normative repair contract.
 
 - **AC-047-01 — Backlog admission:** WHEN the canonical backlog checker reads
   the 0.4.7 candidate, THE SYSTEM SHALL find exactly one valid initial
@@ -1402,6 +1457,7 @@ and the final document authority are stable.
 | `047-CLG` | exact non-ready cleanup and authority command grammar | AC-047-38; no operators, alternate paths or additional arguments admitted |
 | `047-ORG` | portable cleanup-binding publication guard | AC-047-39 green; AC-047-40 reserved for separately authorized real-origin readback |
 | `047-HOV` | Human override capability, audit store, CLI and central adapter | AC-047-41–47; exact denial through single consumption and protected exclusions green |
+| `047-ARB-MG` | multi-generation neutral authority planning and confirmed convergence | AC-047-48–50; Phoenix- and Nova-shaped historical-surface fixtures, drift/replay negatives and three-intent readback green |
 | `047-INT` | Verify registration, threat model, result/evidence, package/version/readback surfaces | AC-047-25–26; every final gate binds one immutable commit/tree |
 
 AC-047-01–08 and AC-047-16–24 have no implementation slice in this hotfix.
@@ -1447,7 +1503,8 @@ own focused and full gates against its new exact candidate.
 Required focused suites:
 
 - legacy continuity adoption, State writer, normal close-feature, narrow
-  stale-marker rebind and neutral authority decision;
+  stale-marker rebind, neutral authority decision, and multi-generation
+  authority-surface recovery;
 - composite cleanup plan/apply, crash replay and private-state assurance;
 - lifecycle guard and outer Codex pretool guard;
 - project onboarding unit and process E2E;

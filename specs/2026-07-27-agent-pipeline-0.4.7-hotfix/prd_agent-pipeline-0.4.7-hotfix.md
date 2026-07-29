@@ -3,14 +3,15 @@
 # PRD — Agent Pipeline 0.4.7 hotfix
 
 > Product Review Document for the PO gate. Status:
-> `implementation scope approved on 2026-07-29; reconciled document bytes
-> await renewed digest-bound PO selection; release remains gated`.
+> `multi-generation authority recovery approved and implemented on 2026-07-29;
+> focused regressions are green; final digest-bound authority, Critic and
+> local installed readback remain gated`.
 > Task: `agent-pipeline-0.4.7-hotfix` · Feature · Rigor 2 · Risk high.
 > Base: public 0.4.6 release at
 > `9d1b3dc108eb77629ace5b82002120f5539abd8d`. Acceptance criteria:
 > [spec.md](spec.md).
 
-<!-- technical-spec-sha256: 1e7129dc115583940f27e6b8d7c14a393b6533f6b4e39d244286bc238ebb9cda -->
+<!-- technical-spec-sha256: 1d05524ce10d6ac29d9522c7e3edb488c58ca103e82defdeeb24814c751a9ded -->
 
 The 2026-07-28 approval remains historical evidence for the already
 implemented slices. The Human/PO explicitly directed implementation of the
@@ -97,6 +98,17 @@ writer, retain both document versions, and return the active feature to
 `design` while preserving the updated Continuity. No manual State, Runtime,
 Continuity, Cleanup, PRD-binding, or projection edit is an acceptable recovery.
 
+A remaining multi-generation variant appears when the current documents, PRD
+marker, persisted PO gate, and Continuity no longer form one prior/current
+pair. A coherent-current-document consumer may retain only older Continuity;
+another consumer may carry independently stale marker, PO-gate and Continuity
+generations. These are legitimate neutral-selection inputs only when every
+historical surface remains structurally valid and the current documents and
+PO profile independently pass full validation. The planner must disclose and
+digest-bind all generations, leave the choice to the PO, and expose the same
+confirmed State-writer path. Human Guard Override remains forbidden for this
+authority transition.
+
 A second repaired deadlock exists when portable State still binds a missing private
 cleanup descriptor while every remaining private descriptor is independently
 safe to retire. Composite recovery binds the complete orphan set and portable
@@ -120,7 +132,7 @@ requests remain non-overridable.
 
 For transparent continuity with the original contract, AC-047-01 through
 AC-047-29 keep their identifiers and receive the normative dispositions in
-the revised Spec. AC-047-30 through AC-047-47 define the new repairs.
+the revised Spec. AC-047-30 through AC-047-50 define the new repairs.
 
 ### Product decisions to bind to the reconciled bytes
 
@@ -128,9 +140,10 @@ the revised Spec. AC-047-30 through AC-047-47 define the new repairs.
    evidence.
 2. Approve removal of AC-047-01–08 and AC-047-16–24 from this hotfix; they
    remain deferred work and are not claimed complete.
-3. Approve AC-047-30–47 as the new product implementation scope: neutral
+3. Approve AC-047-30–50 as the new product implementation scope: neutral
    authority selection, composite cleanup recovery, portable publication
-   baselines, and the attended one-action guard override.
+   baselines, the attended one-action guard override, and multi-generation
+   authority recovery.
 4. Keep push, merge, tag, release, marketplace, Issue, Pull Request, and
    downstream Sprint operations separately gated.
 
@@ -149,6 +162,9 @@ evidence.
   cross-platform command grammar, and restart/private-state repairs;
 - converts general PRD/Spec authority drift from an actionless lockout into a
   neutral, digest-bound, explicitly PO-selected transaction;
+- extends that neutral transaction to structurally valid multi-generation
+  marker, PO-gate and Continuity drift without treating stale provenance as
+  current authority;
 - converges the exact lost-cleanup-binding plus safely retirable-orphan
   deadlock through one crash-safe composite recovery;
 - prevents publication of a portable baseline containing a machine-local
@@ -193,6 +209,11 @@ The hotfix replaces each lockout with an exact, auditable state machine.
   bindings expose both candidates and require a separately digest-bound PO
   selection. The sanctioned writer converges every authority surface and
   returns the active feature to `design` without discarding Continuity.
+- **Multi-generation authority recovery:** structurally valid historical PRD
+  marker, PO-gate and Continuity generations may differ independently from
+  each other and from current documents. The neutral plan binds and discloses
+  every surface; only an explicitly selected and confirmed apply converges
+  them to independently validated current document/profile authority.
 - **Composite cleanup recovery:** the exact lost portable binding and complete
   safely retirable orphan set are planned, revalidated, retired, released and
   read back as one crash-safe transaction.
@@ -234,6 +255,7 @@ The hotfix replaces each lockout with an exact, auditable state machine.
 | --- | --- |
 | Legacy adoption becomes a generic authority rewrite. | One exact historical/current preimage, read-only plan, digest-bound confirmed apply, shared lock, atomic CAS, and negative/replay/durability tests; ordinary CAS remains protected. |
 | Neutral authority repair silently chooses a document. | Both candidates and all binding provenance are exposed; only a separately confirmed selection digest may mutate authority. |
+| Historical authority validation either rejects legitimate generations or trusts stale provenance. | Validate historical schemas, canonical paths and digests structurally; validate current documents/profile independently; disclose every generation and require a plan/selection-bound PO-confirmed writer. |
 | Composite cleanup retires a live or changed descriptor. | Complete sorted orphan-set and State preimages, owner/manifest checks, write-ahead journal, CAS revalidation and idempotent crash recovery. |
 | Human override becomes a guard-disable switch. | Exact denial/tool/repository/preimage binding, short expiry, single consumption, authenticated private audit, and a closed non-overridable invariant set. |
 | Guard parsing authorizes writes. | Closed grammar, per-segment validation, typed denials, hostile and outer-hook tests. |
@@ -262,6 +284,7 @@ The hotfix replaces each lockout with an exact, auditable state machine.
 | Lost binding plus retirable orphans | AC-047-35–38; implemented in the current worktree |
 | Machine-local binding in portable tip | AC-047-39–40; publication guard implemented; real-origin readback remains a separately gated release test |
 | Attended Human guard override | AC-047-41–47; implemented with private authenticated audit and closed exclusions |
+| Multi-generation authority drift | AC-047-48–50; required Phoenix-/Nova-shaped synthetic fixtures and confirmed convergence, with Human Override prohibited |
 | Issue #73 retained repairs | AC-047-09–15; retained from the implementation base |
 | Released 0.4.6 continuity | Dedicated one-shot Result/PRD reconciliation followed by the existing close gate |
 | Backlog, generic source/manifest recovery, WSL IPC profile, Advisor 180/90 | Deferred and excluded from this hotfix |
@@ -271,7 +294,7 @@ The hotfix replaces each lockout with an exact, auditable state machine.
 ## DoD
 
 Product completion requires the retained dispositions of AC-047-09–15 and
-AC-047-25–29 plus AC-047-30–47 in [spec.md](spec.md). AC-047-01–08 and
+AC-047-25–29 plus AC-047-30–50 in [spec.md](spec.md). AC-047-01–08 and
 AC-047-16–24 are explicitly not release requirements for this hotfix.
 Completion still requires one immutable candidate commit/tree, all focused
 tests, the green `0f36072` Full-Verify/Security baseline, a fresh independent
@@ -282,8 +305,8 @@ inadmissible.
 
 ## Decision points
 
-1. The implementation scope and deferrals in this PRD are approved; release is
-   not.
+1. The expanded implementation scope and deferrals in this PRD are approved;
+   release is not approved.
 2. Final PRD/Spec bytes require one matching digest-bound authority decision.
 3. The immutable candidate requires the bound green Full-Verify/Security
    baseline, focused correction-delta regressions, diff-bounded Critic,

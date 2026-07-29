@@ -67,7 +67,7 @@ function seedPoAuthorityRebind(prefix = "po-rebind") {
   const newSpecSha = createHash("sha256").update(readFileSync(join(dir, specPath))).digest("hex");
   writeFileSync(join(dir, planPath), `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${oldSpecSha} -->\n# Nova-shaped PRD\n`);
   const planSha = createHash("sha256").update(readFileSync(join(dir, planPath))).digest("hex");
-  const profile = { humanFacing: "en", sourceSha256: A, runtimeSha256: B, receiptSha256: C, repositoryFingerprint: D };
+  const profile = { schema: "pipeline.po-gate-authority-evidence.v1", humanFacing: "en", sourceSha256: A, runtimeSha256: B, receiptSha256: C, repositoryFingerprint: D };
   const continuity = {
     schema: "pipeline.continuity.v0", featureId: "nova-shaped", revision: 3,
     runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" },
@@ -79,7 +79,7 @@ function seedPoAuthorityRebind(prefix = "po-rebind") {
   const state = {
     schema: SCHEMA_ID, activeFeature: { id: "nova-shaped", planPath, phase: "implementation" }, planApproved: true,
     planApproval: { schema: "pipeline.plan-approval.v2", approvedBy: "PO", approvedAt: "2026-07-26T14:08:37.500Z", specBoundBy: "PO", specBoundAt: "2026-07-26T14:08:37.500Z", poGateAuthority: {
-      schema: "pipeline.po-gate-authority.v2", ...profile, planPath, planSha256: planSha, specPath, specSha256: oldSpecSha,
+      ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: planSha, specPath, specSha256: oldSpecSha,
     } }, continuity, updatedAt: "2026-07-26T14:08:37.500Z",
   };
   writeFileSync(statePath(dir), JSON.stringify(state, null, 2) + "\n");
@@ -87,11 +87,11 @@ function seedPoAuthorityRebind(prefix = "po-rebind") {
     dir, now: () => "2026-07-28T10:00:00.000Z", ownerNonce: () => `rebind-${String(++nonceSequence).padStart(8, "0")}`,
     poGateProfile: () => ({ ok: true, value: profile }),
     poGateAuthority: ({ expectedPlanSha256, expectedSpecSha256 }) => expectedSpecSha256 === newSpecSha && typeof expectedPlanSha256 === "string"
-      ? { ok: true, value: { schema: "pipeline.po-gate-authority.v2", ...profile, planPath, planSha256: expectedPlanSha256, specPath, specSha256: newSpecSha } }
+      ? { ok: true, value: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: expectedPlanSha256, specPath, specSha256: newSpecSha } }
       : { ok: false, code: "PO-GATE-AUTHORITY-STALE" },
     v4Inspection: () => ({ status: "ready" }),
   };
-  return { dir, deps, planPath, specPath, oldSpecSha, newSpecSha };
+  return { dir, deps, planPath, specPath, oldSpecSha, newSpecSha, profile };
 }
 
 function runPoAuthorityRebindTests() {
@@ -194,6 +194,217 @@ function runPoAuthorityRebindTests() {
     && JSON.stringify(observedV4Intents) === JSON.stringify(["bootstrap", "session", "dispatch"])
     && readFileSync(prdPath).equals(beforePrd)
     && readFileSync(statePath(fixture.dir), "utf8") !== beforeState);
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-decision-phoenix-multigeneration");
+  const prdPath = join(fixture.dir, fixture.planPath);
+  const coherentPrd = `${readFileSync(prdPath, "utf8").replace(fixture.oldSpecSha, fixture.newSpecSha)}\nPhoenix current scope.\n`;
+  writeFileSync(prdPath, coherentPrd);
+  const currentPlanSha256 = createHash("sha256").update(readFileSync(prdPath)).digest("hex");
+  const state = readState(fixture.dir).state;
+  state.planApproval.poGateAuthority = {
+    ...fixture.profile,
+    schema: "pipeline.po-gate-authority.v2",
+    planPath: fixture.planPath,
+    planSha256: currentPlanSha256,
+    specPath: fixture.specPath,
+    specSha256: fixture.newSpecSha,
+  };
+  const preservedContinuity = structuredClone(state.continuity);
+  writeFileSync(statePath(fixture.dir), JSON.stringify(state, null, 2) + "\n");
+  const planned = captureConsole(() => run(["po-authority-decision-plan"], fixture.deps));
+  const plan = JSON.parse(planned.text || "{}");
+  const selectionAction = plan.selectionActions?.find((action) => action.selectedCandidate === "spec");
+  const selected = selectionAction
+    ? captureConsole(() => run(selectionAction.argv.slice(1), fixture.deps))
+    : { value: 2, text: "" };
+  const selection = JSON.parse(selected.text || "{}");
+  const observedV4Intents = [];
+  const applied = selection.applyAction
+    ? captureConsole(() => run(selection.applyAction.argv.slice(1), {
+      ...fixture.deps,
+      replaceRebindPrdFdContents: () => { throw new Error("coherent Phoenix PRD must not be rewritten"); },
+      replaceRebindStateFdContents: (fd, bytes) => { writeSync(fd, bytes, 0, bytes.length, 0); },
+      v4Inspection: ({ intent }) => {
+        observedV4Intents.push(intent);
+        return { status: "ready" };
+      },
+    }))
+    : { value: 2, text: "" };
+  const after = readState(fixture.dir).state;
+  const expectedContinuity = structuredClone(preservedContinuity);
+  expectedContinuity.revision += 1;
+  expectedContinuity.authority.prd.sha256 = currentPlanSha256;
+  expectedContinuity.authority.spec.sha256 = fixture.newSpecSha;
+  ok("PS55a Phoenix-shaped current documents with only older Continuity yield a neutral bound plan", planned.value === 0
+    && plan.authoritySurfaces?.currentDocuments?.prd?.sha256 === currentPlanSha256
+    && plan.authoritySurfaces?.persistedPoGateAuthority?.planSha256 === currentPlanSha256
+    && plan.authoritySurfaces?.continuityAuthority?.prd?.sha256 === preservedContinuity.authority.prd.sha256
+    && plan.transition?.documentMutationRequired === false
+    && plan.transition?.bindingMutationRequired === true);
+  ok("PS55b Phoenix-shaped confirmed apply preserves payload and converges all three intents", selected.value === 0
+    && applied.value === 0
+    && after.activeFeature.phase === "design"
+    && after.planApproval.poGateAuthority.planSha256 === currentPlanSha256
+    && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha
+    && JSON.stringify(after.continuity) === JSON.stringify(expectedContinuity)
+    && JSON.stringify(observedV4Intents) === JSON.stringify(["bootstrap", "session", "dispatch"])
+    && readFileSync(prdPath, "utf8") === coherentPrd);
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-decision-nova-multigeneration");
+  const state = readState(fixture.dir).state;
+  state.activeFeature.phase = "design";
+  const historicalProfile = {
+    humanFacing: "de",
+    sourceSha256: "1".repeat(64),
+    runtimeSha256: "2".repeat(64),
+    receiptSha256: "3".repeat(64),
+    repositoryFingerprint: "4".repeat(64),
+  };
+  state.planApproval.poGateAuthority = {
+    schema: "pipeline.po-gate-authority.v2",
+    ...historicalProfile,
+    planPath: fixture.planPath,
+    planSha256: "5".repeat(64),
+    specPath: fixture.specPath,
+    specSha256: "6".repeat(64),
+  };
+  state.continuity.authority.prd.sha256 = "7".repeat(64);
+  state.continuity.authority.spec.sha256 = "8".repeat(64);
+  const preservedContinuity = structuredClone(state.continuity);
+  writeFileSync(statePath(fixture.dir), JSON.stringify(state, null, 2) + "\n");
+  const currentPrdSha256 = createHash("sha256").update(readFileSync(join(fixture.dir, fixture.planPath))).digest("hex");
+  const planned = captureConsole(() => run(["po-authority-decision-plan"], fixture.deps));
+  const plan = JSON.parse(planned.text || "{}");
+  const selectionAction = plan.selectionActions?.find((action) => action.selectedCandidate === "spec");
+  const selected = selectionAction
+    ? captureConsole(() => run(selectionAction.argv.slice(1), fixture.deps))
+    : { value: 2, text: "" };
+  const selection = JSON.parse(selected.text || "{}");
+  const observedV4Intents = [];
+  const applied = selection.applyAction
+    ? captureConsole(() => run(selection.applyAction.argv.slice(1), {
+      ...fixture.deps,
+      v4Inspection: ({ intent }) => {
+        observedV4Intents.push(intent);
+        return { status: "ready" };
+      },
+    }))
+    : { value: 2, text: "" };
+  const after = readState(fixture.dir).state;
+  const afterPrdSha256 = createHash("sha256").update(readFileSync(join(fixture.dir, fixture.planPath))).digest("hex");
+  const expectedContinuity = structuredClone(preservedContinuity);
+  expectedContinuity.revision += 1;
+  expectedContinuity.authority.prd.sha256 = afterPrdSha256;
+  expectedContinuity.authority.spec.sha256 = fixture.newSpecSha;
+  ok("PS55c Nova-shaped four-generation drift discloses marker, documents, PO gate, Continuity and both profiles", planned.value === 0
+    && plan.preimage?.currentPrdMarker?.technicalSpecSha256 === fixture.oldSpecSha
+    && plan.authoritySurfaces?.currentDocuments?.prd?.sha256 === currentPrdSha256
+    && plan.authoritySurfaces?.currentDocuments?.spec?.sha256 === fixture.newSpecSha
+    && plan.authoritySurfaces?.persistedPoGateAuthority?.planSha256 === "5".repeat(64)
+    && plan.authoritySurfaces?.continuityAuthority?.prd?.sha256 === "7".repeat(64)
+    && plan.authoritySurfaces?.profileProvenance?.historical?.sourceSha256 === historicalProfile.sourceSha256
+    && plan.authoritySurfaces?.profileProvenance?.current?.sourceSha256 === fixture.profile.sourceSha256
+    && plan.transition?.documentMutationRequired === true
+    && plan.transition?.bindingMutationRequired === true);
+  ok("PS55d Nova-shaped confirmed apply converges to current documents/profile exactly once and preserves payload", selected.value === 0
+    && applied.value === 0
+    && after.activeFeature.phase === "design"
+    && after.planApproval.poGateAuthority.humanFacing === fixture.profile.humanFacing
+    && after.planApproval.poGateAuthority.sourceSha256 === fixture.profile.sourceSha256
+    && after.planApproval.poGateAuthority.runtimeSha256 === fixture.profile.runtimeSha256
+    && after.planApproval.poGateAuthority.receiptSha256 === fixture.profile.receiptSha256
+    && after.planApproval.poGateAuthority.repositoryFingerprint === fixture.profile.repositoryFingerprint
+    && after.planApproval.poGateAuthority.planSha256 === afterPrdSha256
+    && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha
+    && JSON.stringify(after.continuity) === JSON.stringify(expectedContinuity)
+    && JSON.stringify(observedV4Intents) === JSON.stringify(["bootstrap", "session", "dispatch"]));
+  const replayBytes = readFileSync(statePath(fixture.dir), "utf8");
+  const replay = selection.applyAction
+    ? captureConsoleError(() => run(selection.applyAction.argv.slice(1), fixture.deps))
+    : { value: 0 };
+  ok("PS55e Nova-shaped completed selection replay fails closed without a second revision", replay.value === 2
+    && readFileSync(statePath(fixture.dir), "utf8") === replayBytes
+    && readState(fixture.dir).state.continuity.revision === preservedContinuity.revision + 1);
+}
+
+{
+  const malformedHistoricalCases = [
+    ["schema", (state) => { state.planApproval.poGateAuthority.schema = "pipeline.po-gate-authority.v1"; }],
+    ["extra key", (state) => { state.planApproval.poGateAuthority.extra = true; }],
+    ["noncanonical path", (state) => { state.planApproval.poGateAuthority.planPath = `./${state.activeFeature.planPath}`; }],
+    ["uppercase digest", (state) => { state.planApproval.poGateAuthority.specSha256 = state.planApproval.poGateAuthority.specSha256.toUpperCase(); }],
+    ["provenance type", (state) => { state.planApproval.poGateAuthority.humanFacing = 7; }],
+    ["Continuity path", (state) => { state.continuity.authority.spec.path = `./${state.continuity.authority.spec.path}`; }],
+    ["Continuity schema", (state) => { state.continuity.schema = "pipeline.continuity.v1"; }],
+    ["Continuity extra key", (state) => { state.continuity.extra = true; }],
+  ];
+  for (const [name, mutate] of malformedHistoricalCases) {
+    const fixture = seedPoAuthorityRebind(`po-decision-malformed-${name.replaceAll(" ", "-")}`);
+    const state = readState(fixture.dir).state;
+    mutate(state);
+    writeFileSync(statePath(fixture.dir), JSON.stringify(state, null, 2) + "\n");
+    const before = readFileSync(statePath(fixture.dir), "utf8");
+    const rejected = captureConsoleError(() => run(["po-authority-decision-plan"], fixture.deps));
+    ok(`PS55f malformed historical ${name} is a typed byte-null refusal`, rejected.value === 2
+      && /PO-DECISION-(?:PRIOR-AUTHORITY|CONTINUITY)/u.test(rejected.text)
+      && readFileSync(statePath(fixture.dir), "utf8") === before);
+  }
+}
+
+{
+  const malformedProfileCases = [
+    ["schema", { schema: "pipeline.po-gate-authority-evidence.v0" }],
+    ["extra key", { extra: true }],
+    ["uppercase digest", { receiptSha256: C.toUpperCase() }],
+  ];
+  for (const [name, change] of malformedProfileCases) {
+    const fixture = seedPoAuthorityRebind(`po-decision-current-profile-${name.replaceAll(" ", "-")}`);
+    const before = readFileSync(statePath(fixture.dir), "utf8");
+    const rejected = captureConsoleError(() => run(["po-authority-decision-plan"], {
+      ...fixture.deps,
+      poGateProfile: () => ({ ok: true, value: { ...fixture.profile, ...change } }),
+    }));
+    ok(`PS55g malformed current profile ${name} is a typed byte-null refusal`, rejected.value === 2
+      && /PO-DECISION-CURRENT-AUTHORITY/u.test(rejected.text)
+      && readFileSync(statePath(fixture.dir), "utf8") === before);
+  }
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-decision-current-marker-invalid");
+  const prdPath = join(fixture.dir, fixture.planPath);
+  writeFileSync(prdPath, readFileSync(prdPath, "utf8").replace(fixture.oldSpecSha, fixture.oldSpecSha.toUpperCase()));
+  const before = readFileSync(statePath(fixture.dir), "utf8");
+  const rejected = captureConsoleError(() => run(["po-authority-decision-plan"], fixture.deps));
+  ok("PS55h malformed current PRD marker is a typed byte-null refusal", rejected.value === 2
+    && /PO-DECISION-PRD-MARKER/u.test(rejected.text)
+    && readFileSync(statePath(fixture.dir), "utf8") === before);
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-decision-current-profile-drift");
+  const planned = captureConsole(() => run(["po-authority-decision-plan"], fixture.deps));
+  const plan = JSON.parse(planned.text || "{}");
+  const selectionAction = plan.selectionActions?.find((action) => action.selectedCandidate === "spec");
+  const selected = selectionAction
+    ? captureConsole(() => run(selectionAction.argv.slice(1), fixture.deps))
+    : { value: 2, text: "" };
+  const selection = JSON.parse(selected.text || "{}");
+  const before = readFileSync(statePath(fixture.dir), "utf8");
+  const rejected = selection.applyAction
+    ? captureConsoleError(() => run(selection.applyAction.argv.slice(1), {
+      ...fixture.deps,
+      poGateProfile: () => ({ ok: true, value: { ...fixture.profile, receiptSha256: "9".repeat(64) } }),
+    }))
+    : { value: 0 };
+  ok("PS55i current-profile drift after selection fails closed before mutation", planned.value === 0
+    && selected.value === 0
+    && rejected.value === 2
+    && readFileSync(statePath(fixture.dir), "utf8") === before);
 }
 
 {

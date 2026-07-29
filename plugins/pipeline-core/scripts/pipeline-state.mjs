@@ -237,13 +237,14 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  readdirSync,
   realpathSync,
   renameSync,
   unlinkSync,
   writeSync,
 } from "node:fs";
 import { createHash, randomUUID } from "node:crypto";
-import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import {
@@ -2476,6 +2477,9 @@ const PO_DECISION_SELECTION_SCHEMA = "pipeline.po-authority-selection.v1";
 const PO_REBIND_LOCK_TOKEN = "pipeline-po-authority-rebind-v1";
 const PO_REBIND_TXN_SCHEMA = "pipeline.po-authority-rebind-transaction.v1";
 const TECHNICAL_SPEC_MARKER_RE = /^<!-- technical-spec-sha256: ([a-f0-9]{64}) -->$/gmu;
+const PO_LANGUAGE_MARKER_RE = /^<!-- po-language: (de|en) -->$/gmu;
+const PO_PROFILE_SCHEMA = "pipeline.po-gate-authority-evidence.v1";
+const PO_PROFILE_KEYS = ["schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256", "repositoryFingerprint"];
 
 function rebindTransactionPath(dir) { return join(dir, ".claude", "pipeline-state.json.po-authority-rebind.v1"); }
 
@@ -2544,7 +2548,38 @@ function validRebindApproval(state, prd, spec, profile) {
   return authority;
 }
 
-function validPriorAuthority(state, prd, spec, profile) {
+function validCurrentPoProfile(profile) {
+  const value = profile?.value;
+  return profile?.ok === true
+    && exactObjectKeys(value, PO_PROFILE_KEYS)
+    && value.schema === PO_PROFILE_SCHEMA
+    && new Set(["de", "en"]).has(value.humanFacing)
+    && SHA256_RE.test(value.sourceSha256)
+    && SHA256_RE.test(value.runtimeSha256)
+    && SHA256_RE.test(value.receiptSha256)
+    && SHA256_RE.test(value.repositoryFingerprint)
+    ? value
+    : null;
+}
+
+function validCurrentDecisionDocuments(state, prd, spec, prdText, profile) {
+  if (state.activeFeature?.planPath !== prd.path
+    || !/^prd_[^/\\]+\.md$/u.test(basename(prd.path))
+    || spec.path !== `${dirname(prd.path).split(sep).join("/")}/spec.md`) return false;
+  let prds;
+  try {
+    prds = readdirSync(dirname(prd.absolute), { withFileTypes: true })
+      .filter(({ name }) => /^prd_[^/\\]+\.md$/u.test(name));
+  } catch {
+    return false;
+  }
+  if (prds.length !== 1 || prds[0].name !== basename(prd.path)
+    || !prds[0].isFile() || prds[0].isSymbolicLink()) return false;
+  const languages = [...prdText.matchAll(PO_LANGUAGE_MARKER_RE)].map((match) => match[1]);
+  return languages.length === 1 && languages[0] === profile.humanFacing;
+}
+
+function validPriorAuthority(state, prd, spec) {
   const approval = state?.planApproval;
   const authority = approval?.poGateAuthority;
   const approvalKeys = ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority"];
@@ -2552,15 +2587,14 @@ function validPriorAuthority(state, prd, spec, profile) {
   if (!exactObjectKeys(approval, approvalKeys) || !exactObjectKeys(authority, authorityKeys)
     || approval.schema !== "pipeline.plan-approval.v2" || approval.approvedBy !== "PO"
     || approval.specBoundBy !== "PO" || authority.schema !== "pipeline.po-gate-authority.v2"
+    || !canonicalIso(approval.approvedAt) || !canonicalIso(approval.specBoundAt)
     || authority.planPath !== prd.path || authority.specPath !== spec.path
     || !SHA256_RE.test(authority.planSha256) || !SHA256_RE.test(authority.specSha256)
-    || !profile?.ok) return null;
-  const value = profile.value;
-  if (!value || authority.humanFacing !== value.humanFacing
-    || authority.sourceSha256 !== value.sourceSha256
-    || authority.runtimeSha256 !== value.runtimeSha256
-    || authority.receiptSha256 !== value.receiptSha256
-    || authority.repositoryFingerprint !== value.repositoryFingerprint) return null;
+    || !new Set(["de", "en"]).has(authority.humanFacing)
+    || !SHA256_RE.test(authority.sourceSha256)
+    || !SHA256_RE.test(authority.runtimeSha256)
+    || !SHA256_RE.test(authority.receiptSha256)
+    || !SHA256_RE.test(authority.repositoryFingerprint)) return null;
   return authority;
 }
 
@@ -2570,6 +2604,17 @@ function eligibleRebindContinuity(state, prd, spec, oldAuthority) {
     || continuity.authority.prd.path !== prd.path || continuity.authority.spec.path !== spec.path
     || continuity.authority.prd.sha256 !== oldAuthority.planSha256
     || continuity.authority.spec.sha256 !== oldAuthority.specSha256
+    || continuity.queueHead?.dispatch !== null || continuity.blocker !== null
+    || continuity.decisionTxn !== null || continuity.closeTransition != null
+    || continuity.revision === Number.MAX_SAFE_INTEGER) return null;
+  return continuity;
+}
+
+function eligibleDecisionContinuity(state, prd, spec) {
+  const continuity = state?.continuity;
+  if (!continuity || !validateContinuityState(continuity, state.activeFeature?.id).ok
+    || continuity.authority.prd.path !== prd.path
+    || continuity.authority.spec.path !== spec.path
     || continuity.queueHead?.dispatch !== null || continuity.blocker !== null
     || continuity.decisionTxn !== null || continuity.closeTransition != null
     || continuity.revision === Number.MAX_SAFE_INTEGER) return null;
@@ -2670,12 +2715,15 @@ function buildPoAuthorityDecisionPlan(dir, deps, existing, plannedAt = deps.now?
   const marker = rebindMarker(prdText);
   if (marker === null) return { ok: false, code: "PO-DECISION-PRD-MARKER" };
   const profile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
-  const priorAuthority = validPriorAuthority(state, prd, spec, profile);
-  if (priorAuthority === null
-    || !new Set([priorAuthority.specSha256, spec.sha256]).has(marker.digest)) {
+  const currentProfile = validCurrentPoProfile(profile);
+  if (currentProfile === null || !validCurrentDecisionDocuments(state, prd, spec, prdText, currentProfile)) {
+    return { ok: false, code: "PO-DECISION-CURRENT-AUTHORITY" };
+  }
+  const priorAuthority = validPriorAuthority(state, prd, spec);
+  if (priorAuthority === null) {
     return { ok: false, code: "PO-DECISION-PRIOR-AUTHORITY" };
   }
-  const continuity = eligibleRebindContinuity(state, prd, spec, priorAuthority);
+  const continuity = eligibleDecisionContinuity(state, prd, spec);
   if (continuity === null) return { ok: false, code: "PO-DECISION-CONTINUITY" };
   const documentDrift = marker.digest !== spec.sha256;
   const bindingDrift = priorAuthority.planSha256 !== prd.sha256
@@ -2691,11 +2739,11 @@ function buildPoAuthorityDecisionPlan(dir, deps, existing, plannedAt = deps.now?
   const nextPrdSha256 = sha256Bytes(nextPrdBytes);
   const nextAuthority = {
     schema: "pipeline.po-gate-authority.v2",
-    humanFacing: profile.value.humanFacing,
-    sourceSha256: profile.value.sourceSha256,
-    runtimeSha256: profile.value.runtimeSha256,
-    receiptSha256: profile.value.receiptSha256,
-    repositoryFingerprint: profile.value.repositoryFingerprint,
+    humanFacing: currentProfile.humanFacing,
+    sourceSha256: currentProfile.sourceSha256,
+    runtimeSha256: currentProfile.runtimeSha256,
+    receiptSha256: currentProfile.receiptSha256,
+    repositoryFingerprint: currentProfile.repositoryFingerprint,
     planPath: prd.path,
     planSha256: nextPrdSha256,
     specPath: spec.path,
@@ -2723,6 +2771,26 @@ function buildPoAuthorityDecisionPlan(dir, deps, existing, plannedAt = deps.now?
       state: { sha256: stateSha256, identity: stateFile.identity, updatedAt: state.updatedAt ?? null, continuityRevision: continuity.revision },
       planApproval: state.planApproval,
       continuityAuthority: continuity.authority,
+      currentPoProfile: currentProfile,
+      currentPrdMarker: { path: prd.path, technicalSpecSha256: marker.digest },
+    },
+    authoritySurfaces: {
+      currentDocuments: {
+        prd: { path: prd.path, sha256: prd.sha256, technicalSpecSha256: marker.digest },
+        spec: { path: spec.path, sha256: spec.sha256 },
+      },
+      persistedPoGateAuthority: priorAuthority,
+      continuityAuthority: continuity.authority,
+      profileProvenance: {
+        historical: {
+          humanFacing: priorAuthority.humanFacing,
+          sourceSha256: priorAuthority.sourceSha256,
+          runtimeSha256: priorAuthority.runtimeSha256,
+          receiptSha256: priorAuthority.receiptSha256,
+          repositoryFingerprint: priorAuthority.repositoryFingerprint,
+        },
+        current: currentProfile,
+      },
     },
     transition: {
       kind: "po-authority-design-review",
