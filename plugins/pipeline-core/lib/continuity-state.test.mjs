@@ -871,7 +871,7 @@ for (const [name, mutate] of [
 
 function decisionTxn() {
   return {
-    idempotencyKey: "decision-txn-01",
+    idempotencyKey: "decision-txn-fixture",
     briefSha256: B,
     intentSha256: C,
     selectedOptionId: "defer",
@@ -933,7 +933,7 @@ check("matching durable decision receipt clears marker at dispatchable revision"
     resume: { mode: "resume-on-next-turn", sourceRevision: 1, reasonCode: "blocker" },
   });
   const receipt = {
-    idempotencyKey: "decision-txn-01", briefSha256: B, intentSha256: C,
+    idempotencyKey: "decision-txn-fixture", briefSha256: B, intentSha256: C,
     selectedOptionId: "defer", receiptSha256: D, selectedRevision: 1, dispatchableRevision: 2,
   };
   const cleared = clearDecisionSelection(current, { expectedRevision: 1, receipt }, FEATURE);
@@ -958,7 +958,7 @@ check("mismatched decision receipt is zero mutation", () => {
 
 check("clearing without a live decision marker never claims replay", () => {
   const receipt = {
-    idempotencyKey: "decision-txn-01", briefSha256: B, intentSha256: C,
+    idempotencyKey: "decision-txn-fixture", briefSha256: B, intentSha256: C,
     selectedOptionId: "defer", receiptSha256: D, selectedRevision: 1, dispatchableRevision: 2,
   };
   const result = clearDecisionSelection(state(), { expectedRevision: 0, receipt }, FEATURE);

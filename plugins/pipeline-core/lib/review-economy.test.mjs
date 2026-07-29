@@ -276,7 +276,7 @@ throws("RE55 builder rejects a fabricated custom course", () => buildCourseDecis
 
 const intent = {
   schema: "pipeline.course-decision-intent.v1",
-  idempotencyKey: "decision-key-01",
+  idempotencyKey: "decision-key-fixture",
   briefId: built.brief.briefId,
   briefSha256: built.sha256,
   blockerSignature: signature,
