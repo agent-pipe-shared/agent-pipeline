@@ -674,6 +674,27 @@ test("PRD/Spec drift exposes only the validated digest-bound PO rebind action", 
   } finally { dispose(path); }
 });
 
+test("unapproved kickoff state has no PO authority to rebind", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const deps = { ...fakeDeps };
+    delete deps.observePersistedPoAuthority;
+    const observed = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    assert.equal(observed.status, "ready");
+    assert.equal(observed.nextAction, null);
+    assert.equal(observed.diagnostics.length, 0);
+    const statePath = join(path, ".claude/pipeline-state.json");
+    const malformedApproved = JSON.parse(readFileSync(statePath, "utf8"));
+    malformedApproved.planApproved = true;
+    writeFileSync(statePath, `${JSON.stringify(malformedApproved, null, 2)}\n`);
+    const rejected = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    assert.equal(rejected.status, "partial");
+  } finally { dispose(path); }
+});
+
 test("general PRD/Spec drift exposes the same neutral read-only decision plan for all intents", () => {
   const path = root();
   try {

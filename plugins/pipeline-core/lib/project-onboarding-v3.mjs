@@ -559,8 +559,13 @@ function persistedPoAuthority(root, fs) {
       return { status: "unavailable" };
     }
     const state = JSON.parse(bytes.toString("utf8"));
+    // Kickoff state deliberately has no PO approval yet.  Host-managed
+    // repository initialization must preserve that pristine gate rather than
+    // treating the absent approval as authority drift and invoking a repair
+    // planner that can only operate on an approved feature.
     if (state?.activeFeature === null
-      || (state?.planApproved === false && state?.planApproval === null)) {
+      || (state?.planApproved === false
+        && (state?.planApproval === null || state?.planApproval === undefined))) {
       return { status: "absent" };
     }
     if (state?.planApproved !== true
