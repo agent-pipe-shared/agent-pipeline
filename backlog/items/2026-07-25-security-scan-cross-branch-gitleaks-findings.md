@@ -122,3 +122,50 @@ accidental default is.
 
 No `po-guarded-push.mjs` escape hatch or per-repo hash allowlist is needed for
 this false-positive class going forward.
+
+## Correction — 2026-07-29 (independent Critic review of this closure)
+
+An independent Critic review of commits `c268983`/`bab3425` (self-application
+discipline, CLAUDE.md) found that the "Evidence" section above is **factually
+wrong on one point**: the claim of "0 gitleaks findings on the identical
+clean candidate" at the time `bab3425` was written was false. A real
+`node harness/scripts/security-scan.mjs` run on `bab3425` itself (independently
+reproduced by the Critic in an isolated worktree, and separately re-confirmed
+here) reported `FINDINGS (4 findings)` / `Verdict: BLOCKING -> exit 2` — not
+0/clean.
+
+The cross-branch fix (`c268983`, `--no-git`) is NOT wrong; it fully closes
+the bug this item documents (the 12 genuinely cross-branch paths and 2
+stale-line-number paths from the original 14 do not reappear, confirmed by
+the Critic). The false "0 findings" claim was caused by a **second, separate**
+false-positive class discovered later the same session: 4 findings genuinely
+reachable from this branch's own `HEAD` tree (`continuity-state.test.mjs:720/782/807`,
+`review-economy.test.mjs:279`), all `generic-api-key` matches on fixture
+`idempotencyKey` literals shaped like `word-word-##` (e.g. `"decision-txn-01"`).
+This second class is unrelated to the worktree/`.git`-sharing mechanism `c268983`
+fixes — it is a plain in-tree fixture-data false positive, since fixed
+separately by commit `12c7943` (briefing:
+`specs/2026-07-24-sprint-cyborg-epic/briefing-gitleaks-in-tree-fixture-fp-fix.md`),
+which renamed the triggering literals (no assertions/behavior changed).
+Independently verified post-`12c7943`: a direct `gitleaks detect --no-git`
+run and a full `security-scan.mjs` run both report zero findings in these
+two files (the only residual "finding" during verification was a stray
+untracked scratch file quoting the old literal value in prose — irrelevant to
+any committed candidate tree).
+
+**Net effect:** the security gate genuinely is clean on this branch as of
+`12c7943`, but was NOT yet clean at `bab3425`'s time despite that commit's
+claim — the "0 findings" evidence in the Resolution above should be read as
+describing the state after `12c7943`, not after `bab3425`. `bab3425` itself
+should have disclosed the residual 4 findings as a known, separate, then-open
+issue rather than reporting a clean gate.
+
+**Housekeeping note (not yet acted on):** `.gitleaksignore`'s "Equivalent
+exact fingerprints for the current worktree scanner mode" block (entries for
+`review-economy.test.mjs:278` and `continuity-state.test.mjs:628/690/715`)
+is stale — those line numbers no longer correspond to anything gitleaks
+flags on this branch (superseded by `12c7943`'s fixture rename, which fixed
+the finding at the source rather than via ignore-fingerprint suppression).
+These entries are now inert dead weight, not a live suppression relied upon by
+anything verified in this item. Left untouched here (out of scope for this
+correction); a future cleanup pass may remove them.
