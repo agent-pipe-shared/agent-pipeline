@@ -1,13 +1,237 @@
 # Technical specification — Agent Pipeline 0.4.7 hotfix
 
-Status: `approved by PO on 2026-07-28; implementation authorized`.
+Status: `implementation scope approved on 2026-07-29; post-Critic corrective
+document bytes await renewed digest-bound PO selection; release remains
+gated`.
 
 This specification implements the neighboring
 [PRD](prd_agent-pipeline-0.4.7-hotfix.md) against exact base
 `9d1b3dc108eb77629ace5b82002120f5539abd8d`. It is intentionally independent
 of Sprint Nova and Pull Request #64.
 
-## 0. Candidate audit baseline — 2026-07-28
+## 0. Superseding candidate truth — 2026-07-29
+
+This section and AC-047-30 through AC-047-47 supersede conflicting candidate,
+scope, and delivery statements below. The older sections remain as historical
+design/audit context so removed scope is explicit rather than silently erased.
+
+The implementation baseline is commit
+`0f36072f5250708e59d200ef802bdfdba92adccf`, tree
+`f77f533b94180bf9a7f77a4c046db5b96fa9fd86`, on
+`hotfix/issue-73`. Against `origin/main`
+`9d1b3dc108eb77629ace5b82002120f5539abd8d`, that baseline is
+26 commits ahead and zero behind. Candidate
+`0e6d9cdd4089620cc783d87c947e00e026379b28` is a reachable
+intermediate ancestor, not the current audit target.
+
+`0f36072` has green Full Verify and blocking Security evidence. The
+independent high-risk Critic then identified seven correction-delta gaps:
+persisted authority was not compared to coherent current documents; override
+path/audit/plugin identity was incomplete; composite crash recovery could
+retain an unreclaimable lock or adopt an unbound same-shape State; operational
+Pipeline State was present in the candidate range; and deferred work had no
+owner/expiry. These corrections and their focused tests are composed in one
+local publishable candidate whose tree excludes operational Pipeline State.
+Per explicit PO instruction, only focused delta tests and a diff-bounded
+Critic are rerun; another full suite is not required.
+
+The source and focused tests establish the following disposition of the
+original acceptance criteria:
+
+| Original AC | Candidate disposition |
+| --- | --- |
+| AC-047-01–02 | Removed from this hotfix and deferred: no backlog admission transaction is present. |
+| AC-047-03–08 | Removed from this hotfix and deferred: no `plan-source-recovery`, `plan-manifest-repair`, or `apply-manifest-repair` surface is present. |
+| AC-047-09–12 | Retained and implemented: closed cross-platform command grammar and typed lifecycle-guard denials. |
+| AC-047-13–15 | Retained and implemented: trusted Windows executable, private restart-state assurance, and distinct restart diagnostics. |
+| AC-047-16–23 | Removed from this hotfix and deferred: no WSL IPC compatibility controller/profile transaction is present. |
+| AC-047-24 | Removed from this hotfix and deferred: the installed route intentionally remains at 60,000/45,000 ms. |
+| AC-047-25 | Retained and satisfied by path/history audit: no Nova/PR #64 state, evidence, or unrelated implementation was integrated. |
+| AC-047-26 | Retained release gate and currently open: all final evidence must be regenerated after AC-047-30–34 and the documentation authority transition. |
+| AC-047-27 | Retained and implemented: exact legacy continuity adoption and normal close gate. |
+| AC-047-28 | Retained and implemented for its narrow stale-marker shape, including rollback, identity, replay, and same-bytes inode replacement defenses. |
+| AC-047-29 | Retained and implemented: exact writer-shaped closed/design re-entry and cleanup handling. |
+
+Current-worktree host-authorized focused readback on 2026-07-29 produced:
+
+- `pipeline-state.test.mjs`: 278/278;
+- `project-onboarding-v3.test.mjs`: 43/43;
+- `onboarding-continuity.test.mjs`: 73/73;
+- `session-cleanup-binding.test.mjs`: 25/25;
+- `human-guard-override.test.mjs`: 11/11;
+- `codex-pretool-guard.test.mjs`: 16/16;
+- `guard-lifecycle-ready.test.mjs`: 21/21; and
+- `guard-push.test.mjs`: 100/100.
+
+The Git-spawning suites require the documented host-authorized boundary; their
+workspace-sandbox `EPERM` observations are not product failures. These focused
+results are design/audit evidence. The existing `0f36072` Full Verify and
+Security results remain the full-run baseline; post-Critic changes require
+focused regressions, diff-Critic, packaging, and installed readback.
+
+### 0.1 Deferred-work register
+
+| Deferred acceptance criteria | Accountable owner | Mandatory re-decision |
+| --- | --- | --- |
+| AC-047-01–02 | Agent Pipeline Human/PO | 2026-08-15, or earlier at 0.4.8 planning |
+| AC-047-03–08 | Agent Pipeline Human/PO plus Pipeline security reviewer | 2026-08-15, or earlier at 0.4.8 planning |
+| AC-047-16–23 | Agent Pipeline Human/PO plus Windows/WSL platform owner | 2026-08-15, or immediately after a reproduced native IPC blocker |
+| AC-047-24 | Agent Pipeline Human/PO plus runtime owner | 2026-08-15, or before an Advisor routing change |
+
+At the deadline each owner must admit the item into a fresh approved design or
+renew the deferral with a new date and rationale.
+
+### AC-047-30–34 — Candidate-preserving PO authority decision
+
+- **AC-047-30 — Closed V4 action:** WHEN `bootstrap`, `session`, or `dispatch`
+  detects either repairable PRD/Spec document divergence or internally
+  matching PRD/Spec bytes whose State/Continuity bindings are stale, and the
+  narrow automatic rebind planner cannot select an exact stale-marker
+  transition, THE SYSTEM SHALL return exactly one schema-valid read-only plan
+  action instead of `partial` with `nextAction:null`.
+- **AC-047-31 — Neutral candidate plan:** WHEN that planner runs, THE SYSTEM
+  SHALL list both document candidates with their in-root path, document role,
+  provenance, current SHA-256, and the State/Continuity binding that references
+  them, and SHALL NOT decide which candidate is authoritative.
+- **AC-047-32 — Confirmed bound apply:** WHEN the PO selects one candidate,
+  THE SYSTEM SHALL expose one typed apply action bound to the exact plan and
+  selection digest, marked `mutation:true` and
+  `requiresConfirmation:true`, and SHALL apply only after explicit PO
+  confirmation through the sanctioned lifecycle/State writer. Successful
+  apply SHALL set the active feature phase to `design`, preserve the
+  continuity payload, update its authority and revision, and avoid rewriting
+  a PRD whose current bytes already contain the selected Spec digest.
+- **AC-047-33 — Drift, replay, preservation:** WHEN PRD, Spec, State,
+  Continuity, plan, selection, path identity, permissions, or DACL assurance
+  drifts, or a wrong/reused digest is supplied, THE SYSTEM SHALL fail closed
+  without partial authority change. Apply SHALL preserve both document
+  versions, be idempotent for the identical completed selection, and return a
+  precise typed ambiguity error when a safe two-candidate plan cannot be
+  formed.
+- **AC-047-34 — Intent regression:** WHEN an unchanged authority is inspected,
+  `bootstrap`, `session`, and `dispatch` SHALL remain `ready`; WHEN a
+  repairable divergence is present, all three intents SHALL expose the same
+  candidate-preserving decision contract; and WHEN confirmed apply succeeds,
+  all three SHALL return `ready` with the active feature in `design`.
+
+AC-047-30–34 are implemented in the current worktree by the neutral
+`pipeline.po-authority-decision-plan.v1` planner plus separately bound
+selection/apply commands. The narrow
+`pipeline.po-authority-rebind-plan.v1` action remains unchanged for its exact
+stale-marker shape and is not widened into an implicit document choice.
+
+### AC-047-35–38 — Composite lost-binding and orphan recovery
+
+- **AC-047-35 — Complete composite plan:** WHEN portable Continuity binds a
+  missing cleanup descriptor, no closure can be authenticated, and all other
+  active private descriptors are exactly retirable, THE SYSTEM SHALL return
+  one `retire-orphans-release-lost-binding` plan. Its digest SHALL bind the
+  physical root, loaded writer identity, State digest/revision, lost binding,
+  closure observation, expected binding status, the sorted complete
+  descriptor/digest/owner/retirement set, and the deterministic sanctioned
+  State-release postimage digest.
+- **AC-047-36 — Ordered confirmed apply:** WHEN the Human confirms the exact
+  plan, THE SYSTEM SHALL reobserve every preimage before mutation, load and
+  retire only the exact still-retirable descriptors without disclosing owner
+  nonces, prove the active set empty, prove portable State unchanged, release
+  the exact lost binding through the sanctioned CAS writer, and read back
+  `sessionCleanup:null` with exactly one revision increment.
+- **AC-047-37 — Crash and replay:** WHEN execution stops before retirement,
+  after retirement but before State release, or after State release, THE
+  SYSTEM SHALL respectively preserve the original state, converge through the
+  existing lost-binding release path, or recognize only the exact
+  journal-bound State postimage. The plan-bound process-owner lock SHALL be
+  rejected while its owner is live and reclaimable only after that owner is
+  provably dead. Identical replay SHALL be idempotent.
+- **AC-047-38 — Closed guard lane:** WHEN lifecycle readiness is blocked by
+  this exact recovery, the guard SHALL admit only `status`, `plan-recovery`,
+  and the planner-returned exact `apply-recovery --repo <root>
+  --plan-sha256 <digest> --activate` grammar. Live or unobservable owners,
+  cleanup manifests, descriptor-set drift, State drift, unsafe files, links,
+  permissions, or DACL assurance SHALL remain fail-closed.
+
+### AC-047-39–40 — Portable publication baseline
+
+- **AC-047-39 — No machine-local handle at delivery:** WHEN close, handover,
+  push, or publication readiness is evaluated, THE SYSTEM SHALL reject a
+  candidate whose portable Continuity has non-null
+  `runtime.sessionCleanup`. Only the sanctioned writer may clear it; private
+  `.git/agent-pipeline` material is never published.
+- **AC-047-40 — Real-origin clean readback:** WHEN a push is separately
+  authorized, THE release evidence SHALL clone the published branch from the
+  real HTTPS GitHub origin into an empty sibling directory and prove exact
+  HEAD/branch/upstream/origin, a clean non-nested worktree, no inherited
+  private descriptors, successful full bootstrap, and a still-clean checkout.
+
+### AC-047-41–47 — Attended one-action guard override
+
+The normative threat analysis for this capability is
+`docs/human-guard-override-threat-model.md`.
+
+- **AC-047-41 — Denial-bound request:** WHEN an eligible guard denial occurs,
+  THE adapter SHALL expose a sanitized request digest and one read-only plan
+  action bound to the exact physical repository, canonical tool name/input
+  digest, complete denial set, current HEAD/tree/index/worktree and lifecycle
+  preimage, and loaded plugin/writer identity.
+- **AC-047-42 — Explicit Human authorization:** WHEN the Human explicitly
+  confirms that plan and supplies a non-empty reason, THE SYSTEM SHALL create
+  one owner-private, expiring capability through an exact
+  `--plan-sha256 ... --reason-sha256 ... --activate` action. Merely asking an
+  agent to retry or setting an environment variable SHALL grant no authority.
+- **AC-047-43 — Exact one-time consumption:** WHEN the next tool call exactly
+  matches the capability and all bound preimages remain unchanged, THE central
+  adapter SHALL atomically consume it before allowing the action. Replay,
+  parallel double-consumption, expiry, input drift, denial drift, repository
+  drift, plugin drift, or ambiguous outcome SHALL deny.
+- **AC-047-44 — Tamper-evident private audit:** Authorization, consumption,
+  rejection, and expiry SHALL append sanitized records to an owner-private
+  keyed hash chain below the physical Git common directory. Verification SHALL
+  fail closed on a missing key, broken sequence, invalid MAC, a deleted
+  ledger/head pair, a capability without its matching authorization event,
+  unsafe path, symlink/hardlink, weak POSIX mode, or insufficient
+  native-Windows DACL.
+  Raw tool input, secrets, owner nonces, and private paths SHALL not enter the
+  portable repository or audit projection.
+- **AC-047-45 — Non-overridable invariants:** No override SHALL authorize
+  paths outside the physical repository, direct edits of Pipeline State,
+  Continuity, Runtime projection or private descriptors, descriptor deletion,
+  owner-nonce disclosure, credential/secret paths, plugin installation/source
+  replacement, any Git invocation (including aliases), push, tag, merge,
+  release, or an unparseable/operator-ambiguous command. Every in-root path
+  SHALL be checked through its existing physical ancestors, not only by
+  lexical containment.
+- **AC-047-46 — Central and narrow integration:** Bash, `apply_patch`, Edit,
+  and Write SHALL use the same capability verifier after all guards have
+  produced their normal denial. Existing guard semantics remain unchanged
+  without a valid capability; the legacy free-form Git override SHALL not
+  bypass this contract.
+- **AC-047-47 — End-to-end evidence:** Linux/WSL, macOS semantics, and native
+  Windows/DACL tests SHALL cover plan, authorize, consume, replay, expiry,
+  concurrent consume, tampered audit/key/capability, State and path drift,
+  protected non-overridable actions, adapter failure, and an attended smoke
+  from initial denial through successful exact action and subsequent denial.
+
+## 0.1 Current implementation map
+
+This table is the current code-to-contract map. “Implemented” means present in
+the corrective diff and covered by the listed focused suites; it is not a
+release, packaging, installation or platform-evidence claim.
+
+| Slice | Acceptance | Current production surfaces | Current status |
+| --- | --- | --- | --- |
+| `047-ARB` | AC-047-30–34 | `plugins/pipeline-core/lib/project-onboarding-v3.mjs`, `plugins/pipeline-core/scripts/pipeline-state.mjs`, lifecycle guard | Implemented; neutral plan/selection/apply, coherent-document/stale-State recovery, design re-entry and all three intents covered |
+| `047-CLR` | AC-047-35–37 | `plugins/pipeline-core/lib/session-cleanup-recovery.mjs`, `plugins/pipeline-core/scripts/session-cleanup.mjs` | Implemented; composite plan/apply, journal, crash replay and drift checks covered |
+| `047-CLG` | AC-047-38 | lifecycle and outer Codex guards | Implemented; only exact status/plan/returned apply grammar admitted while non-ready |
+| `047-ORG` | AC-047-39–40 | `plugins/pipeline-core/hooks/guard-push.mjs` | AC-047-39 implemented and covered; AC-047-40 remains the post-push real-origin readback gate |
+| `047-HOV` | AC-047-41–47 | `plugins/pipeline-core/lib/human-guard-override.mjs`, `plugins/pipeline-core/scripts/guard-human-override.mjs`, central Codex guard adapter | Implemented; plan/authorize/single consume, authenticated private audit, exclusions and platform-assurance fixtures covered |
+| `047-INT` | AC-047-26 | Verify registration, threat model, package/version/readback evidence | Verify registration and threat model present; immutable-candidate Verify/Security/Critic/package/install evidence remains open |
+
+The attended override threat model is
+`docs/human-guard-override-threat-model.md`. It is part of the implementation
+contract for AC-047-41–47 and will become a checked documentation link when
+the new file is staged with the implementation candidate.
+
+## 0.2 Historical candidate audit baseline — 2026-07-28 (non-normative)
 
 The audited candidate is `af71c2e18226da8527c94a359fbd343500c6d5b0` on
 `hotfix/issue-73`, observed 15 commits ahead of and zero commits behind
@@ -24,9 +248,11 @@ it is not a plan approval, release claim, or authorization to dispatch.
 - H5 remains incomplete: the active host-Advisor route still declares
   60,000/45,000 ms attempts, not the required 180,000/90,000 ms policy.
 
-Every acceptance criterion below therefore remains required. No existing
-focused evidence may be reused as candidate, release, platform, or approval
-evidence after any subsequent candidate change.
+This subsection and the detailed historical design below are retained as
+provenance. They do not override the dispositions in section 0. In particular,
+AC-047-01–08 and AC-047-16–24 are deferred and are not current release
+requirements. No focused evidence may be reused as immutable-candidate,
+release, platform, or approval evidence after any candidate byte changes.
 
 ## 1. Invariants
 
@@ -57,11 +283,18 @@ The implementation must preserve these release-wide invariants:
     exact-preimage transition. Generic CAS, ordinary feature replacement, and
     manual State editing remain unable to adopt a Result or rewrite PRD
     authority.
+12. A published portable baseline cannot bind a machine-local cleanup
+    descriptor.
+13. A Human guard override is denial-bound, expiring, one-use and
+    tamper-evident; it never authorizes protected invariants or disables a
+    guard.
 
-## Acceptance criteria (EARS)
+## Historical acceptance-criterion definitions (EARS)
 
-These criteria are the normative implementation and release contract. The
-later technical sections explain how the system satisfies them.
+These original definitions preserve identifier history. Their current
+normative disposition is the table in section 0: only AC-047-09–15 and
+AC-047-25–29 are retained from this block; AC-047-01–08 and AC-047-16–24 are
+deferred. AC-047-30–47 above are the new normative repair contract.
 
 - **AC-047-01 — Backlog admission:** WHEN the canonical backlog checker reads
   the 0.4.7 candidate, THE SYSTEM SHALL find exactly one valid initial
@@ -1157,30 +1390,21 @@ still asserts the old 60/45-second policy.
 
 ### 9.1 Bounded implementation slices
 
-Each slice is one serial dispatch with exclusive ownership for its duration.
-No slice may exceed its listed paths or acceptance set; a scope burst stops the
-dispatch for reslicing. Same-file slices never run in parallel. The next slice
-starts only after the prior slice's focused tests and diff review are green.
+The current hotfix is partitioned into these reviewable slices. Same-file
+slices remain serial; the immutable candidate is not formed until every slice
+and the final document authority are stable.
 
 | Slice | Exclusive production ownership | Required acceptance before handoff |
 | --- | --- | --- |
-| `047-LCY` | dedicated continuity adoption transition in the continuity library and State writer, matching tests, and hash-bound 0.4.6 close evidence | AC-047-27; exact planner/apply/close path and every preimage/drift/replay/durability negative green; old feature closed and 0.4.7 authority read back before any later slice |
-| `047-BKG` | backlog missing-event planner/writer plus ledger/STATUS/index projection surfaces | AC-047-01–02; canonical checker and transaction recovery green |
-| `047-GRD` | hook-local command grammar, lifecycle guard, outer pretool guard tests | AC-047-09–12; exact POSIX/Windows pipeline and hostile syntax matrix green |
-| `047-WIN` | Codex restart executable resolver and shared private restart-state adapter | AC-047-13–15; native-Windows direct executable/private-state fixtures plus POSIX regression green |
-| `047-V4P` | V4 source/manifest planners and CLI result schemas in onboarding library/script | AC-047-03–05; every closed recovery category and deterministic zero-write plan green |
-| `047-V4A` | manifest apply/race handling, exact recovery guard entries, pipeline-start recovery wording, onboarding threat model | AC-047-06–08; drift/race/quarantine, outer guard, and process readback fixtures green |
-| `047-IPC` | closed sandbox-failure projection, nested propagation, bounded machine-local diagnostic log, and model-free temp/socket verifier | AC-047-16–18; real/false trigger, exact IPC cause, adapter trace, sanitization/log bounds, canary, cleanup, timeout, and no-model tests green |
-| `047-PRO` | dormant profile transaction, approval receipt, session controller, duty routing | AC-047-19–23; install/readback, paired standard/compatible probe, exact activation, safe retry, next-session reset, fix-retirement, and narrow-duty isolation green |
-| `047-ADV` | Advisor route policy and pipeline-start timeout wording/tests | AC-047-24; exact 180/90-second policy and unchanged route semantics green |
-| `047-INT` | Verify registration, hotfix result/evidence, release/version surfaces, downstream collision manifest | AC-047-25–26; all candidate gates in section 10 bind one exact commit/tree |
+| `047-LCY` | retained legacy adoption, stale-marker rebind and closed/design re-entry | AC-047-27–29 remain green and unchanged by the new general decision path |
+| `047-ARB` | neutral authority planning and State-writer selection/apply | AC-047-30–34; two candidates, three intents, drift/replay/identity negatives green |
+| `047-CLR` | composite cleanup planner/apply and private journal | AC-047-35–37; ordered apply plus pre-/mid-/post-crash convergence green |
+| `047-CLG` | exact non-ready cleanup and authority command grammar | AC-047-38; no operators, alternate paths or additional arguments admitted |
+| `047-ORG` | portable cleanup-binding publication guard | AC-047-39 green; AC-047-40 reserved for separately authorized real-origin readback |
+| `047-HOV` | Human override capability, audit store, CLI and central adapter | AC-047-41–47; exact denial through single consumption and protected exclusions green |
+| `047-INT` | Verify registration, threat model, result/evidence, package/version/readback surfaces | AC-047-25–26; every final gate binds one immutable commit/tree |
 
-`047-LCY` lands and performs the sanctioned lifecycle transition before every
-other slice. `047-GRD` and `047-WIN` land before `047-V4P/V4A`, so #63 consumes the shared
-#73 command/runtime primitives instead of adding a second parser. `047-IPC`
-lands before `047-PRO`. #70 and Advisor budgets remain independently
-reviewable. File-level context/ownership for each dispatch is derived from
-section 2.1 and narrowed to only the files that slice actually changes.
+AC-047-01–08 and AC-047-16–24 have no implementation slice in this hotfix.
 
 ### 9.2 Nova rebase
 
@@ -1222,15 +1446,15 @@ own focused and full gates against its new exact candidate.
 
 Required focused suites:
 
-- legacy continuity adoption pure-transition, State writer plan/apply, normal
-  close-feature, and PO-authority activation;
-- backlog state/transaction tests and canonical checker;
+- legacy continuity adoption, State writer, normal close-feature, narrow
+  stale-marker rebind and neutral authority decision;
+- composite cleanup plan/apply, crash replay and private-state assurance;
 - lifecycle guard and outer Codex pretool guard;
 - project onboarding unit and process E2E;
 - Codex onboarding runtime and Windows private-state assurance;
-- WSL IPC probe/profile/session controller;
-- host Advisor route; and
-- pipeline-start contract tests.
+- portable push/publication baseline guard;
+- attended Human override and authenticated-audit tamper/replay tests; and
+- pipeline-start/preflight contract regressions.
 
 Every new focused suite is registered in the single Verify gate.
 
@@ -1238,33 +1462,42 @@ Every new focused suite is registered in the single Verify gate.
 
 Required platform evidence:
 
-- Linux regression lane for guard, V4 recovery, runtime, and Full Verify;
-- native WSL lane reproducing standard temp success/AF_UNIX failure and
-  validated session fallback;
+- Linux/WSL host lane for authority, cleanup, central guard, publication guard
+  and Full Verify;
+- macOS semantic fixtures for private files, path identity, atomic
+  replace/readback and attended override;
 - native Windows non-admin lane using a packaged/installed 0.4.7 candidate,
-  direct `codex.exe`, fixed PowerShell skill read, restart persistence,
-  restart/readback, and owner-private state; and
-- a second standard-compatible lane proving the WSL fallback is not required
-  when the built-in profile works.
+  direct `codex.exe`, DACL-backed private state, restart persistence and
+  attended-override assurance; and
+- a clean real-origin clone/readback lane after a separately authorized push,
+  proving no private descriptor or portable cleanup binding is inherited.
 
 Issue #72 and native Apple Silicon are not platform gates for this release.
 
 ### 10.3 Candidate gates
 
-The exact candidate commit and tree must pass:
+The exact final candidate commit and tree are reported by Git and package
+readback rather than embedded recursively in their own document bytes. They
+must carry:
 
 1. all focused suites;
-2. Full Verify;
-3. blocking Security;
-4. fresh independent Critic review over the hotfix diff and this design;
+2. the green Full Verify evidence for baseline `0f36072`;
+3. the green blocking Security evidence for baseline `0f36072`;
+4. a fresh independent Critic review restricted to the complete
+   `0f36072..final` correction delta and this updated design;
 5. packaged Claude and Codex plugin validation;
 6. installed-plugin readback;
 7. native platform evidence above;
-8. version-surface and changelog consistency; and
-9. clean repository/readback after candidate evidence is recorded.
+8. version-surface, manifest and changelog consistency;
+9. clean repository/readback after candidate evidence is recorded; and
+10. after separately authorized publication, the AC-047-40 real-origin clone
+    and bootstrap readback.
 
-Any rerun after a candidate byte changes binds a new commit/tree and supersedes
-the earlier evidence. Evidence from PR #64 or any Nova candidate is inadmissible.
+Any focused or diff-Critic rerun after a correction byte changes binds the new
+delta. The PO explicitly waived another full-run cycle for this correction
+delta; no statement may misrepresent the baseline Full Verify/Security as
+having run on later bytes. Evidence from PR #64 or any Nova candidate is
+inadmissible.
 
 ## 11. Release evidence
 
@@ -1273,9 +1506,10 @@ Create hotfix-owned result/evidence under this design directory. It records:
 - exact base, candidate commit, and candidate tree;
 - exact legacy continuity preimage, adoption-plan/apply readback, 0.4.6 close
   evidence, and 0.4.7 plan-activation readback;
-- exact reference commits used for #63;
-- included Issue mapping (#63, #70, #71, #73);
-- explicit #72 and PR #64 exclusion;
+- authority-decision plan/selection/apply, composite cleanup crash/replay,
+  portable-baseline and attended-override evidence;
+- retained Issue #73 and legacy-lifecycle mapping;
+- explicit deferred-scope, #72, PR #64 and downstream-state exclusion;
 - focused/platform/Verify/Security/Critic commands and results;
 - installed plugin versions and readback;
 - version and release surface digests;

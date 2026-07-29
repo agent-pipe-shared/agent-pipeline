@@ -701,6 +701,12 @@
       "member": "host-advisor-workspace-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:human-guard-override-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "human-guard-override-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-state-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1623,6 +1629,7 @@
         "verify-phase:harness/scripts/verify.mjs:guard-testpath-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
         "verify-phase:harness/scripts/verify.mjs:host-advisor-workspace-tests",
+        "verify-phase:harness/scripts/verify.mjs:human-guard-override-tests",
         "verify-phase:harness/scripts/verify.mjs:human-role-label-tests",
         "verify-phase:harness/scripts/verify.mjs:human-role-rendering-tests",
         "verify-phase:harness/scripts/verify.mjs:language-canon-check",

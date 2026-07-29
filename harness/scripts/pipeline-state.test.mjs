@@ -108,10 +108,108 @@ function runPoAuthorityRebindTests() {
   const applied = captureConsole(() => run(plan.applyAction.argv.slice(1), fixture.deps));
   const after = readState(fixture.dir).state;
   const afterPrd = readFileSync(join(fixture.dir, fixture.planPath), "utf8");
-  ok("PS53d exact confirmed apply converges marker, PO gate and Continuity", applied.value === 0 && afterPrd.includes(fixture.newSpecSha) && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha && after.continuity.authority.spec.sha256 === fixture.newSpecSha && after.continuity.authority.prd.sha256 === after.planApproval.poGateAuthority.planSha256 && after.continuity.revision === 4);
+  ok("PS53d exact confirmed apply converges marker, PO gate and Continuity in design", applied.value === 0 && afterPrd.includes(fixture.newSpecSha) && after.activeFeature.phase === "design" && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha && after.continuity.authority.spec.sha256 === fixture.newSpecSha && after.continuity.authority.prd.sha256 === after.planApproval.poGateAuthority.planSha256 && after.continuity.revision === 4);
   const replayBytes = readFileSync(statePath(fixture.dir), "utf8");
   const replay = captureConsoleError(() => run(plan.applyAction.argv.slice(1), fixture.deps));
   ok("PS53e replay is a closed refusal after a verified non-no-op", replay.value === 2 && readFileSync(statePath(fixture.dir), "utf8") === replayBytes);
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-decision-general-drift");
+  const state = readState(fixture.dir).state;
+  state.activeFeature.phase = "design";
+  writeFileSync(statePath(fixture.dir), JSON.stringify(state, null, 2) + "\n");
+  writeFileSync(
+    join(fixture.dir, fixture.planPath),
+    `${readFileSync(join(fixture.dir, fixture.planPath), "utf8")}\nHuman-reviewed scope expansion.\n`,
+  );
+  const beforePrd = readFileSync(join(fixture.dir, fixture.planPath), "utf8");
+  const beforeState = readFileSync(statePath(fixture.dir), "utf8");
+  const planned = captureConsole(() => run(["po-authority-decision-plan"], fixture.deps));
+  const plan = JSON.parse(planned.text || "{}");
+  ok("PS54a general PRD/Spec drift yields two neutral physical candidates", planned.value === 0
+    && plan.schema === "pipeline.po-authority-decision-plan.v1"
+    && plan.status === "planned"
+    && JSON.stringify(plan.candidates?.map((candidate) => candidate.id)) === JSON.stringify(["prd", "spec"])
+    && plan.selectionActions?.find((action) => action.selectedCandidate === "prd")?.status === "unavailable"
+    && plan.selectionActions?.find((action) => action.selectedCandidate === "spec")?.requiresConfirmation === true
+    && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === beforePrd
+    && readFileSync(statePath(fixture.dir), "utf8") === beforeState);
+  const specSelection = plan.selectionActions.find((action) => action.selectedCandidate === "spec");
+  const selected = captureConsole(() => run(specSelection.argv.slice(1), fixture.deps));
+  const selection = JSON.parse(selected.text || "{}");
+  ok("PS54b explicit Spec selection returns a separately digest-bound confirmed apply", selected.value === 0
+    && selection.schema === "pipeline.po-authority-selection.v1"
+    && selection.selectedCandidate === "spec"
+    && /^[a-f0-9]{64}$/u.test(selection.selectionDigest)
+    && selection.applyAction?.requiresConfirmation === true
+    && selection.applyAction?.argv?.includes("--selection-digest")
+    && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === beforePrd
+    && readFileSync(statePath(fixture.dir), "utf8") === beforeState);
+  const applied = captureConsole(() => run(selection.applyAction.argv.slice(1), fixture.deps));
+  const after = readState(fixture.dir).state;
+  ok("PS54c confirmed decision apply converges marker and both authority surfaces in design", applied.value === 0
+    && JSON.parse(applied.text).code === "PO-DECISION-APPLIED"
+    && readFileSync(join(fixture.dir, fixture.planPath), "utf8").includes(fixture.newSpecSha)
+    && after.activeFeature.phase === "design"
+    && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha
+    && after.continuity.authority.spec.sha256 === fixture.newSpecSha
+    && after.continuity.revision === 4);
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-decision-coherent-docs-stale-state");
+  const prdPath = join(fixture.dir, fixture.planPath);
+  const coherentPrd = readFileSync(prdPath, "utf8").replace(fixture.oldSpecSha, fixture.newSpecSha);
+  writeFileSync(prdPath, `${coherentPrd}\nReconciled product scope.\n`);
+  const beforePrd = readFileSync(prdPath);
+  const beforeState = readFileSync(statePath(fixture.dir), "utf8");
+  const planned = captureConsole(() => run(["po-authority-decision-plan"], fixture.deps));
+  const plan = JSON.parse(planned.text || "{}");
+  const selectionAction = plan.selectionActions?.find((action) => action.selectedCandidate === "spec");
+  const selected = captureConsole(() => run(selectionAction.argv.slice(1), fixture.deps));
+  const selection = JSON.parse(selected.text || "{}");
+  const observedV4Intents = [];
+  const applied = captureConsole(() => run(selection.applyAction.argv.slice(1), {
+    ...fixture.deps,
+    replaceRebindPrdFdContents: () => { throw new Error("coherent PRD must not be rewritten"); },
+    replaceRebindStateFdContents: (fd, bytes) => { writeSync(fd, bytes, 0, bytes.length, 0); },
+    v4Inspection: ({ intent }) => {
+      observedV4Intents.push(intent);
+      return { status: "ready" };
+    },
+  }));
+  const after = readState(fixture.dir).state;
+  ok("PS54d coherent documents with stale State yield the same PO plan and design re-entry", planned.value === 0
+    && plan.transition?.kind === "po-authority-design-review"
+    && plan.transition?.documentMutationRequired === false
+    && plan.transition?.bindingMutationRequired === true
+    && applied.value === 0
+    && after.activeFeature.phase === "design"
+    && after.planApproval.poGateAuthority.planSha256 === createHash("sha256").update(beforePrd).digest("hex")
+    && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha
+    && after.continuity.authority.prd.sha256 === after.planApproval.poGateAuthority.planSha256
+    && after.continuity.authority.spec.sha256 === fixture.newSpecSha
+    && after.continuity.revision === 4
+    && JSON.stringify(observedV4Intents) === JSON.stringify(["bootstrap", "session", "dispatch"])
+    && readFileSync(prdPath).equals(beforePrd)
+    && readFileSync(statePath(fixture.dir), "utf8") !== beforeState);
+}
+
+{
+  const fixture = seedPoAuthorityRebind("po-decision-selection-drift");
+  const state = readState(fixture.dir).state;
+  state.activeFeature.phase = "design";
+  writeFileSync(statePath(fixture.dir), JSON.stringify(state, null, 2) + "\n");
+  writeFileSync(join(fixture.dir, fixture.planPath), `${readFileSync(join(fixture.dir, fixture.planPath), "utf8")}\nDrifted PRD.\n`);
+  const plan = JSON.parse(captureConsole(() => run(["po-authority-decision-plan"], fixture.deps)).text || "{}");
+  const specSelection = plan.selectionActions.find((action) => action.selectedCandidate === "spec");
+  const selection = JSON.parse(captureConsole(() => run(specSelection.argv.slice(1), fixture.deps)).text || "{}");
+  writeFileSync(join(fixture.dir, fixture.specPath), "# drift after selection\n");
+  const beforeState = readFileSync(statePath(fixture.dir), "utf8");
+  const rejected = captureConsoleError(() => run(selection.applyAction.argv.slice(1), fixture.deps));
+  ok("PS54e document drift after selection is byte-null", rejected.value === 2
+    && readFileSync(statePath(fixture.dir), "utf8") === beforeState);
 }
 
 {

@@ -549,7 +549,9 @@ if (inlineArm) {
 let arming = null;
 if (armingRaw !== null) {
   const parsed = splitOverrideValue(armingRaw);
-  if (!parsed || parsed.rule === "" || parsed.token === "" || parsed.reason === "") {
+  if (process.env.PIPELINE_REQUIRE_TYPED_HUMAN_OVERRIDE === "1") {
+    arming = { malformed: true, reason: "the Codex adapter requires a digest-bound attended Human override capability" };
+  } else if (!parsed || parsed.rule === "" || parsed.token === "" || parsed.reason === "") {
     arming = { malformed: true, reason: "fewer than three segments, or an empty rule/token/reason" };
   } else if (!KNOWN_RULE_IDS.has(parsed.rule)) {
     arming = { malformed: true, reason: `rule id "${parsed.rule}" is unknown to the union and the loaded guard-config` };

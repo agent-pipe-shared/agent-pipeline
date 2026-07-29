@@ -46,6 +46,7 @@ const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
+const HUMAN_OVERRIDE_SCRIPT = fileURLToPath(new URL("../scripts/guard-human-override.mjs", import.meta.url));
 const PRIVATE_OVERLAY_SCRIPT = fileURLToPath(new URL("../scripts/codex-private-overlay-activation.mjs", import.meta.url));
 const HEX = /^[a-f0-9]{64}$/u;
 const HOST_INIT_CROSS_VIEW_STATUSES = new Set([
@@ -402,6 +403,24 @@ function sanctionedSessionCleanupArgs(args, root) {
 }
 
 function sanctionedPoAuthorityRebindArgs(args) {
+  if (args[0] === "po-authority-decision-plan" && args.length === 1) return true;
+  if (args[0] === "po-authority-decision-select") {
+    return args[1] === "--plan-sha256" && HEX.test(args[2] ?? "")
+      && args[3] === "--planned-at"
+      && typeof args[4] === "string" && Number.isFinite(Date.parse(args[4]))
+      && new Date(args[4]).toISOString() === args[4]
+      && args[5] === "--selection" && new Set(["prd", "spec"]).has(args[6])
+      && args.length === 7;
+  }
+  if (args[0] === "po-authority-decision-apply") {
+    return args[1] === "--plan-sha256" && HEX.test(args[2] ?? "")
+      && args[3] === "--selection-digest" && HEX.test(args[4] ?? "")
+      && args[5] === "--planned-at"
+      && typeof args[6] === "string" && Number.isFinite(Date.parse(args[6]))
+      && new Date(args[6]).toISOString() === args[6]
+      && args[7] === "--selection" && args[8] === "spec"
+      && args[9] === "--activate" && args.length === 10;
+  }
   return args[0] === "po-authority-rebind-apply"
     && args[1] === "--plan-sha256"
     && HEX.test(args[2] ?? "")
@@ -411,6 +430,34 @@ function sanctionedPoAuthorityRebindArgs(args) {
     && new Date(args[4]).toISOString() === args[4]
     && args[5] === "--activate"
     && args.length === 6;
+}
+
+function sanctionedHumanOverrideArgs(args, root) {
+  if (args[0] === "plan") {
+    return args[1] === "--repo" && args[2] === root
+      && args[3] === "--request-sha256" && HEX.test(args[4] ?? "")
+      && args.length === 5;
+  }
+  if (args[0] === "prepare-authorization") {
+    return args[1] === "--repo" && args[2] === root
+      && args[3] === "--request-sha256" && HEX.test(args[4] ?? "")
+      && args[5] === "--plan-sha256" && HEX.test(args[6] ?? "")
+      && args[7] === "--reason" && typeof args[8] === "string"
+      && args[8].trim() !== "" && Buffer.byteLength(args[8], "utf8") <= 500
+      && args.length === 9;
+  }
+  if (args[0] === "verify-audit") {
+    return args[1] === "--repo" && args[2] === root && args.length === 3;
+  }
+  return args[0] === "authorize"
+    && args[1] === "--repo" && args[2] === root
+    && args[3] === "--request-sha256" && HEX.test(args[4] ?? "")
+    && args[5] === "--plan-sha256" && HEX.test(args[6] ?? "")
+    && args[7] === "--selection-sha256" && HEX.test(args[8] ?? "")
+    && args[9] === "--reason" && typeof args[10] === "string"
+    && args[10].trim() !== "" && Buffer.byteLength(args[10], "utf8") <= 500
+    && args[11] === "--reason-sha256" && HEX.test(args[12] ?? "")
+    && args[13] === "--activate" && args.length === 14;
 }
 
 export function isSanctionedLifecycleCommand(command, root, options = {}) {
@@ -433,6 +480,7 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
   if (script === PIPELINE_STATE_SCRIPT) {
     return sanctionedPoAuthorityRebindArgs(args);
   }
+  if (script === HUMAN_OVERRIDE_SCRIPT) return sanctionedHumanOverrideArgs(args, root);
   if (script === PRIVATE_OVERLAY_SCRIPT) {
     return args[0] === "route"
       && args[1] === "--project-root"

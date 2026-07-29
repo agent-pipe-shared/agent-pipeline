@@ -542,11 +542,68 @@ function partialCleanupRecoveryResult({
   return null;
 }
 
+function persistedPoAuthority(root, fs) {
+  try {
+    const path = join(root, ".claude", "pipeline-state.json");
+    const before = fs.lstatSync(path);
+    if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1
+      || fs.realpathSync(path) !== path) {
+      return { status: "unavailable" };
+    }
+    const bytes = fs.readFileSync(path);
+    const after = fs.lstatSync(path);
+    if (!after.isFile() || after.isSymbolicLink() || after.nlink !== 1
+      || before.dev !== after.dev || before.ino !== after.ino
+      || before.mode !== after.mode || before.size !== after.size
+      || before.mtimeMs !== after.mtimeMs || fs.realpathSync(path) !== path) {
+      return { status: "unavailable" };
+    }
+    const state = JSON.parse(bytes.toString("utf8"));
+    if (state?.activeFeature === null
+      || (state?.planApproved === false && state?.planApproval === null)) {
+      return { status: "absent" };
+    }
+    if (state?.planApproved !== true
+      || state?.planApproval === null
+      || state?.continuity === null) {
+      return { status: "drifted" };
+    }
+    const approval = state?.planApproval?.poGateAuthority;
+    const continuity = state?.continuity?.authority;
+    const planSha256 = approval?.planSha256;
+    const specSha256 = approval?.specSha256;
+    if (!SHA256_RE.test(planSha256 ?? "") || !SHA256_RE.test(specSha256 ?? "")
+      || continuity?.prd?.sha256 !== planSha256
+      || continuity?.spec?.sha256 !== specSha256
+      || continuity?.prd?.path !== approval?.planPath
+      || continuity?.spec?.path !== approval?.specPath) {
+      return { status: "drifted" };
+    }
+    return { status: "observed", planSha256, specSha256 };
+  } catch {
+    return { status: "unavailable" };
+  }
+}
+
 function observePoAuthorityRebind(root, fs) {
-  const validateAuthority = fs.validatePoGateAuthorityForRepository
-    ?? validatePoGateAuthorityForRepository;
-  const authority = validateAuthority({ repoRoot: root });
+  const injectedValidator = typeof fs.validatePoGateAuthorityForRepository === "function";
+  const validateAuthority = fs.validatePoGateAuthorityForRepository ?? validatePoGateAuthorityForRepository;
+  const persisted = typeof fs.observePersistedPoAuthority === "function"
+    ? fs.observePersistedPoAuthority(root)
+    : persistedPoAuthority(root, fs);
+  if (persisted.status === "drifted") return { status: "unavailable" };
+  if (persisted.status === "unavailable" && !injectedValidator) return { status: "unavailable" };
+  const authority = validateAuthority(persisted.status === "observed"
+    ? {
+      repoRoot: root,
+      expectedPlanSha256: persisted.planSha256,
+      expectedSpecSha256: persisted.specSha256,
+    }
+    : { repoRoot: root });
   if (authority?.ok === true) return { status: "not-needed" };
+  if (authority?.code === "PO-GATE-PLAN-DIGEST-STALE") {
+    return { status: "unavailable" };
+  }
   if (authority?.code !== "PO-GATE-PRD-SPEC-MISMATCH") {
     return { status: "not-applicable" };
   }
@@ -611,6 +668,73 @@ function observePoAuthorityRebind(root, fs) {
       expected: {
         schema: "pipeline.po-authority-rebind-apply.v1",
         statuses: ["applied"],
+      },
+    },
+  };
+}
+
+function observePoAuthorityDecision(root, fs) {
+  let writer;
+  try {
+    writer = PO_AUTHORITY_REBIND_WRITER;
+    const info = fs.lstatSync(writer);
+    if (!info.isFile() || info.isSymbolicLink() || fs.realpathSync(writer) !== writer) {
+      throw new Error("unsafe PO authority writer");
+    }
+  } catch {
+    return { status: "unavailable" };
+  }
+  const planned = fs.spawnSync(process.execPath, [writer, "po-authority-decision-plan"], {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+    maxBuffer: 2 * 1024 * 1024,
+  });
+  if (planned?.error || planned?.status !== 0 || String(planned.stderr ?? "").trim() !== "") {
+    return { status: "unavailable" };
+  }
+  let plan;
+  try { plan = JSON.parse(String(planned.stdout ?? "")); }
+  catch { return { status: "unavailable" }; }
+  const candidates = Array.isArray(plan?.candidates) ? plan.candidates : [];
+  const actions = Array.isArray(plan?.selectionActions) ? plan.selectionActions : [];
+  const specAction = actions.find((action) => action?.selectedCandidate === "spec");
+  const prdAction = actions.find((action) => action?.selectedCandidate === "prd");
+  const expectedSelectionArgv = [
+    writer,
+    "po-authority-decision-select",
+    "--plan-sha256",
+    plan?.planSha256,
+    "--planned-at",
+    plan?.plannedAt,
+    "--selection",
+    "spec",
+  ];
+  if (!plan || typeof plan !== "object" || Array.isArray(plan)
+    || plan.schema !== "pipeline.po-authority-decision-plan.v1"
+    || plan.root !== root || !SHA256_RE.test(plan.planSha256 ?? "")
+    || typeof plan.plannedAt !== "string" || !Number.isFinite(Date.parse(plan.plannedAt))
+    || new Date(plan.plannedAt).toISOString() !== plan.plannedAt
+    || candidates.length !== 2
+    || JSON.stringify(candidates.map((candidate) => candidate?.id).sort()) !== JSON.stringify(["prd", "spec"])
+    || !specAction || specAction.status !== "available"
+    || specAction.executable !== process.execPath
+    || JSON.stringify(specAction.argv) !== JSON.stringify(expectedSelectionArgv)
+    || specAction.mutation !== false || specAction.requiresConfirmation !== true
+    || !prdAction || prdAction.status !== "unavailable" || prdAction.mutation !== false) {
+    return { status: "unavailable" };
+  }
+  return {
+    status: "required",
+    nextAction: {
+      kind: "command",
+      executable: process.execPath,
+      argv: [writer, "po-authority-decision-plan"],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: {
+        schema: "pipeline.po-authority-decision-plan.v1",
+        statuses: ["planned"],
       },
     },
   };
@@ -1091,6 +1215,25 @@ function readyLifecycleResult({ root, intent, repository, runtime, continuity = 
     });
   }
   if (poAuthorityRebind.status === "unavailable") {
+    const poAuthorityDecision = observePoAuthorityDecision(root, fs);
+    if (poAuthorityDecision.status === "required") {
+      return lifecycleResult({
+        status: "partial",
+        root,
+        intent,
+        repository,
+        runtime,
+        continuity,
+        appServer,
+        nextAction: poAuthorityDecision.nextAction,
+        diagnostics: [lifecycleDiagnostic(
+          "$.authority.poGate",
+          "po_authority_decision_required",
+          "the current PRD and specification require an explicit neutral Human authority selection",
+          "run only the returned read-only decision plan, present both candidates, then use the exact selected action after Human confirmation",
+        )],
+      });
+    }
     return lifecycleResult({
       status: "partial",
       root,

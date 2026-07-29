@@ -2471,6 +2471,8 @@ function runLegacyAdoptionCommand(sub, flags, deps) {
 // ---- AC-047-28: deliberately narrow stale PRD-marker / PO authority rebind ----
 
 const PO_REBIND_PLAN_SCHEMA = "pipeline.po-authority-rebind-plan.v1";
+const PO_DECISION_PLAN_SCHEMA = "pipeline.po-authority-decision-plan.v1";
+const PO_DECISION_SELECTION_SCHEMA = "pipeline.po-authority-selection.v1";
 const PO_REBIND_LOCK_TOKEN = "pipeline-po-authority-rebind-v1";
 const PO_REBIND_TXN_SCHEMA = "pipeline.po-authority-rebind-transaction.v1";
 const TECHNICAL_SPEC_MARKER_RE = /^<!-- technical-spec-sha256: ([a-f0-9]{64}) -->$/gmu;
@@ -2542,6 +2544,26 @@ function validRebindApproval(state, prd, spec, profile) {
   return authority;
 }
 
+function validPriorAuthority(state, prd, spec, profile) {
+  const approval = state?.planApproval;
+  const authority = approval?.poGateAuthority;
+  const approvalKeys = ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority"];
+  const authorityKeys = ["schema","humanFacing","sourceSha256","runtimeSha256","receiptSha256","repositoryFingerprint","planPath","planSha256","specPath","specSha256"];
+  if (!exactObjectKeys(approval, approvalKeys) || !exactObjectKeys(authority, authorityKeys)
+    || approval.schema !== "pipeline.plan-approval.v2" || approval.approvedBy !== "PO"
+    || approval.specBoundBy !== "PO" || authority.schema !== "pipeline.po-gate-authority.v2"
+    || authority.planPath !== prd.path || authority.specPath !== spec.path
+    || !SHA256_RE.test(authority.planSha256) || !SHA256_RE.test(authority.specSha256)
+    || !profile?.ok) return null;
+  const value = profile.value;
+  if (!value || authority.humanFacing !== value.humanFacing
+    || authority.sourceSha256 !== value.sourceSha256
+    || authority.runtimeSha256 !== value.runtimeSha256
+    || authority.receiptSha256 !== value.receiptSha256
+    || authority.repositoryFingerprint !== value.repositoryFingerprint) return null;
+  return authority;
+}
+
 function eligibleRebindContinuity(state, prd, spec, oldAuthority) {
   const continuity = state?.continuity;
   if (!continuity || !validateContinuityState(continuity, state.activeFeature?.id).ok
@@ -2601,6 +2623,7 @@ function buildPoAuthorityRebindPlan(dir, deps, existing, plannedAt = deps.now?.(
   nextContinuity.authority.spec.sha256 = spec.sha256;
   if (!validateContinuityState(nextContinuity, state.activeFeature.id).ok) return { ok: false, code: "PO-REBIND-CONTINUITY" };
   const nextState = structuredClone(state);
+  nextState.activeFeature.phase = "design";
   nextState.planApproval.specBoundAt = plannedAt;
   nextState.planApproval.poGateAuthority = nextAuthority;
   nextState.continuity = nextContinuity;
@@ -2619,7 +2642,7 @@ function buildPoAuthorityRebindPlan(dir, deps, existing, plannedAt = deps.now?.(
     },
     postimage: {
       prd: { path: prd.path, sha256: nextPrdSha256, technicalSpecSha256: spec.sha256 },
-      state: { sha256: sha256Bytes(JSON.stringify(nextState, null, 2) + "\n"), updatedAt: nextState.updatedAt, continuityRevision: nextContinuity.revision },
+      state: { sha256: sha256Bytes(JSON.stringify(nextState, null, 2) + "\n"), updatedAt: nextState.updatedAt, continuityRevision: nextContinuity.revision, phase: "design" },
       poGateAuthority: nextAuthority,
       continuityAuthority: nextContinuity.authority,
     },
@@ -2628,10 +2651,162 @@ function buildPoAuthorityRebindPlan(dir, deps, existing, plannedAt = deps.now?.(
   return { ok: true, payload, planSha256: sha256CanonicalJson(payload), nextPrdBytes, nextState };
 }
 
+function buildPoAuthorityDecisionPlan(dir, deps, existing, plannedAt = deps.now?.() ?? new Date().toISOString()) {
+  if (existing.status !== "ok" || !existing.state) return { ok: false, code: "PO-DECISION-STATE" };
+  const state = existing.state;
+  if (state.schema !== SCHEMA_ID || state.planApproved !== true || !state.activeFeature
+    || !new Set(["design", "implementation"]).has(state.activeFeature.phase)
+    || typeof state.activeFeature.planPath !== "string") return { ok: false, code: "PO-DECISION-STATE" };
+  const prd = physicalRebindFile(dir, state.activeFeature.planPath);
+  const stateFile = physicalRebindFile(dir, ".claude/pipeline-state.json");
+  if (prd === null) return { ok: false, code: "PO-DECISION-PRD-IDENTITY" };
+  if (stateFile === null || stateFile.sha256 !== sha256Bytes(existing.raw)) return { ok: false, code: "PO-DECISION-STATE-IDENTITY" };
+  const specPath = `${dirname(state.activeFeature.planPath).split(sep).join("/")}/spec.md`;
+  const spec = physicalRebindFile(dir, specPath);
+  if (spec === null) return { ok: false, code: "PO-DECISION-SPEC-IDENTITY" };
+  let prdText;
+  try { prdText = new TextDecoder("utf-8", { fatal: true }).decode(prd.bytes); }
+  catch { return { ok: false, code: "PO-DECISION-PRD-MARKER" }; }
+  const marker = rebindMarker(prdText);
+  if (marker === null) return { ok: false, code: "PO-DECISION-PRD-MARKER" };
+  const profile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
+  const priorAuthority = validPriorAuthority(state, prd, spec, profile);
+  if (priorAuthority === null
+    || !new Set([priorAuthority.specSha256, spec.sha256]).has(marker.digest)) {
+    return { ok: false, code: "PO-DECISION-PRIOR-AUTHORITY" };
+  }
+  const continuity = eligibleRebindContinuity(state, prd, spec, priorAuthority);
+  if (continuity === null) return { ok: false, code: "PO-DECISION-CONTINUITY" };
+  const documentDrift = marker.digest !== spec.sha256;
+  const bindingDrift = priorAuthority.planSha256 !== prd.sha256
+    || priorAuthority.specSha256 !== spec.sha256
+    || continuity.authority.prd.sha256 !== prd.sha256
+    || continuity.authority.spec.sha256 !== spec.sha256;
+  if (!documentDrift && !bindingDrift) return { ok: false, code: "PO-DECISION-NOT-DRIFTED" };
+  if (!canonicalIso(plannedAt)) return { ok: false, code: "PO-DECISION-TIMESTAMP" };
+  const nextPrdBytes = documentDrift
+    ? replaceRebindMarker(prd.bytes, marker, spec.sha256)
+    : prd.bytes;
+  if (nextPrdBytes === null) return { ok: false, code: "PO-DECISION-PRD-MARKER" };
+  const nextPrdSha256 = sha256Bytes(nextPrdBytes);
+  const nextAuthority = {
+    schema: "pipeline.po-gate-authority.v2",
+    humanFacing: profile.value.humanFacing,
+    sourceSha256: profile.value.sourceSha256,
+    runtimeSha256: profile.value.runtimeSha256,
+    receiptSha256: profile.value.receiptSha256,
+    repositoryFingerprint: profile.value.repositoryFingerprint,
+    planPath: prd.path,
+    planSha256: nextPrdSha256,
+    specPath: spec.path,
+    specSha256: spec.sha256,
+  };
+  const nextContinuity = structuredClone(continuity);
+  nextContinuity.revision += 1;
+  nextContinuity.authority.prd.sha256 = nextPrdSha256;
+  nextContinuity.authority.spec.sha256 = spec.sha256;
+  if (!validateContinuityState(nextContinuity, state.activeFeature.id).ok) return { ok: false, code: "PO-DECISION-CONTINUITY" };
+  const nextState = structuredClone(state);
+  nextState.activeFeature.phase = "design";
+  nextState.planApproval.specBoundAt = plannedAt;
+  nextState.planApproval.poGateAuthority = nextAuthority;
+  nextState.continuity = nextContinuity;
+  nextState.updatedAt = plannedAt;
+  if (nextState.gateEstimate !== undefined) return { ok: false, code: "PO-DECISION-STATE" };
+  const stateSha256 = sha256Bytes(existing.raw);
+  const basePayload = {
+    schema: PO_DECISION_PLAN_SCHEMA,
+    status: "planned",
+    root: realpathSync(resolve(dir)),
+    plannedAt,
+    preimage: {
+      state: { sha256: stateSha256, identity: stateFile.identity, updatedAt: state.updatedAt ?? null, continuityRevision: continuity.revision },
+      planApproval: state.planApproval,
+      continuityAuthority: continuity.authority,
+    },
+    transition: {
+      kind: "po-authority-design-review",
+      fromPhase: state.activeFeature.phase,
+      toPhase: "design",
+      documentMutationRequired: documentDrift,
+      bindingMutationRequired: bindingDrift,
+    },
+    candidates: [
+      {
+        id: "prd",
+        role: "product-requirements",
+        path: prd.path,
+        provenance: "current-physical-worktree",
+        sha256: prd.sha256,
+        identity: prd.identity,
+        technicalSpecSha256: marker.digest,
+        referencedBinding: { planApprovalSha256: priorAuthority.planSha256, continuitySha256: continuity.authority.prd.sha256 },
+        selection: { status: "unavailable", code: "PO-DECISION-REFERENCED-SPEC-BYTES-UNAVAILABLE" },
+      },
+      {
+        id: "spec",
+        role: "technical-specification",
+        path: spec.path,
+        provenance: "current-physical-worktree",
+        sha256: spec.sha256,
+        identity: spec.identity,
+        referencedBinding: { planApprovalSha256: priorAuthority.specSha256, continuitySha256: continuity.authority.spec.sha256 },
+        selection: { status: "available" },
+      },
+    ],
+    assurance: { regularFilesOnly: true, linksRejected: true, privatePoProfile: true, windowsDacl: "required-by-po-profile" },
+  };
+  const planSha256 = sha256CanonicalJson(basePayload);
+  const selectionPayload = {
+    schema: PO_DECISION_SELECTION_SCHEMA,
+    planSha256,
+    selectedCandidate: "spec",
+    preimage: {
+      stateSha256,
+      continuityRevision: continuity.revision,
+      prdSha256: prd.sha256,
+      specSha256: spec.sha256,
+    },
+    postimage: {
+      prdSha256: nextPrdSha256,
+      stateSha256: sha256Bytes(JSON.stringify(nextState, null, 2) + "\n"),
+      continuityRevision: nextContinuity.revision,
+      phase: "design",
+      authority: nextAuthority,
+    },
+  };
+  const selectionDigest = sha256CanonicalJson(selectionPayload);
+  return {
+    ok: true,
+    payload: { ...basePayload, planSha256 },
+    planSha256,
+    selectionPayload,
+    selectionDigest,
+    nextPrdBytes,
+    nextState,
+    postimage: selectionPayload.postimage,
+  };
+}
+
 function parsePoRebindApply(argv) {
   if (argv.length !== 5 || argv[0] !== "--plan-sha256" || !SHA256_RE.test(argv[1])
     || argv[2] !== "--updated-at" || !canonicalIso(argv[3]) || argv[4] !== "--activate") return null;
   return { planSha256: argv[1], plannedAt: argv[3] };
+}
+
+function parsePoDecisionSelection(argv) {
+  if (argv.length !== 6 || argv[0] !== "--plan-sha256" || !SHA256_RE.test(argv[1])
+    || argv[2] !== "--planned-at" || !canonicalIso(argv[3])
+    || argv[4] !== "--selection" || !new Set(["prd", "spec"]).has(argv[5])) return null;
+  return { planSha256: argv[1], plannedAt: argv[3], selection: argv[5] };
+}
+
+function parsePoDecisionApply(argv) {
+  if (argv.length !== 9 || argv[0] !== "--plan-sha256" || !SHA256_RE.test(argv[1])
+    || argv[2] !== "--selection-digest" || !SHA256_RE.test(argv[3])
+    || argv[4] !== "--planned-at" || !canonicalIso(argv[5])
+    || argv[6] !== "--selection" || argv[7] !== "spec" || argv[8] !== "--activate") return null;
+  return { planSha256: argv[1], selectionDigest: argv[3], plannedAt: argv[5], selection: argv[7] };
 }
 
 function writeRebindFile(target, bytes, mode, nonce, replace, rename, sync) {
@@ -2782,29 +2957,191 @@ function runPoAuthorityRebindCommand(sub, rest, deps) {
   }
 }
 
-function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo) {
+function runPoAuthorityDecisionCommand(sub, rest, deps) {
+  if (sub === "po-authority-decision-plan" && rest.length !== 0) {
+    console.error("Error: PO authority decision plan takes no arguments.");
+    return 2;
+  }
+  const selection = sub === "po-authority-decision-select" ? parsePoDecisionSelection(rest) : null;
+  const apply = sub === "po-authority-decision-apply" ? parsePoDecisionApply(rest) : null;
+  if (sub === "po-authority-decision-select" && selection === null) {
+    console.error("Error: PO authority selection requires --plan-sha256 <sha256> --planned-at <ISO-8601> --selection <prd|spec>.");
+    return 2;
+  }
+  if (sub === "po-authority-decision-apply" && apply === null) {
+    console.error("Error: PO authority decision apply requires --plan-sha256 <sha256> --selection-digest <sha256> --planned-at <ISO-8601> --selection spec --activate.");
+    return 2;
+  }
+  if (sub !== "po-authority-decision-apply") {
+    if (existsSync(rebindTransactionPath(deps.dir))) {
+      console.error("Error: PO authority decision recovery is pending; replay the exact previously confirmed apply action.");
+      return 2;
+    }
+    const existing = readStateRaw(deps.dir);
+    const planned = buildPoAuthorityDecisionPlan(deps.dir, deps, existing, selection?.plannedAt);
+    if (!planned.ok) {
+      console.error(`Error: PO authority decision refused (${planned.code}); zero mutation.`);
+      return 2;
+    }
+    if (selection && selection.planSha256 !== planned.planSha256) {
+      console.error("Error: PO authority decision plan is stale; zero mutation.");
+      return 2;
+    }
+    const writer = fileURLToPath(import.meta.url);
+    if (sub === "po-authority-decision-plan") {
+      console.log(JSON.stringify({
+        ...planned.payload,
+        selectionActions: [
+          {
+            selectedCandidate: "prd",
+            status: "unavailable",
+            code: "PO-DECISION-REFERENCED-SPEC-BYTES-UNAVAILABLE",
+            mutation: false,
+          },
+          {
+            selectedCandidate: "spec",
+            status: "available",
+            executable: process.execPath,
+            argv: [
+              writer,
+              "po-authority-decision-select",
+              "--plan-sha256",
+              planned.planSha256,
+              "--planned-at",
+              planned.payload.plannedAt,
+              "--selection",
+              "spec",
+            ],
+            mutation: false,
+            requiresConfirmation: true,
+          },
+        ],
+      }, null, 2));
+      return 0;
+    }
+    if (selection.selection === "prd") {
+      console.error("Error: PO authority PRD selection is not safely formable because the referenced Spec bytes are unavailable; zero mutation.");
+      return 2;
+    }
+    console.log(JSON.stringify({
+      schema: PO_DECISION_SELECTION_SCHEMA,
+      status: "selected",
+      root: planned.payload.root,
+      planSha256: planned.planSha256,
+      selectionDigest: planned.selectionDigest,
+      selectedCandidate: "spec",
+      applyAction: {
+        executable: process.execPath,
+        argv: [
+          writer,
+          "po-authority-decision-apply",
+          "--plan-sha256",
+          planned.planSha256,
+          "--selection-digest",
+          planned.selectionDigest,
+          "--planned-at",
+          planned.payload.plannedAt,
+          "--selection",
+          "spec",
+          "--activate",
+        ],
+        mutation: true,
+        requiresConfirmation: true,
+        requiresHostBoundary: true,
+      },
+    }, null, 2));
+    return 0;
+  }
+  const lock = acquireContinuityLock(deps.dir, PO_REBIND_LOCK_TOKEN, deps);
+  if (!lock.ok) {
+    console.error(`Error: PO authority decision refused (${lock.code}); zero mutation.`);
+    return 2;
+  }
+  try {
+    const io = {
+      replace: deps.replaceRebindPrdFdContents ?? ((fd, bytes) => {
+        ftruncateSync(fd, 0);
+        let offset = 0;
+        while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset, offset);
+        fsyncSync(fd);
+      }),
+      rename: deps.renameRebindPrd ?? renameSync,
+      sync: deps.syncRebindDirectory ?? syncDirectory,
+    };
+    const stateIo = {
+      replace: deps.replaceRebindStateFdContents ?? io.replace,
+      rename: deps.renameRebindState ?? renameSync,
+      sync: deps.syncRebindDirectory ?? syncDirectory,
+    };
+    const recovered = recoverRebindTransaction(
+      deps.dir,
+      apply.selectionDigest,
+      lock.ownerNonce,
+      io,
+      stateIo,
+    );
+    if (!recovered.ok) {
+      console.error(`Error: PO authority decision recovery refused (${recovered.code}); zero new mutation.`);
+      return 2;
+    }
+    if (recovered.kind === "rolled-back") {
+      console.error("Error: PO authority decision recovered its interrupted transaction; regenerate and confirm a new plan.");
+      return 2;
+    }
+    return runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
+      buildPlan: buildPoAuthorityDecisionPlan,
+      resultSchema: "pipeline.po-authority-decision-apply.v1",
+      resultCode: "PO-DECISION-APPLIED",
+    });
+  } finally {
+    releaseContinuityLock(lock);
+  }
+}
+
+function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
+  buildPlan = buildPoAuthorityRebindPlan,
+  resultSchema = "pipeline.po-authority-rebind-apply.v1",
+  resultCode = "PO-REBIND-APPLIED",
+} = {}) {
   const existing = readStateRaw(deps.dir);
-  const planned = buildPoAuthorityRebindPlan(deps.dir, deps, existing, apply.plannedAt);
-  if (!planned.ok || apply.planSha256 !== planned.planSha256) { console.error("Error: PO authority rebind plan is stale; zero mutation."); return 2; }
+  const planned = buildPlan(deps.dir, deps, existing, apply.plannedAt);
+  if (!planned.ok || apply.planSha256 !== planned.planSha256
+    || (apply.selectionDigest !== undefined && apply.selectionDigest !== planned.selectionDigest)) {
+    console.error("Error: PO authority rebind plan is stale; zero mutation."); return 2;
+  }
+  const transactionDigest = apply.selectionDigest ?? apply.planSha256;
   try {
     const current = readStateRaw(deps.dir);
-    const rebuilt = buildPoAuthorityRebindPlan(deps.dir, deps, current, apply.plannedAt);
-    if (!rebuilt.ok || rebuilt.planSha256 !== apply.planSha256) { console.error("Error: PO authority rebind preimage drifted; zero mutation."); return 2; }
-    const prd = physicalRebindFile(deps.dir, rebuilt.payload.preimage.prd.path);
+    const rebuilt = buildPlan(deps.dir, deps, current, apply.plannedAt);
+    if (!rebuilt.ok || rebuilt.planSha256 !== apply.planSha256
+      || (apply.selectionDigest !== undefined && rebuilt.selectionDigest !== apply.selectionDigest)) {
+      console.error("Error: PO authority rebind preimage drifted; zero mutation."); return 2;
+    }
+    const prdPath = rebuilt.payload.preimage.prd?.path
+      ?? rebuilt.payload.candidates?.find((candidate) => candidate.id === "prd")?.path;
+    const prePrdSha256 = rebuilt.payload.preimage.prd?.sha256
+      ?? rebuilt.payload.candidates?.find((candidate) => candidate.id === "prd")?.sha256;
+    const prePrdIdentity = rebuilt.payload.preimage.prd?.identity
+      ?? rebuilt.payload.candidates?.find((candidate) => candidate.id === "prd")?.identity;
+    const postimage = rebuilt.payload.postimage ?? rebuilt.postimage;
+    const prd = physicalRebindFile(deps.dir, prdPath);
     const stateFile = physicalRebindFile(deps.dir, ".claude/pipeline-state.json");
-    if (prd === null || stateFile === null || prd.sha256 !== rebuilt.payload.preimage.prd.sha256
-      || !sameJson(prd.identity, rebuilt.payload.preimage.prd.identity)
+    if (prd === null || stateFile === null || prd.sha256 !== prePrdSha256
+      || !sameJson(prd.identity, prePrdIdentity)
       || stateFile.sha256 !== rebuilt.payload.preimage.state.sha256
       || !sameJson(stateFile.identity, rebuilt.payload.preimage.state.identity)) {
       console.error("Error: PO authority rebind preimage identity drifted; zero mutation."); return 2;
     }
-    const transaction = { schema: PO_REBIND_TXN_SCHEMA, planSha256: planned.planSha256,
-      prd: { path: prd.path, sha256: prd.sha256, postSha256: planned.payload.postimage.prd.sha256, bytesBase64: prd.bytes.toString("base64"), mode: Number(prd.identity.mode) & 0o777, identity: prd.identity },
-      state: { path: ".claude/pipeline-state.json", sha256: stateFile.sha256, postSha256: planned.payload.postimage.state.sha256, bytesBase64: stateFile.bytes.toString("base64"), mode: Number(stateFile.identity.mode) & 0o777, identity: stateFile.identity } };
+    const transaction = { schema: PO_REBIND_TXN_SCHEMA, planSha256: transactionDigest,
+      prd: { path: prd.path, sha256: prd.sha256, postSha256: postimage.prd?.sha256 ?? postimage.prdSha256, bytesBase64: prd.bytes.toString("base64"), mode: Number(prd.identity.mode) & 0o777, identity: prd.identity },
+      state: { path: ".claude/pipeline-state.json", sha256: stateFile.sha256, postSha256: postimage.state?.sha256 ?? postimage.stateSha256, bytesBase64: stateFile.bytes.toString("base64"), mode: Number(stateFile.identity.mode) & 0o777, identity: stateFile.identity } };
     const published = publishRebindTransaction(deps.dir, transaction, lock.ownerNonce);
     if (!published.ok) { console.error(`Error: PO authority rebind transaction prepare failed (${published.code}); zero authority mutation.`); return 2; }
     deps.afterRebindTransactionPrepared?.();
-    const wrotePrd = writeRebindFile(prd.absolute, rebuilt.nextPrdBytes, prd.identity.mode, lock.ownerNonce, io.replace, io.rename, io.sync);
+    const prdWriteRequired = Buffer.compare(rebuilt.nextPrdBytes, prd.bytes) !== 0;
+    const wrotePrd = prdWriteRequired
+      ? writeRebindFile(prd.absolute, rebuilt.nextPrdBytes, prd.identity.mode, lock.ownerNonce, io.replace, io.rename, io.sync)
+      : { ok: true, committed: false };
     if (!wrotePrd.ok) {
       const rolledBack = wrotePrd.committed === false || restoreRebindFile(prd.absolute, prd.bytes, prd.identity.mode, lock.ownerNonce, io);
       const cleared = rolledBack && clearRebindTransaction(deps.dir);
@@ -2816,43 +3153,50 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo) {
     const wroteState = writeRebindFile(stateFile.absolute, stateBytes, stateFile.identity.mode, lock.ownerNonce, stateIo.replace, stateIo.rename, stateIo.sync);
     if (!wroteState.ok) {
       const stateRolledBack = wroteState.committed === false || restoreRebindFile(stateFile.absolute, stateFile.bytes, stateFile.identity.mode, lock.ownerNonce, stateIo);
-      const prdRolledBack = restoreRebindFile(prd.absolute, prd.bytes, prd.identity.mode, lock.ownerNonce, io);
+      const prdRolledBack = !prdWriteRequired || restoreRebindFile(prd.absolute, prd.bytes, prd.identity.mode, lock.ownerNonce, io);
       const cleared = stateRolledBack && prdRolledBack && clearRebindTransaction(deps.dir);
       console.error(`Error: PO authority rebind State write failed (${wroteState.code}); ${stateRolledBack && prdRolledBack && cleared ? "rollback verified" : "rollback unresolved"}.`);
       return 2;
     }
     deps.afterRebindStateWritten?.();
-    const postPrd = physicalRebindFile(deps.dir, rebuilt.payload.postimage.prd.path);
+    const postPrd = physicalRebindFile(deps.dir, prd.path);
     const postState = readStateRaw(deps.dir);
     const postStateFile = physicalRebindFile(deps.dir, ".claude/pipeline-state.json");
     const authority = (deps.poGateAuthority ?? ((request) => validatePoGateAuthorityForRepository(request)))({
-      repoRoot: deps.dir, expectedPlanSha256: rebuilt.payload.postimage.prd.sha256, expectedSpecSha256: rebuilt.payload.postimage.poGateAuthority.specSha256,
+      repoRoot: deps.dir,
+      expectedPlanSha256: postimage.prd?.sha256 ?? postimage.prdSha256,
+      expectedSpecSha256: postimage.poGateAuthority?.specSha256 ?? postimage.authority.specSha256,
     });
-    const v4 = (deps.v4Inspection ?? ((request) => inspectProjectOnboardingV3(request)))({ rootDir: deps.dir, intent: "po-authority-rebind" });
-    const postOk = postPrd?.sha256 === rebuilt.payload.postimage.prd.sha256
+    const inspectV4 = deps.v4Inspection ?? ((request) => inspectProjectOnboardingV3(request));
+    const v4Readbacks = ["bootstrap", "session", "dispatch"]
+      .map((intent) => inspectV4({ rootDir: deps.dir, intent }));
+    const expectedAuthority = postimage.poGateAuthority ?? postimage.authority;
+    const postOk = postPrd?.sha256 === (postimage.prd?.sha256 ?? postimage.prdSha256)
       && postStateFile !== null && postState.status === "ok" && sameJson(postState.state, rebuilt.nextState)
-      && authority?.ok && sameJson(authority.value, rebuilt.payload.postimage.poGateAuthority)
-      && v4?.status === "ready";
+      && authority?.ok && sameJson(authority.value, expectedAuthority)
+      && v4Readbacks.every((readback) => readback?.status === "ready");
     if (!postOk) {
       const stateRollback = restoreRebindFile(stateFile.absolute, stateFile.bytes, stateFile.identity.mode, lock.ownerNonce, stateIo);
-      const prdRollback = restoreRebindFile(prd.absolute, prd.bytes, prd.identity.mode, lock.ownerNonce, io);
+      const prdRollback = !prdWriteRequired || restoreRebindFile(prd.absolute, prd.bytes, prd.identity.mode, lock.ownerNonce, io);
       const cleared = stateRollback && prdRollback && clearRebindTransaction(deps.dir);
       console.error(`Error: PO authority rebind postimage readback failed; ${stateRollback && prdRollback && cleared ? "rollback verified" : "rollback unresolved"}.`);
       return 2;
     }
     if (!clearRebindTransaction(deps.dir)) {
       const stateRollback = restoreRebindFile(stateFile.absolute, stateFile.bytes, stateFile.identity.mode, lock.ownerNonce, stateIo);
-      const prdRollback = restoreRebindFile(prd.absolute, prd.bytes, prd.identity.mode, lock.ownerNonce, io);
+      const prdRollback = !prdWriteRequired || restoreRebindFile(prd.absolute, prd.bytes, prd.identity.mode, lock.ownerNonce, io);
       console.error(`Error: PO authority rebind transaction close failed; ${stateRollback && prdRollback && clearRebindTransaction(deps.dir) ? "rollback verified" : "rollback unresolved"}.`);
       return 2;
     }
     console.log(JSON.stringify({
-      schema: "pipeline.po-authority-rebind-apply.v1",
+      schema: resultSchema,
       status: "applied",
-      code: "PO-REBIND-APPLIED",
+      code: resultCode,
       root: rebuilt.payload.root,
       planSha256: rebuilt.planSha256,
+      ...(apply.selectionDigest ? { selectionDigest: apply.selectionDigest, selectedCandidate: apply.selection } : {}),
       continuityRevision: rebuilt.nextState.continuity.revision,
+      phase: rebuilt.nextState.activeFeature.phase,
     }));
     return 0;
   } catch { console.error("Error: PO authority rebind transaction failed; recovery journal retained."); return 2; }
@@ -2874,6 +3218,15 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
   if (sub === "po-authority-rebind-plan" || sub === "po-authority-rebind-apply") {
     return runPoAuthorityRebindCommand(sub, rest, {
+      ...deps,
+      dir,
+      now,
+      poGateAuthority,
+      poGateProfile: deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)),
+    });
+  }
+  if (new Set(["po-authority-decision-plan", "po-authority-decision-select", "po-authority-decision-apply"]).has(sub)) {
+    return runPoAuthorityDecisionCommand(sub, rest, {
       ...deps,
       dir,
       now,
@@ -3357,7 +3710,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, set-phase, set-gate-estimate, approve-plan, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, continuity-init, continuity-cas, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, publication-prepare, publication-approve, publication-authorize, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, set-phase, set-gate-estimate, approve-plan, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, publication-prepare, publication-approve, publication-authorize, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
       );
       return 2;
     }

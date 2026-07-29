@@ -1,5 +1,8 @@
 # 047-LCY Critic round 1
 
+> Historical finding record only. This failed round predates AC-047-30–47 and
+> is not current candidate, release, Security, or Critic evidence.
+
 The independent functional-equivalent read-only Critic reviewed the 047-LCY
 working-tree diff on 2026-07-27.
 

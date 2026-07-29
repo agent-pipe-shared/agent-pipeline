@@ -1087,6 +1087,40 @@ if (!sourceCommit) {
   emit(2, ["BLOCKED (guard-push, plugin pipeline-core): the explicit push source does not resolve to one commit."]);
 }
 
+function portableCleanupBaselineFailure(binding, commit) {
+  const shown = spawnSync(
+    "git",
+    ["-C", binding.projectDir, "show", `${commit}:.claude/pipeline-state.json`],
+    { encoding: "utf8", timeout: 5000 },
+  );
+  // Projects without portable Pipeline State retain the guard's historical
+  // behavior. Once the State exists at the exact pushed commit, malformed
+  // Continuity or a machine-local binding is a hard publication defect.
+  if (shown.status !== 0) return null;
+  let state;
+  try {
+    state = JSON.parse(String(shown.stdout));
+  } catch {
+    return "published Pipeline State is not valid JSON";
+  }
+  const continuity = state?.continuity;
+  if (continuity === undefined || continuity === null) return null;
+  if (!continuity || typeof continuity !== "object" || Array.isArray(continuity)
+    || !continuity.runtime || typeof continuity.runtime !== "object"
+    || Array.isArray(continuity.runtime)
+    || !Object.hasOwn(continuity.runtime, "sessionCleanup")) {
+    return "published Pipeline Continuity has no unambiguous runtime.sessionCleanup baseline";
+  }
+  return continuity.runtime.sessionCleanup === null
+    ? null
+    : "published Pipeline Continuity still binds a machine-local sessionCleanup handle";
+}
+
+const portableCleanupFailure = portableCleanupBaselineFailure(pushBinding, sourceCommit);
+if (portableCleanupFailure) {
+  emit(2, [`BLOCKED (guard-push, plugin pipeline-core): ${portableCleanupFailure}.`]);
+}
+
 /**
  * The hook host can run from the primary checkout even when the shell command
  * originates in a linked worktree.  An explicit attached branch is therefore

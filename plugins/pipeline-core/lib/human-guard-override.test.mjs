@@ -1,0 +1,610 @@
+#!/usr/bin/env node
+// SPDX-License-Identifier: SUL-1.0
+
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import {
+  copyFileSync,
+  existsSync,
+  linkSync,
+  mkdtempSync,
+  mkdirSync,
+  readFileSync,
+  rmSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import { spawnSync } from "node:child_process";
+import test from "node:test";
+
+import {
+  authorizeHumanGuardOverride,
+  consumeHumanGuardOverride,
+  HumanGuardOverrideError,
+  humanGuardOverrideInternals,
+  planHumanGuardOverride,
+  prepareHumanGuardOverrideAuthorization,
+  recordHumanGuardDenial,
+  verifyHumanGuardOverrideAudit,
+} from "./human-guard-override.mjs";
+
+const PLUGIN_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+function git(root, ...args) {
+  const result = spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(result.status, 0, result.stderr);
+  return String(result.stdout).trim();
+}
+
+function fixture() {
+  const root = mkdtempSync(join(tmpdir(), "human-guard-override-"));
+  git(root, "init", "-q", "-b", "main");
+  git(root, "config", "user.name", "Fixture");
+  git(root, "config", "user.email", "fixture@example.invalid");
+  writeFileSync(join(root, "README.md"), "fixture\n");
+  git(root, "add", "README.md");
+  git(root, "commit", "-q", "-m", "fixture");
+  return root;
+}
+
+function reasonDigest(reason) {
+  return createHash("sha256").update(Buffer.from(reason, "utf8")).digest("hex");
+}
+
+const denial = [{ guard: "guard-lifecycle-ready.mjs", reason: "GUARD-LIFECYCLE-NOT-READY" }];
+
+test("one exact attended capability is audited, consumed once and cannot be replayed", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "attended recovery\n" };
+    const request = recordHumanGuardDenial({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput,
+      denials: denial,
+      nowMs: 1000,
+    });
+    assert.equal(request.status, "planned");
+    const plan = planHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      nowMs: 2000,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    assert.equal(plan.status, "planned");
+    assert.equal(plan.toolInputSha256.length, 64);
+    assert.deepEqual(plan.eligiblePaths, ["notes.md"]);
+    const reason = "PO attended recovery for the exact notes write";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      planSha256: plan.planSha256,
+      reason,
+      nowMs: 2500,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    assert.equal(prepared.status, "prepared");
+    assert.equal(prepared.authorizeAction.mutation, true);
+    assert.equal(prepared.authorizeAction.requiresConfirmation, true);
+    assert.equal(prepared.authorizeAction.argv.includes("<human-reason>"), false);
+    const armed = authorizeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256,
+      reason,
+      reasonSha256: reasonDigest(reason),
+      activate: true,
+      nowMs: 3000,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    assert.equal(armed.status, "armed");
+    const consumed = consumeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput,
+      denials: denial,
+      nowMs: 4000,
+    });
+    assert.equal(consumed.status, "consumed");
+    assert.equal(consumeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput,
+      denials: denial,
+      nowMs: 5000,
+    }).status, "absent");
+    assert.deepEqual(verifyHumanGuardOverrideAudit({ rootDir: root }), {
+      schema: "pipeline.human-guard-override-audit-verification.v1",
+      status: "valid",
+      entries: 3,
+      lastMac: verifyHumanGuardOverrideAudit({ rootDir: root }).lastMac,
+    });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("drift, expiry and concurrent consumption fail closed", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "bounded\n" };
+    const request = recordHumanGuardDenial({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput,
+      denials: denial,
+      nowMs: 1000,
+      ttlMs: 10000,
+    });
+    const plan = planHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      nowMs: 2000,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    const reason = "Exact attended retry";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      planSha256: plan.planSha256,
+      reason,
+      nowMs: 2500,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    authorizeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256,
+      reason,
+      reasonSha256: reasonDigest(reason),
+      activate: true,
+      nowMs: 3000,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const lockDir = join(common, "agent-pipeline", "human-guard-overrides", "locks");
+    mkdirSync(lockDir, { recursive: true });
+    writeFileSync(join(lockDir, `${plan.planSha256}.lock`), "contender", { mode: 0o600 });
+    assert.deepEqual(consumeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput,
+      denials: denial,
+      nowMs: 4000,
+    }), { status: "invalid", code: "HGO-CONCURRENT-CONSUME" });
+    rmSync(join(lockDir, `${plan.planSha256}.lock`));
+    assert.deepEqual(consumeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput: { ...toolInput, content: "drifted\n" },
+      denials: denial,
+      nowMs: 4000,
+    }), { status: "absent" });
+    assert.deepEqual(consumeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput,
+      denials: denial,
+      nowMs: 12000,
+    }), { status: "invalid", code: "HGO-EXPIRED" });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("State, path escape, push and ambiguous shell actions are non-overridable", () => {
+  const root = fixture();
+  try {
+    mkdirSync(join(root, "physical"), { recursive: true });
+    symlinkSync(join(root, "physical"), join(root, "linked"), "dir");
+    writeFileSync(join(root, "physical", "linked-source.txt"), "shared\n");
+    linkSync(join(root, "physical", "linked-source.txt"), join(root, "hardlinked.txt"));
+    for (const [toolName, toolInput] of [
+      ["Write", { file_path: ".claude/pipeline-state.json", content: "{}" }],
+      ["Write", { file_path: ".claude/pipeline.yaml", content: "runtime: drift\n" }],
+      ["Write", { file_path: "plugins/pipeline-core/lib/human-guard-override.mjs", content: "tamper\n" }],
+      ["Write", { file_path: "../outside.txt", content: "x" }],
+      ["Write", { file_path: "linked/escape.txt", content: "x" }],
+      ["Write", { file_path: "hardlinked.txt", content: "x" }],
+      ["Bash", { command: "git push origin HEAD:refs/heads/main" }],
+      ["Bash", { command: "/usr/bin/git push origin HEAD:refs/heads/main" }],
+      ["Bash", { command: "/bin/sh -c 'git push origin HEAD:refs/heads/main'" }],
+      ["Bash", { command: "git harmless-alias notes.md" }],
+      ["Bash", { command: "python3 -c 'open(\"owned\", \"w\").write(\"x\")'" }],
+      ["Bash", { command: "perl -e 'open my $fh, \">\", \"owned\"'" }],
+      ["Bash", { command: "node safe.mjs" }],
+      ["Bash", { command: "node --check ../../outside.mjs" }],
+      ["Bash", { command: "node --check .claude/pipeline-state.json" }],
+      ["Bash", { command: "node safe.mjs --tok" + "en=fixture-not-a-secret" }],
+      ["Bash", { command: "touch safe && touch second" }],
+      ["apply_patch", { command: "*** Begin Patch\n*** Update File: .claude/pipeline-state.json\n@@\n-{}\n+{\"x\":1}\n*** End Patch" }],
+      ["apply_patch", { command: "*** Begin Patch\n*** Update File: plugins/pipeline-core/hooks/codex-pretool-guard.mjs\n@@\n-old\n+tampered\n*** End Patch" }],
+      ["apply_patch", { command: "*** Begin Patch\n*** Update File: notes.md\n*** Move to: ../outside.md\n@@\n-old\n+new\n*** End Patch" }],
+    ]) {
+      const observed = recordHumanGuardDenial({
+        rootDir: root,
+        pluginRoot: PLUGIN_ROOT,
+        toolName,
+        toolInput,
+        denials: denial,
+      });
+      assert.equal(observed.status, "non-overridable", `${toolName} ${JSON.stringify(toolInput)}`);
+    }
+    writeFileSync(join(root, "safe.mjs"), "export {};\n");
+    const syntaxCheck = recordHumanGuardDenial({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Bash",
+      toolInput: { command: "node --check safe.mjs" },
+      denials: denial,
+    });
+    assert.equal(syntaxCheck.status, "planned");
+    const syntaxPlan = planHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: syntaxCheck.requestSha256,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    assert.deepEqual(syntaxPlan.eligiblePaths, ["safe.mjs"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("tampered audit fails verification", () => {
+  const root = fixture();
+  try {
+    recordHumanGuardDenial({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput: { file_path: "notes.md", content: "x" },
+      denials: denial,
+    });
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const audit = join(common, "agent-pipeline", "human-guard-overrides", "audit.jsonl");
+    writeFileSync(audit, readFileSync(audit, "utf8").replace('"type":"denied"', '"type":"allowed"'), { mode: 0o600 });
+    assert.throws(
+      () => verifyHumanGuardOverrideAudit({ rootDir: root }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-AUDIT",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("deleted ledger, authenticated head, or their pair fails verification", () => {
+  for (const deleted of ["audit.jsonl", "audit.head.json", "both"]) {
+    const root = fixture();
+    try {
+      recordHumanGuardDenial({
+        rootDir: root,
+        pluginRoot: PLUGIN_ROOT,
+        toolName: "Write",
+        toolInput: { file_path: "notes.md", content: deleted },
+        denials: denial,
+      });
+      const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+      const base = join(common, "agent-pipeline", "human-guard-overrides");
+      if (deleted === "both") {
+        unlinkSync(join(base, "audit.jsonl"));
+        unlinkSync(join(base, "audit.head.json"));
+      } else {
+        unlinkSync(join(base, deleted));
+      }
+      assert.throws(
+        () => verifyHumanGuardOverrideAudit({ rootDir: root }),
+        (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-AUDIT",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("an armed capability is unusable when its authorization audit disappeared", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "audit-bound\n" };
+    const request = recordHumanGuardDenial({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput,
+      denials: denial,
+      nowMs: 1000,
+    });
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const plan = planHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      nowMs: 2000,
+      scriptPath,
+    });
+    const reason = "Audit-bound capability";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      planSha256: plan.planSha256,
+      reason,
+      nowMs: 2500,
+      scriptPath,
+    });
+    authorizeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256,
+      reason,
+      reasonSha256: prepared.reasonSha256,
+      activate: true,
+      nowMs: 3000,
+      scriptPath,
+    });
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const base = join(common, "agent-pipeline", "human-guard-overrides");
+    unlinkSync(join(base, "audit.jsonl"));
+    unlinkSync(join(base, "audit.head.json"));
+    assert.deepEqual(consumeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput,
+      denials: denial,
+      nowMs: 4000,
+    }), { status: "invalid", code: "HGO-AUDIT" });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("policy-library and override-CLI drift invalidate the loaded plugin identity", () => {
+  for (const changed of [
+    ["hooks", "guard-command-grammar.mjs"],
+    ["lib", "human-guard-override.mjs"],
+    ["lib", "windows-private-state.mjs"],
+    ["scripts", "guard-human-override.mjs"],
+  ]) {
+    const root = fixture();
+    const plugin = mkdtempSync(join(tmpdir(), "human-guard-plugin-"));
+    try {
+      for (const relative of [
+        [".codex-plugin", "plugin.json"],
+        ["hooks", "codex-pretool-guard.mjs"],
+        ["hooks", "guard-command-grammar.mjs"],
+        ["lib", "human-guard-override.mjs"],
+        ["lib", "windows-private-state.mjs"],
+        ["scripts", "guard-human-override.mjs"],
+      ]) {
+        mkdirSync(join(plugin, relative[0]), { recursive: true });
+        copyFileSync(join(PLUGIN_ROOT, ...relative), join(plugin, ...relative));
+      }
+      const request = recordHumanGuardDenial({
+        rootDir: root,
+        pluginRoot: plugin,
+        toolName: "Write",
+        toolInput: { file_path: "notes.md", content: changed.join("/") },
+        denials: denial,
+        nowMs: 1000,
+      });
+      writeFileSync(join(plugin, ...changed), `${readFileSync(join(plugin, ...changed), "utf8")}\n// identity drift\n`);
+      assert.throws(
+        () => planHumanGuardOverride({
+          rootDir: root,
+          pluginRoot: plugin,
+          requestSha256: request.requestSha256,
+          nowMs: 2000,
+          scriptPath: join(plugin, "scripts", "guard-human-override.mjs"),
+        }),
+        (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-DRIFT",
+      );
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+      rmSync(plugin, { recursive: true, force: true });
+    }
+  }
+});
+
+test("missing or replaced audit keys fail closed without silent regeneration", () => {
+  for (const mode of ["missing", "replaced"]) {
+    const root = fixture();
+    try {
+      recordHumanGuardDenial({
+        rootDir: root,
+        pluginRoot: PLUGIN_ROOT,
+        toolName: "Write",
+        toolInput: { file_path: "notes.md", content: mode },
+        denials: denial,
+      });
+      const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+      const key = join(common, "agent-pipeline", "human-guard-overrides", "audit.key");
+      if (mode === "missing") unlinkSync(key);
+      else writeFileSync(key, Buffer.alloc(32, 7), { mode: 0o600 });
+      assert.throws(
+        () => verifyHumanGuardOverrideAudit({ rootDir: root }),
+        (error) => error instanceof HumanGuardOverrideError
+          && new Set(["HGO-AUDIT-KEY", "HGO-AUDIT"]).has(error.code),
+      );
+      if (mode === "missing") assert.equal(existsSync(key), false);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("a tampered one-action capability cannot be consumed", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "bounded\n" };
+    const request = recordHumanGuardDenial({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput,
+      denials: denial,
+      nowMs: 1000,
+    });
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const plan = planHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      nowMs: 2000,
+      scriptPath,
+    });
+    const reason = "Attended capability tamper regression";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      planSha256: plan.planSha256,
+      reason,
+      nowMs: 2500,
+      scriptPath,
+    });
+    authorizeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256,
+      reason,
+      reasonSha256: prepared.reasonSha256,
+      activate: true,
+      nowMs: 3000,
+      scriptPath,
+    });
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const capability = join(
+      common,
+      "agent-pipeline",
+      "human-guard-overrides",
+      "capabilities",
+      `${plan.planSha256}.json`,
+    );
+    const value = JSON.parse(readFileSync(capability, "utf8"));
+    value.toolInputSha256 = "f".repeat(64);
+    writeFileSync(capability, `${JSON.stringify(value)}\n`, { mode: 0o600 });
+    assert.deepEqual(consumeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput,
+      denials: denial,
+      nowMs: 4000,
+    }), { status: "invalid", code: "HGO-CAPABILITY" });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("authorization audit failure rolls back its newly created capability", () => {
+  const root = fixture();
+  try {
+    const toolInput = { file_path: "notes.md", content: "audit rollback\n" };
+    const request = recordHumanGuardDenial({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput,
+      denials: denial,
+      nowMs: 1000,
+    });
+    const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+    const plan = planHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      nowMs: 2000,
+      scriptPath,
+    });
+    const reason = "Audit failure rollback";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      planSha256: plan.planSha256,
+      reason,
+      nowMs: 2500,
+      scriptPath,
+    });
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const base = join(common, "agent-pipeline", "human-guard-overrides");
+    writeFileSync(join(base, "audit.head.json"), "{}\n", { mode: 0o600 });
+    assert.throws(
+      () => authorizeHumanGuardOverride({
+        rootDir: root,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: request.requestSha256,
+        planSha256: plan.planSha256,
+        selectionSha256: prepared.selectionSha256,
+        reason,
+        reasonSha256: prepared.reasonSha256,
+        activate: true,
+        nowMs: 3000,
+        scriptPath,
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-AUDIT",
+    );
+    assert.equal(existsSync(join(base, "capabilities", `${plan.planSha256}.json`)), false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("native Windows private-state assurance is injected and fail-closed", () => {
+  const root = mkdtempSync(join(tmpdir(), "human-guard-windows-assurance-"));
+  try {
+    const existing = join(root, "existing");
+    mkdirSync(existing, { mode: 0o700 });
+    assert.equal(humanGuardOverrideInternals.secureDirectory(existing, {
+      platform: "win32",
+      assessWindowsPrivatePathFn() { return { status: "secure" }; },
+    }), existing);
+    assert.throws(
+      () => humanGuardOverrideInternals.secureDirectory(existing, {
+        platform: "win32",
+        assessWindowsPrivatePathFn() { return { status: "insecure" }; },
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-DACL",
+    );
+    const created = join(root, "created");
+    assert.equal(humanGuardOverrideInternals.secureDirectory(created, {
+      platform: "win32",
+      hardenWindowsPrivateDirectoryFn() { return { status: "secure" }; },
+    }), created);
+    const file = join(root, "private.json");
+    writeFileSync(file, "{}\n", { mode: 0o600 });
+    assert.throws(
+      () => humanGuardOverrideInternals.safePrivateFile(file, {
+        platform: "win32",
+        assessWindowsPrivatePathFn() { return { status: "unknown" }; },
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-DACL",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

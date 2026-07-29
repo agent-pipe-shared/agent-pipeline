@@ -8,6 +8,10 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { evaluateLifecycleReadyGuard, isSanctionedLifecycleCommand } from "./guard-lifecycle-ready.mjs";
+import {
+  consumeHumanGuardOverride,
+  recordHumanGuardDenial,
+} from "../lib/human-guard-override.mjs";
 import { loadRuntimeProjectionV3OwnedKeys } from "../lib/runtime-projection-v3.mjs";
 import { parseGuardCommand } from "./guard-command-grammar.mjs";
 
@@ -163,7 +167,11 @@ for (const guardName of guardNames) {
     // Existing provider-neutral guards still consume CLAUDE_PROJECT_DIR.
     // Bind that compatibility variable to Codex's native, physical cwd rather
     // than forwarding a possibly stale inherited value.
-    env: { ...process.env, CLAUDE_PROJECT_DIR: projectRoot },
+    env: {
+      ...process.env,
+      CLAUDE_PROJECT_DIR: projectRoot,
+      PIPELINE_REQUIRE_TYPED_HUMAN_OVERRIDE: "1",
+    },
     encoding: "utf8",
     input: rawInput,
     // A Codex hook has a ten-second outer budget. Bound each nested guard so
@@ -172,19 +180,77 @@ for (const guardName of guardNames) {
     timeout: 4_000,
   });
   const detail = String(result.stderr ?? "").trim();
-  if (result.status === 2) denials.push(detail || `${guardName} denied the tool call.`);
+  if (result.status === 2) denials.push({
+    guard: guardName,
+    reason: detail || `${guardName} denied the tool call.`,
+  });
   else if (result.status === 1) warnings.push(detail || `${guardName} returned a warning.`);
   else if (result.status !== 0) {
     const failure = result.error?.code ?? result.error?.name ?? result.signal ?? `exit-${String(result.status)}`;
     diagnostic("nested-guard-failed", { guard: guardName, failure });
-    denials.push(`${guardName} failed unexpectedly (${failure}); pipeline guards fail closed.`);
+    denials.push({
+      guard: guardName,
+      reason: `${guardName} failed unexpectedly (${failure}); pipeline guards fail closed.`,
+    });
   }
 }
 if (lifecycleShouldRun) {
   const lifecycle = evaluateLifecycleReadyGuard(input, { projectDir: projectRoot });
-  if (lifecycle.exitCode === 2) denials.push(String(lifecycle.stderr ?? "guard-lifecycle-ready denied the tool call.").trim());
+  if (lifecycle.exitCode === 2) denials.push({
+    guard: "guard-lifecycle-ready.mjs",
+    reason: String(lifecycle.stderr ?? "guard-lifecycle-ready denied the tool call.").trim(),
+  });
   else if (lifecycle.exitCode === 1) warnings.push(String(lifecycle.stderr ?? "guard-lifecycle-ready returned a warning.").trim());
 }
-if (denials.length > 0) deny(denials.join("\n"));
+if (denials.length > 0) {
+  let consumed;
+  try {
+    consumed = consumeHumanGuardOverride({
+      rootDir: projectRoot,
+      pluginRoot: PLUGIN_ROOT,
+      toolName,
+      toolInput: input?.tool_input ?? {},
+      denials,
+    });
+  } catch (error) {
+    diagnostic("human-override-consume-failed", { name: error?.name, code: error?.code });
+    consumed = { status: "invalid", code: "HGO-ADAPTER-FAILURE" };
+  }
+  if (consumed.status === "consumed") {
+    process.stderr.write(
+      `[pipeline-human-override] exact one-time capability consumed; plan=${consumed.planSha256}.\n`,
+    );
+    completed = true;
+    process.exit(0);
+  }
+  let overrideGuidance = "";
+  if (consumed.status === "absent") {
+    try {
+      const planned = recordHumanGuardDenial({
+        rootDir: projectRoot,
+        pluginRoot: PLUGIN_ROOT,
+        toolName,
+        toolInput: input?.tool_input ?? {},
+        denials,
+      });
+      if (planned.status === "planned") {
+        const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+        overrideGuidance = [
+          "",
+          "Human override available for this exact action (one use; audited; explicit confirmation required):",
+          `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256}`,
+        ].join("\n");
+      } else {
+        overrideGuidance = `\nHuman override unavailable: ${planned.code}.`;
+      }
+    } catch (error) {
+      diagnostic("human-override-plan-failed", { name: error?.name, code: error?.code });
+      overrideGuidance = "\nHuman override unavailable; the guarded action remains denied.";
+    }
+  } else {
+    overrideGuidance = `\nHuman override rejected: ${consumed.code ?? "capability-invalid"}.`;
+  }
+  deny(`${denials.map((entry) => entry.reason).join("\n")}${overrideGuidance}`);
+}
 if (warnings.length > 0) process.stderr.write(`${warnings.join("\n")}\n`);
 completed = true;

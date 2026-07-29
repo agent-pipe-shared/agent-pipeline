@@ -14,6 +14,11 @@ import {
   planOnboardingKickoff,
   readOnboardingSessionCleanupBinding,
 } from "../lib/onboarding-continuity.mjs";
+import {
+  applySessionCleanupRecovery,
+  SessionCleanupRecoveryError,
+  sessionCleanupRecoveryInternals,
+} from "../lib/session-cleanup-recovery.mjs";
 import { validateContinuityState } from "../lib/continuity-state.mjs";
 import {
   cleanupSession,
@@ -691,6 +696,334 @@ test("unknown descriptor loss requires an exact activated PO recovery plan", () 
     ]).output;
     assert.equal(applied.status, "recovered");
     assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("lost binding plus an exact retirable orphan set converges in one confirmed composite recovery", () => {
+  const root = fixture("lost-binding-with-orphans");
+  try {
+    const bound = invoke(["start", "--repo", root, "--session", "session-binding-lost"]);
+    const lost = loadSessionDescriptor(root, bound.output.sessionId, {
+      expectedDescriptorSha256: bound.output.descriptorSha256,
+    });
+    unlinkSync(lost.path);
+    const first = rewriteAsLegacyDescriptor(
+      root,
+      startSessionDescriptor(root, { sessionId: "session-orphan-a" }).sessionId,
+    );
+    const second = rewriteAsLegacyDescriptor(
+      root,
+      startSessionDescriptor(root, { sessionId: "session-orphan-b" }).sessionId,
+    );
+    const before = readOnboardingSessionCleanupBinding({ rootDir: root });
+    const plan = invoke(["plan-recovery", "--repo", root]).output;
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.recovery, "retire-orphans-release-lost-binding");
+    assert.equal(plan.expectedBindingStatus, "bound");
+    assert.match(plan.expectedPostStateSha256, /^[a-f0-9]{64}$/u);
+    assert.deepEqual(plan.sessionCleanup, before.sessionCleanup);
+    assert.equal(plan.writerIdentity.path.endsWith("/scripts/session-cleanup.mjs"), true);
+    assert.match(plan.writerIdentity.sha256, /^[a-f0-9]{64}$/u);
+    assert.equal(plan.writerIdentity.plugin.name, "pipeline-core");
+    assert.match(plan.writerIdentity.plugin.manifestSha256, /^[a-f0-9]{64}$/u);
+    assert.deepEqual(plan.orphanDescriptors, [
+      { sessionId: first.sessionId, descriptorSha256: first.descriptorSha256, ownerStatus: "unobserved" },
+      { sessionId: second.sessionId, descriptorSha256: second.descriptorSha256, ownerStatus: "unobserved" },
+    ]);
+    const applied = invoke([
+      "apply-recovery", "--repo", root,
+      "--plan-sha256", plan.planSha256,
+      "--activate",
+    ]).output;
+    assert.equal(applied.status, "recovered");
+    assert.equal(applied.retiredDescriptorCount, 2);
+    assert.equal(applied.revision, before.revision + 1);
+    assert.deepEqual(listActiveSessionDescriptors(root), []);
+    const after = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(after.status, "unbound");
+    assert.equal(after.sessionCleanup, null);
+    assert.equal(after.revision, before.revision + 1);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("composite recovery remains fail-closed when one orphan cannot be retired", () => {
+  const root = fixture("lost-binding-unsafe-orphan");
+  try {
+    const bound = invoke(["start", "--repo", root, "--session", "session-binding-lost-unsafe"]);
+    unlinkSync(loadSessionDescriptor(root, bound.output.sessionId, {
+      expectedDescriptorSha256: bound.output.descriptorSha256,
+    }).path);
+    const unsafe = startSessionDescriptor(root, { sessionId: "session-orphan-unsafe" });
+    registerTemporaryIntent(root, {
+      sessionId: unsafe.sessionId,
+      ownerNonce: unsafe.ownerNonce,
+      resourceId: "still-active",
+      type: "scratch-file",
+      path: join(root, "still-active"),
+      contentClass: "scratch",
+      soleCopy: false,
+      cleanupPolicy: "unlink-file",
+    });
+    assert.deepEqual(invoke(["plan-recovery", "--repo", root]).output, {
+      schema: "pipeline.session-cleanup-recovery-plan.v1",
+      status: "orphan-recovery-unavailable",
+      activeDescriptorCount: 1,
+    });
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "bound");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("composite recovery resumes exactly after a crash between descriptor retirement and journal advance", () => {
+  const root = fixture("composite-retirement-crash");
+  try {
+    const bound = invoke(["start", "--repo", root, "--session", "session-binding-crash-retire"]);
+    unlinkSync(loadSessionDescriptor(root, bound.output.sessionId, {
+      expectedDescriptorSha256: bound.output.descriptorSha256,
+    }).path);
+    rewriteAsLegacyDescriptor(
+      root,
+      startSessionDescriptor(root, { sessionId: "session-crash-orphan-a" }).sessionId,
+    );
+    rewriteAsLegacyDescriptor(
+      root,
+      startSessionDescriptor(root, { sessionId: "session-crash-orphan-b" }).sessionId,
+    );
+    const plan = invoke(["plan-recovery", "--repo", root]).output;
+    let crashed = false;
+    assert.throws(() => applySessionCleanupRecovery({
+      rootDir: root,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        compositeCrashFn(phase) {
+          if (!crashed && phase === "after-retire-before-journal") {
+            crashed = true;
+            throw new Error("simulated crash after retirement");
+          }
+        },
+      },
+    }), /simulated crash after retirement/u);
+    assert.equal(listActiveSessionDescriptors(root).length, 1);
+    const resumed = applySessionCleanupRecovery({
+      rootDir: root,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+    });
+    assert.equal(resumed.status, "recovered");
+    assert.equal(resumed.retiredDescriptorCount, 2);
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
+    const replay = applySessionCleanupRecovery({
+      rootDir: root,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+    });
+    assert.equal(replay.status, "recovered");
+    assert.equal(replay.mutated, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("composite recovery recognizes an exact post-release crash without replaying State mutation", () => {
+  const root = fixture("composite-release-crash");
+  try {
+    const bound = invoke(["start", "--repo", root, "--session", "session-binding-crash-release"]);
+    unlinkSync(loadSessionDescriptor(root, bound.output.sessionId, {
+      expectedDescriptorSha256: bound.output.descriptorSha256,
+    }).path);
+    rewriteAsLegacyDescriptor(
+      root,
+      startSessionDescriptor(root, { sessionId: "session-release-orphan" }).sessionId,
+    );
+    const before = readOnboardingSessionCleanupBinding({ rootDir: root });
+    const plan = invoke(["plan-recovery", "--repo", root]).output;
+    assert.throws(() => applySessionCleanupRecovery({
+      rootDir: root,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        compositeCrashFn(phase) {
+          if (phase === "after-release-before-journal") {
+            throw new Error("simulated crash after State release");
+          }
+        },
+      },
+    }), /simulated crash after State release/u);
+    const postCrash = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(postCrash.status, "unbound");
+    assert.equal(postCrash.revision, before.revision + 1);
+    const resumed = applySessionCleanupRecovery({
+      rootDir: root,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+    });
+    assert.equal(resumed.status, "recovered");
+    assert.equal(resumed.revision, before.revision + 1);
+    assert.deepEqual(listActiveSessionDescriptors(root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("composite recovery rejects arbitrary same-shape State bytes after a post-release crash", () => {
+  const root = fixture("composite-release-postimage-drift");
+  try {
+    const bound = invoke(["start", "--repo", root, "--session", "session-binding-postimage-drift"]);
+    unlinkSync(loadSessionDescriptor(root, bound.output.sessionId, {
+      expectedDescriptorSha256: bound.output.descriptorSha256,
+    }).path);
+    rewriteAsLegacyDescriptor(
+      root,
+      startSessionDescriptor(root, { sessionId: "session-postimage-drift-orphan" }).sessionId,
+    );
+    const plan = invoke(["plan-recovery", "--repo", root]).output;
+    assert.throws(() => applySessionCleanupRecovery({
+      rootDir: root,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+      deps: {
+        compositeCrashFn(phase) {
+          if (phase === "after-release-before-journal") {
+            throw new Error("simulated crash after State release");
+          }
+        },
+      },
+    }), /simulated crash after State release/u);
+    const statePath = join(root, ".claude", "pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.updatedAt = "2026-07-29T11:00:00.000Z";
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    assert.throws(
+      () => applySessionCleanupRecovery({
+        rootDir: root,
+        expectedPlanSha256: plan.planSha256,
+        activate: true,
+      }),
+      (error) => error instanceof SessionCleanupRecoveryError
+        && error.code === "WT-SESSION-RECOVERY-READBACK",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("a dead process composite lock is reclaimed and the journal resumes", () => {
+  const root = fixture("composite-dead-lock");
+  try {
+    const bound = invoke(["start", "--repo", root, "--session", "session-binding-dead-lock"]);
+    unlinkSync(loadSessionDescriptor(root, bound.output.sessionId, {
+      expectedDescriptorSha256: bound.output.descriptorSha256,
+    }).path);
+    rewriteAsLegacyDescriptor(
+      root,
+      startSessionDescriptor(root, { sessionId: "session-dead-lock-orphan" }).sessionId,
+    );
+    const plan = invoke(["plan-recovery", "--repo", root]).output;
+    const paths = sessionCleanupRecoveryInternals.recoveryJournalPaths(
+      root,
+      plan.planSha256,
+      {},
+    );
+    const child = spawnSync(process.execPath, [
+      "-e",
+      [
+        "const fs=require('node:fs');",
+        `fs.writeFileSync(${JSON.stringify(paths.lock)},`,
+        `JSON.stringify({schema:"pipeline.session-cleanup-composite-recovery-lock.v1",planSha256:${JSON.stringify(plan.planSha256)},pid:process.pid,processIdentity:null,nonce:"${"a".repeat(32)}"})+"\\n",`,
+        "{mode:0o600,flag:'wx'});",
+      ].join(""),
+    ], { encoding: "utf8", shell: false });
+    assert.equal(child.status, 0, child.stderr);
+    const applied = applySessionCleanupRecovery({
+      rootDir: root,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+    });
+    assert.equal(applied.status, "recovered");
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("composite recovery rejects State and orphan-set drift before any planned retirement", () => {
+  for (const drift of ["state", "orphan-set"]) {
+    const root = fixture(`composite-${drift}-drift`);
+    try {
+      const bound = invoke(["start", "--repo", root, "--session", `session-binding-${drift}`]);
+      unlinkSync(loadSessionDescriptor(root, bound.output.sessionId, {
+        expectedDescriptorSha256: bound.output.descriptorSha256,
+      }).path);
+      rewriteAsLegacyDescriptor(
+        root,
+        startSessionDescriptor(root, { sessionId: `session-${drift}-orphan-a` }).sessionId,
+      );
+      const plan = invoke(["plan-recovery", "--repo", root]).output;
+      if (drift === "state") {
+        const statePath = join(root, ".claude", "pipeline-state.json");
+        const state = JSON.parse(readFileSync(statePath, "utf8"));
+        state.updatedAt = "2026-07-29T09:00:00.000Z";
+        writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+      } else {
+        rewriteAsLegacyDescriptor(
+          root,
+          startSessionDescriptor(root, { sessionId: "session-orphan-set-added" }).sessionId,
+        );
+      }
+      const beforeDescriptors = listActiveSessionDescriptors(root);
+      assert.throws(
+        () => applySessionCleanupRecovery({
+          rootDir: root,
+          expectedPlanSha256: plan.planSha256,
+          activate: true,
+        }),
+        (error) => /plan digest does not match|preimage changed/u.test(error.message),
+      );
+      assert.deepEqual(listActiveSessionDescriptors(root), beforeDescriptors);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("composite recovery private journal uses native-Windows DACL assurance fail-closed", () => {
+  const root = mkdtempSync(join(tmpdir(), "session-cleanup-windows-assurance-"));
+  try {
+    const existing = join(root, "existing");
+    mkdirSync(existing, { mode: 0o700 });
+    assert.equal(sessionCleanupRecoveryInternals.securePrivateDirectory(existing, {
+      platform: "win32",
+      assessWindowsPrivatePathFn() { return { status: "secure" }; },
+    }), undefined);
+    assert.throws(
+      () => sessionCleanupRecoveryInternals.securePrivateDirectory(existing, {
+        platform: "win32",
+        assessWindowsPrivatePathFn() { return { status: "insecure" }; },
+      }),
+      (error) => error instanceof SessionCleanupRecoveryError
+        && error.code === "WT-SESSION-RECOVERY-JOURNAL",
+    );
+    const created = join(root, "created");
+    sessionCleanupRecoveryInternals.securePrivateDirectory(created, {
+      platform: "win32",
+      hardenWindowsPrivateDirectoryFn() { return { status: "secure" }; },
+    });
+    const privateFile = join(root, "journal.json");
+    writeFileSync(privateFile, "{}\n", { mode: 0o600 });
+    assert.throws(
+      () => sessionCleanupRecoveryInternals.safePrivateFile(privateFile, {
+        platform: "win32",
+        assessWindowsPrivatePathFn() { return { status: "unknown" }; },
+      }),
+      (error) => error instanceof SessionCleanupRecoveryError
+        && error.code === "WT-SESSION-RECOVERY-JOURNAL",
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

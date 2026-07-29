@@ -1,5 +1,8 @@
 # 047-LCY focused test evidence
 
+> Historical slice evidence only. These counts predate AC-047-30–47 and must
+> not be consumed as current immutable-candidate or release evidence.
+
 Host-authorized focused checks executed on 2026-07-27:
 
 - `node plugins/pipeline-core/lib/continuity-state.test.mjs` — exit 0,

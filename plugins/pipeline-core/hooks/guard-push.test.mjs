@@ -1113,6 +1113,36 @@ function deployApprovalState(forArtifact, forEnvironment) {
   });
 }
 
+{
+  const { dir } = freshRepo("portable-cleanup-binding");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  writeState(dir, {
+    schema: "pipeline.state.v2",
+    continuity: {
+      schema: "pipeline.continuity.v0",
+      runtime: {
+        humanFacingLanguage: "en",
+        activeDuty: "Coordinator",
+        sessionCleanup: {
+          sessionId: "session-machine-local",
+          descriptorSha256: "a".repeat(64),
+        },
+      },
+    },
+  });
+  gitAt(dir, "add", ".claude/pipeline-state.json", ".claude/pipeline.yaml");
+  gitAt(dir, "commit", "-q", "-m", "fixture: bind machine-local cleanup");
+  const head = gitAt(dir, "rev-parse", "HEAD").stdout.trim();
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  check(
+    "PG27 block  a published commit cannot retain a machine-local cleanup binding",
+    "git push origin HEAD:refs/heads/main",
+    dir,
+    BLOCK,
+    { stderrIncludes: ["machine-local sessionCleanup handle"] },
+  );
+}
+
 // ---- Cleanup ----------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {

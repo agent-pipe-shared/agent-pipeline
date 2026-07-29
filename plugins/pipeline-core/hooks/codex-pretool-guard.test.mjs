@@ -11,6 +11,7 @@ import { spawnSync } from "node:child_process";
 const hookDir = dirname(fileURLToPath(import.meta.url));
 const pluginRoot = join(hookDir, "..");
 const adapter = join(hookDir, "codex-pretool-guard.mjs");
+const humanOverrideScript = join(pluginRoot, "scripts", "guard-human-override.mjs");
 let passed = 0;
 
 function fixture() {
@@ -123,6 +124,74 @@ check("multiple Bash guard denials are aggregated into one Codex decision", () =
   assert.equal(output.permissionDecision, "deny");
   assert.match(output.permissionDecisionReason, /git-guard/);
   assert.match(output.permissionDecisionReason, /guard-push/);
+});
+
+check("attended Human override admits only the exact next tool call and is then consumed", () => {
+  const root = fixture();
+  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+  git("init", "-q", "-b", "main");
+  git("config", "user.name", "Fixture");
+  git("config", "user.email", "fixture@example.invalid");
+  writeFileSync(join(root, "README.md"), "fixture\n");
+  git("add", "README.md");
+  git("commit", "-q", "-m", "fixture");
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const input = { tool_name: "Write", tool_input: { file_path: "notes.md", content: "attended\n" } };
+  const first = decision(run(input, root));
+  assert.equal(first.permissionDecision, "deny");
+  const request = first.permissionDecisionReason.match(/--request-sha256 ([a-f0-9]{64})/u)?.[1];
+  assert.match(request ?? "", /^[a-f0-9]{64}$/u);
+  const planned = spawnSync(process.execPath, [
+    humanOverrideScript, "plan", "--repo", root, "--request-sha256", request,
+  ], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(planned.status, 0, planned.stderr);
+  const plan = JSON.parse(planned.stdout);
+  const reason = "PO explicitly approved this exact attended test write";
+  const prepared = spawnSync(process.execPath, [
+    humanOverrideScript,
+    "prepare-authorization",
+    "--repo",
+    root,
+    "--request-sha256",
+    request,
+    "--plan-sha256",
+    plan.planSha256,
+    "--reason",
+    reason,
+  ], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(prepared.status, 0, prepared.stderr);
+  const authorization = JSON.parse(prepared.stdout);
+  const authorized = spawnSync(process.execPath, [
+    ...authorization.authorizeAction.argv,
+  ], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(authorized.status, 0, authorized.stderr);
+  const allowed = run(input, root);
+  assert.equal(allowed.status, 0, allowed.stderr);
+  assert.equal(allowed.stdout, "");
+  assert.match(allowed.stderr, /exact one-time capability consumed/u);
+  const replay = decision(run(input, root));
+  assert.equal(replay.permissionDecision, "deny");
+});
+
+check("override persistence failure remains a sanitized fail-closed denial", () => {
+  const root = fixture();
+  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+  git("init", "-q", "-b", "main");
+  git("config", "user.name", "Fixture");
+  git("config", "user.email", "fixture@example.invalid");
+  writeFileSync(join(root, "README.md"), "fixture\n");
+  git("add", "README.md");
+  git("commit", "-q", "-m", "fixture");
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  mkdirSync(join(root, ".git", "agent-pipeline"), { recursive: true, mode: 0o700 });
+  writeFileSync(join(root, ".git", "agent-pipeline", "human-guard-overrides"), "not-a-directory\n", { mode: 0o600 });
+  const denied = decision(run({
+    tool_name: "Write",
+    tool_input: { file_path: "notes.md", content: "still denied\n" },
+  }, root));
+  assert.equal(denied.permissionDecision, "deny");
+  assert.match(denied.permissionDecisionReason, /HGO-ADAPTER-FAILURE/u);
+  assert.doesNotMatch(denied.permissionDecisionReason, /EEXIST|stack|node:fs/u);
 });
 
 check("Codex routes a documented Git override prefix to the Push-Gate's actual command", () => {

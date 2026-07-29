@@ -172,6 +172,7 @@ const TEST_SUITES = [
   { name: "session-power-cli-tests", file: join(pluginScriptsDir, "session-power.test.mjs") },
   { name: "session-cleanup-power-tests", file: join(pluginScriptsDir, "session-cleanup-power.test.mjs") },
   { name: "session-cleanup-binding-tests", file: join(pluginScriptsDir, "session-cleanup-binding.test.mjs") },
+  { name: "human-guard-override-tests", file: join(libDir, "human-guard-override.test.mjs") },
   { name: "review-economy-tests", file: join(libDir, "review-economy.test.mjs") },
   { name: "guard-git-tests", file: join(hooksDir, "guard-git.test.mjs") },
   { name: "guard-apply-patch-tests", file: join(hooksDir, "guard-apply-patch.test.mjs") },

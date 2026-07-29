@@ -1292,6 +1292,49 @@ export function releaseOnboardingSessionCleanup({
   }
 }
 
+/**
+ * Derive the exact cleanup-release postimage without writing it. Composite
+ * recovery journals bind this digest before retiring any private descriptor,
+ * so a crash after the State rename cannot adopt arbitrary same-shape bytes.
+ */
+export function previewOnboardingSessionCleanupRelease({
+  rootDir,
+  expectedStateSha256,
+  expectedRevision,
+  sessionCleanup,
+} = {}) {
+  if (!SHA256_RE.test(expectedStateSha256 ?? "")
+    || !Number.isSafeInteger(expectedRevision)
+    || expectedRevision < 0
+    || !isObject(sessionCleanup)) {
+    fail("SESSION-CLEANUP-RELEASE-REQUEST", "cleanup release preview request is invalid");
+  }
+  const current = observeSessionCleanupState(rootDir);
+  if (current.stateSha256 !== expectedStateSha256
+    || current.revision !== expectedRevision
+    || canonicalJson(current.sessionCleanup) !== canonicalJson(sessionCleanup)) {
+    fail("SESSION-CLEANUP-RELEASE-CAS", "cleanup release preview preimage changed");
+  }
+  const proposal = releaseContinuitySessionCleanup(current.state.continuity, {
+    expectedRevision,
+    sessionCleanup,
+  }, current.activeFeatureId);
+  if (!proposal.ok || !proposal.mutated) {
+    fail(proposal.code, "continuity state rejected cleanup release preview");
+  }
+  const next = structuredClone(current.state);
+  next.continuity = proposal.state;
+  return {
+    schema: SESSION_CLEANUP_BIND_SCHEMA,
+    status: "previewed",
+    root: current.root,
+    stateSha256: sha256(expectedStateBytes(next)),
+    revision: expectedRevision + 1,
+    sessionCleanup: null,
+    mutated: false,
+  };
+}
+
 /** Trim and validate one goal as UTF-8 data, never as shell syntax. */
 export function validateKickoffGoal(goal) {
   if (typeof goal !== "string" || goal.includes("\0")) {

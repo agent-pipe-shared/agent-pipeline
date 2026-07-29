@@ -83,6 +83,9 @@ const fakeDeps = {
   spawnSync: fakeGit,
   observeCodexOnboardingCapabilities: fakeCapabilities,
   observeOnboardingAppServer: fakeAppServer,
+  observePersistedPoAuthority() {
+    return { status: "absent" };
+  },
   planSessionCleanupRecovery() {
     return {
       schema: "pipeline.session-cleanup-recovery-plan.v1",
@@ -668,6 +671,166 @@ test("PRD/Spec drift exposes only the validated digest-bound PO rebind action", 
     assert.equal(invalidPlan.status, "partial");
     assert.equal(invalidPlan.nextAction, null);
     assertDiagnostic(invalidPlan, "po_authority_rebind_unavailable");
+  } finally { dispose(path); }
+});
+
+test("general PRD/Spec drift exposes the same neutral read-only decision plan for all intents", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const writer = PLUGIN_PIPELINE_STATE_SCRIPT;
+    const planSha256 = "c".repeat(64);
+    const plannedAt = "2026-07-29T10:00:00.000Z";
+    const selectionArgv = [
+      writer,
+      "po-authority-decision-select",
+      "--plan-sha256",
+      planSha256,
+      "--planned-at",
+      plannedAt,
+      "--selection",
+      "spec",
+    ];
+    const deps = {
+      ...fakeDeps,
+      validatePoGateAuthorityForRepository() {
+        return { ok: false, code: "PO-GATE-PRD-SPEC-MISMATCH" };
+      },
+      spawnSync(command, args, options) {
+        if (command === process.execPath
+          && JSON.stringify(args) === JSON.stringify([writer, "po-authority-rebind-plan"])) {
+          return { status: 2, stderr: "narrow shape unavailable", stdout: "" };
+        }
+        if (command === process.execPath
+          && JSON.stringify(args) === JSON.stringify([writer, "po-authority-decision-plan"])) {
+          assert.equal(options.cwd, path);
+          return {
+            status: 0,
+            stderr: "",
+            stdout: JSON.stringify({
+              schema: "pipeline.po-authority-decision-plan.v1",
+              status: "planned",
+              root: path,
+              plannedAt,
+              planSha256,
+              candidates: [
+                { id: "prd", role: "product-requirements", path: "specs/prd.md", sha256: "d".repeat(64) },
+                { id: "spec", role: "technical-specification", path: "specs/spec.md", sha256: "e".repeat(64) },
+              ],
+              selectionActions: [
+                { selectedCandidate: "prd", status: "unavailable", code: "PO-DECISION-REFERENCED-SPEC-BYTES-UNAVAILABLE", mutation: false },
+                {
+                  selectedCandidate: "spec",
+                  status: "available",
+                  executable: process.execPath,
+                  argv: selectionArgv,
+                  mutation: false,
+                  requiresConfirmation: true,
+                },
+              ],
+            }),
+          };
+        }
+        return fakeGit(command, args, options);
+      },
+    };
+    for (const intent of ["bootstrap", "session", "dispatch"]) {
+      const observed = inspectProjectOnboardingV3({ rootDir: path, intent, deps });
+      assert.equal(observed.status, "partial", intent);
+      assertDiagnostic(observed, "po_authority_decision_required");
+      assert.deepEqual(observed.nextAction, {
+        kind: "command",
+        executable: process.execPath,
+        argv: [writer, "po-authority-decision-plan"],
+        mutation: false,
+        requiresConfirmation: false,
+        expected: {
+          schema: "pipeline.po-authority-decision-plan.v1",
+          statuses: ["planned"],
+        },
+      });
+    }
+  } finally { dispose(path); }
+});
+
+test("coherent current documents with stale persisted authority require the same neutral decision for all intents", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const writer = PLUGIN_PIPELINE_STATE_SCRIPT;
+    const planSha256 = "8".repeat(64);
+    const plannedAt = "2026-07-29T10:30:00.000Z";
+    const selectionArgv = [
+      writer,
+      "po-authority-decision-select",
+      "--plan-sha256",
+      planSha256,
+      "--planned-at",
+      plannedAt,
+      "--selection",
+      "spec",
+    ];
+    let validatedExpected = 0;
+    const deps = {
+      ...fakeDeps,
+      observePersistedPoAuthority() {
+        return {
+          status: "observed",
+          planSha256: "1".repeat(64),
+          specSha256: "2".repeat(64),
+        };
+      },
+      validatePoGateAuthorityForRepository(options) {
+        assert.equal(options.expectedPlanSha256, "1".repeat(64));
+        assert.equal(options.expectedSpecSha256, "2".repeat(64));
+        validatedExpected += 1;
+        return { ok: false, code: "PO-GATE-PLAN-DIGEST-STALE" };
+      },
+      spawnSync(command, args, options) {
+        if (command === process.execPath
+          && JSON.stringify(args) === JSON.stringify([writer, "po-authority-decision-plan"])) {
+          assert.equal(options.cwd, path);
+          return {
+            status: 0,
+            stderr: "",
+            stdout: JSON.stringify({
+              schema: "pipeline.po-authority-decision-plan.v1",
+              status: "planned",
+              root: path,
+              plannedAt,
+              planSha256,
+              candidates: [
+                { id: "prd", role: "product-requirements", path: "specs/prd.md", sha256: "3".repeat(64) },
+                { id: "spec", role: "technical-specification", path: "specs/spec.md", sha256: "4".repeat(64) },
+              ],
+              selectionActions: [
+                { selectedCandidate: "prd", status: "unavailable", code: "PO-DECISION-REFERENCED-SPEC-BYTES-UNAVAILABLE", mutation: false },
+                {
+                  selectedCandidate: "spec",
+                  status: "available",
+                  executable: process.execPath,
+                  argv: selectionArgv,
+                  mutation: false,
+                  requiresConfirmation: true,
+                },
+              ],
+            }),
+          };
+        }
+        return fakeGit(command, args, options);
+      },
+    };
+    for (const intent of ["bootstrap", "session", "dispatch"]) {
+      const observed = inspectProjectOnboardingV3({ rootDir: path, intent, deps });
+      assert.equal(observed.status, "partial", intent);
+      assertDiagnostic(observed, "po_authority_decision_required");
+      assert.deepEqual(observed.nextAction?.argv, [writer, "po-authority-decision-plan"]);
+    }
+    assert.equal(validatedExpected, 3);
   } finally { dispose(path); }
 });
 
