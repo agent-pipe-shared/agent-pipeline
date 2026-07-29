@@ -16,8 +16,22 @@
  * the optional `env` param (defaults to `process.env`) -- this lets a unit test call run()
  * in isolation with a fixture env object, without needing the runner's glue.
  *
- * INVOCATION: `gitleaks detect --source <root> --report-format json --report-path <tmp>
- * --no-banner --exit-code 0`. The report is written to a temp JSON file (a fresh
+ * INVOCATION: `gitleaks detect --source <root> --no-git --report-format json --report-path <tmp>
+ * --no-banner --exit-code 0`. `--no-git` makes gitleaks "treat git repo as a regular directory
+ * and scan those files" (its own --help wording): a pure filesystem content scan of <root> with
+ * ZERO git object/ref/history traversal. This is the architecturally correct scope, not a
+ * workaround -- <root> is already an immutable, identity-verified detached snapshot of ONE exact
+ * commit's tree (security-scan.mjs's materializeCandidate + candidate.snapshot
+ * "git-detached-worktree.v1", verifiedBeforeAfter), so a file-content scan is the literal
+ * implementation of the security-evidence schema's `coverage.subject: "candidate-tree"` claim.
+ * WITHOUT --no-git, `detect` defaults to mining git HISTORY; because a git worktree shares the
+ * main clone's `.git` object database, that traversal reaches EVERY locally fetched branch's
+ * commits -- not just the candidate's own ancestry -- producing cross-branch false positives that
+ * blocked unrelated branches (root-caused + closed by backlog item
+ * 2026-07-25-security-scan-cross-branch-gitleaks-findings, hypothesis 1). Historical /
+ * deleted-secret / cross-ancestry mining was never a documented capability of this adapter; it
+ * was an accidental default of the bare `detect` invocation, and --no-git removes only that
+ * accident (no designed capability is lost). The report is written to a temp JSON file (a fresh
  * `mkdtempSync` dir per run, removed again after parsing) rather than parsed from stdout --
  * gitleaks does not print a stable, parseable JSON stream to stdout across versions, but its
  * `--report-path` file is the documented, stable contract. `--exit-code 0` forces gitleaks
@@ -234,6 +248,7 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
     "detect",
     "--source",
     rootDir,
+    "--no-git", // file-content-only scan of the candidate tree; no git history/ref traversal (see header INVOCATION + CAPABILITY_CONTRACT_V2.coverageLimitations)
     "--report-format",
     "json",
     "--report-path",
@@ -354,7 +369,7 @@ export const CAPABILITY_CONTRACT_V2 = Object.freeze({
   confidenceNormalization: null,
   coverageLimitations: Object.freeze([
     "No --config/custom rule-pack flag is passed to `detect` -- this adapter relies on whatever rule set is built into the resolved gitleaks binary itself, not a project-specific config.",
-    "No --log-opts or other git-history-range flag is passed -- this file does not restrict or configure a commit range; scan scope is whatever `gitleaks detect --source <rootDir>` resolves to by the installed binary's own default, unmodified by this adapter.",
+    "`--no-git` is passed to `detect`, so the scan is a pure filesystem content scan of rootDir (gitleaks' own --help wording: \"treat git repo as a regular directory and scan those files\") with ZERO git object/ref/history traversal. rootDir is an immutable, identity-verified single-commit-tree snapshot (security-scan.mjs materializeCandidate, git-detached-worktree.v1), so this is the literal `candidate-tree` coverage the security-evidence schema claims. Historical / deleted-secret / cross-ancestry mining is deliberately NOT performed: it was never a documented capability of this adapter and, because a git worktree shares the main clone's `.git` object database, that default `detect` traversal was the source of cross-branch false positives (backlog 2026-07-25-security-scan-cross-branch-gitleaks-findings).",
     "Single-shot, full scan per invocation -- no --baseline-path or other incremental/diff mechanism; every run() call re-scans the entirety of rootDir from scratch.",
   ]),
   exitCodeMapping: Object.freeze({
