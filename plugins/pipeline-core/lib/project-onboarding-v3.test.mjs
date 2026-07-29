@@ -30,6 +30,7 @@ import { parseYaml } from "./yaml-lite.mjs";
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { main as onboardingCli } from "../scripts/project-onboarding-v3.mjs";
 import { main as sessionCleanupCli } from "../scripts/session-cleanup.mjs";
+import { run as pipelineStateRun } from "../scripts/pipeline-state.mjs";
 import {
   canonicalJson, CodexOnboardingRuntimeError, consumeRuntimeReadback, issueLaunchTicket, readCurrentRuntimeReadback, readRestartBarrier,
   removeRestartBarrierCas, sha256,
@@ -97,6 +98,7 @@ const fakeDeps = {
   },
 };
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
+const PROJECT_AUTHORITY_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
@@ -689,7 +691,7 @@ test("unapproved kickoff state has no PO authority to rebind", () => {
     assert.equal(observed.status, "ready");
     assert.equal(observed.nextAction, null);
     assert.equal(observed.diagnostics.length, 0);
-    const statePath = join(path, ".claude/pipeline-state.json");
+    const statePath = join(path, "project/pipeline-state.json");
     const malformedApproved = JSON.parse(readFileSync(statePath, "utf8"));
     malformedApproved.planApproved = true;
     writeFileSync(statePath, `${JSON.stringify(malformedApproved, null, 2)}\n`);
@@ -776,6 +778,101 @@ test("general PRD/Spec drift exposes the same neutral read-only decision plan fo
         },
       });
     }
+  } finally { dispose(path); }
+});
+
+test("neutral PO decision apply requires all transactional V4 postimage readbacks to become ready", () => {
+  const path = root();
+  const profile = {
+    schema: "pipeline.po-gate-authority-evidence.v1",
+    humanFacing: "en",
+    sourceSha256: "a".repeat(64),
+    runtimeSha256: "b".repeat(64),
+    receiptSha256: "c".repeat(64),
+    repositoryFingerprint: "d".repeat(64),
+  };
+  const capture = (invoke) => {
+    let stdout = ""; let stderr = "";
+    const log = console.log; const error = console.error;
+    console.log = (...values) => { stdout += `${values.join(" ")}\n`; };
+    console.error = (...values) => { stderr += `${values.join(" ")}\n`; };
+    try { return { exit: invoke(), stdout, stderr }; }
+    finally { console.log = log; console.error = error; }
+  };
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const featureDir = join(path, "specs", "nova-shaped");
+    mkdirSync(featureDir, { recursive: true });
+    const planPath = "specs/nova-shaped/prd_nova.md";
+    const specPath = "specs/nova-shaped/spec.md";
+    const oldSpecSha = sha256("# older Spec\n");
+    writeFileSync(join(path, specPath), "# current Spec\n");
+    const newSpecSha = sha256(readFileSync(join(path, specPath)));
+    writeFileSync(join(path, planPath), `<!-- po-language: en -->\n<!-- technical-spec-sha256: ${newSpecSha} -->\n# Nova PRD\n\nReconciled scope.\n`);
+    const planSha = sha256(readFileSync(join(path, planPath)));
+    const continuity = {
+      schema: "pipeline.continuity.v0", featureId: "nova-shaped", revision: 3,
+      runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" },
+      authority: { prd: { path: planPath, sha256: planSha }, spec: { path: specPath, sha256: oldSpecSha }, result: null },
+      queueHead: { packageId: "nova", actionId: "decision", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null },
+      blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null,
+      capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" },
+    };
+    writeFileSync(join(path, "project/pipeline-state.json"), `${JSON.stringify({
+      schema: "pipeline.state.v0", activeFeature: { id: "nova-shaped", planPath, phase: "design" }, planApproved: true,
+      planApproval: { schema: "pipeline.plan-approval.v2", approvedBy: "PO", approvedAt: "2026-07-26T14:08:37.500Z", specBoundBy: "PO", specBoundAt: "2026-07-26T14:08:37.500Z", poGateAuthority: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: planSha, specPath, specSha256: oldSpecSha } },
+      continuity, updatedAt: "2026-07-26T14:08:37.500Z",
+    }, null, 2)}\n`);
+    const authority = ({ expectedPlanSha256, expectedSpecSha256 }) => expectedSpecSha256 === newSpecSha
+      ? { ok: true, value: { ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: expectedPlanSha256, specPath, specSha256: newSpecSha } }
+      : { ok: false, code: "PO-GATE-AUTHORITY-STALE" };
+    const writerDeps = { dir: path, now: () => "2026-07-30T10:00:00.000Z", ownerNonce: () => "postimage-red-0001", poGateProfile: () => ({ ok: true, value: profile }), poGateAuthority: authority };
+    const plan = JSON.parse(capture(() => pipelineStateRun(["po-authority-decision-plan"], writerDeps)).stdout);
+    const selectionAction = plan.selectionActions.find((action) => action.selectedCandidate === "spec");
+    const selection = JSON.parse(capture(() => pipelineStateRun(selectionAction.argv.slice(1), writerDeps)).stdout);
+    const beforePrd = readFileSync(join(path, planPath), "utf8");
+    const beforeState = readFileSync(join(path, "project/pipeline-state.json"), "utf8");
+    const readbacks = [];
+    let postimageEvidence = null;
+    const v4Inspection = ({ rootDir, intent, deps: transactionDeps }) => {
+      const result = inspectProjectOnboardingV3({
+        rootDir,
+        intent,
+        deps: {
+          ...fakeDeps,
+          observePersistedPoAuthority: undefined,
+          validatePoGateAuthorityForRepository: authority,
+          ...transactionDeps,
+        },
+      });
+      readbacks.push({ intent, status: result.status, predicate: result.diagnostics?.[0]?.code ?? null });
+      return result;
+    };
+    const applied = capture(() => pipelineStateRun(selection.applyAction.argv.slice(1), {
+      ...writerDeps,
+      v4Inspection,
+      observeRebindPostimageEvidence: (evidence) => { postimageEvidence = evidence; },
+    }));
+    const exact = JSON.stringify(readbacks);
+    assert.equal(applied.exit, 0, `decision postimage must be V4-ready; observed ${exact}; writer stderr: ${applied.stderr.trim()}`);
+    assert.deepEqual(readbacks, [
+      { intent: "bootstrap", status: "ready", predicate: null },
+      { intent: "session", status: "ready", predicate: null },
+      { intent: "dispatch", status: "ready", predicate: null },
+    ]);
+    assert.deepEqual(
+      postimageEvidence.predicates.v4Intents.map(({ intent, ok, status }) => ({ intent, ok, status })),
+      [
+        { intent: "bootstrap", ok: true, status: "ready" },
+        { intent: "session", ok: true, status: "ready" },
+        { intent: "dispatch", ok: true, status: "ready" },
+      ],
+    );
+    assert.equal(Object.values(postimageEvidence.predicates).flat().every((predicate) => predicate.ok), true);
+    assert.equal(readFileSync(join(path, planPath), "utf8"), beforePrd);
+    assert.notEqual(readFileSync(join(path, "project/pipeline-state.json"), "utf8"), beforeState);
   } finally { dispose(path); }
 });
 
@@ -1050,7 +1147,30 @@ test("blank real root inspect and plan are read-only", () => {
     assert.deepEqual(names(path), []);
     assert.deepEqual(plan.targets.map((target) => target.path), [
       ".claude/pipeline.json", ".claude/pipeline.yaml", ".claude/settings.json", "pipeline.user.yaml",
+      "project/pipeline.json", "project/pipeline.yaml",
     ]);
+  } finally { dispose(path); }
+});
+
+test("healthy legacy authority exposes one typed runner-neutral migration action", () => {
+  const path = root();
+  try {
+    initializeRestartRequiredRoot(path);
+    rmSync(join(path, "project"), { recursive: true, force: true });
+    const inspected = inspectProjectOnboardingV3({ rootDir: path, intent: "bootstrap", deps: fakeDeps });
+    assert.equal(inspected.status, "migration-required");
+    assertDiagnostic(inspected, "project_authority_migration_required");
+    assertSingleLineAction(inspected.nextAction, {
+      kind: "command",
+      executable: "node",
+      argv: [PROJECT_AUTHORITY_MIGRATION_SCRIPT, "plan", "--root", path],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: {
+        schema: "pipeline.project-authority.v1",
+        statuses: ["ready", "noop", "recovery-required", "invalid-source"],
+      },
+    });
   } finally { dispose(path); }
 });
 
@@ -1859,7 +1979,7 @@ test("current runtime exposes closed continuity outcomes while required App Serv
     assert.equal(compound.continuity.status, "damaged");
     assert.equal(compound.nextAction, null);
 
-    writeFileSync(join(unavailable, ".claude", "pipeline-state.json"), "{broken", { flag: "wx" });
+    writeFileSync(join(unavailable, "project", "pipeline-state.json"), "{broken", { flag: "wx" });
     const unreadable = inspectProjectOnboardingV3({
       rootDir: unavailable,
       intent: "onboarding",
@@ -2099,6 +2219,7 @@ test("a recognized read-only host control layout receives portable onboarding wi
     assert.equal(planned.git.initializesGit, false);
     assert.deepEqual(planned.targets.map((target) => target.path), [
       ".claude/pipeline.json", ".claude/pipeline.yaml", ".claude/settings.json", "pipeline.user.yaml",
+      "project/pipeline.json", "project/pipeline.yaml",
     ]);
     const applied = applyProjectOnboardingV3(planned, { rootDir: path, activate: true, deps: fakeDeps });
     assert.equal(applied.status, "applied");
@@ -2336,7 +2457,7 @@ test("an invalid generated manifest is never accepted as a current fresh authori
   try {
     const plan = planProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
     assert.equal(applyProjectOnboardingV3(plan, { rootDir: path, activate: true, deps: fakeDeps }).status, "applied");
-    writeFileSync(join(path, ".claude", "pipeline.yaml"), "not: a canonical pipeline manifest\n");
+    writeFileSync(join(path, "project", "pipeline.yaml"), "not: a canonical pipeline manifest\n");
     const inspected = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
     assert.equal(inspected.schema, "pipeline.project-onboarding.v4");
     assert.equal(inspected.status, "partial");

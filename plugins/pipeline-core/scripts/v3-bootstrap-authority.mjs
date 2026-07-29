@@ -25,6 +25,11 @@ import {
   hasCodexRuntimeControlMount,
   observeCodexHostRepositoryInitAdmission,
 } from "../lib/codex-host-layout.mjs";
+import {
+  LEGACY_CALIBRATION,
+  NEUTRAL_CALIBRATION,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
 
 const SCHEMA = "pipeline.v3-bootstrap-authority.v1";
 
@@ -38,8 +43,14 @@ function rejected(root, diagnostics, extra = {}) {
 
 function hasHostManagedCalibration(root, deps = {}) {
   try {
+    const authority = resolveProjectAuthorityPaths({ rootDir: root });
+    const relativePath = authority.status === "ready"
+      ? authority.calibration
+      : (lstatSync(join(root, NEUTRAL_CALIBRATION), { throwIfNoEntry: false })
+        ? NEUTRAL_CALIBRATION
+        : LEGACY_CALIBRATION);
     const calibration = JSON.parse((deps.readFileSync ?? readFileSync)(
-      join(root, ".claude", "pipeline.json"),
+      join(root, relativePath),
       "utf8",
     ));
     return calibration?.repositoryMode === "host-managed";

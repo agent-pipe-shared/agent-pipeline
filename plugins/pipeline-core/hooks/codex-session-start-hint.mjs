@@ -9,6 +9,8 @@ import { fileURLToPath } from "node:url";
 const GOVERNANCE_MARKERS = [
   ".agent-pipeline/core.lock.json",
   "pipeline.user.yaml",
+  "project/pipeline.json",
+  "project/pipeline.yaml",
   ".claude/pipeline.json",
   ".claude/pipeline.yaml",
 ];

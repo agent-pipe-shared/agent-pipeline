@@ -20,6 +20,11 @@ import { spawnSync } from "node:child_process";
 
 import { parseGuardCommand } from "../hooks/guard-command-grammar.mjs";
 import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "./project-authority.mjs";
+import {
   assessWindowsPrivatePath,
   hardenWindowsPrivateDirectory,
 } from "./windows-private-state.mjs";
@@ -218,7 +223,11 @@ function pluginIdentity(pluginRoot) {
 }
 
 function stateObservation(root) {
-  const path = join(root, ".claude", "pipeline-state.json");
+  const authority = resolveProjectAuthorityPaths({ rootDir: root });
+  const stateRelPath = authority.status === "ready"
+    ? authority.state
+    : (existsSync(join(root, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+  const path = join(root, stateRelPath);
   if (!existsSync(path)) return { status: "absent", sha256: null, continuityRevision: null };
   const info = lstatSync(path);
   if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || realpathSync(path) !== path) {
@@ -274,6 +283,12 @@ function protectedPath(path) {
     || normalized === ".claude/settings.local.json"
     || normalized === ".claude/guard-config.json"
     || normalized === ".claude/guard-override.log.jsonl"
+    || normalized === "project/pipeline-state.json"
+    || normalized.startsWith("project/pipeline-state.json.")
+    || normalized === "project/pipeline.yaml"
+    || normalized === "project/pipeline.json"
+    || normalized === "project/guard-config.json"
+    || normalized === "project/guard-override.log.jsonl"
     || normalized === "pipeline.user.yaml"
     || normalized === "plugins/pipeline-core" || normalized.startsWith("plugins/pipeline-core/")
     || normalized === ".agent-pipeline" || normalized.startsWith(".agent-pipeline/")

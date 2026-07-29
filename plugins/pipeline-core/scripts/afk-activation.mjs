@@ -19,6 +19,11 @@ import {
   sha256Canonical,
 } from "../lib/afk-assumption-mode.mjs";
 import { executeAfkActivationHostTransaction } from "../lib/afk-transaction-host.mjs";
+import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
 
 export const EXIT = Object.freeze({ OK: 0, BLOCKED: 2 });
 export const MAX_STDIN_BYTES = 262_144;
@@ -125,7 +130,11 @@ export async function activateFromBytes(rawInstruction, dependencies = {}) {
   let activatedAt;
   try {
     root = dependencies.root ? resolve(dependencies.root) : trustedRoot(dependencies.cwd ?? process.cwd());
-    statePreimage = await readFile(inside(root, ".claude/pipeline-state.json"));
+    const projectAuthority = resolveProjectAuthorityPaths({ rootDir: root });
+    const statePath = projectAuthority.status === "ready"
+      ? projectAuthority.state
+      : (projectAuthority.source === "legacy" ? LEGACY_STATE : NEUTRAL_STATE);
+    statePreimage = await readFile(inside(root, statePath));
     authority = Object.fromEntries(await Promise.all(["prd", "spec", "courseBrief"].map(async (key) => {
       const path = instruction.authority[key].path;
       return [key, { path, bytes: await readFile(inside(root, path)) }];

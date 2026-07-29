@@ -32,6 +32,13 @@ import { TextDecoder } from "node:util";
 
 import { parseYaml } from "./yaml-lite.mjs";
 import { assessWindowsPrivatePath } from "./windows-private-state.mjs";
+import {
+  LEGACY_MANIFEST,
+  LEGACY_STATE,
+  NEUTRAL_MANIFEST,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "./project-authority.mjs";
 
 export const PO_GATE_PROFILE_RECEIPT_SCHEMA = "pipeline.po-gate-profile-receipt.v1";
 export const PO_GATE_AUTHORITY_EVIDENCE_SCHEMA = "pipeline.po-gate-authority-evidence.v1";
@@ -398,7 +405,11 @@ function loadReceipt(gitCommonDir) {
 
 function readProjection(root) {
   const sourceBytes = readPhysicalFile(root, "pipeline.user.yaml");
-  const runtimeBytes = readPhysicalFile(root, ".claude/pipeline.yaml");
+  const authority = resolveProjectAuthorityPaths({ rootDir: root });
+  const manifest = authority.status === "ready"
+    ? authority.manifest
+    : (existsSync(join(root, NEUTRAL_MANIFEST)) ? NEUTRAL_MANIFEST : LEGACY_MANIFEST);
+  const runtimeBytes = readPhysicalFile(root, manifest);
   return {
     sourceBytes,
     runtimeBytes,
@@ -475,7 +486,14 @@ function validatePoGateProfileSnapshot({ repoRoot, gitCommonDir, primaryRoot, re
 }
 
 function activeFeatureState(repoRoot) {
-  const raw = readPhysicalFile(repoRoot, ".claude/pipeline-state.json");
+  const authority = resolveProjectAuthorityPaths({ rootDir: repoRoot });
+  const statePath = authority.status === "ready"
+    ? authority.state
+    : NEUTRAL_STATE;
+  const raw = readPhysicalFile(
+    repoRoot,
+    statePath ?? (authority.source === "legacy" ? LEGACY_STATE : NEUTRAL_STATE),
+  );
   const state = JSON.parse(decodeUtf8(raw));
   if (!Object.prototype.hasOwnProperty.call(state, "activeFeature")) return { status: "absent" };
   const active = state?.activeFeature;

@@ -220,10 +220,17 @@
  *   printf '{"tool_input":{"command":"git add secrets.yaml"}}'          | node plugins/pipeline-core/hooks/guard-git.mjs; echo $?
  *   printf '{"tool_input":{"command":"git push origin main"}}'          | node plugins/pipeline-core/hooks/guard-git.mjs; echo $?
  */
-import { readFileSync, appendFileSync } from "node:fs";
+import { existsSync, readFileSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 
 import { stripQuotedSegments, normalizeGlobalGitOptions } from "../lib/git-cmd.mjs";
+import {
+  LEGACY_GUARD_AUDIT,
+  LEGACY_GUARD_CONFIG,
+  NEUTRAL_GUARD_AUDIT,
+  NEUTRAL_GUARD_CONFIG,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
 
 // ---- read tool input (fail-open) --------------------------------------------------
 let cmd = "";
@@ -452,7 +459,14 @@ const PRENORM_BLOCKERS = [
 
 // ---- per-project extra denies (config, not fork) ----------------------------------
 const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-const configPath = join(projectDir, ".claude", "guard-config.json");
+const authority = resolveProjectAuthorityPaths({ rootDir: projectDir });
+const guardConfigRelPath = authority.status === "ready"
+  ? authority.guardConfig
+  : (existsSync(join(projectDir, NEUTRAL_GUARD_CONFIG)) ? NEUTRAL_GUARD_CONFIG : LEGACY_GUARD_CONFIG);
+const guardAuditRelPath = authority.status === "ready"
+  ? authority.guardAudit
+  : (existsSync(join(projectDir, NEUTRAL_GUARD_AUDIT)) ? NEUTRAL_GUARD_AUDIT : LEGACY_GUARD_AUDIT);
+const configPath = join(projectDir, guardConfigRelPath);
 const warnings = [];
 /** @type {Array<{id: string, re: RegExp, why: string, origin: string}>} */
 const EXTRA_BLOCKERS = [];
@@ -482,7 +496,7 @@ if (rawConfig !== null) {
             typeof entry?.reason === "string" && entry.reason !== ""
               ? entry.reason
               : `Project deny pattern matched: ${entry.pattern}`,
-          origin: "project guard-config (.claude/guard-config.json)",
+          origin: `project guard-config (${guardConfigRelPath})`,
         });
       } catch (e) {
         warnings.push(`extraDenyPatterns[${i}]: invalid regex (${e.message}) -> entry skipped`);
@@ -562,7 +576,7 @@ if (armingRaw !== null) {
 
 // ---- override mechanism: consumption ledger -------------------------------------------
 function ledgerPath() {
-  return join(projectDir, ".claude", "guard-override.log.jsonl");
+  return join(projectDir, guardAuditRelPath);
 }
 function readLedgerEntries() {
   let raw;
@@ -639,7 +653,7 @@ function blockOverrideConsumed(rule, priorEntry) {
 function blockLedgerFailure(rule) {
   const lines = [
     formatBlockHeader(rule),
-    `Override NOT applied: the audit ledger (.claude/guard-override.log.jsonl) could not be written — ` +
+    `Override NOT applied: the audit ledger (${guardAuditRelPath}) could not be written — ` +
       `fail-closed, an override without an audit record is never applied.`,
     overrideProcedureText(rule),
     ...notices,
@@ -650,7 +664,7 @@ function allowWithOverride() {
   const lines = [
     `[git-guard] OVERRIDE APPLIED (one-time): rule ${arming.rule}, token ${arming.token}.`,
     `Reason: ${arming.reason}`,
-    `Ledger: .claude/guard-override.log.jsonl (appended).`,
+    `Ledger: ${guardAuditRelPath} (appended).`,
     ...notices,
   ];
   emit(1, lines);

@@ -37,7 +37,10 @@ import {
 import { applyRunnerProfileMigrationV3, inspectRunnerProfileMigrationV3, planRunnerProfileMigrationV3, renderCanonicalV3Manifest } from "./runner-profile-migration-v3.mjs";
 import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { loadManifest, validateManifest } from "./manifest.mjs";
-import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
+import {
+  validatePoGateAuthorityForRepository,
+  validatePoGateProfileForRepository,
+} from "./po-gate-authority.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { codexCustomAgentSeed, loadRuntimeProjectionV3OwnedKeys, planRuntimeProjectionV3 } from "./runtime-projection-v3.mjs";
 import {
@@ -47,6 +50,15 @@ import {
 } from "./codex-onboarding-runtime.mjs";
 import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.mjs";
 import { planSessionCleanupRecovery } from "./session-cleanup-recovery.mjs";
+import {
+  LEGACY_CALIBRATION,
+  LEGACY_STATE,
+  NEUTRAL_CALIBRATION,
+  NEUTRAL_MANIFEST,
+  NEUTRAL_STATE,
+  readProjectAuthority,
+  resolveProjectAuthorityPaths,
+} from "./project-authority.mjs";
 
 const SOURCE = "pipeline.user.yaml";
 const SCHEMA = "pipeline.project-onboarding.v4";
@@ -54,12 +66,14 @@ const LEGACY_SCHEMA = "pipeline.project-onboarding.v3";
 const PLAN_SCHEMA = "pipeline.project-onboarding-plan.v3";
 const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
 const AUTHENTICATED = new WeakMap();
-const USER_RESERVED_PATHS = new Set([".agents", ".claude", ".codex"]);
+const USER_RESERVED_PATHS = new Set([".agents", ".claude", ".codex", "project"]);
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
 const PO_AUTHORITY_REBIND_WRITER = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
+const PO_PROFILE_REPAIR_WRITER = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
+const PROJECT_AUTHORITY_MIGRATION_WRITER = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
 const SHA256_RE = /^[a-f0-9]{64}$/u;
 const SOURCE_RECOVERY_SCHEMA = "pipeline.project-onboarding-source-recovery.v1";
 const MANIFEST_REPAIR_SCHEMA = "pipeline.project-onboarding-manifest-repair-plan.v1";
@@ -113,6 +127,23 @@ function safePath(root, relative, fs) {
     if (cursor !== target && !info.isDirectory()) throw new Error(`project path has a non-directory parent: ${relative}`);
   }
   return target;
+}
+
+function projectAuthorityPaths(root, fs) {
+  if (typeof fs.resolveProjectAuthorityPaths === "function") {
+    return fs.resolveProjectAuthorityPaths(root);
+  }
+  const resolved = resolveProjectAuthorityPaths({ rootDir: root });
+  if (resolved.status === "ready") return resolved;
+  const neutralState = safePath(root, NEUTRAL_STATE, fs);
+  const legacyState = safePath(root, LEGACY_STATE, fs);
+  const neutral = fs.existsSync(neutralState) || !fs.existsSync(legacyState);
+  return {
+    status: "compatibility",
+    source: neutral ? "neutral" : "legacy",
+    state: neutral ? NEUTRAL_STATE : LEGACY_STATE,
+    calibration: neutral ? NEUTRAL_CALIBRATION : LEGACY_CALIBRATION,
+  };
 }
 function rootEntries(root, fs) {
   return fs.readdirSync(root).sort().map((name) => {
@@ -330,6 +361,14 @@ function freshBaselines(intent, { hostManaged = false } = {}) {
     }
     baselines[target.path] = { status: "present", bytes: target.after.bytes };
   }
+  baselines[NEUTRAL_CALIBRATION] = {
+    status: "present",
+    bytes: baselines[".claude/pipeline.json"].bytes,
+  };
+  baselines[NEUTRAL_MANIFEST] = {
+    status: "present",
+    bytes: baselines[".claude/pipeline.yaml"].bytes,
+  };
   return baselines;
 }
 function gitCapability(fs, root) {
@@ -546,7 +585,7 @@ function partialCleanupRecoveryResult({
 
 function persistedPoAuthority(root, fs) {
   try {
-    const path = join(root, ".claude", "pipeline-state.json");
+    const path = safePath(root, projectAuthorityPaths(root, fs).state, fs);
     const before = fs.lstatSync(path);
     if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1
       || fs.realpathSync(path) !== path) {
@@ -698,7 +737,7 @@ function observePoAuthorityDecision(root, fs) {
     maxBuffer: 2 * 1024 * 1024,
   });
   if (planned?.error || planned?.status !== 0 || String(planned.stderr ?? "").trim() !== "") {
-    return { status: "unavailable" };
+    return observePoProfileRepair(root, fs);
   }
   let plan;
   try { plan = JSON.parse(String(planned.stdout ?? "")); }
@@ -742,6 +781,67 @@ function observePoAuthorityDecision(root, fs) {
       expected: {
         schema: "pipeline.po-authority-decision-plan.v1",
         statuses: ["planned"],
+      },
+    },
+  };
+}
+
+function observePoProfileRepair(root, fs) {
+  const validateProfile = fs.validatePoGateProfileForRepository ?? validatePoGateProfileForRepository;
+  const profile = validateProfile({ repoRoot: root });
+  if (profile?.ok === true) return { status: "unavailable" };
+  let writer;
+  try {
+    writer = PO_PROFILE_REPAIR_WRITER;
+    const info = fs.lstatSync(writer);
+    if (!info.isFile() || info.isSymbolicLink() || fs.realpathSync(writer) !== writer) {
+      return { status: "unavailable" };
+    }
+  } catch {
+    return { status: "unavailable" };
+  }
+  const planned = fs.spawnSync(process.execPath, [writer, "plan", "--root", root], {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+    maxBuffer: 2 * 1024 * 1024,
+  });
+  if (planned?.error || planned?.status !== 0 || String(planned.stderr ?? "").trim() !== "") {
+    return { status: "unavailable" };
+  }
+  let plan;
+  try { plan = JSON.parse(String(planned.stdout ?? "")); }
+  catch { return { status: "unavailable" }; }
+  const action = plan?.applyAction;
+  const expectedArgv = [
+    writer,
+    "apply",
+    "--root",
+    root,
+    "--plan-sha256",
+    plan?.planSha256,
+    "--activate",
+  ];
+  if (plan?.schema !== "pipeline.po-gate-profile-repair-plan.v1"
+    || plan?.status !== "ready" || plan?.root !== root
+    || !SHA256_RE.test(plan?.planSha256 ?? "")
+    || action?.executable !== process.execPath
+    || JSON.stringify(action?.argv) !== JSON.stringify(expectedArgv)
+    || action?.mutation !== true || action?.requiresConfirmation !== true
+    || action?.requiresHostBoundary !== true) {
+    return { status: "unavailable" };
+  }
+  return {
+    status: "profile-repair-required",
+    nextAction: {
+      kind: "command",
+      executable: action.executable,
+      argv: action.argv,
+      mutation: true,
+      requiresConfirmation: true,
+      expected: {
+        schema: "pipeline.po-gate-profile-repair-apply.v1",
+        statuses: ["applied"],
       },
     },
   };
@@ -811,7 +911,8 @@ function observeRepositoryCapability(rootDir, fs, intent, willInitializeGit = fa
 
 function persistedHostManagedLayout(root, fs) {
   try {
-    const calibration = JSON.parse(fs.readFileSync(safePath(root, ".claude/pipeline.json", fs), "utf8"));
+    const calibrationPath = projectAuthorityPaths(root, fs).calibration;
+    const calibration = JSON.parse(fs.readFileSync(safePath(root, calibrationPath, fs), "utf8"));
     return calibration?.repositoryMode === "host-managed" && hasCodexHostControlLayout(root, {
       access: fs.accessSync, fsConstants: fs.constants, lstat: fs.lstatSync, readdir: fs.readdirSync,
     });
@@ -1241,6 +1342,24 @@ function readyLifecycleResult({ root, intent, repository, runtime, continuity = 
         )],
       });
     }
+    if (poAuthorityDecision.status === "profile-repair-required") {
+      return lifecycleResult({
+        status: "partial",
+        root,
+        intent,
+        repository,
+        runtime,
+        continuity,
+        appServer,
+        nextAction: poAuthorityDecision.nextAction,
+        diagnostics: [lifecycleDiagnostic(
+          "$.authority.poGate.profile",
+          "po_profile_repair_required",
+          "the machine-local PO profile receipt is missing or stale",
+          "apply only the returned digest-bound PO profile repair after explicit PO confirmation, then re-run inspection for the authority decision",
+        )],
+      });
+    }
     return lifecycleResult({
       status: "partial",
       root,
@@ -1661,6 +1780,45 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
       diagnostics: [lifecycleDiagnostic("$.authority", "partial_authority", "the project has an incomplete Pipeline authority", "inspect the existing source and generated targets")] });
   }
   if (legacy.status === "ready") {
+    const projectAuthority = readProjectAuthority({ rootDir: legacy.root });
+    if (projectAuthority.status === "ready" && projectAuthority.source === "legacy") {
+      return lifecycleResult({
+        status: "migration-required",
+        root: legacy.root,
+        intent,
+        repository,
+        runtime: emptyRuntime(),
+        nextAction: commandAction(
+          [PROJECT_AUTHORITY_MIGRATION_WRITER, "plan", "--root", legacy.root],
+          false,
+          false,
+          "pipeline.project-authority.v1",
+          ["ready", "noop", "recovery-required", "invalid-source"],
+        ),
+        diagnostics: [lifecycleDiagnostic(
+          "$.authority",
+          "project_authority_migration_required",
+          "generic Pipeline authority still uses a runner-specific legacy directory",
+          "review and apply the typed runner-neutral project-authority migration",
+        )],
+      });
+    }
+    if (projectAuthority.status !== "ready") {
+      return lifecycleResult({
+        status: "invalid",
+        root: legacy.root,
+        intent,
+        repository,
+        runtime: emptyRuntime(),
+        nextAction: null,
+        diagnostics: [lifecycleDiagnostic(
+          "$.authority",
+          "project_authority_invalid",
+          projectAuthority.reason ?? "runner-neutral project authority is incomplete or mixed",
+          "use only the typed project-authority recovery or migration action",
+        )],
+      });
+    }
     const authority = validateV3BootstrapAuthority({ rootDir: legacy.root, deps: fs });
     if (authority.status === "ready" && authority.runtimeProjection === "plugin-managed") {
       return afterRuntimeLifecycleResult({
@@ -1804,13 +1962,27 @@ export function planProjectOnboardingV3({ rootDir = process.cwd(), deps: overrid
   const intent = freshIntent(); const validation = validatePipelineUserV3(intent);
   if (!validation.ok) return { schema: PLAN_SCHEMA, status: "invalid-authority", root: inspected.root, diagnostics: validation.errors, targets: [], requiresExplicitActivation: true };
   const baselines = freshBaselines(intent, { hostManaged });
-  const manifest = validateManifest(parseYaml(baselines[".claude/pipeline.yaml"].bytes), { rootDir: inspected.root });
+  const manifest = validateManifest(parseYaml(baselines[NEUTRAL_MANIFEST].bytes), { rootDir: inspected.root });
   if (manifest.status !== "ok") return { schema: PLAN_SCHEMA, status: "invalid-projection", root: inspected.root, diagnostics: manifest.errors, targets: [], requiresExplicitActivation: true };
   const internal = [
-    ...[".claude/pipeline.json", ".claude/pipeline.yaml", ".claude/settings.json"].map((path) => ({ path, bytes: baselines[path].bytes })),
+    ...[
+      NEUTRAL_CALIBRATION,
+      NEUTRAL_MANIFEST,
+      ".claude/pipeline.json",
+      ".claude/pipeline.yaml",
+      ".claude/settings.json",
+    ].map((path) => ({ path, bytes: baselines[path].bytes })),
     { path: SOURCE, bytes: renderYaml(intent) },
   ].sort((left, right) => left.path.localeCompare(right.path));
-  const targets = internal.map((target) => ({ path: target.path, kind: target.path === SOURCE ? "source" : "runtime", before: describe(null), after: describe(target.bytes), changed: true }));
+  const targets = internal.map((target) => ({
+    path: target.path,
+    kind: target.path === SOURCE
+      ? "source"
+      : (target.path.startsWith("project/") ? "project-authority" : "runtime"),
+    before: describe(null),
+    after: describe(target.bytes),
+    changed: true,
+  }));
   const initializesGit = !hostManaged && (inspected.status === "fresh" || !inspected.entries.includes(".git"));
   const plan = { schema: PLAN_SCHEMA, status: "ready", root: inspected.root, state: inspected.status, intentSha256: sha256(JSON.stringify(stable(intent))), git: hostManaged ? { mode: "host-managed", initialBranch: null, version: null, initializesGit: false } : { mode: "local", initialBranch: "main", version: git.version, initializesGit }, targets, changes: targets.map((target) => target.path), requiresExplicitActivation: true, activation: { command: "apply --activate", createsGitRepository: initializesGit, createsCommit: false } };
   AUTHENTICATED.set(plan, { signature: JSON.stringify(plan), root: inspected.root, targets: internal, state: inspected.status, initializesGit, hostManaged });

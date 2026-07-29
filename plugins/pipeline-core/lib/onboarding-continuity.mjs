@@ -47,6 +47,13 @@ import {
 } from "./continuity-state.mjs";
 import { resolveOnboardingPrivateState } from "./codex-onboarding-runtime.mjs";
 import { readState as readSanctionedState } from "../scripts/continuity-status.mjs";
+import {
+  LEGACY_CALIBRATION,
+  LEGACY_STATE,
+  NEUTRAL_CALIBRATION,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "./project-authority.mjs";
 
 export const KICKOFF_PLAN_SCHEMA = "pipeline.codex-onboarding-kickoff-plan.v1";
 export const KICKOFF_HISTORY_SCHEMA = "pipeline.codex-onboarding-continuity-history.v1";
@@ -60,8 +67,8 @@ export const SESSION_CLEANUP_RELEASE_RECEIPT_SCHEMA = "pipeline.session-cleanup-
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ONBOARDING_SCRIPT = join(HERE, "..", "scripts", "project-onboarding-v3.mjs");
-const STATE_RELATIVE_PATH = ".claude/pipeline-state.json";
-const CALIBRATION_RELATIVE_PATH = ".claude/pipeline.json";
+const STATE_RELATIVE_PATH = NEUTRAL_STATE;
+const CALIBRATION_RELATIVE_PATH = NEUTRAL_CALIBRATION;
 const INITIAL_PRD_RELATIVE_PATH = "specs/kickoff-initial-prd.md";
 const INITIAL_SPEC_RELATIVE_PATH = "specs/kickoff-initial-spec.md";
 const HISTORY_BASENAME = "continuity-history.json";
@@ -77,6 +84,19 @@ const TARGET_KEYS = {
   spec: new Set(["path", "beforeSha256", "afterSha256", "content"]),
   history: new Set(["path", "beforeSha256", "afterSha256", "value"]),
 };
+
+function authorityPaths(root) {
+  const authority = resolveProjectAuthorityPaths({ rootDir: root });
+  if (authority.status === "ready") {
+    return { state: authority.state, calibration: authority.calibration };
+  }
+  return {
+    state: existsSync(join(root, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE,
+    calibration: existsSync(join(root, NEUTRAL_CALIBRATION))
+      ? NEUTRAL_CALIBRATION
+      : LEGACY_CALIBRATION,
+  };
+}
 
 export const KICKOFF_FAULT_STAGES = Object.freeze([
   "prd-temp-fsync",
@@ -353,18 +373,19 @@ function observeDetailed({
   let historyObservation;
   try {
     root = physicalRoot(rootDir);
-    const calibrationObservation = observeOptionalProjectFile(root, CALIBRATION_RELATIVE_PATH, "Pipeline calibration");
+    const selectedPaths = authorityPaths(root);
+    const calibrationObservation = observeOptionalProjectFile(root, selectedPaths.calibration, "Pipeline calibration");
     if (calibrationObservation.status !== "present") return { continuity: empty };
     const calibration = parseJsonObject(calibrationObservation, "Pipeline calibration");
     const handoverPath = calibration.handover === undefined
       ? "docs/state.md"
       : safeRelativePath(calibration.handover, "configured handover");
-    if ([CALIBRATION_RELATIVE_PATH, STATE_RELATIVE_PATH].includes(handoverPath)
+    if ([selectedPaths.calibration, selectedPaths.state].includes(handoverPath)
       || handoverPath === ".git" || handoverPath.startsWith(".git/")) {
       fail("KICKOFF-PATH-UNSAFE", "configured handover collides with a control path");
     }
 
-    stateObservation = observeOptionalProjectFile(root, STATE_RELATIVE_PATH, "Pipeline machine state");
+    stateObservation = observeOptionalProjectFile(root, selectedPaths.state, "Pipeline machine state");
     handoverObservation = observeOptionalProjectFile(root, handoverPath, "configured handover");
     const privatePaths = resolvePrivate(root, repositoryCapability, { spawn });
     if (existsSync(privatePaths.directory) && (lstatSync(privatePaths.directory).mode & 0o777) !== 0o700) {
@@ -434,6 +455,8 @@ function observeDetailed({
       root,
       repositoryCapability,
       calibration,
+      calibrationRelativePath: selectedPaths.calibration,
+      stateRelativePath: selectedPaths.state,
       calibrationSha256: calibrationObservation.sha256,
       handoverPath,
       stateObservation,
@@ -452,7 +475,7 @@ function observeDetailed({
     if (stateObservation === undefined) {
       try {
         if (root) {
-          const state = observeOptionalProjectFile(root, STATE_RELATIVE_PATH, "Pipeline machine state");
+          const state = observeOptionalProjectFile(root, authorityPaths(root).state, "Pipeline machine state");
           stateSha256 = state.sha256;
         }
       } catch { /* unavailable means unobserved */ }
@@ -620,7 +643,7 @@ export function planOnboardingContinuityRepair({
       repositoryCapability,
       reason: proposed.reason,
       calibration: {
-        path: CALIBRATION_RELATIVE_PATH,
+        path: observed.calibrationRelativePath,
         sha256: observed.calibrationSha256,
       },
       handover: {
@@ -633,7 +656,7 @@ export function planOnboardingContinuityRepair({
       },
       authority: proposed.authority,
       target: {
-        path: STATE_RELATIVE_PATH,
+        path: observed.stateRelativePath,
         beforeSha256: observed.stateObservation.sha256,
         afterSha256: sha256(stateBytes),
         value: proposed.state,
@@ -678,7 +701,7 @@ export function applyOnboardingContinuityRepair({
     || canonicalSha256(continuityRepairBinding(plan)) !== expectedPlanSha256) {
     fail("CONTINUITY-REPAIR-PLAN-DIGEST", "continuity repair plan digest does not match");
   }
-  const statePath = absoluteProjectPath(plan.root, STATE_RELATIVE_PATH, "Pipeline machine state");
+  const statePath = absoluteProjectPath(plan.root, plan.target.path, "Pipeline machine state");
   const token = `continuity-repair-${plan.planSha256.slice(0, 32)}`;
   const lock = acquireLock(
     `${statePath}.lock`,
@@ -747,7 +770,7 @@ export function applyOnboardingContinuityRepair({
 
 function observeMachineState(rootDir) {
   const root = physicalRoot(rootDir);
-  const path = absoluteProjectPath(root, STATE_RELATIVE_PATH, "Pipeline machine state");
+  const path = absoluteProjectPath(root, authorityPaths(root).state, "Pipeline machine state");
   assertPhysicalChain(root, path, { leafMayBeAbsent: false });
   const raw = readPhysicalFile(path, "Pipeline machine state");
   let state;
@@ -783,11 +806,22 @@ function closedReleaseProof(root, state, entry, entryIndex, spawn) {
     || !Number.isSafeInteger(entry.continuityClose.expectedRevision)
     || !validateClosedArtifact(root, entry.continuityClose.result)
     || !validateClosedArtifact(root, entry.continuityClose.closeEvidence)) return null;
-  const result = spawn(
-    "git",
-    ["show", `${entry.forCommit}:${STATE_RELATIVE_PATH}`],
-    { cwd: root, encoding: "utf8", shell: false, maxBuffer: 2 * 1024 * 1024 },
-  );
+  let result = null;
+  for (const statePath of [...new Set([
+    authorityPaths(root).state,
+    NEUTRAL_STATE,
+    LEGACY_STATE,
+  ])]) {
+    const candidate = spawn(
+      "git",
+      ["show", `${entry.forCommit}:${statePath}`],
+      { cwd: root, encoding: "utf8", shell: false, maxBuffer: 2 * 1024 * 1024 },
+    );
+    if (!candidate?.error && candidate?.status === 0) {
+      result = candidate;
+      break;
+    }
+  }
   if (result?.error || result?.status !== 0) return null;
   const raw = Buffer.from(String(result.stdout ?? ""), "utf8");
   let prior;
@@ -1502,6 +1536,9 @@ function expectedHistoryBytes(value) {
 }
 
 function validatePlan(plan) {
+  const selectedAuthority = typeof plan?.root === "string"
+    ? authorityPaths(plan.root)
+    : { state: null, calibration: null };
   if (!exactKeys(plan, PLAN_KEYS)
     || plan.schema !== KICKOFF_PLAN_SCHEMA
     || !new Set(["local", "host-managed"]).has(plan.repositoryCapability)
@@ -1512,7 +1549,7 @@ function validatePlan(plan) {
     || validateKickoffGoal(plan.goal) !== plan.goal
     || sha256(Buffer.from(plan.goal, "utf8")) !== plan.goalSha256
     || !exactKeys(plan.calibration, new Set(["path", "sha256"]))
-    || plan.calibration.path !== CALIBRATION_RELATIVE_PATH
+    || plan.calibration.path !== selectedAuthority.calibration
     || !SHA256_RE.test(plan.calibration.sha256 ?? "")
     || !exactKeys(plan.targets, new Set(["state", "handover", "prd", "spec", "history"]))
     || !exactKeys(plan.targets.state, TARGET_KEYS.state)
@@ -1524,7 +1561,7 @@ function validatePlan(plan) {
   }
   const root = physicalRoot(plan.root);
   if (root !== plan.root
-    || plan.targets.state.path !== STATE_RELATIVE_PATH
+    || plan.targets.state.path !== selectedAuthority.state
     || plan.targets.history.path !== HISTORY_BASENAME
     || plan.targets.prd.path !== INITIAL_PRD_RELATIVE_PATH
     || plan.targets.spec.path !== INITIAL_SPEC_RELATIVE_PATH
@@ -1626,6 +1663,7 @@ function buildOnboardingKickoffPlan({
   const normalizedGoal = validateKickoffGoal(goal);
   if (!isAbsolute(onboardingScript)) fail("KICKOFF-PLAN-INVALID", "onboarding script must be absolute");
   const observed = observeDetailed({ rootDir, repositoryCapability, spawn });
+  const selectedAuthority = authorityPaths(observed.root);
   const replay = allowAppliedReplay && observed.continuity.status === "valid";
   if (observed.continuity.status !== "absent-pristine" && !replay) {
     fail("KICKOFF-NOT-PRISTINE", "kickoff is permitted only for absent-pristine continuity");
@@ -1695,7 +1733,7 @@ function buildOnboardingKickoffPlan({
   };
   const targets = {
     state: {
-      path: STATE_RELATIVE_PATH,
+      path: selectedAuthority.state,
       beforeSha256: null,
       afterSha256: stateSha256,
       value: state,
@@ -1732,7 +1770,7 @@ function buildOnboardingKickoffPlan({
     goal: normalizedGoal,
     goalSha256,
     calibration: {
-      path: CALIBRATION_RELATIVE_PATH,
+      path: selectedAuthority.calibration,
       sha256: observed.calibrationSha256,
     },
     targets,

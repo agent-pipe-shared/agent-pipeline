@@ -36,6 +36,11 @@ import {
   sealTemporaryResource,
   startSessionDescriptor,
 } from "../lib/worktree-lifecycle.mjs";
+import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
 
 const USAGE = `Usage:
   session-cleanup.mjs start --repo <checkout> [--session <safe-id>]
@@ -373,7 +378,11 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       let cleanupBinding = null;
       if (command === "cleanup") {
         drainSessionPower(repo, session);
-        if (existsSync(join(repo, ".claude", "pipeline-state.json"))) {
+        const authority = resolveProjectAuthorityPaths({ rootDir: repo });
+        const statePath = authority.status === "ready"
+          ? authority.state
+          : (existsSync(join(repo, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+        if (existsSync(join(repo, statePath))) {
           const readBinding = dependencies.readOnboardingSessionCleanupBindingFn
             ?? readOnboardingSessionCleanupBinding;
           const observed = readBinding({ rootDir: repo });

@@ -12,13 +12,18 @@
  *
  * Usage: node plugins/pipeline-core/scripts/continuity-status.mjs [--root <project-dir>] [--host-supports-background]
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { projectReadContinuityStatus } from "../lib/continuity-status.mjs";
 import { readGateEstimateEvidence } from "../lib/gate-estimate.mjs";
 import { observeGitSource } from "../lib/source-observation.mjs";
+import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
 
 /**
  * Installed-plugin read path.  The plugin may run without the Public Core
@@ -33,9 +38,17 @@ export function projectDir() {
 export function readState(dir = projectDir()) {
   let raw;
   try {
-    raw = readFileSync(join(dir, ".claude", "pipeline-state.json"), "utf8");
+    const authority = resolveProjectAuthorityPaths({ rootDir: dir });
+    const relativePath = authority.status === "ready"
+      ? authority.state
+      : (existsSync(join(dir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+    raw = readFileSync(join(dir, relativePath), "utf8");
   } catch {
-    return { status: "absent" };
+    try {
+      raw = readFileSync(join(dir, LEGACY_STATE), "utf8");
+    } catch {
+      return { status: "absent" };
+    }
   }
   let parsed;
   try {

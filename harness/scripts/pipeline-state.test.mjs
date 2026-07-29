@@ -53,6 +53,8 @@ import {
 
 const CLI = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
 const ALL_DIRS = [];
+const NOVA_APPROVED_BY = "agent-pipe-shared (PO, 2026-07-27 Nova re-Critic corrections)";
+const PHOENIX_SPEC_BOUND_BY = "PO reauthorization for Phoenix R-14 digest binding";
 function freshDir(prefix) {
   const dir = mkdtempSync(join(tmpdir(), `pipeline-state-${prefix}-`));
   ALL_DIRS.push(dir);
@@ -64,7 +66,7 @@ function seedPoAuthorityRebind(prefix = "po-rebind") {
   const dir = freshDir(prefix);
   const featureDir = join(dir, "specs", "nova-shaped");
   mkdirSync(featureDir, { recursive: true });
-  mkdirSync(join(dir, ".claude"), { recursive: true });
+  mkdirSync(dirname(statePath(dir)), { recursive: true });
   const planPath = "specs/nova-shaped/prd_nova.md";
   const specPath = "specs/nova-shaped/spec.md";
   const oldSpecSha = createHash("sha256").update("# older Spec\n").digest("hex");
@@ -83,7 +85,7 @@ function seedPoAuthorityRebind(prefix = "po-rebind") {
   };
   const state = {
     schema: SCHEMA_ID, activeFeature: { id: "nova-shaped", planPath, phase: "implementation" }, planApproved: true,
-    planApproval: { schema: "pipeline.plan-approval.v2", approvedBy: "PO", approvedAt: "2026-07-26T14:08:37.500Z", specBoundBy: "PO", specBoundAt: "2026-07-26T14:08:37.500Z", poGateAuthority: {
+    planApproval: { schema: "pipeline.plan-approval.v2", approvedBy: NOVA_APPROVED_BY, approvedAt: "2026-07-26T14:08:37.500Z", specBoundBy: PHOENIX_SPEC_BOUND_BY, specBoundAt: "2026-07-26T14:08:37.500Z", poGateAuthority: {
       ...profile, schema: "pipeline.po-gate-authority.v2", planPath, planSha256: planSha, specPath, specSha256: oldSpecSha,
     } }, continuity, updatedAt: "2026-07-26T14:08:37.500Z",
   };
@@ -113,7 +115,7 @@ function runPoAuthorityRebindTests() {
   const applied = captureConsole(() => run(plan.applyAction.argv.slice(1), fixture.deps));
   const after = readState(fixture.dir).state;
   const afterPrd = readFileSync(join(fixture.dir, fixture.planPath), "utf8");
-  ok("PS53d exact confirmed apply converges marker, PO gate and Continuity in design", applied.value === 0 && afterPrd.includes(fixture.newSpecSha) && after.activeFeature.phase === "design" && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha && after.continuity.authority.spec.sha256 === fixture.newSpecSha && after.continuity.authority.prd.sha256 === after.planApproval.poGateAuthority.planSha256 && after.continuity.revision === 4);
+  ok("PS53d Nova-shaped confirmed apply preserves Human approvals and converges marker, PO gate and Continuity in design", applied.value === 0 && afterPrd.includes(fixture.newSpecSha) && after.activeFeature.phase === "design" && after.planApproval.approvedBy === NOVA_APPROVED_BY && after.planApproval.specBoundBy === PHOENIX_SPEC_BOUND_BY && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha && after.continuity.authority.spec.sha256 === fixture.newSpecSha && after.continuity.authority.prd.sha256 === after.planApproval.poGateAuthority.planSha256 && after.continuity.revision === 4);
   const replayBytes = readFileSync(statePath(fixture.dir), "utf8");
   const replay = captureConsoleError(() => run(plan.applyAction.argv.slice(1), fixture.deps));
   ok("PS53e replay is a closed refusal after a verified non-no-op", replay.value === 2 && readFileSync(statePath(fixture.dir), "utf8") === replayBytes);
@@ -251,6 +253,8 @@ function runPoAuthorityRebindTests() {
   ok("PS55b Phoenix-shaped confirmed apply preserves payload and converges all three intents", selected.value === 0
     && applied.value === 0
     && after.activeFeature.phase === "design"
+    && after.planApproval.approvedBy === NOVA_APPROVED_BY
+    && after.planApproval.specBoundBy === PHOENIX_SPEC_BOUND_BY
     && after.planApproval.poGateAuthority.planSha256 === currentPlanSha256
     && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha
     && JSON.stringify(after.continuity) === JSON.stringify(expectedContinuity)
@@ -445,6 +449,29 @@ function runPoAuthorityRebindTests() {
 }
 
 {
+  const fixture = seedPoAuthorityRebind("po-rebind-human-postimage-drift");
+  const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps));
+  const plan = JSON.parse(planned.text || "{}");
+  const prdBefore = readFileSync(join(fixture.dir, fixture.planPath), "utf8");
+  const stateBefore = readFileSync(statePath(fixture.dir), "utf8");
+  let postimageEvidence = null;
+  const rejected = captureConsoleError(() => run(plan.applyAction.argv.slice(1), {
+    ...fixture.deps,
+    afterRebindStateWritten: () => {
+      const postimageState = readState(fixture.dir).state;
+      postimageState.planApproval.approvedBy = PHOENIX_SPEC_BOUND_BY;
+      writeFileSync(statePath(fixture.dir), JSON.stringify(postimageState, null, 2) + "\n");
+    },
+    observeRebindPostimageEvidence: (evidence) => { postimageEvidence = evidence; },
+  }));
+  ok("PS53u valid Human postimage drift fails state-value readback and restores exact preimages", rejected.value === 2
+    && postimageEvidence?.predicates?.stateValue?.ok === false
+    && /rollback verified/iu.test(rejected.text)
+    && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === prdBefore
+    && readFileSync(statePath(fixture.dir), "utf8") === stateBefore);
+}
+
+{
   const fixture = seedPoAuthorityRebind("po-rebind-write-fault");
   const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const plan = JSON.parse(planned.text || "{}");
   const prdBefore = readFileSync(join(fixture.dir, fixture.planPath), "utf8"); const stateBefore = readFileSync(statePath(fixture.dir), "utf8");
@@ -457,15 +484,28 @@ function runPoAuthorityRebindTests() {
   const stateRenameEffect = captureConsoleError(() => run(renamedPlan.applyAction.argv.slice(1), { ...fixture.deps, renameRebindState: (from, to) => { renameSync(from, to); if (!stateRenameFaulted) { stateRenameFaulted = true; throw new Error("injected State rename-effect failure"); } } }));
   ok("PS53i State rename-effect failure rolls both postimages back completely", stateRenameEffect.value === 2 && /rollback verified/i.test(stateRenameEffect.text) && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === prdBefore && readFileSync(statePath(fixture.dir), "utf8") === stateBefore);
   const replanned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const repairPlan = JSON.parse(replanned.text || "{}");
-  const readbackFault = captureConsoleError(() => run(repairPlan.applyAction.argv.slice(1), { ...fixture.deps, v4Inspection: () => ({ status: "partial" }) }));
-  ok("PS53j postimage V4 failure rolls both authority surfaces back", readbackFault.value === 2 && /rollback verified/i.test(readbackFault.text) && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === prdBefore && readFileSync(statePath(fixture.dir), "utf8") === stateBefore);
+  const readbackFault = captureConsoleError(() => run(repairPlan.applyAction.argv.slice(1), {
+    ...fixture.deps,
+    v4Inspection: ({ intent }) => ({
+      status: "partial",
+      diagnostics: [{ code: `injected_${intent}_readback` }],
+    }),
+  }));
+  ok("PS53j postimage V4 failure names every predicate/intent and rolls both authority surfaces back", readbackFault.value === 2
+    && /pipeline\.po-authority-postimage-readback\.v1/u.test(readbackFault.text)
+    && /injected_bootstrap_readback/u.test(readbackFault.text)
+    && /injected_session_readback/u.test(readbackFault.text)
+    && /injected_dispatch_readback/u.test(readbackFault.text)
+    && /rollback verified/iu.test(readbackFault.text)
+    && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === prdBefore
+    && readFileSync(statePath(fixture.dir), "utf8") === stateBefore);
 }
 
 {
   const fixture = seedPoAuthorityRebind("po-rebind-crash-prepared");
   const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const plan = JSON.parse(planned.text || "{}");
   const prdBefore = readFileSync(join(fixture.dir, fixture.planPath), "utf8"); const stateBefore = readFileSync(statePath(fixture.dir), "utf8");
-  const journal = join(fixture.dir, ".claude", "pipeline-state.json.po-authority-rebind.v1");
+  const journal = `${statePath(fixture.dir)}.po-authority-rebind.v1`;
   const interrupted = captureConsoleError(() => run(plan.applyAction.argv.slice(1), {
     ...fixture.deps, afterRebindTransactionPrepared: () => { throw new Error("injected crash after journal prepare"); },
   }));
@@ -480,7 +520,7 @@ function runPoAuthorityRebindTests() {
   const fixture = seedPoAuthorityRebind("po-rebind-crash-mixed");
   const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const plan = JSON.parse(planned.text || "{}");
   const prdBefore = readFileSync(join(fixture.dir, fixture.planPath), "utf8"); const stateBefore = readFileSync(statePath(fixture.dir), "utf8");
-  const journal = join(fixture.dir, ".claude", "pipeline-state.json.po-authority-rebind.v1");
+  const journal = `${statePath(fixture.dir)}.po-authority-rebind.v1`;
   const interrupted = captureConsoleError(() => run(plan.applyAction.argv.slice(1), {
     ...fixture.deps, afterRebindPrdWritten: () => { throw new Error("injected crash after PRD commit"); },
   }));
@@ -495,7 +535,7 @@ function runPoAuthorityRebindTests() {
 {
   const fixture = seedPoAuthorityRebind("po-rebind-crash-committed");
   const planned = captureConsole(() => run(["po-authority-rebind-plan"], fixture.deps)); const plan = JSON.parse(planned.text || "{}");
-  const journal = join(fixture.dir, ".claude", "pipeline-state.json.po-authority-rebind.v1");
+  const journal = `${statePath(fixture.dir)}.po-authority-rebind.v1`;
   const prdPath = join(fixture.dir, fixture.planPath); const stateFilePath = statePath(fixture.dir);
   const prdBefore = readFileSync(prdPath, "utf8"); const stateBefore = readFileSync(stateFilePath, "utf8");
   const interrupted = captureConsoleError(() => run(plan.applyAction.argv.slice(1), {
@@ -602,6 +642,19 @@ const COURSE_RESULT_FIXTURE = "```pipeline-result\n{\n  \"decisionBriefs\": [],\
 const C = createHash("sha256").update(RESULT_FIXTURE).digest("hex");
 const D = "d".repeat(64);
 const CONTINUITY_FEATURE = "phase26-test";
+
+if (process.env.PIPELINE_STATE_PS53_ONLY === "1") {
+  runPoAuthorityRebindTests();
+  for (const dir of ALL_DIRS) rmSync(dir, { recursive: true, force: true });
+  const total = pass + failures.length;
+  console.log(`\n${pass}/${total} cases passed.`);
+  if (failures.length > 0) {
+    console.log("Failures:");
+    for (const failure of failures) console.log(`  - ${failure}`);
+    process.exit(1);
+  }
+  process.exit(0);
+}
 
 function injectedPoGateAuthority(planPath) {
   const planSha256 = createHash("sha256").update(`fixture:${planPath}`).digest("hex");
@@ -1644,7 +1697,7 @@ function canonicalFixtureJson(value) {
   ok("PS38b initialized continuity is persisted at revision 0", state.continuity?.revision === 0);
   ok("PS38c continuity feature is bound to activeFeature.id", state.continuity?.featureId === state.activeFeature?.id);
   ok("PS38d owned lock is released", !existsSync(continuityLockPath(dir)));
-  ok("PS38e same-directory temp is absent after rename", !readdirSync(join(dir, ".claude")).some((name) => name.includes(".tmp.")));
+  ok("PS38e same-directory temp is absent after rename", !readdirSync(dirname(statePath(dir))).some((name) => name.includes(".tmp.")));
 }
 
 // ---- PS39: exact CAS advances once and stale replay is byte-null ---------------------------
@@ -2580,14 +2633,14 @@ if (symlinkCapable) {
   });
   ok("PS49c pre-rename failure reports committed=false", preRename.ok === false && preRename.committed === false);
   ok("PS49d pre-rename failure preserves target byte-identically", readFileSync(statePath(dir), "utf8") === before);
-  ok("PS49e pre-rename failure cleans its owned temp", !readdirSync(join(dir, ".claude")).some((name) => name.includes(`.tmp.${second.ownerNonce}`)));
+  ok("PS49e pre-rename failure cleans its owned temp", !readdirSync(dirname(statePath(dir))).some((name) => name.includes(`.tmp.${second.ownerNonce}`)));
   releaseContinuityLock(second);
 }
 
 // ---- PS50: lock publication is atomic despite an unrelated interrupted candidate ------------
 {
   const dir = freshDir("continuity-lock-publication");
-  mkdirSync(join(dir, ".claude"), { recursive: true });
+  mkdirSync(dirname(continuityLockPath(dir)), { recursive: true });
   writeFileSync(`${continuityLockPath(dir)}.candidate.orphan-nonce`, "partial-record");
   const lock = acquireContinuityLock(dir, "token-publish-001", continuityDeps(dir, { ownerNonce: () => "nonce-publish-001" }));
   const record = JSON.parse(readFileSync(continuityLockPath(dir), "utf8"));
@@ -2653,7 +2706,7 @@ if (symlinkCapable) {
   const continuity = { schema: "pipeline.continuity.v0", featureId: "codex-onboarding-0.4.5", revision: 3, runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator" }, authority: { prd: { path: "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md", sha256: "9825ca78a3765dc71ee2793ef9f84f2eaf998bf297086d869be3562d792cdb94" }, spec: { path: "specs/2026-07-25-codex-onboarding-0.4.5/spec.md", sha256: "5a95aa55b393a88e0d7ab1a8006957fc04d80bcae24399b40f3ffa8e4eb3cf70" }, result: null }, queueHead: { packageId: "continuity-adoption", actionId: "review-active-feature", nextAction: "review", productRetryCount: 0, environmentRerouteCount: 0, dispatch: null }, blocker: null, acknowledgedFinal: null, resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" }, recovery: null, decisionTxn: null, capacity: { concurrencyLimit: 4, reservedCriticSlots: 1, reservedRecoverySlots: 1, fallbackPolicy: "defer" } };
   const stateValue = { schema: SCHEMA_ID, activeFeature: { id: "codex-onboarding-0.4.5", planPath: continuity.authority.prd.path, phase: "implementation" }, planApproved: true, planApproval: { schema: "pipeline.plan-approval.v2", approvedBy: "PO", approvedAt: "2026-07-26T14:08:37.500Z", specBoundBy: "PO", specBoundAt: "2026-07-26T14:08:37.500Z", poGateAuthority: { schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: "2a0f69551b46963d6d49ef0faaf9db5c28d27c4f681a9d4dd0be1a81b297da10", runtimeSha256: "071b0236f6054bbeea2140830320a88d1c6a9e733d7294ad0bb976fd2e28c897", receiptSha256: "c4fc5171dc507a81908b30137bbf537355626f957d1ccbb9bee3a8ae9db02aa2", repositoryFingerprint: "6af2655d04c85a0e2faff67dedc2116a845874502dbe31c20e4c28372ea7885f", planPath: continuity.authority.prd.path, planSha256: "217eff325fffa5d82d5d49f31883c426dca74c42879aaae0a70da87be8e492ae", specPath: "specs/2026-07-25-codex-onboarding-0.4.5/spec.md", specSha256: continuity.authority.spec.sha256 } }, continuity, updatedAt: "2026-07-26T14:08:37.500Z" };
   delete continuity.closeTransition;
-  mkdirSync(join(dir, ".claude"), { recursive: true }); writeFileSync(statePath(dir), JSON.stringify(stateValue) + "\n");
+  mkdirSync(dirname(statePath(dir)), { recursive: true }); writeFileSync(statePath(dir), JSON.stringify(stateValue) + "\n");
   const request = { expectedRevision: 3, currentPrd: { path: continuity.authority.prd.path, sha256: "217eff325fffa5d82d5d49f31883c426dca74c42879aaae0a70da87be8e492ae" }, spec: continuity.authority.spec, result: { path: "specs/2026-07-25-codex-onboarding-0.4.5/result.md", sha256: "ceed30ddce48d921f2afbbb44d02a3fe5301302ad07fab3f41dfbc149f657b73" }, closeEvidence: { path: "specs/2026-07-25-codex-onboarding-0.4.5/legacy-continuity-close-evidence.md", sha256: "8fe8c79f464e2a3f93f2e300fb6e74cccf6791f5920f4a857597f516d97917a1" }, history: { commit: "7a62a4ef9febba844cf5be8a659177b37c6a5da5", path: continuity.authority.prd.path, sha256: continuity.authority.prd.sha256 } };
   const reqPath = writeRequest(dir, "legacy-request", request); const observed = { head: "9d1b3dc108eb77629ace5b82002120f5539abd8d", tagObject: "78359ae1ba7e0194111e531c060db615e4994e40", commit: "9d1b3dc108eb77629ace5b82002120f5539abd8d", tree: "282a8b5c5b0581e042985bfb373a66be0eb2d08b", remoteCommit: "9d1b3dc108eb77629ace5b82002120f5539abd8d", remoteTagObject: "78359ae1ba7e0194111e531c060db615e4994e40", remoteTagCommit: "9d1b3dc108eb77629ace5b82002120f5539abd8d", historicalPrdSha256: continuity.authority.prd.sha256 };
   const planned = captureConsole(() => run(["continuity-adoption-plan", "--request-file", reqPath], { dir, legacyGitObservation: () => observed, now: FIXED_NOW })); const payload = JSON.parse(planned.text || "{}");

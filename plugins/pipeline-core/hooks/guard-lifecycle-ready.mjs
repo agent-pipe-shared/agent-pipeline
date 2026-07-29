@@ -32,6 +32,8 @@ import {
 const GOVERNANCE_MARKERS = [
   ".agent-pipeline/core.lock.json",
   "pipeline.user.yaml",
+  "project/pipeline.json",
+  "project/pipeline.yaml",
   ".claude/pipeline.json",
   ".claude/pipeline.yaml",
   ...loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path),
@@ -46,6 +48,8 @@ const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
+const PO_PROFILE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
+const PROJECT_AUTHORITY_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
 const HUMAN_OVERRIDE_SCRIPT = fileURLToPath(new URL("../scripts/guard-human-override.mjs", import.meta.url));
 const PRIVATE_OVERLAY_SCRIPT = fileURLToPath(new URL("../scripts/codex-private-overlay-activation.mjs", import.meta.url));
 const HEX = /^[a-f0-9]{64}$/u;
@@ -123,7 +127,7 @@ function protectedStateWriterOnly() {
   return verdict(
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
-      + ".claude/pipeline-state.json is writer-owned and must not be edited directly.\n"
+      + "Pipeline State is writer-owned and must not be edited directly.\n"
       + "Use the exact sanctioned State or digest-bound lifecycle writer action.\n",
   );
 }
@@ -438,6 +442,25 @@ function sanctionedPoAuthorityRebindArgs(args) {
     && args.length === 6;
 }
 
+function sanctionedPoProfileRepairArgs(args, root) {
+  if (args[0] === "plan") return exactRoot(args, root, 1) && args.length === 3;
+  return args[0] === "apply"
+    && exactRoot(args, root, 1)
+    && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
+    && args[5] === "--activate" && args.length === 6;
+}
+
+function sanctionedProjectAuthorityMigrationArgs(args, root) {
+  if (["inspect", "plan"].includes(args[0])) {
+    return exactRoot(args, root, 1) && args.length === 3;
+  }
+  if (args[0] === "recover" && exactRoot(args, root, 1) && args.length === 3) return true;
+  return ["apply", "recover"].includes(args[0])
+    && exactRoot(args, root, 1)
+    && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
+    && args[5] === "--activate" && args.length === 6;
+}
+
 function sanctionedHumanOverrideArgs(args, root) {
   if (args[0] === "plan") {
     return args[1] === "--repo" && args[2] === root
@@ -485,6 +508,10 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
   if (script === SESSION_CLEANUP_SCRIPT) return sanctionedSessionCleanupArgs(args, root);
   if (script === PIPELINE_STATE_SCRIPT) {
     return sanctionedPoAuthorityRebindArgs(args);
+  }
+  if (script === PO_PROFILE_REPAIR_SCRIPT) return sanctionedPoProfileRepairArgs(args, root);
+  if (script === PROJECT_AUTHORITY_MIGRATION_SCRIPT) {
+    return sanctionedProjectAuthorityMigrationArgs(args, root);
   }
   if (script === HUMAN_OVERRIDE_SCRIPT) return sanctionedHumanOverrideArgs(args, root);
   if (script === PRIVATE_OVERLAY_SCRIPT) {
@@ -537,7 +564,8 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
       return crossRepositoryMutationBlocked();
     }
     const requested = resolve(root, input.tool_input.file_path);
-    if (requested === join(root, ".claude", "pipeline-state.json")) {
+    if (requested === join(root, ".claude", "pipeline-state.json")
+      || requested === join(root, "project", "pipeline-state.json")) {
       return protectedStateWriterOnly();
     }
   }

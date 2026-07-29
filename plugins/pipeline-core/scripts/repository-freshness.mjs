@@ -16,6 +16,11 @@ import {
   hasCodexHostControlLayout,
   readCodexHostRepositoryInitAdmission,
 } from "../lib/codex-host-layout.mjs";
+import {
+  LEGACY_CALIBRATION,
+  NEUTRAL_CALIBRATION,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
 
 const SCHEMA = "pipeline.repository-freshness.v0";
 const FETCH_TIMEOUT_MS = 8000;
@@ -69,7 +74,13 @@ function outputBase(status, fields = {}) {
 }
 
 function declaredRepositoryMode(repo) {
-  const calibration = join(repo, ".claude", "pipeline.json");
+  const authority = resolveProjectAuthorityPaths({ rootDir: repo });
+  const calibration = join(
+    repo,
+    authority.status === "ready"
+      ? authority.calibration
+      : (existsSync(join(repo, NEUTRAL_CALIBRATION)) ? NEUTRAL_CALIBRATION : LEGACY_CALIBRATION),
+  );
   if (!existsSync(calibration)) return { mode: "remote-tracked" };
   try {
     const parsed = JSON.parse(readFileSync(calibration, "utf8"));

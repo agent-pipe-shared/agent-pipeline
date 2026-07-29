@@ -18,6 +18,11 @@ import {
 } from "../lib/private-boundary.mjs";
 import { assessWindowsPrivatePath } from "../lib/windows-private-state.mjs";
 import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
+import {
   advanceCloseCoordinator,
   coordinatorNextPhases,
   COORDINATOR_PHASES,
@@ -100,7 +105,11 @@ function readJsonFile(root, path, label) {
   return { ...file, value };
 }
 function stateSnapshot(root) {
-  const file = readJsonFile(root, ".claude/pipeline-state.json", "Pipeline State");
+  const authority = resolveProjectAuthorityPaths({ rootDir: root });
+  const statePath = authority.status === "ready"
+    ? authority.state
+    : (existsSync(join(root, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+  const file = readJsonFile(root, statePath, "Pipeline State");
   if (file.value.schema !== "pipeline.state.v0") fail("CLOSE-STATE", "Pipeline State schema is invalid");
   return { ...file, state: file.value };
 }

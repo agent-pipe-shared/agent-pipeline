@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 /** Non-blocking SessionStart projection of validated compact continuity state. */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import {
@@ -10,6 +10,11 @@ import {
 } from "../lib/continuity-state.mjs";
 import { buildContinuationLine } from "../lib/interaction-continuity.mjs";
 import { reconcileMainSessionRoute } from "../lib/main-session-route.mjs";
+import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
 
 const OUTER_SCHEMA = "pipeline.state.v0";
 
@@ -189,7 +194,11 @@ export function run() {
   }
   if (!shouldActivate(input)) process.exit(0);
 
-  const state = loadStateSafe(join(rootDir, ".claude", "pipeline-state.json"));
+  const authority = resolveProjectAuthorityPaths({ rootDir });
+  const statePath = authority.status === "ready"
+    ? authority.state
+    : (existsSync(join(rootDir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+  const state = loadStateSafe(join(rootDir, statePath));
   const { stdout } = decideOutput(input, state);
   if (stdout) process.stdout.write(stdout);
   process.exit(0);

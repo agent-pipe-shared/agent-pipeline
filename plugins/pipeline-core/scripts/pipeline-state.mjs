@@ -283,6 +283,11 @@ import {
   prepareGateEstimateMutation,
   readGateEstimateEvidence,
 } from "../lib/gate-estimate.mjs";
+import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
 import { observeGitSource } from "../lib/source-observation.mjs";
 import { inspectSessionClosure } from "../lib/worktree-lifecycle.mjs";
 import {
@@ -362,7 +367,20 @@ export function projectDir() {
 
 /** Path to the state file under a given project dir. */
 export function statePath(dir = projectDir()) {
-  return join(dir, ".claude", "pipeline-state.json");
+  const authority = resolveProjectAuthorityPaths({ rootDir: dir });
+  if (authority.status === "ready") return join(dir, authority.state);
+  const neutral = join(dir, NEUTRAL_STATE);
+  const legacy = join(dir, LEGACY_STATE);
+  if (existsSync(neutral) || !existsSync(legacy)) return neutral;
+  return legacy;
+}
+
+function stateRelativePath(dir) {
+  return relative(resolve(dir), statePath(dir)).split(sep).join("/");
+}
+
+function stateDirectory(dir) {
+  return dirname(statePath(dir));
 }
 
 /**
@@ -542,7 +560,7 @@ function publishExclusiveRecord(path, record, directory) {
 
 function acquireRecoveryGuard(dir, record) {
   const path = lockRecoveryPath(dir);
-  const published = publishExclusiveRecord(path, record, join(dir, ".claude"));
+  const published = publishExclusiveRecord(path, record, stateDirectory(dir));
   return published.ok ? { ok: true, path, ...record } : published;
 }
 
@@ -570,8 +588,8 @@ function releaseRecoveryGuard(guard) {
  */
 export function acquireContinuityLock(dir, token, deps = {}) {
   if (!LOCK_TOKEN_RE.test(token ?? "")) return { ok: false, code: "PS-CONTINUITY-LOCK-TOKEN" };
-  const claudeDir = join(dir, ".claude");
-  if (!existsSync(claudeDir)) mkdirSync(claudeDir, { recursive: true });
+  const authorityDir = stateDirectory(dir);
+  if (!existsSync(authorityDir)) mkdirSync(authorityDir, { recursive: true });
   const path = continuityLockPath(dir);
   const nowMs = deps.nowMs ?? Date.now;
   const staleMs = deps.lockStaleMs ?? CONTINUITY_LOCK_STALE_MS;
@@ -581,7 +599,7 @@ export function acquireContinuityLock(dir, token, deps = {}) {
   const record = { schema: CONTINUITY_LOCK_SCHEMA_ID, token, ownerNonce, acquiredAtMs };
 
   if (existsSync(lockRecoveryPath(dir))) return { ok: false, code: "PS-CONTINUITY-RECOVERY-IN-PROGRESS" };
-  const published = publishExclusiveRecord(path, record, claudeDir);
+  const published = publishExclusiveRecord(path, record, authorityDir);
   if (published.ok) {
     return { ok: true, code: "PS-CONTINUITY-LOCKED", path, token, ownerNonce, recovered: false };
   }
@@ -610,7 +628,7 @@ export function acquireContinuityLock(dir, token, deps = {}) {
       || current.ownerNonce !== observed.ownerNonce
       || currentAgeMs < staleMs) return { ok: false, code: "PS-CONTINUITY-LOCKED" };
     unlinkSync(path);
-    const recovered = publishExclusiveRecord(path, record, claudeDir);
+    const recovered = publishExclusiveRecord(path, record, authorityDir);
     if (!recovered.ok) return recovered;
     safeUnlink(`${statePath(dir)}.tmp.${observed.ownerNonce}`);
     recoveryComplete = true;
@@ -667,7 +685,7 @@ export function atomicWriteContinuityState(dir, state, lock, deps = {}) {
     if (!assertContinuityLockOwned(lock)) return { ok: false, code: "PS-CONTINUITY-LOCK-OWNERSHIP" };
     (deps.renameSync ?? renameSync)(tmp, target);
     renamed = true;
-    const synced = deps.syncDirectory?.(join(dir, ".claude")) ?? syncDirectory(join(dir, ".claude"));
+    const synced = deps.syncDirectory?.(stateDirectory(dir)) ?? syncDirectory(stateDirectory(dir));
     if (!synced.ok) {
       return { ok: false, committed: true, code: "PS-CONTINUITY-COMMITTED-DURABILITY-UNKNOWN" };
     }
@@ -784,12 +802,70 @@ function sha256Bytes(value) {
 
 function sameJson(left, right) {
   try {
-    return canonicalJson(left) === canonicalJson(right);
+    const leftStack = new Set();
+    const rightStack = new Set();
+    const compare = (leftValue, rightValue) => {
+      if (leftValue === null || rightValue === null) return leftValue === rightValue;
+      if (typeof leftValue !== typeof rightValue) return false;
+      if (typeof leftValue === "string" || typeof leftValue === "boolean") return leftValue === rightValue;
+      if (typeof leftValue === "number") {
+        return Number.isFinite(leftValue) && Number.isFinite(rightValue) && leftValue === rightValue;
+      }
+      if (typeof leftValue !== "object"
+        || leftStack.has(leftValue) || rightStack.has(rightValue)) return false;
+      const leftArray = Array.isArray(leftValue);
+      if (leftArray !== Array.isArray(rightValue)) return false;
+      const leftPrototype = Object.getPrototypeOf(leftValue);
+      const rightPrototype = Object.getPrototypeOf(rightValue);
+      if (!leftArray
+        && (leftPrototype !== Object.prototype && leftPrototype !== null)) return false;
+      if (!leftArray
+        && (rightPrototype !== Object.prototype && rightPrototype !== null)) return false;
+      leftStack.add(leftValue);
+      rightStack.add(rightValue);
+      try {
+        if (leftArray) {
+          if (leftValue.length !== rightValue.length
+            || Reflect.ownKeys(leftValue).length !== leftValue.length + 1
+            || Reflect.ownKeys(rightValue).length !== rightValue.length + 1) return false;
+          for (let index = 0; index < leftValue.length; index += 1) {
+            const leftDescriptor = Object.getOwnPropertyDescriptor(leftValue, String(index));
+            const rightDescriptor = Object.getOwnPropertyDescriptor(rightValue, String(index));
+            if (leftDescriptor === undefined || rightDescriptor === undefined
+              || !Object.hasOwn(leftDescriptor, "value") || !Object.hasOwn(rightDescriptor, "value")
+              || !compare(leftDescriptor.value, rightDescriptor.value)) return false;
+          }
+          return true;
+        }
+        const leftKeys = Reflect.ownKeys(leftValue);
+        const rightKeys = Reflect.ownKeys(rightValue);
+        if (leftKeys.some((key) => typeof key !== "string")
+          || rightKeys.some((key) => typeof key !== "string")
+          || leftKeys.length !== rightKeys.length) return false;
+        leftKeys.sort();
+        rightKeys.sort();
+        for (let index = 0; index < leftKeys.length; index += 1) {
+          if (leftKeys[index] !== rightKeys[index]) return false;
+          const leftDescriptor = Object.getOwnPropertyDescriptor(leftValue, leftKeys[index]);
+          const rightDescriptor = Object.getOwnPropertyDescriptor(rightValue, rightKeys[index]);
+          if (leftDescriptor?.enumerable !== true || rightDescriptor?.enumerable !== true
+            || !Object.hasOwn(leftDescriptor, "value") || !Object.hasOwn(rightDescriptor, "value")
+            || !compare(leftDescriptor.value, rightDescriptor.value)) return false;
+        }
+        return true;
+      } finally {
+        leftStack.delete(leftValue);
+        rightStack.delete(rightValue);
+      }
+    };
+    return compare(left, right);
   } catch {
     return false;
   }
 }
 
+// Closed persisted encodings and their digests intentionally retain this
+// stricter token alphabet. Structural readback comparison belongs in sameJson.
 function canonicalJson(value) {
   if (value === null) return "null";
   if (value === true) return "true";
@@ -2485,7 +2561,7 @@ const PO_LANGUAGE_MARKER_RE = /^<!-- po-language: (de|en) -->$/gmu;
 const PO_PROFILE_SCHEMA = "pipeline.po-gate-authority-evidence.v1";
 const PO_PROFILE_KEYS = ["schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256", "repositoryFingerprint"];
 
-function rebindTransactionPath(dir) { return join(dir, ".claude", "pipeline-state.json.po-authority-rebind.v1"); }
+function rebindTransactionPath(dir) { return `${statePath(dir)}.po-authority-rebind.v1`; }
 
 function physicalRebindFile(dir, relativePath) {
   if (typeof relativePath !== "string" || relativePath.length < 1 || relativePath.length > 240
@@ -2541,7 +2617,9 @@ function validRebindApproval(state, prd, spec, profile) {
   const approvalKeys = ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority"];
   const authorityKeys = ["schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256", "repositoryFingerprint", "planPath", "planSha256", "specPath", "specSha256"];
   if (!exactObjectKeys(approval, approvalKeys) || !exactObjectKeys(authority, authorityKeys)
-    || approval.schema !== "pipeline.plan-approval.v2" || approval.approvedBy !== "PO" || approval.specBoundBy !== "PO"
+    || approval.schema !== "pipeline.plan-approval.v2"
+    || isBlank(approval.approvedBy) || isBlank(approval.specBoundBy)
+    || !canonicalIso(approval.approvedAt) || !canonicalIso(approval.specBoundAt)
     || authority.schema !== "pipeline.po-gate-authority.v2" || authority.planPath !== state.activeFeature?.planPath
     || authority.planSha256 !== prd.sha256 || authority.specPath !== spec.path
     || !SHA256_RE.test(authority.specSha256) || !profile?.ok) return null;
@@ -2589,8 +2667,9 @@ function validPriorAuthority(state, prd, spec) {
   const approvalKeys = ["schema", "approvedBy", "approvedAt", "specBoundBy", "specBoundAt", "poGateAuthority"];
   const authorityKeys = ["schema","humanFacing","sourceSha256","runtimeSha256","receiptSha256","repositoryFingerprint","planPath","planSha256","specPath","specSha256"];
   if (!exactObjectKeys(approval, approvalKeys) || !exactObjectKeys(authority, authorityKeys)
-    || approval.schema !== "pipeline.plan-approval.v2" || approval.approvedBy !== "PO"
-    || approval.specBoundBy !== "PO" || authority.schema !== "pipeline.po-gate-authority.v2"
+    || approval.schema !== "pipeline.plan-approval.v2"
+    || isBlank(approval.approvedBy) || isBlank(approval.specBoundBy)
+    || authority.schema !== "pipeline.po-gate-authority.v2"
     || !canonicalIso(approval.approvedAt) || !canonicalIso(approval.specBoundAt)
     || authority.planPath !== prd.path || authority.specPath !== spec.path
     || !SHA256_RE.test(authority.planSha256) || !SHA256_RE.test(authority.specSha256)
@@ -2636,7 +2715,7 @@ function buildPoAuthorityRebindPlan(dir, deps, existing, plannedAt = deps.now?.(
     || state.activeFeature.phase !== "implementation" || typeof state.activeFeature.planPath !== "string") return { ok: false, code: "PO-REBIND-STATE" };
   const prd = physicalRebindFile(dir, state.activeFeature.planPath);
   if (prd === null) return { ok: false, code: "PO-REBIND-PRD-IDENTITY" };
-  const stateFile = physicalRebindFile(dir, ".claude/pipeline-state.json");
+  const stateFile = physicalRebindFile(dir, stateRelativePath(dir));
   if (stateFile === null || stateFile.sha256 !== sha256Bytes(existing.raw)) return { ok: false, code: "PO-REBIND-STATE-IDENTITY" };
   const specPath = `${dirname(state.activeFeature.planPath).split(sep).join("/")}/spec.md`;
   const spec = physicalRebindFile(dir, specPath);
@@ -2707,7 +2786,7 @@ function buildPoAuthorityDecisionPlan(dir, deps, existing, plannedAt = deps.now?
     || !new Set(["design", "implementation"]).has(state.activeFeature.phase)
     || typeof state.activeFeature.planPath !== "string") return { ok: false, code: "PO-DECISION-STATE" };
   const prd = physicalRebindFile(dir, state.activeFeature.planPath);
-  const stateFile = physicalRebindFile(dir, ".claude/pipeline-state.json");
+  const stateFile = physicalRebindFile(dir, stateRelativePath(dir));
   if (prd === null) return { ok: false, code: "PO-DECISION-PRD-IDENTITY" };
   if (stateFile === null || stateFile.sha256 !== sha256Bytes(existing.raw)) return { ok: false, code: "PO-DECISION-STATE-IDENTITY" };
   const specPath = `${dirname(state.activeFeature.planPath).split(sep).join("/")}/spec.md`;
@@ -2955,7 +3034,7 @@ function clearRebindTransaction(dir) {
 function recoverRebindTransaction(dir, planSha256, nonce, io, stateIo) {
   const target = rebindTransactionPath(dir);
   if (!existsSync(target)) return { ok: true, kind: "none" };
-  const journal = physicalRebindFile(dir, ".claude/pipeline-state.json.po-authority-rebind.v1");
+  const journal = physicalRebindFile(dir, `${stateRelativePath(dir)}.po-authority-rebind.v1`);
   const transaction = journal === null ? null : parseRebindTransaction(journal.bytes.toString("utf8"));
   if (transaction === null || transaction.planSha256 !== planSha256) return { ok: false, code: "PO-REBIND-RECOVERY-PENDING" };
   const prd = physicalRebindFile(dir, transaction.prd.path);
@@ -3197,7 +3276,8 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
       ?? rebuilt.payload.candidates?.find((candidate) => candidate.id === "prd")?.identity;
     const postimage = rebuilt.payload.postimage ?? rebuilt.postimage;
     const prd = physicalRebindFile(deps.dir, prdPath);
-    const stateFile = physicalRebindFile(deps.dir, ".claude/pipeline-state.json");
+    const stateRelative = stateRelativePath(deps.dir);
+    const stateFile = physicalRebindFile(deps.dir, stateRelative);
     if (prd === null || stateFile === null || prd.sha256 !== prePrdSha256
       || !sameJson(prd.identity, prePrdIdentity)
       || stateFile.sha256 !== rebuilt.payload.preimage.state.sha256
@@ -3206,7 +3286,7 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
     }
     const transaction = { schema: PO_REBIND_TXN_SCHEMA, planSha256: transactionDigest,
       prd: { path: prd.path, sha256: prd.sha256, postSha256: postimage.prd?.sha256 ?? postimage.prdSha256, bytesBase64: prd.bytes.toString("base64"), mode: Number(prd.identity.mode) & 0o777, identity: prd.identity },
-      state: { path: ".claude/pipeline-state.json", sha256: stateFile.sha256, postSha256: postimage.state?.sha256 ?? postimage.stateSha256, bytesBase64: stateFile.bytes.toString("base64"), mode: Number(stateFile.identity.mode) & 0o777, identity: stateFile.identity } };
+      state: { path: stateRelative, sha256: stateFile.sha256, postSha256: postimage.state?.sha256 ?? postimage.stateSha256, bytesBase64: stateFile.bytes.toString("base64"), mode: Number(stateFile.identity.mode) & 0o777, identity: stateFile.identity } };
     const published = publishRebindTransaction(deps.dir, transaction, lock.ownerNonce);
     if (!published.ok) { console.error(`Error: PO authority rebind transaction prepare failed (${published.code}); zero authority mutation.`); return 2; }
     deps.afterRebindTransactionPrepared?.();
@@ -3233,25 +3313,67 @@ function runPoAuthorityRebindApply(apply, deps, lock, io, stateIo, {
     deps.afterRebindStateWritten?.();
     const postPrd = physicalRebindFile(deps.dir, prd.path);
     const postState = readStateRaw(deps.dir);
-    const postStateFile = physicalRebindFile(deps.dir, ".claude/pipeline-state.json");
+    const postStateFile = physicalRebindFile(deps.dir, stateRelativePath(deps.dir));
     const authority = (deps.poGateAuthority ?? ((request) => validatePoGateAuthorityForRepository(request)))({
       repoRoot: deps.dir,
       expectedPlanSha256: postimage.prd?.sha256 ?? postimage.prdSha256,
       expectedSpecSha256: postimage.poGateAuthority?.specSha256 ?? postimage.authority.specSha256,
     });
-    const inspectV4 = deps.v4Inspection ?? ((request) => inspectProjectOnboardingV3(request));
+    // This transaction deliberately retains the sanctioned State lock through
+    // postimage validation. The generic cleanup-recovery planner cannot
+    // distinguish that live, caller-owned lock from unavailable cleanup
+    // evidence, so exclude only that planner from this in-transaction readback.
+    // All repository, runtime, Continuity, PO-authority, App Server and intent
+    // predicates remain the real V4 inspection.
+    const inTransactionV4Deps = {
+      planSessionCleanupRecovery: () => ({
+        schema: "pipeline.session-cleanup-recovery-plan.v1",
+        status: "not-needed",
+      }),
+    };
+    const inspectV4 = deps.v4Inspection
+      ?? ((request) => inspectProjectOnboardingV3({ ...request, deps: inTransactionV4Deps }));
     const v4Readbacks = ["bootstrap", "session", "dispatch"]
-      .map((intent) => inspectV4({ rootDir: deps.dir, intent }));
+      .map((intent) => inspectV4({ rootDir: deps.dir, intent, deps: inTransactionV4Deps }));
     const expectedAuthority = postimage.poGateAuthority ?? postimage.authority;
-    const postOk = postPrd?.sha256 === (postimage.prd?.sha256 ?? postimage.prdSha256)
-      && postStateFile !== null && postState.status === "ok" && sameJson(postState.state, rebuilt.nextState)
-      && authority?.ok && sameJson(authority.value, expectedAuthority)
-      && v4Readbacks.every((readback) => readback?.status === "ready");
+    const postimageEvidence = {
+      schema: "pipeline.po-authority-postimage-readback.v1",
+      predicates: {
+        prdDigest: {
+          ok: postPrd?.sha256 === (postimage.prd?.sha256 ?? postimage.prdSha256),
+          expected: postimage.prd?.sha256 ?? postimage.prdSha256,
+          observed: postPrd?.sha256 ?? null,
+        },
+        stateFile: { ok: postStateFile !== null, observed: postStateFile === null ? "unavailable" : "regular" },
+        stateValue: {
+          ok: postState.status === "ok" && sameJson(postState.state, rebuilt.nextState),
+          observed: postState.status,
+        },
+        poAuthority: {
+          ok: authority?.ok === true && sameJson(authority.value, expectedAuthority),
+          observed: authority?.ok === true ? "ready" : authority?.code ?? "unavailable",
+        },
+        v4Intents: v4Readbacks.map((readback, index) => ({
+          intent: ["bootstrap", "session", "dispatch"][index],
+          ok: readback?.status === "ready",
+          status: readback?.status ?? "unavailable",
+          diagnostics: Array.isArray(readback?.diagnostics)
+            ? readback.diagnostics.map((diagnostic) => diagnostic?.code ?? "unknown")
+            : [],
+        })),
+      },
+    };
+    deps.observeRebindPostimageEvidence?.(postimageEvidence);
+    const postOk = postimageEvidence.predicates.prdDigest.ok
+      && postimageEvidence.predicates.stateFile.ok
+      && postimageEvidence.predicates.stateValue.ok
+      && postimageEvidence.predicates.poAuthority.ok
+      && postimageEvidence.predicates.v4Intents.every((readback) => readback.ok);
     if (!postOk) {
       const stateRollback = restoreRebindFile(stateFile.absolute, stateFile.bytes, stateFile.identity.mode, lock.ownerNonce, stateIo);
       const prdRollback = !prdWriteRequired || restoreRebindFile(prd.absolute, prd.bytes, prd.identity.mode, lock.ownerNonce, io);
       const cleared = stateRollback && prdRollback && clearRebindTransaction(deps.dir);
-      console.error(`Error: PO authority rebind postimage readback failed; ${stateRollback && prdRollback && cleared ? "rollback verified" : "rollback unresolved"}.`);
+      console.error(`Error: PO authority rebind postimage readback failed (${JSON.stringify(postimageEvidence)}); ${stateRollback && prdRollback && cleared ? "rollback verified" : "rollback unresolved"}.`);
       return 2;
     }
     if (!clearRebindTransaction(deps.dir)) {

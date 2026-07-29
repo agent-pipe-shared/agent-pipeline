@@ -18,14 +18,23 @@ export const PROJECT_AUTHORITY_SCHEMA = "pipeline.project-authority.v1";
 export const PROJECT_AUTHORITY_RECOVERY_SCHEMA = "pipeline.project-authority-recovery.v1";
 export const NEUTRAL_MANIFEST = "project/pipeline.yaml";
 export const NEUTRAL_STATE = "project/pipeline-state.json";
+export const NEUTRAL_CALIBRATION = "project/pipeline.json";
+export const NEUTRAL_GUARD_CONFIG = "project/guard-config.json";
+export const NEUTRAL_GUARD_AUDIT = "project/guard-override.log.jsonl";
 export const LEGACY_MANIFEST = ".claude/pipeline.yaml";
 export const LEGACY_STATE = ".claude/pipeline-state.json";
+export const LEGACY_CALIBRATION = ".claude/pipeline.json";
+export const LEGACY_GUARD_CONFIG = ".claude/guard-config.json";
+export const LEGACY_GUARD_AUDIT = ".claude/guard-override.log.jsonl";
 export const PROJECT_AUTHORITY_TRANSACTION_DIR = ".pipeline-project-authority-migration";
 const JOURNAL_FILE = "journal.json";
 const JOURNAL_SCHEMA = "pipeline.project-authority-journal.v1";
 const TARGETS = Object.freeze([
   { path: NEUTRAL_MANIFEST, legacy: LEGACY_MANIFEST, kind: "project-authority" },
   { path: NEUTRAL_STATE, legacy: LEGACY_STATE, kind: "project-state" },
+  { path: NEUTRAL_CALIBRATION, legacy: LEGACY_CALIBRATION, kind: "project-calibration" },
+  { path: NEUTRAL_GUARD_CONFIG, legacy: LEGACY_GUARD_CONFIG, kind: "project-guard-config" },
+  { path: NEUTRAL_GUARD_AUDIT, legacy: LEGACY_GUARD_AUDIT, kind: "project-guard-audit" },
 ]);
 const PLANS = new WeakMap();
 const RECOVERY_PLANS = new WeakMap();
@@ -73,25 +82,71 @@ function bytes(root, path) {
 function sameImage(left, right) {
   return left?.status === right?.status && left?.sha256 === right?.sha256 && left?.byteLength === right?.byteLength;
 }
-function readLayer(root, manifest, state, source) {
+function readLayer(root, manifest, state, calibration, guardConfig, guardAudit, source) {
   const manifestImage = image(root, manifest);
   const stateImage = image(root, state);
-  if (manifestImage.status === "absent") return { source, status: "absent", manifest: manifestImage, state: stateImage };
-  return { source, status: "ready", manifest: manifestImage, state: stateImage };
+  const calibrationImage = image(root, calibration);
+  const guardConfigImage = image(root, guardConfig);
+  const guardAuditImage = image(root, guardAudit);
+  if (manifestImage.status === "absent") {
+    return {
+      source, status: "absent", manifest: manifestImage, state: stateImage,
+      calibration: calibrationImage, guardConfig: guardConfigImage, guardAudit: guardAuditImage,
+    };
+  }
+  return {
+    source, status: "ready", manifest: manifestImage, state: stateImage,
+    calibration: calibrationImage, guardConfig: guardConfigImage, guardAudit: guardAuditImage,
+  };
 }
 function authority(root) {
-  const neutral = readLayer(root, NEUTRAL_MANIFEST, NEUTRAL_STATE, "neutral");
-  const legacy = readLayer(root, LEGACY_MANIFEST, LEGACY_STATE, "legacy");
+  const neutral = readLayer(
+    root, NEUTRAL_MANIFEST, NEUTRAL_STATE, NEUTRAL_CALIBRATION,
+    NEUTRAL_GUARD_CONFIG, NEUTRAL_GUARD_AUDIT, "neutral",
+  );
+  const legacy = readLayer(
+    root, LEGACY_MANIFEST, LEGACY_STATE, LEGACY_CALIBRATION,
+    LEGACY_GUARD_CONFIG, LEGACY_GUARD_AUDIT, "legacy",
+  );
   if (neutral.status === "ready") {
     // A state file from a different layer would make the reader dependent on
     // precedence rather than one authority boundary.  Stop instead of mixing.
     if (neutral.state.status === "absent" && legacy.state.status === "present") {
       return { status: "mixed", reason: "neutral authority has no neutral state while legacy state remains" };
     }
-    return { status: "ready", source: "neutral", manifest: NEUTRAL_MANIFEST, state: neutral.state.status === "present" ? NEUTRAL_STATE : null, manifestSha256: neutral.manifest.sha256, stateSha256: neutral.state.sha256 };
+    for (const [name, neutralImage, legacyImage] of [
+      ["calibration", neutral.calibration, legacy.calibration],
+      ["guard config", neutral.guardConfig, legacy.guardConfig],
+      ["guard audit", neutral.guardAudit, legacy.guardAudit],
+    ]) {
+      if (neutralImage.status === "absent" && legacyImage.status === "present") {
+        return { status: "mixed", reason: `neutral authority has no neutral ${name} while legacy ${name} remains` };
+      }
+    }
+    return {
+      status: "ready",
+      source: "neutral",
+      manifest: NEUTRAL_MANIFEST,
+      state: neutral.state.status === "present" ? NEUTRAL_STATE : null,
+      calibration: neutral.calibration.status === "present" ? NEUTRAL_CALIBRATION : null,
+      guardConfig: neutral.guardConfig.status === "present" ? NEUTRAL_GUARD_CONFIG : null,
+      guardAudit: neutral.guardAudit.status === "present" ? NEUTRAL_GUARD_AUDIT : null,
+      manifestSha256: neutral.manifest.sha256,
+      stateSha256: neutral.state.sha256,
+    };
   }
   if (legacy.status === "ready") {
-    return { status: "ready", source: "legacy", manifest: LEGACY_MANIFEST, state: legacy.state.status === "present" ? LEGACY_STATE : null, manifestSha256: legacy.manifest.sha256, stateSha256: legacy.state.sha256 };
+    return {
+      status: "ready",
+      source: "legacy",
+      manifest: LEGACY_MANIFEST,
+      state: legacy.state.status === "present" ? LEGACY_STATE : null,
+      calibration: legacy.calibration.status === "present" ? LEGACY_CALIBRATION : null,
+      guardConfig: legacy.guardConfig.status === "present" ? LEGACY_GUARD_CONFIG : null,
+      guardAudit: legacy.guardAudit.status === "present" ? LEGACY_GUARD_AUDIT : null,
+      manifestSha256: legacy.manifest.sha256,
+      stateSha256: legacy.state.sha256,
+    };
   }
   return { status: "missing", reason: "project authority manifest is missing" };
 }
@@ -137,6 +192,21 @@ function changedTargets(root) {
 export function readProjectAuthority({ rootDir = process.cwd() } = {}) {
   try { return authority(realRoot(rootDir)); }
   catch { return { status: "invalid", reason: "project authority cannot be read" }; }
+}
+
+/** Resolve one coherent runner-neutral or compatibility-layer path set. */
+export function resolveProjectAuthorityPaths({ rootDir = process.cwd() } = {}) {
+  const current = readProjectAuthority({ rootDir });
+  if (current.status !== "ready") return current;
+  const neutral = current.source === "neutral";
+  return {
+    ...current,
+    manifest: current.manifest,
+    state: current.state ?? (neutral ? NEUTRAL_STATE : LEGACY_STATE),
+    calibration: current.calibration ?? (neutral ? NEUTRAL_CALIBRATION : LEGACY_CALIBRATION),
+    guardConfig: current.guardConfig ?? (neutral ? NEUTRAL_GUARD_CONFIG : LEGACY_GUARD_CONFIG),
+    guardAudit: current.guardAudit ?? (neutral ? NEUTRAL_GUARD_AUDIT : LEGACY_GUARD_AUDIT),
+  };
 }
 
 /** Create an exact, write-free legacy-to-neutral migration plan. */
@@ -197,8 +267,8 @@ function validateJournal(root, journal) {
   if (!journal || journal.schema !== JOURNAL_SCHEMA || !["prepared", "applying", "complete"].includes(journal.state) || !Array.isArray(journal.targets)) throw new Error("project authority journal is corrupt");
   if (journal.targets.length > TARGETS.length || new Set(journal.targets.map((entry) => entry.path)).size !== journal.targets.length) throw new Error("project authority journal has an invalid target boundary");
   const { transaction } = transactionPaths(root);
-  for (const [index, entry] of journal.targets.entries()) {
-    const expected = TARGETS[index];
+  for (const entry of journal.targets) {
+    const expected = TARGETS.find((target) => target.path === entry.path);
     if (!expected || entry.path !== expected.path || entry.kind !== expected.kind || !["staged", "displacing", "renamed"].includes(entry.state)
       || !entry.before || !entry.after || !["present", "absent"].includes(entry.before.status) || entry.after.status !== "present"
       || !SHA256.test(entry.after.sha256) || !Number.isInteger(entry.after.byteLength)) throw new Error("project authority journal has an invalid target proof");

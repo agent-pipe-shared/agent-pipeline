@@ -86,8 +86,13 @@
  * .claude/guard-config.json today):
  *   printf '{"tool_input":{"file_path":"plugins/pipeline-core/hooks/guard-git.test.mjs"}}' | node plugins/pipeline-core/hooks/guard-testpath.mjs; echo $?
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import {
+  LEGACY_GUARD_CONFIG,
+  NEUTRAL_GUARD_CONFIG,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
 
 // ---- read tool input (fail-open) --------------------------------------------------
 let filePath = "";
@@ -104,7 +109,11 @@ const normalizedPath = filePath.replace(/\\/g, "/");
 
 // ---- per-project config (config instead of fork) ----------------------------------
 const projectDir = process.env.CLAUDE_PROJECT_DIR || process.cwd();
-const configPath = join(projectDir, ".claude", "guard-config.json");
+const authority = resolveProjectAuthorityPaths({ rootDir: projectDir });
+const guardConfigRelPath = authority.status === "ready"
+  ? authority.guardConfig
+  : (existsSync(join(projectDir, NEUTRAL_GUARD_CONFIG)) ? NEUTRAL_GUARD_CONFIG : LEGACY_GUARD_CONFIG);
+const configPath = join(projectDir, guardConfigRelPath);
 const warnings = [];
 /** @type {Array<{id: string, re: RegExp, reason: string}>} */
 const PROTECTED_PATHS = [];
@@ -159,7 +168,7 @@ if (matched) {
     `Why: an implementing Goldfish MUST NOT modify, weaken, skip or delete the tests/checks ` +
       `that gate its own implementation (QG-04 / roles/goldfish.md GF-04). A genuine test ` +
       `change is its own, explicitly briefed task — escape hatch: the PO edits ` +
-      `.claude/guard-config.json (or the test file itself) directly, outside this session.`,
+      `${guardConfigRelPath} (or the test file itself) directly, outside this session.`,
   ]);
 }
 

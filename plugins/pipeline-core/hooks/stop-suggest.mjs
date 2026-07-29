@@ -229,6 +229,11 @@ import { pathToFileURL } from "node:url";
 
 import { loadManifestSafe, activePhases, gateConfig } from "../lib/manifest.mjs";
 import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
+import {
   coordinatorNextPhases,
   readCloseCoordinator,
 } from "../scripts/publication-close-journal.mjs";
@@ -946,7 +951,11 @@ export function run() {
   const stopHookActive = resolveStopHookActiveFromInput(stdinInput);
 
   const manifest = loadManifestSafe(rootDir);
-  const stateFilePath = join(rootDir, ".claude", "pipeline-state.json");
+  const authority = resolveProjectAuthorityPaths({ rootDir });
+  const stateRelPath = authority.status === "ready"
+    ? authority.state
+    : (existsSync(join(rootDir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
+  const stateFilePath = join(rootDir, stateRelPath);
   const state = loadStateSafe(stateFilePath);
   const coordinator = loadCloseCoordinatorSafe(rootDir, state);
   const phaseMessage = resolveSuggestion(manifest, state, coordinator);

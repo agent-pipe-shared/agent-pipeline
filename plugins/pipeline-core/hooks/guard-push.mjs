@@ -83,13 +83,41 @@
  *
  * VERIFY: node plugins/pipeline-core/hooks/guard-push.test.mjs
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { isAbsolute, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 
 import { loadManifest, gateConfig, loadDeployPolicy } from "../lib/manifest.mjs";
 import { stripQuotedSegments, normalizeGlobalGitOptions, tokenizeArgv, refMatchesPattern } from "../lib/git-cmd.mjs";
+import {
+  LEGACY_CALIBRATION,
+  LEGACY_MANIFEST,
+  LEGACY_STATE,
+  NEUTRAL_CALIBRATION,
+  NEUTRAL_MANIFEST,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
+
+function projectAuthorityRelPath(rootDir, key, neutralPath, legacyPath) {
+  const authority = resolveProjectAuthorityPaths({ rootDir });
+  if (authority.status === "ready") return authority[key];
+  if (existsSync(join(rootDir, neutralPath))) return neutralPath;
+  return legacyPath;
+}
+
+function projectStateRelPath(rootDir) {
+  return projectAuthorityRelPath(rootDir, "state", NEUTRAL_STATE, LEGACY_STATE);
+}
+
+function projectManifestRelPath(rootDir) {
+  return projectAuthorityRelPath(rootDir, "manifest", NEUTRAL_MANIFEST, LEGACY_MANIFEST);
+}
+
+function projectCalibrationRelPath(rootDir) {
+  return projectAuthorityRelPath(rootDir, "calibration", NEUTRAL_CALIBRATION, LEGACY_CALIBRATION);
+}
 
 function emit(code, lines) {
   process.stderr.write(lines.filter(Boolean).join("\n") + "\n");
@@ -384,7 +412,7 @@ function effectivePushUrls(binding) {
 }
 
 function readPublicPushIdentity(binding) {
-  const path = join(binding.projectDir, ".claude", "pipeline.json");
+  const path = join(binding.projectDir, projectCalibrationRelPath(binding.projectDir));
   let parsed;
   try {
     parsed = JSON.parse(readFileSync(path, "utf8"));
@@ -588,7 +616,7 @@ function exactObjectKeys(value, keys) {
  * approval before this hook can observe `push-authorized`.
  */
 function readPublicationMode(dir) {
-  const statePath = join(dir, ".claude", "pipeline-state.json");
+  const statePath = join(dir, projectStateRelPath(dir));
   let raw;
   try {
     raw = readFileSync(statePath, "utf8");
@@ -868,7 +896,7 @@ function isolatePushSegment(rawCmd) {
  * uses for this same file elsewhere in this hook.
  */
 function checkDeployApprovals(required) {
-  const path = join(projectDir, ".claude", "pipeline-state.json");
+  const path = join(projectDir, projectStateRelPath(projectDir));
   let raw = null;
   try {
     raw = readFileSync(path, "utf8");
@@ -999,7 +1027,7 @@ function runDeployBranch(release, manifestResult, cmd) {
       // (an approval binds a config whose validity cannot be established).
       const reason = manifestFindingText(manifestResult.errors?.[0]);
       emit(2, [
-        `BLOCKED (guard-push deploy branch, plugin pipeline-core): .claude/pipeline.yaml is semantically invalid ` +
+        `BLOCKED (guard-push deploy branch, plugin pipeline-core): ${projectManifestRelPath(projectDir)} is semantically invalid ` +
           `(${reason}) AND this push is deploy-triggering (release section present) -- unconditional block, no ` +
           `mode exception.`,
         `Finding(s) (${manifestResult.errors?.length ?? 0}):`,
@@ -1012,7 +1040,7 @@ function runDeployBranch(release, manifestResult, cmd) {
     const reason = manifestFindingText(manifestResult.errors?.[0]);
     return {
       invalidityNote:
-        `[guard-push] WARN: .claude/pipeline.yaml is semantically invalid (${reason}) -- release section ` +
+        `[guard-push] WARN: ${projectManifestRelPath(projectDir)} is semantically invalid (${reason}) -- release section ` +
         `present, the push-gate check still runs normally instead of fail-opening.`,
     };
   }
@@ -1059,7 +1087,7 @@ const hasRelease = Boolean(releaseSection) && typeof releaseSection === "object"
 if (manifestResult.status === "invalid" && !hasRelease) {
   const reason = manifestFindingText(manifestResult.errors?.[0]);
   emit(1, [
-    `[guard-push] WARN: .claude/pipeline.yaml is invalid (${reason}).`,
+    `[guard-push] WARN: ${projectManifestRelPath(projectDir)} is invalid (${reason}).`,
     `Push-Gate is being skipped (fail-open, never silently marked blocking/passing) -- please fix.`,
   ]);
 }
@@ -1088,11 +1116,20 @@ if (!sourceCommit) {
 }
 
 function portableCleanupBaselineFailure(binding, commit) {
-  const shown = spawnSync(
+  const selectedState = projectStateRelPath(binding.projectDir);
+  let shown = spawnSync(
     "git",
-    ["-C", binding.projectDir, "show", `${commit}:.claude/pipeline-state.json`],
+    ["-C", binding.projectDir, "show", `${commit}:${selectedState}`],
     { encoding: "utf8", timeout: 5000 },
   );
+  if (shown.status !== 0) {
+    const compatibilityState = selectedState === NEUTRAL_STATE ? LEGACY_STATE : NEUTRAL_STATE;
+    shown = spawnSync(
+      "git",
+      ["-C", binding.projectDir, "show", `${commit}:${compatibilityState}`],
+      { encoding: "utf8", timeout: 5000 },
+    );
+  }
   // Projects without portable Pipeline State retain the guard's historical
   // behavior. Once the State exists at the exact pushed commit, malformed
   // Continuity or a machine-local binding is a hard publication defect.
@@ -1290,7 +1327,8 @@ if (pushGate.approval === "standing-approved") {
   // "required", or the field absent entirely -- treated as the safer default (a push
   // gate that is active at all, with no explicit standing-approval, should not
   // silently skip the approval check).
-  const statePath = join(projectDir, ".claude", "pipeline-state.json");
+  const stateRelPath = projectStateRelPath(projectDir);
+  const statePath = join(projectDir, stateRelPath);
   let stateRaw;
   let stateExists = true;
   try {
@@ -1299,14 +1337,14 @@ if (pushGate.approval === "standing-approved") {
     stateExists = false;
   }
   if (!stateExists) {
-    failures.push(`Push approval missing: .claude/pipeline-state.json does not exist (never recorded via approve-push).`);
+    failures.push(`Push approval missing: ${stateRelPath} does not exist (never recorded via approve-push).`);
   } else {
     let state;
     try {
       state = JSON.parse(stateRaw);
     } catch (e) {
       emit(1, [
-        `[guard-push] WARN: .claude/pipeline-state.json contains invalid JSON (${e.message}).`,
+        `[guard-push] WARN: ${stateRelPath} contains invalid JSON (${e.message}).`,
         `Push-Gate is being skipped (fail-open, never silently marked blocking/passing) -- please fix ` +
           `(rewrite only via harness/scripts/pipeline-state.mjs, never by hand).`,
       ]);

@@ -93,6 +93,8 @@ try {
 const lifecycleGoverned = [
   ".agent-pipeline/core.lock.json",
   "pipeline.user.yaml",
+  "project/pipeline.json",
+  "project/pipeline.yaml",
   ".claude/pipeline.json",
   ".claude/pipeline.yaml",
   ...loadRuntimeProjectionV3OwnedKeys().targets.map((target) => target.path),

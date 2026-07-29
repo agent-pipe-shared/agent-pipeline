@@ -36,6 +36,12 @@ import {
   codexHostRepositoryAuthoritySha256,
   readCodexHostRepositoryInitAdmission,
 } from "../lib/codex-host-layout.mjs";
+import {
+  NEUTRAL_CALIBRATION,
+  NEUTRAL_MANIFEST,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
 
 const PLAN_SCHEMA = "pipeline.codex-host-repository-init-plan.v1";
 const APPLY_SCHEMA = "pipeline.codex-host-repository-init-apply.v1";
@@ -59,17 +65,31 @@ const INITIAL_GIT_PATHS = new Set([
   "refs/heads",
   "refs/tags",
 ]);
-const REQUIRED = [
-  "pipeline.user.yaml",
-  ".claude/pipeline.json",
-  ".claude/pipeline.yaml",
-  ".claude/settings.json",
-  ".claude/pipeline-state.json",
-  "docs/state.md",
-  "specs/kickoff-initial-prd.md",
-  "specs/kickoff-initial-spec.md",
-  ".claude/.runtime/agent-pipeline/onboarding/continuity-history.json",
-];
+function portableAuthorityPaths(root) {
+  const authority = resolveProjectAuthorityPaths({ rootDir: root });
+  return authority.status === "ready"
+    ? authority
+    : {
+      calibration: NEUTRAL_CALIBRATION,
+      manifest: NEUTRAL_MANIFEST,
+      state: NEUTRAL_STATE,
+    };
+}
+
+function requiredPortablePaths(root) {
+  const authority = portableAuthorityPaths(root);
+  return [
+    "pipeline.user.yaml",
+    authority.calibration,
+    authority.manifest,
+    ".claude/settings.json",
+    authority.state,
+    "docs/state.md",
+    "specs/kickoff-initial-prd.md",
+    "specs/kickoff-initial-spec.md",
+    ".claude/.runtime/agent-pipeline/onboarding/continuity-history.json",
+  ];
+}
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
@@ -95,13 +115,14 @@ function safeRoot(rootDir, fs = {}) {
 function portableSnapshot(root, fs = {}) {
   const read = fs.readFileSync ?? readFileSync;
   const lstat = fs.lstatSync ?? lstatSync;
-  const files = REQUIRED.map((path) => {
+  const authority = portableAuthorityPaths(root);
+  const files = requiredPortablePaths(root).map((path) => {
     const absolute = join(root, path);
     const stat = lstat(absolute);
     if (!stat.isFile() || stat.isSymbolicLink()) throw new Error(`required portable file is unsafe: ${path}`);
     return { path, sha256: sha256(read(absolute)) };
   });
-  const calibrationBytes = read(join(root, ".claude/pipeline.json"));
+  const calibrationBytes = read(join(root, authority.calibration));
   const calibration = JSON.parse(calibrationBytes.toString("utf8"));
   if (calibration?.repositoryMode !== "host-managed") {
     throw new Error("portable calibration is not host-managed");

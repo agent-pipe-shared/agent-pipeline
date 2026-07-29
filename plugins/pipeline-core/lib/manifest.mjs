@@ -60,6 +60,11 @@ import { fileURLToPath } from "node:url";
 
 import { loadDocumentHooksPolicy, validateDocumentHooksRuntimeReadback } from "./document-hooks.mjs";
 import { parseYaml, YamlLiteError } from "./yaml-lite.mjs";
+import {
+  LEGACY_MANIFEST,
+  NEUTRAL_MANIFEST,
+  resolveProjectAuthorityPaths,
+} from "./project-authority.mjs";
 import { validateAgainstSchema } from "./schema-lite.mjs";
 
 const SCRIPT_DIR = dirname(fileURLToPath(import.meta.url));
@@ -71,7 +76,7 @@ export const DEFAULT_SCHEMA_PATH = join(SCRIPT_DIR, "..", "scripts", "pipeline-m
 export const DEFAULT_DEPLOY_POLICY_SCHEMA_PATH = join(SCRIPT_DIR, "..", "scripts", "deploy-policy.schema.json");
 
 /** Where a project's manifest lives, relative to its repo root. */
-export const DEFAULT_MANIFEST_RELPATH = join(".claude", "pipeline.yaml");
+export const DEFAULT_MANIFEST_RELPATH = NEUTRAL_MANIFEST;
 
 /** Fixed filename the central deploy policy is discovered under (no new manifest field for the filename itself). */
 const DEPLOY_POLICY_FILENAME = "deploy-policy.yaml";
@@ -720,10 +725,17 @@ export function validateManifest(
  */
 export function loadManifest(
   rootDir,
-  { manifestRelPath = DEFAULT_MANIFEST_RELPATH, schemaPath = DEFAULT_SCHEMA_PATH, now = new Date() } = {},
+  { manifestRelPath = undefined, schemaPath = DEFAULT_SCHEMA_PATH, now = new Date() } = {},
 ) {
   try {
-    const manifestPath = join(rootDir, manifestRelPath);
+    let selectedManifest = manifestRelPath;
+    if (selectedManifest === undefined) {
+      const authority = resolveProjectAuthorityPaths({ rootDir });
+      selectedManifest = authority.status === "ready"
+        ? authority.manifest
+        : (existsSync(join(rootDir, NEUTRAL_MANIFEST)) ? NEUTRAL_MANIFEST : LEGACY_MANIFEST);
+    }
+    const manifestPath = join(rootDir, selectedManifest);
     let text;
     try {
       text = readFileSync(manifestPath, "utf8");

@@ -125,10 +125,15 @@
  *
  * VERIFY: node plugins/pipeline-core/hooks/guard-devplan.test.mjs
  */
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { join, relative, isAbsolute, posix } from "node:path";
 
 import { loadManifest, gateConfig } from "../lib/manifest.mjs";
+import {
+  LEGACY_STATE,
+  NEUTRAL_STATE,
+  resolveProjectAuthorityPaths,
+} from "../lib/project-authority.mjs";
 
 const DEFAULT_EXEMPT_PREFIXES = ["docs/", "specs/", ".claude/", "backlog/"];
 
@@ -195,7 +200,13 @@ const gate = gateConfig(manifest, "dev-plan");
 if (!gate || gate.mode === "off") process.exit(0);
 
 // ---- state: activeFeature / planApproved (fail-open on absent, WARN on malformed) --
-const statePath = join(projectDir, ".claude", "pipeline-state.json");
+const projectAuthority = resolveProjectAuthorityPaths({ rootDir: projectDir });
+const statePath = join(
+  projectDir,
+  projectAuthority.status === "ready"
+    ? projectAuthority.state
+    : (existsSync(join(projectDir, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE),
+);
 let stateRaw;
 try {
   stateRaw = readFileSync(statePath, "utf8");
