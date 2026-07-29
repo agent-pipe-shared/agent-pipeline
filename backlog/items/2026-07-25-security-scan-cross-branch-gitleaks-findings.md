@@ -3,7 +3,7 @@ schema: pipeline.backlog-item.v1
 id: pipeline.security-scan-cross-branch-gitleaks-findings
 type: observation
 owner: pipeline
-status: open
+status: closed
 created: 2026-07-25
 source: Observed during Sprint Cyborg WIN-PGA-2 post-rebase baseline verify (feat/sprint-cyborg-claude rebased onto v0.4.4), 2026-07-25.
 ---
@@ -79,3 +79,46 @@ read `security-scan.mjs`'s gitleaks invocation to confirm/refute hypothesis
 commit/tree's own reachable history (or add a documented allowlist for this
 repo's own hash-shaped receipt fields) rather than the ambient local object
 database.
+
+## Resolution — closed 2026-07-29
+
+Root-caused and fixed. **Hypothesis 1 is confirmed**; hypothesis 2 is
+refuted — the defect was Pipeline-side, in the gitleaks adapter's invocation
+shape, not intended gitleaks behaviour for a correctly-scoped scan.
+
+`harness/scripts/security-adapters/gitleaks.mjs`'s `run()` invoked `gitleaks
+detect` with no scope flag. `detect` defaults to scanning git HISTORY, and the
+candidate the scanner receives is a `git worktree add --detach` snapshot
+(`materializeCandidate`, `git-detached-worktree.v1`) that shares the main
+clone's `.git` object database — so gitleaks' history traversal reached every
+locally fetched branch's commits, not just the candidate commit's own
+ancestry. That is exactly how content only ever committed to sibling branches
+(`sprint-nova-codex`, `sprint-phoenix-epic`) polluted a scan nominally scoped
+to a different branch.
+
+**Fix:** commit `c268983` adds `--no-git` to the `detect` invocation, so
+gitleaks performs a pure filesystem content scan of the candidate tree with
+zero git object/ref/history traversal — the literal implementation of the
+security-evidence schema's `candidate-tree` coverage claim. No historical /
+cross-ref mining capability was ever documented or is removed; only the
+accidental default is.
+
+**Evidence:**
+
+- Before/after on the reporting host: a real `node
+  harness/scripts/security-scan.mjs` went from 46 gitleaks findings across 14
+  paths (Verdict BLOCKING, exit 2) to 0 gitleaks findings on the identical
+  clean candidate. Of the 14 before-paths, 12 exist on no branch reachable
+  from HEAD; the 2 that share a path with a HEAD file were flagged on line
+  numbers beyond the current file's length (i.e. sourced from historical
+  versions, not the candidate tree). None is a real secret and none reappears
+  after the fix.
+- New regression in `harness/scripts/security-adapters/gitleaks.test.mjs`: a
+  hermetic spy asserts `--no-git` is always passed to `detect`, and an
+  environment-gated reproduction builds a real two-branch repo plus a detached
+  worktree and proves the OLD invocation surfaces the sibling branch's secret
+  while the NEW (`--no-git`) invocation does not. It skips cleanly on hosts
+  with no trusted gitleaks binary.
+
+No `po-guarded-push.mjs` escape hatch or per-repo hash allowlist is needed for
+this false-positive class going forward.
