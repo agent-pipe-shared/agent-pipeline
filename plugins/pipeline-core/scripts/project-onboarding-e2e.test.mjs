@@ -222,7 +222,7 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
       tool_input: { file_path: "src/game.mjs" },
     }, crossViewDependencies).exitCode, 0, "exact cross-view failure accepts intact kickoff bindings");
     for (const relative of [
-      ".claude/pipeline-state.json",
+      "project/pipeline-state.json",
       "docs/state.md",
       "specs/kickoff-initial-prd.md",
       "specs/kickoff-initial-spec.md",
@@ -252,7 +252,7 @@ test("read-only host-control paths receive portable host-managed onboarding", ()
     assert.equal(physicalFreshness.result.status, "host-managed");
     assert.equal(physicalFreshness.result.reason, null);
     assert.equal(physicalFreshness.result.fetchAttempted, false);
-    const calibrationPath = join(path, ".claude", "pipeline.json");
+    const calibrationPath = join(path, "project", "pipeline.json");
     const localOnlyCalibration = JSON.parse(readFileSync(calibrationPath, "utf8"));
     localOnlyCalibration.repositoryMode = "local-only";
     writeFileSync(calibrationPath, `${JSON.stringify(localOnlyCalibration, null, 2)}\n`);

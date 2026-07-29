@@ -125,15 +125,16 @@ function initializedHostManagedRoot(label = "initialized host") {
   const root = makeRoot(label);
   git(root, ["init", "--initial-branch=main"]);
   mkdirSync(join(root, ".codex"));
-  mkdirSync(join(root, ".claude"), { recursive: true });
+  mkdirSync(join(root, "project"), { recursive: true });
   mkdirSync(join(root, "docs"), { recursive: true });
   mkdirSync(join(root, "specs"), { recursive: true });
   const files = {
-    ".claude/pipeline.json": `${JSON.stringify({
+    "project/pipeline.yaml": "schema: pipeline.manifest.v0\n",
+    "project/pipeline.json": `${JSON.stringify({
       repositoryMode: "host-managed",
       handover: "docs/state.md",
     }, null, 2)}\n`,
-    ".claude/pipeline-state.json": "{\"schema\":\"pipeline.state.v1\"}\n",
+    "project/pipeline-state.json": "{\"schema\":\"pipeline.state.v1\"}\n",
     "docs/state.md": "# Initial state\n",
     "specs/kickoff-initial-prd.md": "# Initial PRD\n",
     "specs/kickoff-initial-spec.md": "# Initial Spec\n",
@@ -145,8 +146,8 @@ function initializedHostManagedRoot(label = "initialized host") {
       kind: "kickoff",
       transactionSha256: "a".repeat(64),
       goalSha256: "b".repeat(64),
-      calibrationSha256: sha256(Buffer.from(files[".claude/pipeline.json"])),
-      stateSha256: sha256(Buffer.from(files[".claude/pipeline-state.json"])),
+      calibrationSha256: sha256(Buffer.from(files["project/pipeline.json"])),
+      stateSha256: sha256(Buffer.from(files["project/pipeline-state.json"])),
       handoverSha256: sha256(Buffer.from(files["docs/state.md"])),
       prdSha256: sha256(Buffer.from(files["specs/kickoff-initial-prd.md"])),
       specSha256: sha256(Buffer.from(files["specs/kickoff-initial-spec.md"])),
