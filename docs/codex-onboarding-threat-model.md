@@ -217,6 +217,71 @@ State/journal modes. No replay can widen authority, silently accept stale
 preimages, force-close a feature, or convert a manual State edit into a valid
 rebind.
 
+## Neutral multi-generation PO authority decision
+
+The neutral PO decision is a separate trust boundary from the narrow
+stale-marker rebind. It handles repositories where the current PRD marker,
+persisted `planApproval.poGateAuthority`, Continuity authority, and current
+PRD/Spec bytes may represent more than two independently drifted generations.
+Historical authority is evidence to disclose and bind, not authority to reuse
+as the current postimage.
+
+The planner admits a historical PO-gate surface only when its enclosing plan
+approval and authority have exact closed schemas, canonical timestamps, the
+active feature's exact canonical PRD/Spec paths, lowercase SHA-256 values, and
+typed language/profile provenance. Continuity must independently pass its full
+schema and feature validation, retain the same canonical document paths, have
+no active blocker, dispatch, decision transaction, or close transition, and
+have a safely incrementable revision. Historical PO-gate and Continuity
+digests are deliberately not required to equal each other or the current
+documents; equality would recreate the actionless multi-generation deadlock.
+
+Current authority remains stricter and independent:
+
+- the PO-profile receipt must be current, repository-valid, exact-schema, and
+  contain lowercase source, runtime, receipt, and repository-fingerprint
+  digests;
+- exactly one regular, non-linked PRD with the active feature's canonical
+  `prd_*.md` name must exist beside the canonical `spec.md`;
+- the PRD carries exactly one valid lowercase Spec marker and exactly one
+  language marker matching the current PO profile; and
+- current PRD/Spec identities, bytes, permissions, paths, State identity,
+  revision, and all historical/current authority surfaces enter the neutral
+  plan digest.
+
+The plan exposes both current document candidates plus the current marker,
+persisted PO gate, Continuity authority, and historical/current profile
+provenance. It never infers a winner. Selection is a separate read-only,
+plan-bound operation. Only the exact subsequently confirmed selection digest
+may activate the existing transactional writer.
+
+At apply time every document, State, profile, identity, permission, plan, and
+selection preimage is reobserved. The writer converges the PRD marker,
+PO-gate authority, and Continuity authority to the independently validated
+current PRD/Spec bytes and current PO profile, preserves unrelated Continuity,
+increments its revision exactly once, returns the feature to `design`, and
+requires `bootstrap`, `session`, and `dispatch` V4 readback. Existing
+transaction-journal, atomic-replace, durability, rollback, same-byte identity,
+and replay rules remain controlling. Drift or an invalid historical/current
+surface is a typed zero-mutation refusal; an ambiguous write follows the
+journal-bound rollback/recovery contract and cannot report success.
+
+An attacker may supply self-consistent stale provenance, independently chosen
+historical digests, a marker from a third generation, malformed or extra
+schema keys, non-canonical paths, uppercase digests, a stale current profile,
+or a changed profile after selection. None can become current authority
+without the independently valid current profile/documents, complete neutral
+disclosure, explicit PO selection, separately confirmed apply, and exact
+readback. Human Guard Override cannot authorize planning, selection, State,
+Continuity, Runtime, PRD-marker, or profile mutations.
+
+Rollback of this extension is a source revert before release followed by
+installation of the prior plugin candidate in a new Codex thread. It does not
+rewrite consumer State or guess an older authority generation. A consumer
+already in a multi-generation partial state remains fail-closed until a
+reviewed candidate supplies this neutral plan or another separately approved
+typed recovery is designed.
+
 ## Closed-feature re-entry
 
 The normal State writer deliberately removes active Continuity when it closes
