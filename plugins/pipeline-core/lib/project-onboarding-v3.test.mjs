@@ -95,7 +95,7 @@ const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migrat
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
 const APP_SERVER_HEALTH_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-health.mjs", import.meta.url));
-const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../../../harness/scripts/pipeline-state.mjs", import.meta.url));
+const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 const PLUGIN_PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 function names(path) { return readdirSync(path).sort(); }
 function yaml(value, indent = "") {
