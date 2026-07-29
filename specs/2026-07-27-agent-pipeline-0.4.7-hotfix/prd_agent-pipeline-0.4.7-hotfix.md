@@ -11,7 +11,7 @@
 > `9d1b3dc108eb77629ace5b82002120f5539abd8d`. Acceptance criteria:
 > [spec.md](spec.md).
 
-<!-- technical-spec-sha256: 3fd30e11c99923721cc42fb6bf75a26c3be1356c9a738f716a20539457105a89 -->
+<!-- technical-spec-sha256: cef5983ec352601de8ae8652ffc56212c07869a7238687c300992c2c284af762 -->
 
 The 2026-07-28 approval remains historical evidence for the already
 implemented slices. The Human/PO explicitly directed implementation of the
@@ -274,13 +274,32 @@ The hotfix replaces each lockout with an exact, auditable state machine.
 - **Advisor lifecycle:** preserve the frozen V3 runner routes while a V2
   lifecycle contract makes Epic/Feature bootstrap a zero-model capability
   preflight. Consultation requires one allowlisted reason, question/evidence
-  digests and exact candidate/policy binding; unchanged demand is not repeated.
-  Claude and Codex retain their same-runner adapters, and only actual Codex
-  consultation may consume the 180/90-second budgets.
+  digests and exact candidate/policy binding; the evidence digest is derived
+  from bounded physical repository-file bytes and those exact bytes reach the
+  selected model turn only after independent launcher/bridge/transport
+  validation. Unchanged demand is not repeated. Claude and Codex retain their
+  same-runner adapters, and only actual Codex consultation may consume the
+  180/90-second budgets.
 - **Release evidence:** produce independent 0.4.7 focused, platform,
   verification, security, Critic, packaging, and installed-readback evidence
   against one immutable final candidate. Sprint integration remains a later,
   separately authorized activity.
+
+## Production rollback contract
+
+The PO/release owner must renew this contract before any Main publication and
+no later than 2026-07-30. Before publication, withhold promotion and use only
+an ordinary reviewed revert commit. After publication but before any 0.4.7
+writer mutation, reinstall the exact trusted 0.4.6 package, reload Claude Code
+plugins or start a new Codex session, and verify version/source and lifecycle
+readback. Once any 0.4.7 writer or recovery has mutated state, downgrade is
+forbidden: freeze mutation and publish a forward corrective patch using typed
+0.4.7 recovery only. Never rewrite shared history or manually repair Pipeline
+State, authority, cleanup descriptors, audit, runtime state or private
+configuration. The dormant non-default H4 profile may remain; changing or
+removing it needs a separate typed confirmed plan. Every rollback or
+forward-fix candidate must rerun affected focused gates plus exact-candidate
+Full Verify, blocking Security, package, install and lifecycle readback gates.
 
 ## Non-goals
 
@@ -311,6 +330,7 @@ The hotfix replaces each lockout with an exact, auditable state machine.
 | IPC troubleshooting log leaks machine-local data or becomes an activation oracle. | Closed sanitized schema, owner-private bounded local retention, no raw paths/commands/stderr, and activation consumes typed runtime results rather than log text. |
 | Bootstrap capability observation silently becomes a model probe or consultation. | Closed V2 policy/CLI, zero-effects evidence, explicit non-trigger events and process tests proving no prompt, child, receipt or timeout budget. |
 | An unchanged or stale Advisor question is repeated or reused across material drift. | Demand and consultation-record digests bind question, reason, evidence, candidate and route policies; identical keys do not launch, drift requires a fresh demand. |
+| Advisor evidence is digest-labeled but absent, changed or omitted from the model turn. | Canonical physical-file bundle derives the digest; launcher, bridge and selected transport independently validate path/content/size bindings before child start; the exact runtime-only bytes are rendered into the single model turn as untrusted data. |
 | Windows reports false privacy or runs a wrapper. | Owner/DACL assurance, physical direct executable, digest binding, no shell. |
 | Sprint rebases keep conflicting implementations. | Changed-path intersection, manual disposition, renewed candidate gates. |
 

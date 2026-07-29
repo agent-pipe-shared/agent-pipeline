@@ -107,9 +107,14 @@ cover both paths.
   and V3 route digests. A configured but unprobed route SHALL be `unknown`.
 - **AC-047-64 — Concrete demand gate:** WHEN consultation is requested, THE
   SYSTEM SHALL require exactly one concrete question, one allowlisted reason,
-  bounded evidence and a closed demand binding their digests to runner,
-  profile, dispatch candidate, lifecycle policy and V3 route before any model
-  effect.
+  and one canonical bounded evidence bundle derived from 1–32 sorted, unique,
+  repository-relative physical regular UTF-8 files (maximum 262,144 bytes
+  each and 1,048,576 bytes total). THE SYSTEM SHALL bind every evidence path,
+  byte length, content digest and content plus the canonical bundle digest to
+  the closed demand's runner, profile, dispatch candidate, lifecycle policy
+  and V3 route before any child or model effect. Caller-asserted digest,
+  symlink/path escape, malformed UTF-8, duplicate/unsorted path, content drift,
+  missing bundle or transport-selection mismatch SHALL fail closed.
 - **AC-047-65 — Closed non-triggers:** Session start, profile selection,
   restart, resume, re-entry, Compact, unchanged handover, configured route and
   consent alone SHALL NOT create a consultation demand or invoke an adapter.
@@ -1732,6 +1737,16 @@ The derived `reuseKeySha256` covers every material binding. A matching
 permits a new consultation. Missing or mismatched demand fails before
 workspace observation or a child.
 
+The bounded-evidence SHA-256 is derived from one canonical
+`pipeline.advisory-evidence-bundle.v1`; it is never trusted merely because a
+caller supplied it. The bundle contains 1–32 lexically sorted, unique,
+repository-relative paths resolving to physical regular files beneath the
+repository root. Each file is valid UTF-8, at most 262,144 bytes, and the
+bundle is at most 1,048,576 bytes. Each entry binds exact path, byte length,
+content SHA-256 and content. Symlinks, path escapes, missing/non-regular files,
+duplicate or unsorted paths, invalid UTF-8, size overflow, byte/content drift
+and supplied-digest mismatch fail before any child or model effect.
+
 ### 9.4 Runner adapters and budgets
 
 Only after a valid demand:
@@ -1747,6 +1762,13 @@ Only after a valid demand:
   same-runner, consent, isolation, sanitized receipt and non-blocking
   exhaustion semantics remain unchanged.
 
+For Codex, the launcher builds the physical bundle and the host bridge and
+selected App Server transport independently validate it against the demand and
+selected dispatch. The child receives the same bundle and digest only after
+those checks, then renders the exact contents into the single model turn with
+an explicit untrusted-data boundary. Raw evidence remains runtime-only and is
+never persisted in the demand, consultation record or sanitized receipt.
+
 No bootstrap path consumes these budgets.
 
 ### 9.5 Verification
@@ -1754,8 +1776,10 @@ No bootstrap path consumes these budgets.
 Focused fixtures cover both runners' model-free preflight, every state,
 disabled routes, malformed contracts, all lifecycle non-triggers, valid demand,
 question/policy/evidence/candidate drift, no-repeat reuse, route preservation,
-consultation-only 180/90 budgets and the absence of model effects before the
-demand gate.
+consultation-only 180/90 budgets, physical evidence-bundle construction,
+tamper/missing/selection-drift rejection at launcher, bridge and App Server,
+exact evidence delivery to the child model turn, and the absence of model
+effects before the demand gate.
 
 ## 10. Integration and collision control
 
@@ -1882,6 +1906,33 @@ must carry:
 Any correction byte after final evidence invalidates the affected evidence and
 requires a new exact-candidate run. Evidence from PR #64 or any Nova candidate
 is inadmissible.
+
+### 11.4 Production rollback and forward-repair boundary
+
+The PO/release owner owns this gate. Its current authorization expires before
+any Main publication and no later than 2026-07-30; a later publication requires
+a newly reviewed rollback target and fresh authorization.
+
+- Before publication, promotion is withheld. A rejected candidate is removed
+  only by an ordinary reviewed revert commit; shared history, tags, evidence,
+  Pipeline State and private runtime/configuration files are never rewritten.
+- After publication but before any 0.4.7 writer has mutated repository or
+  private lifecycle state, the rollback target is the trusted packaged 0.4.6
+  plugin. Reinstall that exact package, reload Claude Code plugins or start a
+  new Codex session as applicable, and require version/source plus lifecycle
+  readback before project work resumes.
+- After any 0.4.7 writer or typed recovery has mutated state, downgrade is
+  prohibited. Freeze further mutations and ship a forward corrective patch
+  from 0.4.7 using only its typed plan/confirmation/apply/recovery contracts;
+  never edit continuity, authority, cleanup descriptors, audit, runtime state
+  or private configuration manually.
+- The H4 compatibility profile is dormant and non-default, so rollback does
+  not require deleting it. Removal or legacy-profile replacement requires its
+  own typed digest-bound plan and confirmation.
+- There is no database migration. Any revert or forward-fix candidate reruns
+  all affected focused gates plus fresh exact-candidate Full Verify, blocking
+  Security, package validation, installation and lifecycle readback before
+  publication.
 
 ## 12. Release evidence
 

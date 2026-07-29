@@ -8,6 +8,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import {
+  advisoryEvidenceBundleSha256,
   createAdvisoryConsultationRecord,
   createAdvisoryDemand,
 } from "../lib/advisory-lifecycle-v2.mjs";
@@ -19,28 +20,45 @@ import {
 import { buildSandboxRequest, sandboxSelectionDigest } from "./codex-sandbox-select.mjs";
 
 const dispatch = { dispatchId: "bridge-test", queueRevision: 1, candidateCommit: "a".repeat(40), candidateTree: "b".repeat(40) };
+const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+const evidenceBundle = () => {
+  const content = "allowlisted bridge evidence\n";
+  return {
+    schema: "pipeline.advisory-evidence-bundle.v1",
+    references: [{
+      path: "plugins/pipeline-core/scripts/advisory-host-bridge.mjs",
+      sha256: sha256(content),
+      bytes: Buffer.byteLength(content),
+      content,
+    }],
+  };
+};
 const base = () => {
   const question = "Which boundary is safest?";
+  const evidence = evidenceBundle();
+  const evidenceSha256 = advisoryEvidenceBundleSha256(evidence);
   const demand = createAdvisoryDemand({
     runner: "codex", profile: "epic", reason: "risk-review", question,
-    evidenceSha256: "e".repeat(64), dispatch,
+    evidenceSha256, dispatch,
   }).demand;
   return {
     profile: "epic", runner: "codex", question, dispatch, demand,
+    references: evidence.references.map(({ path }) => path),
+    evidenceBundle: evidence,
     advisorExport: { consent: "approved" },
-    sandboxContext: { repoFingerprint: "c".repeat(64), referenceSetSha256: "d".repeat(64) },
+    sandboxContext: { repoFingerprint: "c".repeat(64), referenceSetSha256: evidenceSha256 },
   };
 };
-const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
 function selectedAdvisory() {
+  const referenceSetSha256 = base().sandboxContext.referenceSetSha256;
   const requestSha256 = buildSandboxRequest({
     repoFingerprint: "c".repeat(64), duty: "advisory", queueRevision: 1, candidateCommit: "a".repeat(40), candidateTree: "b".repeat(40),
-    referenceSetSha256: "d".repeat(64), runner: "codex", model: "gpt-5.6-sol",
+    referenceSetSha256, runner: "codex", model: "gpt-5.6-sol",
   }).requestSha256;
   return {
     schema: "pipeline.codex-sandbox-selection.v1", selectionId: "css_aaaaaaaaaaaaaaaaaaaaaaaaae", repoFingerprint: "c".repeat(64), duty: "advisory",
-    dispatch: { queueRevision: 1, candidateCommit: "a".repeat(40), candidateTree: "b".repeat(40), referenceSetSha256: "d".repeat(64), requestSha256 },
+    dispatch: { queueRevision: 1, candidateCommit: "a".repeat(40), candidateTree: "b".repeat(40), referenceSetSha256, requestSha256 },
     toolchain: { cliVersion: "0.144.6", cliSha256: "0".repeat(64), observedHelperSha256: "1".repeat(64), selectionSchemaSha256: "2".repeat(64) },
     host: { platformClass: "linux-wsl2", kernel: { sysname: "Linux", release: "6", machine: "x86_64" }, filesystemClass: "wsl2-native", bootIdSha256: "3".repeat(64) },
     profile: { id: "codex-critic-intermediate.v1", sha256: "4".repeat(64), base: ":read-only", network: { enabled: true }, writableRootClass: "coordinator-scratch-only", scratchRootSha256: "5".repeat(64) },
@@ -56,7 +74,7 @@ function selectedTransport() {
       async executeSandboxedReadonlyDuty(request, dependencies) {
         const selection = selectedAdvisory();
         const launched = await dependencies.bridge.launch({
-          selectionId: selection.selectionId, duty: "advisory", selection, requested: request.requested, references: [], profile: selection.profile,
+          selectionId: selection.selectionId, duty: "advisory", selection, requested: request.requested, references: request.references, profile: selection.profile,
           scratch: { path: "/tmp/advisory-scratch", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot: "/repo", codexPath: "/codex" },
         });
         const execution = await dependencies.bridge.finalize({ selection, launched, requested: request.requested, profile: selection.profile });
@@ -66,7 +84,8 @@ function selectedTransport() {
         };
       },
     },
-    async invokeCodexAdvisoryAppServer({ sandboxTransport }) {
+    async invokeCodexAdvisoryAppServer({ sandboxTransport, evidenceBundle: evidence }) {
+      assert.equal(advisoryEvidenceBundleSha256(evidence), sandboxTransport.dispatch.referenceSetSha256);
       return {
         status: "answered", answer: "Use the selected transport.", identity: { provider: "openai", modelId: "gpt-5.6-sol", effort: "max" },
         sandboxExecution: {
@@ -159,6 +178,21 @@ test("the deepest selected-host entry point also rejects a missing demand before
   assert.equal(reused.advisoryResult.code, "advisory_reused_no_repeat");
   assert.equal(reused.advisoryResult.answer, null);
   assert.equal(calls, 0);
+});
+
+test("a drifted or omitted evidence bundle fails before the selected transport", async () => {
+  for (const input of [
+    { ...base(), evidenceBundle: null },
+    { ...base(), evidenceBundle: { ...base().evidenceBundle, references: [] } },
+    { ...base(), sandboxContext: { ...base().sandboxContext, referenceSetSha256: "f".repeat(64) } },
+  ]) {
+    let calls = 0;
+    const transport = selectedTransport();
+    transport.dependencies.executeSandboxedReadonlyDuty = async () => { calls += 1; throw new Error("must not run"); };
+    const result = await runSelectedAdvisoryHost(input, transport);
+    assert.equal(result.advisoryResult.code, "advisory_evidence_binding_mismatch");
+    assert.equal(calls, 0);
+  }
 });
 
 test("production bridge persists typed no-child receipt without accepting a raw answer", async () => {

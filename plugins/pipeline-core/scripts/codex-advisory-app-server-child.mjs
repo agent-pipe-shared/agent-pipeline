@@ -3,6 +3,7 @@
 
 /** Fixed child payload for one ephemeral Codex advisory turn. */
 import { spawn } from "node:child_process";
+import { renderAdvisoryEvidencePrompt } from "../lib/advisory-lifecycle-v2.mjs";
 
 const MAX_BYTES = 8 * 1024 * 1024;
 const MODEL = "gpt-5.6-sol";
@@ -21,12 +22,19 @@ try {
 
 if (!process.exitCode) {
   const closedShape = request && typeof request === "object" && !Array.isArray(request)
-    && JSON.stringify(Object.keys(request).sort()) === JSON.stringify(["codexPath", "cwd", "question", "scratchPath"])
+    && JSON.stringify(Object.keys(request).sort()) === JSON.stringify(["codexPath", "cwd", "evidenceBundle", "evidenceSha256", "question", "scratchPath"])
     && typeof request.codexPath === "string" && request.codexPath.startsWith("/")
     && typeof request.cwd === "string" && request.cwd.startsWith("/")
     && typeof request.scratchPath === "string" && request.scratchPath.startsWith("/")
-    && typeof request.question === "string" && request.question.length > 0 && Buffer.byteLength(request.question) <= 262_144;
+    && typeof request.question === "string" && request.question.length > 0 && Buffer.byteLength(request.question) <= 262_144
+    && typeof request.evidenceSha256 === "string";
   if (!closedShape) fail("request-invalid");
+}
+
+let modelInput;
+if (!process.exitCode) {
+  try { modelInput = renderAdvisoryEvidencePrompt(request.question, request.evidenceBundle, request.evidenceSha256); }
+  catch { fail("evidence-invalid"); }
 }
 
 if (!process.exitCode) {
@@ -97,7 +105,7 @@ if (!process.exitCode) {
       threadId = result.thread.id;
       send({ id: 3, method: "turn/start", params: {
         threadId,
-        input: [{ type: "text", text: request.question }],
+        input: [{ type: "text", text: modelInput }],
         model: MODEL,
         effort: EFFORT,
         approvalPolicy: "never",

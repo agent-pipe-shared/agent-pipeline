@@ -6,12 +6,16 @@ import { createHash } from "node:crypto";
 import test from "node:test";
 
 import {
+  advisoryEvidenceBundleSha256,
   advisoryConsultationDisposition,
+  buildAdvisoryEvidenceBundle,
   createAdvisoryConsultationRecord,
   createAdvisoryDemand,
   loadAdvisoryLifecycleV2Policy,
   preflightAdvisoryCapability,
+  renderAdvisoryEvidencePrompt,
   validateAdvisoryDemand,
+  validateAdvisoryEvidenceBundle,
   validateAdvisoryLifecycleV2Policy,
 } from "./advisory-lifecycle-v2.mjs";
 
@@ -94,6 +98,35 @@ test("only a concrete trigger, one question and exact candidate/evidence binding
       evidenceSha256: sha256("same"), dispatch,
     }).ok, false);
   }
+});
+
+test("allowlisted evidence is content-bound, bounded and rendered into the model input", () => {
+  const content = "closed evidence\n";
+  const bundle = {
+    schema: "pipeline.advisory-evidence-bundle.v1",
+    references: [{
+      path: "evidence/review.md",
+      sha256: sha256(content),
+      bytes: Buffer.byteLength(content),
+      content,
+    }],
+  };
+  const bundleSha256 = advisoryEvidenceBundleSha256(bundle);
+  assert.equal(validateAdvisoryEvidenceBundle(bundle, bundleSha256).ok, true);
+  const prompt = renderAdvisoryEvidencePrompt("Which boundary is safe?", bundle, bundleSha256);
+  assert.match(prompt, /Which boundary is safe\?/u);
+  assert.match(prompt, /closed evidence/u);
+  assert.match(prompt, new RegExp(bundleSha256, "u"));
+  const tampered = structuredClone(bundle);
+  tampered.references[0].content = "different evidence\n";
+  assert.equal(validateAdvisoryEvidenceBundle(tampered, bundleSha256).ok, false);
+  assert.throws(
+    () => buildAdvisoryEvidenceBundle(process.cwd(), [
+      "plugins/pipeline-core/scripts/advisory-host-bridge.mjs",
+      "plugins/pipeline-core/scripts/advisory-host-bridge.mjs",
+    ]),
+    /references are invalid/u,
+  );
 });
 
 test("same material demand is not repeated and any bound material drift permits a new consult", () => {

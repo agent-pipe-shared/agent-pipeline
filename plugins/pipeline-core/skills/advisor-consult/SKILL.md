@@ -24,6 +24,14 @@ Before any child, model request, prompt export or timeout:
    ID/revision, candidate commit/tree, V2 policy digest and frozen V3 route
    digest in one closed `pipeline.advisory-demand.v2`. Never persist the raw
    question or answer in that demand.
+   The evidence SHA-256 is derived from one canonical
+   `pipeline.advisory-evidence-bundle.v1`, not accepted as a caller assertion.
+   The bundle contains 1–32 sorted, unique, repository-relative physical
+   regular files, at most 262,144 UTF-8 bytes each and 1,048,576 bytes in
+   total. Every entry binds path, byte length, content and content SHA-256.
+   Symlinks, path escapes, malformed UTF-8, duplicate or unsorted paths,
+   content drift and a supplied digest mismatch fail before any child or model
+   effect.
 3. Reject session start, profile selection, restart, resume, re-entry, Compact,
    unchanged handover, a configured route or consent alone. They are not
    consultation reasons.
@@ -57,6 +65,12 @@ chat, handover or memory, and may not mutate, persist, auto-apply, decide a
 gate, use a separate network tool or export to a third party. Workspace drift
 is a hard integrity failure. An exhausted unchanged route is
 `advisory-unavailable`; the Elephant retains the decision duty.
+
+The launcher, host bridge and selected App Server transport validate the same
+canonical evidence-bundle digest independently. Only then may the child render
+the exact bundle contents into the one model turn, explicitly marked as
+untrusted repository data rather than instructions. Raw evidence remains
+runtime-only and is never added to the demand, consultation record or receipt.
 
 The Elephant creates the one-use launch and validates
 `pipeline.host-advisor-status.v1` against the demand and before/between/after

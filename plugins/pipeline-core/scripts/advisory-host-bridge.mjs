@@ -17,9 +17,11 @@ import { pathToFileURL } from "node:url";
 
 import { coordinateAdvisory } from "../lib/advisory-coordinator.mjs";
 import {
+  advisoryEvidenceBundleSha256,
   advisoryConsultationDisposition,
   createAdvisoryConsultationRecord,
   validateAdvisoryDemand,
+  validateAdvisoryEvidenceBundle,
 } from "../lib/advisory-lifecycle-v2.mjs";
 import { validateAdvisoryReceipt } from "../lib/advisory-receipt.mjs";
 import { AdvisoryReceiptAssuranceError, persistAdvisoryReceipt } from "../lib/advisory-receipt-assurance.mjs";
@@ -85,6 +87,12 @@ function selectedAdvisoryHostBridge(input, { invokeAppServer = invokeCodexAdviso
   return {
     async launch(request) {
       exactKeys(request, ["selectionId", "duty", "selection", "requested", "references", "profile", "scratch"], "selected advisory launch");
+      const evidence = validateAdvisoryEvidenceBundle(input.evidenceBundle, input.demand.evidenceSha256);
+      const evidencePaths = input.evidenceBundle?.references?.map(({ path }) => path);
+      if (!evidence.ok || !equal(request.references, evidencePaths)
+        || request.selection.dispatch.referenceSetSha256 !== evidence.bundleSha256) {
+        throw new Error("selected advisory evidence binding is invalid");
+      }
       const sandboxTransport = {
         selectionId: request.selectionId,
         selectionSha256: sandboxSelectionDigest(request.selection),
@@ -96,7 +104,7 @@ function selectedAdvisoryHostBridge(input, { invokeAppServer = invokeCodexAdviso
         profile: structuredClone(request.profile),
         scratch: structuredClone(request.scratch),
       };
-      const result = await invokeAppServer({ question: input.question, sandboxTransport });
+      const result = await invokeAppServer({ question: input.question, evidenceBundle: structuredClone(input.evidenceBundle), sandboxTransport });
       if (result?.status !== "answered" || typeof result.answer !== "string" || !result.sandboxExecution
         || result.identity?.provider !== "openai" || result.identity?.modelId !== "gpt-5.6-sol" || result.identity?.effort !== "max"
         || !matchesSelectedHostExecution(result.sandboxExecution, sandboxTransport)) {
@@ -172,6 +180,13 @@ export async function runSelectedAdvisoryHost(input, transport = undefined) {
     dispatch: input?.dispatch,
   });
   if (!demand.ok) return demandRejected(demand.code);
+  const evidence = validateAdvisoryEvidenceBundle(input?.evidenceBundle, input?.demand?.evidenceSha256 ?? null);
+  const evidencePaths = input?.evidenceBundle?.references?.map(({ path }) => path);
+  if (!evidence.ok || !equal(input?.references, evidencePaths)
+    || input?.sandboxContext?.referenceSetSha256 !== evidence.bundleSha256
+    || advisoryEvidenceBundleSha256(input.evidenceBundle) !== input.demand.evidenceSha256) {
+    return demandRejected("advisory_evidence_binding_mismatch");
+  }
   const disposition = advisoryConsultationDisposition(input.demand, input.priorConsultation);
   if (!disposition.ok) return demandRejected(disposition.code);
   if (disposition.disposition === "reuse-no-repeat") {

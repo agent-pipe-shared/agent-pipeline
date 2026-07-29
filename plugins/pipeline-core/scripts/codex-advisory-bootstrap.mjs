@@ -5,7 +5,7 @@
  * Compatibility-named launcher for one concrete on-demand Codex consultation.
  * Session bootstrap never invokes this command.
  */
-import { createHash, randomUUID } from "node:crypto";
+import { randomUUID } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -13,7 +13,11 @@ import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { TextDecoder } from "node:util";
 
-import { createAdvisoryDemand } from "../lib/advisory-lifecycle-v2.mjs";
+import {
+  advisoryEvidenceBundleSha256,
+  buildAdvisoryEvidenceBundle,
+  createAdvisoryDemand,
+} from "../lib/advisory-lifecycle-v2.mjs";
 import { derivePoGateRepositoryFingerprint, resolvePoGateRepositoryTopology } from "../lib/po-gate-authority.mjs";
 import {
   ProjectOnboardingReadyError,
@@ -25,8 +29,7 @@ import { resolveSystemExecutable } from "./tool-identity.mjs";
 import { runAdvisoryHostBridge } from "./advisory-host-bridge.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
-const USAGE = "usage: codex-advisory-bootstrap.mjs --profile <epic|feature> --reason <trigger> --evidence-sha256 <sha256> --dispatch-id <id> --queue-revision <n> --session-id <id> --expected-descriptor-sha256 <sha256> --receipt <path> [--reference <repo-relative-path>] < question.txt";
-const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+const USAGE = "usage: codex-advisory-bootstrap.mjs --profile <epic|feature> --reason <trigger> --evidence-sha256 <sha256> --dispatch-id <id> --queue-revision <n> --session-id <id> --expected-descriptor-sha256 <sha256> --receipt <path> --reference <repo-relative-path> [--reference <repo-relative-path> ...] < question.txt";
 const UTF8 = new TextDecoder("utf-8", { fatal: true });
 
 async function readQuestionBytes(input) {
@@ -71,7 +74,7 @@ function parseArgs(argv) {
     || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(value.dispatchId ?? "")
     || !Number.isSafeInteger(value.queueRevision) || value.queueRevision < 0
     || !/^[A-Za-z0-9][A-Za-z0-9._-]{0,119}$/.test(value.sessionId ?? "") || !SHA256.test(value.descriptorSha256 ?? "")
-    || typeof value.receipt !== "string" || value.receipt.length === 0
+    || typeof value.receipt !== "string" || value.receipt.length === 0 || value.references.length === 0
     || value.references.some((entry) => typeof entry !== "string" || entry.startsWith("/") || entry.split("/").some((part) => !part || part === "." || part === ".."))) throw new Error(USAGE);
   return value;
 }
@@ -88,6 +91,9 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
   if (!authority.ok || authority.advisoryExport?.consent === "declined") throw new Error("pipeline.user.v3 advisor_export is explicitly declined");
   const topology = (dependencies.resolveTopologyFn ?? resolvePoGateRepositoryTopology)(repoRoot);
   const repoFingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: topology.gitCommonDir, primaryRoot: topology.primaryRoot });
+  const evidenceBundle = buildAdvisoryEvidenceBundle(repoRoot, args.references);
+  const evidenceSha256 = advisoryEvidenceBundleSha256(evidenceBundle);
+  if (evidenceSha256 !== args.evidenceSha256) throw new Error("advisory evidence digest does not match the physical allowlisted bundle");
   const questionBytes = await (dependencies.readQuestionBytesFn ?? readQuestionBytes)(process.stdin);
   const question = decodeQuestion(questionBytes);
   const resolveExecutable = dependencies.resolveExecutableFn ?? resolveSystemExecutable;
@@ -111,7 +117,7 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
       profile: args.profile,
       reason: args.reason,
       question,
-      evidenceSha256: args.evidenceSha256,
+      evidenceSha256,
       dispatch,
     });
     if (!demand.ok) throw new Error(demand.code);
@@ -121,9 +127,10 @@ export async function runCodexAdvisoryBootstrap(argv = process.argv.slice(2), de
       question,
       dispatch,
       demand: demand.demand,
-      references: [...args.references],
+      references: evidenceBundle.references.map(({ path }) => path),
+      evidenceBundle,
       advisorExport: source.advisor_export ?? { consent: "default" },
-      sandboxContext: { repoFingerprint, referenceSetSha256: sha256(JSON.stringify([...new Set(args.references)].sort())) },
+      sandboxContext: { repoFingerprint, referenceSetSha256: evidenceSha256 },
       sandboxRuntime: { schema: "pipeline.codex-sandbox-runtime.v1", repoRoot, codexPath, observedHelperPath, sessionCleanup: { sessionId: args.sessionId, descriptorSha256: args.descriptorSha256 } },
     };
     writeFileSync(inputPath, JSON.stringify(input), { flag: "wx", mode: 0o600 });
