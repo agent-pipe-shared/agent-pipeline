@@ -231,7 +231,25 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
     const retireDescriptor = dependencies.retireSessionDescriptorFn
       ?? retireSessionDescriptor;
     const binding = readBinding({ rootDir: repo });
-    if (binding.status === "bound") {
+    if (new Set(["closed-unbound", "design-unbound", "released"]).has(binding.status)) {
+      const activeDescriptors = listDescriptors(repo);
+      if (activeDescriptors.length !== 0) {
+        throw new WorktreeLifecycleError(
+          "WT-SESSION-UNBOUND-DESCRIPTOR",
+          "an active cleanup descriptor exists outside a bindable continuity state",
+        );
+      }
+      output = {
+        ok: true,
+        code: "WT-SESSION-NOT-REQUIRED",
+        bindingStatus: binding.status,
+      };
+    } else if (binding.status === "closed-bound") {
+      throw new WorktreeLifecycleError(
+        "WT-SESSION-RECOVERY-REQUIRED",
+        "the closed cleanup binding must complete its typed recovery before a new session starts",
+      );
+    } else if (binding.status === "bound") {
       if (flags.session && flags.session !== binding.sessionCleanup.sessionId) {
         throw new WorktreeLifecycleError(
           "WT-SESSION-BINDING",

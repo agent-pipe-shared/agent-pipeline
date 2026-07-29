@@ -45,6 +45,7 @@ const APP_SERVER_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-hea
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
+const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 const PRIVATE_OVERLAY_SCRIPT = fileURLToPath(new URL("../scripts/codex-private-overlay-activation.mjs", import.meta.url));
 const HEX = /^[a-f0-9]{64}$/u;
 const HOST_INIT_CROSS_VIEW_STATUSES = new Set([
@@ -400,6 +401,18 @@ function sanctionedSessionCleanupArgs(args, root) {
     && args.length === 7;
 }
 
+function sanctionedPoAuthorityRebindArgs(args) {
+  return args[0] === "po-authority-rebind-apply"
+    && args[1] === "--plan-sha256"
+    && HEX.test(args[2] ?? "")
+    && args[3] === "--updated-at"
+    && typeof args[4] === "string"
+    && Number.isFinite(Date.parse(args[4]))
+    && new Date(args[4]).toISOString() === args[4]
+    && args[5] === "--activate"
+    && args.length === 6;
+}
+
 export function isSanctionedLifecycleCommand(command, root, options = {}) {
   const words = simpleWords(command, root, options);
   const platform = options.platform ?? process.platform;
@@ -417,6 +430,9 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
   if (script === READBACK_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
   if (script === START_PREFLIGHT_SCRIPT) return args.length === 0;
   if (script === SESSION_CLEANUP_SCRIPT) return sanctionedSessionCleanupArgs(args, root);
+  if (script === PIPELINE_STATE_SCRIPT) {
+    return sanctionedPoAuthorityRebindArgs(args);
+  }
   if (script === PRIVATE_OVERLAY_SCRIPT) {
     return args[0] === "route"
       && args[1] === "--project-root"

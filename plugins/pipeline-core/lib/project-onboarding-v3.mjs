@@ -37,6 +37,7 @@ import {
 import { applyRunnerProfileMigrationV3, inspectRunnerProfileMigrationV3, planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
 import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { loadManifest, validateManifest } from "./manifest.mjs";
+import { validatePoGateAuthorityForRepository } from "./po-gate-authority.mjs";
 import { parseYaml } from "./yaml-lite.mjs";
 import { codexCustomAgentSeed, loadRuntimeProjectionV3OwnedKeys, planRuntimeProjectionV3 } from "./runtime-projection-v3.mjs";
 import {
@@ -58,6 +59,8 @@ const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
+const PO_AUTHORITY_REBIND_WRITER = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
+const SHA256_RE = /^[a-f0-9]{64}$/u;
 
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 function clone(value) { return JSON.parse(JSON.stringify(value)); }
@@ -539,6 +542,80 @@ function partialCleanupRecoveryResult({
   return null;
 }
 
+function observePoAuthorityRebind(root, fs) {
+  const validateAuthority = fs.validatePoGateAuthorityForRepository
+    ?? validatePoGateAuthorityForRepository;
+  const authority = validateAuthority({ repoRoot: root });
+  if (authority?.ok === true) return { status: "not-needed" };
+  if (authority?.code !== "PO-GATE-PRD-SPEC-MISMATCH") {
+    return { status: "not-applicable" };
+  }
+  let writer;
+  try {
+    writer = PO_AUTHORITY_REBIND_WRITER;
+    const info = fs.lstatSync(writer);
+    if (!info.isFile() || info.isSymbolicLink() || fs.realpathSync(writer) !== writer) {
+      throw new Error("unsafe PO authority writer");
+    }
+  } catch {
+    return { status: "unavailable" };
+  }
+  const planned = fs.spawnSync(process.execPath, [writer, "po-authority-rebind-plan"], {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+    maxBuffer: 2 * 1024 * 1024,
+  });
+  if (planned?.error || planned?.status !== 0 || String(planned.stderr ?? "").trim() !== "") {
+    return { status: "unavailable" };
+  }
+  let plan;
+  try {
+    plan = JSON.parse(String(planned.stdout ?? ""));
+  } catch {
+    return { status: "unavailable" };
+  }
+  const action = plan?.applyAction;
+  const expectedArgv = [
+    writer,
+    "po-authority-rebind-apply",
+    "--plan-sha256",
+    plan?.planSha256,
+    "--updated-at",
+    plan?.plannedAt,
+    "--activate",
+  ];
+  if (!plan || typeof plan !== "object" || Array.isArray(plan)
+    || plan.schema !== "pipeline.po-authority-rebind-plan.v1"
+    || plan.root !== root
+    || !SHA256_RE.test(plan.planSha256 ?? "")
+    || typeof plan.plannedAt !== "string"
+    || !Number.isFinite(Date.parse(plan.plannedAt))
+    || new Date(plan.plannedAt).toISOString() !== plan.plannedAt
+    || !action || typeof action !== "object" || Array.isArray(action)
+    || action.executable !== process.execPath
+    || JSON.stringify(action.argv) !== JSON.stringify(expectedArgv)
+    || action.mutation !== true
+    || action.requiresConfirmation !== true
+    || action.requiresHostBoundary !== true) {
+    return { status: "unavailable" };
+  }
+  return {
+    status: "required",
+    nextAction: {
+      kind: "command",
+      executable: action.executable,
+      argv: action.argv,
+      mutation: true,
+      requiresConfirmation: true,
+      expected: {
+        schema: "pipeline.po-authority-rebind-apply.v1",
+        statuses: ["applied"],
+      },
+    },
+  };
+}
+
 function runtimeTargetReadOnlyResult({ root, intent, repository }) {
   return lifecycleResult({
     status: "runtime-target-read-only",
@@ -991,6 +1068,43 @@ function readyLifecycleResult({ root, intent, repository, runtime, continuity = 
         "continuity_observation_unavailable",
         "continuity authority could not be observed safely",
         "repair continuity read access before retrying",
+      )],
+    });
+  }
+  const poAuthorityRebind = observePoAuthorityRebind(root, fs);
+  if (poAuthorityRebind.status === "required") {
+    return lifecycleResult({
+      status: "partial",
+      root,
+      intent,
+      repository,
+      runtime,
+      continuity,
+      appServer,
+      nextAction: poAuthorityRebind.nextAction,
+      diagnostics: [lifecycleDiagnostic(
+        "$.authority.poGate",
+        "po_authority_rebind_required",
+        "the approved PRD marker and persisted PO authority bind an older neighboring specification",
+        "present and apply only the returned digest-bound PO authority rebind action after explicit PO confirmation",
+      )],
+    });
+  }
+  if (poAuthorityRebind.status === "unavailable") {
+    return lifecycleResult({
+      status: "partial",
+      root,
+      intent,
+      repository,
+      runtime,
+      continuity,
+      appServer,
+      nextAction: null,
+      diagnostics: [lifecycleDiagnostic(
+        "$.authority.poGate",
+        "po_authority_rebind_unavailable",
+        "the PRD and specification authority differ but no closed rebind action could be validated",
+        "retain both authority documents and repair the typed PO rebind planner; do not edit Pipeline State manually",
       )],
     });
   }

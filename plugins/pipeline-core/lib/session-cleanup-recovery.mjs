@@ -138,7 +138,7 @@ export function planSessionCleanupRecovery({
       status: "not-needed",
     };
   }
-  if (binding.status === "closed-unbound") {
+  if (new Set(["closed-unbound", "design-unbound"]).has(binding.status)) {
     const activeDescriptors = listDescriptors(binding.root);
     if (activeDescriptors.length === 0) {
       return {
@@ -167,7 +167,7 @@ export function planSessionCleanupRecovery({
       closure: "unbound-orphans",
       activeDescriptorCount: activeDescriptors.length,
       recovery: "retire-orphans",
-      expectedBindingStatus: "closed-unbound",
+      expectedBindingStatus: binding.status,
       orphanDescriptors: orphanDescriptors.map((descriptor) => ({
         sessionId: descriptor.sessionId,
         descriptorSha256: descriptor.descriptorSha256,
@@ -419,7 +419,7 @@ export function applySessionCleanupRecovery({
       fail("WT-SESSION-RECOVERY-READBACK", "orphan descriptor retirement did not clear the exact active set");
     }
     const readback = readBinding({ rootDir: plan.root });
-    if (!new Set(["unbound", "closed-unbound"]).has(plan.expectedBindingStatus)
+    if (!new Set(["unbound", "closed-unbound", "design-unbound"]).has(plan.expectedBindingStatus)
       || readback.status !== plan.expectedBindingStatus
       || readback.stateSha256 !== plan.stateSha256
       || readback.revision !== plan.revision) {

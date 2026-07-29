@@ -316,6 +316,61 @@ test("an unbound continuity state without descriptors needs no recovery", () => 
   }
 });
 
+test("start is an exact no-op at writer-shaped closed and design transition boundaries", () => {
+  const rows = [
+    ["closed", {
+      schema: "pipeline.state.v0",
+      planApproved: false,
+      updatedAt: "2026-07-29T08:00:00.000Z",
+      closedFeatures: [{
+        id: "previous-feature",
+        planPath: "specs/previous/prd.md",
+        phaseAtClose: "implementation",
+        closedAt: "2026-07-29T08:00:00.000Z",
+        closedBy: "PO",
+        forCommit: null,
+      }],
+    }, "closed-unbound"],
+    ["design", {
+      schema: "pipeline.state.v0",
+      activeFeature: {
+        id: "next-feature",
+        planPath: "specs/next/prd.md",
+        phase: "design",
+      },
+      planApproved: false,
+      updatedAt: "2026-07-29T08:01:00.000Z",
+    }, "design-unbound"],
+  ];
+  for (const [name, state, bindingStatus] of rows) {
+    const root = fixture(`not-required-${name}`);
+    try {
+      const statePath = join(root, ".claude", "pipeline-state.json");
+      writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+      const before = readFileSync(statePath);
+      const started = invoke([
+        "start", "--repo", root, "--session", `session-not-required-${name}`,
+      ]);
+      assert.deepEqual(started, {
+        code: 0,
+        output: {
+          ok: true,
+          code: "WT-SESSION-NOT-REQUIRED",
+          bindingStatus,
+        },
+      });
+      assert.deepEqual(readFileSync(statePath), before);
+      assert.deepEqual(listActiveSessionDescriptors(root), []);
+      assert.deepEqual(invoke(["plan-recovery", "--repo", root]).output, {
+        schema: "pipeline.session-cleanup-recovery-plan.v1",
+        status: "not-needed",
+      });
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
 test("a closed transition remains fail-closed when an unbound descriptor survives", () => {
   const root = fixture("closed-transition-orphan");
   try {
@@ -340,6 +395,23 @@ test("a closed transition remains fail-closed when an unbound descriptor survive
     assert.equal(plan.activeDescriptorCount, 1);
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("start does not replace a provable post-close binding", () => {
+  const fixtureState = legacyClosedCleanupFixture("closed-start-refusal");
+  try {
+    assert.throws(
+      () => invoke(["start", "--repo", fixtureState.root]),
+      (error) => error?.code === "WT-SESSION-RECOVERY-REQUIRED",
+    );
+    assert.deepEqual(listActiveSessionDescriptors(fixtureState.root), []);
+    assert.equal(
+      readOnboardingSessionCleanupBinding({ rootDir: fixtureState.root }).status,
+      "closed-bound",
+    );
+  } finally {
+    rmSync(fixtureState.root, { recursive: true, force: true });
   }
 });
 

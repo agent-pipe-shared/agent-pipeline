@@ -159,7 +159,7 @@ function runPoAuthorityRebindTests() {
     && readFileSync(join(fixture.dir, fixture.planPath), "utf8") === prdBefore && readFileSync(statePath(fixture.dir), "utf8") === stateBefore);
   const resumed = captureConsole(() => run(plan.applyAction.argv.slice(1), fixture.deps));
   const after = readState(fixture.dir).state;
-  ok("PS53l exact confirmed replay resumes a prepared transaction without a false no-op", resumed.value === 0 && /PO-REBIND-APPLIED/.test(resumed.text)
+  ok("PS53l exact confirmed replay resumes a prepared transaction without a false no-op", resumed.value === 0 && JSON.parse(resumed.text).code === "PO-REBIND-APPLIED"
     && !existsSync(journal) && after.planApproval.poGateAuthority.specSha256 === fixture.newSpecSha && after.continuity.revision === 4);
 }
 {

@@ -26,6 +26,7 @@ import { validateV3BootstrapAuthority } from "../scripts/v3-bootstrap-authority.
 import { parseYaml } from "./yaml-lite.mjs";
 import { validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
 import { main as onboardingCli } from "../scripts/project-onboarding-v3.mjs";
+import { main as sessionCleanupCli } from "../scripts/session-cleanup.mjs";
 import {
   canonicalJson, CodexOnboardingRuntimeError, consumeRuntimeReadback, issueLaunchTicket, readCurrentRuntimeReadback, readRestartBarrier,
   removeRestartBarrierCas, sha256,
@@ -95,6 +96,7 @@ const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host
 const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboarding-launch.mjs", import.meta.url));
 const APP_SERVER_HEALTH_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-health.mjs", import.meta.url));
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../../../harness/scripts/pipeline-state.mjs", import.meta.url));
+const PLUGIN_PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 function names(path) { return readdirSync(path).sort(); }
 function yaml(value, indent = "") {
   return Object.entries(value).map(([key, child]) => {
@@ -565,6 +567,107 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
     assert.equal(unobserved.status, "partial");
     assert.equal(unobserved.nextAction, null);
     assertDiagnostic(unobserved, "cleanup_recovery_observation_unavailable");
+  } finally { dispose(path); }
+});
+
+test("PRD/Spec drift exposes only the validated digest-bound PO rebind action", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const writer = PLUGIN_PIPELINE_STATE_SCRIPT;
+    const planSha256 = "b".repeat(64);
+    const plannedAt = "2026-07-29T09:00:00.000Z";
+    const applyArgv = [
+      writer,
+      "po-authority-rebind-apply",
+      "--plan-sha256",
+      planSha256,
+      "--updated-at",
+      plannedAt,
+      "--activate",
+    ];
+    const observed = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "dispatch",
+      deps: {
+        ...fakeDeps,
+        validatePoGateAuthorityForRepository() {
+          return { ok: false, code: "PO-GATE-PRD-SPEC-MISMATCH" };
+        },
+        spawnSync(command, args, options) {
+          if (command === process.execPath
+            && JSON.stringify(args) === JSON.stringify([writer, "po-authority-rebind-plan"])) {
+            assert.equal(options.cwd, path);
+            assert.equal(options.shell, false);
+            return {
+              status: 0,
+              stderr: "",
+              stdout: JSON.stringify({
+                schema: "pipeline.po-authority-rebind-plan.v1",
+                root: path,
+                plannedAt,
+                planSha256,
+                applyAction: {
+                  executable: process.execPath,
+                  argv: applyArgv,
+                  mutation: true,
+                  requiresConfirmation: true,
+                  requiresHostBoundary: true,
+                },
+              }),
+            };
+          }
+          return fakeGit(command, args, options);
+        },
+      },
+    });
+    assert.equal(observed.status, "partial");
+    assertDiagnostic(observed, "po_authority_rebind_required");
+    assertSingleLineAction(observed.nextAction, {
+      kind: "command",
+      executable: process.execPath,
+      argv: applyArgv,
+      mutation: true,
+      requiresConfirmation: true,
+      expected: {
+        schema: "pipeline.po-authority-rebind-apply.v1",
+        statuses: ["applied"],
+      },
+    });
+
+    const invalidPlan = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "dispatch",
+      deps: {
+        ...fakeDeps,
+        validatePoGateAuthorityForRepository() {
+          return { ok: false, code: "PO-GATE-PRD-SPEC-MISMATCH" };
+        },
+        spawnSync(command, args, options) {
+          if (command === process.execPath) {
+            return { status: 0, stderr: "", stdout: JSON.stringify({
+              schema: "pipeline.po-authority-rebind-plan.v1",
+              root: path,
+              plannedAt,
+              planSha256,
+              applyAction: {
+                executable: process.execPath,
+                argv: [...applyArgv, "--unexpected"],
+                mutation: true,
+                requiresConfirmation: true,
+                requiresHostBoundary: true,
+              },
+            }) };
+          }
+          return fakeGit(command, args, options);
+        },
+      },
+    });
+    assert.equal(invalidPlan.status, "partial");
+    assert.equal(invalidPlan.nextAction, null);
+    assertDiagnostic(invalidPlan, "po_authority_rebind_unavailable");
   } finally { dispose(path); }
 });
 
@@ -1602,6 +1705,28 @@ test("closed feature re-entry stays ready through the sanctioned set-feature tra
       shell: false,
       env: { ...process.env, CLAUDE_PROJECT_DIR: path },
     });
+    const startWithoutDescriptor = () => {
+      let output = "";
+      let descriptorStarts = 0;
+      const status = sessionCleanupCli(["start", "--repo", path], {}, {
+        requireProjectOnboardingReadyFn() {
+          return {
+            schema: "pipeline.project-onboarding-ready-gate.v1",
+            status: "ready",
+            intent: "session",
+          };
+        },
+        listActiveSessionDescriptorsFn() { return []; },
+        startSessionDescriptorFn() {
+          descriptorStarts += 1;
+          throw new Error("transition boundary must not create a descriptor");
+        },
+        writeFn(value) { output += value; },
+      });
+      assert.equal(status, 0);
+      assert.equal(descriptorStarts, 0);
+      return JSON.parse(output);
+    };
 
     const initial = runStateCommand(
       "set-feature",
@@ -1626,6 +1751,11 @@ test("closed feature re-entry stays ready through the sanctioned set-feature tra
     });
     assert.equal(closed.status, "ready");
     assert.equal(closed.continuity.status, "valid");
+    assert.deepEqual(startWithoutDescriptor(), {
+      ok: true,
+      code: "WT-SESSION-NOT-REQUIRED",
+      bindingStatus: "closed-unbound",
+    });
 
     const selected = runStateCommand(
       "set-feature",
@@ -1640,6 +1770,11 @@ test("closed feature re-entry stays ready through the sanctioned set-feature tra
     });
     assert.equal(design.status, "ready");
     assert.equal(design.continuity.status, "valid");
+    assert.deepEqual(startWithoutDescriptor(), {
+      ok: true,
+      code: "WT-SESSION-NOT-REQUIRED",
+      bindingStatus: "design-unbound",
+    });
   } finally {
     dispose(path);
   }

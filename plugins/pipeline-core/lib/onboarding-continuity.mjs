@@ -903,7 +903,9 @@ function observeSessionCleanupState(rootDir, spawn = defaultGitSpawn) {
 export function readOnboardingSessionCleanupBinding({ rootDir, spawn = defaultGitSpawn } = {}) {
   const observed = observeSessionCleanupState(rootDir, spawn);
   const status = observed.mode === "active"
-    ? (observed.sessionCleanup === null ? "unbound" : "bound")
+    ? (observed.revision === null
+      ? "design-unbound"
+      : observed.sessionCleanup === null ? "unbound" : "bound")
     : observed.released
       ? "released"
       : observed.sessionCleanup === null

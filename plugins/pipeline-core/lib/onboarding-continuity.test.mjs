@@ -150,7 +150,7 @@ check("writer-shaped unapproved design state remains valid before continuity ini
     updatedAt: "2026-07-29T08:01:00.000Z",
   }, null, 2)}\n`);
   assert.equal(classifyOnboardingContinuity({ rootDir: root }).status, "valid");
-  assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
+  assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "design-unbound");
 });
 
 check("inactive and design transition lookalikes remain damaged", () => {
