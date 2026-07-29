@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
-  "planApproved": true,
-  "updatedAt": "2026-07-29T17:35:13.045Z",
+  "planApproved": false,
+  "updatedAt": "2026-07-28T22:23:25.677Z",
   "closedFeatures": [
     {
       "id": "codex-onboarding-0.4.5",
@@ -24,76 +24,5 @@
         }
       }
     }
-  ],
-  "activeFeature": {
-    "id": "agent-pipeline-0.4.7-hotfix",
-    "planPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/prd_agent-pipeline-0.4.7-hotfix.md",
-    "phase": "design"
-  },
-  "planApproval": {
-    "schema": "pipeline.plan-approval.v2",
-    "approvedBy": "PO",
-    "approvedAt": "2026-07-29T06:42:02.837Z",
-    "specBoundBy": "PO",
-    "specBoundAt": "2026-07-29T17:35:13.045Z",
-    "poGateAuthority": {
-      "schema": "pipeline.po-gate-authority.v2",
-      "humanFacing": "en",
-      "sourceSha256": "6e8bb42932b4f46ead9db5cf3bf636d2bd584e7154eaa087896124f1deca1f1f",
-      "runtimeSha256": "071b0236f6054bbeea2140830320a88d1c6a9e733d7294ad0bb976fd2e28c897",
-      "receiptSha256": "c307bdd33d4d590991107b453edaed690ad800d981db42551fdb14ebfb444b78",
-      "repositoryFingerprint": "5af06dcbe0d60349beeb52c7a7bdf51092f653f1e9ae6836e676a8bd6f3c47e3",
-      "planPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/prd_agent-pipeline-0.4.7-hotfix.md",
-      "planSha256": "5e0f6e7ff177d62b502aea57394abcba341e5101d612c9690e1b6e04fe13113f",
-      "specPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/spec.md",
-      "specSha256": "cef5983ec352601de8ae8652ffc56212c07869a7238687c300992c2c284af762"
-    }
-  },
-  "continuity": {
-    "schema": "pipeline.continuity.v0",
-    "featureId": "agent-pipeline-0.4.7-hotfix",
-    "revision": 14,
-    "runtime": {
-      "humanFacingLanguage": "en",
-      "activeDuty": "Coordinator",
-      "sessionCleanup": {
-        "sessionId": "session-449b2adcf34c5d12d593856c",
-        "descriptorSha256": "70d11a3412195e16ef2915522c5037517d252794c74fcdfd96da8b2623d44f14"
-      }
-    },
-    "authority": {
-      "prd": {
-        "path": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/prd_agent-pipeline-0.4.7-hotfix.md",
-        "sha256": "5e0f6e7ff177d62b502aea57394abcba341e5101d612c9690e1b6e04fe13113f"
-      },
-      "spec": {
-        "path": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/spec.md",
-        "sha256": "cef5983ec352601de8ae8652ffc56212c07869a7238687c300992c2c284af762"
-      },
-      "result": null
-    },
-    "queueHead": {
-      "packageId": "continuity-adoption",
-      "actionId": "review-active-feature",
-      "nextAction": "review",
-      "productRetryCount": 0,
-      "environmentRerouteCount": 0,
-      "dispatch": null
-    },
-    "blocker": null,
-    "acknowledgedFinal": null,
-    "resume": {
-      "mode": "immediate",
-      "sourceRevision": 0,
-      "reasonCode": "active-turn"
-    },
-    "recovery": null,
-    "decisionTxn": null,
-    "capacity": {
-      "concurrencyLimit": 4,
-      "reservedCriticSlots": 1,
-      "reservedRecoverySlots": 1,
-      "fallbackPolicy": "defer"
-    }
-  }
+  ]
 }

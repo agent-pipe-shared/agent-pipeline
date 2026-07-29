@@ -52,14 +52,11 @@
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "agent-pipeline-0.4.7-hotfix",
-    "revision": 14,
+    "revision": 15,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Coordinator",
-      "sessionCleanup": {
-        "sessionId": "session-449b2adcf34c5d12d593856c",
-        "descriptorSha256": "70d11a3412195e16ef2915522c5037517d252794c74fcdfd96da8b2623d44f14"
-      }
+      "sessionCleanup": null
     },
     "authority": {
       "prd": {

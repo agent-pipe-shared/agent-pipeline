@@ -76,6 +76,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { loadManifestSafe, gateConfig } from "../../plugins/pipeline-core/lib/manifest.mjs";
+import { resolveProjectAuthorityPaths } from "../../plugins/pipeline-core/lib/project-authority.mjs";
 import { assessTrustedExecutablePath, resolveTrustedSystemExecutable } from "./security-readiness/tool-identity.mjs";
 
 import * as gitleaksAdapter from "./security-adapters/gitleaks.mjs";
@@ -144,10 +145,11 @@ function buildAdapterConfig(key, { rootDir, manifest, policiesPathAbs }) {
   return {};
 }
 
-/** Best-effort `project` name: `.claude/pipeline.json`'s own field, else dir basename. */
-function resolveProjectName(rootDir) {
+/** Best-effort `project` name from the coherent authority layer, else dir basename. */
+function resolveProjectName(rootDir, authority) {
   try {
-    const raw = readFileSync(join(rootDir, ".claude", "pipeline.json"), "utf8");
+    if (authority.status !== "ready") return basename(rootDir);
+    const raw = readFileSync(join(rootDir, authority.calibration), "utf8");
     const parsed = JSON.parse(raw);
     if (typeof parsed?.project === "string" && parsed.project.trim() !== "") return parsed.project;
   } catch {
@@ -262,13 +264,19 @@ function fileSha256(path) {
   try { return sha256(readFileSync(path)); } catch { return null; }
 }
 
-function securityPolicyBinding(scanRoot, manifest, blockOn, mode) {
+function securityPolicyBinding(scanRoot, authority, manifest, blockOn, mode) {
   const policiesPath = resolveGovernancePoliciesPath(manifest);
   const semgrepRules = manifest?.security?.scanners?.semgrep?.rules_dir;
+  const manifestPath = authority.status === "ready" ? authority.manifest : null;
+  const licenseAllowlistPath = `${policiesPath}/license-allowlist.json`;
   const inputs = {
-    manifestSha256: fileSha256(join(scanRoot, ".claude", "pipeline.yaml")),
+    authoritySource: authority.status === "ready" ? authority.source : null,
+    manifestPath,
+    manifestSha256: manifestPath === null ? null : fileSha256(join(scanRoot, manifestPath)),
+    declaredLicensesPath: "third-party-licenses.json",
     declaredLicensesSha256: fileSha256(join(scanRoot, "third-party-licenses.json")),
-    licenseAllowlistSha256: fileSha256(join(scanRoot, policiesPath, "license-allowlist.json")),
+    licenseAllowlistPath,
+    licenseAllowlistSha256: fileSha256(join(scanRoot, licenseAllowlistPath)),
     semgrepRulesPath: typeof semgrepRules === "string" ? semgrepRules : null,
   };
   return {
@@ -413,7 +421,15 @@ export async function runSecurityScan({
   // fall back to its mutable worktree.
   const refuseMutableSource = candidateBefore.status !== "unavailable" && !snapshot.ok;
   const scanRoot = snapshot.ok ? snapshot.rootDir : refuseMutableSource ? null : rootDir;
-  const manifest = scanRoot ? loadManifestSafe(scanRoot) : loadManifestSafe(rootDir);
+  const authorityRoot = scanRoot ?? rootDir;
+  const authority = resolveProjectAuthorityPaths({ rootDir: authorityRoot });
+  const authorityBlocked = new Set(["mixed", "invalid"]).has(authority.status);
+  const manifest = authorityBlocked
+    ? null
+    : loadManifestSafe(
+      authorityRoot,
+      authority.status === "ready" ? { manifestRelPath: authority.manifest } : undefined,
+    );
   const blockOn = resolveBlockOn(manifest);
   const mode = resolveGateMode(manifest);
   const policiesPathAbs = scanRoot ? join(scanRoot, resolveGovernancePoliciesPath(manifest)) : null;
@@ -429,7 +445,15 @@ export async function runSecurityScan({
 
     let entry;
     try {
-      if (!scanRoot) {
+      if (authorityBlocked) {
+        entry = {
+          tool: adapter.name,
+          status: "ERROR",
+          classification: "project_authority",
+          findingCount: 0,
+          reason: `project authority is ${authority.status}`,
+        };
+      } else if (!scanRoot) {
         entry = { tool: adapter.name, status: "ERROR", classification: "candidate_snapshot", findingCount: 0, reason: snapshot.reason };
       } else {
       // The license check does not spawn a process and remains usable when the
@@ -504,14 +528,21 @@ export async function runSecurityScan({
   const cleanup = cleanupCandidateSnapshot(rootDir, snapshot);
   const evidenceCore = {
     schema: "pipeline.security-evidence.v1",
-    project: resolveProjectName(rootDir),
+    project: resolveProjectName(authorityRoot, authority),
     command: "node harness/scripts/security-scan.mjs",
     commit: resolveCommit(rootDir),
     candidate,
     finishedAt: new Date().toISOString(),
     thresholds: { block_on: blockOn },
-    policy: securityPolicyBinding(scanRoot ?? rootDir, manifest, blockOn, mode),
-    execution: { childProcessPreflight, snapshotCleanup: cleanup },
+    policy: securityPolicyBinding(authorityRoot, authority, manifest, blockOn, mode),
+    execution: {
+      childProcessPreflight,
+      projectAuthority: {
+        status: authority.status,
+        source: authority.status === "ready" ? authority.source : null,
+      },
+      snapshotCleanup: cleanup,
+    },
     scanners,
     findings,
     exitCode,

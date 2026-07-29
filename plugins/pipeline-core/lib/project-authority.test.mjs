@@ -30,6 +30,64 @@ try {
     assert.equal(readProjectAuthority({ rootDir: base }).source, "legacy"); assert.equal(plan.status, "ready");
     assert.equal(plan.compatibility, "dual-read-one-write"); assert.equal(existsSync(join(base, NEUTRAL_MANIFEST)), false);
   });
+  ok("machine-local cleanup binding blocks planning and apply until sanctioned release", () => {
+    const base = root(); legacy(base);
+    const sanitizedState = `${JSON.stringify({
+      schema: "pipeline.state.v0",
+      continuity: { runtime: { sessionCleanup: null } },
+    })}\n`;
+    const boundState = `${JSON.stringify({
+      schema: "pipeline.state.v0",
+      continuity: { runtime: { sessionCleanup: {
+        sessionId: "private-session-id",
+        descriptorSha256: "a".repeat(64),
+      } } },
+    })}\n`;
+    const expectedBlock = {
+      status: "session-cleanup-required",
+      code: "PA-MIGRATION-SESSION-CLEANUP-BOUND",
+      diagnostics: ["legacy State retains a machine-local session cleanup binding"],
+      recovery: {
+        operation: "sanctioned-session-cleanup-release",
+        replan: "project-authority-migration",
+      },
+      targets: [],
+    };
+
+    write(base, LEGACY_STATE, boundState);
+    const blockedPlan = planProjectAuthorityMigration({ rootDir: base });
+    assert.deepEqual({
+      status: blockedPlan.status,
+      code: blockedPlan.code,
+      diagnostics: blockedPlan.diagnostics,
+      recovery: blockedPlan.recovery,
+      targets: blockedPlan.targets,
+    }, expectedBlock);
+    assert.equal(JSON.stringify(blockedPlan).includes("private-session-id"), false);
+    assert.equal(JSON.stringify(blockedPlan).includes("descriptorSha256"), false);
+    assert.equal(existsSync(join(base, NEUTRAL_MANIFEST)), false);
+    assert.equal(existsSync(join(base, ".pipeline-project-authority-migration")), false);
+
+    write(base, LEGACY_STATE, sanitizedState);
+    const sanitizedPlan = planProjectAuthorityMigration({ rootDir: base });
+    assert.equal(sanitizedPlan.status, "ready");
+    write(base, LEGACY_STATE, boundState);
+    const blockedApply = applyProjectAuthorityMigration(sanitizedPlan, { rootDir: base, activate: true });
+    assert.deepEqual({
+      status: blockedApply.status,
+      code: blockedApply.code,
+      diagnostics: blockedApply.diagnostics,
+      recovery: blockedApply.recovery,
+      targets: blockedApply.targets,
+    }, expectedBlock);
+    assert.equal(readFileSync(join(base, LEGACY_STATE), "utf8"), boundState);
+    assert.equal(existsSync(join(base, NEUTRAL_STATE)), false);
+    assert.equal(existsSync(join(base, ".pipeline-project-authority-migration")), false);
+
+    write(base, LEGACY_STATE, sanitizedState);
+    assert.equal(applyProjectAuthorityMigration(sanitizedPlan, { rootDir: base, activate: true }).status, "applied");
+    assert.equal(readFileSync(join(base, NEUTRAL_STATE), "utf8"), sanitizedState);
+  });
   ok("activation is explicit and preserves legacy", () => {
     const base = root(); legacy(base); const plan = planProjectAuthorityMigration({ rootDir: base });
     assert.equal(applyProjectAuthorityMigration(plan, { rootDir: base }).status, "activation-required");

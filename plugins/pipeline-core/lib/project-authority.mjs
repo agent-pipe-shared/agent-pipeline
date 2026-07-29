@@ -188,6 +188,41 @@ function changedTargets(root) {
   }).filter((target) => target.after.status === "present");
 }
 
+function legacyStatePortability(root) {
+  const raw = bytes(root, LEGACY_STATE);
+  if (raw === null) return { ok: true };
+  let state;
+  try { state = JSON.parse(raw.toString("utf8")); }
+  catch { return { ok: false, status: "invalid-source", reason: "legacy State is not valid JSON" }; }
+  if (state?.continuity?.runtime?.sessionCleanup !== undefined
+    && state.continuity.runtime.sessionCleanup !== null) {
+    return {
+      ok: false,
+      status: "session-cleanup-required",
+      reason: "legacy State retains a machine-local session cleanup binding",
+    };
+  }
+  return { ok: true };
+}
+
+function portabilityFailureResult(portability) {
+  return result(portability.status, {
+    code: portability.status === "session-cleanup-required"
+      ? "PA-MIGRATION-SESSION-CLEANUP-BOUND"
+      : "PA-MIGRATION-STATE-INVALID",
+    source: "legacy",
+    compatibility: "dual-read-one-write",
+    diagnostics: [portability.reason],
+    recovery: portability.status === "session-cleanup-required"
+      ? {
+        operation: "sanctioned-session-cleanup-release",
+        replan: "project-authority-migration",
+      }
+      : null,
+    targets: [],
+  });
+}
+
 /** Read neutral authority first; legacy is a compatibility reader only. */
 export function readProjectAuthority({ rootDir = process.cwd() } = {}) {
   try { return authority(realRoot(rootDir)); }
@@ -219,6 +254,8 @@ export function planProjectAuthorityMigration({ rootDir = process.cwd() } = {}) 
     const current = authority(root);
     if (current.status !== "ready") return result(current.status, { diagnostics: [current.reason], targets: [] });
     if (current.source === "neutral") return remember(result("noop", { source: "neutral", compatibility: "dual-read-one-write", targets: [] }), { root, status: "noop", targets: [] });
+    const portability = legacyStatePortability(root);
+    if (!portability.ok) return portabilityFailureResult(portability);
     const internalTargets = changedTargets(root);
     const publicTargets = internalTargets.map(({ path, kind, before, after, changed }) => ({ path, kind, before, after, changed }));
     return remember(result(publicTargets.some((target) => target.changed) ? "ready" : "noop", {
@@ -314,6 +351,8 @@ export function applyProjectAuthorityMigration(plan, { rootDir = process.cwd(), 
     root = realRoot(rootDir); if (root !== state.root) throw new Error("apply root differs from the authenticated plan root");
     const { transaction } = transactionPaths(root); if (existsSync(transaction)) throw new Error("project authority recovery is required");
     if (!authenticated(plan)) throw new Error("public plan changed since authentication");
+    const portability = legacyStatePortability(root);
+    if (!portability.ok) return portabilityFailureResult(portability);
     validateBeforeApply(root, state); const journal = prepare(root, state.targets);
     try {
       for (const [index, entry] of journal.targets.entries()) {

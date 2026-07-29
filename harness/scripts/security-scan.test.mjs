@@ -20,6 +20,7 @@
  * Exit:  0 = all cases pass, 1 = at least one case failed (failure list on stdout).
  */
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -870,6 +871,103 @@ governance:
     existsSync(join(rootDir, "evidence", "security-latest.json")),
     "evidence/security-latest.json missing",
   );
+}
+
+{
+  const rootDir = makeRootDir("runner-neutral-policy-binding-root");
+  const neutralManifest = `schema: pipeline.manifest.v0
+
+security:
+  scanners:
+    gitleaks:
+      enabled: false
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: false
+    license-check:
+      enabled: true
+
+governance:
+  policies_path: governance/neutral-policies
+`;
+  const legacyManifest = `schema: pipeline.manifest.v0
+
+security:
+  scanners:
+    gitleaks:
+      enabled: false
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: false
+    license-check:
+      enabled: false
+
+governance:
+  policies_path: governance/legacy-policies
+`;
+  const neutralAllowlist = JSON.stringify({ allow: ["MIT"], deny: [] });
+  const legacyAllowlist = JSON.stringify({ allow: [], deny: ["MIT"] });
+  const declaredLicenses = JSON.stringify({ dependencies: [{ name: "pkgA", version: "1.0.0", license: "MIT" }] });
+  mkdirSync(join(rootDir, "project"), { recursive: true });
+  mkdirSync(join(rootDir, ".claude"), { recursive: true });
+  mkdirSync(join(rootDir, "governance", "neutral-policies"), { recursive: true });
+  mkdirSync(join(rootDir, "governance", "legacy-policies"), { recursive: true });
+  writeFileSync(join(rootDir, "project", "pipeline.yaml"), neutralManifest);
+  writeFileSync(join(rootDir, ".claude", "pipeline.yaml"), legacyManifest);
+  writeFileSync(join(rootDir, "governance", "neutral-policies", "license-allowlist.json"), neutralAllowlist);
+  writeFileSync(join(rootDir, "governance", "legacy-policies", "license-allowlist.json"), legacyAllowlist);
+  writeFileSync(join(rootDir, "third-party-licenses.json"), declaredLicenses);
+
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  assertEqual("runner: neutral authority selects its enabled license policy without legacy fallback", {
+    exitCode,
+    scanners: evidence.scanners.map((scanner) => [scanner.tool, scanner.status]),
+  }, { exitCode: 0, scanners: [["license-check", "PASS"]] });
+  assertEqual("runner: neutral authority evidence binds exact non-null manifest and license-policy digests", {
+    manifestSha256: evidence.policy?.inputs?.manifestSha256,
+    declaredLicensesSha256: evidence.policy?.inputs?.declaredLicensesSha256,
+    licenseAllowlistSha256: evidence.policy?.inputs?.licenseAllowlistSha256,
+  }, {
+    manifestSha256: digest(neutralManifest),
+    declaredLicensesSha256: digest(declaredLicenses),
+    licenseAllowlistSha256: digest(neutralAllowlist),
+  });
+  assertTrue("runner: neutral policy evidence does not bind legacy or mixed authority bytes",
+    evidence.policy.inputs.manifestSha256 !== digest(legacyManifest)
+      && evidence.policy.inputs.licenseAllowlistSha256 !== digest(legacyAllowlist),
+    JSON.stringify(evidence.policy));
+}
+
+{
+  const rootDir = makeRootDir("runner-mixed-authority-root");
+  mkdirSync(join(rootDir, "project"), { recursive: true });
+  mkdirSync(join(rootDir, ".claude"), { recursive: true });
+  writeFileSync(join(rootDir, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(rootDir, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(rootDir, ".claude", "pipeline-state.json"), "{\"schema\":\"pipeline.state.v0\"}\n");
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual("runner: mixed authority is fail-closed instead of falling back to legacy", {
+    exitCode,
+    authority: evidence.execution.projectAuthority,
+    scanners: evidence.scanners.map((scanner) => [scanner.status, scanner.classification]),
+  }, {
+    exitCode: 2,
+    authority: { status: "mixed", source: null },
+    scanners: [
+      ["ERROR", "project_authority"],
+      ["ERROR", "project_authority"],
+      ["ERROR", "project_authority"],
+      ["ERROR", "project_authority"],
+    ],
+  });
+  assertEqual("runner: mixed authority evidence binds no legacy manifest", {
+    authoritySource: evidence.policy.inputs.authoritySource,
+    manifestPath: evidence.policy.inputs.manifestPath,
+    manifestSha256: evidence.policy.inputs.manifestSha256,
+  }, { authoritySource: null, manifestPath: null, manifestSha256: null });
 }
 
 {

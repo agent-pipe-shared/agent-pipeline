@@ -33,10 +33,16 @@ or accepted from a project file.
    ticket, and receipt are distinct identities. Every handoff binds their
    exact digests plus the repository fingerprint, source digest, complete
    runtime-target digest, transaction, and writer generation.
-4. Repository-private state is outside portable project authority. It must use
-   the physical Git common directory, or the explicitly classified
-   host-managed private directory, with private ownership/mode assurance and
-   no symlink traversal.
+4. Repository-private runtime state (tickets, owner nonces, cleanup
+   descriptors, transaction journals, and receipts) is outside portable
+   project authority. It must use the physical Git common directory, or the
+   explicitly classified host-managed private directory, with private
+   ownership/mode assurance and no symlink traversal. The portable lifecycle
+   projection may live at the runner-neutral `project/pipeline-state.json`
+   authority, but publication and authority migration reject it while
+   `continuity.runtime.sessionCleanup` is non-null. The legacy
+   `.claude/pipeline-state.json` remains a compatibility input only and is
+   never copied into a portable candidate with a machine-local handle.
 5. A shell command is a write-capable boundary. In a governed non-ready root,
    Bash, Edit, Write, and apply_patch remain blocked except for an exact
    plugin-local lifecycle/remediation command with closed arguments.

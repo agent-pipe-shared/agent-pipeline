@@ -2,6 +2,7 @@
 /** Deterministic, provider-neutral workflow dispatch preflight. */
 import { createHash } from "node:crypto";
 import { validateContinuityState } from "./continuity-state.mjs";
+import { LEGACY_STATE, NEUTRAL_STATE } from "./project-authority.mjs";
 
 const MODES = new Set(["read-only", "bounded-write", "isolated-write"]);
 const PHASE26_MODES = new Set(["read-only", "bounded-write"]);
@@ -269,7 +270,7 @@ function validateContinuityBinding(request, state) {
 function validateNonCoordinatorPaths(request, state) {
   if (request.actorDuty === "Coordinator") return null;
   const protectedPaths = [
-    ".claude/pipeline-state.json", "docs/state.md", state.authority.prd.path,
+    NEUTRAL_STATE, LEGACY_STATE, "docs/state.md", state.authority.prd.path,
     state.authority.spec.path, ...(state.authority.result === null ? [] : [state.authority.result.path]),
   ];
   return request.pathAllowlist.write.some((allowed) => protectedPaths.some((path) => pathCovers(allowed, path)))
