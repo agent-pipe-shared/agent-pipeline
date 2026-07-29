@@ -1450,13 +1450,23 @@ function checkSecurityEvidenceV2(sourceTree) {
     ];
   }
 
-  /** Order-independent comparison key for an offendingCapabilities array. */
+  // Order-independent comparison key for an offendingCapabilities array -- capabilityId SET
+  // only, deliberately NOT the `outcome` string. Reason: `evaluateCapability`'s ERROR-status
+  // branch picks "invalid" vs "execution-unavailable" based on `capability.raw` (the scanner's
+  // captured raw output), but the persisted v2 envelope schema (`v2CapabilityRecord`,
+  // security-scan.mjs) never carries a `raw` field -- it is never written to disk at all, only
+  // used transiently inside security-scan.mjs's own original computation. This function's
+  // reconstruction therefore always evaluates `raw` as absent, and would spuriously disagree
+  // with a genuinely fresh, correctly-bound pair whenever the original computation saw a
+  // non-null `raw` for an ERROR-status capability. Neither "invalid" nor "execution-unavailable"
+  // is in ACCEPTED_AGGREGATE_OUTCOMES, so this never changes whether a required capability is
+  // offending or whether the aggregate is blocking -- only the cosmetic outcome label -- so
+  // comparing capabilityId sets (backed by the same `blocking` boolean check) is a complete
+  // consistency proof without needing `raw` persisted. The actual reported outcome string in
+  // the failure line below always comes from the PERSISTED verdict, never from this
+  // reconstruction, so reporting stays accurate regardless.
   function normalizeOffending(list) {
-    return canonicalJson(
-      [...list]
-        .map((o) => ({ capabilityId: o?.capabilityId ?? null, outcome: o?.outcome ?? null }))
-        .sort((x, y) => (x.capabilityId ?? "").localeCompare(y.capabilityId ?? "")),
-    );
+    return canonicalJson([...list].map((o) => o?.capabilityId ?? null).sort());
   }
   const isConsistent =
     recomputed.blocking === verdictBlock.blocking &&

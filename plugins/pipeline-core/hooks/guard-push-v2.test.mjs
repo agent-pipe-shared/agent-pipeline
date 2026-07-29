@@ -366,6 +366,41 @@ function allGreenBase() {
   );
 }
 
+// ---- PGV2-08 ERROR-status capability: outcome label ignored by the consistency check --------
+// (Elephant-added, self-application review of a54a060): `evaluateCapability`'s ERROR branch
+// picks "invalid" vs "execution-unavailable" based on `capability.raw`, a field the persisted
+// v2 envelope schema never carries. The ORIGINAL security-scan.mjs computation (which DOES see
+// `raw`) can legitimately produce outcome "invalid" for an ERROR-status required capability;
+// this guard's reconstruction (no `raw` available) always recomputes "execution-unavailable"
+// for that same capability. Without the capabilityId-set-only comparison, this genuinely fresh,
+// correctly-bound pair would be misreported as "stale or mismatched pair" instead of the
+// accurate per-capability failure. Proves: still blocks (fail-closed intact), but with the
+// correct, PERSISTED outcome label, not a false staleness diagnosis.
+{
+  const { dir, head, tree } = allGreenBase();
+  writeExactV2Pair(dir, {
+    head,
+    tree,
+    status: "ERROR",
+    classification: "unspecified",
+    outcome: "invalid", // what the ORIGINAL run (which saw a non-null `raw`) persisted
+    blocking: true,
+    offendingCapabilities: [{ capabilityId: "cap.secrets", outcome: "invalid" }],
+  });
+  check(
+    "PGV2-08 block  ERROR-status capability with persisted outcome=invalid is NOT misreported as a stale/mismatched pair",
+    PUSH_CMD,
+    dir,
+    BLOCK,
+    {
+      stderrIncludes: [
+        "evidence/security-latest.v2.verdict.json: required capability cap.secrets did not reach an accepted state (outcome=invalid)",
+      ],
+      stderrNotIncludes: ["stale or mismatched pair"],
+    },
+  );
+}
+
 // ---- Cleanup ----------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {
