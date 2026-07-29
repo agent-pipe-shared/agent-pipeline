@@ -12,8 +12,28 @@ import {
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const skill = readFileSync(join(HERE, "SKILL.md"), "utf8");
+const pluginRoot = join(HERE, "..", "..");
+const criticSkill = readFileSync(join(pluginRoot, "skills", "critic-review", "SKILL.md"), "utf8");
+const criticAgent = readFileSync(join(pluginRoot, "agents", "critic.md"), "utf8");
+const repositoryRoot = join(pluginRoot, "..", "..");
+const criticRole = readFileSync(join(repositoryRoot, "roles", "critic.md"), "utf8");
+const criticTemplate = readFileSync(join(repositoryRoot, "templates", "prompts", "critic-review.md"), "utf8");
+const sessionBootstrap = readFileSync(join(repositoryRoot, "harness", "session-bootstrap.md"), "utf8");
 
 const cases = [
+  ["Critic role carriers close before preflight and cannot fall into Elephant onboarding", () => {
+    assert.match(skill, /Role resolution \(first decision, before preflight\)/u);
+    assert.match(skill, /Default to `elephant` only when no role carrier exists/u);
+    assert.match(skill, /Conflicting or unknown role carriers are a bootstrap defect: stop before the\s+preflight, onboarding inspection, Git, State, handover, or history/u);
+    assert.match(skill, /For\s+Goldfish and Critic, validate the action shape but do not execute it/u);
+    assert.match(skill, /Goldfish and Critic retain their compact rows and never gain an onboarding\s+inspection from this boundary selection/u);
+    for (const surface of [skill, criticSkill, criticAgent, criticRole, criticTemplate, sessionBootstrap]) {
+      assert.match(surface, /CRITIC-BOOTSTRAP-ROLE-CLOSED/u);
+    }
+    assert.match(criticSkill, /an omitted adapter argument must not select\s+the Elephant default/u);
+    assert.match(criticAgent, /never execute\s+its onboarding `nextAction`, default to Elephant/u);
+    assert.match(criticTemplate, /Bootstrap role: critic \(closed/u);
+  }],
   ["bootstrap command grammar failures retry without revoking lifecycle readiness", () => {
     assert.match(skill, /Run each bootstrap shell observation as one simple read-only command/u);
     assert.match(skill, /Do not use `\| sort`, `&&`, `;`, `tee`, `xargs`, command substitution, or output redirection/u);
@@ -149,7 +169,7 @@ const cases = [
     assert.match(skill, /`installedSource` as\s+`remote\|local-development\|unknown`/u);
     assert.match(skill, /`executionBoundary` as\s+`default\|host-authorized-wsl`/u);
     assert.match(skill, /a `nextAction`\s+that is null unless status is `ready`/u);
-    assert.match(skill, /Execute that exact returned action at its declared boundary/u);
+    assert.match(skill, /For Elephant, execute that exact returned action at its declared boundary/u);
     assert.match(skill, /never reconstruct\s+or independently invoke the initial lifecycle inspector/u);
     assert.match(skill, /Agent Pipeline source: local-development · registered local Codex marketplace/u);
     assert.match(skill, /also permits push and release/u);

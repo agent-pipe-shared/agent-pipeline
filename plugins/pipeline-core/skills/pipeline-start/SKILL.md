@@ -27,7 +27,21 @@ general lifecycle. Earlier working names `/pipeline:start` and
 - Run each bootstrap shell observation as one simple read-only command. Do not use `| sort`, `&&`, `;`, `tee`, `xargs`, command substitution, or output redirection. When ordering is useful, read with `rg --files` and sort the returned paths in agent memory. The only admitted shell pipeline is the exact bounded `rg … | head -n 1..500` diagnostic form defined by the guard grammar. A typed `GUARD-PARSE-UNSUPPORTED`, `GUARD-OPERATOR-UNAPPROVED`, or `GUARD-REDIRECT-UNAPPROVED` verdict rejects only that command shape; it does not invalidate an already observed V4 `ready` lifecycle result. Retry the observation in an admitted form and continue the same bootstrap.
 - **Compact continuity:** Compact MUST rerun `pipeline-start` as a continuation re-entry; after that re-entry, automatically continue the persisted next action without waiting. Compact preserves the active task. Only an explicit pause/cancel/replace/redirect, a named gate, completion or a typed blocker may stop continuation.
 
-**Role:** take the role from `$ARGUMENTS` (default when empty: `elephant`).
+**Role resolution (first decision, before preflight):**
+
+- An explicit `$ARGUMENTS` value `elephant|goldfish|critic` selects that role.
+- `agent: critic`, an active `critic-review` skill, or the closed dispatch
+  metadata `Bootstrap role: critic` selects `critic` even when an invocation
+  adapter omitted the optional skill argument. This is role metadata, not an
+  inference from review prose. The equivalent closed Goldfish agent/dispatch
+  metadata selects `goldfish`.
+- Default to `elephant` only when no role carrier exists. Never let that default
+  override a Critic or Goldfish carrier.
+- Conflicting or unknown role carriers are a bootstrap defect: stop before the
+  preflight, onboarding inspection, Git, State, handover, or history.
+
+`CRITIC-BOOTSTRAP-ROLE-CLOSED`: once resolved as Critic, the role cannot become
+Elephant during this bootstrap.
 
 **Runtime identity line (mandatory, before Step 0):** resolve the absolute
 plugin root from this loaded skill and run exactly:
@@ -44,9 +58,11 @@ that is null unless status is `ready`. For `ready`, require one read-only
 `command` action for the absolute loaded-root `project-onboarding-v3.mjs`
 `inspect --root <physical-cwd> --intent bootstrap`, with the same
 `executionBoundary`, `mutation:false`, and `requiresConfirmation:false`.
-Execute that exact returned action at its declared boundary; never reconstruct
-or independently invoke the initial lifecycle inspector. The helper reports handoff presence only and never
-prints the private ticket or token.
+For Elephant, execute that exact returned action at its declared boundary;
+never reconstruct or independently invoke the initial lifecycle inspector. For
+Goldfish and Critic, validate the action shape but do not execute it: Step 0 is
+fixed by the Goldfish dispatch receipt and forbidden for Critic. The helper
+reports handoff presence only and never prints the private ticket or token.
 
 `plugin-refresh-required` is an attended update handoff, not a project defect:
 report the loaded and installed versions, run no onboarding command, and ask
@@ -97,11 +113,13 @@ push/publication approval, and readback gates, also permits push and release.
 It does not itself satisfy or bypass any delivery gate.
 
 When `executionBoundary` is `host-authorized-wsl`, make that one routing
-decision authoritative for the whole bootstrap. Run the exact read-only
-lifecycle inspector returned as the preflight `nextAction` and every later
-fixed Pipeline bootstrap helper that
+decision authoritative for the whole bootstrap. On the Elephant path, run the
+exact read-only lifecycle inspector returned as the preflight `nextAction` and
+every later fixed Pipeline bootstrap helper that
 inspects or spawns Git, probes worktree/session capability, or observes the
 App-Server control socket directly through the host-authorized local boundary.
+Goldfish and Critic retain their compact rows and never gain an onboarding
+inspection from this boundary selection.
 Run a fixed remote-freshness helper through the host-authorized
 network-open/read-only boundary. Do not first execute any of those helpers in
 the workspace sandbox: its known WSL control-path, process, socket, and network

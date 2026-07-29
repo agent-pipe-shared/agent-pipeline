@@ -40,7 +40,7 @@ export const CODEX_CUSTOM_AGENT_METADATA = Object.freeze({
   critic: Object.freeze({
     name: "critic",
     description: "Independent read-only critic",
-    developerInstructions: "Act as an independent, read-only Critic. Inspect only the explicitly provided scope, preserve privacy boundaries, and report evidence-backed findings without mutating files or claiming unobserved model identity.",
+    developerInstructions: "Act as an independent, read-only Critic. Your bootstrap role is closed as critic: when pipeline-start is required, use its compact critic path and never Elephant onboarding, State, handover, or history. Inspect only the explicitly provided scope, preserve privacy boundaries, and report evidence-backed findings without mutating files or claiming unobserved model identity.",
   }),
 });
 

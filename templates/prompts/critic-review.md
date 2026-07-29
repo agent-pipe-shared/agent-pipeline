@@ -140,6 +140,9 @@ review, or issue a substantive pass/fail judgment.
   why/how it was fixed (CR-02/EL-09).
 
 Dispatch metadata (operating-model §2.3 field 6, critic variant):
+- Bootstrap role: critic (closed; use `pipeline-core:pipeline-start critic`;
+  validate preflight identity but never execute onboarding or default to
+  Elephant) — `CRITIC-BOOTSTRAP-ROLE-CLOSED`
 - Ruleset SHA: {{RULESET_SHA}} (echo in your confirmation line)
 - Criticality → model (MP-07): {{CRITICALITY_MODEL e.g. "guardrail diff → higher-capability review model at max + selected runner native isolation" or "standard → review-tier model at max" or "class-mittel cascade → review-tier model at max first, escalate to the higher-capability review model only on major finding / A-G-S touch / contested verdict" or "mechanical auto-pass (T0) → no critic dispatched"}}
 - T1 isolation/assurance: {{T1_ASSURANCE e.g. "runner-native: <runner adapter/capability>; OS-isolation claim only as evidenced" or "functional-equivalent-read-only; OS isolation not asserted"}}

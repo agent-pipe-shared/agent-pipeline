@@ -324,6 +324,14 @@ The Elephant must additionally be able to speak to the session-lifecycle policy 
 
   > "Bootstrap check passed: ruleset \<SHA from assignment\> loaded · Project \<name\> · Calibration \<file|n/a\> · State n/a (Critic sees no history) · Role Critic"
 
+- **Closed role binding:** `agent: critic`, an active `critic-review` skill, or
+  dispatch metadata `Bootstrap role: critic` selects the compact Critic path
+  before preflight even when an adapter omitted the optional skill argument.
+  The Elephant default is permitted only without a role carrier. Critic
+  validates preflight identity but never executes onboarding or reads State,
+  handover, or history; contradictory role carriers stop before those reads.
+  `CRITIC-BOOTSTRAP-ROLE-CLOSED`.
+
 ### 6.4 Short bootstrap (same-day light bootstrap, Elephant)
 
 **Preconditions (ALL must hold, otherwise full bootstrap):**
