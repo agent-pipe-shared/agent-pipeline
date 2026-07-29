@@ -6,7 +6,7 @@ import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import { buildSandboxInvocation } from "./codex-sandbox-preflight.mjs";
-import { validateAdvisoryEvidenceBundle } from "../lib/advisory-lifecycle-v2.mjs";
+import { validateAdvisoryEvidenceBundleForRepository } from "../lib/advisory-lifecycle-v2.mjs";
 
 const CHILD = realpathSync(fileURLToPath(new URL("./codex-advisory-app-server-child.mjs", import.meta.url)));
 const MODEL = "gpt-5.6-sol";
@@ -14,7 +14,11 @@ const PROVIDER = "openai";
 
 export async function invokeCodexAdvisoryAppServer(payload, dependencies = {}) {
   const selected = payload?.sandboxTransport;
-  const evidence = validateAdvisoryEvidenceBundle(payload?.evidenceBundle, selected?.dispatch?.referenceSetSha256 ?? null);
+  const evidence = validateAdvisoryEvidenceBundleForRepository(
+    selected?.scratch?.repoRoot,
+    payload?.evidenceBundle,
+    selected?.dispatch?.referenceSetSha256 ?? null,
+  );
   if (!selected || selected.requested?.runner !== "codex" || selected.requested?.model !== MODEL
     || selected.profile?.base !== ":read-only" || selected.profile?.network?.enabled !== true
     || selected.profile?.scratchRootSha256 !== selected.scratch?.sha256

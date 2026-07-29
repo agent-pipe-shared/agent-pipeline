@@ -8,8 +8,16 @@
  * only when that route may be consulted and how bootstrap reports it.
  */
 import { createHash } from "node:crypto";
-import { lstatSync, readFileSync, realpathSync } from "node:fs";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import {
+  closeSync,
+  constants,
+  fstatSync,
+  lstatSync,
+  openSync,
+  readFileSync,
+  realpathSync,
+} from "node:fs";
+import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { TextDecoder } from "node:util";
 
@@ -70,7 +78,7 @@ export const ADVISORY_CAPABILITY_STATES = STATES;
 
 function evidencePath(value) {
   return typeof value === "string" && value.length > 0 && value.length <= 240
-    && !value.startsWith("/") && !value.includes("\\")
+    && !value.startsWith("/") && !value.includes("\\") && !value.includes(":") && !value.includes("\0")
     && value.split("/").every((part) => part !== "" && part !== "." && part !== "..");
 }
 
@@ -105,30 +113,97 @@ export function validateAdvisoryEvidenceBundle(bundle, expectedSha256 = null) {
   return { ok: true, bundleSha256, totalBytes: total };
 }
 
-export function buildAdvisoryEvidenceBundle(repoRoot, references) {
-  const root = realpathSync(repoRoot);
-  if (!lstatSync(root).isDirectory() || !Array.isArray(references)) throw new Error("advisory evidence root or references are invalid");
-  const paths = [...new Set(references)].sort();
-  if (paths.length !== references.length || paths.length === 0 || paths.length > MAX_EVIDENCE_REFERENCES
-    || paths.some((entry) => !evidencePath(entry))) {
-    throw new Error("advisory evidence references are invalid");
+function sameEvidenceIdentity(left, right) {
+  return left.isFile() && right.isFile()
+    && left.dev === right.dev && left.ino === right.ino
+    && left.mode === right.mode && left.nlink === right.nlink
+    && left.size === right.size && left.mtimeNs === right.mtimeNs;
+}
+
+function samePhysicalPath(left, right) {
+  return process.platform === "win32"
+    ? left.toLocaleLowerCase("en-US") === right.toLocaleLowerCase("en-US")
+    : left === right;
+}
+
+function readPhysicalAdvisoryEvidence(repoRoot, path) {
+  const resolvedRoot = resolve(repoRoot);
+  const root = realpathSync(resolvedRoot);
+  if (!samePhysicalPath(root, resolvedRoot) || !lstatSync(root).isDirectory()) {
+    throw new Error("advisory evidence root is not physical");
   }
-  const entries = paths.map((path) => {
-    const lexical = resolve(root, ...path.split("/"));
-    const physical = realpathSync(lexical);
-    const fromRoot = relative(root, physical);
-    if (lexical !== physical || fromRoot === "" || fromRoot.startsWith("..") || isAbsolute(fromRoot)
-      || !lstatSync(physical).isFile()) throw new Error("advisory evidence reference is not a physical repository file");
-    const bytes = readFileSync(physical);
-    if (bytes.length > MAX_EVIDENCE_REFERENCE_BYTES) throw new Error("advisory evidence reference exceeds its byte limit");
+  const lexical = resolve(root, ...path.split("/"));
+  const fromRoot = relative(root, lexical);
+  if (fromRoot === "" || fromRoot === ".." || fromRoot.startsWith(`..${sep}`) || isAbsolute(fromRoot)) {
+    throw new Error("advisory evidence reference escaped its repository");
+  }
+  const before = lstatSync(lexical, { bigint: true });
+  if (!before.isFile() || before.isSymbolicLink() || before.nlink !== 1n
+    || !samePhysicalPath(realpathSync(lexical), lexical)) {
+    throw new Error("advisory evidence reference is not a physical repository file");
+  }
+  let descriptor;
+  try {
+    const noFollow = process.platform === "win32" ? 0 : (constants.O_NOFOLLOW ?? 0);
+    descriptor = openSync(lexical, constants.O_RDONLY | noFollow);
+    const opened = fstatSync(descriptor, { bigint: true });
+    if (!sameEvidenceIdentity(before, opened) || opened.nlink !== 1n) {
+      throw new Error("advisory evidence reference identity drifted before read");
+    }
+    const bytes = readFileSync(descriptor);
+    const afterDescriptor = fstatSync(descriptor, { bigint: true });
+    const afterPath = lstatSync(lexical, { bigint: true });
+    if (!sameEvidenceIdentity(opened, afterDescriptor)
+      || !sameEvidenceIdentity(afterDescriptor, afterPath)
+      || afterPath.nlink !== 1n || afterPath.isSymbolicLink()
+      || !samePhysicalPath(realpathSync(lexical), lexical)
+      || BigInt(bytes.length) !== afterDescriptor.size) {
+      throw new Error("advisory evidence reference identity drifted during read");
+    }
+    if (bytes.length > MAX_EVIDENCE_REFERENCE_BYTES) {
+      throw new Error("advisory evidence reference exceeds its byte limit");
+    }
     let content;
     try { content = UTF8.decode(bytes); } catch { throw new Error("advisory evidence reference is not valid UTF-8"); }
     return { path, sha256: digest(content), bytes: bytes.length, content };
-  });
+  } finally {
+    if (descriptor !== undefined) closeSync(descriptor);
+  }
+}
+
+export function buildAdvisoryEvidenceBundle(repoRoot, references) {
+  if (!Array.isArray(references) || references.length === 0 || references.length > MAX_EVIDENCE_REFERENCES
+    || references.some((entry, index) => !evidencePath(entry)
+      || (index > 0 && references[index - 1] >= entry))) {
+    throw new Error("advisory evidence references are invalid");
+  }
+  const entries = references.map((path) => readPhysicalAdvisoryEvidence(repoRoot, path));
   const bundle = { schema: ADVISORY_EVIDENCE_BUNDLE_SCHEMA, references: entries };
   const checked = validateAdvisoryEvidenceBundle(bundle);
   if (!checked.ok) throw new Error(checked.code);
   return bundle;
+}
+
+export function validateAdvisoryEvidenceBundleForRepository(repoRoot, bundle, expectedSha256 = null) {
+  const checked = validateAdvisoryEvidenceBundle(bundle, expectedSha256);
+  if (!checked.ok) return checked;
+  try {
+    for (const reference of bundle.references) {
+      const current = readPhysicalAdvisoryEvidence(repoRoot, reference.path);
+      if (canonical(current) !== canonical(reference)) return failure("advisory_evidence_physical_drift");
+    }
+  } catch {
+    return failure("advisory_evidence_physical_drift");
+  }
+  return checked;
+}
+
+export function sameAdvisoryEvidenceRepository(left, right) {
+  try {
+    return samePhysicalPath(realpathSync(resolve(left)), realpathSync(resolve(right)));
+  } catch {
+    return false;
+  }
 }
 
 export function renderAdvisoryEvidencePrompt(question, bundle, expectedSha256) {

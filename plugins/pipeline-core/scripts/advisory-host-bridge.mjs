@@ -20,8 +20,9 @@ import {
   advisoryEvidenceBundleSha256,
   advisoryConsultationDisposition,
   createAdvisoryConsultationRecord,
+  sameAdvisoryEvidenceRepository,
   validateAdvisoryDemand,
-  validateAdvisoryEvidenceBundle,
+  validateAdvisoryEvidenceBundleForRepository,
 } from "../lib/advisory-lifecycle-v2.mjs";
 import { validateAdvisoryReceipt } from "../lib/advisory-receipt.mjs";
 import { AdvisoryReceiptAssuranceError, persistAdvisoryReceipt } from "../lib/advisory-receipt-assurance.mjs";
@@ -82,14 +83,19 @@ function unavailable(input, code, execution = null) {
   };
 }
 
-function selectedAdvisoryHostBridge(input, { invokeAppServer = invokeCodexAdvisoryAppServer } = {}) {
+function selectedAdvisoryHostBridge(input, { invokeAppServer = invokeCodexAdvisoryAppServer, repoRoot } = {}) {
   const completed = new Map();
   return {
     async launch(request) {
       exactKeys(request, ["selectionId", "duty", "selection", "requested", "references", "profile", "scratch"], "selected advisory launch");
-      const evidence = validateAdvisoryEvidenceBundle(input.evidenceBundle, input.demand.evidenceSha256);
+      const evidence = validateAdvisoryEvidenceBundleForRepository(
+        request.scratch?.repoRoot,
+        input.evidenceBundle,
+        input.demand.evidenceSha256,
+      );
       const evidencePaths = input.evidenceBundle?.references?.map(({ path }) => path);
       if (!evidence.ok || !equal(request.references, evidencePaths)
+        || !sameAdvisoryEvidenceRepository(request.scratch?.repoRoot, repoRoot)
         || request.selection.dispatch.referenceSetSha256 !== evidence.bundleSha256) {
         throw new Error("selected advisory evidence binding is invalid");
       }
@@ -180,7 +186,12 @@ export async function runSelectedAdvisoryHost(input, transport = undefined) {
     dispatch: input?.dispatch,
   });
   if (!demand.ok) return demandRejected(demand.code);
-  const evidence = validateAdvisoryEvidenceBundle(input?.evidenceBundle, input?.demand?.evidenceSha256 ?? null);
+  const evidenceRoot = transport?.repoRoot ?? input?.sandboxRuntime?.repoRoot;
+  const evidence = validateAdvisoryEvidenceBundleForRepository(
+    evidenceRoot,
+    input?.evidenceBundle,
+    input?.demand?.evidenceSha256 ?? null,
+  );
   const evidencePaths = input?.evidenceBundle?.references?.map(({ path }) => path);
   if (!evidence.ok || !equal(input?.references, evidencePaths)
     || input?.sandboxContext?.referenceSetSha256 !== evidence.bundleSha256
@@ -203,7 +214,10 @@ export async function runSelectedAdvisoryHost(input, transport = undefined) {
       sandboxBinding: null,
     };
   }
-  const selectedHost = selectedAdvisoryHostBridge(input, { invokeAppServer: transport?.invokeCodexAdvisoryAppServer ?? invokeCodexAdvisoryAppServer });
+  const selectedHost = selectedAdvisoryHostBridge(input, {
+    invokeAppServer: transport?.invokeCodexAdvisoryAppServer ?? invokeCodexAdvisoryAppServer,
+    repoRoot: evidenceRoot,
+  });
   let dependencies = transport?.dependencies;
   if (dependencies !== undefined) {
     dependencies = {

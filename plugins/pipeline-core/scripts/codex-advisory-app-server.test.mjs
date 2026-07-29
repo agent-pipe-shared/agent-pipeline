@@ -7,20 +7,16 @@ import { EventEmitter } from "node:events";
 import { PassThrough } from "node:stream";
 import test from "node:test";
 
-import { advisoryEvidenceBundleSha256 } from "../lib/advisory-lifecycle-v2.mjs";
+import {
+  advisoryEvidenceBundleSha256,
+  buildAdvisoryEvidenceBundle,
+} from "../lib/advisory-lifecycle-v2.mjs";
 import { invokeCodexAdvisoryAppServer } from "./codex-advisory-app-server.mjs";
 
 function payload() {
-  const content = "bounded App Server evidence\n";
-  const evidenceBundle = {
-    schema: "pipeline.advisory-evidence-bundle.v1",
-    references: [{
-      path: "evidence/advisor.md",
-      sha256: createHash("sha256").update(content).digest("hex"),
-      bytes: Buffer.byteLength(content),
-      content,
-    }],
-  };
+  const evidenceBundle = buildAdvisoryEvidenceBundle(process.cwd(), [
+    "plugins/pipeline-core/scripts/codex-advisory-app-server.mjs",
+  ]);
   const referenceSetSha256 = advisoryEvidenceBundleSha256(evidenceBundle);
   return {
     question: "What is the smallest safe bootstrap fix?",
@@ -31,7 +27,7 @@ function payload() {
       requested: { runner: "codex", model: "gpt-5.6-sol" },
       toolchain: { cliSha256: "1".repeat(64) },
       profile: { base: ":read-only", network: { enabled: true }, sha256: "2".repeat(64), scratchRootSha256: "3".repeat(64) },
-      scratch: { path: "/tmp/advisory", sha256: "3".repeat(64), sandboxStateJson: "{}", sandboxStateSha256: "4".repeat(64), repoRoot: "/repo", codexPath: "/codex" },
+      scratch: { path: "/tmp/advisory", sha256: "3".repeat(64), sandboxStateJson: "{}", sandboxStateSha256: "4".repeat(64), repoRoot: process.cwd(), codexPath: "/codex" },
     },
   };
 }
@@ -73,10 +69,22 @@ test("native adapter accepts only a complete openai/gpt-5.6-sol App-Server turn 
 });
 
 test("missing, tampered or selection-drifted evidence never starts the App Server child", async () => {
+  const physicallyForeign = payload();
+  physicallyForeign.evidenceBundle.references[0].content = "internally valid but not repository evidence\n";
+  physicallyForeign.evidenceBundle.references[0].bytes = Buffer.byteLength(
+    physicallyForeign.evidenceBundle.references[0].content,
+  );
+  physicallyForeign.evidenceBundle.references[0].sha256 = createHash("sha256")
+    .update(physicallyForeign.evidenceBundle.references[0].content)
+    .digest("hex");
+  physicallyForeign.sandboxTransport.dispatch.referenceSetSha256 = advisoryEvidenceBundleSha256(
+    physicallyForeign.evidenceBundle,
+  );
   for (const value of [
     { ...payload(), evidenceBundle: null },
     { ...payload(), evidenceBundle: { ...payload().evidenceBundle, references: [] } },
     { ...payload(), sandboxTransport: { ...payload().sandboxTransport, dispatch: { ...payload().sandboxTransport.dispatch, referenceSetSha256: "f".repeat(64) } } },
+    physicallyForeign,
   ]) {
     let spawned = false;
     await assert.rejects(invokeCodexAdvisoryAppServer(value, { spawnFn: () => { spawned = true; } }), /evidence|transport/u);

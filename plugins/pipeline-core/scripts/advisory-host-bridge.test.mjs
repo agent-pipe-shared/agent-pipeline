@@ -9,6 +9,7 @@ import { join } from "node:path";
 import test from "node:test";
 import {
   advisoryEvidenceBundleSha256,
+  buildAdvisoryEvidenceBundle,
   createAdvisoryConsultationRecord,
   createAdvisoryDemand,
 } from "../lib/advisory-lifecycle-v2.mjs";
@@ -21,18 +22,9 @@ import { buildSandboxRequest, sandboxSelectionDigest } from "./codex-sandbox-sel
 
 const dispatch = { dispatchId: "bridge-test", queueRevision: 1, candidateCommit: "a".repeat(40), candidateTree: "b".repeat(40) };
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
-const evidenceBundle = () => {
-  const content = "allowlisted bridge evidence\n";
-  return {
-    schema: "pipeline.advisory-evidence-bundle.v1",
-    references: [{
-      path: "plugins/pipeline-core/scripts/advisory-host-bridge.mjs",
-      sha256: sha256(content),
-      bytes: Buffer.byteLength(content),
-      content,
-    }],
-  };
-};
+const evidenceBundle = () => buildAdvisoryEvidenceBundle(process.cwd(), [
+  "plugins/pipeline-core/scripts/advisory-host-bridge.mjs",
+]);
 const base = () => {
   const question = "Which boundary is safest?";
   const evidence = evidenceBundle();
@@ -70,12 +62,13 @@ function selectedAdvisory() {
 
 function selectedTransport() {
   return {
+    repoRoot: process.cwd(),
     dependencies: {
       async executeSandboxedReadonlyDuty(request, dependencies) {
         const selection = selectedAdvisory();
         const launched = await dependencies.bridge.launch({
           selectionId: selection.selectionId, duty: "advisory", selection, requested: request.requested, references: request.references, profile: selection.profile,
-          scratch: { path: "/tmp/advisory-scratch", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot: "/repo", codexPath: "/codex" },
+          scratch: { path: "/tmp/advisory-scratch", sha256: selection.profile.scratchRootSha256, sandboxStateJson: "{}", sandboxStateSha256: "8".repeat(64), repoRoot: process.cwd(), codexPath: "/codex" },
         });
         const execution = await dependencies.bridge.finalize({ selection, launched, requested: request.requested, profile: selection.profile });
         return {
@@ -198,7 +191,7 @@ test("a drifted or omitted evidence bundle fails before the selected transport",
 test("production bridge persists typed no-child receipt without accepting a raw answer", async () => {
   const root = await mkdtemp(join(tmpdir(), "host-advisor-")); const inputPath = join(root, "input.json"); const receiptPath = join(root, "status.json");
   try {
-    await writeFile(inputPath, JSON.stringify({ ...base(), sandboxRuntime: { sessionCleanup: { sessionId: "session-test" } } }));
+    await writeFile(inputPath, JSON.stringify({ ...base(), sandboxRuntime: { repoRoot: process.cwd(), sessionCleanup: { sessionId: "session-test" } } }));
     const code = await runAdvisoryHostBridge(["--input", inputPath, "--receipt", receiptPath], { makeHostAdapter: () => async () => ({ status: "answered", answer: "private answer" }) });
     assert.equal(code, 2); await assert.rejects(readFile(inputPath));
     const status = JSON.parse(await readFile(receiptPath, "utf8")); assert.equal(status.schema, "pipeline.advisory-receipt.v1"); assert.equal(status.observed.status, "unavailable"); assert.equal(JSON.stringify(status).includes("private answer"), false);
@@ -211,7 +204,7 @@ test("production bridge persists typed no-child receipt without accepting a raw 
     assert.equal(recordBytes.includes("private answer"), false);
 
     const repeatedInputPath = join(root, "repeat.json");
-    await writeFile(repeatedInputPath, JSON.stringify({ ...base(), sandboxRuntime: { sessionCleanup: { sessionId: "session-test" } } }));
+    await writeFile(repeatedInputPath, JSON.stringify({ ...base(), sandboxRuntime: { repoRoot: process.cwd(), sessionCleanup: { sessionId: "session-test" } } }));
     const repeated = await runAdvisoryHostBridge(["--input", repeatedInputPath, "--receipt", receiptPath]);
     assert.equal(repeated, 0);
     assert.equal(await readFile(recordPath, "utf8"), recordBytes, "no-repeat must not rewrite its durable record");

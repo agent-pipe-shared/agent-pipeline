@@ -3,6 +3,9 @@
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import {
@@ -16,6 +19,7 @@ import {
   renderAdvisoryEvidencePrompt,
   validateAdvisoryDemand,
   validateAdvisoryEvidenceBundle,
+  validateAdvisoryEvidenceBundleForRepository,
   validateAdvisoryLifecycleV2Policy,
 } from "./advisory-lifecycle-v2.mjs";
 
@@ -127,6 +131,29 @@ test("allowlisted evidence is content-bound, bounded and rendered into the model
     ]),
     /references are invalid/u,
   );
+});
+
+test("physical evidence requires caller order and is re-read against the exact repository bytes", () => {
+  const root = mkdtempSync(join(tmpdir(), "advisory-evidence-"));
+  try {
+    mkdirSync(join(root, "evidence"));
+    writeFileSync(join(root, "evidence", "a.md"), "alpha\n");
+    writeFileSync(join(root, "evidence", "b.md"), "bravo\n");
+    assert.throws(
+      () => buildAdvisoryEvidenceBundle(root, ["evidence/b.md", "evidence/a.md"]),
+      /references are invalid/u,
+    );
+    const bundle = buildAdvisoryEvidenceBundle(root, ["evidence/a.md", "evidence/b.md"]);
+    const bundleSha256 = advisoryEvidenceBundleSha256(bundle);
+    assert.equal(validateAdvisoryEvidenceBundleForRepository(root, bundle, bundleSha256).ok, true);
+    writeFileSync(join(root, "evidence", "a.md"), "changed\n");
+    assert.equal(
+      validateAdvisoryEvidenceBundleForRepository(root, bundle, bundleSha256).code,
+      "advisory_evidence_physical_drift",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test("same material demand is not repeated and any bound material drift permits a new consult", () => {
