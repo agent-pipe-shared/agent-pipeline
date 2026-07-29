@@ -55,11 +55,12 @@ plugins/pipeline-core/lib/review-economy.test.mjs:279    rule=generic-api-key
    isolation). gitleaks' `generic-api-key` rule pattern-matches the uniform,
    high-"entropy-looking" repeated-character string next to secret-shaped
    field names. These are never real secrets — pure fixture placeholders.
-2. `review-economy.test.mjs:279` — a DIFFERENT trigger shape, the literal
-   string `idempotencyKey: "decision-key-01"` (line 279 exactly, confirmed via
-   direct read — this is NOT one of that file's `A`/`B`/`C`/`D` constants).
-   The dash-separated `word-word-digits` shape next to a `...Key`-named field
-   resembles a common API-key/token format to the rule.
+2. `review-economy.test.mjs:279` — a DIFFERENT trigger shape: an
+   `idempotencyKey` field (line 279 exactly, confirmed via direct read — this
+   is NOT one of that file's `A`/`B`/`C`/`D` constants) whose value had the
+   shape "word-word-digits" (two hyphen-joined words ending in a two-digit
+   suffix). That dash-separated shape next to a `...Key`-named field resembles
+   a common API-key/token format to the rule.
 
 **The fix:** change the fixture *values* only — never the test assertions,
 control flow, or what is being tested — so gitleaks' `generic-api-key` rule
