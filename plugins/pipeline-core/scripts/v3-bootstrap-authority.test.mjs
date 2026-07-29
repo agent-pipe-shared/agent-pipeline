@@ -251,16 +251,17 @@ check("a legacy non-V3 source is rejected for every runner", () => {
 });
 
 // ---------------------------------------------------------------------------
-// CLI contract: unchanged, and it has no runner input of its own today.
+// CLI contract: --help/argument errors, and the new --runner parsing (AC-6a).
 // ---------------------------------------------------------------------------
 
-check("the CLI keeps its exact usage, argument, and exit-code mapping", () => {
+check("the CLI keeps its exact usage/argument contract and validates --runner", () => {
   withFixture({}, (root) => {
     const { deps } = gitDeps(root);
     let output = "";
     const write_ = (chunk) => { output += String(chunk); };
     assert.equal(authorityCli(["--help"], { write: write_, deps }), 0);
     assert.match(output, /Usage: node plugins\/pipeline-core\/scripts\/v3-bootstrap-authority\.mjs --root/u);
+    assert.match(output, /--runner claude\|codex/u);
 
     output = "";
     assert.equal(authorityCli([], { write: write_, deps }), 2);
@@ -271,8 +272,123 @@ check("the CLI keeps its exact usage, argument, and exit-code mapping", () => {
     assert.match(output, /unknown argument: --boom/u);
 
     output = "";
-    assert.equal(authorityCli(["--root", root], { write: write_, deps }), 1);
+    assert.equal(authorityCli(["--root", root, "--runner", "bogus"], { write: write_, deps }), 2);
+    assert.match(output, /--runner requires "claude" or "codex"/u);
+
+    output = "";
+    assert.equal(authorityCli(["--root", root, "--runner"], { write: write_, deps }), 2);
+    assert.match(output, /--runner requires "claude" or "codex"/u);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// CLAUDE-RUNNER-01c: the CLI derives the runner from the project's own V3
+// source when --runner is absent (the fix this file's `main()` was missing).
+// ---------------------------------------------------------------------------
+
+/** Flips the migrated fixture's one `runners.default` occurrence to `value`. */
+function setRunnersDefault(root, value) {
+  const path = join(root, "pipeline.user.yaml");
+  const before = readFileSync(path, "utf8");
+  const needle = 'runners:\n  default: "claude"';
+  assert.ok(before.includes(needle), "fixture must contain the expected migrated runners.default line to flip");
+  writeFileSync(path, before.replace(needle, `runners:\n  default: "${value}"`));
+}
+
+check("CLI derivation: a claude-default source reaches ready with no --runner flag", () => {
+  withFixture({}, (root) => {
+    const { deps, probes } = gitDeps(root);
+    let output = "";
+    const exit = authorityCli(["--root", root], { write: (chunk) => { output += String(chunk); }, deps });
+    const authority = JSON.parse(output);
+    assert.equal(exit, 0);
+    assert.equal(authority.status, "ready");
+    assert.equal(authority.runtimeReadback, "not-applicable");
+    assert.equal(authority.sourceKind, "v3");
+    assert.deepEqual(authority.diagnostics, []);
+    assert.deepEqual(probes, [], "the derived claude runner never reaches the private Codex runtime authority");
+  });
+});
+
+check("CLI derivation: a codex-default source stays on the Codex native-readback path with no --runner flag", () => {
+  withFixture({}, (root) => {
+    setRunnersDefault(root, "codex");
+    const { deps, probes } = gitDeps(root);
+    let output = "";
+    const exit = authorityCli(["--root", root], { write: (chunk) => { output += String(chunk); }, deps });
+    const authority = JSON.parse(output);
+    assert.equal(exit, 1);
+    assert.equal(authority.status, "projection-current");
+    assert.equal(authority.runtimeReadback, "absent");
+    assert.ok(probes.length > 0, "the derived codex runner still reaches the private Codex runtime authority");
+  });
+});
+
+check("CLI derivation: an explicit --runner always overrides the project's own declared default", () => {
+  withFixture({}, (root) => {
+    const { deps: depsA, probes: probesA } = gitDeps(root);
+    let output = "";
+    let exit = authorityCli(["--root", root, "--runner", "codex"], { write: (chunk) => { output += String(chunk); }, deps: depsA });
+    assert.equal(exit, 1, "an explicit --runner codex overrides the fixture's own claude default");
     assert.equal(JSON.parse(output).status, "projection-current");
+    assert.ok(probesA.length > 0);
+
+    setRunnersDefault(root, "codex");
+    const { deps: depsB, probes: probesB } = gitDeps(root);
+    output = "";
+    exit = authorityCli(["--root", root, "--runner", "claude"], { write: (chunk) => { output += String(chunk); }, deps: depsB });
+    assert.equal(exit, 0, "an explicit --runner claude overrides a codex-default source");
+    assert.equal(JSON.parse(output).status, "ready");
+    assert.deepEqual(probesB, []);
+  });
+});
+
+check("CLI derivation fails closed for a legacy source with no runners declaration at all", () => {
+  // A legacy (non-V3) source has no `runners` block -- deriveCliRunner reads
+  // no usable value and returns null (the Codex fail-closed default). The
+  // overall pipeline also rejects the source for being non-V3
+  // (v3_source_not_current) before the runtime-readback branch is ever
+  // reached; both gates independently agree the CLI must never claim ready.
+  withFixture({ migrate: false }, (root) => {
+    const { deps } = gitDeps(root);
+    let output = "";
+    const exit = authorityCli(["--root", root], { write: (chunk) => { output += String(chunk); }, deps });
+    const authority = JSON.parse(output);
+    assert.notEqual(exit, 0);
+    assert.notEqual(authority.status, "ready");
+  });
+});
+
+check("CLI derivation fails closed for a root with no readable pipeline.user.yaml at all", () => {
+  const root = mkdtempSync(join(tmpdir(), "v3-bootstrap-authority-runner-empty-"));
+  try {
+    let output = "";
+    const exit = authorityCli(["--root", root], { write: (chunk) => { output += String(chunk); } });
+    const authority = JSON.parse(output);
+    assert.notEqual(exit, 0);
+    assert.notEqual(authority.status, "ready");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+check("CLI derivation fails closed for an ambiguous runners declaration (default not in enabled)", () => {
+  // This exact malformation also fails the full pipeline.user.v3 schema
+  // contract (runner-profiles-v3.mjs's default-must-be-enabled rule), so the
+  // CLI is rejected before the runtime-readback branch is ever reached --
+  // defense in depth, not a distinct branch this test can isolate further.
+  // The property that matters, and that this proves, is that the CLI never
+  // silently claims ready/claude for it.
+  withFixture({}, (root) => {
+    const path = join(root, "pipeline.user.yaml");
+    const before = readFileSync(path, "utf8");
+    const needle = 'runners:\n  default: "claude"\n  enabled:\n    - "claude"\n    - "codex"';
+    assert.ok(before.includes(needle), "fixture must contain the expected migrated runners block to make ambiguous");
+    writeFileSync(path, before.replace(needle, 'runners:\n  default: "codex"\n  enabled:\n    - "claude"'));
+    const { deps } = gitDeps(root);
+    let output = "";
+    const exit = authorityCli(["--root", root], { write: (chunk) => { output += String(chunk); }, deps });
+    const authority = JSON.parse(output);
+    assert.notEqual(exit, 0);
+    assert.notEqual(authority.status, "ready");
   });
 });
 

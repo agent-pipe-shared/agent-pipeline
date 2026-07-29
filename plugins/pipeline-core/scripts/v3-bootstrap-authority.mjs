@@ -30,6 +30,7 @@ import {
   NEUTRAL_CALIBRATION,
   resolveProjectAuthorityPaths,
 } from "../lib/project-authority.mjs";
+import { parseYaml } from "../lib/yaml-lite.mjs";
 
 const SCHEMA = "pipeline.v3-bootstrap-authority.v1";
 /**
@@ -219,11 +220,43 @@ function parseArgs(args) {
       if (!root || root.startsWith("--")) return { error: "--root requires a project directory" };
       parsed.root = root;
       index += 1;
+    } else if (arg === "--runner") {
+      const runner = args[index + 1];
+      if (runner !== "claude" && runner !== "codex") {
+        return { error: '--runner requires "claude" or "codex"' };
+      }
+      parsed.runner = runner;
+      index += 1;
     } else if (arg === "--help" || arg === "-h") parsed.help = true;
     else return { error: `unknown argument: ${arg}` };
   }
   if (!parsed.help && !parsed.root) return { error: "--root is required" };
   return parsed;
+}
+
+/**
+ * Derives the CLI's runner from the project's own V3 source when `--runner`
+ * is not given on the command line. This replicates (does not import) the
+ * canonical `selectedRunner(root, fs)` derivation in
+ * `../lib/project-onboarding-v3.mjs:934` -- that lib already imports
+ * `validateV3BootstrapAuthority` FROM this file, so importing back from it
+ * would be circular. Returns `null` on any missing/unreadable/ambiguous
+ * source; a `null` result deliberately keeps the caller on the Codex
+ * fail-closed path (`RUNNERS_WITHOUT_NATIVE_READBACK.has(null)` is false).
+ */
+function deriveCliRunner(root, deps = {}) {
+  try {
+    const raw = (deps.readFileSync ?? readFileSync)(join(root, "pipeline.user.yaml"), "utf8");
+    const declared = parseYaml(raw)?.runners;
+    const selected = declared?.default;
+    return (selected === "claude" || selected === "codex")
+      && Array.isArray(declared?.enabled)
+      && declared.enabled.includes(selected)
+      ? selected
+      : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -345,14 +378,15 @@ export function main(args = process.argv.slice(2), {
 } = {}) {
   const options = parseArgs(args);
   if (options.help) {
-    write("Usage: node plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs --root <project-dir>\n");
+    write("Usage: node plugins/pipeline-core/scripts/v3-bootstrap-authority.mjs --root <project-dir> [--runner claude|codex]\n");
     return 0;
   }
   if (options.error) {
     write(`${options.error}\n`);
     return 2;
   }
-  const result = validateV3BootstrapAuthority({ rootDir: options.root, deps });
+  const runner = options.runner ?? deriveCliRunner(options.root, deps);
+  const result = validateV3BootstrapAuthority({ rootDir: options.root, deps, runner });
   write(`${JSON.stringify(result, null, 2)}\n`);
   return result.status === "ready" ? 0 : 1;
 }
