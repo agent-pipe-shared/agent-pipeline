@@ -525,6 +525,10 @@ export async function runSecurityScan({
     ...candidateBefore,
     snapshot: { method: snapshot.ok ? snapshot.method : null, verifiedBeforeAfter: false },
   };
+  // Bind policy bytes while the verified detached snapshot still exists.
+  // Cleanup deliberately precedes evidence publication, so hashing afterward
+  // would silently turn every snapshot-backed digest into null.
+  const policy = securityPolicyBinding(authorityRoot, authority, manifest, blockOn, mode);
   const cleanup = cleanupCandidateSnapshot(rootDir, snapshot);
   const evidenceCore = {
     schema: "pipeline.security-evidence.v1",
@@ -534,7 +538,7 @@ export async function runSecurityScan({
     candidate,
     finishedAt: new Date().toISOString(),
     thresholds: { block_on: blockOn },
-    policy: securityPolicyBinding(authorityRoot, authority, manifest, blockOn, mode),
+    policy,
     execution: {
       childProcessPreflight,
       projectAuthority: {

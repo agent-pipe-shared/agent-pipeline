@@ -1147,6 +1147,10 @@ security:
       enabled: false
 `,
   );
+  writeLicenseFiles(rootDir, {
+    allowlist: { allow: ["MIT"], deny: [] },
+    declared: { dependencies: [{ name: "fixture", license: "MIT" }] },
+  });
   writeFileSync(join(rootDir, "governed.txt"), "committed candidate bytes\\n");
   commitFixture(rootDir);
   const { evidence, exitCode } = await runSecurityScan({ rootDir, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
@@ -1154,6 +1158,10 @@ security:
     exitCode, status: evidence.candidate.status, method: evidence.candidate.snapshot.method,
     verified: evidence.candidate.snapshot.verifiedBeforeAfter,
   }, { exitCode: 0, status: "clean", method: "git-detached-worktree.v1", verified: true });
+  assertTrue("runner: detached snapshot policy digests are bound before snapshot cleanup",
+    [evidence.policy.inputs.manifestSha256, evidence.policy.inputs.declaredLicensesSha256,
+      evidence.policy.inputs.licenseAllowlistSha256].every((digest) => /^[0-9a-f]{64}$/u.test(digest)),
+    JSON.stringify(evidence.policy.inputs));
   assertTrue("runner: exact candidate omits private worktree path", !JSON.stringify(evidence).includes(rootDir), JSON.stringify(evidence));
 }
 
