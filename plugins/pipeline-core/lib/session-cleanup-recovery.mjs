@@ -632,7 +632,11 @@ function readyRecoveryPlan(partial, scriptPath) {
   const planSha256 = digest(recoveryBinding(partial));
   const status = partial.recovery === "bind-orphan"
     ? "rebound"
-    : new Set(["retire-orphans", "retire-externally-archived-orphans"]).has(partial.recovery)
+    : new Set([
+      "retire-orphans",
+      "retire-externally-archived-orphans",
+      "retire-mixed-orphans",
+    ]).has(partial.recovery)
       ? "retired"
       : "recovered";
   const applyAction = {
@@ -662,16 +666,78 @@ function readyRecoveryPlan(partial, scriptPath) {
   };
 }
 
+function descriptorRecoveryBinding(descriptor) {
+  return {
+    sessionId: descriptor.sessionId,
+    descriptorSha256: descriptor.descriptorSha256,
+    ownerStatus: descriptor.ownerStatus,
+  };
+}
+
+function externalRetirementBinding(entry) {
+  return {
+    sessionId: entry.sessionId,
+    descriptorSha256: entry.descriptorSha256,
+    ownerStatus: entry.ownerStatus,
+    manifestSha256: entry.manifestSha256,
+    resources: entry.resources,
+  };
+}
+
+/**
+ * A historical root may retain more than one orphan descriptor.  Some may
+ * have been externally archived under the exceptional worktree procedure,
+ * while other capability-only descriptors have no manifest and are normally
+ * retirable.  Treat every descriptor independently: a missing worktree alone
+ * never authorizes retirement, and a regular descriptor never inherits the
+ * external-archive exception from a neighbour.
+ */
+function planExactOrphanRetirement({
+  binding,
+  activeDescriptors,
+  orphanDescriptors,
+  externalRetirements,
+  scriptPath,
+}) {
+  const external = externalRetirements.filter((entry) => entry.status === "ready");
+  const externallyArchivedIds = new Set(external.map((entry) => entry.sessionId));
+  const eligible = orphanDescriptors.every((descriptor) => externallyArchivedIds.has(descriptor.sessionId)
+    || descriptor.status === "retirable");
+  if (!eligible) return null;
+  const recovery = external.length === 0
+    ? "retire-orphans"
+    : external.length === activeDescriptors.length
+      ? "retire-externally-archived-orphans"
+      : "retire-mixed-orphans";
+  return readyRecoveryPlan({
+    schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+    root: binding.root,
+    stateSha256: binding.stateSha256,
+    revision: binding.revision,
+    sessionCleanup: null,
+    closure: recovery === "retire-externally-archived-orphans"
+      ? "unbound-externally-archived-orphans"
+      : recovery === "retire-mixed-orphans"
+        ? "unbound-mixed-orphans"
+        : "unbound-orphans",
+    activeDescriptorCount: activeDescriptors.length,
+    recovery,
+    expectedBindingStatus: binding.status,
+    orphanDescriptors: orphanDescriptors.map(descriptorRecoveryBinding),
+    ...(external.length > 0 ? { externalRetirements: external.map(externalRetirementBinding) } : {}),
+    applyAction: null,
+  }, scriptPath);
+}
+
 /**
  * Plan only closed crash residues. A single validated unbound active
  * descriptor can be rebound through explicit PO confirmation. Multiple exact
- * descriptors may be retired only when every descriptor has no cleanup
- * manifest and its owner is proven non-live/reused or is a legacy V1 owner
- * whose liveness is deliberately unobserved; that legacy case is therefore a
- * Human-only, digest-bound recovery rather than an automatic cleanup. A bound
- * handle whose private descriptor and closure receipt are both absent can be
- * released. Active bound descriptors still require ordinary cleanup and closed
- * ones release-binding.
+ * descriptors may be retired only when each one either has no cleanup manifest
+ * and is independently retirable, or carries the separate external-archive
+ * proof. The legacy V1 owner case is therefore a Human-only, digest-bound
+ * recovery rather than an automatic cleanup. A bound handle whose private
+ * descriptor and closure receipt are both absent can be released. Active bound
+ * descriptors still require ordinary cleanup and closed ones release-binding.
  */
 export function planSessionCleanupRecovery({
   rootDir,
@@ -712,32 +778,14 @@ export function planSessionCleanupRecovery({
       descriptor.sessionId,
       { expectedDescriptorSha256: descriptor.descriptorSha256 },
     ));
-    if (externalRetirements.every((entry) => entry.status === "ready")) {
-      return readyRecoveryPlan({
-        schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
-        root: binding.root,
-        stateSha256: binding.stateSha256,
-        revision: binding.revision,
-        sessionCleanup: null,
-        closure: "unbound-externally-archived-orphans",
-        activeDescriptorCount: activeDescriptors.length,
-        recovery: "retire-externally-archived-orphans",
-        expectedBindingStatus: binding.status,
-        orphanDescriptors: orphanDescriptors.map((descriptor) => ({
-          sessionId: descriptor.sessionId,
-          descriptorSha256: descriptor.descriptorSha256,
-          ownerStatus: descriptor.ownerStatus,
-        })),
-        externalRetirements: externalRetirements.map((entry) => ({
-          sessionId: entry.sessionId,
-          descriptorSha256: entry.descriptorSha256,
-          ownerStatus: entry.ownerStatus,
-          manifestSha256: entry.manifestSha256,
-          resources: entry.resources,
-        })),
-        applyAction: null,
-      }, scriptPath);
-    }
+    const plan = planExactOrphanRetirement({
+      binding,
+      activeDescriptors,
+      orphanDescriptors,
+      externalRetirements,
+      scriptPath,
+    });
+    if (plan !== null) return plan;
     if (orphanDescriptors.some((descriptor) => descriptor.status !== "retirable")) {
       return {
         schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
@@ -745,23 +793,7 @@ export function planSessionCleanupRecovery({
         activeDescriptorCount: activeDescriptors.length,
       };
     }
-    return readyRecoveryPlan({
-      schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
-      root: binding.root,
-      stateSha256: binding.stateSha256,
-      revision: binding.revision,
-      sessionCleanup: null,
-      closure: "unbound-orphans",
-      activeDescriptorCount: activeDescriptors.length,
-      recovery: "retire-orphans",
-      expectedBindingStatus: binding.status,
-      orphanDescriptors: orphanDescriptors.map((descriptor) => ({
-        sessionId: descriptor.sessionId,
-        descriptorSha256: descriptor.descriptorSha256,
-        ownerStatus: descriptor.ownerStatus,
-      })),
-      applyAction: null,
-    }, scriptPath);
+    fail("WT-SESSION-RECOVERY-PLAN", "orphan retirement proof was not constructible");
   }
   if (binding.status === "closed-bound") {
     const closure = inspectClosure(binding.root, binding.sessionCleanup.sessionId, {
@@ -816,36 +848,32 @@ export function planSessionCleanupRecovery({
         status: "not-needed",
       };
     }
-    if (activeDescriptors.length > 1) {
-      const orphanDescriptors = activeDescriptors.map((descriptor) => inspectRetirement(
-        binding.root,
-        descriptor.sessionId,
-        { expectedDescriptorSha256: descriptor.descriptorSha256 },
-      ));
-      if (orphanDescriptors.some((descriptor) => descriptor.status !== "retirable")) {
-        return {
-          schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
-          status: "orphan-recovery-unavailable",
-          activeDescriptorCount: activeDescriptors.length,
-        };
-      }
-      return readyRecoveryPlan({
+    const orphanDescriptors = activeDescriptors.map((descriptor) => inspectRetirement(
+      binding.root,
+      descriptor.sessionId,
+      { expectedDescriptorSha256: descriptor.descriptorSha256 },
+    ));
+    const inspectExternal = deps.inspectExternallyArchivedSessionFn
+      ?? inspectExternallyArchivedSession;
+    const externalRetirements = activeDescriptors.map((descriptor) => inspectExternal(
+      binding.root,
+      descriptor.sessionId,
+      { expectedDescriptorSha256: descriptor.descriptorSha256 },
+    ));
+    if (activeDescriptors.length > 1 || externalRetirements.some((entry) => entry.status === "ready")) {
+      const plan = planExactOrphanRetirement({
+        binding,
+        activeDescriptors,
+        orphanDescriptors,
+        externalRetirements,
+        scriptPath,
+      });
+      if (plan !== null) return plan;
+      return {
         schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
-        root: binding.root,
-        stateSha256: binding.stateSha256,
-        revision: binding.revision,
-        sessionCleanup: null,
-        closure: "unbound-orphans",
+        status: "orphan-recovery-unavailable",
         activeDescriptorCount: activeDescriptors.length,
-        recovery: "retire-orphans",
-        expectedBindingStatus: "unbound",
-        orphanDescriptors: orphanDescriptors.map((descriptor) => ({
-          sessionId: descriptor.sessionId,
-          descriptorSha256: descriptor.descriptorSha256,
-          ownerStatus: descriptor.ownerStatus,
-        })),
-        applyAction: null,
-      }, scriptPath);
+      };
     }
     if (activeDescriptors.length !== 1) {
       return {
@@ -1054,7 +1082,11 @@ export function applySessionCleanupRecovery({
       deps,
     });
   }
-  if (new Set(["retire-orphans", "retire-externally-archived-orphans"]).has(plan.recovery)) {
+  if (new Set([
+    "retire-orphans",
+    "retire-externally-archived-orphans",
+    "retire-mixed-orphans",
+  ]).has(plan.recovery)) {
     const inspectRetirement = deps.inspectSessionRetirementFn
       ?? inspectSessionRetirement;
     const loadDescriptor = deps.loadSessionDescriptorFn ?? loadSessionDescriptor;
@@ -1071,7 +1103,9 @@ export function applySessionCleanupRecovery({
       const observed = inspectRetirement(plan.root, expected.sessionId, {
         expectedDescriptorSha256: expected.descriptorSha256,
       });
-      const expectedRetirementStatus = plan.recovery === "retire-externally-archived-orphans"
+      const requiresExternalRetirement = plan.recovery === "retire-externally-archived-orphans"
+        || (plan.recovery === "retire-mixed-orphans" && externalById.has(expected.sessionId));
+      const expectedRetirementStatus = requiresExternalRetirement
         ? "cleanup-required" : "retirable";
       if (observed.status !== expectedRetirementStatus
         || observed.ownerStatus !== expected.ownerStatus
@@ -1083,7 +1117,9 @@ export function applySessionCleanupRecovery({
       });
     });
     for (const descriptor of prepared) {
-      if (plan.recovery === "retire-externally-archived-orphans") {
+      const requiresExternalRetirement = plan.recovery === "retire-externally-archived-orphans"
+        || (plan.recovery === "retire-mixed-orphans" && externalById.has(descriptor.sessionId));
+      if (requiresExternalRetirement) {
         const expected = externalById.get(descriptor.sessionId);
         if (!expected || expected.descriptorSha256 !== descriptor.descriptorSha256) {
           fail("WT-SESSION-RECOVERY-PLAN", "external retirement descriptor binding changed");
@@ -1130,8 +1166,8 @@ export function applySessionCleanupRecovery({
       stateSha256: readback.stateSha256,
       revision: readback.revision,
       retiredDescriptorCount: prepared.length,
-      externallyArchivedDescriptorCount: plan.recovery === "retire-externally-archived-orphans"
-        ? prepared.length : 0,
+      externallyArchivedDescriptorCount: ["retire-externally-archived-orphans", "retire-mixed-orphans"].includes(plan.recovery)
+        ? externalById.size : 0,
     };
   }
   if (plan.recovery === "release-closed-feature") {

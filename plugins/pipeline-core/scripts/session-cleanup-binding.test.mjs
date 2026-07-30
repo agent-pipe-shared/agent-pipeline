@@ -524,6 +524,57 @@ test("an explicitly confirmed recovery retires only externally archived disposab
   }
 });
 
+test("a mixed recovery binds external archival proof to only its matching descriptor", () => {
+  const root = fixture("closed-transition-mixed-archive");
+  try {
+    gitRun(root, ["add", ".claude"]);
+    gitRun(root, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "fixture: mixed archive recovery"]);
+    const closedAt = "2026-07-30T08:00:00.000Z";
+    writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+      schema: "pipeline.state.v0",
+      planApproved: false,
+      updatedAt: closedAt,
+      closedFeatures: [{
+        id: "closed-transition",
+        planPath: "specs/closed/prd.md",
+        phaseAtClose: "implementation",
+        closedAt,
+        closedBy: "PO",
+        forCommit: null,
+      }],
+    }, null, 2)}\n`);
+    const archived = startSessionDescriptor(root, {
+      sessionId: "session-closed-transition-mixed-archive",
+    });
+    const record = createDetachedWorktree(root, "archive", gitRun(root, ["rev-parse", "HEAD"]), archived);
+    gitRun(root, ["worktree", "remove", record.physicalPath]);
+    const archivedLegacy = rewriteAsLegacyDescriptor(root, archived.sessionId);
+    const capability = rewriteAsLegacyDescriptor(root, startSessionDescriptor(root, {
+      sessionId: "capability-closed-transition-mixed-archive",
+    }).sessionId);
+
+    const plan = invoke(["plan-recovery", "--repo", root]).output;
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.recovery, "retire-mixed-orphans");
+    assert.deepEqual(plan.externalRetirements.map((entry) => entry.sessionId), [archivedLegacy.sessionId]);
+    assert.deepEqual(plan.orphanDescriptors.map((entry) => entry.sessionId).sort(), [
+      archivedLegacy.sessionId,
+      capability.sessionId,
+    ].sort());
+    const applied = invoke([
+      "apply-recovery", "--repo", root,
+      "--plan-sha256", plan.planSha256,
+      "--activate",
+    ]).output;
+    assert.equal(applied.status, "retired");
+    assert.equal(applied.retiredDescriptorCount, 2);
+    assert.equal(applied.externallyArchivedDescriptorCount, 1);
+    assert.deepEqual(listActiveSessionDescriptors(root), []);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("status lists sanitized descriptor owner observations in sorted order", () => {
   const root = fixture("owner-status");
   try {

@@ -299,10 +299,12 @@ node plugins/pipeline-core/scripts/session-cleanup.mjs plan-recovery --repo /abs
 node plugins/pipeline-core/scripts/session-cleanup.mjs apply-recovery --repo /absolute/consumer/root --plan-sha256 <digest-from-plan> --activate
 ```
 
-The plan is available only when every remaining target is a missing,
-non-sole-copy `disposable-control` worktree under `branch/detached`, its
-descriptor digest and manifest digest still match, and the recorded owner is
-not live. Activation records `WT-EXTERNALLY-ARCHIVED` in the completed closure
-receipt and retires only that exact descriptor/manifest. It never accepts a
-scratch file, generated output, implementation worktree, present path, or
-path-prefix guess.
+Every externally archived descriptor must prove a missing, non-sole-copy
+`disposable-control` worktree under `branch/detached`; its descriptor digest
+and manifest digest must still match and its recorded owner must not be live.
+Activation records `WT-EXTERNALLY-ARCHIVED` in the completed closure receipt
+and retires only that exact descriptor/manifest. A stale capability-only
+descriptor without a cleanup manifest may be included in the same plan only
+when it separately proves normally retirable; it never inherits the archive
+exception. The recovery never accepts a scratch file, generated output,
+implementation worktree, present path, or path-prefix guess.
