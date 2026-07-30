@@ -368,6 +368,42 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   const tree = gitAt(dir, "rev-parse", "HEAD^{tree}").stdout.trim();
   writeEvidence(dir, "evidence/security-latest.json", exactSecurityEvidence({ head, tree }));
+  writeEvidence(dir, "evidence/security-latest.v2.json", {
+    schema: "pipeline.security-evidence.v2",
+    policy: { configurationSha256: "e".repeat(64) },
+    input: { commit: head, tree, inputSha256: "f".repeat(64) },
+    environment: { platform: process.platform, nodeVersion: process.version },
+    capabilities: [
+      {
+        capabilityId: "cap.secrets",
+        tool: { name: "gitleaks", version: null },
+        rulePack: { ref: "gitleaks-default", digest: null },
+        status: "PASS",
+        classification: "clean",
+        findings: [],
+        coverage: {
+          subject: "candidate-tree",
+          exclusions: [],
+          ignored: [],
+          unsupportedScope: [],
+          truncation: { truncated: false, scannedFileCount: null, totalEligibleFileCount: null },
+          dataAge: { ageSeconds: 0, snapshotAt: null },
+        },
+        reason: null,
+      },
+    ],
+  });
+  writeEvidence(dir, "evidence/security-latest.v2.verdict.json", {
+    schema: "pipeline.security-verdict.v2",
+    producedFrom: "pipeline.security-evidence.v2",
+    exitAuthority: "v1-blocking-logic",
+    note: "fixture",
+    v1ExitCode: 0,
+    plan: { required: ["cap.secrets"], optional: [], planDigest: "g".repeat(64), source: "fixture", resolvedPolicyDigest: "h".repeat(64) },
+    capabilityOutcomes: { "cap.secrets": "pass" },
+    verdict: { blocking: false, offendingCapabilities: [] },
+    controls: [],
+  });
   check("PG13 allow  all-green (verify + security fresh, standing-approved)", PUSH_CMD, dir, ALLOW, { stderrEmpty: true });
 }
 
