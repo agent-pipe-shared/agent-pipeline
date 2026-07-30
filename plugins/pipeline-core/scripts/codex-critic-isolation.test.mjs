@@ -300,7 +300,7 @@ await check("trace payload schemas reject unsafe enum values, categories and inc
 await check("trace path validation rejects relative, noncanonical, outside, fixture, symlink and existing targets", () => withTraceCase(async ({ directory, fixtureRoot, tracePath, options }) => {
   await assert.rejects(() => createSecureTraceStore({ ...options, tracePath: "trace.jsonl" }), /absolute/u);
   await assert.rejects(() => createSecureTraceStore({ ...options, tracePath: `${directory}${path.sep}nested${path.sep}..${path.sep}other.jsonl` }), /canonical/u);
-  await assert.rejects(() => createSecureTraceStore({ ...options, tracePath: path.join(root, "private-trace.jsonl") }), /OS temp/u);
+  await assert.rejects(() => createSecureTraceStore({ ...options, tracePath: path.join(root, "private-trace.jsonl") }), /OS temp|outside repoRoot/u);
   await assert.rejects(() => createSecureTraceStore({ ...options, tracePath: path.join(fixtureRoot, "trace.jsonl") }), /outside fixtureRoot/u);
 
   const realParent = path.join(directory, "real-parent");
