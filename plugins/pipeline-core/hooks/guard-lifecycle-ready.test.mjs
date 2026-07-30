@@ -405,6 +405,7 @@ test("non-ready governed roots retain a narrow simple-command read-only diagnost
       "git diff --check",
       "git rev-parse HEAD",
       "git config --get branch.main.remote",
+      "git fetch origin refs/heads/main:refs/remotes/origin/main",
     ]) {
       assert.equal(isReadOnlyDiagnosticCommand(command, path), true, command);
       assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {

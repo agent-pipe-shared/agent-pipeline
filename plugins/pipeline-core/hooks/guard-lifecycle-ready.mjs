@@ -244,6 +244,11 @@ export function isReadOnlyDiagnosticCommand(command, root) {
       arg === "--list" || arg === "--show-current" || arg === "--contains" || arg.startsWith("--format="));
   }
   if (subcommand === "remote") return subargs.length === 0 || (subargs.length === 1 && subargs[0] === "-v");
+  // Fetch updates only remote-tracking/object state; it never changes the
+  // index or working tree.  A stale or migration-required lifecycle must not
+  // prevent an operator from observing the current upstream.  Destructive
+  // adoption remains separately guarded at checkout/switch time.
+  if (subcommand === "fetch") return true;
   return subcommand === "config"
     && subargs.length >= 2
     && ["--get", "--get-all", "--get-regexp"].includes(subargs[0]);

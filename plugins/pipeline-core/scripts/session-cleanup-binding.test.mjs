@@ -128,7 +128,11 @@ test("release-binding completes an interrupted post-cleanup State release", () =
     assert.equal(cleanupSession(root, loaded, { allowAbsent: true }).ok, true);
     retireSessionDescriptor(root, loaded);
     assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "bound");
-    const released = invoke(["release-binding", "--repo", root]);
+    const released = invoke(["release-binding", "--repo", root], {
+      requireProjectOnboardingReadyFn() {
+        throw new Error("legacy authority migration is still pending");
+      },
+    });
     assert.equal(released.output.code, "WT-SESSION-BINDING-RELEASED");
     assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
   } finally {

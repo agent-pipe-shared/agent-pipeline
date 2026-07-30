@@ -309,7 +309,11 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       };
     }
   } else if (command === "release-binding") {
-    requireReady({ rootDir: repo, intent: "session" });
+    // This is a narrow, exact post-cleanup CAS release.  Requiring general
+    // onboarding readiness here creates a cycle when a legacy authority's
+    // migration is blocked solely by the stale cleanup tuple that this command
+    // is designed to release.  The closure receipt and persisted tuple below
+    // remain the complete mutation authority.
     const readBinding = dependencies.readOnboardingSessionCleanupBindingFn
       ?? readOnboardingSessionCleanupBinding;
     const inspectClosure = dependencies.inspectSessionClosureFn
