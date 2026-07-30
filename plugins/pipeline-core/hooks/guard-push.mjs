@@ -110,7 +110,12 @@
  * trustworthy and says something is incomplete." The v2 pair being absent entirely (an older
  * security-scan.mjs invocation, or the files were never generated) is ALSO fail-closed — v2
  * emission is unconditional whenever security-scan.mjs runs at all post-CYB-2E, matching this
- * file's "never silent-block, never silent-pass" doctrine.
+ * file's "never silent-block, never silent-pass" doctrine. The check logic itself (CYB-2I-0,
+ * Wave 6 foundation) now lives in the shared, parameterized, exported
+ * `checkSecurityCompleteness` function in `../lib/security-completeness-gate.mjs` — extracted
+ * so CYB-2I-1/2/3 (PR/Close/Release) can each call the exact same evaluator instead of
+ * hand-rolling their own copy (AC8); this file's own call site only resolves and passes in
+ * `evidenceProjectDir`/`sourceCommit`/`resolveSourceTree()`.
  *
  * VERIFY: node plugins/pipeline-core/hooks/guard-push.test.mjs
  */
@@ -149,7 +154,7 @@ function projectManifestRelPath(rootDir) {
 function projectCalibrationRelPath(rootDir) {
   return projectAuthorityRelPath(rootDir, "calibration", NEUTRAL_CALIBRATION, LEGACY_CALIBRATION);
 }
-import { evaluateAllCapabilities, aggregateVerdict, validateSecurityEvidenceV2 } from "../lib/security-evidence-evaluator.mjs";
+import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
 
 function emit(code, lines) {
   process.stderr.write(lines.filter(Boolean).join("\n") + "\n");
@@ -1324,7 +1329,7 @@ function validSha256(value) {
 }
 
 // Memoized: `undefined` = not yet resolved. `checkSecurityEvidenceBinding` (v1, below)
-// and the v2 call site (checkSecurityEvidenceV2's caller, further down) both need "the
+// and the v2 call site (`checkSecurityCompleteness`'s caller, further down) both need "the
 // pushed source commit's tree OID" -- this makes that ONE `git rev-parse ...^{tree}`
 // call shared instead of each computing it independently (Finding 5, CYB-2F
 // self-application Critic review 2026-07-30: the duplication was itself a hidden second
@@ -1368,169 +1373,6 @@ function checkSecurityEvidenceBinding() {
   return [...new Set(failures)];
 }
 
-/**
- * v2 policy-complete verdict consult (CYB-2F, additive — PO decision 2026-07-29,
- * docs/state.md; see this file's header comment "V2 POLICY-COMPLETE VERDICT"). Sits
- * alongside `checkSecurityEvidenceBinding` (the v1-only check, untouched by this
- * function) — NEVER replaces its severity-based authority, only adds one new,
- * independent completeness failure mode: `evidence/security-latest.v2.verdict.json`'s
- * `verdict.blocking`.
- *
- * BINDING PROOF (CYB-2F briefing Field 1 items 1-3):
- *   1. The envelope (`security-latest.v2.json`) must itself bind to the pushed source
- *      via `input.commit`/`input.tree`, exactly like the v1 candidate binding above —
- *      using the caller's already-resolved `sourceTree` (no second `git rev-parse`
- *      inside this function; `sourceCommit` is the same file-level constant (b) uses).
- *   2. The verdict.json's `capabilityOutcomes`/`verdict` must be reconcilable against
- *      the envelope's OWN `capabilities[].status`/`.classification`: this function feeds
- *      the envelope's capability records (capabilityId/tool/status/classification/reason
- *      only — nothing else) plus the verdict's own persisted `plan.required`/
- *      `plan.optional` into the SAME pure, exported `evaluateAllCapabilities`/
- *      `aggregateVerdict` functions security-scan.mjs itself calls to produce these
- *      fields, and requires the recomputed PER-CAPABILITY outcome map to match the
- *      persisted `capabilityOutcomes` map exactly for every capabilityId present on
- *      either side, tolerating only the `{"invalid","execution-unavailable"}` pair as
- *      mutually equivalent (see the comparison block below for why that ONE pair alone
- *      is unreconstructable from persisted data) — plus an independent `blocking`
- *      boolean match. A verdict.json produced by an earlier/different run than the fresh
- *      envelope sitting next to it (or hand-edited independently of it) will, with
- *      overwhelming likelihood, fail this reconstruction, because the recomputed verdict
- *      reflects the FRESH envelope's own capability records, not whatever the
- *      stale/tampered verdict.json separately claims — a genuine cross-run staleness/
- *      tamper proof, not merely a schema-shape check.
- *   3. Any failure above (envelope missing/stale/mismatched, verdict.json missing/
- *      malformed/schema-wrong, or the reconstruction failing to match) is returned as
- *      its OWN failure line and short-circuits before item 4 below runs at all — kept
- *      distinct from a `verdict.blocking === true` failure so a `blocking` reading is
- *      never surfaced from evidence this function cannot itself vouch for.
- *
- * MISSING-EVIDENCE DEFAULT (Field 1 item 4): the v2 pair (envelope OR verdict) being
- * absent entirely is fail-closed here too, the same "never silent-block, never
- * silent-pass" doctrine `checkSecurityEvidenceBinding` already applies to a missing
- * `evidence/security-latest.json` — v2 emission is unconditional whenever
- * security-scan.mjs runs at all post-CYB-2E, and this function is only ever reached
- * once the security gate is already confirmed active (same guard clause as (b)).
- */
-function checkSecurityEvidenceV2(sourceTree) {
-  const failures = [];
-  const envelopeRead = readEvidence("evidence/security-latest.v2.json");
-  const verdictRead = readEvidence("evidence/security-latest.v2.verdict.json");
-  if (!envelopeRead.ok) failures.push(envelopeRead.reason);
-  if (!verdictRead.ok) failures.push(verdictRead.reason);
-  if (!envelopeRead.ok || !verdictRead.ok) return failures;
-
-  const envelope = envelopeRead.data;
-  const verdictDoc = verdictRead.data;
-
-  // Envelope schema-shape validation (Finding 6, CYB-2F self-application Critic review
-  // 2026-07-30): reuses the real exported full-schema validator (PART A of
-  // security-evidence-evaluator.mjs) instead of a hand-rolled narrow subset that
-  // previously checked only the schema string + a non-empty `capabilities` array,
-  // silently trusting the rest of the envelope's shape (policy/environment identity,
-  // per-capability tool/rulePack/findings/coverage shape). The candidate-BINDING checks
-  // right below (commit/tree matching the pushed source) stay hand-rolled: they are
-  // this gate's own job, not generic schema shape -- the real validator has no notion of
-  // "the pushed source" to check field values against.
-  const envelopeValidation = validateSecurityEvidenceV2(envelope);
-  if (!envelopeValidation.valid) {
-    failures.push(
-      `evidence/security-latest.v2.json: envelope schema is invalid (${envelopeValidation.errors.map((e) => e.message).join("; ")})`,
-    );
-  }
-  if (envelope?.input?.commit !== sourceCommit) {
-    failures.push("evidence/security-latest.v2.json: input commit does not match the pushed source");
-  }
-  if (!sourceTree || envelope?.input?.tree !== sourceTree) {
-    failures.push("evidence/security-latest.v2.json: input tree does not match the pushed source");
-  }
-  if (verdictDoc?.schema !== "pipeline.security-verdict.v2") {
-    failures.push("evidence/security-latest.v2.verdict.json: exact policy-complete verdict v2 schema is required");
-  }
-  const plan = verdictDoc?.plan;
-  if (!plan || !Array.isArray(plan.required) || !Array.isArray(plan.optional)) {
-    failures.push("evidence/security-latest.v2.verdict.json: plan.required/plan.optional is missing or malformed");
-  }
-  const verdictBlock = verdictDoc?.verdict;
-  if (typeof verdictBlock?.blocking !== "boolean" || !Array.isArray(verdictBlock?.offendingCapabilities)) {
-    failures.push("evidence/security-latest.v2.verdict.json: verdict.blocking/offendingCapabilities shape is invalid");
-  }
-  const persistedOutcomes = verdictDoc?.capabilityOutcomes;
-  if (!persistedOutcomes || typeof persistedOutcomes !== "object" || Array.isArray(persistedOutcomes)) {
-    failures.push("evidence/security-latest.v2.verdict.json: capabilityOutcomes map is missing or malformed");
-  }
-  if (failures.length > 0) return failures;
-
-  let recomputed;
-  let recomputedOutcomes;
-  try {
-    const evalCandidate = {
-      capabilities: envelope.capabilities.map((c) => ({
-        id: c?.capabilityId,
-        tool: c?.tool?.name,
-        status: c?.status,
-        classification: c?.classification,
-        reason: c?.reason ?? null,
-      })),
-    };
-    const planForEval = { required: plan.required, optional: plan.optional };
-    recomputedOutcomes = evaluateAllCapabilities(evalCandidate, planForEval);
-    recomputed = aggregateVerdict(recomputedOutcomes, planForEval);
-  } catch (e) {
-    return [
-      `evidence/security-latest.v2.verdict.json: capabilityOutcomes could not be reconciled against ` +
-        `evidence/security-latest.v2.json's capability records (${e.message})`,
-    ];
-  }
-
-  // Per-capabilityId outcome comparison (Finding 2, CYB-2F self-application Critic review
-  // 2026-07-30 -- narrows the prior, over-broad tolerance). `evaluateCapability`'s
-  // ERROR-status branch alone picks "invalid" vs "execution-unavailable" based on
-  // `capability.raw` (the scanner's captured raw output), a field the persisted v2
-  // envelope schema (`v2CapabilityRecord`, security-scan.mjs) never carries -- it is
-  // never written to disk at all, only used transiently inside security-scan.mjs's own
-  // original computation. This function's reconstruction therefore always evaluates
-  // `raw` as absent for an ERROR-status capability, so ONLY the
-  // `{"invalid","execution-unavailable"}` pair is genuinely unreconstructable from
-  // persisted data and must be tolerated, in EITHER direction. Every OTHER outcome value
-  // across the full ten-member RUN_OUTCOMES vocabulary is fully and unambiguously
-  // derivable from persisted `status`+`required` alone -- a mismatch on any of those
-  // (e.g. a persisted "unsupported" against a recomputed "required-capability-missing")
-  // is a genuine staleness/tamper signal and must BLOCK, not be silently tolerated.
-  // Comparing only `blocking` + the capabilityId SET (the prior approach) accidentally
-  // tolerated exactly this kind of non-ERROR divergence too, because a lied outcome
-  // string never changes which capabilityId is offending nor the aggregate `blocking`
-  // boolean -- only the label. This compares every capabilityId present on EITHER side
-  // of the persisted `capabilityOutcomes` map against the freshly recomputed
-  // per-capability outcome map; the actual reported outcome string in the failure line
-  // below still always comes from the PERSISTED verdict, never from this reconstruction.
-  const AMBIGUOUS_ERROR_OUTCOMES = new Set(["invalid", "execution-unavailable"]);
-  function outcomeMatches(recomputedOutcome, persistedOutcome) {
-    if (recomputedOutcome === persistedOutcome) return true;
-    return AMBIGUOUS_ERROR_OUTCOMES.has(recomputedOutcome) && AMBIGUOUS_ERROR_OUTCOMES.has(persistedOutcome);
-  }
-  const outcomeCapabilityIds = new Set([...Object.keys(recomputedOutcomes), ...Object.keys(persistedOutcomes)]);
-  const outcomesConsistent = [...outcomeCapabilityIds].every((capabilityId) =>
-    outcomeMatches(recomputedOutcomes[capabilityId], persistedOutcomes[capabilityId]),
-  );
-  const isConsistent = recomputed.blocking === verdictBlock.blocking && outcomesConsistent;
-  if (!isConsistent) {
-    return [
-      "evidence/security-latest.v2.verdict.json: verdict is not consistent with evidence/security-latest.v2.json's " +
-        "capability records (stale or mismatched pair)",
-    ];
-  }
-
-  if (verdictBlock.blocking === true) {
-    for (const offender of verdictBlock.offendingCapabilities) {
-      failures.push(
-        `evidence/security-latest.v2.verdict.json: required capability ${offender?.capabilityId} did not reach ` +
-          `an accepted state (outcome=${offender?.outcome})`,
-      );
-    }
-  }
-  return failures;
-}
-
 const failures = [];
 
 // (a) verify evidence -- always checked once the push gate is active.
@@ -1542,11 +1384,14 @@ if (securityGate && securityGate.mode !== "off") {
   failures.push(...checkSecurityEvidenceBinding());
 
   // (b.2) v2 policy-complete verdict -- additive, same trigger as (b), never replacing
-  // its severity-based authority (CYB-2F; see checkSecurityEvidenceV2's header comment
-  // and this file's header "V2 POLICY-COMPLETE VERDICT" paragraph). Reuses the single
+  // its severity-based authority (CYB-2F; see this file's header "V2 POLICY-COMPLETE
+  // VERDICT" paragraph and `checkSecurityCompleteness`'s own header comment in
+  // ../lib/security-completeness-gate.mjs, CYB-2I-0). Reuses the single
   // `resolveSourceTree()` computation `checkSecurityEvidenceBinding()` above may already
   // have triggered (Finding 5) -- never a second independent `git rev-parse`.
-  failures.push(...checkSecurityEvidenceV2(resolveSourceTree()));
+  failures.push(
+    ...checkSecurityCompleteness({ projectDir: evidenceProjectDir, commit: sourceCommit, tree: resolveSourceTree() }),
+  );
 }
 
 // (b.1) self-application-only anonymous public range and dedicated authenticated
