@@ -98,9 +98,10 @@ foundation-first story.
    decision and plan, or elsewhere) as part of the task, which is a bigger ask
    than "add a call here." Flagging so it isn't silently assumed to be as
    simple as CYB-2I-2.
-3. **CYB-1h's own spec line ("registered via CYB-2's scoped-registration
-   mechanism") appears to describe something that doesn't exist the way it's
-   worded.** The actual `scoped-verify-registration` mechanism
+3. **RESOLVED (PO decision, 2026-07-30):** CYB-1h's own spec line
+   ("registered via CYB-2's scoped-registration mechanism") described
+   something that doesn't exist the way it's worded — the actual
+   `scoped-verify-registration` mechanism
    (`plugins/pipeline-core/lib/scoped-verify-registration.mjs`,
    `SCOPED_VERIFY_REGISTRATION_TASK_ID = "pipeline.verify-gate-scoped-registration"`)
    is a Sentinel-epic artifact, hard-pinned by sha256 to
@@ -109,13 +110,10 @@ foundation-first story.
    suites so far (e.g. `guard-push-v2-tests`, this session) were registered
    as plain `TEST_SUITES` entries in `verify.mjs`, NOT through this scoped
    mechanism — there is no distinct "CYB-2 scoped-registration mechanism".
-   **PO decision needed before CYB-1h can be briefed:** (a) extend the
-   existing Sentinel-pinned mechanism to also authorize a CYB-1/CYB-2 PRD
-   binding (a real, cross-epic schema change to a frozen allowlist), or (b)
-   register CYB-1h's suite as a plain `TEST_SUITES` entry like the rest of
-   CYB-2's suites, treating the original epic wording as stale/aspirational
-   rather than a binding requirement. Recommend (b) as the lower-risk,
-   precedent-consistent choice, but this is a PO call, not an Elephant one.
+   **PO chose option (b): register CYB-1h's suite as a plain `TEST_SUITES`
+   entry**, like the rest of CYB-2's suites, treating the original epic
+   wording as stale/aspirational rather than a binding requirement. CYB-1h
+   can now be briefed precisely on this basis.
 4. **CYB-2I-5's concrete CI mechanism is not yet scoped** — needs a quick
    survey of `.github/workflows/*.yml` for an existing network-isolation
    pattern (or confirmation none exists) before its briefing can be written
