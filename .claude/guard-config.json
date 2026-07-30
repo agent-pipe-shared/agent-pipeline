@@ -22,8 +22,8 @@
     },
     {
       "id": "TP-5",
-      "pattern": "(?:plugins/pipeline-core/hooks/guard-push|harness/scripts/pipeline-state)\\.test\\.mjs$",
-      "reason": "guard-push test suite gates the release/deploy push-enforcement hook, and pipeline-state test suite gates the deployApprovals state writer (E5/QG-04) — no ad-hoc edits outside a briefed test-change task."
+      "pattern": "(?:plugins/pipeline-core/hooks/guard-push(?:-v2)?|harness/scripts/pipeline-state)\\.test\\.mjs$",
+      "reason": "guard-push and guard-push-v2 test suites gate the release/deploy push-enforcement hook (v1 severity-based + v2 policy-completeness checks), and pipeline-state test suite gates the deployApprovals state writer (E5/QG-04) — no ad-hoc edits outside a briefed test-change task."
     }
   ]
 }
