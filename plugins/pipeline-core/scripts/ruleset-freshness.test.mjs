@@ -14,12 +14,14 @@ import {
   FRESHNESS_HOST_RESULT_SCHEMA,
   FRESHNESS_HOST_TRANSPORT_SCHEMA,
   FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
+  freshnessHostPlanForEnvironment,
   inspectClaudeRulesetFreshness,
   inspectCliRulesetFreshness,
   inspectRulesetFreshness,
   observePublicRemoteIdentity,
   PUBLIC_MARKETPLACE_URL,
   RULESET_FRESHNESS_SCHEMA,
+  withFreshnessHostRequest,
 } from "./ruleset-freshness.mjs";
 
 const roots = [];
@@ -136,6 +138,32 @@ test("a restricted preflight without its exact selected host transport fails clo
   });
   assert.deepEqual(observed, { status: "remote-unavailable", identity: null, reason: "host-transport-required" });
   assert.equal(attempts, 0);
+});
+
+test("WSL CLI planning emits a bound host request and never restores a default sandbox fallback", () => {
+  const plan = freshnessHostPlanForEnvironment({ WSL_DISTRO_NAME: "Ubuntu" });
+  assert.deepEqual(plan.networkPreflight, {
+    schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
+    network: "restricted",
+    boundaryId: "pipeline-start-host-authorized-wsl",
+  });
+  const unavailable = {
+    schema: RULESET_FRESHNESS_SCHEMA,
+    status: "remote-unavailable",
+    source: "marketplace-public",
+    loadedSha: "a".repeat(40),
+    remoteSha: null,
+    ahead: null,
+    behind: null,
+    writePermitted: false,
+    reason: "host-transport-required",
+  };
+  const output = withFreshnessHostRequest(unavailable, plan);
+  assert.deepEqual(output.nextAction, createFreshnessHostAction("pipeline-start-host-authorized-wsl"));
+  assert.equal(JSON.stringify(output).includes("/home/"), false);
+  assert.equal(JSON.stringify(output).includes(".codex"), false);
+  assert.equal(freshnessHostPlanForEnvironment({}), null);
+  assert.equal(withFreshnessHostRequest(unavailable, null), unavailable);
 });
 
 test("the normal Codex freshness entrypoint forwards a selected host transport", () => {

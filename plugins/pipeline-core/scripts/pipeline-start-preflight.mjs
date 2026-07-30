@@ -7,12 +7,11 @@ import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { observeCodexRulesetSource } from "../lib/codex-host-plugin-list.mjs";
-import { createFreshnessHostAction, FRESHNESS_NETWORK_PREFLIGHT_SCHEMA } from "./ruleset-freshness.mjs";
+import { freshnessHostPlanForExecutionBoundary } from "./ruleset-freshness.mjs";
 
 export const SCHEMA = "pipeline.start-preflight.v1";
 const PLUGIN_ID = "pipeline-core@agent-pipeline";
 const LOCAL_PLUGIN_ID = "pipeline-core@agent-pipeline-local";
-const WSL_FRESHNESS_BOUNDARY_ID = "pipeline-start-host-authorized-wsl";
 
 function readInstalledPluginList() {
   const result = spawnSync("codex", ["plugin", "list", "--json"], {
@@ -86,16 +85,7 @@ export function freshnessHostActionForPreflight(preflight) {
     || preflight.schema !== SCHEMA
     || preflight.status !== "ready"
     || preflight.executionBoundary !== "host-authorized-wsl") return null;
-  const action = createFreshnessHostAction(WSL_FRESHNESS_BOUNDARY_ID);
-  if (action === null) return null;
-  return Object.freeze({
-    networkPreflight: Object.freeze({
-      schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
-      network: "restricted",
-      boundaryId: WSL_FRESHNESS_BOUNDARY_ID,
-    }),
-    action,
-  });
+  return freshnessHostPlanForExecutionBoundary(preflight.executionBoundary);
 }
 
 export function observePipelineStartPreflight({

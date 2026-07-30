@@ -28,6 +28,7 @@ export const FRESHNESS_NETWORK_PREFLIGHT_SCHEMA = "pipeline.ruleset-freshness-ne
 export const FRESHNESS_HOST_TRANSPORT_SCHEMA = "pipeline.ruleset-freshness-host-transport.v1";
 export const FRESHNESS_HOST_ACTION_SCHEMA = "pipeline.ruleset-freshness-host-action.v1";
 export const FRESHNESS_HOST_RESULT_SCHEMA = "pipeline.ruleset-freshness-host-result.v1";
+export const WSL_FRESHNESS_BOUNDARY_ID = "pipeline-start-host-authorized-wsl";
 const SHA = /^[0-9a-f]{40,64}$/iu;
 const BOUNDARY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -95,6 +96,38 @@ export function createFreshnessHostAction(boundaryId) {
     command: Object.freeze({ executable: "git", argv: Object.freeze(["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"]) }),
   };
   return Object.freeze({ ...unsigned, requestSha256: sha256(JSON.stringify(unsigned)) });
+}
+
+/**
+ * This is a request plan, never an executor. A host integration may pass the
+ * returned preflight together with its exact host transport to
+ * inspectCliRulesetFreshness; without that adapter the CLI emits this action
+ * and fails closed rather than attempting network access in the sandbox.
+ */
+export function freshnessHostPlanForExecutionBoundary(executionBoundary) {
+  if (executionBoundary !== "host-authorized-wsl") return null;
+  const action = createFreshnessHostAction(WSL_FRESHNESS_BOUNDARY_ID);
+  if (action === null) return null;
+  return Object.freeze({
+    networkPreflight: Object.freeze({
+      schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
+      network: "restricted",
+      boundaryId: WSL_FRESHNESS_BOUNDARY_ID,
+    }),
+    action,
+  });
+}
+
+export function freshnessHostPlanForEnvironment(env = process.env) {
+  const wsl = [env?.WSL_DISTRO_NAME, env?.WSL_INTEROP]
+    .some((value) => typeof value === "string" && value.trim() !== "");
+  return freshnessHostPlanForExecutionBoundary(wsl ? "host-authorized-wsl" : "default");
+}
+
+/** Add only an actionable public host request to a CLI result that needs it. */
+export function withFreshnessHostRequest(inspected, plan) {
+  if (!plan || inspected?.status !== "remote-unavailable" || inspected.reason !== "host-transport-required") return inspected;
+  return { ...inspected, nextAction: plan.action };
 }
 
 function selectHostTransport(networkPreflight, hostTransport) {
@@ -345,12 +378,16 @@ if (isCli) {
     loadedPluginRoot,
     selfApplicationRoot: resolve(loadedPluginRoot, "..", ".."),
   });
+  const hostPlan = freshnessHostPlanForEnvironment(process.env);
   const inspected = inspectCliRulesetFreshness({
     repoPath: parsed.repo,
     loadedSha: parsed.loadedSha,
     loadedPluginRoot,
     codexObservation: codex,
+    networkPreflight: hostPlan?.networkPreflight,
   });
-  process.stdout.write(`${JSON.stringify(inspected)}\n`);
-  process.exit(inspected.status === "equal" || inspected.status === "ahead" || inspected.status === "remote-unavailable" ? 0 : 2);
+  const output = withFreshnessHostRequest(inspected, hostPlan);
+  process.stdout.write(`${JSON.stringify(output)}\n`);
+  process.exit(inspected.status === "equal" || inspected.status === "ahead"
+    || inspected.status === "remote-unavailable" && inspected.reason !== "host-transport-required" ? 0 : 2);
 }

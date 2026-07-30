@@ -158,6 +158,7 @@ const TEST_SUITES = [
   { name: "state-budget-check", file: join(pluginScriptsDir, "check-state-budgets.mjs") },
   { name: "repository-freshness-tests", file: join(pluginScriptsDir, "repository-freshness.test.mjs") },
   { name: "ruleset-freshness-tests", file: join(pluginScriptsDir, "ruleset-freshness.test.mjs") },
+  { name: "phoenix-governance-threat-model-tests", file: join(pluginScriptsDir, "phoenix-governance-threat-model.test.mjs") },
   { name: "ruleset-source-tests", file: join(libDir, "ruleset-source.test.mjs") },
   { name: "bootstrap-env-check-tests", file: join(pluginScriptsDir, "bootstrap-env-check.test.mjs") },
   { name: "critic-bare-tests", file: join(pluginScriptsDir, "critic-bare.test.mjs") },
