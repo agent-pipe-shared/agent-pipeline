@@ -688,7 +688,7 @@ test("unapproved kickoff state has no PO authority to rebind", () => {
     const deps = { ...fakeDeps };
     delete deps.observePersistedPoAuthority;
     const observed = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
-    assert.equal(observed.status, "ready");
+    assert.equal(observed.status, "ready", JSON.stringify(observed.diagnostics));
     assert.equal(observed.nextAction, null);
     assert.equal(observed.diagnostics.length, 0);
     const statePath = join(path, "project/pipeline-state.json");
@@ -697,6 +697,76 @@ test("unapproved kickoff state has no PO authority to rebind", () => {
     writeFileSync(statePath, `${JSON.stringify(malformedApproved, null, 2)}\n`);
     const rejected = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
     assert.equal(rejected.status, "partial");
+  } finally { dispose(path); }
+});
+
+test("exact revoke-plan v2 postimage keeps repeated PRD and Spec design edits writable", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const statePath = join(path, "project/pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    const planPath = state.activeFeature.planPath;
+    const planSha256 = sha256(readFileSync(join(path, planPath)));
+    const specPath = planPath.replace(/-prd\.md$/u, "-spec.md");
+    const specSha256 = sha256(readFileSync(join(path, specPath)));
+    const revokedAt = "2026-07-30T20:51:44.348Z";
+    state.continuity.authority.prd = { path: planPath, sha256: planSha256 };
+    state.continuity.authority.spec = { path: specPath, sha256: specSha256 };
+    state.planApproved = false;
+    state.updatedAt = revokedAt;
+    state.planApproval = {
+      schema: "pipeline.plan-approval.v2",
+      approvedBy: "PO",
+      approvedAt: "2026-07-29T06:42:02.837Z",
+      specBoundBy: "PO",
+      specBoundAt: "2026-07-29T17:35:13.045Z",
+      poGateAuthority: {
+        schema: "pipeline.po-gate-authority.v2",
+        humanFacing: "en",
+        sourceSha256: "a".repeat(64),
+        runtimeSha256: "b".repeat(64),
+        receiptSha256: "c".repeat(64),
+        repositoryFingerprint: "d".repeat(64),
+        planPath,
+        planSha256,
+        specPath,
+        specSha256,
+      },
+    };
+    state.planRevocation = {
+      schema: "pipeline.plan-revocation.v2",
+      planPath,
+      planSha256,
+      specPath,
+      specSha256,
+      revokedBy: "PO",
+      revokedAt,
+    };
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    const deps = { ...fakeDeps };
+    delete deps.observePersistedPoAuthority;
+    const observed = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    assert.equal(observed.status, "ready", JSON.stringify(observed.diagnostics));
+    assert.equal(observed.nextAction, null);
+    assert.deepEqual(observed.diagnostics, []);
+
+    writeFileSync(join(path, planPath), `${readFileSync(join(path, planPath), "utf8")}\nFirst revised product decision.\n`);
+    const afterPrdEdit = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    assert.equal(afterPrdEdit.status, "ready", JSON.stringify(afterPrdEdit.diagnostics));
+    writeFileSync(join(path, specPath), `${readFileSync(join(path, specPath), "utf8")}\nFirst revised technical contract.\n`);
+    writeFileSync(join(path, planPath), `${readFileSync(join(path, planPath), "utf8")}\nSecond revised product decision.\n`);
+    const afterRepeatedEdits = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    assert.equal(afterRepeatedEdits.status, "ready", JSON.stringify(afterRepeatedEdits.diagnostics));
+    assert.equal(afterRepeatedEdits.nextAction, null);
+
+    state.planRevocation.specSha256 = "e".repeat(64);
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    const rejected = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
+    assert.equal(rejected.status, "partial");
+    assertDiagnostic(rejected, "po_authority_rebind_unavailable");
   } finally { dispose(path); }
 });
 

@@ -601,13 +601,39 @@ function persistedPoAuthority(root, fs) {
       return { status: "unavailable" };
     }
     const state = JSON.parse(bytes.toString("utf8"));
-    // Kickoff state deliberately has no PO approval yet.  Host-managed
-    // repository initialization must preserve that pristine gate rather than
-    // treating the absent approval as authority drift and invoking a repair
-    // planner that can only operate on an approved feature.
+    const approvalAuthority = state?.planApproval?.poGateAuthority;
+    const revocation = state?.planRevocation;
+    const exactRevocation = state?.planApproved === false
+      && state?.activeFeature?.phase === "design"
+      && typeof state?.activeFeature?.planPath === "string"
+      && state.activeFeature.planPath === approvalAuthority?.planPath
+      && state?.planApproval?.schema === "pipeline.plan-approval.v2"
+      && revocation?.schema === "pipeline.plan-revocation.v2"
+      && typeof revocation.revokedBy === "string"
+      && revocation.revokedBy.trim() !== ""
+      && typeof revocation.revokedAt === "string"
+      && Number.isFinite(Date.parse(revocation.revokedAt))
+      && new Date(revocation.revokedAt).toISOString() === revocation.revokedAt
+      && state.updatedAt === revocation.revokedAt
+      && revocation.planPath === approvalAuthority?.planPath
+      && revocation.planSha256 === approvalAuthority?.planSha256
+      && revocation.specPath === approvalAuthority?.specPath
+      && revocation.specSha256 === approvalAuthority?.specSha256
+      && SHA256_RE.test(revocation.planSha256 ?? "")
+      && SHA256_RE.test(revocation.specSha256 ?? "")
+      && state?.continuity?.authority?.prd?.path === revocation.planPath
+      && state.continuity.authority.prd.sha256 === revocation.planSha256
+      && state?.continuity?.authority?.spec?.path === revocation.specPath
+      && state.continuity.authority.spec.sha256 === revocation.specSha256;
+    // Kickoff state deliberately has no PO approval yet. Host-managed
+    // repository initialization and the exact revoke-plan v2 postimage have no
+    // current PO approval. Preserve those gates rather than treating historical
+    // approval provenance as live authority drift and invoking a repair planner
+    // that can only operate on an approved feature.
     if (state?.activeFeature === null
       || (state?.planApproved === false
-        && (state?.planApproval === null || state?.planApproval === undefined))) {
+        && (state?.planApproval === null || state?.planApproval === undefined))
+      || exactRevocation) {
       return { status: "absent" };
     }
     if (state?.planApproved !== true
@@ -635,11 +661,16 @@ function persistedPoAuthority(root, fs) {
 function observePoAuthorityRebind(root, fs) {
   const injectedValidator = typeof fs.validatePoGateAuthorityForRepository === "function";
   const validateAuthority = fs.validatePoGateAuthorityForRepository ?? validatePoGateAuthorityForRepository;
-  const persisted = typeof fs.observePersistedPoAuthority === "function"
+  const injectedPersisted = typeof fs.observePersistedPoAuthority === "function";
+  const persisted = injectedPersisted
     ? fs.observePersistedPoAuthority(root)
     : persistedPoAuthority(root, fs);
   if (persisted.status === "drifted") return { status: "unavailable" };
   if (persisted.status === "unavailable" && !injectedValidator) return { status: "unavailable" };
+  // A pristine kickoff or exact revoke-plan v2 postimage deliberately carries
+  // no current approval. Re-validating historical State provenance as though
+  // it were live PO authority recreates the design re-entry deadlock.
+  if (persisted.status === "absent" && !injectedPersisted) return { status: "not-needed" };
   const authority = validateAuthority(persisted.status === "observed"
     ? {
       repoRoot: root,
