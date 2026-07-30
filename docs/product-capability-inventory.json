@@ -929,6 +929,12 @@
       "member": "phase3-sdlc-coherence-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:phoenix-governance-threat-model-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "phoenix-governance-threat-model-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1647,6 +1653,7 @@
         "verify-phase:harness/scripts/verify.mjs:phase26-invariants-tests",
         "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-check",
         "verify-phase:harness/scripts/verify.mjs:phase3-sdlc-coherence-tests",
+        "verify-phase:harness/scripts/verify.mjs:phoenix-governance-threat-model-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-preflight-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-start-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:pipeline-state-tests",
@@ -1744,7 +1751,8 @@
         "harness/scripts/verify.mjs"
       ],
       "testEvidence": [
-        "harness/scripts/check-doc-contracts.test.mjs"
+        "harness/scripts/check-doc-contracts.test.mjs",
+        "plugins/pipeline-core/scripts/phoenix-governance-threat-model.test.mjs"
       ],
       "targets": [
         {
