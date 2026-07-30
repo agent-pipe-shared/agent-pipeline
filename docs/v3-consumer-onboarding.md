@@ -259,7 +259,17 @@ node plugins/pipeline-core/scripts/project-authority-migration.mjs apply --root 
 sanitized pre-write preview to standard error before it can activate. The
 legacy files are retained for the compatibility reader; the neutral files are
 the only migration writes. A changed legacy source, changed neutral
-destination, mixed authority layer, or pending journal rejects activation.
+destination, or pending journal rejects activation.
+
+An ordinary `git fetch` never changes a checkout. Do not follow it with
+`git checkout --force` or `git switch --force`: those commands can overlay the
+untracked kickoff authority with a remote legacy authority. If an older host
+already left exactly that mixed state, `plan` returns the explicit
+`adopt-legacy-after-remote-checkout` recovery. Its activated apply preserves
+the existing neutral preimages under the repository's private Git common-dir,
+then copies the exact legacy authority into the neutral layer and verifies the
+result. It is a PO-confirmed recovery, not a precedence rule or a normal
+fetch-side effect.
 
 If an interrupted cutover leaves a journal, do not delete it or hand-copy its
 files. First inspect the recorded recovery, then explicitly activate it:
@@ -271,3 +281,22 @@ node plugins/pipeline-core/scripts/project-authority-migration.mjs recover --roo
 
 Recovery restores recorded preimages only after its own digest-bound preview;
 it never resumes an unreviewed write.
+
+## Externally archived temporary-worktree recovery
+
+Do not remove a Pipeline-owned worktree by hand during an active cleanup
+session. If an emergency archival was already performed outside the checkout,
+first retain the archive and then inspect the normal recovery plan:
+
+```sh
+node plugins/pipeline-core/scripts/session-cleanup.mjs plan-recovery --repo /absolute/consumer/root
+node plugins/pipeline-core/scripts/session-cleanup.mjs apply-recovery --repo /absolute/consumer/root --plan-sha256 <digest-from-plan> --activate
+```
+
+The plan is available only when every remaining target is a missing,
+non-sole-copy `disposable-control` worktree under `branch/detached`, its
+descriptor digest and manifest digest still match, and the recorded owner is
+not live. Activation records `WT-EXTERNALLY-ARCHIVED` in the completed closure
+receipt and retires only that exact descriptor/manifest. It never accepts a
+scratch file, generated output, implementation worktree, present path, or
+path-prefix guess.

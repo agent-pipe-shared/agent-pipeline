@@ -46,6 +46,7 @@ export const LEGACY_SESSION_DESCRIPTOR_SCHEMA = "pipeline.session-descriptor.v1"
 export const SESSION_OWNER_RUNTIME_SCHEMA = "pipeline.session-owner-runtime.v1";
 export const SESSION_OWNER_STATUS_SCHEMA = "pipeline.session-owner-status.v1";
 export const SESSION_RETIREMENT_STATUS_SCHEMA = "pipeline.session-retirement-status.v1";
+export const SESSION_EXTERNAL_RETIREMENT_STATUS_SCHEMA = "pipeline.session-external-retirement-status.v1";
 
 const SAFE_COMPONENT = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/;
 const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/;
@@ -667,6 +668,101 @@ export function inspectSessionRetirement(startPath, sessionId, options = {}) {
   if (owner.status === "live") return { ...base, status: "owner-live" };
   if (owner.status === "unavailable") return { ...base, status: "owner-unavailable" };
   return { ...base, status: "retirable" };
+}
+
+function externalRetirementEligibility(repo, manifest) {
+  const detachedRoot = resolve(repo.primaryRoot, "branch", "detached");
+  if (manifest.resources.length === 0) return { ok: false, reason: "empty-manifest" };
+  for (const resource of manifest.resources) {
+    // This is deliberately narrower than normal cleanup.  The PO may attest
+    // an already archived, missing *disposable control* worktree, never a
+    // scratch/output path or a resource that could be the only copy.
+    if (resource.type !== "disposable-worktree"
+      || resource.contentClass !== "disposable-control"
+      || resource.soleCopy !== false
+      || resource.cleanupPolicy !== "remove-worktree"
+      || !new Set(["ready", "sealed"]).has(resource.status)
+      || resource.allowedRoot !== detachedRoot
+      || !isInside(detachedRoot, resource.physicalPath)
+      || resource.physicalPath === detachedRoot
+      || existsSync(resource.physicalPath)) {
+      return { ok: false, reason: "resource-not-externally-retirable" };
+    }
+  }
+  return { ok: true };
+}
+
+/**
+ * Read-only proof for the exceptional case where an operator archived
+ * registered disposable worktrees outside the repository before the normal
+ * session owner could drain them.  It never treats a missing path as ordinary
+ * cleanup: callers must surface and bind this exact proof to an explicit PO
+ * recovery action.
+ */
+export function inspectExternallyArchivedSession(startPath, sessionId, options = {}) {
+  const loaded = loadSessionDescriptor(startPath, sessionId, options);
+  const owner = inspectSessionOwnerRuntime(startPath, loaded.sessionId, {
+    ...options,
+    expectedDescriptorSha256: loaded.descriptorSha256,
+  });
+  const base = {
+    schema: SESSION_EXTERNAL_RETIREMENT_STATUS_SCHEMA,
+    sessionId: loaded.sessionId,
+    descriptorSha256: loaded.descriptorSha256,
+    ownerStatus: owner.status,
+  };
+  if (new Set(["live", "unavailable"]).has(owner.status)) return { ...base, status: "owner-active" };
+  if (!existsSync(cleanupManifestPath(loaded.repo, loaded.sessionId))) return { ...base, status: "manifest-absent" };
+  const manifest = loadManifest(loaded.repo, loaded.sessionId, loaded.ownerNonce);
+  const eligibility = externalRetirementEligibility(loaded.repo, manifest.manifest);
+  if (!eligibility.ok) return { ...base, status: "not-eligible", reason: eligibility.reason };
+  return {
+    ...base,
+    status: "ready",
+    manifestSha256: rawSha256(readFileSync(manifest.path)),
+    resources: manifest.manifest.resources.map((resource) => ({
+      resourceId: resource.resourceId,
+      type: resource.type,
+      classification: resource.contentClass,
+    })),
+  };
+}
+
+/**
+ * Retire only the manifest whose missing resources were already externally
+ * archived.  This does not delete a filesystem target; the receipt says so in
+ * every outcome code and remains a normal completed closure for the exact
+ * descriptor lifecycle.
+ */
+export function retireExternallyArchivedSession(startPath, fields, options = {}) {
+  const loaded = loadSessionDescriptor(startPath, fields.sessionId, {
+    ...options,
+    expectedDescriptorSha256: fields.descriptorSha256 ?? options.expectedDescriptorSha256,
+  });
+  if (loaded.ownerNonce !== fields.ownerNonce) fail("WT-SESSION-OWNER", "session descriptor owner does not match");
+  const releaseLock = acquireManifestLock(loaded.repo, loaded.sessionId, loaded.ownerNonce);
+  try {
+    const manifest = loadManifest(loaded.repo, loaded.sessionId, loaded.ownerNonce);
+    const observedManifestSha256 = rawSha256(readFileSync(manifest.path));
+    if (observedManifestSha256 !== fields.expectedManifestSha256) {
+      fail("WT-EXTERNAL-RETIREMENT-PLAN", "external retirement manifest changed since planning");
+    }
+    const eligibility = externalRetirementEligibility(loaded.repo, manifest.manifest);
+    if (!eligibility.ok) fail("WT-EXTERNAL-RETIREMENT-PLAN", "external retirement eligibility changed since planning");
+    const receipt = sanitizedCleanupReceipt(loaded.sessionId, manifest.manifest.resources.map((resource) => ({
+      ...resource,
+      status: "removed",
+      reason: "WT-EXTERNALLY-ARCHIVED",
+    })), "complete", options.now);
+    const receiptPath = cleanupReceiptPath(loaded.repo, loaded.sessionId);
+    if (existsSync(receiptPath)) fail("WT-SESSION-CLOSED", "a completed cleanup receipt already closes this session ID");
+    writeAtomic(receiptPath, canonicalJson(receipt));
+    unlinkSync(manifest.path);
+    fsyncDirectory(dirname(manifest.path));
+    return { receipt, receiptPath };
+  } finally {
+    releaseLock();
+  }
 }
 
 /**

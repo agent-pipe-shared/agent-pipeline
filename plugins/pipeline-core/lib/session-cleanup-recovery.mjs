@@ -27,9 +27,11 @@ import {
 } from "./onboarding-continuity.mjs";
 import {
   inspectSessionRetirement,
+  inspectExternallyArchivedSession,
   inspectSessionClosure,
   listActiveSessionDescriptors,
   loadSessionDescriptor,
+  retireExternallyArchivedSession,
   retireSessionDescriptor,
 } from "./worktree-lifecycle.mjs";
 import {
@@ -88,6 +90,9 @@ function recoveryBinding(plan) {
   };
   if (Object.hasOwn(plan, "orphanDescriptors")) {
     binding.orphanDescriptors = plan.orphanDescriptors;
+  }
+  if (Object.hasOwn(plan, "externalRetirements")) {
+    binding.externalRetirements = plan.externalRetirements;
   }
   if (Object.hasOwn(plan, "expectedBindingStatus")) {
     binding.expectedBindingStatus = plan.expectedBindingStatus;
@@ -627,7 +632,7 @@ function readyRecoveryPlan(partial, scriptPath) {
   const planSha256 = digest(recoveryBinding(partial));
   const status = partial.recovery === "bind-orphan"
     ? "rebound"
-    : partial.recovery === "retire-orphans"
+    : new Set(["retire-orphans", "retire-externally-archived-orphans"]).has(partial.recovery)
       ? "retired"
       : "recovered";
   const applyAction = {
@@ -700,6 +705,39 @@ export function planSessionCleanupRecovery({
       descriptor.sessionId,
       { expectedDescriptorSha256: descriptor.descriptorSha256 },
     ));
+    const inspectExternal = deps.inspectExternallyArchivedSessionFn
+      ?? inspectExternallyArchivedSession;
+    const externalRetirements = activeDescriptors.map((descriptor) => inspectExternal(
+      binding.root,
+      descriptor.sessionId,
+      { expectedDescriptorSha256: descriptor.descriptorSha256 },
+    ));
+    if (externalRetirements.every((entry) => entry.status === "ready")) {
+      return readyRecoveryPlan({
+        schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+        root: binding.root,
+        stateSha256: binding.stateSha256,
+        revision: binding.revision,
+        sessionCleanup: null,
+        closure: "unbound-externally-archived-orphans",
+        activeDescriptorCount: activeDescriptors.length,
+        recovery: "retire-externally-archived-orphans",
+        expectedBindingStatus: binding.status,
+        orphanDescriptors: orphanDescriptors.map((descriptor) => ({
+          sessionId: descriptor.sessionId,
+          descriptorSha256: descriptor.descriptorSha256,
+          ownerStatus: descriptor.ownerStatus,
+        })),
+        externalRetirements: externalRetirements.map((entry) => ({
+          sessionId: entry.sessionId,
+          descriptorSha256: entry.descriptorSha256,
+          ownerStatus: entry.ownerStatus,
+          manifestSha256: entry.manifestSha256,
+          resources: entry.resources,
+        })),
+        applyAction: null,
+      }, scriptPath);
+    }
     if (orphanDescriptors.some((descriptor) => descriptor.status !== "retirable")) {
       return {
         schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
@@ -1016,7 +1054,7 @@ export function applySessionCleanupRecovery({
       deps,
     });
   }
-  if (plan.recovery === "retire-orphans") {
+  if (new Set(["retire-orphans", "retire-externally-archived-orphans"]).has(plan.recovery)) {
     const inspectRetirement = deps.inspectSessionRetirementFn
       ?? inspectSessionRetirement;
     const loadDescriptor = deps.loadSessionDescriptorFn ?? loadSessionDescriptor;
@@ -1024,11 +1062,18 @@ export function applySessionCleanupRecovery({
       ?? retireSessionDescriptor;
     const listDescriptors = deps.listActiveSessionDescriptorsFn
       ?? listActiveSessionDescriptors;
+    const inspectExternal = deps.inspectExternallyArchivedSessionFn
+      ?? inspectExternallyArchivedSession;
+    const retireExternal = deps.retireExternallyArchivedSessionFn
+      ?? retireExternallyArchivedSession;
+    const externalById = new Map((plan.externalRetirements ?? []).map((entry) => [entry.sessionId, entry]));
     const prepared = plan.orphanDescriptors.map((expected) => {
       const observed = inspectRetirement(plan.root, expected.sessionId, {
         expectedDescriptorSha256: expected.descriptorSha256,
       });
-      if (observed.status !== "retirable"
+      const expectedRetirementStatus = plan.recovery === "retire-externally-archived-orphans"
+        ? "cleanup-required" : "retirable";
+      if (observed.status !== expectedRetirementStatus
         || observed.ownerStatus !== expected.ownerStatus
         || observed.descriptorSha256 !== expected.descriptorSha256) {
         fail("WT-SESSION-RECOVERY-PLAN", "orphan descriptor retirement binding changed");
@@ -1038,6 +1083,27 @@ export function applySessionCleanupRecovery({
       });
     });
     for (const descriptor of prepared) {
+      if (plan.recovery === "retire-externally-archived-orphans") {
+        const expected = externalById.get(descriptor.sessionId);
+        if (!expected || expected.descriptorSha256 !== descriptor.descriptorSha256) {
+          fail("WT-SESSION-RECOVERY-PLAN", "external retirement descriptor binding changed");
+        }
+        const observed = inspectExternal(plan.root, descriptor.sessionId, {
+          expectedDescriptorSha256: descriptor.descriptorSha256,
+        });
+        if (observed.status !== "ready"
+          || observed.ownerStatus !== expected.ownerStatus
+          || observed.manifestSha256 !== expected.manifestSha256
+          || canonicalJson(observed.resources) !== canonicalJson(expected.resources)) {
+          fail("WT-SESSION-RECOVERY-PLAN", "external retirement proof changed since planning");
+        }
+        retireExternal(plan.root, {
+          sessionId: descriptor.sessionId,
+          descriptorSha256: descriptor.descriptorSha256,
+          ownerNonce: descriptor.ownerNonce,
+          expectedManifestSha256: expected.manifestSha256,
+        });
+      }
       retireDescriptor(plan.root, {
         sessionId: descriptor.sessionId,
         descriptorSha256: descriptor.descriptorSha256,
@@ -1064,6 +1130,8 @@ export function applySessionCleanupRecovery({
       stateSha256: readback.stateSha256,
       revision: readback.revision,
       retiredDescriptorCount: prepared.length,
+      externallyArchivedDescriptorCount: plan.recovery === "retire-externally-archived-orphans"
+        ? prepared.length : 0,
     };
   }
   if (plan.recovery === "release-closed-feature") {

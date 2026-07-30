@@ -22,6 +22,7 @@ import {
 import { validateContinuityState } from "../lib/continuity-state.mjs";
 import {
   cleanupSession,
+  createDetachedWorktree,
   listActiveSessionDescriptors,
   loadSessionDescriptor,
   registerTemporaryIntent,
@@ -466,6 +467,54 @@ test("a closed transition retires exact legacy orphans and preserves its closed 
       schema: "pipeline.session-cleanup-recovery-plan.v1",
       status: "not-needed",
     });
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("an explicitly confirmed recovery retires only externally archived disposable worktrees", () => {
+  const root = fixture("closed-transition-external-archive");
+  try {
+    gitRun(root, ["add", ".claude"]);
+    gitRun(root, ["-c", "user.name=Fixture", "-c", "user.email=fixture@example.invalid", "commit", "-q", "-m", "fixture: external archive recovery"]);
+    const closedAt = "2026-07-30T08:00:00.000Z";
+    writeFileSync(join(root, ".claude", "pipeline-state.json"), `${JSON.stringify({
+      schema: "pipeline.state.v0",
+      planApproved: false,
+      updatedAt: closedAt,
+      closedFeatures: [{
+        id: "closed-transition",
+        planPath: "specs/closed/prd.md",
+        phaseAtClose: "implementation",
+        closedAt,
+        closedBy: "PO",
+        forCommit: null,
+      }],
+    }, null, 2)}\n`);
+    const descriptor = startSessionDescriptor(root, {
+      sessionId: "session-closed-transition-external-archive",
+    });
+    const record = createDetachedWorktree(root, "archive", gitRun(root, ["rev-parse", "HEAD"]), descriptor);
+    gitRun(root, ["worktree", "remove", record.physicalPath]);
+    const legacy = rewriteAsLegacyDescriptor(root, descriptor.sessionId);
+
+    const plan = invoke(["plan-recovery", "--repo", root]).output;
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.recovery, "retire-externally-archived-orphans");
+    assert.deepEqual(plan.externalRetirements[0].resources, [{
+      resourceId: `detached-archive-${gitRun(root, ["rev-parse", "HEAD"]).slice(0, 12)}`,
+      type: "disposable-worktree",
+      classification: "disposable-control",
+    }]);
+    const applied = invoke([
+      "apply-recovery", "--repo", root,
+      "--plan-sha256", plan.planSha256,
+      "--activate",
+    ]).output;
+    assert.equal(applied.status, "retired");
+    assert.equal(applied.externallyArchivedDescriptorCount, 1);
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "closed-unbound");
+    assert.deepEqual(listActiveSessionDescriptors(root), []);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

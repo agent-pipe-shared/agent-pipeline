@@ -56,6 +56,7 @@ import {
   NEUTRAL_CALIBRATION,
   NEUTRAL_MANIFEST,
   NEUTRAL_STATE,
+  planProjectAuthorityMigration,
   readProjectAuthority,
   resolveProjectAuthorityPaths,
 } from "./project-authority.mjs";
@@ -1804,6 +1805,29 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
       });
     }
     if (projectAuthority.status !== "ready") {
+      const migration = planProjectAuthorityMigration({ rootDir: legacy.root });
+      if (projectAuthority.status === "mixed" && migration.status === "ready") {
+        return lifecycleResult({
+          status: "migration-required",
+          root: legacy.root,
+          intent,
+          repository,
+          runtime: emptyRuntime(),
+          nextAction: commandAction(
+            [PROJECT_AUTHORITY_MIGRATION_WRITER, "plan", "--root", legacy.root],
+            false,
+            false,
+            "pipeline.project-authority.v1",
+            ["ready"],
+          ),
+          diagnostics: [lifecycleDiagnostic(
+            "$.authority",
+            "project_authority_remote_adoption_required",
+            "a remote checkout left a partial neutral authority beside a complete legacy authority",
+            "review the typed adoption plan; it archives neutral preimages in private Git metadata before replacing them",
+          )],
+        });
+      }
       return lifecycleResult({
         status: "invalid",
         root: legacy.root,

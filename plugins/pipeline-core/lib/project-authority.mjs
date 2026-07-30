@@ -13,6 +13,7 @@ import {
   realpathSync, renameSync, rmSync, unlinkSync, writeFileSync,
 } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
+import { spawnSync } from "node:child_process";
 
 export const PROJECT_AUTHORITY_SCHEMA = "pipeline.project-authority.v1";
 export const PROJECT_AUTHORITY_RECOVERY_SCHEMA = "pipeline.project-authority-recovery.v1";
@@ -188,6 +189,39 @@ function changedTargets(root) {
   }).filter((target) => target.after.status === "present");
 }
 
+function privateAdoptionArchive(root, planSha256, targets) {
+  const git = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], {
+    cwd: root,
+    encoding: "utf8",
+    shell: false,
+    timeout: 5000,
+  });
+  if (git.status !== 0 || git.error) throw new Error("mixed authority adoption requires a Git common directory");
+  const common = realpathSync(String(git.stdout).trim());
+  const commonInfo = lstatSync(common);
+  if (!commonInfo.isDirectory() || commonInfo.isSymbolicLink()) throw new Error("Git common directory is unsafe");
+  const archive = join(common, "agent-pipeline", "project-authority-adoption", planSha256);
+  if (existsSync(archive)) throw new Error("project authority adoption archive already exists");
+  mkdirSync(archive, { recursive: true, mode: 0o700 });
+  const archiveInfo = lstatSync(archive);
+  if (!archiveInfo.isDirectory() || archiveInfo.isSymbolicLink() || (archiveInfo.mode & 0o077) !== 0) {
+    throw new Error("project authority adoption archive is unsafe");
+  }
+  const entries = [];
+  for (const [index, target] of targets.entries()) {
+    if (target.before.status !== "present") continue;
+    const name = `preimage-${index}`;
+    const destination = join(archive, name);
+    writeFileSync(destination, bytes(root, target.path), { mode: 0o600, flag: "wx" });
+    const observed = image(archive, name);
+    if (!sameImage(observed, target.before)) throw new Error(`project authority adoption archive readback failed: ${target.path}`);
+    entries.push({ path: target.path, archive: name, before: target.before });
+  }
+  const record = { schema: "pipeline.project-authority-adoption-archive.v1", planSha256, entries };
+  writeFileSync(join(archive, "manifest.json"), `${JSON.stringify(record)}\n`, { mode: 0o600, flag: "wx" });
+  return { entryCount: entries.length, manifestSha256: sha(Buffer.from(JSON.stringify(record))) };
+}
+
 function legacyStatePortability(root) {
   const raw = bytes(root, LEGACY_STATE);
   if (raw === null) return { ok: true };
@@ -252,6 +286,25 @@ export function planProjectAuthorityMigration({ rootDir = process.cwd() } = {}) 
     const { transaction, journal } = transactionPaths(root);
     if (existsSync(transaction) || existsSync(journal)) return result("recovery-required", { diagnostics: ["project authority recovery is required"], targets: [] });
     const current = authority(root);
+    if (current.status === "mixed") {
+      const portability = legacyStatePortability(root);
+      if (!portability.ok) return portabilityFailureResult(portability);
+      const internalTargets = changedTargets(root);
+      if (internalTargets.length === 0) return result("mixed", { diagnostics: [current.reason], targets: [] });
+      const publicTargets = internalTargets.map(({ path, kind, before, after, changed }) => ({ path, kind, before, after, changed }));
+      return remember(result("ready", {
+        source: "legacy",
+        compatibility: "dual-read-one-write",
+        recovery: "adopt-legacy-after-remote-checkout",
+        targets: publicTargets,
+        activation: {
+          required: true,
+          command: "apply --activate",
+          legacyRetained: true,
+          neutralPreimagesArchivedInGitMetadata: true,
+        },
+      }), { root, status: "ready", mode: "adopt-legacy", targets: internalTargets });
+    }
     if (current.status !== "ready") return result(current.status, { diagnostics: [current.reason], targets: [] });
     if (current.source === "neutral") return remember(result("noop", { source: "neutral", compatibility: "dual-read-one-write", targets: [] }), { root, status: "noop", targets: [] });
     const portability = legacyStatePortability(root);
@@ -265,7 +318,10 @@ export function planProjectAuthorityMigration({ rootDir = process.cwd() } = {}) 
   } catch (error) { return result("invalid-source", { diagnostics: [error.message], targets: [] }); }
 }
 function validateBeforeApply(root, state) {
-  if (authority(root).source !== "legacy") throw new Error("legacy source changed since planning");
+  const current = authority(root);
+  if (state.mode === "adopt-legacy") {
+    if (current.status !== "mixed") throw new Error("mixed authority changed since planning");
+  } else if (current.source !== "legacy") throw new Error("legacy source changed since planning");
   for (const target of state.targets) {
     if (!sameImage(image(root, target.path), target.before)) throw new Error(`neutral destination changed since planning: ${target.path}`);
     if (!sameImage(image(root, target.legacy), target.after)) throw new Error(`legacy source changed since planning: ${target.legacy}`);
@@ -353,7 +409,11 @@ export function applyProjectAuthorityMigration(plan, { rootDir = process.cwd(), 
     if (!authenticated(plan)) throw new Error("public plan changed since authentication");
     const portability = legacyStatePortability(root);
     if (!portability.ok) return portabilityFailureResult(portability);
-    validateBeforeApply(root, state); const journal = prepare(root, state.targets);
+    validateBeforeApply(root, state);
+    const adoptionArchive = state.mode === "adopt-legacy"
+      ? privateAdoptionArchive(root, sha(Buffer.from(planSignature(plan))), state.targets)
+      : null;
+    const journal = prepare(root, state.targets);
     try {
       for (const [index, entry] of journal.targets.entries()) {
         commitTarget(root, journal, entry);
@@ -361,7 +421,12 @@ export function applyProjectAuthorityMigration(plan, { rootDir = process.cwd(), 
       }
       journal.state = "complete"; durableJournal(root, journal); rmSync(transaction, { recursive: true, force: true }); fsyncDirectory(root);
       const readback = authority(root); if (readback.status !== "ready" || readback.source !== "neutral") throw new Error("neutral authority readback failed");
-      PLANS.delete(plan); return result("applied", { source: "neutral", targets: state.targets.map(({ path }) => path), legacyRetained: true });
+      PLANS.delete(plan); return result("applied", {
+        source: "neutral",
+        targets: state.targets.map(({ path }) => path),
+        legacyRetained: true,
+        ...(adoptionArchive === null ? {} : { adoptionArchive }),
+      });
     } catch (error) {
       if (error instanceof IntentionalInterruption) return result("interrupted", { reason: error.message });
       try { restore(root, journal); } catch (recoveryError) { return result("recovery-required", { reason: recoveryError.message }); }

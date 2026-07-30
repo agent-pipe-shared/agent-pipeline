@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { spawnSync } from "node:child_process";
 import {
   applyPendingProjectAuthorityRecovery, applyProjectAuthorityMigration,
   LEGACY_CALIBRATION, LEGACY_GUARD_AUDIT, LEGACY_GUARD_CONFIG, LEGACY_MANIFEST, LEGACY_STATE,
@@ -20,6 +21,11 @@ function legacy(base, { state = true } = {}) {
   write(base, LEGACY_CALIBRATION, "{\"project\":\"fixture\"}\n");
   write(base, LEGACY_GUARD_CONFIG, "{\"protectedTestPaths\":[]}\n");
   write(base, LEGACY_GUARD_AUDIT, "{\"event\":\"legacy\"}\n");
+}
+function git(base, args) {
+  const result = spawnSync("git", args, { cwd: base, encoding: "utf8", shell: false });
+  assert.equal(result.status, 0, result.stderr);
+  return String(result.stdout).trim();
 }
 let passed = 0;
 let interruptedRoot;
@@ -102,6 +108,27 @@ try {
   ok("neutral authority is a no-op", () => {
     const base = root(); legacy(base); assert.equal(applyProjectAuthorityMigration(planProjectAuthorityMigration({ rootDir: base }), { rootDir: base, activate: true }).status, "applied");
     const plan = planProjectAuthorityMigration({ rootDir: base }); assert.equal(plan.status, "noop"); assert.equal(applyProjectAuthorityMigration(plan, { rootDir: base }).status, "noop");
+  });
+  ok("a remote checkout mixed layer has an explicit, preserving legacy adoption path", () => {
+    const base = root();
+    git(base, ["init", "-q"]);
+    legacy(base);
+    const provisional = "schema: pipeline.manifest.v0\nprovisional: kickoff\n";
+    write(base, NEUTRAL_MANIFEST, provisional);
+    const plan = planProjectAuthorityMigration({ rootDir: base });
+    assert.equal(readProjectAuthority({ rootDir: base }).status, "mixed");
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.recovery, "adopt-legacy-after-remote-checkout");
+    assert.equal(applyProjectAuthorityMigration(plan, { rootDir: base }).status, "activation-required");
+    const applied = applyProjectAuthorityMigration(plan, { rootDir: base, activate: true });
+    assert.equal(applied.status, "applied");
+    assert.equal(applied.adoptionArchive.entryCount, 1);
+    assert.equal(readProjectAuthority({ rootDir: base }).source, "neutral");
+    assert.equal(readFileSync(join(base, NEUTRAL_MANIFEST), "utf8"), readFileSync(join(base, LEGACY_MANIFEST), "utf8"));
+    const common = git(base, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
+    const archives = readdirSync(join(common, "agent-pipeline", "project-authority-adoption"));
+    assert.equal(archives.length, 1);
+    assert.equal(readFileSync(join(common, "agent-pipeline", "project-authority-adoption", archives[0], "preimage-0"), "utf8"), provisional);
   });
   ok("source and destination drift reject before writes", () => {
     const base = root(); legacy(base); let plan = planProjectAuthorityMigration({ rootDir: base }); write(base, LEGACY_MANIFEST, "changed\n");

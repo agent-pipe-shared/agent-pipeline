@@ -138,6 +138,11 @@ check("R10 allow  checkout branch", "git checkout main", ALLOW);
 check("R10 allow  restore single file", "git restore src/app.js", ALLOW);
 check("R10 allow  checkout ./subpath (anchor)", "git checkout ./src", ALLOW);
 
+// ---- Rule 21: destructive branch adoption -------------------------------------------------
+check("R21 block  checkout --force branch", "git checkout --force origin/feat/remote-adoption", BLOCK, { stderrIncludes: ["GG-21"] });
+check("R21 block  switch -f branch", "git switch -f origin/feat/remote-adoption", BLOCK, { stderrIncludes: ["GG-21"] });
+check("R21 allow  ordinary fetch", "git fetch origin refs/heads/main:refs/remotes/origin/main", ALLOW);
+
 // ---- Rule 11: secret/state staging block (.env all three; secrets.yaml <PROJECT_B>; <PROJECT_C> SSH keys) ----------
 check("R11 block  add .env", "git add .env", BLOCK);
 check("R11 block  add .env.production", "git add .env.production", BLOCK);

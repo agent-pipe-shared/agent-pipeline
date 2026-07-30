@@ -328,6 +328,16 @@ const UNION_BLOCKERS = [
     origin: "<PROJECT_C> (checkout .) + <PROJECT_B> (bare-dot form); restore-dot combined",
   },
   {
+    id: "GG-21",
+    // A branch checkout with --force discards colliding tracked and untracked
+    // control artifacts. Fetch is intentionally not restricted; this closes
+    // only the destructive follow-up that turned remote adoption into an
+    // unrecoverable mixed authority state.
+    re: /\bgit\s+(checkout|switch)\b[^|&;]*\s(?:--force|-f)\b/,
+    why: "Force checkout discards or overlays local repository state; archive/adopt the checkout explicitly first.",
+    origin: "remote-authority adoption recovery",
+  },
+  {
     id: "GG-11",
     // Union of all three staging deny-lists. `.env` intentionally without trailing \b
     // so .env.local/.env.production are caught (errs safe: .env.example too).
