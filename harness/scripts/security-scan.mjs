@@ -529,10 +529,11 @@ export async function runSecurityScan({
   // Cleanup deliberately precedes evidence publication, so hashing afterward
   // would silently turn every snapshot-backed digest into null.
   const policy = securityPolicyBinding(authorityRoot, authority, manifest, blockOn, mode);
+  const project = resolveProjectName(authorityRoot, authority);
   const cleanup = cleanupCandidateSnapshot(rootDir, snapshot);
   const evidenceCore = {
     schema: "pipeline.security-evidence.v1",
-    project: resolveProjectName(authorityRoot, authority),
+    project,
     command: "node harness/scripts/security-scan.mjs",
     commit: resolveCommit(rootDir),
     candidate,

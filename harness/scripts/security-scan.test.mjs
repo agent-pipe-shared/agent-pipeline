@@ -1151,6 +1151,7 @@ security:
     allowlist: { allow: ["MIT"], deny: [] },
     declared: { dependencies: [{ name: "fixture", license: "MIT" }] },
   });
+  writeFileSync(join(rootDir, ".claude", "pipeline.json"), JSON.stringify({ project: "security-fixture" }));
   writeFileSync(join(rootDir, "governed.txt"), "committed candidate bytes\\n");
   commitFixture(rootDir);
   const { evidence, exitCode } = await runSecurityScan({ rootDir, env: {}, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
@@ -1162,6 +1163,8 @@ security:
     [evidence.policy.inputs.manifestSha256, evidence.policy.inputs.declaredLicensesSha256,
       evidence.policy.inputs.licenseAllowlistSha256].every((digest) => /^[0-9a-f]{64}$/u.test(digest)),
     JSON.stringify(evidence.policy.inputs));
+  assertEqual("runner: detached snapshot project identity is bound before snapshot cleanup",
+    evidence.project, "security-fixture");
   assertTrue("runner: exact candidate omits private worktree path", !JSON.stringify(evidence).includes(rootDir), JSON.stringify(evidence));
 }
 
