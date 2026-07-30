@@ -401,6 +401,40 @@ function allGreenBase() {
   );
 }
 
+// ---- PGV2-09 outcome mismatch OUTSIDE the invalid/execution-unavailable pair is caught -------
+// (CYB-2F self-application Critic review, Finding 2): persisted capabilityOutcomes claims
+// "unsupported" for a required capability whose FRESH envelope (SKIPPED status, a non-special
+// classification, required) recomputes to "required-capability-missing". Neither outcome is in
+// the tolerated {"invalid","execution-unavailable"} pair, yet the pre-fix comparison (blocking
+// boolean + capabilityId SET only) would have missed this entirely: both sides name the SAME one
+// offending capability and both are blocking:true, so the old check would have silently trusted
+// the lied "unsupported" label instead of catching the stale/mismatched pair. Proves the
+// per-capability outcome comparison now genuinely reconstructs and rejects this mismatch.
+{
+  const { dir, head, tree } = allGreenBase();
+  writeExactV2Pair(dir, {
+    head,
+    tree,
+    status: "SKIPPED",
+    classification: "binary_missing",
+    outcome: "unsupported", // LIE: fresh envelope recomputes to "required-capability-missing"
+    blocking: true,
+    offendingCapabilities: [{ capabilityId: "cap.secrets", outcome: "unsupported" }],
+  });
+  check(
+    "PGV2-09 block  outcome mismatch outside the invalid/execution-unavailable pair is caught (Finding 2 regression)",
+    PUSH_CMD,
+    dir,
+    BLOCK,
+    {
+      stderrIncludes: [
+        "evidence/security-latest.v2.verdict.json: verdict is not consistent with evidence/security-latest.v2.json's capability records (stale or mismatched pair)",
+      ],
+      stderrNotIncludes: ["did not reach an accepted state"],
+    },
+  );
+}
+
 // ---- Cleanup ----------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {
