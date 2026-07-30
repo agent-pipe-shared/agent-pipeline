@@ -5,7 +5,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
-  installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight as observeActual,
+  freshnessHostActionForPreflight, installedPipelineIdentity, installedPipelineVersion, observePipelineStartPreflight as observeActual,
   pipelineStartPreflightExitCode, SCHEMA,
 } from "./pipeline-start-preflight.mjs";
 
@@ -104,7 +104,29 @@ test("preflight selects one host-authorized capability boundary for WSL", () => 
     assert.equal(result.executionBoundary, "host-authorized-wsl");
     assert.equal(result.nextAction.executionBoundary, "host-authorized-wsl");
     assert.equal(result.nextAction.argv[3], "/projects/wsl");
+    const freshness = freshnessHostActionForPreflight(result);
+    assert.deepEqual(freshness.networkPreflight, {
+      schema: "pipeline.ruleset-freshness-network-preflight.v1",
+      network: "restricted",
+      boundaryId: "pipeline-start-host-authorized-wsl",
+    });
+    assert.deepEqual(freshness.action.command, {
+      executable: "git",
+      argv: ["ls-remote", "https://github.com/agent-pipe-shared/agent-pipeline.git", "HEAD"],
+    });
+    assert.equal(JSON.stringify(freshness).includes("/projects/wsl"), false);
+    assert.equal(JSON.stringify(freshness).includes(result.pluginRoot), false);
   }
+});
+
+test("default-boundary preflight exposes no freshness host action", () => {
+  const result = observePipelineStartPreflight({
+    env: {},
+    pluginList: pluginList(),
+    read: () => manifest,
+  });
+  assert.equal(freshnessHostActionForPreflight(result), null);
+  assert.equal(freshnessHostActionForPreflight({ ...result, status: "plugin-refresh-required" }), null);
 });
 
 test("preflight distinguishes complete and malformed handoff by presence only", () => {

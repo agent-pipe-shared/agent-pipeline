@@ -7,8 +7,13 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
 
 import {
+  createFreshnessHostAction,
+  FRESHNESS_HOST_RESULT_SCHEMA,
+  FRESHNESS_HOST_TRANSPORT_SCHEMA,
+  FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
   inspectClaudeRulesetFreshness,
   inspectCliRulesetFreshness,
   inspectRulesetFreshness,
@@ -18,6 +23,7 @@ import {
 } from "./ruleset-freshness.mjs";
 
 const roots = [];
+const SCRIPT = fileURLToPath(new URL("./ruleset-freshness.mjs", import.meta.url));
 function git(cwd, ...args) {
   const out = spawnSync("git", args, { cwd, encoding: "utf8" });
   assert.equal(out.status, 0, out.stderr);
@@ -75,6 +81,94 @@ test("the default public remote observation is fixed, injected, and coordinate-f
   });
   assert.deepEqual(calls[0].args, ["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"]);
   assert.equal(JSON.stringify(observed).includes("github.com"), false);
+});
+
+test("a known restricted sandbox binds exactly one data-minimized network-open host action", () => {
+  const { source } = fixture("selected-host-transport");
+  const loaded = git(source, "rev-parse", "HEAD");
+  let sandboxAttempts = 0;
+  const actions = [];
+  const boundaryId = "freshness-host-boundary-1";
+  const value = inspectRulesetFreshness(source, {
+    sourceObservation: sourceObservation(loaded),
+    networkPreflight: {
+      schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
+      network: "restricted",
+      boundaryId,
+    },
+    hostTransport: {
+      schema: FRESHNESS_HOST_TRANSPORT_SCHEMA,
+      boundaryId,
+      access: "read-only",
+      network: "enabled",
+      execute(action) {
+        actions.push(action);
+        return {
+          schema: FRESHNESS_HOST_RESULT_SCHEMA,
+          requestSha256: action.requestSha256,
+          status: "completed",
+          stdout: `${loaded}\tHEAD\n`,
+        };
+      },
+    },
+    spawn() {
+      sandboxAttempts += 1;
+      throw new Error("known restricted sandbox must not be attempted");
+    },
+  });
+  assert.equal(value.status, "equal");
+  assert.equal(sandboxAttempts, 0);
+  assert.equal(actions.length, 1);
+  assert.deepEqual(actions[0], createFreshnessHostAction(boundaryId));
+  assert.equal(JSON.stringify(actions[0]).includes(source), false);
+  assert.equal(JSON.stringify(actions[0]).includes(process.env.HOME ?? "not-set"), false);
+});
+
+test("a restricted preflight without its exact selected host transport fails closed without a sandbox attempt", () => {
+  let attempts = 0;
+  const observed = observePublicRemoteIdentity({
+    networkPreflight: {
+      schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
+      network: "restricted",
+      boundaryId: "freshness-host-boundary-2",
+    },
+    spawn() { attempts += 1; return { status: 0, stdout: `${"a".repeat(40)}\tHEAD\n` }; },
+  });
+  assert.deepEqual(observed, { status: "remote-unavailable", identity: null, reason: "host-transport-required" });
+  assert.equal(attempts, 0);
+});
+
+test("the normal Codex freshness entrypoint forwards a selected host transport", () => {
+  const loaded = "a".repeat(40);
+  const boundaryId = "freshness-host-boundary-cli";
+  let directAttempts = 0;
+  let hostCalls = 0;
+  const value = inspectCliRulesetFreshness({
+    repoPath: "/private/consumer-not-forwarded",
+    codexObservation: { status: "ready", observation: sourceObservation(loaded) },
+    networkPreflight: {
+      schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
+      network: "restricted",
+      boundaryId,
+    },
+    hostTransport: {
+      schema: FRESHNESS_HOST_TRANSPORT_SCHEMA,
+      boundaryId,
+      access: "read-only",
+      network: "enabled",
+      execute(action) {
+        hostCalls += 1;
+        assert.deepEqual(action, createFreshnessHostAction(boundaryId));
+        return { schema: FRESHNESS_HOST_RESULT_SCHEMA, requestSha256: action.requestSha256, status: "completed", stdout: `${loaded}\tHEAD\n` };
+      },
+    },
+    // The direct spawn seam is intentionally absent from this entrypoint. A
+    // hostile fallback would therefore have to reach the host transport first.
+    inspectClaude() { directAttempts += 1; throw new Error("Claude fallback must not run"); },
+  });
+  assert.equal(value.status, "equal");
+  assert.equal(hostCalls, 1);
+  assert.equal(directAttempts, 0);
 });
 
 test("self-application accepts equal and descendant loaded rulesets without consumer HEAD", () => {
@@ -173,6 +267,29 @@ test("freshness diagnostics never include private remote coordinates", () => {
   });
   assert.equal(JSON.stringify(value).includes(privateRemote), false);
   assert.equal(JSON.stringify(value).includes("private.example.invalid"), false);
+});
+
+test("CLI source and freshness diagnostics never disclose HOME, cache, or private coordinates", () => {
+  const privateRepo = "/private/work/consumer-987";
+  const childEnv = { ...process.env };
+  delete childEnv.NODE_TEST_CONTEXT;
+  const run = spawnSync(process.execPath, [SCRIPT, "--repo", privateRepo], {
+    encoding: "utf8",
+    env: childEnv,
+  });
+  const combined = `${run.stdout ?? ""}${run.stderr ?? ""}`;
+  assert.equal(combined.includes(privateRepo), false);
+  if (typeof process.env.HOME === "string" && process.env.HOME.length > 0) assert.equal(combined.includes(process.env.HOME), false);
+  if (typeof process.env.CODEX_HOME === "string" && process.env.CODEX_HOME.length > 0) assert.equal(combined.includes(process.env.CODEX_HOME), false);
+  // Codex's workspace sandbox can deny nested process creation before the
+  // child reaches the CLI. That denial has no child output to inspect; a
+  // normal host run remains the end-to-end assertion below.
+  if (run.error?.code === "EPERM") return;
+  assert.equal(run.error, undefined);
+  assert.equal(run.status, 2);
+  const payload = JSON.parse(run.stdout);
+  assert.equal(payload.schema, RULESET_FRESHNESS_SCHEMA);
+  assert.equal(typeof payload.status, "string");
 });
 
 test("Claude compatibility treats only the exact reviewed marketplace as public", () => {

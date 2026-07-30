@@ -11,6 +11,7 @@
  * explicit compatibility adapter below, rather than contaminating the common
  * Codex/AGY contract.
  */
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, isAbsolute, join, resolve } from "node:path";
@@ -23,7 +24,12 @@ import { compareLoadedRulesetIdentity, normalizeRulesetSource } from "../lib/rul
 
 export const RULESET_FRESHNESS_SCHEMA = "pipeline.ruleset-freshness.v1";
 export const PUBLIC_MARKETPLACE_URL = "https://github.com/agent-pipe-shared/agent-pipeline.git";
+export const FRESHNESS_NETWORK_PREFLIGHT_SCHEMA = "pipeline.ruleset-freshness-network-preflight.v1";
+export const FRESHNESS_HOST_TRANSPORT_SCHEMA = "pipeline.ruleset-freshness-host-transport.v1";
+export const FRESHNESS_HOST_ACTION_SCHEMA = "pipeline.ruleset-freshness-host-action.v1";
+export const FRESHNESS_HOST_RESULT_SCHEMA = "pipeline.ruleset-freshness-host-result.v1";
 const SHA = /^[0-9a-f]{40,64}$/iu;
+const BOUNDARY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
 const DEFAULT_TIMEOUT_MS = 30_000;
 const CODEX_CLAUDE_FALLBACK_STATUS = "codex-plugin-list-unavailable";
 
@@ -43,6 +49,11 @@ function git(repo, args, options = {}) {
 
 function safeIdentity(identity) {
   return identity?.status === "available" ? identity.value : null;
+}
+function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
+function exactKeys(value, keys) {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    && JSON.stringify(Object.keys(value).sort()) === JSON.stringify([...keys].sort());
 }
 
 function result(status, fields = {}) {
@@ -68,8 +79,68 @@ function relation(counts, fields) {
   return result(status, { ...fields, ahead, behind });
 }
 
+/**
+ * A known network-restricted sandbox must not consume a speculative direct
+ * fetch. The preflight binds the one selected host boundary by a non-secret
+ * identifier; the host receives only this fixed public-HEAD operation.
+ */
+export function createFreshnessHostAction(boundaryId) {
+  if (typeof boundaryId !== "string" || !BOUNDARY_ID.test(boundaryId)) return null;
+  const unsigned = {
+    schema: FRESHNESS_HOST_ACTION_SCHEMA,
+    boundaryId,
+    operation: "read-public-marketplace-head",
+    access: "read-only",
+    network: "enabled",
+    command: Object.freeze({ executable: "git", argv: Object.freeze(["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"]) }),
+  };
+  return Object.freeze({ ...unsigned, requestSha256: sha256(JSON.stringify(unsigned)) });
+}
+
+function selectHostTransport(networkPreflight, hostTransport) {
+  if (networkPreflight === undefined && hostTransport === undefined) return null;
+  if (!exactKeys(networkPreflight, ["schema", "network", "boundaryId"])
+    || networkPreflight.schema !== FRESHNESS_NETWORK_PREFLIGHT_SCHEMA
+    || !["enabled", "restricted"].includes(networkPreflight.network)
+    || typeof networkPreflight.boundaryId !== "string" || !BOUNDARY_ID.test(networkPreflight.boundaryId)) return false;
+  if (networkPreflight.network === "enabled") return null;
+  if (!exactKeys(hostTransport, ["schema", "boundaryId", "access", "network", "execute"])
+    || hostTransport.schema !== FRESHNESS_HOST_TRANSPORT_SCHEMA
+    || hostTransport.boundaryId !== networkPreflight.boundaryId
+    || hostTransport.access !== "read-only" || hostTransport.network !== "enabled"
+    || typeof hostTransport.execute !== "function") return false;
+  return hostTransport;
+}
+
+function observeThroughSelectedHost(action, hostTransport) {
+  let response;
+  try { response = hostTransport.execute(action); } catch { return { status: "remote-unavailable", identity: null, reason: "host-transport-unavailable" }; }
+  if (!exactKeys(response, ["schema", "requestSha256", "status", "stdout"])
+    || response.schema !== FRESHNESS_HOST_RESULT_SCHEMA
+    || response.requestSha256 !== action.requestSha256
+    || !["completed", "unavailable"].includes(response.status)
+    || typeof response.stdout !== "string") return { status: "remote-unavailable", identity: null, reason: "host-transport-unavailable" };
+  const value = response.stdout.trim().split(/\s+/u)[0]?.toLowerCase();
+  if (response.status !== "completed" || !SHA.test(value)) return { status: "remote-unavailable", identity: null, reason: "host-transport-unavailable" };
+  return {
+    status: "ready",
+    identity: { status: "available", algorithm: value.length === 40 ? "git-sha1" : "git-sha256", value },
+    reason: null,
+  };
+}
+
 /** A coordinate-free, host-bound observation envelope used by the common path. */
-export function observePublicRemoteIdentity({ remoteUrl = PUBLIC_MARKETPLACE_URL, spawn = spawnSync, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+export function observePublicRemoteIdentity({ remoteUrl = PUBLIC_MARKETPLACE_URL, spawn = spawnSync, timeoutMs = DEFAULT_TIMEOUT_MS, networkPreflight = undefined, hostTransport = undefined } = {}) {
+  const selectedHost = selectHostTransport(networkPreflight, hostTransport);
+  if (selectedHost === false) return { status: "remote-unavailable", identity: null, reason: "host-transport-required" };
+  if (selectedHost !== null) {
+    // The selected action is fixed to the reviewed public marketplace. It has
+    // no consumer root, plugin root, cache path, HOME value, or private URL.
+    const action = createFreshnessHostAction(selectedHost.boundaryId);
+    return action === null
+      ? { status: "remote-unavailable", identity: null, reason: "host-transport-required" }
+      : observeThroughSelectedHost(action, selectedHost);
+  }
   let remote;
   try {
     remote = spawn("git", ["ls-remote", remoteUrl, "HEAD"], {
@@ -176,7 +247,13 @@ export function inspectRulesetFreshness(repoPath, options = {}) {
   }
 
   const remote = validRemoteObservation(options.remoteObservation
-    ?? observePublicRemoteIdentity({ remoteUrl: options.remoteUrl ?? PUBLIC_MARKETPLACE_URL, spawn: options.spawn ?? spawnSync, timeoutMs: options.timeoutMs }));
+    ?? observePublicRemoteIdentity({
+      remoteUrl: options.remoteUrl ?? PUBLIC_MARKETPLACE_URL,
+      spawn: options.spawn ?? spawnSync,
+      timeoutMs: options.timeoutMs,
+      networkPreflight: options.networkPreflight,
+      hostTransport: options.hostTransport,
+    }));
   if (remote.status !== "ready") return result("remote-unavailable", { source, loadedSha, reason: remote.reason });
   const comparison = compareLoadedRulesetIdentity(normalized.observation, remote.identity);
   const remoteSha = safeIdentity(remote.identity);
@@ -221,11 +298,21 @@ export function inspectClaudeRulesetFreshness(repoPath, options = {}) {
  * when Codex itself could not be discovered, never for another typed Codex
  * outcome (including pre-HEAD and source-attestation failures).
  */
-export function inspectCliRulesetFreshness({ repoPath, loadedSha, loadedPluginRoot, codexObservation, inspectClaude = inspectClaudeRulesetFreshness } = {}) {
+export function inspectCliRulesetFreshness({
+  repoPath,
+  loadedSha,
+  loadedPluginRoot,
+  codexObservation,
+  networkPreflight = undefined,
+  hostTransport = undefined,
+  inspectClaude = inspectClaudeRulesetFreshness,
+} = {}) {
   if (codexObservation?.status === "ready") {
     return inspectRulesetFreshness(repoPath, {
       sourceObservation: codexObservation.observation,
       loadedPluginRoot,
+      networkPreflight,
+      hostTransport,
     });
   }
   if (codexObservation?.status === CODEX_CLAUDE_FALLBACK_STATUS) {
