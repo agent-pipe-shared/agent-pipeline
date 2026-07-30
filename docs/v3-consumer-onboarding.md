@@ -271,6 +271,12 @@ then copies the exact legacy authority into the neutral layer and verifies the
 result. It is a PO-confirmed recovery, not a precedence rule or a normal
 fetch-side effect.
 
+If migration is blocked solely by a previously completed, no-longer-live
+session-cleanup binding, use `session-cleanup.mjs release-binding --repo
+<root>`. This exact closure-receipt CAS is intentionally available before
+general onboarding readiness: it releases only the already persisted tuple and
+cannot create a session, delete a worktree, or bypass a missing closure proof.
+
 If an interrupted cutover leaves a journal, do not delete it or hand-copy its
 files. First inspect the recorded recovery, then explicitly activate it:
 
