@@ -292,9 +292,11 @@ import {
   enterPlanImplementation,
   reopenPlanDesign,
   revokePlanV2,
+  sealCurrentPlanApproval,
   sha256CanonicalJson,
   submitPlan,
 } from "../lib/plan-spec-state-v2.mjs";
+import { validateFeaturePackage } from "../lib/feature-package-topology.mjs";
 import {
   clearGateEstimateForMutation,
   prepareGateEstimateMutation,
@@ -380,6 +382,9 @@ const RESULT_BOOTSTRAP_PLAN_SCHEMA = "pipeline.continuity-result-bootstrap-plan.
 const RESULT_BOOTSTRAP_APPLY_SCHEMA = "pipeline.continuity-result-bootstrap-apply.v1";
 const RESULT_BOOTSTRAP_LOCK_TOKEN = "pipeline-result-bootstrap-v1";
 const RESULT_BOOTSTRAP_JOURNAL_SCHEMA = "pipeline.continuity-result-bootstrap-journal.v1";
+const RESULT_REBIND_PLAN_SCHEMA = "pipeline.continuity-result-rebind-plan.v1";
+const RESULT_REBIND_APPLY_SCHEMA = "pipeline.continuity-result-rebind-apply.v1";
+const RESULT_REBIND_LOCK_TOKEN = "pipeline-result-rebind-v1";
 const LEGACY_PLAN_APPROVAL_KEYS = ["approvedBy", "approvedAt", "poGateAuthority"];
 const LEGACY_PO_GATE_AUTHORITY_KEYS = [
   "schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256",
@@ -2615,6 +2620,139 @@ function runLegacyAdoptionCommand(sub, flags, deps) {
   } finally { releaseContinuityLock(lock); }
 }
 
+// ---- Closed lossless Result.md/result.md authority rebind (AC-047-151--154) ----
+
+function resultRebindCandidates(dir, prdPath) {
+  if (typeof prdPath !== "string" || !/^specs\/[A-Za-z0-9._:-]+\/prd_[A-Za-z0-9._:-]+\.md$/u.test(prdPath)) return null;
+  const base = dirname(prdPath).split(sep).join("/");
+  const upper = physicalRebindFile(dir, `${base}/Result.md`);
+  const lower = physicalRebindFile(dir, `${base}/result.md`);
+  if (upper === null || lower === null || upper.path === lower.path
+    || upper.identity.dev === lower.identity.dev && upper.identity.ino === lower.identity.ino) return null;
+  return { upper, lower };
+}
+
+function resultRebindInventory(dir, state, prd, spec) {
+  const continuity = state.continuity;
+  const bindings = [];
+  const add = (artifact, status, detail = undefined) => bindings.push({ artifact, status, ...(detail === undefined ? {} : { detail }) });
+  const submission = state.planSubmission;
+  if (submission === undefined) add("planSubmission", "not-present");
+  else if (submission?.planPath === prd.path && submission?.planSha256 === prd.sha256 && submission?.specPath === spec.path && submission?.specSha256 === spec.sha256) add("planSubmission", "validated-immutable");
+  else add("planSubmission", "rejected", "direct PRD/Spec binding is stale or unknown");
+  const approval = state.planApproval;
+  if (approval === undefined) add("planApproval", "not-present");
+  else if (approval?.poGateAuthority?.planPath === prd.path && approval?.poGateAuthority?.planSha256 === prd.sha256 && approval?.poGateAuthority?.specPath === spec.path && approval?.poGateAuthority?.specSha256 === spec.sha256) add("planApproval", "validated-immutable");
+  else add("planApproval", "rejected", "direct PRD/Spec binding is stale or unknown");
+  if (continuity.authority.prd.path === prd.path && continuity.authority.prd.sha256 === prd.sha256 && continuity.authority.spec.path === spec.path && continuity.authority.spec.sha256 === spec.sha256) add("continuity.authority.prd-spec", "validated-immutable");
+  else add("continuity.authority.prd-spec", "rejected", "direct PRD/Spec binding is stale or unknown");
+  const manifestPath = `${dirname(prd.path).split(sep).join("/")}/lifecycle.json`;
+  const manifest = physicalRebindFile(dir, manifestPath);
+  if (manifest === null) {
+    try { lstatSync(resolve(dir, manifestPath)); add("lifecycle.json", "rejected", "optional direct package binding is unsafe"); }
+    catch { add("lifecycle.json", "not-present"); }
+  } else {
+    const checked = validateFeaturePackage(dir, manifestPath);
+    add("lifecycle.json", "rejected", checked.ok ? "case collision is incompatible with package topology" : "optional direct package binding is invalid");
+  }
+  return bindings;
+}
+
+function resultRebindEligible(state, prd, spec, target, candidates) {
+  const continuity = state?.continuity;
+  const lifecycle = derivePlanLifecycle(state, { planSha256: prd.sha256, specSha256: spec.sha256 });
+  if (!state?.activeFeature || state.schema !== SCHEMA_ID || state.gateEstimate !== undefined || !lifecycle.ok || lifecycle.status !== "implementing" || !validateContinuityState(continuity, state.activeFeature.id).ok || continuity.featureId !== state.activeFeature.id || continuity.queueHead === null || continuity.queueHead.dispatch !== null || continuity.blocker !== null || continuity.acknowledgedFinal !== null || continuity.recovery !== null || continuity.decisionTxn !== null || continuity.closeTransition != null || continuity.revision >= Number.MAX_SAFE_INTEGER || continuity.authority.result === null || state.activeFeature.planPath !== prd.path || target.path === continuity.authority.result.path) return false;
+  const current = continuity.authority.result.path === candidates.upper.path ? candidates.upper : continuity.authority.result.path === candidates.lower.path ? candidates.lower : null;
+  return current !== null && continuity.authority.result.sha256 === current.sha256;
+}
+
+function resultRebindNextState(state, target, updatedAt) {
+  const next = structuredClone(state);
+  next.continuity.revision += 1;
+  next.continuity.authority.result = { path: target.path, sha256: target.sha256 };
+  next.continuity.resume = { ...next.continuity.resume, sourceRevision: next.continuity.revision };
+  next.updatedAt = updatedAt;
+  return next;
+}
+
+function buildResultRebindPlan(dir, existing, selectedPath, updatedAt) {
+  if (existing.status !== "ok" || !canonicalIso(updatedAt) || typeof selectedPath !== "string") return { ok: false, code: "PS-RESULT-REBIND-STATE" };
+  const state = existing.state;
+  const stateFile = physicalRebindFile(dir, stateRelativePath(dir));
+  if (stateFile === null || stateFile.sha256 !== sha256Bytes(existing.raw)) return { ok: false, code: "PS-RESULT-REBIND-STATE-IDENTITY" };
+  const prd = physicalRebindFile(dir, state?.continuity?.authority?.prd?.path);
+  const spec = physicalRebindFile(dir, state?.continuity?.authority?.spec?.path);
+  if (prd === null || spec === null) return { ok: false, code: "PS-RESULT-REBIND-AUTHORITY" };
+  let prdText;
+  try { prdText = new TextDecoder("utf-8", { fatal: true }).decode(prd.bytes); } catch { return { ok: false, code: "PS-RESULT-REBIND-PRD-MARKER" }; }
+  const marker = rebindMarker(prdText);
+  if (marker === null || marker.digest !== spec.sha256) return { ok: false, code: "PS-RESULT-REBIND-PRD-MARKER" };
+  const candidates = resultRebindCandidates(dir, prd.path);
+  if (candidates === null) return { ok: false, code: "PS-RESULT-REBIND-COLLISION" };
+  const target = selectedPath === candidates.upper.path ? candidates.upper : selectedPath === candidates.lower.path ? candidates.lower : null;
+  if (target === null) return { ok: false, code: "PS-RESULT-REBIND-TARGET" };
+  const inventory = resultRebindInventory(dir, state, prd, spec);
+  if (inventory.some((entry) => entry.status === "rejected")) return { ok: false, code: "PS-RESULT-REBIND-AUTHORITY-CLOSURE", inventory };
+  if (!resultRebindEligible(state, prd, spec, target, candidates)) return { ok: false, code: "PS-RESULT-REBIND-CONTINUITY", inventory };
+  const nextState = resultRebindNextState(state, target, updatedAt);
+  if (!validateContinuityState(nextState.continuity, state.activeFeature.id).ok) return { ok: false, code: "PS-RESULT-REBIND-POSTIMAGE", inventory };
+  const payload = {
+    schema: RESULT_REBIND_PLAN_SCHEMA, root: realpathSync(resolve(dir)), featureId: state.activeFeature.id,
+    selectedAuthorityTarget: { path: target.path, sha256: target.sha256, identity: target.identity }, authorityClosure: inventory,
+    preimage: { state: { sha256: sha256Bytes(existing.raw), identity: stateFile.identity, updatedAt: state.updatedAt ?? null }, continuity: { revision: state.continuity.revision, authority: state.continuity.authority, resume: state.continuity.resume }, prd: { path: prd.path, sha256: prd.sha256, identity: prd.identity, technicalSpecSha256: marker.digest }, spec: { path: spec.path, sha256: spec.sha256, identity: spec.identity }, resultCandidates: [candidates.upper, candidates.lower].map((candidate) => ({ path: candidate.path, sha256: candidate.sha256, identity: candidate.identity })) },
+    postimage: { stateSha256: sha256Bytes(Buffer.from(JSON.stringify(nextState, null, 2) + "\n", "utf8")), revision: nextState.continuity.revision, updatedAt, authorityResult: nextState.continuity.authority.result, resume: nextState.continuity.resume },
+    assurance: { regularFilesOnly: true, singleLinkOnly: true, resultFilesUntouched: true, archiveMoveDelete: false },
+  };
+  return { ok: true, payload, planSha256: sha256CanonicalJson(payload), nextState };
+}
+
+function parseResultRebindPlan(argv) {
+  const parsed = parseExactFlags(argv, new Set(["result-path"]));
+  return parsed.ok && typeof parsed.value["result-path"] === "string" && !isBlank(parsed.value["result-path"]) ? parsed.value["result-path"] : null;
+}
+
+function parseResultRebindApply(argv) {
+  if (argv.length !== 15 || argv[0] !== "--feature-id" || isBlank(argv[1]) || argv[2] !== "--result-path" || isBlank(argv[3]) || argv[4] !== "--expected-revision" || !parseExpectedRevision(argv[5]).ok || argv[6] !== "--expected-state-sha256" || !SHA256_RE.test(argv[7]) || argv[8] !== "--expected-post-state-sha256" || !SHA256_RE.test(argv[9]) || argv[10] !== "--updated-at" || !canonicalIso(argv[11]) || argv[12] !== "--plan-sha256" || !SHA256_RE.test(argv[13]) || argv[14] !== "--activate") return null;
+  return { featureId: argv[1], resultPath: argv[3], expectedRevision: Number(argv[5]), expectedStateSha256: argv[7], expectedPostStateSha256: argv[9], updatedAt: argv[11], planSha256: argv[13] };
+}
+
+function runResultRebindCommand(sub, rest, deps) {
+  if (sub === "continuity-result-rebind-plan") {
+    const selectedPath = parseResultRebindPlan(rest);
+    if (selectedPath === null) { console.error("Error: Result rebind plan requires exactly --result-path <explicit Result.md|result.md target>."); return 2; }
+    const planned = buildResultRebindPlan(deps.dir, readStateRaw(deps.dir), selectedPath, deps.now());
+    if (!planned.ok) { console.error(`Error: Result rebind plan refused (${planned.code}); zero mutation.`); return 2; }
+    const writer = fileURLToPath(import.meta.url);
+    console.log(JSON.stringify({ ...planned.payload, planSha256: planned.planSha256, applyAction: { executable: process.execPath, argv: [writer, "continuity-result-rebind-apply", "--feature-id", planned.payload.featureId, "--result-path", selectedPath, "--expected-revision", String(planned.payload.preimage.continuity.revision), "--expected-state-sha256", planned.payload.preimage.state.sha256, "--expected-post-state-sha256", planned.payload.postimage.stateSha256, "--updated-at", planned.payload.postimage.updatedAt, "--plan-sha256", planned.planSha256, "--activate"], mutation: true, requiresConfirmation: true, executionBoundary: "host-authorized-wsl", expected: { schema: RESULT_REBIND_APPLY_SCHEMA, statuses: ["applied", "replayed"] } } }, null, 2));
+    return 0;
+  }
+  const apply = parseResultRebindApply(rest);
+  if (apply === null) { console.error("Error: Result rebind apply requires the complete returned action and --activate confirmation."); return 2; }
+  const lock = acquireContinuityLock(deps.dir, RESULT_REBIND_LOCK_TOKEN, deps);
+  if (!lock.ok) { console.error(`Error: Result rebind apply refused (${lock.code}); zero mutation.`); return 2; }
+  try {
+    const current = readStateRaw(deps.dir);
+    if (current.status !== "ok") { console.error("Error: Result rebind State is unavailable or malformed; zero mutation."); return 2; }
+    if (sha256Bytes(current.raw) === apply.expectedPostStateSha256) {
+      const prd = physicalRebindFile(deps.dir, current.state.continuity?.authority?.prd?.path);
+      const candidates = prd === null ? null : resultRebindCandidates(deps.dir, prd.path);
+      if (current.state.activeFeature?.id !== apply.featureId || current.state.updatedAt !== apply.updatedAt || current.state.continuity?.revision !== apply.expectedRevision + 1 || current.state.continuity?.authority?.result?.path !== apply.resultPath || candidates === null || ![candidates.upper, candidates.lower].some((candidate) => candidate.path === apply.resultPath && candidate.sha256 === current.state.continuity.authority.result.sha256)) { console.error("Error: Result rebind replay postimage is invalid; zero mutation."); return 2; }
+      console.log(JSON.stringify({ schema: RESULT_REBIND_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: current.state.continuity.authority.result, mutated: false })); return 0;
+    }
+    const planned = buildResultRebindPlan(deps.dir, current, apply.resultPath, apply.updatedAt);
+    if (sha256Bytes(current.raw) !== apply.expectedStateSha256 || !planned.ok || planned.planSha256 !== apply.planSha256 || planned.payload.featureId !== apply.featureId || planned.payload.preimage.continuity.revision !== apply.expectedRevision || planned.payload.postimage.stateSha256 !== apply.expectedPostStateSha256) { console.error("Error: Result rebind apply inputs are stale or conflicting; zero mutation."); return 2; }
+    const before = planned.payload.preimage.resultCandidates;
+    const written = atomicWriteContinuityState(deps.dir, planned.nextState, lock, deps);
+    if (!written.ok) { console.error(`Error: Result rebind State write unresolved (${written.code}); mutation disposition is not success.`); return 2; }
+    const persisted = readStateRaw(deps.dir);
+    const prd = physicalRebindFile(deps.dir, current.state.continuity.authority.prd.path);
+    const after = prd === null ? null : resultRebindCandidates(deps.dir, prd.path);
+    const unchanged = after !== null && before.every((entry) => [after.upper, after.lower].some((candidate) => candidate.path === entry.path && candidate.sha256 === entry.sha256 && sameJson(candidate.identity, entry.identity)));
+    if (persisted.status !== "ok" || sha256Bytes(persisted.raw) !== apply.expectedPostStateSha256 || !sameJson(persisted.state, planned.nextState) || !unchanged) { console.error("Error: Result rebind postimage readback is unresolved; inspect persisted State before retry."); return 2; }
+    console.log(JSON.stringify({ schema: RESULT_REBIND_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: persisted.state.continuity.authority.result, mutated: true })); return 0;
+  } finally { releaseContinuityLock(lock); }
+}
+
 // ---- Elephant-owned first Result-authority bootstrap (AC-047-143--148) ----
 
 function resultBootstrapPath(dir, prdPath) {
@@ -4070,6 +4208,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   if (sub === "continuity-result-bootstrap-plan" || sub === "continuity-result-bootstrap-apply") {
     return runResultBootstrapCommand(sub, rest, { ...deps, dir, now });
   }
+  if (sub === "continuity-result-rebind-plan" || sub === "continuity-result-rebind-apply") {
+    return runResultRebindCommand(sub, rest, { ...deps, dir, now });
+  }
   if (CONTINUITY_SUBCOMMANDS.has(sub)) return runContinuityCommand(sub, flags, { ...deps, dir, now });
   if (PUBLICATION_SUBCOMMANDS.has(sub)) return runPublicationCommand(sub, flags, { ...deps, dir, now });
 
@@ -4215,7 +4356,12 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       let reopenedAt;
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
-          reopenedAt = observed.planInvalidation?.invalidatedAt ?? now();
+          // Only an already-open exact replay may retain the persisted audit
+          // timestamp.  A successor approval reopened after a prior audit must
+          // bind this invocation's timestamp and current authority objects.
+          reopenedAt = observed.activeFeature?.phase === "design" && observed.planApproved === false
+            ? observed.planInvalidation?.invalidatedAt ?? now()
+            : now();
           const transition = reopenPlanDesign({
             state: observed,
             expectedStateSha256: sha256CanonicalJson(observed),
@@ -4234,6 +4380,54 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       console.log(written.replay
         ? "Design is already open; zero-write replay accepted."
         : `Design reopened by "${by}" on ${reopenedAt}; lifecycle="draft".`);
+      return 0;
+    }
+
+    case "seal-plan-approval": {
+      if (!parseExactFlags(rest, new Set()).ok) {
+        console.error("Error: seal-plan-approval accepts no caller arguments.");
+        return 2;
+      }
+      const authority = poGateAuthority({ repoRoot: dir });
+      const submission = base.planSubmission;
+      if (!authority?.ok || !submission
+        || authority.value.planPath !== submission.planPath
+        || authority.value.planSha256 !== submission.planSha256
+        || authority.value.specPath !== submission.specPath
+        || authority.value.specSha256 !== submission.specSha256) {
+        console.error(`Error: seal-plan-approval blocked by ${authority?.code ?? "PLAN-APPROVAL-SEAL-AUTHORITY-STALE"}.`);
+        return 2;
+      }
+      const expectedAuthority = authority.value;
+      let sealedAt;
+      const written = writeState(dir, undefined, base, {
+        transition: (observed) => {
+          sealedAt = now();
+          const transition = sealCurrentPlanApproval({
+            state: observed,
+            expectedStateSha256: sha256CanonicalJson(observed),
+          });
+          return transition.ok
+            ? { ...transition, state: { ...transition.state, updatedAt: sealedAt } }
+            : transition;
+        },
+        beforeCommit: () => {
+          const current = poGateAuthority({ repoRoot: dir, expectedPlanSha256: expectedAuthority.planSha256, expectedSpecSha256: expectedAuthority.specSha256 });
+          return current?.ok && sameJson(current.value, expectedAuthority)
+            ? { ok: true }
+            : { ok: false, code: current?.code ?? "PLAN-APPROVAL-SEAL-AUTHORITY-STALE" };
+        },
+      });
+      if (!stateWriteSucceeded(written)) {
+        console.error(`Error: seal-plan-approval refused (${written.code}); PO approval was not changed.`);
+        return 2;
+      }
+      const persisted = readState(dir);
+      if (persisted.status !== "ok" || !sameJson(persisted.state, written.transition?.state)) {
+        console.error("Error: seal-plan-approval postimage readback failed; inspect persisted State before retry.");
+        return 2;
+      }
+      console.log(`Plan approval audit seal written on ${sealedAt}; current PO approval retained.`);
       return 0;
     }
 
@@ -4697,7 +4891,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-close-plan, continuity-result-close-apply, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, seal-plan-approval, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-rebind-plan, continuity-result-rebind-apply, continuity-result-close-plan, continuity-result-close-apply, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
       );
       return 2;
     }

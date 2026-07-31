@@ -9,6 +9,7 @@ import {
   derivePlanLifecycle,
   enterPlanImplementation,
   reopenPlanDesign,
+  sealCurrentPlanApproval,
   sha256CanonicalJson,
   submitPlan,
 } from "./plan-spec-state-v2.mjs";
@@ -434,4 +435,43 @@ test("reopen-design fails closed for drifted or inconsistent pre-submission V2 s
   });
   assert.equal(stale.ok, false);
   assert.equal(stale.code, "PLAN-REOPEN-STATE-STALE");
+});
+
+test("AC-047-149/150: successor approvals seal fresh invalidation audit and v3 migration is closed", () => {
+  const first = approved();
+  const firstReopen = reopenPlanDesign({ state: first, expectedStateSha256: sha256CanonicalJson(first), by: "PO", at: REOPENED });
+  assert.equal(firstReopen.ok, true);
+  const successorSubmission = submitted(firstReopen.state, AUTHORITY, RESUBMITTED);
+  const successor = approved(successorSubmission, AUTHORITY, REAPPROVED);
+  const priorInvalidationSha256 = sha256CanonicalJson(firstReopen.invalidation);
+  assert.equal(successor.planApproval.schema, "pipeline.plan-approval.v4");
+  assert.equal(successor.planApproval.priorInvalidationSha256, priorInvalidationSha256);
+  assert.equal(derivePlanLifecycle(successor).status, "approved");
+
+  const missingSeal = { ...successor, planApproval: { ...successor.planApproval } };
+  delete missingSeal.planApproval.priorInvalidationSha256;
+  assert.equal(derivePlanLifecycle(missingSeal).ok, false);
+  const wrongSeal = { ...successor, planApproval: { ...successor.planApproval, priorInvalidationSha256: "f".repeat(64) } };
+  assert.equal(derivePlanLifecycle(wrongSeal).ok, false);
+
+  const v3WithAudit = { ...successor, planApproval: { ...successor.planApproval, schema: "pipeline.plan-approval.v3" } };
+  delete v3WithAudit.planApproval.priorInvalidationSha256;
+  assert.equal(derivePlanLifecycle(v3WithAudit).ok, false);
+  const sealed = sealCurrentPlanApproval({ state: v3WithAudit, expectedStateSha256: sha256CanonicalJson(v3WithAudit) });
+  assert.equal(sealed.ok, true, JSON.stringify(sealed));
+  assert.equal(sealed.state.planApproval.approvedBy, "PO");
+  assert.equal(sealed.state.planApproval.priorInvalidationSha256, priorInvalidationSha256);
+  assert.equal(derivePlanLifecycle(sealed.state).status, "approved");
+
+  const v3WithoutAudit = { ...first, planApproval: { ...first.planApproval, schema: "pipeline.plan-approval.v3" } };
+  delete v3WithoutAudit.planApproval.priorInvalidationSha256;
+  assert.equal(derivePlanLifecycle(v3WithoutAudit).status, "approved");
+
+  const secondAt = "2026-07-30T20:25:00.000Z";
+  const secondReopen = reopenPlanDesign({ state: successor, expectedStateSha256: sha256CanonicalJson(successor), by: "PO", at: secondAt });
+  assert.equal(secondReopen.ok, true);
+  assert.equal(secondReopen.replay, false);
+  assert.equal(secondReopen.invalidation.invalidatedAt, secondAt);
+  assert.notEqual(secondReopen.invalidation.invalidatedSubmissionSha256, firstReopen.invalidation.invalidatedSubmissionSha256);
+  assert.equal(secondReopen.invalidation.invalidatedApprovalSha256, sha256CanonicalJson(successor.planApproval));
 });

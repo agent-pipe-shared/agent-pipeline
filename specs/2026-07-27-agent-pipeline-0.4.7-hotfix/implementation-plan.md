@@ -1,8 +1,8 @@
 # Implementation plan — Agent Pipeline 0.4.7 completion
 
 Status: reopened design on 2026-07-31; AC-047-143–148 and the synchronized
-PRD/Spec bytes require fresh digest-bound PO approval before Result-bootstrap
-implementation or dispatch.
+PRD/Spec bytes require fresh digest-bound PO approval before Result-bootstrap,
+fresh-invalidation, Result-rebind implementation or dispatch.
 
 Authority is the code-first section of the neighboring PRD and Spec.
 `main@83640cec22d494d227eebc82929370277ce926b9` is the implementation
@@ -19,7 +19,7 @@ prohibitions, and stop conditions.
 
 ### F0 — Lifecycle authority, kickoff promotion and portable cleanup
 
-Implement AC-047-100–111 and AC-047-131–148 first because these rules decide
+Implement AC-047-100–111 and AC-047-131–153 first because these rules decide
 whether later work can be edited, approved, resumed, recovered, and persisted
 safely.
 
@@ -89,6 +89,24 @@ safely.
   file, authority or State evidence. It creates no dispatch, blocker,
   acknowledgement, decision, outcome, close transition, Git/remote write or
   other external effect. Do not implement this bullet before fresh PO approval.
+- Correct repeated `reopen-design` so a non-replay invalidation is constructed
+  only from the current submission/approval and the current writer timestamp;
+  a prior invalidation is replay evidence, never source data for a fresh
+  transition. Require the successor approval to seal the canonical retained
+  invalidation digest; a legacy approval is compatible only with no retained
+  invalidation. Extend the pure lifecycle and process-writer regressions.
+- Add one narrow, confirmed `continuity-result-rebind` transaction for exactly
+  a PO-selected `Result.md` plus historical `result.md` case collision. Its
+  read-only plan binds both regular-file identities, State/revision and the
+  exact selected target. Its confirmed apply changes only continuity Result
+  authority, revision/resume/update fields; both Result files remain untouched.
+  It rejects every other topology or recovery ambiguity. Do not implement either
+  lifecycle writer before fresh PO approval.
+- Add one closed authority-closure inventory shared by submission/approval and
+  Result-rebind planning. It must renew every current State PRD/Spec binding,
+  validate the PRD technical-Spec marker, classify immutable Result authority,
+  and reject a stale/unowned direct binding in an optional package manifest or
+  other recognized artifact rather than leaving it behind.
 - Preserve closed guard grammar: expose retry actions only when each action is
   independently valid and read-only, keep the bounded cold-repository Git
   observation budget, and restrict Pipeline Author Repair to its exact,
@@ -103,7 +121,9 @@ kickoff promotion for all three profiles, Pipeline-start reinspection, and
 negative guard grammar. For AC-047-143–148 additionally prove read-only
 planning, exact canonical Result creation/binding, postimage field confinement,
 all crash/replay boundaries, and negative root/feature/State/revision/PRD/Spec/
-Result/active-work/journal cases.
+Result/active-work/journal cases. For AC-047-149–153 additionally prove a
+fresh repeated invalidation and the complete Result collision archive/rebind
+matrix, including preimage/postimage replay and crash boundaries.
 
 Owned production paths: `plugins/pipeline-core/scripts/session-cleanup.mjs`,
 `plugins/pipeline-core/lib/session-cleanup-recovery.mjs`,
@@ -295,8 +315,8 @@ old Issue prose. Any regression is fixed within its current architecture.
 After all slices are integrated:
 
 1. synchronize PRD/Spec/plan and exact technical-spec digest, including the
-   code-aligned AC-047-136–142 amendment and approved AC-047-143–148
-   Result-authority bootstrap;
+   code-aligned AC-047-136–142 amendment and approved AC-047-143–154
+   Result-authority bootstrap/recovery;
 2. freeze one commit/tree;
 3. run all focused suites, runner-neutral Full Verify, and blocking Security;
 4. obtain independent high-risk Critic review and disposition every finding;

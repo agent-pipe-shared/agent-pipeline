@@ -21,8 +21,10 @@ The design baseline is commit
 `83640cec22d494d227eebc82929370277ce926b9`. Existing AC-047-01–68 retain
 their identifiers and implemented behavior. The following AC-047-69–135 bind
 only the current missing or newly reproduced release remainder;
-AC-047-136–142 retain the code-aligned corrective amendment, and
-AC-047-143–148 define the newly reopened Result-authority bootstrap design.
+AC-047-136–142 retain the code-aligned corrective amendment, AC-047-143–148
+define the reopened Result-authority bootstrap design, and AC-047-149–153
+define the lifecycle-audit and Result case-collision recovery amendment;
+AC-047-154 defines closure of all PRD/Spec-derived authority.
 
 ### AC-047-69–74 — Fixed exact-candidate main publication (#81)
 
@@ -531,17 +533,77 @@ AC-047-143–148 define the newly reopened Result-authority bootstrap design.
   unsafe files and journal drift. The later Result-close transaction remains a
   separate authority transition.
 
+### AC-047-149–153 — Fresh invalidation audit and Result case-collision recovery
+
+- **AC-047-149 — Fresh invalidation generation:** Every non-replay
+  `reopen-design` transition SHALL create a new invalidation from the exact
+  currently bound submission and approval objects and the invocation's current
+  canonical timestamp. It SHALL NOT copy a timestamp, submission digest or
+  approval digest from a prior invalidation. Exact replay may return the
+  already persisted record without mutation. Tests SHALL cover reopening after
+  an earlier invalidation and prove that the second record is freshly bound.
+- **AC-047-150 — Non-current historical audit:** Historical invalidation data
+  SHALL be represented and validated as audit only. A successor approval after
+  an invalidation SHALL use `pipeline.plan-approval.v4` and carry the canonical
+  digest of that exact retained invalidation. Current lifecycle and
+  implementation authority SHALL require this seal to match before deriving
+  approval; a v3 compatibility approval is valid only when no invalidation
+  exists. A malformed, contradictory, missing, or manually rebound audit seal
+  SHALL fail closed rather than making a later approval appear sanctioned.
+- **AC-047-151 — Closed collision eligibility and plan:** A new
+  `continuity-result-rebind` planner SHALL write nothing and be eligible only
+  for one valid, quiescent active continuity with distinct `Result.md` and
+  `result.md` regular files in the same canonical feature directory. The
+  selected target authority SHALL be explicit in the plan/confirmation, never
+  inferred from case or recency.
+  Both inputs and portable State SHALL be regular, single-link, in-root files
+  with stable identities. The plan SHALL bind State, continuity revision,
+  both Result candidates, selected target and complete State postimage. Missing
+  files, non-colliding paths, aliases,
+  symlinks, hard-links, already archived/ambiguous content, active dispatch,
+  blocker, decision/recovery/close state, or any byte/identity drift fail
+  closed.
+- **AC-047-152 — Confirmed lossless rebind:** The sole typed apply action SHALL
+  require explicit digest-bound confirmation and run under the normal
+  State/continuity lock. It SHALL bind only the explicitly selected `Result.md`
+  digest as current `continuity.authority.result`, increment continuity
+  revision once, set the matching resume revision and `updatedAt`, and fully
+  read back the State postimage. It SHALL leave both Result files byte-for-byte
+  unchanged, and it SHALL not mutate another repository, Git refs, remotes,
+  outcome, decision or close state.
+- **AC-047-153 — Recovery and regression evidence:** Crash/replay handling
+  SHALL converge only through the same confirmed plan: exact preimage may
+  continue, exact postimage is a zero-mutation replay, and partial or
+  contradictory State/files fail closed. Focused tests SHALL cover plan
+  read-only behavior, successful rebind/readback, stale State/revision and
+  identity races, unsafe files, wrong authority, replay, and the
+  fresh-invalidation and audit-seal regressions from AC-047-149–150.
+- **AC-047-154 — Authority-closure inventory:** The sanctioned current
+  submission/approval path SHALL renew from one exact PRD/Spec observation all
+  direct current bindings in `planSubmission`, `planApproval`, and
+  `continuity.authority.prd/spec`; the PRD technical-Spec marker SHALL match
+  the current Spec bytes. A Result rebind SHALL revalidate those current
+  Continuity PRD/Spec bindings while leaving immutable Result bytes unchanged.
+  Before any plan/apply succeeds, the owning writer SHALL classify every
+  recognized direct PRD/Spec-binding artifact in the active package as
+  `rebound`, `validated-immutable`, `not-present`, or `rejected`. An unknown,
+  stale, or unowned direct binding, including an optional `lifecycle.json`,
+  SHALL be rejected fail-closed rather than copied, guessed, or left stale.
+  Tests SHALL cover the complete inventory, each renewed State field, immutable
+  Result readback, absent optional artifacts, and a stale direct package
+  binding.
+
 ### Current ownership and focused-gate map
 
 | Slice | Criteria | Exclusive production ownership | Required focused gate |
 | --- | --- | --- | --- |
-| F0 lifecycle/cleanup | AC-047-100–111, 131–148 | cleanup/recovery, portable State writer, approval/submission model, kickoff promotion, Result-authority bootstrap, onboarding/continuity/topology/Dev-Plan readers | session-cleanup binding, project-authority/migration, onboarding V3, legacy reopen, kickoff promotion, Result bootstrap/close, pipeline-state, feature-package topology, Dev-Plan and lifecycle-guard suites |
+| F0 lifecycle/cleanup | AC-047-100–111, 131–154 | cleanup/recovery, portable State writer, approval/submission model, kickoff promotion, Result-authority bootstrap/rebind, authority-closure inventory, onboarding/continuity/topology/Dev-Plan readers | session-cleanup binding, project-authority/migration, onboarding V3, legacy reopen, kickoff promotion, Result bootstrap/rebind/close, pipeline-state, feature-package topology, Dev-Plan and lifecycle-guard suites |
 | F1 freshness/baseline/backlog | AC-047-99, 112–130 | ruleset/update channels and repository freshness, per-project channel writer, host-source documentation, parallel-Sprint baseline policy, staleness/bootstrap policy, backlog ledger/projections | ruleset/repository freshness, channel writer, parallel-Sprint policy, backlog state suite and canonical checker |
 | F2 Verify/supervision | AC-047-75–80, 88–98 | Verify workflow/harness, injected runner seams, Critic trace identity, onboarding rollback identity, only shipped supervisor paths | Critic isolation, onboarding V3/E2E, Advisor bootstrap, and runner-free Full Verify |
 | F3 publication | AC-047-69–74 | existing publication bundle/authority, fixed executor, publication-only State/guard/close/release integration | bundle, authority, State-authority, close-journal, and new executor disposable-remote suites |
 | F4 authority adoption | AC-047-81–87 | neutral authority resolver/migration, runtime provenance, classification and adoption receipt | project-authority, migration, and onboarding V3 suites |
 | F5 retained regression | AC-047-01–68 | no redesign; only exact affected current surfaces on regression | existing focused suite matrix |
-| F6 immutable candidate | AC-047-01–148 | integration metadata, package/version/evidence only after all production slices | all focused gates, Full Verify, Security, high-risk Critic, install/readback, portable-state readback |
+| F6 immutable candidate | AC-047-01–154 | integration metadata, package/version/evidence only after all production slices | all focused gates, Full Verify, Security, high-risk Critic, install/readback, portable-state readback |
 
 Exact file paths, command lines, sequencing, shared-file handoff, and stop
 conditions are binding in [implementation-plan.md](implementation-plan.md).

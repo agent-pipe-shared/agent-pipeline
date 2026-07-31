@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-07-31T16:37:15.110Z",
+  "updatedAt": "2026-07-31T19:42:22.118Z",
   "closedFeatures": [
     {
       "id": "codex-onboarding-0.4.5",
@@ -61,7 +61,7 @@
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "agent-pipeline-0.4.7-hotfix",
-    "revision": 3,
+    "revision": 4,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Coordinator",
@@ -70,11 +70,11 @@
     "authority": {
       "prd": {
         "path": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/prd_agent-pipeline-0.4.7-hotfix.md",
-        "sha256": "b290af3e35f5b939f288207d5acb0ef12da5ff9adcb1ebfe6eb4fe1f8a1d6879"
+        "sha256": "e48e966b0e4aad3d17bf3c08481b66d98d33e2bd1e89b412f6efcf06ae3fe97d"
       },
       "spec": {
         "path": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/spec.md",
-        "sha256": "d815c7e1966e0a656fc8b28ecff2c0420deab8cd6eab29e8c25c2a7a44aa8a1a"
+        "sha256": "e15fd22c3a85faafb5f08a4b71b66e62e4f76d85a1e2f4dfeddded4963b4cfad"
       },
       "result": null
     },
@@ -90,7 +90,7 @@
     "acknowledgedFinal": null,
     "resume": {
       "mode": "immediate",
-      "sourceRevision": 3,
+      "sourceRevision": 4,
       "reasonCode": "active-turn"
     },
     "recovery": null,
@@ -106,19 +106,19 @@
     "schema": "pipeline.plan-submission.v1",
     "featureId": "agent-pipeline-0.4.7-hotfix",
     "planPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/prd_agent-pipeline-0.4.7-hotfix.md",
-    "planSha256": "b290af3e35f5b939f288207d5acb0ef12da5ff9adcb1ebfe6eb4fe1f8a1d6879",
+    "planSha256": "e48e966b0e4aad3d17bf3c08481b66d98d33e2bd1e89b412f6efcf06ae3fe97d",
     "specPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/spec.md",
-    "specSha256": "d815c7e1966e0a656fc8b28ecff2c0420deab8cd6eab29e8c25c2a7a44aa8a1a",
+    "specSha256": "e15fd22c3a85faafb5f08a4b71b66e62e4f76d85a1e2f4dfeddded4963b4cfad",
     "profile": "feature",
     "profileSha256": "5956cbe39906901a5c195b33b7de90a51b96e6e2db80eac31fe5497258423580",
     "submittedBy": "PO",
-    "submittedAt": "2026-07-31T16:36:58.310Z"
+    "submittedAt": "2026-07-31T19:03:45.697Z"
   },
   "planApproval": {
-    "schema": "pipeline.plan-approval.v3",
+    "schema": "pipeline.plan-approval.v4",
     "approvedBy": "PO",
-    "approvedAt": "2026-07-31T16:37:06.334Z",
-    "submissionSha256": "5892fe6d521fe24b5716a33073fb423c2eaca81528622ae1c531d8c324cf0f9f",
+    "approvedAt": "2026-07-31T19:03:56.472Z",
+    "submissionSha256": "e817afa42101efef46e6ed2e04945e4bee2835786dcbe1ec31ee049408675fb4",
     "profileSha256": "5956cbe39906901a5c195b33b7de90a51b96e6e2db80eac31fe5497258423580",
     "poGateAuthority": {
       "schema": "pipeline.po-gate-authority.v2",
@@ -128,16 +128,17 @@
       "receiptSha256": "d3c4d4b3b952d44e64c2b33164e96ad61652ac25d99425e6ffe9a6fb9c10aebb",
       "repositoryFingerprint": "3f74c2558c19687097f1285753400a03fde3953ec6a3496820ddbe1f25196f7d",
       "planPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/prd_agent-pipeline-0.4.7-hotfix.md",
-      "planSha256": "b290af3e35f5b939f288207d5acb0ef12da5ff9adcb1ebfe6eb4fe1f8a1d6879",
+      "planSha256": "e48e966b0e4aad3d17bf3c08481b66d98d33e2bd1e89b412f6efcf06ae3fe97d",
       "specPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/spec.md",
-      "specSha256": "d815c7e1966e0a656fc8b28ecff2c0420deab8cd6eab29e8c25c2a7a44aa8a1a"
-    }
+      "specSha256": "e15fd22c3a85faafb5f08a4b71b66e62e4f76d85a1e2f4dfeddded4963b4cfad"
+    },
+    "priorInvalidationSha256": "7d96545189a99ac949fb3136f866e71ec303909b08dec9aecab9928ea3ec5c75"
   },
   "planInvalidation": {
     "schema": "pipeline.plan-invalidation.v1",
     "featureId": "agent-pipeline-0.4.7-hotfix",
-    "invalidatedSubmissionSha256": "b107bb3091ec019bfec28c1690b60cb28fb688116532e8129dddf3e7460e8ed2",
-    "invalidatedApprovalSha256": "525ab1541b0c3786eca81df680ab49b228ea715bf222d9c8cbe27912e558228b",
+    "invalidatedSubmissionSha256": "5892fe6d521fe24b5716a33073fb423c2eaca81528622ae1c531d8c324cf0f9f",
+    "invalidatedApprovalSha256": "ed6d2ae6d3f8bca3997abc7321699320ef44099981fcbf54d2353f02ffd572f5",
     "invalidatedBy": "PO",
     "invalidatedAt": "2026-07-31T15:05:51.993Z",
     "reason": "reopen-design"

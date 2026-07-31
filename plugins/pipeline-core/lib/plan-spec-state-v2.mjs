@@ -9,7 +9,8 @@ import { createHash } from "node:crypto";
 import { validateContinuityState } from "./continuity-state.mjs";
 
 const APPROVAL_SCHEMA = "pipeline.plan-approval.v2";
-export const CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v3";
+const PREVIOUS_CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v3";
+export const CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v4";
 export const PLAN_SUBMISSION_SCHEMA = "pipeline.plan-submission.v1";
 export const PLAN_INVALIDATION_SCHEMA = "pipeline.plan-invalidation.v1";
 const AUTHORITY_SCHEMA = "pipeline.po-gate-authority.v2";
@@ -66,7 +67,9 @@ const CURRENT_APPROVAL_KEYS = [
   "submissionSha256",
   "profileSha256",
   "poGateAuthority",
+  "priorInvalidationSha256",
 ];
+const PREVIOUS_CURRENT_APPROVAL_KEYS = CURRENT_APPROVAL_KEYS.filter((key) => key !== "priorInvalidationSha256");
 const INVALIDATION_KEYS = [
   "schema",
   "featureId",
@@ -207,6 +210,17 @@ export function validCurrentPlanApproval(value) {
     && isCanonicalIso(value.approvedAt)
     && SHA256.test(value.submissionSha256)
     && SHA256.test(value.profileSha256)
+    && (value.priorInvalidationSha256 === null || SHA256.test(value.priorInvalidationSha256))
+    && validAuthority(value.poGateAuthority);
+}
+
+function validPreviousCurrentPlanApproval(value) {
+  return hasExactKeys(value, PREVIOUS_CURRENT_APPROVAL_KEYS)
+    && value.schema === PREVIOUS_CURRENT_APPROVAL_SCHEMA
+    && isNonBlankString(value.approvedBy)
+    && isCanonicalIso(value.approvedAt)
+    && SHA256.test(value.submissionSha256)
+    && SHA256.test(value.profileSha256)
     && validAuthority(value.poGateAuthority);
 }
 
@@ -242,8 +256,13 @@ function currentSubmission(state, observation) {
 
 function currentApproval(state, submission, observation) {
   const approval = state.planApproval;
-  if (submission !== null && validCurrentPlanApproval(approval)) {
+  if (submission !== null && (validCurrentPlanApproval(approval) || validPreviousCurrentPlanApproval(approval))) {
     const authority = approval.poGateAuthority;
+    const invalidation = state.planInvalidation;
+    const requiredSeal = invalidation === undefined ? null : sha256CanonicalJson(invalidation);
+    const sealed = approval.schema === CURRENT_APPROVAL_SCHEMA
+      ? approval.priorInvalidationSha256 === requiredSeal
+      : invalidation === undefined;
     return approval.submissionSha256 === sha256CanonicalJson(submission)
       && approval.profileSha256 === submission.profileSha256
       && authority.planPath === submission.planPath
@@ -251,6 +270,7 @@ function currentApproval(state, submission, observation) {
       && authority.specPath === submission.specPath
       && authority.specSha256 === submission.specSha256
       && submissionMatchesObservation(submission, observation)
+      && sealed
       ? approval
       : null;
   }
@@ -478,12 +498,53 @@ export function approveSubmittedPlan({
     submissionSha256: expectedSubmissionSha256,
     profileSha256,
     poGateAuthority,
+    priorInvalidationSha256: state.planInvalidation === undefined
+      ? null
+      : sha256CanonicalJson(state.planInvalidation),
   };
   return {
     ok: true,
     replay: false,
     state: { ...state, planApproved: true, planApproval: approval },
     approval,
+  };
+}
+
+/**
+ * One deterministic compatibility writer for a current v3 approval that
+ * follows retained invalidation audit.  It preserves the PO approval itself;
+ * only the current-approval schema and its closed audit seal are renewed.
+ */
+export function sealCurrentPlanApproval({ state, expectedStateSha256 }) {
+  if (!currentStateMatches(state, expectedStateSha256)) return fail("PLAN-LIFECYCLE-STATE-STALE");
+  if (!validActiveFeature(state?.activeFeature) || state.planApproved !== true) {
+    return fail("PLAN-APPROVAL-SEAL-STATE-INVALID");
+  }
+  if (!validPlanInvalidation(state.planInvalidation)) return fail("PLAN-APPROVAL-SEAL-INVALIDATION-REQUIRED");
+  const approval = state.planApproval;
+  if (!validPreviousCurrentPlanApproval(approval)) return fail("PLAN-APPROVAL-SEAL-V3-REQUIRED");
+  const submission = currentSubmission(state, {});
+  const authority = approval.poGateAuthority;
+  if (submission === null
+    || !new Set(["design", "implementation"]).has(state.activeFeature.phase)
+    || approval.submissionSha256 !== sha256CanonicalJson(submission)
+    || approval.profileSha256 !== submission.profileSha256
+    || authority.planPath !== submission.planPath
+    || authority.planSha256 !== submission.planSha256
+    || authority.specPath !== submission.specPath
+    || authority.specSha256 !== submission.specSha256) {
+    return fail("PLAN-APPROVAL-SEAL-STATE-INVALID");
+  }
+  const sealed = {
+    ...approval,
+    schema: CURRENT_APPROVAL_SCHEMA,
+    priorInvalidationSha256: sha256CanonicalJson(state.planInvalidation),
+  };
+  return {
+    ok: true,
+    replay: false,
+    state: { ...state, planApproval: sealed },
+    approval: sealed,
   };
 }
 

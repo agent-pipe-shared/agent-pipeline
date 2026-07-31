@@ -11,7 +11,7 @@
 > `9d1b3dc108eb77629ace5b82002120f5539abd8d`. Acceptance criteria:
 > [spec.md](spec.md).
 
-<!-- technical-spec-sha256: d815c7e1966e0a656fc8b28ecff2c0420deab8cd6eab29e8c25c2a7a44aa8a1a -->
+<!-- technical-spec-sha256: e15fd22c3a85faafb5f08a4b71b66e62e4f76d85a1e2f4dfeddded4963b4cfad -->
 
 The 2026-07-28 approval remains historical evidence for the already
 implemented slices. The Human/PO explicitly directed implementation of the
@@ -149,9 +149,44 @@ dispatch, blocker, decision/recovery/close state, or contradictory transaction
 evidence fail closed. The bootstrap creates no dispatch, decision, outcome,
 completion claim, Git/remote write or other external effect.
 
-This amendment is design only. No Result-bootstrap production implementation
-or dispatch is authorized until the PO approves the synchronized PRD/Spec
-digests again.
+### Lifecycle-audit and case-collision recovery amendment — 2026-07-31
+
+The reopened lifecycle exposed that a repeated `reopen-design` can carry the
+timestamp of an earlier invalidation into a new invalidation record. A
+sanctioned transition must instead bind its own current submission/approval
+objects and its own transition time; it may never reuse a previous audit value.
+Historical invalidation data is retained only as explicit, non-current audit
+data and cannot be reinterpreted as the current approval.
+
+The successor PO approval shall seal the retained invalidation audit by its
+canonical digest, so a later approval cannot make a manually rebound old audit
+look current. A pre-seal compatibility approval is accepted only when no
+invalidation exists.
+
+The Pipeline additionally needs one narrow recovery writer for a feature
+directory that contains both `Result.md` (the selected current Result) and
+`result.md` (a historical append-only Result). Its read-only plan shall bind
+both physical files, State and continuity preimages, and the PO-selected target
+authority. Its explicitly confirmed CAS apply shall leave both Result files
+byte-for-byte unchanged, bind only `Result.md` as current authority, advance
+the continuity revision once, and read back the complete State postimage. It
+shall never silently select an authority, erase, move or archive historical
+content, alter a non-colliding Result, create an outcome/close claim, or touch
+another checkout. A collision remains fail-closed unless it satisfies this
+exact recovery shape.
+
+Every PRD/Spec-derived authority is part of the same closure. The submission
+writer shall renew `planSubmission`, PO approval and Continuity PRD/Spec
+bindings from the same current bytes, while the PRD's technical Spec marker is
+renewed with the Spec itself. Immutable Result bytes shall not be rewritten;
+their relationship is revalidated through Continuity. A package manifest or
+other recognized artifact that directly serializes a PRD/Spec binding must be
+atomically rebound by its owning writer or cause a typed fail-closed result;
+the system shall never guess or leave a stale direct binding behind.
+
+This amendment is design only. No lifecycle-audit or Result-recovery
+production implementation or dispatch is authorized until the PO approves the
+synchronized PRD/Spec digests again.
 
 ### Release boundary
 
