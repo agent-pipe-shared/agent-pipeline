@@ -719,3 +719,68 @@ export function storeReleaseVersionPlan({ gitCommonDir, repoFingerprint, plan, d
   const result = recoverReleaseVersionPlan({ gitCommonDir, repoFingerprint, planId: plan.planId, decision }, { nowMs });
   return { ...result, status: result.status === "stored" ? "stored" : "replay" };
 }
+
+/**
+ * AC8's Release call site's own orchestrator (CYB-2I-3R): sequences an already-sealed plan
+ * through the shared completeness gate and then storage-or-fail-closed, giving
+ * `checkReleaseVersionPlanSecurityCompleteness` (CYB-2I-3, above) its first real caller in this
+ * repo -- fulfilling the "USAGE CONTRACT FOR A FUTURE CALLER" paragraph documented on that
+ * function's own header comment.
+ *
+ * Sequencing contract (fixed, exactly three steps, in order):
+ *   1. `plan` must already be a SEALED plan (the caller is responsible for having called
+ *      `createReleaseVersionPlan()` first -- this function never builds a plan itself and
+ *      accepts no plan-construction inputs at all).
+ *   2. Evaluate `checkReleaseVersionPlanSecurityCompleteness(plan, { projectDir, envelopePath,
+ *      verdictPath })`.
+ *   3a. A non-empty `failures` array fails closed via `RVP-SECURITY-INCOMPLETE` (message includes
+ *       every failure reason) WITHOUT ever calling `storeReleaseVersionPlan()` -- no record/
+ *       journal write of any kind happens on this path.
+ *   3b. An empty `failures` array calls `storeReleaseVersionPlan({ gitCommonDir, repoFingerprint,
+ *       plan, decision }, { nowMs })` and returns its result UNCHANGED (this function performs no
+ *       storage of its own; `storeReleaseVersionPlan()`'s own idempotent/replay behavior is
+ *       untouched by this wrapper).
+ *
+ * `createReleaseVersionPlan()` and `storeReleaseVersionPlan()` are both UNCHANGED by this
+ * addition -- this function only composes them; see `checkReleaseVersionPlanSecurityCompleteness`'s
+ * own header comment above for why the gate check lives in its own fs-touching function rather
+ * than inside the pure `createReleaseVersionPlan()`.
+ *
+ * NOT covered by this gate (deliberate): `recoverReleaseVersionPlan()`. Recovery only ever
+ * replays/repairs a plan that already has a "prepared"-or-later journal on disk -- i.e. a plan
+ * that already passed this exact gate once, at the original `sealAndStoreReleaseVersionPlan()`
+ * call that produced that journal. Re-running the security check at recovery time would (a)
+ * re-derive a NEW pass/fail against whatever `evidence/security-latest.v2*.json` pair happens to
+ * sit in `projectDir` at repair time -- which a later, unrelated `security-scan.mjs` run may have
+ * long since overwritten with evidence bound to a *different* (newer) commit/tree than the
+ * recovering plan's own `privateProductCandidate` -- spuriously blocking recovery of already-
+ * authorized state on a resource that has nothing to do with the plan's own validity; (b) change
+ * `recoverReleaseVersionPlan()`'s existing signature/behavior for already-passing callers, which
+ * this sub-package's own prohibitions forbid. Recovery therefore stays exactly as it is today,
+ * reached only through `storeReleaseVersionPlan()`'s own existing journal-driven path, never
+ * through this function directly.
+ *
+ * @param {object} params
+ * @param {string} params.gitCommonDir - forwarded to `storeReleaseVersionPlan` unchanged.
+ * @param {string} params.repoFingerprint - forwarded to `storeReleaseVersionPlan` unchanged.
+ * @param {object} params.plan - an already-sealed release version plan (typically
+ *   `createReleaseVersionPlan()`'s own return value).
+ * @param {object} params.decision - forwarded to `storeReleaseVersionPlan` unchanged.
+ * @param {string} params.projectDir - forwarded to `checkReleaseVersionPlanSecurityCompleteness`
+ *   unchanged (no default; the caller supplies it explicitly, same as that function's own
+ *   contract).
+ * @param {string} [params.envelopePath] - forwarded to `checkReleaseVersionPlanSecurityCompleteness`
+ *   unchanged.
+ * @param {string} [params.verdictPath] - forwarded to `checkReleaseVersionPlanSecurityCompleteness`
+ *   unchanged.
+ * @param {object} [options]
+ * @param {number} [options.nowMs] - forwarded to `storeReleaseVersionPlan` unchanged.
+ * @returns {object} `storeReleaseVersionPlan()`'s own return value, unchanged.
+ */
+export function sealAndStoreReleaseVersionPlan({ gitCommonDir, repoFingerprint, plan, decision, projectDir, envelopePath, verdictPath }, { nowMs = Date.now() } = {}) {
+  const failures = checkReleaseVersionPlanSecurityCompleteness(plan, { projectDir, envelopePath, verdictPath });
+  if (failures.length > 0) {
+    fail("RVP-SECURITY-INCOMPLETE", `release version plan fails security completeness, storage refused: ${failures.join("; ")}`);
+  }
+  return storeReleaseVersionPlan({ gitCommonDir, repoFingerprint, plan, decision }, { nowMs });
+}

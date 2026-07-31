@@ -22,6 +22,7 @@ import {
   releaseVersionPlanJournalPath,
   releaseVersionPlanPath,
   recoverReleaseVersionPlan,
+  sealAndStoreReleaseVersionPlan,
   storeReleaseVersionDecision,
   storeReleaseVersionPlan,
   validateReleaseVersionDecision,
@@ -383,6 +384,81 @@ const cases = [
       () => checkReleaseVersionPlanSecurityCompleteness(plan, {}),
       (error) => error instanceof ReleaseVersionDecisionError && error.code === "RVP-COMPLETENESS",
     );
+  }],
+  ["release AC8 caller (CYB-2I-3R): non-blocking verdict stores exactly what storeReleaseVersionPlan itself would", () => {
+    const projectDir = mkdtempSync(join(tmpdir(), "release-plan-caller-pass-"));
+    const common = mkdtempSync(join(tmpdir(), "release-version-plan-caller-"));
+    try {
+      const source = planInput();
+      const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+      writeReleasePlanSecurityEvidence(projectDir, { commit: plan.privateProductCandidate.commit, tree: plan.privateProductCandidate.tree });
+      const sealed = sealAndStoreReleaseVersionPlan({ gitCommonDir: common, repoFingerprint: h("d"), plan, decision: source.decision, projectDir }, { nowMs: NOW });
+      assert.equal(sealed.status, "stored");
+      const recordPath = releaseVersionPlanPath({ gitCommonDir: common, repoFingerprint: h("d"), planId: plan.planId });
+      assert.equal(readFileSync(recordPath, "utf8"), canonicalJson(plan));
+      // Equivalence proof: a direct storeReleaseVersionPlan() replay call against the exact
+      // state sealAndStoreReleaseVersionPlan() just wrote must see status "replay" with the
+      // SAME path/journalPath/recordSha256 -- if the orchestrator had stored anything
+      // different, storeReleaseVersionPlan's own RVP-CONFLICT check would throw here instead.
+      const directReplay = storeReleaseVersionPlan({ gitCommonDir: common, repoFingerprint: h("d"), plan, decision: source.decision }, { nowMs: NOW });
+      assert.equal(directReplay.status, "replay");
+      assert.equal(directReplay.path, sealed.path);
+      assert.equal(directReplay.journalPath, sealed.journalPath);
+      assert.equal(directReplay.recordSha256, sealed.recordSha256);
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true });
+      rmSync(common, { recursive: true, force: true });
+    }
+  }],
+  ["release AC8 caller (CYB-2I-3R): blocking verdict fails closed before storeReleaseVersionPlan ever runs (no record/journal written)", () => {
+    const projectDir = mkdtempSync(join(tmpdir(), "release-plan-caller-block-"));
+    const common = mkdtempSync(join(tmpdir(), "release-version-plan-caller-"));
+    try {
+      const source = planInput();
+      const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+      writeReleasePlanSecurityEvidence(projectDir, {
+        commit: plan.privateProductCandidate.commit,
+        tree: plan.privateProductCandidate.tree,
+        status: "SKIPPED",
+        classification: "binary_missing",
+        outcome: "required-capability-missing",
+        blocking: true,
+        offendingCapabilities: [{ capabilityId: "cap.secrets", outcome: "required-capability-missing" }],
+      });
+      assert.throws(
+        () => sealAndStoreReleaseVersionPlan({ gitCommonDir: common, repoFingerprint: h("e"), plan, decision: source.decision, projectDir }, { nowMs: NOW }),
+        (error) => error instanceof ReleaseVersionDecisionError && error.code === "RVP-SECURITY-INCOMPLETE"
+          && error.message.includes("required capability cap.secrets did not reach an accepted state"),
+      );
+      const recordPath = releaseVersionPlanPath({ gitCommonDir: common, repoFingerprint: h("e"), planId: plan.planId });
+      const journalPath = releaseVersionPlanJournalPath({ gitCommonDir: common, repoFingerprint: h("e"), planId: plan.planId });
+      assert.equal(existsSync(recordPath), false);
+      assert.equal(existsSync(journalPath), false);
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true });
+      rmSync(common, { recursive: true, force: true });
+    }
+  }],
+  ["release AC8 caller (CYB-2I-3R): missing evidence fails closed through the orchestrator too, observed via the caller not the gate directly", () => {
+    const projectDir = mkdtempSync(join(tmpdir(), "release-plan-caller-missing-"));
+    const common = mkdtempSync(join(tmpdir(), "release-version-plan-caller-"));
+    try {
+      const source = planInput();
+      const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+      assert.throws(
+        () => sealAndStoreReleaseVersionPlan({ gitCommonDir: common, repoFingerprint: h("f"), plan, decision: source.decision, projectDir }, { nowMs: NOW }),
+        (error) => error instanceof ReleaseVersionDecisionError && error.code === "RVP-SECURITY-INCOMPLETE"
+          && error.message.includes("evidence/security-latest.v2.json missing")
+          && error.message.includes("evidence/security-latest.v2.verdict.json missing"),
+      );
+      const recordPath = releaseVersionPlanPath({ gitCommonDir: common, repoFingerprint: h("f"), planId: plan.planId });
+      const journalPath = releaseVersionPlanJournalPath({ gitCommonDir: common, repoFingerprint: h("f"), planId: plan.planId });
+      assert.equal(existsSync(recordPath), false);
+      assert.equal(existsSync(journalPath), false);
+    } finally {
+      rmSync(projectDir, { recursive: true, force: true });
+      rmSync(common, { recursive: true, force: true });
+    }
   }],
 ];
 
