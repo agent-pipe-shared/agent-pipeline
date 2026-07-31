@@ -93,12 +93,15 @@ function writeSecurityCompletenessEvidence(root, headSha, { blocking = false, st
 }
 
 /**
- * `security` selects the candidate root's `.claude/pipeline.yaml` gate-activation shape (F2,
- * CYB-2I-1R): default `"blocking"` writes an ACTIVE security gate so every pre-existing,
- * zero-argument `fixture()` call below keeps exercising today's unconditional
- * checkSecurityCompleteness() behavior unchanged; `"off"` writes an inactive gate; `"absent"`
- * writes no manifest file at all (mirrors check-close-security-completeness.test.mjs's own
- * fixture() shape for the identical guard).
+ * `security` selects the TRUSTED `claRoot`'s `.claude/pipeline.yaml` gate-activation shape (F2,
+ * CYB-2I-1R; re-rooted to `claRoot` per Critic finding N1, CYB-2I-1R2): default `"blocking"`
+ * writes an ACTIVE security gate so every pre-existing, zero-argument `fixture()` call below
+ * keeps exercising today's unconditional checkSecurityCompleteness() behavior unchanged; `"off"`
+ * writes an inactive gate; `"absent"` writes no manifest file at all (mirrors
+ * check-close-security-completeness.test.mjs's own fixture() shape for the identical guard). The
+ * manifest is written into `claRoot`, NEVER into `root` (the untrusted candidate) -- N1's fix is
+ * exactly that `root`'s own manifest must have no effect on gate activation; a dedicated test
+ * below proves a `root`-side manifest attempting to disable the gate has no effect.
  */
 function fixture({ security = "blocking" } = {}) {
   const root = mkdtempSync(join(tmpdir(), "pr-contributor-gates-"));
@@ -110,9 +113,9 @@ function fixture({ security = "blocking" } = {}) {
   writeFileSync(join(claRoot, "CONTRIBUTOR_LICENSE_AGREEMENT.md"), CLA_BYTES, "utf8");
   writeFileSync(join(root, "change.txt"), "base\n", "utf8");
   if (security !== "absent") {
-    mkdirSync(join(root, ".claude"), { recursive: true });
+    mkdirSync(join(claRoot, ".claude"), { recursive: true });
     writeFileSync(
-      join(root, ".claude", "pipeline.yaml"),
+      join(claRoot, ".claude", "pipeline.yaml"),
       `schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: ${security}\n    type: automated\n`,
       "utf8",
     );
@@ -328,6 +331,33 @@ test("security gate mode:off: completeness check is skipped, CLA/DCO evaluated n
   const receipt = validatePrContributorGates({ root, claRoot, event });
   assert.equal(receipt.ok, true, JSON.stringify(receipt.errors));
   assert.equal(receipt.errors.some((entry) => entry.code === "SECURITY_COMPLETENESS_BLOCKING"), false);
+  assert.equal(receipt.cla.accepted, true);
+  assert.equal(receipt.dco.status, "passed");
+});
+
+test("an untrusted root's own manifest cannot disable the security gate: only the trusted claRoot governs activation (Critic finding N1, CYB-2I-1R2)", () => {
+  const { root, claRoot, event } = fixture({ security: "blocking" }); // claRoot: mode:"blocking" (trusted, governs).
+  // Attacker-controlled candidate root sets its OWN manifest to mode:"off" -- the exact CYB-2I-1R2
+  // bypass this test closes. Before the fix, loadManifest(root) would read THIS file and skip the
+  // completeness check entirely; after the fix, root's manifest has no bearing on activation at
+  // all, only claRoot's does.
+  mkdirSync(join(root, ".claude"), { recursive: true });
+  writeFileSync(
+    join(root, ".claude", "pipeline.yaml"),
+    "schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: off\n    type: automated\n",
+    "utf8",
+  );
+  // No security evidence written for this headSha -- if the gate were (incorrectly) governed by
+  // root's manifest, this would be a silent skip (ok:true, no missing-evidence errors, exactly
+  // like the "security gate mode:off" case above). A correctly re-rooted guard must instead still
+  // run the completeness check against claRoot's "blocking" configuration and fail closed.
+  const receipt = validatePrContributorGates({ root, claRoot, event });
+  assert.equal(receipt.ok, false);
+  const completenessErrors = receipt.errors.filter((entry) => entry.code === "SECURITY_COMPLETENESS_BLOCKING");
+  assert.equal(completenessErrors.length, 2);
+  assert.ok(completenessErrors.some((entry) => entry.detail === "evidence/security-latest.v2.json missing"));
+  assert.ok(completenessErrors.some((entry) => entry.detail === "evidence/security-latest.v2.verdict.json missing"));
+  // CLA/DCO remain independently, correctly evaluated -- the attempted bypass affects nothing else.
   assert.equal(receipt.cla.accepted, true);
   assert.equal(receipt.dco.status, "passed");
 });
