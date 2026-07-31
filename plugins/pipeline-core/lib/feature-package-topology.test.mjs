@@ -39,7 +39,10 @@ try {
   file(`${base}/Result.md`, "conflicting result envelope\n");
   assert.match(validateFeatureTopology(root).findings.join("\n"), /filesystem case-fold or Unicode-normalization collision/u);
   rmSync(join(root, `${base}/Result.md`));
+  file(`${base}/ſpec.md`, "compatibility-conflicting spec envelope\n");
+  assert.match(validateFeatureTopology(root).findings.join("\n"), /filesystem case-fold or Unicode-normalization collision/u);
+  rmSync(join(root, `${base}/ſpec.md`));
   manifest.artifacts[1].sha256 = "0".repeat(64); writeFileSync(join(root, `${base}/lifecycle.json`), JSON.stringify(manifest));
   assert.match(validateFeatureTopology(root).findings.join("\n"), /digest does not bind/u);
-  console.log("feature-package-topology: 10 passed, 0 failed");
+  console.log("feature-package-topology: 11 passed, 0 failed");
 } finally { rmSync(root, { recursive: true, force: true }); }

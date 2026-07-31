@@ -21,8 +21,8 @@
 - The current neutral State authority is valid at continuity revision `10`, in
   `phase:"implementation"` with `planApproved:true`, the renewed
   Plan/Spec-bound approval, and the canonical Result authority
-  `specs/sprint-phoenix-epic/Result.md` bound at
-  `dd75b473e13918e8b41e10f2005217473e991adbd918b61c461f567cad2e9842`.
+  `specs/sprint-phoenix-epic/result.md` bound at
+  `a95979c94a93547be2de4d130d5825b97946f63fae5345289b412458882a60c6`.
   It still names `audit-handoff-design-revision` / `review` as its queue head;
   that action must be resolved through the designated lifecycle/dispatch path
   before selecting another writing package. The legacy `.claude` State and

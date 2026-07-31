@@ -59,7 +59,7 @@ function caseFoldedPackageFiles(root, id) {
   const folded = new Map();
   if (!SAFE_ID.test(id ?? "")) return folded;
   for (const path of walk(root, `specs/${id}`)) {
-    const key = path.normalize("NFC").toLocaleLowerCase("en-US");
+    const key = path.normalize("NFKC").toLocaleLowerCase("en-US");
     folded.set(key, [...(folded.get(key) ?? []), path]);
   }
   return folded;
@@ -106,7 +106,7 @@ export function validateFeaturePackage(rootDir = process.cwd(), manifestPath) {
     const rel = packageRelative(id, artifact.path);
     if (!rel || !canonicalRelative(root, artifact.path)) findings.push(`${label}: path must be canonical within specs/${id}/`);
     const file = rel ? regularFile(root, artifact.path, findings, label) : null;
-    const caseKey = typeof artifact.path === "string" ? artifact.path.normalize("NFC").toLocaleLowerCase("en-US") : "";
+    const caseKey = typeof artifact.path === "string" ? artifact.path.normalize("NFKC").toLocaleLowerCase("en-US") : "";
     if (caseKey && folded.has(caseKey)) findings.push(`${label}: case-fold or Unicode-normalization collision`);
     if (caseKey) folded.add(caseKey);
     if (caseKey && (packageFiles.get(caseKey)?.length ?? 0) > 1) findings.push(`${label}: filesystem case-fold or Unicode-normalization collision`);
