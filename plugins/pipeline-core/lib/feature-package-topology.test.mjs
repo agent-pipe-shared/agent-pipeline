@@ -36,7 +36,10 @@ try {
   assert.equal(planFeaturePackageBootstrap(root, bootstrapPath, { ...proposal, targetState: "approved" }).reason, "invalid-bootstrap-proposal");
   assert.equal(planFeaturePackageBootstrap(root, bootstrapPath, { targetState: "draft" }).reason, "invalid-bootstrap-proposal");
   assert.equal(planFeaturePackageBootstrap(root, `${bootstrapBase}/other.json`, proposal).reason, "invalid-bootstrap-manifest");
+  file(`${base}/Result.md`, "conflicting result envelope\n");
+  assert.match(validateFeatureTopology(root).findings.join("\n"), /filesystem case-fold or Unicode-normalization collision/u);
+  rmSync(join(root, `${base}/Result.md`));
   manifest.artifacts[1].sha256 = "0".repeat(64); writeFileSync(join(root, `${base}/lifecycle.json`), JSON.stringify(manifest));
   assert.match(validateFeatureTopology(root).findings.join("\n"), /digest does not bind/u);
-  console.log("feature-package-topology: 9 passed, 0 failed");
+  console.log("feature-package-topology: 10 passed, 0 failed");
 } finally { rmSync(root, { recursive: true, force: true }); }

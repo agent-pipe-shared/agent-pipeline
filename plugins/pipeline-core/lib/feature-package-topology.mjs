@@ -55,6 +55,15 @@ function walk(root, start) {
   if (existsSync(join(root, start))) visit(join(root, start));
   return files.sort((a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)));
 }
+function caseFoldedPackageFiles(root, id) {
+  const folded = new Map();
+  if (!SAFE_ID.test(id ?? "")) return folded;
+  for (const path of walk(root, `specs/${id}`)) {
+    const key = path.normalize("NFC").toLocaleLowerCase("en-US");
+    folded.set(key, [...(folded.get(key) ?? []), path]);
+  }
+  return folded;
+}
 
 export function inventoryFeaturePackages(rootDir = process.cwd()) {
   const root = resolve(rootDir);
@@ -89,6 +98,7 @@ export function validateFeaturePackage(rootDir = process.cwd(), manifestPath) {
   if (!(value?.supersedes === null || (typeof value?.supersedes === "string" && SAFE_ID.test(value.supersedes)))) findings.push("FTP-SUPERSEDES: relationship must be null or a safe feature id");
 
   const seen = new Set(); const folded = new Set(); const classes = new Map();
+  const packageFiles = caseFoldedPackageFiles(root, id);
   for (const [index, artifact] of (Array.isArray(value?.artifacts) ? value.artifacts : []).entries()) {
     const label = `FTP-ARTIFACT-${index}`;
     if (!exact(artifact, ["class", "path", "sha256", "authority", "mutability", "retention"])) { findings.push(`${label}: closed artifact keys are required`); continue; }
@@ -99,6 +109,7 @@ export function validateFeaturePackage(rootDir = process.cwd(), manifestPath) {
     const caseKey = typeof artifact.path === "string" ? artifact.path.normalize("NFC").toLocaleLowerCase("en-US") : "";
     if (caseKey && folded.has(caseKey)) findings.push(`${label}: case-fold or Unicode-normalization collision`);
     if (caseKey) folded.add(caseKey);
+    if (caseKey && (packageFiles.get(caseKey)?.length ?? 0) > 1) findings.push(`${label}: filesystem case-fold or Unicode-normalization collision`);
     if (file && seen.has(file)) findings.push(`${label}: duplicate artifact path`);
     if (file) seen.add(file);
     if (!SHA256.test(artifact.sha256 ?? "") || (file && digest(readFileSync(join(root, file))) !== artifact.sha256)) findings.push(`${label}: digest does not bind file bytes`);
