@@ -929,6 +929,12 @@
       "member": "parallel-dispatch-planner-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:parallel-sprint-integration-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "parallel-sprint-integration-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:phase26-invariants-check",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -969,6 +975,12 @@
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "pipeline-state-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:pipeline-update-channel-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "pipeline-update-channel-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-gate-authority-fixture-tests",
@@ -1886,6 +1898,105 @@
         }
       ],
       "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "parallel-sprint-promotion-gates",
+      "publicName": "Parallel Sprint promotion gates",
+      "problem": "Long-lived parallel Sprints must not be forced to rebase continuously or promote an unsafe candidate.",
+      "benefit": "The integration contract rebases only the explicitly selected first merge-ready Sprint and requires bounded impact review for protected or overlapping baseline advances.",
+      "status": "shipped",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:parallel-sprint-integration-tests"
+      ],
+      "runners": [
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/lib/parallel-sprint-integration.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/lib/parallel-sprint-integration.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-parallel-sprint-promotion-gates",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "none",
+      "specializedOnlyReason": null
+    },
+    {
+      "id": "pipeline-update-channels",
+      "publicName": "Pipeline update channels",
+      "problem": "Self-application and consuming repositories need explicit update selection without conflating repository freshness, host source switching, or release promotion.",
+      "benefit": "A closed alpha, beta, or stable channel contract provides trusted defaults and a sanctioned repository-local override while keeping update availability read-only.",
+      "status": "shipped",
+      "surfaceIds": [
+        "verify-phase:harness/scripts/verify.mjs:pipeline-update-channel-tests"
+      ],
+      "runners": [
+        "runner-neutral"
+      ],
+      "runnerDispositions": {
+        "claude": {
+          "status": "supported",
+          "reasonCode": null
+        },
+        "codex": {
+          "status": "supported",
+          "reasonCode": null
+        }
+      },
+      "platforms": [
+        "all"
+      ],
+      "operatingShapes": [
+        "multi-team",
+        "small-team",
+        "solo"
+      ],
+      "prerequisites": [
+        "pipeline-core plugin"
+      ],
+      "productionEvidence": [
+        "plugins/pipeline-core/scripts/pipeline-update-channel.mjs",
+        "plugins/pipeline-core/scripts/ruleset-freshness.mjs"
+      ],
+      "testEvidence": [
+        "plugins/pipeline-core/scripts/pipeline-update-channel.test.mjs",
+        "plugins/pipeline-core/scripts/ruleset-freshness.test.mjs"
+      ],
+      "targets": [
+        {
+          "document": "FLOW",
+          "anchorId": "capability-pipeline-update-channels",
+          "status": "pending"
+        }
+      ],
+      "configurationPath": "project/pipeline.json",
       "specializedOnlyReason": null
     },
     {

@@ -704,11 +704,64 @@ function lifecycleDeps(dir, planPath, overrides = {}) {
   };
 }
 
+function lifecycleContinuity(featureId, authority) {
+  return {
+    schema: "pipeline.continuity.v0",
+    featureId,
+    revision: 0,
+    runtime: {
+      humanFacingLanguage: authority.humanFacing,
+      activeDuty: "Coordinator",
+      sessionCleanup: null,
+    },
+    authority: {
+      prd: { path: authority.planPath, sha256: authority.planSha256 },
+      spec: { path: authority.specPath, sha256: authority.specSha256 },
+      result: null,
+    },
+    queueHead: {
+      packageId: "initial-planning",
+      actionId: "review-plan",
+      nextAction: "review",
+      productRetryCount: 0,
+      environmentRerouteCount: 0,
+      dispatch: null,
+    },
+    blocker: null,
+    acknowledgedFinal: null,
+    resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" },
+    recovery: null,
+    decisionTxn: null,
+    capacity: {
+      concurrencyLimit: 4,
+      reservedCriticSlots: 1,
+      reservedRecoverySlots: 1,
+      fallbackPolicy: "defer",
+    },
+  };
+}
+
+function initializeLifecycleContinuity(dir, featureId, planPath) {
+  const observed = injectedPoGateAuthority(planPath)();
+  if (!observed.ok) return 2;
+  const requestFile = writeRequest(
+    dir,
+    `lifecycle-continuity-${featureId}`,
+    lifecycleContinuity(featureId, observed.value),
+  );
+  return run(
+    continuityArgs("continuity-init", "absent", requestFile),
+    continuityDeps(dir),
+  );
+}
+
 function submitAndApprove(dir, planPath) {
+  const activeFeature = readState(dir).state.activeFeature;
+  const initialized = initializeLifecycleContinuity(dir, activeFeature.id, planPath);
   const deps = lifecycleDeps(dir, planPath);
   const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps);
   const approved = run(["approve-plan", "--by", "po-test"], deps);
-  return { submitted, approved };
+  return { initialized, submitted, approved };
 }
 
 function seedSubprocessPoGateAuthority(dir, planPath) {
@@ -747,6 +800,26 @@ function seedSubprocessPoGateAuthority(dir, planPath) {
   }
   writeFileSync(receiptPath, serializePoGateProfileReceipt(receipt));
   chmodSync(receiptPath, 0o600);
+}
+
+function initializeSubprocessLifecycleContinuity(dir, featureId, planPath, env) {
+  const specPath = `${planPath.slice(0, planPath.lastIndexOf("/") + 1)}spec.md`;
+  const authority = {
+    humanFacing: "de",
+    planPath,
+    planSha256: createHash("sha256").update(readFileSync(join(dir, planPath))).digest("hex"),
+    specPath,
+    specSha256: createHash("sha256").update(readFileSync(join(dir, specPath))).digest("hex"),
+  };
+  const requestFile = writeRequest(
+    dir,
+    `subprocess-lifecycle-continuity-${featureId}`,
+    lifecycleContinuity(featureId, authority),
+  );
+  return spawnSync(process.execPath, [
+    CLI,
+    ...continuityArgs("continuity-init", "absent", requestFile),
+  ], { encoding: "utf8", env });
 }
 
 function continuityIdentity(overrides = {}) {
@@ -971,11 +1044,17 @@ function canonicalFixtureJson(value) {
 {
   const dir = freshDir("approve-shape");
   run(["set-feature", "--id", "ap1-pipeline-tuning", "--plan-path", ".claude/plans/x.md"], { dir, now: FIXED_NOW });
+  const initialized = initializeLifecycleContinuity(
+    dir,
+    "ap1-pipeline-tuning",
+    ".claude/plans/x.md",
+  );
   const submitted = run(
     ["submit-plan", "--by", "coordinator", "--profile", "feature"],
     lifecycleDeps(dir, ".claude/plans/x.md"),
   );
   const code = run(["approve-plan", "--by", "po-test"], lifecycleDeps(dir, ".claude/plans/x.md"));
+  ok("PS06a-1 continuity-init exit 0", initialized === 0, `got ${initialized}`);
   ok("PS06a0 submit-plan exit 0", submitted === 0, `got ${submitted}`);
   ok("PS06a approve-plan exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
@@ -997,7 +1076,10 @@ function canonicalFixtureJson(value) {
 {
   const dir = freshDir("set-feature-reset");
   run(["set-feature", "--id", "f1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
-  submitAndApprove(dir, "p1.md");
+  const approved = readState(dir).state;
+  approved.planApproved = true;
+  approved.planApproval = { approvedBy: "legacy-po", approvedAt: FIXED_NOW() };
+  writeFileSync(statePath(dir), `${JSON.stringify(approved, null, 2)}\n`);
   run(["set-feature", "--id", "f2", "--plan-path", "p2.md"], { dir, now: FIXED_NOW });
   const state = readState(dir).state;
   ok("PS07a new feature resets planApproved=false", state.planApproved === false);
@@ -1106,12 +1188,15 @@ function canonicalFixtureJson(value) {
     env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
   });
   ok("PS12a subprocess set-feature exit 0", res1.status === 0, `stderr: ${res1.stderr}`);
+  const e2eEnv = { ...process.env, CLAUDE_PROJECT_DIR: dir };
+  const continuity = initializeSubprocessLifecycleContinuity(dir, "e2e", planPath, e2eEnv);
+  ok("PS12a1 subprocess continuity-init exit 0", continuity.status === 0, `stderr: ${continuity.stderr}`);
 
   const submitted = spawnSync(process.execPath, [
     CLI, "submit-plan", "--by", "coordinator", "--profile", "feature",
   ], {
     encoding: "utf8",
-    env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
+    env: e2eEnv,
   });
   ok("PS12b0 subprocess submit-plan exit 0", submitted.status === 0, `stderr: ${submitted.stderr}`);
 
@@ -1203,6 +1288,13 @@ function canonicalFixtureJson(value) {
     env,
   });
   ok("PS14a F1-integration: real set-feature subprocess exit 0", r1.status === 0, `stderr: ${r1.stderr}`);
+  const continuity = initializeSubprocessLifecycleContinuity(
+    dir,
+    "f1-integration-test",
+    planPath,
+    env,
+  );
+  ok("PS14a-1 F1-integration: real continuity-init subprocess exit 0", continuity.status === 0, `stderr: ${continuity.stderr}`);
   const submitted = spawnSync(process.execPath, [
     CLI, "submit-plan", "--by", "coordinator", "--profile", "feature",
   ], { encoding: "utf8", env });
