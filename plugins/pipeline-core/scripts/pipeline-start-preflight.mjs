@@ -3,6 +3,7 @@
 
 /** Report loaded distribution identity and restart-handoff presence without secrets. */
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -84,7 +85,25 @@ export function freshnessHostActionForPreflight(preflight) {
     || preflight.schema !== SCHEMA
     || preflight.status !== "ready"
     || preflight.executionBoundary !== "host-authorized-wsl") return null;
-  return Object.freeze({ executionBoundary: "host-authorized-wsl", boundaryId: WSL_FRESHNESS_BOUNDARY_ID });
+  // Bind the host freshness adapter to this exact preflight projection.  The
+  // digest is opaque to callers, so it does not disclose the physical plugin
+  // root or the normalized source observation carried by the preflight.
+  const bound = {
+    schema: preflight.schema,
+    status: preflight.status,
+    version: preflight.version,
+    installedVersion: preflight.installedVersion,
+    installedSource: preflight.installedSource,
+    rulesetSource: preflight.rulesetSource,
+    executionBoundary: preflight.executionBoundary,
+    pluginRoot: preflight.pluginRoot,
+    nextAction: preflight.nextAction,
+  };
+  return Object.freeze({
+    executionBoundary: "host-authorized-wsl",
+    boundaryId: WSL_FRESHNESS_BOUNDARY_ID,
+    preflightSha256: createHash("sha256").update(JSON.stringify(bound)).digest("hex"),
+  });
 }
 
 export function observePipelineStartPreflight({
@@ -135,7 +154,7 @@ export function observePipelineStartPreflight({
     : installedIdentity?.ambiguous === true || installedVersion !== null && installedVersion !== version || !sourceVersionBound
       ? "plugin-refresh-required"
       : "ready";
-  return {
+  const preflight = {
     schema: SCHEMA,
     status,
     version,
@@ -167,7 +186,13 @@ export function observePipelineStartPreflight({
             schema: "pipeline.project-onboarding.v4",
           },
         }
-      : null,
+        : null,
+  };
+  return {
+    ...preflight,
+    // This is the sole public handoff for a selected WSL freshness host
+    // transport.  Consumers pass only its digest to the host companion.
+    freshnessHostBinding: freshnessHostActionForPreflight(preflight),
   };
 }
 

@@ -75,7 +75,13 @@ Accept only schema `pipeline.start-preflight.v1`, status
 skill root, a nonempty `version`, `installedVersion` as either null or a
 nonempty version, `installedSource` as
 `remote|local-development|unknown`, `executionBoundary` as
-`default|host-authorized-wsl`, handoff `none|ready|malformed`, and a `nextAction`
+`default|host-authorized-wsl`, handoff `none|ready|malformed`, and a
+`freshnessHostBinding` that is null unless the ready execution boundary is
+`host-authorized-wsl`.  In that host-bound form, retain the exact opaque
+`freshnessHostBinding.preflightSha256` with its fixed
+`executionBoundary:host-authorized-wsl` and
+`boundaryId:pipeline-start-host-authorized-wsl`; it is the only later
+freshness-host transport binding for this bootstrap.  Require a `nextAction`
 that is null unless status is `ready`. For `ready`, require one read-only
 `command` action for the absolute loaded-root `project-onboarding-v3.mjs`
 `inspect --root <physical-cwd> --intent bootstrap`, with the same
@@ -656,10 +662,10 @@ This step ends in a **third mandatory confirmation line** (verbatim, printed dir
   `equal|ahead` is current, while `behind|diverged` is F2. Consumer plugin
   installs still require equality; `stale` is F2. `unknown` is F3.
 - **Codex host boundary:** with `executionBoundary:host-authorized-wsl`, run
-  `node "${PIPELINE_PLUGIN_ROOT}/scripts/ruleset-freshness-host.mjs" --repo "$PWD"`
+  `node "${PIPELINE_PLUGIN_ROOT}/scripts/ruleset-freshness-host.mjs" --repo "$PWD" --preflight-sha256 "{{STEP_0_PREFLIGHT.freshnessHostBinding.preflightSha256}}"`
   once through that exact network-open/read-only command boundary. This is the
   **only** Remote-Freshness observation: it binds the closed public Core HEAD
-  read to its internal host transport and then returns the ordinary
+  read to the exact Step-0-selected host transport/control binding and then returns the ordinary
   `pipeline.ruleset-freshness.v1` result. Do not invoke either freshness helper
   first inside a known network-restricted workspace sandbox; that produces a
   misleading DNS error before the authoritative host observation. The host

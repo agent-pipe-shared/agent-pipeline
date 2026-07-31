@@ -59,7 +59,7 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
     cwd,
   });
   assert.deepEqual(Object.keys(result).sort(), [
-    "executionBoundary", "handoff", "installedSource", "installedVersion",
+    "executionBoundary", "freshnessHostBinding", "handoff", "installedSource", "installedVersion",
     "nextAction", "pluginRoot", "rulesetSource", "schema", "status", "version",
   ]);
   assert.equal(result.schema, SCHEMA);
@@ -68,6 +68,7 @@ test("preflight reports exact identity and no-handoff without secret fields", ()
   assert.equal(result.installedVersion, "0.4.5+test");
   assert.equal(result.installedSource, "remote");
   assert.equal(result.executionBoundary, "default");
+  assert.equal(result.freshnessHostBinding, null);
   assert.equal(result.handoff, "none");
   assert.deepEqual(result.rulesetSource, { status: "ready", observation: source().observation });
   assert.deepEqual(result.nextAction, {
@@ -108,7 +109,10 @@ test("preflight selects one host-authorized capability boundary for WSL", () => 
     assert.deepEqual(freshness, {
       executionBoundary: "host-authorized-wsl",
       boundaryId: "pipeline-start-host-authorized-wsl",
+      preflightSha256: freshness.preflightSha256,
     });
+    assert.match(freshness.preflightSha256, /^[0-9a-f]{64}$/u);
+    assert.deepEqual(result.freshnessHostBinding, freshness);
     assert.equal(JSON.stringify(freshness).includes("/projects/wsl"), false);
     assert.equal(JSON.stringify(freshness).includes(result.pluginRoot), false);
   }

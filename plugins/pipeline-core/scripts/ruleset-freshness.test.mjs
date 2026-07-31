@@ -26,7 +26,7 @@ import {
   RULESET_FRESHNESS_SCHEMA,
   withFreshnessHostRequest,
 } from "./ruleset-freshness.mjs";
-import { executeRulesetFreshnessHostAction, inspectHostRulesetFreshness } from "./ruleset-freshness-host.mjs";
+import { executeRulesetFreshnessHostAction, inspectHostRulesetFreshness, main as hostMain } from "./ruleset-freshness-host.mjs";
 
 const roots = [];
 const SCRIPT = fileURLToPath(new URL("./ruleset-freshness.mjs", import.meta.url));
@@ -96,6 +96,13 @@ function expectedControlIdentitySha256() {
 }
 function hostAction(boundaryId) {
   return createFreshnessHostAction(boundaryId, expectedControlIdentitySha256());
+}
+function preflightBinding() {
+  return {
+    executionBoundary: "host-authorized-wsl",
+    boundaryId: "pipeline-start-host-authorized-wsl",
+    preflightSha256: "c".repeat(64),
+  };
 }
 function hostExecutionReceipt(action, publicHeadOid) {
   const control = readyHostControlObservation();
@@ -373,6 +380,7 @@ test("the host adapter produces the complete freshness result through its fixed 
     repoPath: "/private/consumer-not-forwarded",
     loadedPluginRoot: "/private/plugin-not-forwarded",
     codexObservation: { status: "ready", observation: sourceObservation(loaded) },
+    preflightBinding: preflightBinding(),
     observeHostControl() { return readyHostControlObservation(); },
     execute(action) {
       assert.deepEqual(action, hostAction("pipeline-start-host-authorized-wsl"));
@@ -392,6 +400,7 @@ test("the host adapter produces the complete freshness result through its fixed 
     repoPath: "/private/consumer-not-forwarded",
     loadedPluginRoot: "/private/plugin-not-forwarded",
     codexObservation: { status: "ready", observation: sourceObservation(loaded) },
+    preflightBinding: preflightBinding(),
     observeHostControl() { return readyHostControlObservation(); },
     execute() { return null; },
   });
@@ -490,6 +499,7 @@ test("a control identity exchanged after host selection fails before Git starts"
     repoPath: "/private/consumer-not-forwarded",
     loadedPluginRoot: "/private/plugin-not-forwarded",
     codexObservation: { status: "ready", observation: sourceObservation(loaded) },
+    preflightBinding: preflightBinding(),
     observeHostControl() {
       observations += 1;
       return observations === 1 ? firstControl : secondControl;
@@ -519,6 +529,7 @@ test("missing or invalid host control identity cannot select a freshness action"
       repoPath: "/private/consumer-not-forwarded",
       loadedPluginRoot: "/private/plugin-not-forwarded",
       codexObservation: { status: "ready", observation: sourceObservation(loaded) },
+      preflightBinding: preflightBinding(),
       observeHostControl() { return control; },
       execute() { executeCalls += 1; throw new Error("must not execute without a selected identity"); },
     });
@@ -529,29 +540,29 @@ test("missing or invalid host control identity cannot select a freshness action"
   }
 });
 
-test("the host adapter has a real full-result CLI path and rejects arbitrary requests", () => {
-  const valid = spawnSync(process.execPath, [HOST_SCRIPT, "--repo", process.cwd()], {
-    encoding: "utf8",
-    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
-  });
-  // The host executable is run directly, not injected into an in-process
-  // transport. Network may be unavailable in a nested workspace sandbox, but
-  // both typed outcomes prove the closed CLI path.
-  if (valid.error?.code === "EPERM") return;
-  assert.equal(valid.error, undefined);
-  assert.ok([0, 2].includes(valid.status));
-  const payload = JSON.parse(valid.stdout);
-  assert.equal(payload.schema, RULESET_FRESHNESS_SCHEMA);
-  assert.equal(typeof payload.status, "string");
-  assert.equal(typeof payload.remoteSha === "string" || payload.remoteSha === null, true);
-
-  const rejected = spawnSync(process.execPath, [HOST_SCRIPT, "--repo", process.cwd(), "--unexpected"], {
+test("the host adapter rejects direct or unbound CLI invocation before it can claim freshness", () => {
+  const rejected = spawnSync(process.execPath, [HOST_SCRIPT, "--repo", process.cwd()], {
     encoding: "utf8",
     env: process.env,
   });
   assert.equal(rejected.status, 64);
   assert.equal(rejected.stdout, "");
-  assert.match(rejected.stderr, /usage/u);
+
+  const loaded = "a".repeat(40);
+  const preflight = { executionBoundary: "host-authorized-wsl", boundaryId: "pipeline-start-host-authorized-wsl", preflightSha256: "d".repeat(64) };
+  const output = hostMain(["--repo", process.cwd(), "--preflight-sha256", preflight.preflightSha256], {
+    observePreflight() { return null; },
+  });
+  assert.equal(output, 2);
+  const unbound = inspectHostRulesetFreshness({
+    repoPath: "/private/consumer-not-forwarded",
+    loadedPluginRoot: "/private/plugin-not-forwarded",
+    codexObservation: { status: "ready", observation: sourceObservation(loaded) },
+    observeHostControl() { return readyHostControlObservation(); },
+    execute() { throw new Error("unbound host invocation must not execute"); },
+  });
+  assert.equal(unbound.status, "remote-unavailable");
+  assert.equal(unbound.writePermitted, false);
 });
 
 test("self-application accepts equal and descendant loaded rulesets without consumer HEAD", () => {
