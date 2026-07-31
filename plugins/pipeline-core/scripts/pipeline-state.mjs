@@ -2950,9 +2950,11 @@ function atomicAppendResultBootstrap(result, bytes, lock, deps = {}) {
   finally { if (fd !== undefined) closeSync(fd); safeUnlink(tmp); }
 }
 
-function resultBootstrapEligible(state) {
+function resultBootstrapEligible(state, prd, spec) {
   const continuity = state?.continuity;
-  return Boolean(state?.activeFeature && validateContinuityState(continuity, state.activeFeature.id).ok
+  const lifecycle = derivePlanLifecycle(state, { planSha256: prd.sha256, specSha256: spec.sha256 });
+  return Boolean(state?.activeFeature && lifecycle.ok && lifecycle.status === "implementing"
+    && validateContinuityState(continuity, state.activeFeature.id).ok
     && continuity.featureId === state.activeFeature.id
     && continuity.authority.result === null
     && continuity.queueHead !== null && continuity.queueHead.dispatch === null
@@ -2993,11 +2995,13 @@ function resultBootstrapPayload(root, stateRaw, state, prd, spec, resultPath, re
 }
 
 function buildResultBootstrapPlan(dir, existing, updatedAt) {
-  if (existing.status !== "ok" || !resultBootstrapEligible(existing.state) || !canonicalIso(updatedAt)) return { ok: false, code: "PS-RESULT-BOOTSTRAP-STATE" };
+  if (existing.status !== "ok" || !canonicalIso(updatedAt)) return { ok: false, code: "PS-RESULT-BOOTSTRAP-STATE" };
   const state = existing.state;
-  const prd = physicalRebindFile(dir, state.continuity.authority.prd.path);
-  const spec = physicalRebindFile(dir, state.continuity.authority.spec.path);
-  if (prd === null || spec === null || prd.sha256 !== state.continuity.authority.prd.sha256 || spec.sha256 !== state.continuity.authority.spec.sha256) return { ok: false, code: "PS-RESULT-BOOTSTRAP-AUTHORITY" };
+  const authority = state?.continuity?.authority;
+  const prd = physicalRebindFile(dir, authority?.prd?.path);
+  const spec = physicalRebindFile(dir, authority?.spec?.path);
+  if (prd === null || spec === null || prd.sha256 !== authority?.prd?.sha256 || spec.sha256 !== authority?.spec?.sha256) return { ok: false, code: "PS-RESULT-BOOTSTRAP-AUTHORITY" };
+  if (!resultBootstrapEligible(state, prd, spec)) return { ok: false, code: "PS-RESULT-BOOTSTRAP-STATE" };
   if (state.activeFeature.planPath !== prd.path) return { ok: false, code: "PS-RESULT-BOOTSTRAP-FEATURE" };
   const resultPath = observeCanonicalResultBootstrap(dir, resultBootstrapPath(dir, prd.path));
   if (resultPath === null) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-PATH" };
@@ -3127,8 +3131,11 @@ function runResultBootstrapCommand(sub, rest, deps) {
     let planned = buildResultBootstrapPlan(deps.dir, current, apply.updatedAt);
     const resultPath = resultBootstrapPath(deps.dir, current.state.continuity?.authority?.prd?.path);
     const resultObserved = resultPath ? physicalRebindFile(deps.dir, resultPath) : null;
+    const prd = physicalRebindFile(deps.dir, current.state.continuity?.authority?.prd?.path);
+    const spec = physicalRebindFile(deps.dir, current.state.continuity?.authority?.spec?.path);
     if (sha256Bytes(current.raw) === apply.expectedPostStateSha256) {
-      if (!resultBootstrapEligible({ ...current.state, continuity: { ...current.state.continuity, authority: { ...current.state.continuity.authority, result: null }, revision: current.state.continuity.revision - 1, resume: { ...current.state.continuity.resume, sourceRevision: current.state.continuity.revision - 1 } } })
+      if (prd === null || spec === null
+        || !resultBootstrapEligible({ ...current.state, continuity: { ...current.state.continuity, authority: { ...current.state.continuity.authority, result: null }, revision: current.state.continuity.revision - 1, resume: { ...current.state.continuity.resume, sourceRevision: current.state.continuity.revision - 1 } } }, prd, spec)
         || current.state.activeFeature.id !== apply.featureId || current.state.updatedAt !== apply.updatedAt || current.state.continuity.authority.result?.path !== resultPath
         || resultObserved === null || resultObserved.sha256 !== current.state.continuity.authority.result.sha256) { console.error("Error: Result bootstrap replay postimage is invalid; zero mutation."); return 2; }
       if (journal.journal !== null && (journal.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(journal.paths))) { console.error("Error: Result bootstrap journal recovery is unresolved."); return 2; }
@@ -3139,13 +3146,11 @@ function runResultBootstrapCommand(sub, rest, deps) {
     // that Result-before-State window; rebuilding an "absent Result" plan would
     // correctly refuse and must not turn recovery into a false conflict.
     if (!planned.ok && journal.journal !== null && sha256Bytes(current.raw) === apply.expectedStateSha256
-      && resultBootstrapEligible(current.state) && current.state.activeFeature.id === apply.featureId
+      && prd !== null && spec !== null && resultBootstrapEligible(current.state, prd, spec) && current.state.activeFeature.id === apply.featureId
       && current.state.continuity.revision === apply.expectedRevision && resultObserved !== null
       && resultObserved.sha256 === journal.journal.result.sha256
       && journal.journal.planSha256 === apply.planSha256 && journal.journal.stateSha256 === apply.expectedStateSha256
       && journal.journal.postStateSha256 === apply.expectedPostStateSha256) {
-      const prd = physicalRebindFile(deps.dir, current.state.continuity.authority.prd.path);
-      const spec = physicalRebindFile(deps.dir, current.state.continuity.authority.spec.path);
       const result = { path: journal.journal.result.path, sha256: journal.journal.result.sha256 };
       const nextState = resultBootstrapNextState(current.state, result, apply.updatedAt);
       if (prd !== null && spec !== null && prd.sha256 === current.state.continuity.authority.prd.sha256

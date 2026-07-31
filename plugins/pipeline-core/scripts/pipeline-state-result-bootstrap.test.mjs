@@ -13,6 +13,7 @@ const roots = [];
 const NOW = "2026-07-31T12:00:00.000Z";
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 const h = (c) => c.repeat(64);
+const canonical = (value) => value === null || typeof value !== "object" ? JSON.stringify(value) : Array.isArray(value) ? `[${value.map(canonical).join(",")}]` : `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
 afterEach(() => { while (roots.length) rmSync(roots.pop(), { recursive: true, force: true }); });
 
 function state(overrides = {}) {
@@ -42,6 +43,10 @@ function fixture(name = "case") {
   const value = state();
   value.continuity.authority.prd.sha256 = hash(readFileSync(join(root, "specs/feature/prd_feature.md")));
   value.continuity.authority.spec.sha256 = hash(readFileSync(join(root, "specs/feature/spec.md")));
+  const authority = { schema: "pipeline.po-gate-authority.v2", humanFacing: "en", sourceSha256: h("1"), runtimeSha256: h("2"), receiptSha256: h("3"), repositoryFingerprint: h("4"), planPath: value.continuity.authority.prd.path, planSha256: value.continuity.authority.prd.sha256, specPath: value.continuity.authority.spec.path, specSha256: value.continuity.authority.spec.sha256 };
+  const submission = { schema: "pipeline.plan-submission.v1", featureId: "feature", planPath: authority.planPath, planSha256: authority.planSha256, specPath: authority.specPath, specSha256: authority.specSha256, profile: "feature", profileSha256: h("5"), submittedBy: "Coordinator", submittedAt: "2026-07-31T10:00:00.000Z" };
+  value.planSubmission = submission;
+  value.planApproval = { schema: "pipeline.plan-approval.v4", approvedBy: "PO", approvedAt: "2026-07-31T10:05:00.000Z", submissionSha256: hash(canonical(submission)), profileSha256: submission.profileSha256, poGateAuthority: authority, priorInvalidationSha256: null };
   const statePath = join(root, ".claude", "pipeline-state.json"); writeFileSync(statePath, JSON.stringify(value, null, 2) + "\n");
   return { root, statePath, value, historical, resultPath: join(root, "specs/feature/result.md"), commonDir, journalPath: join(commonDir, "agent-pipeline", "result-bootstrap", "journal") };
 }
@@ -106,5 +111,28 @@ test("AC-047-143/148: active work, nonnull authority, State/document drift, abse
     if (kind === "hardlink") { rmSync(f.resultPath); writeFileSync(join(f.root, "specs/feature/foreign"), "x"); linkSync(join(f.root, "specs/feature/foreign"), f.resultPath); }
     if (!["prd", "missing", "fence", "symlink", "hardlink"].includes(kind)) writeFileSync(f.statePath, JSON.stringify(s, null, 2) + "\n");
     const before = readFileSync(f.statePath); assert.equal(invoke(f.root, ["continuity-result-bootstrap-plan"]).status, 2, kind); assert.deepEqual(readFileSync(f.statePath), before, kind);
+  }
+});
+
+test("AC-047-149: bootstrap requires a current implementing Plan lifecycle before any Result or State mutation", () => {
+  for (const kind of ["missing-approval", "stale-approval", "contradictory-approval", "prd-lifecycle-drift", "spec-lifecycle-drift"]) {
+    const f = fixture(kind); const s = JSON.parse(readFileSync(f.statePath));
+    if (kind === "missing-approval") delete s.planApproval;
+    if (kind === "stale-approval") s.planApproval.submissionSha256 = h("f");
+    if (kind === "contradictory-approval") s.planApproved = false;
+    if (kind === "prd-lifecycle-drift") {
+      writeFileSync(join(f.root, "specs/feature/prd_feature.md"), "prd lifecycle drift\n");
+      s.continuity.authority.prd.sha256 = hash(readFileSync(join(f.root, "specs/feature/prd_feature.md")));
+    }
+    if (kind === "spec-lifecycle-drift") {
+      writeFileSync(join(f.root, "specs/feature/spec.md"), "spec lifecycle drift\n");
+      s.continuity.authority.spec.sha256 = hash(readFileSync(join(f.root, "specs/feature/spec.md")));
+    }
+    writeFileSync(f.statePath, JSON.stringify(s, null, 2) + "\n");
+    const beforeState = readFileSync(f.statePath); const beforeResult = readFileSync(f.resultPath);
+    const rejected = invoke(f.root, ["continuity-result-bootstrap-plan"]);
+    assert.equal(rejected.status, 2, kind); assert.match(rejected.err, /zero mutation/, kind);
+    assert.deepEqual(readFileSync(f.statePath), beforeState, kind); assert.deepEqual(readFileSync(f.resultPath), beforeResult, kind);
+    assert.equal(existsSync(f.journalPath), false, kind);
   }
 });
