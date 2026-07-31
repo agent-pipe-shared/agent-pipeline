@@ -401,6 +401,7 @@ ok("shaMatches: too-short prefix not compared", shaMatches("ab", "ab") === false
   }
   ok("decideOutput stale: stdout is valid JSON", parsed !== null, stdout);
   ok("decideOutput stale: has systemMessage string", typeof parsed?.systemMessage === "string" && parsed.systemMessage.length > 0);
+  ok("decideOutput stale: ordinary marketplace drift is explicitly advisory", parsed?.systemMessage?.includes("advisory") === true);
   ok("decideOutput stale: systemMessage names marketplace-update command", parsed?.systemMessage?.includes(CMD_MARKETPLACE_UPDATE) === true);
   ok(
     "decideOutput stale: systemMessage names scope-aware plugin-update command (project)",
@@ -408,6 +409,12 @@ ok("shaMatches: too-short prefix not compared", shaMatches("ab", "ab") === false
   );
   ok("decideOutput stale: systemMessage names /reload-plugins", parsed?.systemMessage?.includes(CMD_RELOAD) === true);
   ok("decideOutput stale: hookSpecificOutput.hookEventName is SessionStart", parsed?.hookSpecificOutput?.hookEventName === "SessionStart");
+  ok(
+    "decideOutput stale: hook metadata cannot block repository admission",
+    parsed?.hookSpecificOutput?.pipelineUpdate?.status === "update-available"
+      && parsed.hookSpecificOutput.pipelineUpdate.updateRecommended === true
+      && parsed.hookSpecificOutput.pipelineUpdate.blocking === false,
+  );
   ok(
     "decideOutput stale: additionalContext states installed vs remote SHA",
     typeof parsed?.hookSpecificOutput?.additionalContext === "string" &&

@@ -78,10 +78,17 @@ const PLAN_PATH = ".claude/plans/2026-07-07-ap1-pipeline-tuning.md";
 // silently masked a schema drift.
 const UNAPPROVED_STATE = {
   schema: "pipeline.state.v0",
-  activeFeature: { id: "ap1-pipeline-tuning", planPath: PLAN_PATH },
+  activeFeature: { id: "ap1-pipeline-tuning", planPath: PLAN_PATH, phase: "design" },
   planApproved: false,
 };
-const APPROVED_STATE = { ...UNAPPROVED_STATE, planApproved: true };
+const APPROVED_STATE = {
+  ...UNAPPROVED_STATE,
+  planApproved: true,
+  planApproval: {
+    approvedBy: "PO",
+    approvedAt: "2026-07-30T20:00:00.000Z",
+  },
+};
 const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
 
 // ---- DP01 no manifest at all -> allow --------------------------------------------------
@@ -120,12 +127,23 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
   check("DP05 allow  no activeFeature in state", "Edit", "src/foo.ts", ALLOW, { projectDir: dir, stderrEmpty: true });
 }
 
-// ---- DP06 gate blocking, planApproved true -> allow -------------------------------------
+// ---- DP06 approval alone stays design-gated; implementation phase admits edits ----------
 {
   const dir = freshDir("approved");
   writeManifest(dir, MANIFEST_BLOCKING);
   writeState(dir, APPROVED_STATE);
-  check("DP06 allow  planApproved true", "Edit", "src/foo.ts", ALLOW, { projectDir: dir, stderrEmpty: true });
+  check("DP06 block approved design before explicit implementation phase", "Edit", "src/foo.ts", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["approved", "set-phase"],
+  });
+  writeState(dir, {
+    ...APPROVED_STATE,
+    activeFeature: { ...APPROVED_STATE.activeFeature, phase: "implementation" },
+  });
+  check("DP06b allow exact approved implementation", "Edit", "src/foo.ts", ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
 }
 
 // ---- DP07 gate blocking, unapproved, non-exempt path -> block, names feature id ---------

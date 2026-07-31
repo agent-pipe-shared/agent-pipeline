@@ -12,6 +12,7 @@ import { spawnSync } from "node:child_process";
 import {
   closeSync,
   constants,
+  existsSync,
   fstatSync,
   lstatSync,
   openSync,

@@ -562,6 +562,14 @@ function checkAnonymousPublicPush(binding, sourceCommit) {
 }
 
 const pushBinding = parsePushBinding(cmd);
+if (pushBinding.ok
+  && (pushBinding.destination === "refs/heads/main"
+    || (pushBinding.destination === null && new Set(["main", "refs/heads/main"]).has(pushBinding.source)))) {
+  emit(2, [
+    "BLOCKED (guard-push publication boundary): raw Bash/Git cannot publish refs/heads/main.",
+    "Only the plugin-owned fixed publication executor may consume exact-candidate main authority; GG-03 and Human Guard Override do not widen it.",
+  ]);
+}
 function fallbackProjectDir() {
   const candidate = process.env.CLAUDE_PROJECT_DIR || process.cwd();
   const result = spawnSync("git", ["-C", candidate, "rev-parse", "--show-toplevel"], {
@@ -714,6 +722,16 @@ function enforcePublicationAuthorization(mode, rawCmd, binding) {
   if (mode.error) {
     emit(2, [`BLOCKED (guard-push publication mode): ${mode.error}; ordinary/standing push approval is not a fallback.`]);
   }
+  emit(2, [
+    "BLOCKED (guard-push publication mode): raw Bash/Git cannot consume publication authority.",
+    "Use the plugin-owned fixed publication executor; generic, standing, GG-03, and Human Guard Override authority remain closed.",
+  ]);
+  /*
+   * The validation below remains intentionally unreachable during the schema
+   * migration window. Keeping it here lets old projections receive a precise
+   * malformed-state diagnosis above, while no raw command can cross the new
+   * executor-only boundary.
+   */
   const invocation = publicationCommandFromInvocation(rawCmd, binding);
   if (!invocation.ok) {
     emit(2, [

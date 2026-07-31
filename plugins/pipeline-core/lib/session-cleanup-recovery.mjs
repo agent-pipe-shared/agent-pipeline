@@ -100,6 +100,9 @@ function recoveryBinding(plan) {
   if (Object.hasOwn(plan, "expectedPostStateSha256")) {
     binding.expectedPostStateSha256 = plan.expectedPostStateSha256;
   }
+  if (Object.hasOwn(plan, "expectedPostRevision")) {
+    binding.expectedPostRevision = plan.expectedPostRevision;
+  }
   if (Object.hasOwn(plan, "writerIdentity")) {
     binding.writerIdentity = plan.writerIdentity;
   }
@@ -289,7 +292,7 @@ function validateCompositeJournal(value, expectedPlanSha256) {
     || !Array.isArray(value.completedSessionIds)
     || value.completedSessionIds.some((sessionId) => typeof sessionId !== "string")
     || !(value.pendingSessionId === null || typeof value.pendingSessionId === "string")
-    || value.expectedPostRevision !== value.binding.revision + 1
+    || value.expectedPostRevision !== value.binding.expectedPostRevision
     || !SHA256.test(value.expectedPostStateSha256 ?? "")
     || value.expectedPostStateSha256 !== value.binding.expectedPostStateSha256) {
     fail("WT-SESSION-RECOVERY-JOURNAL", "composite recovery journal is invalid");
@@ -328,7 +331,7 @@ function initialCompositeJournal(plan) {
     revision: 0,
     pendingSessionId: null,
     completedSessionIds: [],
-    expectedPostRevision: plan.revision + 1,
+    expectedPostRevision: plan.expectedPostRevision ?? plan.revision + 1,
     expectedPostStateSha256: plan.expectedPostStateSha256,
   }, plan.planSha256);
 }
@@ -954,7 +957,7 @@ export function planSessionCleanupRecovery({
         sessionCleanup: binding.sessionCleanup,
       });
       if (postimage.status !== "previewed"
-        || postimage.revision !== binding.revision + 1
+        || !new Set([binding.revision, binding.revision + 1]).has(postimage.revision)
         || !SHA256.test(postimage.stateSha256 ?? "")) {
         throw new Error("invalid cleanup release preview");
       }
@@ -976,6 +979,7 @@ export function planSessionCleanupRecovery({
       recovery: "retire-orphans-release-lost-binding",
       expectedBindingStatus: "bound",
       expectedPostStateSha256: postimage.stateSha256,
+      expectedPostRevision: postimage.revision,
       writerIdentity,
       orphanDescriptors: orphanDescriptors.map((descriptor) => ({
         sessionId: descriptor.sessionId,

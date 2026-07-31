@@ -7,6 +7,18 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      live_certification:
+        description: Run the separately authorized pinned live-runner lane
+        required: false
+        default: false
+        type: boolean
+      live_certification_required:
+        description: Treat typed live-runner unavailability as blocking
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -17,8 +29,35 @@ jobs:
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          fetch-depth: 0
           persist-credentials: false
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
         with:
           node-version: '22'
-      - run: node harness/scripts/verify.mjs
+      - name: Offline CI boundary conformance
+        run: node plugins/pipeline-core/scripts/verify-topology-preflight.test.mjs && node plugins/pipeline-core/scripts/live-runner-certification.test.mjs
+      - name: Typed Git topology preflight
+        run: node plugins/pipeline-core/scripts/verify-topology-preflight.mjs
+      - name: Runner-free offline Core Verify
+        env:
+          PIPELINE_LIVE_CERTIFICATION: disabled
+        run: core_path="${RUNNER_TEMP}/pipeline-core-path" && mkdir -p "${core_path}" && ln -s "$(command -v node)" "${core_path}/node" && ln -s "$(command -v git)" "${core_path}/git" && ln -s "$(command -v bash)" "${core_path}/bash" && ln -s "$(command -v sh)" "${core_path}/sh" && PATH="${core_path}" "${core_path}/node" harness/scripts/verify.mjs
+
+  live-certification:
+    if: github.event_name == 'workflow_dispatch' && inputs.live_certification
+    runs-on: ubuntu-latest
+    environment: live-runner-certification
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '22'
+      - name: Typed Git topology preflight
+        run: node plugins/pipeline-core/scripts/verify-topology-preflight.mjs
+      - name: Pinned live-runner certification
+        env:
+          PIPELINE_LIVE_CERTIFICATION_AUTHORITY: ${{ vars.PIPELINE_LIVE_CERTIFICATION_AUTHORITY }}
+        run: node plugins/pipeline-core/scripts/live-runner-certification.mjs --candidate "${GITHUB_SHA}" --policy "${{ inputs.live_certification_required && 'blocking' || 'advisory' }}"

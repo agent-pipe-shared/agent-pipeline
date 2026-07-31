@@ -30,8 +30,22 @@ const OID = /^[a-f0-9]{40}$/u;
 const SAFE_REPOSITORY_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._/-]+$/u;
 const HASH = /^[a-f0-9]{64}$/u;
 const EVIDENCE_AMENDMENT_KEYS = new Set(["kind", "commit", "reference", "previousClosureCommit", "resultSha256", "privateLicenseGateSha256", "neutralPublicLicenseGateSha256"]);
+const REACHABILITY_AMENDMENT_KEYS = new Set(["kind", "commit", "reference", "supersedesSequence", "supersedesEntryHash", "referenceBlobOid", "referenceSha256"]);
 const AFK_REPAIR_ID = "pipeline.elephant-direct-implementation-under-afk-authorization";
 const MANAGED_ONBOARDING_REPAIR_ID = "pipeline.managed-onboarding-success-contract";
+const REACHABILITY_REPAIR_ACTOR = "hotfix-047-reachability-repair";
+const REACHABILITY_REPAIR_TARGETS = Object.freeze({
+  "pipeline.elephant-direct-implementation-under-afk-authorization": Object.freeze({
+    sequence: 39,
+    entryHash: "84d2128467224ca61aa980c088e92473b9dda27959ecd29600cf8d4a72b83d3b",
+    status: "open",
+  }),
+  "pipeline.source-available-commercial-licensing": Object.freeze({
+    sequence: 40,
+    entryHash: "2849de19fb7f0d0f34d6f2cbe6ed6d5171445abb09fa02132bc9a1d0d707e2b1",
+    status: "closed",
+  }),
+});
 const AFK_REPAIR_EVIDENCE_KEYS = new Set(["kind", "commit", "reference", "sourceSha256"]);
 const PROJECT_CLOSURE_READBACK_KEYS = new Set(["schema", "repository", "commit", "readbackCommit"]);
 const SENTINEL_RECOVERY_CATALOG_KEYS = new Set(["schema", "source", "recoveredAt", "items"]);
@@ -289,15 +303,25 @@ function validateTransitionShape(event, label) {
   if (!(event.from === null || BACKLOG_STATUSES.includes(event.from))) errors.push(`${label}: from must be null or a canonical status`);
   if (!BACKLOG_STATUSES.includes(event.to)) errors.push(`${label}: to must be a canonical status`);
   const amendment = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "evidence-amendment";
+  const reachabilityAmendment = event.from === event.to
+    && event?.evidence?.kind === "reachability-amendment";
   const afkRepair = event.id === AFK_REPAIR_ID && event.from === null && event.to === "open" && event?.evidence?.kind === "missing-initial-ledger-repair";
   const managedRepair = event.id === MANAGED_ONBOARDING_REPAIR_ID && event.from === null && event.to === "open" && event?.evidence?.kind === "missing-initial-ledger-repair";
-  if (event.from === event.to && !amendment) errors.push(`${label}: transition must change status`);
+  if (event.from === event.to && !amendment && !reachabilityAmendment) errors.push(`${label}: transition must change status`);
   if (!validDate(asString(event.at))) errors.push(`${label}: at must be an ISO calendar date`);
   if (!ITEM_ID.test(asString(event.actor))) errors.push(`${label}: actor must be a lowercase stable identifier`);
   if (asString(event.reason).trim().length === 0) errors.push(`${label}: reason must be non-empty`);
   if (!isPlainObject(event.evidence)) errors.push(`${label}: evidence must be an object`);
   else {
-    const evidenceKeys = amendment ? EVIDENCE_AMENDMENT_KEYS : afkRepair ? AFK_REPAIR_EVIDENCE_KEYS : managedRepair ? new Set(["kind", "commit", "reference", "itemSha256"]) : new Set(["kind", "commit", "legacyStatus", "reference"]);
+    const evidenceKeys = amendment
+      ? EVIDENCE_AMENDMENT_KEYS
+      : reachabilityAmendment
+        ? REACHABILITY_AMENDMENT_KEYS
+        : afkRepair
+          ? AFK_REPAIR_EVIDENCE_KEYS
+          : managedRepair
+            ? new Set(["kind", "commit", "reference", "itemSha256"])
+            : new Set(["kind", "commit", "legacyStatus", "reference"]);
     for (const key of Object.keys(event.evidence)) if (!evidenceKeys.has(key)) errors.push(`${label}: evidence has unsupported field ${key}`);
     if (typeof event.evidence.kind !== "string" || event.evidence.kind.length === 0) errors.push(`${label}: evidence.kind must be non-empty`);
     if (!OID.test(asString(event.evidence.commit))) errors.push(`${label}: evidence.commit must be a full lowercase Git commit OID`);
@@ -307,6 +331,28 @@ function validateTransitionShape(event, label) {
       for (const key of ["previousClosureCommit", "resultSha256", "privateLicenseGateSha256", "neutralPublicLicenseGateSha256"]) if (!own(event.evidence, key)) errors.push(`${label}: evidence-amendment is missing ${key}`);
       if (!OID.test(asString(event.evidence.previousClosureCommit))) errors.push(`${label}: previousClosureCommit must be a full lowercase Git commit OID`);
       for (const key of ["resultSha256", "privateLicenseGateSha256", "neutralPublicLicenseGateSha256"]) if (!HASH.test(asString(event.evidence[key]))) errors.push(`${label}: ${key} must be a SHA-256 hex digest`);
+    }
+    if (reachabilityAmendment) {
+      const target = REACHABILITY_REPAIR_TARGETS[event.id];
+      if (!target
+        || event.actor !== REACHABILITY_REPAIR_ACTOR
+        || event.from !== target.status
+        || event.to !== target.status) {
+        errors.push(`${label}: reachability amendment is not an authorized 0.4.7 target`);
+      }
+      for (const key of ["supersedesSequence", "supersedesEntryHash", "referenceBlobOid", "referenceSha256"]) {
+        if (!own(event.evidence, key)) errors.push(`${label}: reachability-amendment is missing ${key}`);
+      }
+      if (!Number.isSafeInteger(event.evidence.supersedesSequence) || event.evidence.supersedesSequence < 1) {
+        errors.push(`${label}: supersedesSequence must be a positive integer`);
+      }
+      if (!HASH.test(asString(event.evidence.supersedesEntryHash))) errors.push(`${label}: supersedesEntryHash must be a SHA-256 hex digest`);
+      if (!OID.test(asString(event.evidence.referenceBlobOid))) errors.push(`${label}: referenceBlobOid must be a full lowercase Git blob OID`);
+      if (!HASH.test(asString(event.evidence.referenceSha256))) errors.push(`${label}: referenceSha256 must be a SHA-256 hex digest`);
+      if (target && (event.evidence.supersedesSequence !== target.sequence
+        || event.evidence.supersedesEntryHash !== target.entryHash)) {
+        errors.push(`${label}: reachability amendment does not bind the authorized historical event`);
+      }
     }
     if (afkRepair && !HASH.test(asString(event.evidence.sourceSha256))) errors.push(`${label}: sourceSha256 must be a SHA-256 hex digest`);
     if (managedRepair && !HASH.test(asString(event.evidence.itemSha256))) errors.push(`${label}: itemSha256 must be a SHA-256 hex digest`);
@@ -334,6 +380,25 @@ export function validateTransitionLedger(events, items, { commitExists = null } 
   }
   const stateById = new Map();
   const closureCommitById = new Map();
+  const reachabilitySupersessions = new Set();
+  for (const event of events) {
+    if (event?.evidence?.kind !== "reachability-amendment") continue;
+    const target = REACHABILITY_REPAIR_TARGETS[event.id];
+    const superseded = events[event.evidence.supersedesSequence - 1];
+    if (target
+      && event.actor === REACHABILITY_REPAIR_ACTOR
+      && event.from === target.status
+      && event.to === target.status
+      && event.evidence.supersedesSequence === target.sequence
+      && event.evidence.supersedesEntryHash === target.entryHash
+      && superseded?.id === event.id
+      && superseded?.entryHash === target.entryHash
+      && superseded?.evidence?.reference === event.evidence.reference
+      && OID.test(asString(event.evidence.commit))
+      && (typeof commitExists !== "function" || commitExists(event.evidence.commit))) {
+      reachabilitySupersessions.add(target.sequence);
+    }
+  }
   let previousHash = null;
   for (const [index, event] of events.entries()) {
     const label = `ledger event ${index + 1}`;
@@ -353,14 +418,26 @@ export function validateTransitionLedger(events, items, { commitExists = null } 
     } else {
       if (event.from !== prior) errors.push(`${label}: from does not match that item's prior ledger status`);
       if (prior === "closed") {
-        if (!(event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "evidence-amendment")) errors.push(`${label}: closed must never transition to another status`);
-        else if (event.evidence.previousClosureCommit !== closureCommitById.get(event.id)) errors.push(`${label}: previousClosureCommit does not bind the prior closure`);
+        const closureAmendment = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "evidence-amendment";
+        const reachabilityAmendment = event.from === "closed" && event.to === "closed" && event?.evidence?.kind === "reachability-amendment";
+        if (!closureAmendment && !reachabilityAmendment) errors.push(`${label}: closed must never transition to another status`);
+        else if (closureAmendment && event.evidence.previousClosureCommit !== closureCommitById.get(event.id)) errors.push(`${label}: previousClosureCommit does not bind the prior closure`);
+      } else if (event?.evidence?.kind === "reachability-amendment") {
+        if (event.to !== prior) errors.push(`${label}: reachability amendment must preserve status`);
       } else if (FORWARD_TRANSITIONS[prior] !== event.to) errors.push(`${label}: ${prior} may only move to ${FORWARD_TRANSITIONS[prior]}`);
     }
     if (BACKLOG_STATUSES.includes(event.to)) stateById.set(event.id, event.to);
-    if (event.to === "closed" && OID.test(asString(event?.evidence?.commit))) closureCommitById.set(event.id, event.evidence.commit);
+    if (event.to === "closed"
+      && event?.evidence?.kind !== "reachability-amendment"
+      && OID.test(asString(event?.evidence?.commit))) {
+      closureCommitById.set(event.id, event.evidence.commit);
+    }
     const externalProjectClosure = item?.metadata?.closure_repository?.startsWith("project:") && event.to === "closed";
-    if (typeof commitExists === "function" && !externalProjectClosure && OID.test(asString(event?.evidence?.commit)) && !commitExists(event.evidence.commit)) {
+    if (typeof commitExists === "function"
+      && !externalProjectClosure
+      && OID.test(asString(event?.evidence?.commit))
+      && !reachabilitySupersessions.has(event.sequence)
+      && !commitExists(event.evidence.commit)) {
       errors.push(`${label}: evidence.commit is not a reachable local Git commit`);
     }
     previousHash = typeof event.entryHash === "string" ? event.entryHash : previousHash;
@@ -370,7 +447,8 @@ export function validateTransitionLedger(events, items, { commitExists = null } 
     if (current === undefined) errors.push(`items: ${id} has no transition-ledger entry`);
     else if (current !== item.metadata.status) errors.push(`items: ${id} status does not match its final ledger transition`);
     if (item.metadata.status === "closed" && current === "closed") {
-      const final = [...events].reverse().find((event) => event?.id === id);
+      const final = [...events].reverse().find((event) =>
+        event?.id === id && event?.evidence?.kind !== "reachability-amendment");
       if (final?.evidence?.commit !== item.metadata.closure_commit) errors.push(`items: ${id} closure_commit must equal its final ledger evidence.commit`);
     }
   }
@@ -547,4 +625,97 @@ export function planManagedOnboardingLedgerRepair(items, events, input) {
   const nextEvents = [...events, event];
   errors.push(...validateTransitionLedger(nextEvents, items));
   return { ok: errors.length === 0, errors, items, events: nextEvents, event, projection: errors.length ? null : projectBacklog(items, nextEvents) };
+}
+
+/**
+ * Append the two narrowly authorized 0.4.7 reachability corrections. The
+ * historical events remain byte-for-byte intact and item status is unchanged.
+ */
+export function planBacklogReachabilityRepair(items, events, input) {
+  const errors = [];
+  const expectedKeys = ["at", "actor", "commit", "references"];
+  if (!isPlainObject(input)
+    || Object.keys(input).sort().join("\n") !== expectedKeys.sort().join("\n")) {
+    return { ok: false, errors: ["reachability repair input shape is invalid"], items, events, projection: null };
+  }
+  if (input.actor !== REACHABILITY_REPAIR_ACTOR || !validDate(asString(input.at))) {
+    errors.push("reachability repair authority binding is invalid");
+  }
+  if (!OID.test(asString(input.commit))) errors.push("reachability repair commit is invalid");
+  const expectedIds = Object.keys(REACHABILITY_REPAIR_TARGETS);
+  if (!Array.isArray(input.references)
+    || input.references.length !== expectedIds.length
+    || input.references.map((entry) => entry?.id).join("\n") !== expectedIds.join("\n")) {
+    errors.push("reachability repair references must equal the authorized ordered target set");
+  }
+  if (events.some((event) => event?.evidence?.kind === "reachability-amendment")) {
+    errors.push("reachability repair was already appended");
+  }
+  for (const [index, id] of expectedIds.entries()) {
+    const target = REACHABILITY_REPAIR_TARGETS[id];
+    const historical = events[target.sequence - 1];
+    const reference = input.references?.[index];
+    const item = items.find((entry) => entry?.metadata?.id === id);
+    if (historical?.id !== id
+      || historical?.entryHash !== target.entryHash
+      || historical?.evidence?.reference !== reference?.reference) {
+      errors.push(`reachability repair target ${id} does not bind canonical history`);
+    }
+    if (!item || item.metadata.status !== target.status) {
+      errors.push(`reachability repair target ${id} must preserve ${target.status}`);
+    }
+    if (!isPlainObject(reference)
+      || !exactReferenceKeys(reference)
+      || !SAFE_REPOSITORY_PATH.test(asString(reference.reference))
+      || !OID.test(asString(reference.referenceBlobOid))
+      || !HASH.test(asString(reference.referenceSha256))) {
+      errors.push(`reachability repair reference ${id} is invalid`);
+    }
+  }
+  if (errors.length) return { ok: false, errors, items, events, projection: null };
+
+  const nextEvents = [...events];
+  let previousHash = nextEvents.at(-1)?.entryHash ?? null;
+  for (const [index, id] of expectedIds.entries()) {
+    const target = REACHABILITY_REPAIR_TARGETS[id];
+    const reference = input.references[index];
+    const event = {
+      schema: TRANSITION_SCHEMA,
+      sequence: nextEvents.length + 1,
+      id,
+      from: target.status,
+      to: target.status,
+      at: input.at,
+      actor: input.actor,
+      reason: `Append reachable evidence for historical event ${target.sequence} without rewriting it or changing item status.`,
+      evidence: {
+        kind: "reachability-amendment",
+        commit: input.commit,
+        reference: reference.reference,
+        supersedesSequence: target.sequence,
+        supersedesEntryHash: target.entryHash,
+        referenceBlobOid: reference.referenceBlobOid,
+        referenceSha256: reference.referenceSha256,
+      },
+      previousHash,
+      entryHash: "",
+    };
+    event.entryHash = transitionHash(event);
+    nextEvents.push(event);
+    previousHash = event.entryHash;
+  }
+  errors.push(...validateTransitionLedger(nextEvents, items));
+  return {
+    ok: errors.length === 0,
+    errors,
+    items,
+    events: nextEvents,
+    appended: nextEvents.slice(events.length),
+    projection: errors.length ? null : projectBacklog(items, nextEvents),
+  };
+}
+
+function exactReferenceKeys(value) {
+  return Object.keys(value).sort().join("\n")
+    === ["id", "reference", "referenceBlobOid", "referenceSha256"].sort().join("\n");
 }

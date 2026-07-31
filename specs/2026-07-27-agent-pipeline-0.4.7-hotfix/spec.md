@@ -1,13 +1,287 @@
 # Technical specification — Agent Pipeline 0.4.7 hotfix
 
-Status: `expanded 0.4.7 corrective implementation candidate in progress on
-2026-07-29; the final stabilized PRD/Spec bytes require a fresh digest-bound
-PO selection before candidate freeze`.
+Status: `design reopened on 2026-07-30; prior approval revoked; implementation
+requires a fresh digest-bound PO approval of the stabilized PRD/Spec bytes`.
 
 This specification implements the neighboring
 [PRD](prd_agent-pipeline-0.4.7-hotfix.md) against exact base
 `9d1b3dc108eb77629ace5b82002120f5539abd8d`. It is intentionally independent
 of Sprint Nova and Pull Request #64.
+
+## -1. Current code-first release authority — 2026-07-30
+
+This section is the highest normative authority in this document. It
+supersedes every conflicting historical branch, baseline, implementation
+status, or deferral below. Current `main` code is newer than the PRD, this
+Spec, and the GitHub Issue implementation sketches. The nine open Issues with
+label `hotfix:0.4.7` remain mandatory outcome scope: #63, #70, #71, #73, #77,
+#81, #82, #83, and #84.
+
+The design baseline is commit
+`83640cec22d494d227eebc82929370277ce926b9`. Existing AC-047-01–68 retain
+their identifiers and implemented behavior. The following AC-047-69–116 bind
+only the current missing or newly reproduced release remainder.
+
+### AC-047-69–74 — Fixed exact-candidate main publication (#81)
+
+- **AC-047-69 — Existing authority consumption:** WHEN an existing publication
+  record is exactly `push-authorized`, THE SYSTEM SHALL expose one plugin-owned
+  executor that consumes that record rather than creating a parallel approval
+  or accepting caller-selected Git arguments.
+- **AC-047-70 — Exact fast-forward tuple:** BEFORE an external effect, THE
+  executor SHALL revalidate repository and sanitized remote fingerprints,
+  destination `refs/heads/main`, candidate commit/tree, remote preimage,
+  fast-forward proof, required candidate evidence, approval digest, and expiry.
+- **AC-047-71 — One-use boundary:** THE executor SHALL consume authorization
+  before the effect and SHALL reject replay, altered arguments, force, delete,
+  tag, merge, additional refspec, implicit source, another destination, and
+  non-fast-forward updates.
+- **AC-047-72 — Uncertain result:** WHEN transport/authentication outcome is
+  ambiguous, THE executor SHALL perform fresh alternates-disabled remote
+  readback, SHALL NOT automatically retry the push, and SHALL close only on an
+  exact candidate/tree match. A changed preimage requires a fresh plan and
+  approval.
+- **AC-047-73 — Generic guard remains closed:** Raw Bash/Git push and Human
+  Guard Override SHALL remain unable to authorize Git or publication. #77 and
+  release preflight SHALL reference only the fixed publication capability.
+- **AC-047-74 — Disposable-remote evidence:** Tests SHALL cover success,
+  already-published convergence, stale CAS, wrong identity/evidence, replay,
+  crash boundaries, ambiguous results, and every prohibited Git shape using an
+  isolated disposable remote with sanitized candidate-bound evidence.
+
+### AC-047-75–80 — Deterministic shipped-supervisor heartbeat (#82)
+
+- **AC-047-75 — Code-first scope:** WHEN the accepted Core candidate does not
+  ship or register a Sprint-local worker supervisor, Core Verify SHALL NOT
+  import or require that unshipped implementation. IF a supervisor is actually
+  adopted into the candidate, the remaining criteria in this block apply.
+- **AC-047-76 — Advancement invariant:** A shipped supervisor SHALL prove
+  heartbeat progress with an explicit monotonic generation/event transition,
+  not by requiring two legitimate events to receive distinct wall-clock
+  timestamps.
+- **AC-047-77 — Deterministic fixtures:** Conformance tests SHALL inject a
+  deterministic clock/event boundary and cover equal clock resolution, delayed
+  scheduling, normal advancement, stale/missing heartbeat, worker exit,
+  timeout, cancellation, lease loss, and orphan recovery.
+- **AC-047-78 — Fail-closed supervision:** A relaxed timestamp assertion SHALL
+  NOT become success. Missing, stale, non-advancing, orphaned, or lease-lost
+  workers remain typed failures inside the configured supervision contract.
+- **AC-047-79 — Runtime integration:** At least one process-level test SHALL
+  observe a real runtime transition without depending on sub-millisecond
+  ordering or uncontrolled sleeps.
+- **AC-047-80 — Evidence:** Repeated focused tests and Full Verify SHALL bind
+  commit/tree, adapter/supervisor contract, platform class, clock mode, command,
+  and result without private host data. Broader worker-pool scope remains #21.
+
+### AC-047-81–87 — Provenance-consistent neutral authority adoption (#83)
+
+- **AC-047-81 — Versioned classification:** THE SYSTEM SHALL classify every
+  expected `project/` authority file as canonical, generated, migrated, or
+  prohibited. Bootstrap SHALL NOT silently create untracked canonical
+  authority in a governed checkout.
+- **AC-047-82 — Frozen endpoints:** BEFORE adoption, THE planner SHALL bind the
+  accepted source commit/tree and authority-contract digest plus destination
+  commit/tree, configured branch/upstream, cleanliness, and relevant target
+  preimages.
+- **AC-047-83 — Runtime provenance:** Normal qualification SHALL load the
+  governed candidate or an explicitly declared installed artifact whose
+  commit/tree, compatibility, and operation are bound to the run. An
+  undeclared source mix fails early with a typed sanitized diagnostic before
+  checkout mutation.
+- **AC-047-84 — Existing migration transaction:** Adoption SHALL extend the
+  current neutral project-authority plan/apply/recovery contract, preserve
+  legacy/source bytes and destination-owned semantics, require exact
+  confirmation, and cover clean, existing, partial, conflicting, stale, race,
+  rollback, and replay states.
+- **AC-047-85 — Clean qualification:** A fresh destination worktree SHALL
+  bootstrap without unexpected untracked authority files and SHALL pass
+  focused authority tests, Full Verify, and Security on the exact candidate.
+- **AC-047-86 — Semantic topology:** Topology/freshness evidence SHALL
+  distinguish canonical product changes from local technical PRD bindings and
+  SHALL NOT treat private paths or unpublished local-only commits as accepted
+  authority.
+- **AC-047-87 — Downstream receipt:** The accepted hotfix SHALL emit a
+  sanitized, digest-bound adoption/adaptation receipt that #67 and Phoenix may
+  consume later. This hotfix SHALL NOT copy in-flight source, rebase Phoenix,
+  or mutate a downstream checkout.
+
+### AC-047-88–98 — Runner-neutral exact-candidate Verify (#84)
+
+- **AC-047-88 — Required history:** GitHub Actions SHALL fetch sufficient
+  history, normally `fetch-depth: 0`, while retaining
+  `persist-credentials:false` and `contents:read`.
+- **AC-047-89 — Typed topology preflight:** BEFORE candidate/ancestor-bound
+  suites, Verify SHALL prove the exact parent and every declared evidence
+  baseline are resolvable; insufficient history SHALL produce a typed topology
+  failure rather than misleading product-test failures.
+- **AC-047-90 — Runner-free Core:** `node harness/scripts/verify.mjs` SHALL run
+  hermetically and offline-capably on a clean supported CI host without Codex,
+  Claude, Antigravity, authentication, or productive runner configuration.
+- **AC-047-91 — Injectable neutral boundary:** Generic lifecycle tests SHALL
+  inject executable identity/version, launch construction, runtime readback,
+  re-entry evidence, capability discovery, process events, cancellation,
+  timeout, normalized result, and typed-unavailable behavior. They SHALL NOT
+  resolve productive runners from host `PATH`.
+- **AC-047-92 — Offline adapter conformance:** Every shipped adapter SHALL have
+  mandatory deterministic fixtures for its native invocation, parsing,
+  capability, cancellation, timeout, malformed output, and unavailable
+  behavior while retaining runner-native distinctions.
+- **AC-047-93 — Live certification separation:** Live runner qualification
+  SHALL be a separately selected, pinned-version, authority-declared evidence
+  lane. Missing prerequisites report `unavailable`; release policy, not
+  accidental host contents, decides whether that blocks publication.
+- **AC-047-94 — Lifecycle matrices:** Current onboarding runtime, Advisor
+  bootstrap, V4, E2E, and review matrices SHALL pass through deterministic
+  fixtures without weakening their production adapters.
+- **AC-047-95 — Finalized trace identity:** Critic trace verification SHALL
+  reject unlink/replacement deterministically even under immediate inode reuse,
+  and retain truncation, content mutation, mode, symlink/reparse, and path
+  replacement protection through sufficient finalized identity/content
+  binding.
+- **AC-047-96 — Rollback identity:** WHEN a newly created onboarding target is
+  replaced by foreign or identity-changed bytes during rollback, THE SYSTEM
+  SHALL preserve the foreign object and report typed `rollback-failed`; exact
+  retry and zero-unrelated-mutation behavior remain.
+- **AC-047-97 — Evidence privacy:** Core, adapter, and selected live evidence
+  SHALL bind candidate, runner/adapter version, platform class, command/result,
+  and typed unavailable reason without credentials, account identity,
+  hostname, private path, or raw runner configuration.
+- **AC-047-98 — Integrated gate:** Full Verify, blocking Security, high-risk
+  Critic, package/install readback, and later downstream adoption records SHALL
+  bind one immutable candidate. Issue closure evidence may be published only
+  through a separately authorized GitHub operation.
+
+### AC-047-99 — Reachable canonical backlog evidence (#70)
+
+- **AC-047-99 — Ledger reachability:** The current canonical checker SHALL pass
+  with the managed-onboarding item still open. Events 39/40 and every retained
+  evidence reference SHALL bind reachable local commits and exact projections
+  through an append-only, rollback/replay-safe correction; no history rewrite,
+  fabricated commit, or status/Issue closure is permitted.
+
+### AC-047-100–105 — Portable neutral cleanup state
+
+- **AC-047-100 — No private portable binding:** A sanctioned cleanup start
+  SHALL NOT serialize session ID, descriptor digest, nonce, host path, owner,
+  PID, or equivalent machine-local cleanup identity into
+  `project/pipeline-state.json` or another portable repository authority.
+- **AC-047-101 — Private binding authority:** Descriptor identity and binding
+  SHALL live solely in owner-private Git-common-dir/runtime storage with
+  authenticated integrity, CAS, restrictive permissions, and sanitized public
+  status.
+- **AC-047-102 — Neutral fail-closed parity:** Every active neutral State read,
+  write, migration, close, publication, and recovery boundary SHALL apply the
+  same portability rejection currently applied to bound legacy migration
+  input.
+- **AC-047-103 — No manual dual-path repair:** Legacy `.claude/` and neutral
+  `project/` consumers SHALL converge through sanctioned transactions; no
+  manual copy, direct State edit, or installed-cache patch is required.
+- **AC-047-104 — Restart and crash safety:** Start/reuse/cleanup/release and
+  interrupted recovery SHALL rebind only exact private descriptors, converge
+  idempotently, and leave portable State null/sanitized before and after every
+  repository write.
+- **AC-047-105 — Process evidence:** Tests SHALL reproduce the sanctioned
+  neutral start, inspect structurally with identifiers redacted, prove no
+  private portable binding, cover legacy/neutral parity and hostile drift, and
+  retain normal cleanup/close/publication behavior.
+
+### AC-047-106–111 — Editable design, submission, and approval lifecycle
+
+- **AC-047-106 — Closed schema and compatibility:** Portable
+  `pipeline.state.v0` SHALL keep the existing exact
+  `activeFeature:{id,planPath,phase}` shape and phase enum
+  `design|implementation`. A new optional top-level
+  `planSubmission` SHALL carry the exact current PRD/Spec/profile digests and
+  submission audit; a new optional top-level `planInvalidation` SHALL record
+  the last sanctioned invalidation. The canonical derived status enum is
+  `draft|awaiting-approval|approved|implementing`: `draft` =
+  design/no current submission/no current approval; `awaiting-approval` =
+  design/current submission/no approval; `approved` = design/current matching
+  submission and approval; `implementing` = implementation/current matching
+  submission and approval. Legacy valid states derive `draft`, `approved`, or
+  `implementing` from current fields until their next sanctioned write.
+- **AC-047-107 — Explicit submission:** Only a sanctioned digest-bound submit
+  transition SHALL change `draft` to the canonical hyphenated status
+  `awaiting-approval`; submission is not approval and does not enter
+  implementation.
+- **AC-047-108 — Reopen before edit and drift safety:** A sanctioned
+  `reopen-design` transaction SHALL clear current submission/approval
+  authority, preserve historical audit, record invalidation, and set phase
+  `design` before an authoritative PRD/Spec edit is admitted. Independently,
+  any observed digest drift SHALL immediately derive no implementation
+  authority and a typed reopen action; it can never remain approved because a
+  post-tool update was missed. After reopen, repeated design edits remain
+  writable without another PO action.
+- **AC-047-109 — Exact approval:** Only a sanctioned PO approval bound to the
+  exact current PRD, Spec, profile, and submission SHALL transition
+  `awaiting-approval` to `approved`. A separate sanctioned phase transition may
+  enter `implementation` only from that exact `approved` state and then derives
+  `implementing`. Stale, partial, contradictory, or replayed approval fails
+  closed.
+- **AC-047-110 — One derived model:** State writer, onboarding classifier,
+  continuity, Dev-Plan guard, statusline, bootstrap/resume, feature-package
+  topology, close, and approval readers SHALL derive the same lifecycle status
+  and phase. Historical approval may remain audit data but is never current
+  authority after invalidation.
+- **AC-047-111 — Lifecycle fixtures:** Unit and process tests SHALL cover
+  repeated draft edits, submit, edit-after-submit, approve, edit-after-approve,
+  restart/resume, reapprove, malformed/hostile states, exact revocation
+  postimages, and guard admission in design versus implementation.
+
+### AC-047-112–116 — Repository freshness vs Pipeline update availability
+
+- **AC-047-112 — Separate observations:** Bootstrap SHALL expose distinct
+  `pipeline.repository-freshness.v0` and
+  `pipeline.pipeline-update-availability.v1` results. The latter is a closed
+  result with `status:current|update-available|local-ahead|unknown`, loaded
+  version/commit evidence, marketplace commit evidence,
+  `updateRecommended:boolean`, and a digest-bound policy disposition. Neither
+  result may reuse the other's branch, upstream, candidate, or write decision.
+- **AC-047-113 — Configured upstream only:** Repository freshness SHALL compare
+  checked-out `HEAD` only with its configured upstream. Thus
+  `sprint_phoenix == origin/sprint_phoenix` is `equal` even when `main`
+  differs, and repository writes remain permitted.
+- **AC-047-114 — Loaded distribution comparison:** Pipeline update
+  availability SHALL compare the actually loaded plugin build/commit with the
+  marketplace default head. Older/equal/ahead/unknown results SHALL be
+  reported as update metadata, not reinterpreted as repository divergence.
+  The old `pipeline.ruleset-freshness.v1.writePermitted` field is deprecated:
+  compatibility readers SHALL treat it as update metadata only and SHALL use
+  repository freshness for ordinary write admission.
+- **AC-047-115 — Nonblocking default:** An ordinary newer marketplace build
+  SHALL yield `updateAvailable`/`updateRecommended` while preserving current
+  branch tracking and write/review permission. Only a separately explicit,
+  plugin-shipped `pipeline.ruleset-update-policy.v1` entry may elevate a named
+  update to blocking. Such an entry SHALL bind policy id/version/digest, an
+  exact blocked loaded version/commit set or minimum safe version, a public
+  security reason, and an explicit `blocking` disposition. Absence, mismatch,
+  ordinary feature drift, or generic behind/diverged status is advisory.
+- **AC-047-116 — Explicit operator boundary:** Update remains an operator
+  action (`/plugins update`, then `/new` for Codex). The checker SHALL never
+  auto-update, restart, retarget upstream, checkout, rebase, merge, copy
+  hotfix source, or mutate refs/config/worktree. Tests SHALL cover Phoenix
+  branch equality with differing main, older loaded Pipeline, default-head
+  movement, offline/unknown results, policy match/mismatch, migration of old
+  `writePermitted` consumers, and visibly separated output. Bootstrap skill,
+  harness copy, staleness hook, and tests SHALL remove generic F2 write
+  blocking while retaining only the exact versioned security-policy block.
+
+### Current ownership and focused-gate map
+
+| Slice | Criteria | Exclusive production ownership | Required focused gate |
+| --- | --- | --- | --- |
+| F0 lifecycle/cleanup | AC-047-100–111 | cleanup/recovery, portable State writer, approval/submission model, onboarding/continuity/topology/Dev-Plan readers | session-cleanup binding, project-authority, onboarding V3, pipeline-state, feature-package topology, Dev-Plan suites |
+| F1 freshness/backlog | AC-047-99, 112–116 | ruleset/update and repository freshness, staleness/bootstrap policy, backlog ledger/projections | ruleset/repository freshness suites plus backlog state suite and canonical checker |
+| F2 Verify/supervision | AC-047-75–80, 88–98 | Verify workflow/harness, injected runner seams, Critic trace identity, onboarding rollback identity, only shipped supervisor paths | Critic isolation, onboarding V3/E2E, Advisor bootstrap, and runner-free Full Verify |
+| F3 publication | AC-047-69–74 | existing publication bundle/authority, fixed executor, publication-only State/guard/close/release integration | bundle, authority, State-authority, close-journal, and new executor disposable-remote suites |
+| F4 authority adoption | AC-047-81–87 | neutral authority resolver/migration, runtime provenance, classification and adoption receipt | project-authority, migration, and onboarding V3 suites |
+| F5 retained regression | AC-047-01–68 | no redesign; only exact affected current surfaces on regression | existing focused suite matrix |
+| F6 immutable candidate | AC-047-01–116 | integration metadata, package/version/evidence only after all production slices | all focused gates, Full Verify, Security, high-risk Critic, install/readback, portable-state readback |
+
+Exact file paths, command lines, sequencing, shared-file handoff, and stop
+conditions are binding in [implementation-plan.md](implementation-plan.md).
+F0 releases shared State/onboarding files before F3/F4 may edit their bounded
+regions; no two concurrent dispatches own the same file.
 
 ## 0. Final expanded release authority — 2026-07-29
 
@@ -1781,9 +2055,15 @@ tamper/missing/selection-drift rejection at launcher, bridge and App Server,
 exact evidence delivery to the child model turn, and the absence of model
 effects before the demand gate.
 
-## 10. Integration and collision control
+## 10. Historical AC-047-01–68 integration record (non-normative)
 
-### 10.1 Bounded implementation slices
+This entire section is retained only as implementation provenance for the
+already delivered AC-047-01–68 baseline. It is not current hotfix work.
+Sections 10.2–10.3 describe post-release downstream adoption owned by the
+respective Sprint and require separate authorization. No Goldfish may use them
+to import, copy, rebase, merge, or mutate Sprint work during 0.4.7 completion.
+
+### 10.1 Historical bounded implementation slices
 
 The current hotfix is partitioned into these reviewable slices. Same-file
 slices remain serial; the immutable candidate is not formed until every slice
@@ -1808,7 +2088,7 @@ and the final document authority are stable.
 
 AC-047-24 is implemented only within `047-ADV`; it never applies to bootstrap.
 
-### 10.2 Nova rebase
+### 10.2 Post-release Nova adoption (not hotfix implementation)
 
 After 0.4.7 reaches the approved integration commit:
 
@@ -1835,14 +2115,19 @@ Expected collision paths include:
 No automated conflict resolution may choose Nova or hotfix wholesale for those
 paths.
 
-### 10.3 Other Sprint rebases
+### 10.3 Post-release other-Sprint adoption (not hotfix implementation)
 
 For each of the three Sprint branches rebasing onto 0.4.7, produce a
 machine-generated changed-path intersection and a human disposition for every
 overlap. A successful textual rebase is not acceptance; each Sprint reruns its
 own focused and full gates against its new exact candidate.
 
-## 11. Verification gates
+## 11. Historical AC-047-01–68 verification record
+
+The commands and gates below remain regression inputs for delivered behavior,
+but they are not the complete current DoD. The current AC-047-69–116 ownership
+and focused commands are in the implementation plan; the integrated immutable
+candidate gate is F6 there.
 
 ### 11.1 Focused gates
 

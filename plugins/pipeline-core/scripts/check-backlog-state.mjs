@@ -23,6 +23,7 @@ import {
   parseBacklogItem,
   parseTransitionLedger,
   planBacklogEvidenceAmendment,
+  planBacklogReachabilityRepair,
   planBacklogTransition,
   planElephantAfkLedgerRepair,
   planManagedOnboardingLedgerRepair,
@@ -127,6 +128,34 @@ function projectReadbackFindings(root, item) {
 function localCommitExists(root, oid) {
   const result = spawnSync("git", ["cat-file", "-e", `${oid}^{commit}`], { cwd: root, stdio: "ignore" });
   return result.status === 0;
+}
+
+function reachabilityAmendmentFindings(root, event) {
+  const findings = [];
+  const label = `ledger event ${event.sequence}`;
+  const reference = event?.evidence?.reference;
+  if (!regularFile(root, reference)) return [`${label}: reachability amendment reference is missing`];
+  const blob = spawnSync("git", ["rev-parse", `${event.evidence.commit}:${reference}`], {
+    cwd: root,
+    encoding: "utf8",
+  });
+  const blobOid = String(blob.stdout ?? "").trim();
+  if (blob.status !== 0 || blobOid !== event.evidence.referenceBlobOid) {
+    findings.push(`${label}: referenceBlobOid does not bind the reachable commit projection`);
+  }
+  const historical = spawnSync("git", ["show", `${event.evidence.commit}:${reference}`], {
+    cwd: root,
+    encoding: null,
+  });
+  const historicalSha = historical.status === 0
+    ? createHash("sha256").update(historical.stdout).digest("hex")
+    : null;
+  const currentSha = createHash("sha256").update(readFileSync(join(root, reference))).digest("hex");
+  if (historicalSha !== event.evidence.referenceSha256
+    || currentSha !== event.evidence.referenceSha256) {
+    findings.push(`${label}: referenceSha256 does not bind the exact retained projection`);
+  }
+  return findings;
 }
 
 function atomicWrite(path, content) {
@@ -268,6 +297,9 @@ export function loadBacklogState(root = DEFAULT_ROOT, { checkCommit = true } = {
     if (event?.id === "pipeline.managed-onboarding-success-contract" && event?.evidence?.kind === "missing-initial-ledger-repair") {
       const bytes = itemBytes.get(event.id);
       if (typeof bytes !== "string" || event.evidence.itemSha256 !== createHash("sha256").update(bytes).digest("hex")) findings.push(`ledger event ${event.sequence}: itemSha256 does not bind the current item bytes`);
+    }
+    if (event?.evidence?.kind === "reachability-amendment") {
+      findings.push(...reachabilityAmendmentFindings(root, event));
     }
   }
 
@@ -611,6 +643,50 @@ export function applyManagedOnboardingLedgerRepair(root = DEFAULT_ROOT, input, o
   ];
   const transaction = writeBacklogTransaction(root, targets, options);
   return transaction.ok ? { ...current, ok: true, findings: [], wrote: true, transition: planned.event } : { ...current, ok: false, findings: transaction.findings, wrote: false, transition: null };
+}
+
+/** Append only the two AC-047-99 reachability amendments and regenerate projections. */
+export function applyBacklogReachabilityRepair(root = DEFAULT_ROOT, input, options = {}) {
+  const current = checkBacklogState(root, options);
+  const expectedFindings = [
+    "ledger event 39: evidence.commit is not a reachable local Git commit",
+    "ledger event 40: evidence.commit is not a reachable local Git commit",
+  ];
+  if (current.findings.join("\n") !== expectedFindings.join("\n")) {
+    return {
+      ...current,
+      ok: false,
+      findings: ["reachability repair requires exactly the canonical events 39/40 findings", ...current.findings],
+      wrote: false,
+      transitions: [],
+    };
+  }
+  if (options.checkCommit !== false && !localCommitExists(root, input?.commit)) {
+    return { ...current, ok: false, findings: ["reachability repair commit is not reachable"], wrote: false, transitions: [] };
+  }
+  const planned = planBacklogReachabilityRepair(current.items, current.events, input);
+  if (!planned.ok) {
+    return { ...current, ok: false, findings: planned.errors, wrote: false, transitions: [] };
+  }
+  for (const event of planned.appended) {
+    const referenceFindings = reachabilityAmendmentFindings(root, event);
+    if (referenceFindings.length > 0) {
+      return { ...current, ok: false, findings: referenceFindings, wrote: false, transitions: [] };
+    }
+  }
+  const ledgerBefore = readFileSync(join(root, LEDGER_PATH), "utf8");
+  const targets = [
+    {
+      path: LEDGER_PATH,
+      after: `${ledgerBefore}${planned.appended.map((event) => JSON.stringify(event)).join("\n")}\n`,
+    },
+    { path: STATUS_PATH, after: planned.projection.statusText },
+    { path: INDEX_PATH, after: planned.projection.indexText },
+  ];
+  const transaction = writeBacklogTransaction(root, targets, options);
+  return transaction.ok
+    ? { ...current, ok: true, findings: [], wrote: true, transitions: planned.appended }
+    : { ...current, ok: false, findings: transaction.findings, wrote: false, transitions: [] };
 }
 
 function cli() {

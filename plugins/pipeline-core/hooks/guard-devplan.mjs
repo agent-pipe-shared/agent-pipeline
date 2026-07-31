@@ -126,14 +126,17 @@
  * VERIFY: node plugins/pipeline-core/hooks/guard-devplan.test.mjs
  */
 import { existsSync, readFileSync } from "node:fs";
-import { join, relative, isAbsolute, posix } from "node:path";
+import { createHash } from "node:crypto";
+import { join, relative, isAbsolute, posix, resolve } from "node:path";
 
 import { loadManifest, gateConfig } from "../lib/manifest.mjs";
 import {
   LEGACY_STATE,
   NEUTRAL_STATE,
   resolveProjectAuthorityPaths,
+  validatePortablePipelineState,
 } from "../lib/project-authority.mjs";
+import { derivePlanLifecycle } from "../lib/plan-spec-state-v2.mjs";
 
 const DEFAULT_EXEMPT_PREFIXES = ["docs/", "specs/", ".claude/", "backlog/"];
 
@@ -229,28 +232,69 @@ if (!activeFeature || typeof activeFeature !== "object" || typeof activeFeature.
   process.exit(0); // no active feature -- nothing to enforce
 }
 
-if (state.planApproved === true) process.exit(0); // approved -- allow
+if (statePath === join(projectDir, NEUTRAL_STATE)) {
+  const portability = validatePortablePipelineState(state);
+  if (!portability.ok) {
+    emit(gate.mode === "warn" ? 1 : 2, [
+      `[guard-devplan] ${gate.mode === "warn" ? "WARN" : "BLOCKED"}: neutral State contains private cleanup identity (${portability.code}).`,
+      "Repair through the sanctioned cleanup recovery transaction; direct State edits are not authority.",
+    ]);
+  }
+}
+
+function fileSha256(path) {
+  try { return createHash("sha256").update(readFileSync(resolve(projectDir, path))).digest("hex"); }
+  catch { return null; }
+}
+
+const submitted = state.planSubmission;
+const approvalAuthority = state.planApproval?.poGateAuthority;
+const planPath = typeof submitted?.planPath === "string"
+  ? submitted.planPath
+  : approvalAuthority?.planPath;
+const specPath = typeof submitted?.specPath === "string"
+  ? submitted.specPath
+  : approvalAuthority?.specPath;
+const lifecycle = derivePlanLifecycle(state, {
+  ...(typeof planPath === "string" ? { planSha256: fileSha256(planPath) } : {}),
+  ...(typeof specPath === "string" ? { specSha256: fileSha256(specPath) } : {}),
+});
+if (lifecycle.status === "implementing" && lifecycle.ok && lifecycle.nextAction === null) {
+  process.exit(0);
+}
 
 // ---- exempt paths -------------------------------------------------------------------
 const exemptPrefixes = [...DEFAULT_EXEMPT_PREFIXES];
-if (typeof activeFeature.planPath === "string" && activeFeature.planPath !== "") {
+if (lifecycle.status === "draft"
+  && typeof activeFeature.planPath === "string"
+  && activeFeature.planPath !== "") {
   exemptPrefixes.push(activeFeature.planPath);
 }
 if (Array.isArray(gate.exemptPaths)) {
   for (const p of gate.exemptPaths) if (typeof p === "string" && p !== "") exemptPrefixes.push(p);
 }
 
-const isExempt = exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix)));
+const authoritativePaths = [planPath, specPath]
+  .filter((path) => typeof path === "string")
+  .map(normalize);
+const touchesAuthority = authoritativePaths.some((path) => normalizedPath === path);
+const isExempt = !touchesAuthority
+  && exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix)));
 if (isExempt) process.exit(0);
 
 // ---- verdict --------------------------------------------------------------------------
+const lifecycleReason = lifecycle.nextAction === "reopen-design"
+  ? "Current Plan/Spec authority is stale or closed; run `reopen-design --by <name>` before editing."
+  : lifecycle.status === "awaiting-approval"
+    ? "The submitted Plan/Spec is immutable until approval or a sanctioned `reopen-design --by <name>`."
+    : lifecycle.status === "approved"
+      ? "The approved design must enter implementation through `set-phase --phase implementation`, or be reopened before design edits."
+      : "The feature is still in draft design and has no implementation authority.";
 const message = [
-  `BLOCKED (guard-devplan, plugin pipeline-core): Feature "${activeFeature.id}" has no approved plan yet.`,
+  `BLOCKED (guard-devplan, plugin pipeline-core): Feature "${activeFeature.id}" lifecycle is "${lifecycle.status ?? "invalid"}".`,
   `Plan: ${typeof activeFeature.planPath === "string" ? activeFeature.planPath : "(no planPath recorded in state)"}`,
   `File: ${filePath}`,
-  `Why: The Dev-Plan gate (.claude/pipeline.yaml, gate "dev-plan") requires a recorded approval BEFORE ` +
-    `implementation edits (docs/operating-model.md §3.2 step 3b). Record approval: ` +
-    `node harness/scripts/pipeline-state.mjs approve-plan --by <name>.`,
+  `Why: ${lifecycleReason}`,
 ];
 
 if (gate.mode === "warn") emit(1, message);

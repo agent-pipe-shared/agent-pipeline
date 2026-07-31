@@ -34,6 +34,23 @@ function canonical(value) {
 const sha = (value) => createHash("sha256").update(typeof value === "string" ? value : canonical(value)).digest("hex");
 export const publicationDigest = sha;
 
+/** Sanitized, stable identities shared by the publication planner/executor. */
+export function publicationRepositoryFingerprint({ root, common }) {
+  if (typeof root !== "string" || root.length === 0 || typeof common !== "string" || common.length === 0) {
+    throw new Error("publication repository identity invalid");
+  }
+  return sha({ schema: "pipeline.publication-repository-fingerprint.v1", root, gitCommonDir: common });
+}
+
+export function publicationRemoteFingerprint(remoteName, pushUrls) {
+  if (typeof remoteName !== "string" || remoteName.length === 0
+    || !Array.isArray(pushUrls) || pushUrls.length !== 1
+    || typeof pushUrls[0] !== "string" || pushUrls[0].length === 0) {
+    throw new Error("publication remote identity invalid");
+  }
+  return sha({ schema: "pipeline.publication-remote-fingerprint.v1", remoteName, pushUrls });
+}
+
 function assertKeys(value, expected, label) {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} invalid`);
   const actual = Object.keys(value).sort();
@@ -146,7 +163,7 @@ export function observePublication(state, args) {
   if (args.observedOid !== null) assertHex(args.observedOid, "observedOid");
   if (args.observedOid === state.candidateOid) return next(state, args.expectedStateSha256, { phase: "pushed-observed", observation: { status: "observed", outcome: "candidate", oid: args.observedOid, observedAt: args.observedAt } });
   if (state.remotePreimageOid === args.observedOid) return next(state, args.expectedStateSha256, { phase: "reapproval-required", reason: "remote-still-preimage", observation: { status: "observed", outcome: "preimage", oid: args.observedOid, observedAt: args.observedAt } });
-  return next(state, args.expectedStateSha256, { phase: "blocked-recovery", reason: "remote-observation-conflict", observation: { status: "observed", outcome: "conflict", oid: args.observedOid, observedAt: args.observedAt } });
+  return next(state, args.expectedStateSha256, { phase: "reapproval-required", reason: "remote-preimage-changed", observation: { status: "observed", outcome: "conflict", oid: args.observedOid, observedAt: args.observedAt } });
 }
 
 export function startReadback(state, args) {

@@ -30,6 +30,35 @@ import { writePrivateJsonAtomic } from "../lib/private-boundary.mjs";
 const h = (c, n = 64) => c.repeat(n);
 const CLI = fileURLToPath(new URL("./close-coordinator.mjs", import.meta.url));
 const digest = (bytes) => createHash("sha256").update(bytes).digest("hex");
+const canonical = (value) => {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
+  return JSON.stringify(value);
+};
+function executorReceipt(candidateOid, candidateTree, destinationRef = "refs/heads/main") {
+  const body = {
+    schema: "pipeline.publication-executor-result.v1",
+    status: "closed",
+    code: "PX-CLOSED",
+    channel: "neutral-public",
+    transactionId: "close-delivery",
+    destinationDigest: h("9"),
+    destinationRef,
+    candidateOid,
+    candidateTree,
+    authorityRawSha256: h("8"),
+    publicationReceiptDigest: h("a"),
+    executorSha256: h("7"),
+    pushAttempted: true,
+    readback: {
+      repositoryKind: "fresh-disposable",
+      alternatesDisabled: true,
+      oid: candidateOid,
+      tree: candidateTree,
+    },
+  };
+  return { ...body, receiptSha256: digest(canonical(body)) };
+}
 const childEnv = () => {
   const env = { ...process.env };
   delete env.NODE_TEST_CONTEXT;
@@ -446,35 +475,17 @@ test("process: authorization, failed publication, exact readback and cleanup sta
   assert.equal(afterFailedPush.coordinator.phase, "publication-authorized");
 
   const publicationPath = join(fixture.evidenceDirectory, "publication.json");
-  writePrivateJsonAtomic(publicationPath, {
-    schema: "pipeline.close-publication-receipt.v1",
-    channel: "neutral-public",
-    destinationDigest: h("9"),
-    ref: "refs/heads/main",
-    oid: fixture.candidateOid,
-    tree: fixture.candidateTree,
-    publicationReceiptDigest: h("a"),
-  });
+  writePrivateJsonAtomic(publicationPath, executorReceipt(fixture.candidateOid, fixture.candidateTree));
   fixture.transition("published", ["--publication", publicationPath]);
   const readbackPath = join(fixture.evidenceDirectory, "readback.json");
-  writePrivateJsonAtomic(readbackPath, {
-    schema: "pipeline.close-readback-receipt.v1",
-    channel: "neutral-public",
-    destinationDigest: h("9"),
-    ref: "refs/heads/other",
-    oid: fixture.candidateOid,
-    tree: fixture.candidateTree,
-    publicationReceiptDigest: h("a"),
-    readbackReceiptDigest: h("b"),
-  });
+  writePrivateJsonAtomic(readbackPath, executorReceipt(fixture.candidateOid, fixture.candidateTree, "refs/heads/other"));
   const mismatch = invoke([
     "plan-transition", "--root", fixture.root, "--lifecycle", fixture.lifecycle,
     "--actor", "PO", "--phase", "readback-confirmed",
     "--publication", readbackPath,
   ], 2);
   assert.equal(mismatch.code, "CLOSE-PUBLICATION");
-  const mismatchedBytes = readFileSync(readbackPath, "utf8").replace("refs/heads/other", "refs/heads/main");
-  writeFileSync(readbackPath, mismatchedBytes, { mode: 0o600 });
+  writeFileSync(readbackPath, `${JSON.stringify(executorReceipt(fixture.candidateOid, fixture.candidateTree), null, 2)}\n`, { mode: 0o600 });
   fixture.transition("readback-confirmed", ["--publication", readbackPath]);
   const cleanupPath = join(fixture.evidenceDirectory, "cleanup.json");
   writePrivateJsonAtomic(cleanupPath, {

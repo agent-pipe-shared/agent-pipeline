@@ -3,12 +3,55 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-07-25
+**Last updated:** 2026-07-30
 **Project status:** ACTIVE
-**Current block:** `0.4.4` Codex managed-workspace onboarding hotfix; final
-candidate verification, independent review, and authorized publication pending
-**Repair baseline:** `e4d62646f842e2dfd7ab8ef48457ea676fceecd3`
-**Release version:** `0.4.3` released; `0.4.4` local hotfix candidate
+**Current block:** `0.4.7` code-first hotfix completion; design reopened and
+fresh PO approval required before implementation dispatch
+**Repair baseline:** `83640cec22d494d227eebc82929370277ce926b9`
+**Release version:** `0.4.6` released; `0.4.7` expanded corrective candidate
+
+## 2026-07-30 code-first 0.4.7 checkpoint — authoritative latest
+
+This checkpoint supersedes every older current-block, candidate, scope,
+next-action, branch, and release statement below where they conflict.
+
+- The installed remote Pipeline is
+  `0.4.7-partial-auth+codex.20260730210932`; bootstrap resolved the loaded
+  self-application commit and `origin/main` to exact
+  `83640cec22d494d227eebc82929370277ce926b9`.
+- The latest lifecycle correction keeps a valid revoked-plan postimage
+  writable in design. The prior PRD/Spec approval has now been revoked through
+  the sanctioned writer; implementation remains blocked until the PO receives
+  the stabilized PRD readably and replies exactly `approved`.
+- Current code is the implementation truth. The mandatory GitHub Issue outcome
+  scope is the nine open `hotfix:0.4.7` Issues #63, #70, #71, #73, #77,
+  #81–#84. Stale Issue branches, commits, paths, and implementation sketches do
+  not override current `main`.
+- The updated code-first PRD/Spec retain AC-047-01–68 and add AC-047-69–116 for
+  the actual remainder: fixed exact-main publication, conditional deterministic
+  shipped-supervisor conformance, provenance-consistent authority adoption,
+  runner-neutral full-history Verify, reachable backlog evidence, portable
+  neutral cleanup state, editable design/submission/reapproval lifecycle, and
+  repository-freshness/Pipeline-update separation.
+- Reproduced current failures/holes:
+  `plugins/pipeline-core/scripts/check-backlog-state.mjs` rejects ledger events
+  39/40 because their evidence commits are unreachable; GitHub Verify still
+  uses a shallow checkout; no fixed publication executor exists; sanctioned
+  session start writes a private cleanup binding into portable neutral
+  `project/pipeline-state.json`; active feature State has no integrated
+  `awaiting-approval` transition; and self-application ruleset freshness treats
+  a feature-branch HEAD versus marketplace default HEAD as repository-diverged.
+- Current retained evidence: onboarding revocation classifier suites are green;
+  neutral project-authority host tests are 9/9 green; V4 session inspection is
+  `ready`; App Server is `CAS-READY`; toolchain preflight is `TCP-READY`; and
+  repository/ruleset freshness are equal on `main`.
+- No Phoenix/Nova/Cyborg checkout is to be copied, rebased, retargeted, or
+  mutated by this block. Downstream adoption occurs later through a
+  digest-bound receipt and separate authorization.
+- Next action: finish document digest binding and readiness checks, present the
+  PRD readably, wait for exact PO approval, then dispatch implementation only
+  through bounded Goldfish tasks in the order recorded in
+  `specs/2026-07-27-agent-pipeline-0.4.7-hotfix/implementation-plan.md`.
 
 ## Operational head
 

@@ -417,10 +417,11 @@ await check("trace verifier requires one correctly labelled lease arm for every 
 await check("trace creation uses regular 0600 single-link file and binds device/inode", () => withTraceCase(async ({ tracePath, directory, options }) => {
   const store = await createSecureTraceStore(options);
   const info = await lstat(tracePath);
+  const bigintInfo = await lstat(tracePath, { bigint: true });
   assert.equal(info.isFile(), true);
   assert.equal(info.mode & 0o777, 0o600);
   assert.equal(info.nlink, 1);
-  assert.deepEqual(store.binding, { dev: String(info.dev), ino: String(info.ino) });
+  assert.deepEqual(store.binding, { dev: String(info.dev), ino: String(info.ino), birthtimeNs: String(bigintInfo.birthtimeNs) });
   await appendMinimalFailedTrace(store, "cleanup");
   const alias = path.join(directory, "trace-alias.jsonl");
   await link(tracePath, alias);
@@ -521,6 +522,55 @@ await check("trace verification detects truncation, mutation, replacement and mo
     });
   }
 });
+
+await check("trace finalization rejects pathname replacement even when device and inode are immediately reused", () => withTraceCase(async ({ tracePath, options }) => {
+  let replaced = false;
+  let originalIdentity = null;
+  const spoofReplacementStat = (info) => {
+    if (!replaced || originalIdentity === null) return info;
+    return new Proxy(info, {
+      get(target, property) {
+        if (property === "dev") return originalIdentity.dev;
+        if (property === "ino") return originalIdentity.ino;
+        if (property === "birthtimeNs") return originalIdentity.birthtimeNs + 1n;
+        const value = Reflect.get(target, property, target);
+        return typeof value === "function" ? value.bind(target) : value;
+      },
+    });
+  };
+  const injectedOpen = async (...args) => {
+    const handle = await open(...args);
+    if (args.length >= 3) {
+      return {
+        stat: (...inner) => handle.stat(...inner),
+        write: (...inner) => handle.write(...inner),
+        datasync: () => handle.datasync(),
+        sync: () => handle.sync(),
+        async close() {
+          const bytes = await readFile(tracePath);
+          originalIdentity = await lstat(tracePath, { bigint: true });
+          await handle.close();
+          await unlink(tracePath);
+          await writeFile(tracePath, bytes, { mode: 0o600 });
+          replaced = true;
+        },
+      };
+    }
+    return {
+      stat: async (...inner) => spoofReplacementStat(await handle.stat(...inner)),
+      read: (...inner) => handle.read(...inner),
+      close: () => handle.close(),
+    };
+  };
+  const injectedLstat = async (...args) => spoofReplacementStat(await lstat(...args));
+  const store = await createSecureTraceStore({ ...options, io: { open: injectedOpen, lstat: injectedLstat } });
+  await appendMinimalFailedTrace(store);
+  await assert.rejects(
+    () => store.finalize({ outcome: "failed", cause: "unbestimmt" }),
+    /binding changed|finalized identity changed/u,
+  );
+  assert.equal(replaced, true);
+}));
 
 function observedChild({ pid = 4242, onWrite = () => {}, onEnd = () => {}, onKill = () => true, listenerOrder = [] } = {}) {
   const child = new EventEmitter();

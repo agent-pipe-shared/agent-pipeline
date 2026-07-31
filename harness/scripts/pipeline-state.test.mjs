@@ -679,6 +679,38 @@ function injectedPoGateAuthority(planPath) {
       : { ok: false, code: "PO-GATE-AUTHORITY-STALE" };
 }
 
+function injectedPoGateProfile() {
+  return () => ({
+    ok: true,
+    code: "PO-PROFILE-AUTHORITY-VALID",
+    value: {
+      schema: PO_GATE_AUTHORITY_EVIDENCE_SCHEMA,
+      humanFacing: "de",
+      sourceSha256: A,
+      runtimeSha256: B,
+      receiptSha256: C,
+      repositoryFingerprint: D,
+    },
+  });
+}
+
+function lifecycleDeps(dir, planPath, overrides = {}) {
+  return {
+    dir,
+    now: FIXED_NOW,
+    poGateAuthority: injectedPoGateAuthority(planPath),
+    poGateProfile: injectedPoGateProfile(),
+    ...overrides,
+  };
+}
+
+function submitAndApprove(dir, planPath) {
+  const deps = lifecycleDeps(dir, planPath);
+  const submitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], deps);
+  const approved = run(["approve-plan", "--by", "po-test"], deps);
+  return { submitted, approved };
+}
+
 function seedSubprocessPoGateAuthority(dir, planPath) {
   const sourcePath = join(dir, "pipeline.user.yaml");
   const runtimePath = join(dir, ".claude", "pipeline.yaml");
@@ -939,22 +971,23 @@ function canonicalFixtureJson(value) {
 {
   const dir = freshDir("approve-shape");
   run(["set-feature", "--id", "ap1-pipeline-tuning", "--plan-path", ".claude/plans/x.md"], { dir, now: FIXED_NOW });
-  const code = run(["approve-plan", "--by", "po-test"], {
-    dir,
-    now: FIXED_NOW,
-    poGateAuthority: injectedPoGateAuthority(".claude/plans/x.md"),
-  });
+  const submitted = run(
+    ["submit-plan", "--by", "coordinator", "--profile", "feature"],
+    lifecycleDeps(dir, ".claude/plans/x.md"),
+  );
+  const code = run(["approve-plan", "--by", "po-test"], lifecycleDeps(dir, ".claude/plans/x.md"));
+  ok("PS06a0 submit-plan exit 0", submitted === 0, `got ${submitted}`);
   ok("PS06a approve-plan exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
   ok("PS06b schema field correct", state.schema === SCHEMA_ID);
   ok("PS06c planApproved true", state.planApproved === true);
   ok(
-    "PS06d planApproval is exact v2 and binds the injected Plan and Spec authority",
-    state.planApproval?.schema === "pipeline.plan-approval.v2"
+    "PS06d planApproval is exact v3 and binds the submitted Plan, Spec, and profile authority",
+    state.planSubmission?.schema === "pipeline.plan-submission.v1"
+      && state.planApproval?.schema === "pipeline.plan-approval.v3"
       && state.planApproval?.approvedBy === "po-test"
       && state.planApproval?.approvedAt === FIXED_NOW()
-      && state.planApproval?.specBoundBy === "po-test"
-      && state.planApproval?.specBoundAt === FIXED_NOW()
+      && state.planApproval?.submissionSha256
       && state.planApproval?.poGateAuthority?.schema === PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA,
   );
   ok("PS06e activeFeature preserved from set-feature", state.activeFeature?.id === "ap1-pipeline-tuning");
@@ -964,11 +997,7 @@ function canonicalFixtureJson(value) {
 {
   const dir = freshDir("set-feature-reset");
   run(["set-feature", "--id", "f1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
-  run(["approve-plan", "--by", "po-test"], {
-    dir,
-    now: FIXED_NOW,
-    poGateAuthority: injectedPoGateAuthority("p1.md"),
-  });
+  submitAndApprove(dir, "p1.md");
   run(["set-feature", "--id", "f2", "--plan-path", "p2.md"], { dir, now: FIXED_NOW });
   const state = readState(dir).state;
   ok("PS07a new feature resets planApproved=false", state.planApproved === false);
@@ -977,24 +1006,20 @@ function canonicalFixtureJson(value) {
   ok("PS07d activeFeature reflects the NEW feature", state.activeFeature?.id === "f2");
 }
 
-// ---- PS08: revoke-plan sets planApproved=false + records revocation -------------------
+// ---- PS08: reopen-design invalidates exact submission/approval authority --------------
 {
   const dir = freshDir("revoke");
   run(["set-feature", "--id", "f1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
-  run(["approve-plan", "--by", "po-test"], {
-    dir,
-    now: FIXED_NOW,
-    poGateAuthority: injectedPoGateAuthority("p1.md"),
-  });
-  const code = run(["revoke-plan", "--by", "po-test"], { dir, now: FIXED_NOW });
-  ok("PS08a revoke-plan exit 0", code === 0, `got ${code}`);
+  submitAndApprove(dir, "p1.md");
+  const code = run(["reopen-design", "--by", "po-test"], { dir, now: FIXED_NOW });
+  ok("PS08a reopen-design exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
-  ok("PS08b planApproved false after revoke", state.planApproved === false);
-  ok("PS08c exact v2 planRevocation recorded", state.planRevocation?.schema === "pipeline.plan-revocation.v2" && state.planRevocation?.revokedBy === "po-test");
+  ok("PS08b planApproved false after reopen", state.planApproved === false && state.activeFeature.phase === "design");
+  ok("PS08c exact invalidation recorded", state.planInvalidation?.schema === "pipeline.plan-invalidation.v1" && state.planInvalidation?.invalidatedBy === "po-test");
   const beforeReplay = readFileSync(statePath(dir), "utf8");
-  const replay = run(["revoke-plan", "--by", "po-test"], { dir, now: () => "2026-07-07T22:00:00.000Z" });
-  ok("PS08d revoke-plan replay accepts the stored timestamp after an ambiguous response", replay === 0, `got ${replay}`);
-  ok("PS08e revoke-plan replay leaves state byte-identical", readFileSync(statePath(dir), "utf8") === beforeReplay);
+  const replay = run(["reopen-design", "--by", "po-test"], { dir, now: () => "2026-07-07T22:00:00.000Z" });
+  ok("PS08d reopen replay accepts the stored timestamp after an ambiguous response", replay === 0, `got ${replay}`);
+  ok("PS08e reopen replay leaves state byte-identical", readFileSync(statePath(dir), "utf8") === beforeReplay);
 }
 
 // ---- PS08f: bind-plan-spec replay keeps the stored bind time --------------------------
@@ -1028,11 +1053,7 @@ function canonicalFixtureJson(value) {
 {
   const dir = freshDir("set-phase");
   run(["set-feature", "--id", "f1", "--plan-path", "p1.md"], { dir, now: FIXED_NOW });
-  run(["approve-plan", "--by", "po-test"], {
-    dir,
-    now: FIXED_NOW,
-    poGateAuthority: injectedPoGateAuthority("p1.md"),
-  });
+  submitAndApprove(dir, "p1.md");
   const code = run(["set-phase", "--phase", "implementation"], { dir, now: FIXED_NOW });
   ok("PS09a set-phase exit 0", code === 0, `got ${code}`);
   const state = readState(dir).state;
@@ -1085,6 +1106,14 @@ function canonicalFixtureJson(value) {
     env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
   });
   ok("PS12a subprocess set-feature exit 0", res1.status === 0, `stderr: ${res1.stderr}`);
+
+  const submitted = spawnSync(process.execPath, [
+    CLI, "submit-plan", "--by", "coordinator", "--profile", "feature",
+  ], {
+    encoding: "utf8",
+    env: { ...process.env, CLAUDE_PROJECT_DIR: dir },
+  });
+  ok("PS12b0 subprocess submit-plan exit 0", submitted.status === 0, `stderr: ${submitted.stderr}`);
 
   const res2 = spawnSync(process.execPath, [CLI, "approve-plan", "--by", "po-test"], {
     encoding: "utf8",
@@ -1174,6 +1203,10 @@ function canonicalFixtureJson(value) {
     env,
   });
   ok("PS14a F1-integration: real set-feature subprocess exit 0", r1.status === 0, `stderr: ${r1.stderr}`);
+  const submitted = spawnSync(process.execPath, [
+    CLI, "submit-plan", "--by", "coordinator", "--profile", "feature",
+  ], { encoding: "utf8", env });
+  ok("PS14a0 F1-integration: real submit-plan subprocess exit 0", submitted.status === 0, `stderr: ${submitted.stderr}`);
   const r2 = spawnSync(process.execPath, [CLI, "approve-plan", "--by", "po-test"], { encoding: "utf8", env });
   ok("PS14b F1-integration: real approve-plan subprocess exit 0", r2.status === 0, `stderr: ${r2.stderr}`);
   const r3 = spawnSync(process.execPath, [CLI, "set-phase", "--phase", "implementation"], { encoding: "utf8", env });
@@ -2503,11 +2536,15 @@ if (symlinkCapable) {
   const before = readFileSync(statePath(dir), "utf8");
   const continuityBefore = structuredClone(readState(dir).state.continuity);
   const foreign = acquireContinuityLock(dir, "continuity-owner-01", continuityDeps(dir));
-  const blocked = run(["set-phase", "--phase", "verify"], { dir, now: FIXED_NOW });
+  const blocked = run([
+    "approve-deploy", "--env", "test", "--artifact", "candidate", "--by", "po-test",
+  ], { dir, now: FIXED_NOW });
   ok("PS47a legacy writer is blocked by the shared continuity lock", blocked === 2, `got ${blocked}`);
   ok("PS47b blocked legacy writer performs zero byte mutation", readFileSync(statePath(dir), "utf8") === before);
   releaseContinuityLock(foreign);
-  const allowed = run(["set-phase", "--phase", "verify"], { dir, now: FIXED_NOW });
+  const allowed = run([
+    "approve-deploy", "--env", "test", "--artifact", "candidate", "--by", "po-test",
+  ], { dir, now: FIXED_NOW });
   ok("PS47c serialized legacy writer succeeds after lock release", allowed === 0, `got ${allowed}`);
   ok("PS47d non-lifecycle legacy transition preserves continuity exactly", JSON.stringify(readState(dir).state.continuity) === JSON.stringify(continuityBefore));
 }
@@ -2593,6 +2630,7 @@ if (symlinkCapable) {
   ok("PS48h refused bound close is byte-identical", readFileSync(statePath(active.dir), "utf8") === activeBefore);
 
   const closed = prepareBoundClose("continuity-bound-cleanup-closed");
+  const closedBefore = readFileSync(statePath(closed.dir), "utf8");
   const accepted = run([
     "close-feature", "--by", "po-test", "--continuity-close-request", closed.closeRequestFile,
   ], {
@@ -2606,8 +2644,8 @@ if (symlinkCapable) {
       return { status: "closed", closedAt: FIXED_NOW(), receiptSha256: "f".repeat(64) };
     },
   });
-  ok("PS48j close-feature atomically consumes an already-closed cleanup binding", accepted === 0);
-  ok("PS48k accepted bound close removes active continuity", readState(closed.dir).state.continuity === undefined);
+  ok("PS48j neutral close rejects even an already-closed portable cleanup binding", accepted === 2);
+  ok("PS48k rejected hostile neutral close remains byte-identical", readFileSync(statePath(closed.dir), "utf8") === closedBefore);
 }
 
 // ---- PS49: post-rename durability failure is never mislabeled as zero mutation ---------------
@@ -2664,7 +2702,7 @@ if (symlinkCapable) {
   const estimateEvidence = {
     schema: "pipeline.gate-estimate-evidence.v1",
     featureId: "eta-feature",
-    gate: "security",
+    gate: "prd",
     observedAt: FIXED_NOW(),
     basis: [{ kind: "verify-run", reference: "evidence/verify.json", digest: A }],
     note: "One bounded check remains.",
@@ -2673,27 +2711,28 @@ if (symlinkCapable) {
   writeFileSync(join(dir, "evidence", "eta.json"), evidenceBytes);
   const evidenceSha256 = createHash("sha256").update(evidenceBytes).digest("hex");
   run(["set-feature", "--id", "eta-feature", "--plan-path", "specs/eta/prd_eta.md"], { dir, now: FIXED_NOW });
-  run(["set-phase", "--phase", "implementation"], { dir, now: FIXED_NOW });
   const args = [
-    "set-gate-estimate", "--id", "eta-security-1", "--expected-current-id", "absent",
-    "--feature-id", "eta-feature", "--gate", "security", "--object-format", "sha1", "--source-oid", oid,
+    "set-gate-estimate", "--id", "eta-prd-1", "--expected-current-id", "absent",
+    "--feature-id", "eta-feature", "--gate", "prd", "--object-format", "sha1", "--source-oid", oid,
     "--evidence-path", "evidence/eta.json", "--evidence-sha256", evidenceSha256,
     "--min-minutes", "20", "--max-minutes", "45", "--by", "coordinator",
   ];
   const recorded = run(args, { dir, now: FIXED_NOW });
   const stored = readState(dir).state;
   ok("PS51a set-gate-estimate writes only a source/evidence-bound coordinator record", recorded === 0
-    && stored.gateEstimate?.id === "eta-security-1"
+    && stored.gateEstimate?.id === "eta-prd-1"
     && stored.gateEstimate?.sourceOid === oid
     && stored.gateEstimate?.evidence?.sha256 === evidenceSha256
     && stored.gateEstimate?.recordedBy === "coordinator", JSON.stringify(stored.gateEstimate));
   const beforeReplay = readFileSync(statePath(dir), "utf8");
-  const replay = run(args.map((value, index) => index === 4 ? "eta-security-1" : value), { dir, now: () => "2026-07-08T00:00:00.000Z" });
+  const replay = run(args.map((value, index) => index === 4 ? "eta-prd-1" : value), { dir, now: () => "2026-07-08T00:00:00.000Z" });
   ok("PS51b identical estimate retry is a zero-write CAS replay", replay === 0 && readFileSync(statePath(dir), "utf8") === beforeReplay);
   const beforeRejected = readFileSync(statePath(dir), "utf8");
   const rejected = run([...args.slice(0, -1), "operator"], { dir, now: FIXED_NOW });
   ok("PS51c non-coordinator estimate attribution is refused without mutation", rejected === 2 && readFileSync(statePath(dir), "utf8") === beforeRejected);
-  const advanced = run(["set-phase", "--phase", "security-scan"], { dir, now: FIXED_NOW });
+  const advanced = run([
+    "approve-deploy", "--env", "test", "--artifact", "candidate", "--by", "po-test",
+  ], { dir, now: FIXED_NOW });
   ok("PS51d a later successful state mutation clears the persisted estimate", advanced === 0 && readState(dir).state.gateEstimate === undefined);
 }
 

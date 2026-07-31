@@ -10,9 +10,10 @@
 import { createHash } from "node:crypto";
 import { existsSync, lstatSync, readdirSync, readFileSync } from "node:fs";
 import { isAbsolute, join, normalize, relative, resolve, sep } from "node:path";
+import { PLAN_LIFECYCLE_STATUSES } from "./plan-spec-state-v2.mjs";
 
 export const FEATURE_PACKAGE_SCHEMA = "pipeline.feature-package.v1";
-export const FEATURE_STATES = Object.freeze(["draft", "awaiting-approval", "approved", "implementing", "verifying", "completed", "superseded", "abandoned", "retained"]);
+export const FEATURE_STATES = Object.freeze([...PLAN_LIFECYCLE_STATUSES, "verifying", "completed", "superseded", "abandoned", "retained"]);
 export const FEATURE_CLASSES = Object.freeze(["prd", "spec", "design", "plan", "acceptance", "result", "candidate-evidence"]);
 const ACTIVE_STATES = new Set(["awaiting-approval", "approved", "implementing", "verifying", "completed"]);
 const SHA256 = /^[a-f0-9]{64}$/u;
@@ -125,8 +126,37 @@ export function planFeaturePackageTransition(rootDir = process.cwd(), manifestPa
   if (!checked.ok) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-current-package", findings: checked.findings };
   if (!FEATURE_STATES.includes(nextState)) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-target-state", findings: [] };
   if (checked.receipt.state === nextState) return { schema: "pipeline.feature-package-transition-plan.v1", status: "noop", manifest: checked.receipt.manifest, from: nextState, to: nextState, changes: [] };
-  if (["completed", "retained"].includes(checked.receipt.state) || ["draft", "abandoned"].includes(nextState)) return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-transition", findings: [] };
-  return { schema: "pipeline.feature-package-transition-plan.v1", status: "preview", manifest: checked.receipt.manifest, from: checked.receipt.state, to: nextState, changes: [{ path: checked.receipt.manifest, operation: "replace-manifest-state" }], requiredAuthority: nextState === "awaiting-approval" ? "po" : "lifecycle" };
+  const from = checked.receipt.state;
+  const admitted = new Set([
+    "draft:awaiting-approval",
+    "awaiting-approval:draft",
+    "awaiting-approval:approved",
+    "approved:draft",
+    "approved:implementing",
+    "implementing:draft",
+    "implementing:verifying",
+    "verifying:completed",
+    "verifying:implementing",
+  ]);
+  if (!admitted.has(`${from}:${nextState}`)) {
+    return { schema: "pipeline.feature-package-transition-plan.v1", status: "rejected", reason: "invalid-transition", findings: [] };
+  }
+  const operation = from === "draft" && nextState === "awaiting-approval"
+    ? "submit"
+    : nextState === "draft"
+      ? "reopen-design"
+      : from === "awaiting-approval" && nextState === "approved"
+        ? "approve"
+        : "replace-manifest-state";
+  return {
+    schema: "pipeline.feature-package-transition-plan.v1",
+    status: "preview",
+    manifest: checked.receipt.manifest,
+    from,
+    to: nextState,
+    changes: [{ path: checked.receipt.manifest, operation }],
+    requiredAuthority: operation === "approve" ? "po" : "lifecycle",
+  };
 }
 
 export function validateFeatureTopology(rootDir = process.cwd()) {

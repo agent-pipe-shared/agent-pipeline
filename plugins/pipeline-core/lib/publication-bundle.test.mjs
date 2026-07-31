@@ -3,7 +3,8 @@
 import assert from "node:assert/strict";
 import {
   approvePublication, authorizePublication, closePublication, observePublication,
-  preparePublication, publicationDigest, publicationUncertaintyDigest,
+  preparePublication, publicationDigest, publicationRemoteFingerprint,
+  publicationRepositoryFingerprint, publicationUncertaintyDigest,
   rearmPublication, startReadback, validatePublication,
 } from "./publication-bundle.mjs";
 
@@ -46,4 +47,10 @@ check("rearm requires attended uncertainty binding", () => assert.throws(() => r
 const rearmed = rearmPublication(uncertain, { expectedRevision: 3, expectedStateSha256: publicationDigest(uncertain), freshPreimageOid: h("d", 40), candidateDescendsFromFreshPreimage: true, attended: true, priorUncertaintyDigest: publicationUncertaintyDigest(uncertain) });
 check("rearm clears consumed approval", () => assert.equal(rearmed.approval, null));
 check("unknown remote result blocks recovery", () => { let value = fixture(); value = approvePublication(value, { expectedRevision: 0, expectedStateSha256: publicationDigest(value), approvalId: "x", attribution: "PO", approvedAt: 1, expiresAt: 2 }); value = authorizePublication(value, { expectedRevision: 1, expectedStateSha256: publicationDigest(value), now: 2, command: ["git", "push", "--porcelain", "origin", `${h("e", 40)}:refs/heads/main`] }); value = observePublication(value, { expectedRevision: 2, expectedStateSha256: publicationDigest(value), observedOid: null, observedAt: 3, status: "unknown" }); assert.equal(value.phase, "blocked-recovery"); });
+check("changed remote preimage requires a fresh plan and approval", () => { let value = fixture(); value = approvePublication(value, { expectedRevision: 0, expectedStateSha256: publicationDigest(value), approvalId: "x", attribution: "PO", approvedAt: 1, expiresAt: 2 }); value = authorizePublication(value, { expectedRevision: 1, expectedStateSha256: publicationDigest(value), now: 2, command: ["git", "push", "--porcelain", "origin", `${h("e", 40)}:refs/heads/main`] }); value = observePublication(value, { expectedRevision: 2, expectedStateSha256: publicationDigest(value), observedOid: h("f", 40), observedAt: 3, status: "observed" }); assert.equal(value.phase, "reapproval-required"); assert.equal(value.reason, "remote-preimage-changed"); });
+check("sanitized repository and single-endpoint fingerprints are deterministic", () => {
+  assert.equal(publicationRepositoryFingerprint({ root: "/fixture/root", common: "/fixture/root/.git" }), publicationRepositoryFingerprint({ root: "/fixture/root", common: "/fixture/root/.git" }));
+  assert.equal(publicationRemoteFingerprint("origin", ["fixture://remote"]), publicationRemoteFingerprint("origin", ["fixture://remote"]));
+  assert.throws(() => publicationRemoteFingerprint("origin", ["one", "two"]), /remote identity/u);
+});
 console.log(`publication-bundle: ${tests} tests passed`);

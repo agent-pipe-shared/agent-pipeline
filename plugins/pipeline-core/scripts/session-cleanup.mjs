@@ -12,7 +12,9 @@ import {
 } from "../lib/project-onboarding-ready-gate.mjs";
 import {
   KickoffError,
+  applyOnboardingSessionCleanupPrivatization,
   bindOnboardingSessionCleanup,
+  planOnboardingSessionCleanupPrivatization,
   readOnboardingSessionCleanupBinding,
   releaseOnboardingSessionCleanup,
 } from "../lib/onboarding-continuity.mjs";
@@ -46,6 +48,8 @@ const USAGE = `Usage:
   session-cleanup.mjs start --repo <checkout> [--session <safe-id>]
   session-cleanup.mjs status --repo <checkout>
   session-cleanup.mjs release-binding --repo <checkout>
+  session-cleanup.mjs plan-privatization --repo <checkout>
+  session-cleanup.mjs apply-privatization --repo <checkout> --plan-sha256 <sha256> --activate
   session-cleanup.mjs plan-recovery --repo <checkout>
   session-cleanup.mjs apply-recovery --repo <checkout> --plan-sha256 <sha256> --activate
   session-cleanup.mjs register-intent --repo <checkout> (--session <id> | --session-descriptor <id> --expected-descriptor-sha256 <sha256>) --resource-id <id> --type <scratch-file|scratch-directory> --path <absolute> --content-class <scratch|disposable-control|generated-output> --policy <unlink-file|remove-directory>
@@ -116,7 +120,8 @@ function drainSessionPower(repo, session) {
 function parseArgs(argv) {
   const [command, ...rest] = argv;
   if (!new Set([
-    "start", "status", "release-binding", "plan-recovery", "apply-recovery",
+    "start", "status", "release-binding", "plan-privatization", "apply-privatization",
+    "plan-recovery", "apply-recovery",
     "register-intent", "finalize", "seal", "cleanup", "hygiene",
   ]).has(command)) throw new Error(USAGE);
   const flags = {};
@@ -139,8 +144,8 @@ function parseArgs(argv) {
     : new Set(["finalize", "seal"]).has(command) ? ["resource-id", "canary"] : [];
   const allowed = command === "start" ? new Set(["repo", "session"])
     : new Set(["status", "release-binding"]).has(command) ? new Set(["repo"])
-      : command === "plan-recovery" ? new Set(["repo"])
-        : command === "apply-recovery" ? new Set(["repo", "plan-sha256", "activate"])
+      : new Set(["plan-recovery", "plan-privatization"]).has(command) ? new Set(["repo"])
+        : new Set(["apply-recovery", "apply-privatization"]).has(command) ? new Set(["repo", "plan-sha256", "activate"])
       : new Set([...common, ...extra]);
   for (const name of Object.keys(flags)) if (!allowed.has(name)) throw new Error(`Unknown option: --${name}`);
   return { command, flags };
@@ -219,6 +224,18 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
     output = planSessionCleanupRecovery({ rootDir: repo });
   } else if (command === "apply-recovery") {
     output = applySessionCleanupRecovery({
+      rootDir: repo,
+      expectedPlanSha256: required(flags, "plan-sha256"),
+      activate: flags.activate === true,
+    });
+  } else if (command === "plan-privatization") {
+    const planPrivatization = dependencies.planOnboardingSessionCleanupPrivatizationFn
+      ?? planOnboardingSessionCleanupPrivatization;
+    output = planPrivatization({ rootDir: repo });
+  } else if (command === "apply-privatization") {
+    const applyPrivatization = dependencies.applyOnboardingSessionCleanupPrivatizationFn
+      ?? applyOnboardingSessionCleanupPrivatization;
+    output = applyPrivatization({
       rootDir: repo,
       expectedPlanSha256: required(flags, "plan-sha256"),
       activate: flags.activate === true,

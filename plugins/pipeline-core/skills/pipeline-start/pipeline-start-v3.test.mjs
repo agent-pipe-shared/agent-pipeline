@@ -296,7 +296,9 @@ const cases = [
   ["existing provenance and Elephant role checks remain", () => {
     assert.match(skill, /git rev-parse HEAD/u);
     assert.match(skill, /ruleset-freshness\.mjs" --repo "\$PWD"/u);
-    assert.match(skill, /`equal\|ahead` is current/u);
+    assert.match(skill, /`pipeline\.pipeline-update-availability\.v1`/u);
+    assert.match(skill, /`sprint_phoenix == origin\/sprint_phoenix` remains `equal` and write-permitted/u);
+    assert.match(skill, /Only an exact matched entry from the loaded plugin's shipped\s+`pipeline\.ruleset-update-policy\.v1` may return `blocking:true`/u);
     assert.match(skill, /host-authorized\s+network-open\/read-only command boundary/u);
     assert.match(skill, /`installedSource:local-development`, skip the public-marketplace equality\s+helper/u);
     assert.match(skill, /all\s+Verify, Security, push\/publication approval, and readback gates still run\s+unchanged/u);

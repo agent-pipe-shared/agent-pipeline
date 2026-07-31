@@ -49,6 +49,16 @@ function writeState(dir, obj) {
   mkdirSync(join(dir, ".claude"), { recursive: true });
   writeFileSync(join(dir, ".claude", "pipeline-state.json"), typeof obj === "string" ? obj : JSON.stringify(obj));
 }
+function writePublicationMode(dir) {
+  writeState(dir, {
+    schema: "pipeline.state.v0",
+    publication: {
+      schema: "pipeline.publication-projection.v1",
+      channels: { private: null, "neutral-public": null },
+      authorizedPushes: [],
+    },
+  });
+}
 function writeEvidence(dir, relPath, obj) {
   const full = join(dir, relPath);
   mkdirSync(join(full, ".."), { recursive: true });
@@ -163,7 +173,7 @@ const BLOCK = 2,
   ALLOW = 0,
   WARN = 1;
 
-const PUSH_CMD = "git push origin main";
+const PUSH_CMD = "git push origin main:refs/heads/feature-test";
 
 function manifestPush({ mode = "blocking", approval = "required", security = null }) {
   let y = `schema: pipeline.manifest.v0\ngates:\n  push:\n    mode: ${mode}\n    type: human\n    approval: ${approval}\n`;
@@ -195,11 +205,11 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   writeManifest(dir, manifestPush({ approval: "standing-approved" }));
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   check(
-    "PG03a allow  documented inline override prefix still binds the one explicit push",
+    "PG03a block  documented inline override cannot authorize main publication",
     `PIPELINE_GUARD_OVERRIDE="GG-03|20260726-test|PO-approved fixture" git push origin ${head}:refs/heads/main`,
     dir,
-    ALLOW,
-    { stderrEmpty: true },
+    BLOCK,
+    { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main", "GG-03"] },
   );
   check(
     "PG03a block  dynamic inline override prefix stays inside the strict shell grammar",
@@ -225,6 +235,27 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   check("PG03c allow  structural policy remains off when push gate is off", "git add README.md && git push", dir, ALLOW, {
     stderrEmpty: true,
   });
+}
+
+{
+  const { dir, head } = freshRepo("publication-executor-only");
+  writeManifest(dir, manifestPush({ approval: "standing-approved" }));
+  writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
+  writePublicationMode(dir);
+  check(
+    "PG03d block  raw publication push cannot consume typed authority",
+    `git push --porcelain origin ${head}:refs/heads/main`,
+    dir,
+    BLOCK,
+    { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main", "publication executor"] },
+  );
+  check(
+    "PG03e block  GG-03 cannot widen the executor-only publication boundary",
+    `PIPELINE_GUARD_OVERRIDE="GG-03|20260731-publication|PO-approved fixture" git push --porcelain origin ${head}:refs/heads/main`,
+    dir,
+    BLOCK,
+    { stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main", "GG-03"] },
+  );
 }
 
 // ---- PG04 blocking + missing verify evidence -> exit 2 ---------------------------------
@@ -378,7 +409,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   writeManifest(decoy.dir, manifestPush({ approval: "standing-approved" }));
   writeManifest(target.dir, manifestPush({ approval: "standing-approved" }));
   writeEvidence(decoy.dir, "evidence/verify-latest.json", { exitCode: 0, commit: decoy.head });
-  check("PG17a block  git -C target never borrows green evidence from session repo", `git -C ${target.dir} push origin main`, decoy.dir, BLOCK, {
+  check("PG17a block  git -C target never borrows green evidence from session repo", `git -C ${target.dir} push origin main:refs/heads/feature-test`, decoy.dir, BLOCK, {
     cwd: decoy.dir,
     projectDir: decoy.dir,
     stderrIncludes: ["evidence/verify-latest.json missing"],
@@ -386,7 +417,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
   });
   writeEvidence(target.dir, "evidence/verify-latest.json", { exitCode: 0, commit: target.head });
   writeEvidence(decoy.dir, "evidence/verify-latest.json", { exitCode: 1, commit: decoy.head });
-  check("PG17b allow  git -C target uses target evidence despite red session repo", `git -C ${target.dir} push origin main`, decoy.dir, ALLOW, {
+  check("PG17b allow  git -C target uses target evidence despite red session repo", `git -C ${target.dir} push origin main:refs/heads/feature-test`, decoy.dir, ALLOW, {
     cwd: decoy.dir,
     projectDir: decoy.dir,
     stderrEmpty: true,
@@ -436,7 +467,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
 {
   const { dir } = freshRepo("detection-privacy");
   writeManifest(dir, manifestPush({ approval: "standing-approved" }));
-  check("PG17f block  quoted git executable is gated", '"git" push origin main', dir, BLOCK, {
+  check("PG17f block  quoted git executable is gated", '"git" push origin main:refs/heads/feature-test', dir, BLOCK, {
     stderrIncludes: ["evidence/verify-latest.json missing"],
   });
   check("PG17g block  git.exe cannot bypass detection", "git.exe push origin main", dir, BLOCK, {
@@ -478,7 +509,7 @@ function manifestPush({ mode = "blocking", approval = "required", security = nul
     check(`${id} is structurally blocked`, command, dir, BLOCK, { stderrIncludes: ["not unambiguous"] });
   }
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: gitAt(dir, "rev-parse", "HEAD").stdout.trim() });
-  check("PG17q allow  safe set-upstream flag preserves one-source binding", "git push -u origin main", dir, ALLOW, {
+  check("PG17q allow  safe set-upstream flag preserves one-source binding", "git push -u origin main:refs/heads/feature-test", dir, ALLOW, {
     stderrEmpty: true,
   });
 }
@@ -799,7 +830,7 @@ function deployApprovalState(forArtifact, forEnvironment) {
   );
   check(
     "PGD15 block  case B: semantic-invalid manifest + release present + NON-deploy-triggering push -- falls through, blocked by the normal evidence-freshness gate (WARN prepended, not fail-open)",
-    "git push origin main",
+    "git push origin main:refs/heads/nondeploy",
     dir,
     BLOCK,
     { stderrIncludes: ["release section present, the push-gate check still runs normally", "evidence/verify-latest.json missing"] },
@@ -809,7 +840,7 @@ function deployApprovalState(forArtifact, forEnvironment) {
   // Case C: semantic-invalid manifest, NO release section at all -- unchanged WARN behavior.
   const { dir } = freshRepo("deploy-caseC-warn");
   writeManifest(dir, "schema: pipeline.manifest.v0\nprofiles:\n  active: bogus-profile\n");
-  check("PGD16 warn  case C: semantic-invalid manifest, no release section -- unchanged WARN", "git push origin main", dir, WARN, {
+  check("PGD16 warn  case C: semantic-invalid manifest, no release section -- unchanged WARN", "git push origin main:refs/heads/nondeploy", dir, WARN, {
     stderrIncludes: ["WARN"],
   });
 }
@@ -818,7 +849,7 @@ function deployApprovalState(forArtifact, forEnvironment) {
   // unchanged WARN behavior (same fixture class as PG14 above).
   const { dir } = freshRepo("deploy-caseD-warn");
   writeManifest(dir, "schema: pipeline.manifest.v0\ngates:\n  push: &anchor\n    mode: blocking\n");
-  check("PGD17 warn  case D: parse-level invalid manifest (malformed YAML) -- unchanged WARN", "git push origin main", dir, WARN, {
+  check("PGD17 warn  case D: parse-level invalid manifest (malformed YAML) -- unchanged WARN", "git push origin main:refs/heads/nondeploy", dir, WARN, {
     stderrIncludes: ["WARN"],
   });
 }
@@ -894,7 +925,7 @@ function deployApprovalState(forArtifact, forEnvironment) {
   writeManifest(dir, releaseManifest({ testEnvAdapterRef: "ghost-adapter" }));
   check(
     "PGD21 warn  case B: semantic-invalid manifest + release present + NON-deploy-triggering push + NO active push gate -- invalidity WARN still surfaces, does not silently exit 0",
-    "git push origin main",
+    "git push origin main:refs/heads/nondeploy",
     dir,
     WARN,
     { stderrIncludes: ["is semantically invalid", "release section present"] },
@@ -1000,7 +1031,7 @@ function deployApprovalState(forArtifact, forEnvironment) {
   const { dir } = freshRepo("anonymous-public-main");
   const { env } = prepareAnonymousPublicPush(dir);
   check("PG26j block  main is never an anonymous-public delivery destination", "git push origin HEAD:refs/heads/main", dir, BLOCK, {
-    stderrIncludes: ["explicit refs/heads/<feature-branch> destination"],
+    stderrIncludes: ["raw Bash/Git cannot publish refs/heads/main"],
     env,
   });
 }
@@ -1136,7 +1167,7 @@ function deployApprovalState(forArtifact, forEnvironment) {
   writeEvidence(dir, "evidence/verify-latest.json", { exitCode: 0, commit: head });
   check(
     "PG27 block  a published commit cannot retain a machine-local cleanup binding",
-    "git push origin HEAD:refs/heads/main",
+    "git push origin HEAD:refs/heads/feature-test",
     dir,
     BLOCK,
     { stderrIncludes: ["machine-local sessionCleanup handle"] },

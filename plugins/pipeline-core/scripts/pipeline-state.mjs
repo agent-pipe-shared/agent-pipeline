@@ -274,9 +274,14 @@ import {
 } from "../lib/po-gate-authority.mjs";
 import { inspectProjectOnboardingV3 } from "../lib/project-onboarding-v3.mjs";
 import {
+  approveSubmittedPlan,
   bindPlanSpecApproval,
+  derivePlanLifecycle,
+  enterPlanImplementation,
+  reopenPlanDesign,
   revokePlanV2,
   sha256CanonicalJson,
+  submitPlan,
 } from "../lib/plan-spec-state-v2.mjs";
 import {
   clearGateEstimateForMutation,
@@ -287,6 +292,7 @@ import {
   LEGACY_STATE,
   NEUTRAL_STATE,
   resolveProjectAuthorityPaths,
+  validatePortablePipelineState,
 } from "../lib/project-authority.mjs";
 import { observeGitSource } from "../lib/source-observation.mjs";
 import { inspectSessionClosure } from "../lib/worktree-lifecycle.mjs";
@@ -342,6 +348,7 @@ const PUBLICATION_SUBCOMMANDS = new Set([
   "publication-prepare",
   "publication-approve",
   "publication-authorize",
+  "publication-reconcile",
   "publication-observe",
   "publication-start-readback",
   "publication-close",
@@ -410,6 +417,12 @@ export function readState(dir = projectDir()) {
   if (parsed.schema !== undefined && parsed.schema !== SCHEMA_ID) {
     return { status: "malformed", error: `unknown schema "${parsed.schema}" (expected "${SCHEMA_ID}")` };
   }
+  if (p === join(dir, NEUTRAL_STATE)) {
+    const portability = validatePortablePipelineState(parsed);
+    if (!portability.ok) {
+      return { status: "malformed", error: `${portability.code}: ${portability.reason}` };
+    }
+  }
   return { status: "ok", state: parsed };
 }
 
@@ -443,6 +456,10 @@ function writeState(dir, state, expectedState, options = {}) {
       if (!gate?.ok) return { ok: false, committed: false, code: gate?.code ?? "PS-BEFORE-COMMIT" };
     }
     if (transition?.replay) return { ok: true, committed: true, code: "PS-STATE-REPLAY", replay: true, transition };
+    if (statePath(dir) === join(dir, NEUTRAL_STATE)) {
+      const portability = validatePortablePipelineState(nextState);
+      if (!portability.ok) return { ok: false, committed: false, code: portability.code };
+    }
     if (nextState.continuity !== undefined) {
       const valid = validateContinuityState(nextState.continuity, nextState.activeFeature?.id);
       if (!valid.ok
@@ -2192,6 +2209,31 @@ function runPublicationCommand(sub, flags, deps) {
         authority = preparePublicationAuthority({ gitCommonDir: common.path, input,
           expectedRawSha256: priorAuthority?.rawDigest ?? null, heldLocks: ["pipeline-state"] });
         replay = authority.written === false;
+      } else if (sub === "publication-reconcile") {
+        if (expected.value === "absent" || prior === null
+          || !exactObjectKeys(input, ["authorityRawSha256"])
+          || !SHA256_RE.test(input.authorityRawSha256 ?? "")) {
+          throw new Error("publication reconciliation tuple invalid");
+        }
+        const observed = readPublicationAuthority({
+          gitCommonDir: common.path,
+          transactionId: request.value.transactionId,
+          channel: prior.channel,
+        });
+        if (observed.rawDigest !== input.authorityRawSha256
+          || !new Set(["executing", "consumed"]).has(observed.record.status)) {
+          throw new Error("publication executor authority is not reconcilable");
+        }
+        const alreadyProjected = sameJson(prior, observed.reference)
+          && !base.publication.authorizedPushes.some((entry) => entry?.transactionId === request.value.transactionId);
+        if (!alreadyProjected
+          && (prior.phase !== "push-authorized"
+            || prior.publicationStateSha256 !== request.value.expectedStateSha256
+            || observed.record.publication.revision < expected.value)) {
+          throw new Error("State publication reference stale");
+        }
+        authority = observed;
+        replay = alreadyProjected;
       } else {
         if (expected.value === "absent") throw new Error("stale publication CAS");
         if (prior !== null) {
@@ -3465,6 +3507,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       };
       delete next.planApproval;
       delete next.planRevocation;
+      delete next.planSubmission;
+      delete next.planInvalidation;
       delete next.phase; // F1 fix: strip any legacy top-level `phase` left over from a
       // pre-fix file -- phase now lives exclusively at activeFeature.phase.
       if (!stateWriteSucceeded(writeState(dir, next, base))) {
@@ -3476,23 +3520,122 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     case "set-phase": {
       const phase = flags.phase;
-      if (isBlank(phase)) {
-        console.error('Error: set-phase requires --phase <name> (non-empty).');
+      if (!new Set(["design", "implementation"]).has(phase)) {
+        console.error('Error: set-phase requires --phase <design|implementation>.');
         return 2;
       }
-      const baseActiveFeature = base.activeFeature && typeof base.activeFeature === "object" ? base.activeFeature : {};
-      const next = {
-        ...base,
-        schema: SCHEMA_ID,
-        activeFeature: { ...baseActiveFeature, phase },
-        updatedAt: now(),
-      };
-      delete next.phase; // F1 fix: strip any legacy top-level `phase` left over from a
-      // pre-fix file -- phase now lives exclusively at activeFeature.phase.
-      if (!stateWriteSucceeded(writeState(dir, next, base))) {
+      const lifecycle = derivePlanLifecycle(base);
+      if (!lifecycle.ok || lifecycle.status === null) {
+        console.error(`Error: set-phase rejected invalid lifecycle state (${lifecycle.code}).`);
         return 2;
       }
-      console.log(`Phase set: "${phase}".`);
+      if (phase === "design") {
+        if (base.activeFeature.phase !== "design" || !new Set(["draft", "awaiting-approval"]).has(lifecycle.status)) {
+          console.error("Error: use reopen-design --by <name> before leaving an approved or implementing lifecycle.");
+          return 2;
+        }
+        console.log('Phase already "design"; zero-write replay accepted.');
+        return 0;
+      }
+      const written = writeState(dir, undefined, base, {
+        transition: (observed) => {
+          const transition = enterPlanImplementation({
+            state: observed,
+            expectedStateSha256: sha256CanonicalJson(observed),
+          });
+          return transition.ok
+            ? { ...transition, state: { ...transition.state, updatedAt: now() } }
+            : transition;
+        },
+      });
+      if (!stateWriteSucceeded(written)) {
+        console.error(`Error: set-phase implementation requires an exact approved submission (${written.code}).`);
+        return 2;
+      }
+      console.log('Phase set: "implementation"; lifecycle="implementing".');
+      return 0;
+    }
+
+    case "submit-plan": {
+      const by = flags.by;
+      const profileName = flags.profile;
+      if (isBlank(by) || !new Set(["epic", "feature", "mini"]).has(profileName)) {
+        console.error("Error: submit-plan requires --by <name> --profile <epic|feature|mini>.");
+        return 2;
+      }
+      const authority = poGateAuthority({ repoRoot: dir });
+      const profile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
+      if (!authority?.ok || authority.value?.planPath !== base.activeFeature?.planPath || !profile?.ok) {
+        console.error(`Error: submit-plan blocked by ${authority?.code ?? profile?.code ?? "PO-GATE-AUTHORITY-INVALID"}.`);
+        return 2;
+      }
+      const profileSha256 = sha256CanonicalJson(profile.value);
+      const expectedPlanSha256 = authority.value.planSha256;
+      const expectedSpecSha256 = authority.value.specSha256;
+      let submittedAt;
+      const written = writeState(dir, undefined, base, {
+        transition: (observed) => {
+          submittedAt = now();
+          const transition = submitPlan({
+            state: observed,
+            expectedStateSha256: sha256CanonicalJson(observed),
+            poGateAuthority: authority.value,
+            profile: profileName,
+            profileSha256,
+            by,
+            at: submittedAt,
+          });
+          return transition.ok
+            ? { ...transition, state: { ...transition.state, updatedAt: submittedAt } }
+            : transition;
+        },
+        beforeCommit: () => {
+          const nextAuthority = poGateAuthority({ repoRoot: dir, expectedPlanSha256, expectedSpecSha256 });
+          const nextProfile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
+          return nextAuthority?.ok
+            && JSON.stringify(nextAuthority.value) === JSON.stringify(authority.value)
+            && nextProfile?.ok
+            && sha256CanonicalJson(nextProfile.value) === profileSha256
+            ? { ok: true }
+            : { ok: false, code: nextAuthority?.code ?? nextProfile?.code ?? "PLAN-SUBMIT-AUTHORITY-STALE" };
+        },
+      });
+      if (!stateWriteSucceeded(written)) {
+        console.error(`Error: submit-plan failed before commit (${written.code}); no submission was recorded.`);
+        return 2;
+      }
+      console.log(`Plan submitted by "${by}" on ${submittedAt}; lifecycle="awaiting-approval".`);
+      return 0;
+    }
+
+    case "reopen-design": {
+      const by = flags.by;
+      if (isBlank(by)) {
+        console.error("Error: reopen-design requires --by <name>.");
+        return 2;
+      }
+      let reopenedAt;
+      const written = writeState(dir, undefined, base, {
+        transition: (observed) => {
+          reopenedAt = observed.planInvalidation?.invalidatedAt ?? now();
+          const transition = reopenPlanDesign({
+            state: observed,
+            expectedStateSha256: sha256CanonicalJson(observed),
+            by,
+            at: reopenedAt,
+          });
+          return transition.ok && !transition.replay
+            ? { ...transition, state: { ...transition.state, updatedAt: reopenedAt } }
+            : transition;
+        },
+      });
+      if (!stateWriteSucceeded(written)) {
+        console.error(`Error: reopen-design failed before commit (${written.code}); approval authority was not changed.`);
+        return 2;
+      }
+      console.log(written.replay
+        ? "Design is already open; zero-write replay accepted."
+        : `Design reopened by "${by}" on ${reopenedAt}; lifecycle="draft".`);
       return 0;
     }
 
@@ -3544,42 +3687,51 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error('Error: approve-plan requires --by <name> (non-empty) -- an unattributed approval is refused.');
         return 2;
       }
+      const lifecycle = derivePlanLifecycle(base);
+      if (!lifecycle.ok || lifecycle.status !== "awaiting-approval"
+        || !SHA256_RE.test(lifecycle.submissionSha256 ?? "")) {
+        console.error(`Error: approve-plan requires an exact current submitted plan (${lifecycle.code}); run submit-plan first.`);
+        return 2;
+      }
       const authority = poGateAuthority({ repoRoot: dir });
+      const profile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
       if (
         !authority?.ok
         || typeof authority.value?.planPath !== "string"
         || authority.value.planPath !== base.activeFeature?.planPath
+        || !profile?.ok
       ) {
         console.error(`Error: approve-plan blocked by ${authority?.code ?? "PO-GATE-AUTHORITY-INVALID"}; repair the repository-scoped PO profile and single-PRD authority first.`);
         return 2;
       }
       const expectedPlanSha256 = authority.value.planSha256;
       const expectedSpecSha256 = authority.value.specSha256;
+      const profileSha256 = sha256CanonicalJson(profile.value);
+      const expectedSubmissionSha256 = lifecycle.submissionSha256;
       let approvedAt;
       const written = writeState(dir, undefined, base, {
         transition: (observed) => {
           approvedAt = now();
-          const legacyApproval = {
-            ...observed,
-            schema: SCHEMA_ID,
-            planApproved: true,
-            planApproval: { approvedBy: by, approvedAt },
-            updatedAt: approvedAt,
-          };
-          delete legacyApproval.planRevocation;
-          return bindPlanSpecApproval({
-            state: legacyApproval,
-            expectedStateSha256: sha256CanonicalJson(legacyApproval),
+          const transition = approveSubmittedPlan({
+            state: observed,
+            expectedStateSha256: sha256CanonicalJson(observed),
+            expectedSubmissionSha256,
             poGateAuthority: authority.value,
-            expectedPlanSha256,
-            expectedSpecSha256,
+            profileSha256,
             by,
             at: approvedAt,
           });
+          return transition.ok
+            ? { ...transition, state: { ...transition.state, updatedAt: approvedAt } }
+            : transition;
         },
         beforeCommit: () => {
           const observed = poGateAuthority({ repoRoot: dir, expectedPlanSha256, expectedSpecSha256 });
-          return observed?.ok && JSON.stringify(observed.value) === JSON.stringify(authority.value)
+          const observedProfile = (deps.poGateProfile ?? ((request) => validatePoGateProfileForRepository(request)))({ repoRoot: dir });
+          return observed?.ok
+            && JSON.stringify(observed.value) === JSON.stringify(authority.value)
+            && observedProfile?.ok
+            && sha256CanonicalJson(observedProfile.value) === profileSha256
             ? { ok: true }
             : { ok: false, code: observed?.code ?? "PO-GATE-AUTHORITY-STALE" };
         },
@@ -3588,7 +3740,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
         console.error(`Error: approve-plan authority or v2 transition failed before commit (${written.code}); no approval was recorded.`);
         return 2;
       }
-      console.log(`Plan approved by "${by}" on ${approvedAt}.`);
+      console.log(`Plan approved by "${by}" on ${approvedAt}; lifecycle="approved".`);
       return 0;
     }
 
@@ -3827,6 +3979,8 @@ export function run(argv = process.argv.slice(2), deps = {}) {
       delete next.activeFeature;
       delete next.planApproval;
       delete next.planRevocation;
+      delete next.planSubmission;
+      delete next.planInvalidation;
       delete next.continuity;
       if (!stateWriteSucceeded(writeState(dir, next, base))) {
         return 2;
@@ -3945,7 +4099,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, set-phase, set-gate-estimate, approve-plan, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, publication-prepare, publication-approve, publication-authorize, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
       );
       return 2;
     }

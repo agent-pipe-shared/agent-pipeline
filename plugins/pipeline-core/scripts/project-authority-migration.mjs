@@ -6,6 +6,7 @@ import { writeSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   applyPendingProjectAuthorityRecovery, applyProjectAuthorityMigration,
+  inspectProjectAuthorityProvenance,
   planPendingProjectAuthorityRecovery, planProjectAuthorityMigration,
   readProjectAuthority,
 } from "../lib/project-authority.mjs";
@@ -68,10 +69,18 @@ export function main(args = process.argv.slice(2), { write = process.stdout.writ
   let output;
   if (options.command === "inspect") output = readProjectAuthority({ rootDir: options.root });
   else if (options.command === "plan") {
-    output = plannedOutput(planProjectAuthorityMigration({ rootDir: options.root }), options.root, "apply");
+    const provenance = inspectProjectAuthorityProvenance({ rootDir: options.root });
+    output = plannedOutput(planProjectAuthorityMigration({
+      rootDir: options.root,
+      provenance: provenance.status === "ready" ? provenance : undefined,
+    }), options.root, "apply");
   }
   else if (options.command === "apply") {
-    const plan = planProjectAuthorityMigration({ rootDir: options.root });
+    const provenance = inspectProjectAuthorityProvenance({ rootDir: options.root });
+    const plan = planProjectAuthorityMigration({
+      rootDir: options.root,
+      provenance: provenance.status === "ready" ? provenance : undefined,
+    });
     const currentPlanSha256 = sha256(JSON.stringify(plan));
     if (!SHA256.test(options.planSha256 ?? "") || options.planSha256 !== currentPlanSha256) {
       output = { schema: plan.schema, status: "invalid-plan", reason: "plan digest is missing or stale" };

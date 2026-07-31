@@ -57,9 +57,11 @@ import {
   NEUTRAL_MANIFEST,
   NEUTRAL_STATE,
   planProjectAuthorityMigration,
+  inspectProjectAuthorityProvenance,
   readProjectAuthority,
   resolveProjectAuthorityPaths,
 } from "./project-authority.mjs";
+import { derivePlanLifecycle } from "./plan-spec-state-v2.mjs";
 
 const SOURCE = "pipeline.user.yaml";
 const SCHEMA = "pipeline.project-onboarding.v4";
@@ -601,58 +603,30 @@ function persistedPoAuthority(root, fs) {
       return { status: "unavailable" };
     }
     const state = JSON.parse(bytes.toString("utf8"));
-    const approvalAuthority = state?.planApproval?.poGateAuthority;
-    const revocation = state?.planRevocation;
-    const exactRevocation = state?.planApproved === false
-      && state?.activeFeature?.phase === "design"
-      && typeof state?.activeFeature?.planPath === "string"
-      && state.activeFeature.planPath === approvalAuthority?.planPath
-      && state?.planApproval?.schema === "pipeline.plan-approval.v2"
-      && revocation?.schema === "pipeline.plan-revocation.v2"
-      && typeof revocation.revokedBy === "string"
-      && revocation.revokedBy.trim() !== ""
-      && typeof revocation.revokedAt === "string"
-      && Number.isFinite(Date.parse(revocation.revokedAt))
-      && new Date(revocation.revokedAt).toISOString() === revocation.revokedAt
-      && state.updatedAt === revocation.revokedAt
-      && revocation.planPath === approvalAuthority?.planPath
-      && revocation.planSha256 === approvalAuthority?.planSha256
-      && revocation.specPath === approvalAuthority?.specPath
-      && revocation.specSha256 === approvalAuthority?.specSha256
-      && SHA256_RE.test(revocation.planSha256 ?? "")
-      && SHA256_RE.test(revocation.specSha256 ?? "")
-      && state?.continuity?.authority?.prd?.path === revocation.planPath
-      && state.continuity.authority.prd.sha256 === revocation.planSha256
-      && state?.continuity?.authority?.spec?.path === revocation.specPath
-      && state.continuity.authority.spec.sha256 === revocation.specSha256;
-    // Kickoff state deliberately has no PO approval yet. Host-managed
-    // repository initialization and the exact revoke-plan v2 postimage have no
-    // current PO approval. Preserve those gates rather than treating historical
-    // approval provenance as live authority drift and invoking a repair planner
-    // that can only operate on an approved feature.
-    if (state?.activeFeature === null
-      || (state?.planApproved === false
-        && (state?.planApproval === null || state?.planApproval === undefined))
-      || exactRevocation) {
-      return { status: "absent" };
-    }
-    if (state?.planApproved !== true
-      || state?.planApproval === null
-      || state?.continuity === null) {
-      return { status: "drifted" };
-    }
-    const approval = state?.planApproval?.poGateAuthority;
     const continuity = state?.continuity?.authority;
-    const planSha256 = approval?.planSha256;
-    const specSha256 = approval?.specSha256;
-    if (!SHA256_RE.test(planSha256 ?? "") || !SHA256_RE.test(specSha256 ?? "")
-      || continuity?.prd?.sha256 !== planSha256
-      || continuity?.spec?.sha256 !== specSha256
-      || continuity?.prd?.path !== approval?.planPath
-      || continuity?.spec?.path !== approval?.specPath) {
-      return { status: "drifted" };
-    }
-    return { status: "observed", planSha256, specSha256 };
+    const lifecycle = derivePlanLifecycle(state, {
+      ...(SHA256_RE.test(continuity?.prd?.sha256 ?? "")
+        ? { planSha256: continuity.prd.sha256 }
+        : {}),
+      ...(SHA256_RE.test(continuity?.spec?.sha256 ?? "")
+        ? { specSha256: continuity.spec.sha256 }
+        : {}),
+    });
+    if (!lifecycle.ok) return { status: "drifted", nextAction: lifecycle.nextAction };
+    if (lifecycle.status === null
+      || lifecycle.status === "draft"
+      || lifecycle.status === "awaiting-approval") return { status: "absent" };
+    const approval = state.planApproval?.poGateAuthority;
+    if (!SHA256_RE.test(approval?.planSha256 ?? "")
+      || !SHA256_RE.test(approval?.specSha256 ?? "")
+      || continuity?.prd?.path !== approval.planPath
+      || continuity?.spec?.path !== approval.specPath) return { status: "drifted" };
+    return {
+      status: "observed",
+      planSha256: approval.planSha256,
+      specSha256: approval.specSha256,
+      lifecycleStatus: lifecycle.status,
+    };
   } catch {
     return { status: "unavailable" };
   }
@@ -1836,7 +1810,11 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
       });
     }
     if (projectAuthority.status !== "ready") {
-      const migration = planProjectAuthorityMigration({ rootDir: legacy.root });
+      const provenance = inspectProjectAuthorityProvenance({ rootDir: legacy.root });
+      const migration = planProjectAuthorityMigration({
+        rootDir: legacy.root,
+        provenance: provenance.status === "ready" ? provenance : undefined,
+      });
       if (projectAuthority.status === "mixed" && migration.status === "ready") {
         return lifecycleResult({
           status: "migration-required",

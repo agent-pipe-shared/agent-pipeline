@@ -14,6 +14,7 @@ import {
   parseBacklogItem,
   parseTransitionLedger,
   planBacklogEvidenceAmendment,
+  planBacklogReachabilityRepair,
   planBacklogTransition,
   planElephantAfkLedgerRepair,
   planManagedOnboardingLedgerRepair,
@@ -33,6 +34,7 @@ import {
   applySentinelBacklogRecovery,
   applySentinelScopeExtension,
   checkBacklogState,
+  loadBacklogState,
   planSentinelBacklogRecovery,
   planSentinelScopeExtension,
   recoverBacklogTransaction,
@@ -784,6 +786,45 @@ function managedRepairInput(root, overrides = {}) {
       && invalid.findings.some((finding) => finding.includes("closure_repository must match the configured item project binding"))
       && invalid.findings.some((finding) => finding.includes("project closure requires closure_readback"))
       && invalid.findings.some((finding) => finding.includes("first ledger event may only initialize open or in-progress work")), invalid.findings.join("; "));
+}
+
+{
+  const canonical = loadBacklogState(process.cwd(), { checkCommit: false });
+  const historical = canonical.events.slice(0, 41);
+  const input = {
+    at: "2026-07-30",
+    actor: "hotfix-047-reachability-repair",
+    commit: "83640cec22d494d227eebc82929370277ce926b9",
+    references: [
+      {
+        id: "pipeline.elephant-direct-implementation-under-afk-authorization",
+        reference: "backlog/items/2026-07-23-elephant-direct-implementation-under-afk-authorization.md",
+        referenceBlobOid: "708c5c05b1868b616e0d56974da4316bf6fc43d5",
+        referenceSha256: "90ba0093cf0494ce44c3f1c7cdb207cff0813c55c3a11eac5f2cebc46e701024",
+      },
+      {
+        id: "pipeline.source-available-commercial-licensing",
+        reference: "backlog/evidence/2026-07-23-snt-1-activation-result.json",
+        referenceBlobOid: "60e389bac6077092f7d36055bf90dc915d734036",
+        referenceSha256: "8fc2763647282368716dfe43e9bfb848f0cf572b7de284e508be1ac9d316076d",
+      },
+    ],
+  };
+  const planned = planBacklogReachabilityRepair(canonical.items, historical, input);
+  const rejectedReplay = planBacklogReachabilityRepair(canonical.items, canonical.events, input);
+  const statuses = new Map(canonical.items.map((entry) => [entry.metadata.id, entry.metadata.status]));
+  check("BS12 events 39/40 are repaired only by append-only reachable evidence with status preserved",
+    canonical.ok
+      && planned.ok
+      && planned.appended.length === 2
+      && planned.appended[0].sequence === 42
+      && planned.appended[1].sequence === 43
+      && planned.appended[0].previousHash === historical.at(-1).entryHash
+      && planned.appended[1].previousHash === planned.appended[0].entryHash
+      && planned.appended.every((entry) => entry.from === entry.to && entry.to === statuses.get(entry.id))
+      && !rejectedReplay.ok
+      && rejectedReplay.errors.some((error) => error.includes("already appended")),
+    [...canonical.findings, ...planned.errors, ...rejectedReplay.errors].join("; "));
 }
 
 for (const root of roots) rmSync(root, { recursive: true, force: true });

@@ -1,15 +1,17 @@
 #!/usr/bin/env node
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { cpSync, existsSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import {
   applyPendingProjectAuthorityRecovery, applyProjectAuthorityMigration,
+  classifyProjectAuthority,
   LEGACY_CALIBRATION, LEGACY_GUARD_AUDIT, LEGACY_GUARD_CONFIG, LEGACY_MANIFEST, LEGACY_STATE,
   NEUTRAL_CALIBRATION, NEUTRAL_GUARD_AUDIT, NEUTRAL_GUARD_CONFIG, NEUTRAL_MANIFEST, NEUTRAL_STATE,
-  planPendingProjectAuthorityRecovery, planProjectAuthorityMigration, readProjectAuthority,
+  inspectProjectAuthorityProvenance, planPendingProjectAuthorityRecovery, planProjectAuthorityMigration, readProjectAuthority,
 } from "./project-authority.mjs";
 
 const roots = [];
@@ -35,6 +37,24 @@ try {
     const base = root(); legacy(base); const plan = planProjectAuthorityMigration({ rootDir: base });
     assert.equal(readProjectAuthority({ rootDir: base }).source, "legacy"); assert.equal(plan.status, "ready");
     assert.equal(plan.compatibility, "dual-read-one-write"); assert.equal(existsSync(join(base, NEUTRAL_MANIFEST)), false);
+  });
+  ok("classification is versioned and provenance drift fails closed", () => {
+    const base = root(); legacy(base);
+    const classification = classifyProjectAuthority({ rootDir: base });
+    assert.equal(classification.schema, "pipeline.project-authority-classification.v1");
+    assert.equal(classification.files.find((entry) => entry.path === NEUTRAL_MANIFEST).classification, "generated");
+    const plan = planProjectAuthorityMigration({ rootDir: base, provenance: { contractVersion: "project-authority.v0" } });
+    assert.equal(plan.status, "provenance-rejected");
+    assert.equal(plan.code, "PA-PROVENANCE-MISMATCH");
+  });
+  ok("adoption provenance rejects malformed downstream receipts before mutation", () => {
+    const base = root(); legacy(base); write(base, NEUTRAL_MANIFEST, "provisional\n");
+    const plan = planProjectAuthorityMigration({ rootDir: base, provenance: {
+      operation: "adopt-existing-neutral", compatibility: "byte-identical-self-application",
+      receipt: { schema: "pipeline.project-authority-adoption-receipt.v1", version: "project-authority.v1", operation: "adopt-existing-neutral", receiptSha256: "0".repeat(64) },
+    } });
+    assert.equal(plan.status, "provenance-rejected");
+    assert.equal(existsSync(join(base, NEUTRAL_MANIFEST)), true);
   });
   ok("machine-local cleanup binding blocks planning and apply until sanctioned release", () => {
     const base = root(); legacy(base);
@@ -117,18 +137,68 @@ try {
     write(base, NEUTRAL_MANIFEST, provisional);
     const plan = planProjectAuthorityMigration({ rootDir: base });
     assert.equal(readProjectAuthority({ rootDir: base }).status, "mixed");
-    assert.equal(plan.status, "ready");
-    assert.equal(plan.recovery, "adopt-legacy-after-remote-checkout");
-    assert.equal(applyProjectAuthorityMigration(plan, { rootDir: base }).status, "activation-required");
+    assert.equal(plan.status, "provenance-rejected");
+    assert.equal(plan.code, "PA-PROVENANCE-REQUIRED");
+    assert.equal(readFileSync(join(base, NEUTRAL_MANIFEST), "utf8"), provisional);
+  });
+  ok("byte-identical self-application adopts with persisted receipt and replays as noop", () => {
+    const base = root(); git(base, ["init", "-q"]); legacy(base);
+    write(base, NEUTRAL_MANIFEST, "schema: pipeline.manifest.v0\nprovisional: kickoff\n");
+    cpSync(join(process.cwd(), "plugins/pipeline-core"), join(base, "plugins/pipeline-core"), { recursive: true });
+    git(base, ["add", "."]); git(base, ["-c", "user.email=test@example.invalid", "-c", "user.name=Test", "commit", "-qm", "fixture"]);
+    const refsBefore = { commit: git(base, ["rev-parse", "HEAD"]), tree: git(base, ["rev-parse", "HEAD^{tree}"]), branch: git(base, ["branch", "--show-current"]) };
+    const provenance = inspectProjectAuthorityProvenance({ rootDir: base });
+    assert.equal(provenance.status, "ready");
+    const plan = planProjectAuthorityMigration({ rootDir: base, provenance });
+    assert.equal(plan.status, "ready"); assert.equal(plan.operation, "adopt-existing-neutral");
     const applied = applyProjectAuthorityMigration(plan, { rootDir: base, activate: true });
-    assert.equal(applied.status, "applied");
-    assert.equal(applied.adoptionArchive.entryCount, 1);
-    assert.equal(readProjectAuthority({ rootDir: base }).source, "neutral");
-    assert.equal(readFileSync(join(base, NEUTRAL_MANIFEST), "utf8"), readFileSync(join(base, LEGACY_MANIFEST), "utf8"));
-    const common = git(base, ["rev-parse", "--path-format=absolute", "--git-common-dir"]);
-    const archives = readdirSync(join(common, "agent-pipeline", "project-authority-adoption"));
-    assert.equal(archives.length, 1);
-    assert.equal(readFileSync(join(common, "agent-pipeline", "project-authority-adoption", archives[0], "preimage-0"), "utf8"), provisional);
+    assert.equal(applied.status, "applied"); assert.equal(applied.adoptionReceipt.schema, "pipeline.project-authority-adoption-receipt.v1");
+    assert.equal(existsSync(join(base, ".git/agent-pipeline/project-authority-adoption")), true);
+    assert.deepEqual({ commit: git(base, ["rev-parse", "HEAD"]), tree: git(base, ["rev-parse", "HEAD^{tree}"]), branch: git(base, ["branch", "--show-current"]) }, refsBefore);
+    const replay = planProjectAuthorityMigration({ rootDir: base, provenance: inspectProjectAuthorityProvenance({ rootDir: base }) });
+    assert.equal(replay.status, "noop");
+  });
+  ok("schema-valid downstream receipt-bound adoption plans and applies", () => {
+    const base = root(); git(base, ["init", "-q"]); legacy(base);
+    write(base, NEUTRAL_MANIFEST, "schema: pipeline.manifest.v0\nprovisional: downstream\n");
+    cpSync(join(process.cwd(), "plugins/pipeline-core"), join(base, "plugins/pipeline-core"), { recursive: true });
+    git(base, ["add", "."]); git(base, ["-c", "user.email=test@example.invalid", "-c", "user.name=Test", "commit", "-qm", "fixture"]);
+    const first = inspectProjectAuthorityProvenance({ rootDir: base });
+    const seed = planProjectAuthorityMigration({ rootDir: base, provenance: first });
+    assert.equal(seed.status, "ready");
+    const receipt = {
+      schema: "pipeline.project-authority-adoption-receipt.v1", version: "project-authority.v1", operation: "adopt-existing-neutral",
+      planSha256: "a".repeat(64), entryCount: 1, sanitized: true,
+      manifestVersion: first.manifestVersion, manifestSha256: first.manifestSha256, packageSha256: first.packageSha256,
+    };
+    receipt.receiptSha256 = createHash("sha256").update(JSON.stringify(receipt)).digest("hex");
+    const downstream = planProjectAuthorityMigration({ rootDir: base, provenance: { ...first, operation: "adopt-existing-neutral", compatibility: "byte-identical-self-application", receipt } });
+    assert.equal(downstream.status, "ready");
+    assert.equal(applyProjectAuthorityMigration(downstream, { rootDir: base, activate: true }).status, "applied");
+  });
+  ok("provenance field drift table rejects before adoption writes", () => {
+    const cases = [
+      ["commit", (p) => ({ ...p, sourceCommit: "f".repeat(40) })],
+      ["tree", (p) => ({ ...p, sourceTree: "e".repeat(40) })],
+      ["branch", (p) => ({ ...p, branch: "other-branch" })],
+      ["upstream", (p) => ({ ...p, upstream: "origin/other" })],
+      ["clean", (p) => ({ ...p, clean: !p.clean })],
+      ["manifest", (p) => ({ ...p, manifestVersion: "other" })],
+      ["package", (p) => ({ ...p, packageSha256: "b".repeat(64) })],
+      ["contract", (p) => ({ ...p, contractVersion: "project-authority.v0" })],
+      ["operation", (p) => ({ ...p, operation: "migrate-legacy" })],
+    ];
+    for (const [name, mutate] of cases) {
+      const base = root(); git(base, ["init", "-q"]); legacy(base);
+      write(base, NEUTRAL_MANIFEST, `schema: pipeline.manifest.v0\nprovisional: ${name}\n`);
+      cpSync(join(process.cwd(), "plugins/pipeline-core"), join(base, "plugins/pipeline-core"), { recursive: true });
+      git(base, ["add", "."]); git(base, ["-c", "user.email=test@example.invalid", "-c", "user.name=Test", "commit", "-qm", "fixture"]);
+      const provenance = inspectProjectAuthorityProvenance({ rootDir: base });
+      assert.equal(provenance.status, "ready", name);
+      const plan = planProjectAuthorityMigration({ rootDir: base, provenance: mutate(provenance) });
+      assert.equal(plan.status, "provenance-rejected", name);
+      assert.equal(existsSync(join(base, NEUTRAL_STATE)), false, name);
+    }
   });
   ok("source and destination drift reject before writes", () => {
     const base = root(); legacy(base); let plan = planProjectAuthorityMigration({ rootDir: base }); write(base, LEGACY_MANIFEST, "changed\n");

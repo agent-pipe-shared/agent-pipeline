@@ -30,6 +30,10 @@ import {
   startSessionDescriptor,
 } from "../lib/worktree-lifecycle.mjs";
 import { main as sessionCleanupMain } from "./session-cleanup.mjs";
+import {
+  applyProjectAuthorityMigration,
+  planProjectAuthorityMigration,
+} from "../lib/project-authority.mjs";
 
 function fixture(name) {
   const root = mkdtempSync(join(tmpdir(), `session-cleanup-binding-${name}-`));
@@ -51,6 +55,15 @@ function fixture(name) {
     expectedPlanSha256: plan.planSha256,
     activate: true,
   });
+  return root;
+}
+
+function neutralFixture(name) {
+  const root = fixture(name);
+  writeFileSync(join(root, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  const plan = planProjectAuthorityMigration({ rootDir: root });
+  assert.equal(plan.status, "ready");
+  assert.equal(applyProjectAuthorityMigration(plan, { rootDir: root, activate: true }).status, "applied");
   return root;
 }
 
@@ -135,6 +148,122 @@ test("release-binding completes an interrupted post-cleanup State release", () =
     });
     assert.equal(released.output.code, "WT-SESSION-BINDING-RELEASED");
     assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("sanctioned neutral start/reuse/release keeps portable State structurally redacted", () => {
+  const root = neutralFixture("neutral-private-binding");
+  const statePath = join(root, "project", "pipeline-state.json");
+  try {
+    const before = readFileSync(statePath);
+    const started = invoke(["start", "--repo", root, "--session", "neutral-session"]);
+    assert.equal(started.output.code, "WT-SESSION-STARTED");
+    assert.deepEqual(readFileSync(statePath), before);
+    const portable = JSON.parse(readFileSync(statePath, "utf8"));
+    assert.equal(portable.continuity.runtime.sessionCleanup, null);
+    assert.equal(JSON.stringify(portable).includes(started.output.sessionId), false);
+    assert.equal(JSON.stringify(portable).includes(started.output.descriptorSha256), false);
+    const structuralStatus = {
+      status: readOnboardingSessionCleanupBinding({ rootDir: root }).status,
+      descriptor: "<redacted>",
+      portableSessionCleanup: portable.continuity.runtime.sessionCleanup,
+    };
+    assert.deepEqual(structuralStatus, {
+      status: "bound",
+      descriptor: "<redacted>",
+      portableSessionCleanup: null,
+    });
+
+    const resumed = invoke(["start", "--repo", root]);
+    assert.equal(resumed.output.code, "WT-SESSION-REUSED");
+    assert.deepEqual(readFileSync(statePath), before);
+    const loaded = loadSessionDescriptor(root, started.output.sessionId, {
+      expectedDescriptorSha256: started.output.descriptorSha256,
+    });
+    assert.equal(cleanupSession(root, loaded, { allowAbsent: true }).ok, true);
+    retireSessionDescriptor(root, loaded);
+    assert.equal(invoke(["release-binding", "--repo", root]).output.code, "WT-SESSION-BINDING-RELEASED");
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
+    assert.deepEqual(readFileSync(statePath), before);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("hostile neutral portable cleanup identity fails closed without private rebinding", () => {
+  const root = neutralFixture("neutral-hostile-state");
+  const statePath = join(root, "project", "pipeline-state.json");
+  try {
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.continuity.runtime.sessionCleanup = {
+      sessionId: "hostile-session",
+      descriptorSha256: "f".repeat(64),
+    };
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    const before = readFileSync(statePath);
+    assert.throws(
+      () => readOnboardingSessionCleanupBinding({ rootDir: root }),
+      (error) => error?.code === "SESSION-CLEANUP-STATE-NONPORTABLE",
+    );
+    assert.throws(
+      () => invoke(["start", "--repo", root]),
+      (error) => error?.code === "SESSION-CLEANUP-STATE-NONPORTABLE",
+    );
+    assert.deepEqual(readFileSync(statePath), before);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("sanctioned privatization converges one historical neutral cleanup tuple without projecting identity", () => {
+  const root = neutralFixture("neutral-privatization");
+  const statePath = join(root, "project", "pipeline-state.json");
+  const leaked = {
+    sessionId: "historical-neutral-session",
+    descriptorSha256: "e".repeat(64),
+  };
+  try {
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.continuity.runtime.sessionCleanup = leaked;
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
+
+    const planned = invoke(["plan-privatization", "--repo", root]).output;
+    assert.equal(planned.status, "ready");
+    assert.equal(JSON.stringify(planned).includes(leaked.sessionId), false);
+    assert.equal(JSON.stringify(planned).includes(leaked.descriptorSha256), false);
+    const applied = invoke([
+      "apply-privatization",
+      "--repo",
+      root,
+      "--plan-sha256",
+      planned.planSha256,
+      "--activate",
+    ]).output;
+    assert.equal(applied.status, "applied");
+    assert.equal(applied.portable, true);
+    const portable = JSON.parse(readFileSync(statePath, "utf8"));
+    assert.equal(portable.continuity.runtime.sessionCleanup, null);
+    assert.equal(JSON.stringify(portable).includes(leaked.sessionId), false);
+    assert.equal(JSON.stringify(portable).includes(leaked.descriptorSha256), false);
+    const binding = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(binding.status, "bound");
+    assert.deepEqual(binding.sessionCleanup, leaked);
+
+    const replayPlan = invoke(["plan-privatization", "--repo", root]).output;
+    assert.equal(replayPlan.status, "noop");
+    const beforeReplay = readFileSync(statePath);
+    const replay = invoke([
+      "apply-privatization",
+      "--repo",
+      root,
+      "--plan-sha256",
+      replayPlan.planSha256,
+      "--activate",
+    ]).output;
+    assert.equal(replay.status, "noop");
+    assert.deepEqual(readFileSync(statePath), beforeReplay);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }

@@ -36,6 +36,7 @@ import {
   removeRestartBarrierCas, sha256,
 } from "./codex-onboarding-runtime.mjs";
 import { observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
+import { readOnboardingSessionCleanupBinding } from "./onboarding-continuity.mjs";
 
 let passed = 0; const failures = [];
 function test(name, run) { try { run(); passed += 1; console.log(`PASS  ${name}`); } catch (error) { failures.push(`${name}: ${error.message}`); console.log(`FAIL  ${name} -- ${error.message}`); } }
@@ -2092,6 +2093,9 @@ test("closed feature re-entry stays ready through the sanctioned set-feature tra
             status: "ready",
             intent: "session",
           };
+        },
+        readOnboardingSessionCleanupBindingFn(options) {
+          return readOnboardingSessionCleanupBinding({ ...options, spawn: fakeGit });
         },
         listActiveSessionDescriptorsFn() { return []; },
         startSessionDescriptorFn() {

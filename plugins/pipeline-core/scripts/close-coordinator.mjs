@@ -32,6 +32,10 @@ import {
   readCloseCoordinator,
   storeCloseCoordinator,
 } from "./publication-close-journal.mjs";
+import {
+  PUBLICATION_EXECUTOR_RESULT_SCHEMA,
+  validatePublicationExecutorResult,
+} from "./publication-executor.mjs";
 
 const SCRIPT = fileURLToPath(import.meta.url);
 const STATE_WRITER = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.url));
@@ -428,15 +432,21 @@ function transitionPlan(values) {
     advance.inputDigest = authorization.sha256;
     advance.observedDigest = sha256(canonical(authorization.value));
   } else if (values.phase === "published" || values.phase === "readback-confirmed") {
-    const schema = values.phase === "published" ? "pipeline.close-publication-receipt.v1" : "pipeline.close-readback-receipt.v1";
-    const keys = values.phase === "published"
-      ? ["schema", "channel", "destinationDigest", "ref", "oid", "tree", "publicationReceiptDigest"]
-      : ["schema", "channel", "destinationDigest", "ref", "oid", "tree", "publicationReceiptDigest", "readbackReceiptDigest"];
-    const publication = evidence(root, common, values.lifecycle, values.publication, schema, keys, { privateOnly: true });
-    for (const key of ["destinationDigest", "publicationReceiptDigest"]) if (!SHA256.test(publication.value[key] ?? "")) fail("CLOSE-PUBLICATION", "publication digest is invalid");
-    if (publication.value.oid !== stored.coordinator.candidateOid || publication.value.tree !== stored.coordinator.candidateTree
-      || !["private", "neutral-public"].includes(publication.value.channel)
-      || !/^refs\/heads\/[A-Za-z0-9._/-]+$/u.test(publication.value.ref ?? "")) fail("CLOSE-PUBLICATION", "publication candidate/ref is invalid");
+    const keys = [
+      "schema", "status", "code", "channel", "transactionId", "destinationDigest",
+      "destinationRef", "candidateOid", "candidateTree", "authorityRawSha256",
+      "publicationReceiptDigest", "executorSha256", "pushAttempted", "readback",
+      "receiptSha256",
+    ];
+    const publication = evidence(root, common, values.lifecycle, values.publication, PUBLICATION_EXECUTOR_RESULT_SCHEMA, keys, { privateOnly: true });
+    try { validatePublicationExecutorResult(publication.value); } catch {
+      fail("CLOSE-PUBLICATION", "fixed publication executor receipt is invalid");
+    }
+    if (publication.value.status !== "closed"
+      || publication.value.candidateOid !== stored.coordinator.candidateOid
+      || publication.value.candidateTree !== stored.coordinator.candidateTree) {
+      fail("CLOSE-PUBLICATION", "fixed publication executor did not close the frozen candidate");
+    }
     if (values.phase === "published"
       && (publication.value.channel !== stored.coordinator.publicationAuthorization?.channel
         || publication.value.destinationDigest
@@ -446,20 +456,19 @@ function transitionPlan(values) {
     if (values.phase === "readback-confirmed"
       && (publication.value.channel !== stored.coordinator.publication?.channel
         || publication.value.destinationDigest !== stored.coordinator.publication?.destinationDigest
-        || publication.value.ref !== stored.coordinator.publication?.ref
+        || publication.value.destinationRef !== stored.coordinator.publication?.ref
         || publication.value.publicationReceiptDigest
           !== stored.coordinator.publication?.publicationReceiptDigest)) {
       fail("CLOSE-PUBLICATION", "readback does not match the durable publication");
     }
-    if (values.phase === "readback-confirmed" && !SHA256.test(publication.value.readbackReceiptDigest ?? "")) fail("CLOSE-PUBLICATION", "readback digest is invalid");
     advance.publication = {
       channel: publication.value.channel,
       destinationDigest: publication.value.destinationDigest,
-      ref: publication.value.ref,
-      oid: publication.value.oid,
-      tree: publication.value.tree,
+      ref: publication.value.destinationRef,
+      oid: publication.value.candidateOid,
+      tree: publication.value.candidateTree,
       publicationReceiptDigest: publication.value.publicationReceiptDigest,
-      readbackReceiptDigest: publication.value.readbackReceiptDigest ?? null,
+      readbackReceiptDigest: values.phase === "readback-confirmed" ? publication.value.receiptSha256 : null,
     };
     boundEvidenceSha256 = publication.sha256;
     advance.inputDigest = publication.sha256;

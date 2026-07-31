@@ -3,15 +3,15 @@
 # PRD — Agent Pipeline 0.4.7 hotfix
 
 > Product Review Document for the PO gate. Status:
-> `expanded 0.4.7 corrective implementation candidate in progress on
-> 2026-07-29; the final stabilized PRD/Spec bytes require a fresh digest-bound
-> PO selection before candidate freeze`.
+> `design reopened on 2026-07-30; the prior approval is revoked and the
+> stabilized PRD/Spec bytes require a fresh digest-bound PO approval before
+> implementation resumes`.
 > Task: `agent-pipeline-0.4.7-hotfix` · Feature · Rigor 2 · Risk high.
 > Base: public 0.4.6 release at
 > `9d1b3dc108eb77629ace5b82002120f5539abd8d`. Acceptance criteria:
 > [spec.md](spec.md).
 
-<!-- technical-spec-sha256: cef5983ec352601de8ae8652ffc56212c07869a7238687c300992c2c284af762 -->
+<!-- technical-spec-sha256: 5aa79f0d95a540540246687270ab54c62c21fc771c38d4e864a71fd5719015c3 -->
 
 The 2026-07-28 approval remains historical evidence for the already
 implemented slices. The Human/PO explicitly directed implementation of the
@@ -19,6 +19,63 @@ revised recovery and attended-override scope on 2026-07-29. This authorizes
 repository-local implementation and verification only; it does not authorize
 push, merge, tag, release, Issue mutation, Pull Request operation, or mutation
 of a downstream Sprint checkout.
+
+## Current code-first release authority — 2026-07-30
+
+This section supersedes every conflicting scope, implementation-status,
+baseline, branch, and evidence statement below. Current `main` code is the
+implementation truth. GitHub Issues carrying `hotfix:0.4.7` are mandatory
+problem/outcome inputs, but their older implementation assumptions do not
+override newer code.
+
+The design baseline is `main` at
+`83640cec22d494d227eebc82929370277ce926b9`. The nine open mandatory Issues are
+#63, #70, #71, #73, #77, #81, #82, #83, and #84. The already implemented
+Advisor correction from #80 remains part of the delivered code baseline even
+though it is no longer in the label set. Three additional reproduced defects
+are mandatory for the same release:
+
+1. a sanctioned session start serializes a private
+   `continuity.runtime.sessionCleanup` binding into portable neutral
+   `project/pipeline-state.json`;
+2. the active feature lifecycle does not connect editable design,
+   `awaiting-approval`, invalidation, and exact PO reapproval into one closed
+   state machine; and
+3. self-application ruleset freshness compares the checkout branch HEAD with
+   marketplace default HEAD and incorrectly turns ordinary update availability
+   into a write blocker.
+
+### Code-first disposition
+
+| Scope | Current truth and required remainder |
+| --- | --- |
+| #63 V4 source/manifest recovery | Implemented in the retained code baseline; preserve the closed action matrix and hostile fixtures. |
+| #70 backlog admission | Writer/projection support exists; repair current ledger evidence so events 39/40 bind reachable commits without rewriting history or closing the item. |
+| #71 WSL IPC compatibility | Implemented in the retained code baseline; keep standard-first, typed, opt-in, session-only behavior. |
+| #73 guarded V4/runtime/cleanup | Broadly implemented; preserve it and close the active-neutral cleanup portability hole. |
+| #77 close ordering | Close coordinator exists; retain checkpoint/close/publication/cleanup separation and integrate the fixed publication lane. |
+| #80 Advisor lifecycle | Implemented baseline; retain zero-model bootstrap and demand-only consultation. |
+| #81 exact main fast-forward | Publication bundle and authority exist; add the missing fixed, one-use executor without opening generic Git or Human override. |
+| #82 heartbeat Verify defect | `main` does not ship the reported Sprint-local supervisor. Do not import Sprint worker-pool code merely to match an old Issue body. Core Verify must exclude unshipped supervisors; any supervisor actually adopted into the final candidate must satisfy deterministic generation/event-based heartbeat conformance. |
+| #83 mixed-source authority | Neutral authority migration/adoption exists and its host-bound focused suite is green. Complete provenance binding, clean-checkout classification, and an explicit downstream adoption receipt; do not copy in-flight source into Phoenix. |
+| #84 runner-neutral CI | Repair shallow history, remove productive runner lookup from generic tests, retain offline adapter conformance, and fix the two independent trace-replacement and rollback-identity regressions. |
+| Neutral cleanup portability | Private cleanup identity stays solely in private runtime storage; portable neutral State is null/sanitized at every persist boundary, not only at publication. |
+| Design/approval lifecycle | Draft design remains repeatedly editable; explicit submission enters `awaiting-approval`; any PRD/Spec change invalidates submission/approval back to draft; exact PO approval alone enters implementation. |
+| Freshness separation | Branch/upstream freshness alone controls repository writes. Loaded Pipeline versus marketplace default produces explicit update availability and never retargets, rebases, auto-updates, or ordinarily blocks work. |
+
+The complete release contract is AC-047-01–116 in
+[spec.md](spec.md). AC-047-01–68 retain the delivered/historical identifiers;
+AC-047-69–116 bind the current mandatory remainder.
+
+### Release boundary
+
+This is a Feature/Rigor-2/high-risk completion package, not a new Epic and not
+a Sprint merge. Implementation resumes only after the PO receives this PRD in
+readable form and replies exactly `approved`. Publication remains a separate
+explicit gate. The final candidate must pass focused tests, runner-neutral Full
+Verify, blocking Security, independent high-risk Critic review, package/install
+readback, clean portable-state readback, and exact remote readback where an
+external effect is separately approved.
 
 ## Final expanded release authority — 2026-07-29
 
@@ -364,25 +421,28 @@ Full Verify, blocking Security, package, install and lifecycle readback gates.
 
 ## DoD
 
-Product completion requires AC-047-01–68, including AC-047-24, in
-[spec.md](spec.md).
+Product completion requires AC-047-01–116 in [spec.md](spec.md). AC-047-01–68
+are retained regression scope; AC-047-69–116 are the current missing or newly
+reproduced remainder.
 Completion still requires one immutable candidate commit/tree, all focused
-tests, fresh candidate-bound Full Verify/Security, a fresh independent
-high-risk Critic over the complete expanded candidate,
+tests, runner-neutral fresh candidate-bound Full Verify, blocking Security, a
+fresh independent high-risk Critic over the complete expanded candidate,
 packaged/installed plugin readback, version consistency, required platform
-semantics, and clean lifecycle/readback. Nova/Phoenix or PR #64 evidence is
-inadmissible.
+semantics, clean lifecycle/readback, and a portable State with no machine-local
+cleanup binding. Nova/Phoenix or PR #64 evidence is inadmissible.
 
 ## Decision points
 
-1. The expanded implementation scope for #70, #63, #71, #73, the kickoff
-   correction, #77 and #80 is approved; release is not approved.
-2. Final PRD/Spec bytes require one matching digest-bound authority decision.
-3. The immutable candidate requires the bound green Full-Verify/Security
-   baseline, focused correction-delta regressions, diff-bounded Critic,
-   packaging and installed readback before any release claim.
-4. Push, tag, merge, release and every downstream Sprint mutation require new
-   explicit authorization.
+1. The code-first AC-047-01–116 implementation scope is proposed and currently
+   unapproved; the prior approval is historical and revoked.
+2. Implementation begins only after this readable PRD is presented and the PO
+   replies exactly `approved`, followed by the matching sanctioned
+   digest-bound approval write.
+3. The immutable candidate requires green focused regressions,
+   runner-neutral Full Verify, blocking Security, independent high-risk
+   Critic, packaging and installed readback before any release claim.
+4. Push, tag, merge, release, Issue mutation and every downstream Sprint
+   operation remain separate explicit gates.
 
 ## Technical source note
 

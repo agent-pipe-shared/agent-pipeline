@@ -8,6 +8,9 @@
 import { createHash } from "node:crypto";
 
 const APPROVAL_SCHEMA = "pipeline.plan-approval.v2";
+export const CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v3";
+export const PLAN_SUBMISSION_SCHEMA = "pipeline.plan-submission.v1";
+export const PLAN_INVALIDATION_SCHEMA = "pipeline.plan-invalidation.v1";
 const AUTHORITY_SCHEMA = "pipeline.po-gate-authority.v2";
 const REVOCATION_SCHEMA = "pipeline.plan-revocation.v2";
 const STATE_SCHEMA = "pipeline.state.v0";
@@ -42,6 +45,46 @@ const REVOCATION_KEYS = [
   "revokedBy",
   "revokedAt",
 ];
+const ACTIVE_FEATURE_KEYS = ["id", "planPath", "phase"];
+const SUBMISSION_KEYS = [
+  "schema",
+  "featureId",
+  "planPath",
+  "planSha256",
+  "specPath",
+  "specSha256",
+  "profile",
+  "profileSha256",
+  "submittedBy",
+  "submittedAt",
+];
+const CURRENT_APPROVAL_KEYS = [
+  "schema",
+  "approvedBy",
+  "approvedAt",
+  "submissionSha256",
+  "profileSha256",
+  "poGateAuthority",
+];
+const INVALIDATION_KEYS = [
+  "schema",
+  "featureId",
+  "invalidatedSubmissionSha256",
+  "invalidatedApprovalSha256",
+  "invalidatedBy",
+  "invalidatedAt",
+  "reason",
+];
+const PROFILES = new Set(["epic", "feature", "mini"]);
+const PHASES = new Set(["design", "implementation"]);
+const INVALIDATION_REASONS = new Set(["reopen-design", "document-drift"]);
+
+export const PLAN_LIFECYCLE_STATUSES = Object.freeze([
+  "draft",
+  "awaiting-approval",
+  "approved",
+  "implementing",
+]);
 
 function fail(code) {
   return { ok: false, code };
@@ -133,6 +176,345 @@ function validV2Approval(value) {
     && isNonBlankString(value.specBoundBy)
     && isCanonicalIso(value.specBoundAt)
     && validAuthority(value.poGateAuthority);
+}
+
+function validActiveFeature(value) {
+  return hasExactKeys(value, ACTIVE_FEATURE_KEYS)
+    && isNonBlankString(value.id)
+    && isRepositoryPath(value.planPath)
+    && PHASES.has(value.phase);
+}
+
+export function validPlanSubmission(value) {
+  return hasExactKeys(value, SUBMISSION_KEYS)
+    && value.schema === PLAN_SUBMISSION_SCHEMA
+    && isNonBlankString(value.featureId)
+    && isRepositoryPath(value.planPath)
+    && SHA256.test(value.planSha256)
+    && isRepositoryPath(value.specPath)
+    && SHA256.test(value.specSha256)
+    && PROFILES.has(value.profile)
+    && SHA256.test(value.profileSha256)
+    && isNonBlankString(value.submittedBy)
+    && isCanonicalIso(value.submittedAt);
+}
+
+export function validCurrentPlanApproval(value) {
+  return hasExactKeys(value, CURRENT_APPROVAL_KEYS)
+    && value.schema === CURRENT_APPROVAL_SCHEMA
+    && isNonBlankString(value.approvedBy)
+    && isCanonicalIso(value.approvedAt)
+    && SHA256.test(value.submissionSha256)
+    && SHA256.test(value.profileSha256)
+    && validAuthority(value.poGateAuthority);
+}
+
+export function validPlanInvalidation(value) {
+  return hasExactKeys(value, INVALIDATION_KEYS)
+    && value.schema === PLAN_INVALIDATION_SCHEMA
+    && isNonBlankString(value.featureId)
+    && SHA256.test(value.invalidatedSubmissionSha256)
+    && (value.invalidatedApprovalSha256 === null || SHA256.test(value.invalidatedApprovalSha256))
+    && isNonBlankString(value.invalidatedBy)
+    && isCanonicalIso(value.invalidatedAt)
+    && INVALIDATION_REASONS.has(value.reason);
+}
+
+function submissionMatchesObservation(submission, observation = {}) {
+  return (observation.planSha256 === undefined || observation.planSha256 === submission.planSha256)
+    && (observation.specSha256 === undefined || observation.specSha256 === submission.specSha256)
+    && (observation.profileSha256 === undefined || observation.profileSha256 === submission.profileSha256);
+}
+
+function currentSubmission(state, observation) {
+  const submission = state.planSubmission;
+  if (!validPlanSubmission(submission)
+    || submission.featureId !== state.activeFeature.id
+    || submission.planPath !== state.activeFeature.planPath) return null;
+  const invalidation = state.planInvalidation;
+  if (invalidation !== undefined) {
+    if (!validPlanInvalidation(invalidation) || invalidation.featureId !== state.activeFeature.id) return null;
+    if (invalidation.invalidatedSubmissionSha256 === sha256CanonicalJson(submission)) return null;
+  }
+  return submissionMatchesObservation(submission, observation) ? submission : null;
+}
+
+function currentApproval(state, submission, observation) {
+  const approval = state.planApproval;
+  if (submission !== null && validCurrentPlanApproval(approval)) {
+    const authority = approval.poGateAuthority;
+    return approval.submissionSha256 === sha256CanonicalJson(submission)
+      && approval.profileSha256 === submission.profileSha256
+      && authority.planPath === submission.planPath
+      && authority.planSha256 === submission.planSha256
+      && authority.specPath === submission.specPath
+      && authority.specSha256 === submission.specSha256
+      && submissionMatchesObservation(submission, observation)
+      ? approval
+      : null;
+  }
+  // Compatibility states had no explicit submission. Their exact approval
+  // remains current until the next sanctioned lifecycle write.
+  if (state.planSubmission === undefined && state.planApproved === true) {
+    if (validV2Approval(approval)) {
+      const authority = approval.poGateAuthority;
+      if (authority.planPath !== state.activeFeature.planPath) return null;
+      if (observation.planSha256 !== undefined && observation.planSha256 !== authority.planSha256) return null;
+      if (observation.specSha256 !== undefined && observation.specSha256 !== authority.specSha256) return null;
+      return approval;
+    }
+    if (validLegacyApproval(approval)) return approval;
+  }
+  return null;
+}
+
+/**
+ * One closed lifecycle projection shared by every State reader. Callers that
+ * can observe repository bytes pass their current digests; any drift then
+ * immediately removes approval/implementation authority and names the sole
+ * sanctioned recovery action.
+ */
+export function derivePlanLifecycle(state, observation = {}) {
+  if (!isPlainObject(state) || state.schema !== STATE_SCHEMA) {
+    return { ok: false, code: "PLAN-LIFECYCLE-STATE-INVALID", status: null, phase: null, nextAction: null };
+  }
+  if (state.activeFeature === undefined || state.activeFeature === null) {
+    return { ok: true, code: "PLAN-LIFECYCLE-INACTIVE", status: null, phase: null, nextAction: null };
+  }
+  if (!validActiveFeature(state.activeFeature)) {
+    return { ok: false, code: "PLAN-LIFECYCLE-FEATURE-INVALID", status: null, phase: null, nextAction: null };
+  }
+  if (state.planSubmission !== undefined && !validPlanSubmission(state.planSubmission)) {
+    return { ok: false, code: "PLAN-LIFECYCLE-SUBMISSION-INVALID", status: null, phase: state.activeFeature.phase, nextAction: null };
+  }
+  if (state.planInvalidation !== undefined && !validPlanInvalidation(state.planInvalidation)) {
+    return { ok: false, code: "PLAN-LIFECYCLE-INVALIDATION-INVALID", status: null, phase: state.activeFeature.phase, nextAction: null };
+  }
+  if (state.planSubmission === undefined
+    && state.planApproved === false
+    && validV2Approval(state.planApproval)
+    && (!validV2Revocation(state.planRevocation)
+      || !matchingRevocation(state.planRevocation, state.planApproval))) {
+    return {
+      ok: false,
+      code: "PLAN-LIFECYCLE-LEGACY-REVOCATION-INVALID",
+      status: null,
+      phase: state.activeFeature.phase,
+      nextAction: null,
+    };
+  }
+  const submission = currentSubmission(state, observation);
+  const approval = currentApproval(state, submission, observation);
+  const observedDrift = validPlanSubmission(state.planSubmission)
+    && !submissionMatchesObservation(state.planSubmission, observation);
+  const invalidated = validPlanSubmission(state.planSubmission)
+    && validPlanInvalidation(state.planInvalidation)
+    && state.planInvalidation.invalidatedSubmissionSha256 === sha256CanonicalJson(state.planSubmission);
+  let status;
+  if (submission === null && approval === null) status = "draft";
+  else if (submission === null) status = state.activeFeature.phase === "implementation" ? "implementing" : "approved";
+  else if (approval === null) status = "awaiting-approval";
+  else status = state.activeFeature.phase === "implementation" ? "implementing" : "approved";
+  if (approval !== null && state.planApproved !== true) {
+    return {
+      ok: false,
+      code: "PLAN-LIFECYCLE-APPROVAL-CONTRADICTORY",
+      status,
+      phase: state.activeFeature.phase,
+      nextAction: "reopen-design",
+      submissionCurrent: submission !== null,
+      approvalCurrent: false,
+    };
+  }
+  if (state.activeFeature.phase === "implementation" && status !== "implementing") {
+    return {
+      ok: false,
+      code: observedDrift ? "PLAN-LIFECYCLE-DIGEST-DRIFT" : "PLAN-LIFECYCLE-IMPLEMENTATION-UNAUTHORIZED",
+      status,
+      phase: state.activeFeature.phase,
+      nextAction: "reopen-design",
+      submissionCurrent: submission !== null,
+      approvalCurrent: false,
+    };
+  }
+  if (state.planApproved === true && approval === null) {
+    return {
+      ok: false,
+      code: observedDrift ? "PLAN-LIFECYCLE-DIGEST-DRIFT" : "PLAN-LIFECYCLE-APPROVAL-STALE",
+      status,
+      phase: state.activeFeature.phase,
+      nextAction: "reopen-design",
+      submissionCurrent: submission !== null,
+      approvalCurrent: false,
+    };
+  }
+  return {
+    ok: true,
+    code: observedDrift ? "PLAN-LIFECYCLE-DIGEST-DRIFT"
+      : invalidated ? "PLAN-LIFECYCLE-INVALIDATED"
+        : "PLAN-LIFECYCLE-CURRENT",
+    status,
+    phase: state.activeFeature.phase,
+    nextAction: observedDrift ? "reopen-design" : null,
+    submissionCurrent: submission !== null,
+    approvalCurrent: approval !== null,
+    submissionSha256: submission === null ? null : sha256CanonicalJson(submission),
+    approvalSha256: approval === null ? null : sha256CanonicalJson(approval),
+  };
+}
+
+function exactTransitionState(state, expectedStateSha256) {
+  if (!currentStateMatches(state, expectedStateSha256)) return fail("PLAN-LIFECYCLE-STATE-STALE");
+  const lifecycle = derivePlanLifecycle(state);
+  return lifecycle.ok ? { ok: true, lifecycle } : fail(lifecycle.code);
+}
+
+export function submitPlan({
+  state,
+  expectedStateSha256,
+  poGateAuthority,
+  profile,
+  profileSha256,
+  by,
+  at,
+}) {
+  const checked = exactTransitionState(state, expectedStateSha256);
+  if (!checked.ok) return checked;
+  if (checked.lifecycle.status !== "draft" || state.activeFeature.phase !== "design") {
+    return fail("PLAN-SUBMIT-STATE-INVALID");
+  }
+  if (!validAuthority(poGateAuthority)
+    || poGateAuthority.planPath !== state.activeFeature.planPath
+    || !PROFILES.has(profile)
+    || !SHA256.test(profileSha256 ?? "")
+    || !isNonBlankString(by)
+    || !isCanonicalIso(at)) return fail("PLAN-SUBMIT-REQUEST-INVALID");
+  const submission = {
+    schema: PLAN_SUBMISSION_SCHEMA,
+    featureId: state.activeFeature.id,
+    planPath: poGateAuthority.planPath,
+    planSha256: poGateAuthority.planSha256,
+    specPath: poGateAuthority.specPath,
+    specSha256: poGateAuthority.specSha256,
+    profile,
+    profileSha256,
+    submittedBy: by,
+    submittedAt: at,
+  };
+  const next = {
+    ...state,
+    planApproved: false,
+    planSubmission: submission,
+  };
+  return {
+    ok: true,
+    replay: false,
+    state: next,
+    submission,
+    planSubmissionSha256: sha256CanonicalJson(submission),
+  };
+}
+
+export function approveSubmittedPlan({
+  state,
+  expectedStateSha256,
+  expectedSubmissionSha256,
+  poGateAuthority,
+  profileSha256,
+  by,
+  at,
+}) {
+  const checked = exactTransitionState(state, expectedStateSha256);
+  if (!checked.ok) return checked;
+  if (checked.lifecycle.status !== "awaiting-approval"
+    || checked.lifecycle.submissionSha256 !== expectedSubmissionSha256
+    || !validAuthority(poGateAuthority)
+    || !SHA256.test(profileSha256 ?? "")
+    || !isNonBlankString(by)
+    || !isCanonicalIso(at)) return fail("PLAN-APPROVE-REQUEST-INVALID");
+  const submission = state.planSubmission;
+  if (submission.profileSha256 !== profileSha256
+    || submission.planPath !== poGateAuthority.planPath
+    || submission.planSha256 !== poGateAuthority.planSha256
+    || submission.specPath !== poGateAuthority.specPath
+    || submission.specSha256 !== poGateAuthority.specSha256) return fail("PLAN-APPROVE-AUTHORITY-STALE");
+  const approval = {
+    schema: CURRENT_APPROVAL_SCHEMA,
+    approvedBy: by,
+    approvedAt: at,
+    submissionSha256: expectedSubmissionSha256,
+    profileSha256,
+    poGateAuthority,
+  };
+  return {
+    ok: true,
+    replay: false,
+    state: { ...state, planApproved: true, planApproval: approval },
+    approval,
+  };
+}
+
+export function reopenPlanDesign({
+  state,
+  expectedStateSha256,
+  by,
+  at,
+  reason = "reopen-design",
+}) {
+  if (!currentStateMatches(state, expectedStateSha256)) return fail("PLAN-REOPEN-STATE-STALE");
+  if (!validActiveFeature(state?.activeFeature)
+    || !isNonBlankString(by)
+    || !isCanonicalIso(at)
+    || !INVALIDATION_REASONS.has(reason)) return fail("PLAN-REOPEN-REQUEST-INVALID");
+  const submission = state.planSubmission;
+  if (!validPlanSubmission(submission)) {
+    if (state.activeFeature.phase === "design" && state.planApproved !== true) {
+      return { ok: true, replay: true, state, invalidation: state.planInvalidation ?? null };
+    }
+    return fail("PLAN-REOPEN-SUBMISSION-INVALID");
+  }
+  const invalidation = {
+    schema: PLAN_INVALIDATION_SCHEMA,
+    featureId: state.activeFeature.id,
+    invalidatedSubmissionSha256: sha256CanonicalJson(submission),
+    invalidatedApprovalSha256: state.planApproval === undefined ? null : sha256CanonicalJson(state.planApproval),
+    invalidatedBy: by,
+    invalidatedAt: at,
+    reason,
+  };
+  if (validPlanInvalidation(state.planInvalidation)
+    && equalCanonical(state.planInvalidation, invalidation)
+    && state.activeFeature.phase === "design"
+    && state.planApproved === false) {
+    return { ok: true, replay: true, state, invalidation };
+  }
+  return {
+    ok: true,
+    replay: false,
+    state: {
+      ...state,
+      activeFeature: { ...state.activeFeature, phase: "design" },
+      planApproved: false,
+      planInvalidation: invalidation,
+    },
+    invalidation,
+  };
+}
+
+export function enterPlanImplementation({ state, expectedStateSha256 }) {
+  const checked = exactTransitionState(state, expectedStateSha256);
+  if (!checked.ok) return checked;
+  if (checked.lifecycle.status !== "approved" || state.activeFeature.phase !== "design") {
+    return fail("PLAN-IMPLEMENTATION-STATE-INVALID");
+  }
+  return {
+    ok: true,
+    replay: false,
+    state: {
+      ...state,
+      activeFeature: { ...state.activeFeature, phase: "implementation" },
+    },
+  };
 }
 
 function validV2Revocation(value) {

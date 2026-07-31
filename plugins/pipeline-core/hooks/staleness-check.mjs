@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 /**
  * staleness-check — SessionStart hook: compares the installed pipeline-core plugin SHA
- * against the marketplace remote HEAD and surfaces a reminder/upgrade notice.
+ * against the marketplace remote HEAD and surfaces a nonblocking update notice.
  *
  * Plugin: pipeline-core (Agent-Pipeline). Canon:
  * `harness/session-bootstrap.md` §3 (anchoring) + §7 (SessionStart-hook OPEN item).
@@ -49,7 +49,7 @@
  *      only network call this hook ever makes.
  *   4. Verdict: SHA compared case-insensitively with a tolerant prefix match (7+ chars)
  *      so a short-SHA install record still compares correctly against ls-remote's full
- *      40-char SHA. On a STALE verdict, `buildPluginUpdateCommand` renders the scope-aware
+ *      40-char SHA. On an UPDATE AVAILABLE verdict, `buildPluginUpdateCommand` renders the scope-aware
  *      update command from step 1's resolved scope: `user` -> `--scope user`, `project` ->
  *      `--scope project`, unresolved (`null`/unknown) -> no scope flag, plus a hint to
  *      check the `scope` field in `installed_plugins.json` manually.
@@ -236,15 +236,16 @@ export function shaMatches(installed, remote) {
 export function buildStaleMessage(installedSha, remoteSha, scope) {
   const short = (s) => String(s).slice(0, 12);
   return (
-    `Agent-Pipeline plugin is stale (installed ${short(installedSha)}, remote ${short(remoteSha)}). ` +
-    `Update: \`${CMD_MARKETPLACE_UPDATE}\` -> \`${buildPluginUpdateCommand(scope)}\` -> \`${CMD_RELOAD}\`.`
+    `Agent-Pipeline update available (installed ${short(installedSha)}, marketplace ${short(remoteSha)}); ` +
+    `this is advisory and does not change repository write admission. Operator update: ` +
+    `\`${CMD_MARKETPLACE_UPDATE}\` -> \`${buildPluginUpdateCommand(scope)}\` -> \`${CMD_RELOAD}\`.`
   );
 }
 
 export function buildStaleContextLine(installedSha, remoteSha) {
   const short = (s) => String(s).slice(0, 12);
   return (
-    `Agent-Pipeline: STALE (installed ${short(installedSha)} vs remote ${short(remoteSha)}) - ` +
+    `Agent-Pipeline: UPDATE AVAILABLE (advisory; loaded ${short(installedSha)} vs marketplace ${short(remoteSha)}; repository admission unchanged) - ` +
     `run /pipeline-core:pipeline-start before any work`
   );
 }
@@ -252,7 +253,8 @@ export function buildStaleContextLine(installedSha, remoteSha) {
 /**
  * Decide the hook's stdout given the two resolved SHAs (or null on any unresolved step)
  * and the resolved install scope (only used to render the scope-aware update command on
- * a stale verdict; irrelevant otherwise).
+ * an update-available verdict; irrelevant otherwise). The `stale` return key remains a
+ * compatibility key and never carries repository-write authority.
  * @param {string|null} installedSha
  * @param {string|null} remoteSha
  * @param {string|null} [scope] - "user" | "project" | null/unknown (unresolved)
@@ -270,6 +272,11 @@ export function decideOutput(installedSha, remoteSha, scope = null) {
     hookSpecificOutput: {
       hookEventName: "SessionStart",
       additionalContext: buildStaleContextLine(installedSha, remoteSha),
+      pipelineUpdate: {
+        status: "update-available",
+        updateRecommended: true,
+        blocking: false,
+      },
     },
   };
   return { stale: true, stdout: JSON.stringify(payload) + "\n", json: true, payload };

@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.ruleset-update-policy.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "policyId", "policyVersion", "entries"],
+  "properties": {
+    "schema": { "const": "pipeline.ruleset-update-policy.v1" },
+    "policyId": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$" },
+    "policyVersion": { "type": "integer", "minimum": 1 },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "disposition", "publicSecurityReason", "match"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$" },
+          "disposition": { "const": "blocking" },
+          "publicSecurityReason": { "type": "string", "minLength": 12 },
+          "match": {
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["type", "builds"],
+                "properties": {
+                  "type": { "const": "exact-loaded-builds" },
+                  "builds": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["version", "commit"],
+                      "properties": {
+                        "version": { "type": "string" },
+                        "commit": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["type", "version"],
+                "properties": {
+                  "type": { "const": "minimum-safe-version" },
+                  "version": { "type": "string" }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}
