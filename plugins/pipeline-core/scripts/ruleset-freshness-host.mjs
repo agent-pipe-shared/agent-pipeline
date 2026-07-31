@@ -19,12 +19,15 @@ import { dirname, resolve } from "node:path";
 import {
   createFreshnessHostAction,
   FRESHNESS_HOST_RESULT_SCHEMA,
+  FRESHNESS_HOST_CONTROL_SCHEMA,
+  FRESHNESS_HOST_RECEIPT_SCHEMA,
   FRESHNESS_HOST_TRANSPORT_SCHEMA,
   inspectCliRulesetFreshness,
   PUBLIC_MARKETPLACE_URL,
   WSL_FRESHNESS_BOUNDARY_ID,
 } from "./ruleset-freshness.mjs";
 import { observeCodexRulesetSource } from "../lib/codex-host-plugin-list.mjs";
+import { CODEX_APP_SERVER_HEALTH_SCHEMA, observeCodexAppServer } from "./codex-app-server-health.mjs";
 
 const SHA = /^[0-9a-f]{40,64}$/iu;
 const DEFAULT_TIMEOUT_MS = 30_000;
@@ -46,12 +49,45 @@ const WSL_SYSTEM_GIT_ENV = Object.freeze({
   SSH_ASKPASS: "/bin/false",
 });
 
-function result(action, status, stdout = "") {
+function result(action, status, stdout = "", receipt = null) {
   return Object.freeze({
     schema: FRESHNESS_HOST_RESULT_SCHEMA,
     requestSha256: action.requestSha256,
     status,
     stdout,
+    receipt,
+  });
+}
+
+function hostControlBinding(observation) {
+  if (observation?.schema !== CODEX_APP_SERVER_HEALTH_SCHEMA
+    || observation.status !== "ready"
+    || observation.code !== "CAS-READY"
+    || observation.phase !== "observe"
+    || typeof observation.daemon?.appServerVersion !== "string"
+    || observation.daemon.appServerVersion.length === 0) return null;
+  // The public receipt intentionally omits the private control socket and
+  // executable paths. The ready code and daemon version are sufficient to
+  // bind this read to a validated host-control observation.
+  return Object.freeze({
+    schema: FRESHNESS_HOST_CONTROL_SCHEMA,
+    code: "CAS-READY",
+    appServerVersion: observation.daemon.appServerVersion,
+  });
+}
+
+function executionReceipt(action, hostControl, publicHeadOid) {
+  return Object.freeze({
+    schema: FRESHNESS_HOST_RECEIPT_SCHEMA,
+    boundaryId: WSL_FRESHNESS_BOUNDARY_ID,
+    action,
+    requestSha256: action.requestSha256,
+    hostControl,
+    childStarted: true,
+    executable: WSL_SYSTEM_GIT,
+    argv: Object.freeze(["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"]),
+    exitCode: 0,
+    publicHeadOid,
   });
 }
 
@@ -60,9 +96,12 @@ function result(action, status, stdout = "") {
  * The action comparison rejects substituted boundary IDs, URLs, argv and
  * request digests before a process is spawned.
  */
-export function executeRulesetFreshnessHostAction(action, { spawn = spawnSync, timeoutMs = DEFAULT_TIMEOUT_MS } = {}) {
+export function executeRulesetFreshnessHostAction(action, { spawn = spawnSync, timeoutMs = DEFAULT_TIMEOUT_MS, observeHostControl = observeCodexAppServer } = {}) {
   const expected = createFreshnessHostAction(WSL_FRESHNESS_BOUNDARY_ID);
   if (expected === null || JSON.stringify(action) !== JSON.stringify(expected)) return null;
+  let hostControl;
+  try { hostControl = hostControlBinding(observeHostControl()); } catch { hostControl = null; }
+  if (hostControl === null) return result(expected, "unavailable");
   let child;
   try {
     child = spawn(WSL_SYSTEM_GIT, ["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"], {
@@ -77,10 +116,12 @@ export function executeRulesetFreshnessHostAction(action, { spawn = spawnSync, t
     return result(expected, "unavailable");
   }
   const value = String(child?.stdout ?? "").trim().split(/\s+/u)[0]?.toLowerCase();
-  if (child?.status !== 0 || !SHA.test(value)) return result(expected, "unavailable");
+  if (!Number.isInteger(child?.pid) || child.pid <= 0 || child?.status !== 0 || !SHA.test(value)) return result(expected, "unavailable");
   // Do not return arbitrary Git output. The envelope contains only the public
-  // object identity expected by the common freshness reader.
-  return result(expected, "completed", `${value}\tHEAD\n`);
+  // object identity expected by the common freshness reader. The receipt is
+  // Freshness-specific: it binds the selected boundary, fixed action, actual
+  // child start, literal system Git completion, and the public HEAD OID.
+  return result(expected, "completed", `${value}\tHEAD\n`, executionReceipt(expected, hostControl, value));
 }
 
 export function inspectHostRulesetFreshness({ repoPath, loadedPluginRoot, codexObservation, execute = executeRulesetFreshnessHostAction } = {}) {

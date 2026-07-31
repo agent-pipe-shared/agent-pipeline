@@ -12,6 +12,8 @@ import { fileURLToPath } from "node:url";
 import {
   createFreshnessHostAction,
   FRESHNESS_HOST_RESULT_SCHEMA,
+  FRESHNESS_HOST_CONTROL_SCHEMA,
+  FRESHNESS_HOST_RECEIPT_SCHEMA,
   FRESHNESS_HOST_TRANSPORT_SCHEMA,
   FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
   freshnessHostPlanForEnvironment,
@@ -66,6 +68,37 @@ function sourceObservation(sha, sourceClass = "marketplace-public", installedSha
 function remoteObservation(sha) {
   return { status: "ready", identity: { status: "available", algorithm: "git-sha1", value: sha } };
 }
+function readyHostControlObservation(version = "0.146.0") {
+  return {
+    schema: "pipeline.codex-app-server-health.v1",
+    status: "ready",
+    code: "CAS-READY",
+    phase: "observe",
+    daemon: {
+      appServerVersion: version,
+      socketPath: "/private/codex-control.sock",
+      managedCodexPath: "/private/codex",
+    },
+  };
+}
+function hostExecutionReceipt(action, publicHeadOid) {
+  return {
+    schema: FRESHNESS_HOST_RECEIPT_SCHEMA,
+    boundaryId: action.boundaryId,
+    action,
+    requestSha256: action.requestSha256,
+    hostControl: {
+      schema: FRESHNESS_HOST_CONTROL_SCHEMA,
+      code: "CAS-READY",
+      appServerVersion: "0.146.0",
+    },
+    childStarted: true,
+    executable: "/usr/bin/git",
+    argv: ["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"],
+    exitCode: 0,
+    publicHeadOid,
+  };
+}
 
 test.after(() => { for (const root of roots) rmSync(root, { recursive: true, force: true }); });
 
@@ -112,6 +145,7 @@ test("a known restricted sandbox binds exactly one data-minimized network-open h
           requestSha256: action.requestSha256,
           status: "completed",
           stdout: `${loaded}\tHEAD\n`,
+          receipt: hostExecutionReceipt(action, loaded),
         };
       },
     },
@@ -189,7 +223,13 @@ test("the normal Codex freshness entrypoint forwards a selected host transport",
       execute(action) {
         hostCalls += 1;
         assert.deepEqual(action, createFreshnessHostAction(boundaryId));
-        return { schema: FRESHNESS_HOST_RESULT_SCHEMA, requestSha256: action.requestSha256, status: "completed", stdout: `${loaded}\tHEAD\n` };
+        return {
+          schema: FRESHNESS_HOST_RESULT_SCHEMA,
+          requestSha256: action.requestSha256,
+          status: "completed",
+          stdout: `${loaded}\tHEAD\n`,
+          receipt: hostExecutionReceipt(action, loaded),
+        };
       },
     },
     // The direct spawn seam is intentionally absent from this entrypoint. A
@@ -201,6 +241,22 @@ test("the normal Codex freshness entrypoint forwards a selected host transport",
   assert.equal(directAttempts, 0);
 });
 
+test("a direct Codex invocation cannot claim freshness on a selected host boundary without its receipt", () => {
+  const loaded = "a".repeat(40);
+  const value = inspectCliRulesetFreshness({
+    repoPath: "/private/consumer-not-forwarded",
+    codexObservation: { status: "ready", observation: sourceObservation(loaded) },
+    networkPreflight: {
+      schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
+      network: "restricted",
+      boundaryId: "freshness-host-boundary-direct",
+    },
+  });
+  assert.equal(value.status, "remote-unavailable");
+  assert.equal(value.writePermitted, false);
+  assert.equal(value.reason, "remote-unavailable");
+});
+
 test("the dedicated WSL host adapter executes only the fixed public action", () => {
   const action = createFreshnessHostAction("pipeline-start-host-authorized-wsl");
   const sha = "e".repeat(40);
@@ -208,8 +264,9 @@ test("the dedicated WSL host adapter executes only the fixed public action", () 
   const output = executeRulesetFreshnessHostAction(action, {
     spawn(command, args, options) {
       calls.push({ command, args, options });
-      return { status: 0, stdout: `${sha}\tHEAD\nprivate diagnostic that must not escape` };
+      return { pid: 3456, status: 0, stdout: `${sha}\tHEAD\nprivate diagnostic that must not escape` };
     },
+    observeHostControl() { return readyHostControlObservation(); },
   });
   assert.deepEqual(calls[0].args, ["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"]);
   assert.equal(calls[0].command, "/usr/bin/git");
@@ -233,8 +290,11 @@ test("the dedicated WSL host adapter executes only the fixed public action", () 
     requestSha256: action.requestSha256,
     status: "completed",
     stdout: `${sha}\tHEAD\n`,
+    receipt: hostExecutionReceipt(action, sha),
   });
   assert.equal(JSON.stringify(output).includes("private diagnostic"), false);
+  assert.equal(JSON.stringify(output).includes("/private/codex-control.sock"), false);
+  assert.equal(JSON.stringify(output).includes("/private/codex"), false);
 
   const substituted = { ...action, boundaryId: "other-boundary" };
   assert.equal(executeRulesetFreshnessHostAction(substituted, {
@@ -262,8 +322,9 @@ test("the dedicated WSL host adapter ignores hostile PATH and Git URL-rewrite st
     output = executeRulesetFreshnessHostAction(action, {
       spawn(command, args, options) {
         calls.push({ command, args, options });
-        return { status: 0, stdout: `${sha}\tHEAD\n` };
+        return { pid: 3457, status: 0, stdout: `${sha}\tHEAD\n` };
       },
+      observeHostControl() { return readyHostControlObservation(); },
     });
   } finally {
     for (const [key, value] of Object.entries(previousEnvironment)) {
@@ -296,6 +357,7 @@ test("the host adapter produces the complete freshness result through its fixed 
         requestSha256: action.requestSha256,
         status: "completed",
         stdout: `${loaded}\tHEAD\n`,
+        receipt: hostExecutionReceipt(action, loaded),
       };
     },
   });
@@ -311,6 +373,81 @@ test("the host adapter produces the complete freshness result through its fixed 
   assert.equal(unavailable.status, "remote-unavailable");
   assert.equal(unavailable.writePermitted, false);
   assert.notEqual(unavailable.status, "equal");
+});
+
+test("a completed host response without the closed Freshness execution receipt fails closed", () => {
+  const loaded = "a".repeat(40);
+  const boundaryId = "freshness-host-boundary-receipt";
+  const base = hostExecutionReceipt(createFreshnessHostAction(boundaryId), loaded);
+  for (const receipt of [
+    null,
+    { ...base, boundaryId: "other-boundary" },
+    { ...base, action: { ...base.action, boundaryId: "other-boundary" } },
+    { ...base, hostControl: null },
+    { ...base, hostControl: { ...base.hostControl, code: "CAS-DAEMON-UNREACHABLE" } },
+    { ...base, hostControl: { ...base.hostControl, appServerVersion: "" } },
+    { ...base, childStarted: false },
+    { ...base, executable: "git" },
+    { ...base, exitCode: 1 },
+    { ...base, publicHeadOid: "b".repeat(40) },
+  ]) {
+    const observed = inspectRulesetFreshness("/private/consumer-not-forwarded", {
+      sourceObservation: sourceObservation(loaded),
+      networkPreflight: {
+        schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
+        network: "restricted",
+        boundaryId,
+      },
+      hostTransport: {
+        schema: FRESHNESS_HOST_TRANSPORT_SCHEMA,
+        boundaryId,
+        access: "read-only",
+        network: "enabled",
+        execute(action) {
+          return {
+            schema: FRESHNESS_HOST_RESULT_SCHEMA,
+            requestSha256: action.requestSha256,
+            status: "completed",
+            stdout: `${loaded}\tHEAD\n`,
+            receipt,
+          };
+        },
+      },
+    });
+    assert.equal(observed.status, "remote-unavailable");
+    assert.equal(observed.writePermitted, false);
+    assert.equal(observed.reason, "remote-unavailable");
+  }
+});
+
+test("the host executor rejects a successful-looking Git result without proof that its child started", () => {
+  const action = createFreshnessHostAction("pipeline-start-host-authorized-wsl");
+  const output = executeRulesetFreshnessHostAction(action, {
+    spawn() { return { status: 0, stdout: `${"a".repeat(40)}\tHEAD\n` }; },
+    observeHostControl() { return readyHostControlObservation(); },
+  });
+  assert.equal(output.status, "unavailable");
+  assert.equal(output.receipt, null);
+});
+
+test("the host executor does not issue completed when host control is absent or unready", () => {
+  const action = createFreshnessHostAction("pipeline-start-host-authorized-wsl");
+  let gitCalls = 0;
+  for (const hostControl of [
+    null,
+    { ...readyHostControlObservation(), status: "stale", code: "CAS-DAEMON-UNREACHABLE" },
+  ]) {
+    const output = executeRulesetFreshnessHostAction(action, {
+      spawn() {
+        gitCalls += 1;
+        return { pid: 7890, status: 0, stdout: `${"a".repeat(40)}\tHEAD\n` };
+      },
+      observeHostControl() { return hostControl; },
+    });
+    assert.equal(output.status, "unavailable");
+    assert.equal(output.receipt, null);
+  }
+  assert.equal(gitCalls, 0);
 });
 
 test("the host adapter has a real full-result CLI path and rejects arbitrary requests", () => {

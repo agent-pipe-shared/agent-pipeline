@@ -28,6 +28,8 @@ export const FRESHNESS_NETWORK_PREFLIGHT_SCHEMA = "pipeline.ruleset-freshness-ne
 export const FRESHNESS_HOST_TRANSPORT_SCHEMA = "pipeline.ruleset-freshness-host-transport.v1";
 export const FRESHNESS_HOST_ACTION_SCHEMA = "pipeline.ruleset-freshness-host-action.v1";
 export const FRESHNESS_HOST_RESULT_SCHEMA = "pipeline.ruleset-freshness-host-result.v1";
+export const FRESHNESS_HOST_RECEIPT_SCHEMA = "pipeline.ruleset-freshness-host-execution-receipt.v1";
+export const FRESHNESS_HOST_CONTROL_SCHEMA = "pipeline.ruleset-freshness-host-control.v1";
 export const WSL_FRESHNESS_BOUNDARY_ID = "pipeline-start-host-authorized-wsl";
 const SHA = /^[0-9a-f]{40,64}$/iu;
 const BOUNDARY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
@@ -148,13 +150,32 @@ function selectHostTransport(networkPreflight, hostTransport) {
 function observeThroughSelectedHost(action, hostTransport) {
   let response;
   try { response = hostTransport.execute(action); } catch { return { status: "remote-unavailable", identity: null, reason: "host-transport-unavailable" }; }
-  if (!exactKeys(response, ["schema", "requestSha256", "status", "stdout"])
+  if (!exactKeys(response, ["schema", "requestSha256", "status", "stdout", "receipt"])
     || response.schema !== FRESHNESS_HOST_RESULT_SCHEMA
     || response.requestSha256 !== action.requestSha256
     || !["completed", "unavailable"].includes(response.status)
     || typeof response.stdout !== "string") return { status: "remote-unavailable", identity: null, reason: "host-transport-unavailable" };
   const value = response.stdout.trim().split(/\s+/u)[0]?.toLowerCase();
-  if (response.status !== "completed" || !SHA.test(value)) return { status: "remote-unavailable", identity: null, reason: "host-transport-unavailable" };
+  const receipt = response.receipt;
+  if (response.status !== "completed"
+    || !exactKeys(receipt, ["schema", "boundaryId", "action", "requestSha256", "hostControl", "childStarted", "executable", "argv", "exitCode", "publicHeadOid"])
+    || receipt.schema !== FRESHNESS_HOST_RECEIPT_SCHEMA
+    || receipt.boundaryId !== hostTransport.boundaryId
+    || JSON.stringify(receipt.action) !== JSON.stringify(action)
+    || receipt.requestSha256 !== action.requestSha256
+    || !exactKeys(receipt.hostControl, ["schema", "code", "appServerVersion"])
+    || receipt.hostControl.schema !== FRESHNESS_HOST_CONTROL_SCHEMA
+    || receipt.hostControl.code !== "CAS-READY"
+    || typeof receipt.hostControl.appServerVersion !== "string"
+    || receipt.hostControl.appServerVersion.length === 0
+    || receipt.childStarted !== true
+    || receipt.executable !== "/usr/bin/git"
+    || JSON.stringify(receipt.argv) !== JSON.stringify(["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"])
+    || receipt.exitCode !== 0
+    || typeof receipt.publicHeadOid !== "string"
+    || receipt.publicHeadOid !== value
+    || !SHA.test(value)
+    || response.stdout !== `${value}\tHEAD\n`) return { status: "remote-unavailable", identity: null, reason: "host-transport-unavailable" };
   return {
     status: "ready",
     identity: { status: "available", algorithm: value.length === 40 ? "git-sha1" : "git-sha256", value },
