@@ -152,6 +152,9 @@ OID/tree/tag/release readback.
 - Issue mutation is not release evidence and may be handed to the operator when
   authenticated GitHub Issue access is unavailable.
 
+Amendment (2026-07-31): skar667, the 0.4.7 release PO, owns the deferred
+worker-pool gap in #21. Review and expiry date: 2026-08-31.
+
 ```pipeline-result
 {
   "decisionBriefs": [],

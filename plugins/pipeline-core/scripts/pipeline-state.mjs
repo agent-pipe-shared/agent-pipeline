@@ -385,6 +385,10 @@ const RESULT_BOOTSTRAP_JOURNAL_SCHEMA = "pipeline.continuity-result-bootstrap-jo
 const RESULT_REBIND_PLAN_SCHEMA = "pipeline.continuity-result-rebind-plan.v1";
 const RESULT_REBIND_APPLY_SCHEMA = "pipeline.continuity-result-rebind-apply.v1";
 const RESULT_REBIND_LOCK_TOKEN = "pipeline-result-rebind-v1";
+const RESULT_CASE_MIGRATION_PLAN_SCHEMA = "pipeline.continuity-result-case-migration-plan.v1";
+const RESULT_CASE_MIGRATION_APPLY_SCHEMA = "pipeline.continuity-result-case-migration-apply.v1";
+const RESULT_CASE_MIGRATION_JOURNAL_SCHEMA = "pipeline.continuity-result-case-migration-journal.v1";
+const RESULT_CASE_MIGRATION_LOCK_TOKEN = "pipeline-result-case-migration-v1";
 const LEGACY_PLAN_APPROVAL_KEYS = ["approvedBy", "approvedAt", "poGateAuthority"];
 const LEGACY_PO_GATE_AUTHORITY_KEYS = [
   "schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256",
@@ -2753,6 +2757,149 @@ function runResultRebindCommand(sub, rest, deps) {
   } finally { releaseContinuityLock(lock); }
 }
 
+// ---- Closed Result.md/result.md case-collision migration (Phoenix recovery) ----
+
+function caseMigrationArchivePath(prdPath, inactivePath, archivePath) {
+  const base = dirname(prdPath).split(sep).join("/");
+  const expected = `${base}/archive/${basename(inactivePath)}`;
+  return archivePath === expected ? expected : null;
+}
+
+function readCaseLifecycle(dir, manifestPath, source, target, archive) {
+  const manifest = physicalRebindFile(dir, manifestPath);
+  if (manifest === null) return null;
+  let value;
+  try { value = JSON.parse(manifest.bytes.toString("utf8")); } catch { return null; }
+  if (!Array.isArray(value?.artifacts) || !value?.feature || typeof value.feature.id !== "string") return null;
+  const sourceEntries = value.artifacts.filter((entry) => entry?.class === "result" && entry.path === source.path && entry.authority === true && entry.sha256 === source.sha256);
+  const targetEntries = value.artifacts.filter((entry) => entry?.class === "result" && entry.path === target.path);
+  const allAuthorities = value.artifacts.filter((entry) => entry?.class === "result" && entry.authority === true);
+  if (sourceEntries.length !== 1 || targetEntries.length > 1 || allAuthorities.length !== 1) return null;
+  const next = structuredClone(value);
+  const sourceIndex = next.artifacts.findIndex((entry) => entry?.class === "result" && entry.path === source.path && entry.authority === true && entry.sha256 === source.sha256);
+  const targetIndex = next.artifacts.findIndex((entry) => entry?.class === "result" && entry.path === target.path);
+  const archived = { ...next.artifacts[sourceIndex], path: archive, authority: false, retention: "archive", sha256: source.sha256 };
+  if (targetIndex >= 0) next.artifacts[targetIndex] = { ...next.artifacts[targetIndex], authority: true, retention: "active", sha256: target.sha256 };
+  else next.artifacts.push({ ...next.artifacts[sourceIndex], path: target.path, authority: true, retention: "active", sha256: target.sha256 });
+  next.artifacts[sourceIndex] = archived;
+  const postBytes = Buffer.from(JSON.stringify(next, null, 2) + "\n", "utf8");
+  return { manifest, value, postBytes, postSha256: sha256Bytes(postBytes) };
+}
+
+function caseMigrationEligible(state, prd, spec, target, source) {
+  const continuity = state?.continuity;
+  const lifecycle = derivePlanLifecycle(state, { planSha256: prd.sha256, specSha256: spec.sha256 });
+  return Boolean(state?.activeFeature && state.schema === SCHEMA_ID && state.gateEstimate === undefined
+    && lifecycle.ok && lifecycle.status === "implementing"
+    && validateContinuityState(continuity, state.activeFeature.id).ok
+    && continuity.featureId === state.activeFeature.id && continuity.queueHead !== null
+    && continuity.queueHead.dispatch === null && continuity.blocker === null
+    && continuity.acknowledgedFinal === null && continuity.recovery === null
+    && continuity.decisionTxn === null && continuity.closeTransition == null
+    && continuity.revision < Number.MAX_SAFE_INTEGER && state.activeFeature.planPath === prd.path
+    && continuity.authority.prd.path === prd.path && continuity.authority.prd.sha256 === prd.sha256
+    && continuity.authority.spec.path === spec.path && continuity.authority.spec.sha256 === spec.sha256
+    && continuity.authority.result?.path === target.path && continuity.authority.result.sha256 === target.sha256
+    && target.path !== source.path);
+}
+
+function caseMigrationNextState(state, target, updatedAt) {
+  return resultRebindNextState(state, target, updatedAt);
+}
+
+function buildResultCaseMigrationPlan(dir, existing, selectedPath, archivePath, updatedAt) {
+  if (existing.status !== "ok" || !canonicalIso(updatedAt)) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-STATE" };
+  const state = existing.state; const prd = physicalRebindFile(dir, state.continuity?.authority?.prd?.path); const spec = physicalRebindFile(dir, state.continuity?.authority?.spec?.path);
+  if (prd === null || spec === null || prd.sha256 !== state.continuity.authority.prd.sha256 || spec.sha256 !== state.continuity.authority.spec.sha256) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-AUTHORITY" };
+  let prdText; try { prdText = new TextDecoder("utf-8", { fatal: true }).decode(prd.bytes); } catch { return { ok: false, code: "PS-RESULT-CASE-MIGRATION-PRD" }; }
+  if (rebindMarker(prdText)?.digest !== spec.sha256) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-PRD" };
+  const candidates = resultRebindCandidates(dir, prd.path);
+  if (candidates === null) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-CANDIDATES" };
+  const target = selectedPath === candidates.upper.path ? candidates.upper : selectedPath === candidates.lower.path ? candidates.lower : null;
+  const source = target?.path === candidates.upper.path ? candidates.lower : candidates.upper;
+  const archive = target === null ? null : caseMigrationArchivePath(prd.path, source.path, archivePath);
+  if (target === null || archive === null || physicalRebindFile(dir, archive) !== null) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-ARCHIVE" };
+  try { if (existsSync(resolve(dir, archive))) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-ARCHIVE" }; } catch { return { ok: false, code: "PS-RESULT-CASE-MIGRATION-ARCHIVE" }; }
+  if (!caseMigrationEligible(state, prd, spec, target, source)) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-CONTINUITY" };
+  const lifecyclePath = `${dirname(prd.path).split(sep).join("/")}/lifecycle.json`;
+  const lifecycle = readCaseLifecycle(dir, lifecyclePath, source, target, archive);
+  if (lifecycle === null) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-LIFECYCLE" };
+  const nextState = caseMigrationNextState(state, target, updatedAt);
+  if (!validateContinuityState(nextState.continuity, state.activeFeature.id).ok) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-POSTIMAGE" };
+  const nextStateBytes = Buffer.from(JSON.stringify(nextState, null, 2) + "\n", "utf8");
+  const payload = {
+    schema: RESULT_CASE_MIGRATION_PLAN_SCHEMA, root: realpathSync(resolve(dir)), featureId: state.activeFeature.id,
+    selectedAuthorityTarget: { path: target.path, sha256: target.sha256, identity: target.identity },
+    archive: { path: archive, preimage: "absent", source: { path: source.path, sha256: source.sha256, identity: source.identity } },
+    preimage: { stateSha256: sha256Bytes(existing.raw), revision: state.continuity.revision, prd: { path: prd.path, sha256: prd.sha256, identity: prd.identity }, spec: { path: spec.path, sha256: spec.sha256, identity: spec.identity }, resultCandidates: [candidates.upper, candidates.lower].map((entry) => ({ path: entry.path, sha256: entry.sha256, identity: entry.identity })), lifecycle: { path: lifecycle.manifest.path, sha256: lifecycle.manifest.sha256, identity: lifecycle.manifest.identity } },
+    postimage: { stateSha256: sha256Bytes(nextStateBytes), lifecycleSha256: lifecycle.postSha256, revision: nextState.continuity.revision, updatedAt, caseAliasEliminated: true },
+  };
+  return { ok: true, payload, planSha256: sha256Bytes(JSON.stringify(payload)), nextState, nextStateBytes, lifecycle, source, target, archive };
+}
+
+function caseMigrationPrivatePaths(dir, deps = {}) {
+  const common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir); if (!common?.ok || typeof common.path !== "string") return null;
+  try { const root = realpathSync(common.path); if (root !== resolve(common.path) || !lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) return null; const namespace = join(root, "agent-pipeline"); const base = join(namespace, "result-case-migration"); return { root, namespace, base, key: join(base, "key"), journal: join(base, "journal") }; } catch { return null; }
+}
+function ensureCaseMigrationDirectory(paths) {
+  if (paths === null) return false;
+  try { for (const path of [paths.namespace, paths.base]) { if (!existsSync(path)) mkdirSync(path, { mode: 0o700 }); const info = lstatSync(path); if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(path) !== path || (info.mode & 0o077) !== 0) return false; } return true; } catch { return false; }
+}
+function caseMigrationMac(key, value) { return createHmac("sha256", key).update(JSON.stringify(value)).digest("hex"); }
+function loadCaseMigrationJournal(dir, deps = {}) {
+  const paths = caseMigrationPrivatePaths(dir, deps); if (!ensureCaseMigrationDirectory(paths)) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-JOURNAL" };
+  const raw = readPrivateBootstrap(paths.journal); if (raw === null) return { ok: true, paths, journal: null };
+  const key = readPrivateBootstrap(paths.key); if (key === null || key.byteLength !== 32) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-JOURNAL" };
+  try { const value = JSON.parse(raw.toString("utf8")); const { mac, ...core } = value; if (value.schema !== RESULT_CASE_MIGRATION_JOURNAL_SCHEMA || !SHA256_RE.test(value.planSha256) || !SHA256_RE.test(value.stateSha256) || !SHA256_RE.test(value.postStateSha256) || !SHA256_RE.test(value.lifecycleSha256) || !SHA256_RE.test(value.postLifecycleSha256) || !value.source || !value.target || !value.archive || typeof value.postStateBase64 !== "string" || typeof value.postLifecycleBase64 !== "string" || !SHA256_RE.test(mac) || caseMigrationMac(key, core) !== mac) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-JOURNAL" }; return { ok: true, paths, journal: value }; } catch { return { ok: false, code: "PS-RESULT-CASE-MIGRATION-JOURNAL" }; }
+}
+function publishCaseMigrationJournal(dir, plan, deps = {}) {
+  const paths = caseMigrationPrivatePaths(dir, deps); if (!ensureCaseMigrationDirectory(paths)) return false;
+  let key = readPrivateBootstrap(paths.key); if (key === null) { key = randomBytes(32); if (!writePrivateBootstrap(paths.key, key)) return false; } if (key.byteLength !== 32) return false;
+  const core = { schema: RESULT_CASE_MIGRATION_JOURNAL_SCHEMA, planSha256: plan.planSha256, stateSha256: plan.payload.preimage.stateSha256, postStateSha256: plan.payload.postimage.stateSha256, lifecycleSha256: plan.payload.preimage.lifecycle.sha256, postLifecycleSha256: plan.payload.postimage.lifecycleSha256, source: { path: plan.source.path, sha256: plan.source.sha256 }, target: { path: plan.target.path, sha256: plan.target.sha256 }, archive: plan.archive, postStateBase64: plan.nextStateBytes.toString("base64"), postLifecycleBase64: plan.lifecycle.postBytes.toString("base64") };
+  return writePrivateBootstrap(paths.journal, Buffer.from(JSON.stringify({ ...core, mac: caseMigrationMac(key, core) }) + "\n", "utf8"), false);
+}
+function retireCaseMigrationJournal(paths) { try { unlinkSync(paths.journal); return syncDirectory(paths.base).ok; } catch { return false; } }
+function atomicCaseMigrationWrite(path, bytes, lock, deps = {}) {
+  const tmp = `${path}.tmp.${lock.ownerNonce}`; let fd;
+  try { if (!assertContinuityLockOwned(lock)) return false; fd = openSync(tmp, "wx", 0o600); let offset = 0; while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset); fsyncSync(fd); closeSync(fd); fd = undefined; if (!assertContinuityLockOwned(lock)) return false; (deps.renameCaseMigration ?? renameSync)(tmp, path); return (deps.syncCaseMigrationDirectory ?? syncDirectory)(dirname(path)).ok; } catch { return false; } finally { if (fd !== undefined) closeSync(fd); safeUnlink(tmp); }
+}
+function moveCaseMigrationSource(dir, journal, lock, deps = {}) {
+  const source = physicalRebindFile(dir, journal.source.path); const archive = physicalRebindFile(dir, journal.archive);
+  if (source === null && archive !== null && archive.sha256 === journal.source.sha256) return true;
+  if (source === null || archive !== null || source.sha256 !== journal.source.sha256 || !assertContinuityLockOwned(lock)) return false;
+  const parent = dirname(resolve(dir, journal.archive));
+  try { mkdirSync(parent, { recursive: true, mode: 0o700 }); const info = lstatSync(parent); if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(parent) !== parent) return false; (deps.renameCaseMigrationSource ?? renameSync)(source.absolute, resolve(dir, journal.archive)); return (deps.syncCaseMigrationDirectory ?? syncDirectory)(dirname(source.absolute)).ok && (deps.syncCaseMigrationDirectory ?? syncDirectory)(parent).ok; } catch { return false; }
+}
+function recoverCaseMigration(dir, journal, lock, deps = {}) {
+  if (!moveCaseMigrationSource(dir, journal, lock, deps)) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-RECOVERY" };
+  if (deps.afterCaseMigrationSource?.() === false) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-INTERRUPTED" };
+  const lifecycle = physicalRebindFile(dir, `${dirname(journal.target.path)}/lifecycle.json`); if (lifecycle === null || ![journal.lifecycleSha256, journal.postLifecycleSha256].includes(lifecycle.sha256)) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-RECOVERY" };
+  if (lifecycle.sha256 === journal.lifecycleSha256 && !atomicCaseMigrationWrite(lifecycle.absolute, Buffer.from(journal.postLifecycleBase64, "base64"), lock, deps)) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-RECOVERY" };
+  if (deps.afterCaseMigrationLifecycle?.() === false) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-INTERRUPTED" };
+  const current = readStateRaw(dir); if (current.status !== "ok" || ![journal.stateSha256, journal.postStateSha256].includes(sha256Bytes(current.raw))) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-RECOVERY" };
+  if (sha256Bytes(current.raw) === journal.stateSha256 && !atomicWriteContinuityState(dir, JSON.parse(Buffer.from(journal.postStateBase64, "base64").toString("utf8")), lock, deps).ok) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-RECOVERY" };
+  const doneState = readStateRaw(dir); const doneLifecycle = physicalRebindFile(dir, `${dirname(journal.target.path)}/lifecycle.json`); const doneArchive = physicalRebindFile(dir, journal.archive);
+  if (doneState.status !== "ok" || sha256Bytes(doneState.raw) !== journal.postStateSha256 || doneLifecycle === null || doneLifecycle.sha256 !== journal.postLifecycleSha256 || doneArchive === null || doneArchive.sha256 !== journal.source.sha256 || physicalRebindFile(dir, journal.source.path) !== null) return { ok: false, code: "PS-RESULT-CASE-MIGRATION-RECOVERY" };
+  return { ok: true };
+}
+function parseCaseMigrationPlan(argv) { return argv.length === 4 && argv[0] === "--result-path" && argv[2] === "--archive-path" && !isBlank(argv[1]) && !isBlank(argv[3]) ? { resultPath: argv[1], archivePath: argv[3] } : null; }
+function parseCaseMigrationApply(argv) { if (argv.length !== 17 || argv[0] !== "--feature-id" || isBlank(argv[1]) || argv[2] !== "--result-path" || isBlank(argv[3]) || argv[4] !== "--archive-path" || isBlank(argv[5]) || argv[6] !== "--expected-revision" || !parseExpectedRevision(argv[7]).ok || argv[8] !== "--expected-state-sha256" || !SHA256_RE.test(argv[9]) || argv[10] !== "--expected-post-state-sha256" || !SHA256_RE.test(argv[11]) || argv[12] !== "--updated-at" || !canonicalIso(argv[13]) || argv[14] !== "--plan-sha256" || !SHA256_RE.test(argv[15]) || argv[16] !== "--activate") return null; return { featureId: argv[1], resultPath: argv[3], archivePath: argv[5], expectedRevision: Number(argv[7]), expectedStateSha256: argv[9], expectedPostStateSha256: argv[11], updatedAt: argv[13], planSha256: argv[15] }; }
+function isCaseMigrationPostimage(dir, current, apply) {
+  if (current.status !== "ok" || sha256Bytes(current.raw) !== apply.expectedPostStateSha256) return false;
+  const state = current.state; const target = physicalRebindFile(dir, apply.resultPath); const archive = physicalRebindFile(dir, apply.archivePath);
+  if (state.activeFeature?.id !== apply.featureId || state.updatedAt !== apply.updatedAt || state.continuity?.revision !== apply.expectedRevision + 1 || state.continuity?.authority?.result?.path !== apply.resultPath || target === null || archive === null || target.sha256 !== state.continuity.authority.result.sha256 || physicalRebindFile(dir, `${dirname(apply.resultPath)}/result.md`) !== null && physicalRebindFile(dir, `${dirname(apply.resultPath)}/Result.md`) !== null) return false;
+  const manifest = physicalRebindFile(dir, `${dirname(apply.resultPath)}/lifecycle.json`); if (manifest === null) return false;
+  try { const value = JSON.parse(manifest.bytes.toString("utf8")); const results = value.artifacts?.filter((entry) => entry?.class === "result") ?? []; return results.filter((entry) => entry.path === apply.resultPath && entry.authority === true && entry.sha256 === target.sha256 && entry.retention === "active").length === 1 && results.filter((entry) => entry.path === apply.archivePath && entry.authority === false && entry.sha256 === archive.sha256 && entry.retention === "archive").length === 1; } catch { return false; }
+}
+function runResultCaseMigrationCommand(sub, rest, deps) {
+  if (sub === "continuity-result-case-migration-plan") { const request = parseCaseMigrationPlan(rest); if (request === null) { console.error("Error: Result case migration plan requires exact --result-path and --archive-path."); return 2; } const plan = buildResultCaseMigrationPlan(deps.dir, readStateRaw(deps.dir), request.resultPath, request.archivePath, deps.now()); if (!plan.ok) { console.error(`Error: Result case migration plan refused (${plan.code}); zero mutation.`); return 2; } const writer = fileURLToPath(import.meta.url); console.log(JSON.stringify({ ...plan.payload, planSha256: plan.planSha256, applyAction: { executable: process.execPath, argv: [writer, "continuity-result-case-migration-apply", "--feature-id", plan.payload.featureId, "--result-path", request.resultPath, "--archive-path", request.archivePath, "--expected-revision", String(plan.payload.preimage.revision), "--expected-state-sha256", plan.payload.preimage.stateSha256, "--expected-post-state-sha256", plan.payload.postimage.stateSha256, "--updated-at", plan.payload.postimage.updatedAt, "--plan-sha256", plan.planSha256, "--activate"], mutation: true, requiresConfirmation: true, executionBoundary: "host-authorized-wsl", expected: { schema: RESULT_CASE_MIGRATION_APPLY_SCHEMA, statuses: ["applied", "replayed"] } } }, null, 2)); return 0; }
+  const apply = parseCaseMigrationApply(rest); if (apply === null) { console.error("Error: Result case migration apply requires the complete returned action and --activate confirmation."); return 2; }
+  const lock = acquireContinuityLock(deps.dir, RESULT_CASE_MIGRATION_LOCK_TOKEN, deps); if (!lock.ok) { console.error(`Error: Result case migration refused (${lock.code}); zero mutation.`); return 2; }
+  try { const current = readStateRaw(deps.dir); if (isCaseMigrationPostimage(deps.dir, current, apply)) { console.log(JSON.stringify({ schema: RESULT_CASE_MIGRATION_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: current.state.continuity.authority.result, archive: apply.archivePath, mutated: false })); return 0; } const freshPlan = buildResultCaseMigrationPlan(deps.dir, current, apply.resultPath, apply.archivePath, apply.updatedAt); const journal = loadCaseMigrationJournal(deps.dir, deps); if (!journal.ok) { console.error(`Error: Result case migration journal refused (${journal.code}); zero mutation.`); return 2; } let plan = null; if (journal.journal === null) { plan = freshPlan; if (!plan.ok || sha256Bytes(current.raw) !== apply.expectedStateSha256 || plan.planSha256 !== apply.planSha256 || plan.payload.featureId !== apply.featureId || plan.payload.preimage.revision !== apply.expectedRevision || plan.payload.postimage.stateSha256 !== apply.expectedPostStateSha256) { console.error("Error: Result case migration apply inputs are stale or conflicting; zero mutation."); return 2; } if (!publishCaseMigrationJournal(deps.dir, plan, deps)) { console.error("Error: Result case migration journal prepare failed; zero mutation."); return 2; } } else if (journal.journal.planSha256 !== apply.planSha256 || journal.journal.stateSha256 !== apply.expectedStateSha256 || journal.journal.postStateSha256 !== apply.expectedPostStateSha256 || journal.journal.target.path !== apply.resultPath || journal.journal.archive !== apply.archivePath) { console.error("Error: Result case migration journal conflicts; zero new mutation."); return 2; }
+    const active = journal.journal ?? loadCaseMigrationJournal(deps.dir, deps).journal; const recovered = recoverCaseMigration(deps.dir, active, lock, deps); if (!recovered.ok) { console.error(`Error: Result case migration recovery unresolved (${recovered.code}); mutation disposition is not success.`); return 2; } if (!retireCaseMigrationJournal(journal.paths)) { console.error("Error: Result case migration committed but journal retirement is unresolved."); return 2; } const state = readStateRaw(deps.dir); console.log(JSON.stringify({ schema: RESULT_CASE_MIGRATION_APPLY_SCHEMA, status: plan === null ? "replayed" : "applied", featureId: apply.featureId, revision: state.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: state.state.continuity.authority.result, archive: apply.archivePath, mutated: plan !== null })); return 0;
+  } finally { releaseContinuityLock(lock); }
+}
+
 // ---- Elephant-owned first Result-authority bootstrap (AC-047-143--148) ----
 
 function resultBootstrapPath(dir, prdPath) {
@@ -2787,6 +2934,9 @@ function atomicAppendResultBootstrap(result, bytes, lock, deps = {}) {
     if (!sameBootstrapResultPreimage(before, result)) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-PATH" };
     fd = openSync(tmp, "wx", 0o600);
     (deps.replaceResultFdContents ?? replaceFdContents)(fd, bytes);
+    // The injectable writer used by crash tests is not itself a durability
+    // boundary.  Sync the descriptor here, immediately before publication.
+    fsyncSync(fd);
     closeSync(fd); fd = undefined;
     const rechecked = observeCanonicalResultBootstrap(result.root, result.path);
     if (!sameBootstrapResultPreimage(rechecked, result)) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-RACE" };
@@ -4211,6 +4361,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   if (sub === "continuity-result-rebind-plan" || sub === "continuity-result-rebind-apply") {
     return runResultRebindCommand(sub, rest, { ...deps, dir, now });
   }
+  if (sub === "continuity-result-case-migration-plan" || sub === "continuity-result-case-migration-apply") {
+    return runResultCaseMigrationCommand(sub, rest, { ...deps, dir, now });
+  }
   if (CONTINUITY_SUBCOMMANDS.has(sub)) return runContinuityCommand(sub, flags, { ...deps, dir, now });
   if (PUBLICATION_SUBCOMMANDS.has(sub)) return runPublicationCommand(sub, flags, { ...deps, dir, now });
 
@@ -4891,7 +5044,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, seal-plan-approval, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-rebind-plan, continuity-result-rebind-apply, continuity-result-close-plan, continuity-result-close-apply, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, seal-plan-approval, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-rebind-plan, continuity-result-rebind-apply, continuity-result-case-migration-plan, continuity-result-case-migration-apply, continuity-result-close-plan, continuity-result-close-apply, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
       );
       return 2;
     }
