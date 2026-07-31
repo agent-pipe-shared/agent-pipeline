@@ -23,9 +23,11 @@ import {
   RULESET_FRESHNESS_SCHEMA,
   withFreshnessHostRequest,
 } from "./ruleset-freshness.mjs";
+import { executeRulesetFreshnessHostAction, inspectHostRulesetFreshness } from "./ruleset-freshness-host.mjs";
 
 const roots = [];
 const SCRIPT = fileURLToPath(new URL("./ruleset-freshness.mjs", import.meta.url));
+const HOST_SCRIPT = fileURLToPath(new URL("./ruleset-freshness-host.mjs", import.meta.url));
 function git(cwd, ...args) {
   const out = spawnSync("git", args, { cwd, encoding: "utf8" });
   assert.equal(out.status, 0, out.stderr);
@@ -197,6 +199,88 @@ test("the normal Codex freshness entrypoint forwards a selected host transport",
   assert.equal(value.status, "equal");
   assert.equal(hostCalls, 1);
   assert.equal(directAttempts, 0);
+});
+
+test("the dedicated WSL host adapter executes only the fixed public action", () => {
+  const action = createFreshnessHostAction("pipeline-start-host-authorized-wsl");
+  const sha = "e".repeat(40);
+  const calls = [];
+  const output = executeRulesetFreshnessHostAction(action, {
+    spawn(command, args, options) {
+      calls.push({ command, args, options });
+      return { status: 0, stdout: `${sha}\tHEAD\nprivate diagnostic that must not escape` };
+    },
+  });
+  assert.deepEqual(calls[0].args, ["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"]);
+  assert.equal(calls[0].command, "git");
+  assert.equal(calls[0].options.shell, false);
+  assert.deepEqual(output, {
+    schema: FRESHNESS_HOST_RESULT_SCHEMA,
+    requestSha256: action.requestSha256,
+    status: "completed",
+    stdout: `${sha}\tHEAD\n`,
+  });
+  assert.equal(JSON.stringify(output).includes("private diagnostic"), false);
+
+  const substituted = { ...action, boundaryId: "other-boundary" };
+  assert.equal(executeRulesetFreshnessHostAction(substituted, {
+    spawn() { throw new Error("substituted action must never run"); },
+  }), null);
+});
+
+test("the host adapter produces the complete freshness result through its fixed transport", () => {
+  const loaded = "a".repeat(40);
+  const observed = inspectHostRulesetFreshness({
+    repoPath: "/private/consumer-not-forwarded",
+    loadedPluginRoot: "/private/plugin-not-forwarded",
+    codexObservation: { status: "ready", observation: sourceObservation(loaded) },
+    execute(action) {
+      assert.deepEqual(action, createFreshnessHostAction("pipeline-start-host-authorized-wsl"));
+      return {
+        schema: FRESHNESS_HOST_RESULT_SCHEMA,
+        requestSha256: action.requestSha256,
+        status: "completed",
+        stdout: `${loaded}\tHEAD\n`,
+      };
+    },
+  });
+  assert.equal(observed.status, "equal");
+  assert.equal(observed.remoteSha, loaded);
+  assert.equal(JSON.stringify(observed).includes("/private/"), false);
+  const unavailable = inspectHostRulesetFreshness({
+    repoPath: "/private/consumer-not-forwarded",
+    loadedPluginRoot: "/private/plugin-not-forwarded",
+    codexObservation: { status: "ready", observation: sourceObservation(loaded) },
+    execute() { return null; },
+  });
+  assert.equal(unavailable.status, "remote-unavailable");
+  assert.equal(unavailable.writePermitted, false);
+  assert.notEqual(unavailable.status, "equal");
+});
+
+test("the host adapter has a real full-result CLI path and rejects arbitrary requests", () => {
+  const valid = spawnSync(process.execPath, [HOST_SCRIPT, "--repo", process.cwd()], {
+    encoding: "utf8",
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+  });
+  // The host executable is run directly, not injected into an in-process
+  // transport. Network may be unavailable in a nested workspace sandbox, but
+  // both typed outcomes prove the closed CLI path.
+  if (valid.error?.code === "EPERM") return;
+  assert.equal(valid.error, undefined);
+  assert.ok([0, 2].includes(valid.status));
+  const payload = JSON.parse(valid.stdout);
+  assert.equal(payload.schema, RULESET_FRESHNESS_SCHEMA);
+  assert.equal(typeof payload.status, "string");
+  assert.equal(typeof payload.remoteSha === "string" || payload.remoteSha === null, true);
+
+  const rejected = spawnSync(process.execPath, [HOST_SCRIPT, "--repo", process.cwd(), "--unexpected"], {
+    encoding: "utf8",
+    env: process.env,
+  });
+  assert.equal(rejected.status, 64);
+  assert.equal(rejected.stdout, "");
+  assert.match(rejected.stderr, /usage/u);
 });
 
 test("self-application accepts equal and descendant loaded rulesets without consumer HEAD", () => {

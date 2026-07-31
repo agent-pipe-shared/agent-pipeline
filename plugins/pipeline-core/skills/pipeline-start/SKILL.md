@@ -648,18 +648,22 @@ This step ends in a **third mandatory confirmation line** (verbatim, printed dir
   lock-bound comparison; retain only its sanitized status and do not echo
   private coordinates or receipts.
 
-- Run `node "${PIPELINE_PLUGIN_ROOT}/scripts/ruleset-freshness.mjs" --repo "$PWD"`.
+- With `executionBoundary:default`, run `node "${PIPELINE_PLUGIN_ROOT}/scripts/ruleset-freshness.mjs" --repo "$PWD"`.
   The helper derives the marketplace URL from the **committed**
   `.claude/settings.json`, bounds remote access to 30 seconds, sanitizes
   transport/authentication failures, and never updates source refs/config.
   In self-application it proves ancestry through a disposable bare repository:
   `equal|ahead` is current, while `behind|diverged` is F2. Consumer plugin
   installs still require equality; `stale` is F2. `unknown` is F3.
-- **Codex host boundary:** run this helper once through the host-authorized
-  network-open/read-only command boundary. Do not first probe it inside a
-  known network-restricted workspace sandbox: that produces a misleading DNS
-  error before the authoritative host observation. The host result, including
-  `unknown`, is the one bootstrap observation.
+- **Codex host boundary:** with `executionBoundary:host-authorized-wsl`, run
+  `node "${PIPELINE_PLUGIN_ROOT}/scripts/ruleset-freshness-host.mjs" --repo "$PWD"`
+  once through that exact network-open/read-only command boundary. This is the
+  **only** Remote-Freshness observation: it binds the closed public Core HEAD
+  read to its internal host transport and then returns the ordinary
+  `pipeline.ruleset-freshness.v1` result. Do not invoke either freshness helper
+  first inside a known network-restricted workspace sandbox; that produces a
+  misleading DNS error before the authoritative host observation. The host
+  result, including `unknown`, is the one bootstrap observation.
 - **Registered local development source:** when the Step-0 preflight reported
   `installedSource:local-development`, skip the public-marketplace equality
   helper. The native Codex registry plus the cache-busted loaded/installed
