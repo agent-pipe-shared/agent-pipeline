@@ -249,8 +249,8 @@ check("keeps the closed full TimedObservation state envelope parallel with runti
   const expected = [true, true, false, false, false, false];
   corpus.forEach((record, index) => {
     const structural = schemaAccepts(record, STATE_SCHEMA);
-    const previous = index === 1 ? admitted : undefined;
-    const runtime = validateExecutionState(record, previous).ok;
+    const history = index === 1 ? [created, admitted] : undefined;
+    const runtime = validateExecutionState(record, history).ok;
     assert.equal(structural && runtime, expected[index], `state public corpus ${index}`);
     assert.equal(runtime, expected[index], `state runtime corpus ${index}`);
   });
@@ -267,17 +267,22 @@ check("normalizes success as unverified and reserves verified for matching verif
   assert.equal(verified.state.state, "verified");
 });
 
-check("rejects unbound non-genesis states and only admits exact predecessor transitions", () => {
+check("rejects unbound and forged chains, admitting successors only with a complete genesis history", () => {
   const created = createExecutionState(subject);
   const admitted = reduceExecutionState(created, outcome("admitted")).state;
   const running = reduceExecutionState(admitted, outcome("running")).state;
   const forged = { ...clone(running), state: "verified", result: { resultSha256: A, bytes: 1, status: "verified" }, revision: 0, previousSha256: null };
   assert.equal(validateExecutionState(forged).code, "AUTHORITY:state-genesis");
   assert.equal(validateExecutionState(running).code, "UNAVAILABLE:state-predecessor");
-  assert.deepEqual(validateExecutionState(running, admitted), { ok: true, code: null });
-  assert.equal(validateExecutionState(running, created).code, "STALE:state-predecessor");
-  const verified = reduceExecutionState(reduceExecutionState(running, outcome("success", { resultSha256: A, bytes: 1, status: "delivered" })).state, outcome("verifierPassed", { resultSha256: A, bytes: 1, status: "delivered" })).state;
-  assert.equal(validateExecutionState(verified, running).code, "STALE:state-predecessor");
+  assert.deepEqual(validateExecutionState(running, [created, admitted]), { ok: true, code: null });
+  assert.equal(validateExecutionState(running, [admitted]).code, "UNAVAILABLE:state-predecessor");
+  const forgedPredecessor = { ...clone(created), state: "admitted", revision: 0 };
+  const forgedSuccessor = { ...clone(running), previousSha256: executionSubjectDigest(subject) };
+  assert.equal(validateExecutionState(forgedSuccessor, [forgedPredecessor, admitted]).code, "STALE:state-predecessor");
+  assert.equal(reduceExecutionState(forgedPredecessor, outcome("running")).code, "AUTHORITY:state-genesis");
+  const success = reduceExecutionState(running, outcome("success", { resultSha256: A, bytes: 1, status: "delivered" })).state;
+  const verified = reduceExecutionState(success, outcome("verifierPassed", { resultSha256: A, bytes: 1, status: "delivered" })).state;
+  assert.deepEqual(validateExecutionState(verified, [created, admitted, running, success]), { ok: true, code: null });
 });
 
 check("covers duplicate, out-of-order, stale candidate, failure, timeout, cancellation, lost heartbeat and completed-undelivered without false success", () => {

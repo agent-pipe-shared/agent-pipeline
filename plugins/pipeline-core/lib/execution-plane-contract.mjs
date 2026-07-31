@@ -10,6 +10,7 @@ const OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/u;
 const ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 const STATES = new Set(["created", "admitted", "rejected", "running", "paused", "cancel-requested", "cancelled", "succeeded-unverified", "verified", "failed", "timed-out", "lost", "completed-undelivered", "unavailable", "invalidated"]);
 const TERMINAL = new Set(["rejected", "cancelled", "failed", "timed-out", "lost", "unavailable", "invalidated"]);
+const TRUSTED_STATES = new WeakSet();
 const TRANSITIONS = {
   created: new Set(["admitted", "rejected"]), admitted: new Set(["running", "cancel-requested", "failed", "timed-out", "unavailable"]),
   running: new Set(["running", "paused", "cancel-requested", "succeeded-unverified", "failed", "timed-out", "lost", "completed-undelivered"]),
@@ -106,20 +107,32 @@ function transitionStateCode(previous, next) {
     || canonicalExecutionJson(next.subject) !== canonicalExecutionJson(previous.subject)) return "STALE:state-predecessor";
   return TRANSITIONS[previous.state]?.has(next.state) ? null : "CONFLICT:state-transition";
 }
+function stateHistoryCode(history, next) {
+  if (!Array.isArray(history) || history.length !== next.revision) return "UNAVAILABLE:state-predecessor";
+  if (next.revision === 0) return history.length === 0 ? genesisStateCode(next) : "STALE:state-predecessor";
+  let previous = history[0];
+  if (stateCode(previous) || genesisStateCode(previous)) return "STALE:state-predecessor";
+  for (let index = 1; index < history.length; index += 1) {
+    const current = history[index];
+    if (stateCode(current) || transitionStateCode(previous, current)) return "STALE:state-predecessor";
+    previous = current;
+  }
+  return transitionStateCode(previous, next);
+}
 /**
- * Validates a genesis state alone, or a successor only against its exact prior
- * semantic record.  A non-genesis state without that predecessor is deliberately
+ * Validates a genesis state alone, or a successor only against a complete
+ * ordered history from that exact genesis. A partial predecessor is deliberately
  * unavailable rather than treated as independently authoritative.
  */
-export function validateExecutionState(v, previous = undefined) {
+export function validateExecutionState(v, history = undefined) {
   const code = stateCode(v);
   if (code) return { ok: false, code };
-  const semantic = previous === undefined
+  const semantic = history === undefined
     ? (v.revision === 0 ? genesisStateCode(v) : "UNAVAILABLE:state-predecessor")
-    : previous === null ? genesisStateCode(v) : transitionStateCode(previous, v);
+    : stateHistoryCode(history, v);
   return semantic ? { ok: false, code: semantic } : { ok: true, code: null };
 }
-export function createExecutionState(subject) { if (subjectCode(subject)) throw new Error("SHAPE:state-subject"); return freeze({ schema: NOVA_EXECUTION_STATE_SCHEMA, subject: clone(subject), subjectSha256: executionSubjectDigest(subject), state: "created", revision: 0, observation: null, result: null, reason: null, previousSha256: null }); }
+export function createExecutionState(subject) { if (subjectCode(subject)) throw new Error("SHAPE:state-subject"); const state = freeze({ schema: NOVA_EXECUTION_STATE_SCHEMA, subject: clone(subject), subjectSha256: executionSubjectDigest(subject), state: "created", revision: 0, observation: null, result: null, reason: null, previousSha256: null }); TRUSTED_STATES.add(state); return state; }
 export function normalizeSyntheticExecutionOutcome(expected, outcome) {
   if (!expected || subjectCode(expected.subject) || !exact(outcome, ["dispatchId", "attempt", "candidateCommit", "kind", "evidenceSha256", "result"]) || !ID.test(outcome.dispatchId) || !Number.isSafeInteger(outcome.attempt) || outcome.attempt < 0 || !OID.test(outcome.candidateCommit) || !SHA.test(outcome.evidenceSha256) || !validResult(outcome.result)) return { ok: false, code: "SHAPE:outcome", state: null };
   const s = expected.subject; if (outcome.dispatchId !== s.dispatchId || outcome.attempt !== s.attempt || outcome.candidateCommit !== s.candidateCommit) return { ok: false, code: "STALE:outcome", state: null };
@@ -130,4 +143,4 @@ export function normalizeSyntheticExecutionOutcome(expected, outcome) {
   if (outcome.kind === "success" && outcome.result === null) return { ok: false, code: "SHAPE:success-result", state: null };
   return { ok: true, code: "OUTCOME:normalized", state: map[outcome.kind], result: outcome.kind === "verifierPassed" ? { ...outcome.result, status: "verified" } : outcome.result, reason: null, observation: { source: "synthetic-adapter", monotonicMs: expected.revision + 1, wallTime: null, rawSha256: outcome.evidenceSha256, adapterState: outcome.kind, rawStateSha256: outcome.evidenceSha256 } };
 }
-export function reduceExecutionState(current, outcome) { if (stateCode(current)) throw new Error("SHAPE:state-current"); const n = normalizeSyntheticExecutionOutcome(current, outcome); if (!n.ok || n.state === null) return n; if (TERMINAL.has(current.state) || !TRANSITIONS[current.state]?.has(n.state)) return { ok: false, code: "CONFLICT:transition", state: null }; const next = { ...clone(current), state: n.state, revision: current.revision + 1, observation: n.observation, result: n.result ?? current.result, reason: n.reason, previousSha256: executionStateDigest(current) }; return stateCode(next) ? { ok: false, code: "INTERNAL:state", state: null } : { ok: true, code: "STATE:applied", state: freeze(next) }; }
+export function reduceExecutionState(current, outcome, history = undefined) { if (stateCode(current)) throw new Error("SHAPE:state-current"); if (!TRUSTED_STATES.has(current)) { const checked = validateExecutionState(current, history); if (!checked.ok) return { ok: false, code: checked.code, state: null }; } const n = normalizeSyntheticExecutionOutcome(current, outcome); if (!n.ok || n.state === null) return n; if (TERMINAL.has(current.state) || !TRANSITIONS[current.state]?.has(n.state)) return { ok: false, code: "CONFLICT:transition", state: null }; const next = { ...clone(current), state: n.state, revision: current.revision + 1, observation: n.observation, result: n.result ?? current.result, reason: n.reason, previousSha256: executionStateDigest(current) }; if (stateCode(next)) return { ok: false, code: "INTERNAL:state", state: null }; const sealed = freeze(next); TRUSTED_STATES.add(sealed); return { ok: true, code: "STATE:applied", state: sealed }; }
