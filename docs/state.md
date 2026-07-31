@@ -3,14 +3,13 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-07-27
+**Last updated:** 2026-07-31
 **Project status:** ACTIVE
-**Current block:** PHX-0A lifecycle-manifest reconciliation scope revision approved; Goldfish dispatch next
+**Current block:** Handover authority reconciled to the current Phoenix State; the persisted queue remains `review` before any further package dispatch
 **Branch:** `sprint_phoenix`, based on public `origin/main`
 `9d1b3dc108eb77629ace5b82002120f5539abd8d`
-**Pipeline:** `0.4.6+codex.20260726170452`
-**DoD:** 🟡 implementation pending — the revised PHX-0A Plan/Spec-bound
-approval includes the writer-only lifecycle-manifest reconciliation
+**Pipeline:** `0.4.7+codex.20260731161954`
+**DoD:** 🟡 Phoenix remains open; PHX-0A lifecycle-manifest reconciliation has a committed writer readback, while later package selection remains gated by the persisted review action
 
 ## Operational head
 
@@ -19,14 +18,20 @@ approval includes the writer-only lifecycle-manifest reconciliation
 - Phoenix is the only active feature in this checkout. Its readable plan is
   [the Phoenix PRD](../specs/sprint-phoenix-epic/prd_phoenix-epic.md), bound
   to the immutable [technical Spec](../specs/sprint-phoenix-epic/spec.md).
-- Pipeline state is in `phase:"implementation"` with the renewed
-  Plan/Spec-bound approval for the explicit PO-authorized PHX-0A
-  lifecycle-manifest reconciliation scope revision. The canonical #22
-  planner may receive only its narrow read-only absent-manifest `draft`
-  bootstrap preview and existing-suite coverage. Continuity revision `5` still
-  names `review`; the first implementation package must be recorded through the
-  designated lifecycle/dispatch path. Its earlier Continuity PRD/Spec authority
-  digests remain diagnostic only; PHX-0 slice A owns their revision writer.
+- The current neutral State authority is valid at continuity revision `10`, in
+  `phase:"implementation"` with `planApproved:true`, the renewed
+  Plan/Spec-bound approval, and the canonical Result authority
+  `specs/sprint-phoenix-epic/Result.md` bound at
+  `dd75b473e13918e8b41e10f2005217473e991adbd918b61c461f567cad2e9842`.
+  It still names `audit-handoff-design-revision` / `review` as its queue head;
+  that action must be resolved through the designated lifecycle/dispatch path
+  before selecting another writing package. The legacy `.claude` State and
+  this handover are diagnostic mirrors, not a replacement for that active
+  authority.
+- PHX-0A's narrow writer-only lifecycle-manifest reconciliation is complete:
+  its `draft` state and reviewed inventory were retained, its four stale digest
+  bindings were reconciled through the feature-package writer, and the
+  committed readback receipt is retained under the Phoenix lifecycle evidence.
 - Earlier reviews remain preserved in the append-only
   [Phoenix Result](../specs/sprint-phoenix-epic/result.md). The external-handoff
   correction candidate passed Full Verify, Security, and a fresh independent
@@ -47,6 +52,20 @@ approval includes the writer-only lifecycle-manifest reconciliation
 - The runner-neutral marketplace path and sanitized workaround/recovery audit
   are first-class Phoenix scope. They are not authorized as isolated early
   fixes.
+- The current PHX-0B repair candidate is local commit
+  `3e8261131a7f3152c09e287cb803fa56fe503819` (`fix(freshness): bind host
+  adapter to bootstrap`), a descendant of the approved candidate `8ddb9a8`.
+  It addresses the independent Critic's proven host-transport binding defect
+  strictly inside the existing PHX-0B/Freshness inventory: it carries the
+  opaque Step-0 preflight digest to the host adapter, rejects missing or stale
+  binding, and wires the declared `pipeline-start` route. Its five-file scope
+  is limited to the preflight, host adapter, their focused tests, and the
+  `pipeline-start` contract. The focused Node tests passed and `git diff
+  --check` was clean before commit. Aggregate Verify remains unrun for this
+  repaired candidate because pre-existing tracked State/handover changes keep
+  the candidate-preflight intentionally closed; no aggregate-Verify, Security,
+  Critic-pass, completion, or dispatch claim is made. At PO direction, the
+  fresh independent Critic review is deferred until after the imminent restart.
 - R-13 records two distinct Security evidence observations with their exact
   candidates. It does not establish a reproducible Security-gate defect and
   therefore creates no unproven Phoenix implementation scope.
@@ -91,6 +110,59 @@ approval includes the writer-only lifecycle-manifest reconciliation
   [RECOVERY.md](../specs/sprint-phoenix-epic/RECOVERY.md).
 
 ## Open items and next block
+
+## 0.4.7 Elephant hotfix handover — Result-Authority bootstrap
+
+**Trigger.** The current neutral Phoenix State is valid at continuity revision
+`9`, is approved for implementation, and retains the queue head
+`audit-handoff-design-revision` / `review`, but has
+`authority.result:null`. This makes the state non-dispatchable
+(`CS-NOT-DISPATCH-ACTION`). The existing Result file is readable historical
+evidence but has no required `pipeline-result` fence, so it cannot become a
+Course-Decision authority as-is.
+
+**Confirmed limitation.** The generic continuity CAS intentionally rejects a
+first Result binding (`CS-PROTECTED-AUTHORITY`); the existing Result-first
+Course-Decision writer intentionally requires an already non-null Result
+authority (`PS-CONTINUITY-RESULT-BINDING`). No planner or dedicated writer
+bridges this valid `result:null` state. A Product Owner exception cannot safely
+bypass either invariant.
+
+**Required generic hotfix.** Pipeline 0.4.7 needs an Elephant-owned,
+repository-generic, digest-bound *Result-Authority bootstrap* plan/apply
+workflow. It must not be Phoenix-specific. Its read-only plan must bind the
+physical project root, current State SHA/revision, active feature, PRD/Spec
+digests, exact Result path/bytes, and the absence of a Result authority. The
+returned apply action must require explicit PO confirmation, create the
+strict canonical `pipeline-result` authority envelope only through the
+sanctioned writer, atomically bind its readback digest into State, and be
+idempotent/recoverable after every Result-before-State interruption.
+
+**Safety contract.** Refuse malformed State/Result, a pre-existing Result
+authority, changed State SHA/revision, symlink/unsafe Result paths, duplicate
+or noncanonical fences, an active dispatch, a pending decision transaction,
+or a changed PRD/Spec binding. The bootstrap must create no implementation
+dispatch, modify no product artifact beyond the Result authority envelope,
+perform no remote action, and make no completion, verification, security, or
+model-identity claim. After successful readback, the ordinary existing
+Course-Decision flow alone may record a PO brief and select a dispatch.
+
+**Acceptance evidence.** Add tests for valid `result:null` bootstrap;
+stale/replay/conflict rejection; Result-before-State and State-before-receipt
+interruption recovery; strict Result-fence/canonicality/path rejection; and
+proof that ordinary `continuity-cas` and Course-Decision behavior stay
+unchanged. The final hotfix candidate requires focused tests, aggregate
+Verify, Security, and an independent Critic before it can repair Phoenix or
+any other project.
+
+**Phoenix disposition.** The PO states that no factual Phoenix-content issue
+has been found. Preserve candidate `8ddb9a8` and the completed PHX-0A
+lifecycle-manifest reconciliation unchanged. Once the generic hotfix is
+released and read back, use the separately recorded PO decision to select
+`phx-0b-current-candidate-validation`; that Goldfish work validates and
+consolidates evidence for the existing PHX-0B/Freshness candidate and may
+change files only for a demonstrated defect within the existing PHX-0B
+inventory.
 
 1. The PO authorized PHX-0A to add the existing Phoenix `lifecycle.json` to
    its bounded scope and reconcile only its stale PRD, Spec, acceptance, and

@@ -1,0 +1,124 @@
+# pipeline.yaml -- declarative pipeline manifest for THIS repo.
+# ADDITIVE to .claude/pipeline.json (project calibration) -- disjoint field sets, see
+# plugins/pipeline-core/lib/manifest.mjs file header for the dedup confirmation.
+# Schema: pipeline.manifest.v0 (plugins/pipeline-core/scripts/pipeline-manifest.schema.json).
+# Validate with: node harness/scripts/validate-manifest.mjs
+
+schema: pipeline.manifest.v0
+
+language:
+  human_facing: en
+
+# This repo is docs+guardrails only (no live UI) -- ui-design stays declared but its
+# condition keeps it inactive until flags.has_ui below flips true for a project that has one.
+session:
+  keep_awake: false
+phases:
+  - name: design
+    enabled: true
+  - name: implementation
+    enabled: true
+  - name: security-scan
+    enabled: true
+  - name: ui-design
+    enabled: true
+    condition: has_ui
+
+# Exactly 2 blocking human gates (dev-plan, push) plus 1 blocking automated gate
+# (security). `approval: required` expresses the future PHX-2 human gate; it is
+# not push authority by itself. Until PHX-2 provides the Human Governance
+# Decision Ledger and Authority Resolver, guard-push blocks every active-gate
+# push, including a matching legacy or required approval in mutable State.
+# This contract is runner- and platform-neutral (Claude, Codex, AGY; macOS,
+# Windows, Linux).
+gates:
+  dev-plan:
+    mode: blocking
+    type: human
+  push:
+    mode: blocking
+    type: human
+    approval: required
+  security:
+    mode: blocking
+    type: automated
+
+security:
+  scanners:
+    gitleaks:
+      enabled: true
+    osv-scanner:
+      enabled: true
+    semgrep:
+      enabled: true
+      rules_dir: governance/examples/policies/semgrep
+    license-check:
+      enabled: true
+
+modelRouting:
+  # Generated V3 Claude compatibility projection; pipeline.user.v3 is the only routing authority.
+  # Requested selectors are not advisor-receipt, route-receipt, or effective-model evidence.
+  elephant_epic_design:
+    model: opus
+    effort: xhigh
+  elephant_epic_execution:
+    model: sonnet-5
+    effort: high
+  advisor_epic:
+    model: fable
+    effort: not-applicable
+  elephant_feature_design:
+    model: opus
+    effort: high
+  elephant_feature_execution:
+    model: sonnet-5
+    effort: medium
+  advisor_feature:
+    model: fable
+    effort: not-applicable
+  elephant_mini_design:
+    model: sonnet-5
+    effort: high
+  elephant_mini_execution:
+    model: sonnet-5
+    effort: medium
+  goldfish:
+    model: sonnet-5
+    effort: medium
+  goldfish_mechanic:
+    model: sonnet-5
+    effort: low
+  goldfish_deep:
+    model: sonnet-5
+    effort: high
+  critic:
+    model: sonnet-5
+    effort: high
+
+criticExport:
+  policy: pipeline.critic-export-policy.v1
+  mode: allowlisted
+  policySha256: ffc77887b868a3f2c697e54bd6ac947f8435f0ce330b0906aa54e2eab9b685b1
+  packetSchema: pipeline.critic-candidate-packet.v1
+  packetBoundary: candidate-diff-and-allowlisted-references
+  hostGate: visible-not-bypassed
+  providerGate: visible-not-bypassed
+
+profiles:
+  active: full-sdlc
+  quick:
+    phases:
+      - implementation
+  full-sdlc:
+    phases:
+      - design
+      - implementation
+      - security-scan
+      - ui-design
+
+governance:
+  guidelines_path: governance/examples/guidelines
+  policies_path: governance/examples/policies
+
+flags:
+  has_ui: false
