@@ -1,0 +1,192 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.invocation-request.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "invocationId",
+    "subject",
+    "route",
+    "duty",
+    "sandboxDispositionSha256",
+    "command",
+    "inputDigests",
+    "timeoutMs",
+    "allowedOutputs",
+    "privacyClass",
+    "requestSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.invocation-request.v1"
+    },
+    "invocationId": {
+      "$ref": "#/$defs/id"
+    },
+    "subject": {
+      "$ref": "#/$defs/subject"
+    },
+    "route": {
+      "$ref": "#/$defs/route"
+    },
+    "duty": {
+      "$ref": "#/$defs/id"
+    },
+    "sandboxDispositionSha256": {
+      "$ref": "#/$defs/sha256"
+    },
+    "command": {
+      "$ref": "#/$defs/command"
+    },
+    "inputDigests": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/sha256"
+      }
+    },
+    "timeoutMs": {
+      "type": "integer",
+      "minimum": 1000,
+      "maximum": 3600000
+    },
+    "allowedOutputs": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 3,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "result",
+          "receipt",
+          "metrics"
+        ]
+      }
+    },
+    "privacyClass": {
+      "enum": [
+        "public",
+        "restricted",
+        "private"
+      ]
+    },
+    "requestSha256": {
+      "$ref": "#/$defs/sha256"
+    }
+  },
+  "$defs": {
+    "sha256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:+-]{0,127}$"
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/id"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha256"
+        }
+      }
+    },
+    "route": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "runner",
+        "adapterId",
+        "adapterVersion",
+        "requestedModel"
+      ],
+      "properties": {
+        "runner": {
+          "$ref": "#/$defs/id"
+        },
+        "adapterId": {
+          "$ref": "#/$defs/id"
+        },
+        "adapterVersion": {
+          "$ref": "#/$defs/id"
+        },
+        "requestedModel": {
+          "$ref": "#/$defs/id"
+        }
+      }
+    },
+    "argument": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ],
+          "properties": {
+            "type": {
+              "const": "literal"
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 512,
+              "pattern": "^[^\\u0000\\r\\n]+$"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "type",
+            "value"
+          ],
+          "properties": {
+            "type": {
+              "const": "digest-ref"
+            },
+            "value": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        }
+      ]
+    },
+    "command": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "contractId",
+        "executableSha256",
+        "arguments"
+      ],
+      "properties": {
+        "contractId": {
+          "$ref": "#/$defs/id"
+        },
+        "executableSha256": {
+          "$ref": "#/$defs/sha256"
+        },
+        "arguments": {
+          "type": "array",
+          "maxItems": 256,
+          "items": {
+            "$ref": "#/$defs/argument"
+          }
+        }
+      }
+    }
+  }
+}

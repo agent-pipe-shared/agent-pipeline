@@ -5,13 +5,17 @@
 Shared-file changes are never incidental tail work. Create explicit packages
 for:
 
-1. central Verify suite registration;
-2. ADR register and post-V3 migration projection;
-3. issue/backlog reconciliation;
-4. Nova A Result and Nova B activation;
-5. Nova-only candidate assembly and freeze;
-6. final platform/runner/forge evidence; and
-7. append-only Result, state, history and close metadata.
+1. bounded pre-rebase Nova A packages with exact protected-surface-negative
+   write-sets;
+2. exact stable `main` 0.4.7 baseline identification and Nova rebase;
+3. conflict disposition plus regenerated Spec/backlog/lifecycle bindings;
+4. central Verify suite registration;
+5. ADR register and post-V3 migration projection;
+6. issue/backlog reconciliation;
+7. Nova A Result and Nova B activation;
+8. Nova-only candidate assembly and freeze;
+9. final platform/runner/forge evidence; and
+10. append-only Result, state, history and close metadata.
 
 Each package declares exact write paths and resources and is planned through
 the deterministic conflict model.
@@ -19,13 +23,20 @@ the deterministic conflict model.
 ## Required evidence order
 
 ```text
-focused tests
+bounded pre-rebase package
+  -> exact write-set/protected-surface readback
+  -> focused provisional tests
+  -> stable main 0.4.7 identification
+  -> exact Nova rebase and conflict disposition
+  -> impact invalidation/rerun
+  -> regenerated binding/lifecycle readback
+  -> focused tests
   -> diff/path/privacy checks
   -> freeze exact Nova-only candidate
   -> Full Verify
   -> Security
   -> independent Critic
-  -> native Apple Silicon evidence
+  -> synthetic/non-native macOS disposition
   -> finding disposition
   -> exact remote readback where authorized
   -> PO acceptance
@@ -39,7 +50,7 @@ tail or a fresh complete gate when they change authority/security scope.
 
 ## Issue accounting
 
-Before closure, every Nova issue comment must name:
+Before closure, every one of the 16 Nova issue comments must name:
 
 - accepted merged/delivered commit and tree;
 - relevant conformance/benchmark/platform/forge evidence;
@@ -59,6 +70,12 @@ in-sprint Issue naming the narrowed Nova scope, the new Issue number and what
 the future scope alone owns. The original Issue remains open and is closed only
 at Sprint close with its exact candidate/evidence; that closure must not claim
 the transferred work. This rule applies to every later Nova scope adjustment.
+
+Issue `#72` independently owns native Apple-Silicon lifecycle and evidence;
+its close is not a Nova gate. Issue `#63` independently owns the 0.4.7 hotfix;
+Nova consumes it only through the exact stable-baseline rebase. Pre-rebase
+Nova packages must prove that their exact write-sets do not overlap its
+Bootstrap, installation, runtime-readback or V4 recovery surfaces.
 
 ## Backlog accounting
 

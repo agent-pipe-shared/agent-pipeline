@@ -11,9 +11,12 @@
  */
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 
 import {
   SELECTED_SANDBOX_DISPOSITION_SCHEMA,
+  canonicalJson,
   createSelectedSandboxDisposition,
   reduceSelectedSandboxDisposition,
   selectedSandboxDispositionDigest,
@@ -52,16 +55,19 @@ function input(overrides = {}) {
 function start(attemptId = "attempt-01", index = 0, nowMonotonicMs = 1_000) {
   return { kind: "probe-start", attempt: { attemptId, index, startedMonotonicMs: nowMonotonicMs }, challenge: { nonceSha256: C, bits: 256 } };
 }
+function fingerprintSha256(value = fingerprint()) {
+  return createHash("sha256").update(canonicalJson(value), "utf8").digest("hex");
+}
 function childReceipt(overrides = {}) {
   return {
     childIdSha256: D, attemptId: "attempt-01", nonceSha256: C, duty: "readiness",
-    transport: "selected-network-open-read-only-v1", subjectSha256: A,
-    assurance: "sandbox-read-only-except-coordinator-scratch-network-open", resultSha256: B, terminal: true, ...overrides,
+    transport: "selected-network-open-read-only-v1", subjectSha256: fingerprintSha256(),
+    assurance: "sandbox-read-only-except-coordinator-scratch-network-open", resultSha256: D, terminal: true, ...overrides,
   };
 }
 function reduce(record, event) { return reduceSelectedSandboxDisposition(record, event); }
-function success(receipt = childReceipt()) {
-  return { kind: "probe-success", selectedChildIdSha256: D, childReceipt: receipt, observationReceiptSha256: D };
+function success(receipt = childReceipt(), observationReceiptSha256 = D) {
+  return { kind: "probe-success", selectedChildIdSha256: D, childReceipt: receipt, observationReceiptSha256 };
 }
 
 const created = createSelectedSandboxDisposition(input());
@@ -100,6 +106,11 @@ check("A2S04 available-attested requires the parent 256-bit challenge and exact 
     const receipt = childReceipt({ [field]: value });
     rejected(reduce(probing, success(receipt)), /^(?:AUTHORITY|CONFLICT|SHAPE):/u);
   }
+  const wrongProfile = fingerprint({ profileSha256: B });
+  rejected(reduce(probing, success(childReceipt({ subjectSha256: fingerprintSha256(wrongProfile) }))), /^AUTHORITY:/u);
+  const wrongFingerprint = fingerprint({ hostBootSha256: C });
+  rejected(reduce(probing, success(childReceipt({ subjectSha256: fingerprintSha256(wrongFingerprint) }))), /^AUTHORITY:/u);
+  rejected(reduce(probing, success(childReceipt({ resultSha256: A }), B)), /^AUTHORITY:/u);
 });
 
 check("A2S05 CAS health, fallback and a self-asserted runner cannot become attested", () => {
@@ -116,6 +127,8 @@ check("A2S06 transient retry is unavailable before and eligible at exactly 30000
   const transient = reduce(probing, { kind: "probe-failure", failure: "transient-unavailable", observationReceiptSha256: D, nowMonotonicMs: 2_000 });
   assert.equal(transient.ok, true); assert.equal(transient.disposition.state, "transient-unavailable");
   assert.deepEqual(transient.disposition.failure, { class: "transient-unavailable", observationReceiptSha256: D });
+  assert.deepEqual(transient.disposition.attempt, probing.attempt);
+  assert.equal(transient.disposition.challenge, null);
   rejected(reduce(transient.disposition, start("attempt-02", 1, 301_999)), /^UNAVAILABLE:/u);
   const retry = reduce(transient.disposition, start("attempt-02", 1, 302_000));
   assert.equal(retry.ok, true); assert.equal(retry.launch, true); assert.equal(retry.disposition.state, "probing");
@@ -124,13 +137,24 @@ check("A2S06 transient retry is unavailable before and eligible at exactly 30000
 check("A2S07 terminal suppression blocks unchanged inputs; only explicit force-reprobe authority creates a new attempt", () => {
   const probing = reduce(created, start()).disposition;
   const terminal = reduce(probing, { kind: "probe-failure", failure: "terminal-unavailable", observationReceiptSha256: D, nowMonotonicMs: 2_000 }).disposition;
+  assert.deepEqual(terminal.attempt, probing.attempt);
+  assert.equal(terminal.challenge, null);
   const suppressed = reduce(terminal, start("attempt-02", 1, 999_999));
   rejected(suppressed, /^UNAVAILABLE:/u);
+  const authority = {
+    kind: "po-force-reprobe", decisionId: "nova-a2-force-01",
+    receiptPath: "specs/sprint-nova-epic/evidence/nova-a/force-reprobe-01.json", receiptSha256: C,
+  };
+  rejected(reduce(terminal, {
+    kind: "force-reprobe", authority,
+    attempt: { attemptId: "attempt-01", index: 1, startedMonotonicMs: 3_000 }, challenge: { nonceSha256: B, bits: 256 },
+  }), /^BOUND:/u);
+  rejected(reduce(terminal, {
+    kind: "force-reprobe", authority,
+    attempt: { attemptId: "attempt-02", index: 0, startedMonotonicMs: 3_000 }, challenge: { nonceSha256: B, bits: 256 },
+  }), /^BOUND:/u);
   const force = reduce(terminal, {
-    kind: "force-reprobe", authority: {
-      kind: "po-force-reprobe", decisionId: "nova-a2-force-01",
-      receiptPath: "specs/sprint-nova-epic/evidence/nova-a/force-reprobe-01.json", receiptSha256: C,
-    },
+    kind: "force-reprobe", authority,
     attempt: { attemptId: "attempt-02", index: 1, startedMonotonicMs: 3_000 }, challenge: { nonceSha256: B, bits: 256 },
   });
   assert.equal(force.ok, true); assert.equal(force.launch, true); assert.equal(force.disposition.state, "probing");
@@ -139,6 +163,9 @@ check("A2S07 terminal suppression blocks unchanged inputs; only explicit force-r
     kind: "po-force-reprobe", decisionId: "nova-a2-force-01",
     receiptPath: "specs/sprint-nova-epic/evidence/nova-a/force-reprobe-01.json", receiptSha256: C,
   });
+  const drift = reduce(force.disposition, { kind: "fingerprint-drift", fingerprint: fingerprint({ profileSha256: B }) });
+  assert.equal(drift.ok, true);
+  assert.equal(drift.disposition.forceReprobe, null);
 });
 
 check("A2S08 fingerprint/session drift invalidates attestation before any new probe", () => {
@@ -166,6 +193,18 @@ check("A2S10 semantic record chains bind the exact prior digest and fail closed 
   const replay = reduce(probing, success());
   assert.equal(replay.ok, true);
   rejected(reduce(replay.disposition, success()), /^(?:REPLAY|CONFLICT|UNAVAILABLE):/u);
+});
+
+check("A2S11 the published 2020-12 schema closes every selected-sandbox nested record", () => {
+  const schema = JSON.parse(readFileSync(new URL("../scripts/selected-sandbox-disposition.schema.json", import.meta.url), "utf8"));
+  assert.equal(schema.additionalProperties, false);
+  assert.deepEqual(schema.required, ["schema", "dispositionId", "duty", "transport", "fingerprint", "state", "failure", "attempt", "challenge", "childReceipt", "expiry", "forceReprobe", "assurance", "previousSha256", "recordSha256"]);
+  for (const name of ["fingerprint", "failure", "attempt", "challenge", "childReceipt", "expiry", "authority", "assurance"]) {
+    assert.equal(schema.$defs[name].additionalProperties, false, `${name} must reject additional properties`);
+    assert.deepEqual(Object.keys(schema.$defs[name].properties).sort(), [...schema.$defs[name].required].sort());
+  }
+  assert.equal(schema.$defs.challenge.properties.bits.const, 256);
+  assert.deepEqual(schema.$defs.childReceipt.properties.terminal, { const: true });
 });
 
 console.log(`\nselected-sandbox-disposition: ${passed}/${passed + failures.length} checks passed.`);

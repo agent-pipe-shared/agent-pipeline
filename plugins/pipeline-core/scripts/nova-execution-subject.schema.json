@@ -1,1 +1,127 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"pipeline.nova-execution-subject.v1","type":"object","additionalProperties":false,"required":["schema","repository","baseCommit","baseTree","candidateCommit","candidateTree","packageId","dispatchId","attempt","queueRevision","authorityDigests","writePaths","resources"],"properties":{"schema":{"const":"pipeline.nova-execution-subject.v1"},"repository":{"type":"object","additionalProperties":false,"required":["identitySha256"],"properties":{"identitySha256":{"$ref":"#/$defs/sha"}}},"baseCommit":{"$ref":"#/$defs/oid"},"baseTree":{"$ref":"#/$defs/oid"},"candidateCommit":{"$ref":"#/$defs/oid"},"candidateTree":{"$ref":"#/$defs/oid"},"packageId":{"type":"string"},"dispatchId":{"type":"string"},"attempt":{"type":"string"},"queueRevision":{"type":"integer","minimum":0},"authorityDigests":{"type":"array","minItems":1,"items":{"type":"object","additionalProperties":false,"required":["kind","sha256"],"properties":{"kind":{"type":"string"},"sha256":{"$ref":"#/$defs/sha"}}}},"writePaths":{"type":"array","items":{"type":"string"}},"resources":{"type":"array","items":{"type":"string"}}},"$defs":{"sha":{"type":"string","pattern":"^[a-f0-9]{64}$"},"oid":{"type":"string","pattern":"^(?:[a-f0-9]{40}|[a-f0-9]{64})$"}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.nova-execution-subject.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "repository",
+    "baseCommit",
+    "baseTree",
+    "candidateCommit",
+    "candidateTree",
+    "packageId",
+    "dispatchId",
+    "attempt",
+    "queueRevision",
+    "authorityDigests",
+    "writePaths",
+    "resources"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.nova-execution-subject.v1"
+    },
+    "repository": {
+      "$ref": "#/$defs/repository"
+    },
+    "baseCommit": {
+      "$ref": "#/$defs/oid"
+    },
+    "baseTree": {
+      "$ref": "#/$defs/oid"
+    },
+    "candidateCommit": {
+      "$ref": "#/$defs/oid"
+    },
+    "candidateTree": {
+      "$ref": "#/$defs/oid"
+    },
+    "packageId": {
+      "$ref": "#/$defs/id"
+    },
+    "dispatchId": {
+      "$ref": "#/$defs/id"
+    },
+    "attempt": {
+      "$ref": "#/$defs/id"
+    },
+    "queueRevision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "authorityDigests": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/authorityDigest"
+      }
+    },
+    "writePaths": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/path"
+      }
+    },
+    "resources": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/id"
+      }
+    }
+  },
+  "$defs": {
+    "sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "oid": {
+      "type": "string",
+      "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*//)(?!.*\\\\)[^\\u0000]+$"
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "identitySha256"
+      ],
+      "properties": {
+        "identitySha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "authorityDigest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "sha256"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/id"
+        },
+        "sha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    }
+  }
+}

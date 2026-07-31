@@ -11,6 +11,7 @@
  */
 
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 
 import {
   RUNNER_CAPABILITY_REPORT_SCHEMA,
@@ -52,6 +53,7 @@ function invalid(record, prefix = PREFIX) {
 function evidence(kind, sha256) {
   return { kind, path: null, fileSha256: sha256, recordSha256: null };
 }
+const sha256 = (value) => value.toString(16).padStart(64, "0");
 
 function draft() {
   return {
@@ -124,6 +126,14 @@ check("A2R04 the required synthetic, Claude, Codex and unsupported matrix is non
     value.recordSha256 = runnerCapabilityReportDigest(value);
     invalid(value, /^BOUND:/u);
   }
+  const wrongSynthetic = clone(report);
+  wrongSynthetic.cells.find((cell) => cell.capabilityId === "synthetic-contract").mode = "native";
+  wrongSynthetic.recordSha256 = runnerCapabilityReportDigest(wrongSynthetic);
+  invalid(wrongSynthetic, /^BOUND:/u);
+  const uncertified = clone(report);
+  uncertified.cells.find((cell) => cell.capabilityId === "synthetic-contract").status = "observed";
+  uncertified.recordSha256 = runnerCapabilityReportDigest(uncertified);
+  invalid(uncertified, /^BOUND:/u);
 });
 
 check("A2R05 sorted unique capacity/cell/evidence sets and declared bounds are mandatory", () => {
@@ -135,6 +145,17 @@ check("A2R05 sorted unique capacity/cell/evidence sets and declared bounds are m
   duplicate.cells.splice(1, 0, clone(duplicate.cells[0]));
   duplicate.recordSha256 = runnerCapabilityReportDigest(duplicate);
   invalid(duplicate, /^BOUND:/u);
+  const oversizedCells = clone(report);
+  oversizedCells.cells.push(...Array.from({ length: 253 }, (_, index) => ({
+    capabilityId: `zz-extra-${String(index).padStart(3, "0")}`,
+    mode: "synthetic", status: "observed", evidence: [evidence("fixture", sha256(index + 10))],
+  })));
+  oversizedCells.recordSha256 = runnerCapabilityReportDigest(oversizedCells);
+  invalid(oversizedCells, /^BOUND:/u);
+  const oversizedEvidence = clone(report);
+  oversizedEvidence.cells[0].evidence = Array.from({ length: 65 }, (_, index) => evidence(`host-receipt-${String(index).padStart(2, "0")}`, sha256(index + 100)));
+  oversizedEvidence.recordSha256 = runnerCapabilityReportDigest(oversizedEvidence);
+  invalid(oversizedEvidence, /^BOUND:/u);
 });
 
 check("A2R06 capacity keeps typed units separate and computes task concurrency only from concurrent-tasks", () => {
@@ -163,6 +184,14 @@ check("A2R08 requested and independently observed identity remain distinct; not-
   value.identity.observedModel = "gpt-5.6-terra";
   value.recordSha256 = runnerCapabilityReportDigest(value);
   invalid(value, /^BOUND:/u);
+  const unbounded = clone(report);
+  unbounded.identity.adapterId = "a".repeat(129);
+  unbounded.recordSha256 = runnerCapabilityReportDigest(unbounded);
+  invalid(unbounded, /^SHAPE:/u);
+  const missingObservedEvidence = clone(report);
+  missingObservedEvidence.assurance.workspace.evidenceSha256 = null;
+  missingObservedEvidence.recordSha256 = runnerCapabilityReportDigest(missingObservedEvidence);
+  invalid(missingObservedEvidence, /^SHAPE:/u);
 });
 
 check("A2R09 candidate/authority/raw-evidence binding is covered by the own semantic digest", () => {
@@ -176,6 +205,19 @@ check("A2R09 candidate/authority/raw-evidence binding is covered by the own sema
     mutate(value);
     invalid(value);
   }
+});
+
+check("A2R10 the published 2020-12 schema closes every runner-report nested record", () => {
+  const schema = JSON.parse(readFileSync(new URL("../scripts/runner-capability-report.schema.json", import.meta.url), "utf8"));
+  assert.equal(schema.additionalProperties, false);
+  assert.deepEqual(schema.required, ["schema", "reportId", "identity", "environment", "capacity", "cells", "assurance", "bindings", "recordSha256"]);
+  for (const name of ["identity", "environment", "capacityValue", "cell", "assuranceValue", "assurance", "candidate", "authorityDigest", "bindings", "evidence"]) {
+    assert.equal(schema.$defs[name].additionalProperties, false, `${name} must reject additional properties`);
+    assert.deepEqual(Object.keys(schema.$defs[name].properties).sort(), [...schema.$defs[name].required].sort());
+  }
+  assert.equal(schema.properties.capacity.maxItems, 256);
+  assert.equal(schema.$defs.cell.properties.evidence.maxItems, 64);
+  assert.equal(schema.$defs.bindings.properties.rawEvidenceSha256.maxItems, 64);
 });
 
 console.log(`\nrunner-capability-report: ${passed}/${passed + failures.length} checks passed.`);

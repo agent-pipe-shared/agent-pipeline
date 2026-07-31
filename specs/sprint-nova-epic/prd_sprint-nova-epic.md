@@ -1,54 +1,65 @@
 # Sprint Nova Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: e5ca2fef371e8c9d8b355052fab3620aba997b77f8bdaab3243308dac75253c9 -->
+<!-- technical-spec-sha256: aa5eba0ce0c251ed90b8a00e94509a73146873f1cfc9f0942203c5dca9fccf17 -->
 
 **Feature ID:** `sprint-nova-epic`
 **Profile / rigor / risk:** Epic / 2 / high
-**Gate:** PRD review; technical Spec and implementation remain blocked
-**Product base:** delivered and closed release `v0.4.6`, commit
+**Gate:** PRD/Spec approved for bounded pre-rebase Execution; Bootstrap,
+installation and V4/#63-overlapping implementation remain blocked
+**Current working base:** delivered and closed release `v0.4.6`, commit
 `9d1b3dc108eb77629ace5b82002120f5539abd8d`, tree
 `282a8b5c5b0581e042985bfb373a66be0eb2d08b`
-**Working branch:** `feat/sprint-nova-codex`, explicitly rebased and adapted on
-that base; later development remains isolated in its own Sprint branches
+**Pre-rebase execution base:** the current v0.4.6-derived branch, restricted to
+packages whose exact write-set is disjoint from Bootstrap, installation,
+runtime-readback and V4/#63 recovery surfaces
+**Required full execution base:** the exact future stable `main` 0.4.7
+commit/tree, accepted and rebased before protected surfaces, increment
+acceptance or final candidate evidence
+**Working branch:** `feat/sprint-nova-codex-v046`; bounded conflict-independent
+Nova work may continue without importing `main`
 **Sibling workstream:** Sprint Cyborg, independently owned and independently
 closable
 
 ## Gate boundary
 
-This gate asks the PO to approve the product problem, outcomes, exact issue
-membership, Nova A/B split, independence rules and success measures. It does
-not approve the current technical Spec, schemas, file plan, implementation,
-external access, credentials, provider mutations, merge, push or release.
+The PO approved the reconciled PRD and technical Spec on 2026-07-30, with an
+explicit exception that the independently attempted high-risk Advisor was
+typed unavailable and produced no answer, child or sandbox binding. That
+exception is not an Advisor success claim.
 
-After PRD approval, the technical Spec must resolve the stateful-control
-checklist, exact interfaces and files, ADR extensions, readiness evidence and
-implementation slices. Production work remains blocked until that separate
-Spec/readiness gate passes.
+The same PO decision authorizes bounded pre-rebase implementation only when a
+dispatch declares an exact write-set that is disjoint from Bootstrap,
+installation, runtime-readback and V4/#63 recovery surfaces. An absent,
+uncertain or overlapping path is protected and waits for the stable 0.4.7
+rebase. This approval grants no external access, credentials, provider
+mutation, merge, push, release, issue closure or final increment acceptance.
 
 ## Executive decision
 
-Sprint Nova contains the exact approved set of 17 GitHub issues, including
-the later scoped continuation baseline `#60` and P0/M release blocker `#63`.
-They
-remain one Epic but are delivered as two
+Sprint Nova contains exactly the 16 open GitHub Issues carrying `sprint:nova`
+on the 2026-07-30 read-only snapshot, after excluding competing Sprint and
+`hotfix:*` ownership. They remain one Epic but are delivered as two
 serial, separately accepted increments:
 
 | Increment | Product outcome | Issues |
 | --- | --- | --- |
 | **Nova A — Trustworthy execution foundation** | Make backlog state, capability claims, invocation, scheduling, review and release preparation deterministic and evidence-bound before increasing execution capacity. | `#57`, `#7`, `#8`, `#12`, `#14`, `#29`, `#38`, `#54`, `#56` |
-| **Nova B — Bounded continuity, scale and portability** | First bind active Pipeline work to supported runners' native goal continuation, then add supervised local workers, asynchronous execution, bounded credentials, Antigravity with Gemini models, dual-provider GitHub/GitLab support and V4 recovery safety. The native Apple-Silicon close transfers to `#72`. | `#60`, `#21`, `#16`, `#18`, `#15`, `#51`, `#63`, `#49` (narrowed) |
+| **Nova B — Bounded continuity, scale and portability** | First bind active Pipeline work to supported runners' native goal continuation, then add supervised local workers, asynchronous execution, bounded credentials, the Antigravity Alpha boundary and dual-provider GitHub/GitLab support. The native Apple-Silicon close transfers to `#72`. | `#60`, `#21`, `#16`, `#18`, `#15`, `#51`, `#49` (narrowed) |
 
 Nova B may begin only from an exact PO-accepted Nova A commit/tree and immutable
 increment receipt. Nova A and Nova B must remain independently verifiable from
 Cyborg. No Nova gate requires a Cyborg OID, unpublished implementation,
 manifest or Result.
 
-**Current basis (PO confirmation, 2026-07-26):** the earlier temporary B0
-exception is exhausted. Nova is rebased onto delivered and closed `v0.4.6`.
-There are no open `0.4.x` tasks; any document implying otherwise is stale
-documentation, not delivery authority. B1–B4R continue only as isolated Nova
-Sprint work and retain their own external-access and release gates.
+**Current basis (PO confirmations, 2026-07-30):** Nova remains isolated on its
+current v0.4.6-derived branch and imports no `main` bytes yet. Issue `#63` is
+owned by `hotfix:0.4.7`, not Nova. Conflict-independent packages may enter
+bounded pre-rebase Execution. A stable accepted `main` 0.4.7 and exact Nova
+rebase remain mandatory before protected-path work, increment acceptance,
+final candidate evidence or any claim that depends on the recovered V4
+baseline. Existing B4R bytes/evidence are retained as historical pre-rescope
+material and are neither extended nor claimed as Nova delivery.
 
 ## Product problem
 
@@ -65,12 +76,11 @@ yet supervise workers; remote work introduces cancellation, replay and
 credential risks; and final platform/forge support lacks exact-candidate
 evidence.
 
-Implementing all 17 issues as one parallel wave would mix authority,
+Implementing all 16 issues as one parallel wave would mix authority,
 certification, scheduling, execution, review, provider integration and release
-acceptance. The newly confirmed V4 recovery deadlock additionally leaves
-`source_invalid` and `manifest_invalid` projects without a complete safe
-recovery path before readiness. A mixed wave would also make later failure
-attribution and rollback unreliable.
+acceptance. A mixed wave would also make later failure attribution and rollback
+unreliable. The V4 recovery correction is an external 0.4.7 baseline
+prerequisite and cannot be counted again as a Nova outcome.
 
 ## Product outcome
 
@@ -133,6 +143,12 @@ and cannot retroactively redefine either Sprint's acceptance.
 - Make conformance consumable by admission, benchmarking and platform
   acceptance without treating reported model identity as independent
   attestation.
+- Expose whether the usage/cost and actual Critic-assurance fields required by
+  the shared contract are observed or typed unavailable; never project
+  `not collected` as zero or configured independence as executed attestation.
+- Keep the cross-runner receipt taxonomy, denominators and aggregation under
+  `#75`; consuming that boundary does not expand Nova to deliver Nightwing
+  telemetry.
 
 ### A3. Reproducible benchmark — `#8`
 
@@ -183,6 +199,9 @@ and cannot retroactively redefine either Sprint's acceptance.
   `pipeline.evidence-bound-review-retry-economics`; keep
   `pipeline.critic-context-isolation` under Cyborg's already activated
   ownership unless the PO later transfers it.
+- Emit the Critic-specific validity, convergence and actual assurance inputs
+  required by `#75` while leaving cross-runner usage/cost receipt taxonomy,
+  denominators and public aggregation to that Nightwing Issue.
 
 ### A7. Release preflight — `#56`
 
@@ -279,23 +298,20 @@ and cannot retroactively redefine either Sprint's acceptance.
 - Require at least one proved read-only GitLab cell; zero supported cells
   cannot close the issue.
 
-### B4R. V4 recovery deadlock correction — `#63`
+### Execution-baseline prerequisite — external `#63`
 
-- Make every `source_invalid` and `manifest_invalid` V4 result lead to one
-  complete, closed recovery disposition instead of `nextAction:null`.
-- Distinguish invalid source authority, recognized stale generated projection,
-  unsupported source transition and unavailable evidence without synthesizing
-  source bytes.
-- Generate only an absent `.claude/pipeline.yaml`, bind raw
-  source/preimage/postimage and plan digests, preserve every existing manifest
-  byte by returning `unrepairable`, require explicit confirmation, reject or
-  quarantine drift at the atomic no-replace boundary, and read V4 back after
-  apply.
-- Permit only the exact shipped read-only lifecycle diagnostics before
-  readiness; retain the general pre-ready write prohibition.
-- Prove hostile argv/root/chaining cases plus process-level recovery fixtures.
-- Keep the broader onboarding and documentation program from `#61` in its
-  separate Nightwing scope.
+- Issue `#63` is owned by `hotfix:0.4.7` and is not part of the 16-Issue Nova
+  delivery.
+- Nova performs no further B4R, Bootstrap, installation or runtime-readback
+  implementation before the stable 0.4.7 rebase.
+- A pre-rebase package may proceed only with an exact reviewed write-set that
+  excludes those protected surfaces; uncertainty fails closed into the rebase
+  lane.
+- The rebase must resolve redundant/conflicting B4R bytes against the accepted
+  `main` implementation and rerun its applicable regression coverage.
+- No pre-rebase package receives final increment acceptance or immutable final
+  candidate evidence before that rebase and refreshed readiness readback.
+- Nova cannot claim the `#63` merge, close evidence or product outcome.
 
 ### B5. macOS contract boundary and native-transfer disposition — `#49` → `#72`
 
@@ -309,8 +325,17 @@ and cannot retroactively redefine either Sprint's acceptance.
 ## Sequencing
 
 ```text
-v0.4.6
+current v0.4.6-derived Nova branch
   |
+  +--> approved bounded pre-rebase Nova A packages
+  |      (exact write-set; no Bootstrap/install/runtime-readback/V4 overlap)
+  |
+  +--> stable accepted main 0.4.7
+  |
+  +--> exact Nova rebase + conflict disposition + regenerated bindings
+  |      + refreshed readiness approval
+  |
+  +--> protected-path work and completion of Nova A
   +--> Nova A1 backlog authority (#57)
   +--> Nova A2 conformance (#7)
            |
@@ -333,8 +358,6 @@ v0.4.6
         B2 async/leases           B3 implementation
              |                       |
              +-----------> B4 GitLab
-                         |
-                        B4R V4 recovery
                          |
                          v
               frozen Nova-only candidate
@@ -388,19 +411,25 @@ concurrency is a separately measured capability.
 
 ## Branch and authority policy
 
-- Nova's current product base is delivered and closed `v0.4.6` at the exact
-  commit/tree named above. Sibling Sprints retain their own accepted bases and
-  do not donate unpublished bytes to Nova.
-- Nova does not automatically merge, rebase or cherry-pick `main`, Cyborg or
-  another Sprint.
+- Nova's current bounded pre-rebase working base is delivered and closed
+  `v0.4.6` at the exact commit/tree named above. It authorizes only
+  conflict-independent packages with an exact protected-path-negative
+  write-set.
+- Nova does not merge, rebase or cherry-pick `main`, Cyborg or another Sprint
+  before the stable 0.4.7 rebase decision.
+- Once `main` exposes the stable accepted 0.4.7 baseline, an explicit rebase
+  onto its exact commit/tree is mandatory before protected-path
+  implementation, increment acceptance, final candidate evidence and full
+  readiness approval.
 - Shared behavior comes only from the released base or a separately approved
   common-contract lifecycle.
 - The Nova branch is an explicit feature-branch disposition for this Epic;
   this PRD does not silently rewrite global project calibration.
-- PRD approval resubmits ADR-0043 only for Nova membership: the exact 17 issues
-  above replace its earlier seven-issue Nova list and separately approve
-  placing `#15`, `#29`, `#38`, `#49`, `#51`, `#54`, `#56`, `#57`, `#60` and
-  `#63` in this Epic. ADR-0043's independent-closability rules remain.
+- PRD approval resubmits ADR-0043 only for Nova membership: the exact 16 Issues
+  above replace its earlier allocations. It explicitly removes `#63` from
+  Nova ownership while retaining `#15`, `#49` and `#60` under their current
+  narrowed/current Issue details. ADR-0043's independent-closability rules
+  remain.
 - PRD approval does not supersede ADR-0044. Any production execution,
   remote/credential or additional state-authority boundary needs the technical
   Spec and the explicit ADR decisions named above.
@@ -427,7 +456,7 @@ concurrency is a separately measured capability.
 
 ## Success measures
 
-- All 17 issues have non-vacuous acceptance and exact evidence disposition;
+- All 16 Issues have non-vacuous acceptance and exact evidence disposition;
   incomplete criteria keep the issue and Epic open unless the PO explicitly
   changes scope.
 - 100% of advertised runner, sandbox, worker, forge and platform cells have a
@@ -446,8 +475,9 @@ concurrency is a separately measured capability.
   idempotent and read back.
 - Every accepted delivery produces or advances an authorized canonical
   backlog transition with exact readback.
-- Final Apple Silicon evidence binds the exact frozen Nova candidate and lists
-  every unsupported/unverified cell.
+- Nova's narrowed `#49` disposition binds the exact frozen Nova candidate,
+  preserves only synthetic/non-native claims and identifies `#72` as the sole
+  native Apple-Silicon lifecycle.
 
 ## Principal risks and stop conditions
 
@@ -478,12 +508,12 @@ historical evidence are never rewritten.
 | Let each runner maintain its own canonical backlog | Rejected: creates split-brain ledger state. |
 | Infer completion from issue labels, branches or file presence | Rejected: none is delivery evidence. |
 
-## PO decisions requested
+## PO decisions recorded
 
-Approval of this PRD means:
+The PO approvals recorded on 2026-07-30 mean:
 
-1. the exact 17 approved issues remain in one Nova Epic;
-2. Nova A contains nine foundation issues and Nova B eight bounded
+1. the exact 16 current `sprint:nova` Issues remain in one Nova Epic;
+2. Nova A contains nine foundation Issues and Nova B seven bounded
    continuity/scale/portability
    issues as listed above;
 3. `#57` is the first quality foundation and this repository remains the sole
@@ -493,10 +523,17 @@ Approval of this PRD means:
    and combined integration occurs only after both Sprint Results;
 6. the ADR-0043 Nova membership resubmission and the explicit feature-branch
    disposition are accepted while ADR-0044 remains in force;
-7. live Antigravity/GitLab/external execution requires the later research,
+7. bounded pre-rebase implementation may proceed only for exact write-sets
+   disjoint from Bootstrap, installation, runtime-readback and V4/#63
+   recovery;
+8. stable `main` 0.4.7 plus an exact Nova rebase, conflict disposition and
+   regenerated bindings remain mandatory before protected-path work,
+   increment acceptance and final candidate evidence;
+9. live Antigravity/GitLab/external execution requires the later research,
    Spec, ADR, credential and mutation gates described above; and
-8. after PRD approval, work proceeds only to the technical Spec/readiness
-   gate—no production implementation is authorized.
+10. the high-risk Advisor attempt is accepted only as typed unavailable under
+    an explicit PO exception; no Advisor answer, model identity or sandbox
+    success is claimed.
 
-The requested response for this gate is `PRD approved` or a numbered list of
-required corrections.
+This decision authorizes the bounded lane above, not merge, push, release,
+issue closure or a waiver of the later 0.4.7 rebase/readiness gate.

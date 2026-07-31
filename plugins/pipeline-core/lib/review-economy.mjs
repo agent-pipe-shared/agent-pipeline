@@ -34,6 +34,17 @@ export const REVIEW_LIMITS = Object.freeze({
   productRetries: 1,
   environmentReroutes: 1,
 });
+export const CRITIC_REVIEW_ECONOMY_PROJECTION_SCHEMA = "pipeline.critic-review-economy-projection.v1";
+export const CRITIC_REVIEW_FAILURE_CLASSES = Object.freeze([
+  "no-result",
+  "empty",
+  "timeout",
+  "child",
+  "malformed",
+  "incomplete",
+  "drift",
+  "internal",
+]);
 export const PROGRESS_COMPONENTS = Object.freeze([
   "boundTreeChanges",
   "verifiedOutputBytes",
@@ -197,6 +208,404 @@ export function admitReviewAttempt(input) {
     code: "RE-DELTA-ADMITTED",
     affectedInvariantIds: sortedUnique(input.changedPaths.flatMap((path) => input.pathInvariantMap[path])),
   };
+}
+
+const CRITIC_LINEAGE_ROOT_KEYS = Object.freeze([
+  "schema",
+  "reviewId",
+  "parentReviewId",
+  "candidate",
+  "diff",
+  "references",
+  "packages",
+  "coverage",
+  "request",
+  "lane",
+  "verdict",
+  "findings",
+  "correction",
+  "invalidation",
+  "course",
+  "previousSha256",
+  "recordSha256",
+]);
+const CRITIC_VERDICT_STATUSES = Object.freeze(["pending", "no-findings", "findings", "failed"]);
+const CRITIC_FINDING_SEVERITIES = Object.freeze(["critical", "high", "medium", "low"]);
+const CRITIC_FINDING_DISPOSITIONS = Object.freeze(["open", "fixed", "withdrawn", "superseded"]);
+const CRITIC_SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const CRITIC_SAFE_PATH = /^(?!\/)(?!.*\\)[A-Za-z0-9._/-]{1,512}$/;
+const CRITIC_OID = /^(?:[a-f0-9]{40}|[a-f0-9]{64})$/;
+const CRITIC_PACKET_ID = /^[a-f0-9]{32}$/;
+const CRITIC_INVALIDATION_REASONS = new Set([
+  "explicit-broad-review",
+  "delta-bindings-invalid",
+  "unknown-changed-path",
+  "trust-boundary-change",
+  "impact-ambiguous",
+  "prior-review-failure",
+]);
+
+function criticPath(value) {
+  return typeof value === "string"
+    && CRITIC_SAFE_PATH.test(value)
+    && Buffer.byteLength(value, "utf8") <= 512
+    && value.split("/").every((part) => part !== "" && part !== "." && part !== "..");
+}
+
+function criticSorted(values, valid, { allowEmpty = false } = {}) {
+  return Array.isArray(values)
+    && (allowEmpty || values.length > 0)
+    && values.length <= 256
+    && values.every(valid)
+    && values.every((value, index) => index === 0 || values[index - 1] < value);
+}
+
+function criticSame(left, right) {
+  return canonicalJson(left) === canonicalJson(right);
+}
+
+function criticCompiledRequest(record) {
+  return {
+    packetId: record.request.packetId,
+    candidate: record.candidate,
+    diff: record.diff,
+    references: record.references,
+    packages: record.packages,
+    coverage: {
+      changedPaths: record.coverage.changedPaths,
+      acceptanceIds: record.coverage.acceptanceIds,
+      integrationEdges: record.coverage.integrationEdges,
+    },
+    mode: record.request.mode,
+    admissionCode: record.request.admissionCode,
+  };
+}
+
+function criticPackageCode(packages, coverage) {
+  if (!Array.isArray(packages)
+    || packages.length < 1
+    || packages.length > 256
+    || !packages.every((row) => exactKeys(row, ["id", "subjectSha256", "changedPaths", "integrationEdges"])
+      && CRITIC_SAFE_ID.test(row.id ?? "")
+      && SHA256.test(row.subjectSha256 ?? "")
+      && criticSorted(row.changedPaths, criticPath)
+      && criticSorted(row.integrationEdges, (value) => CRITIC_SAFE_ID.test(value), { allowEmpty: true }))
+    || !packages.every((row, index) => index === 0 || packages[index - 1].id < row.id)) {
+    return "RE-CRITIC-PROJECTION-PACKAGES";
+  }
+  const flattenedPaths = packages.flatMap(({ changedPaths }) => changedPaths);
+  if (new Set(flattenedPaths).size !== flattenedPaths.length) {
+    return "RE-CRITIC-PROJECTION-PACKAGE-OVERLAP";
+  }
+  const packagePaths = [...flattenedPaths].sort();
+  const packageEdges = [...new Set(packages.flatMap(({ integrationEdges }) => integrationEdges))].sort();
+  return criticSame(packagePaths, coverage.changedPaths)
+    && criticSame(packageEdges, coverage.integrationEdges)
+    ? null
+    : "RE-CRITIC-PROJECTION-PACKAGE-CLOSURE";
+}
+
+function criticProjectionRecordCode(record) {
+  if (!exactKeys(record, CRITIC_LINEAGE_ROOT_KEYS)
+    || record.schema !== "pipeline.critic-review-lineage.v1"
+    || !CRITIC_SAFE_ID.test(record.reviewId ?? "")
+    || !(record.parentReviewId === null || CRITIC_SAFE_ID.test(record.parentReviewId))
+    || !exactKeys(record.candidate, ["commit", "tree"])
+    || !CRITIC_OID.test(record.candidate.commit ?? "")
+    || !CRITIC_OID.test(record.candidate.tree ?? "")
+    || !exactKeys(record.diff, ["base", "sha256", "changedPaths"])
+    || !CRITIC_OID.test(record.diff.base ?? "")
+    || !SHA256.test(record.diff.sha256 ?? "")
+    || !criticSorted(record.diff.changedPaths, criticPath)
+    || !exactKeys(record.references, ["packetSha256", "requestSha256", "diffPathsSha256", "governanceSha256"])
+    || !Object.values(record.references).every((value) => SHA256.test(value))
+    || !exactKeys(record.coverage, ["changedPaths", "acceptanceIds", "integrationEdges", "complete", "receiptSha256"])
+    || !criticSorted(record.coverage.changedPaths, criticPath)
+    || !criticSorted(record.coverage.acceptanceIds, (value) => CRITIC_SAFE_ID.test(value))
+    || !criticSorted(record.coverage.integrationEdges, (value) => CRITIC_SAFE_ID.test(value))
+    || typeof record.coverage.complete !== "boolean"
+    || !(record.coverage.receiptSha256 === null || SHA256.test(record.coverage.receiptSha256))
+    || record.coverage.complete !== (record.coverage.receiptSha256 !== null)
+    || criticPackageCode(record.packages, record.coverage)
+    || !exactKeys(record.request, ["packetId", "requestSha256", "compiledSha256", "mode", "admissionCode"])
+    || !CRITIC_PACKET_ID.test(record.request.packetId ?? "")
+    || !SHA256.test(record.request.requestSha256 ?? "")
+    || !SHA256.test(record.request.compiledSha256 ?? "")
+    || !new Set(["full", "delta", "none"]).has(record.request.mode)
+    || typeof record.request.admissionCode !== "string"
+    || !/^RE-[A-Z0-9-]{1,96}$/.test(record.request.admissionCode)
+    || !exactKeys(record.lane, ["laneId", "contextSha256", "independent", "evidenceSha256", "freshFromReviewId"])
+    || !CRITIC_SAFE_ID.test(record.lane.laneId ?? "")
+    || !SHA256.test(record.lane.contextSha256 ?? "")
+    || record.lane.independent !== true
+    || !SHA256.test(record.lane.evidenceSha256 ?? "")
+    || !(record.lane.freshFromReviewId === null || CRITIC_SAFE_ID.test(record.lane.freshFromReviewId))
+    || !exactKeys(record.verdict, ["status", "schemaValid", "resultSha256", "failure"])
+    || !CRITIC_VERDICT_STATUSES.includes(record.verdict.status)
+    || typeof record.verdict.schemaValid !== "boolean"
+    || !(record.verdict.resultSha256 === null || SHA256.test(record.verdict.resultSha256))
+    || !(record.verdict.failure === null || CRITIC_REVIEW_FAILURE_CLASSES.includes(record.verdict.failure))
+    || !Array.isArray(record.findings)
+    || record.findings.length > 256
+    || !record.findings.every((finding) => exactKeys(finding, ["id", "priorFindingId", "severity", "status", "evidenceSha256"])
+      && CRITIC_SAFE_ID.test(finding.id ?? "")
+      && (finding.priorFindingId === null || CRITIC_SAFE_ID.test(finding.priorFindingId))
+      && CRITIC_FINDING_SEVERITIES.includes(finding.severity)
+      && CRITIC_FINDING_DISPOSITIONS.includes(finding.status)
+      && SHA256.test(finding.evidenceSha256 ?? ""))
+    || !record.findings.every((finding, index) => index === 0 || record.findings[index - 1].id < finding.id)
+    || !(record.correction === null || (exactKeys(record.correction, ["commit", "deltaSha256", "impactSha256"])
+      && CRITIC_OID.test(record.correction.commit ?? "")
+      && SHA256.test(record.correction.deltaSha256 ?? "")
+      && SHA256.test(record.correction.impactSha256 ?? "")))
+    || !exactKeys(record.invalidation, ["kind", "reason", "evidenceSha256"])
+    || !new Set(["none", "full-review-required"]).has(record.invalidation.kind)
+    || !(record.invalidation.reason === null || CRITIC_INVALIDATION_REASONS.has(record.invalidation.reason))
+    || !(record.invalidation.evidenceSha256 === null || SHA256.test(record.invalidation.evidenceSha256))
+    || !exactKeys(record.course, ["reviewRound", "correctionCommitCount", "maxReviewRounds", "maxCorrectionCommits", "status"])
+    || record.course.maxReviewRounds !== REVIEW_LIMITS.criticRounds
+    || record.course.maxCorrectionCommits !== REVIEW_LIMITS.correctionCommits
+    || !safeInteger(record.course.reviewRound, REVIEW_LIMITS.criticRounds + 1)
+    || record.course.reviewRound < 1
+    || !safeInteger(record.course.correctionCommitCount, REVIEW_LIMITS.correctionCommits + 1)
+    || !new Set(["admitted", "po-course-gate"]).has(record.course.status)
+    || !(record.previousSha256 === null || SHA256.test(record.previousSha256))
+    || !SHA256.test(record.recordSha256 ?? "")
+    || record.recordSha256 !== sha256Canonical(Object.fromEntries(
+      Object.entries(record).filter(([key]) => key !== "recordSha256"),
+    ))) {
+    return "RE-CRITIC-PROJECTION-SHAPE";
+  }
+  const admitted = record.course.status === "admitted";
+  const exhausted = record.course.reviewRound > REVIEW_LIMITS.criticRounds
+    || record.course.correctionCommitCount > REVIEW_LIMITS.correctionCommits;
+  const noInvalidation = record.invalidation.kind === "none"
+    && record.invalidation.reason === null
+    && record.invalidation.evidenceSha256 === null;
+  const fullInvalidation = record.invalidation.kind === "full-review-required"
+    && CRITIC_INVALIDATION_REASONS.has(record.invalidation.reason)
+    && SHA256.test(record.invalidation.evidenceSha256 ?? "");
+  if (!criticSame(record.diff.changedPaths, record.coverage.changedPaths)
+    || record.request.requestSha256 !== record.references.requestSha256
+    || record.request.compiledSha256 !== sha256Canonical(criticCompiledRequest(record))
+    || admitted === exhausted
+    || admitted === (record.request.mode === "none")
+    || record.parentReviewId === null
+      && (record.previousSha256 !== null || record.lane.freshFromReviewId !== null || record.correction !== null)
+    || record.parentReviewId !== null
+      && (record.previousSha256 === null || record.lane.freshFromReviewId !== record.parentReviewId)
+    || record.parentReviewId === null
+      && record.findings.some(({ priorFindingId, status }) => priorFindingId !== null || status !== "open")
+    || record.parentReviewId === null
+      && ["pending", "failed"].includes(record.verdict.status)
+      && record.findings.length !== 0
+    || record.verdict.status === "pending"
+      && (record.verdict.schemaValid || record.verdict.resultSha256 !== null || record.verdict.failure !== null || record.coverage.complete)
+    || ["no-findings", "findings"].includes(record.verdict.status)
+      && (!record.verdict.schemaValid || !SHA256.test(record.verdict.resultSha256 ?? "")
+        || record.verdict.failure !== null || !record.coverage.complete)
+    || record.verdict.status === "no-findings"
+      && record.findings.some(({ status }) => status === "open")
+    || record.verdict.status === "findings"
+      && !record.findings.some(({ status }) => status === "open")
+    || record.verdict.status === "failed"
+      && (record.verdict.schemaValid || !CRITIC_REVIEW_FAILURE_CLASSES.includes(record.verdict.failure))
+    || record.verdict.failure === "no-result"
+      && record.verdict.resultSha256 !== null
+    || ["empty", "malformed", "incomplete"].includes(record.verdict.failure)
+      && !SHA256.test(record.verdict.resultSha256 ?? "")
+    || record.verdict.failure === "incomplete"
+      && record.coverage.complete
+    || record.request.mode === "delta"
+      && !noInvalidation
+    || record.request.mode === "full"
+      && record.parentReviewId === null
+      && !noInvalidation
+    || record.request.mode === "full"
+      && record.parentReviewId !== null
+      && !fullInvalidation
+    || record.correction !== null
+      && (record.correction.commit !== record.candidate.commit
+        || record.correction.deltaSha256 !== record.diff.sha256
+        || record.correction.impactSha256 !== sha256Canonical(record.coverage.integrationEdges))
+    || record.findings.some(({ status }) => status === "superseded")
+      && !fullInvalidation
+    || record.course.status === "po-course-gate"
+      && (record.parentReviewId === null
+        || record.request.mode !== "none"
+        || record.request.admissionCode !== "RE-PO-COURSE-GATE"
+        || record.verdict.status !== "pending"
+        || record.correction !== null
+        || !noInvalidation)) {
+    return "RE-CRITIC-PROJECTION-SEMANTICS";
+  }
+  return null;
+}
+
+function criticProjectionTransitionCode(parent, current) {
+  if (parent.course.status !== "admitted"
+    || current.parentReviewId !== parent.reviewId
+    || current.previousSha256 !== parent.recordSha256
+    || current.reviewId === parent.reviewId
+    || current.lane.freshFromReviewId !== parent.reviewId
+    || current.lane.laneId === parent.lane.laneId
+    || current.lane.contextSha256 === parent.lane.contextSha256) {
+    return "RE-CRITIC-PROJECTION-CHAIN";
+  }
+  if (current.course.status === "po-course-gate") {
+    if (!criticSame(current.candidate, parent.candidate)
+      || !criticSame(current.diff, parent.diff)
+      || !criticSame(current.findings, parent.findings)) {
+      return "RE-CRITIC-PROJECTION-COURSE-GATE-BINDING";
+    }
+    const roundStep = current.course.reviewRound - parent.course.reviewRound;
+    const correctionStep = current.course.correctionCommitCount - parent.course.correctionCommitCount;
+    const boundedNextStep = [0, 1].includes(roundStep)
+      && [0, 1].includes(correctionStep)
+      && roundStep + correctionStep >= 1;
+    const crossesRound = parent.course.reviewRound === REVIEW_LIMITS.criticRounds
+      && current.course.reviewRound === REVIEW_LIMITS.criticRounds + 1;
+    const crossesCorrection = parent.course.correctionCommitCount === REVIEW_LIMITS.correctionCommits
+      && current.course.correctionCommitCount === REVIEW_LIMITS.correctionCommits + 1;
+    return boundedNextStep && (crossesRound || crossesCorrection)
+      ? null
+      : "RE-CRITIC-PROJECTION-COURSE-GATE";
+  }
+  if (current.course.reviewRound !== parent.course.reviewRound + 1) {
+    return "RE-CRITIC-PROJECTION-COUNTERS";
+  }
+  const correctionStep = current.course.correctionCommitCount - parent.course.correctionCommitCount;
+  if (![0, 1].includes(correctionStep)) return "RE-CRITIC-PROJECTION-COUNTERS";
+  if (correctionStep === 1) {
+    if (current.correction === null
+      || current.diff.base !== parent.candidate.commit
+      || current.correction.commit !== current.candidate.commit) {
+      return "RE-CRITIC-PROJECTION-CORRECTION";
+    }
+  } else if (current.correction !== null
+    || !criticSame(current.candidate, parent.candidate)
+    || !criticSame(current.diff, parent.diff)
+    || parent.verdict.status !== "failed"
+    || current.invalidation.reason !== "prior-review-failure") {
+    return "RE-CRITIC-PROJECTION-RERUN";
+  }
+  if (["pending", "failed"].includes(current.verdict.status)) {
+    return criticSame(current.findings, parent.findings)
+      ? null
+      : "RE-CRITIC-PROJECTION-RETAINED-FINDINGS";
+  }
+  const parentById = new Map(parent.findings.map((finding) => [finding.id, finding]));
+  const currentById = new Map(current.findings.map((finding) => [finding.id, finding]));
+  for (const prior of parent.findings.filter(({ status }) => status === "open")) {
+    const next = currentById.get(prior.id);
+    if (!next || next.priorFindingId !== prior.id || next.severity !== prior.severity) {
+      return "RE-CRITIC-PROJECTION-FINDING-DROPPED";
+    }
+  }
+  for (const finding of current.findings) {
+    const prior = finding.priorFindingId === null ? null : parentById.get(finding.priorFindingId);
+    if (prior === null) {
+      if (finding.status !== "open" || parentById.has(finding.id)) {
+        return "RE-CRITIC-PROJECTION-NEW-FINDING";
+      }
+    } else if (!prior || prior.status !== "open" || finding.id !== prior.id) {
+      return "RE-CRITIC-PROJECTION-FINDING-LINEAGE";
+    }
+  }
+  return null;
+}
+
+/**
+ * Project privacy-safe convergence and course consumption from validated A5
+ * lineage records. The projection intentionally has no path, finding ID,
+ * lane, provider, model, usage, cost or assurance channel. Retained evidence
+ * is counted as occurrence only; the terminal status derives from the typed
+ * verdict and never uses a generic PASS value.
+ */
+export function projectCriticReviewEconomy(records) {
+  if (!Array.isArray(records) || records.length < 1 || records.length > REVIEW_LIMITS.criticRounds + 1) {
+    return { ok: false, code: "RE-CRITIC-PROJECTION-INPUT" };
+  }
+  const reviewIds = new Set();
+  const laneIds = new Set();
+  const contextDigests = new Set();
+  for (let index = 0; index < records.length; index += 1) {
+    const invalid = criticProjectionRecordCode(records[index]);
+    if (invalid) return { ok: false, code: invalid, index };
+    const record = records[index];
+    if (reviewIds.has(record.reviewId)
+      || laneIds.has(record.lane.laneId)
+      || contextDigests.has(record.lane.contextSha256)) {
+      return { ok: false, code: "RE-CRITIC-PROJECTION-REPLAY", index };
+    }
+    reviewIds.add(record.reviewId);
+    laneIds.add(record.lane.laneId);
+    contextDigests.add(record.lane.contextSha256);
+    if (index === 0) {
+      if (record.parentReviewId !== null || record.previousSha256 !== null
+        || record.course.status !== "admitted"
+        || record.course.reviewRound !== 1
+        || record.course.correctionCommitCount !== 0) {
+        return { ok: false, code: "RE-CRITIC-PROJECTION-GENESIS", index };
+      }
+    } else {
+      const parent = records[index - 1];
+      const transitionInvalid = criticProjectionTransitionCode(parent, record);
+      if (transitionInvalid) return { ok: false, code: transitionInvalid, index };
+    }
+  }
+  const admitted = records.filter(({ course }) => course.status === "admitted");
+  const head = records.at(-1);
+  const latestFindings = head.findings;
+  const countBy = (values, catalog, key) => Object.fromEntries(
+    catalog.map((entry) => [entry, values.filter((value) => value[key] === entry).length]),
+  );
+  const verdicts = {
+    pending: admitted.filter(({ verdict }) => verdict.status === "pending").length,
+    noFindings: admitted.filter(({ verdict }) => verdict.status === "no-findings").length,
+    findings: admitted.filter(({ verdict }) => verdict.status === "findings").length,
+    failed: admitted.filter(({ verdict }) => verdict.status === "failed").length,
+  };
+  const failures = Object.fromEntries(CRITIC_REVIEW_FAILURE_CLASSES.map((failure) => [
+    failure,
+    admitted.filter(({ verdict }) => verdict.failure === failure).length,
+  ]));
+  const projection = {
+    schema: CRITIC_REVIEW_ECONOMY_PROJECTION_SCHEMA,
+    inputSha256: sha256Canonical(records.map(({ recordSha256 }) => recordSha256)),
+    requests: {
+      admitted: admitted.length,
+      courseGated: records.length - admitted.length,
+    },
+    consumption: {
+      reviewRounds: Math.max(...admitted.map(({ course }) => course.reviewRound)),
+      correctionCommits: Math.max(...admitted.map(({ course }) => course.correctionCommitCount)),
+      maxReviewRounds: REVIEW_LIMITS.criticRounds,
+      maxCorrectionCommits: REVIEW_LIMITS.correctionCommits,
+      fullReviews: admitted.filter(({ request }) => request.mode === "full").length,
+      deltaReviews: admitted.filter(({ request }) => request.mode === "delta").length,
+    },
+    verdicts,
+    failures,
+    findings: {
+      total: latestFindings.length,
+      bySeverity: countBy(latestFindings, CRITIC_FINDING_SEVERITIES, "severity"),
+      byDisposition: countBy(latestFindings, CRITIC_FINDING_DISPOSITIONS, "status"),
+    },
+    retainedStages: {
+      coverageReceipts: admitted.filter(({ coverage }) => coverage.receiptSha256 !== null).length,
+      laneEvidence: admitted.length,
+      resultDigests: admitted.filter(({ verdict }) => verdict.resultSha256 !== null).length,
+    },
+    status: head.course.status === "po-course-gate"
+      ? "po-course-gate"
+      : head.verdict.status === "no-findings"
+        ? "converged"
+        : head.verdict.status === "findings"
+          ? "findings-open"
+          : head.verdict.status,
+  };
+  return { ok: true, code: "RE-CRITIC-PROJECTION", projection };
 }
 
 function fallbackId(kind, seed) {

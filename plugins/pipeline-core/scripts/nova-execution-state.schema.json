@@ -1,1 +1,198 @@
-{"$schema":"https://json-schema.org/draft/2020-12/schema","$id":"pipeline.nova-execution-state.v1","type":"object","additionalProperties":false,"required":["schema","subject","subjectSha256","state","revision","observation","result","reason","previousSha256"],"properties":{"schema":{"const":"pipeline.nova-execution-state.v1"},"subject":{"$ref":"pipeline.nova-execution-subject.v1"},"subjectSha256":{"type":"string","pattern":"^[a-f0-9]{64}$"},"state":{"enum":["created","admitted","rejected","running","paused","cancel-requested","cancelled","succeeded-unverified","verified","failed","timed-out","lost","completed-undelivered","unavailable","invalidated"]},"revision":{"type":"integer","minimum":0},"observation":{"type":["object","null"]},"result":{"type":["object","null"]},"reason":{"type":["string","null"]},"previousSha256":{"type":["string","null"],"pattern":"^[a-f0-9]{64}$"}}}
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.nova-execution-state.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "subject",
+    "subjectSha256",
+    "state",
+    "revision",
+    "observation",
+    "result",
+    "reason",
+    "previousSha256"
+  ],
+  "properties": {
+    "schema": {
+      "const": "pipeline.nova-execution-state.v1"
+    },
+    "subject": {
+      "$ref": "pipeline.nova-execution-subject.v1"
+    },
+    "subjectSha256": {
+      "$ref": "#/$defs/sha"
+    },
+    "state": {
+      "enum": [
+        "created",
+        "admitted",
+        "rejected",
+        "running",
+        "paused",
+        "cancel-requested",
+        "cancelled",
+        "succeeded-unverified",
+        "verified",
+        "failed",
+        "timed-out",
+        "lost",
+        "completed-undelivered",
+        "unavailable",
+        "invalidated"
+      ]
+    },
+    "revision": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "observation": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/observation"
+        }
+      ]
+    },
+    "result": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/result"
+        }
+      ]
+    },
+    "reason": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 512
+        }
+      ]
+    },
+    "previousSha256": {
+      "oneOf": [
+        {
+          "type": "null"
+        },
+        {
+          "$ref": "#/$defs/sha"
+        }
+      ]
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "state": {
+            "const": "verified"
+          }
+        },
+        "required": [
+          "state"
+        ]
+      },
+      "then": {
+        "properties": {
+          "result": {
+            "type": "object",
+            "properties": {
+              "status": {
+                "const": "verified"
+              }
+            },
+            "required": [
+              "status"
+            ]
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "sha": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source",
+        "monotonicMs",
+        "wallTime",
+        "rawSha256",
+        "adapterState",
+        "rawStateSha256"
+      ],
+      "properties": {
+        "source": {
+          "$ref": "#/$defs/id"
+        },
+        "monotonicMs": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "wallTime": {
+          "oneOf": [
+            {
+              "type": "string",
+              "format": "date-time"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "rawSha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "adapterState": {
+          "$ref": "#/$defs/id"
+        },
+        "rawStateSha256": {
+          "$ref": "#/$defs/sha"
+        }
+      }
+    },
+    "result": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "resultSha256",
+        "bytes",
+        "status"
+      ],
+      "properties": {
+        "resultSha256": {
+          "$ref": "#/$defs/sha"
+        },
+        "bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "status": {
+          "enum": [
+            "delivered",
+            "verified"
+          ]
+        }
+      }
+    }
+  }
+}

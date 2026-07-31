@@ -21,6 +21,14 @@ const PATH = /^(?!\/)(?!.*(?:^|\/)\.\.?(?:\/|$))[A-Za-z0-9._@+\/-]{1,240}$/u;
 const ISO = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/u;
 const DOCUMENTS = Object.freeze(["prd", "spec", "acceptance", "result"]);
 const FINAL_GATES = Object.freeze(["verify", "security", "critic", "remote", "human"]);
+const BLOCKER_REASONS = Object.freeze([
+  "candidate-base-drift",
+  "candidate-repository-drift",
+  "repository-not-clean",
+  "version-decision-mismatch",
+  "consent-not-approved",
+  "gg03-candidate-mismatch",
+]);
 
 export class ReleasePreflightError extends Error {
   constructor(code, message) { super(message); this.name = "ReleasePreflightError"; this.code = code; }
@@ -74,7 +82,7 @@ function validateDocumentation(value) {
 }
 function validateLifecycle(value) {
   exact(value, ["featureId", "manifestPath", "manifestSha256", "status"], "lifecycle");
-  if (typeof value.featureId !== "string" || value.featureId.length === 0 || /[\0\r\n]/u.test(value.featureId)) fail("RPF-LIFECYCLE", "lifecycle.featureId is invalid");
+  if (typeof value.featureId !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(value.featureId)) fail("RPF-LIFECYCLE", "lifecycle.featureId is invalid");
   path(value.manifestPath, "lifecycle.manifestPath"); digest(value.manifestSha256, "lifecycle.manifestSha256");
   if (value.status !== "prepared") fail("RPF-LIFECYCLE", "lifecycle.status must be prepared");
 }
@@ -94,6 +102,7 @@ function validateRetention(value, documentation) {
       digest(record.archiveDigest, "archive digest"); digest(record.archiveProvenanceSha256, "archive provenance");
     } else if (archivePresent) fail("RPF-RETENTION", "active retention cannot claim archive evidence");
   }
+  if (value.records.some((record, index) => index > 0 && value.records[index - 1].path >= record.path)) fail("RPF-RETENTION", "retention records must be sorted by distinct path");
 }
 function validateConsent(value) {
   exact(value, ["authoritySha256", "decisionId", "evaluatedAt", "expiresAt", "status"], "consent");
@@ -117,7 +126,7 @@ function validateGates(value) {
   const seen = new Set();
   for (const [index, gate] of value.inventory.entries()) {
     exact(gate, ["id", "kind", "status"], `gates.inventory[${index}]`);
-    if (!FINAL_GATES.includes(gate.id) || seen.has(gate.id)) fail("RPF-GATES", "gate inventory has an unknown or duplicate gate");
+    if (gate.id !== FINAL_GATES[index] || seen.has(gate.id)) fail("RPF-GATES", "gate inventory must use the canonical final-gate order");
     seen.add(gate.id);
     const expectedKind = ["remote", "human"].includes(gate.id) ? "external" : "local-final";
     if (gate.kind !== expectedKind || gate.status !== "pending") fail("RPF-GATES", "gate inventory must retain pending local-final and external gates separately");
@@ -125,7 +134,7 @@ function validateGates(value) {
 }
 function validateExtensions(value) {
   exact(value, ["registrySha256", "requirements", "schema", "status"], "extensions");
-  if (value.schema !== RELEASE_PREFLIGHT_EXTENSION_SCHEMA || !["none", "registered"].includes(value.status) || !Array.isArray(value.requirements)) fail("RPF-EXTENSION", "extension input is invalid");
+  if (value.schema !== RELEASE_PREFLIGHT_EXTENSION_SCHEMA || !["none", "registered"].includes(value.status) || !Array.isArray(value.requirements) || value.requirements.length > 256) fail("RPF-EXTENSION", "extension input is invalid");
   if (value.status === "none") { if (value.registrySha256 !== null || value.requirements.length !== 0) fail("RPF-EXTENSION", "empty extension input cannot carry a registry or requirements"); return; }
   digest(value.registrySha256, "extensions.registrySha256");
   const identifiers = [];
@@ -184,6 +193,8 @@ export function createReleasePreflight(input) {
 export function validateReleasePreflight(record) {
   exact(record, ["base", "candidate", "consent", "documentation", "extensions", "gates", "lifecycle", "preflightId", "recordSha256", "reasons", "repository", "retention", "schema", "status", "version"], "release preflight record");
   if (record.schema !== RELEASE_PREFLIGHT_SCHEMA) fail("RPF-SCHEMA", "release preflight schema is invalid");
+  if (!["ready", "blocked"].includes(record.status) || !Array.isArray(record.reasons) || record.reasons.length > BLOCKER_REASONS.length || !record.reasons.every((reason) => BLOCKER_REASONS.includes(reason))) fail("RPF-STATUS", "release preflight status or reasons are invalid");
+  if (typeof record.recordSha256 !== "string" || !SHA256.test(record.recordSha256)) fail("RPF-HASH", "release preflight record hash is invalid");
   const expected = createReleasePreflight({
     preflightId: record.preflightId, candidate: record.candidate, base: record.base, version: record.version, repository: record.repository,
     documentation: record.documentation, lifecycle: record.lifecycle, retention: record.retention, consent: record.consent, gates: record.gates, extensions: record.extensions,

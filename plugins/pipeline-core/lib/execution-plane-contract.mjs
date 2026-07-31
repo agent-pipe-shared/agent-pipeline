@@ -23,9 +23,13 @@ function freeze(v) { if (v && typeof v === "object" && !Object.isFrozen(v)) { Ob
 export function canonicalExecutionJson(v) { if (Array.isArray(v)) return `[${v.map(canonicalExecutionJson).join(",")}]`; if (v && typeof v === "object") return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${canonicalExecutionJson(v[k])}`).join(",")}}`; return JSON.stringify(v); }
 const hash = (v) => createHash("sha256").update(canonicalExecutionJson(v), "utf8").digest("hex");
 const sorted = (v, predicate) => Array.isArray(v) && v.length <= 256 && v.every(predicate) && v.every((x, i) => i === 0 || canonicalExecutionJson(v[i - 1]) < canonicalExecutionJson(x));
-const path = (v) => typeof v === "string" && v.length > 0 && v.length <= 512 && !v.startsWith("/") && !v.includes("\\") && !v.split("/").some((x) => !x || x === "." || x === "..");
+const path = (v) => typeof v === "string" && Buffer.byteLength(v, "utf8") > 0 && Buffer.byteLength(v, "utf8") <= 512 && !v.includes("\0") && !v.startsWith("/") && !v.includes("\\") && !v.split("/").some((x) => !x || x === "." || x === "..");
 const authority = (v) => exact(v, ["kind", "sha256"]) && ID.test(v.kind) && SHA.test(v.sha256);
-const capacity = (v) => exact(v, ["unit", "limit"]) && ID.test(v.unit) && Number.isSafeInteger(v.limit) && v.limit >= 0;
+const capacity = (v) => exact(v, ["unit", "value", "source", "status"])
+  && ID.test(v.unit)
+  && ID.test(v.source)
+  && ["known", "unknown", "unavailable"].includes(v.status)
+  && (v.status === "known" ? Number.isSafeInteger(v.value) && v.value >= 0 : v.value === null);
 function subjectCode(v) {
   if (!exact(v, ["schema", "repository", "baseCommit", "baseTree", "candidateCommit", "candidateTree", "packageId", "dispatchId", "attempt", "queueRevision", "authorityDigests", "writePaths", "resources"])) return "SHAPE:subject";
   if (v.schema !== NOVA_EXECUTION_SUBJECT_SCHEMA) return "SCHEMA:subject";
@@ -42,16 +46,46 @@ function requestCode(v, digest = true) {
   if (!exact(v, keys)) return "SHAPE:request"; if (v.schema !== EXECUTION_PLANE_REQUEST_SCHEMA) return "SCHEMA:request";
   if (!ID.test(v.requestId) || subjectCode(v.subject) || !exact(v.adapter, ["kind", "version", "implementationSha256"]) || !ID.test(v.adapter.kind) || !ID.test(v.adapter.version) || !SHA.test(v.adapter.implementationSha256) || !["in-process", "local-process", "local-isolated", "external-synthetic"].includes(v.locality)) return "AUTHORITY:request-adapter";
   if (!exact(v.workspace, ["identitySha256", "separation", "assuranceEvidenceSha256"]) || !SHA.test(v.workspace.identitySha256) || !["observed", "not-observed", "unavailable"].includes(v.workspace.separation) || !SHA.test(v.workspace.assuranceEvidenceSha256) || !exact(v.network, ["mode", "egressClasses"]) || !["none", "restricted", "open"].includes(v.network.mode) || !sorted(v.network.egressClasses, (x) => ID.test(x))) return "SHAPE:request-environment";
-  if (!sorted(v.mounts, (x) => exact(x, ["sourceClass", "targetClass", "mode", "evidenceSha256"]) && [x.sourceClass, x.targetClass].every((y) => ID.test(y)) && ["read-only", "read-write"].includes(x.mode) && SHA.test(x.evidenceSha256)) || !sorted(v.writePaths, path) || canonicalExecutionJson(v.writePaths) !== canonicalExecutionJson(v.subject.writePaths) || !sorted(v.resources, capacity) || !sorted(v.sidecars, (x) => exact(x, ["kind", "evidenceSha256"]) && ID.test(x.kind) && SHA.test(x.evidenceSha256))) return "AUTHORITY:request-capability";
-  if (!(v.credentialLease === null || (exact(v.credentialLease, ["leaseSha256"]) && SHA.test(v.credentialLease.leaseSha256))) || !exact(v.heartbeat, ["intervalMs", "orphanAfterMs"]) || !Number.isSafeInteger(v.heartbeat.intervalMs) || !Number.isSafeInteger(v.heartbeat.orphanAfterMs) || v.heartbeat.intervalMs < 1 || v.heartbeat.orphanAfterMs < v.heartbeat.intervalMs || !exact(v.timeout, ["absoluteMs", "maxPauseMs"]) || !Number.isSafeInteger(v.timeout.absoluteMs) || !Number.isSafeInteger(v.timeout.maxPauseMs) || v.timeout.absoluteMs < 1 || v.timeout.maxPauseMs < 0 || !exact(v.cancellation, ["supported", "deadlineMs"]) || typeof v.cancellation.supported !== "boolean" || !Number.isSafeInteger(v.cancellation.deadlineMs) || v.cancellation.deadlineMs < 0 || !exact(v.resultDelivery, ["mode", "maxBytes", "destinationClass"]) || !["inline-digest", "import-only"].includes(v.resultDelivery.mode) || !Number.isSafeInteger(v.resultDelivery.maxBytes) || v.resultDelivery.maxBytes < 0 || !ID.test(v.resultDelivery.destinationClass)) return "BOUND:request-contract";
+  if (v.network.mode === "none" && v.network.egressClasses.length !== 0) return "AUTHORITY:request-network";
+  if ((v.locality === "local-isolated" && v.workspace.separation !== "observed") || (v.locality === "external-synthetic" && (v.adapter.kind !== "synthetic" || v.network.mode !== "none" || v.credentialLease !== null))) return "AUTHORITY:request-locality";
+  if (!sorted(v.mounts, (x) => exact(x, ["sourceClass", "targetClass", "mode", "evidenceSha256"]) && [x.sourceClass, x.targetClass].every((y) => ID.test(y)) && ["read-only", "read-write"].includes(x.mode) && SHA.test(x.evidenceSha256)) || !sorted(v.writePaths, path) || canonicalExecutionJson(v.writePaths) !== canonicalExecutionJson(v.subject.writePaths) || !sorted(v.resources, capacity) || !v.resources.every((x) => x.status === "known") || canonicalExecutionJson(v.resources.map((x) => x.unit)) !== canonicalExecutionJson(v.subject.resources) || !sorted(v.sidecars, (x) => exact(x, ["kind", "evidenceSha256"]) && ID.test(x.kind) && SHA.test(x.evidenceSha256))) return "AUTHORITY:request-capability";
+  if (!(v.credentialLease === null || (exact(v.credentialLease, ["leaseSha256"]) && SHA.test(v.credentialLease.leaseSha256))) || !exact(v.heartbeat, ["intervalMs", "orphanAfterMs"]) || !Number.isSafeInteger(v.heartbeat.intervalMs) || !Number.isSafeInteger(v.heartbeat.orphanAfterMs) || v.heartbeat.intervalMs < 1 || v.heartbeat.orphanAfterMs <= v.heartbeat.intervalMs || !exact(v.timeout, ["absoluteMs", "maxPauseMs"]) || !Number.isSafeInteger(v.timeout.absoluteMs) || !Number.isSafeInteger(v.timeout.maxPauseMs) || v.timeout.absoluteMs < 1 || v.timeout.maxPauseMs < 0 || v.timeout.maxPauseMs > v.timeout.absoluteMs || !exact(v.cancellation, ["supported", "deadlineMs"]) || typeof v.cancellation.supported !== "boolean" || (v.cancellation.supported ? !Number.isSafeInteger(v.cancellation.deadlineMs) || v.cancellation.deadlineMs < 1 : v.cancellation.deadlineMs !== null) || !exact(v.resultDelivery, ["mode", "maxBytes", "destinationClass"]) || !["inline-digest", "import-only"].includes(v.resultDelivery.mode) || !Number.isSafeInteger(v.resultDelivery.maxBytes) || v.resultDelivery.maxBytes < 0 || !ID.test(v.resultDelivery.destinationClass)) return "BOUND:request-contract";
   if (!exact(v.frozenBinding, ["controlExecutionExchangeSha256", "invocationRequestSha256"]) || !SHA.test(v.frozenBinding.controlExecutionExchangeSha256) || !SHA.test(v.frozenBinding.invocationRequestSha256) || !SHA.test(v.requestSha256)) return "AUTHORITY:request-frozen";
   if (digest && executionRequestDigest(v) !== v.requestSha256) return "CONFLICT:request-digest"; return null;
 }
 export function executionRequestDigest(v) { if (!v || typeof v !== "object") return null; const { requestSha256, ...body } = v; return hash(body); }
 export function validateExecutionPlaneRequest(v) { const code = requestCode(v); return code ? { ok: false, code } : { ok: true, code: null }; }
 export function createExecutionPlaneRequest(input) { const v = { schema: EXECUTION_PLANE_REQUEST_SCHEMA, ...clone(input), requestSha256: "0".repeat(64) }; if (Object.hasOwn(input, "schema") || Object.hasOwn(input, "requestSha256") || requestCode(v, false)) throw new Error(requestCode(v, false) ?? "SHAPE:request-input"); v.requestSha256 = executionRequestDigest(v); return freeze(v); }
+export function validateExecutionPlaneAdmission(v, expected) {
+  const code = requestCode(v);
+  if (code) return { ok: false, code };
+  const keys = ["subjectSha256", "candidateCommit", "candidateTree", "queueRevision", "controlExecutionExchangeSha256", "invocationRequestSha256", "seenRequestSha256s"];
+  if (!exact(expected, keys)
+    || !SHA.test(expected.subjectSha256)
+    || !OID.test(expected.candidateCommit)
+    || !OID.test(expected.candidateTree)
+    || !Number.isSafeInteger(expected.queueRevision)
+    || expected.queueRevision < 0
+    || !SHA.test(expected.controlExecutionExchangeSha256)
+    || !SHA.test(expected.invocationRequestSha256)
+    || !sorted(expected.seenRequestSha256s, (x) => SHA.test(x))) return { ok: false, code: "SHAPE:admission-context" };
+  if (expected.seenRequestSha256s.includes(v.requestSha256)) return { ok: false, code: "REPLAY:request" };
+  if (executionSubjectDigest(v.subject) !== expected.subjectSha256) return { ok: false, code: "STALE:request-subject" };
+  if (v.subject.candidateCommit !== expected.candidateCommit || v.subject.candidateTree !== expected.candidateTree || v.subject.queueRevision !== expected.queueRevision) return { ok: false, code: "STALE:request-candidate" };
+  if (v.frozenBinding.controlExecutionExchangeSha256 !== expected.controlExecutionExchangeSha256 || v.frozenBinding.invocationRequestSha256 !== expected.invocationRequestSha256) return { ok: false, code: "STALE:request-frozen" };
+  return { ok: true, code: null };
+}
 
-function validObservation(v) { return v === null || (exact(v, ["monotonicMs", "adapterState", "rawStateSha256"]) && Number.isSafeInteger(v.monotonicMs) && v.monotonicMs >= 0 && ID.test(v.adapterState) && SHA.test(v.rawStateSha256)); }
+function validObservation(v) {
+  return v === null || (exact(v, ["source", "monotonicMs", "wallTime", "rawSha256", "adapterState", "rawStateSha256"])
+    && ID.test(v.source)
+    && Number.isSafeInteger(v.monotonicMs)
+    && v.monotonicMs >= 0
+    && (v.wallTime === null || (typeof v.wallTime === "string" && !Number.isNaN(Date.parse(v.wallTime))))
+    && SHA.test(v.rawSha256)
+    && ID.test(v.adapterState)
+    && SHA.test(v.rawStateSha256));
+}
 function validResult(v) { return v === null || (exact(v, ["resultSha256", "bytes", "status"]) && SHA.test(v.resultSha256) && Number.isSafeInteger(v.bytes) && v.bytes >= 0 && ["delivered", "verified"].includes(v.status)); }
 function stateCode(v) { if (!exact(v, ["schema", "subject", "subjectSha256", "state", "revision", "observation", "result", "reason", "previousSha256"])) return "SHAPE:state"; if (v.schema !== NOVA_EXECUTION_STATE_SCHEMA) return "SCHEMA:state"; if (subjectCode(v.subject) || executionSubjectDigest(v.subject) !== v.subjectSha256 || !STATES.has(v.state) || !Number.isSafeInteger(v.revision) || v.revision < 0 || !validObservation(v.observation) || !validResult(v.result) || !(v.reason === null || (typeof v.reason === "string" && v.reason.length > 0 && v.reason.length <= 512)) || !(v.previousSha256 === null || SHA.test(v.previousSha256))) return "BOUND:state"; if (v.state === "verified" && v.result?.status !== "verified") return "AUTHORITY:verifier"; return null; }
 export function executionStateDigest(v) { return stateCode(v) ? null : hash(v); }
@@ -62,9 +96,9 @@ export function normalizeSyntheticExecutionOutcome(expected, outcome) {
   const s = expected.subject; if (outcome.dispatchId !== s.dispatchId || outcome.attempt !== s.attempt || outcome.candidateCommit !== s.candidateCommit) return { ok: false, code: "STALE:outcome", state: null };
   const map = { admitted: "admitted", running: "running", success: "succeeded-unverified", failure: "failed", timeout: "timed-out", lostHeartbeat: "lost", completedUndelivered: "completed-undelivered", verifierPassed: "verified" };
   if (outcome.kind === "duplicate") return { ok: true, code: "REPLAY:duplicate", state: null }; if (outcome.kind === "outOfOrder") return { ok: false, code: "STALE:out-of-order", state: null }; if (outcome.kind !== "cancel" && !Object.hasOwn(map, outcome.kind)) return { ok: false, code: "SHAPE:outcome-kind", state: null };
-  if (outcome.kind === "cancel") return { ok: true, code: "OUTCOME:normalized", state: expected.state === "cancel-requested" ? "cancelled" : "cancel-requested", result: null, reason: null, observation: { monotonicMs: expected.revision + 1, adapterState: outcome.kind, rawStateSha256: outcome.evidenceSha256 } };
+  if (outcome.kind === "cancel") return { ok: true, code: "OUTCOME:normalized", state: expected.state === "cancel-requested" ? "cancelled" : "cancel-requested", result: null, reason: null, observation: { source: "synthetic-adapter", monotonicMs: expected.revision + 1, wallTime: null, rawSha256: outcome.evidenceSha256, adapterState: outcome.kind, rawStateSha256: outcome.evidenceSha256 } };
   if (outcome.kind === "verifierPassed" && (!expected.result || outcome.result?.resultSha256 !== expected.result.resultSha256)) return { ok: false, code: "AUTHORITY:verifier", state: null };
   if (outcome.kind === "success" && outcome.result === null) return { ok: false, code: "SHAPE:success-result", state: null };
-  return { ok: true, code: "OUTCOME:normalized", state: map[outcome.kind], result: outcome.kind === "verifierPassed" ? { ...outcome.result, status: "verified" } : outcome.result, reason: null, observation: { monotonicMs: expected.revision + 1, adapterState: outcome.kind, rawStateSha256: outcome.evidenceSha256 } };
+  return { ok: true, code: "OUTCOME:normalized", state: map[outcome.kind], result: outcome.kind === "verifierPassed" ? { ...outcome.result, status: "verified" } : outcome.result, reason: null, observation: { source: "synthetic-adapter", monotonicMs: expected.revision + 1, wallTime: null, rawSha256: outcome.evidenceSha256, adapterState: outcome.kind, rawStateSha256: outcome.evidenceSha256 } };
 }
 export function reduceExecutionState(current, outcome) { if (stateCode(current)) throw new Error("SHAPE:state-current"); const n = normalizeSyntheticExecutionOutcome(current, outcome); if (!n.ok || n.state === null) return n; if (TERMINAL.has(current.state) || !TRANSITIONS[current.state]?.has(n.state)) return { ok: false, code: "CONFLICT:transition", state: null }; const next = { ...clone(current), state: n.state, revision: current.revision + 1, observation: n.observation, result: n.result ?? current.result, reason: n.reason, previousSha256: executionStateDigest(current) }; return stateCode(next) ? { ok: false, code: "INTERNAL:state", state: null } : { ok: true, code: "STATE:applied", state: freeze(next) }; }

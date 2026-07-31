@@ -3,28 +3,288 @@
   "$id": "pipeline.release-preflight.v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "preflightId", "candidate", "base", "version", "repository", "documentation", "lifecycle", "retention", "consent", "gates", "extensions", "status", "reasons", "recordSha256"],
+  "required": [
+    "schema",
+    "preflightId",
+    "candidate",
+    "base",
+    "version",
+    "repository",
+    "documentation",
+    "lifecycle",
+    "retention",
+    "consent",
+    "gates",
+    "extensions",
+    "status",
+    "reasons",
+    "recordSha256"
+  ],
   "properties": {
     "schema": {"const": "pipeline.release-preflight.v1"},
     "preflightId": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"},
-    "candidate": {"$ref": "#/$defs/candidate"}, "base": {"$ref": "#/$defs/candidate"},
-    "version": {"type": "object", "additionalProperties": false, "required": ["decisionId", "decisionSha256", "targetVersion", "candidateVersion"], "properties": {"decisionId": {"$ref": "#/$defs/digest"}, "decisionSha256": {"$ref": "#/$defs/digest"}, "targetVersion": {"$ref": "#/$defs/version"}, "candidateVersion": {"$ref": "#/$defs/version"}}},
-    "repository": {"type": "object", "additionalProperties": false, "required": ["headCommit", "headTree", "clean"], "properties": {"headCommit": {"$ref": "#/$defs/oid"}, "headTree": {"$ref": "#/$defs/oid"}, "clean": {"type": "boolean"}}},
-    "documentation": {"type": "object", "additionalProperties": false, "required": ["prd", "spec", "acceptance", "result"], "properties": {"prd": {"$ref": "#/$defs/document"}, "spec": {"$ref": "#/$defs/document"}, "acceptance": {"$ref": "#/$defs/document"}, "result": {"$ref": "#/$defs/document"}}},
-    "lifecycle": {"type": "object", "additionalProperties": false, "required": ["featureId", "manifestPath", "manifestSha256", "status"], "properties": {"featureId": {"type": "string"}, "manifestPath": {"$ref": "#/$defs/path"}, "manifestSha256": {"$ref": "#/$defs/digest"}, "status": {"const": "prepared"}}},
-    "retention": {"type": "object", "additionalProperties": false, "required": ["policySha256", "records"], "properties": {"policySha256": {"$ref": "#/$defs/digest"}, "records": {"type": "array", "items": {"$ref": "#/$defs/retention"}}}},
-    "consent": {"type": "object", "additionalProperties": false, "required": ["decisionId", "status", "authoritySha256", "evaluatedAt", "expiresAt"], "properties": {"decisionId": {"$ref": "#/$defs/digest"}, "status": {"enum": ["approved", "declined", "expired"]}, "authoritySha256": {"$ref": "#/$defs/digest"}, "evaluatedAt": {"type": "string", "format": "date-time"}, "expiresAt": {"type": "string", "format": "date-time"}}},
-    "gates": {"type": "object", "additionalProperties": false, "required": ["gg03", "inventory"], "properties": {"gg03": {"$ref": "#/$defs/gg03"}, "inventory": {"type": "array", "items": {"$ref": "#/$defs/gate"}}}},
+    "candidate": {"$ref": "#/$defs/candidate"},
+    "base": {"$ref": "#/$defs/candidate"},
+    "version": {"$ref": "#/$defs/versionDecision"},
+    "repository": {"$ref": "#/$defs/repository"},
+    "documentation": {"$ref": "#/$defs/documentation"},
+    "lifecycle": {"$ref": "#/$defs/lifecycle"},
+    "retention": {"$ref": "#/$defs/retentionSection"},
+    "consent": {"$ref": "#/$defs/consent"},
+    "gates": {"$ref": "#/$defs/gates"},
     "extensions": {"$ref": "#/$defs/extensions"},
-    "status": {"enum": ["ready", "blocked"]}, "reasons": {"type": "array", "items": {"type": "string"}}, "recordSha256": {"$ref": "#/$defs/digest"}
+    "status": {"enum": ["ready", "blocked"]},
+    "reasons": {
+      "type": "array",
+      "maxItems": 6,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "candidate-base-drift",
+          "candidate-repository-drift",
+          "repository-not-clean",
+          "version-decision-mismatch",
+          "consent-not-approved",
+          "gg03-candidate-mismatch"
+        ]
+      }
+    },
+    "recordSha256": {"$ref": "#/$defs/digest"}
   },
   "$defs": {
-    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "oid": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"}, "version": {"type": "string", "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$"}, "path": {"type": "string", "pattern": "^(?!/)[A-Za-z0-9._@+/-]{1,240}$"},
-    "candidate": {"type": "object", "additionalProperties": false, "required": ["commit", "tree"], "properties": {"commit": {"$ref": "#/$defs/oid"}, "tree": {"$ref": "#/$defs/oid"}}},
-    "document": {"type": "object", "additionalProperties": false, "required": ["path", "sha256"], "properties": {"path": {"$ref": "#/$defs/path"}, "sha256": {"$ref": "#/$defs/digest"}}},
-    "retention": {"type": "object", "additionalProperties": false, "required": ["path", "classification", "retentionClass", "archiveDigest", "archiveProvenanceSha256"], "properties": {"path": {"$ref": "#/$defs/path"}, "classification": {"enum": ["public", "private"]}, "retentionClass": {"enum": ["active", "archive"]}, "archiveDigest": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"}, "archiveProvenanceSha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"}}},
-    "gg03": {"type": "object", "additionalProperties": false, "required": ["required", "binding"], "properties": {"required": {"type": "boolean"}, "binding": {"anyOf": [{"type": "null"}, {"type": "object", "additionalProperties": false, "required": ["schema", "operation", "candidateCommit", "candidateTree", "authoritySha256", "evidenceSha256"], "properties": {"schema": {"const": "pipeline.gg-03-binding.v1"}, "operation": {"const": "protected-main-fast-forward"}, "candidateCommit": {"$ref": "#/$defs/oid"}, "candidateTree": {"$ref": "#/$defs/oid"}, "authoritySha256": {"$ref": "#/$defs/digest"}, "evidenceSha256": {"$ref": "#/$defs/digest"}}}]} }},
-    "gate": {"type": "object", "additionalProperties": false, "required": ["id", "kind", "status"], "properties": {"id": {"enum": ["verify", "security", "critic", "remote", "human"]}, "kind": {"enum": ["local-final", "external"]}, "status": {"const": "pending"}}},
-    "extensions": {"type": "object", "additionalProperties": false, "required": ["schema", "status", "registrySha256", "requirements"], "properties": {"schema": {"const": "pipeline.release-preflight-extension-input.v1"}, "status": {"enum": ["none", "registered"]}, "registrySha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"}, "requirements": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "sha256", "status"], "properties": {"id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"}, "sha256": {"$ref": "#/$defs/digest"}, "status": {"const": "accepted"}}}}}}
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "oid": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"},
+    "version": {"type": "string", "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$"},
+    "path": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240,
+      "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[A-Za-z0-9._@+/-]+$"
+    },
+    "timestamp": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$"
+    },
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree"],
+      "properties": {
+        "commit": {"$ref": "#/$defs/oid"},
+        "tree": {"$ref": "#/$defs/oid"}
+      }
+    },
+    "versionDecision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decisionId", "decisionSha256", "targetVersion", "candidateVersion"],
+      "properties": {
+        "decisionId": {"$ref": "#/$defs/digest"},
+        "decisionSha256": {"$ref": "#/$defs/digest"},
+        "targetVersion": {"$ref": "#/$defs/version"},
+        "candidateVersion": {"$ref": "#/$defs/version"}
+      }
+    },
+    "repository": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["headCommit", "headTree", "clean"],
+      "properties": {
+        "headCommit": {"$ref": "#/$defs/oid"},
+        "headTree": {"$ref": "#/$defs/oid"},
+        "clean": {"type": "boolean"}
+      }
+    },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "sha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "sha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "documentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["prd", "spec", "acceptance", "result"],
+      "properties": {
+        "prd": {"$ref": "#/$defs/document"},
+        "spec": {"$ref": "#/$defs/document"},
+        "acceptance": {"$ref": "#/$defs/document"},
+        "result": {"$ref": "#/$defs/document"}
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["featureId", "manifestPath", "manifestSha256", "status"],
+      "properties": {
+        "featureId": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+        "manifestPath": {"$ref": "#/$defs/path"},
+        "manifestSha256": {"$ref": "#/$defs/digest"},
+        "status": {"const": "prepared"}
+      }
+    },
+    "retentionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "classification", "retentionClass", "archiveDigest", "archiveProvenanceSha256"],
+      "properties": {
+        "path": {"$ref": "#/$defs/path"},
+        "classification": {"enum": ["public", "private"]},
+        "retentionClass": {"enum": ["active", "archive"]},
+        "archiveDigest": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+        "archiveProvenanceSha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"retentionClass": {"const": "archive"}}},
+          "then": {
+            "properties": {
+              "archiveDigest": {"$ref": "#/$defs/digest"},
+              "archiveProvenanceSha256": {"$ref": "#/$defs/digest"}
+            }
+          },
+          "else": {
+            "properties": {
+              "archiveDigest": {"type": "null"},
+              "archiveProvenanceSha256": {"type": "null"}
+            }
+          }
+        }
+      ]
+    },
+    "retentionSection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policySha256", "records"],
+      "properties": {
+        "policySha256": {"$ref": "#/$defs/digest"},
+        "records": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/retentionRecord"}
+        }
+      }
+    },
+    "consent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decisionId", "status", "authoritySha256", "evaluatedAt", "expiresAt"],
+      "properties": {
+        "decisionId": {"$ref": "#/$defs/digest"},
+        "status": {"enum": ["approved", "declined", "expired"]},
+        "authoritySha256": {"$ref": "#/$defs/digest"},
+        "evaluatedAt": {"$ref": "#/$defs/timestamp"},
+        "expiresAt": {"$ref": "#/$defs/timestamp"}
+      }
+    },
+    "gg03Binding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "operation", "candidateCommit", "candidateTree", "authoritySha256", "evidenceSha256"],
+      "properties": {
+        "schema": {"const": "pipeline.gg-03-binding.v1"},
+        "operation": {"const": "protected-main-fast-forward"},
+        "candidateCommit": {"$ref": "#/$defs/oid"},
+        "candidateTree": {"$ref": "#/$defs/oid"},
+        "authoritySha256": {"$ref": "#/$defs/digest"},
+        "evidenceSha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "gg03": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["required", "binding"],
+      "properties": {
+        "required": {"type": "boolean"},
+        "binding": {"oneOf": [{"type": "null"}, {"$ref": "#/$defs/gg03Binding"}]}
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"required": {"const": true}}},
+          "then": {"properties": {"binding": {"$ref": "#/$defs/gg03Binding"}}},
+          "else": {"properties": {"binding": {"type": "null"}}}
+        }
+      ]
+    },
+    "gate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "status"],
+      "properties": {
+        "id": {"enum": ["verify", "security", "critic", "remote", "human"]},
+        "kind": {"enum": ["local-final", "external"]},
+        "status": {"const": "pending"}
+      }
+    },
+    "gates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["gg03", "inventory"],
+      "properties": {
+        "gg03": {"$ref": "#/$defs/gg03"},
+        "inventory": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "prefixItems": [
+            {"allOf": [{"$ref": "#/$defs/gate"}, {"properties": {"id": {"const": "verify"}, "kind": {"const": "local-final"}}}]},
+            {"allOf": [{"$ref": "#/$defs/gate"}, {"properties": {"id": {"const": "security"}, "kind": {"const": "local-final"}}}]},
+            {"allOf": [{"$ref": "#/$defs/gate"}, {"properties": {"id": {"const": "critic"}, "kind": {"const": "local-final"}}}]},
+            {"allOf": [{"$ref": "#/$defs/gate"}, {"properties": {"id": {"const": "remote"}, "kind": {"const": "external"}}}]},
+            {"allOf": [{"$ref": "#/$defs/gate"}, {"properties": {"id": {"const": "human"}, "kind": {"const": "external"}}}]}
+          ],
+          "items": false
+        }
+      }
+    },
+    "extensionRequirement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "sha256", "status"],
+      "properties": {
+        "id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"},
+        "sha256": {"$ref": "#/$defs/digest"},
+        "status": {"const": "accepted"}
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["schema", "status", "registrySha256", "requirements"],
+      "properties": {
+        "schema": {"const": "pipeline.release-preflight-extension-input.v1"},
+        "status": {"enum": ["none", "registered"]},
+        "registrySha256": {"type": ["string", "null"], "pattern": "^[a-f0-9]{64}$"},
+        "requirements": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"$ref": "#/$defs/extensionRequirement"}
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"status": {"const": "none"}}},
+          "then": {
+            "properties": {
+              "registrySha256": {"type": "null"},
+              "requirements": {"maxItems": 0}
+            }
+          },
+          "else": {
+            "properties": {
+              "registrySha256": {"$ref": "#/$defs/digest"},
+              "requirements": {"minItems": 1}
+            }
+          }
+        }
+      ]
+    }
   }
 }

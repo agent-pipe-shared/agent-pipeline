@@ -470,7 +470,9 @@ export function claimCandidatePacket({ controlRoot, packetId, adapter, claimantN
     criticReviewLineageSha256 = admission.lineageSha256;
   }
   const timestamp = nowIso(now);
-  const body = criticReviewLineageSha256 === null ? { adapter, claimantNonce } : { adapter, claimantNonce, criticReviewLineageSha256 };
+  const body = criticReviewLineageSha256 === null
+    ? { adapter, claimantNonce }
+    : { adapter, claimantNonce, criticReviewLineageSha256 };
   const claim = { schema: RECORD_SCHEMA, packetId, packetDigest: sha256(canonicalJson(packet)), revision: 2, priorStateDigest: sha256(canonicalJson(state)), timestamp, phase: "claimed", body };
   publishExclusive(join(packetDir, "claim.json"), claim);
   replaceState(join(packetDir, "state.json"), recordBody(packet, 2, claim.priorStateDigest, "claimed", claim.body, timestamp));

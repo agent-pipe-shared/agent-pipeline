@@ -3,7 +3,7 @@
   "featureId": "sprint-nova-epic",
   "specification": {
     "path": "specs/sprint-nova-epic/spec.md",
-    "sha256": "e5ca2fef371e8c9d8b355052fab3620aba997b77f8bdaab3243308dac75253c9"
+    "sha256": "aa5eba0ce0c251ed90b8a00e94509a73146873f1cfc9f0942203c5dca9fccf17"
   },
   "backlogSnapshot": {
     "commit": "5ca5a4b292a267ffdfcc52577fda0a0593957a65",
@@ -192,7 +192,8 @@
         "NVA-A54-1",
         "NVA-A54-2",
         "NVA-A54-4",
-        "NVA-A54-7"
+        "NVA-A54-7",
+        "NVA-A54-9"
       ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "revalidate:2026-08-17"
@@ -206,7 +207,8 @@
         "NVA-A7-2",
         "NVA-A7-3",
         "NVA-A7-4",
-        "NVA-A7-5"
+        "NVA-A7-5",
+        "NVA-A7-6"
       ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "not-applicable"
@@ -395,7 +397,9 @@
         "NVA-B51-4",
         "NVA-B51-5",
         "NVA-B51-6",
-        "NVA-B51-7"
+        "NVA-B51-7",
+        "NVA-B51-8",
+        "NVA-B51-9"
       ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "revalidate:2026-08-17"
@@ -406,10 +410,21 @@
       "increment": "B",
       "acceptanceIds": [
         "NVA-B60-1",
+        "NVA-B60-10",
+        "NVA-B60-11",
+        "NVA-B60-12",
+        "NVA-B60-13",
+        "NVA-B60-14",
+        "NVA-B60-15",
+        "NVA-B60-16",
         "NVA-B60-2",
         "NVA-B60-3",
         "NVA-B60-4",
-        "NVA-B60-5"
+        "NVA-B60-5",
+        "NVA-B60-6",
+        "NVA-B60-7",
+        "NVA-B60-8",
+        "NVA-B60-9"
       ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "not-applicable"
@@ -425,31 +440,7 @@
       ],
       "closureMode": "candidate-evidence",
       "expiryDisposition": "not-applicable"
-    },
-    {
-      "id": "pipeline.v4-recovery-deadlock-correction",
-      "issue": 63,
-      "increment": "B",
-      "acceptanceIds": [
-        "NVA-B63-1",
-        "NVA-B63-10",
-        "NVA-B63-11",
-        "NVA-B63-12",
-        "NVA-B63-13",
-        "NVA-B63-14",
-        "NVA-B63-15",
-        "NVA-B63-2",
-        "NVA-B63-3",
-        "NVA-B63-4",
-        "NVA-B63-5",
-        "NVA-B63-6",
-        "NVA-B63-7",
-        "NVA-B63-8",
-        "NVA-B63-9"
-      ],
-      "closureMode": "candidate-evidence",
-      "expiryDisposition": "not-applicable"
     }
   ],
-  "recordSha256": "b406e72949513a9f5a85a529e0f003ad454fd1ff51612f70ae539658d2fb34d2"
+  "recordSha256": "e5654d81942151e488ee59cd24cfb6367c386f2ba48fa16368e22b3088786798"
 }

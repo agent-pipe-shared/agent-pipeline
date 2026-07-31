@@ -3,12 +3,303 @@
   "$id": "pipeline.multi-cli-benchmark.v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "benchmarkId", "scoringVersion", "candidate", "fixture", "adapterReportSha256", "subjects", "resourceEnvelope", "warmups", "repetitions", "observations", "score", "recommendation", "recordSha256"],
-  "$defs": {"fixture": {"type": "object", "additionalProperties": false, "required": ["class", "path", "fileSha256", "seed"], "properties": {"class": {"enum": ["mini", "feature", "review", "migration", "failure-recovery"]}, "path": {"type": "string", "pattern": "^(?!/)(?!.*\\\\)(?!.*(?:^|/)\\.{1,2}(?:/|$))[A-Za-z0-9._@+/-]{1,512}$"}, "fileSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "seed": {"type": "string", "minLength": 1}}}},
+  "required": [
+    "schema",
+    "benchmarkId",
+    "scoringVersion",
+    "candidate",
+    "fixture",
+    "adapterReportSha256",
+    "subjects",
+    "resourceEnvelope",
+    "warmups",
+    "repetitions",
+    "observations",
+    "score",
+    "recommendation",
+    "recordSha256"
+  ],
   "properties": {
-    "schema": {"const": "pipeline.multi-cli-benchmark.v1"}, "benchmarkId": {"type": "string"}, "scoringVersion": {"const": "nova-efficiency-v1"},
-    "candidate": {"type": "object", "additionalProperties": false, "required": ["commit", "tree"], "properties": {"commit": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"}, "tree": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"}}},
-    "fixture": {"type": "array", "minItems": 5, "maxItems": 5, "prefixItems": [{"allOf": [{"$ref": "#/$defs/fixture"}, {"properties": {"class": {"const": "mini"}}}]}, {"allOf": [{"$ref": "#/$defs/fixture"}, {"properties": {"class": {"const": "feature"}}}]}, {"allOf": [{"$ref": "#/$defs/fixture"}, {"properties": {"class": {"const": "review"}}}]}, {"allOf": [{"$ref": "#/$defs/fixture"}, {"properties": {"class": {"const": "migration"}}}]}, {"allOf": [{"$ref": "#/$defs/fixture"}, {"properties": {"class": {"const": "failure-recovery"}}}]}], "items": false},
-    "adapterReportSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}, "subjects": {"type": "array"}, "resourceEnvelope": {"type": "object"}, "warmups": {"type": "array"}, "repetitions": {"type": "object"}, "observations": {"type": "array"}, "score": {"type": "array"}, "recommendation": {"enum": ["candidate-route-for-observed-envelope", "no-recommendation"]}, "recordSha256": {"type": "string", "pattern": "^[a-f0-9]{64}$"}
+    "schema": {"const": "pipeline.multi-cli-benchmark.v1"},
+    "benchmarkId": {"$ref": "#/$defs/id"},
+    "scoringVersion": {"const": "nova-efficiency-v1"},
+    "candidate": {"$ref": "#/$defs/candidate"},
+    "fixture": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "prefixItems": [
+        {"allOf": [{"$ref": "#/$defs/fixture"}, {"properties": {"class": {"const": "mini"}, "path": {"const": "plugins/pipeline-core/scripts/fixtures/nova-benchmark/mini.json"}, "fileSha256": {"const": "27acdfda8347616ffa0497a1c07c91f4f71ba6802c62e5263af9ac15f17425e7"}}}]},
+        {"allOf": [{"$ref": "#/$defs/fixture"}, {"properties": {"class": {"const": "feature"}, "path": {"const": "plugins/pipeline-core/scripts/fixtures/nova-benchmark/feature.json"}, "fileSha256": {"const": "d00670aa6ec9128e156f3972b38f2c25710fb481a09da825101ac80bceea1e53"}}}]},
+        {"allOf": [{"$ref": "#/$defs/fixture"}, {"properties": {"class": {"const": "review"}, "path": {"const": "plugins/pipeline-core/scripts/fixtures/nova-benchmark/review.json"}, "fileSha256": {"const": "82060c2e61ad1a97b1dc2a6f21f2feea180280ea8da8e4e19e3a0e72c55116ba"}}}]},
+        {"allOf": [{"$ref": "#/$defs/fixture"}, {"properties": {"class": {"const": "migration"}, "path": {"const": "plugins/pipeline-core/scripts/fixtures/nova-benchmark/migration.json"}, "fileSha256": {"const": "609ea0e957134d14be84562025d808a7f3e386df916a9fe01ca28814f8da4cd3"}}}]},
+        {"allOf": [{"$ref": "#/$defs/fixture"}, {"properties": {"class": {"const": "failure-recovery"}, "path": {"const": "plugins/pipeline-core/scripts/fixtures/nova-benchmark/failure-recovery.json"}, "fileSha256": {"const": "a34d7f2c91888c47052af37271039d548462fce53e47cbb2327ad94cb644c6fe"}}}]}
+      ],
+      "items": false
+    },
+    "adapterReportSha256": {"$ref": "#/$defs/digest"},
+    "subjects": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {"$ref": "#/$defs/subject"}
+    },
+    "resourceEnvelope": {"$ref": "#/$defs/resourceEnvelope"},
+    "warmups": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "prefixItems": [
+        {"$ref": "#/$defs/warmupMini"}, {"$ref": "#/$defs/warmupFeature"}, {"$ref": "#/$defs/warmupReview"}, {"$ref": "#/$defs/warmupMigration"}, {"$ref": "#/$defs/warmupFailureRecovery"},
+        {"$ref": "#/$defs/warmupMini"}, {"$ref": "#/$defs/warmupFeature"}, {"$ref": "#/$defs/warmupReview"}, {"$ref": "#/$defs/warmupMigration"}, {"$ref": "#/$defs/warmupFailureRecovery"}
+      ],
+      "items": false
+    },
+    "repetitions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["warmupExcluded", "measured"],
+      "properties": {
+        "warmupExcluded": {"const": 1},
+        "measured": {"const": 5}
+      }
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 10,
+      "maxItems": 10,
+      "prefixItems": [
+        {"$ref": "#/$defs/samplesMini"}, {"$ref": "#/$defs/samplesFeature"}, {"$ref": "#/$defs/samplesReview"}, {"$ref": "#/$defs/samplesMigration"}, {"$ref": "#/$defs/samplesFailureRecovery"},
+        {"$ref": "#/$defs/samplesMini"}, {"$ref": "#/$defs/samplesFeature"}, {"$ref": "#/$defs/samplesReview"}, {"$ref": "#/$defs/samplesMigration"}, {"$ref": "#/$defs/samplesFailureRecovery"}
+      ],
+      "items": false
+    },
+    "score": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "prefixItems": [
+        {"allOf": [{"$ref": "#/$defs/score"}, {"properties": {"taskClass": {"const": "mini"}}}]},
+        {"allOf": [{"$ref": "#/$defs/score"}, {"properties": {"taskClass": {"const": "feature"}}}]},
+        {"allOf": [{"$ref": "#/$defs/score"}, {"properties": {"taskClass": {"const": "review"}}}]},
+        {"allOf": [{"$ref": "#/$defs/score"}, {"properties": {"taskClass": {"const": "migration"}}}]},
+        {"allOf": [{"$ref": "#/$defs/score"}, {"properties": {"taskClass": {"const": "failure-recovery"}}}]}
+      ],
+      "items": false
+    },
+    "recommendation": {"enum": ["candidate-route-for-observed-envelope", "no-recommendation"]},
+    "recordSha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "oid": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"},
+    "nonNegativeInteger": {"type": "integer", "minimum": 0, "maximum": 9007199254740991},
+    "positiveInteger": {"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+    "candidate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["commit", "tree"],
+      "properties": {
+        "commit": {"$ref": "#/$defs/oid"},
+        "tree": {"$ref": "#/$defs/oid"}
+      }
+    },
+    "fixture": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["class", "path", "fileSha256", "seed"],
+      "properties": {
+        "class": {"enum": ["mini", "feature", "review", "migration", "failure-recovery"]},
+        "path": {"type": "string"},
+        "fileSha256": {"$ref": "#/$defs/digest"},
+        "seed": {"$ref": "#/$defs/id"}
+      }
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["route", "subjectSha256", "hostClass"],
+      "properties": {
+        "route": {"$ref": "#/$defs/id"},
+        "subjectSha256": {"$ref": "#/$defs/digest"},
+        "hostClass": {"$ref": "#/$defs/id"}
+      }
+    },
+    "bound": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resource", "unit", "hardLimit"],
+      "properties": {
+        "resource": {"$ref": "#/$defs/id"},
+        "unit": {"$ref": "#/$defs/id"},
+        "hardLimit": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "resourceEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hostClass", "bounds"],
+      "properties": {
+        "hostClass": {"$ref": "#/$defs/id"},
+        "bounds": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {"$ref": "#/$defs/bound"}
+        }
+      }
+    },
+    "clock": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "monotonicMs", "wallTime", "rawSha256"],
+      "properties": {
+        "source": {"$ref": "#/$defs/id"},
+        "monotonicMs": {"$ref": "#/$defs/nonNegativeInteger"},
+        "wallTime": {"type": "null"},
+        "rawSha256": {"$ref": "#/$defs/digest"}
+      }
+    },
+    "stages": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["orchestrationMs", "workspaceMs", "verificationMs", "reviewMs", "retryMs", "cleanupMs"],
+      "properties": {
+        "orchestrationMs": {"$ref": "#/$defs/nonNegativeInteger"},
+        "workspaceMs": {"$ref": "#/$defs/nonNegativeInteger"},
+        "verificationMs": {"$ref": "#/$defs/nonNegativeInteger"},
+        "reviewMs": {"$ref": "#/$defs/nonNegativeInteger"},
+        "retryMs": {"$ref": "#/$defs/nonNegativeInteger"},
+        "cleanupMs": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["input", "output", "unit"],
+      "properties": {
+        "input": {"type": ["integer", "null"], "minimum": 0, "maximum": 9007199254740991},
+        "output": {"type": ["integer", "null"], "minimum": 0, "maximum": 9007199254740991},
+        "unit": {"type": "string"}
+      },
+      "oneOf": [
+        {
+          "properties": {
+            "input": {"type": "null"},
+            "output": {"type": "null"},
+            "unit": {"const": "unknown"}
+          }
+        },
+        {
+          "properties": {
+            "input": {"$ref": "#/$defs/nonNegativeInteger"},
+            "output": {"$ref": "#/$defs/nonNegativeInteger"},
+            "unit": {"allOf": [{"$ref": "#/$defs/id"}, {"not": {"const": "unknown"}}]}
+          }
+        }
+      ]
+    },
+    "measures": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["wallMs", "cpuMs", "concurrency", "stages", "usage", "interventions"],
+      "properties": {
+        "wallMs": {"$ref": "#/$defs/nonNegativeInteger"},
+        "cpuMs": {"$ref": "#/$defs/nonNegativeInteger"},
+        "concurrency": {"$ref": "#/$defs/positiveInteger"},
+        "stages": {"$ref": "#/$defs/stages"},
+        "usage": {"$ref": "#/$defs/usage"},
+        "interventions": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "resourceUse": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["resource", "unit", "value"],
+      "properties": {
+        "resource": {"$ref": "#/$defs/id"},
+        "unit": {"$ref": "#/$defs/id"},
+        "value": {"$ref": "#/$defs/nonNegativeInteger"}
+      }
+    },
+    "observation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["route", "repetition", "clock", "outcome", "measures", "resourceUse", "correctnessSha256", "evidenceSha256", "cleanupOk", "authorityOk"],
+      "properties": {
+        "route": {"$ref": "#/$defs/id"},
+        "repetition": {"type": "integer", "minimum": 0, "maximum": 5},
+        "clock": {"$ref": "#/$defs/clock"},
+        "outcome": {"enum": ["succeeded", "failed", "cancelled", "unknown"]},
+        "measures": {"$ref": "#/$defs/measures"},
+        "resourceUse": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 256,
+          "items": {"$ref": "#/$defs/resourceUse"}
+        },
+        "correctnessSha256": {"$ref": "#/$defs/digest"},
+        "evidenceSha256": {"$ref": "#/$defs/digest"},
+        "cleanupOk": {"type": "boolean"},
+        "authorityOk": {"type": "boolean"}
+      }
+    },
+    "warmup": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["taskClass", "observation"],
+      "properties": {
+        "taskClass": {"enum": ["mini", "feature", "review", "migration", "failure-recovery"]},
+        "observation": {"allOf": [{"$ref": "#/$defs/observation"}, {"properties": {"repetition": {"const": 0}}}]}
+      }
+    },
+    "samples": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["taskClass", "samples"],
+      "properties": {
+        "taskClass": {"enum": ["mini", "feature", "review", "migration", "failure-recovery"]},
+        "samples": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "prefixItems": [
+            {"allOf": [{"$ref": "#/$defs/observation"}, {"properties": {"repetition": {"const": 1}}}]},
+            {"allOf": [{"$ref": "#/$defs/observation"}, {"properties": {"repetition": {"const": 2}}}]},
+            {"allOf": [{"$ref": "#/$defs/observation"}, {"properties": {"repetition": {"const": 3}}}]},
+            {"allOf": [{"$ref": "#/$defs/observation"}, {"properties": {"repetition": {"const": 4}}}]},
+            {"allOf": [{"$ref": "#/$defs/observation"}, {"properties": {"repetition": {"const": 5}}}]}
+          ],
+          "items": false
+        }
+      }
+    },
+    "score": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["taskClass", "medianWallMs", "p95WallMs", "classImprovementPct", "classRegressionPct", "correctnessEqual", "resourceWithinEnvelope", "interventionsDelta", "usageKnown"],
+      "properties": {
+        "taskClass": {"enum": ["mini", "feature", "review", "migration", "failure-recovery"]},
+        "medianWallMs": {"$ref": "#/$defs/nonNegativeInteger"},
+        "p95WallMs": {"$ref": "#/$defs/nonNegativeInteger"},
+        "classImprovementPct": {"type": "number", "maximum": 100},
+        "classRegressionPct": {"type": "number", "minimum": -100},
+        "correctnessEqual": {"type": "boolean"},
+        "resourceWithinEnvelope": {"type": "boolean"},
+        "interventionsDelta": {"type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991},
+        "usageKnown": {"type": "boolean"}
+      }
+    },
+    "warmupMini": {"allOf": [{"$ref": "#/$defs/warmup"}, {"properties": {"taskClass": {"const": "mini"}}}]},
+    "warmupFeature": {"allOf": [{"$ref": "#/$defs/warmup"}, {"properties": {"taskClass": {"const": "feature"}}}]},
+    "warmupReview": {"allOf": [{"$ref": "#/$defs/warmup"}, {"properties": {"taskClass": {"const": "review"}}}]},
+    "warmupMigration": {"allOf": [{"$ref": "#/$defs/warmup"}, {"properties": {"taskClass": {"const": "migration"}}}]},
+    "warmupFailureRecovery": {"allOf": [{"$ref": "#/$defs/warmup"}, {"properties": {"taskClass": {"const": "failure-recovery"}}}]},
+    "samplesMini": {"allOf": [{"$ref": "#/$defs/samples"}, {"properties": {"taskClass": {"const": "mini"}}}]},
+    "samplesFeature": {"allOf": [{"$ref": "#/$defs/samples"}, {"properties": {"taskClass": {"const": "feature"}}}]},
+    "samplesReview": {"allOf": [{"$ref": "#/$defs/samples"}, {"properties": {"taskClass": {"const": "review"}}}]},
+    "samplesMigration": {"allOf": [{"$ref": "#/$defs/samples"}, {"properties": {"taskClass": {"const": "migration"}}}]},
+    "samplesFailureRecovery": {"allOf": [{"$ref": "#/$defs/samples"}, {"properties": {"taskClass": {"const": "failure-recovery"}}}]}
   }
 }

@@ -1,5 +1,11 @@
 # Nova B4R Design — V4 Recovery Deadlock Correction (`#63`)
 
+> Historical artifact, superseded for Nova authority on 2026-07-30. Issue
+> `#63` is now owned by `hotfix:0.4.7`. This document is retained only as
+> conflict-analysis input; it grants no current Nova implementation or
+> delivery authority. Nova consumes the canonical fix solely by rebasing onto
+> the Product-Owner-identified stable `main` 0.4.7 baseline.
+
 ## Decision
 
 Issue `#63` is a Nova P0/M release blocker implemented directly on the current

@@ -774,3 +774,208 @@ This is not a GitLab CI invocation, credential use, provider observation,
 remote write, capability certification, Issue mutation, merge, release or
 delivery claim. The B2-I live pilot remains subject to its own exact
 target/YAML/credential preview, PO confirmation and readback.
+
+## 2026-07-30 — Nova scope and execution-authority reconciliation
+
+Status: `design-reopened; 16-issue-scope; stable-0.4.7-rebase-required`.
+
+The current public GitHub intake contains exactly the open `sprint:nova`
+Issues `#7`, `#8`, `#12`, `#14`, `#15`, `#16`, `#18`, `#21`, `#29`, `#38`,
+`#49`, `#51`, `#54`, `#56`, `#57` and `#60`. Issue `#63` is excluded from
+Nova because its current authority is `hotfix:0.4.7`; historical B4R design
+and evidence remain retained only as conflict-analysis history.
+
+Nova imports no `main` bytes during this Design correction. Before renewed
+Execution approval, the branch must rebase onto the exact stable `main` 0.4.7
+commit/tree, resolve conflicts, rerun the upstream #63 recovery regressions
+and regenerate Spec/backlog/lifecycle bindings.
+
+Issue-specific boundaries are explicit: #15 is documentation-only Antigravity
+Alpha and direct AGY execution belongs to #69; #49 retains synthetic/non-native
+macOS plus keep-awake/continuity while native Apple Silicon belongs to #72;
+#7 and #54 expose typed usage/cost/assurance and Critic-convergence inputs
+while #75 owns cross-runner taxonomy and aggregation; and #60 carries the full
+Codex-and-Claude native continuation contract.
+
+This entry records no implementation, merge, rebase, external mutation, Issue
+closure, gate pass or delivery claim.
+
+## 2026-07-30 — PO-approved bounded pre-rebase Execution
+
+Status: `design-approved; pre-rebase-execution-authorized;
+bootstrap-install-v4-protected`.
+
+The PO approved the reconciled PRD and technical Spec with an explicit
+exception for the validated typed-unavailable Advisor outcome. The Advisor
+produced no answer, child, model identity or sandbox binding; this decision
+does not convert unavailability into review success.
+
+While stable `main` 0.4.7 is pending, Nova may implement serial packages on the
+current feature branch only when each dispatch declares an exact write-set
+that is disjoint from Bootstrap, installation, marketplace,
+runtime-readback and V4/#63 recovery surfaces. Missing or uncertain
+classification fails closed into the post-rebase lane.
+
+The stable 0.4.7 rebase, conflict disposition, affected-test rerun,
+regenerated bindings and refreshed readiness remain mandatory before
+protected-path work, Nova A increment acceptance, immutable final candidate
+evidence, Nova B activation, push, merge, release or Issue closure.
+
+## 2026-07-30 — Standing temporary-lift authority for TP-1, TP-3 and TP-5
+
+Status: `po-authorized-standing-temporary-lifts`.
+
+The Product Owner permanently grants the authority to lift TP-1, TP-3 and
+TP-5 temporarily for an exact, briefed Nova edit to their protected paths.
+Each lift remains path- and task-scoped, and the corresponding protection is
+restored immediately after that edit. This standing authority does not remove
+TP-2 or TP-4, does not waive the mandatory stable-main 0.4.7 rebase/readiness
+gate, and does not authorize push, merge, release, external mutation or a
+success claim without the normally required evidence.
+
+## 2026-07-30 — Bounded pre-rebase Nova A contract checkpoint
+
+Status: `contract-kernels-implemented; focused-evidence-provisional;
+stable-main-0.4.7-rebase-and-expanded-integration-pending`.
+
+The approved PRD and Spec remain bound to SHA-256
+`aeb073d720ec5f2384221b16a6533d32667f47e5a3ebe6c491642564ccccb661`
+and
+`aa5eba0ce0c251ed90b8a00e94509a73146873f1cfc9f0942203c5dca9fccf17`.
+Within their pre-rebase lane, the branch now contains the bounded contract
+kernels for:
+
+- A2 runner capability and selected-sandbox disposition;
+- A3 invocation reliability, preflight, request and attempt records;
+- A4 execution-plane admission and scheduling lifecycle;
+- A5 closed Critic lineage, exact coverage receipt semantics, typed failures,
+  finding/invalidation history, the four-round/three-correction course gate
+  and privacy-safe review-economy projection; and
+- A6 the exact five-fixture multi-CLI benchmark and deterministic release
+  preflight.
+
+A1's reconciliation, writer and backlog-state contract suites remain green,
+but the normal backlog checker exits `2`: the feature branch deliberately
+does not yet contain the stable-main history that makes the ledger evidence
+and amendment commits reachable. No ledger event was rewritten and no main
+object was imported to turn that expected pre-rebase condition into a false
+success.
+
+The consolidated local rerun passed A1 contract suites `20/20`, `6/6` and
+`47/47`; A2 suites `18/18`, `11/11`, `9/9`, `13/13` and `2/2`; A3 suites
+`10/10` and `11/11`; A4 suites `9/9`, `9/9`, `10/10`, the frozen
+control-execution exchange and `31/31` workflow-boundary cases; A5 suites
+`12/12`, `103/103` and the process-capable Critic packet preflight `6/6`; and
+A6 suites `6/6` and `18/18`. The A5 Draft 2020-12 schema is meta-valid and
+`git diff --check` is clean.
+
+This focused evidence is provisional. The stable-main 0.4.7 rebase and
+conflict disposition must invalidate or re-establish it by affected path.
+Shared durable writers and consumers, real adapters/launchers/reporters,
+universal pre-launch Critic-lineage enforcement, the missing release-version
+surfaces, A7 registration, complete Issue acceptance and final
+candidate-bound Verify, Security and independent Critic evidence remain
+outside this checkpoint and require their accepted post-rebase Spec/write-set
+expansion.
+
+No temporary TP lift was exercised here. TP-1 and TP-5 remain configured.
+TP-3 is already absent in the inherited branch HEAD; this checkpoint does not
+silently mutate that protected/bootstrap-adjacent guard configuration. Its
+restoration and any exact Verify registration remain a named protected-surface
+step after the stable 0.4.7 rebase/readiness review under the standing PO
+authority above.
+
+This record makes no Nova A acceptance, backlog transition, Issue closure,
+native selected-sandbox or Critic execution claim, increment evidence claim,
+Nova B activation, push, merge, release or external-mutation claim.
+
+## 2026-07-31 — Pre-rebase re-entry and focused-evidence readback
+
+Status: `stable-main-0.4.7-not-yet-identified; nova-upstream-equal;
+focused-contract-evidence-reconfirmed`.
+
+The mandatory full Pipeline re-entry observed the Nova branch and its tracked
+upstream at the same commit `28e797f7ca6231cffcf702d5ce6ad79d953bc2ad`.
+The current remote `main` observation is
+`83640cec22d494d227eebc82929370277ce926b9`; no `v0.4.7` tag was returned.
+The Product Owner has therefore not yet identified the exact stable 0.4.7
+commit/tree required by the Spec. Nova imported no `main` bytes, fetched no
+baseline into the worktree and performed no rebase, stash, commit or remote
+mutation.
+
+A fresh read-only GitHub intake confirmed the same 16 open `sprint:nova`
+Issues recorded above and in `design/issue-intake.md`; no other Sprint or
+hotfix-labeled issue was incorporated. Focused A1–A6 local contract suites
+were rerun successfully: A1 `20/20` and `47/47`; A2 `18/18` and `11/11`; A3
+`10/10` and `11/11`; A4 `9/9` and `9/9`; A5 `12/12`, `103/103` and
+host-capable packet preflight `6/6`; A6 `6/6` and `18/18`.
+`git diff --check` is clean. The ordinary workspace-sandbox execution of the
+packet-preflight fixture remains non-evidence `spawnSync git EPERM`; the
+host-authorized rerun is the successful evidence because that fixture creates
+temporary Git repositories.
+
+This readback confirms only the provisional pre-rebase contract kernels. The
+uncommitted Nova worktree is intentionally retained. A7 registration and
+acceptance, all Nova B work, the default ledger reachability result, full
+candidate Verify/Security/Critic evidence and every final delivery action
+remain blocked until the exact stable 0.4.7 baseline is identified, rebased
+and re-approved under the existing Spec.
+
+## 2026-07-31 — Remote main version clarification
+
+The validated GitHub `main/VERSION` readback decodes to
+`0.4.7-partial-auth`; the same remote exposes no `v0.4.7` tag. This is the
+current partial-auth baseline, not the Product Owner-identified stable 0.4.7
+commit/tree required by NVA-G13. It changes no Nova artifact, acceptance,
+branch or remote state and does not authorize an early rebase.
+
+## 2026-07-31 — Rebase-readiness preparation
+
+Status: `preparation-complete; stable-baseline-and-snapshot-decision-pending`.
+
+The PO requested maximal non-invasive preparation while the stable 0.4.7
+baseline is pending. `design/rebase-readiness-0.4.7.md` now records the exact
+admission record, dirty-worktree inventory boundary, protected/shared-path
+stops, conflict-disposition rule and affected-test/invalidation matrix. It
+does not select a snapshot mechanism, fetch a baseline, change a protected
+path, create a candidate, or activate A7/Nova B.
+
+## 2026-07-31 — Existing Nova B local-readiness audit
+
+Status: `local-contracts-green; activation-and-delivery-gates-pending`.
+
+To complete the permitted pre-rebase preparation, existing local Nova B
+contracts were rerun without provider access, credential use, native-goal
+activation, external mutation, candidate freeze or Issue transition. The
+focused results are:
+
+- B0 continuation: core `24/24`, Codex host `9/9`, Claude host `4/4`;
+- B1-C pool `6/6`; B1-I supervisor contract `13/13`, local process/clone
+  fixtures `9/9`, supervisor-state `21/21`, and worktree lifecycle `25/25`;
+- B2-C async `4/4` and credential lease `4/4`; B2-I GitLab-CI broker contract
+  and CLI fixtures passed on the process-capable host boundary;
+- B3-A Antigravity Alpha boundary `5/5` with all execution/network cells still
+  unavailable;
+- B4 forge/transport adapters: capability `15/15`, Git transport, GitHub and
+  GitLab adapter fixtures including `25/25` GitLab mutation lifecycle cases;
+- B5 synthetic macOS boundary `6/6` and candidate-freeze contract `8/8`; and
+- A7 receipt `7/7` plus PO-gate authority `32/32`.
+
+Workspace-sandbox `spawnSync git EPERM` outcomes were rerun only for their
+local Git-fixture suites through the selected host-authorized boundary; those
+reruns passed. This is local contract evidence only. It does not activate
+Nova B, create a native Codex/Claude goal, start a worker or external job,
+claim a native macOS result, select a credential/provider target, register
+A7, accept Nova A, or authorize any delivery action.
+
+## 2026-07-31 — Parallel-sprint integration handoff for 0.4.7
+
+Status: `central-policy-handoff-proposed; no-current-policy-claim`.
+
+`design/parallel-sprint-integration-handoff.md` records Nova's proposed
+cross-Sprint policy: a stale baseline is a typed deferred or
+impact-review state, while an exact rebase is required only for protected
+incompatibility or candidate promotion. The 0.4.7/main owner must accept this
+through the central policy/lifecycle source with its own exact PO authority,
+commit/tree and fixtures. This entry neither changes a current Pipeline gate
+nor claims that Nova, Cyborg or Phoenix is merge-ready.

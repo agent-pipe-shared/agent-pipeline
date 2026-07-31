@@ -11,7 +11,7 @@ The Epic has four human-visible gates:
 3. **Nova A gate:** accept an exact Nova A commit/tree, increment receipt,
    Result, Verify, Security and Critic evidence before Nova B implementation.
 4. **Nova B / Epic close gate:** accept the frozen Nova-only candidate,
-   platform/runner/forge/recovery evidence and all 17 issue dispositions.
+   platform/runner/forge evidence and all 16 issue dispositions.
 
 No prior gate implies a later gate.
 
@@ -23,14 +23,15 @@ No prior gate implies a later gate.
 | NVA-G02 | WHEN an outcome is unknown, unavailable, stale, invalidated, cancelled, expired, malformed or completed-but-undelivered, THE SYSTEM SHALL NOT project success. | Outcome taxonomy fixtures across local and async adapters. |
 | NVA-G03 | WHEN a worker requests delegation, review, approval, merge, release or undeclared authority, THE SYSTEM SHALL reject it. | Closed-schema and confused-deputy fixtures. |
 | NVA-G04 | WHEN isolation evidence is absent or weaker than requested, THE SYSTEM SHALL report only the observed assurance and SHALL NOT infer OS isolation from branch, worktree, runner or process names. | Assurance downgrade fixtures and reports. |
-| NVA-G05 | WHEN Nova and Cyborg would mutate the same physical workspace or global runtime resource concurrently, implementation SHALL stop until the actual resource is serialized. An identical repository-relative path on independent Sprint branches SHALL be recorded as a later merge collision and SHALL block only the combined integration if the accepted diffs conflict. Nova's current base is delivered and closed `v0.4.6`. | Physical-resource declaration, collision manifest and later exact-OID integration receipt. |
+| NVA-G05 | WHEN Nova and Cyborg would mutate the same physical workspace or global runtime resource concurrently, implementation SHALL stop until the actual resource is serialized. An identical repository-relative path on independent Sprint branches SHALL be recorded as a later merge collision and SHALL block only the combined integration if the accepted diffs conflict. Before the stable `main` 0.4.7 rebase, a Nova dispatch SHALL carry an exact write-set and SHALL be admitted only when every path is disjoint from Bootstrap, installation, runtime-readback and V4/#63 recovery surfaces; absent or uncertain classification fails closed. | Physical-resource declaration, exact dispatch write-set, protected-surface disposition, collision manifest, exact 0.4.7 rebase receipt and later exact-OID integration receipt. |
 | NVA-G06 | WHEN Nova and Cyborg both claim direct reconciliation ownership of one canonical backlog ID, integration SHALL fail closed until one claim is withdrawn or an explicit common owner is approved. | Backlog claim manifests bound to the same ledger head. |
 | NVA-G07 | WHEN the backlog ledger head, item body or status differs from the approved intake snapshot, no backlog transition preview SHALL be accepted until the complete intake is regenerated. | Canonical backlog readback and fresh disposition digest. |
 | NVA-G08 | WHEN a frozen V3 or v1 authority would need an in-place edit, the slice SHALL stop and propose a versioned companion or explicit ADR. | Diff review and schema compatibility tests. |
 | NVA-G09 | WHEN a result is accepted, it SHALL bind the exact package, dispatch, attempt, candidate and result digest; conflicting replay SHALL fail closed. | Replay/duplicate/out-of-order fixtures. |
 | NVA-G10 | Every external mutation SHALL resolve the exact target, require confirmation matching its preview, carry an idempotency binding and require matching readback before success. | Forge/credential adapter tests and opt-in observation. |
 | NVA-G11 | Every portable metric SHALL preserve unknown usage/cost as unknown and SHALL exclude prompts, secrets, private coordinates and unrestricted output. | Privacy/cardinality tests. |
-| NVA-G12 | Epic completion SHALL require all 17 issue acceptance sets and the same frozen Nova-only candidate to pass configured Verify, Security, independent Critic and PO acceptance; unavailable or deferred criteria SHALL remain open unless the PO explicitly changes scope. | Final Result and issue-evidence matrix. |
+| NVA-G12 | Epic completion SHALL require all 16 issue acceptance sets and the same frozen Nova-only candidate to pass configured Verify, Security, independent Critic and PO acceptance; unavailable or deferred criteria SHALL remain open unless the PO explicitly changes scope. | Final Result and issue-evidence matrix. |
+| NVA-G13 | Before any protected-surface implementation, Nova A increment acceptance, immutable final candidate evidence or full Nova readiness approval, the branch SHALL rebase onto the exact Product-Owner-identified stable `main` 0.4.7 commit/tree, resolve conflicts against the 16-Issue scope, rerun upstream #63 recovery regressions and regenerate every affected binding without claiming #63 delivery. Pre-rebase focused evidence is provisional and SHALL be invalidated or re-established after the rebase according to path impact. | Exact pre-rebase write-set receipts, base/head OIDs, rebase/conflict disposition, impact invalidation, regression readback and regenerated binding/lifecycle digests. |
 
 ## Nova A issue acceptance
 
@@ -64,6 +65,10 @@ No prior gate implies a later gate.
   certified.
 - NVA-A7-5: A required non-empty baseline matrix is explicit; zero advertised
   cells or runner-reported identity alone cannot close the issue.
+- NVA-A7-6: Supported usage, cost and actual-assurance fields are observed or
+  typed unsupported/unavailable; “not collected” is not zero, configured
+  independence is not executed attestation, and #75 owns the shared
+  cross-runner taxonomy, denominators and aggregation.
 
 ### `#8` Benchmark suite
 
@@ -150,6 +155,8 @@ No prior gate implies a later gate.
   and retained evidence cannot itself become PASS.
 - NVA-A54-8: `pipeline.critic-context-isolation` remains under Cyborg's
   activated ownership unless a later explicit transfer is recorded.
+- NVA-A54-9: Nova exposes request validity, convergence and delta-review inputs
+  without owning #75's cross-runner usage/cost or Critic-assurance aggregation.
 
 ### `#56` Release preflight
 
@@ -188,19 +195,43 @@ Nova A is accepted only when:
 
 ### `#60` Runner-native continuation
 
-- NVA-B60-1: An active work item projects only one generation-bound native goal
-  and receives an exact native readback before continuation is claimed.
-- NVA-B60-2: A Codex native `blocked` readback stops automation and persists as
-  `typed-blocker` evidence with its goal identity, generation and observation.
-- NVA-B60-3: The user-facing notice distinguishes same-blocker CLI resume from
-  a changed objective, which requires `/goal <new objective>`; the Pipeline
-  never silently resumes or replaces the goal.
-- NVA-B60-4: Resume and compact re-entry retain the active native-goal
-  generation; a successor is created only after a recorded named PO-gate
-  resolution, never to split ordinary autonomous work.
-- NVA-B60-5: A blocked Codex goal becomes current typed-blocker evidence only
-  after exact rendered-objective and generation binding; a different blocked
-  or active user-controlled goal is never overwritten or misreported.
+- NVA-B60-1: One versioned runner-neutral continuation contract binds the exact
+  active feature, phase, approved plan/Spec, current action, acceptance and
+  required evidence.
+- NVA-B60-2: While that item is active, an informational question,
+  clarification or observation is additive input and does not silently end,
+  replace or split the continuation.
+- NVA-B60-3: Codex activates or updates exactly one generation-bound native
+  goal and receives an exact identity/objective/generation readback before
+  claiming continuation.
+- NVA-B60-4: Claude Code activates or updates the same bounded semantic goal
+  through its supported native mechanism and receives an equivalent fresh
+  bound readback.
+- NVA-B60-5: Session activation, resume and Compact re-entry preserve the same
+  goal generation while the bound executable item remains unchanged.
+- NVA-B60-6: A named PO gate pauses or clears native continuation before the
+  prompt and persists `paused-po-gate` with the exact gate binding.
+- NVA-B60-7: Only a recorded PO resolution may restore that paused item; a
+  successor generation is never created merely for ordinary autonomous work.
+- NVA-B60-8: A typed blocker is distinct from a PO gate, stops automation and
+  binds the exact goal identity, objective, generation and observation.
+- NVA-B60-9: The user-facing blocker notice distinguishes same-blocker CLI
+  resume from a changed objective, which requires a new explicit goal.
+- NVA-B60-10: Explicit pause, cancel, replace and redirect always override
+  automatic continuation and are recorded as explicit control changes.
+- NVA-B60-11: Read-only tools, writes and long-running tools project bounded
+  progress without manufacturing completion; absent progress stays unknown.
+- NVA-B60-12: Stop-hook and interruption protections prevent duplicate native
+  activation, recursive continuation and completion before durable evidence.
+- NVA-B60-13: Continuation never widens approval, sandbox, network, repository,
+  host, delegation, merge or release authority.
+- NVA-B60-14: Unsupported or incompatible native goal support emits a typed
+  degraded/unavailable result and no false continuation claim.
+- NVA-B60-15: Cross-runner fixtures cover activation/readback, intermediate
+  input, PO pause/resolution, typed blocker, explicit control, resume/Compact,
+  progress, verified completion and degraded capability.
+- NVA-B60-16: Focused tests, configured Verify and public documentation bind
+  the exact contract and candidate for both Codex and Claude Code.
 
 ### `#21` Local worker pool
 
@@ -307,43 +338,11 @@ Nova A is accepted only when:
   mutations with preview, confirmation and readback; a Git push alone never
   claims either outcome.
 
-### `#63` V4 recovery deadlock
+### External `#63` hotfix baseline
 
-- NVA-B63-1: Every V4 `source_invalid` result exposes the exact read-only
-  source recovery planner rather than `nextAction:null`.
-- NVA-B63-2: Every V4 `manifest_invalid` result exposes the exact read-only
-  manifest repair planner rather than `nextAction:null`.
-- NVA-B63-3: Source diagnosis distinguishes invalid authority, stale generated
-  projection, unsupported transition and unavailable evidence.
-- NVA-B63-4: Source recovery never synthesizes or directly rewrites
-  `pipeline.user.yaml`; it ends in one sanctioned workflow or explicit
-  `unrepairable`.
-- NVA-B63-5: A missing generated manifest yields a plan bound to the current
-  raw V3 source digest and the raw manifest preimage/postimage; source drift
-  before publication rejects the write.
-- NVA-B63-6: An invalid existing manifest always remains byte-identical and
-  returns terminal `unrepairable`; only an absent generated manifest may use
-  the atomic no-replace writer.
-- NVA-B63-7: Manifest apply targets only `.claude/pipeline.yaml`, recomputes
-  the exact plan and rejects source, root, plan or preimage drift.
-- NVA-B63-8: Manifest apply requires the exact plan digest and explicit
-  `--activate`; inspection and planning never auto-apply.
-- NVA-B63-9: Apply returns a fresh V4 readback; recovery reaches `ready`,
-  another typed controlling state, or explicit terminal disposition without a
-  false success claim.
-- NVA-B63-10: The exact Pipeline-shipped V3 authority validator is available
-  read-only before readiness for the exact governed root.
-- NVA-B63-11: Only the exact source/manifest planners and manifest writer argv
-  are added to pre-ready lifecycle authorization.
-- NVA-B63-12: Arbitrary pre-ready writes, direct State/source edits and
-  readiness-guard bypasses remain denied.
-- NVA-B63-13: Wrong roots, aliases, missing/extra arguments, chaining,
-  redirection and command substitution fail hostile guard tests.
-- NVA-B63-14: Process-level shipped-CLI fixtures prove `ready` through
-  manifest loss and governed V3 registry refresh back to `ready`.
-- NVA-B63-15: Full Verify, Security and fresh independent Critic evidence bind
-  the exact candidate; the Issue comment names the actual delivery merge
-  commit and relevant verification results before Sprint close.
+Issue `#63` has no Nova acceptance IDs. Its stable 0.4.7 implementation is
+consumed only through NVA-G13; Nova does not implement, close or claim delivery
+of the hotfix.
 
 ### `#49` macOS boundary transfer
 
@@ -380,6 +379,6 @@ Nova A is accepted only when:
 | Security | Exact A candidate | Exact final candidate |
 | Independent Critic | High-risk A review | High-risk final review |
 | Benchmark | Serial/native baseline | Local/async/runner/forge additions |
-| Real host | Selected-sandbox opt-in where claimed | Local worker + Apple Silicon where claimed |
+| Real host | Selected-sandbox opt-in where claimed | Local worker where claimed; synthetic/non-native macOS disposition only |
 | External readback | None unless a slice explicitly mutates | Every forge/remote mutation |
 | PO acceptance | Activates Nova B | Closes Epic |

@@ -85,15 +85,39 @@ function lineage(packet, reviewId = "nova-a5-review") {
     packet,
     reviewId,
     parent: null,
-    packages: [{ id: "nova-a5", subjectSha256: "a".repeat(64) }],
-    coverage: { paths: [...packet.diffPaths], acceptanceIds: ["NVA-A54-1"], integrationEdges: ["critic-packet-claim"] },
-    lane: { laneId: "independent-critic", evidenceSha256: "b".repeat(64) },
+    packages: [{
+      id: "nova-a5",
+      subjectSha256: "a".repeat(64),
+      changedPaths: [...packet.diffPaths],
+      integrationEdges: ["critic-packet-claim"],
+    }],
+    coverage: {
+      changedPaths: [...packet.diffPaths],
+      acceptanceIds: ["NVA-A54-1"],
+      integrationEdges: ["critic-packet-claim"],
+      complete: false,
+      receiptSha256: null,
+    },
+    lane: {
+      laneId: "independent-critic",
+      contextSha256: "c".repeat(64),
+      evidenceSha256: "b".repeat(64),
+    },
     verdict: { status: "pending", schemaValid: false, resultSha256: null, failure: null },
     findings: [],
     correction: null,
-    invalidation: { kind: "none", evidenceSha256: null },
+    invalidation: { kind: "none", reason: null, evidenceSha256: null },
     reviewAttempt: { round: 1, correctionCommits: 0, requestedMode: "full" },
   });
+}
+function claimInput(prepared, claimantNonce) {
+  return {
+    controlRoot: prepared.packetDir.slice(0, -prepared.packet.packetId.length - 1),
+    packetId: prepared.packet.packetId,
+    adapter: prepared.packet.route.adapter,
+    claimantNonce,
+    lineage: lineage(prepared.packet),
+  };
 }
 
 await check("prepares a canonical no-remote packet with sorted diff and explicit empty governance", () => {
@@ -115,7 +139,7 @@ await check("claims once, records once, consumes once and capability-cleans only
   const f = fixture();
   try {
     const prepared = prepareCandidatePacket(options(f, "2".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 8) });
-    const claim = claimCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId, adapter: prepared.packet.route.adapter, claimantNonce: "b".repeat(64) }, { now: new Date("2026-07-18T12:01:00.000Z") });
+    const claim = claimCandidatePacket(claimInput(prepared, "b".repeat(64)), { now: new Date("2026-07-18T12:01:00.000Z") });
     assert.equal(claim.code, "CPP-CLAIMED");
     assert.throws(() => claimCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId, adapter: prepared.packet.route.adapter, claimantNonce: "c".repeat(64) }, { now: new Date("2026-07-18T12:01:01.000Z") }), expectCode("CPP-CLAIM"));
     const result = recordCandidateResult({ controlRoot: f.control, packetId: prepared.packet.packetId, result: { verdict: "pass" } }, { now: new Date("2026-07-18T12:02:00.000Z") });
@@ -143,7 +167,7 @@ await check("detects candidate mutation before result publication", () => {
   const f = fixture();
   try {
     const prepared = prepareCandidatePacket(options(f, "4".repeat(32)), { now: new Date("2026-07-18T12:00:00.000Z"), nonce: () => Buffer.alloc(32, 10) });
-    claimCandidatePacket({ controlRoot: f.control, packetId: prepared.packet.packetId, adapter: prepared.packet.route.adapter, claimantNonce: "e".repeat(64) }, { now: new Date("2026-07-18T12:01:00.000Z") });
+    claimCandidatePacket(claimInput(prepared, "e".repeat(64)), { now: new Date("2026-07-18T12:01:00.000Z") });
     writeFileSync(join(prepared.packet.checkout.realPath, "specs", "review.md"), "mutated\n");
     assert.throws(() => recordCandidateResult({ controlRoot: f.control, packetId: prepared.packet.packetId, result: { verdict: "pass" } }, { now: new Date("2026-07-18T12:02:00.000Z") }), expectCode("CPP-TREE"));
   } finally { rmSync(f.root, { recursive: true, force: true }); }

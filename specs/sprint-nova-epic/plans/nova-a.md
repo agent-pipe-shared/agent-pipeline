@@ -2,14 +2,32 @@
 
 ## Entry gate
 
-- PRD approval and the later technical Spec/readiness approval are both
-  durably recorded.
-- Branch remains `feat/sprint-nova-codex` at the approved base or an explicitly
-  accepted descendant.
+- PRD and technical Spec approval, including the explicit typed-unavailable
+  Advisor exception, are durably recorded and bind the current digests.
+- The exact 16-Issue snapshot and regenerated bindings are approved.
+- Branch remains `feat/sprint-nova-codex-v046`. Before the stable 0.4.7 rebase,
+  each dispatch carries an exact write-set and may proceed only when every path
+  is disjoint from Bootstrap, installation, runtime-readback and V4/#63
+  recovery.
+- The mandatory rebase and fresh readiness/PO approval remain required before
+  protected-path work, Nova A increment acceptance or immutable final
+  candidate evidence.
 - The package has exact Nova write paths/resources and does not share a
   physical workspace or global runtime resource concurrently with Cyborg.
 - Implementation is dispatched to a fresh Goldfish; the Elephant does not
   implement production code.
+
+## Pre-rebase execution lane
+
+Run serially, beginning with A1/#57. A3/#8, contract-only A4/#12/#14 and the
+non-protected portions of A6/#54 may follow when their exact manifests pass the
+same protected-surface check. A2/#7, A5/#29/#38 and A7/#56 are not assumed
+safe by Issue number: any bootstrap, install, runtime-readback or V4-adjacent
+path moves that package to the post-rebase lane.
+
+Pre-rebase focused tests are useful implementation evidence but not final
+increment evidence. The rebase impact review explicitly reruns or invalidates
+them before Nova A acceptance.
 
 ## Design D0 — Boundary freeze and test inventory
 
@@ -75,6 +93,8 @@ no-repeat selected-sandbox disposition used by deterministic fixtures.
 
 - NVA-A7 and NVA-A29 criteria pass;
 - no native success is inferred from CAS health or fallback;
+- usage, cost and actual assurance remain observed or typed unavailable, with
+  #75 owning shared taxonomy, denominators and aggregation;
 - terminal probe repeats are prevented per fingerprint; and
 - no shared Verify registration yet.
 
@@ -147,6 +167,8 @@ bounded delta review lineages.
 - valid `No findings` is distinct from every transport/failure class;
 - fresh Critic independence remains unchanged;
 - broad rerun requires typed invalidation; and
+- Nova supplies Critic request/convergence/delta inputs without claiming
+  #75's cross-runner reporting scope; and
 - budget exhaustion stops at a PO gate.
 
 ## Slice A6 — Benchmark and release preflight

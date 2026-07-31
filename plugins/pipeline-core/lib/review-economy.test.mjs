@@ -4,6 +4,7 @@ import {
   COURSE_CATALOG_VERSION,
   COURSE_ELIMINATION_REASONS,
   COURSE_KINDS,
+  CRITIC_REVIEW_ECONOMY_PROJECTION_SCHEMA,
   DIAGNOSTIC_TAIL_MAX_UTF8_BYTES,
   TRUSTED_ENVIRONMENT_CODES,
   admitCapacity,
@@ -14,12 +15,14 @@ import {
   decideFailureAction,
   evaluateProgress,
   failureSignature,
+  projectCriticReviewEconomy,
   sha256Canonical,
   validateCourseDecisionBrief,
   validateCourseDecisionIntent,
   validateCourseDecisionReceipt,
   validateWorkflowFallbackReceipt,
 } from "./review-economy.mjs";
+import { compileCriticReviewLineage } from "./critic-review-lineage.mjs";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -134,6 +137,168 @@ ok("RE23 fourth Critic round remains within the approved budget", admitReviewAtt
 ok("RE24 fourth Critic round creates course gate", admitReviewAttempt({ ...delta, round: 5 }).courseGateRequired === true);
 ok("RE25 third correction commit remains within the approved budget", admitReviewAttempt({ ...delta, correctionCommits: 3 }).courseGateRequired !== true);
 ok("RE26 fourth correction commit creates course gate", admitReviewAttempt({ ...delta, correctionCommits: 4 }).courseGateRequired === true);
+
+const criticPath = "plugins/pipeline-core/lib/critic-review-lineage.mjs";
+const criticEdge = "critic-packet-claim";
+function criticPacket({ packetId, base, commit, tree, diffSha256, requestSha256 }) {
+  return {
+    packetId,
+    request: { projectId: "pipeline", taskId: "nova-a5", trigger: "T1" },
+    candidate: { base, commit, tree },
+    diff: { base, commit, path: ".git/review.diff", bytes: 1, sha256: diffSha256 },
+    diffPaths: [criticPath],
+    bindings: { requestSha256, diffPathsSha256: C, governanceSha256: D },
+  };
+}
+function criticPackages() {
+  return [{
+    id: "nova-a5",
+    subjectSha256: A,
+    changedPaths: [criticPath],
+    integrationEdges: [criticEdge],
+  }];
+}
+function criticCoverage(complete) {
+  return {
+    changedPaths: [criticPath],
+    acceptanceIds: ["NVA-A54-9"],
+    integrationEdges: [criticEdge],
+    complete,
+    receiptSha256: complete ? B : null,
+  };
+}
+const criticPacket1 = criticPacket({
+  packetId: "1".repeat(32),
+  base: "1".repeat(40),
+  commit: "2".repeat(40),
+  tree: "3".repeat(40),
+  diffSha256: A,
+  requestSha256: B,
+});
+const criticFinding = {
+  id: "private:finding:1",
+  priorFindingId: null,
+  severity: "high",
+  status: "open",
+  evidenceSha256: C,
+};
+const criticFirst = compileCriticReviewLineage({
+  packet: criticPacket1,
+  reviewId: "private:review:1",
+  parent: null,
+  packages: criticPackages(),
+  coverage: criticCoverage(true),
+  lane: { laneId: "private-lane-id", contextSha256: A, evidenceSha256: B },
+  verdict: { status: "findings", schemaValid: true, resultSha256: D, failure: null },
+  findings: [criticFinding],
+  correction: null,
+  invalidation: { kind: "none", reason: null, evidenceSha256: null },
+  reviewAttempt: { round: 1, correctionCommits: 0, requestedMode: "full" },
+});
+const criticPacket2 = criticPacket({
+  packetId: "2".repeat(32),
+  base: criticPacket1.candidate.commit,
+  commit: "4".repeat(40),
+  tree: "5".repeat(40),
+  diffSha256: C,
+  requestSha256: D,
+});
+const criticMap = { [criticPath]: ["INV-01"] };
+const criticSecond = compileCriticReviewLineage({
+  packet: criticPacket2,
+  reviewId: "private:review:2",
+  parent: criticFirst,
+  packages: criticPackages(),
+  coverage: criticCoverage(true),
+  lane: { laneId: "private-lane-id-2", contextSha256: B, evidenceSha256: C },
+  verdict: { status: "no-findings", schemaValid: true, resultSha256: A, failure: null },
+  findings: [{ ...criticFinding, priorFindingId: criticFinding.id, status: "fixed", evidenceSha256: D }],
+  correction: {
+    commit: criticPacket2.candidate.commit,
+    deltaSha256: criticPacket2.diff.sha256,
+    impactSha256: sha256Canonical([criticEdge]),
+  },
+  invalidation: { kind: "none", reason: null, evidenceSha256: null },
+  reviewAttempt: {
+    round: 2,
+    correctionCommits: 1,
+    requestedMode: "delta",
+    base: criticPacket2.candidate.base,
+    head: criticPacket2.candidate.commit,
+    tree: criticPacket2.candidate.tree,
+    changedPaths: [criticPath],
+    changedBehaviorClaims: ["acceptance-delta"],
+    priorReceipt: { id: "review-receipt", sha256: A },
+    pathInvariantMap: criticMap,
+    pathInvariantMapSha256: sha256Canonical(criticMap),
+    coordinatorImpactConfirmed: true,
+    trustBoundaryChanged: false,
+    impactAmbiguous: false,
+  },
+});
+const criticProjectionResult = projectCriticReviewEconomy([criticFirst, criticSecond]);
+ok("RE26a A5 projection exposes exact bounded course and convergence counts", criticProjectionResult.ok
+  && criticProjectionResult.projection.schema === CRITIC_REVIEW_ECONOMY_PROJECTION_SCHEMA
+  && criticProjectionResult.projection.consumption.reviewRounds === 2
+  && criticProjectionResult.projection.consumption.correctionCommits === 1
+  && criticProjectionResult.projection.consumption.fullReviews === 1
+  && criticProjectionResult.projection.consumption.deltaReviews === 1
+  && criticProjectionResult.projection.status === "converged");
+ok("RE26b A5 projection derives severity/disposition metrics without raw private lineage fields", criticProjectionResult.projection.findings.bySeverity.high === 1
+  && criticProjectionResult.projection.findings.byDisposition.fixed === 1
+  && !JSON.stringify(criticProjectionResult.projection).includes(criticPath)
+  && !JSON.stringify(criticProjectionResult.projection).includes(criticFinding.id)
+  && !JSON.stringify(criticProjectionResult.projection).includes(criticFirst.lane.laneId));
+ok("RE26c retained stage receipts are occurrence counts and never become a PASS verdict", criticProjectionResult.projection.retainedStages.coverageReceipts === 2
+  && criticProjectionResult.projection.retainedStages.laneEvidence === 2
+  && criticProjectionResult.projection.retainedStages.resultDigests === 2
+  && criticProjectionResult.projection.status !== "pass");
+const criticFailed = compileCriticReviewLineage({
+  packet: criticPacket1,
+  reviewId: "failed-review",
+  parent: null,
+  packages: criticPackages(),
+  coverage: criticCoverage(false),
+  lane: { laneId: "failed-lane", contextSha256: A, evidenceSha256: B },
+  verdict: { status: "failed", schemaValid: false, resultSha256: A, failure: "empty" },
+  findings: [],
+  correction: null,
+  invalidation: { kind: "none", reason: null, evidenceSha256: null },
+  reviewAttempt: { round: 1, correctionCommits: 0, requestedMode: "full" },
+});
+const failedProjection = projectCriticReviewEconomy([criticFailed]);
+ok("RE26d empty output remains a typed failure metric, not converged", failedProjection.ok
+  && failedProjection.projection.failures.empty === 1
+  && failedProjection.projection.status === "failed"
+  && failedProjection.projection.verdicts.noFindings === 0);
+ok("RE26e projection rejects free-form lineage roots", projectCriticReviewEconomy([{ ...criticFirst, rawFinding: "private" }]).ok === false);
+function rehashCriticRecord(record, mutate) {
+  const changed = structuredClone(record);
+  mutate(changed);
+  const core = structuredClone(changed);
+  delete core.recordSha256;
+  changed.recordSha256 = sha256Canonical(core);
+  return changed;
+}
+ok("RE26f newly rehashed null candidate cannot converge", projectCriticReviewEconomy([
+  rehashCriticRecord(criticFirst, (record) => { record.candidate = null; }),
+]).ok === false);
+ok("RE26g newly rehashed empty package plan cannot converge", projectCriticReviewEconomy([
+  rehashCriticRecord(criticFirst, (record) => { record.packages = []; }),
+]).ok === false);
+ok("RE26h newly rehashed non-independent lane cannot converge", projectCriticReviewEconomy([
+  rehashCriticRecord(criticFirst, (record) => { record.lane.independent = false; }),
+]).ok === false);
+const badCourse = rehashCriticRecord(criticFirst, (record) => { record.course.reviewRound = 2; });
+const badFinding = rehashCriticRecord(criticSecond, (record) => { record.findings[0].status = "open"; });
+const badCoverage = rehashCriticRecord(criticSecond, (record) => {
+  record.coverage.complete = false;
+  record.coverage.receiptSha256 = null;
+});
+ok("RE26i course, finding and coverage semantics are validated beyond record digest",
+  projectCriticReviewEconomy([badCourse]).ok === false
+  && projectCriticReviewEconomy([criticFirst, badFinding]).ok === false
+  && projectCriticReviewEconomy([criticFirst, badCoverage]).ok === false);
 
 const baseAction = {
   failure,

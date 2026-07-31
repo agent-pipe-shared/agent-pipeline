@@ -9,13 +9,20 @@
 - Nova B uses that exact accepted product candidate as product base and the
   validated `E2` evidence descendant as branch continuation head.
 - No unpublished Cyborg dependency is introduced.
+- The branch is rebased onto the exact Product-Owner-identified stable `main`
+  0.4.7 commit/tree; conflicts are dispositioned against the 16-Issue scope,
+  affected bindings are regenerated and upstream #63 regressions pass without
+  a Nova delivery claim.
 - External hosts, credentials and mutations remain opt-in and separately
   authorized.
+- The PO-approved pre-rebase lane applies first to Nova A only. Nova B retains
+  this full entry gate because its activation depends on the exact accepted
+  Nova A receipt.
 - **B0 exception (historical, superseded):** the temporary exception allowing
   a `0.4.3`-based branch while `0.4.4` was pending is complete. Nova is now
-  adapted on the delivered and closed `v0.4.6` base. B1–B6 retain only their
-  Nova integration gates; no `0.4.x` release, installation, or pipeline-start
-  gate is reopened by this plan.
+  historically adapted on `v0.4.6`; that fact is superseded as an Execution
+  basis by the mandatory stable 0.4.7 rebase. B1–B6 retain only their Nova
+  integration gates.
 
 ## Slice B0 — Runner-native continuation baseline
 
@@ -191,9 +198,10 @@ provider adapter remains inactive, B1 capability remains unadvertised, and
 Issue `#21` remains open. This disposition authorizes neither activation nor
 implementation, credentials, network access, issue closure, push or release.
 
-**Phase exit:** after ADR-0048 is durably present, implementation may resume
-under this same PO instruction. The design phase is not a live worker
-activation.
+**Phase exit:** ADR-0048 alone does not activate a live worker. Nova B starts
+only after the stable 0.4.7 rebase, refreshed 16-Issue bindings, exact accepted
+Nova A receipt and explicit PO activation. Bounded pre-rebase Nova A Execution
+is not a live worker capability claim.
 
 ## Slice B2-C — Async execution and credential-lease contracts
 
@@ -272,20 +280,11 @@ tests proving no AGY discovery/install/auth/network/invocation primitive.
 access, capability certification, or claim that the direct runner is shipped.
 Those belong solely to #69's later dedicated AGY sprint.
 
-## Slice B3-I — Antigravity with Gemini models implementation
+## External B3-I follow-up
 
-**Entry:** B3-R is approved and either accepted B2-I leases or a separately
-approved operator-local authentication boundary is available.
-
-**Outcome:** one post-V3 runner adapter with only certified capability cells.
-
-**Order:**
-
-1. adapter invocation/cancel/result/usage contract;
-2. synthetic fixtures;
-3. `#7` conformance;
-4. opt-in live capability observation; and
-5. existing Claude/Codex regression.
+Direct Antigravity invocation, cancellation, result, usage and live
+conformance are not a Nova slice. They are owned exclusively by Issue `#69`
+with `sprint:NONE` and require their own future lifecycle and authority.
 
 ## Slice B4 — GitHub/GitLab transport and forge adapter
 
@@ -314,38 +313,13 @@ authentication boundary precedes live access or mutation.
 **Stop:** ambiguous host/project, token exposure, silent weaker control or
 provider-specific field leakage into the core contract.
 
-## Slice B4R — V4 recovery deadlock correction
+## External 0.4.7 rebase gate (`#63`)
 
-**Issue:** `#63`
-
-**Risk:** P0/M release blocker
-
-**Entry:** delivered/closed `v0.4.6` basis and completed B4 local contract work
-
-**Exit:** complete closed recovery actions plus exact-candidate gate evidence
-
-1. bind Issue `#63` into PRD, Spec, Acceptance, backlog binding and lifecycle;
-2. add a read-only source recovery planner that distinguishes invalid
-   authority, recognized stale projection, unsupported transition and
-   unavailable evidence;
-3. add an absent-manifest-only repair plan bound to current raw source,
-   preimage, postimage and canonical plan digests;
-4. require explicit confirmation, atomic no-replace publication,
-   publication-boundary drift quarantine and V4 readback for the sole manifest
-   writer; retain every existing manifest byte under its owning workflow;
-5. authorize only the exact read-only V3 validator and new planner argv before
-   readiness, plus the exact digest-bound manifest apply;
-6. retain arbitrary pre-ready write denial and add hostile root/argv/chaining
-   fixtures in both lifecycle guard and outer Codex adapter;
-7. prove process-level `ready -> recovery -> ready` flows through shipped CLIs;
-8. run focused tests, Full Verify, blocking Security and fresh independent
-   Critic on the exact candidate; and
-9. only after a real delivery merge commit exists, comment `#63` with that
-   commit and the relevant exact-candidate verification readback.
-
-The broader onboarding/documentation/installer program from `#61` is outside
-B4R and remains in its separate Nightwing scope. B4R performs no push, merge,
-release, Issue closure or external comment before its actual references exist.
+Issue `#63` belongs to `hotfix:0.4.7`, not Nova. Nova waits for the stable
+`main` 0.4.7 commit/tree, rebases onto it, resolves conflicts, regenerates
+bindings and reruns the upstream recovery regressions. Historical B4R design
+and evidence are retained only for conflict analysis. Nova makes no #63
+implementation, comment, closure or delivery claim.
 
 ## Slice B5 — Nova-only candidate assembly and freeze
 
@@ -354,7 +328,7 @@ candidate before any native or final gate evidence.
 
 **Checks:**
 
-- complete 17-issue acceptance mapping;
+- complete 16-Issue acceptance mapping;
 - no reverse dependency on unpublished Cyborg bytes;
 - exact backlog reconciliation previews from the current canonical head;
 - focused tests and candidate inventory; and
@@ -388,7 +362,7 @@ candidate evidence. The close tail may add only append-only evidence that binds
 the frozen candidate; any relevant byte change invalidates and reruns the
 applicable gates.
 
-Every one of the 17 issues receives its own evidence disposition. Any
+Every one of the 16 issues receives its own evidence disposition. Any
 incomplete criterion keeps the issue and Epic open unless the PO explicitly
 changes scope. Canonical backlog transitions use the sanctioned ledger writer
 only after exact closure evidence exists.
