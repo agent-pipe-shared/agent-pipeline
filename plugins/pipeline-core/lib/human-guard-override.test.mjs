@@ -211,7 +211,7 @@ test("drift, expiry and concurrent consumption fail closed", () => {
   }
 });
 
-test("State, path escape, push and ambiguous shell actions are non-overridable", () => {
+test("security boundaries, path escape, push and ambiguous shell actions remain non-overridable", () => {
   const root = fixture();
   try {
     mkdirSync(join(root, "physical"), { recursive: true });
@@ -247,7 +247,12 @@ test("State, path escape, push and ambiguous shell actions are non-overridable",
         toolInput,
         denials: denial,
       });
-      assert.equal(observed.status, "non-overridable", `${toolName} ${JSON.stringify(toolInput)}`);
+      const pipelineSource = JSON.stringify(toolInput).includes("plugins/pipeline-core/");
+      assert.equal(
+        observed.status,
+        pipelineSource ? "author-repair-required" : "non-overridable",
+        `${toolName} ${JSON.stringify(toolInput)}`,
+      );
     }
     writeFileSync(join(root, "safe.mjs"), "export {};\n");
     const syntaxCheck = recordHumanGuardDenial({
@@ -265,6 +270,94 @@ test("State, path escape, push and ambiguous shell actions are non-overridable",
       scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
     });
     assert.deepEqual(syntaxPlan.eligiblePaths, ["safe.mjs"]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("pipeline author repair binds one exact source root and action without State readiness", () => {
+  const root = fixture();
+  try {
+    const sourceRoot = join(root, "plugins", "pipeline-core");
+    mkdirSync(join(sourceRoot, ".codex-plugin"), { recursive: true });
+    mkdirSync(join(sourceRoot, "lib"), { recursive: true });
+    writeFileSync(join(sourceRoot, ".codex-plugin", "plugin.json"), '{"name":"pipeline-core","version":"0.4.7"}\n');
+    writeFileSync(join(sourceRoot, "lib", "repair.mjs"), "export const repaired = false;\n");
+    mkdirSync(join(root, "outside-source"), { recursive: true });
+    symlinkSync(join(root, "outside-source"), join(sourceRoot, "linked-outside"), "dir");
+    assert.equal(humanGuardOverrideInternals.eligibility(
+      root,
+      "Write",
+      { file_path: "plugins/pipeline-core/linked-outside/escape.mjs", content: "escape\n" },
+      { selectedAuthorSourceRoot: sourceRoot },
+    ).code, "HGO-NONOVERRIDABLE-PATH");
+    mkdirSync(join(root, "project"), { recursive: true });
+    writeFileSync(join(root, "project", "pipeline-state.json"), "{damaged portable state\n");
+    const toolInput = {
+      command: "*** Begin Patch\n*** Update File: plugins/pipeline-core/lib/repair.mjs\n@@\n-export const repaired = false;\n+export const repaired = true;\n*** End Patch",
+    };
+    const request = recordHumanGuardDenial({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "apply_patch",
+      toolInput,
+      denials: denial,
+      nowMs: 1000,
+    });
+    assert.equal(request.status, "author-repair-required");
+    assert.equal(request.candidateSourceRoot, sourceRoot);
+    assert.throws(
+      () => planHumanGuardOverride({
+        rootDir: root, pluginRoot: PLUGIN_ROOT, requestSha256: request.requestSha256,
+        nowMs: 2000, scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+      }),
+      (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-AUTHOR-ROOT",
+    );
+    const plan = planHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      authorSourceRoot: sourceRoot,
+      nowMs: 2000,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    assert.equal(plan.mode, "pipeline-author-repair");
+    assert.equal(plan.authorSourceRoot, sourceRoot);
+    assert.equal(plan.repository.state.status, "malformed");
+    assert.deepEqual(plan.eligiblePaths, ["plugins/pipeline-core/lib/repair.mjs"]);
+    const reason = "PO-authorized exact Pipeline source repair";
+    const prepared = prepareHumanGuardOverrideAuthorization({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      planSha256: plan.planSha256,
+      reason,
+      authorSourceRoot: sourceRoot,
+      nowMs: 2500,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    const armed = authorizeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      requestSha256: request.requestSha256,
+      planSha256: plan.planSha256,
+      selectionSha256: prepared.selectionSha256,
+      reason,
+      reasonSha256: prepared.reasonSha256,
+      authorSourceRoot: sourceRoot,
+      activate: true,
+      nowMs: 3000,
+      scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+    });
+    assert.equal(armed.status, "armed");
+    assert.deepEqual(consumeHumanGuardOverride({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "apply_patch",
+      toolInput,
+      denials: denial,
+      nowMs: 4000,
+    }).status, "consumed");
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -603,6 +696,27 @@ test("native Windows private-state assurance is injected and fail-closed", () =>
         assessWindowsPrivatePathFn() { return { status: "unknown" }; },
       }),
       (error) => error instanceof HumanGuardOverrideError && error.code === "HGO-DACL",
+    );
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("repository identity failures name the sanitized Git operation", () => {
+  const root = fixture();
+  try {
+    assert.throws(
+      () => planHumanGuardOverride({
+        rootDir: root,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: "a".repeat(64),
+        spawn() { return { status: null, error: Object.assign(new Error("blocked"), { code: "EPERM" }) }; },
+        scriptPath: join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"),
+      }),
+      (error) => error instanceof HumanGuardOverrideError
+        && error.code === "HGO-GIT"
+        && error.message.includes("operation=rev-parse---show-toplevel")
+        && error.message.includes("outcome=EPERM"),
     );
   } finally {
     rmSync(root, { recursive: true, force: true });

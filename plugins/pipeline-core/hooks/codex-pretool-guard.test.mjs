@@ -100,6 +100,12 @@ check("descriptor uses quoted PLUGIN_ROOT with Windows parity for both routing f
   }
 });
 
+check("Human override Git observation keeps a bounded cold-repository budget", () => {
+  const source = readFileSync(adapter, "utf8");
+  assert.match(source, /\{ capMs: 2_000, reserveMs: 750 \}/u);
+  assert.doesNotMatch(source, /\{ capMs: 300, reserveMs: 400 \}/u);
+});
+
 check("Bash, apply_patch, Edit and Write each reach their intended guard family", () => {
   const root = fixture();
   writeFileSync(join(root, ".claude", "guard-config.json"), JSON.stringify({
@@ -161,6 +167,8 @@ check("closed shell grammar denial teaches the stable retry shape and remains no
   assert.match(output.permissionDecisionReason, /separate parallel tool calls/u);
   assert.match(output.permissionDecisionReason, /Do not retry by varying &&, ;, newline composition, pipelines, or redirects/u);
   assert.match(output.permissionDecisionReason, /exact bounded rg-to-head diagnostic pipeline/u);
+  assert.match(output.permissionDecisionReason, /"schema":"pipeline.guard-retry-actions.v1"/u);
+  assert.match(output.permissionDecisionReason, /"retryActions":\[\]/u);
   assert.match(output.permissionDecisionReason, /Human override unavailable: HGO-NONOVERRIDABLE-GRAMMAR/u);
   assert.doesNotMatch(output.permissionDecisionReason, /Human override available for this exact action/u);
 });
@@ -210,6 +218,60 @@ check("attended Human override admits only the exact next tool call and is then 
   assert.match(allowed.stderr, /exact one-time capability consumed/u);
   const replay = decision(run(input, root));
   assert.equal(replay.permissionDecision, "deny");
+});
+
+check("Pipeline Author Repair selects one exact source root and consumes one patch", () => {
+  const root = fixture();
+  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+  git("init", "-q", "-b", "main");
+  git("config", "user.name", "Fixture");
+  git("config", "user.email", "fixture@example.invalid");
+  writeFileSync(join(root, "README.md"), "fixture\n");
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const sourceRoot = join(root, "plugins", "pipeline-core");
+  mkdirSync(join(sourceRoot, ".codex-plugin"), { recursive: true });
+  mkdirSync(join(sourceRoot, "lib"), { recursive: true });
+  writeFileSync(join(sourceRoot, ".codex-plugin", "plugin.json"), '{"name":"pipeline-core","version":"0.4.7"}\n');
+  writeFileSync(join(sourceRoot, "lib", "repair.mjs"), "export const repaired = false;\n");
+  git("add", "README.md", "pipeline.user.yaml", "plugins/pipeline-core");
+  git("commit", "-q", "-m", "fixture");
+  const input = {
+    tool_name: "apply_patch",
+    tool_input: {
+      command: "*** Begin Patch\n*** Update File: plugins/pipeline-core/lib/repair.mjs\n@@\n-export const repaired = false;\n+export const repaired = true;\n*** End Patch",
+    },
+  };
+  const first = decision(run(input, root));
+  assert.equal(first.permissionDecision, "deny");
+  assert.match(first.permissionDecisionReason, /Pipeline Author Repair is available/u);
+  assert.match(first.permissionDecisionReason, new RegExp(`--author-source-root ${JSON.stringify(sourceRoot)}`, "u"));
+  const request = first.permissionDecisionReason.match(/--request-sha256 ([a-f0-9]{64})/u)?.[1];
+  assert.match(request ?? "", /^[a-f0-9]{64}$/u);
+  const planned = spawnSync(process.execPath, [
+    humanOverrideScript, "plan", "--repo", root, "--request-sha256", request,
+    "--author-source-root", sourceRoot,
+  ], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(planned.status, 0, planned.stderr);
+  const plan = JSON.parse(planned.stdout);
+  assert.equal(plan.mode, "pipeline-author-repair");
+  assert.equal(plan.authorSourceRoot, sourceRoot);
+  const reason = "PO explicitly approved this exact source repair";
+  const prepared = spawnSync(process.execPath, [
+    humanOverrideScript, "prepare-authorization", "--repo", root,
+    "--request-sha256", request, "--plan-sha256", plan.planSha256,
+    "--reason", reason, "--author-source-root", sourceRoot,
+  ], { cwd: root, encoding: "utf8", shell: false });
+  assert.equal(prepared.status, 0, prepared.stderr);
+  const authorization = JSON.parse(prepared.stdout);
+  const authorized = spawnSync(process.execPath, authorization.authorizeAction.argv, {
+    cwd: root, encoding: "utf8", shell: false,
+  });
+  assert.equal(authorized.status, 0, authorized.stderr);
+  const allowed = run(input, root);
+  assert.equal(allowed.status, 0, allowed.stderr);
+  assert.equal(allowed.stdout, "");
+  assert.match(allowed.stderr, /exact one-time capability consumed/u);
+  assert.equal(decision(run(input, root)).permissionDecision, "deny");
 });
 
 check("override persistence failure remains a sanitized fail-closed denial", () => {

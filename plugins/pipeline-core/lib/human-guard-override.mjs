@@ -31,9 +31,9 @@ import {
 
 const SHA256 = /^[a-f0-9]{64}$/u;
 const SAFE_ID = /^[A-Za-z0-9._-]{1,120}$/u;
-const REQUEST_SCHEMA = "pipeline.human-guard-override-request.v1";
-const PLAN_SCHEMA = "pipeline.human-guard-override-plan.v1";
-const CAPABILITY_SCHEMA = "pipeline.human-guard-override-capability.v1";
+const REQUEST_SCHEMA = "pipeline.human-guard-override-request.v2";
+const PLAN_SCHEMA = "pipeline.human-guard-override-plan.v2";
+const CAPABILITY_SCHEMA = "pipeline.human-guard-override-capability.v2";
 const AUDIT_SCHEMA = "pipeline.human-guard-override-audit.v1";
 const AUDIT_HEAD_SCHEMA = "pipeline.human-guard-override-audit-head.v1";
 const MAX_REASON_BYTES = 500;
@@ -78,7 +78,14 @@ function exactKeys(value, keys) {
 
 function git(root, args, spawn = spawnSync) {
   const result = spawn("git", args, { cwd: root, encoding: "utf8", shell: false, timeout: 5000 });
-  if (result?.status !== 0 || result?.error) fail("HGO-GIT", "repository identity is unavailable");
+  if (result?.status !== 0 || result?.error) {
+    // The operation label is deliberately argv-only: it is enough to repair a
+    // broken adapter/spawn boundary without disclosing repository data.
+    const operation = args.map((value) => String(value).replace(/[^A-Za-z0-9._=-]/gu, "_")).join("-").slice(0, 120);
+    const outcome = result?.error?.code ?? result?.error?.name
+      ?? result?.signal ?? `exit-${String(result?.status)}`;
+    fail("HGO-GIT", `repository identity is unavailable (operation=${operation}, outcome=${outcome})`);
+  }
   return String(result.stdout ?? "").trim();
 }
 
@@ -223,24 +230,29 @@ function pluginIdentity(pluginRoot) {
 }
 
 function stateObservation(root) {
-  const authority = resolveProjectAuthorityPaths({ rootDir: root });
-  const stateRelPath = authority.status === "ready"
+  let authority = null;
+  try { authority = resolveProjectAuthorityPaths({ rootDir: root }); } catch {}
+  const stateRelPath = authority?.status === "ready"
     ? authority.state
     : (existsSync(join(root, NEUTRAL_STATE)) ? NEUTRAL_STATE : LEGACY_STATE);
   const path = join(root, stateRelPath);
-  if (!existsSync(path)) return { status: "absent", sha256: null, continuityRevision: null };
+  if (!existsSync(path)) {
+    return { status: "absent", path: stateRelPath, sha256: null, continuityRevision: null };
+  }
   const info = lstatSync(path);
   if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || realpathSync(path) !== path) {
     fail("HGO-STATE", "Pipeline State identity is unsafe");
   }
   const bytes = readFileSync(path);
   let value;
-  try { value = JSON.parse(bytes); } catch { fail("HGO-STATE", "Pipeline State is malformed"); }
+  try { value = JSON.parse(bytes); } catch {
+    return { status: "malformed", path: stateRelPath, sha256: sha(bytes), continuityRevision: null };
+  }
   const revision = value?.continuity?.revision ?? null;
   if (revision !== null && (!Number.isSafeInteger(revision) || revision < 0)) {
-    fail("HGO-STATE", "Pipeline Continuity revision is invalid");
+    return { status: "invalid", path: stateRelPath, sha256: sha(bytes), continuityRevision: null };
   }
-  return { status: "present", sha256: sha(bytes), continuityRevision: revision };
+  return { status: "present", path: stateRelPath, sha256: sha(bytes), continuityRevision: revision };
 }
 
 function repositoryObservation(root, spawn = spawnSync) {
@@ -290,11 +302,37 @@ function protectedPath(path) {
     || normalized === "project/guard-config.json"
     || normalized === "project/guard-override.log.jsonl"
     || normalized === "pipeline.user.yaml"
-    || normalized === "plugins/pipeline-core" || normalized.startsWith("plugins/pipeline-core/")
     || normalized === ".agent-pipeline" || normalized.startsWith(".agent-pipeline/")
     || normalized === ".git" || normalized.startsWith(".git/")
     || normalized === ".codex" || normalized.startsWith(".codex/")
     || /(^|\/)(?:secrets?|credentials?|tokens?|id_rsa|id_ed25519)(?:[./_-]|$)/u.test(normalized);
+}
+
+function pipelineSourcePath(path) {
+  const normalized = path.toLowerCase();
+  return normalized === "plugins/pipeline-core" || normalized.startsWith("plugins/pipeline-core/");
+}
+
+function authorSourceRoot(repoRoot, candidate) {
+  if (typeof candidate !== "string" || !isAbsolute(candidate)) return null;
+  let physical;
+  try { physical = physicalRoot(candidate); } catch { return null; }
+  const expected = join(repoRoot, "plugins", "pipeline-core");
+  if (physical !== expected || !existsSync(join(physical, ".codex-plugin", "plugin.json"))) return null;
+  return physical;
+}
+
+function authorEligiblePaths(root, paths, selectedSourceRoot) {
+  const sourceRoot = authorSourceRoot(root, selectedSourceRoot);
+  if (sourceRoot === null || paths.length === 0) return null;
+  for (const path of paths) {
+    if (!pipelineSourcePath(path)) return null;
+    const safe = safePath(root, path);
+    if (safe === null || safe.relative !== path) return null;
+    const rel = relative(sourceRoot, safe.absolute);
+    if (rel === "" || rel === ".." || rel.startsWith("../") || isAbsolute(rel)) return null;
+  }
+  return sourceRoot;
 }
 
 function patchPaths(command) {
@@ -307,7 +345,7 @@ function patchPaths(command) {
   return paths.length > 0 ? paths : null;
 }
 
-function eligibility(root, toolName, toolInput) {
+function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = null } = {}) {
   const paths = [];
   const serialized = canonical(toolInput);
   if (/(?:gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:token|password|secret)\s*[:=]\s*["']?[A-Za-z0-9+/_=-]{12,})/u.test(serialized)) {
@@ -354,7 +392,27 @@ function eligibility(root, toolName, toolInput) {
   } else {
     return { eligible: false, code: "HGO-NONOVERRIDABLE-TOOL" };
   }
-  return { eligible: true, paths: [...new Set(paths)].sort() };
+  const uniquePaths = [...new Set(paths)].sort();
+  const pipelinePaths = uniquePaths.filter(pipelineSourcePath);
+  if (pipelinePaths.length > 0) {
+    if (pipelinePaths.length !== uniquePaths.length) {
+      return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY" };
+    }
+    if (selectedAuthorSourceRoot === null) {
+      return {
+        eligible: false,
+        code: "HGO-AUTHOR-ROOT-REQUIRED",
+        authorCandidate: true,
+        paths: uniquePaths,
+        candidateSourceRoot: join(root, "plugins", "pipeline-core"),
+      };
+    }
+    const sourceRoot = authorEligiblePaths(root, uniquePaths, selectedAuthorSourceRoot);
+    if (sourceRoot === null) return { eligible: false, code: "HGO-AUTHOR-ROOT-MISMATCH" };
+    return { eligible: true, mode: "pipeline-author-repair", sourceRoot, paths: uniquePaths };
+  }
+  if (selectedAuthorSourceRoot !== null) return { eligible: false, code: "HGO-AUTHOR-SCOPE-MISMATCH" };
+  return { eligible: true, mode: "standard", sourceRoot: null, paths: uniquePaths };
 }
 
 function requestPath(paths, digest) {
@@ -483,6 +541,8 @@ const CAPABILITY_KEYS = [
   "toolInputSha256",
   "denials",
   "eligiblePaths",
+  "mode",
+  "authorSourceRoot",
   "authorizedAt",
   "expiresAt",
   "consumedAt",
@@ -506,6 +566,8 @@ function validatedCapability(paths, path) {
     || !SHA256.test(value.selectionSha256 ?? "")
     || !SHA256.test(value.reasonSha256 ?? "")
     || !SHA256.test(value.toolInputSha256 ?? "")
+    || !new Set(["standard", "pipeline-author-repair"]).has(value.mode)
+    || !(value.authorSourceRoot === null || typeof value.authorSourceRoot === "string")
     || !SHA256.test(value.mac ?? "")
     || !(value.consumedAt === null || typeof value.consumedAt === "string")
     || value.mac !== capabilityMac(key(paths), value)) {
@@ -521,13 +583,20 @@ function hasAuthorizedAuditEntry(paths, capability) {
     && event.planSha256 === capability.planSha256
     && event.reasonSha256 === capability.reasonSha256
     && event.selectionSha256 === capability.selectionSha256
+    && event.mode === capability.mode
+    && event.authorSourceRoot === capability.authorSourceRoot
     && event.at === capability.authorizedAt);
 }
 
 function validatedRequest(paths, requestSha256) {
   const request = readJson(requestPath(paths, requestSha256));
-  if (!exactKeys(request, ["schema", "root", "plugin", "repository", "toolName", "toolInputSha256", "denials", "eligiblePaths", "createdAt", "expiresAt"])
+  if (!exactKeys(request, [
+    "schema", "root", "plugin", "repository", "toolName", "toolInputSha256", "denials",
+    "eligiblePaths", "mode", "authorSourceRoot", "createdAt", "expiresAt",
+  ])
     || request.schema !== REQUEST_SCHEMA || request.root === undefined
+    || !new Set(["standard", "pipeline-author-repair-candidate"]).has(request.mode)
+    || request.authorSourceRoot !== null
     || !SHA256.test(request.toolInputSha256) || !Array.isArray(request.denials)
     || sha(request) !== requestSha256) fail("HGO-REQUEST", "override request is invalid");
   return request;
@@ -545,7 +614,9 @@ export function recordHumanGuardDenial({
 } = {}) {
   const repo = topology(rootDir, spawn);
   const eligible = eligibility(repo.root, toolName, toolInput);
-  if (!eligible.eligible) return { status: "non-overridable", code: eligible.code };
+  if (!eligible.eligible && !eligible.authorCandidate) {
+    return { status: "non-overridable", code: eligible.code };
+  }
   if (!Array.isArray(denials) || denials.length === 0) fail("HGO-DENIAL", "denial set is empty");
   const paths = storage(repo.common);
   const request = {
@@ -560,6 +631,8 @@ export function recordHumanGuardDenial({
       sha256: sha(String(denial.reason)),
     })).sort((left, right) => `${left.guard}:${left.sha256}`.localeCompare(`${right.guard}:${right.sha256}`)),
     eligiblePaths: eligible.paths,
+    mode: eligible.authorCandidate ? "pipeline-author-repair-candidate" : eligible.mode,
+    authorSourceRoot: null,
     createdAt: new Date(nowMs).toISOString(),
     expiresAt: new Date(nowMs + ttlMs).toISOString(),
   };
@@ -574,7 +647,13 @@ export function recordHumanGuardDenial({
     toolName,
     denialDigests: request.denials,
   });
-  return { status: "planned", requestSha256 };
+  return eligible.authorCandidate
+    ? {
+      status: "author-repair-required",
+      requestSha256,
+      candidateSourceRoot: eligible.candidateSourceRoot,
+    }
+    : { status: "planned", requestSha256 };
 }
 
 export function planHumanGuardOverride({
@@ -584,6 +663,7 @@ export function planHumanGuardOverride({
   nowMs = Date.now(),
   spawn = spawnSync,
   scriptPath,
+  authorSourceRoot: selectedAuthorSourceRoot = null,
 } = {}) {
   const repo = topology(rootDir, spawn);
   const paths = storage(repo.common);
@@ -593,6 +673,17 @@ export function planHumanGuardOverride({
   const repository = repositoryObservation(repo.root, spawn);
   if (canonical(plugin) !== canonical(request.plugin) || canonical(repository) !== canonical(request.repository)) {
     fail("HGO-DRIFT", "override request preimage drifted");
+  }
+  let mode = "standard";
+  let authorSourceRootValue = null;
+  if (request.mode === "pipeline-author-repair-candidate") {
+    authorSourceRootValue = authorEligiblePaths(repo.root, request.eligiblePaths, selectedAuthorSourceRoot);
+    if (authorSourceRootValue === null) {
+      fail("HGO-AUTHOR-ROOT", "author repair requires the exact Pipeline source root");
+    }
+    mode = "pipeline-author-repair";
+  } else if (selectedAuthorSourceRoot !== null) {
+    fail("HGO-AUTHOR-SCOPE", "author repair root does not match this request");
   }
   const payload = {
     schema: PLAN_SCHEMA,
@@ -605,6 +696,8 @@ export function planHumanGuardOverride({
     toolInputSha256: request.toolInputSha256,
     denials: request.denials,
     eligiblePaths: request.eligiblePaths,
+    mode,
+    authorSourceRoot: authorSourceRootValue,
     expiresAt: request.expiresAt,
   };
   const planSha256 = sha(payload);
@@ -624,9 +717,15 @@ export function planHumanGuardOverride({
         planSha256,
         "--reason",
         "<human-reason>",
+        ...(authorSourceRootValue === null ? [] : ["--author-source-root", authorSourceRootValue]),
       ],
       mutation: false,
       requiresConfirmation: false,
+      executionBoundary: "local-process",
+      expected: {
+        schema: "pipeline.human-guard-override-authorization-selection.v1",
+        status: "prepared",
+      },
     },
   };
 }
@@ -640,6 +739,7 @@ export function prepareHumanGuardOverrideAuthorization({
   nowMs = Date.now(),
   spawn = spawnSync,
   scriptPath,
+  authorSourceRoot = null,
 } = {}) {
   const reasonBytes = Buffer.from(String(reason ?? ""), "utf8");
   if (reasonBytes.length < 1 || reasonBytes.length > MAX_REASON_BYTES) {
@@ -652,6 +752,7 @@ export function prepareHumanGuardOverrideAuthorization({
     nowMs,
     spawn,
     scriptPath,
+    authorSourceRoot,
   });
   if (planned.planSha256 !== planSha256) {
     fail("HGO-PLAN", "override plan digest does not match");
@@ -685,10 +786,15 @@ export function prepareHumanGuardOverrideAuthorization({
         String(reason),
         "--reason-sha256",
         reasonSha256,
+        ...(planned.authorSourceRoot === null
+          ? []
+          : ["--author-source-root", planned.authorSourceRoot]),
         "--activate",
       ],
       mutation: true,
       requiresConfirmation: true,
+      executionBoundary: "local-process",
+      expected: { schema: CAPABILITY_SCHEMA, status: "armed" },
     },
   };
 }
@@ -705,6 +811,7 @@ export function authorizeHumanGuardOverride({
   nowMs = Date.now(),
   spawn = spawnSync,
   scriptPath,
+  authorSourceRoot = null,
 } = {}) {
   if (activate !== true) fail("HGO-ACTIVATION", "override authorization requires explicit activation");
   const reasonBytes = Buffer.from(String(reason ?? ""), "utf8");
@@ -720,6 +827,7 @@ export function authorizeHumanGuardOverride({
     nowMs,
     spawn,
     scriptPath,
+    authorSourceRoot,
   });
   if (prepared.selectionSha256 !== selectionSha256
     || prepared.reasonSha256 !== reasonSha256) {
@@ -732,6 +840,7 @@ export function authorizeHumanGuardOverride({
     nowMs,
     spawn,
     scriptPath,
+    authorSourceRoot,
   });
   const repo = topology(rootDir, spawn);
   const paths = storage(repo.common);
@@ -749,6 +858,8 @@ export function authorizeHumanGuardOverride({
     toolInputSha256: planned.toolInputSha256,
     denials: planned.denials,
     eligiblePaths: planned.eligiblePaths,
+    mode: planned.mode,
+    authorSourceRoot: planned.authorSourceRoot,
     authorizedAt: new Date(nowMs).toISOString(),
     expiresAt: planned.expiresAt,
     consumedAt: null,
@@ -769,6 +880,8 @@ export function authorizeHumanGuardOverride({
           planSha256,
           reasonSha256,
           selectionSha256,
+          mode: capability.mode,
+          authorSourceRoot: capability.authorSourceRoot,
         });
       }
       return { schema: CAPABILITY_SCHEMA, status: "armed", planSha256, requestSha256, mutated: false };
@@ -785,6 +898,8 @@ export function authorizeHumanGuardOverride({
       planSha256,
       reasonSha256,
       selectionSha256,
+      mode: capability.mode,
+      authorSourceRoot: capability.authorSourceRoot,
     });
   } catch (error) {
     try {
@@ -846,7 +961,9 @@ export function consumeHumanGuardOverride({
         || capability.toolName !== toolName || capability.toolInputSha256 !== toolInputSha256
         || canonical(capability.denials) !== canonical(denialDigests)
         || canonical(capability.plugin) !== canonical(plugin)
-        || canonical(capability.repository) !== canonical(repository);
+        || canonical(capability.repository) !== canonical(repository)
+        || (capability.mode === "pipeline-author-repair"
+          && authorEligiblePaths(repo.root, capability.eligiblePaths, capability.authorSourceRoot) === null);
       if (expired || drifted) {
         appendAudit(paths, {
           type: expired ? "expired" : "rejected",
@@ -875,6 +992,8 @@ export function consumeHumanGuardOverride({
         requestSha256: capability.requestSha256,
         planSha256,
         reasonSha256: capability.reasonSha256,
+        mode: capability.mode,
+        authorSourceRoot: capability.authorSourceRoot,
       });
       return { status: "consumed", planSha256, requestSha256: capability.requestSha256 };
     } finally {

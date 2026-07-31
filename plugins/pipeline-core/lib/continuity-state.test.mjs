@@ -8,6 +8,7 @@ import {
   applyDecisionSelection,
   beginCloseTransition,
   bindContinuitySessionCleanup,
+  bindContinuityResultForClose,
   clearCourseDecisionReceipt,
   clearDecisionSelection,
   compareAndSwapContinuity,
@@ -221,6 +222,94 @@ check("valid queue state passes runtime and supported schema subset", () => {
   const value = state();
   assert.deepEqual(validateContinuityState(value, FEATURE), { ok: true, code: "CS-VALID" });
   assert.equal(validateAgainstSchema(value, schemaLiteSchema).valid, true);
+});
+
+check("Result-close binding changes only revision, Result, review action and resume", () => {
+  const current = state({
+    authority: {
+      prd: { path: "specs/prd.md", sha256: A },
+      spec: { path: "specs/spec.md", sha256: B },
+      result: null,
+    },
+    queueHead: queueHead({ nextAction: "review", dispatch: null }),
+  });
+  const applied = bindContinuityResultForClose(current, {
+    expectedRevision: 0,
+    result: { path: "specs/result.md", sha256: C },
+  }, FEATURE);
+  assert.equal(applied.ok, true);
+  assert.equal(applied.code, "CS-RESULT-CLOSE-APPLIED");
+  assert.equal(applied.state.revision, 1);
+  assert.deepEqual(applied.state.authority.result, { path: "specs/result.md", sha256: C });
+  assert.equal(applied.state.queueHead.nextAction, "close");
+  assert.deepEqual(applied.state.resume, {
+    mode: "immediate", sourceRevision: 1, reasonCode: "active-turn",
+  });
+  const expected = structuredClone(current);
+  expected.revision = 1;
+  expected.authority.result = { path: "specs/result.md", sha256: C };
+  expected.queueHead.nextAction = "close";
+  expected.resume = { mode: "immediate", sourceRevision: 1, reasonCode: "active-turn" };
+  assert.deepEqual(applied.state, expected);
+});
+
+check("Result-close binding accepts only its exact committed replay", () => {
+  const current = state({
+    authority: {
+      prd: { path: "specs/prd.md", sha256: A },
+      spec: { path: "specs/spec.md", sha256: B },
+      result: null,
+    },
+    queueHead: queueHead({ nextAction: "review", dispatch: null }),
+  });
+  const request = {
+    expectedRevision: 0,
+    result: { path: "specs/result.md", sha256: C },
+  };
+  const applied = bindContinuityResultForClose(current, request, FEATURE);
+  const replay = bindContinuityResultForClose(applied.state, request, FEATURE);
+  assert.equal(replay.ok, true);
+  assert.equal(replay.code, "CS-RESULT-CLOSE-REPLAY");
+  assert.equal(replay.mutated, false);
+  const conflict = bindContinuityResultForClose(applied.state, {
+    ...request, result: { path: "specs/result.md", sha256: D },
+  }, FEATURE);
+  assert.equal(conflict.code, "CS-RESULT-CLOSE-CONFLICT");
+});
+
+check("Result-close binding rejects non-review, retries and active lifecycle work", () => {
+  const base = state({
+    authority: {
+      prd: { path: "specs/prd.md", sha256: A },
+      spec: { path: "specs/spec.md", sha256: B },
+      result: null,
+    },
+    queueHead: queueHead({ nextAction: "review", dispatch: null }),
+  });
+  const request = {
+    expectedRevision: 0,
+    result: { path: "specs/result.md", sha256: C },
+  };
+  for (const mutate of [
+    (value) => { value.queueHead.nextAction = "verify"; },
+    (value) => { value.queueHead.productRetryCount = 1; },
+    (value) => { value.recovery = {
+      originLaneId: "lane-a", originDispatchId: "dispatch-a", originAttemptId: "attempt-a",
+      environmentEvidenceSha256: A, sameLaneRetryProhibited: true,
+      fallbackStatus: "failed", fallbackLaneId: "lane-b", fallbackDispatchId: "dispatch-b",
+      narrowingContractSha256: B, originProductRetryCount: 0, resultDigest: null, count: 1,
+    }; value.queueHead = null; value.blocker = {
+      type: "environment", signature: "blocked", resumeCondition: { kind: "manual", evidenceSha256: null },
+      decisionBrief: null,
+    }; },
+    (value) => { value.closeTransition = {}; },
+  ]) {
+    const changed = structuredClone(base);
+    mutate(changed);
+    assert.equal(bindContinuityResultForClose(changed, request, FEATURE).ok, false);
+  }
+  assert.equal(bindContinuityResultForClose(base, { ...request, expectedRevision: 1 }, FEATURE).code, "CS-STALE");
+  assert.equal(bindContinuityResultForClose(base, request, "other-feature").ok, false);
 });
 
 // AC-047-27 pure adoption contract: the planner is exact, read-only, and the

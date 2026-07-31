@@ -32,6 +32,15 @@ function diagnostic(code, fields = {}) {
   process.stderr.write(`${DEBUG_PREFIX} code=${code}${tokens.length === 0 ? "" : ` ${tokens.join(" ")}`}\n`);
 }
 
+function humanOverrideFailureFields(error) {
+  const git = String(error?.message ?? "").match(/\(operation=([A-Za-z0-9._=-]+), outcome=([A-Za-z0-9._=-]+)\)/u);
+  return {
+    name: error?.name,
+    code: error?.code,
+    ...(git ? { operation: git[1], outcome: git[2] } : {}),
+  };
+}
+
 function deny(reason, debug = undefined) {
   if (completed) return;
   completed = true;
@@ -302,7 +311,11 @@ if (denials.length > 0) {
     executable,
     args,
     options,
-    { capMs: 300, reserveMs: 400 },
+    // Repository identity needs several independent Git observations.  A
+    // 300ms per-child cap made the audited escape hatch unavailable in large
+    // or cold repositories even though the same Git operations succeeded
+    // directly.  The global hook budget still bounds the complete adapter.
+    { capMs: 2_000, reserveMs: 750 },
   );
   let consumed;
   try {
@@ -315,7 +328,7 @@ if (denials.length > 0) {
       spawn: overrideSpawn,
     });
   } catch (error) {
-    diagnostic("human-override-consume-failed", { name: error?.name, code: error?.code });
+    diagnostic("human-override-consume-failed", humanOverrideFailureFields(error));
     consumed = { status: "invalid", code: "HGO-ADAPTER-FAILURE" };
   }
   if (consumed.status === "consumed") {
@@ -343,11 +356,18 @@ if (denials.length > 0) {
           "Human override available for this exact action (one use; audited; explicit confirmation required):",
           `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256}`,
         ].join("\n");
+      } else if (planned.status === "author-repair-required") {
+        const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+        overrideGuidance = [
+          "",
+          "Pipeline Author Repair is available for this exact source action (one use; audited; explicit confirmation required):",
+          `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256} --author-source-root ${JSON.stringify(planned.candidateSourceRoot)}`,
+        ].join("\n");
       } else {
         overrideGuidance = `\nHuman override unavailable: ${planned.code}.`;
       }
     } catch (error) {
-      diagnostic("human-override-plan-failed", { name: error?.name, code: error?.code });
+      diagnostic("human-override-plan-failed", humanOverrideFailureFields(error));
       overrideGuidance = "\nHuman override unavailable; the guarded action remains denied.";
     }
   } else {

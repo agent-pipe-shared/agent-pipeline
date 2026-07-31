@@ -166,6 +166,7 @@ const TEST_SUITES = [
   { name: "codex-isolated-critic-contract-tests", file: join(pluginScriptsDir, "codex-isolated-critic-contract.test.mjs") },
   { name: "claude-critic-host-tests", file: join(pluginScriptsDir, "critic-claude-host.test.mjs") },
   { name: "continuity-host-adapter-tests", file: join(libDir, "continuity-host-adapter.test.mjs") },
+  { name: "continuity-result-close-tests", file: join(pluginScriptsDir, "pipeline-state-result-close.test.mjs") },
   { name: "continuity-state-tests", file: join(libDir, "continuity-state.test.mjs") },
   { name: "main-session-route-tests", file: join(libDir, "main-session-route.test.mjs") },
   { name: "wsl-ipc-compatibility-tests", file: join(libDir, "wsl-ipc-compatibility.test.mjs") },

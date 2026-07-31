@@ -3,14 +3,15 @@
 # PRD — Agent Pipeline 0.4.7 hotfix
 
 > Product Review Document for the PO gate. Status:
-> `approved by the PO on 2026-07-31; implementation authority requires the
-> matching digest-bound lifecycle write for these stabilized PRD/Spec bytes`.
+> `code-aligned and approved by the PO on 2026-07-31; implementation authority
+> requires the matching digest-bound lifecycle write for these stabilized
+> PRD/Spec bytes`.
 > Task: `agent-pipeline-0.4.7-hotfix` · Feature · Rigor 2 · Risk high.
 > Base: public 0.4.6 release at
 > `9d1b3dc108eb77629ace5b82002120f5539abd8d`. Acceptance criteria:
 > [spec.md](spec.md).
 
-<!-- technical-spec-sha256: 4959ada5652b2d94939eaf6633478c3f1b3c4f968af4dbc85a496638c68a6e32 -->
+<!-- technical-spec-sha256: 714238949d1ce36fec3c31e41bafcdc2eaab9bdafa0134d89b5e23da2ed832fe -->
 
 The 2026-07-28 approval remains historical evidence for the already
 implemented slices. The Human/PO explicitly directed implementation of the
@@ -79,9 +80,42 @@ policy gaps are mandatory for the same release:
 | Recovery completeness | Every fail-closed lifecycle state has a typed read-only planner and confirmation-bound writer where safe. Completed closure recovery remains first; an active historical descriptor falls back to the identifier-free Privatization plan/apply path. A valid recovery cannot be blocked merely because the session is not ready. |
 | Kickoff promotion | Exact unapproved kickoff seed state can become real Epic/Feature/Mini work atomically without manufacturing approval or requiring feature close. |
 
-The complete release contract is AC-047-01–135 in
+The complete release contract is AC-047-01–142 in
 [spec.md](spec.md). AC-047-01–68 retain the delivered/historical identifiers;
-AC-047-69–135 bind the current mandatory remainder.
+AC-047-69–135 bind the current mandatory remainder; AC-047-136–142 record
+the code-aligned recovery and guard corrections retained in the dirty
+candidate.
+
+### Code-aligned corrective amendment — 2026-07-31
+
+The PO has selected the tested dirty 0.4.7 worktree as the corrective
+implementation authority for the following narrow additions. This amendment
+documents that code; it neither rolls back the fixes nor broadens any release
+or publication permission.
+
+1. A coordinator-originated close releases cleanup identity only through an
+   authenticated owner-private receipt. The portable State remains byte-stable
+   and identity-free; a completed replay is explicitly zero-mutation.
+2. A crash between private receipt publication and binding removal is
+   recoverable through one exact digest-bound plan. Missing, replaced,
+   detached or conflicting receipts are typed failures or a bounded receipt
+   quarantine, never an inferred success or manual portable-State repair.
+3. The close handoff can bind one physical, immutable Result to the exact idle
+   review head through a read-only plan and confirmed CAS apply. Replays are
+   idempotent and unrelated continuity fields remain unchanged.
+4. Closed shell-grammar denials may return only independently valid,
+   read-only retry actions. They are advice for separate tool calls, never a
+   compound-command admission or a guard bypass.
+5. The attended override adapter keeps a bounded cold-repository Git
+   observation budget and emits sanitized operation/outcome diagnostics.
+   Pipeline Author Repair remains one explicit source-root-bound, audited,
+   one-use capability; it cannot authorize arbitrary source edits.
+
+The mandatory focused evidence is the cleanup-recovery, Human Override,
+Onboarding/Promotion, Lifecycle Guard, PreTool Guard, Result-close and
+Continuity-State suites. The final candidate still requires fresh Full Verify,
+Security, independent high-risk Critic, install/readback, and publication
+gates.
 
 ### Release boundary
 
@@ -438,9 +472,10 @@ Full Verify, blocking Security, package, install and lifecycle readback gates.
 
 ## DoD
 
-Product completion requires AC-047-01–135 in [spec.md](spec.md). AC-047-01–68
+Product completion requires AC-047-01–142 in [spec.md](spec.md). AC-047-01–68
 are retained regression scope; AC-047-69–135 are the current missing or newly
-reproduced remainder.
+reproduced remainder; AC-047-136–142 bind the retained code-aligned recovery
+and guard corrections.
 Completion still requires one immutable candidate commit/tree, all focused
 tests, runner-neutral fresh candidate-bound Full Verify, blocking Security, a
 fresh independent high-risk Critic over the complete expanded candidate,
@@ -450,11 +485,11 @@ cleanup binding. Nova/Phoenix or PR #64 evidence is inadmissible.
 
 ## Decision points
 
-1. The code-first AC-047-01–135 implementation scope is proposed and currently
-   unapproved; the prior approval is historical and revoked.
-2. Implementation begins only after this readable PRD is presented and the PO
-   replies exactly `approved`, followed by the matching sanctioned
-   digest-bound approval write.
+1. The code-first AC-047-01–142 implementation scope is approved by the PO;
+   the matching sanctioned digest-bound approval write remains the operative
+   lifecycle record.
+2. Implementation begins only after that lifecycle record binds these exact
+   readable PRD/Spec bytes.
 3. The immutable candidate requires green focused regressions,
    runner-neutral Full Verify, blocking Security, independent high-risk
    Critic, packaging and installed readback before any release claim.

@@ -62,6 +62,7 @@ import {
   validatePortablePipelineState,
 } from "./project-authority.mjs";
 import {
+  inspectSessionClosure,
   listActiveSessionDescriptors,
   loadSessionDescriptor,
 } from "./worktree-lifecycle.mjs";
@@ -78,6 +79,8 @@ export const SESSION_CLEANUP_BIND_SCHEMA = "pipeline.codex-onboarding-session-cl
 export const SESSION_CLEANUP_RELEASE_PROOF_SCHEMA = "pipeline.session-cleanup-release-proof.v1";
 export const SESSION_CLEANUP_RELEASE_RECEIPT_SCHEMA = "pipeline.session-cleanup-release-receipt.v1";
 export const PRIVATE_SESSION_CLEANUP_BINDING_SCHEMA = "pipeline.private-session-cleanup-binding.v1";
+export const PRIVATE_SESSION_CLEANUP_RELEASE_RECEIPT_SCHEMA = "pipeline.private-session-cleanup-release-receipt.v1";
+export const PRIVATE_SESSION_CLEANUP_RELEASE_QUARANTINE_SCHEMA = "pipeline.private-session-cleanup-release-quarantine.v1";
 export const SESSION_CLEANUP_PRIVATIZATION_PLAN_SCHEMA = "pipeline.session-cleanup-privatization-plan.v1";
 export const SESSION_CLEANUP_PRIVATIZATION_APPLY_SCHEMA = "pipeline.session-cleanup-privatization-apply.v1";
 
@@ -91,6 +94,7 @@ const INITIAL_SPEC_RELATIVE_PATH = "specs/kickoff-initial-spec.md";
 const HISTORY_BASENAME = "continuity-history.json";
 const SESSION_CLEANUP_BINDING_BASENAME = "session-cleanup-binding.json";
 const SESSION_CLEANUP_KEY_BASENAME = "session-cleanup-binding.key";
+const SESSION_CLEANUP_RELEASE_RECEIPT_BASENAME = "session-cleanup-release-receipt.json";
 const SHA256_RE = /^[a-f0-9]{64}$/u;
 const PLAN_KEYS = new Set([
   "schema", "root", "repositoryCapability", "goal", "goalSha256", "calibration",
@@ -178,9 +182,9 @@ function canonicalIsoTimestamp(value) {
 
 function validClosedFeatureEntry(root, entry) {
   const baseKeys = new Set(["id", "planPath", "phaseAtClose", "closedAt", "closedBy", "forCommit"]);
-  const expectedKeys = entry?.continuityClose === undefined
-    ? baseKeys
-    : new Set([...baseKeys, "continuityClose"]);
+  const expectedKeys = new Set(baseKeys);
+  if (entry?.continuityClose !== undefined) expectedKeys.add("continuityClose");
+  if (entry?.coordinatorClose !== undefined) expectedKeys.add("coordinatorClose");
   if (!exactKeys(entry, expectedKeys)
     || typeof entry.id !== "string" || entry.id.length === 0
     || typeof entry.planPath !== "string" || entry.planPath.length === 0
@@ -189,16 +193,26 @@ function validClosedFeatureEntry(root, entry) {
     || typeof entry.closedBy !== "string" || entry.closedBy.length === 0
     || !(entry.forCommit === null || /^[a-f0-9]{40}(?:[a-f0-9]{24})?$/u.test(entry.forCommit))) return false;
   try { safeRelativePath(entry.planPath, "closed feature plan"); } catch { return false; }
-  if (entry.continuityClose === undefined) return true;
-  const close = entry.continuityClose;
-  if (!exactKeys(close, new Set(["schema", "featureId", "expectedRevision", "result", "closeEvidence"]))
-    || close.schema !== "pipeline.continuity-close.v0"
-    || close.featureId !== entry.id
-    || !Number.isSafeInteger(close.expectedRevision) || close.expectedRevision < 0
-    || !exactKeys(close.result, new Set(["path", "sha256"]))
-    || !exactKeys(close.closeEvidence, new Set(["path", "sha256"]))
-    || !validateClosedArtifact(root, close.result)
-    || !validateClosedArtifact(root, close.closeEvidence)) return false;
+  if (entry.continuityClose !== undefined) {
+    const close = entry.continuityClose;
+    if (!exactKeys(close, new Set(["schema", "featureId", "expectedRevision", "result", "closeEvidence"]))
+      || close.schema !== "pipeline.continuity-close.v0"
+      || close.featureId !== entry.id
+      || !Number.isSafeInteger(close.expectedRevision) || close.expectedRevision < 0
+      || !exactKeys(close.result, new Set(["path", "sha256"]))
+      || !exactKeys(close.closeEvidence, new Set(["path", "sha256"]))
+      || !validateClosedArtifact(root, close.result)
+      || !validateClosedArtifact(root, close.closeEvidence)) return false;
+  }
+  if (entry.coordinatorClose !== undefined) {
+    const coordinator = entry.coordinatorClose;
+    if (!exactKeys(coordinator, new Set(["schema", "lifecycleId", "stateSha256", "revision", "phase"]))
+      || coordinator.schema !== "pipeline.close-coordinator-reference.v1"
+      || !/^[A-Za-z0-9._-]{1,100}$/u.test(coordinator.lifecycleId ?? "")
+      || !SHA256_RE.test(coordinator.stateSha256 ?? "")
+      || coordinator.revision !== 2
+      || coordinator.phase !== "feature-close-prepared") return false;
+  }
   return true;
 }
 
@@ -818,6 +832,7 @@ function privateCleanupPaths(root, { create = false, spawn = defaultGitSpawn } =
     directory: privateState.directory,
     binding: join(privateState.directory, SESSION_CLEANUP_BINDING_BASENAME),
     key: join(privateState.directory, SESSION_CLEANUP_KEY_BASENAME),
+    releaseReceipt: join(privateState.directory, SESSION_CLEANUP_RELEASE_RECEIPT_BASENAME),
   };
 }
 
@@ -882,6 +897,197 @@ function readPrivateCleanupBinding(root, { spawn = defaultGitSpawn } = {}) {
   return { binding: value, paths };
 }
 
+function privateReleaseReceiptCore(value) {
+  return {
+    schema: value.schema,
+    featureId: value.featureId,
+    stateSha256: value.stateSha256,
+    coordinatorCloseSha256: value.coordinatorCloseSha256,
+    closureReceiptSha256: value.closureReceiptSha256,
+    recoveryPlanSha256: value.recoveryPlanSha256,
+    bindingSha256: value.bindingSha256,
+    releasedAt: value.releasedAt,
+  };
+}
+
+function privateReleaseQuarantineCore(value) {
+  return {
+    schema: value.schema,
+    stateSha256: value.stateSha256,
+    receiptSha256: value.receiptSha256,
+    recoveryPlanSha256: value.recoveryPlanSha256,
+    quarantinedAt: value.quarantinedAt,
+  };
+}
+
+function parsePrivateReleaseQuarantine(bytes, key) {
+  let value;
+  try { value = JSON.parse(bytes.toString("utf8")); } catch { return null; }
+  if (!exactKeys(value, new Set([
+    "schema", "stateSha256", "receiptSha256", "recoveryPlanSha256", "quarantinedAt", "mac",
+  ]))
+    || value.schema !== PRIVATE_SESSION_CLEANUP_RELEASE_QUARANTINE_SCHEMA
+    || !SHA256_RE.test(value.stateSha256 ?? "")
+    || !SHA256_RE.test(value.receiptSha256 ?? "")
+    || !SHA256_RE.test(value.recoveryPlanSha256 ?? "")
+    || !canonicalIsoTimestamp(value.quarantinedAt)
+    || !SHA256_RE.test(value.mac ?? "")) return null;
+  const expected = Buffer.from(cleanupBindingMac(privateReleaseQuarantineCore(value), key), "hex");
+  const actual = Buffer.from(value.mac, "hex");
+  return actual.length === expected.length && timingSafeEqual(actual, expected) ? value : null;
+}
+
+function readPrivateCleanupReleaseReceipt(root, { spawn = defaultGitSpawn } = {}) {
+  let paths;
+  try { paths = privateCleanupPaths(root, { spawn }); }
+  catch { fail("SESSION-CLEANUP-PRIVATE-UNAVAILABLE", "private cleanup receipt storage is unavailable"); }
+  if (!existsSync(paths.releaseReceipt)) return { receipt: null, paths };
+  if (!existsSync(paths.key)) fail("SESSION-CLEANUP-PRIVATE-DAMAGED", "private cleanup receipt key is missing");
+  const key = assertPrivateCleanupFile(paths.key, "private cleanup binding key");
+  if (key.length !== 32) fail("SESSION-CLEANUP-PRIVATE-DAMAGED", "private cleanup binding key is malformed");
+  let value;
+  try { value = JSON.parse(assertPrivateCleanupFile(paths.releaseReceipt, "private cleanup release receipt").toString("utf8")); }
+  catch (error) {
+    if (error instanceof KickoffError) throw error;
+    fail("SESSION-CLEANUP-PRIVATE-DAMAGED", "private cleanup release receipt is malformed");
+  }
+  if (!exactKeys(value, new Set([
+    "schema", "featureId", "stateSha256", "coordinatorCloseSha256", "closureReceiptSha256",
+    "recoveryPlanSha256", "bindingSha256", "releasedAt", "mac",
+  ]))
+    || value.schema !== PRIVATE_SESSION_CLEANUP_RELEASE_RECEIPT_SCHEMA
+    || typeof value.featureId !== "string" || value.featureId.length === 0
+    || !SHA256_RE.test(value.stateSha256 ?? "")
+    || !SHA256_RE.test(value.coordinatorCloseSha256 ?? "")
+    || !SHA256_RE.test(value.closureReceiptSha256 ?? "")
+    || !SHA256_RE.test(value.recoveryPlanSha256 ?? "")
+    || !SHA256_RE.test(value.bindingSha256 ?? "")
+    || !canonicalIsoTimestamp(value.releasedAt)
+    || !SHA256_RE.test(value.mac ?? "")) {
+    fail("SESSION-CLEANUP-PRIVATE-DAMAGED", "private cleanup release receipt has an invalid closed shape");
+  }
+  const expected = Buffer.from(cleanupBindingMac(privateReleaseReceiptCore(value), key), "hex");
+  const actual = Buffer.from(value.mac, "hex");
+  if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
+    fail("SESSION-CLEANUP-PRIVATE-AUTH", "private cleanup release receipt authentication failed");
+  }
+  return { receipt: value, paths };
+}
+
+function observePrivateCleanupReleaseReceipt(root, { spawn = defaultGitSpawn } = {}) {
+  let paths;
+  try { paths = privateCleanupPaths(root, { spawn }); }
+  catch { fail("SESSION-CLEANUP-PRIVATE-UNAVAILABLE", "private cleanup receipt storage is unavailable"); }
+  if (!existsSync(paths.releaseReceipt)) {
+    return { status: "absent", sha256: null, receipt: null, bytes: null, paths };
+  }
+  const bytes = assertPrivateCleanupFile(paths.releaseReceipt, "private cleanup release receipt");
+  const receiptSha256 = sha256(bytes);
+  if (existsSync(paths.key)) {
+    const key = assertPrivateCleanupFile(paths.key, "private cleanup binding key");
+    if (key.length !== 32) fail("SESSION-CLEANUP-PRIVATE-DAMAGED", "private cleanup binding key is malformed");
+    const quarantine = parsePrivateReleaseQuarantine(bytes, key);
+    if (quarantine !== null) {
+      return {
+        status: "quarantined",
+        sha256: receiptSha256,
+        receipt: null,
+        quarantine,
+        bytes,
+        paths,
+      };
+    }
+  }
+  try {
+    return {
+      status: "valid",
+      sha256: receiptSha256,
+      receipt: readPrivateCleanupReleaseReceipt(root, { spawn }).receipt,
+      bytes,
+      paths,
+    };
+  } catch (error) {
+    if (error instanceof KickoffError
+      && new Set(["SESSION-CLEANUP-PRIVATE-AUTH", "SESSION-CLEANUP-PRIVATE-DAMAGED"]).has(error.code)) {
+      return { status: "invalid", sha256: receiptSha256, receipt: null, bytes, paths };
+    }
+    throw error;
+  }
+}
+
+function archiveObservedPrivateCleanupReleaseReceipt(observed, archiveId) {
+  if (observed.status === "absent" || !SHA256_RE.test(archiveId ?? "")) {
+    fail("SESSION-CLEANUP-PRIVATE-RECEIPT-ARCHIVE", "private cleanup release receipt archive request is invalid");
+  }
+  const archivePath = join(
+    observed.paths.directory,
+    `session-cleanup-release-receipt.${archiveId}.json`,
+  );
+  if (existsSync(archivePath)) {
+    const archivedBytes = assertPrivateCleanupFile(archivePath, "private cleanup release receipt archive");
+    if (archivedBytes.equals(observed.bytes) && !existsSync(observed.paths.releaseReceipt)) return archivePath;
+    fail("SESSION-CLEANUP-PRIVATE-RECEIPT-ARCHIVE", "private cleanup release receipt archive already exists");
+  }
+  try {
+    renameSync(observed.paths.releaseReceipt, archivePath);
+    fsyncDirectory(observed.paths.directory);
+  } catch {
+    fail("SESSION-CLEANUP-PRIVATE-RECEIPT-ARCHIVE", "private cleanup release receipt could not be archived");
+  }
+  const archivedBytes = assertPrivateCleanupFile(archivePath, "private cleanup release receipt archive");
+  if (!archivedBytes.equals(observed.bytes) || existsSync(observed.paths.releaseReceipt)) {
+    fail("SESSION-CLEANUP-PRIVATE-RECEIPT-ARCHIVE", "private cleanup release receipt archive readback failed", {
+      committed: true,
+    });
+  }
+  return archivePath;
+}
+
+function archivePrivateCleanupReleaseReceipt(root, { spawn = defaultGitSpawn } = {}) {
+  const observed = observePrivateCleanupReleaseReceipt(root, { spawn });
+  if (observed.status === "absent") return null;
+  if (!new Set(["valid", "quarantined"]).has(observed.status)) {
+    fail("SESSION-CLEANUP-PRIVATE-RECEIPT-ARCHIVE", "invalid private cleanup release receipt requires recovery");
+  }
+  return archiveObservedPrivateCleanupReleaseReceipt(
+    observed,
+    observed.receipt?.recoveryPlanSha256 ?? observed.quarantine.recoveryPlanSha256,
+  );
+}
+
+function writePrivateCleanupReleaseReceipt(root, receipt, { spawn = defaultGitSpawn } = {}) {
+  const observed = readPrivateCleanupReleaseReceipt(root, { spawn });
+  if (observed.receipt !== null) {
+    const expectedCore = privateReleaseReceiptCore(receipt);
+    const observedCore = privateReleaseReceiptCore(observed.receipt);
+    delete expectedCore.releasedAt;
+    delete observedCore.releasedAt;
+    if (canonicalJson(observedCore) === canonicalJson(expectedCore)) return observed.receipt;
+    fail("SESSION-CLEANUP-PRIVATE-RECEIPT-CAS", "private cleanup release receipt changed");
+  }
+  const key = assertPrivateCleanupFile(observed.paths.key, "private cleanup binding key");
+  if (key.length !== 32) fail("SESSION-CLEANUP-PRIVATE-DAMAGED", "private cleanup binding key is malformed");
+  const core = privateReleaseReceiptCore(receipt);
+  const value = { ...core, mac: cleanupBindingMac(core, key) };
+  let record = null;
+  try {
+    record = writeExclusiveSynced(
+      observed.paths.releaseReceipt,
+      Buffer.from(`${JSON.stringify(value)}\n`, "utf8"),
+      0o600,
+    );
+    fsyncDirectory(observed.paths.directory);
+  } catch {
+    try { unlinkOwned(record); } catch {}
+    fail("SESSION-CLEANUP-PRIVATE-WRITE", "private cleanup release receipt could not be persisted");
+  }
+  const readback = readPrivateCleanupReleaseReceipt(root, { spawn }).receipt;
+  if (canonicalJson(readback) !== canonicalJson(value)) {
+    fail("SESSION-CLEANUP-PRIVATE-READBACK", "private cleanup release receipt readback failed", { committed: true });
+  }
+  return readback;
+}
+
 function writePrivateCleanupBinding(root, featureId, sessionCleanup, {
   spawn = defaultGitSpawn,
   now = () => new Date().toISOString(),
@@ -891,6 +1097,7 @@ function writePrivateCleanupBinding(root, featureId, sessionCleanup, {
   if (existsSync(paths.binding)) {
     fail("SESSION-CLEANUP-PRIVATE-CONFLICT", "private cleanup binding already exists");
   }
+  archivePrivateCleanupReleaseReceipt(root, { spawn });
   let key;
   let createdKey = false;
   if (existsSync(paths.key)) {
@@ -1408,10 +1615,25 @@ function observeSessionCleanupState(rootDir, spawn = defaultGitSpawn) {
  */
 export function readOnboardingSessionCleanupBinding({ rootDir, spawn = defaultGitSpawn } = {}) {
   const observed = observeSessionCleanupState(rootDir, spawn);
+  const privateReceiptObservation = observed.neutral
+    ? observePrivateCleanupReleaseReceipt(observed.root, { spawn })
+    : { status: "absent", sha256: null, receipt: null };
+  const privateReleaseReceipt = privateReceiptObservation.receipt;
+  const closedEntry = observed.mode === "closed" ? observed.state.closedFeatures?.at(-1) : undefined;
+  const coordinatorClose = closedEntry?.coordinatorClose;
+  const privateReceiptConflict = observed.neutral && observed.mode === "closed"
+    && observed.privateBinding === null && privateReceiptObservation.status === "valid"
+    && (privateReleaseReceipt.featureId !== closedEntry?.id
+      || privateReleaseReceipt.stateSha256 !== observed.stateSha256
+      || coordinatorClose === undefined
+      || privateReleaseReceipt.coordinatorCloseSha256 !== canonicalSha256(coordinatorClose));
+  const privateReceiptInvalid = privateReceiptObservation.status === "invalid" || privateReceiptConflict;
   const status = observed.mode === "active"
     ? (observed.revision === null
       ? "design-unbound"
       : observed.sessionCleanup === null ? "unbound" : "bound")
+    : observed.neutral && observed.privateBinding === null && privateReceiptInvalid
+      ? "closed-receipt-invalid"
     : observed.released
       ? "released"
       : observed.sessionCleanup === null
@@ -1429,7 +1651,214 @@ export function readOnboardingSessionCleanupBinding({ rootDir, spawn = defaultGi
       releasePlanSha256: observed.releaseReceipt.recoveryPlanSha256,
       closureReceiptSha256: observed.releaseReceipt.closureReceiptSha256,
     } : {}),
+    ...(privateReceiptObservation.status !== "absent" ? {
+      privateReceiptStatus: privateReceiptInvalid
+        ? "invalid"
+        : privateReceiptObservation.status,
+      privateReceiptSha256: privateReceiptObservation.sha256,
+    } : {}),
+    ...(privateReleaseReceipt && !privateReceiptInvalid ? {
+      releasePlanSha256: privateReleaseReceipt.recoveryPlanSha256,
+      closureReceiptSha256: privateReleaseReceipt.closureReceiptSha256,
+    } : {}),
+    ...(privateReceiptObservation.status === "quarantined" ? {
+      releasePlanSha256: privateReceiptObservation.quarantine.recoveryPlanSha256,
+    } : {}),
+    ...(coordinatorClose ? { coordinatorCloseSha256: canonicalSha256(coordinatorClose) } : {}),
   };
+}
+
+function privateClosedReleaseContext(observed, closureReceiptSha256, recoveryPlanSha256, coordinatorCloseSha256) {
+  const entry = observed.state.closedFeatures?.at(-1);
+  if (!observed.neutral || observed.mode !== "closed" || !entry
+    || observed.privateBinding === null
+    || observed.privateBinding.featureId !== entry.id
+    || entry.continuityClose === undefined
+    || entry.coordinatorClose === undefined
+    || entry.coordinatorClose.revision !== 2
+    || entry.coordinatorClose.phase !== "feature-close-prepared"
+    || canonicalSha256(entry.coordinatorClose) !== coordinatorCloseSha256
+    || listActiveSessionDescriptors(observed.root).length !== 0) {
+    fail("SESSION-CLEANUP-PRIVATE-RELEASE-CAS", "private closed cleanup release preimage changed");
+  }
+  const closure = inspectSessionClosure(observed.root, observed.privateBinding.sessionCleanup.sessionId, {
+    expectedDescriptorSha256: observed.privateBinding.sessionCleanup.descriptorSha256,
+  });
+  if (closure.status !== "closed" || closure.receiptSha256 !== closureReceiptSha256) {
+    fail("SESSION-CLEANUP-PRIVATE-RELEASE-CLOSURE", "private closed cleanup closure proof changed");
+  }
+  return {
+    featureId: entry.id,
+    stateSha256: observed.stateSha256,
+    coordinatorCloseSha256,
+    closureReceiptSha256,
+    recoveryPlanSha256,
+    bindingSha256: canonicalSha256(observed.privateBinding),
+  };
+}
+
+function privateClosedReleaseReplay(root, expectedStateSha256, closureReceiptSha256, recoveryPlanSha256, coordinatorCloseSha256, spawn) {
+  const observed = observeSessionCleanupState(root, spawn);
+  const privateReceipt = observePrivateCleanupReleaseReceipt(observed.root, { spawn });
+  const receipt = privateReceipt.status === "valid" ? privateReceipt.receipt : null;
+  const entry = observed.state.closedFeatures?.at(-1);
+  if (observed.mode !== "closed" || observed.stateSha256 !== expectedStateSha256
+    || observed.privateBinding !== null || receipt === null
+    || entry?.id !== receipt.featureId
+    || entry?.coordinatorClose === undefined
+    || canonicalSha256(entry?.coordinatorClose) !== coordinatorCloseSha256
+    || receipt.stateSha256 !== expectedStateSha256
+    || receipt.closureReceiptSha256 !== closureReceiptSha256
+    || receipt.recoveryPlanSha256 !== recoveryPlanSha256
+    || receipt.coordinatorCloseSha256 !== coordinatorCloseSha256) return null;
+  return observed;
+}
+
+export function quarantineClosedPrivateCleanupReleaseReceipt({
+  rootDir,
+  expectedStateSha256,
+  expectedReceiptSha256,
+  recoveryPlanSha256,
+  deps = {},
+} = {}) {
+  if (!SHA256_RE.test(expectedStateSha256 ?? "")
+    || !SHA256_RE.test(expectedReceiptSha256 ?? "")
+    || !SHA256_RE.test(recoveryPlanSha256 ?? "")) {
+    fail("SESSION-CLEANUP-PRIVATE-RECEIPT-RECOVERY", "private cleanup receipt recovery request is invalid");
+  }
+  const spawn = deps.spawn ?? defaultGitSpawn;
+  const initial = observeSessionCleanupState(rootDir, spawn);
+  if (!initial.neutral || initial.mode !== "closed" || initial.stateSha256 !== expectedStateSha256
+    || initial.privateBinding !== null || listActiveSessionDescriptors(initial.root).length !== 0) {
+    fail("SESSION-CLEANUP-PRIVATE-RECEIPT-CAS", "private cleanup receipt recovery preimage changed");
+  }
+  const entry = initial.state.closedFeatures?.at(-1);
+  if (entry?.coordinatorClose?.revision !== 2
+    || entry.coordinatorClose.phase !== "feature-close-prepared") {
+    fail("SESSION-CLEANUP-PRIVATE-RECEIPT-CAS", "private cleanup receipt recovery has no exact coordinator close");
+  }
+  const archiveId = canonicalSha256({
+    kind: "quarantined-private-release-receipt",
+    recoveryPlanSha256,
+    receiptSha256: expectedReceiptSha256,
+  });
+  const archivePath = join(
+    privateCleanupPaths(initial.root, { spawn }).directory,
+    `session-cleanup-release-receipt.${archiveId}.json`,
+  );
+  const replay = () => {
+    if (!existsSync(archivePath)) return null;
+    const bytes = assertPrivateCleanupFile(archivePath, "private cleanup release receipt quarantine");
+    if (sha256(bytes) !== expectedReceiptSha256) return null;
+    const marker = observePrivateCleanupReleaseReceipt(initial.root, { spawn });
+    if (marker.status !== "quarantined"
+      || marker.quarantine.stateSha256 !== expectedStateSha256
+      || marker.quarantine.receiptSha256 !== expectedReceiptSha256
+      || marker.quarantine.recoveryPlanSha256 !== recoveryPlanSha256) return null;
+    const current = observeSessionCleanupState(initial.root, spawn);
+    return current.neutral && current.mode === "closed"
+      && current.stateSha256 === expectedStateSha256 && current.privateBinding === null
+      && listActiveSessionDescriptors(current.root).length === 0 ? current : null;
+  };
+  const replayed = replay();
+  if (replayed !== null) {
+    return {
+      schema: SESSION_CLEANUP_BIND_SCHEMA,
+      status: "closed-unbound",
+      root: replayed.root,
+      stateSha256: replayed.stateSha256,
+      revision: replayed.revision,
+      sessionCleanup: null,
+      mutated: false,
+      storage: "private-runtime-quarantine",
+    };
+  }
+  const token = `session-cleanup-private-receipt-${expectedStateSha256.slice(0, 32)}`;
+  const lock = acquireLock(`${initial.path}.lock`, "pipeline.continuity-lock.v0", token, {
+    nowMs: deps.nowMs ?? Date.now,
+    lockStaleMs: deps.lockStaleMs ?? 30_000,
+  });
+  let committed = false;
+  try {
+    const current = observeSessionCleanupState(initial.root, spawn);
+    const receipt = observePrivateCleanupReleaseReceipt(current.root, { spawn });
+    if (!current.neutral || current.mode !== "closed" || current.stateSha256 !== expectedStateSha256
+      || current.privateBinding !== null || listActiveSessionDescriptors(current.root).length !== 0
+      || receipt.status === "absent" || receipt.sha256 !== expectedReceiptSha256) {
+      fail("SESSION-CLEANUP-PRIVATE-RECEIPT-CAS", "private cleanup receipt recovery preimage changed");
+    }
+    if (existsSync(archivePath)) {
+      const archived = assertPrivateCleanupFile(archivePath, "private cleanup release receipt quarantine");
+      if (!archived.equals(receipt.bytes)) {
+        fail("SESSION-CLEANUP-PRIVATE-RECEIPT-CAS", "private cleanup receipt quarantine archive changed");
+      }
+    } else {
+      writeExclusiveSynced(archivePath, receipt.bytes, 0o600);
+      fsyncDirectory(receipt.paths.directory);
+      const archived = assertPrivateCleanupFile(archivePath, "private cleanup release receipt quarantine");
+      if (!archived.equals(receipt.bytes)) {
+        fail("SESSION-CLEANUP-PRIVATE-RECEIPT-READBACK", "private cleanup receipt quarantine archive readback failed", {
+          committed: true,
+        });
+      }
+    }
+    let key;
+    if (existsSync(receipt.paths.key)) {
+      key = assertPrivateCleanupFile(receipt.paths.key, "private cleanup binding key");
+      if (key.length !== 32) fail("SESSION-CLEANUP-PRIVATE-DAMAGED", "private cleanup binding key is malformed");
+    } else {
+      key = randomBytes(32);
+      writeExclusiveSynced(receipt.paths.key, key, 0o600);
+      fsyncDirectory(receipt.paths.directory);
+    }
+    const core = {
+      schema: PRIVATE_SESSION_CLEANUP_RELEASE_QUARANTINE_SCHEMA,
+      stateSha256: expectedStateSha256,
+      receiptSha256: expectedReceiptSha256,
+      recoveryPlanSha256,
+      quarantinedAt: (deps.now ?? (() => new Date().toISOString()))(),
+    };
+    if (!canonicalIsoTimestamp(core.quarantinedAt)) {
+      fail("SESSION-CLEANUP-PRIVATE-RECEIPT-RECOVERY", "private cleanup receipt quarantine timestamp is invalid");
+    }
+    const marker = { ...core, mac: cleanupBindingMac(core, key) };
+    const temporary = `${receipt.paths.releaseReceipt}.${process.pid}.${randomUUID()}.tmp`;
+    let temporaryRecord = null;
+    try {
+      temporaryRecord = writeExclusiveSynced(
+        temporary,
+        Buffer.from(`${JSON.stringify(marker)}\n`, "utf8"),
+        0o600,
+      );
+      renameSync(temporary, receipt.paths.releaseReceipt);
+      fsyncDirectory(receipt.paths.directory);
+    } catch (error) {
+      try { unlinkOwned(temporaryRecord); } catch {}
+      throw error;
+    }
+    committed = true;
+    const readback = replay();
+    if (readback === null) {
+      fail("SESSION-CLEANUP-PRIVATE-RECEIPT-READBACK", "private cleanup receipt recovery readback failed", {
+        committed: true,
+      });
+    }
+    return {
+      schema: SESSION_CLEANUP_BIND_SCHEMA,
+      status: "closed-unbound",
+      root: readback.root,
+      stateSha256: readback.stateSha256,
+      revision: readback.revision,
+      sessionCleanup: null,
+      mutated: true,
+      storage: "private-runtime-quarantine",
+    };
+  } catch (error) {
+    if (error instanceof KickoffError) throw error;
+    fail("SESSION-CLEANUP-PRIVATE-RECEIPT-RECOVERY", "private cleanup receipt recovery failed", { committed });
+  } finally {
+    releaseLock(lock);
+  }
 }
 
 /**
@@ -1443,19 +1872,112 @@ export function recordClosedOnboardingSessionCleanupRelease({
   releaseProof,
   closureReceiptSha256,
   recoveryPlanSha256,
+  coordinatorCloseSha256 = null,
+  privateReceiptRecoverySha256 = null,
   releasedAt = new Date().toISOString(),
   deps = {},
 } = {}) {
   if (!SHA256_RE.test(expectedStateSha256 ?? "")
-    || !isObject(releaseProof)
-    || releaseProof.schema !== SESSION_CLEANUP_RELEASE_PROOF_SCHEMA
     || !SHA256_RE.test(closureReceiptSha256 ?? "")
     || !SHA256_RE.test(recoveryPlanSha256 ?? "")
+    || !(privateReceiptRecoverySha256 === null || SHA256_RE.test(privateReceiptRecoverySha256))
     || typeof releasedAt !== "string"
     || Number.isNaN(Date.parse(releasedAt))) {
     fail("SESSION-CLEANUP-CLOSED-RELEASE-REQUEST", "closed cleanup release request is invalid");
   }
   const spawn = deps.spawn ?? defaultGitSpawn;
+  if (releaseProof === null) {
+    if (!SHA256_RE.test(coordinatorCloseSha256 ?? "")) {
+      fail("SESSION-CLEANUP-CLOSED-RELEASE-REQUEST", "private closed cleanup release request is invalid");
+    }
+    const replay = privateClosedReleaseReplay(
+      rootDir, expectedStateSha256, closureReceiptSha256, recoveryPlanSha256, coordinatorCloseSha256, spawn,
+    );
+    if (replay !== null) {
+      return {
+        schema: SESSION_CLEANUP_BIND_SCHEMA,
+        status: "closed-unbound",
+        root: replay.root,
+        stateSha256: replay.stateSha256,
+        revision: replay.revision,
+        sessionCleanup: null,
+        mutated: false,
+        storage: "private-runtime",
+      };
+    }
+    const initial = observeSessionCleanupState(rootDir, spawn);
+    if (initial.stateSha256 !== expectedStateSha256) {
+      fail("SESSION-CLEANUP-PRIVATE-RELEASE-CAS", "private closed cleanup release preimage changed");
+    }
+    const token = `session-cleanup-private-closed-release-${expectedStateSha256.slice(0, 32)}`;
+    const lock = acquireLock(`${initial.path}.lock`, "pipeline.continuity-lock.v0", token, {
+      nowMs: deps.nowMs ?? Date.now,
+      lockStaleMs: deps.lockStaleMs ?? 30_000,
+    });
+    let committed = false;
+    try {
+      const current = observeSessionCleanupState(initial.root, spawn);
+      const replayed = privateClosedReleaseReplay(
+        current.root, expectedStateSha256, closureReceiptSha256, recoveryPlanSha256, coordinatorCloseSha256, spawn,
+      );
+      if (replayed !== null) {
+        return {
+          schema: SESSION_CLEANUP_BIND_SCHEMA, status: "closed-unbound", root: replayed.root,
+          stateSha256: replayed.stateSha256, revision: replayed.revision, sessionCleanup: null,
+          mutated: false, storage: "private-runtime",
+        };
+      }
+      const core = privateClosedReleaseContext(
+        current, closureReceiptSha256, recoveryPlanSha256, coordinatorCloseSha256,
+      );
+      const existingReceipt = observePrivateCleanupReleaseReceipt(current.root, { spawn });
+      if (privateReceiptRecoverySha256 !== null) {
+        if (existingReceipt.status === "absent"
+          || existingReceipt.sha256 !== privateReceiptRecoverySha256) {
+          fail("SESSION-CLEANUP-PRIVATE-RECEIPT-CAS", "private cleanup release receipt changed");
+        }
+        archiveObservedPrivateCleanupReleaseReceipt(
+          existingReceipt,
+          canonicalSha256({
+            kind: "conflicting-private-release-receipt",
+            recoveryPlanSha256,
+            receiptSha256: privateReceiptRecoverySha256,
+          }),
+        );
+      } else if (existingReceipt.status === "invalid") {
+        fail("SESSION-CLEANUP-PRIVATE-RECEIPT-CAS", "invalid private cleanup release receipt requires a new recovery plan");
+      }
+      const receipt = writePrivateCleanupReleaseReceipt(current.root, {
+        schema: PRIVATE_SESSION_CLEANUP_RELEASE_RECEIPT_SCHEMA,
+        ...core,
+        releasedAt,
+      }, { spawn });
+      committed = true;
+      deps.afterReceiptWrite?.({ root: current.root, receipt: structuredClone(receipt) });
+      deletePrivateCleanupBinding(current.root, current.privateBinding.sessionCleanup, { spawn });
+      deps.afterBindingUnlink?.({ root: current.root });
+      fsyncDirectory(readPrivateCleanupReleaseReceipt(current.root, { spawn }).paths.directory);
+      const readback = privateClosedReleaseReplay(
+        current.root, expectedStateSha256, closureReceiptSha256, recoveryPlanSha256, coordinatorCloseSha256, spawn,
+      );
+      if (readback === null || receipt.bindingSha256.length !== 64) {
+        fail("SESSION-CLEANUP-PRIVATE-RELEASE-READBACK", "private closed cleanup release readback is invalid", { committed: true });
+      }
+      return {
+        schema: SESSION_CLEANUP_BIND_SCHEMA, status: "closed-unbound", root: readback.root,
+        stateSha256: readback.stateSha256, revision: readback.revision, sessionCleanup: null,
+        mutated: true, storage: "private-runtime",
+      };
+    } catch (error) {
+      if (error instanceof KickoffError) throw error;
+      fail("SESSION-CLEANUP-PRIVATE-RELEASE-WRITE", "private closed cleanup release failed", { committed });
+    } finally {
+      releaseLock(lock);
+    }
+  }
+  if (!isObject(releaseProof) || releaseProof.schema !== SESSION_CLEANUP_RELEASE_PROOF_SCHEMA) {
+    fail("SESSION-CLEANUP-CLOSED-RELEASE-REQUEST", "closed cleanup release request is invalid");
+  }
   const initial = observeSessionCleanupState(rootDir, spawn);
   if (initial.released
     && canonicalJson(initial.releaseProof) === canonicalJson(releaseProof)

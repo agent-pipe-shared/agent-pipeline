@@ -24,6 +24,7 @@ import {
   isProjectWritePath,
   isReadOnlyDiagnosticCommand,
   isSanctionedLifecycleCommand,
+  retryActionsForDeniedCommand,
 } from "./guard-lifecycle-ready.mjs";
 import {
   isBoundedReadOnlyPipeline,
@@ -558,6 +559,35 @@ test("redirect-looking quoted data stays argv while hostile composition is typed
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
+test("grammar denials return closed typed retries only for independent read diagnostics", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    writeFileSync(join(path, "one.txt"), "one\n");
+    writeFileSync(join(path, "two.txt"), "two\n");
+    const command = "sed -n '1,10p' one.txt ; sed -n '1,10p' two.txt";
+    const actions = retryActionsForDeniedCommand(command, path);
+    assert.deepEqual(actions, [
+      {
+        executable: "sed", argv: ["-n", "1,10p", "one.txt"], mutation: false,
+        requiresConfirmation: false, executionBoundary: "separate-tool-call", expected: { exitCodes: [0, 1] },
+      },
+      {
+        executable: "sed", argv: ["-n", "1,10p", "two.txt"], mutation: false,
+        requiresConfirmation: false, executionBoundary: "separate-tool-call", expected: { exitCodes: [0, 1] },
+      },
+    ]);
+    const result = evaluateLifecycleReadyGuard(bash(command), { projectDir: path });
+    assert.equal(result.exitCode, 2);
+    const envelopeLine = result.stderr.split("\n").find((line) => line.startsWith('{"schema":"pipeline.guard-retry-actions.v1"'));
+    assert.ok(envelopeLine);
+    assert.deepEqual(JSON.parse(envelopeLine).retryActions, actions);
+    assert.deepEqual(retryActionsForDeniedCommand("sed -n '1,10p' one.txt ; touch changed.txt", path), []);
+    assert.deepEqual(retryActionsForDeniedCommand("rg one . | head -n 10", path), []);
+    assert.deepEqual(retryActionsForDeniedCommand("sed -n \"$(id)\" one.txt ; pwd", path), []);
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
 test("non-ready Bash permits only exact plugin-local lifecycle remediation argv", () => {
   const path = root();
   try {
@@ -581,7 +611,11 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const overridePlan = `node '${HUMAN_OVERRIDE_SCRIPT}' plan --repo '${path}' --request-sha256 ${"f".repeat(64)}`;
     const overridePrepare = `node '${HUMAN_OVERRIDE_SCRIPT}' prepare-authorization --repo '${path}' --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --reason 'PO attended exact action'`;
     const overrideAuthorize = `node '${HUMAN_OVERRIDE_SCRIPT}' authorize --repo '${path}' --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --selection-sha256 ${"c".repeat(64)} --reason 'PO attended exact action' --reason-sha256 ${"b".repeat(64)} --activate`;
-    for (const command of [inspect, apply, preflight, hostPlan, hostApply, kickoffPlan, kickoffApply, overlayRoute, poRebind, poDecisionPlan, poDecisionSelect, poDecisionApply, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, overridePlan, overridePrepare, overrideAuthorize]) {
+    const authorRoot = join(path, "plugins", "pipeline-core");
+    const overrideAuthorPlan = `${overridePlan} --author-source-root '${authorRoot}'`;
+    const overrideAuthorPrepare = `${overridePrepare} --author-source-root '${authorRoot}'`;
+    const overrideAuthorAuthorize = `node '${HUMAN_OVERRIDE_SCRIPT}' authorize --repo '${path}' --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --selection-sha256 ${"c".repeat(64)} --reason 'PO attended exact action' --reason-sha256 ${"b".repeat(64)} --author-source-root '${authorRoot}' --activate`;
+    for (const command of [inspect, apply, preflight, hostPlan, hostApply, kickoffPlan, kickoffApply, overlayRoute, poRebind, poDecisionPlan, poDecisionSelect, poDecisionApply, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
       assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
         projectDir: path,
@@ -608,6 +642,8 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
       `node '${PO_PROFILE_REPAIR_SCRIPT}' apply --root '${path}' --activate`,
       `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' apply --root '${path}' --activate`,
       `${overrideAuthorize} --bypass`,
+      `${overridePlan} --author-source-root /tmp/other`,
+      `${overrideAuthorAuthorize} --bypass`,
       `node '${HUMAN_OVERRIDE_SCRIPT}' authorize --repo /tmp/other --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --selection-sha256 ${"c".repeat(64)} --reason x --reason-sha256 ${"b".repeat(64)} --activate`,
       `node -e 'require("node:fs").writeFileSync("bypass","x")'`,
     ]) {

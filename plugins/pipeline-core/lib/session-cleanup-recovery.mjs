@@ -20,6 +20,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   bindOnboardingSessionCleanup,
+  quarantineClosedPrivateCleanupReleaseReceipt,
   readOnboardingSessionCleanupBinding,
   recordClosedOnboardingSessionCleanupRelease,
   releaseOnboardingSessionCleanup,
@@ -87,6 +88,7 @@ function recoveryBinding(plan) {
     activeDescriptorCount: plan.activeDescriptorCount,
     recovery: plan.recovery,
     releaseProof: plan.releaseProof ?? null,
+    coordinatorCloseSha256: plan.coordinatorCloseSha256 ?? null,
   };
   if (Object.hasOwn(plan, "orphanDescriptors")) {
     binding.orphanDescriptors = plan.orphanDescriptors;
@@ -96,6 +98,9 @@ function recoveryBinding(plan) {
   }
   if (Object.hasOwn(plan, "expectedBindingStatus")) {
     binding.expectedBindingStatus = plan.expectedBindingStatus;
+  }
+  if (Object.hasOwn(plan, "privateReceiptRecoverySha256")) {
+    binding.privateReceiptRecoverySha256 = plan.privateReceiptRecoverySha256;
   }
   if (Object.hasOwn(plan, "expectedPostStateSha256")) {
     binding.expectedPostStateSha256 = plan.expectedPostStateSha256;
@@ -656,6 +661,7 @@ function readyRecoveryPlan(partial, scriptPath) {
     ],
     mutation: true,
     requiresConfirmation: true,
+    executionBoundary: "local-process",
     expected: {
       schema: SESSION_CLEANUP_RECOVERY_APPLY_SCHEMA,
       statuses: [status],
@@ -761,6 +767,28 @@ export function planSessionCleanupRecovery({
       status: "not-needed",
     };
   }
+  if (binding.status === "closed-receipt-invalid") {
+    const activeDescriptors = listDescriptors(binding.root);
+    if (activeDescriptors.length !== 0 || !SHA256.test(binding.privateReceiptSha256 ?? "")) {
+      return {
+        schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+        status: "closed-recovery-unavailable",
+      };
+    }
+    return readyRecoveryPlan({
+      schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+      root: binding.root,
+      stateSha256: binding.stateSha256,
+      revision: binding.revision,
+      sessionCleanup: null,
+      closure: "private-receipt-invalid",
+      activeDescriptorCount: 0,
+      recovery: "quarantine-private-receipt",
+      expectedBindingStatus: "closed-unbound",
+      privateReceiptRecoverySha256: binding.privateReceiptSha256,
+      applyAction: null,
+    }, scriptPath);
+  }
   if (new Set(["closed-unbound", "design-unbound"]).has(binding.status)) {
     const activeDescriptors = listDescriptors(binding.root);
     if (activeDescriptors.length === 0) {
@@ -821,6 +849,8 @@ export function planSessionCleanupRecovery({
           ],
           mutation: true,
           requiresConfirmation: false,
+          executionBoundary: "local-process",
+          expected: { statuses: ["complete"] },
         },
       };
     }
@@ -830,17 +860,47 @@ export function planSessionCleanupRecovery({
         status: "closed-recovery-unavailable",
       };
     }
-    return readyRecoveryPlan({
+    const privateCoordinatorRelease = binding.releaseProof === undefined;
+    if (privateCoordinatorRelease && !SHA256.test(binding.coordinatorCloseSha256 ?? "")) {
+      return {
+        schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+        status: "closed-recovery-unavailable",
+      };
+    }
+    const partial = {
       schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
       root: binding.root,
       stateSha256: binding.stateSha256,
       revision: binding.revision,
-      sessionCleanup: binding.sessionCleanup,
+      // A neutral closed-state release is authenticated again under the State
+      // lock from private storage.  Do not leak its session tuple into the
+      // portable recovery plan.
+      sessionCleanup: privateCoordinatorRelease ? null : binding.sessionCleanup,
       closure,
       activeDescriptorCount: 0,
       recovery: "release-closed-feature",
-      releaseProof: binding.releaseProof,
+      releaseProof: binding.releaseProof ?? null,
+      ...(privateCoordinatorRelease ? {
+        coordinatorCloseSha256: binding.coordinatorCloseSha256,
+        expectedBindingStatus: "closed-unbound",
+      } : { expectedBindingStatus: "released" }),
       applyAction: null,
+    };
+    const preliminary = readyRecoveryPlan(partial, scriptPath);
+    const privateReceiptNeedsRecovery = privateCoordinatorRelease
+      && binding.privateReceiptStatus !== undefined
+      && (binding.privateReceiptStatus !== "valid"
+        || binding.releasePlanSha256 !== preliminary.planSha256);
+    if (!privateReceiptNeedsRecovery) return preliminary;
+    if (!SHA256.test(binding.privateReceiptSha256 ?? "")) {
+      return {
+        schema: SESSION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+        status: "closed-recovery-unavailable",
+      };
+    }
+    return readyRecoveryPlan({
+      ...partial,
+      privateReceiptRecoverySha256: binding.privateReceiptSha256,
     }, scriptPath);
   }
   if (binding.status === "unbound") {
@@ -919,6 +979,8 @@ export function planSessionCleanupRecovery({
         argv: [scriptPath, "release-binding", "--repo", binding.root],
         mutation: true,
         requiresConfirmation: false,
+        executionBoundary: "local-process",
+        expected: { codes: ["WT-SESSION-BINDING-RELEASED"] },
       },
     };
   }
@@ -1016,7 +1078,7 @@ export function applySessionCleanupRecovery({
   const readBinding = deps.readOnboardingSessionCleanupBindingFn
     ?? readOnboardingSessionCleanupBinding;
   const before = readBinding({ rootDir });
-  if (before.status === "released"
+  if (new Set(["released", "closed-unbound"]).has(before.status)
     && SHA256.test(expectedPlanSha256 ?? "")
     && before.releasePlanSha256 === expectedPlanSha256) {
     return {
@@ -1048,6 +1110,34 @@ export function applySessionCleanupRecovery({
     || plan.planSha256 !== expectedPlanSha256
     || digest(recoveryBinding(plan)) !== expectedPlanSha256) {
     fail("WT-SESSION-RECOVERY-PLAN", "cleanup recovery plan digest does not match");
+  }
+  if (plan.recovery === "quarantine-private-receipt") {
+    const quarantine = deps.quarantineClosedPrivateCleanupReleaseReceiptFn
+      ?? quarantineClosedPrivateCleanupReleaseReceipt;
+    const result = quarantine({
+      rootDir: plan.root,
+      expectedStateSha256: plan.stateSha256,
+      expectedReceiptSha256: plan.privateReceiptRecoverySha256,
+      recoveryPlanSha256: plan.planSha256,
+      deps: { spawn: deps.spawn, now: deps.now },
+    });
+    if (result.status !== "closed-unbound" || result.sessionCleanup !== null) {
+      fail("WT-SESSION-RECOVERY-READBACK", "private cleanup receipt recovery did not converge");
+    }
+    const readback = readBinding({ rootDir: plan.root });
+    if (readback.status !== "closed-unbound"
+      || readback.releasePlanSha256 !== plan.planSha256) {
+      fail("WT-SESSION-RECOVERY-READBACK", "private cleanup receipt recovery readback is invalid");
+    }
+    return {
+      schema: SESSION_CLEANUP_RECOVERY_APPLY_SCHEMA,
+      status: "recovered",
+      root: plan.root,
+      planSha256: plan.planSha256,
+      stateSha256: result.stateSha256,
+      revision: result.revision,
+      mutated: result.mutated,
+    };
   }
   if (plan.recovery === "bind-orphan") {
     const loadDescriptor = deps.loadSessionDescriptorFn ?? loadSessionDescriptor;
@@ -1183,13 +1273,19 @@ export function applySessionCleanupRecovery({
       releaseProof: plan.releaseProof,
       closureReceiptSha256: plan.closure.receiptSha256,
       recoveryPlanSha256: plan.planSha256,
-      deps: { spawn: deps.spawn },
+      coordinatorCloseSha256: plan.coordinatorCloseSha256 ?? null,
+      privateReceiptRecoverySha256: plan.privateReceiptRecoverySha256 ?? null,
+      deps: {
+        spawn: deps.spawn,
+        afterReceiptWrite: deps.afterPrivateReleaseReceiptWrite,
+        afterBindingUnlink: deps.afterPrivateReleaseBindingUnlink,
+      },
     });
-    if (result.status !== "released" || result.sessionCleanup !== null) {
+    if (!new Set(["released", "closed-unbound"]).has(result.status) || result.sessionCleanup !== null) {
       fail("WT-SESSION-RECOVERY-READBACK", "closed cleanup recovery did not record the exact release");
     }
     const readback = readBinding({ rootDir: plan.root });
-    if (readback.status !== "released") {
+    if (readback.status !== plan.expectedBindingStatus) {
       fail("WT-SESSION-RECOVERY-READBACK", "closed cleanup release readback is invalid");
     }
     return {
@@ -1199,6 +1295,7 @@ export function applySessionCleanupRecovery({
       planSha256: plan.planSha256,
       stateSha256: result.stateSha256,
       revision: result.revision,
+      mutated: result.mutated,
     };
   }
   if (plan.recovery !== "release-lost-binding") {

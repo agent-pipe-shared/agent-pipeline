@@ -169,6 +169,17 @@
  *                                                 validated by continuity-state.mjs.
  *                                                 Accepted passive/duplicate outcomes
  *                                                 exit 0 with zero mutation.
+ *   continuity-result-close-plan                  Read-only approved-implementation
+ *                 --feature-id <id>               Result binding plan. Requires the
+ *                 --expected-revision <integer>   exact idle review head, null Result,
+ *                 --result-path <repo-path>       zero retries and a physical regular
+ *                 --result-sha256 <sha256>        single-link Result whose bytes match.
+ *   continuity-result-close-apply <returned argv> Confirmed digest/CAS apply of that
+ *                                                 plan. Changes only Continuity revision,
+ *                                                 Result authority, review -> close and
+ *                                                 resume, making the existing H5 close
+ *                                                 coordinator reachable. Exact replay is
+ *                                                 a zero-write success.
  *
  * RULES (all seven `--by`-taking subcommands: approve-plan/revoke-plan/approve-push/
  * close-feature/approve-deploy/consume-deploy/clear-deploy)
@@ -252,6 +263,7 @@ import {
   applyDecisionSelection,
   clearCourseDecisionReceipt,
   clearDecisionSelection,
+  bindContinuityResultForClose,
   compareAndSwapContinuity,
   planLegacyContinuityAdoption,
   applyLegacyContinuityAdoption,
@@ -361,6 +373,9 @@ const PUBLICATION_AUTHORIZATION_SCHEMA = "pipeline.publication-authorization.v1"
 const LOCK_TOKEN_RE = /^[A-Za-z0-9][A-Za-z0-9._:-]{7,127}$/;
 const SHA256_RE = /^[a-f0-9]{64}$/;
 const LEGACY_WRITER_LOCK_TOKEN = "pipeline-legacy-writer-v0";
+const RESULT_CLOSE_PLAN_SCHEMA = "pipeline.continuity-result-close-plan.v1";
+const RESULT_CLOSE_APPLY_SCHEMA = "pipeline.continuity-result-close-apply.v1";
+const RESULT_CLOSE_LOCK_TOKEN = "pipeline-result-close-v1";
 const LEGACY_PLAN_APPROVAL_KEYS = ["approvedBy", "approvedAt", "poGateAuthority"];
 const LEGACY_PO_GATE_AUTHORITY_KEYS = [
   "schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256",
@@ -2596,6 +2611,298 @@ function runLegacyAdoptionCommand(sub, flags, deps) {
   } finally { releaseContinuityLock(lock); }
 }
 
+// ---- Dedicated approved implementation Result -> close readiness writer ----
+
+const RESULT_CLOSE_PLAN_FLAGS = new Set([
+  "feature-id", "expected-revision", "result-path", "result-sha256",
+]);
+
+function parseResultClosePlan(argv) {
+  const parsed = parseExactFlags(argv, RESULT_CLOSE_PLAN_FLAGS);
+  const revision = parsed.ok ? parseExpectedRevision(parsed.value["expected-revision"]) : { ok: false };
+  if (!parsed.ok || !revision.ok || isBlank(parsed.value["feature-id"])
+    || !SHA256_RE.test(parsed.value["result-sha256"])) return null;
+  return {
+    featureId: parsed.value["feature-id"],
+    expectedRevision: revision.value,
+    result: {
+      path: parsed.value["result-path"],
+      sha256: parsed.value["result-sha256"],
+    },
+  };
+}
+
+function parseResultCloseApply(argv) {
+  if (argv.length !== 17
+    || argv[0] !== "--feature-id" || isBlank(argv[1])
+    || argv[2] !== "--expected-revision" || !parseExpectedRevision(argv[3]).ok
+    || argv[4] !== "--result-path" || isBlank(argv[5])
+    || argv[6] !== "--result-sha256" || !SHA256_RE.test(argv[7])
+    || argv[8] !== "--expected-state-sha256" || !SHA256_RE.test(argv[9])
+    || argv[10] !== "--expected-post-state-sha256" || !SHA256_RE.test(argv[11])
+    || argv[12] !== "--updated-at" || !canonicalIso(argv[13])
+    || argv[14] !== "--plan-sha256" || !SHA256_RE.test(argv[15])
+    || argv[16] !== "--activate") return null;
+  return {
+    featureId: argv[1],
+    expectedRevision: parseExpectedRevision(argv[3]).value,
+    result: { path: argv[5], sha256: argv[7] },
+    expectedStateSha256: argv[9],
+    expectedPostStateSha256: argv[11],
+    updatedAt: argv[13],
+    planSha256: argv[15],
+  };
+}
+
+function observeResultCloseArtifact(dir, binding) {
+  const observed = physicalRebindFile(dir, binding?.path);
+  return observed !== null
+    && binding?.sha256 === observed.sha256
+    && observed.bytes.byteLength > 0
+    && observed.bytes.byteLength <= CONTINUITY_RESULT_MAX_BYTES
+    ? observed
+    : null;
+}
+
+function resultClosePlanPayload(root, request, resultFile, expectedStateSha256,
+  expectedPostStateSha256, updatedAt) {
+  return {
+    schema: RESULT_CLOSE_PLAN_SCHEMA,
+    root,
+    featureId: request.featureId,
+    expectedRevision: request.expectedRevision,
+    preimage: {
+      stateSha256: expectedStateSha256,
+      authorityResult: null,
+      nextAction: "review",
+    },
+    result: {
+      path: request.result.path,
+      sha256: request.result.sha256,
+      identity: resultFile.identity,
+    },
+    postimage: {
+      stateSha256: expectedPostStateSha256,
+      revision: request.expectedRevision + 1,
+      authorityResult: request.result,
+      nextAction: "close",
+      resume: {
+        mode: "immediate",
+        sourceRevision: request.expectedRevision + 1,
+        reasonCode: "active-turn",
+      },
+      updatedAt,
+    },
+  };
+}
+
+function approvedResultCloseRoot(state, request) {
+  const lifecycle = derivePlanLifecycle(state);
+  return lifecycle.ok
+    && lifecycle.status === "implementing"
+    && state.planApproved === true
+    && state.activeFeature?.id === request.featureId
+    && state.activeFeature?.phase === "implementation"
+    && state.continuity?.featureId === request.featureId;
+}
+
+function buildResultClosePlan(dir, request, existing, updatedAt) {
+  if (existing.status !== "ok" || !approvedResultCloseRoot(existing.state, request)
+    || !canonicalIso(updatedAt)) return { ok: false, code: "PS-RESULT-CLOSE-STATE" };
+  const resultFile = observeResultCloseArtifact(dir, request.result);
+  if (resultFile === null
+    || request.result.path === existing.state.continuity.authority.prd.path
+    || request.result.path === existing.state.continuity.authority.spec.path) {
+    return { ok: false, code: "PS-RESULT-CLOSE-RESULT" };
+  }
+  const transition = bindContinuityResultForClose(
+    existing.state.continuity,
+    { expectedRevision: request.expectedRevision, result: request.result },
+    request.featureId,
+  );
+  if (!transition.ok || transition.code !== "CS-RESULT-CLOSE-APPLIED") {
+    return { ok: false, code: transition.code };
+  }
+  const nextState = clearGateEstimateForMutation({
+    ...existing.state,
+    continuity: transition.state,
+    updatedAt,
+  });
+  const expectedStateSha256 = sha256Bytes(existing.raw);
+  const expectedPostStateSha256 = sha256Bytes(JSON.stringify(nextState, null, 2) + "\n");
+  const payload = resultClosePlanPayload(
+    realpathSync(resolve(dir)),
+    request,
+    resultFile,
+    expectedStateSha256,
+    expectedPostStateSha256,
+    updatedAt,
+  );
+  return {
+    ok: true,
+    payload,
+    planSha256: sha256Bytes(JSON.stringify(payload)),
+    resultFile,
+    nextState,
+  };
+}
+
+function resultCloseApplyPayload(dir, request, apply, resultFile) {
+  return resultClosePlanPayload(
+    realpathSync(resolve(dir)),
+    request,
+    resultFile,
+    apply.expectedStateSha256,
+    apply.expectedPostStateSha256,
+    apply.updatedAt,
+  );
+}
+
+function exactResultCloseReplay(state, request, apply) {
+  if (!approvedResultCloseRoot(state, request) || state.updatedAt !== apply.updatedAt) return false;
+  const replay = bindContinuityResultForClose(
+    state.continuity,
+    { expectedRevision: request.expectedRevision, result: request.result },
+    request.featureId,
+  );
+  return replay.ok && replay.code === "CS-RESULT-CLOSE-REPLAY";
+}
+
+function runResultCloseCommand(sub, rest, deps) {
+  const plannedRequest = sub === "continuity-result-close-plan" ? parseResultClosePlan(rest) : null;
+  const apply = sub === "continuity-result-close-apply" ? parseResultCloseApply(rest) : null;
+  if (sub === "continuity-result-close-plan" && plannedRequest === null) {
+    console.error("Error: Result-close plan requires exact --feature-id, --expected-revision, --result-path and --result-sha256 bindings.");
+    return 2;
+  }
+  if (sub === "continuity-result-close-apply" && apply === null) {
+    console.error("Error: Result-close apply requires the complete returned action and --activate confirmation.");
+    return 2;
+  }
+  if (plannedRequest !== null) {
+    const updatedAt = deps.now();
+    const planned = buildResultClosePlan(deps.dir, plannedRequest, readStateRaw(deps.dir), updatedAt);
+    if (!planned.ok) {
+      console.error(`Error: Result-close plan refused (${planned.code}); zero mutation.`);
+      return 2;
+    }
+    const writer = fileURLToPath(import.meta.url);
+    console.log(JSON.stringify({
+      ...planned.payload,
+      planSha256: planned.planSha256,
+      applyAction: {
+        executable: process.execPath,
+        argv: [
+          writer,
+          "continuity-result-close-apply",
+          "--feature-id", plannedRequest.featureId,
+          "--expected-revision", String(plannedRequest.expectedRevision),
+          "--result-path", plannedRequest.result.path,
+          "--result-sha256", plannedRequest.result.sha256,
+          "--expected-state-sha256", planned.payload.preimage.stateSha256,
+          "--expected-post-state-sha256", planned.payload.postimage.stateSha256,
+          "--updated-at", planned.payload.postimage.updatedAt,
+          "--plan-sha256", planned.planSha256,
+          "--activate",
+        ],
+        mutation: true,
+        requiresConfirmation: true,
+        requiresHostBoundary: true,
+        expected: { schema: RESULT_CLOSE_APPLY_SCHEMA, statuses: ["applied", "replayed"] },
+      },
+    }, null, 2));
+    return 0;
+  }
+
+  const request = {
+    featureId: apply.featureId,
+    expectedRevision: apply.expectedRevision,
+    result: apply.result,
+  };
+  const lock = acquireContinuityLock(deps.dir, RESULT_CLOSE_LOCK_TOKEN, deps);
+  if (!lock.ok) {
+    console.error(`Error: Result-close apply refused (${lock.code}); zero mutation.`);
+    return 2;
+  }
+  try {
+    const resultFile = observeResultCloseArtifact(deps.dir, request.result);
+    if (resultFile === null) {
+      console.error("Error: Result-close apply refused (PS-RESULT-CLOSE-RESULT); zero mutation.");
+      return 2;
+    }
+    const payload = resultCloseApplyPayload(deps.dir, request, apply, resultFile);
+    if (sha256Bytes(JSON.stringify(payload)) !== apply.planSha256) {
+      console.error("Error: Result-close apply plan digest is stale or conflicting; zero mutation.");
+      return 2;
+    }
+    const current = readStateRaw(deps.dir);
+    if (current.status !== "ok") {
+      console.error("Error: Result-close apply State is unavailable or malformed; zero mutation.");
+      return 2;
+    }
+    const currentSha256 = sha256Bytes(current.raw);
+    if (currentSha256 === apply.expectedPostStateSha256) {
+      if (!exactResultCloseReplay(current.state, request, apply)) {
+        console.error("Error: Result-close replay postimage is invalid; zero mutation.");
+        return 2;
+      }
+      console.log(JSON.stringify({
+        schema: RESULT_CLOSE_APPLY_SCHEMA,
+        status: "replayed",
+        featureId: request.featureId,
+        revision: current.state.continuity.revision,
+        stateSha256: currentSha256,
+        result: request.result,
+        nextAction: "close",
+      }));
+      return 0;
+    }
+    if (currentSha256 !== apply.expectedStateSha256) {
+      console.error("Error: Result-close apply preimage is stale; zero mutation.");
+      return 2;
+    }
+    const rebuilt = buildResultClosePlan(deps.dir, request, current, apply.updatedAt);
+    if (!rebuilt.ok || rebuilt.planSha256 !== apply.planSha256
+      || rebuilt.payload.postimage.stateSha256 !== apply.expectedPostStateSha256
+      || !sameJson(rebuilt.resultFile.identity, resultFile.identity)) {
+      console.error("Error: Result-close apply inputs drifted; zero mutation.");
+      return 2;
+    }
+    const finalResultProbe = observeResultCloseArtifact(deps.dir, request.result);
+    if (finalResultProbe === null || !sameJson(finalResultProbe.identity, resultFile.identity)) {
+      console.error("Error: Result-close Result bytes or physical identity drifted; zero mutation.");
+      return 2;
+    }
+    const written = atomicWriteContinuityState(deps.dir, rebuilt.nextState, lock, deps);
+    if (!written.ok) {
+      console.error(`Error: Result-close State write unresolved (${written.code}); inspect before retry.`);
+      return 2;
+    }
+    const persisted = readStateRaw(deps.dir);
+    const persistedResult = observeResultCloseArtifact(deps.dir, request.result);
+    if (persisted.status !== "ok"
+      || sha256Bytes(persisted.raw) !== apply.expectedPostStateSha256
+      || !exactResultCloseReplay(persisted.state, request, apply)
+      || persistedResult === null
+      || !sameJson(persistedResult.identity, resultFile.identity)) {
+      console.error("Error: Result-close postimage readback is unresolved; inspect before retry.");
+      return 2;
+    }
+    console.log(JSON.stringify({
+      schema: RESULT_CLOSE_APPLY_SCHEMA,
+      status: "applied",
+      featureId: request.featureId,
+      revision: persisted.state.continuity.revision,
+      stateSha256: apply.expectedPostStateSha256,
+      result: request.result,
+      nextAction: "close",
+    }));
+    return 0;
+  } finally {
+    releaseContinuityLock(lock);
+  }
+}
+
 // ---- AC-047-28: deliberately narrow stale PRD-marker / PO authority rebind ----
 
 const PO_REBIND_PLAN_SCHEMA = "pipeline.po-authority-rebind-plan.v1";
@@ -3478,6 +3785,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   if (sub === "continuity-adoption-plan" || sub === "continuity-adoption-apply") {
     return runLegacyAdoptionCommand(sub, flags, { ...deps, dir, now });
   }
+  if (sub === "continuity-result-close-plan" || sub === "continuity-result-close-apply") {
+    return runResultCloseCommand(sub, rest, { ...deps, dir, now });
+  }
   if (CONTINUITY_SUBCOMMANDS.has(sub)) return runContinuityCommand(sub, flags, { ...deps, dir, now });
   if (PUBLICATION_SUBCOMMANDS.has(sub)) return runPublicationCommand(sub, flags, { ...deps, dir, now });
 
@@ -4105,7 +4415,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-close-plan, continuity-result-close-apply, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
       );
       return 2;
     }

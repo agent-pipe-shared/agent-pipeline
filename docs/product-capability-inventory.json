@@ -707,6 +707,12 @@
       "member": "continuity-host-adapter-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-result-close-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "continuity-result-close-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1637,6 +1643,7 @@
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-select-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-session-start-hint-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-result-close-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-state-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-status-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-status-tests",

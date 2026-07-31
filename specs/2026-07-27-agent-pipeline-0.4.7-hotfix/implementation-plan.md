@@ -1,8 +1,8 @@
 # Implementation plan — Agent Pipeline 0.4.7 completion
 
-Status: approved by the PO on 2026-07-31; implementation dispatch remains
-blocked only until the matching PRD/Spec digests are bound by the sanctioned
-lifecycle writer.
+Status: code-aligned and approved by the PO on 2026-07-31; implementation
+dispatch remains blocked only until the matching PRD/Spec digests are bound by
+the sanctioned lifecycle writer.
 
 Authority is the code-first section of the neighboring PRD and Spec.
 `main@83640cec22d494d227eebc82929370277ce926b9` is the implementation
@@ -19,7 +19,7 @@ prohibitions, and stop conditions.
 
 ### F0 — Lifecycle authority, kickoff promotion and portable cleanup
 
-Implement AC-047-100–111 and AC-047-131–135 first because these rules decide
+Implement AC-047-100–111 and AC-047-131–142 first because these rules decide
 whether later work can be edited, approved, resumed, recovered, and persisted
 safely.
 
@@ -60,6 +60,19 @@ safely.
   read-only, validate the 64-hex digest and complete action, present unchanged
   for PO confirmation, apply once at the host write boundary, then rerun Step
   0 and continue only from an actual `ready`.
+- Retain the completed coordinator-close path as a private, receipt-bound
+  cleanup release. Its public State postimage is identity-free and byte-stable;
+  an exact replay is zero-mutation.
+- Recover only the documented crash windows around private receipt publication
+  and binding removal. Invalid, detached or conflicting receipts are
+  quarantined or repaired by one digest-bound recovery plan; no manual State
+  repair or false success is allowed.
+- Bind an immutable Result to the exact idle review head only through the
+  read-only `continuity-result-close-plan` and confirmed CAS apply path.
+- Preserve closed guard grammar: expose retry actions only when each action is
+  independently valid and read-only, keep the bounded cold-repository Git
+  observation budget, and restrict Pipeline Author Repair to its exact,
+  audited source root.
 
 Focused evidence: neutral cleanup start/reuse/recovery, legacy/neutral parity,
 repeated design edits, submit, edit-after-submit, edit-after-approval,
@@ -256,7 +269,8 @@ old Issue prose. Any regression is fixed within its current architecture.
 
 After all slices are integrated:
 
-1. synchronize PRD/Spec/plan and exact technical-spec digest;
+1. synchronize PRD/Spec/plan and exact technical-spec digest, including the
+   code-aligned AC-047-136–142 amendment;
 2. freeze one commit/tree;
 3. run all focused suites, runner-neutral Full Verify, and blocking Security;
 4. obtain independent high-risk Critic review and disposition every finding;

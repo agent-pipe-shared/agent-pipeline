@@ -437,11 +437,44 @@ only the current missing or newly reproduced release remainder.
   lookalike commands, direct State edits, identity disclosure, missing
   activation, stale digests, State drift, and foreign-lock deletion.
 
+### AC-047-136–142 — Code-aligned close recovery and guarded remediation
+
+- **AC-047-136 — Private coordinator-close release:** A coordinator-originated
+  close SHALL release a session-cleanup binding only through an authenticated
+  owner-private receipt bound to the exact closed feature, continuity close,
+  coordinator-close reference, and portable-State preimage. The portable State
+  SHALL remain identity-free and byte-stable.
+- **AC-047-137 — Crash-safe receipt replay:** A crash after private receipt
+  publication or binding unlink SHALL converge only through the exact
+  digest-bound recovery plan. A completed replay SHALL report `mutated:false`;
+  no recovery may infer success from similarly shaped State bytes.
+- **AC-047-138 — Receipt conflict containment:** Missing, malformed, detached,
+  replaced or conflicting private release receipts SHALL fail closed or enter
+  a typed, identifier-free quarantine/recovery path. Public plans, diagnostics
+  and actions SHALL not disclose session identity or descriptor digests.
+- **AC-047-139 — Result-close authority:** A physical regular, single-link
+  Result with exact bytes MAY be bound to only the matching idle review head by
+  a read-only plan and confirmed CAS apply. The postimage changes only the
+  permitted continuity Result/review/resume fields; stale, malformed and
+  conflicting input is zero-mutation.
+- **AC-047-140 — Closed retry hints:** A grammar denial MAY contain a
+  `pipeline.guard-retry-actions.v1` envelope only when every returned action
+  is a separate-tool-call, independently admitted read-only diagnostic. The
+  envelope SHALL never admit composition, redirects, mutation or a bypass.
+- **AC-047-141 — Bounded override observation:** The Codex attended-override
+  adapter SHALL retain one bounded cold-repository Git-observation allowance
+  and expose only sanitized operation/outcome diagnostics on failure.
+- **AC-047-142 — Source-repair confinement:** Pipeline Author Repair SHALL be
+  an explicit, audited, one-use capability bound to the exact Pipeline source
+  root and tool action. It SHALL remain unavailable for arbitrary paths,
+  generic source mutation, publication, State edits and all existing
+  non-overridable classes.
+
 ### Current ownership and focused-gate map
 
 | Slice | Criteria | Exclusive production ownership | Required focused gate |
 | --- | --- | --- | --- |
-| F0 lifecycle/cleanup | AC-047-100–111, 131–135 | cleanup/recovery, portable State writer, approval/submission model, kickoff promotion, onboarding/continuity/topology/Dev-Plan readers | session-cleanup binding, project-authority/migration, onboarding V3, legacy reopen, kickoff promotion, pipeline-state, feature-package topology, Dev-Plan and lifecycle-guard suites |
+| F0 lifecycle/cleanup | AC-047-100–111, 131–142 | cleanup/recovery, portable State writer, approval/submission model, kickoff promotion, onboarding/continuity/topology/Dev-Plan readers | session-cleanup binding, project-authority/migration, onboarding V3, legacy reopen, kickoff promotion, pipeline-state, feature-package topology, Dev-Plan and lifecycle-guard suites |
 | F1 freshness/baseline/backlog | AC-047-99, 112–130 | ruleset/update channels and repository freshness, per-project channel writer, host-source documentation, parallel-Sprint baseline policy, staleness/bootstrap policy, backlog ledger/projections | ruleset/repository freshness, channel writer, parallel-Sprint policy, backlog state suite and canonical checker |
 | F2 Verify/supervision | AC-047-75–80, 88–98 | Verify workflow/harness, injected runner seams, Critic trace identity, onboarding rollback identity, only shipped supervisor paths | Critic isolation, onboarding V3/E2E, Advisor bootstrap, and runner-free Full Verify |
 | F3 publication | AC-047-69–74 | existing publication bundle/authority, fixed executor, publication-only State/guard/close/release integration | bundle, authority, State-authority, close-journal, and new executor disposable-remote suites |

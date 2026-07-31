@@ -19,9 +19,9 @@ const SHA256 = /^[a-f0-9]{64}$/u;
 function usage() {
   return [
     "Usage:",
-    "  guard-human-override.mjs plan --repo <absolute-root> --request-sha256 <64hex>",
-    "  guard-human-override.mjs prepare-authorization --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --reason <text>",
-    "  guard-human-override.mjs authorize --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --selection-sha256 <64hex> --reason <text> --reason-sha256 <64hex> --activate",
+    "  guard-human-override.mjs plan --repo <absolute-root> --request-sha256 <64hex> [--author-source-root <absolute-root>]",
+    "  guard-human-override.mjs prepare-authorization --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --reason <text> [--author-source-root <absolute-root>]",
+    "  guard-human-override.mjs authorize --repo <absolute-root> --request-sha256 <64hex> --plan-sha256 <64hex> --selection-sha256 <64hex> --reason <text> --reason-sha256 <64hex> [--author-source-root <absolute-root>] --activate",
     "  guard-human-override.mjs verify-audit --repo <absolute-root>",
   ].join("\n");
 }
@@ -34,6 +34,12 @@ function flags(argv) {
     result[key.slice(2)] = argv[index + 1];
   }
   return result;
+}
+
+function exactFlagSet(value, required, optional = []) {
+  if (!value || !required.every((key) => Object.hasOwn(value, key))) return false;
+  const allowed = new Set([...required, ...optional]);
+  return Object.keys(value).every((key) => allowed.has(key));
 }
 
 export function main(argv = process.argv.slice(2), io = {}) {
@@ -49,19 +55,23 @@ export function main(argv = process.argv.slice(2), io = {}) {
     }
     if (command === "plan") {
       const parsed = flags(rest);
-      if (!parsed || Object.keys(parsed).length !== 2 || typeof parsed.repo !== "string"
+      if (!exactFlagSet(parsed, ["repo", "request-sha256"], ["author-source-root"])
+        || typeof parsed.repo !== "string"
         || !SHA256.test(parsed["request-sha256"] ?? "")) throw new Error(usage());
+      if (Object.hasOwn(parsed, "author-source-root") && typeof parsed["author-source-root"] !== "string") throw new Error(usage());
       write(`${JSON.stringify(planHumanGuardOverride({
         rootDir: parsed.repo,
         pluginRoot: PLUGIN_ROOT,
         requestSha256: parsed["request-sha256"],
         scriptPath: SCRIPT,
+        authorSourceRoot: parsed["author-source-root"] ?? null,
       }), null, 2)}\n`);
       return 0;
     }
     if (command === "prepare-authorization") {
       const parsed = flags(rest);
-      if (!parsed || Object.keys(parsed).length !== 4 || typeof parsed.repo !== "string"
+      if (!exactFlagSet(parsed, ["repo", "request-sha256", "plan-sha256", "reason"], ["author-source-root"])
+        || typeof parsed.repo !== "string"
         || !SHA256.test(parsed["request-sha256"] ?? "")
         || !SHA256.test(parsed["plan-sha256"] ?? "")
         || typeof parsed.reason !== "string" || parsed.reason.trim() === "") throw new Error(usage());
@@ -72,13 +82,16 @@ export function main(argv = process.argv.slice(2), io = {}) {
         planSha256: parsed["plan-sha256"],
         reason: parsed.reason,
         scriptPath: SCRIPT,
+        authorSourceRoot: parsed["author-source-root"] ?? null,
       }), null, 2)}\n`);
       return 0;
     }
     if (command === "authorize") {
       if (rest.at(-1) !== "--activate") throw new Error(usage());
       const parsed = flags(rest.slice(0, -1));
-      if (!parsed || Object.keys(parsed).length !== 6 || typeof parsed.repo !== "string"
+      if (!exactFlagSet(parsed, [
+        "repo", "request-sha256", "plan-sha256", "selection-sha256", "reason", "reason-sha256",
+      ], ["author-source-root"]) || typeof parsed.repo !== "string"
         || !SHA256.test(parsed["request-sha256"] ?? "")
         || !SHA256.test(parsed["plan-sha256"] ?? "")
         || !SHA256.test(parsed["selection-sha256"] ?? "")
@@ -94,6 +107,7 @@ export function main(argv = process.argv.slice(2), io = {}) {
         reasonSha256: parsed["reason-sha256"],
         activate: true,
         scriptPath: SCRIPT,
+        authorSourceRoot: parsed["author-source-root"] ?? null,
       }))}\n`);
       return 0;
     }

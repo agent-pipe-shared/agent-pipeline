@@ -3,7 +3,15 @@
 
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, unlinkSync, writeFileSync, mkdirSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -565,6 +573,266 @@ test("legacy post-close recovery rejects close-entry drift after planning", () =
     assert.equal(JSON.parse(readFileSync(fixtureState.statePath, "utf8")).cleanupReleases, undefined);
   } finally {
     rmSync(fixtureState.root, { recursive: true, force: true });
+  }
+});
+
+test("neutral coordinator-close release is private, byte-stable, and replayable", () => {
+  const root = neutralFixture("private-coordinator-release");
+  try {
+    const started = invoke(["start", "--repo", root, "--session", "session-private-coordinator"]);
+    const statePath = join(root, "project", "pipeline-state.json");
+    const active = JSON.parse(readFileSync(statePath, "utf8"));
+    mkdirSync(join(root, "specs"), { recursive: true });
+    mkdirSync(join(root, "evidence"), { recursive: true });
+    const resultBytes = "private coordinator result\n";
+    const evidenceBytes = "private coordinator evidence\n";
+    writeFileSync(join(root, "specs", "private-coordinator-result.md"), resultBytes);
+    writeFileSync(join(root, "evidence", "private-coordinator-close.md"), evidenceBytes);
+    active.continuity.authority.result = {
+      path: "specs/private-coordinator-result.md",
+      sha256: createHash("sha256").update(resultBytes).digest("hex"),
+    };
+    active.continuity.queueHead = { ...active.continuity.queueHead, nextAction: "close", dispatch: null };
+    assert.equal(validateContinuityState(active.continuity, active.activeFeature.id).ok, true);
+    writeFileSync(statePath, `${JSON.stringify(active, null, 2)}\n`);
+    gitRun(root, ["config", "user.email", "fixture@example.invalid"]);
+    gitRun(root, ["config", "user.name", "Fixture"]);
+    gitRun(root, ["add", "project/pipeline-state.json", "specs/private-coordinator-result.md", "evidence/private-coordinator-close.md"]);
+    gitRun(root, ["commit", "-q", "-m", "fixture: private coordinator close preimage"]);
+    const descriptor = loadSessionDescriptor(root, started.output.sessionId, {
+      expectedDescriptorSha256: started.output.descriptorSha256,
+    });
+    assert.equal(cleanupSession(root, descriptor, { allowAbsent: true }).ok, true);
+    retireSessionDescriptor(root, descriptor);
+    const closed = {
+      schema: "pipeline.state.v0",
+      planApproved: false,
+      updatedAt: "2026-07-31T12:00:00.000Z",
+      closedFeatures: [{
+        id: active.activeFeature.id,
+        planPath: active.activeFeature.planPath,
+        phaseAtClose: active.activeFeature.phase,
+        closedAt: "2026-07-31T12:00:00.000Z",
+        closedBy: "close-coordinator",
+        forCommit: gitRun(root, ["rev-parse", "HEAD"]),
+        continuityClose: {
+          schema: "pipeline.continuity-close.v0", featureId: active.activeFeature.id,
+          expectedRevision: active.continuity.revision,
+          result: structuredClone(active.continuity.authority.result),
+          closeEvidence: {
+            path: "evidence/private-coordinator-close.md",
+            sha256: createHash("sha256").update(evidenceBytes).digest("hex"),
+          },
+        },
+        coordinatorClose: {
+          schema: "pipeline.close-coordinator-reference.v1",
+          lifecycleId: "private-coordinator-release",
+          stateSha256: "a".repeat(64), revision: 2, phase: "feature-close-prepared",
+        },
+      }],
+    };
+    writeFileSync(statePath, `${JSON.stringify(closed, null, 2)}\n`);
+    const stateBefore = readFileSync(statePath);
+    const closureReceiptPath = join(
+      root,
+      ".git",
+      "agent-pipeline",
+      "session-cleanup",
+      "receipts",
+      `${started.output.sessionId}.json`,
+    );
+    const closureReceiptBytes = readFileSync(closureReceiptPath);
+    unlinkSync(closureReceiptPath);
+    assert.equal(invoke(["plan-recovery", "--repo", root]).output.status, "closed-recovery-unavailable");
+    writeFileSync(closureReceiptPath, closureReceiptBytes, { mode: 0o600, flag: "wx" });
+    const plan = invoke(["plan-recovery", "--repo", root]).output;
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.recovery, "release-closed-feature");
+    assert.equal(plan.releaseProof, null);
+    assert.match(plan.coordinatorCloseSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(JSON.stringify(plan).includes(started.output.sessionId), false);
+    assert.equal(JSON.stringify(plan).includes(started.output.descriptorSha256), false);
+    const bindingPath = join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json");
+    const receiptPath = join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-release-receipt.json");
+    const bindingBytes = readFileSync(bindingPath);
+    const wrongFeature = JSON.parse(stateBefore);
+    wrongFeature.closedFeatures[0].id = "wrong-private-feature";
+    wrongFeature.closedFeatures[0].continuityClose.featureId = "wrong-private-feature";
+    writeFileSync(statePath, `${JSON.stringify(wrongFeature, null, 2)}\n`);
+    const wrongFeaturePlan = invoke(["plan-recovery", "--repo", root]).output;
+    assert.equal(wrongFeaturePlan.status, "ready");
+    assert.throws(
+      () => invoke([
+        "apply-recovery", "--repo", root,
+        "--plan-sha256", wrongFeaturePlan.planSha256,
+        "--activate",
+      ]),
+      (error) => error?.code === "SESSION-CLEANUP-PRIVATE-RELEASE-CAS",
+    );
+    writeFileSync(statePath, stateBefore);
+    const coordinatorDrift = JSON.parse(stateBefore);
+    coordinatorDrift.closedFeatures[0].coordinatorClose.stateSha256 = "b".repeat(64);
+    writeFileSync(statePath, `${JSON.stringify(coordinatorDrift, null, 2)}\n`);
+    assert.throws(
+      () => invoke(["apply-recovery", "--repo", root, "--plan-sha256", plan.planSha256, "--activate"]),
+      (error) => error?.code === "WT-SESSION-RECOVERY-PLAN",
+    );
+    writeFileSync(statePath, stateBefore);
+    const revisionDrift = JSON.parse(stateBefore);
+    revisionDrift.closedFeatures[0].coordinatorClose.revision = 3;
+    writeFileSync(statePath, `${JSON.stringify(revisionDrift, null, 2)}\n`);
+    assert.throws(
+      () => readOnboardingSessionCleanupBinding({ rootDir: root }),
+      (error) => error?.code === "SESSION-CLEANUP-STATE-MALFORMED",
+    );
+    writeFileSync(statePath, stateBefore);
+    const bindingDrift = JSON.parse(bindingBytes);
+    bindingDrift.featureId = "wrong-feature";
+    writeFileSync(bindingPath, `${JSON.stringify(bindingDrift)}\n`, { mode: 0o600 });
+    assert.throws(
+      () => readOnboardingSessionCleanupBinding({ rootDir: root }),
+      (error) => error?.code === "SESSION-CLEANUP-PRIVATE-AUTH",
+    );
+    writeFileSync(bindingPath, bindingBytes, { mode: 0o600 });
+    const unexpectedDescriptor = startSessionDescriptor(root, { sessionId: "session-private-release-unexpected" });
+    assert.throws(
+      () => applySessionCleanupRecovery({
+        rootDir: root, expectedPlanSha256: plan.planSha256, activate: true,
+      }),
+      (error) => error?.code === "SESSION-CLEANUP-PRIVATE-RELEASE-CAS",
+    );
+    retireSessionDescriptor(root, unexpectedDescriptor);
+    assert.throws(
+      () => applySessionCleanupRecovery({
+        rootDir: root,
+        expectedPlanSha256: plan.planSha256,
+        activate: true,
+        deps: {
+          afterPrivateReleaseReceiptWrite() { throw new Error("simulated crash after receipt write"); },
+        },
+      }),
+      (error) => error?.code === "SESSION-CLEANUP-PRIVATE-RELEASE-WRITE",
+    );
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "closed-bound");
+    assert.equal(existsSync(bindingPath), true);
+    assert.equal(existsSync(receiptPath), true);
+    assert.deepEqual(readFileSync(statePath), stateBefore);
+    const receiptBytes = readFileSync(receiptPath);
+    const receiptDrift = JSON.parse(receiptBytes);
+    receiptDrift.bindingSha256 = "c".repeat(64);
+    writeFileSync(receiptPath, `${JSON.stringify(receiptDrift)}\n`, { mode: 0o600 });
+    const driftedReceiptBinding = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(driftedReceiptBinding.status, "closed-bound");
+    assert.equal(driftedReceiptBinding.privateReceiptStatus, "invalid");
+    const driftedReceiptPlan = invoke(["plan-recovery", "--repo", root]).output;
+    assert.equal(driftedReceiptPlan.status, "ready");
+    assert.equal(driftedReceiptPlan.recovery, "release-closed-feature");
+    assert.equal(driftedReceiptPlan.privateReceiptRecoverySha256, driftedReceiptBinding.privateReceiptSha256);
+    assert.equal(JSON.stringify(driftedReceiptPlan).includes(started.output.sessionId), false);
+    assert.equal(JSON.stringify(driftedReceiptPlan).includes(started.output.descriptorSha256), false);
+    writeFileSync(receiptPath, receiptBytes, { mode: 0o600 });
+    const applied = invoke(["apply-recovery", "--repo", root, "--plan-sha256", plan.planSha256, "--activate"]).output;
+    assert.equal(applied.status, "recovered");
+    assert.equal(applied.mutated, true);
+    assert.deepEqual(readFileSync(statePath), stateBefore);
+    const binding = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(binding.status, "closed-unbound");
+    assert.equal(binding.releasePlanSha256, plan.planSha256);
+    assert.equal(existsSync(bindingPath), false);
+    assert.equal(existsSync(receiptPath), true);
+    assert.equal(invoke(["plan-recovery", "--repo", root]).output.status, "not-needed");
+    writeFileSync(bindingPath, bindingBytes, { mode: 0o600, flag: "wx" });
+    assert.throws(
+      () => applySessionCleanupRecovery({
+        rootDir: root,
+        expectedPlanSha256: plan.planSha256,
+        activate: true,
+        deps: {
+          afterPrivateReleaseBindingUnlink() { throw new Error("simulated crash after binding unlink"); },
+        },
+      }),
+      (error) => error?.code === "SESSION-CLEANUP-PRIVATE-RELEASE-WRITE",
+    );
+    assert.equal(existsSync(bindingPath), false);
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "closed-unbound");
+    assert.deepEqual(readFileSync(statePath), stateBefore);
+    const replay = invoke(["apply-recovery", "--repo", root, "--plan-sha256", plan.planSha256, "--activate"]).output;
+    assert.equal(replay.mutated, false);
+
+    writeFileSync(statePath, `${JSON.stringify(active, null, 2)}\n`);
+    const next = invoke(["start", "--repo", root, "--session", "session-after-private-release"]);
+    assert.equal(next.output.code, "WT-SESSION-STARTED");
+    const archivedReceiptPath = join(
+      root,
+      ".git",
+      "agent-pipeline",
+      "onboarding",
+      `session-cleanup-release-receipt.${plan.planSha256}.json`,
+    );
+    assert.equal(existsSync(receiptPath), false);
+    assert.equal(existsSync(archivedReceiptPath), true);
+    assert.deepEqual(readFileSync(archivedReceiptPath), receiptBytes);
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "bound");
+
+    const nextDescriptor = loadSessionDescriptor(root, next.output.sessionId, {
+      expectedDescriptorSha256: next.output.descriptorSha256,
+    });
+    assert.equal(cleanupSession(root, nextDescriptor, { allowAbsent: true }).ok, true);
+    retireSessionDescriptor(root, nextDescriptor);
+    assert.equal(invoke(["release-binding", "--repo", root]).output.code, "WT-SESSION-BINDING-RELEASED");
+    writeFileSync(statePath, stateBefore);
+    const detachedReceiptDrift = JSON.parse(receiptBytes);
+    detachedReceiptDrift.bindingSha256 = "d".repeat(64);
+    writeFileSync(receiptPath, `${JSON.stringify(detachedReceiptDrift)}\n`, { mode: 0o600, flag: "wx" });
+    const invalidDetached = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(invalidDetached.status, "closed-receipt-invalid");
+    const quarantinePlan = invoke(["plan-recovery", "--repo", root]).output;
+    assert.equal(quarantinePlan.status, "ready");
+    assert.equal(quarantinePlan.recovery, "quarantine-private-receipt");
+    assert.equal(JSON.stringify(quarantinePlan).includes(started.output.sessionId), false);
+    assert.equal(JSON.stringify(quarantinePlan).includes(started.output.descriptorSha256), false);
+    const quarantined = invoke([
+      "apply-recovery", "--repo", root,
+      "--plan-sha256", quarantinePlan.planSha256,
+      "--activate",
+    ]).output;
+    assert.equal(quarantined.mutated, true);
+    const quarantineReadback = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(quarantineReadback.status, "closed-unbound");
+    assert.equal(quarantineReadback.privateReceiptStatus, "quarantined");
+    assert.equal(quarantineReadback.releasePlanSha256, quarantinePlan.planSha256);
+    assert.equal(invoke(["plan-recovery", "--repo", root]).output.status, "not-needed");
+    const quarantineReplay = invoke([
+      "apply-recovery", "--repo", root,
+      "--plan-sha256", quarantinePlan.planSha256,
+      "--activate",
+    ]).output;
+    assert.equal(quarantineReplay.mutated, false);
+
+    writeFileSync(bindingPath, bindingBytes, { mode: 0o600, flag: "wx" });
+    const conflictingReceiptPlan = invoke(["plan-recovery", "--repo", root]).output;
+    assert.equal(conflictingReceiptPlan.status, "ready");
+    assert.equal(
+      conflictingReceiptPlan.privateReceiptRecoverySha256,
+      quarantineReadback.privateReceiptSha256,
+    );
+    const conflictingReceiptApplied = invoke([
+      "apply-recovery", "--repo", root,
+      "--plan-sha256", conflictingReceiptPlan.planSha256,
+      "--activate",
+    ]).output;
+    assert.equal(conflictingReceiptApplied.mutated, true);
+    const repairedReceipt = readOnboardingSessionCleanupBinding({ rootDir: root });
+    assert.equal(repairedReceipt.status, "closed-unbound");
+    assert.equal(repairedReceipt.privateReceiptStatus, "valid");
+    assert.equal(repairedReceipt.releasePlanSha256, conflictingReceiptPlan.planSha256);
+    assert.equal(invoke([
+      "apply-recovery", "--repo", root,
+      "--plan-sha256", conflictingReceiptPlan.planSha256,
+      "--activate",
+    ]).output.mutated, false);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
   }
 });
 

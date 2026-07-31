@@ -58,6 +58,7 @@ const CLOSE_COMPLETE_REQUEST_KEYS = new Set(["expectedRevision", "result"]);
 const CAS_KEYS = new Set(["expectedRevision", "next"]);
 const SESSION_CLEANUP_BIND_KEYS = new Set(["expectedRevision", "sessionCleanup"]);
 const SESSION_CLEANUP_RELEASE_KEYS = new Set(["expectedRevision", "sessionCleanup"]);
+const RESULT_CLOSE_BIND_KEYS = new Set(["expectedRevision", "result"]);
 const FINAL_REQUEST_KEYS = new Set(["expectedRevision", "observation", "next"]);
 const DECISION_APPLY_KEYS = new Set(["expectedRevision", "decisionTxn", "queueHead", "blocker", "resume"]);
 const DECISION_CLEAR_KEYS = new Set(["expectedRevision", "receipt"]);
@@ -552,6 +553,77 @@ export function releaseContinuitySessionCleanup(current, request, activeFeatureI
   return after.ok
     ? result(true, "CS-SESSION-CLEANUP-RELEASED", next, true)
     : result(false, after.code);
+}
+
+/**
+ * Bind one already-written Result and make an idle review head close-ready.
+ *
+ * Result bytes and the project approval are I/O-layer concerns.  This pure
+ * transition owns only the closed continuity mutation surface: one revision,
+ * the previously-null Result authority, review -> close, and the immediate
+ * resume marker.  Exact committed replay is a zero-write success.
+ */
+export function bindContinuityResultForClose(current, request, activeFeatureId = undefined) {
+  const before = validateContinuityState(current, activeFeatureId);
+  if (!before.ok || !exactKeys(request, RESULT_CLOSE_BIND_KEYS)
+    || !safeInteger(request.expectedRevision) || !validArtifact(request.result)) {
+    return result(false, before.ok ? "CS-RESULT-CLOSE-REQUEST" : before.code);
+  }
+  const idle = current.queueHead !== null
+    && current.queueHead.dispatch === null
+    && current.queueHead.productRetryCount === 0
+    && current.queueHead.environmentRerouteCount === 0
+    && current.blocker === null
+    && current.recovery === null
+    && current.decisionTxn === null
+    && current.closeTransition == null;
+  if (!idle) return result(false, "CS-RESULT-CLOSE-PREIMAGE");
+
+  const replayResume = {
+    mode: "immediate",
+    sourceRevision: request.expectedRevision + 1,
+    reasonCode: "active-turn",
+  };
+  if (current.authority.result !== null) {
+    return current.revision === request.expectedRevision + 1
+      && current.queueHead.nextAction === "close"
+      && sameJson(current.authority.result, request.result)
+      && sameJson(current.resume, replayResume)
+      ? result(true, "CS-RESULT-CLOSE-REPLAY", structuredClone(current), false)
+      : result(false, "CS-RESULT-CLOSE-CONFLICT");
+  }
+  if (request.expectedRevision !== current.revision) return result(false, "CS-STALE");
+  if (current.queueHead.nextAction !== "review") return result(false, "CS-RESULT-CLOSE-PREIMAGE");
+
+  const next = structuredClone(current);
+  next.revision += 1;
+  next.authority.result = structuredClone(request.result);
+  next.queueHead.nextAction = "close";
+  next.resume = {
+    mode: "immediate",
+    sourceRevision: next.revision,
+    reasonCode: "active-turn",
+  };
+  const after = validateContinuityState(next, activeFeatureId);
+  if (!after.ok) return result(false, after.code);
+  const scoped = next.revision === current.revision + 1
+    && sameJson(next.runtime, current.runtime)
+    && sameJson(next.authority.prd, current.authority.prd)
+    && sameJson(next.authority.spec, current.authority.spec)
+    && sameJson(next.acknowledgedFinal, current.acknowledgedFinal)
+    && next.queueHead.packageId === current.queueHead.packageId
+    && next.queueHead.actionId === current.queueHead.actionId
+    && next.queueHead.productRetryCount === current.queueHead.productRetryCount
+    && next.queueHead.environmentRerouteCount === current.queueHead.environmentRerouteCount
+    && sameJson(next.queueHead.dispatch, current.queueHead.dispatch)
+    && sameJson(next.blocker, current.blocker)
+    && sameJson(next.recovery, current.recovery)
+    && sameJson(next.decisionTxn, current.decisionTxn)
+    && sameJson(next.capacity, current.capacity)
+    && sameJson(next.closeTransition, current.closeTransition);
+  return scoped
+    ? result(true, "CS-RESULT-CLOSE-APPLIED", next, true)
+    : result(false, "CS-RESULT-CLOSE-SCOPE");
 }
 
 function adapterAck(acknowledgedFinal) {
@@ -1106,6 +1178,9 @@ export function applyLegacyContinuityAdoption(current, request = {}, activeFeatu
 export const LEGACY_CONTINUITY_ADOPTION = LEGACY_ADOPTION;
 
 export const CONTINUITY_STATE_CODES = Object.freeze([
+  "CS-RESULT-CLOSE-REQUEST", "CS-RESULT-CLOSE-PREIMAGE",
+  "CS-RESULT-CLOSE-CONFLICT", "CS-RESULT-CLOSE-REPLAY",
+  "CS-RESULT-CLOSE-APPLIED", "CS-RESULT-CLOSE-SCOPE",
   "CS-LEGACY-PREIMAGE", "CS-LEGACY-BINDING", "CS-LEGACY-FEATURE", "CS-LEGACY-SCOPE",
   "CS-LEGACY-ADOPTION-PLAN", "CS-LEGACY-ADOPTION-APPLIED",
   "CS-INVALID", "CS-STATE-BUDGET", "CS-VALID", "CS-REQUEST", "CS-STALE",

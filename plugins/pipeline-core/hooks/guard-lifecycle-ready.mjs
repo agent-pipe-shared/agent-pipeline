@@ -75,7 +75,7 @@ function exactReadyReceipt(value) {
     && value.intent === "session";
 }
 
-function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null) {
+function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, retryActions = []) {
   const grammarGuidance = {
     "GUARD-PARSE-UNSUPPORTED": "The command is outside the closed Pipeline shell grammar.",
     "GUARD-OPERATOR-UNAPPROVED": "The command contains an unapproved shell operator.",
@@ -87,13 +87,18 @@ function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null) {
     : null;
   const grammarReason = grammarGuidance[code];
   if (grammarReason) {
+    const retryEnvelope = {
+      schema: "pipeline.guard-retry-actions.v1",
+      retryActions,
+    };
     return verdict(
       2,
       "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
         + `${code}: ${grammarReason}\n`
         + "Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.\n"
         + "Do not retry by varying &&, ;, newline composition, pipelines, or redirects.\n"
-        + "Only the exact bounded rg-to-head diagnostic pipeline is admitted as an exception.\n",
+        + "Only the exact bounded rg-to-head diagnostic pipeline is admitted as an exception.\n"
+        + `${JSON.stringify(retryEnvelope)}\n`,
     );
   }
   const guidance = typedLifecycleStatus === null
@@ -253,6 +258,64 @@ export function isReadOnlyDiagnosticCommand(command, root) {
   return subcommand === "config"
     && subargs.length >= 2
     && ["--get", "--get-all", "--get-regexp"].includes(subargs[0]);
+}
+
+/**
+ * Recover only independent semicolon-separated diagnostics.  This is a
+ * correction hint, never an execution bypass: each returned argv must pass
+ * the same closed single-command read-only policy on its own.
+ */
+export function retryActionsForDeniedCommand(command, root) {
+  if (typeof command !== "string" || command.trim() === ""
+    || /[\0\r\n`]/u.test(command) || /\$\s*\(/u.test(command)) return [];
+  const parts = [];
+  let quote = null;
+  let escaped = false;
+  let start = 0;
+  for (let index = 0; index < command.length; index += 1) {
+    const char = command[index];
+    if (escaped) {
+      escaped = false;
+      continue;
+    }
+    if (quote !== "'" && char === "\\") {
+      escaped = true;
+      continue;
+    }
+    if (quote !== null) {
+      if (char === quote) quote = null;
+      continue;
+    }
+    if (char === "'" || char === "\"") {
+      quote = char;
+      continue;
+    }
+    if (char === ";") {
+      parts.push(command.slice(start, index).trim());
+      start = index + 1;
+      continue;
+    }
+    if ("|&<>()".includes(char)) return [];
+  }
+  if (quote !== null || escaped || parts.length === 0) return [];
+  parts.push(command.slice(start).trim());
+  if (parts.some((part) => part === "")) return [];
+  const actions = [];
+  for (const part of parts) {
+    const parsed = parseGuardCommand(part, root);
+    if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
+      || parsed.operators.length !== 0 || parsed.redirects.length !== 0
+      || !isReadOnlyDiagnosticCommand(part, root)) return [];
+    actions.push({
+      executable: parsed.segments[0].executable,
+      argv: [...parsed.segments[0].argv],
+      mutation: false,
+      requiresConfirmation: false,
+      executionBoundary: "separate-tool-call",
+      expected: { exitCodes: [0, 1] },
+    });
+  }
+  return actions;
 }
 
 function pipelineSourceRoot(root, exists = existsSync) {
@@ -468,31 +531,34 @@ function sanctionedProjectAuthorityMigrationArgs(args, root) {
 }
 
 function sanctionedHumanOverrideArgs(args, root) {
+  const exactAuthorRoot = (index) => args[index] === "--author-source-root"
+    && args[index + 1] === join(root, "plugins", "pipeline-core");
   if (args[0] === "plan") {
-    return args[1] === "--repo" && args[2] === root
+    const base = args[1] === "--repo" && args[2] === root
       && args[3] === "--request-sha256" && HEX.test(args[4] ?? "")
-      && args.length === 5;
+    return base && (args.length === 5 || (exactAuthorRoot(5) && args.length === 7));
   }
   if (args[0] === "prepare-authorization") {
-    return args[1] === "--repo" && args[2] === root
+    const base = args[1] === "--repo" && args[2] === root
       && args[3] === "--request-sha256" && HEX.test(args[4] ?? "")
       && args[5] === "--plan-sha256" && HEX.test(args[6] ?? "")
       && args[7] === "--reason" && typeof args[8] === "string"
-      && args[8].trim() !== "" && Buffer.byteLength(args[8], "utf8") <= 500
-      && args.length === 9;
+      && args[8].trim() !== "" && Buffer.byteLength(args[8], "utf8") <= 500;
+    return base && (args.length === 9 || (exactAuthorRoot(9) && args.length === 11));
   }
   if (args[0] === "verify-audit") {
     return args[1] === "--repo" && args[2] === root && args.length === 3;
   }
-  return args[0] === "authorize"
+  const base = args[0] === "authorize"
     && args[1] === "--repo" && args[2] === root
     && args[3] === "--request-sha256" && HEX.test(args[4] ?? "")
     && args[5] === "--plan-sha256" && HEX.test(args[6] ?? "")
     && args[7] === "--selection-sha256" && HEX.test(args[8] ?? "")
     && args[9] === "--reason" && typeof args[10] === "string"
     && args[10].trim() !== "" && Buffer.byteLength(args[10], "utf8") <= 500
-    && args[11] === "--reason-sha256" && HEX.test(args[12] ?? "")
-    && args[13] === "--activate" && args.length === 14;
+    && args[11] === "--reason-sha256" && HEX.test(args[12] ?? "");
+  return base && ((args[13] === "--activate" && args.length === 14)
+    || (exactAuthorRoot(13) && args[15] === "--activate" && args.length === 16));
 }
 
 export function isSanctionedLifecycleCommand(command, root, options = {}) {
@@ -584,11 +650,17 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
   }
   if (toolName === "Bash") {
     const parsed = parseGuardCommand(input.tool_input.command, root);
-    if (parsed.parseStatus !== "accepted") return blocked("GUARD-PARSE-UNSUPPORTED");
+    if (parsed.parseStatus !== "accepted") {
+      return blocked(
+        "GUARD-PARSE-UNSUPPORTED",
+        null,
+        retryActionsForDeniedCommand(input.tool_input.command, root),
+      );
+    }
     if (parsed.operators.length > 0 || parsed.redirects.length > 0) {
       return blocked(parsed.redirects.length > 0
         ? "GUARD-REDIRECT-UNAPPROVED"
-        : "GUARD-OPERATOR-UNAPPROVED");
+        : "GUARD-OPERATOR-UNAPPROVED", null, []);
     }
   }
   if (toolName === "Bash" && input.tool_input.command.includes(LAUNCH_SCRIPT)) {
