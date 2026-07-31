@@ -707,10 +707,28 @@
       "member": "continuity-host-adapter-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-result-bootstrap-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "continuity-result-bootstrap-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-result-case-migration-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "continuity-result-case-migration-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-result-close-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
       "member": "continuity-result-close-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:continuity-result-rebind-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "continuity-result-rebind-tests"
     },
     {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:host-advisor-status-tests",
@@ -1289,6 +1307,12 @@
       "member": "product-capability-inventory-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:publication-executor-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "publication-executor-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:project-authority-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1643,7 +1667,10 @@
         "verify-phase:harness/scripts/verify.mjs:codex-sandbox-select-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-session-start-hint-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-host-adapter-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-result-bootstrap-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-result-case-migration-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-result-close-tests",
+        "verify-phase:harness/scripts/verify.mjs:continuity-result-rebind-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-state-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-status-cli-tests",
         "verify-phase:harness/scripts/verify.mjs:continuity-status-tests",
@@ -1716,6 +1743,7 @@
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-ready-gate-tests",
         "verify-phase:harness/scripts/verify.mjs:project-onboarding-v3-tests",
         "verify-phase:harness/scripts/verify.mjs:public-core-observation-tests",
+        "verify-phase:harness/scripts/verify.mjs:publication-executor-tests",
         "verify-phase:harness/scripts/verify.mjs:recovery-preview-attestation-tests",
         "verify-phase:harness/scripts/verify.mjs:release-version-plan-tests",
         "verify-phase:harness/scripts/verify.mjs:repository-freshness-tests",

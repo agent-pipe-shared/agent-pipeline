@@ -23,8 +23,8 @@ function inventory() {
   return document;
 }
 
-function validated(document, phase = "inventory") {
-  return validateInventory({ root: repoRoot, phase, document });
+function validated(document, phase = "inventory", testGitOperations = undefined) {
+  return validateInventory({ root: repoRoot, phase, document, _testGitOperations: testGitOperations });
 }
 
 function gitText(args, options = {}, spawn = spawnSync) {
@@ -58,19 +58,27 @@ function revision(ref) {
   };
 }
 
-function nonAncestorRevision() {
-  // Depending on the checkout's ambient branch/tag topology (e.g. whether any ref
-  // diverges from HEAD) is fragile and environment-dependent, not a portability
-  // concern. `commit-tree` creates a real, resolvable, parentless commit object
-  // directly -- unreachable from HEAD by construction, no branch/tag/working-tree
-  // side effects, deterministic on every host and every repo state.
-  const emptyTree = gitText(["hash-object", "-t", "tree", "--stdin"], { input: "" });
-  const commit = gitText([
-    "-c", "user.name=Agent Pipeline Fixture",
-    "-c", "user.email=fixture@example.invalid",
-    "commit-tree", emptyTree, "-m", "non-ancestor fixture root",
-  ]);
-  return revision(commit);
+function nonAncestorBaseline() {
+  // Object writes are forbidden in the sandbox, so model a real resolvable
+  // foreign commit through the validator's closed test-only Git adapter. The
+  // production checker always uses the real Git implementation.
+  const commit = "a".repeat(40);
+  const tree = "b".repeat(40);
+  return {
+    baseline: { commit, tree },
+    gitOperations: {
+      revision(_root, argument) {
+        if (argument === `${commit}^{commit}`) return commit;
+        if (argument === `${commit}^{tree}`) return tree;
+        return null;
+      },
+      isAncestor(_root, candidate, descendant) {
+        assert.equal(candidate, commit);
+        assert.equal(descendant, "HEAD");
+        return false;
+      },
+    },
+  };
 }
 
 check("HAW-A00 accepts only a status-zero Git EPERM false positive with observed output", () => {
@@ -165,17 +173,24 @@ check("HAW-A05 accepts an ancestor baseline and still requires the exact discove
   assert.match(result.findings.join("\n"), /exactly cover the discovered current product surface/);
 });
 
-for (const [name, baseline, pattern] of [
-  ["a tree that does not belong to its commit", () => ({ commit: revision("HEAD^").commit, tree: revision("HEAD").tree }), /sourceBaseline tree does not match commit/],
-  ["a resolvable commit outside current HEAD ancestry", nonAncestorRevision, /sourceBaseline commit is not an ancestor of current HEAD/],
+for (const [name, fixture, pattern] of [
+  ["a tree that does not belong to its commit", () => ({ baseline: { commit: revision("HEAD^").commit, tree: revision("HEAD").tree } }), /sourceBaseline tree does not match commit/],
+  ["a resolvable commit outside current HEAD ancestry", nonAncestorBaseline, /sourceBaseline commit is not an ancestor of current HEAD/],
 ]) {
   check(`HAW-A06 rejects ${name}`, () => {
     const document = inventory();
-    document.sourceBaseline = baseline();
-    const result = validated(document);
+    const { baseline, gitOperations } = fixture();
+    document.sourceBaseline = baseline;
+    const result = validated(document, "inventory", gitOperations);
     assert.equal(result.ok, false);
     assert.match(result.findings.join("\n"), pattern);
   });
 }
+
+check("HAW-A07 rejects an open-ended test Git adapter", () => {
+  const result = validated(inventory(), "inventory", { revision() {} });
+  assert.equal(result.ok, false);
+  assert.match(result.findings.join("\n"), /test Git operations must have exactly revision and isAncestor functions/);
+});
 
 process.stdout.write(`1..${passed}\n# pass ${passed}\n`);

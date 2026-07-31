@@ -213,6 +213,21 @@ function isAncestor(root, commit, descendant) {
   }
 }
 
+const DEFAULT_GIT_OPERATIONS = Object.freeze({ revision: gitRevision, isAncestor });
+
+function validationGitOperations(testOperations) {
+  if (testOperations === undefined) return DEFAULT_GIT_OPERATIONS;
+  if (!hasExactKeys(testOperations, ["revision", "isAncestor"])
+    || typeof testOperations.revision !== "function"
+    || typeof testOperations.isAncestor !== "function") {
+    return null;
+  }
+  // This narrow seam is intentionally unavailable to the CLI and inventory
+  // document. It lets the unit test represent a resolvable foreign history
+  // without writing synthetic objects into a sandboxed checkout.
+  return testOperations;
+}
+
 function documentPath(document) {
   return {
     README: "README.md",
@@ -234,9 +249,18 @@ function capabilityMarkerExists(root, id) {
   );
 }
 
-export function validateInventory({ root, phase = "inventory", inventoryPath = INVENTORY_PATH, requireCurrentBaseline = true, document = undefined }) {
+export function validateInventory({
+  root,
+  phase = "inventory",
+  inventoryPath = INVENTORY_PATH,
+  requireCurrentBaseline = true,
+  document = undefined,
+  _testGitOperations = undefined,
+}) {
   const findings = [];
   if (phase !== "inventory" && phase !== "final") return { ok: false, findings: [`phase must be inventory or final, got ${phase}`] };
+  const gitOperations = validationGitOperations(_testGitOperations);
+  if (!gitOperations) return { ok: false, findings: ["test Git operations must have exactly revision and isAncestor functions"] };
   let inventory = document;
   if (inventory === undefined) {
     const absoluteInventory = repoPath(root, inventoryPath);
@@ -251,13 +275,13 @@ export function validateInventory({ root, phase = "inventory", inventoryPath = I
   if (!hasExactKeys(inventory.sourceBaseline, ["commit", "tree"]) || !GIT_OID_RE.test(inventory.sourceBaseline?.commit ?? "") || !GIT_OID_RE.test(inventory.sourceBaseline?.tree ?? "")) {
     fail(findings, "sourceBaseline must have exactly full lowercase Git commit and tree");
   } else {
-    const baselineCommit = gitRevision(root, `${inventory.sourceBaseline.commit}^{commit}`);
+    const baselineCommit = gitOperations.revision(root, `${inventory.sourceBaseline.commit}^{commit}`);
     if (!baselineCommit) {
       fail(findings, "sourceBaseline commit does not resolve as a commit");
     } else {
-      const baselineTree = gitRevision(root, `${baselineCommit}^{tree}`);
+      const baselineTree = gitOperations.revision(root, `${baselineCommit}^{tree}`);
       if (inventory.sourceBaseline.tree !== baselineTree) fail(findings, "sourceBaseline tree does not match commit");
-      if (requireCurrentBaseline && !isAncestor(root, baselineCommit, "HEAD")) {
+      if (requireCurrentBaseline && !gitOperations.isAncestor(root, baselineCommit, "HEAD")) {
         fail(findings, "sourceBaseline commit is not an ancestor of current HEAD");
       }
     }
