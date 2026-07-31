@@ -91,6 +91,12 @@ function daemonIdentitySha256(daemon) {
   const canonical = JSON.stringify(Object.fromEntries(keys.map((key) => [key, daemon[key]])));
   return createHash("sha256").update(canonical).digest("hex");
 }
+function expectedControlIdentitySha256() {
+  return daemonIdentitySha256(readyHostControlObservation().daemon);
+}
+function hostAction(boundaryId) {
+  return createFreshnessHostAction(boundaryId, expectedControlIdentitySha256());
+}
 function hostExecutionReceipt(action, publicHeadOid) {
   const control = readyHostControlObservation();
   return {
@@ -144,6 +150,7 @@ test("a known restricted sandbox binds exactly one data-minimized network-open h
       schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
       network: "restricted",
       boundaryId,
+      expectedControlIdentitySha256: expectedControlIdentitySha256(),
     },
     hostTransport: {
       schema: FRESHNESS_HOST_TRANSPORT_SCHEMA,
@@ -169,7 +176,7 @@ test("a known restricted sandbox binds exactly one data-minimized network-open h
   assert.equal(value.status, "equal");
   assert.equal(sandboxAttempts, 0);
   assert.equal(actions.length, 1);
-  assert.deepEqual(actions[0], createFreshnessHostAction(boundaryId));
+  assert.deepEqual(actions[0], hostAction(boundaryId));
   assert.equal(JSON.stringify(actions[0]).includes(source), false);
   assert.equal(JSON.stringify(actions[0]).includes(process.env.HOME ?? "not-set"), false);
 });
@@ -181,6 +188,7 @@ test("a restricted preflight without its exact selected host transport fails clo
       schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
       network: "restricted",
       boundaryId: "freshness-host-boundary-2",
+      expectedControlIdentitySha256: expectedControlIdentitySha256(),
     },
     spawn() { attempts += 1; return { status: 0, stdout: `${"a".repeat(40)}\tHEAD\n` }; },
   });
@@ -189,11 +197,12 @@ test("a restricted preflight without its exact selected host transport fails clo
 });
 
 test("WSL CLI planning emits a bound host request and never restores a default sandbox fallback", () => {
-  const plan = freshnessHostPlanForEnvironment({ WSL_DISTRO_NAME: "Ubuntu" });
+  const plan = freshnessHostPlanForEnvironment({ WSL_DISTRO_NAME: "Ubuntu" }, expectedControlIdentitySha256());
   assert.deepEqual(plan.networkPreflight, {
     schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
     network: "restricted",
     boundaryId: "pipeline-start-host-authorized-wsl",
+    expectedControlIdentitySha256: expectedControlIdentitySha256(),
   });
   const unavailable = {
     schema: RULESET_FRESHNESS_SCHEMA,
@@ -207,7 +216,7 @@ test("WSL CLI planning emits a bound host request and never restores a default s
     reason: "host-transport-required",
   };
   const output = withFreshnessHostRequest(unavailable, plan);
-  assert.deepEqual(output.nextAction, createFreshnessHostAction("pipeline-start-host-authorized-wsl"));
+  assert.deepEqual(output.nextAction, hostAction("pipeline-start-host-authorized-wsl"));
   assert.equal(JSON.stringify(output).includes("/home/"), false);
   assert.equal(JSON.stringify(output).includes(".codex"), false);
   assert.equal(freshnessHostPlanForEnvironment({}), null);
@@ -226,6 +235,7 @@ test("the normal Codex freshness entrypoint forwards a selected host transport",
       schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
       network: "restricted",
       boundaryId,
+      expectedControlIdentitySha256: expectedControlIdentitySha256(),
     },
     hostTransport: {
       schema: FRESHNESS_HOST_TRANSPORT_SCHEMA,
@@ -234,7 +244,7 @@ test("the normal Codex freshness entrypoint forwards a selected host transport",
       network: "enabled",
       execute(action) {
         hostCalls += 1;
-        assert.deepEqual(action, createFreshnessHostAction(boundaryId));
+        assert.deepEqual(action, hostAction(boundaryId));
         return {
           schema: FRESHNESS_HOST_RESULT_SCHEMA,
           requestSha256: action.requestSha256,
@@ -262,6 +272,7 @@ test("a direct Codex invocation cannot claim freshness on a selected host bounda
       schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
       network: "restricted",
       boundaryId: "freshness-host-boundary-direct",
+      expectedControlIdentitySha256: expectedControlIdentitySha256(),
     },
   });
   assert.equal(value.status, "remote-unavailable");
@@ -270,7 +281,7 @@ test("a direct Codex invocation cannot claim freshness on a selected host bounda
 });
 
 test("the dedicated WSL host adapter executes only the fixed public action", () => {
-  const action = createFreshnessHostAction("pipeline-start-host-authorized-wsl");
+  const action = hostAction("pipeline-start-host-authorized-wsl");
   const sha = "e".repeat(40);
   const calls = [];
   const output = executeRulesetFreshnessHostAction(action, {
@@ -315,7 +326,7 @@ test("the dedicated WSL host adapter executes only the fixed public action", () 
 });
 
 test("the dedicated WSL host adapter ignores hostile PATH and Git URL-rewrite state", () => {
-  const action = createFreshnessHostAction("pipeline-start-host-authorized-wsl");
+  const action = hostAction("pipeline-start-host-authorized-wsl");
   const sha = "f".repeat(40);
   const hostileEnvironment = {
     PATH: "/tmp/attacker-bin",
@@ -362,8 +373,9 @@ test("the host adapter produces the complete freshness result through its fixed 
     repoPath: "/private/consumer-not-forwarded",
     loadedPluginRoot: "/private/plugin-not-forwarded",
     codexObservation: { status: "ready", observation: sourceObservation(loaded) },
+    observeHostControl() { return readyHostControlObservation(); },
     execute(action) {
-      assert.deepEqual(action, createFreshnessHostAction("pipeline-start-host-authorized-wsl"));
+      assert.deepEqual(action, hostAction("pipeline-start-host-authorized-wsl"));
       return {
         schema: FRESHNESS_HOST_RESULT_SCHEMA,
         requestSha256: action.requestSha256,
@@ -380,6 +392,7 @@ test("the host adapter produces the complete freshness result through its fixed 
     repoPath: "/private/consumer-not-forwarded",
     loadedPluginRoot: "/private/plugin-not-forwarded",
     codexObservation: { status: "ready", observation: sourceObservation(loaded) },
+    observeHostControl() { return readyHostControlObservation(); },
     execute() { return null; },
   });
   assert.equal(unavailable.status, "remote-unavailable");
@@ -390,7 +403,7 @@ test("the host adapter produces the complete freshness result through its fixed 
 test("a completed host response without the closed Freshness execution receipt fails closed", () => {
   const loaded = "a".repeat(40);
   const boundaryId = "freshness-host-boundary-receipt";
-  const base = hostExecutionReceipt(createFreshnessHostAction(boundaryId), loaded);
+  const base = hostExecutionReceipt(hostAction(boundaryId), loaded);
   for (const receipt of [
     null,
     { ...base, boundaryId: "other-boundary" },
@@ -399,6 +412,7 @@ test("a completed host response without the closed Freshness execution receipt f
     { ...base, hostControl: { ...base.hostControl, code: "CAS-DAEMON-UNREACHABLE" } },
     { ...base, hostControl: { ...base.hostControl, appServerVersion: "" } },
     { ...base, hostControl: { ...base.hostControl, daemonIdentitySha256: "not-a-sha256" } },
+    { ...base, hostControl: { ...base.hostControl, daemonIdentitySha256: "b".repeat(64) } },
     { ...base, childStarted: false },
     { ...base, executable: "git" },
     { ...base, exitCode: 1 },
@@ -410,6 +424,7 @@ test("a completed host response without the closed Freshness execution receipt f
         schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
         network: "restricted",
         boundaryId,
+        expectedControlIdentitySha256: expectedControlIdentitySha256(),
       },
       hostTransport: {
         schema: FRESHNESS_HOST_TRANSPORT_SCHEMA,
@@ -434,7 +449,7 @@ test("a completed host response without the closed Freshness execution receipt f
 });
 
 test("the host executor rejects a successful-looking Git result without proof that its child started", () => {
-  const action = createFreshnessHostAction("pipeline-start-host-authorized-wsl");
+  const action = hostAction("pipeline-start-host-authorized-wsl");
   const output = executeRulesetFreshnessHostAction(action, {
     spawn() { return { status: 0, stdout: `${"a".repeat(40)}\tHEAD\n` }; },
     observeHostControl() { return readyHostControlObservation(); },
@@ -444,7 +459,7 @@ test("the host executor rejects a successful-looking Git result without proof th
 });
 
 test("the host executor does not issue completed when host control is absent or unready", () => {
-  const action = createFreshnessHostAction("pipeline-start-host-authorized-wsl");
+  const action = hostAction("pipeline-start-host-authorized-wsl");
   let gitCalls = 0;
   for (const hostControl of [
     null,
@@ -463,25 +478,55 @@ test("the host executor does not issue completed when host control is absent or 
   assert.equal(gitCalls, 0);
 });
 
-test("same-version daemon identities produce distinct private control digests", () => {
-  const action = createFreshnessHostAction("pipeline-start-host-authorized-wsl");
+test("a control identity exchanged after host selection fails before Git starts", () => {
+  const loaded = "a".repeat(40);
   const firstControl = readyHostControlObservation();
   const secondControl = readyHostControlObservation();
   secondControl.daemon.socketPath = "/private/replaced-control.sock";
   secondControl.daemon.managedCodexPath = "/private/replaced-codex";
-  const execute = (hostControl) => executeRulesetFreshnessHostAction(action, {
-    spawn() { return { pid: 7890, status: 0, stdout: `${"a".repeat(40)}\tHEAD\n` }; },
-    observeHostControl() { return hostControl; },
+  let observations = 0;
+  let gitCalls = 0;
+  const observed = inspectHostRulesetFreshness({
+    repoPath: "/private/consumer-not-forwarded",
+    loadedPluginRoot: "/private/plugin-not-forwarded",
+    codexObservation: { status: "ready", observation: sourceObservation(loaded) },
+    observeHostControl() {
+      observations += 1;
+      return observations === 1 ? firstControl : secondControl;
+    },
+    execute(action, options) {
+      return executeRulesetFreshnessHostAction(action, {
+        ...options,
+        spawn() {
+          gitCalls += 1;
+          return { pid: 7890, status: 0, stdout: `${loaded}\tHEAD\n` };
+        },
+      });
+    },
   });
-  const first = execute(firstControl);
-  const second = execute(secondControl);
-  assert.equal(first.status, "completed");
-  assert.equal(second.status, "completed");
-  assert.equal(first.receipt.hostControl.appServerVersion, second.receipt.hostControl.appServerVersion);
-  assert.notEqual(first.receipt.hostControl.daemonIdentitySha256, second.receipt.hostControl.daemonIdentitySha256);
-  assert.match(first.receipt.hostControl.daemonIdentitySha256, /^[0-9a-f]{64}$/u);
-  assert.equal(JSON.stringify(first.receipt).includes("/private/"), false);
-  assert.equal(JSON.stringify(second.receipt).includes("/private/"), false);
+  assert.equal(observed.status, "remote-unavailable");
+  assert.equal(observed.writePermitted, false);
+  assert.equal(observations, 2);
+  assert.equal(gitCalls, 0);
+  assert.equal(JSON.stringify(observed).includes("/private/"), false);
+});
+
+test("missing or invalid host control identity cannot select a freshness action", () => {
+  const loaded = "a".repeat(40);
+  for (const control of [null, { ...readyHostControlObservation(), status: "stale", code: "CAS-DAEMON-UNREACHABLE" }]) {
+    let executeCalls = 0;
+    const observed = inspectHostRulesetFreshness({
+      repoPath: "/private/consumer-not-forwarded",
+      loadedPluginRoot: "/private/plugin-not-forwarded",
+      codexObservation: { status: "ready", observation: sourceObservation(loaded) },
+      observeHostControl() { return control; },
+      execute() { executeCalls += 1; throw new Error("must not execute without a selected identity"); },
+    });
+    assert.equal(observed.status, "remote-unavailable");
+    assert.equal(observed.writePermitted, false);
+    assert.equal(executeCalls, 0);
+    assert.equal(JSON.stringify(observed).includes("/private/"), false);
+  }
 });
 
 test("the host adapter has a real full-result CLI path and rejects arbitrary requests", () => {

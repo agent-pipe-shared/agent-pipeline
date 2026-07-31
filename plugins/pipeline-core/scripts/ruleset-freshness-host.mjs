@@ -79,7 +79,7 @@ function canonicalDaemonIdentity(daemon) {
   return JSON.stringify(Object.fromEntries(DAEMON_IDENTITY_KEYS.map((key) => [key, daemon[key]])));
 }
 
-function hostControlBinding(observation) {
+export function hostControlBinding(observation) {
   const daemonIdentity = canonicalDaemonIdentity(observation?.daemon);
   if (observation?.schema !== CODEX_APP_SERVER_HEALTH_SCHEMA
     || observation.status !== "ready"
@@ -118,11 +118,11 @@ function executionReceipt(action, hostControl, publicHeadOid) {
  * request digests before a process is spawned.
  */
 export function executeRulesetFreshnessHostAction(action, { spawn = spawnSync, timeoutMs = DEFAULT_TIMEOUT_MS, observeHostControl = observeCodexAppServer } = {}) {
-  const expected = createFreshnessHostAction(WSL_FRESHNESS_BOUNDARY_ID);
+  const expected = createFreshnessHostAction(WSL_FRESHNESS_BOUNDARY_ID, action?.expectedControlIdentitySha256);
   if (expected === null || JSON.stringify(action) !== JSON.stringify(expected)) return null;
   let hostControl;
   try { hostControl = hostControlBinding(observeHostControl()); } catch { hostControl = null; }
-  if (hostControl === null) return result(expected, "unavailable");
+  if (hostControl === null || hostControl.daemonIdentitySha256 !== expected.expectedControlIdentitySha256) return result(expected, "unavailable");
   let child;
   try {
     child = spawn(WSL_SYSTEM_GIT, ["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"], {
@@ -145,14 +145,36 @@ export function executeRulesetFreshnessHostAction(action, { spawn = spawnSync, t
   return result(expected, "completed", `${value}\tHEAD\n`, executionReceipt(expected, hostControl, value));
 }
 
-export function inspectHostRulesetFreshness({ repoPath, loadedPluginRoot, codexObservation, execute = executeRulesetFreshnessHostAction } = {}) {
-  if (typeof repoPath !== "string" || repoPath.length === 0 || typeof loadedPluginRoot !== "string" || loadedPluginRoot.length === 0) return null;
+export function inspectHostRulesetFreshness({
+  repoPath,
+  loadedPluginRoot,
+  codexObservation,
+  execute = executeRulesetFreshnessHostAction,
+  observeHostControl = observeCodexAppServer,
+} = {}) {
+  if (typeof repoPath !== "string" || repoPath.length === 0 || typeof loadedPluginRoot !== "string" || loadedPluginRoot.length === 0
+    || typeof execute !== "function" || typeof observeHostControl !== "function") return null;
+  // This runs only in the selected host adapter. Select the complete control
+  // identity before handing an action to the executor, which independently
+  // observes it again before spawning Git. A changed control endpoint is
+  // therefore unable to claim a successful freshness read.
+  let hostControl;
+  try { hostControl = hostControlBinding(observeHostControl()); } catch { hostControl = null; }
+  const expectedControlIdentitySha256 = hostControl?.daemonIdentitySha256;
+  if (typeof expectedControlIdentitySha256 !== "string") {
+    return inspectCliRulesetFreshness({
+      repoPath,
+      loadedPluginRoot,
+      codexObservation,
+      networkPreflight: {},
+    });
+  }
   const hostTransport = Object.freeze({
     schema: FRESHNESS_HOST_TRANSPORT_SCHEMA,
     boundaryId: WSL_FRESHNESS_BOUNDARY_ID,
     access: "read-only",
     network: "enabled",
-    execute,
+    execute(action) { return execute(action, { observeHostControl }); },
   });
   return inspectCliRulesetFreshness({
     repoPath,
@@ -162,6 +184,7 @@ export function inspectHostRulesetFreshness({ repoPath, loadedPluginRoot, codexO
       schema: "pipeline.ruleset-freshness-network-preflight.v1",
       network: "restricted",
       boundaryId: WSL_FRESHNESS_BOUNDARY_ID,
+      expectedControlIdentitySha256,
     }),
     hostTransport,
   });
@@ -169,12 +192,12 @@ export function inspectHostRulesetFreshness({ repoPath, loadedPluginRoot, codexO
 
 function parseArgs(argv) {
   if (argv.length !== 2 || argv[0] !== "--repo" || argv[1].length === 0) return null;
-  return resolve(argv[1]);
+  return { repoPath: resolve(argv[1]) };
 }
 
 export function main(argv = process.argv.slice(2)) {
-  const repoPath = parseArgs(argv);
-  if (repoPath === null) {
+  const parsed = parseArgs(argv);
+  if (parsed === null) {
     process.stderr.write("ruleset-freshness-host: usage: ruleset-freshness-host.mjs --repo <existing-freshness-root>\n");
     return 64;
   }
@@ -183,7 +206,7 @@ export function main(argv = process.argv.slice(2)) {
     loadedPluginRoot,
     selfApplicationRoot: resolve(loadedPluginRoot, "..", ".."),
   });
-  const output = inspectHostRulesetFreshness({ repoPath, loadedPluginRoot, codexObservation });
+  const output = inspectHostRulesetFreshness({ ...parsed, loadedPluginRoot, codexObservation });
   process.stdout.write(`${JSON.stringify(output)}\n`);
   return output?.status === "equal" || output?.status === "ahead"
     || output?.status === "remote-unavailable" && output.reason !== "host-transport-required" ? 0 : 2;

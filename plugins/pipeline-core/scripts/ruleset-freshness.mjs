@@ -88,11 +88,13 @@ function relation(counts, fields) {
  * fetch. The preflight binds the one selected host boundary by a non-secret
  * identifier; the host receives only this fixed public-HEAD operation.
  */
-export function createFreshnessHostAction(boundaryId) {
-  if (typeof boundaryId !== "string" || !BOUNDARY_ID.test(boundaryId)) return null;
+export function createFreshnessHostAction(boundaryId, expectedControlIdentitySha256) {
+  if (typeof boundaryId !== "string" || !BOUNDARY_ID.test(boundaryId)
+    || typeof expectedControlIdentitySha256 !== "string" || !SHA256.test(expectedControlIdentitySha256)) return null;
   const unsigned = {
     schema: FRESHNESS_HOST_ACTION_SCHEMA,
     boundaryId,
+    expectedControlIdentitySha256,
     operation: "read-public-marketplace-head",
     access: "read-only",
     network: "enabled",
@@ -107,24 +109,25 @@ export function createFreshnessHostAction(boundaryId) {
  * inspectCliRulesetFreshness; without that adapter the CLI emits this action
  * and fails closed rather than attempting network access in the sandbox.
  */
-export function freshnessHostPlanForExecutionBoundary(executionBoundary) {
+export function freshnessHostPlanForExecutionBoundary(executionBoundary, expectedControlIdentitySha256) {
   if (executionBoundary !== "host-authorized-wsl") return null;
-  const action = createFreshnessHostAction(WSL_FRESHNESS_BOUNDARY_ID);
+  const action = createFreshnessHostAction(WSL_FRESHNESS_BOUNDARY_ID, expectedControlIdentitySha256);
   if (action === null) return null;
   return Object.freeze({
     networkPreflight: Object.freeze({
       schema: FRESHNESS_NETWORK_PREFLIGHT_SCHEMA,
       network: "restricted",
       boundaryId: WSL_FRESHNESS_BOUNDARY_ID,
+      expectedControlIdentitySha256,
     }),
     action,
   });
 }
 
-export function freshnessHostPlanForEnvironment(env = process.env) {
+export function freshnessHostPlanForEnvironment(env = process.env, expectedControlIdentitySha256 = undefined) {
   const wsl = [env?.WSL_DISTRO_NAME, env?.WSL_INTEROP]
     .some((value) => typeof value === "string" && value.trim() !== "");
-  return freshnessHostPlanForExecutionBoundary(wsl ? "host-authorized-wsl" : "default");
+  return freshnessHostPlanForExecutionBoundary(wsl ? "host-authorized-wsl" : "default", expectedControlIdentitySha256);
 }
 
 /** Add only an actionable public host request to a CLI result that needs it. */
@@ -135,10 +138,11 @@ export function withFreshnessHostRequest(inspected, plan) {
 
 function selectHostTransport(networkPreflight, hostTransport) {
   if (networkPreflight === undefined && hostTransport === undefined) return null;
-  if (!exactKeys(networkPreflight, ["schema", "network", "boundaryId"])
+  if (!exactKeys(networkPreflight, ["schema", "network", "boundaryId", "expectedControlIdentitySha256"])
     || networkPreflight.schema !== FRESHNESS_NETWORK_PREFLIGHT_SCHEMA
     || !["enabled", "restricted"].includes(networkPreflight.network)
-    || typeof networkPreflight.boundaryId !== "string" || !BOUNDARY_ID.test(networkPreflight.boundaryId)) return false;
+    || typeof networkPreflight.boundaryId !== "string" || !BOUNDARY_ID.test(networkPreflight.boundaryId)
+    || typeof networkPreflight.expectedControlIdentitySha256 !== "string" || !SHA256.test(networkPreflight.expectedControlIdentitySha256)) return false;
   if (networkPreflight.network === "enabled") return null;
   if (!exactKeys(hostTransport, ["schema", "boundaryId", "access", "network", "execute"])
     || hostTransport.schema !== FRESHNESS_HOST_TRANSPORT_SCHEMA
@@ -171,6 +175,7 @@ function observeThroughSelectedHost(action, hostTransport) {
     || receipt.hostControl.appServerVersion.length === 0
     || typeof receipt.hostControl.daemonIdentitySha256 !== "string"
     || !SHA256.test(receipt.hostControl.daemonIdentitySha256)
+    || receipt.hostControl.daemonIdentitySha256 !== action.expectedControlIdentitySha256
     || receipt.childStarted !== true
     || receipt.executable !== "/usr/bin/git"
     || JSON.stringify(receipt.argv) !== JSON.stringify(["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"])
@@ -193,7 +198,7 @@ export function observePublicRemoteIdentity({ remoteUrl = PUBLIC_MARKETPLACE_URL
   if (selectedHost !== null) {
     // The selected action is fixed to the reviewed public marketplace. It has
     // no consumer root, plugin root, cache path, HOME value, or private URL.
-    const action = createFreshnessHostAction(selectedHost.boundaryId);
+    const action = createFreshnessHostAction(selectedHost.boundaryId, networkPreflight.expectedControlIdentitySha256);
     return action === null
       ? { status: "remote-unavailable", identity: null, reason: "host-transport-required" }
       : observeThroughSelectedHost(action, selectedHost);
@@ -403,12 +408,17 @@ if (isCli) {
     selfApplicationRoot: resolve(loadedPluginRoot, "..", ".."),
   });
   const hostPlan = freshnessHostPlanForEnvironment(process.env);
+  const wsl = [process.env.WSL_DISTRO_NAME, process.env.WSL_INTEROP]
+    .some((value) => typeof value === "string" && value.trim() !== "");
   const inspected = inspectCliRulesetFreshness({
     repoPath: parsed.repo,
     loadedSha: parsed.loadedSha,
     loadedPluginRoot,
     codexObservation: codex,
-    networkPreflight: hostPlan?.networkPreflight,
+    // A WSL CLI has no preflight-bound control identity on its own. Supplying
+    // a deliberately invalid preflight preserves the selected-host fail-closed
+    // path instead of falling back to a direct sandbox network read.
+    networkPreflight: hostPlan?.networkPreflight ?? (wsl ? {} : undefined),
   });
   const output = withFreshnessHostRequest(inspected, hostPlan);
   process.stdout.write(`${JSON.stringify(output)}\n`);

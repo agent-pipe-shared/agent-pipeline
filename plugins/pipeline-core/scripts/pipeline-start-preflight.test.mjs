@@ -105,18 +105,28 @@ test("preflight selects one host-authorized capability boundary for WSL", () => 
     assert.equal(result.nextAction.executionBoundary, "host-authorized-wsl");
     assert.equal(result.nextAction.argv[3], "/projects/wsl");
     const freshness = freshnessHostActionForPreflight(result);
-    assert.deepEqual(freshness.networkPreflight, {
-      schema: "pipeline.ruleset-freshness-network-preflight.v1",
-      network: "restricted",
+    assert.deepEqual(freshness, {
+      executionBoundary: "host-authorized-wsl",
       boundaryId: "pipeline-start-host-authorized-wsl",
-    });
-    assert.deepEqual(freshness.action.command, {
-      executable: "git",
-      argv: ["ls-remote", "https://github.com/agent-pipe-shared/agent-pipeline.git", "HEAD"],
     });
     assert.equal(JSON.stringify(freshness).includes("/projects/wsl"), false);
     assert.equal(JSON.stringify(freshness).includes(result.pluginRoot), false);
   }
+});
+
+test("a sandbox preflight routes WSL without observing host control identity", () => {
+  let observations = 0;
+  const result = observeActual({
+    env: { WSL_DISTRO_NAME: "Ubuntu" },
+    pluginList: pluginList(),
+    read: () => manifest,
+    observeRulesetSource: () => source(),
+    observeHostControl() { observations += 1; return { status: "ready" }; },
+  });
+  assert.equal(result.status, "ready");
+  assert.equal(result.executionBoundary, "host-authorized-wsl");
+  assert.equal(observations, 0);
+  assert.equal(JSON.stringify(result).includes("daemonIdentity"), false);
 });
 
 test("default-boundary preflight exposes no freshness host action", () => {

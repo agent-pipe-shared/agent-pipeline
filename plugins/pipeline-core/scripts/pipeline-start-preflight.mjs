@@ -7,7 +7,7 @@ import { readFileSync } from "node:fs";
 import { dirname, isAbsolute, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { observeCodexRulesetSource } from "../lib/codex-host-plugin-list.mjs";
-import { freshnessHostPlanForExecutionBoundary } from "./ruleset-freshness.mjs";
+import { WSL_FRESHNESS_BOUNDARY_ID } from "./ruleset-freshness.mjs";
 
 export const SCHEMA = "pipeline.start-preflight.v1";
 const PLUGIN_ID = "pipeline-core@agent-pipeline";
@@ -75,17 +75,16 @@ export function installedPipelineVersion(pluginList = readInstalledPluginList) {
 }
 
 /**
- * Return the only freshness action a host may use after a WSL preflight. The
- * plan contains no project, plugin-cache, HOME, or runtime coordinates and is
- * deliberately not an executor: a host integration must supply its own exact
- * read-only/network-open boundary or fail closed.
+ * Return only the selected host route after a WSL preflight. Control identity
+ * selection occurs in the authorized host helper immediately before it starts
+ * the fixed Git child; a sandbox preflight must not claim host availability.
  */
 export function freshnessHostActionForPreflight(preflight) {
   if (!preflight || typeof preflight !== "object"
     || preflight.schema !== SCHEMA
     || preflight.status !== "ready"
     || preflight.executionBoundary !== "host-authorized-wsl") return null;
-  return freshnessHostPlanForExecutionBoundary(preflight.executionBoundary);
+  return Object.freeze({ executionBoundary: "host-authorized-wsl", boundaryId: WSL_FRESHNESS_BOUNDARY_ID });
 }
 
 export function observePipelineStartPreflight({
