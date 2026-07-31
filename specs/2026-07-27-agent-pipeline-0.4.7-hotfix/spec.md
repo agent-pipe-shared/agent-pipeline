@@ -486,25 +486,31 @@ AC-047-143–148 define the newly reopened Result-authority bootstrap design.
   SHALL return one typed, identifier-safe envelope binding the physical
   repository root, portable-State byte digest, feature ID, expected continuity
   revision, exact PRD and Spec paths/digests, canonically feature-package-derived
-  in-root Result path, Result-path preimage, exact canonical Result
-  bytes/digest, expected State postimage digest, and plan digest. An unjournaled
-  Result-path preimage SHALL be absent. Its sole apply action SHALL use
+  in-root Result path, existing canonical Result-path preimage, immutable
+  historical-Markdown-prefix bytes/digest, exact appended fence bytes/digest,
+  expected State postimage digest, and plan digest. The Result preimage SHALL
+  be one regular single-link canonical Result file with no existing
+  `pipeline-result` fence; a missing or conflicting preimage fails closed. Its
+  sole apply action SHALL use
   `executable` plus `argv[]`, set `mutation`, `requiresConfirmation`,
   `executionBoundary` and `expected`, and require explicit digest-bound
   confirmation.
-- **AC-047-145 — Canonical Result seed:** The planned Result SHALL be a bounded
-  UTF-8/LF regular single-link file with exactly one `pipeline-result` fence.
-  That envelope SHALL contain exactly the four canonical empty collections
+- **AC-047-145 — Canonical Result augmentation:** The existing canonical Result
+  SHALL remain a bounded UTF-8/LF regular single-link file. Its historical
+  Markdown bytes SHALL remain byte-for-byte unchanged as a prefix; the writer
+  SHALL append exactly one strict `pipeline-result` fence and no other Result
+  content. That envelope SHALL contain exactly the four canonical empty collections
   `decisionBriefs`, `courseDecisionIntents`, `courseDecisionReceipts`, and
   `finalIntegrations`; it SHALL contain no fabricated dispatch, decision,
-  outcome, evidence or completion claim. The complete planned file bytes, not
-  a caller-supplied shell string, are authoritative.
+  outcome, evidence or completion claim. The complete planned postimage bytes,
+  not a caller-supplied shell string, are authoritative.
 - **AC-047-146 — Confirmed durable CAS apply:** Apply SHALL recompute the
   complete plan under the normal State/continuity lock, verify root, State,
   revision, feature, PRD, Spec and Result-path preimages, and refuse symlink,
   hard-link, path-escape or byte drift. Through a repository-private,
-  authenticated, fsynced write-ahead transaction it SHALL atomically
-  materialize/read back the exact Result file,
+  authenticated, fsynced write-ahead transaction stored exclusively in the
+  Git common directory (with the existing physical-safety and authenticity
+  checks) it SHALL atomically append/read back the exact Result postimage,
   bind only `continuity.authority.result`, increment continuity revision once,
   set matching `resume.sourceRevision`, update `updatedAt`, durably commit and
   fully read back the State postimage.

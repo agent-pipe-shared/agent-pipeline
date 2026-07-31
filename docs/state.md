@@ -3,12 +3,23 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-07-30
+**Last updated:** 2026-07-31
 **Project status:** ACTIVE
 **Current block:** `0.4.7` final release-candidate qualification; implementation
 is complete and publication remains gated on fresh candidate-bound evidence
 **Repair baseline:** `83640cec22d494d227eebc82929370277ce926b9`
 **Release version:** `0.4.6` released; `0.4.7` final corrective candidate
+
+## 2026-07-31 PO session authorization — temporary protected-test lifts
+
+The PO has approved implementation of the current 0.4.7 PRD, Spec, and
+implementation plan. For this session only, TP-1 through TP-5 may each be
+lifted only while a bounded, approved task edits that rule's exact protected
+file. Every lifted entry must be restored byte-for-byte before staging, commit,
+push, or final verification. This is not a global guard disable and does not
+authorize edits outside the exact protected target, Human-override bypass,
+`main` integration, publication, or any remote effect. Each use and restoration
+remains subject to the applicable focused tests and candidate evidence.
 
 ## 2026-07-31 0.4.7 release qualification — authoritative latest
 

@@ -12,8 +12,10 @@ import {
 } from "../lib/project-onboarding-ready-gate.mjs";
 import {
   KickoffError,
+  applyOnboardingKickoffPromotionCleanupRecovery,
   applyOnboardingSessionCleanupPrivatization,
   bindOnboardingSessionCleanup,
+  planOnboardingKickoffPromotionCleanupRecovery,
   planOnboardingSessionCleanupPrivatization,
   readOnboardingSessionCleanupBinding,
   releaseOnboardingSessionCleanup,
@@ -221,13 +223,16 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
       descriptors,
     };
   } else if (command === "plan-recovery") {
-    output = planSessionCleanupRecovery({ rootDir: repo });
+    const promotionRecovery = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: repo });
+    output = promotionRecovery.status === "not-applicable"
+      ? planSessionCleanupRecovery({ rootDir: repo })
+      : promotionRecovery;
   } else if (command === "apply-recovery") {
-    output = applySessionCleanupRecovery({
-      rootDir: repo,
-      expectedPlanSha256: required(flags, "plan-sha256"),
-      activate: flags.activate === true,
-    });
+    const planSha256 = required(flags, "plan-sha256");
+    const promotionRecovery = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: repo });
+    output = promotionRecovery.status === "not-applicable"
+      ? applySessionCleanupRecovery({ rootDir: repo, expectedPlanSha256: planSha256, activate: flags.activate === true })
+      : applyOnboardingKickoffPromotionCleanupRecovery({ rootDir: repo, expectedPlanSha256: planSha256, activate: flags.activate === true });
   } else if (command === "plan-privatization") {
     const planPrivatization = dependencies.planOnboardingSessionCleanupPrivatizationFn
       ?? planOnboardingSessionCleanupPrivatization;

@@ -19,11 +19,13 @@ import {
   applyOnboardingContinuityRepair,
   applyOnboardingKickoff,
   applyOnboardingKickoffPromotion,
+  applyOnboardingKickoffPromotionCleanupRecovery,
   bindOnboardingSessionCleanup,
   classifyOnboardingContinuity,
   planOnboardingContinuityRepair,
   planOnboardingKickoff,
   planOnboardingKickoffPromotion,
+  planOnboardingKickoffPromotionCleanupRecovery,
   readOnboardingSessionCleanupBinding,
   reconstructOnboardingKickoffPromotionPlan,
   releaseOnboardingSessionCleanup,
@@ -831,6 +833,7 @@ check("revision-0 kickoff seed promotion remains monotonic and replayable", () =
 check("authentic post-privatization kickoff seed promotes revision 1 to revision 2", () => {
   const seed = promotionSeed("post-private", { privatized: true });
   const before = classifyOnboardingContinuity({ rootDir: seed.root });
+  const beforeBinding = readOnboardingSessionCleanupBinding({ rootDir: seed.root });
   const plan = planOnboardingKickoffPromotion(seed.request);
   assert.equal(plan.kickoff.revision, 1);
   assert.equal(plan.targets.state.beforeSha256, before.stateSha256);
@@ -846,6 +849,13 @@ check("authentic post-privatization kickoff seed promotes revision 1 to revision
     activate: true,
   });
   assert.equal(applied.status, "applied");
+  const afterBinding = readOnboardingSessionCleanupBinding({ rootDir: seed.root });
+  assert.equal(afterBinding.status, "bound");
+  assert.equal(afterBinding.root, beforeBinding.root);
+  assert.deepEqual(afterBinding.sessionCleanup, beforeBinding.sessionCleanup);
+  assert.equal(afterBinding.stateSha256, plan.targets.state.afterSha256);
+  assert.equal(plan.targets.cleanupBinding.beforeSha256.length, 64);
+  assert.equal(plan.targets.cleanupBinding.afterSha256.length, 64);
   assert.equal(applyOnboardingKickoffPromotion({
     plan,
     expectedPlanSha256: plan.planSha256,
@@ -853,6 +863,110 @@ check("authentic post-privatization kickoff seed promotes revision 1 to revision
   }).status, "replayed");
   assert.deepEqual(reconstructOnboardingKickoffPromotionPlan(seed.request), plan);
 });
+
+for (const stage of [
+  "promotion-history-published",
+  "promotion-cleanup-binding-published",
+  "promotion-state-published",
+]) {
+  check(`post-privatization promotion ${stage} crash recovers with the same bound plan`, () => {
+    const seed = promotionSeed(`crash-${stage}`, { privatized: true });
+    const plan = planOnboardingKickoffPromotion(seed.request);
+    assert.throws(() => applyOnboardingKickoffPromotion({
+      plan,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+      deps: { crashAt: stage },
+    }), (error) => error?.message === stage);
+    const recovered = applyOnboardingKickoffPromotion({
+      plan,
+      expectedPlanSha256: plan.planSha256,
+      activate: true,
+      deps: { lockStaleMs: 0, nowMs: Date.now() + 1_000 },
+    });
+    assert.ok(["applied", "replayed"].includes(recovered.status));
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: seed.root }).status, "bound");
+  });
+}
+
+function legacyPromotionCleanupMismatch(name) {
+  const seed = promotionSeed(`legacy-${name}`, { privatized: true });
+  const bindingPath = join(seed.root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json");
+  const originalBinding = readFileSync(bindingPath);
+  const promotion = planOnboardingKickoffPromotion(seed.request);
+  applyOnboardingKickoffPromotion({ plan: promotion, expectedPlanSha256: promotion.planSha256, activate: true });
+  const historyPath = join(seed.root, ".git", "agent-pipeline", "onboarding", "continuity-history.json");
+  const history = JSON.parse(readFileSync(historyPath, "utf8"));
+  delete history.transactions[1].cleanupBinding;
+  writeFileSync(historyPath, `${JSON.stringify(history)}\n`, { mode: 0o600 });
+  writeFileSync(bindingPath, originalBinding, { mode: 0o600 });
+  return { ...seed, bindingPath, historyPath };
+}
+
+check("legacy revision-2 promotion cleanup mismatch has a read-only digest-bound repair and exact replay", () => {
+  const seed = legacyPromotionCleanupMismatch("repair");
+  const before = {
+    state: readFileSync(seed.statePath),
+    history: readFileSync(seed.historyPath),
+    binding: readFileSync(seed.bindingPath),
+  };
+  const plan = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: seed.root });
+  assert.equal(plan.status, "ready");
+  assert.equal(plan.feature.from.startsWith("kickoff-"), true);
+  assert.equal(plan.feature.to, seed.request.featureId);
+  assert.deepEqual(readFileSync(seed.statePath), before.state);
+  assert.deepEqual(readFileSync(seed.historyPath), before.history);
+  assert.deepEqual(readFileSync(seed.bindingPath), before.binding);
+  const applied = applyOnboardingKickoffPromotionCleanupRecovery({
+    rootDir: seed.root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(applied.status, "applied");
+  assert.equal(applied.mutated, true);
+  assert.equal(readOnboardingSessionCleanupBinding({ rootDir: seed.root }).status, "bound");
+  const replay = applyOnboardingKickoffPromotionCleanupRecovery({
+    rootDir: seed.root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+  });
+  assert.equal(replay.status, "replayed");
+  assert.equal(replay.mutated, false);
+});
+
+check("legacy promotion cleanup recovery is crash-replay safe after private binding publication", () => {
+  const seed = legacyPromotionCleanupMismatch("recovery-crash");
+  const plan = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: seed.root });
+  assert.throws(() => applyOnboardingKickoffPromotionCleanupRecovery({
+    rootDir: seed.root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+    deps: { crashAt: "kickoff-promotion-cleanup-recovery-binding-published" },
+  }), (error) => error?.message === "kickoff-promotion-cleanup-recovery-binding-published");
+  const replay = applyOnboardingKickoffPromotionCleanupRecovery({
+    rootDir: seed.root,
+    expectedPlanSha256: plan.planSha256,
+    activate: true,
+    deps: { lockStaleMs: 0, nowMs: Date.now() + 1_000 },
+  });
+  assert.equal(replay.status, "replayed");
+  assert.equal(replay.mutated, false);
+});
+
+for (const [name, mutate] of [
+  ["history-binding", (seed) => {
+    const history = JSON.parse(readFileSync(seed.historyPath, "utf8"));
+    history.transactions[1].featureId = "wrong-feature";
+    writeFileSync(seed.historyPath, `${JSON.stringify(history)}\n`, { mode: 0o600 });
+  }],
+  ["state-feature", (seed) => mutatePromotionState(seed, (state) => { state.activeFeature.id = "wrong-feature"; })],
+]) {
+  check(`legacy promotion cleanup mismatch ${name} fails closed`, () => {
+    const seed = legacyPromotionCleanupMismatch(name);
+    mutate(seed);
+    assert.equal(planOnboardingKickoffPromotionCleanupRecovery({ rootDir: seed.root }).status, "recovery-unavailable");
+  });
+}
 
 check("revision-1 kickoff lookalike without authenticated private binding is rejected", () => {
   const seed = promotionSeed("missing-private-binding");

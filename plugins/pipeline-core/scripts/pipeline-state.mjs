@@ -254,7 +254,7 @@ import {
   unlinkSync,
   writeSync,
 } from "node:fs";
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto";
 import { basename, dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -376,6 +376,10 @@ const LEGACY_WRITER_LOCK_TOKEN = "pipeline-legacy-writer-v0";
 const RESULT_CLOSE_PLAN_SCHEMA = "pipeline.continuity-result-close-plan.v1";
 const RESULT_CLOSE_APPLY_SCHEMA = "pipeline.continuity-result-close-apply.v1";
 const RESULT_CLOSE_LOCK_TOKEN = "pipeline-result-close-v1";
+const RESULT_BOOTSTRAP_PLAN_SCHEMA = "pipeline.continuity-result-bootstrap-plan.v1";
+const RESULT_BOOTSTRAP_APPLY_SCHEMA = "pipeline.continuity-result-bootstrap-apply.v1";
+const RESULT_BOOTSTRAP_LOCK_TOKEN = "pipeline-result-bootstrap-v1";
+const RESULT_BOOTSTRAP_JOURNAL_SCHEMA = "pipeline.continuity-result-bootstrap-journal.v1";
 const LEGACY_PLAN_APPROVAL_KEYS = ["approvedBy", "approvedAt", "poGateAuthority"];
 const LEGACY_PO_GATE_AUTHORITY_KEYS = [
   "schema", "humanFacing", "sourceSha256", "runtimeSha256", "receiptSha256",
@@ -2611,6 +2615,281 @@ function runLegacyAdoptionCommand(sub, flags, deps) {
   } finally { releaseContinuityLock(lock); }
 }
 
+// ---- Elephant-owned first Result-authority bootstrap (AC-047-143--148) ----
+
+function resultBootstrapPath(dir, prdPath) {
+  if (typeof prdPath !== "string" || !/^specs\/[A-Za-z0-9._:-]+\/prd_[A-Za-z0-9._:-]+\.md$/u.test(prdPath)) return null;
+  return `${dirname(prdPath).split(sep).join("/")}/result.md`;
+}
+
+function canonicalResultBootstrapBytes() {
+  return Buffer.from("```pipeline-result\n{\"courseDecisionIntents\":[],\"courseDecisionReceipts\":[],\"decisionBriefs\":[],\"finalIntegrations\":[]}\n```\n", "utf8");
+}
+
+function observeCanonicalResultBootstrap(dir, relativePath) {
+  const observed = physicalRebindFile(dir, relativePath);
+  if (observed === null || observed.bytes.byteLength > CONTINUITY_RESULT_MAX_BYTES) return null;
+  let text;
+  try { text = new TextDecoder("utf-8", { fatal: true }).decode(observed.bytes); } catch { return null; }
+  if (!Buffer.from(text, "utf8").equals(observed.bytes) || text.startsWith("\uFEFF") || text.includes("\r") || !text.endsWith("\n")) return null;
+  if (/^```pipeline-result(?:\n|$)/mu.test(text)) return null;
+  return { ...observed, root: realpathSync(resolve(dir)), parent: dirname(observed.absolute), historicalBytes: observed.bytes };
+}
+
+function sameBootstrapResultPreimage(left, right) {
+  return left !== null && right !== null && left.path === right.path && left.sha256 === right.sha256
+    && sameJson(left.identity, right.identity) && left.historicalBytes.equals(right.historicalBytes);
+}
+
+function atomicAppendResultBootstrap(result, bytes, lock, deps = {}) {
+  const tmp = `${result.absolute}.tmp.${lock.ownerNonce}`;
+  let fd;
+  try {
+    const before = observeCanonicalResultBootstrap(result.root, result.path);
+    if (!sameBootstrapResultPreimage(before, result)) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-PATH" };
+    fd = openSync(tmp, "wx", 0o600);
+    (deps.replaceResultFdContents ?? replaceFdContents)(fd, bytes);
+    closeSync(fd); fd = undefined;
+    const rechecked = observeCanonicalResultBootstrap(result.root, result.path);
+    if (!sameBootstrapResultPreimage(rechecked, result)) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-RACE" };
+    (deps.renameResultSync ?? renameSync)(tmp, result.absolute);
+    const synced = deps.syncResultDirectory?.(result.parent) ?? syncDirectory(result.parent);
+    const observed = physicalRebindFile(result.root, result.path);
+    return synced.ok && observed !== null && observed.bytes.equals(bytes)
+      ? { ok: true, code: "PS-RESULT-BOOTSTRAP-RESULT-WRITTEN" }
+      : { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-READBACK" };
+  } catch { return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-IO" }; }
+  finally { if (fd !== undefined) closeSync(fd); safeUnlink(tmp); }
+}
+
+function resultBootstrapEligible(state) {
+  const continuity = state?.continuity;
+  return Boolean(state?.activeFeature && validateContinuityState(continuity, state.activeFeature.id).ok
+    && continuity.featureId === state.activeFeature.id
+    && continuity.authority.result === null
+    && continuity.queueHead !== null && continuity.queueHead.dispatch === null
+    && continuity.blocker === null && continuity.acknowledgedFinal === null
+    && continuity.recovery === null && continuity.decisionTxn === null
+    && (continuity.closeTransition === null || continuity.closeTransition === undefined)
+    && continuity.revision < Number.MAX_SAFE_INTEGER);
+}
+
+function resultBootstrapNextState(state, result, updatedAt) {
+  const next = structuredClone(state);
+  next.continuity.revision += 1;
+  next.continuity.authority.result = result;
+  next.continuity.resume = { ...next.continuity.resume, sourceRevision: next.continuity.revision };
+  next.updatedAt = updatedAt;
+  return next;
+}
+
+function resultBootstrapPayload(root, stateRaw, state, prd, spec, resultPath, resultBytes, nextState, updatedAt) {
+  const appendedFence = canonicalResultBootstrapBytes();
+  return {
+    schema: RESULT_BOOTSTRAP_PLAN_SCHEMA,
+    root,
+    featureId: state.activeFeature.id,
+    expectedRevision: state.continuity.revision,
+    preimage: {
+      stateSha256: sha256Bytes(stateRaw),
+      authorityResult: null,
+      prd: { path: prd.path, sha256: prd.sha256, identity: prd.identity },
+      spec: { path: spec.path, sha256: spec.sha256, identity: spec.identity },
+      result: { path: resultPath.path, sha256: resultPath.sha256, identity: resultPath.identity },
+      historicalMarkdown: { sha256: sha256Bytes(resultPath.historicalBytes), bytesBase64: resultPath.historicalBytes.toString("base64") },
+    },
+    append: { sha256: sha256Bytes(appendedFence), bytesBase64: appendedFence.toString("base64") },
+    result: { path: resultPath.path, sha256: sha256Bytes(resultBytes), bytesBase64: resultBytes.toString("base64") },
+    postimage: { stateSha256: sha256Bytes(Buffer.from(JSON.stringify(nextState, null, 2) + "\n", "utf8")), revision: nextState.continuity.revision, updatedAt },
+  };
+}
+
+function buildResultBootstrapPlan(dir, existing, updatedAt) {
+  if (existing.status !== "ok" || !resultBootstrapEligible(existing.state) || !canonicalIso(updatedAt)) return { ok: false, code: "PS-RESULT-BOOTSTRAP-STATE" };
+  const state = existing.state;
+  const prd = physicalRebindFile(dir, state.continuity.authority.prd.path);
+  const spec = physicalRebindFile(dir, state.continuity.authority.spec.path);
+  if (prd === null || spec === null || prd.sha256 !== state.continuity.authority.prd.sha256 || spec.sha256 !== state.continuity.authority.spec.sha256) return { ok: false, code: "PS-RESULT-BOOTSTRAP-AUTHORITY" };
+  if (state.activeFeature.planPath !== prd.path) return { ok: false, code: "PS-RESULT-BOOTSTRAP-FEATURE" };
+  const resultPath = observeCanonicalResultBootstrap(dir, resultBootstrapPath(dir, prd.path));
+  if (resultPath === null) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-PATH" };
+  const resultBytes = Buffer.concat([resultPath.historicalBytes, canonicalResultBootstrapBytes()]);
+  if (resultBytes.byteLength > CONTINUITY_RESULT_MAX_BYTES) return { ok: false, code: "PS-RESULT-BOOTSTRAP-RESULT-SIZE" };
+  const result = { path: resultPath.path, sha256: sha256Bytes(resultBytes) };
+  const nextState = resultBootstrapNextState(state, result, updatedAt);
+  if (!validateContinuityState(nextState.continuity, nextState.activeFeature.id).ok) return { ok: false, code: "PS-RESULT-BOOTSTRAP-POSTIMAGE" };
+  const payload = resultBootstrapPayload(realpathSync(resolve(dir)), existing.raw, state, prd, spec, resultPath, resultBytes, nextState, updatedAt);
+  return { ok: true, payload, planSha256: sha256Bytes(JSON.stringify(payload)), resultPath, resultBytes, nextState };
+}
+
+function resultBootstrapPrivatePaths(dir, deps = {}) {
+  const common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir);
+  if (!common?.ok || typeof common.path !== "string") return null;
+  try {
+    const root = realpathSync(common.path);
+    if (root !== resolve(common.path) || !lstatSync(root).isDirectory() || lstatSync(root).isSymbolicLink()) return null;
+    const namespace = join(root, "agent-pipeline");
+    const base = join(namespace, "result-bootstrap");
+    return { root, namespace, base, key: join(base, "key"), journal: join(base, "journal") };
+  } catch { return null; }
+}
+
+function ensureBootstrapPrivateDirectory(paths) {
+  if (paths === null) return false;
+  try {
+    for (const path of [paths.namespace, paths.base]) {
+      if (!existsSync(path)) mkdirSync(path, { mode: 0o700 });
+      const info = lstatSync(path);
+      if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(path) !== path || (info.mode & 0o077) !== 0) return false;
+    }
+    return true;
+  } catch { return false; }
+}
+
+function observeBootstrapPrivateDirectory(paths) {
+  if (paths === null) return false;
+  try {
+    for (const path of [paths.namespace, paths.base]) {
+      if (!existsSync(path)) continue;
+      const info = lstatSync(path);
+      if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(path) !== path || (info.mode & 0o077) !== 0) return false;
+    }
+    return true;
+  } catch { return false; }
+}
+
+function writePrivateBootstrap(path, bytes, replace = false) {
+  let fd;
+  try {
+    fd = openSync(path, replace ? "w" : "wx", 0o600);
+    fchmodSync(fd, 0o600);
+    let offset = 0;
+    while (offset < bytes.length) offset += writeSync(fd, bytes, offset, bytes.length - offset);
+    fsyncSync(fd);
+    closeSync(fd); fd = undefined;
+    return syncDirectory(dirname(path)).ok;
+  } catch { return false; } finally { if (fd !== undefined) closeSync(fd); }
+}
+
+function readPrivateBootstrap(path) {
+  try { const s = lstatSync(path); return s.isFile() && !s.isSymbolicLink() && s.nlink === 1 && (s.mode & 0o077) === 0 ? readFileSync(path) : null; } catch { return null; }
+}
+
+function bootstrapJournalMac(key, record) { return createHmac("sha256", key).update(JSON.stringify(record)).digest("hex"); }
+
+function loadBootstrapJournal(dir, deps = {}) {
+  const paths = resultBootstrapPrivatePaths(dir, deps);
+  if (paths === null || !observeBootstrapPrivateDirectory(paths)) return { ok: false, code: "PS-RESULT-BOOTSTRAP-GIT-COMMON-DIR" };
+  const key = readPrivateBootstrap(paths.key);
+  const raw = readPrivateBootstrap(paths.journal);
+  if (raw === null) return { ok: true, journal: null, paths, key };
+  if (key === null || key.byteLength !== 32) return { ok: false, code: "PS-RESULT-BOOTSTRAP-JOURNAL" };
+  try {
+    const value = JSON.parse(raw.toString("utf8"));
+    if (!exactObjectKeys(value, ["schema", "planSha256", "stateSha256", "postStateSha256", "result", "mac"])
+      || value.schema !== RESULT_BOOTSTRAP_JOURNAL_SCHEMA || !SHA256_RE.test(value.planSha256) || !SHA256_RE.test(value.stateSha256)
+      || !SHA256_RE.test(value.postStateSha256) || !exactObjectKeys(value.result, ["path", "sha256"]) || !SHA256_RE.test(value.result.sha256)
+      || typeof value.result.path !== "string" || !SHA256_RE.test(value.mac)) return { ok: false, code: "PS-RESULT-BOOTSTRAP-JOURNAL" };
+    const { mac, ...core } = value;
+    if (bootstrapJournalMac(key, core) !== mac) return { ok: false, code: "PS-RESULT-BOOTSTRAP-JOURNAL" };
+    return { ok: true, journal: value, paths, key };
+  } catch { return { ok: false, code: "PS-RESULT-BOOTSTRAP-JOURNAL" }; }
+}
+
+function publishBootstrapJournal(dir, plan, deps = {}) {
+  const paths = resultBootstrapPrivatePaths(dir, deps);
+  if (!ensureBootstrapPrivateDirectory(paths)) return false;
+  let key = readPrivateBootstrap(paths.key);
+  if (key === null) { key = randomBytes(32); if (!writePrivateBootstrap(paths.key, key)) return false; }
+  if (key.byteLength !== 32) return false;
+  const core = { schema: RESULT_BOOTSTRAP_JOURNAL_SCHEMA, planSha256: plan.planSha256, stateSha256: plan.payload.preimage.stateSha256, postStateSha256: plan.payload.postimage.stateSha256, result: { path: plan.payload.result.path, sha256: plan.payload.result.sha256 } };
+  const bytes = Buffer.from(JSON.stringify({ ...core, mac: bootstrapJournalMac(key, core) }) + "\n", "utf8");
+  return writePrivateBootstrap(paths.journal, bytes, false);
+}
+
+function retireBootstrapJournal(paths) {
+  try { return ensureBootstrapPrivateDirectory(paths) && (unlinkSync(paths.journal), syncDirectory(paths.base).ok); } catch { return false; }
+}
+
+function parseResultBootstrapApply(argv) {
+  if (argv.length !== 13 || argv[0] !== "--feature-id" || isBlank(argv[1]) || argv[2] !== "--expected-revision" || !parseExpectedRevision(argv[3]).ok
+    || argv[4] !== "--expected-state-sha256" || !SHA256_RE.test(argv[5]) || argv[6] !== "--expected-post-state-sha256" || !SHA256_RE.test(argv[7])
+    || argv[8] !== "--updated-at" || !canonicalIso(argv[9]) || argv[10] !== "--plan-sha256" || !SHA256_RE.test(argv[11]) || argv[12] !== "--activate") return null;
+  return { featureId: argv[1], expectedRevision: parseExpectedRevision(argv[3]).value, expectedStateSha256: argv[5], expectedPostStateSha256: argv[7], updatedAt: argv[9], planSha256: argv[11] };
+}
+
+function runResultBootstrapCommand(sub, rest, deps) {
+  if (sub === "continuity-result-bootstrap-plan") {
+    if (rest.length !== 0) { console.error("Error: Result bootstrap plan accepts no caller bindings."); return 2; }
+    const planned = buildResultBootstrapPlan(deps.dir, readStateRaw(deps.dir), deps.now());
+    if (!planned.ok) { console.error(`Error: Result bootstrap plan refused (${planned.code}); zero mutation.`); return 2; }
+    const writer = fileURLToPath(import.meta.url);
+    console.log(JSON.stringify({ ...planned.payload, planSha256: planned.planSha256, applyAction: { executable: process.execPath, argv: [writer, "continuity-result-bootstrap-apply", "--feature-id", planned.payload.featureId, "--expected-revision", String(planned.payload.expectedRevision), "--expected-state-sha256", planned.payload.preimage.stateSha256, "--expected-post-state-sha256", planned.payload.postimage.stateSha256, "--updated-at", planned.payload.postimage.updatedAt, "--plan-sha256", planned.planSha256, "--activate"], mutation: true, requiresConfirmation: true, executionBoundary: "host-authorized-wsl", expected: { schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, statuses: ["applied", "replayed"] } } }, null, 2));
+    return 0;
+  }
+  const apply = parseResultBootstrapApply(rest);
+  if (apply === null) { console.error("Error: Result bootstrap apply requires the complete returned action and --activate confirmation."); return 2; }
+  const lock = acquireContinuityLock(deps.dir, RESULT_BOOTSTRAP_LOCK_TOKEN, deps);
+  if (!lock.ok) { console.error(`Error: Result bootstrap apply refused (${lock.code}); zero mutation.`); return 2; }
+  try {
+    const current = readStateRaw(deps.dir);
+    const journal = loadBootstrapJournal(deps.dir, deps);
+    if (!journal.ok) { console.error(`Error: Result bootstrap journal refused (${journal.code}); zero mutation.`); return 2; }
+    if (current.status !== "ok") { console.error("Error: Result bootstrap State is unavailable or malformed; zero mutation."); return 2; }
+    let planned = buildResultBootstrapPlan(deps.dir, current, apply.updatedAt);
+    const resultPath = resultBootstrapPath(deps.dir, current.state.continuity?.authority?.prd?.path);
+    const resultObserved = resultPath ? physicalRebindFile(deps.dir, resultPath) : null;
+    if (sha256Bytes(current.raw) === apply.expectedPostStateSha256) {
+      if (!resultBootstrapEligible({ ...current.state, continuity: { ...current.state.continuity, authority: { ...current.state.continuity.authority, result: null }, revision: current.state.continuity.revision - 1, resume: { ...current.state.continuity.resume, sourceRevision: current.state.continuity.revision - 1 } } })
+        || current.state.activeFeature.id !== apply.featureId || current.state.updatedAt !== apply.updatedAt || current.state.continuity.authority.result?.path !== resultPath
+        || resultObserved === null || resultObserved.sha256 !== current.state.continuity.authority.result.sha256) { console.error("Error: Result bootstrap replay postimage is invalid; zero mutation."); return 2; }
+      if (journal.journal !== null && (journal.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(journal.paths))) { console.error("Error: Result bootstrap journal recovery is unresolved."); return 2; }
+      console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: current.state.continuity.authority.result, mutated: false })); return 0;
+    }
+    // A durable Result may legitimately exist while State is still at the exact
+    // preimage.  The authenticated journal is the only authority that may resume
+    // that Result-before-State window; rebuilding an "absent Result" plan would
+    // correctly refuse and must not turn recovery into a false conflict.
+    if (!planned.ok && journal.journal !== null && sha256Bytes(current.raw) === apply.expectedStateSha256
+      && resultBootstrapEligible(current.state) && current.state.activeFeature.id === apply.featureId
+      && current.state.continuity.revision === apply.expectedRevision && resultObserved !== null
+      && resultObserved.sha256 === journal.journal.result.sha256
+      && journal.journal.planSha256 === apply.planSha256 && journal.journal.stateSha256 === apply.expectedStateSha256
+      && journal.journal.postStateSha256 === apply.expectedPostStateSha256) {
+      const prd = physicalRebindFile(deps.dir, current.state.continuity.authority.prd.path);
+      const spec = physicalRebindFile(deps.dir, current.state.continuity.authority.spec.path);
+      const result = { path: journal.journal.result.path, sha256: journal.journal.result.sha256 };
+      const nextState = resultBootstrapNextState(current.state, result, apply.updatedAt);
+      if (prd !== null && spec !== null && prd.sha256 === current.state.continuity.authority.prd.sha256
+        && spec.sha256 === current.state.continuity.authority.spec.sha256
+        && sha256Bytes(Buffer.from(JSON.stringify(nextState, null, 2) + "\n", "utf8")) === apply.expectedPostStateSha256) {
+        planned = { ok: true, payload: { featureId: apply.featureId, result, postimage: { stateSha256: apply.expectedPostStateSha256 } }, planSha256: apply.planSha256, nextState, resultBytes: resultObserved.bytes, resultPath: null };
+      }
+    }
+    if (sha256Bytes(current.raw) !== apply.expectedStateSha256 || !planned.ok || planned.payload.featureId !== apply.featureId || planned.planSha256 !== apply.planSha256 || planned.payload.postimage.stateSha256 !== apply.expectedPostStateSha256) { console.error("Error: Result bootstrap apply inputs are stale or conflicting; zero mutation."); return 2; }
+    if (journal.journal !== null && (journal.journal.planSha256 !== apply.planSha256 || journal.journal.stateSha256 !== apply.expectedStateSha256 || journal.journal.postStateSha256 !== apply.expectedPostStateSha256)) { console.error("Error: Result bootstrap journal conflicts; zero mutation."); return 2; }
+    if (journal.journal === null && !publishBootstrapJournal(deps.dir, planned, deps)) { console.error("Error: Result bootstrap journal prepare failed; zero mutation."); return 2; }
+    if (deps.afterResultBootstrapJournal?.() === false) { console.error("Error: Result bootstrap interrupted after journal preparation; recovery journal retained."); return 2; }
+    const existingResult = physicalRebindFile(deps.dir, planned.payload.result.path);
+    if (existingResult === null) {
+      console.error("Error: Result bootstrap Result is absent; recovery journal retained."); return 2;
+    } else if (existingResult.sha256 !== planned.payload.result.sha256) {
+      if (planned.resultPath === null || !atomicAppendResultBootstrap(planned.resultPath, planned.resultBytes, lock, deps).ok) { console.error("Error: Result bootstrap Result write unresolved; recovery journal retained."); return 2; }
+    }
+    const verifiedResult = physicalRebindFile(deps.dir, planned.payload.result.path);
+    if (verifiedResult === null || verifiedResult.sha256 !== planned.payload.result.sha256) { console.error("Error: Result bootstrap Result readback failed; recovery journal retained."); return 2; }
+    if (deps.afterResultBootstrapResult?.() === false) { console.error("Error: Result bootstrap interrupted after Result publication; recovery journal retained."); return 2; }
+    const written = atomicWriteContinuityState(deps.dir, planned.nextState, lock, deps);
+    if (!written.ok) { console.error(`Error: Result bootstrap State write unresolved (${written.code}); recovery journal retained.`); return 2; }
+    const persisted = readStateRaw(deps.dir);
+    if (persisted.status !== "ok" || sha256Bytes(persisted.raw) !== apply.expectedPostStateSha256 || persisted.state.continuity.authority.result?.sha256 !== planned.payload.result.sha256) { console.error("Error: Result bootstrap postimage readback is unresolved; recovery journal retained."); return 2; }
+    if (deps.afterResultBootstrapState?.() === false) { console.error("Error: Result bootstrap interrupted after State commit; recovery journal retained."); return 2; }
+    const recovered = loadBootstrapJournal(deps.dir, deps);
+    if (!recovered.ok || recovered.journal === null || recovered.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(recovered.paths)) { console.error("Error: Result bootstrap journal retirement is unresolved."); return 2; }
+    console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: persisted.state.continuity.authority.result, mutated: true })); return 0;
+  } finally { releaseContinuityLock(lock); }
+}
+
 // ---- Dedicated approved implementation Result -> close readiness writer ----
 
 const RESULT_CLOSE_PLAN_FLAGS = new Set([
@@ -3788,6 +4067,9 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   if (sub === "continuity-result-close-plan" || sub === "continuity-result-close-apply") {
     return runResultCloseCommand(sub, rest, { ...deps, dir, now });
   }
+  if (sub === "continuity-result-bootstrap-plan" || sub === "continuity-result-bootstrap-apply") {
+    return runResultBootstrapCommand(sub, rest, { ...deps, dir, now });
+  }
   if (CONTINUITY_SUBCOMMANDS.has(sub)) return runContinuityCommand(sub, flags, { ...deps, dir, now });
   if (PUBLICATION_SUBCOMMANDS.has(sub)) return runPublicationCommand(sub, flags, { ...deps, dir, now });
 
@@ -4415,7 +4697,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
 
     default: {
       console.error(
-        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-close-plan, continuity-result-close-apply, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
+        `Error: unknown command "${sub ?? ""}". Allowed: set-feature, submit-plan, approve-plan, reopen-design, set-phase, set-gate-estimate, revoke-plan, bind-plan-spec, approve-push, close-feature, approve-deploy, consume-deploy, clear-deploy, po-authority-rebind-plan, po-authority-rebind-apply, po-authority-decision-plan, po-authority-decision-select, po-authority-decision-apply, continuity-init, continuity-cas, continuity-integrate-final, continuity-record-course-brief, continuity-select-course, continuity-apply-decision, continuity-clear-decision, continuity-result-bootstrap-plan, continuity-result-bootstrap-apply, continuity-result-close-plan, continuity-result-close-apply, publication-prepare, publication-approve, publication-authorize, publication-reconcile, publication-observe, publication-start-readback, publication-close, publication-rearm, publication-block.`,
       );
       return 2;
     }

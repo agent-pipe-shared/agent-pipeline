@@ -75,13 +75,15 @@ safely.
 - Add a separate generic Elephant-owned Result-authority bootstrap for an
   exact active, quiescent `authority.result:null` State. Its read-only plan
   binds physical root, State bytes, feature/revision, PRD/Spec, the canonically
-  feature-package-derived safe Result path and absent preimage, canonical
-  Result bytes/digest, expected postimage and plan digest; its sole typed apply
-  action requires explicit confirmation. Under the normal lock, a private,
-  authenticated durable write-ahead transaction materializes and
-  fsync/readbacks the canonical four-empty-collection `pipeline-result`
-  envelope, then CAS-binds only Result authority plus monotonic
-  revision/resume/update fields. Recover
+  feature-package-derived safe existing Result path/preimage, immutable
+  historical-Markdown-prefix bytes/digest, exact appended fence bytes/digest,
+  expected postimage and plan digest; its sole typed apply action requires
+  explicit confirmation. Under the normal lock, an authenticated durable
+  write-ahead transaction stored exclusively in the Git common directory,
+  under the existing physical-safety and authenticity checks, appends and
+  fsync/readbacks exactly one strict four-empty-collection `pipeline-result`
+  fence without altering the historical Result bytes, then CAS-binds only
+  Result authority plus monotonic revision/resume/update fields. Recover
   every Result-write/State-write/journal-retirement crash boundary, return
   `mutated:false` for exact replay, and fail closed on any conflicting journal,
   file, authority or State evidence. It creates no dispatch, blocker,

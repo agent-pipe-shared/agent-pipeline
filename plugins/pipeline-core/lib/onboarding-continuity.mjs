@@ -83,6 +83,8 @@ export const PRIVATE_SESSION_CLEANUP_RELEASE_RECEIPT_SCHEMA = "pipeline.private-
 export const PRIVATE_SESSION_CLEANUP_RELEASE_QUARANTINE_SCHEMA = "pipeline.private-session-cleanup-release-quarantine.v1";
 export const SESSION_CLEANUP_PRIVATIZATION_PLAN_SCHEMA = "pipeline.session-cleanup-privatization-plan.v1";
 export const SESSION_CLEANUP_PRIVATIZATION_APPLY_SCHEMA = "pipeline.session-cleanup-privatization-apply.v1";
+export const KICKOFF_PROMOTION_CLEANUP_RECOVERY_PLAN_SCHEMA = "pipeline.kickoff-promotion-cleanup-recovery-plan.v1";
+export const KICKOFF_PROMOTION_CLEANUP_RECOVERY_APPLY_SCHEMA = "pipeline.kickoff-promotion-cleanup-recovery-apply.v1";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ONBOARDING_SCRIPT = join(HERE, "..", "scripts", "project-onboarding-v3.mjs");
@@ -114,6 +116,7 @@ const PROMOTION_PLAN_KEYS = new Set([
 const PROMOTION_TARGET_KEYS = {
   state: new Set(["path", "beforeSha256", "afterSha256", "value"]),
   history: new Set(["path", "beforeSha256", "afterSha256", "value"]),
+  cleanupBinding: new Set(["beforeSha256", "afterSha256"]),
 };
 const PROMOTION_PROFILES = new Set(["epic", "feature", "mini"]);
 const SAFE_FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
@@ -374,7 +377,8 @@ function validateHistory(value) {
       "transactionSha256", "goalSha256", "calibrationSha256", "stateSha256",
       "handoverSha256", "prdSha256", "specSha256",
     ].every((key) => SHA256_RE.test(entry[key]));
-  const validPromotion = (entry, previous) => exactKeys(entry, promotionEntryKeys)
+  const validPromotion = (entry, previous) => (exactKeys(entry, promotionEntryKeys)
+      || exactKeys(entry, new Set([...promotionEntryKeys, "cleanupBinding"])))
     && entry.kind === "kickoff-promotion"
     && SHA256_RE.test(entry.transactionSha256)
     && entry.previousTransactionSha256 === previous?.transactionSha256
@@ -383,7 +387,9 @@ function validateHistory(value) {
     && SAFE_FEATURE_ID.test(entry.featureId)
     && typeof entry.planPath === "string"
     && ["prdSha256", "specSha256", "beforeStateSha256", "afterStateSha256"]
-      .every((key) => SHA256_RE.test(entry[key]));
+      .every((key) => SHA256_RE.test(entry[key]))
+    && (entry.cleanupBinding === undefined || (exactKeys(entry.cleanupBinding, new Set(["beforeSha256", "afterSha256"]))
+      && SHA256_RE.test(entry.cleanupBinding.beforeSha256) && SHA256_RE.test(entry.cleanupBinding.afterSha256)));
   if (!exactKeys(value, new Set(["schema", "transactions"]))
     || value.schema !== KICKOFF_HISTORY_SCHEMA
     || !Array.isArray(value.transactions)
@@ -873,8 +879,12 @@ function readPrivateCleanupBinding(root, { spawn = defaultGitSpawn } = {}) {
   }
   const key = assertPrivateCleanupFile(paths.key, "private cleanup binding key");
   if (key.length !== 32) fail("SESSION-CLEANUP-PRIVATE-DAMAGED", "private cleanup binding key is malformed");
+  let bytes;
   let value;
-  try { value = JSON.parse(assertPrivateCleanupFile(paths.binding, "private cleanup binding").toString("utf8")); }
+  try {
+    bytes = assertPrivateCleanupFile(paths.binding, "private cleanup binding");
+    value = JSON.parse(bytes.toString("utf8"));
+  }
   catch (error) {
     if (error instanceof KickoffError) throw error;
     fail("SESSION-CLEANUP-PRIVATE-DAMAGED", "private cleanup binding is malformed");
@@ -894,7 +904,7 @@ function readPrivateCleanupBinding(root, { spawn = defaultGitSpawn } = {}) {
   if (actual.length !== expected.length || !timingSafeEqual(actual, expected)) {
     fail("SESSION-CLEANUP-PRIVATE-AUTH", "private cleanup binding authentication failed");
   }
-  return { binding: value, paths };
+  return { binding: value, paths, bytes, sha256: sha256(bytes), key };
 }
 
 function privateReleaseReceiptCore(value) {
@@ -1133,6 +1143,56 @@ function writePrivateCleanupBinding(root, featureId, sessionCleanup, {
     fail("SESSION-CLEANUP-PRIVATE-READBACK", "private cleanup binding readback failed", { committed: true });
   }
   return readback.binding;
+}
+
+function promotedPrivateCleanupBinding(observed, featureId) {
+  if (observed?.binding === null || !Buffer.isBuffer(observed?.key)
+    || observed.key.length !== 32 || !SHA256_RE.test(observed.sha256 ?? "")
+    || !SAFE_FEATURE_ID.test(featureId ?? "")) {
+    fail("KICKOFF-PROMOTION-PRIVATE-BINDING", "private cleanup binding promotion input is invalid");
+  }
+  const core = {
+    ...cleanupBindingCore(observed.binding),
+    featureId,
+  };
+  return Buffer.from(`${JSON.stringify({ ...core, mac: cleanupBindingMac(core, observed.key) })}\n`, "utf8");
+}
+
+function replacePromotedPrivateCleanupBinding(root, observed, expectedBeforeSha256, expectedAfterBytes, {
+  spawn = defaultGitSpawn,
+  suffix,
+} = {}) {
+  if (!SHA256_RE.test(expectedBeforeSha256 ?? "") || !Buffer.isBuffer(expectedAfterBytes)) {
+    fail("KICKOFF-PROMOTION-PRIVATE-BINDING", "private cleanup binding promotion target is invalid");
+  }
+  if (observed.binding === null || observed.sha256 !== expectedBeforeSha256) {
+    fail("KICKOFF-PROMOTION-CAS-DRIFT", "private cleanup binding preimage drifted");
+  }
+  if (typeof suffix !== "string" || !/^[a-f0-9]{32,64}$/iu.test(suffix)) {
+    fail("KICKOFF-PROMOTION-PRIVATE-BINDING", "private cleanup binding temporary name is invalid");
+  }
+  const temporary = `${observed.paths.binding}.promotion-${suffix}.tmp`;
+  let record;
+  try {
+    record = writeExclusiveSynced(temporary, expectedAfterBytes, 0o600);
+    const current = readPrivateCleanupBinding(root, { spawn });
+    if (current.binding === null || current.sha256 !== expectedBeforeSha256
+      || canonicalJson(current.binding) !== canonicalJson(observed.binding)) {
+      fail("KICKOFF-PROMOTION-CAS-DRIFT", "private cleanup binding preimage drifted");
+    }
+    renameSync(temporary, observed.paths.binding);
+    record = null;
+    fsyncDirectory(observed.paths.directory);
+    const readback = readPrivateCleanupBinding(root, { spawn });
+    if (readback.binding === null || !readback.bytes.equals(expectedAfterBytes)) {
+      fail("KICKOFF-PROMOTION-PRIVATE-READBACK", "private cleanup binding readback failed", { committed: true });
+    }
+    return readback;
+  } catch (error) {
+    try { unlinkOwned(record); } catch {}
+    if (error instanceof KickoffError) throw error;
+    fail("KICKOFF-PROMOTION-PRIVATE-WRITE", "private cleanup binding temporary write failed");
+  }
 }
 
 function deletePrivateCleanupBinding(root, expected, { spawn = defaultGitSpawn } = {}) {
@@ -2934,13 +2994,15 @@ function recognisedKickoff(observed, spawn = defaultGitSpawn) {
     || entry.specSha256 !== spec.sha256) return null;
 
   let originalState = state;
+  let cleanupBinding = null;
   if (continuity.revision === 1) {
     if (continuity.resume.mode !== "resume-on-next-turn"
       || continuity.resume.sourceRevision !== 0
       || continuity.resume.reasonCode !== "host-no-background-wakeup") return null;
     let privateBinding;
     try {
-      privateBinding = readPrivateCleanupBinding(observed.root, { spawn }).binding;
+      cleanupBinding = readPrivateCleanupBinding(observed.root, { spawn });
+      privateBinding = cleanupBinding.binding;
     } catch {
       return null;
     }
@@ -2972,6 +3034,7 @@ function recognisedKickoff(observed, spawn = defaultGitSpawn) {
     history,
     revision: continuity.revision,
     transactionSha256: entry.transactionSha256,
+    cleanupBinding,
   };
 }
 
@@ -3040,9 +3103,11 @@ function validatePromotionPlan(plan) {
     || !exactKeys(plan.authority.prd, new Set(["path", "sha256"]))
     || !exactKeys(plan.authority.spec, new Set(["path", "sha256"]))
     || !exactKeys(plan.kickoff, new Set(["featureId", "transactionSha256", "stateSha256", "historySha256", "revision"]))
-    || !exactKeys(plan.targets, new Set(["state", "history"]))
+    || !(exactKeys(plan.targets, new Set(["state", "history"]))
+      || exactKeys(plan.targets, new Set(["state", "history", "cleanupBinding"])))
     || !exactKeys(plan.targets.state, PROMOTION_TARGET_KEYS.state)
-    || !exactKeys(plan.targets.history, PROMOTION_TARGET_KEYS.history)) {
+    || !exactKeys(plan.targets.history, PROMOTION_TARGET_KEYS.history)
+    || (plan.targets.cleanupBinding !== undefined && !exactKeys(plan.targets.cleanupBinding, PROMOTION_TARGET_KEYS.cleanupBinding))) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion plan is not closed and valid");
   }
   const input = promotionInput({
@@ -3095,6 +3160,13 @@ function validatePromotionPlan(plan) {
     || history[1].afterStateSha256 !== plan.targets.state.afterSha256) {
     fail("KICKOFF-PROMOTION-PLAN", "promotion history postimage is invalid");
   }
+  const cleanupBinding = plan.targets.cleanupBinding ?? null;
+  if ((plan.kickoff.revision === 1) !== (cleanupBinding !== null)
+    || (cleanupBinding !== null && (!SHA256_RE.test(cleanupBinding.beforeSha256)
+      || !SHA256_RE.test(cleanupBinding.afterSha256)
+      || canonicalJson(history[1].cleanupBinding) !== canonicalJson(cleanupBinding)))) {
+    fail("KICKOFF-PROMOTION-PLAN", "promotion private cleanup binding target is invalid");
+  }
   const stateBytes = expectedStateBytes(state);
   const historyBytes = expectedHistoryBytes(plan.targets.history.value);
   const kickoffHistoryBytes = expectedHistoryBytes({
@@ -3142,6 +3214,13 @@ function buildKickoffPromotionPlan({
       fail("KICKOFF-PROMOTION-REPLAY", "promotion replay does not match the exact completed postimage");
     }
     const historyBefore = { schema: KICKOFF_HISTORY_SCHEMA, transactions: [entries[0]] };
+    const cleanupBinding = entry.cleanupBinding === undefined ? null : readPrivateCleanupBinding(observed.root, { spawn });
+    if ((entry.cleanupBinding === undefined && observed.state.continuity.revision === 2 && observed.privateBinding !== null)
+      || (entry.cleanupBinding !== undefined && (cleanupBinding.binding === null
+        || cleanupBinding.binding.featureId !== input.featureId
+        || cleanupBinding.sha256 !== entry.cleanupBinding.afterSha256))) {
+      fail("KICKOFF-PROMOTION-REPLAY", "promotion private cleanup binding does not match the exact completed postimage");
+    }
     const binding = {
       schema: KICKOFF_PROMOTION_PLAN_SCHEMA, root: observed.root, repositoryCapability, profile: input.profile,
       feature: { id: input.featureId, planPath: input.planPath }, authority,
@@ -3155,6 +3234,7 @@ function buildKickoffPromotionPlan({
       targets: {
         state: { path: authorityPaths(observed.root).state, beforeSha256: entry.beforeStateSha256, afterSha256: observed.stateObservation.sha256, value: observed.state },
         history: { path: HISTORY_BASENAME, beforeSha256: sha256(expectedHistoryBytes(historyBefore)), afterSha256: observed.historyObservation.sha256, value: observed.history },
+        ...(entry.cleanupBinding === undefined ? {} : { cleanupBinding: structuredClone(entry.cleanupBinding) }),
       },
       transactionSha256: entry.transactionSha256, onboardingScript,
     };
@@ -3192,6 +3272,15 @@ function buildKickoffPromotionPlan({
     fail("KICKOFF-PROMOTION-PLAN", "promotion continuity transition is invalid");
   }
   const afterStateSha256 = sha256(expectedStateBytes(next));
+  const cleanupBindingAfterBytes = kickoff.cleanupBinding === null
+    ? null
+    : promotedPrivateCleanupBinding(kickoff.cleanupBinding, input.featureId);
+  const cleanupBindingTarget = cleanupBindingAfterBytes === null
+    ? null
+    : {
+      beforeSha256: kickoff.cleanupBinding.sha256,
+      afterSha256: sha256(cleanupBindingAfterBytes),
+    };
   const transaction = {
     schema: "pipeline.codex-onboarding-kickoff-promotion-transaction.v1",
     root: observed.root, repositoryCapability, profile: input.profile, feature: { id: input.featureId, planPath: input.planPath },
@@ -3206,6 +3295,7 @@ function buildKickoffPromotionPlan({
       profile: input.profile, featureId: input.featureId, planPath: input.planPath,
       prdSha256: authority.prd.sha256, specSha256: authority.spec.sha256,
       beforeStateSha256, afterStateSha256,
+      ...(cleanupBindingTarget === null ? {} : { cleanupBinding: cleanupBindingTarget }),
     }],
   };
   const binding = {
@@ -3221,6 +3311,7 @@ function buildKickoffPromotionPlan({
     targets: {
       state: { path: authorityPaths(observed.root).state, beforeSha256: beforeStateSha256, afterSha256: afterStateSha256, value: next },
       history: { path: HISTORY_BASENAME, beforeSha256: beforeHistorySha256, afterSha256: sha256(expectedHistoryBytes(history)), value: history },
+      ...(cleanupBindingTarget === null ? {} : { cleanupBinding: cleanupBindingTarget }),
     },
     transactionSha256, onboardingScript,
   };
@@ -3662,9 +3753,9 @@ export function applyOnboardingKickoff({
 }
 
 /**
- * Apply the two-target promotion under the same public/private continuity
- * locks as kickoff. Publication order is history then state: a crash can only
- * leave a recoverable history-prefix, never an un-audited active identity.
+ * Apply the public/private promotion under the same continuity locks as
+ * kickoff. Publication order is history, private cleanup binding, then State:
+ * a crash can only leave a recoverable prefix, never an un-audited identity.
  */
 export function applyOnboardingKickoffPromotion({
   plan,
@@ -3683,29 +3774,42 @@ export function applyOnboardingKickoffPromotion({
   const paths = {
     state: absoluteProjectPath(plan.root, plan.targets.state.path, "Pipeline machine state"),
     history: join(privatePaths.directory, HISTORY_BASENAME),
+    ...(plan.targets.cleanupBinding === undefined ? {} : {
+      cleanupBinding: join(privatePaths.directory, SESSION_CLEANUP_BINDING_BASENAME),
+    }),
   };
   const token = `kickoff-promotion-${plan.planSha256.slice(0, 32)}`;
   const lockOptions = { nowMs: deps.nowMs ?? Date.now, lockStaleMs: deps.lockStaleMs ?? 30_000 };
   const stateLock = acquireLock(`${paths.state}.lock`, "pipeline.continuity-lock.v0", token, lockOptions);
   let privateLock;
+  let simulatedCrash = false;
   try {
     privateLock = acquireLock(join(privatePaths.directory, ".kickoff-writer.lock"), "pipeline.codex-onboarding-kickoff-lock.v1", token, lockOptions);
     const state = currentTarget(paths.state, plan.targets.state.afterSha256);
     const history = currentTarget(paths.history, plan.targets.history.afterSha256);
-    if (state.status === "exact" && history.status === "exact") {
+    const cleanupBinding = plan.targets.cleanupBinding === undefined
+      ? { status: "exact" }
+      : currentTarget(paths.cleanupBinding, plan.targets.cleanupBinding.afterSha256);
+    if (state.status === "exact" && history.status === "exact" && cleanupBinding.status === "exact") {
       return promotionResult(plan, "replayed", false, deps.spawn ?? defaultGitSpawn);
     }
     const stateBefore = currentTarget(paths.state, plan.targets.state.beforeSha256);
     const historyBefore = currentTarget(paths.history, plan.targets.history.beforeSha256);
-    const recoverHistoryPrefix = stateBefore.status === "exact" && history.status === "exact"
+    const cleanupBindingBefore = plan.targets.cleanupBinding === undefined
+      ? { status: "exact" }
+      : currentTarget(paths.cleanupBinding, plan.targets.cleanupBinding.beforeSha256);
+    const exactPreimage = stateBefore.status === "exact" && historyBefore.status === "exact"
+      && cleanupBindingBefore.status === "exact";
+    const recoverPrefix = stateBefore.status === "exact" && history.status === "exact"
+      && (cleanupBinding.status === "exact" || cleanupBindingBefore.status === "exact")
       && stateLock.recovered === true && privateLock.recovered === true;
-    if (!(stateBefore.status === "exact" && historyBefore.status === "exact") && !recoverHistoryPrefix) {
+    if (!exactPreimage && !recoverPrefix) {
       fail("KICKOFF-PROMOTION-CAS-DRIFT", "promotion target preimage drifted");
     }
-    const observed = observeDetailed({ rootDir: plan.root, repositoryCapability: plan.repositoryCapability, spawn: deps.spawn ?? defaultGitSpawn });
-    const seed = recognisedKickoff(observed, deps.spawn ?? defaultGitSpawn);
-    if (stateBefore.status === "exact" && seed === null) {
-      fail("KICKOFF-PROMOTION-CAS-DRIFT", "promotion kickoff seed drifted");
+    if (exactPreimage) {
+      const observed = observeDetailed({ rootDir: plan.root, repositoryCapability: plan.repositoryCapability, spawn: deps.spawn ?? defaultGitSpawn });
+      const seed = recognisedKickoff(observed, deps.spawn ?? defaultGitSpawn);
+      if (seed === null) fail("KICKOFF-PROMOTION-CAS-DRIFT", "promotion kickoff seed drifted");
     }
     const authority = promotionArtifacts(plan.root, {
       profile: plan.profile, featureId: plan.feature.id, planPath: plan.feature.planPath,
@@ -3721,14 +3825,201 @@ export function applyOnboardingKickoffPromotion({
       writeExclusiveSynced(temp, bytes.historyBytes, 0o600);
       renameSync(temp, paths.history);
       fsyncDirectory(dirname(paths.history));
+      if (deps.crashAt === "promotion-history-published") {
+        simulatedCrash = true;
+        throw new SimulatedKickoffCrash("promotion-history-published");
+      }
+    }
+    if (plan.targets.cleanupBinding !== undefined && cleanupBindingBefore.status === "exact") {
+      const observedBinding = readPrivateCleanupBinding(plan.root, { spawn: deps.spawn ?? defaultGitSpawn });
+      const nextBindingBytes = promotedPrivateCleanupBinding(observedBinding, plan.feature.id);
+      if (sha256(nextBindingBytes) !== plan.targets.cleanupBinding.afterSha256) {
+        fail("KICKOFF-PROMOTION-CAS-DRIFT", "private cleanup binding postimage drifted");
+      }
+      replacePromotedPrivateCleanupBinding(plan.root, observedBinding, plan.targets.cleanupBinding.beforeSha256, nextBindingBytes, {
+        spawn: deps.spawn ?? defaultGitSpawn,
+        suffix,
+      });
+      if (deps.crashAt === "promotion-cleanup-binding-published") {
+        simulatedCrash = true;
+        throw new SimulatedKickoffCrash("promotion-cleanup-binding-published");
+      }
     }
     const stateTemp = join(dirname(paths.state), `.${basename(paths.state)}.promotion-${suffix}.tmp`);
     writeExclusiveSynced(stateTemp, bytes.stateBytes, 0o600);
     renameSync(stateTemp, paths.state);
     fsyncDirectory(dirname(paths.state));
+    if (deps.crashAt === "promotion-state-published") {
+      simulatedCrash = true;
+      throw new SimulatedKickoffCrash("promotion-state-published");
+    }
     return promotionResult(plan, "applied", true, deps.spawn ?? defaultGitSpawn);
   } finally {
-    if (privateLock) releaseLock(privateLock);
-    releaseLock(stateLock);
+    if (!simulatedCrash && privateLock) releaseLock(privateLock);
+    if (!simulatedCrash) releaseLock(stateLock);
+  }
+}
+
+function kickoffPromotionCleanupRecoveryPlanCore(observed, binding, sessionCleanupScript) {
+  const state = observed.state;
+  const entry = observed.history?.transactions?.at(-1);
+  if (observed.continuity.status !== "valid" || observed.stateRelativePath !== NEUTRAL_STATE || binding.binding === null
+    || entry?.kind !== "kickoff-promotion" || entry.cleanupBinding !== undefined
+    || observed.history.transactions.length !== 2 || state?.continuity?.revision !== 2
+    || state.activeFeature?.id !== entry.featureId || state.activeFeature?.planPath !== entry.planPath
+    || state.continuity.featureId !== entry.featureId || state.continuity.authority.result !== null
+    || state.continuity.authority.prd?.sha256 !== entry.prdSha256
+    || state.continuity.authority.spec?.sha256 !== entry.specSha256
+    || entry.afterStateSha256 !== observed.stateObservation.sha256
+    || !isObject(binding.binding.sessionCleanup)) return null;
+  let beforeSha256;
+  let afterSha256;
+  if (binding.binding.featureId === entry.kickoffFeatureId) {
+    beforeSha256 = binding.sha256;
+    afterSha256 = sha256(promotedPrivateCleanupBinding(binding, entry.featureId));
+  } else if (binding.binding.featureId === entry.featureId) {
+    beforeSha256 = sha256(promotedPrivateCleanupBinding(binding, entry.kickoffFeatureId));
+    afterSha256 = binding.sha256;
+  } else return null;
+  return {
+    schema: KICKOFF_PROMOTION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+    root: observed.root,
+    stateSha256: observed.stateObservation.sha256,
+    historySha256: observed.historyObservation.sha256,
+    revision: state.continuity.revision,
+    feature: { from: entry.kickoffFeatureId, to: entry.featureId },
+    binding: { beforeSha256, afterSha256 },
+    sessionCleanupScript,
+  };
+}
+
+function kickoffPromotionCleanupRecoveryAction(sessionCleanupScript, root, planSha256) {
+  return {
+    kind: "command",
+    executable: "node",
+    argv: [sessionCleanupScript, "apply-recovery", "--repo", root, "--plan-sha256", planSha256, "--activate"],
+    mutation: true,
+    requiresConfirmation: true,
+    executionBoundary: "host-authorized-wsl",
+    expected: { schema: KICKOFF_PROMOTION_CLEANUP_RECOVERY_APPLY_SCHEMA, statuses: ["applied", "replayed"] },
+  };
+}
+
+export function planOnboardingKickoffPromotionCleanupRecovery({
+  rootDir,
+  sessionCleanupScript = DEFAULT_SESSION_CLEANUP_SCRIPT,
+  spawn = defaultGitSpawn,
+} = {}) {
+  if (!isAbsolute(sessionCleanupScript)) fail("KICKOFF-PROMOTION-CLEANUP-RECOVERY", "cleanup recovery script must be absolute");
+  const observed = observeDetailed({ rootDir, repositoryCapability: "local", spawn });
+  const binding = readPrivateCleanupBinding(observed.root, { spawn });
+  const core = kickoffPromotionCleanupRecoveryPlanCore(observed, binding, sessionCleanupScript);
+  const featureMismatch = binding.binding !== null && observed.stateRelativePath === NEUTRAL_STATE
+    && isObject(observed.state?.activeFeature) && isObject(observed.state?.continuity)
+    && binding.binding.featureId !== observed.state.activeFeature.id;
+  if (core === null) return {
+    schema: KICKOFF_PROMOTION_CLEANUP_RECOVERY_PLAN_SCHEMA,
+    status: featureMismatch
+      ? "recovery-unavailable"
+      : "not-applicable",
+  };
+  const planSha256 = canonicalSha256(core);
+  return {
+    ...core,
+    status: "ready",
+    planSha256,
+    applyAction: kickoffPromotionCleanupRecoveryAction(sessionCleanupScript, observed.root, planSha256),
+  };
+}
+
+export function applyOnboardingKickoffPromotionCleanupRecovery({
+  rootDir,
+  expectedPlanSha256,
+  activate = false,
+  sessionCleanupScript = DEFAULT_SESSION_CLEANUP_SCRIPT,
+  deps = {},
+} = {}) {
+  if (activate !== true) fail("KICKOFF-PROMOTION-CLEANUP-RECOVERY", "cleanup recovery requires explicit activation");
+  if (!SHA256_RE.test(expectedPlanSha256 ?? "")) fail("KICKOFF-PROMOTION-CLEANUP-RECOVERY", "cleanup recovery plan digest is invalid");
+  const spawn = deps.spawn ?? defaultGitSpawn;
+  const initial = planOnboardingKickoffPromotionCleanupRecovery({ rootDir, sessionCleanupScript, spawn });
+  if (initial.status !== "ready" || initial.planSha256 !== expectedPlanSha256) {
+    fail("KICKOFF-PROMOTION-CLEANUP-RECOVERY", "cleanup recovery preimage changed");
+  }
+  const privatePaths = resolvePrivate(initial.root, "local", { create: false, spawn });
+  const lockOptions = { nowMs: deps.nowMs ?? Date.now, lockStaleMs: deps.lockStaleMs ?? 30_000 };
+  const stateLock = acquireLock(
+    `${absoluteProjectPath(initial.root, authorityPaths(initial.root).state, "Pipeline machine state")}.lock`,
+    "pipeline.continuity-lock.v0",
+    `kickoff-promotion-cleanup-recovery-${expectedPlanSha256.slice(0, 24)}`,
+    lockOptions,
+  );
+  let privateLock;
+  let simulatedCrash = false;
+  try {
+    privateLock = acquireLock(
+      join(privatePaths.directory, ".kickoff-writer.lock"),
+      "pipeline.codex-onboarding-kickoff-lock.v1",
+      `kickoff-promotion-cleanup-recovery-${expectedPlanSha256.slice(0, 24)}`,
+      lockOptions,
+    );
+    const current = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: initial.root, sessionCleanupScript, spawn });
+    if (current.status === "ready" && current.planSha256 === expectedPlanSha256) {
+      const binding = readPrivateCleanupBinding(initial.root, { spawn });
+      if (binding.binding !== null && binding.binding.featureId === current.feature.to
+        && binding.sha256 === current.binding.afterSha256) {
+        return {
+          schema: KICKOFF_PROMOTION_CLEANUP_RECOVERY_APPLY_SCHEMA,
+          status: "replayed",
+          root: initial.root,
+          planSha256: expectedPlanSha256,
+          stateSha256: current.stateSha256,
+          revision: current.revision,
+          mutated: false,
+        };
+      }
+      const afterBytes = promotedPrivateCleanupBinding(binding, current.feature.to);
+      replacePromotedPrivateCleanupBinding(initial.root, binding, current.binding.beforeSha256, afterBytes, {
+        spawn,
+        suffix: (deps.randomUUID ?? randomUUID)().replaceAll("-", ""),
+      });
+      if (deps.crashAt === "kickoff-promotion-cleanup-recovery-binding-published") {
+        simulatedCrash = true;
+        throw new SimulatedKickoffCrash("kickoff-promotion-cleanup-recovery-binding-published");
+      }
+      const readback = readOnboardingSessionCleanupBinding({ rootDir: initial.root, spawn });
+      if (readback.status !== "bound" || readback.stateSha256 !== current.stateSha256
+        || readback.revision !== current.revision) {
+        fail("KICKOFF-PROMOTION-CLEANUP-READBACK", "cleanup recovery readback is invalid", { committed: true });
+      }
+      return {
+        schema: KICKOFF_PROMOTION_CLEANUP_RECOVERY_APPLY_SCHEMA,
+        status: "applied",
+        root: initial.root,
+        planSha256: expectedPlanSha256,
+        stateSha256: current.stateSha256,
+        revision: current.revision,
+        mutated: true,
+      };
+    }
+    const observed = observeDetailed({ rootDir: initial.root, repositoryCapability: "local", spawn });
+    const binding = readPrivateCleanupBinding(observed.root, { spawn });
+    if (observed.continuity.status !== "valid" || observed.stateObservation.sha256 !== initial.stateSha256
+      || observed.historyObservation.sha256 !== initial.historySha256 || binding.binding === null
+      || binding.binding.featureId !== initial.feature.to || binding.sha256 !== initial.binding.afterSha256) {
+      fail("KICKOFF-PROMOTION-CLEANUP-RECOVERY", "cleanup recovery postimage is invalid");
+    }
+    return {
+      schema: KICKOFF_PROMOTION_CLEANUP_RECOVERY_APPLY_SCHEMA,
+      status: "replayed",
+      root: initial.root,
+      planSha256: expectedPlanSha256,
+      stateSha256: initial.stateSha256,
+      revision: initial.revision,
+      mutated: false,
+    };
+  } finally {
+    if (!simulatedCrash && privateLock) releaseLock(privateLock);
+    if (!simulatedCrash) releaseLock(stateLock);
   }
 }

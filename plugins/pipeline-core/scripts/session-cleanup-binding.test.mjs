@@ -19,7 +19,9 @@ import test from "node:test";
 
 import {
   applyOnboardingKickoff,
+  applyOnboardingKickoffPromotion,
   planOnboardingKickoff,
+  planOnboardingKickoffPromotion,
   readOnboardingSessionCleanupBinding,
 } from "../lib/onboarding-continuity.mjs";
 import {
@@ -83,6 +85,33 @@ function invoke(argv, dependencies = {}) {
     ...dependencies,
   });
   return { code, output: output === "" ? null : JSON.parse(output) };
+}
+
+function legacyPromotionCleanupMismatch(name) {
+  const root = neutralFixture(`promotion-mismatch-${name}`);
+  const statePath = join(root, "project", "pipeline-state.json");
+  const started = invoke(["start", "--repo", root, "--session", `promotion-mismatch-${name}`]);
+  const bindingPath = join(root, ".git", "agent-pipeline", "onboarding", "session-cleanup-binding.json");
+  const kickoffBinding = readFileSync(bindingPath);
+  const state = JSON.parse(readFileSync(statePath, "utf8"));
+  state.continuity.revision = 1;
+  state.continuity.resume = { mode: "resume-on-next-turn", sourceRevision: 0, reasonCode: "host-no-background-wakeup" };
+  writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+  const authorityDir = join(root, "specs", "rune");
+  mkdirSync(authorityDir, { recursive: true });
+  writeFileSync(join(authorityDir, "prd.md"), "# Rune PRD\n");
+  writeFileSync(join(authorityDir, "spec.md"), "# Rune spec\n");
+  const promotion = planOnboardingKickoffPromotion({
+    rootDir: root, profile: "feature", featureId: "rune-game",
+    planPath: "specs/rune/spec.md", prdPath: "specs/rune/prd.md", specPath: "specs/rune/spec.md",
+  });
+  applyOnboardingKickoffPromotion({ plan: promotion, expectedPlanSha256: promotion.planSha256, activate: true });
+  const historyPath = join(root, ".git", "agent-pipeline", "onboarding", "continuity-history.json");
+  const history = JSON.parse(readFileSync(historyPath, "utf8"));
+  delete history.transactions[1].cleanupBinding;
+  writeFileSync(historyPath, `${JSON.stringify(history)}\n`, { mode: 0o600 });
+  writeFileSync(bindingPath, kickoffBinding, { mode: 0o600 });
+  return { root, statePath, bindingPath, historyPath, started };
 }
 
 function rewriteAsLegacyDescriptor(root, sessionId) {
@@ -158,6 +187,38 @@ test("release-binding completes an interrupted post-cleanup State release", () =
     assert.equal(readOnboardingSessionCleanupBinding({ rootDir: root }).status, "unbound");
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("plan-recovery repairs only the exact historical kickoff-promotion cleanup mismatch", () => {
+  const fixture = legacyPromotionCleanupMismatch("exact");
+  try {
+    const before = {
+      state: readFileSync(fixture.statePath),
+      history: readFileSync(fixture.historyPath),
+      binding: readFileSync(fixture.bindingPath),
+    };
+    const planned = invoke(["plan-recovery", "--repo", fixture.root]);
+    assert.equal(planned.code, 0);
+    assert.equal(planned.output.status, "ready");
+    assert.equal(JSON.stringify(planned.output).includes(fixture.started.output.descriptorSha256), false);
+    assert.deepEqual(readFileSync(fixture.statePath), before.state);
+    assert.deepEqual(readFileSync(fixture.historyPath), before.history);
+    assert.deepEqual(readFileSync(fixture.bindingPath), before.binding);
+    const applied = invoke([
+      "apply-recovery", "--repo", fixture.root,
+      "--plan-sha256", planned.output.planSha256, "--activate",
+    ]);
+    assert.equal(applied.output.status, "applied");
+    assert.equal(readOnboardingSessionCleanupBinding({ rootDir: fixture.root }).status, "bound");
+    const replay = invoke([
+      "apply-recovery", "--repo", fixture.root,
+      "--plan-sha256", planned.output.planSha256, "--activate",
+    ]);
+    assert.equal(replay.output.status, "replayed");
+    assert.equal(replay.output.mutated, false);
+  } finally {
+    rmSync(fixture.root, { recursive: true, force: true });
   }
 });
 

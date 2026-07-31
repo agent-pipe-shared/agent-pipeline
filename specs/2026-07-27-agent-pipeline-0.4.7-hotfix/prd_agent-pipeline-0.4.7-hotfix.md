@@ -11,7 +11,7 @@
 > `9d1b3dc108eb77629ace5b82002120f5539abd8d`. Acceptance criteria:
 > [spec.md](spec.md).
 
-<!-- technical-spec-sha256: 7d86314adc02541890ad654abe82bd61f98efebda0e5cb666813faacd1ee66c6 -->
+<!-- technical-spec-sha256: d815c7e1966e0a656fc8b28ecff2c0420deab8cd6eab29e8c25c2a7a44aa8a1a -->
 
 The 2026-07-28 approval remains historical evidence for the already
 implemented slices. The Human/PO explicitly directed implementation of the
@@ -129,20 +129,25 @@ authority, a quiescent queue and `authority.result:null`, the Elephant needs
 one generic bootstrap before the existing Result-close transaction can apply.
 The read-only plan binds the physical root, portable-State byte digest,
 feature/revision, PRD, Spec, canonically feature-package-derived safe Result
-path and absent preimage, exact canonical Result bytes/digest, State postimage
-and plan digest. Its single typed apply action is explicitly confirmed and
-runs only at the declared host write boundary.
+path and existing canonical Result preimage, the historical Markdown-prefix
+bytes/digest, the exact appended `pipeline-result` fence bytes/digest, State
+postimage and plan digest. Its single typed apply action is explicitly
+confirmed and runs only at the declared host write boundary.
 
 The confirmed writer uses the normal lock and a durable write-ahead
-transaction to materialize and read back a canonical `pipeline-result`
-envelope with the four empty decision/integration collections, then binds only
-Result authority and the corresponding monotonic revision/resume/update
-fields. Exact replay is `mutated:false`; crashes around Result publication,
-State commit and journal retirement converge without a second revision.
-Drift, unsafe paths/files, an existing Result authority, dispatch, blocker,
-decision/recovery/close state, or contradictory transaction evidence fail
-closed. The bootstrap creates no dispatch, decision, outcome, completion
-claim, Git/remote write or other external effect.
+transaction to append exactly one strict `pipeline-result` fence with the four
+empty decision/integration collections to that existing canonical Result. Its
+historical Markdown content is an immutable byte-for-byte prefix: the writer
+neither creates a parallel Result file nor rewrites any prior Result byte. The
+private recovery journal lives exclusively in the Git common directory under
+the existing physical-safety and authenticity checks, never in the checkout.
+The writer then binds only Result authority and the corresponding monotonic
+revision/resume/update fields. Exact replay is `mutated:false`; crashes around
+Result publication, State commit and journal retirement converge without a
+second revision. Drift, unsafe paths/files, an existing Result authority,
+dispatch, blocker, decision/recovery/close state, or contradictory transaction
+evidence fail closed. The bootstrap creates no dispatch, decision, outcome,
+completion claim, Git/remote write or other external effect.
 
 This amendment is design only. No Result-bootstrap production implementation
 or dispatch is authorized until the PO approves the synchronized PRD/Spec
