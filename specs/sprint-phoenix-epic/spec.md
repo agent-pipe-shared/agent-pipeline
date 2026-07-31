@@ -368,6 +368,7 @@ files are excepted only when their path is already declared here.
 | `plugins/pipeline-core/hooks/staleness-check.mjs` | separate Claude adapter from common source contract | Remove runner-specific common dependency. |
 | `plugins/pipeline-core/hooks/staleness-check.test.mjs` | add Claude adapter contract tests | Retain Claude behavior. |
 | `plugins/pipeline-core/scripts/ruleset-freshness.mjs` | consume normalized source and selected host boundary | Truthful freshness. |
+| `plugins/pipeline-core/scripts/ruleset-freshness-host.mjs` | execute only the literal Public-Core `git ls-remote` action at the selected WSL host boundary, using a fixed system Git binary and sterile Git configuration | Prevent ambient PATH or Git URL-rewrite state from retargeting freshness. |
 | `plugins/pipeline-core/scripts/ruleset-freshness.test.mjs` | cover Codex-only, Claude, pre-HEAD, self/local, network and privacy states | Binary PX0 evidence. |
 | `plugins/pipeline-core/scripts/pipeline-start-preflight.mjs` | return/bind normalized source observation | Bootstrap trust root. |
 | `plugins/pipeline-core/scripts/pipeline-start-preflight.test.mjs` | validate loaded/installed/source mismatch behavior | Prevent false readiness. |

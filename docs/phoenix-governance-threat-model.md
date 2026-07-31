@@ -19,6 +19,7 @@ source-observation, or privacy-contract change.
 | --- | --- | --- |
 | Restricted sandbox attempts direct network access | No direct fallback after restricted preflight; use the selected host adapter only. | Return `host-transport-required` with the fixed bound action. |
 | Copied, substituted, or stale host request | Boundary ID and request hash must match exactly. | Reject as `host-transport-unavailable`; obtain a fresh preflight plan. |
+| Ambient `PATH`, repository context, or Git URL rewrite retargets the reviewed public read | The WSL adapter invokes only `/usr/bin/git` from `/` with a sterile environment that disables system/global/repository configuration and all inherited `GIT_*` state. | Return `unavailable`; do not resolve Git from PATH, inherit a Git directory, or retry an alternate URL. |
 | Private source gains public-freshness authority | Only the reviewed Public-Core coordinate is selectable. | Return typed private/local source status; do not probe it. |
 | Host output forges a success | Require result schema, exact request hash, completion state, and valid Git ID. | Treat malformed output as unavailable; no write permission follows. |
 | Diagnostic leaks private topology | Output is limited to status, source class, hashes, counts, typed reason, and (when needed) fixed public action. | Stop publication, remove the leaking field, and rerun privacy tests. |
@@ -32,6 +33,15 @@ If that adapter is absent, unavailable, or mismatched, the CLI returns the
 data-minimized action and exits non-successfully; it must not retry in the
 workspace sandbox. A remote timeout without a restricted-boundary request
 remains a typed offline observation, never proof of freshness.
+
+The productive WSL adapter has no durable state, lockfile, repository mutation,
+or fallback executor. It performs one public observation from the fixed host
+directory and returns only a validated public object ID. A platform, trust, or
+privacy regression therefore rolls back as the complete PHX-0B adapter package:
+`ruleset-freshness-host.mjs`, its binding in `ruleset-freshness.mjs`, and its
+matching tests/spec inventory. A new local compensating revert candidate must
+then carry fresh exact Verify, Security, and independent Critic evidence; no
+reset, history rewrite, remote action, or stale evidence can claim recovery.
 
 ## Acceptance mapping
 

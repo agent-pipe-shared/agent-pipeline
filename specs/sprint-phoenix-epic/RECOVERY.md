@@ -469,8 +469,9 @@ an earlier blocked result must never be relabelled as clean.
 If a trust, privacy, or platform/runner regression is found after delivery of
 the PHX-0B adapter, freshness, or bootstrap integration, the sole rollback
 path is a new local compensating `git revert` commit for the complete set of
-PHX-0B integration commits. It must not use reset, history rewriting,
-force-push, or an automatic remote operation.
+PHX-0B integration commits: the host adapter, its binding in common freshness,
+the bootstrap route, and their matching tests and Spec inventory. It must not
+use reset, history rewriting, force-push, or an automatic remote operation.
 
 The compensating candidate requires new exact Verify, Security, and independent
 Critic evidence before it may be described as a successful rollback. Those

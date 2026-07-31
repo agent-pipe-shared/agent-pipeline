@@ -212,8 +212,22 @@ test("the dedicated WSL host adapter executes only the fixed public action", () 
     },
   });
   assert.deepEqual(calls[0].args, ["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"]);
-  assert.equal(calls[0].command, "git");
+  assert.equal(calls[0].command, "/usr/bin/git");
+  assert.equal(calls[0].options.cwd, "/");
   assert.equal(calls[0].options.shell, false);
+  assert.deepEqual(calls[0].options.env, {
+    GIT_ASKPASS: "/bin/false",
+    GIT_CONFIG_COUNT: "0",
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_CONFIG_NOSYSTEM: "1",
+    GIT_OPTIONAL_LOCKS: "0",
+    GIT_TERMINAL_PROMPT: "0",
+    HOME: "/nonexistent",
+    LANG: "C",
+    LC_ALL: "C",
+    PATH: "/usr/bin:/bin",
+    SSH_ASKPASS: "/bin/false",
+  });
   assert.deepEqual(output, {
     schema: FRESHNESS_HOST_RESULT_SCHEMA,
     requestSha256: action.requestSha256,
@@ -226,6 +240,47 @@ test("the dedicated WSL host adapter executes only the fixed public action", () 
   assert.equal(executeRulesetFreshnessHostAction(substituted, {
     spawn() { throw new Error("substituted action must never run"); },
   }), null);
+});
+
+test("the dedicated WSL host adapter ignores hostile PATH and Git URL-rewrite state", () => {
+  const action = createFreshnessHostAction("pipeline-start-host-authorized-wsl");
+  const sha = "f".repeat(40);
+  const hostileEnvironment = {
+    PATH: "/tmp/attacker-bin",
+    HOME: "/tmp/attacker-home",
+    GIT_DIR: "/tmp/attacker-repository",
+    GIT_CONFIG_COUNT: "1",
+    GIT_CONFIG_KEY_0: "url.https://attacker.invalid/.insteadof",
+    GIT_CONFIG_VALUE_0: PUBLIC_MARKETPLACE_URL,
+  };
+  const previousEnvironment = Object.fromEntries(Object.keys(hostileEnvironment)
+    .map((key) => [key, process.env[key]]));
+  Object.assign(process.env, hostileEnvironment);
+  const calls = [];
+  let output;
+  try {
+    output = executeRulesetFreshnessHostAction(action, {
+      spawn(command, args, options) {
+        calls.push({ command, args, options });
+        return { status: 0, stdout: `${sha}\tHEAD\n` };
+      },
+    });
+  } finally {
+    for (const [key, value] of Object.entries(previousEnvironment)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].command, "/usr/bin/git");
+  assert.equal(calls[0].options.env.PATH, "/usr/bin:/bin");
+  assert.equal(calls[0].options.env.GIT_CONFIG_GLOBAL, "/dev/null");
+  assert.equal(calls[0].options.env.GIT_CONFIG_NOSYSTEM, "1");
+  for (const key of ["PATH", "HOME", "GIT_DIR", "GIT_CONFIG_KEY_0", "GIT_CONFIG_VALUE_0"]) {
+    assert.equal(Object.hasOwn(calls[0].options.env, key), key === "PATH" || key === "HOME");
+  }
+  assert.equal(calls[0].options.env.GIT_CONFIG_COUNT, "0");
+  assert.equal(output.status, "completed");
 });
 
 test("the host adapter produces the complete freshness result through its fixed transport", () => {

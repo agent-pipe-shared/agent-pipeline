@@ -139,7 +139,7 @@ fixed Pipeline bootstrap helper that
 inspects or spawns Git, probes worktree/session capability, or observes the
 App-Server control socket directly through the host-authorized local boundary.
 Run a fixed remote-freshness helper through the host-authorized
-network-open/read-only boundary. Do not first execute any of those helpers in
+network-open/read-only command boundary. Do not first execute any of those helpers in
 the workspace sandbox: its known WSL control-path, process, socket, and network
 restrictions yield misleading `EPERM`, invalid-layout, unavailable, or DNS
 results and must not consume a bootstrap attempt. This is execution routing,

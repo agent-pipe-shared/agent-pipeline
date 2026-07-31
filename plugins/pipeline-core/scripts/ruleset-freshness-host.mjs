@@ -28,6 +28,23 @@ import { observeCodexRulesetSource } from "../lib/codex-host-plugin-list.mjs";
 
 const SHA = /^[0-9a-f]{40,64}$/iu;
 const DEFAULT_TIMEOUT_MS = 30_000;
+// This helper is intentionally WSL-only.  A literal system path and a sterile
+// Git environment prevent a user PATH entry or ambient Git configuration from
+// retargeting the one reviewed public read.
+const WSL_SYSTEM_GIT = "/usr/bin/git";
+const WSL_SYSTEM_GIT_ENV = Object.freeze({
+  GIT_ASKPASS: "/bin/false",
+  GIT_CONFIG_COUNT: "0",
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_NOSYSTEM: "1",
+  GIT_OPTIONAL_LOCKS: "0",
+  GIT_TERMINAL_PROMPT: "0",
+  HOME: "/nonexistent",
+  LANG: "C",
+  LC_ALL: "C",
+  PATH: "/usr/bin:/bin",
+  SSH_ASKPASS: "/bin/false",
+});
 
 function result(action, status, stdout = "") {
   return Object.freeze({
@@ -48,12 +65,13 @@ export function executeRulesetFreshnessHostAction(action, { spawn = spawnSync, t
   if (expected === null || JSON.stringify(action) !== JSON.stringify(expected)) return null;
   let child;
   try {
-    child = spawn("git", ["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"], {
+    child = spawn(WSL_SYSTEM_GIT, ["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"], {
+      cwd: "/",
       encoding: "utf8",
       timeout: timeoutMs,
       shell: false,
       windowsHide: true,
-      env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+      env: WSL_SYSTEM_GIT_ENV,
     });
   } catch {
     return result(expected, "unavailable");
