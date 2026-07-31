@@ -92,7 +92,15 @@ function writeSecurityCompletenessEvidence(root, headSha, { blocking = false, st
   );
 }
 
-function fixture() {
+/**
+ * `security` selects the candidate root's `.claude/pipeline.yaml` gate-activation shape (F2,
+ * CYB-2I-1R): default `"blocking"` writes an ACTIVE security gate so every pre-existing,
+ * zero-argument `fixture()` call below keeps exercising today's unconditional
+ * checkSecurityCompleteness() behavior unchanged; `"off"` writes an inactive gate; `"absent"`
+ * writes no manifest file at all (mirrors check-close-security-completeness.test.mjs's own
+ * fixture() shape for the identical guard).
+ */
+function fixture({ security = "blocking" } = {}) {
   const root = mkdtempSync(join(tmpdir(), "pr-contributor-gates-"));
   const claRoot = mkdtempSync(join(tmpdir(), "pr-contributor-gates-trusted-"));
   git(root, "init", "-q");
@@ -101,6 +109,14 @@ function fixture() {
   writeFileSync(join(root, "CONTRIBUTOR_LICENSE_AGREEMENT.md"), CLA_BYTES, "utf8");
   writeFileSync(join(claRoot, "CONTRIBUTOR_LICENSE_AGREEMENT.md"), CLA_BYTES, "utf8");
   writeFileSync(join(root, "change.txt"), "base\n", "utf8");
+  if (security !== "absent") {
+    mkdirSync(join(root, ".claude"), { recursive: true });
+    writeFileSync(
+      join(root, ".claude", "pipeline.yaml"),
+      `schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: ${security}\n    type: automated\n`,
+      "utf8",
+    );
+  }
   git(root, "add", ".");
   git(root, "commit", "-q", "-m", "base", "-m", `Signed-off-by: ${AUTHOR_NAME} <${AUTHOR_EMAIL}>`);
   const baseSha = git(root, "rev-parse", "HEAD");
@@ -289,6 +305,29 @@ test("fresh, bound, BLOCKING security evidence yields ok:false with SECURITY_COM
     completenessErrors[0].detail,
     "evidence/security-latest.v2.verdict.json: required capability cap.secrets did not reach an accepted state (outcome=required-capability-missing)",
   );
+  assert.equal(receipt.cla.accepted, true);
+  assert.equal(receipt.dco.status, "passed");
+});
+
+test("no security gate configured (manifest absent): completeness check is skipped, CLA/DCO evaluated normally, no missing-evidence failure (F2 gate-activation guard)", () => {
+  const { root, claRoot, event } = fixture({ security: "absent" });
+  // no .claude/pipeline.yaml and no evidence/ files -- with the security gate absent, the
+  // completeness check must be skipped entirely (opt-in semantics, same as guard-push.mjs and
+  // check-close-security-completeness.mjs), not fail closed on missing evidence.
+  const receipt = validatePrContributorGates({ root, claRoot, event });
+  assert.equal(receipt.ok, true, JSON.stringify(receipt.errors));
+  assert.equal(receipt.errors.some((entry) => entry.code === "SECURITY_COMPLETENESS_BLOCKING"), false);
+  assert.equal(receipt.cla.accepted, true);
+  assert.equal(receipt.dco.status, "passed");
+});
+
+test("security gate mode:off: completeness check is skipped, CLA/DCO evaluated normally, no missing-evidence failure (F2 gate-activation guard)", () => {
+  const { root, claRoot, event } = fixture({ security: "off" });
+  // no evidence/ files -- with the gate configured but mode:"off", the completeness check must
+  // still be skipped, exactly like the other three AC8 call sites.
+  const receipt = validatePrContributorGates({ root, claRoot, event });
+  assert.equal(receipt.ok, true, JSON.stringify(receipt.errors));
+  assert.equal(receipt.errors.some((entry) => entry.code === "SECURITY_COMPLETENESS_BLOCKING"), false);
   assert.equal(receipt.cla.accepted, true);
   assert.equal(receipt.dco.status, "passed");
 });

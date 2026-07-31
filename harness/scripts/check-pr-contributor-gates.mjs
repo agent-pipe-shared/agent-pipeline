@@ -8,6 +8,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 import { checkSecurityCompleteness } from "../../plugins/pipeline-core/lib/security-completeness-gate.mjs";
+import { loadManifest, gateConfig } from "../../plugins/pipeline-core/lib/manifest.mjs";
 
 export const RECEIPT_SCHEMA = "agent-pipeline.pr-contributor-gate.v2";
 export const CLA_PATH = "CONTRIBUTOR_LICENSE_AGREEMENT.md";
@@ -138,7 +139,19 @@ export function validatePrContributorGates({ root, claRoot, event }) {
   const dco = baseSha && headSha ? checkDcoRange(root, baseSha, headSha) : { status: "failed", checkedCommits: 0, failures: [error("DCO_RANGE_IDENTIFIERS_INVALID")] };
   errors.push(...dco.failures);
 
-  if (headSha) {
+  // Gate-activation guard (F2, CYB-2I-1R): mirrors guard-push.mjs's/
+  // check-close-security-completeness.mjs's own "opt-in, nothing configured -> skip" pattern
+  // EXACTLY -- the completeness check only runs (and only pushes SECURITY_COMPLETENESS_BLOCKING
+  // errors) when the candidate's own manifest declares an active `security` gate (present and
+  // `mode !== "off"`). A project with no security gate configured gets `errors` unaffected by
+  // this check, same as the other three AC8 call sites already behave.
+  const manifestResult = headSha ? loadManifest(root) : null;
+  const securityGate = manifestResult ? gateConfig(manifestResult.manifest, "security") : null;
+  const securityGateActive = manifestResult
+    && manifestResult.status !== "absent"
+    && securityGate
+    && securityGate.mode !== "off";
+  if (headSha && securityGateActive) {
     const treeResult = git(root, ["rev-parse", `${headSha}^{tree}`]);
     const headTree = treeResult.status === 0 ? treeResult.stdout.trim() : null;
     const completenessFailures = checkSecurityCompleteness({ projectDir: root, commit: headSha, tree: headTree });
