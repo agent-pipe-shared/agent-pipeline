@@ -1,7 +1,8 @@
 # Implementation plan — Agent Pipeline 0.4.7 completion
 
-Status: design reopened; prior PO approval revoked; implementation dispatch is
-blocked until the current PRD/Spec digests receive fresh PO approval.
+Status: approved by the PO on 2026-07-31; implementation dispatch remains
+blocked only until the matching PRD/Spec digests are bound by the sanctioned
+lifecycle writer.
 
 Authority is the code-first section of the neighboring PRD and Spec.
 `main@83640cec22d494d227eebc82929370277ce926b9` is the implementation
@@ -16,10 +17,11 @@ one combined dispatch where production surfaces overlap. Every dispatch binds
 the exact baseline commit/tree, PRD/Spec digests, owned paths, DoD commands,
 prohibitions, and stop conditions.
 
-### F0 — Lifecycle authority and portable cleanup
+### F0 — Lifecycle authority, kickoff promotion and portable cleanup
 
-Implement AC-047-100–111 first because these rules decide whether later work
-can be edited, approved, resumed, and persisted safely.
+Implement AC-047-100–111 and AC-047-131–135 first because these rules decide
+whether later work can be edited, approved, resumed, recovered, and persisted
+safely.
 
 - Keep machine-local session-cleanup identity in authenticated private runtime
   storage and make every neutral portable State writer/readback fail closed on
@@ -34,10 +36,38 @@ can be edited, approved, resumed, and persisted safely.
   resume, topology, and close.
 - Preserve historical approval/revocation as audit data without treating it as
   current authority.
+- Admit the exact valid pre-submission V2 implementation postimage to the
+  sanctioned `reopen-design` writer without manufacturing submission,
+  invalidation, or approval history.
+- Add one closed, guard-admitted neutral cleanup upgrade matrix: completed
+  closure sanitization first; otherwise lifecycle fallback to the existing
+  read-only `plan-privatization`; live-descriptor adoption into authenticated
+  private binding authority without ending the session; and bounded retirement
+  of an exact proven non-live/reused or admissible legacy descriptor with no
+  cleanup manifest. Extend the privatization plan with one complete
+  identifier-free, digest-bound, confirmation-required host-bound
+  `applyAction`; preserve the symbolic action for compatibility. Every path
+  CAS-sanitizes only the portable binding and ends in a fresh V4-ready
+  readback.
+- Promote only an exact unapproved revision-zero kickoff seed into a selected
+  Epic/Feature/Mini work feature, atomically replacing feature and continuity
+  while creating no submission or approval.
+- Keep Mini promotion migration evidence separate from Mini PRD ceremony.
+- For every non-ready state, prove the typed planner and returned writer remain
+  reachable through the central guard; no valid recovery path may deadlock on
+  the readiness state it is intended to repair.
+- Extend `pipeline-start` with the narrow returned-action protocol: plan
+  read-only, validate the 64-hex digest and complete action, present unchanged
+  for PO confirmation, apply once at the host write boundary, then rerun Step
+  0 and continue only from an actual `ready`.
 
 Focused evidence: neutral cleanup start/reuse/recovery, legacy/neutral parity,
 repeated design edits, submit, edit-after-submit, edit-after-approval,
-restart/resume, hostile State, and exact reapproval.
+restart/resume, hostile State, exact reapproval, valid V2 reopen,
+Phoenix/Nova/Rune-shaped portable-binding recovery, identifier-free complete
+privatization actions, missing-activation/stale-plan/replay/drift failures,
+kickoff promotion for all three profiles, Pipeline-start reinspection, and
+negative guard grammar.
 
 Owned production paths: `plugins/pipeline-core/scripts/session-cleanup.mjs`,
 `plugins/pipeline-core/lib/session-cleanup-recovery.mjs`,
@@ -47,45 +77,80 @@ Owned production paths: `plugins/pipeline-core/scripts/session-cleanup.mjs`,
 `plugins/pipeline-core/lib/project-onboarding-v3.mjs`,
 `plugins/pipeline-core/lib/onboarding-continuity.mjs`,
 `plugins/pipeline-core/lib/feature-package-topology.mjs`,
+`plugins/pipeline-core/scripts/project-authority-migration.mjs`,
+`plugins/pipeline-core/hooks/guard-lifecycle-ready.mjs`,
 `plugins/pipeline-core/hooks/guard-devplan.mjs`, and their adjacent tests.
 
 Required focused commands:
 
 - `node plugins/pipeline-core/scripts/session-cleanup-binding.test.mjs`
 - `node plugins/pipeline-core/lib/project-authority.test.mjs`
+- `node plugins/pipeline-core/scripts/project-authority-migration.test.mjs`
 - `node plugins/pipeline-core/lib/project-onboarding-v3.test.mjs`
+- `node plugins/pipeline-core/scripts/pipeline-state-reopen-design.test.mjs`
 - `node harness/scripts/pipeline-state.test.mjs`
 - `node plugins/pipeline-core/lib/feature-package-topology.test.mjs`
 - `node plugins/pipeline-core/hooks/guard-devplan.test.mjs`
+- `node plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs`
 
-### F1 — Freshness separation and canonical backlog
+### F1 — Freshness channels, parallel Sprint baselines and canonical backlog
 
-Implement AC-047-99 and AC-047-112–116.
+Implement AC-047-99 and AC-047-112–130.
 
 - Separate branch/upstream repository freshness from loaded-Pipeline update
   availability. Ordinary marketplace drift is informational and nonblocking.
 - Bind the loaded plugin identity independently of the self-application
   checkout branch.
+- Resolve exactly `alpha|beta|stable` with automatic per-project defaults:
+  trusted Pipeline self-application uses alpha, ordinary consumers use stable,
+  and beta is documented opt-in. Initial onboarding asks no channel question.
+- Do not infer self-application from the host-wide local-development selector;
+  a Consumer retains its stable default unless its own portable channel
+  override changes.
+- Add the sanctioned per-repository channel writer/readback. It preserves
+  unrelated calibration, accepts no caller URL/ref, and handles drift/replay.
+- Document and test the separate host-wide source topology: official versus
+  local-development selection affects every repository on the shared App
+  Server, is never portable project config, and requires an attended
+  one-selector/cachebuster/restart/readback workflow.
+- Extend release planning so beta prerelease versus stable final promotion,
+  exact version/tag and candidate are explicit before publication. Alpha
+  remains the development-head observation.
+- Adopt the general Pipeline-managed parallel-Sprint baseline policy with the
+  four closed dispositions, mandatory protected-surface impact review, first
+  merge-ready candidate selection, and exact promotion-only rebase plan.
+- Provide typed `baseline-repair`, `write-set-repair`,
+  `impact-review-receipt`, `promotion-rebase`, and `resume-interrupted`
+  recovery contracts; none may execute Git automatically.
 - Repair ledger events 39/40 through append-only reachable evidence without
   rewriting history or closing the managed-onboarding item.
 
 Focused evidence: Phoenix-shaped branch/upstream equality with a different
-marketplace default head, older/equal/ahead/offline loaded-plugin states, no
-ref/config/worktree mutation, and a green canonical backlog checker.
+marketplace default head; alpha/beta/stable tag resolution; automatic defaults
+without prompts; Consumer-under-local-source stability; channel writer
+drift/replay; host-wide source warning/readback; older/equal/ahead/offline
+loaded-plugin states; four baseline dispositions and all repair plans; no
+automatic Git/ref/config/worktree mutation; and a green canonical backlog
+checker.
 
 Owned production paths:
 `plugins/pipeline-core/scripts/ruleset-freshness.mjs`,
+`plugins/pipeline-core/scripts/pipeline-update-channel.mjs`,
 `plugins/pipeline-core/scripts/repository-freshness.mjs`,
+`plugins/pipeline-core/lib/parallel-sprint-integration.mjs`,
 `plugins/pipeline-core/hooks/staleness-check.mjs`,
 `plugins/pipeline-core/skills/pipeline-start/SKILL.md`,
-`harness/session-bootstrap.md`, `plugins/pipeline-core/lib/backlog-state.mjs`,
+`harness/session-bootstrap.md`, `docs/codex-local-plugin-development.md`,
+the release-version planner, `plugins/pipeline-core/lib/backlog-state.mjs`,
 `plugins/pipeline-core/scripts/check-backlog-state.mjs`,
 `backlog/transitions.ndjson`, `backlog/index.json`, and `backlog/STATUS.md`.
 
 Required focused commands:
 
 - `node plugins/pipeline-core/scripts/ruleset-freshness.test.mjs`
+- `node plugins/pipeline-core/scripts/pipeline-update-channel.test.mjs`
 - `node plugins/pipeline-core/scripts/repository-freshness.test.mjs`
+- `node plugins/pipeline-core/lib/parallel-sprint-integration.test.mjs`
 - `node plugins/pipeline-core/lib/backlog-state.test.mjs`
 - `node plugins/pipeline-core/scripts/check-backlog-state.mjs`
 
@@ -198,9 +263,14 @@ After all slices are integrated:
 5. update cachebuster/package version and repeat candidate-sensitive gates;
 6. install and read back exact source/cache bytes in a fresh Codex process;
 7. prove portable State contains no machine-local cleanup binding;
-8. if separately approved, publish only through the fixed executor and perform
+8. exercise the three formerly blocked consumer shapes through their exact
+   typed recovery chains to V4 `ready`, without manual State edits;
+9. verify automatic project-channel defaults, documented override, and
+   host-wide source-topology warning/readback;
+10. if separately approved, publish only through the fixed executor and perform
    exact remote readback; and
-9. update/close GitHub Issues only through a separate explicit Issue operation.
+11. update/close GitHub Issues only through a separate explicit Issue
+    operation.
 
 ## Stop conditions
 

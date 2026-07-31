@@ -12,9 +12,13 @@ import {
   closeSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync,
   readdirSync, realpathSync, renameSync, rmSync, unlinkSync, writeFileSync,
 } from "node:fs";
-import { dirname, join, relative, resolve, sep } from "node:path";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import {
+  inspectSessionClosure,
+  listActiveSessionDescriptors,
+} from "./worktree-lifecycle.mjs";
 
 export const PROJECT_AUTHORITY_SCHEMA = "pipeline.project-authority.v1";
 export const PROJECT_AUTHORITY_RECOVERY_SCHEMA = "pipeline.project-authority-recovery.v1";
@@ -44,6 +48,7 @@ const TARGETS = Object.freeze([
 ]);
 const PLANS = new WeakMap();
 const RECOVERY_PLANS = new WeakMap();
+const SESSION_CLEANUP_RECOVERY_PLANS = new WeakMap();
 const SHA256 = /^[0-9a-f]{64}$/u;
 const GIT_OBJECT = /^[0-9a-f]{40,64}$/u;
 const MODULE_PLUGIN_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -675,6 +680,211 @@ export function applyProjectAuthorityMigration(plan, { rootDir = process.cwd(), 
       return result("rolled-back", { reason: error.message });
     }
   } catch (error) { return result("rejected", { reason: error.message }); }
+}
+
+function exactSessionCleanupTuple(value) {
+  return value !== null
+    && typeof value === "object"
+    && !Array.isArray(value)
+    && Object.keys(value).length === 2
+    && Object.hasOwn(value, "sessionId")
+    && Object.hasOwn(value, "descriptorSha256")
+    && typeof value.sessionId === "string"
+    && value.sessionId.length > 0
+    && /^[A-Za-z0-9._-]{1,80}$/u.test(value.sessionId)
+    && SHA256.test(value.descriptorSha256);
+}
+
+function nonPortableCleanupPaths(value, path = "$") {
+  if (Array.isArray(value)) return value.flatMap((child, index) => nonPortableCleanupPaths(child, `${path}[${index}]`));
+  if (value === null || typeof value !== "object") return [];
+  return Object.entries(value).flatMap(([key, child]) => {
+    const childPath = `${path}.${key}`;
+    return key === "sessionCleanup" && child !== null
+      ? [childPath]
+      : nonPortableCleanupPaths(child, childPath);
+  });
+}
+
+function sessionCleanupRecoveryPlanCore(observed) {
+  return {
+    schema: PROJECT_AUTHORITY_RECOVERY_SCHEMA,
+    status: observed.status,
+    operation: "sanitize-completed-session-cleanup",
+    root: observed.root,
+    statePath: NEUTRAL_STATE,
+    stateSha256: observed.stateSha256 ?? null,
+    closureReceiptSha256: observed.closureReceiptSha256 ?? null,
+    targets: observed.targets ?? [],
+    ...(observed.diagnostics ? { diagnostics: observed.diagnostics } : {}),
+  };
+}
+
+/**
+ * Preview the one upgrade-only cleanup repair.  A legacy neutral State may
+ * have leaked the private cleanup tuple before the V4 split.  We never infer
+ * a target from a descriptor: one exact tuple, no active descriptors and the
+ * matching completed private closure receipt are all required before the
+ * portable field can be cleared.
+ */
+export function planProjectAuthoritySessionCleanupRecovery({ rootDir = process.cwd() } = {}) {
+  let root;
+  try { root = realRoot(rootDir); } catch (error) {
+    return recoveryResult("invalid-root", { targets: [], diagnostics: [error.message] });
+  }
+  try {
+    const raw = bytes(root, NEUTRAL_STATE);
+    if (raw === null) return recoveryResult("none", { targets: [] });
+    let state;
+    try { state = JSON.parse(raw.toString("utf8")); } catch {
+      return recoveryResult("recovery-unavailable", { targets: [], diagnostics: ["neutral State is not valid JSON"] });
+    }
+    const portability = validatePortablePipelineState(state);
+    if (portability.ok) return recoveryResult("none", { targets: [] });
+    const leakedPaths = nonPortableCleanupPaths(state);
+    const tuple = state?.continuity?.runtime?.sessionCleanup;
+    if (portability.code !== "PA-STATE-SESSION-CLEANUP-PRIVATE"
+      || leakedPaths.length !== 1
+      || leakedPaths[0] !== "$.continuity.runtime.sessionCleanup"
+      || !exactSessionCleanupTuple(tuple)) {
+      return recoveryResult("recovery-unavailable", {
+        targets: [], diagnostics: ["neutral cleanup leakage is not one exact recoverable binding"],
+      });
+    }
+    // A closed receipt is valid only after the descriptor has disappeared;
+    // any active descriptor (including an unrelated concurrent session) makes
+    // target selection ambiguous and therefore remains a hard stop.
+    const descriptors = listActiveSessionDescriptors(root);
+    if (descriptors.length !== 0) {
+      return recoveryResult("recovery-unavailable", {
+        targets: [], diagnostics: ["active or multiple cleanup descriptors prevent recovery"],
+      });
+    }
+    const closure = inspectSessionClosure(root, tuple.sessionId, {
+      expectedDescriptorSha256: tuple.descriptorSha256,
+    });
+    if (closure.status !== "closed" || !SHA256.test(closure.receiptSha256 ?? "")) {
+      return recoveryResult("recovery-unavailable", {
+        targets: [], diagnostics: ["the exact cleanup binding has no completed closure receipt"],
+      });
+    }
+    const sanitized = structuredClone(state);
+    sanitized.continuity.runtime.sessionCleanup = null;
+    if (!validatePortablePipelineState(sanitized).ok) {
+      return recoveryResult("recovery-unavailable", {
+        targets: [], diagnostics: ["sanitized State still contains private cleanup identity"],
+      });
+    }
+    const observed = {
+      status: "ready",
+      root,
+      stateSha256: sha(raw),
+      closureReceiptSha256: closure.receiptSha256,
+      targets: [{
+        path: NEUTRAL_STATE,
+        kind: "project-state",
+        action: "replace-completed-session-cleanup-with-null",
+        before: present(raw),
+        after: present(Buffer.from(`${JSON.stringify(sanitized)}\n`, "utf8")),
+      }],
+    };
+    const core = sessionCleanupRecoveryPlanCore(observed);
+    const plan = recoveryResult("ready", core);
+    SESSION_CLEANUP_RECOVERY_PLANS.set(plan, {
+      root,
+      signature: planSignature(plan),
+      stateSha256: observed.stateSha256,
+      closureReceiptSha256: closure.receiptSha256,
+    });
+    return plan;
+  } catch (error) {
+    return recoveryResult("recovery-unavailable", { targets: [], diagnostics: [error.message] });
+  }
+}
+
+function cleanupRecoveryAuthenticated(plan) {
+  try {
+    const remembered = SESSION_CLEANUP_RECOVERY_PLANS.get(plan);
+    return remembered && planSignature(plan) === remembered.signature ? remembered : null;
+  } catch { return null; }
+}
+
+/** Apply the exact receipt-bound cleanup sanitization under a state CAS. */
+export function applyProjectAuthoritySessionCleanupRecovery(plan, {
+  rootDir = process.cwd(), activate = false,
+} = {}) {
+  const remembered = cleanupRecoveryAuthenticated(plan);
+  if (!remembered || plan.status !== "ready") {
+    return recoveryResult("rejected", { reason: "unauthenticated or changed cleanup recovery plan" });
+  }
+  if (!activate) return recoveryResult("activation-required", { reason: "explicit activation required" });
+  let lockFd = null;
+  let lockPath = null;
+  let ownsLock = false;
+  let temporary = null;
+  try {
+    const root = realRoot(rootDir);
+    if (root !== remembered.root) throw new Error("recovery root differs from the authenticated plan root");
+    const current = planProjectAuthoritySessionCleanupRecovery({ rootDir: root });
+    const currentState = cleanupRecoveryAuthenticated(current);
+    if (!currentState
+      || current.status !== "ready"
+      || currentState.stateSha256 !== remembered.stateSha256
+      || currentState.closureReceiptSha256 !== remembered.closureReceiptSha256
+      || planSignature(current) !== planSignature(plan)) {
+      throw new Error("cleanup recovery preimage changed since planning");
+    }
+    const statePath = projectPath(root, NEUTRAL_STATE);
+    lockPath = `${statePath}.lock`;
+    lockFd = openSync(lockPath, "wx", 0o600);
+    ownsLock = true;
+    writeFileSync(lockFd, `${JSON.stringify({ schema: "pipeline.project-authority-cleanup-recovery-lock.v1", stateSha256: remembered.stateSha256 })}\n`);
+    fsyncSync(lockFd);
+    const locked = planProjectAuthoritySessionCleanupRecovery({ rootDir: root });
+    const lockedState = cleanupRecoveryAuthenticated(locked);
+    if (!lockedState
+      || locked.status !== "ready"
+      || lockedState.stateSha256 !== remembered.stateSha256
+      || lockedState.closureReceiptSha256 !== remembered.closureReceiptSha256
+      || planSignature(locked) !== planSignature(plan)) {
+      throw new Error("cleanup recovery preimage changed while acquiring the State lock");
+    }
+    const raw = bytes(root, NEUTRAL_STATE);
+    if (raw === null || sha(raw) !== remembered.stateSha256) throw new Error("cleanup recovery State preimage changed");
+    const state = JSON.parse(raw.toString("utf8"));
+    state.continuity.runtime.sessionCleanup = null;
+    if (!validatePortablePipelineState(state).ok) throw new Error("cleanup recovery produced nonportable State");
+    const after = Buffer.from(`${JSON.stringify(state)}\n`, "utf8");
+    const expectedAfterSha256 = sha(after);
+    temporary = join(dirname(statePath), `.${basename(statePath)}.project-authority-cleanup-recovery-${remembered.stateSha256.slice(0, 16)}.tmp`);
+    const temporaryFd = openSync(temporary, "wx", 0o600);
+    try { writeFileSync(temporaryFd, after); fsyncSync(temporaryFd); } finally { closeSync(temporaryFd); }
+    if (sha(bytes(root, NEUTRAL_STATE)) !== remembered.stateSha256) throw new Error("cleanup recovery State preimage changed before commit");
+    renameSync(temporary, statePath); temporary = null; fsyncDirectory(dirname(statePath));
+    const readback = authority(root);
+    if (readback.status !== "ready" || readback.source !== "neutral"
+      || readback.stateSha256 !== expectedAfterSha256) {
+      throw new Error("cleanup recovery portable State readback failed");
+    }
+    SESSION_CLEANUP_RECOVERY_PLANS.delete(plan);
+    return recoveryResult("recovered", {
+      operation: "sanitize-completed-session-cleanup",
+      stateSha256: expectedAfterSha256,
+      targets: [{ path: NEUTRAL_STATE, action: "session-cleanup-null-readback" }],
+    });
+  } catch (error) {
+    return recoveryResult("rejected", { reason: error.message });
+  } finally {
+    if (temporary !== null) {
+      try { unlinkSync(temporary); } catch {}
+    }
+    if (lockFd !== null) {
+      try { closeSync(lockFd); } catch {}
+    }
+    if (ownsLock && lockPath !== null) {
+      try { unlinkSync(lockPath); fsyncDirectory(dirname(lockPath)); } catch {}
+    }
+  }
 }
 
 /** Preview recovery only; it never writes or silently resumes a cutover. */

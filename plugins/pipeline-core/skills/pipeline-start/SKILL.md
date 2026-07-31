@@ -24,7 +24,7 @@ general lifecycle. Earlier working names `/pipeline:start` and
 - **No work before the confirmation line.** The confirmation is the auditable proof of the bootstrap; a session without it counts as not bootstrapped.
 - **NEVER print the confirmation line without actually performing the steps.** That is the documented main failure mode "reported done, but not verified", and a Critic audits trajectories.
 - Normal bootstrap commands below are read-only (git `ls-remote`/`rev-parse`/`log`, file reads). Step 0 may execute only a schema-valid read-only lifecycle action; every mutating lifecycle action is separately confirmed and ends this bootstrap with no confirmation line.
-- Run each bootstrap shell observation as one simple read-only command. Do not use `| sort`, `&&`, `;`, `tee`, `xargs`, command substitution, or output redirection. When ordering is useful, read with `rg --files` and sort the returned paths in agent memory. The only admitted shell pipeline is the exact bounded `rg … | head -n 1..500` diagnostic form defined by the guard grammar. A typed `GUARD-PARSE-UNSUPPORTED`, `GUARD-OPERATOR-UNAPPROVED`, or `GUARD-REDIRECT-UNAPPROVED` verdict rejects only that command shape; it does not invalidate an already observed V4 `ready` lifecycle result. Retry the observation in an admitted form and continue the same bootstrap.
+- Runner rule for the whole session: use one simple shell command per tool call. Independent read-only commands may be issued as separate parallel tool calls. Do not compose or retry commands by varying `&&`, `;`, newlines, pipelines, or redirects. The only exception is the exact bounded `rg … | head -n 1..500` diagnostic form defined by the closed guard grammar. A typed `GUARD-PARSE-UNSUPPORTED`, `GUARD-OPERATOR-UNAPPROVED`, or `GUARD-REDIRECT-UNAPPROVED` verdict rejects only that command shape; it does not invalidate an already observed V4 `ready` lifecycle result. Decompose the observation into admitted commands and continue the same bootstrap.
 - **Compact continuity:** Compact MUST rerun `pipeline-start` as a continuation re-entry; after that re-entry, automatically continue the persisted next action without waiting. Compact preserves the active task. Only an explicit pause/cancel/replace/redirect, a named gate, completion or a typed blocker may stop continuation.
 
 **Role resolution (first decision, before preflight):**
@@ -365,6 +365,27 @@ not plan an unrelated runtime initialization or request an untyped restart.
   history. If the plan returns `continuity_repair_unavailable` with
   `nextAction:null`, stop; do not repeat the plan, invent hashes, or edit
   `.claude/pipeline-state.json` directly.
+- **Typed session-cleanup privatization fallback:** when and only when status is
+  `invalid`, the sole diagnostic is `project_authority_invalid`, and the exact
+  returned read-only `nextAction` invokes the loaded
+  `session-cleanup.mjs plan-privatization --repo "$PWD"` with expected schema
+  `pipeline.session-cleanup-privatization-plan.v1` and statuses
+  `ready|noop`, execute that action once. Accept `ready` only with a lowercase
+  64-hex `planSha256` and one complete `applyAction` that invokes the same
+  loaded helper as `apply-privatization`, binds the same physical root and
+  plan digest, includes `--activate`, declares `mutation:true`,
+  `requiresConfirmation:true`, `executionBoundary:host-authorized-wsl`, and
+  expects schema `pipeline.session-cleanup-privatization-apply.v1` with
+  statuses `applied|noop`. The public plan and action must contain neither a
+  session ID nor a descriptor digest. Present that `applyAction` unchanged to
+  the PO and wait; perform no mutation before explicit confirmation. After
+  confirmation execute its argv exactly once at the host-authorized write
+  boundary, accept only the declared apply schema and `applied|noop`, then
+  restart Step 0 from the lifecycle inspection. A read-only plan status
+  `noop` also restarts Step 0 without an apply. Never edit Consumer State,
+  delete a descriptor or closure receipt, reconstruct an action, or print a
+  bootstrap confirmation until the repeated V4 inspection is genuinely
+  `ready`.
 - **`partial|invalid|unsafe|migration-required|adoption-required|repository-mount-read-only|repository-control-path-invalid|git-capability-unavailable|project-root-read-only|repository-mode-unsupported|repository-observation-unavailable|session-capability-unavailable|worktree-capability-unavailable|runtime-target-read-only|runtime-readback-unavailable|projection-drift|continuity-damaged|continuity-observation-unavailable|app-server-execution-denied|app-server-not-running|app-server-unavailable`:**
   stop with no confirmation and report the exact diagnostics and closed
   `nextAction`. A read-only action may run only when its schema, executable,
@@ -659,6 +680,18 @@ This step ends in a **third mandatory confirmation line** (verbatim, printed dir
   Compatibility readers must migrate the old
   `pipeline.ruleset-freshness.v1.writePermitted` field as update metadata only;
   they use the separate repository result for ordinary write admission.
+- Report the two observations under distinct names: `pipelineUpdateAvailability`
+  includes its selected `channel` and `ref`; `repositoryFreshness` includes the
+  working branch/upstream result. The SessionStart hook consumes the same
+  channel-aware update helper and may preannounce its result, but it always
+  renders `repositoryFreshness=not-observed` and never substitutes for the
+  repository helper or a write-admission decision.
+- Channel authority is project-scoped and explicit: consumer projects default
+  to `stable`; this Agent-Pipeline self-repository carries explicit `alpha`.
+  `beta` is opt-in only through `pipeline-update-channel.mjs plan --repo "$PWD"
+  --channel beta` followed by the returned, separately confirmed `applyAction`.
+  Do not ask an onboarding question, edit calibration directly, or infer a
+  channel from the loaded host plugin source.
 - **Codex host boundary:** run this helper once through the host-authorized
   network-open/read-only command boundary. Do not first probe it inside a
   known network-restricted workspace sandbox: that produces a misleading DNS
@@ -671,6 +704,10 @@ This step ends in a **third mandatory confirmation line** (verbatim, printed dir
   local development, not equal/ahead/behind. Repository freshness and all
   Verify, Security, push/publication approval, and readback gates still run
   unchanged; a local source is not a delivery bypass.
+  Official-versus-local source selection is host-wide for the shared Codex App
+  Server, not a per-repository update channel. Switching it requires the
+  explicit attended operator flow with affected sessions closed; never claim
+  simultaneous Pipeline versions for different repositories on one App Server.
 - Working repository (EVERY writable governed project, including self-application): run `node "${PIPELINE_PLUGIN_ROOT}/scripts/repository-freshness.mjs"`. This is the sole ordinary repository-write freshness authority and is separate from Pipeline update availability. It compares checked-out `HEAD` only with that branch's configured upstream through a disposable bare repository and never fetches into the source checkout. Thus `sprint_phoenix == origin/sprint_phoenix` remains `equal` and write-permitted even when marketplace/default `main` differs. The committed calibration declares `repositoryMode` as `local-only` or `remote-tracked`; absent means the safe `remote-tracked` default. `local-only` permits writes without an upstream but never justifies a push or release claim. `equal|ahead` permit remote-tracked writes. `pre-head` names a newly initialized repository: the main session may create the initial project scaffold under an exact `session`-ready lifecycle result, but dispatch, worktrees, push, release, and delivery claims remain blocked until the first commit exists. `behind|diverged|detached|no-upstream|unknown` STOP remote-tracked writes and dispatch while read-only diagnosis remains allowed. `host-managed` is retained as the narrow calibration of a Codex fresh-root transition: the helper accepts only the exact protected control layout or the durable digest-bound receipt from the exact host initializer. After that initializer created real Git, the lifecycle's local repository observation is authoritative for session writes, while push/release/branch claims remain unavailable and project-specific verification is still required. Neither host-managed form claims remote freshness or performs a fetch. `unknown` covers invalid mode, invalid host-managed layout or receipt, fetch failure/timeout, unavailable upstream, and insufficient shallow history; never call it fresh. Other unmerged remote branches are bounded information only, never a branch-selection gate.
 - This is a point-in-time protocol check, not an atomic lock or global enforcement claim: the remote may advance immediately afterwards, and SessionStart context is not an OS-level write barrier. The helper never pulls, merges, rebases, checks out, or writes source refs/config.
 - Why: third-party marketplaces do not auto-update; only an explicit refresh propagates — without this check, two-machine cache drift silently replaces the old copy-paste drift.

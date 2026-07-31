@@ -1,14 +1,14 @@
 # Technical specification — Agent Pipeline 0.4.7 hotfix
 
-Status: `design reopened on 2026-07-30; prior approval revoked; implementation
-requires a fresh digest-bound PO approval of the stabilized PRD/Spec bytes`.
+Status: `approved by the PO on 2026-07-31; implementation authority requires
+the matching digest-bound lifecycle write for these stabilized PRD/Spec bytes`.
 
 This specification implements the neighboring
 [PRD](prd_agent-pipeline-0.4.7-hotfix.md) against exact base
 `9d1b3dc108eb77629ace5b82002120f5539abd8d`. It is intentionally independent
 of Sprint Nova and Pull Request #64.
 
-## -1. Current code-first release authority — 2026-07-30
+## -1. Current code-first release authority — 2026-07-31
 
 This section is the highest normative authority in this document. It
 supersedes every conflicting historical branch, baseline, implementation
@@ -19,7 +19,7 @@ label `hotfix:0.4.7` remain mandatory outcome scope: #63, #70, #71, #73, #77,
 
 The design baseline is commit
 `83640cec22d494d227eebc82929370277ce926b9`. Existing AC-047-01–68 retain
-their identifiers and implemented behavior. The following AC-047-69–116 bind
+their identifiers and implemented behavior. The following AC-047-69–135 bind
 only the current missing or newly reproduced release remainder.
 
 ### AC-047-69–74 — Fixed exact-candidate main publication (#81)
@@ -266,17 +266,188 @@ only the current missing or newly reproduced release remainder.
   harness copy, staleness hook, and tests SHALL remove generic F2 write
   blocking while retaining only the exact versioned security-policy block.
 
+### AC-047-117–123 — Update channels and host-wide source topology
+
+- **AC-047-117 — Closed channel contract:** Pipeline update availability SHALL
+  support exactly `alpha|beta|stable`. `alpha` resolves only the configured
+  official development head (`refs/heads/main` for this distribution);
+  `beta` resolves the highest valid SemVer `vX.Y.Z-beta.N` or a later final
+  promotion of that line; and `stable` resolves only the highest valid final
+  `vX.Y.Z`. Annotated and lightweight tags SHALL resolve to their peeled
+  commit. Malformed, ambiguous, missing, or unreachable channel authority
+  yields typed `unknown/channel-unavailable` with no fallback to another
+  channel.
+- **AC-047-118 — Automatic project defaults:** Initial onboarding SHALL NOT
+  ask the user to select or confirm an update channel. A Pipeline
+  self-application repository defaults to `alpha`; every ordinary managed
+  consumer repository defaults to `stable`; `beta` is opt-in. Self-application
+  SHALL be established by explicit trusted project/lifecycle authority, never
+  inferred merely because the host currently loads a local-development
+  plugin. Therefore a host-wide local-development source switch does not
+  silently change a consumer repository's channel default.
+- **AC-047-119 — Portable per-repository override:** A repository MAY later
+  select another closed channel through one documented, sanctioned,
+  digest-bound configuration writer and readback for the existing portable
+  calibration field `pipelineUpdateChannel`. The writer SHALL preserve all
+  unrelated calibration bytes/semantics, accept no URL/ref/remote input, and
+  cover exact replay, drift, malformed configuration, and invalid enum values.
+  Onboarding documentation SHALL explain the switch; normal onboarding SHALL
+  not prompt for it.
+- **AC-047-120 — Resolution evidence:** Update output SHALL visibly name the
+  effective channel, selection source (`project-config` or
+  `distribution-default`), resolved ref/tag/version/commit, loaded build
+  evidence, comparison result, and advisory/blocking policy disposition.
+  Repository branch/upstream and write permission remain absent from this
+  result. Invalid explicit configuration is fail-closed `unknown`, never a
+  silent default.
+- **AC-047-121 — Source topology is separate and host-wide:** The actually
+  loaded Pipeline source is a machine-local Codex/App-Server selection, not a
+  portable repository setting. The official selector
+  `pipeline-core@agent-pipeline` and isolated local-development selector
+  `pipeline-core@agent-pipeline-local` apply to every repository session using
+  that shared App Server. Any UI, CLI plan, or documentation that offers this
+  source switch SHALL state before mutation that it affects all repositories
+  on the host. No repository config may silently install, remove, enable,
+  disable, or switch either selector.
+- **AC-047-122 — Attended source switch:** Entering or leaving local
+  development SHALL remain an explicit machine-local operator workflow:
+  close affected sessions, maintain exactly one enabled Pipeline selector,
+  use a fresh cachebuster for each local candidate, restart/read back the
+  shared App Server where required, and start a fresh session. The workflow
+  SHALL never auto-switch based on a repository channel, auto-delete another
+  cache, or claim simultaneous per-repository loaded Pipeline versions on one
+  shared App Server.
+- **AC-047-123 — Release promotion decision:** A publication/release plan SHALL
+  bind the exact candidate commit/tree, version and tag, and SHALL explicitly
+  distinguish prerelease (`beta`) from final (`stable`) promotion before any
+  external effect. It MAY propose the normal final-release default, but it
+  SHALL never publish, tag, change host source topology, or rewrite repository
+  channel configuration without the existing explicit release gate. `alpha`
+  remains the development-head observation and is not itself a release tag.
+
+### AC-047-124–130 — Parallel Sprint baseline and promotion policy
+
+- **AC-047-124 — Immutable Sprint baseline:** Every Pipeline-managed Sprint
+  SHALL record an exact selected integration baseline commit and tree (or an
+  exact released tag peeled to both), its declared bounded write-set, and one
+  closed baseline disposition. Missing/broad baseline or write-set authority
+  fails closed with a typed repair plan; it never becomes implicit `main`.
+- **AC-047-125 — Four dispositions:** The closed disposition enum SHALL be
+  `baseline-current|baseline-stale-deferred|baseline-impact-review-required|
+  rebase-required-for-promotion`, with status/readiness output that does not
+  claim freshness or merge-readiness for a deferred branch.
+- **AC-047-126 — Rebase is not a steady-state gate:** A disjoint ordinary
+  integration-baseline advance MAY become `baseline-stale-deferred`; ongoing
+  Sprint work remains permitted without a generic rebase nag. Repository
+  freshness still compares the checked-out branch with its configured
+  upstream and remains independent of baseline disposition.
+- **AC-047-127 — Mandatory bounded impact review:** A baseline advance touching
+  security/release controls, guards/configuration/permissions, bootstrap,
+  installation, runtime/native-readback boundaries, accepted compatibility
+  contracts, or the Sprint write-set SHALL enter
+  `baseline-impact-review-required`. A digest-bound receipt SHALL record the
+  observed baseline commit/tree, changed surface classes, write-set
+  comparison, decision, and any PO exception.
+- **AC-047-128 — First merge-ready candidate:** The next integration candidate
+  is the first Sprint whose own approved scope, candidate evidence, and gates
+  are actually ready, not the oldest or largest branch. Candidate selection is
+  explicit PO/release authority and does not mutate other Sprint baselines.
+- **AC-047-129 — Promotion rebase:** Only the selected merge/release candidate,
+  a Sprint with confirmed material incompatibility, or a Sprint requiring a
+  protected shared surface enters `rebase-required-for-promotion`. The
+  promotion plan binds the exact target `main` commit/tree, freezes the Sprint
+  candidate, performs no automatic Git action, and requires an explicit
+  operator rebase followed by regenerated bindings and complete final gates.
+- **AC-047-130 — Repairable fail-closed policy:** Every blocking state SHALL
+  expose a typed, bounded recovery contract:
+  `baseline-repair`, `write-set-repair`, `impact-review-receipt`,
+  `promotion-rebase`, or `resume-interrupted`. Planner operations are
+  read-only; apply actions are digest/CAS-bound and separately confirmed.
+  Crash, replay, drift, conflicting receipts, unknown changed surfaces, and
+  unavailable Git evidence SHALL converge or return a usable next action,
+  never a writer deadlock or an instruction to edit portable State manually.
+
+### AC-047-131–135 — Upgrade, kickoff and lifecycle recovery completeness
+
+- **AC-047-131 — Legacy approval reopen:** A valid pre-submission V2
+  implementation state MAY use the sanctioned `reopen-design` writer. The
+  atomic postimage sets phase `design`, clears current approval, derives
+  `draft`, invents no submission/approval/invalidation event, and preserves
+  unrelated history. Inconsistent V2 authority, document drift, replay with a
+  different postimage, or a current submission fails closed.
+- **AC-047-132 — Portable-cleanup upgrade recovery:** When a neutral portable
+  State contains exactly one legacy machine-local cleanup tuple, the migration
+  recovery classifier SHALL use this exact priority rather than support only
+  the completed-closure case: (a) first, an exact completed closure receipt
+  uses the existing `project-authority-migration recover` CAS
+  sanitization/release path; (b) otherwise an exact still-valid private
+  descriptor exposes the read-only `session-cleanup.mjs plan-privatization
+  --repo <physical-root>` lifecycle action and is bound or adopted into
+  authenticated private runtime authority before removal from portable State,
+  without ending the live session; and (c) an exact non-live/reused or
+  admissible legacy descriptor with no cleanup manifest is retired through the
+  existing bounded orphan proof before the portable tuple is sanitized.
+  `plan-privatization` SHALL return schema
+  `pipeline.session-cleanup-privatization-plan.v1`, status `ready|noop`, one
+  valid 64-hex plan digest, and for `ready` a complete command `applyAction`
+  for the loaded plugin's `session-cleanup.mjs apply-privatization --repo
+  <physical-root> --plan-sha256 <exact-digest> --activate`. The action SHALL
+  declare `mutation:true`, `requiresConfirmation:true`,
+  `executionBoundary:host-authorized-wsl`, and expected schema
+  `pipeline.session-cleanup-privatization-apply.v1` with
+  `applied|noop`. Neither public plan, diagnostics, log nor action may contain
+  the session ID or descriptor digest; the exact State preimage remains bound
+  by the plan digest. Apply SHALL write and fully read back the private binding
+  before atomically committing the portable State postimage. The confirmed
+  writer changes only the exact private binding/descriptor lifecycle and
+  `continuity.runtime.sessionCleanup:null`, preserves all unrelated State, and
+  requires a complete subsequent V4 inspection that reaches `ready` before
+  bootstrap may continue. Missing/malformed/multiple or substituted
+  identities, active cleanup uncertainty, unavailable liveness, receipt
+  drift, replay drift, a stale plan or a foreign lock remain typed failures;
+  every safely recoverable class returns its exact next planner/writer instead
+  of `null`.
+- **AC-047-133 — Kickoff-to-work promotion:** An exact unapproved revision-zero
+  kickoff seed MAY be atomically promoted into a real
+  `epic|feature|mini` work feature through a digest-bound plan/apply that binds
+  existing PRD/spec authority and the single private kickoff history. It
+  replaces feature and continuity together, appends promotion history, and
+  creates neither submission nor approval. A real active feature, dispatched
+  work, document/history drift, replay-mix, or non-kickoff source fails closed.
+- **AC-047-134 — Profile-correct lifecycle:** Epic and Feature promotion SHALL
+  enter editable design and their normal PRD/Spec approval path. Mini SHALL
+  retain the Mini process contract (no newly manufactured PRD/approval
+  ceremony); any technical authority paths supplied for exact kickoff
+  migration are migration evidence, not a new Mini PRD gate. Reopen,
+  submission, approval and guard behavior SHALL be covered across Epic,
+  Feature and Mini wherever the profile contract permits the transition.
+- **AC-047-135 — No recovery deadlocks:** V4 lifecycle classification and the
+  central guard SHALL expose and admit only the exact typed read-only planner
+  and returned confirmation-bound writer for every supported non-ready state.
+  No valid upgrade state may simultaneously require a recovery command and
+  block that command because the session is not ready. The Pipeline-start
+  contract SHALL execute only an exactly returned privatization planner,
+  accept only its closed digest/action shape, present the apply action
+  unchanged for explicit PO confirmation, execute it exactly once at the
+  declared host write boundary, and restart Step 0 from the V4 inspector after
+  `applied|noop`; it SHALL never report bootstrap success before the fresh
+  result is actually `ready`. Process tests SHALL reproduce the prior
+  Phoenix/Nova/Rune portable-cleanup locks and the kickoff feature-transition
+  lock, prove the reachable recovery chain through V4 `ready`, and reject
+  lookalike commands, direct State edits, identity disclosure, missing
+  activation, stale digests, State drift, and foreign-lock deletion.
+
 ### Current ownership and focused-gate map
 
 | Slice | Criteria | Exclusive production ownership | Required focused gate |
 | --- | --- | --- | --- |
-| F0 lifecycle/cleanup | AC-047-100–111 | cleanup/recovery, portable State writer, approval/submission model, onboarding/continuity/topology/Dev-Plan readers | session-cleanup binding, project-authority, onboarding V3, pipeline-state, feature-package topology, Dev-Plan suites |
-| F1 freshness/backlog | AC-047-99, 112–116 | ruleset/update and repository freshness, staleness/bootstrap policy, backlog ledger/projections | ruleset/repository freshness suites plus backlog state suite and canonical checker |
+| F0 lifecycle/cleanup | AC-047-100–111, 131–135 | cleanup/recovery, portable State writer, approval/submission model, kickoff promotion, onboarding/continuity/topology/Dev-Plan readers | session-cleanup binding, project-authority/migration, onboarding V3, legacy reopen, kickoff promotion, pipeline-state, feature-package topology, Dev-Plan and lifecycle-guard suites |
+| F1 freshness/baseline/backlog | AC-047-99, 112–130 | ruleset/update channels and repository freshness, per-project channel writer, host-source documentation, parallel-Sprint baseline policy, staleness/bootstrap policy, backlog ledger/projections | ruleset/repository freshness, channel writer, parallel-Sprint policy, backlog state suite and canonical checker |
 | F2 Verify/supervision | AC-047-75–80, 88–98 | Verify workflow/harness, injected runner seams, Critic trace identity, onboarding rollback identity, only shipped supervisor paths | Critic isolation, onboarding V3/E2E, Advisor bootstrap, and runner-free Full Verify |
 | F3 publication | AC-047-69–74 | existing publication bundle/authority, fixed executor, publication-only State/guard/close/release integration | bundle, authority, State-authority, close-journal, and new executor disposable-remote suites |
 | F4 authority adoption | AC-047-81–87 | neutral authority resolver/migration, runtime provenance, classification and adoption receipt | project-authority, migration, and onboarding V3 suites |
 | F5 retained regression | AC-047-01–68 | no redesign; only exact affected current surfaces on regression | existing focused suite matrix |
-| F6 immutable candidate | AC-047-01–116 | integration metadata, package/version/evidence only after all production slices | all focused gates, Full Verify, Security, high-risk Critic, install/readback, portable-state readback |
+| F6 immutable candidate | AC-047-01–135 | integration metadata, package/version/evidence only after all production slices | all focused gates, Full Verify, Security, high-risk Critic, install/readback, portable-state readback |
 
 Exact file paths, command lines, sequencing, shared-file handoff, and stop
 conditions are binding in [implementation-plan.md](implementation-plan.md).
@@ -2125,7 +2296,7 @@ own focused and full gates against its new exact candidate.
 ## 11. Historical AC-047-01–68 verification record
 
 The commands and gates below remain regression inputs for delivered behavior,
-but they are not the complete current DoD. The current AC-047-69–116 ownership
+but they are not the complete current DoD. The current AC-047-69–135 ownership
 and focused commands are in the implementation plan; the integrated immutable
 candidate gate is F6 there.
 

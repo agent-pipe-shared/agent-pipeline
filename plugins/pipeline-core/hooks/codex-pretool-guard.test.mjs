@@ -2,7 +2,15 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import {
+  closeSync,
+  mkdtempSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -28,12 +36,22 @@ function run(input, root = fixture(), {
     cwd: root,
     ...input,
   };
-  return spawnSync(process.execPath, [adapter], {
-    cwd: hookCwd,
-    env: { ...process.env, CLAUDE_PROJECT_DIR: claudeProjectDir },
-    encoding: "utf8",
-    input: typeof envelope === "string" ? envelope : JSON.stringify(envelope),
-  });
+  const inputRoot = mkdtempSync(join(tmpdir(), "codex-pretool-input-"));
+  const inputPath = join(inputRoot, "input.json");
+  writeFileSync(inputPath, typeof envelope === "string" ? envelope : JSON.stringify(envelope));
+  const inputFd = openSync(inputPath, "r");
+  try {
+    return spawnSync(process.execPath, [adapter], {
+      cwd: hookCwd,
+      env: { ...process.env, CLAUDE_PROJECT_DIR: claudeProjectDir },
+      encoding: "utf8",
+      stdio: [inputFd, "pipe", "pipe"],
+      timeout: 8_000,
+    });
+  } finally {
+    closeSync(inputFd);
+    rmSync(inputRoot, { recursive: true, force: true });
+  }
 }
 
 function check(name, fn) {
@@ -124,6 +142,27 @@ check("multiple Bash guard denials are aggregated into one Codex decision", () =
   assert.equal(output.permissionDecision, "deny");
   assert.match(output.permissionDecisionReason, /git-guard/);
   assert.match(output.permissionDecisionReason, /guard-push/);
+});
+
+check("closed shell grammar denial teaches the stable retry shape and remains non-overridable", () => {
+  const root = fixture();
+  const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
+  git("init", "-q", "-b", "main");
+  writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
+  const startedAt = Date.now();
+  const output = decision(run({
+    tool_name: "Bash",
+    tool_input: { command: "rg --files . | rg lifecycle" },
+  }, root));
+  const elapsedMs = Date.now() - startedAt;
+  assert.ok(elapsedMs < 2_000, `grammar denial exceeded strict elapsed bound: ${elapsedMs}ms`);
+  assert.equal(output.permissionDecision, "deny");
+  assert.match(output.permissionDecisionReason, /one simple shell command per tool call/u);
+  assert.match(output.permissionDecisionReason, /separate parallel tool calls/u);
+  assert.match(output.permissionDecisionReason, /Do not retry by varying &&, ;, newline composition, pipelines, or redirects/u);
+  assert.match(output.permissionDecisionReason, /exact bounded rg-to-head diagnostic pipeline/u);
+  assert.match(output.permissionDecisionReason, /Human override unavailable: HGO-NONOVERRIDABLE-GRAMMAR/u);
+  assert.doesNotMatch(output.permissionDecisionReason, /Human override available for this exact action/u);
 });
 
 check("attended Human override admits only the exact next tool call and is then consumed", () => {

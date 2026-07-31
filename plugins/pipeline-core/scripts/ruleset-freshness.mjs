@@ -19,6 +19,10 @@ import {
   evaluateRulesetUpdatePolicy,
   readRulesetUpdatePolicy,
 } from "./ruleset-update-policy.mjs";
+import {
+  readProjectPipelineUpdateChannel,
+  resolvePipelineUpdateChannel,
+} from "./pipeline-update-channel.mjs";
 
 export const PIPELINE_UPDATE_AVAILABILITY_SCHEMA =
   "pipeline.pipeline-update-availability.v1";
@@ -97,6 +101,12 @@ function result(status, fields = {}) {
   return {
     schema: PIPELINE_UPDATE_AVAILABILITY_SCHEMA,
     status,
+    pipelineUpdateAvailability: status,
+    channel: fields.channel?.channel ?? null,
+    channelSource: fields.channel?.source ?? null,
+    ref: fields.selected?.ref ?? null,
+    version: fields.selected?.version ?? null,
+    commit: fields.selected?.commit ?? null,
     loaded: {
       version: fields.loaded?.version ?? null,
       commit: fields.loaded?.commit ?? null,
@@ -112,6 +122,94 @@ function result(status, fields = {}) {
     blocking: policyDisposition.blocking,
     reason: fields.reason ?? null,
   };
+}
+
+function validTag(ref) {
+  const numeric = "(?:0|[1-9]\\d*)";
+  const match = String(ref).match(new RegExp(`^refs/tags/v(${numeric}\\.${numeric}\\.${numeric})(?:-beta\\.(${numeric}))?$`, "u"));
+  if (!match) return null;
+  return {
+    core: match[1],
+    beta: match[2] === undefined ? null : Number(match[2]),
+    version: `${match[1]}${match[2] === undefined ? "" : `-beta.${match[2]}`}`,
+  };
+}
+
+function selectedTagFromRemote(output, channel) {
+  const tags = new Map();
+  let ambiguous = false;
+  for (const line of String(output ?? "").trim().split("\n")) {
+    const match = line.match(/^([0-9a-f]{40})\s+(refs\/tags\/[^\s^]+)(\^\{\})?$/iu);
+    if (!match) continue;
+    const [, commit, ref, peeled] = match;
+    const parsed = validTag(ref);
+    if (!parsed) continue;
+    const current = tags.get(ref) ?? { ref, ...parsed, commit: null, peeled: null };
+    const field = peeled ? "peeled" : "commit";
+    const oid = commit.toLowerCase();
+    if (current[field] !== null && current[field] !== oid) ambiguous = true;
+    current[field] = oid;
+    tags.set(ref, current);
+  }
+  if (ambiguous) return { selected: null, reason: "channel-unavailable" };
+  const candidates = [...tags.values()]
+    .map((tag) => ({ ref: tag.ref, version: tag.version, commit: tag.peeled ?? tag.commit }))
+    .filter((tag) => OID.test(tag.commit ?? ""));
+  const descending = (left, right) => {
+    const compared = comparePipelineVersions(left.version, right.version);
+    return compared === null ? 0 : -compared;
+  };
+  if (channel === "stable") {
+    const finals = candidates.filter((tag) => validTag(tag.ref)?.beta === null);
+    finals.sort(descending);
+    return finals[0]
+      ? { selected: finals[0], reason: null }
+      : { selected: null, reason: "channel-unavailable" };
+  }
+
+  // Beta follows the highest observed beta core line. A final tag is eligible
+  // only when it is the exact final promotion of that same X.Y.Z line; an
+  // unrelated, numerically higher final must never hijack the beta channel.
+  const betas = candidates.filter((tag) => validTag(tag.ref)?.beta !== null);
+  betas.sort(descending);
+  const highestBeta = betas[0];
+  if (!highestBeta) return { selected: null, reason: "channel-unavailable" };
+  const core = validTag(highestBeta.ref).core;
+  const promoted = candidates.find((tag) => tag.ref === `refs/tags/v${core}`);
+  return { selected: promoted ?? highestBeta, reason: null };
+}
+
+function selectedChannelTarget(remoteUrl, channel, options) {
+  const selector = channel === "alpha" ? "refs/heads/main" : "refs/tags/*";
+  const remote = run("git", ["ls-remote", remoteUrl, selector], {
+    ...options,
+    timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+  });
+  if (remote.status !== 0) {
+    return { selected: null, reason: remote.error?.code === "ETIMEDOUT" || remote.signal ? "timeout" : "remote-unavailable" };
+  }
+  if (channel === "alpha") {
+    const line = String(remote.stdout ?? "").trim().match(/^([0-9a-f]{40})\s+refs\/heads\/main$/imu);
+    return line
+      ? { selected: { ref: "refs/heads/main", version: null, commit: line[1].toLowerCase() }, reason: null }
+      : { selected: null, reason: "channel-unavailable" };
+  }
+  return selectedTagFromRemote(remote.stdout, channel);
+}
+
+/**
+ * Bridge lifecycle-owned distribution topology into the closed channel
+ * resolver. Only the persisted project field may override the trusted
+ * distribution default; no caller-provided channel, URL, or Git ref crosses
+ * this boundary.
+ */
+export function resolvePipelineUpdateChannelConfig(repoPath, options = {}) {
+  return resolvePipelineUpdateChannel({
+    projectConfig: options.projectConfig ?? readProjectPipelineUpdateChannel(repoPath),
+    distributionTopology: options.distributionTopology,
+    selfApplication: options.selfApplication === true,
+  });
 }
 
 function statusFromVersions(loadedVersion, marketplaceVersion) {
@@ -182,30 +280,34 @@ function compareLoadedToMarketplace(temporary, env, loaded, marketplace, options
 export function inspectPipelineUpdateAvailability(repoPath, options = {}) {
   const repo = resolve(repoPath);
   const loaded = loadedIdentity(options);
+  const channel = resolvePipelineUpdateChannelConfig(repo, {
+    ...options,
+    pluginRoot: loaded.pluginRoot,
+  });
   const settingsPath = options.settingsPath ?? join(repo, ".claude", "settings.json");
   const remoteUrl = options.remoteUrl ?? resolveMarketplaceUrl({ settingsPath });
   const policy = options.policy !== undefined
     ? options.policy
     : readRulesetUpdatePolicy(options.policyPath ?? join(loaded.pluginRoot, "config", "ruleset-update-policy.v1.json"));
+  if (channel.status !== "ready") {
+    const policyDisposition = evaluateRulesetUpdatePolicy(policy, loaded);
+    return result("unknown", { loaded, channel, policyDisposition, reason: "channel-unavailable" });
+  }
   if (!remoteUrl) {
     const policyDisposition = evaluateRulesetUpdatePolicy(policy, loaded);
-    return result("unknown", { loaded, policyDisposition, reason: "marketplace-unavailable" });
+    return result("unknown", { loaded, channel, policyDisposition, reason: "channel-unavailable" });
   }
-
-  const remote = run("git", ["ls-remote", remoteUrl, "HEAD"], {
-    ...options,
-    timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
-    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
-  });
-  const remoteCommit = String(remote.stdout ?? "").trim().split(/\s+/u)[0]?.toLowerCase();
-  if (remote.status !== 0 || !OID.test(remoteCommit)) {
+  const target = selectedChannelTarget(remoteUrl, channel.channel, options);
+  if (!target.selected) {
     const policyDisposition = evaluateRulesetUpdatePolicy(policy, loaded);
     return result("unknown", {
       loaded,
+      channel,
       policyDisposition,
-      reason: remote.error?.code === "ETIMEDOUT" || remote.signal ? "timeout" : "remote-unavailable",
+      reason: target.reason,
     });
   }
+  const selected = target.selected;
 
   const temporary = mkdtempSync(join(tmpdir(), "pipeline-update-availability-"));
   try {
@@ -213,7 +315,9 @@ export function inspectPipelineUpdateAvailability(repoPath, options = {}) {
     if (init.status !== 0) {
       return result("unknown", {
         loaded,
-        marketplace: { commit: remoteCommit },
+        channel,
+        selected,
+        marketplace: { version: selected.version, commit: selected.commit },
         policyDisposition: evaluateRulesetUpdatePolicy(policy, loaded),
         reason: "comparison-init-failed",
       });
@@ -236,7 +340,7 @@ export function inspectPipelineUpdateAvailability(repoPath, options = {}) {
       "--no-recurse-submodules",
       "--no-write-fetch-head",
       remoteUrl,
-      `${remoteCommit}:refs/pipeline/marketplace`,
+      `${selected.commit}:refs/pipeline/marketplace`,
     ], {
       ...options,
       timeout: options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
@@ -245,7 +349,9 @@ export function inspectPipelineUpdateAvailability(repoPath, options = {}) {
     if (fetch.status !== 0) {
       return result("unknown", {
         loaded,
-        marketplace: { commit: remoteCommit },
+        channel,
+        selected,
+        marketplace: { version: selected.version, commit: selected.commit },
         policyDisposition: evaluateRulesetUpdatePolicy(policy, loaded),
         reason: fetch.error?.code === "ETIMEDOUT" || fetch.signal
           ? "timeout"
@@ -253,14 +359,16 @@ export function inspectPipelineUpdateAvailability(repoPath, options = {}) {
       });
     }
     const marketplace = {
-      version: options.marketplaceVersion ?? readMarketplaceVersion(temporary, env, options),
-      commit: remoteCommit,
+      version: options.marketplaceVersion ?? selected.version ?? readMarketplaceVersion(temporary, env, options),
+      commit: selected.commit,
     };
     const compared = compareLoadedToMarketplace(temporary, env, loaded, marketplace, options);
     const policyDisposition = evaluateRulesetUpdatePolicy(policy, loaded);
     return result(compared.status, {
       loaded,
       marketplace,
+      channel,
+      selected: { ...selected, version: marketplace.version },
       policyDisposition,
       reason: compared.reason,
     });
@@ -316,14 +424,19 @@ function parseArgs(argv) {
   return parsed;
 }
 
+export function runPipelineUpdateAvailabilityCli(argv, deps = {}) {
+  const parsed = parseArgs(argv);
+  if (!parsed) {
+    (deps.stderr ?? process.stderr).write("ruleset-freshness: usage: ruleset-freshness.mjs [--repo <path>] [--loaded-version <version>] [--loaded-commit <sha>]\n");
+    return { exitCode: 64, result: null };
+  }
+  const inspected = (deps.inspect ?? inspectPipelineUpdateAvailability)(parsed.repo, parsed);
+  (deps.stdout ?? process.stdout).write(`${JSON.stringify(inspected)}\n`);
+  return { exitCode: inspected.blocking ? 2 : 0, result: inspected };
+}
+
 const isCli = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isCli) {
-  const parsed = parseArgs(process.argv.slice(2));
-  if (!parsed) {
-    process.stderr.write("ruleset-freshness: usage: ruleset-freshness.mjs [--repo <path>] [--loaded-version <version>] [--loaded-commit <sha>]\n");
-    process.exit(64);
-  }
-  const inspected = inspectPipelineUpdateAvailability(parsed.repo, parsed);
-  process.stdout.write(`${JSON.stringify(inspected)}\n`);
-  process.exit(inspected.blocking ? 2 : 0);
+  const execution = runPipelineUpdateAvailabilityCli(process.argv.slice(2));
+  process.exitCode = execution.exitCode;
 }

@@ -220,9 +220,13 @@ test("hostile neutral portable cleanup identity fails closed without private reb
 test("sanctioned privatization converges one historical neutral cleanup tuple without projecting identity", () => {
   const root = neutralFixture("neutral-privatization");
   const statePath = join(root, "project", "pipeline-state.json");
-  const leaked = {
+  const active = startSessionDescriptor(root, {
     sessionId: "historical-neutral-session",
-    descriptorSha256: "e".repeat(64),
+    ownerNonce: "historical-neutral-owner",
+  });
+  const leaked = {
+    sessionId: active.sessionId,
+    descriptorSha256: active.descriptorSha256,
   };
   try {
     const state = JSON.parse(readFileSync(statePath, "utf8"));
@@ -233,6 +237,49 @@ test("sanctioned privatization converges one historical neutral cleanup tuple wi
     assert.equal(planned.status, "ready");
     assert.equal(JSON.stringify(planned).includes(leaked.sessionId), false);
     assert.equal(JSON.stringify(planned).includes(leaked.descriptorSha256), false);
+    assert.deepEqual(planned.applyAction, {
+      kind: "command",
+      executable: "node",
+      argv: [
+        planned.sessionCleanupScript,
+        "apply-privatization",
+        "--repo",
+        root,
+        "--plan-sha256",
+        planned.planSha256,
+        "--activate",
+      ],
+      mutation: true,
+      requiresConfirmation: true,
+      executionBoundary: "host-authorized-wsl",
+      expected: {
+        schema: "pipeline.session-cleanup-privatization-apply.v1",
+        statuses: ["applied", "noop"],
+      },
+    });
+    assert.equal(JSON.stringify(planned.applyAction).includes(leaked.sessionId), false);
+    assert.equal(JSON.stringify(planned.applyAction).includes(leaked.descriptorSha256), false);
+    assert.throws(
+      () => invoke([
+        "apply-privatization",
+        "--repo",
+        root,
+        "--plan-sha256",
+        planned.planSha256,
+      ]),
+      (error) => error?.code === "SESSION-CLEANUP-PRIVATIZE-ACTIVATION",
+    );
+    assert.throws(
+      () => invoke([
+        "apply-privatization",
+        "--repo",
+        root,
+        "--plan-sha256",
+        "f".repeat(64),
+        "--activate",
+      ]),
+      (error) => error?.code === "SESSION-CLEANUP-PRIVATIZE-CAS",
+    );
     const applied = invoke([
       "apply-privatization",
       "--repo",
@@ -250,6 +297,10 @@ test("sanctioned privatization converges one historical neutral cleanup tuple wi
     const binding = readOnboardingSessionCleanupBinding({ rootDir: root });
     assert.equal(binding.status, "bound");
     assert.deepEqual(binding.sessionCleanup, leaked);
+    assert.deepEqual(listActiveSessionDescriptors(root), [{
+      sessionId: leaked.sessionId,
+      descriptorSha256: leaked.descriptorSha256,
+    }]);
 
     const replayPlan = invoke(["plan-privatization", "--repo", root]).output;
     assert.equal(replayPlan.status, "noop");
@@ -264,6 +315,124 @@ test("sanctioned privatization converges one historical neutral cleanup tuple wi
     ]).output;
     assert.equal(replay.status, "noop");
     assert.deepEqual(readFileSync(statePath), beforeReplay);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("privatization planning rejects missing, replaced, or multiple active descriptors", () => {
+  for (const mode of ["missing", "replaced", "multiple"]) {
+    const root = neutralFixture(`neutral-privatization-${mode}`);
+    const statePath = join(root, "project", "pipeline-state.json");
+    try {
+      const active = startSessionDescriptor(root, {
+        sessionId: `historical-${mode}`,
+        ownerNonce: `historical-owner-${mode}`,
+      });
+      const state = JSON.parse(readFileSync(statePath, "utf8"));
+      state.continuity.runtime.sessionCleanup = {
+        sessionId: active.sessionId,
+        descriptorSha256: mode === "replaced" ? "e".repeat(64) : active.descriptorSha256,
+      };
+      writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
+      if (mode === "missing") {
+        retireSessionDescriptor(root, active);
+      } else if (mode === "multiple") {
+        startSessionDescriptor(root, {
+          sessionId: "unrelated-active-session",
+          ownerNonce: "unrelated-active-owner",
+        });
+      }
+      assert.throws(
+        () => invoke(["plan-privatization", "--repo", root]),
+        (error) => error?.code === "SESSION-CLEANUP-PRIVATIZE-DESCRIPTOR",
+      );
+      assert.equal(JSON.parse(readFileSync(statePath, "utf8"))
+        .continuity.runtime.sessionCleanup.sessionId, active.sessionId);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("privatization planning rejects malformed, multiply embedded, or conflicting bindings", () => {
+  for (const mode of ["malformed", "multiple-binding", "private-conflict"]) {
+    const root = neutralFixture(`neutral-privatization-${mode}`);
+    const statePath = join(root, "project", "pipeline-state.json");
+    try {
+      const state = JSON.parse(readFileSync(statePath, "utf8"));
+      let expectedCode = "SESSION-CLEANUP-PRIVATIZE-SHAPE";
+      if (mode === "malformed") {
+        state.continuity.runtime.sessionCleanup = {
+          sessionId: "historical-malformed",
+          descriptorSha256: "a".repeat(64),
+          unexpected: true,
+        };
+      } else if (mode === "multiple-binding") {
+        const active = startSessionDescriptor(root, {
+          sessionId: "historical-multiple-binding",
+          ownerNonce: "historical-multiple-binding-owner",
+        });
+        state.continuity.runtime.sessionCleanup = {
+          sessionId: active.sessionId,
+          descriptorSha256: active.descriptorSha256,
+        };
+        state.unexpected = {
+          sessionCleanup: {
+            sessionId: "second-private-session",
+            descriptorSha256: "b".repeat(64),
+          },
+        };
+      } else {
+        const bound = invoke(["start", "--repo", root, "--session", "private-bound-session"]).output;
+        state.continuity.runtime.sessionCleanup = {
+          sessionId: "conflicting-portable-session",
+          descriptorSha256: "c".repeat(64),
+        };
+        assert.notEqual(bound.sessionId, state.continuity.runtime.sessionCleanup.sessionId);
+        expectedCode = "SESSION-CLEANUP-PRIVATE-CAS";
+      }
+      writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
+      const before = readFileSync(statePath);
+      assert.throws(
+        () => invoke(["plan-privatization", "--repo", root]),
+        (error) => error?.code === expectedCode,
+      );
+      assert.deepEqual(readFileSync(statePath), before);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }
+});
+
+test("privatization apply rejects portable State drift after planning", () => {
+  const root = neutralFixture("neutral-privatization-drift");
+  const statePath = join(root, "project", "pipeline-state.json");
+  try {
+    const active = startSessionDescriptor(root, {
+      sessionId: "historical-drift",
+      ownerNonce: "historical-owner-drift",
+    });
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.continuity.runtime.sessionCleanup = {
+      sessionId: active.sessionId,
+      descriptorSha256: active.descriptorSha256,
+    };
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
+    const plan = invoke(["plan-privatization", "--repo", root]).output;
+    state.updatedAt = "2026-07-31T09:30:00.000Z";
+    writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`, { mode: 0o600 });
+    assert.throws(
+      () => invoke([
+        "apply-privatization",
+        "--repo",
+        root,
+        "--plan-sha256",
+        plan.planSha256,
+        "--activate",
+      ]),
+      (error) => error?.code === "SESSION-CLEANUP-PRIVATIZE-CAS",
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -730,7 +899,8 @@ test("status lists sanitized descriptor owner observations in sorted order", () 
 });
 
 test("a single unbound descriptor requires an activated digest-bound rebind", () => {
-  const root = fixture("orphan-rebind");
+  const root = neutralFixture("orphan-rebind");
+  const statePath = join(root, "project", "pipeline-state.json");
   try {
     const orphan = startSessionDescriptor(root, { sessionId: "session-binding-orphan-rebind" });
     const plan = invoke(["plan-recovery", "--repo", root]).output;
@@ -765,6 +935,10 @@ test("a single unbound descriptor requires an activated digest-bound rebind", ()
       "--activate",
     ]).output;
     assert.equal(applied.status, "rebound");
+    const portable = JSON.parse(readFileSync(statePath, "utf8"));
+    assert.equal(portable.continuity.runtime.sessionCleanup, null);
+    assert.equal(JSON.stringify(portable).includes(orphan.sessionId), false);
+    assert.equal(JSON.stringify(portable).includes(orphan.descriptorSha256), false);
     assert.deepEqual(readOnboardingSessionCleanupBinding({ rootDir: root }).sessionCleanup, plan.sessionCleanup);
     assert.deepEqual(listActiveSessionDescriptors(root), [plan.sessionCleanup]);
     assert.equal(invoke(["start", "--repo", root]).output.code, "WT-SESSION-REUSED");

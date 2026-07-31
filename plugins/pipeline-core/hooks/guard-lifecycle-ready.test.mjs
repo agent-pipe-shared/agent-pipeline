@@ -540,6 +540,8 @@ test("redirect-looking quoted data stays argv while hostile composition is typed
       ["rg -n lifecycle . > output.txt | head -n 20", "GUARD-REDIRECT-UNAPPROVED"],
       ["rg -n lifecycle . | tee output.txt", "GUARD-OPERATOR-UNAPPROVED"],
       ["rg -n lifecycle . && touch output.txt", "GUARD-PARSE-UNSUPPORTED"],
+      ["rg -n lifecycle . ; head -n 20 output.txt", "GUARD-PARSE-UNSUPPORTED"],
+      ["rg -n lifecycle .\nhead -n 20 output.txt", "GUARD-PARSE-UNSUPPORTED"],
     ]) {
       const result = evaluateLifecycleReadyGuard(bash(command), {
         projectDir: path,
@@ -548,7 +550,10 @@ test("redirect-looking quoted data stays argv while hostile composition is typed
       assert.equal(result.exitCode, 2, command);
       assert.match(result.stderr, new RegExp(code, "u"), command);
       assert.doesNotMatch(result.stderr, /exact V4 ready result/u, command);
-      assert.match(result.stderr, /separate simple read-only commands|Retry without redirection/u, command);
+      assert.match(result.stderr, /one simple shell command per tool call/u, command);
+      assert.match(result.stderr, /separate parallel tool calls/u, command);
+      assert.match(result.stderr, /Do not retry by varying &&, ;, newline composition, pipelines, or redirects/u, command);
+      assert.match(result.stderr, /Only the exact bounded rg-to-head diagnostic pipeline is admitted as an exception/u, command);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
@@ -615,7 +620,7 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
-test("non-ready cleanup recovery admits only exact root, descriptor and digest bindings", () => {
+test("non-ready cleanup recovery and privatization admit only exact closed argv", () => {
   const path = root();
   try {
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
@@ -623,8 +628,10 @@ test("non-ready cleanup recovery admits only exact root, descriptor and digest b
     const commands = [
       `node '${SESSION_CLEANUP_SCRIPT}' status --repo '${path}'`,
       `node '${SESSION_CLEANUP_SCRIPT}' plan-recovery --repo '${path}'`,
+      `node '${SESSION_CLEANUP_SCRIPT}' plan-privatization --repo '${path}'`,
       `node '${SESSION_CLEANUP_SCRIPT}' release-binding --repo '${path}'`,
       `node '${SESSION_CLEANUP_SCRIPT}' apply-recovery --repo '${path}' --plan-sha256 ${digest} --activate`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-privatization --repo '${path}' --plan-sha256 ${digest} --activate`,
       `node '${SESSION_CLEANUP_SCRIPT}' cleanup --repo '${path}' --session-descriptor session-01 --expected-descriptor-sha256 ${digest}`,
     ];
     for (const command of commands) {
@@ -637,10 +644,25 @@ test("non-ready cleanup recovery admits only exact root, descriptor and digest b
     for (const command of [
       `node '${SESSION_CLEANUP_SCRIPT}' apply-recovery --repo /tmp/other --plan-sha256 ${digest} --activate`,
       `node '${SESSION_CLEANUP_SCRIPT}' apply-recovery --repo '${path}' --plan-sha256 ${digest}`,
+      `node '${SESSION_CLEANUP_SCRIPT}' plan-privatization --repo /tmp/other`,
+      `node '${SESSION_CLEANUP_SCRIPT}' plan-privatization --repo '${path}' --session-descriptor session-private`,
+      `node '${SESSION_CLEANUP_SCRIPT}' plan-privatization --repo '${path}' --expected-descriptor-sha256 ${digest}`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-privatization --repo /tmp/other --plan-sha256 ${digest} --activate`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-privatization --repo '${path}' --plan-sha256 ${digest}`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-privatization --repo '${path}' --activate`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-privatization --repo '${path}' --plan-sha256 ${digest.toUpperCase()} --activate`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-privatization --repo '${path}' --plan-sha256 ${digest} --session-descriptor session-private --activate`,
+      `node '${SESSION_CLEANUP_SCRIPT}' apply-privatization --repo '${path}' --plan-sha256 ${digest} --activate --bypass`,
+      `node '/tmp/other/scripts/session-cleanup.mjs' plan-privatization --repo '${path}'`,
+      `node '${SESSION_CLEANUP_SCRIPT}' plan-privatization --repo '${path}' && touch bypass`,
       `node '${SESSION_CLEANUP_SCRIPT}' cleanup --repo '${path}' --session-descriptor ../foreign --expected-descriptor-sha256 ${digest}`,
       `node '${SESSION_CLEANUP_SCRIPT}' start --repo '${path}'`,
     ]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+      }).exitCode, 2, command);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });

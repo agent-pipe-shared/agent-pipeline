@@ -77,33 +77,34 @@ function exactReadyReceipt(value) {
 
 function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null) {
   const grammarGuidance = {
-    "GUARD-PARSE-UNSUPPORTED": [
-      "The command is outside the closed Pipeline shell grammar.",
-      "Retry the observation as separate simple read-only commands without shell composition.",
-    ],
-    "GUARD-OPERATOR-UNAPPROVED": [
-      "The command contains an unapproved shell operator.",
-      "Retry as separate simple read-only commands; only the exact bounded rg-to-head diagnostic pipeline is admitted.",
-    ],
-    "GUARD-REDIRECT-UNAPPROVED": [
-      "The command contains an unapproved shell redirection.",
-      "Retry without redirection; only the platform null redirect in the exact bounded rg-to-head diagnostic pipeline is admitted.",
-    ],
+    "GUARD-PARSE-UNSUPPORTED": "The command is outside the closed Pipeline shell grammar.",
+    "GUARD-OPERATOR-UNAPPROVED": "The command contains an unapproved shell operator.",
+    "GUARD-REDIRECT-UNAPPROVED": "The command contains an unapproved shell redirection.",
   };
   const typedLifecycleStatus = code === "GUARD-LIFECYCLE-NOT-READY"
     && CONTROLLING_NON_READY_STATUSES.has(lifecycleStatus)
     ? lifecycleStatus
     : null;
-  const guidance = grammarGuidance[code]
-    ?? (typedLifecycleStatus === null
-      ? [
-        "Pipeline-governed project writes require an exact V4 ready result for session intent.",
-        "Re-run the typed project-onboarding-v3 session inspection and use only its returned nextAction.",
-      ]
-      : [
-        `Pipeline session readiness is ${typedLifecycleStatus}.`,
-        "Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.",
-      ]);
+  const grammarReason = grammarGuidance[code];
+  if (grammarReason) {
+    return verdict(
+      2,
+      "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
+        + `${code}: ${grammarReason}\n`
+        + "Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.\n"
+        + "Do not retry by varying &&, ;, newline composition, pipelines, or redirects.\n"
+        + "Only the exact bounded rg-to-head diagnostic pipeline is admitted as an exception.\n",
+    );
+  }
+  const guidance = typedLifecycleStatus === null
+    ? [
+      "Pipeline-governed project writes require an exact V4 ready result for session intent.",
+      "Re-run the typed project-onboarding-v3 session inspection and use only its returned nextAction.",
+    ]
+    : [
+      `Pipeline session readiness is ${typedLifecycleStatus}.`,
+      "Re-run the typed project-onboarding-v3 inspection with intent session and use only its returned nextAction.",
+    ];
   return verdict(
     2,
     "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
@@ -400,10 +401,10 @@ function sanctionedMigrationArgs(args, root) {
 }
 
 function sanctionedSessionCleanupArgs(args, root) {
-  if (["status", "release-binding", "plan-recovery"].includes(args[0])) {
+  if (["status", "release-binding", "plan-recovery", "plan-privatization"].includes(args[0])) {
     return args[1] === "--repo" && args[2] === root && args.length === 3;
   }
-  if (args[0] === "apply-recovery") {
+  if (["apply-recovery", "apply-privatization"].includes(args[0])) {
     return args[1] === "--repo" && args[2] === root
       && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
       && args[5] === "--activate" && args.length === 6;

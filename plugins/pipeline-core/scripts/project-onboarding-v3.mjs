@@ -4,12 +4,14 @@
 import { pathToFileURL } from "node:url";
 import {
   applyProjectOnboardingKickoffV4,
+  applyProjectOnboardingKickoffPromotionV4,
   applyProjectOnboardingLifecycleV4,
   applyProjectOnboardingManifestRepair,
   inspectProjectOnboardingV3,
   planProjectOnboardingManifestRepair,
   planProjectOnboardingSourceRecovery,
   planProjectOnboardingKickoffV4,
+  planProjectOnboardingKickoffPromotionV4,
   planProjectOnboardingLifecycleV4,
 } from "../lib/project-onboarding-v3.mjs";
 
@@ -17,13 +19,18 @@ function usage() {
   return [
     "Usage: node plugins/pipeline-core/scripts/project-onboarding-v3.mjs <inspect|plan|plan-source-recovery|plan-manifest-repair|apply-manifest-repair|apply-portable-seed|plan-runtime|initialize-runtime|plan-repair|apply-repair|plan-readback|apply-readback> --root <project-dir> [--intent onboarding|bootstrap|session|dispatch] [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff <plan|apply> --root <project-dir> --goal <text> [--plan-sha256 <sha256>] [--activate]",
+    "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs kickoff promote <plan|apply> --root <project-dir> --profile <epic|feature|mini> --id <id> --plan-path <path> --prd-path <path> --spec-path <path> [--plan-sha256 <sha256>] [--activate]",
     "       node plugins/pipeline-core/scripts/project-onboarding-v3.mjs continuity inspect --root <project-dir>",
   ].join("\n");
 }
 function parse(args) {
   const output = { activate: false, intent: "onboarding" };
   let start = 0;
-  if (args[0] === "kickoff") {
+  if (args[0] === "kickoff" && args[1] === "promote") {
+    if (!["plan", "apply"].includes(args[2])) return { error: "kickoff promote requires plan or apply" };
+    output.command = `kickoff-promote-${args[2]}`;
+    start = 3;
+  } else if (args[0] === "kickoff") {
     if (!["plan", "apply"].includes(args[1])) return { error: "kickoff requires plan or apply" };
     output.command = `kickoff-${args[1]}`;
     start = 2;
@@ -40,6 +47,11 @@ function parse(args) {
     if (arg === "--root") { const root = args[index + 1]; if (!root || root.startsWith("--")) return { error: "--root requires a project directory" }; output.root = root; index += 1; }
     else if (arg === "--intent") { const intent = args[index + 1]; if (!["onboarding", "bootstrap", "session", "dispatch"].includes(intent)) return { error: "--intent must be onboarding, bootstrap, session, or dispatch" }; output.intent = intent; index += 1; }
     else if (arg === "--goal") { const goal = args[index + 1]; if (goal === undefined) return { error: "--goal requires one argv text element" }; output.goal = goal; index += 1; }
+    else if (arg === "--profile") { const profile = args[index + 1]; if (!["epic", "feature", "mini"].includes(profile)) return { error: "--profile must be epic, feature, or mini" }; output.profile = profile; index += 1; }
+    else if (arg === "--id") { const featureId = args[index + 1]; if (!featureId || featureId.startsWith("--")) return { error: "--id requires a feature id" }; output.featureId = featureId; index += 1; }
+    else if (arg === "--plan-path") { const planPath = args[index + 1]; if (!planPath || planPath.startsWith("--")) return { error: "--plan-path requires a repository path" }; output.planPath = planPath; index += 1; }
+    else if (arg === "--prd-path") { const prdPath = args[index + 1]; if (!prdPath || prdPath.startsWith("--")) return { error: "--prd-path requires a repository path" }; output.prdPath = prdPath; index += 1; }
+    else if (arg === "--spec-path") { const specPath = args[index + 1]; if (!specPath || specPath.startsWith("--")) return { error: "--spec-path requires a repository path" }; output.specPath = specPath; index += 1; }
     else if (arg === "--plan-sha256") { const digest = args[index + 1]; if (!/^[a-f0-9]{64}$/u.test(digest ?? "")) return { error: "--plan-sha256 requires a lowercase SHA-256 digest" }; output.planSha256 = digest; index += 1; }
     else if (arg === "--activate") output.activate = true;
     else if (arg === "--help" || arg === "-h") output.help = true;
@@ -47,9 +59,12 @@ function parse(args) {
   }
   if (!output.help && !output.command) return { error: "one command is required" };
   if (!output.help && !output.root) return { error: "--root is required" };
-  if (output.command?.startsWith("kickoff-") && output.goal === undefined) return { error: "kickoff plan/apply requires --goal <text>" };
-  if (!output.command?.startsWith("kickoff-") && output.goal !== undefined) return { error: "--goal is only valid for kickoff plan/apply" };
-  if (output.activate && !["apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback", "apply-manifest-repair", "kickoff-apply"].includes(output.command)) return { error: "--activate is only valid for an apply command" };
+  if (output.command?.startsWith("kickoff-promote-")) {
+    if (output.goal !== undefined) return { error: "--goal is not valid for kickoff promotion" };
+    if (![output.profile, output.featureId, output.planPath, output.prdPath, output.specPath].every(Boolean)) return { error: "kickoff promotion requires --profile --id --plan-path --prd-path --spec-path" };
+  } else if (output.command?.startsWith("kickoff-") && output.goal === undefined) return { error: "kickoff plan/apply requires --goal <text>" };
+  else if (!output.command?.startsWith("kickoff-") && output.goal !== undefined) return { error: "--goal is only valid for kickoff plan/apply" };
+  if (output.activate && !["apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback", "apply-manifest-repair", "kickoff-apply", "kickoff-promote-apply"].includes(output.command)) return { error: "--activate is only valid for an apply command" };
   return output;
 }
 export function main(args = process.argv.slice(2), {
@@ -83,6 +98,15 @@ export function main(args = process.argv.slice(2), {
       activate: options.activate,
       deps,
     });
+    else if (options.command === "kickoff-promote-plan") output = planProjectOnboardingKickoffPromotionV4({
+      rootDir: options.root, profile: options.profile, featureId: options.featureId,
+      planPath: options.planPath, prdPath: options.prdPath, specPath: options.specPath, deps,
+    });
+    else if (options.command === "kickoff-promote-apply") output = applyProjectOnboardingKickoffPromotionV4({
+      rootDir: options.root, profile: options.profile, featureId: options.featureId,
+      planPath: options.planPath, prdPath: options.prdPath, specPath: options.specPath,
+      planSha256: options.planSha256, activate: options.activate, deps,
+    });
     else {
       const operation = options.command === "initialize-runtime"
         ? "runtime"
@@ -106,7 +130,7 @@ export function main(args = process.argv.slice(2), {
     return 2;
   }
   write(`${JSON.stringify(output, null, 2)}\n`);
-  if (output.schema === "pipeline.codex-onboarding-kickoff-plan.v1") return 0;
+  if (["pipeline.codex-onboarding-kickoff-plan.v1", "pipeline.codex-onboarding-kickoff-promotion-plan.v1"].includes(output.schema)) return 0;
   return ["portable-seed-required", "runtime-initialization-required", "runtime-attestation-required", "restart-required", "kickoff-required", "host-repository-init-required", "ready", "migration-required", "adoption-required", "projection-drift"].includes(output.status) ? 0 : 1;
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) process.exit(main());

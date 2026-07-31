@@ -19,6 +19,7 @@ const repositoryRoot = join(pluginRoot, "..", "..");
 const criticRole = readFileSync(join(repositoryRoot, "roles", "critic.md"), "utf8");
 const criticTemplate = readFileSync(join(repositoryRoot, "templates", "prompts", "critic-review.md"), "utf8");
 const sessionBootstrap = readFileSync(join(repositoryRoot, "harness", "session-bootstrap.md"), "utf8");
+const codexLocalDevelopment = readFileSync(join(repositoryRoot, "docs", "codex-local-plugin-development.md"), "utf8");
 
 const cases = [
   ["Critic role carriers close before preflight and cannot fall into Elephant onboarding", () => {
@@ -35,12 +36,33 @@ const cases = [
     assert.match(criticTemplate, /Bootstrap role: critic \(closed/u);
   }],
   ["bootstrap command grammar failures retry without revoking lifecycle readiness", () => {
-    assert.match(skill, /Run each bootstrap shell observation as one simple read-only command/u);
-    assert.match(skill, /Do not use `\| sort`, `&&`, `;`, `tee`, `xargs`, command substitution, or output redirection/u);
-    assert.match(skill, /read with `rg --files` and sort the returned paths in agent memory/u);
+    assert.match(skill, /Runner rule for the whole session: use one simple shell command per tool call/u);
+    assert.match(skill, /Independent read-only commands may be issued as separate parallel tool calls/u);
+    assert.match(skill, /Do not compose or retry commands by varying `&&`, `;`, newlines, pipelines, or redirects/u);
     assert.match(skill, /exact bounded `rg … \| head -n 1\.\.500` diagnostic form/u);
+    assert.match(skill, /closed guard grammar/u);
     assert.match(skill, /does not invalidate an already observed V4 `ready` lifecycle result/u);
-    assert.match(skill, /Retry the observation in an admitted form and continue the same bootstrap/u);
+    assert.match(skill, /Decompose the observation into admitted commands and continue the same bootstrap/u);
+  }],
+  ["SessionStart and bootstrap keep update channels separate from repository freshness and host source", () => {
+    for (const surface of [skill, sessionBootstrap]) {
+      assert.match(surface, /pipelineUpdateAvailability/u);
+      assert.match(surface, /repositoryFreshness/u);
+      assert.match(surface, /channel/u);
+      assert.match(surface, /ref/u);
+      assert.match(surface, /consumers?(?: projects)? default(?:s)?\s+to `stable`/iu);
+      assert.match(surface, /self-repository carries explicit `alpha`/u);
+      assert.match(surface, /pipeline-update-channel\.mjs plan --repo/u);
+      assert.match(surface, /--channel beta/u);
+      assert.match(surface, /returned, separately confirmed `applyAction`/u);
+      assert.match(surface, /no onboarding question|Do not ask an onboarding question/iu);
+    }
+    assert.match(codexLocalDevelopment, /host-wide selection for every repository served by the shared Codex\s+App Server/u);
+    assert.match(codexLocalDevelopment, /cannot provide simultaneous\s+official and local Pipeline versions/u);
+    assert.match(codexLocalDevelopment, /consumers default to\s+`stable`/u);
+    assert.match(codexLocalDevelopment, /self-repository explicitly selects `alpha`/u);
+    assert.match(codexLocalDevelopment, /--channel beta/u);
+    assert.match(codexLocalDevelopment, /digest-bound `applyAction`/u);
   }],
   ["V4 bootstrap inspection is checked before Git or ordinary V3 authority", () => {
     const onboarding = skill.indexOf("## Step 0 — Consumer-root onboarding state");
@@ -122,6 +144,24 @@ const cases = [
     assert.match(skill, /`partial\|invalid\|unsafe\|migration-required\|adoption-required/u);
     assert.doesNotMatch(skill, /fresh-host-managed/u);
     assert.doesNotMatch(skill, /project-onboarding-v3\.mjs" apply --root "\$PWD" --activate/u);
+  }],
+  ["historical cleanup leakage uses only the confirmed typed privatization fallback", () => {
+    const fallback = skill.indexOf("Typed session-cleanup privatization fallback");
+    const genericInvalid = skill.indexOf("`partial|invalid|unsafe|migration-required");
+    assert.ok(fallback >= 0 && fallback < genericInvalid, "privatization fallback must precede the generic invalid stop");
+    assert.match(skill, /status is\s+`invalid`, the sole diagnostic is `project_authority_invalid`/u);
+    assert.match(skill, /session-cleanup\.mjs plan-privatization --repo "\$PWD"/u);
+    assert.match(skill, /pipeline\.session-cleanup-privatization-plan\.v1/u);
+    assert.match(skill, /64-hex `planSha256`/u);
+    assert.match(skill, /one complete `applyAction`/u);
+    assert.match(skill, /same physical root and\s+plan digest, includes `--activate`/u);
+    assert.match(skill, /`mutation:true`,\s+`requiresConfirmation:true`, `executionBoundary:host-authorized-wsl`/u);
+    assert.match(skill, /pipeline\.session-cleanup-privatization-apply\.v1/u);
+    assert.match(skill, /Present that `applyAction` unchanged to\s+the PO and wait; perform no mutation before explicit confirmation/u);
+    assert.match(skill, /execute its argv exactly once at the host-authorized write\s+boundary/u);
+    assert.match(skill, /then\s+restart Step 0 from the lifecycle inspection/u);
+    assert.match(skill, /Never edit Consumer State,\s+delete a descriptor or closure receipt/u);
+    assert.match(skill, /bootstrap confirmation until the repeated V4 inspection is genuinely\s+`ready`/u);
   }],
   ["kickoff-required gives one complete local command and forbids remote syntax discovery", () => {
     assert.match(skill, /goal is a short project\s+objective, not the pasted design, requirements list, acceptance criteria, or\s+PRD/u);

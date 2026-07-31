@@ -12,7 +12,9 @@ import {
   LEGACY_CALIBRATION, LEGACY_GUARD_AUDIT, LEGACY_GUARD_CONFIG, LEGACY_MANIFEST, LEGACY_STATE,
   NEUTRAL_CALIBRATION, NEUTRAL_GUARD_AUDIT, NEUTRAL_GUARD_CONFIG, NEUTRAL_MANIFEST, NEUTRAL_STATE,
   inspectProjectAuthorityProvenance, planPendingProjectAuthorityRecovery, planProjectAuthorityMigration, readProjectAuthority,
+  applyProjectAuthoritySessionCleanupRecovery, planProjectAuthoritySessionCleanupRecovery,
 } from "./project-authority.mjs";
+import { cleanupSession, retireSessionDescriptor, startSessionDescriptor } from "./worktree-lifecycle.mjs";
 
 const roots = [];
 function root() { const value = mkdtempSync(join(tmpdir(), "project-authority-")); roots.push(value); return value; }
@@ -28,6 +30,34 @@ function git(base, args) {
   const result = spawnSync("git", args, { cwd: base, encoding: "utf8", shell: false });
   assert.equal(result.status, 0, result.stderr);
   return String(result.stdout).trim();
+}
+function neutral(base, state) {
+  write(base, NEUTRAL_MANIFEST, "schema: pipeline.manifest.v0\n");
+  write(base, NEUTRAL_STATE, `${JSON.stringify(state)}\n`);
+  write(base, NEUTRAL_CALIBRATION, "{\"project\":\"fixture\"}\n");
+  write(base, NEUTRAL_GUARD_CONFIG, "{\"protectedTestPaths\":[]}\n");
+  write(base, NEUTRAL_GUARD_AUDIT, "{\"event\":\"fixture\"}\n");
+}
+function leakedState(tuple) {
+  return {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "feature-cleanup-recovery" },
+    continuity: { runtime: { sessionCleanup: tuple } },
+  };
+}
+function completeDescriptor(base, sessionId) {
+  const started = startSessionDescriptor(base, { sessionId });
+  const cleaned = cleanupSession(base, {
+    sessionId: started.sessionId,
+    ownerNonce: started.ownerNonce,
+  }, { allowAbsent: true });
+  assert.equal(cleaned.ok, true);
+  retireSessionDescriptor(base, {
+    sessionId: started.sessionId,
+    ownerNonce: started.ownerNonce,
+    descriptorSha256: started.descriptorSha256,
+  });
+  return started;
 }
 let passed = 0;
 let interruptedRoot;
@@ -113,6 +143,74 @@ try {
     write(base, LEGACY_STATE, sanitizedState);
     assert.equal(applyProjectAuthorityMigration(sanitizedPlan, { rootDir: base, activate: true }).status, "applied");
     assert.equal(readFileSync(join(base, NEUTRAL_STATE), "utf8"), sanitizedState);
+  });
+  ok("completed legacy neutral cleanup is sanitized only through a receipt-bound recovery CAS", () => {
+    const base = root(); git(base, ["init", "-q"]);
+    const completed = completeDescriptor(base, "session-phoenix-closed");
+    neutral(base, leakedState({
+      sessionId: completed.sessionId,
+      descriptorSha256: completed.descriptorSha256,
+    }));
+    assert.equal(readProjectAuthority({ rootDir: base }).code, "PA-STATE-SESSION-CLEANUP-PRIVATE");
+    const plan = planProjectAuthoritySessionCleanupRecovery({ rootDir: base });
+    assert.equal(plan.status, "ready");
+    assert.equal(plan.operation, "sanitize-completed-session-cleanup");
+    assert.equal(plan.targets.length, 1);
+    assert.equal(JSON.stringify(plan).includes(completed.sessionId), false);
+    assert.equal(JSON.stringify(plan).includes("descriptorSha256"), false);
+    assert.equal(applyProjectAuthoritySessionCleanupRecovery(plan, { rootDir: base }).status, "activation-required");
+    const applied = applyProjectAuthoritySessionCleanupRecovery(plan, { rootDir: base, activate: true });
+    assert.equal(applied.status, "recovered");
+    assert.equal(JSON.parse(readFileSync(join(base, NEUTRAL_STATE), "utf8")).continuity.runtime.sessionCleanup, null);
+    assert.equal(readProjectAuthority({ rootDir: base }).status, "ready");
+    assert.equal(applyProjectAuthoritySessionCleanupRecovery(plan, { rootDir: base, activate: true }).status, "rejected");
+  });
+  ok("legacy cleanup recovery rejects live, missing, malformed and multiple descriptor evidence", () => {
+    const cases = ["live", "missing", "malformed", "multiple"];
+    for (const kind of cases) {
+      const base = root(); git(base, ["init", "-q"]);
+      let tuple;
+      if (kind === "live") {
+        const started = startSessionDescriptor(base, { sessionId: "session-nova-live" });
+        tuple = { sessionId: started.sessionId, descriptorSha256: started.descriptorSha256 };
+      } else if (kind === "missing") {
+        tuple = { sessionId: "session-nova-missing", descriptorSha256: "b".repeat(64) };
+      } else {
+        const completed = completeDescriptor(base, `session-nova-${kind}`);
+        tuple = { sessionId: completed.sessionId, descriptorSha256: completed.descriptorSha256 };
+        if (kind === "malformed") {
+          write(base, `.git/agent-pipeline/session-cleanup/receipts/${completed.sessionId}.json`, "{broken\n");
+        } else {
+          startSessionDescriptor(base, { sessionId: "session-nova-other-active" });
+        }
+      }
+      neutral(base, leakedState(tuple));
+      const plan = planProjectAuthoritySessionCleanupRecovery({ rootDir: base });
+      assert.notEqual(plan.status, "ready", kind);
+      assert.deepEqual(plan.targets, [], kind);
+      assert.equal(readProjectAuthority({ rootDir: base }).code, "PA-STATE-SESSION-CLEANUP-PRIVATE", kind);
+    }
+  });
+  ok("legacy cleanup recovery rejects State drift before commit", () => {
+    const base = root(); git(base, ["init", "-q"]);
+    const completed = completeDescriptor(base, "session-drift-closed");
+    neutral(base, leakedState({ sessionId: completed.sessionId, descriptorSha256: completed.descriptorSha256 }));
+    const plan = planProjectAuthoritySessionCleanupRecovery({ rootDir: base });
+    const statePath = join(base, NEUTRAL_STATE);
+    writeFileSync(statePath, `${readFileSync(statePath, "utf8").trimEnd()}\n\n`);
+    assert.equal(applyProjectAuthoritySessionCleanupRecovery(plan, { rootDir: base, activate: true }).status, "rejected");
+    assert.equal(JSON.parse(readFileSync(statePath, "utf8")).continuity.runtime.sessionCleanup.sessionId, completed.sessionId);
+  });
+  ok("legacy cleanup recovery fails closed without removing a concurrent State lock", () => {
+    const base = root(); git(base, ["init", "-q"]);
+    const completed = completeDescriptor(base, "session-lock-closed");
+    neutral(base, leakedState({ sessionId: completed.sessionId, descriptorSha256: completed.descriptorSha256 }));
+    const plan = planProjectAuthoritySessionCleanupRecovery({ rootDir: base });
+    const lock = `${NEUTRAL_STATE}.lock`;
+    write(base, lock, "foreign lock\n");
+    assert.equal(applyProjectAuthoritySessionCleanupRecovery(plan, { rootDir: base, activate: true }).status, "rejected");
+    assert.equal(readFileSync(join(base, lock), "utf8"), "foreign lock\n");
+    assert.equal(JSON.parse(readFileSync(join(base, NEUTRAL_STATE), "utf8")).continuity.runtime.sessionCleanup.sessionId, completed.sessionId);
   });
   ok("activation is explicit and preserves legacy", () => {
     const base = root(); legacy(base); const plan = planProjectAuthorityMigration({ rootDir: base });

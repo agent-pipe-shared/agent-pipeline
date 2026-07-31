@@ -6,6 +6,7 @@
  * filesystem I/O and command routing; this module owns only closed values.
  */
 import { createHash } from "node:crypto";
+import { validateContinuityState } from "./continuity-state.mjs";
 
 const APPROVAL_SCHEMA = "pipeline.plan-approval.v2";
 export const CURRENT_APPROVAL_SCHEMA = "pipeline.plan-approval.v3";
@@ -389,6 +390,21 @@ export function submitPlan({
     || !SHA256.test(profileSha256 ?? "")
     || !isNonBlankString(by)
     || !isCanonicalIso(at)) return fail("PLAN-SUBMIT-REQUEST-INVALID");
+  const continuity = state.continuity;
+  if (!validateContinuityState(continuity, state.activeFeature.id).ok) {
+    return fail("PLAN-SUBMIT-CONTINUITY-INVALID");
+  }
+  if (continuity.revision >= Number.MAX_SAFE_INTEGER
+    || continuity.queueHead === null
+    || continuity.queueHead.dispatch !== null
+    || continuity.blocker !== null
+    || continuity.acknowledgedFinal !== null
+    || continuity.authority.result !== null
+    || continuity.recovery !== null
+    || continuity.decisionTxn !== null
+    || continuity.closeTransition != null) {
+    return fail("PLAN-SUBMIT-CONTINUITY-BUSY");
+  }
   const submission = {
     schema: PLAN_SUBMISSION_SCHEMA,
     featureId: state.activeFeature.id,
@@ -405,7 +421,24 @@ export function submitPlan({
     ...state,
     planApproved: false,
     planSubmission: submission,
+    continuity: {
+      ...continuity,
+      revision: continuity.revision + 1,
+      authority: {
+        prd: { path: poGateAuthority.planPath, sha256: poGateAuthority.planSha256 },
+        spec: { path: poGateAuthority.specPath, sha256: poGateAuthority.specSha256 },
+        result: null,
+      },
+      resume: {
+        mode: "immediate",
+        sourceRevision: continuity.revision + 1,
+        reasonCode: "active-turn",
+      },
+    },
   };
+  if (!validateContinuityState(next.continuity, state.activeFeature.id).ok) {
+    return fail("PLAN-SUBMIT-CONTINUITY-POSTIMAGE");
+  }
   return {
     ok: true,
     replay: false,
@@ -468,6 +501,32 @@ export function reopenPlanDesign({
     || !INVALIDATION_REASONS.has(reason)) return fail("PLAN-REOPEN-REQUEST-INVALID");
   const submission = state.planSubmission;
   if (!validPlanSubmission(submission)) {
+    // Pre-submission V2 approvals are a bounded compatibility state. They have
+    // an authority-bound approval but no submission digest to invalidate, so a
+    // V3 invalidation record cannot be truthfully manufactured. The sanctioned
+    // reopen writer therefore retires that approval atomically and leaves an
+    // ordinary editable design draft. Do not accept any mixed legacy state.
+    const legacyV2Approval = state.planSubmission === undefined
+      && state.planApproved === true
+      && state.activeFeature.phase === "implementation"
+      && validV2Approval(state.planApproval)
+      && state.planApproval.poGateAuthority.planPath === state.activeFeature.planPath
+      && state.planInvalidation === undefined
+      && state.planRevocation === undefined;
+    if (legacyV2Approval) {
+      const next = {
+        ...state,
+        activeFeature: { ...state.activeFeature, phase: "design" },
+        planApproved: false,
+      };
+      delete next.planApproval;
+      return {
+        ok: true,
+        replay: false,
+        state: next,
+        invalidation: null,
+      };
+    }
     if (state.activeFeature.phase === "design" && state.planApproved !== true) {
       return { ok: true, replay: true, state, invalidation: state.planInvalidation ?? null };
     }

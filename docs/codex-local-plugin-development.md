@@ -21,9 +21,23 @@ candidate at `plugins/pipeline-core`. Its plugin manifest must carry a fresh
 Codex cachebuster. Do not repoint the `agent-pipeline` marketplace name to a
 checkout and do not use a local candidate through the released selector.
 
+This is a host-wide selection for every repository served by the shared Codex
+App Server. It is not an onboarding choice and cannot provide simultaneous
+official and local Pipeline versions to different repositories. Never prompt a
+consumer project to choose this source. Changing it is an explicit attended
+operator operation: close all affected sessions, switch the sole selector,
+restart the shared App Server, and verify the registry readback before reopening
+sessions.
+
 The local selector is only a source-topology override. It does not waive
 candidate-bound Verify, Security, Critic, PO, push, release, or remote-readback
 gates, and it never changes a consumer repository's portable authority.
+Distribution channels remain separate project authority: consumers default to
+`stable`, while the Agent-Pipeline self-repository explicitly selects `alpha`.
+An operator may opt a project into `beta` only by running the read-only
+`pipeline-update-channel.mjs plan --repo <project> --channel beta` operation and
+then explicitly confirming its returned digest-bound `applyAction`. Neither a
+local source switch nor SessionStart changes that channel automatically.
 
 ## Enter local test mode
 

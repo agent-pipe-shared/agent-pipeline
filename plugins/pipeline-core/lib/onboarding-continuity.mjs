@@ -61,10 +61,16 @@ import {
   resolveProjectAuthorityPaths,
   validatePortablePipelineState,
 } from "./project-authority.mjs";
+import {
+  listActiveSessionDescriptors,
+  loadSessionDescriptor,
+} from "./worktree-lifecycle.mjs";
 
 export const KICKOFF_PLAN_SCHEMA = "pipeline.codex-onboarding-kickoff-plan.v1";
 export const KICKOFF_HISTORY_SCHEMA = "pipeline.codex-onboarding-continuity-history.v1";
 export const KICKOFF_APPLY_SCHEMA = "pipeline.codex-onboarding-kickoff-apply.v1";
+export const KICKOFF_PROMOTION_PLAN_SCHEMA = "pipeline.codex-onboarding-kickoff-promotion-plan.v1";
+export const KICKOFF_PROMOTION_APPLY_SCHEMA = "pipeline.codex-onboarding-kickoff-promotion-apply.v1";
 export const KICKOFF_GOAL_MAX_BYTES = 160;
 export const CONTINUITY_REPAIR_PLAN_SCHEMA = "pipeline.codex-onboarding-continuity-repair-plan.v1";
 export const CONTINUITY_REPAIR_APPLY_SCHEMA = "pipeline.codex-onboarding-continuity-repair-apply.v1";
@@ -77,6 +83,7 @@ export const SESSION_CLEANUP_PRIVATIZATION_APPLY_SCHEMA = "pipeline.session-clea
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ONBOARDING_SCRIPT = join(HERE, "..", "scripts", "project-onboarding-v3.mjs");
+const DEFAULT_SESSION_CLEANUP_SCRIPT = join(HERE, "..", "scripts", "session-cleanup.mjs");
 const STATE_RELATIVE_PATH = NEUTRAL_STATE;
 const CALIBRATION_RELATIVE_PATH = NEUTRAL_CALIBRATION;
 const INITIAL_PRD_RELATIVE_PATH = "specs/kickoff-initial-prd.md";
@@ -96,6 +103,16 @@ const TARGET_KEYS = {
   spec: new Set(["path", "beforeSha256", "afterSha256", "content"]),
   history: new Set(["path", "beforeSha256", "afterSha256", "value"]),
 };
+const PROMOTION_PLAN_KEYS = new Set([
+  "schema", "root", "repositoryCapability", "profile", "feature", "authority",
+  "kickoff", "targets", "transactionSha256", "onboardingScript", "planSha256", "applyAction",
+]);
+const PROMOTION_TARGET_KEYS = {
+  state: new Set(["path", "beforeSha256", "afterSha256", "value"]),
+  history: new Set(["path", "beforeSha256", "afterSha256", "value"]),
+};
+const PROMOTION_PROFILES = new Set(["epic", "feature", "mini"]);
+const SAFE_FEATURE_ID = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u;
 
 function authorityPaths(root) {
   const authority = resolveProjectAuthorityPaths({ rootDir: root });
@@ -329,21 +346,36 @@ function parseJsonObject(observation, label) {
 }
 
 function validateHistory(value) {
-  const entryKeys = new Set([
+  const kickoffEntryKeys = new Set([
     "kind", "transactionSha256", "goalSha256", "calibrationSha256",
     "stateSha256", "handoverSha256", "prdSha256", "specSha256",
   ]);
+  const promotionEntryKeys = new Set([
+    "kind", "transactionSha256", "previousTransactionSha256", "profile", "kickoffFeatureId", "featureId",
+    "planPath", "prdSha256", "specSha256", "beforeStateSha256", "afterStateSha256",
+  ]);
+  const validKickoff = (entry) => exactKeys(entry, kickoffEntryKeys)
+    && entry.kind === "kickoff"
+    && [
+      "transactionSha256", "goalSha256", "calibrationSha256", "stateSha256",
+      "handoverSha256", "prdSha256", "specSha256",
+    ].every((key) => SHA256_RE.test(entry[key]));
+  const validPromotion = (entry, previous) => exactKeys(entry, promotionEntryKeys)
+    && entry.kind === "kickoff-promotion"
+    && SHA256_RE.test(entry.transactionSha256)
+    && entry.previousTransactionSha256 === previous?.transactionSha256
+    && PROMOTION_PROFILES.has(entry.profile)
+    && /^kickoff-[a-f0-9]{16}$/u.test(entry.kickoffFeatureId)
+    && SAFE_FEATURE_ID.test(entry.featureId)
+    && typeof entry.planPath === "string"
+    && ["prdSha256", "specSha256", "beforeStateSha256", "afterStateSha256"]
+      .every((key) => SHA256_RE.test(entry[key]));
   if (!exactKeys(value, new Set(["schema", "transactions"]))
     || value.schema !== KICKOFF_HISTORY_SCHEMA
     || !Array.isArray(value.transactions)
     || value.transactions.length < 1
-    || !value.transactions.every((entry) => exactKeys(entry, entryKeys)
-      && entry.kind === "kickoff"
-      && [
-        "transactionSha256", "goalSha256", "calibrationSha256", "stateSha256",
-        "handoverSha256", "prdSha256", "specSha256",
-      ]
-        .every((key) => SHA256_RE.test(entry[key])))) {
+    || !validKickoff(value.transactions[0])
+    || !value.transactions.slice(1).every((entry, index) => validPromotion(entry, value.transactions[index]))) {
     fail("KICKOFF-HISTORY-MALFORMED", "private continuity history is malformed");
   }
   return true;
@@ -980,6 +1012,28 @@ function observeSessionCleanupPrivatization(rootDir, spawn = defaultGitSpawn) {
       || canonicalJson(observed.privateBinding.sessionCleanup) !== canonicalJson(leakedBinding))) {
     fail("SESSION-CLEANUP-PRIVATE-CAS", "private cleanup binding conflicts with portable migration input");
   }
+  let descriptors;
+  try {
+    descriptors = listActiveSessionDescriptors(observed.root, { spawn });
+    if (descriptors.length !== 1
+      || descriptors[0].sessionId !== leakedBinding.sessionId
+      || descriptors[0].descriptorSha256 !== leakedBinding.descriptorSha256) {
+      fail(
+        "SESSION-CLEANUP-PRIVATIZE-DESCRIPTOR",
+        "cleanup privatization requires exactly the bound active descriptor",
+      );
+    }
+    loadSessionDescriptor(observed.root, leakedBinding.sessionId, {
+      spawn,
+      expectedDescriptorSha256: leakedBinding.descriptorSha256,
+    });
+  } catch (error) {
+    if (error instanceof KickoffError) throw error;
+    fail(
+      "SESSION-CLEANUP-PRIVATIZE-DESCRIPTOR",
+      "cleanup privatization active descriptor is unavailable or inconsistent",
+    );
+  }
   return {
     ...observed,
     status: "ready",
@@ -989,7 +1043,23 @@ function observeSessionCleanupPrivatization(rootDir, spawn = defaultGitSpawn) {
   };
 }
 
-function sessionCleanupPrivatizationPlanCore(observed) {
+function sessionCleanupPrivatizationWriter(path) {
+  if (typeof path !== "string" || !isAbsolute(path) || resolve(path) !== path) {
+    fail("SESSION-CLEANUP-PRIVATIZE-WRITER", "cleanup privatization writer path is invalid");
+  }
+  let info;
+  try {
+    info = lstatSync(path);
+  } catch {
+    fail("SESSION-CLEANUP-PRIVATIZE-WRITER", "cleanup privatization writer is unavailable");
+  }
+  if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || realpathSync(path) !== path) {
+    fail("SESSION-CLEANUP-PRIVATIZE-WRITER", "cleanup privatization writer is unsafe");
+  }
+  return path;
+}
+
+function sessionCleanupPrivatizationPlanCore(observed, sessionCleanupScript) {
   return {
     schema: SESSION_CLEANUP_PRIVATIZATION_PLAN_SCHEMA,
     status: observed.status,
@@ -998,6 +1068,30 @@ function sessionCleanupPrivatizationPlanCore(observed) {
     stateSha256: observed.stateSha256,
     featureId: observed.featureId,
     privateBindingStatus: observed.privateBinding === null ? "unbound" : "bound",
+    sessionCleanupScript,
+  };
+}
+
+function sessionCleanupPrivatizationApplyAction(sessionCleanupScript, root, planSha256) {
+  return {
+    kind: "command",
+    executable: "node",
+    argv: [
+      sessionCleanupScript,
+      "apply-privatization",
+      "--repo",
+      root,
+      "--plan-sha256",
+      planSha256,
+      "--activate",
+    ],
+    mutation: true,
+    requiresConfirmation: true,
+    executionBoundary: "host-authorized-wsl",
+    expected: {
+      schema: SESSION_CLEANUP_PRIVATIZATION_APPLY_SCHEMA,
+      statuses: ["applied", "noop"],
+    },
   };
 }
 
@@ -1009,9 +1103,11 @@ function sessionCleanupPrivatizationPlanCore(observed) {
 export function planOnboardingSessionCleanupPrivatization({
   rootDir,
   spawn = defaultGitSpawn,
+  sessionCleanupScript = DEFAULT_SESSION_CLEANUP_SCRIPT,
 } = {}) {
   const observed = observeSessionCleanupPrivatization(rootDir, spawn);
-  const core = sessionCleanupPrivatizationPlanCore(observed);
+  const writer = sessionCleanupPrivatizationWriter(sessionCleanupScript);
+  const core = sessionCleanupPrivatizationPlanCore(observed, writer);
   const planSha256 = sha256(Buffer.from(canonicalJson(core)));
   return {
     ...core,
@@ -1022,6 +1118,9 @@ export function planOnboardingSessionCleanupPrivatization({
         expectedPlanSha256: planSha256,
         requiresActivation: true,
       }
+      : null,
+    applyAction: observed.status === "ready"
+      ? sessionCleanupPrivatizationApplyAction(writer, observed.root, planSha256)
       : null,
   };
 }
@@ -1037,13 +1136,15 @@ export function applyOnboardingSessionCleanupPrivatization({
   expectedPlanSha256,
   activate = false,
   deps = {},
+  sessionCleanupScript = DEFAULT_SESSION_CLEANUP_SCRIPT,
 } = {}) {
   if (!SHA256_RE.test(expectedPlanSha256 ?? "") || activate !== true) {
     fail("SESSION-CLEANUP-PRIVATIZE-ACTIVATION", "cleanup privatization requires the exact plan digest and activation");
   }
   const spawn = deps.spawn ?? defaultGitSpawn;
+  const writer = sessionCleanupPrivatizationWriter(sessionCleanupScript);
   const initial = observeSessionCleanupPrivatization(rootDir, spawn);
-  const initialCore = sessionCleanupPrivatizationPlanCore(initial);
+  const initialCore = sessionCleanupPrivatizationPlanCore(initial, writer);
   const actualPlanSha256 = sha256(Buffer.from(canonicalJson(initialCore)));
   if (actualPlanSha256 !== expectedPlanSha256) {
     fail("SESSION-CLEANUP-PRIVATIZE-CAS", "cleanup privatization plan is stale");
@@ -1074,7 +1175,9 @@ export function applyOnboardingSessionCleanupPrivatization({
   let stateCommitted = false;
   try {
     const current = observeSessionCleanupPrivatization(initial.root, spawn);
-    const currentPlanSha256 = sha256(Buffer.from(canonicalJson(sessionCleanupPrivatizationPlanCore(current))));
+    const currentPlanSha256 = sha256(Buffer.from(canonicalJson(
+      sessionCleanupPrivatizationPlanCore(current, writer),
+    )));
     if (current.status !== "ready" || currentPlanSha256 !== expectedPlanSha256) {
       fail("SESSION-CLEANUP-PRIVATIZE-CAS", "cleanup privatization preimage changed");
     }
@@ -2245,6 +2348,377 @@ export function reconstructOnboardingKickoffPlan(options = {}) {
   return buildOnboardingKickoffPlan({ ...options, allowAppliedReplay: true });
 }
 
+function promotionApplyAction(onboardingScript, root, profile, featureId, planPath, prdPath, specPath, planSha256) {
+  return {
+    kind: "command",
+    executable: "node",
+    argv: [
+      onboardingScript, "kickoff", "promote", "apply", "--root", root,
+      "--profile", profile, "--id", featureId, "--plan-path", planPath,
+      "--prd-path", prdPath, "--spec-path", specPath,
+      "--plan-sha256", planSha256, "--activate",
+    ],
+    mutation: true,
+    requiresConfirmation: true,
+    expected: { schema: "pipeline.project-onboarding.v4", statuses: ["ready"] },
+  };
+}
+
+function promotionBinding(plan) {
+  return {
+    schema: plan.schema,
+    root: plan.root,
+    repositoryCapability: plan.repositoryCapability,
+    profile: plan.profile,
+    feature: plan.feature,
+    authority: plan.authority,
+    kickoff: plan.kickoff,
+    targets: plan.targets,
+    transactionSha256: plan.transactionSha256,
+    onboardingScript: plan.onboardingScript,
+  };
+}
+
+function recognisedKickoff(observed, spawn = defaultGitSpawn) {
+  const state = observed.state;
+  const continuity = state?.continuity;
+  const history = observed.history;
+  if (!exactKeys(state, new Set(["schema", "activeFeature", "planApproved", "continuity"]))) return null;
+  if (state.schema !== "pipeline.state.v0" || state.planApproved !== false
+    || !exactKeys(state.activeFeature, new Set(["id", "planPath", "phase"]))) return null;
+  if (!/^kickoff-[a-f0-9]{16}$/u.test(state.activeFeature.id)
+    || state.activeFeature.planPath !== INITIAL_SPEC_RELATIVE_PATH
+    || state.activeFeature.phase !== "design"
+    || !validateContinuityState(continuity, state.activeFeature.id).ok
+    || continuity.runtime.sessionCleanup !== null
+    || continuity.authority.result !== null
+    || continuity.authority.prd.path !== INITIAL_PRD_RELATIVE_PATH
+    || continuity.authority.spec.path !== INITIAL_SPEC_RELATIVE_PATH
+    || continuity.queueHead?.dispatch !== null
+    || continuity.blocker !== null
+    || continuity.acknowledgedFinal !== null
+    || continuity.recovery !== null
+    || continuity.decisionTxn !== null) return null;
+  if (!history || history.transactions?.length !== 1 || history.transactions[0]?.kind !== "kickoff") return null;
+  const entry = history.transactions[0];
+  const prd = observeOptionalProjectFile(observed.root, INITIAL_PRD_RELATIVE_PATH, "initial PRD");
+  const spec = observeOptionalProjectFile(observed.root, INITIAL_SPEC_RELATIVE_PATH, "initial specification");
+  if (prd.status !== "present" || spec.status !== "present"
+    || entry.calibrationSha256 !== observed.calibrationSha256
+    || entry.handoverSha256 !== observed.handoverObservation.sha256
+    || entry.prdSha256 !== continuity.authority.prd.sha256
+    || entry.specSha256 !== continuity.authority.spec.sha256
+    || entry.prdSha256 !== prd.sha256
+    || entry.specSha256 !== spec.sha256) return null;
+
+  let originalState = state;
+  if (continuity.revision === 1) {
+    if (continuity.resume.mode !== "resume-on-next-turn"
+      || continuity.resume.sourceRevision !== 0
+      || continuity.resume.reasonCode !== "host-no-background-wakeup") return null;
+    let privateBinding;
+    try {
+      privateBinding = readPrivateCleanupBinding(observed.root, { spawn }).binding;
+    } catch {
+      return null;
+    }
+    if (privateBinding?.featureId !== state.activeFeature.id
+      || !isObject(privateBinding.sessionCleanup)) return null;
+    originalState = structuredClone(state);
+    originalState.continuity.revision = 0;
+  } else if (continuity.revision !== 0) {
+    return null;
+  }
+  const originalStateSha256 = sha256(expectedStateBytes(originalState));
+  const transaction = {
+    schema: "pipeline.codex-onboarding-kickoff-transaction.v1",
+    root: observed.root,
+    repositoryCapability: observed.repositoryCapability,
+    goalSha256: entry.goalSha256,
+    calibrationSha256: entry.calibrationSha256,
+    prdSha256: entry.prdSha256,
+    specSha256: entry.specSha256,
+    stateSha256: entry.stateSha256,
+    handoverSha256: entry.handoverSha256,
+  };
+  if (entry.stateSha256 !== originalStateSha256
+    || canonicalSha256(transaction) !== entry.transactionSha256) return null;
+  return {
+    state,
+    originalState,
+    continuity,
+    history,
+    revision: continuity.revision,
+    transactionSha256: entry.transactionSha256,
+  };
+}
+
+function promotionInput({ profile, featureId, planPath, prdPath, specPath }) {
+  if (!PROMOTION_PROFILES.has(profile)) fail("KICKOFF-PROMOTION-INPUT", "promotion profile is invalid");
+  if (!SAFE_FEATURE_ID.test(featureId ?? "") || featureId.startsWith("kickoff-")) {
+    fail("KICKOFF-PROMOTION-INPUT", "promotion feature id is invalid");
+  }
+  for (const [value, label] of [[planPath, "plan"], [prdPath, "PRD"], [specPath, "specification"]]) {
+    safeRelativePath(value, `promotion ${label}`);
+  }
+  if (planPath !== specPath || new Set([prdPath, specPath]).size !== 2) {
+    fail("KICKOFF-PROMOTION-INPUT", "promotion plan and authority paths are inconsistent");
+  }
+  return { profile, featureId, planPath, prdPath, specPath };
+}
+
+function promotionArtifacts(root, input) {
+  const prd = observeOptionalProjectFile(root, input.prdPath, "promotion PRD");
+  const spec = observeOptionalProjectFile(root, input.specPath, "promotion specification");
+  if (prd.status !== "present" || spec.status !== "present") {
+    fail("KICKOFF-PROMOTION-AUTHORITY", "promotion PRD and specification must already exist");
+  }
+  if ([INITIAL_PRD_RELATIVE_PATH, INITIAL_SPEC_RELATIVE_PATH].includes(prd.path)
+    || [INITIAL_PRD_RELATIVE_PATH, INITIAL_SPEC_RELATIVE_PATH].includes(spec.path)) {
+    fail("KICKOFF-PROMOTION-AUTHORITY", "promotion authority must not reuse kickoff artifacts");
+  }
+  return {
+    prd: { path: input.prdPath, sha256: prd.sha256 },
+    spec: { path: input.specPath, sha256: spec.sha256 },
+  };
+}
+
+function promotionResult(plan, status, mutated, spawn = defaultGitSpawn) {
+  const readback = projectReadContinuityStatus(readSanctionedState(plan.root));
+  if (readback.code !== "CS-STATUS-ACTIVE" || readback.continuity.status !== "valid") {
+    fail("KICKOFF-PROMOTION-READBACK", "sanctioned continuity readback rejected promotion");
+  }
+  const continuity = classifyOnboardingContinuity({
+    rootDir: plan.root,
+    repositoryCapability: plan.repositoryCapability,
+    spawn,
+  });
+  if (continuity.status !== "valid" || continuity.stateSha256 !== plan.targets.state.afterSha256
+    || continuity.historySha256 !== plan.targets.history.afterSha256) {
+    fail("KICKOFF-PROMOTION-READBACK", "promotion hashes did not validate immediately");
+  }
+  return {
+    schema: KICKOFF_PROMOTION_APPLY_SCHEMA,
+    status,
+    root: plan.root,
+    planSha256: plan.planSha256,
+    mutated,
+    continuity,
+    readback,
+  };
+}
+
+function validatePromotionPlan(plan) {
+  if (!exactKeys(plan, PROMOTION_PLAN_KEYS) || plan.schema !== KICKOFF_PROMOTION_PLAN_SCHEMA
+    || !new Set(["local", "host-managed"]).has(plan.repositoryCapability)
+    || !isAbsolute(plan.onboardingScript ?? "") || !SHA256_RE.test(plan.planSha256 ?? "")
+    || !SHA256_RE.test(plan.transactionSha256 ?? "")
+    || !exactKeys(plan.feature, new Set(["id", "planPath"]))
+    || !exactKeys(plan.authority, new Set(["prd", "spec"]))
+    || !exactKeys(plan.authority.prd, new Set(["path", "sha256"]))
+    || !exactKeys(plan.authority.spec, new Set(["path", "sha256"]))
+    || !exactKeys(plan.kickoff, new Set(["featureId", "transactionSha256", "stateSha256", "historySha256", "revision"]))
+    || !exactKeys(plan.targets, new Set(["state", "history"]))
+    || !exactKeys(plan.targets.state, PROMOTION_TARGET_KEYS.state)
+    || !exactKeys(plan.targets.history, PROMOTION_TARGET_KEYS.history)) {
+    fail("KICKOFF-PROMOTION-PLAN", "promotion plan is not closed and valid");
+  }
+  const input = promotionInput({
+    profile: plan.profile, featureId: plan.feature.id, planPath: plan.feature.planPath,
+    prdPath: plan.authority.prd.path, specPath: plan.authority.spec.path,
+  });
+  const root = physicalRoot(plan.root);
+  const selected = authorityPaths(root);
+  if (root !== plan.root || plan.targets.state.path !== selected.state
+    || plan.targets.history.path !== HISTORY_BASENAME
+    || ![plan.authority.prd.sha256, plan.authority.spec.sha256, plan.kickoff.transactionSha256,
+      plan.kickoff.stateSha256, plan.kickoff.historySha256, plan.targets.state.beforeSha256,
+      plan.targets.state.afterSha256, plan.targets.history.beforeSha256, plan.targets.history.afterSha256]
+      .every((value) => SHA256_RE.test(value ?? ""))) {
+    fail("KICKOFF-PROMOTION-PLAN", "promotion plan bindings are invalid");
+  }
+  const state = plan.targets.state.value;
+  if (!exactKeys(state, new Set(["schema", "activeFeature", "planApproved", "continuity"]))) {
+    fail("KICKOFF-PROMOTION-PLAN", "promotion state postimage is invalid");
+  }
+  if (state.schema !== "pipeline.state.v0" || state.activeFeature.id !== input.featureId
+    || state.activeFeature.planPath !== input.planPath || state.activeFeature.phase !== "design"
+    || state.planApproved !== false || state.continuity.featureId !== input.featureId
+    || state.continuity.authority.prd.path !== input.prdPath
+    || state.continuity.authority.prd.sha256 !== plan.authority.prd.sha256
+    || state.continuity.authority.spec.path !== input.specPath
+    || state.continuity.authority.spec.sha256 !== plan.authority.spec.sha256
+    || !Number.isSafeInteger(plan.kickoff.revision)
+    || ![0, 1].includes(plan.kickoff.revision)
+    || state.continuity.revision !== plan.kickoff.revision + 1
+    || state.continuity.resume.sourceRevision !== state.continuity.revision
+    || !validateContinuityState(state.continuity, input.featureId).ok) {
+    fail("KICKOFF-PROMOTION-PLAN", "promotion continuity postimage is invalid");
+  }
+  validateHistory(plan.targets.history.value);
+  const history = plan.targets.history.value.transactions;
+  if (history.length !== 2 || history[1].kind !== "kickoff-promotion"
+    || plan.kickoff.stateSha256 !== plan.targets.state.beforeSha256
+    || plan.kickoff.historySha256 !== plan.targets.history.beforeSha256
+    || history[0].transactionSha256 !== plan.kickoff.transactionSha256
+    || history[1].previousTransactionSha256 !== plan.kickoff.transactionSha256
+    || history[1].kickoffFeatureId !== plan.kickoff.featureId
+    || history[1].profile !== plan.profile
+    || history[1].transactionSha256 !== plan.transactionSha256
+    || history[1].featureId !== input.featureId
+    || history[1].planPath !== input.planPath
+    || history[1].prdSha256 !== plan.authority.prd.sha256
+    || history[1].specSha256 !== plan.authority.spec.sha256
+    || history[1].beforeStateSha256 !== plan.targets.state.beforeSha256
+    || history[1].afterStateSha256 !== plan.targets.state.afterSha256) {
+    fail("KICKOFF-PROMOTION-PLAN", "promotion history postimage is invalid");
+  }
+  const stateBytes = expectedStateBytes(state);
+  const historyBytes = expectedHistoryBytes(plan.targets.history.value);
+  const kickoffHistoryBytes = expectedHistoryBytes({
+    schema: KICKOFF_HISTORY_SCHEMA,
+    transactions: [history[0]],
+  });
+  if (sha256(stateBytes) !== plan.targets.state.afterSha256 || sha256(historyBytes) !== plan.targets.history.afterSha256) {
+    fail("KICKOFF-PROMOTION-PLAN", "promotion postimage digest is invalid");
+  }
+  if (sha256(kickoffHistoryBytes) !== plan.targets.history.beforeSha256) {
+    fail("KICKOFF-PROMOTION-PLAN", "promotion kickoff history binding is invalid");
+  }
+  if (canonicalSha256(promotionBinding(plan)) !== plan.planSha256
+    || canonicalJson(plan.applyAction) !== canonicalJson(promotionApplyAction(
+      plan.onboardingScript, plan.root, input.profile, input.featureId, input.planPath,
+      input.prdPath, input.specPath, plan.planSha256,
+    ))) {
+    fail("KICKOFF-PROMOTION-PLAN", "promotion action binding is invalid");
+  }
+  return { input, stateBytes, historyBytes };
+}
+
+function buildKickoffPromotionPlan({
+  rootDir, profile, featureId, planPath, prdPath, specPath,
+  repositoryCapability = "local", onboardingScript = DEFAULT_ONBOARDING_SCRIPT,
+  spawn = defaultGitSpawn, allowAppliedReplay = false,
+} = {}) {
+  if (!isAbsolute(onboardingScript)) fail("KICKOFF-PROMOTION-PLAN", "onboarding script must be absolute");
+  const input = promotionInput({ profile, featureId, planPath, prdPath, specPath });
+  const observed = observeDetailed({ rootDir, repositoryCapability, spawn });
+  if (observed.continuity.status !== "valid") fail("KICKOFF-PROMOTION-STATE", "promotion requires valid continuity");
+  const kickoff = recognisedKickoff(observed, spawn);
+  if (kickoff === null && allowAppliedReplay) {
+    const entries = observed.history?.transactions;
+    const entry = entries?.at(-1);
+    const authority = promotionArtifacts(observed.root, input);
+    if (entries?.length !== 2 || entry?.kind !== "kickoff-promotion"
+      || entry.profile !== input.profile || entry.featureId !== input.featureId
+      || entry.planPath !== input.planPath || entry.prdSha256 !== authority.prd.sha256
+      || entry.specSha256 !== authority.spec.sha256 || entry.afterStateSha256 !== observed.stateObservation.sha256
+      || observed.state?.activeFeature?.id !== input.featureId || observed.state?.activeFeature?.planPath !== input.planPath
+      || observed.state?.continuity?.featureId !== input.featureId
+      || observed.state?.continuity?.authority?.prd?.sha256 !== authority.prd.sha256
+      || observed.state?.continuity?.authority?.spec?.sha256 !== authority.spec.sha256) {
+      fail("KICKOFF-PROMOTION-REPLAY", "promotion replay does not match the exact completed postimage");
+    }
+    const historyBefore = { schema: KICKOFF_HISTORY_SCHEMA, transactions: [entries[0]] };
+    const binding = {
+      schema: KICKOFF_PROMOTION_PLAN_SCHEMA, root: observed.root, repositoryCapability, profile: input.profile,
+      feature: { id: input.featureId, planPath: input.planPath }, authority,
+      kickoff: {
+        featureId: entry.kickoffFeatureId,
+        transactionSha256: entries[0].transactionSha256,
+        stateSha256: entry.beforeStateSha256,
+        historySha256: sha256(expectedHistoryBytes(historyBefore)),
+        revision: observed.state.continuity.revision - 1,
+      },
+      targets: {
+        state: { path: authorityPaths(observed.root).state, beforeSha256: entry.beforeStateSha256, afterSha256: observed.stateObservation.sha256, value: observed.state },
+        history: { path: HISTORY_BASENAME, beforeSha256: sha256(expectedHistoryBytes(historyBefore)), afterSha256: observed.historyObservation.sha256, value: observed.history },
+      },
+      transactionSha256: entry.transactionSha256, onboardingScript,
+    };
+    const planSha256 = canonicalSha256(binding);
+    const plan = { ...binding, planSha256, applyAction: promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, planSha256) };
+    validatePromotionPlan(plan);
+    return plan;
+  }
+  if (kickoff === null) {
+    fail("KICKOFF-PROMOTION-NOT-SEED", "promotion requires the exact unapproved kickoff seed");
+  }
+  const authority = promotionArtifacts(observed.root, input);
+  const beforeStateSha256 = observed.stateObservation.sha256;
+  const beforeHistorySha256 = observed.historyObservation.sha256;
+  const next = structuredClone(kickoff.state);
+  next.activeFeature = { id: input.featureId, planPath: input.planPath, phase: "design" };
+  next.planApproved = false;
+  next.continuity.featureId = input.featureId;
+  next.continuity.revision = kickoff.revision + 1;
+  next.continuity.authority = { prd: authority.prd, spec: authority.spec, result: null };
+  next.continuity.queueHead = {
+    packageId: "kickoff-promotion", actionId: "review-work", nextAction: "review",
+    productRetryCount: 0, environmentRerouteCount: 0, dispatch: null,
+  };
+  next.continuity.blocker = null;
+  next.continuity.acknowledgedFinal = null;
+  next.continuity.resume = {
+    mode: "immediate",
+    sourceRevision: next.continuity.revision,
+    reasonCode: "active-turn",
+  };
+  next.continuity.recovery = null;
+  next.continuity.decisionTxn = null;
+  if (!validateContinuityState(next.continuity, input.featureId).ok) {
+    fail("KICKOFF-PROMOTION-PLAN", "promotion continuity transition is invalid");
+  }
+  const afterStateSha256 = sha256(expectedStateBytes(next));
+  const transaction = {
+    schema: "pipeline.codex-onboarding-kickoff-promotion-transaction.v1",
+    root: observed.root, repositoryCapability, profile: input.profile, feature: { id: input.featureId, planPath: input.planPath },
+    kickoffTransactionSha256: kickoff.transactionSha256, beforeStateSha256, afterStateSha256,
+    prdSha256: authority.prd.sha256, specSha256: authority.spec.sha256,
+  };
+  const transactionSha256 = canonicalSha256(transaction);
+  const history = {
+    schema: KICKOFF_HISTORY_SCHEMA,
+    transactions: [...kickoff.history.transactions, {
+      kind: "kickoff-promotion", transactionSha256, previousTransactionSha256: kickoff.transactionSha256, kickoffFeatureId: kickoff.state.activeFeature.id,
+      profile: input.profile, featureId: input.featureId, planPath: input.planPath,
+      prdSha256: authority.prd.sha256, specSha256: authority.spec.sha256,
+      beforeStateSha256, afterStateSha256,
+    }],
+  };
+  const binding = {
+    schema: KICKOFF_PROMOTION_PLAN_SCHEMA, root: observed.root, repositoryCapability, profile: input.profile,
+    feature: { id: input.featureId, planPath: input.planPath }, authority,
+    kickoff: {
+      featureId: kickoff.state.activeFeature.id,
+      transactionSha256: kickoff.transactionSha256,
+      stateSha256: beforeStateSha256,
+      historySha256: beforeHistorySha256,
+      revision: kickoff.revision,
+    },
+    targets: {
+      state: { path: authorityPaths(observed.root).state, beforeSha256: beforeStateSha256, afterSha256: afterStateSha256, value: next },
+      history: { path: HISTORY_BASENAME, beforeSha256: beforeHistorySha256, afterSha256: sha256(expectedHistoryBytes(history)), value: history },
+    },
+    transactionSha256, onboardingScript,
+  };
+  const planSha256 = canonicalSha256(binding);
+  const plan = {
+    ...binding, planSha256,
+    applyAction: promotionApplyAction(onboardingScript, observed.root, input.profile, input.featureId, input.planPath, input.prdPath, input.specPath, planSha256),
+  };
+  validatePromotionPlan(plan);
+  return plan;
+}
+
+export function planOnboardingKickoffPromotion(options = {}) {
+  return buildKickoffPromotionPlan(options);
+}
+
+export function reconstructOnboardingKickoffPromotionPlan(options = {}) {
+  return buildKickoffPromotionPlan({ ...options, allowAppliedReplay: true });
+}
+
 function fsyncDirectory(path) {
   let fd;
   try {
@@ -2662,5 +3136,77 @@ export function applyOnboardingKickoff({
     if (!simulatedCrash && cleanupCreatedDirectories) {
       rollbackCreatedDirectories([...createdPrivateDirectories, ...createdProjectDirectories]);
     }
+  }
+}
+
+/**
+ * Apply the two-target promotion under the same public/private continuity
+ * locks as kickoff. Publication order is history then state: a crash can only
+ * leave a recoverable history-prefix, never an un-audited active identity.
+ */
+export function applyOnboardingKickoffPromotion({
+  plan,
+  expectedPlanSha256,
+  activate = false,
+  deps = {},
+} = {}) {
+  if (activate !== true) fail("KICKOFF-PROMOTION-ACTIVATION-REQUIRED", "promotion apply requires explicit activation");
+  if (!SHA256_RE.test(expectedPlanSha256 ?? "") || plan?.planSha256 !== expectedPlanSha256) {
+    fail("KICKOFF-PROMOTION-PLAN-DIGEST", "promotion plan digest does not match");
+  }
+  const bytes = validatePromotionPlan(plan);
+  const privatePaths = resolvePrivate(plan.root, plan.repositoryCapability, {
+    create: false, spawn: deps.spawn ?? defaultGitSpawn,
+  });
+  const paths = {
+    state: absoluteProjectPath(plan.root, plan.targets.state.path, "Pipeline machine state"),
+    history: join(privatePaths.directory, HISTORY_BASENAME),
+  };
+  const token = `kickoff-promotion-${plan.planSha256.slice(0, 32)}`;
+  const lockOptions = { nowMs: deps.nowMs ?? Date.now, lockStaleMs: deps.lockStaleMs ?? 30_000 };
+  const stateLock = acquireLock(`${paths.state}.lock`, "pipeline.continuity-lock.v0", token, lockOptions);
+  let privateLock;
+  try {
+    privateLock = acquireLock(join(privatePaths.directory, ".kickoff-writer.lock"), "pipeline.codex-onboarding-kickoff-lock.v1", token, lockOptions);
+    const state = currentTarget(paths.state, plan.targets.state.afterSha256);
+    const history = currentTarget(paths.history, plan.targets.history.afterSha256);
+    if (state.status === "exact" && history.status === "exact") {
+      return promotionResult(plan, "replayed", false, deps.spawn ?? defaultGitSpawn);
+    }
+    const stateBefore = currentTarget(paths.state, plan.targets.state.beforeSha256);
+    const historyBefore = currentTarget(paths.history, plan.targets.history.beforeSha256);
+    const recoverHistoryPrefix = stateBefore.status === "exact" && history.status === "exact"
+      && stateLock.recovered === true && privateLock.recovered === true;
+    if (!(stateBefore.status === "exact" && historyBefore.status === "exact") && !recoverHistoryPrefix) {
+      fail("KICKOFF-PROMOTION-CAS-DRIFT", "promotion target preimage drifted");
+    }
+    const observed = observeDetailed({ rootDir: plan.root, repositoryCapability: plan.repositoryCapability, spawn: deps.spawn ?? defaultGitSpawn });
+    const seed = recognisedKickoff(observed, deps.spawn ?? defaultGitSpawn);
+    if (stateBefore.status === "exact" && seed === null) {
+      fail("KICKOFF-PROMOTION-CAS-DRIFT", "promotion kickoff seed drifted");
+    }
+    const authority = promotionArtifacts(plan.root, {
+      profile: plan.profile, featureId: plan.feature.id, planPath: plan.feature.planPath,
+      prdPath: plan.authority.prd.path, specPath: plan.authority.spec.path,
+    });
+    if (authority.prd.sha256 !== plan.authority.prd.sha256 || authority.spec.sha256 !== plan.authority.spec.sha256) {
+      fail("KICKOFF-PROMOTION-CAS-DRIFT", "promotion authority bytes drifted");
+    }
+    const suffix = (deps.randomUUID ?? randomUUID)().replaceAll("-", "");
+    if (!/^[a-f0-9]{32,64}$/iu.test(suffix)) fail("KICKOFF-PROMOTION-RANDOM-UNAVAILABLE", "promotion temporary-name source is invalid");
+    if (historyBefore.status === "exact") {
+      const temp = join(dirname(paths.history), `.${HISTORY_BASENAME}.promotion-${suffix}.tmp`);
+      writeExclusiveSynced(temp, bytes.historyBytes, 0o600);
+      renameSync(temp, paths.history);
+      fsyncDirectory(dirname(paths.history));
+    }
+    const stateTemp = join(dirname(paths.state), `.${basename(paths.state)}.promotion-${suffix}.tmp`);
+    writeExclusiveSynced(stateTemp, bytes.stateBytes, 0o600);
+    renameSync(stateTemp, paths.state);
+    fsyncDirectory(dirname(paths.state));
+    return promotionResult(plan, "applied", true, deps.spawn ?? defaultGitSpawn);
+  } finally {
+    if (privateLock) releaseLock(privateLock);
+    releaseLock(stateLock);
   }
 }

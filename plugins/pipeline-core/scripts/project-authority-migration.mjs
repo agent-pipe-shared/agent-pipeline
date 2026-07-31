@@ -6,8 +6,10 @@ import { writeSync } from "node:fs";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   applyPendingProjectAuthorityRecovery, applyProjectAuthorityMigration,
+  applyProjectAuthoritySessionCleanupRecovery,
   inspectProjectAuthorityProvenance,
   planPendingProjectAuthorityRecovery, planProjectAuthorityMigration,
+  planProjectAuthoritySessionCleanupRecovery,
   readProjectAuthority,
 } from "../lib/project-authority.mjs";
 
@@ -89,7 +91,13 @@ export function main(args = process.argv.slice(2), { write = process.stdout.writ
       output = applyProjectAuthorityMigration(plan, { rootDir: options.root, activate: options.activate });
     }
   } else {
-    const plan = planPendingProjectAuthorityRecovery({ rootDir: options.root });
+    // Recovery first considers an interrupted authority transaction.  When no
+    // such journal exists it may expose the one closed-receipt-only cleanup
+    // sanitization; it never routes a nonportable State to a generic writer.
+    const pending = planPendingProjectAuthorityRecovery({ rootDir: options.root });
+    const plan = pending.status === "none"
+      ? planProjectAuthoritySessionCleanupRecovery({ rootDir: options.root })
+      : pending;
     if (!options.activate) {
       output = plannedOutput(plan, options.root, "recover");
     } else {
@@ -98,7 +106,9 @@ export function main(args = process.argv.slice(2), { write = process.stdout.writ
         output = { schema: plan.schema, status: "invalid-plan", reason: "plan digest is missing or stale" };
       } else {
         if (plan.status === "ready") previewWrite(`${JSON.stringify(preview(plan, "recovery"))}\n`);
-        output = applyPendingProjectAuthorityRecovery(plan, { rootDir: options.root, activate: true });
+        output = plan.operation === "sanitize-completed-session-cleanup"
+          ? applyProjectAuthoritySessionCleanupRecovery(plan, { rootDir: options.root, activate: true })
+          : applyPendingProjectAuthorityRecovery(plan, { rootDir: options.root, activate: true });
       }
     }
   }

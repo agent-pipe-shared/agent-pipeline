@@ -34,20 +34,56 @@ const REOPENED = "2026-07-30T20:10:00.000Z";
 const RESUBMITTED = "2026-07-30T20:15:00.000Z";
 const REAPPROVED = "2026-07-30T20:20:00.000Z";
 
+function continuity(overrides = {}) {
+  return {
+    schema: "pipeline.continuity.v0",
+    featureId: "feature",
+    revision: 0,
+    runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null },
+    authority: {
+      prd: { path: AUTHORITY.planPath, sha256: "8".repeat(64) },
+      spec: { path: AUTHORITY.specPath, sha256: "9".repeat(64) },
+      result: null,
+    },
+    queueHead: {
+      packageId: "continuity-adoption",
+      actionId: "review-active-feature",
+      nextAction: "review",
+      productRetryCount: 0,
+      environmentRerouteCount: 0,
+      dispatch: null,
+    },
+    blocker: null,
+    acknowledgedFinal: null,
+    resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" },
+    recovery: null,
+    decisionTxn: null,
+    closeTransition: null,
+    capacity: {
+      concurrencyLimit: 4,
+      reservedCriticSlots: 1,
+      reservedRecoverySlots: 1,
+      fallbackPolicy: "defer",
+    },
+    ...overrides,
+  };
+}
+
 function draft() {
   return {
     schema: "pipeline.state.v0",
     activeFeature: { id: "feature", planPath: AUTHORITY.planPath, phase: "design" },
     planApproved: false,
+    continuity: continuity(),
   };
 }
 
-function submitted(state = draft(), authority = AUTHORITY, at = NOW) {
+function submitted(state = draft(), authority = AUTHORITY, at = NOW, profile = "feature") {
   const result = submitPlan({
     state,
     expectedStateSha256: sha256CanonicalJson(state),
     poGateAuthority: authority,
-    profile: "feature",
+    profile,
     profileSha256: PROFILE,
     by: "Coordinator",
     at,
@@ -85,6 +121,145 @@ test("closed lifecycle derives draft, awaiting-approval, approved, and implement
   assert.equal(implementation.ok, true);
   assert.equal(derivePlanLifecycle(implementation.state).status, "implementing");
   assert.deepEqual(Object.keys(implementation.state.activeFeature).sort(), ["id", "phase", "planPath"]);
+});
+
+test("submission atomically rebinds Continuity authority before approval and implementation", () => {
+  for (const profile of ["epic", "feature", "mini"]) {
+    const initial = draft();
+    const awaiting = submitted(initial, AUTHORITY, NOW, profile);
+    assert.equal(awaiting.planSubmission.profile, profile);
+    assert.equal(awaiting.continuity.revision, 1);
+    assert.deepEqual(awaiting.continuity.authority, {
+      prd: { path: AUTHORITY.planPath, sha256: AUTHORITY.planSha256 },
+      spec: { path: AUTHORITY.specPath, sha256: AUTHORITY.specSha256 },
+      result: null,
+    });
+    assert.deepEqual(awaiting.continuity.resume, {
+      mode: "immediate",
+      sourceRevision: 1,
+      reasonCode: "active-turn",
+    });
+    const accepted = approved(awaiting);
+    const implementation = enterPlanImplementation({
+      state: accepted,
+      expectedStateSha256: sha256CanonicalJson(accepted),
+    });
+    assert.equal(implementation.ok, true, JSON.stringify(implementation));
+    assert.deepEqual(implementation.state.continuity, awaiting.continuity);
+    assert.equal(derivePlanLifecycle(implementation.state).status, "implementing");
+  }
+});
+
+test("submission fails closed for malformed, busy, overflow, path, and State-CAS inputs", () => {
+  const valid = draft();
+  const identity = {
+    featureId: "feature",
+    queueRevision: 0,
+    packageId: valid.continuity.queueHead.packageId,
+    actionId: valid.continuity.queueHead.actionId,
+    dispatchId: "dispatch-01",
+    attemptId: "attempt-01",
+    authorityDigests: {
+      prdSha256: valid.continuity.authority.prd.sha256,
+      specSha256: valid.continuity.authority.spec.sha256,
+      resultSha256: null,
+    },
+    routeRequestSha256: "a".repeat(64),
+    mayDelegate: false,
+  };
+  const cases = [
+    [
+      {
+        ...valid,
+        continuity: {
+          ...valid.continuity,
+          runtime: { ...valid.continuity.runtime, activeDuty: "../bad" },
+        },
+      },
+      "PLAN-SUBMIT-CONTINUITY-INVALID",
+    ],
+    [
+      {
+        ...valid,
+        continuity: {
+          ...valid.continuity,
+          queueHead: {
+            ...valid.continuity.queueHead,
+            nextAction: "poll",
+            dispatch: identity,
+          },
+        },
+      },
+      "PLAN-SUBMIT-CONTINUITY-BUSY",
+    ],
+    [
+      {
+        ...valid,
+        continuity: {
+          ...valid.continuity,
+          queueHead: null,
+          blocker: {
+            type: "authority",
+            signature: "authority-update-required",
+            resumeCondition: { kind: "authority-update", evidenceSha256: null },
+            decisionBrief: null,
+          },
+          resume: { mode: "resume-on-next-turn", sourceRevision: 0, reasonCode: "blocker" },
+        },
+      },
+      "PLAN-SUBMIT-CONTINUITY-BUSY",
+    ],
+    [
+      {
+        ...valid,
+        continuity: {
+          ...valid.continuity,
+          revision: Number.MAX_SAFE_INTEGER,
+          resume: {
+            mode: "immediate",
+            sourceRevision: Number.MAX_SAFE_INTEGER,
+            reasonCode: "active-turn",
+          },
+        },
+      },
+      "PLAN-SUBMIT-CONTINUITY-BUSY",
+    ],
+  ];
+  for (const [state, code] of cases) {
+    const result = submitPlan({
+      state,
+      expectedStateSha256: sha256CanonicalJson(state),
+      poGateAuthority: AUTHORITY,
+      profile: "feature",
+      profileSha256: PROFILE,
+      by: "Coordinator",
+      at: NOW,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, code);
+  }
+
+  const pathDrift = submitPlan({
+    state: valid,
+    expectedStateSha256: sha256CanonicalJson(valid),
+    poGateAuthority: { ...AUTHORITY, planPath: "specs/other/prd.md" },
+    profile: "feature",
+    profileSha256: PROFILE,
+    by: "Coordinator",
+    at: NOW,
+  });
+  assert.equal(pathDrift.code, "PLAN-SUBMIT-REQUEST-INVALID");
+
+  const stale = submitPlan({
+    state: valid,
+    expectedStateSha256: "f".repeat(64),
+    poGateAuthority: AUTHORITY,
+    profile: "feature",
+    profileSha256: PROFILE,
+    by: "Coordinator",
+    at: NOW,
+  });
+  assert.equal(stale.code, "PLAN-LIFECYCLE-STATE-STALE");
 });
 
 test("repeated draft edits remain writable while edit-after-submit requires reopen", () => {
@@ -166,4 +341,97 @@ test("legacy approval derives approved or implementing until its next sanctioned
   assert.equal(derivePlanLifecycle(legacy).status, "approved");
   legacy.activeFeature.phase = "implementation";
   assert.equal(derivePlanLifecycle(legacy).status, "implementing");
+});
+
+test("reopen-design retires a pre-submission V2 approval as a profile-independent draft", () => {
+  for (const profile of ["epic", "feature", "mini"]) {
+    // V2 states predate V3 submission/profile evidence. In particular, no
+    // profile is present in the state, so every modern profile takes this same
+    // closed compatibility transition.
+    const legacy = {
+      schema: "pipeline.state.v0",
+      activeFeature: { id: `${profile}-legacy`, planPath: AUTHORITY.planPath, phase: "implementation" },
+      planApproved: true,
+      planApproval: {
+        schema: "pipeline.plan-approval.v2",
+        approvedBy: "PO",
+        approvedAt: NOW,
+        specBoundBy: "PO",
+        specBoundAt: LATER,
+        poGateAuthority: AUTHORITY,
+      },
+    };
+    const reopened = reopenPlanDesign({
+      state: legacy,
+      expectedStateSha256: sha256CanonicalJson(legacy),
+      by: "PO",
+      at: REOPENED,
+    });
+    assert.equal(reopened.ok, true, `${profile}: ${JSON.stringify(reopened)}`);
+    assert.equal(reopened.replay, false);
+    assert.equal(reopened.invalidation, null);
+    assert.equal(reopened.state.activeFeature.phase, "design");
+    assert.equal(reopened.state.planApproved, false);
+    assert.equal(Object.hasOwn(reopened.state, "planSubmission"), false);
+    assert.equal(Object.hasOwn(reopened.state, "planApproval"), false);
+    assert.equal(Object.hasOwn(reopened.state, "planInvalidation"), false);
+    assert.equal(derivePlanLifecycle(reopened.state).status, "draft");
+
+    const replay = reopenPlanDesign({
+      state: reopened.state,
+      expectedStateSha256: sha256CanonicalJson(reopened.state),
+      by: "PO",
+      at: REAPPROVED,
+    });
+    assert.equal(replay.ok, true);
+    assert.equal(replay.replay, true);
+    assert.equal(replay.state, reopened.state);
+  }
+});
+
+test("reopen-design fails closed for drifted or inconsistent pre-submission V2 states", () => {
+  const legacy = {
+    schema: "pipeline.state.v0",
+    activeFeature: { id: "legacy", planPath: AUTHORITY.planPath, phase: "implementation" },
+    planApproved: true,
+    planApproval: {
+      schema: "pipeline.plan-approval.v2",
+      approvedBy: "PO",
+      approvedAt: NOW,
+      specBoundBy: "PO",
+      specBoundAt: LATER,
+      poGateAuthority: AUTHORITY,
+    },
+  };
+  const drifted = {
+    ...legacy,
+    activeFeature: { ...legacy.activeFeature, planPath: "specs/other/prd.md" },
+  };
+  const inconsistent = { ...legacy, planInvalidation: {
+    schema: "pipeline.plan-invalidation.v1",
+    featureId: legacy.activeFeature.id,
+    invalidatedSubmissionSha256: "8".repeat(64),
+    invalidatedApprovalSha256: null,
+    invalidatedBy: "PO",
+    invalidatedAt: REOPENED,
+    reason: "reopen-design",
+  } };
+  for (const state of [drifted, inconsistent]) {
+    const result = reopenPlanDesign({
+      state,
+      expectedStateSha256: sha256CanonicalJson(state),
+      by: "PO",
+      at: REOPENED,
+    });
+    assert.equal(result.ok, false);
+    assert.equal(result.code, "PLAN-REOPEN-SUBMISSION-INVALID");
+  }
+  const stale = reopenPlanDesign({
+    state: legacy,
+    expectedStateSha256: sha256CanonicalJson({ ...legacy, planApproved: false }),
+    by: "PO",
+    at: REOPENED,
+  });
+  assert.equal(stale.ok, false);
+  assert.equal(stale.code, "PLAN-REOPEN-STATE-STALE");
 });

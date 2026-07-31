@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-07-30T21:49:38.169Z",
+  "updatedAt": "2026-07-31T10:12:16.238Z",
   "closedFeatures": [
     {
       "id": "codex-onboarding-0.4.5",
@@ -30,45 +30,23 @@
     "planPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/prd_agent-pipeline-0.4.7-hotfix.md",
     "phase": "implementation"
   },
-  "planApproval": {
-    "schema": "pipeline.plan-approval.v2",
-    "approvedBy": "PO",
-    "approvedAt": "2026-07-30T21:46:27.365Z",
-    "specBoundBy": "PO",
-    "specBoundAt": "2026-07-30T21:46:55.488Z",
-    "poGateAuthority": {
-      "schema": "pipeline.po-gate-authority.v2",
-      "humanFacing": "en",
-      "sourceSha256": "2a0f69551b46963d6d49ef0faaf9db5c28d27c4f681a9d4dd0be1a81b297da10",
-      "runtimeSha256": "071b0236f6054bbeea2140830320a88d1c6a9e733d7294ad0bb976fd2e28c897",
-      "receiptSha256": "d3c4d4b3b952d44e64c2b33164e96ad61652ac25d99425e6ffe9a6fb9c10aebb",
-      "repositoryFingerprint": "3f74c2558c19687097f1285753400a03fde3953ec6a3496820ddbe1f25196f7d",
-      "planPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/prd_agent-pipeline-0.4.7-hotfix.md",
-      "planSha256": "1f04e9b47d8298d3ea44070ecc04244f052f6e479c51e97e5eacc66bea5a7fa6",
-      "specPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/spec.md",
-      "specSha256": "5aa79f0d95a540540246687270ab54c62c21fc771c38d4e864a71fd5719015c3"
-    }
-  },
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "agent-pipeline-0.4.7-hotfix",
-    "revision": 18,
+    "revision": 20,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Coordinator",
-      "sessionCleanup": {
-        "sessionId": "session-c82f49c5e08f0e7bfe74d05f",
-        "descriptorSha256": "034bc150d64e2008bc87c25dd3ecdce44863cc9ac6d9114729c961f07c275316"
-      }
+      "sessionCleanup": null
     },
     "authority": {
       "prd": {
         "path": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/prd_agent-pipeline-0.4.7-hotfix.md",
-        "sha256": "1f04e9b47d8298d3ea44070ecc04244f052f6e479c51e97e5eacc66bea5a7fa6"
+        "sha256": "536e21d500a29ccc637301f60291a20f5786d02edff2bb9563d039a81056d6ca"
       },
       "spec": {
         "path": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/spec.md",
-        "sha256": "5aa79f0d95a540540246687270ab54c62c21fc771c38d4e864a71fd5719015c3"
+        "sha256": "4959ada5652b2d94939eaf6633478c3f1b3c4f968af4dbc85a496638c68a6e32"
       },
       "result": null
     },
@@ -84,7 +62,7 @@
     "acknowledgedFinal": null,
     "resume": {
       "mode": "immediate",
-      "sourceRevision": 0,
+      "sourceRevision": 20,
       "reasonCode": "active-turn"
     },
     "recovery": null,
@@ -95,5 +73,45 @@
       "reservedRecoverySlots": 1,
       "fallbackPolicy": "defer"
     }
+  },
+  "planSubmission": {
+    "schema": "pipeline.plan-submission.v1",
+    "featureId": "agent-pipeline-0.4.7-hotfix",
+    "planPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/prd_agent-pipeline-0.4.7-hotfix.md",
+    "planSha256": "536e21d500a29ccc637301f60291a20f5786d02edff2bb9563d039a81056d6ca",
+    "specPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/spec.md",
+    "specSha256": "4959ada5652b2d94939eaf6633478c3f1b3c4f968af4dbc85a496638c68a6e32",
+    "profile": "feature",
+    "profileSha256": "5956cbe39906901a5c195b33b7de90a51b96e6e2db80eac31fe5497258423580",
+    "submittedBy": "Coordinator",
+    "submittedAt": "2026-07-31T10:11:41.406Z"
+  },
+  "planApproval": {
+    "schema": "pipeline.plan-approval.v3",
+    "approvedBy": "PO",
+    "approvedAt": "2026-07-31T10:12:05.645Z",
+    "submissionSha256": "5b80bf1bf4142fd98f5edd9c90b7d1d0218a1e6a239b5c8ee571ae283f928105",
+    "profileSha256": "5956cbe39906901a5c195b33b7de90a51b96e6e2db80eac31fe5497258423580",
+    "poGateAuthority": {
+      "schema": "pipeline.po-gate-authority.v2",
+      "humanFacing": "en",
+      "sourceSha256": "2a0f69551b46963d6d49ef0faaf9db5c28d27c4f681a9d4dd0be1a81b297da10",
+      "runtimeSha256": "071b0236f6054bbeea2140830320a88d1c6a9e733d7294ad0bb976fd2e28c897",
+      "receiptSha256": "d3c4d4b3b952d44e64c2b33164e96ad61652ac25d99425e6ffe9a6fb9c10aebb",
+      "repositoryFingerprint": "3f74c2558c19687097f1285753400a03fde3953ec6a3496820ddbe1f25196f7d",
+      "planPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/prd_agent-pipeline-0.4.7-hotfix.md",
+      "planSha256": "536e21d500a29ccc637301f60291a20f5786d02edff2bb9563d039a81056d6ca",
+      "specPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/spec.md",
+      "specSha256": "4959ada5652b2d94939eaf6633478c3f1b3c4f968af4dbc85a496638c68a6e32"
+    }
+  },
+  "planInvalidation": {
+    "schema": "pipeline.plan-invalidation.v1",
+    "featureId": "agent-pipeline-0.4.7-hotfix",
+    "invalidatedSubmissionSha256": "8279c80bf565a4f28bd272487039068f3977a4d830b80a0a2e58e8a4befd8e39",
+    "invalidatedApprovalSha256": "5c6673af0da18c4d66df49a352208c5961249cc35458eaf0cff81bd6bc8a4468",
+    "invalidatedBy": "PO",
+    "invalidatedAt": "2026-07-31T08:36:10.909Z",
+    "reason": "reopen-design"
   }
 }

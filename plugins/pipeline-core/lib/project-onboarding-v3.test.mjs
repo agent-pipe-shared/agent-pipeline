@@ -13,6 +13,7 @@ import { fileURLToPath } from "node:url";
 
 import {
   applyProjectOnboardingKickoffV4,
+  applyProjectOnboardingKickoffPromotionV4,
   applyProjectOnboardingLifecycleV4,
   applyProjectOnboardingManifestRepair,
   applyProjectOnboardingV3,
@@ -20,6 +21,7 @@ import {
   planProjectOnboardingManifestRepair,
   planProjectOnboardingSourceRecovery,
   planProjectOnboardingKickoffV4,
+  planProjectOnboardingKickoffPromotionV4,
   planProjectOnboardingLifecycleV4,
   planProjectOnboardingV3,
   renderProjectOnboardingAction,
@@ -37,6 +39,11 @@ import {
 } from "./codex-onboarding-runtime.mjs";
 import { observeOnboardingAppServer } from "./codex-onboarding-app-server.mjs";
 import { readOnboardingSessionCleanupBinding } from "./onboarding-continuity.mjs";
+import { cleanupSession, retireSessionDescriptor, startSessionDescriptor } from "./worktree-lifecycle.mjs";
+import {
+  applyProjectAuthoritySessionCleanupRecovery,
+  planProjectAuthoritySessionCleanupRecovery,
+} from "./project-authority.mjs";
 
 let passed = 0; const failures = [];
 function test(name, run) { try { run(); passed += 1; console.log(`PASS  ${name}`); } catch (error) { failures.push(`${name}: ${error.message}`); console.log(`FAIL  ${name} -- ${error.message}`); } }
@@ -106,6 +113,7 @@ const ONBOARDING_LAUNCH_SCRIPT = fileURLToPath(new URL("../scripts/codex-onboard
 const APP_SERVER_HEALTH_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-health.mjs", import.meta.url));
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 const PLUGIN_PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
+const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
 function names(path) { return readdirSync(path).sort(); }
 function yaml(value, indent = "") {
   return Object.entries(value).map(([key, child]) => {
@@ -698,6 +706,208 @@ test("unapproved kickoff state has no PO authority to rebind", () => {
     writeFileSync(statePath, `${JSON.stringify(malformedApproved, null, 2)}\n`);
     const rejected = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps });
     assert.equal(rejected.status, "partial");
+  } finally { dispose(path); }
+});
+
+test("V4 exposes only the read-only completed-cleanup recovery planner while authority is nonportable", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const statePath = join(path, "project/pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.continuity.runtime.sessionCleanup = {
+      sessionId: "session-legacy-closed",
+      descriptorSha256: "a".repeat(64),
+    };
+    writeFileSync(statePath, `${JSON.stringify(state)}\n`);
+    const observed = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "session",
+      deps: {
+        ...fakeDeps,
+        planProjectAuthoritySessionCleanupRecovery() {
+          return {
+            schema: "pipeline.project-authority-recovery.v1",
+            status: "ready",
+            operation: "sanitize-completed-session-cleanup",
+            targets: [{ path: "project/pipeline-state.json" }],
+          };
+        },
+      },
+    });
+    assert.equal(observed.status, "invalid");
+    assertDiagnostic(observed, "project_authority_invalid");
+    assertSingleLineAction(observed.nextAction, {
+      kind: "command",
+      executable: "node",
+      argv: [PROJECT_AUTHORITY_MIGRATION_SCRIPT, "recover", "--root", path],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: {
+        schema: "pipeline.project-authority-recovery.v1",
+        statuses: ["ready", "none", "recovery-unavailable", "recovery-required"],
+      },
+    });
+  } finally { dispose(path); }
+});
+
+test("completed legacy cleanup recovery returns session V4 to ready after exact apply", () => {
+  const path = root();
+  try {
+    hostGit(path, ["init", "-q"]);
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const descriptor = startSessionDescriptor(path, { sessionId: "session-v4-legacy-closed" });
+    assert.equal(cleanupSession(path, {
+      sessionId: descriptor.sessionId, ownerNonce: descriptor.ownerNonce,
+    }, { allowAbsent: true }).ok, true);
+    retireSessionDescriptor(path, {
+      sessionId: descriptor.sessionId, ownerNonce: descriptor.ownerNonce, descriptorSha256: descriptor.descriptorSha256,
+    });
+    const statePath = join(path, "project/pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.continuity.runtime.sessionCleanup = {
+      sessionId: descriptor.sessionId,
+      descriptorSha256: descriptor.descriptorSha256,
+    };
+    writeFileSync(statePath, `${JSON.stringify(state)}\n`);
+    const blocked = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps: fakeDeps });
+    assert.equal(blocked.status, "invalid");
+    assertSingleLineAction(blocked.nextAction, {
+      kind: "command",
+      executable: "node",
+      argv: [PROJECT_AUTHORITY_MIGRATION_SCRIPT, "recover", "--root", path],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: {
+        schema: "pipeline.project-authority-recovery.v1",
+        statuses: ["ready", "none", "recovery-unavailable", "recovery-required"],
+      },
+    });
+    const plan = planProjectAuthoritySessionCleanupRecovery({ rootDir: path });
+    assert.equal(plan.status, "ready");
+    assert.equal(applyProjectAuthoritySessionCleanupRecovery(plan, { rootDir: path, activate: true }).status, "recovered");
+    const ready = inspectProjectOnboardingV3({ rootDir: path, intent: "session", deps: fakeDeps });
+    assert.equal(ready.status, "ready", JSON.stringify(ready.diagnostics));
+    assert.equal(ready.nextAction, null);
+  } finally { dispose(path); }
+});
+
+test("active historical cleanup binding exposes privatization and returns V4 to ready after confirmed apply", () => {
+  const path = root();
+  let output = "";
+  const invokeCleanup = (args, dependencies = {}) => {
+    output = "";
+    const status = sessionCleanupCli(args, {}, {
+      ...dependencies,
+      writeFn(value) { output += value; },
+    });
+    assert.equal(status, 0);
+    return JSON.parse(output);
+  };
+  try {
+    hostGit(path, ["init", "-q"]);
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const descriptor = startSessionDescriptor(path, {
+      sessionId: "session-v4-active-private",
+      ownerNonce: "session-v4-active-private-owner",
+    });
+    const statePath = join(path, "project/pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.continuity.runtime.sessionCleanup = {
+      sessionId: descriptor.sessionId,
+      descriptorSha256: descriptor.descriptorSha256,
+    };
+    writeFileSync(statePath, `${JSON.stringify(state)}\n`);
+
+    const blocked = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "session",
+      deps: fakeDeps,
+    });
+    assert.equal(blocked.status, "invalid");
+    assertSingleLineAction(blocked.nextAction, {
+      kind: "command",
+      executable: "node",
+      argv: [SESSION_CLEANUP_SCRIPT, "plan-privatization", "--repo", path],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: {
+        schema: "pipeline.session-cleanup-privatization-plan.v1",
+        statuses: ["ready", "noop"],
+      },
+    });
+
+    const plan = invokeCleanup(["plan-privatization", "--repo", path]);
+    assert.equal(plan.status, "ready");
+    assert.match(plan.planSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(JSON.stringify(plan).includes(descriptor.sessionId), false);
+    assert.equal(JSON.stringify(plan).includes(descriptor.descriptorSha256), false);
+    const applied = invokeCleanup(plan.applyAction.argv.slice(1));
+    assert.equal(applied.status, "applied");
+    const portable = JSON.parse(readFileSync(statePath, "utf8"));
+    assert.equal(portable.continuity.runtime.sessionCleanup, null);
+    assert.deepEqual(readOnboardingSessionCleanupBinding({ rootDir: path }).sessionCleanup, {
+      sessionId: descriptor.sessionId,
+      descriptorSha256: descriptor.descriptorSha256,
+    });
+    const ready = inspectProjectOnboardingV3({
+      rootDir: path,
+      intent: "session",
+      deps: fakeDeps,
+    });
+    assert.equal(ready.status, "ready", JSON.stringify(ready.diagnostics));
+    const reused = invokeCleanup(["start", "--repo", path], {
+      requireProjectOnboardingReadyFn() {
+        return {
+          schema: "pipeline.project-onboarding-ready-gate.v1",
+          status: "ready",
+          intent: "session",
+        };
+      },
+    });
+    assert.equal(reused.code, "WT-SESSION-REUSED");
+    assert.equal(reused.sessionId, descriptor.sessionId);
+    assert.equal(reused.descriptorSha256, descriptor.descriptorSha256);
+  } finally { dispose(path); }
+});
+
+test("nonportable cleanup authority keeps a null nextAction when privatization is unavailable", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    completeKickoff(path);
+    const statePath = join(path, "project/pipeline-state.json");
+    const state = JSON.parse(readFileSync(statePath, "utf8"));
+    state.continuity.runtime.sessionCleanup = {
+      sessionId: "session-without-descriptor",
+      descriptorSha256: "b".repeat(64),
+    };
+    writeFileSync(statePath, `${JSON.stringify(state)}\n`);
+    for (const privatization of [
+      () => { throw new Error("malformed cleanup binding"); },
+      () => ({ schema: "pipeline.session-cleanup-privatization-plan.v1", status: "unavailable" }),
+    ]) {
+      const observed = inspectProjectOnboardingV3({
+        rootDir: path,
+        intent: "session",
+        deps: {
+          ...fakeDeps,
+          planProjectAuthoritySessionCleanupRecovery() {
+            return { schema: "pipeline.project-authority-recovery.v1", status: "recovery-unavailable" };
+          },
+          planOnboardingSessionCleanupPrivatization: privatization,
+        },
+      });
+      assert.equal(observed.status, "invalid");
+      assert.equal(observed.nextAction, null);
+    }
   } finally { dispose(path); }
 });
 
@@ -1968,6 +2178,151 @@ test("public kickoff plan/apply carries goal as one argv element and reconstruct
     assert.equal(replayed.result.status, "ready");
     assert.equal(replayed.result.continuity.status, "valid");
     assert.equal(existsSync(join(path, "nope")), false);
+  } finally { dispose(path); }
+});
+
+test("kickoff promotion replaces only the exact unapproved seed and is replay-safe across profiles", () => {
+  for (const profile of ["epic", "feature", "mini"]) {
+    const path = root();
+    try {
+      const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
+      completeKickoff(path, `Promotion ${profile}`);
+      mkdirSync(join(path, "specs"), { recursive: true });
+      const prdPath = `specs/${profile}-prd.md`;
+      const specPath = `specs/${profile}-spec.md`;
+      writeFileSync(join(path, prdPath), `# ${profile} PRD\n`);
+      writeFileSync(join(path, specPath), `# ${profile} Spec\n`);
+      const args = {
+        rootDir: path, profile, featureId: `${profile}-work`, planPath: specPath,
+        prdPath, specPath, deps: fakeDeps,
+      };
+      const plan = planProjectOnboardingKickoffPromotionV4(args);
+      assert.equal(plan.schema, "pipeline.codex-onboarding-kickoff-promotion-plan.v1");
+      assert.equal(plan.targets.state.value.planApproved, false);
+      assert.equal(plan.targets.state.value.planSubmission, undefined);
+      const applied = applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: plan.planSha256, activate: true });
+      assert.equal(applied.status, "ready");
+      const state = JSON.parse(readFileSync(join(path, "project", "pipeline-state.json"), "utf8"));
+      assert.equal(state.activeFeature.id, `${profile}-work`);
+      assert.equal(state.activeFeature.planPath, specPath);
+      assert.equal(state.planApproved, false);
+      assert.equal(state.planSubmission, undefined);
+      assert.equal(state.planApproval, undefined);
+      const replayed = applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: plan.planSha256, activate: true });
+      assert.equal(replayed.status, "ready");
+    } finally { dispose(path); }
+  }
+});
+
+test("public cleanup privatization preserves the historical kickoff seed for CLI promotion", () => {
+  const path = root();
+  let onboardingOutput = "";
+  let onboardingError = "";
+  let cleanupOutput = "";
+  const invokeOnboarding = (args) => {
+    onboardingOutput = "";
+    onboardingError = "";
+    const code = onboardingCli(args, {
+      deps: fakeDeps,
+      write: (chunk) => { onboardingOutput += chunk; },
+      writeError: (chunk) => { onboardingError += chunk; },
+    });
+    return { code, result: onboardingOutput ? JSON.parse(onboardingOutput) : null };
+  };
+  const invokeCleanup = (args) => {
+    cleanupOutput = "";
+    const code = sessionCleanupCli(args, {}, {
+      writeFn(value) { cleanupOutput += value; },
+    });
+    return { code, result: cleanupOutput ? JSON.parse(cleanupOutput) : null };
+  };
+  try {
+    hostGit(path, ["init", "-q"]);
+    const barrier = initializeRestartRequiredRoot(path);
+    clearRuntimeBarrier(path, barrier);
+    const kickoff = completeKickoff(path, "Promote the privatized historical kickoff");
+    const descriptor = startSessionDescriptor(path, {
+      sessionId: "session-kickoff-promote-private",
+      ownerNonce: "session-kickoff-promote-private-owner",
+    });
+    const statePath = join(path, "project", "pipeline-state.json");
+    const historical = JSON.parse(readFileSync(statePath, "utf8"));
+    historical.continuity.revision = 1;
+    historical.continuity.runtime.sessionCleanup = {
+      sessionId: descriptor.sessionId,
+      descriptorSha256: descriptor.descriptorSha256,
+    };
+    writeFileSync(statePath, `${JSON.stringify(historical)}\n`);
+
+    const privatization = invokeCleanup(["plan-privatization", "--repo", path]);
+    assert.equal(privatization.code, 0);
+    assert.equal(privatization.result.status, "ready");
+    const privatized = invokeCleanup(privatization.result.applyAction.argv.slice(1));
+    assert.equal(privatized.code, 0);
+    assert.equal(privatized.result.status, "applied");
+    const seed = JSON.parse(readFileSync(statePath, "utf8"));
+    assert.equal(seed.continuity.revision, 1);
+    assert.equal(seed.continuity.runtime.sessionCleanup, null);
+    assert.equal(seed.continuity.resume.mode, "resume-on-next-turn");
+    assert.equal(seed.continuity.resume.sourceRevision, 0);
+    const seedSha256 = sha256(readFileSync(statePath));
+
+    mkdirSync(join(path, "specs", "post-private"), { recursive: true });
+    const prdPath = "specs/post-private/prd.md";
+    const specPath = "specs/post-private/spec.md";
+    writeFileSync(join(path, prdPath), "# Post-private PRD\n");
+    writeFileSync(join(path, specPath), "# Post-private specification\n");
+    const promoteArgs = [
+      "kickoff", "promote", "plan", "--root", path,
+      "--profile", "feature", "--id", "post-private-work",
+      "--plan-path", specPath, "--prd-path", prdPath, "--spec-path", specPath,
+    ];
+    const planned = invokeOnboarding(promoteArgs);
+    assert.equal(planned.code, 0, onboardingError);
+    assert.equal(planned.result.schema, "pipeline.codex-onboarding-kickoff-promotion-plan.v1");
+    assert.equal(planned.result.kickoff.revision, 1);
+    assert.equal(planned.result.kickoff.transactionSha256, kickoff.transactionSha256);
+    assert.equal(planned.result.targets.state.beforeSha256, seedSha256);
+    assert.equal(planned.result.targets.state.value.continuity.revision, 2);
+    assert.equal(planned.result.targets.state.value.continuity.resume.sourceRevision, 2);
+    assert.equal(planned.result.targets.history.value.transactions[1].beforeStateSha256, seedSha256);
+    assert.equal(planned.result.targets.history.value.transactions[1].previousTransactionSha256,
+      kickoff.transactionSha256);
+
+    const applied = invokeOnboarding(planned.result.applyAction.argv.slice(1));
+    assert.equal(applied.code, 0, onboardingError);
+    assert.equal(applied.result.status, "ready");
+    assert.equal(applied.result.continuity.status, "valid");
+    const after = readFileSync(statePath);
+    const promoted = JSON.parse(after.toString("utf8"));
+    assert.equal(promoted.activeFeature.id, "post-private-work");
+    assert.equal(promoted.continuity.revision, 2);
+    assert.equal(promoted.continuity.resume.sourceRevision, 2);
+
+    const replayed = invokeOnboarding(planned.result.applyAction.argv.slice(1));
+    assert.equal(replayed.code, 0, onboardingError);
+    assert.equal(replayed.result.status, "ready");
+    assert.equal(replayed.result.continuity.status, "valid");
+    assert.deepEqual(readFileSync(statePath), after);
+  } finally { dispose(path); }
+});
+
+test("kickoff promotion fails closed for authority drift, a real active feature, and plan replay mismatch", () => {
+  const path = root();
+  try {
+    const barrier = initializeRestartRequiredRoot(path); clearRuntimeBarrier(path, barrier);
+    completeKickoff(path, "Promotion failures");
+    mkdirSync(join(path, "specs"), { recursive: true });
+    writeFileSync(join(path, "specs", "real-prd.md"), "# PRD\n");
+    writeFileSync(join(path, "specs", "real-spec.md"), "# Spec\n");
+    const args = { rootDir: path, profile: "feature", featureId: "real-work", planPath: "specs/real-spec.md", prdPath: "specs/real-prd.md", specPath: "specs/real-spec.md", deps: fakeDeps };
+    const plan = planProjectOnboardingKickoffPromotionV4(args);
+    writeFileSync(join(path, "specs", "real-spec.md"), "# changed\n");
+    assert.throws(() => applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: plan.planSha256, activate: true }), /promotion plan digest/u);
+    writeFileSync(join(path, "specs", "real-spec.md"), "# Spec\n");
+    const applied = applyProjectOnboardingKickoffPromotionV4({ ...args, planSha256: plan.planSha256, activate: true });
+    assert.equal(applied.status, "ready");
+    assert.throws(() => planProjectOnboardingKickoffPromotionV4({ ...args, featureId: "other-work" }), /exact unapproved kickoff seed/u);
   } finally { dispose(path); }
 });
 

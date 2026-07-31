@@ -3,11 +3,11 @@
 
 /** Translate provider-neutral guard exits into Codex PreToolUse denials. */
 import { spawnSync } from "node:child_process";
-import { existsSync, readFileSync, realpathSync } from "node:fs";
+import { existsSync, read, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { evaluateLifecycleReadyGuard, isSanctionedLifecycleCommand } from "./guard-lifecycle-ready.mjs";
+import { isSanctionedLifecycleCommand } from "./guard-lifecycle-ready.mjs";
 import {
   consumeHumanGuardOverride,
   recordHumanGuardDenial,
@@ -18,6 +18,11 @@ import { parseGuardCommand } from "./guard-command-grammar.mjs";
 const DEBUG_PREFIX = "[pipeline.codex-pretool.v1]";
 const PLUGIN_ROOT = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const PIPELINE_START_SKILL = join(PLUGIN_ROOT, "skills", "pipeline-start", "SKILL.md");
+const LIFECYCLE_GUARD = join(PLUGIN_ROOT, "hooks", "guard-lifecycle-ready.mjs");
+const HOOK_STARTED_AT = Date.now();
+const HOOK_BUDGET_MS = 9_000;
+const STDIN_TIMEOUT_MS = 1_000;
+const STDIN_MAX_BYTES = 1024 * 1024;
 let completed = false;
 
 function diagnostic(code, fields = {}) {
@@ -41,6 +46,75 @@ function deny(reason, debug = undefined) {
   process.exit(0);
 }
 
+function remainingBudgetMs(reserveMs = 0) {
+  return HOOK_BUDGET_MS - (Date.now() - HOOK_STARTED_AT) - reserveMs;
+}
+
+function timedOutSpawnResult() {
+  const error = new Error("Codex PreToolUse hook budget is exhausted");
+  error.code = "ETIMEDOUT";
+  return { status: null, signal: "SIGTERM", error, stdout: "", stderr: "" };
+}
+
+function boundedSpawn(executable, args, options, { capMs, reserveMs }) {
+  const available = remainingBudgetMs(reserveMs);
+  if (available <= 0) return timedOutSpawnResult();
+  return spawnSync(executable, args, {
+    ...options,
+    timeout: Math.max(1, Math.min(capMs, available)),
+  });
+}
+
+function readStdinBounded(timeoutMs = STDIN_TIMEOUT_MS) {
+  return new Promise((resolveInput, rejectInput) => {
+    const chunks = [];
+    let bytesRead = 0;
+    let settled = false;
+    const finish = (callback, result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      callback(result);
+    };
+    const timer = setTimeout(() => {
+      const error = new Error("Codex PreToolUse input did not close in time");
+      error.code = "HOOK-STDIN-TIMEOUT";
+      finish(rejectInput, error);
+    }, timeoutMs);
+    const readNext = () => {
+      if (settled) return;
+      const buffer = Buffer.allocUnsafe(64 * 1024);
+      read(0, buffer, 0, buffer.length, null, (error, count) => {
+        if (settled) return;
+        if (error) {
+          finish(rejectInput, error);
+          return;
+        }
+        if (count === 0) {
+          finish(resolveInput, Buffer.concat(chunks, bytesRead).toString("utf8"));
+          return;
+        }
+        bytesRead += count;
+        if (bytesRead > STDIN_MAX_BYTES) {
+          const oversized = new Error("Codex PreToolUse input exceeds its byte limit");
+          oversized.code = "HOOK-STDIN-OVERSIZED";
+          finish(rejectInput, oversized);
+          return;
+        }
+        chunks.push(buffer.subarray(0, count));
+        const value = Buffer.concat(chunks, bytesRead).toString("utf8");
+        try {
+          JSON.parse(value);
+          finish(resolveInput, value);
+        } catch {
+          readNext();
+        }
+      });
+    };
+    readNext();
+  });
+}
+
 // Codex reports a bare "hook exited with code 1" when an uncaught adapter
 // exception escapes. Convert those into the normal, fail-closed hook response
 // and leave a sanitized diagnostic for the next attended invocation.
@@ -58,9 +132,9 @@ process.on("unhandledRejection", (reason) => {
 });
 
 let rawInput;
-try { rawInput = readFileSync(0, "utf8"); }
+try { rawInput = await readStdinBounded(); }
 catch (error) {
-  deny("Codex PreToolUse input could not be read; pipeline guards fail closed.", {
+  deny("Codex PreToolUse input was unavailable within the hook budget; pipeline guards fail closed.", {
     code: "stdin-read-failed",
     fields: { name: error?.name, code: error?.code },
   });
@@ -164,7 +238,7 @@ const denials = [];
 const warnings = [];
 for (const guardName of guardNames) {
   const guard = fileURLToPath(new URL(`./${guardName}`, import.meta.url));
-  const result = spawnSync(process.execPath, [guard], {
+  const result = boundedSpawn(process.execPath, [guard], {
     cwd: projectRoot,
     // Existing provider-neutral guards still consume CLAUDE_PROJECT_DIR.
     // Bind that compatibility variable to Codex's native, physical cwd rather
@@ -176,11 +250,7 @@ for (const guardName of guardNames) {
     },
     encoding: "utf8",
     input: rawInput,
-    // A Codex hook has a ten-second outer budget. Bound each nested guard so
-    // two sequential guards cannot turn a diagnosable timeout into an opaque
-    // host-level exit-1 failure.
-    timeout: 4_000,
-  });
+  }, { capMs: 2_000, reserveMs: 4_000 });
   const detail = String(result.stderr ?? "").trim();
   if (result.status === 2) denials.push({
     guard: guardName,
@@ -197,14 +267,43 @@ for (const guardName of guardNames) {
   }
 }
 if (lifecycleShouldRun) {
-  const lifecycle = evaluateLifecycleReadyGuard(input, { projectDir: projectRoot });
-  if (lifecycle.exitCode === 2) denials.push({
+  const lifecycle = boundedSpawn(process.execPath, [LIFECYCLE_GUARD], {
+    cwd: projectRoot,
+    env: { ...process.env, CLAUDE_PROJECT_DIR: projectRoot },
+    encoding: "utf8",
+    input: rawInput,
+  }, { capMs: 3_000, reserveMs: 1_500 });
+  const detail = String(lifecycle.stderr ?? "").trim();
+  if (lifecycle.status === 2) denials.push({
     guard: "guard-lifecycle-ready.mjs",
-    reason: String(lifecycle.stderr ?? "guard-lifecycle-ready denied the tool call.").trim(),
+    reason: detail || "guard-lifecycle-ready denied the tool call.",
   });
-  else if (lifecycle.exitCode === 1) warnings.push(String(lifecycle.stderr ?? "guard-lifecycle-ready returned a warning.").trim());
+  else if (lifecycle.status === 1) warnings.push(detail || "guard-lifecycle-ready returned a warning.");
+  else if (lifecycle.status !== 0) {
+    const failure = lifecycle.error?.code ?? lifecycle.error?.name
+      ?? lifecycle.signal ?? `exit-${String(lifecycle.status)}`;
+    diagnostic("lifecycle-guard-failed", { failure });
+    denials.push({
+      guard: "guard-lifecycle-ready.mjs",
+      reason: `guard-lifecycle-ready failed within the hook budget (${failure}); pipeline guards fail closed.`,
+    });
+  }
 }
 if (denials.length > 0) {
+  const grammarCode = [
+    "GUARD-PARSE-UNSUPPORTED",
+    "GUARD-OPERATOR-UNAPPROVED",
+    "GUARD-REDIRECT-UNAPPROVED",
+  ].find((code) => denials.some((entry) => entry.reason.includes(`${code}:`)));
+  if (grammarCode) {
+    deny(`${denials.map((entry) => entry.reason).join("\n")}\nHuman override unavailable: HGO-NONOVERRIDABLE-GRAMMAR.`);
+  }
+  const overrideSpawn = (executable, args, options) => boundedSpawn(
+    executable,
+    args,
+    options,
+    { capMs: 300, reserveMs: 400 },
+  );
   let consumed;
   try {
     consumed = consumeHumanGuardOverride({
@@ -213,6 +312,7 @@ if (denials.length > 0) {
       toolName,
       toolInput: input?.tool_input ?? {},
       denials,
+      spawn: overrideSpawn,
     });
   } catch (error) {
     diagnostic("human-override-consume-failed", { name: error?.name, code: error?.code });
@@ -234,6 +334,7 @@ if (denials.length > 0) {
         toolName,
         toolInput: input?.tool_input ?? {},
         denials,
+        spawn: overrideSpawn,
       });
       if (planned.status === "planned") {
         const script = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");

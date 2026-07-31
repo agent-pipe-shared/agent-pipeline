@@ -114,6 +114,38 @@ function state(planPath = "specs/feature/prd_feature.md") {
   return `${JSON.stringify({
     schema: "pipeline.state.v0",
     activeFeature: { id: "feature", planPath, phase: "design" },
+    planApproved: false,
+    continuity: {
+      schema: "pipeline.continuity.v0",
+      featureId: "feature",
+      revision: 0,
+      runtime: { humanFacingLanguage: "de", activeDuty: "Coordinator", sessionCleanup: null },
+      authority: {
+        prd: { path: planPath, sha256: "a".repeat(64) },
+        spec: { path: "specs/feature/spec.md", sha256: "b".repeat(64) },
+        result: null,
+      },
+      queueHead: {
+        packageId: "continuity-adoption",
+        actionId: "review-active-feature",
+        nextAction: "review",
+        productRetryCount: 0,
+        environmentRerouteCount: 0,
+        dispatch: null,
+      },
+      blocker: null,
+      acknowledgedFinal: null,
+      resume: { mode: "immediate", sourceRevision: 0, reasonCode: "active-turn" },
+      recovery: null,
+      decisionTxn: null,
+      closeTransition: null,
+      capacity: {
+        concurrencyLimit: 4,
+        reservedCriticSlots: 1,
+        reservedRecoverySlots: 1,
+        fallbackPolicy: "defer",
+      },
+    },
   }, null, 2)}\n`;
 }
 

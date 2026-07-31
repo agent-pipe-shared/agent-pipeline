@@ -32,6 +32,7 @@ export const CHANNEL_FETCH_SKEW_MS = 5 * 60 * 1000;
 const SHA256 = /^[0-9a-f]{64}$/u;
 const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 const STABLE_VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/u;
+const BETA_VERSION = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)-beta\.(0|[1-9][0-9]*)$/u;
 const SAFE_REF = /^refs\/(?:heads|tags)\/[A-Za-z0-9._/-]+$/u;
 const SAFE_REPOSITORY_PATH = /^(?!\/)(?!.*(?:^|\/)\.\.?$)(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9._@+\-/]+$/u;
 const VERSION_SURFACES = Object.freeze(["versionFile", "codexPlugin", "claudePlugin", "codexMarketplaceResolved", "claudeMarketplaceResolved"]);
@@ -105,6 +106,32 @@ export function nextMinorVersion(version) {
   return `${major}.${minor + 1n}.0`;
 }
 
+function parsePromotionVersion(value, promotionChannel, label) {
+  if (promotionChannel === "stable") return parseStableVersion(value, label);
+  if (promotionChannel !== "beta" || typeof value !== "string") fail("RVD-CHANNEL", `${label} requires an explicit beta or stable promotion channel`);
+  const match = BETA_VERSION.exec(value);
+  if (!match) fail("RVD-SEMVER", `${label} must be X.Y.Z-beta.N without build metadata or leading zeroes`);
+  return match.slice(1, 4).map((part) => BigInt(part));
+}
+
+const SELECTION_KEYS = ["promotionChannel", "targetVersion", "targetTag", "candidateCommit", "candidateTree"];
+function validateReleaseSelection(selection, privateChannel, neutralPublicChannel) {
+  exactKeys(selection, SELECTION_KEYS, "release promotion selection");
+  if (!new Set(["beta", "stable"]).has(selection.promotionChannel)) fail("RVD-CHANNEL", "release promotion channel must explicitly be beta or stable; alpha is not publishable");
+  const targetCore = parsePromotionVersion(selection.targetVersion, selection.promotionChannel, "target version");
+  if (selection.targetTag !== `v${selection.targetVersion}`) fail("RVD-TAG", "target tag must exactly be v plus target version");
+  if (!OID.test(selection.candidateCommit ?? "") || !OID.test(selection.candidateTree ?? "")
+    || selection.candidateCommit.length !== selection.candidateTree.length) fail("RVD-CANDIDATE", "selected candidate commit/tree must be exact same-format Git object IDs");
+  const privateStable = parseStableVersion(privateChannel.highestStableVersion, "private highest stable version");
+  const publicStable = parseStableVersion(neutralPublicChannel.highestStableVersion, "neutral-public highest stable version");
+  for (const baseline of [privateStable, publicStable]) {
+    let comparison = 0;
+    for (let index = 0; index < 3 && comparison === 0; index += 1) comparison = targetCore[index] < baseline[index] ? -1 : targetCore[index] > baseline[index] ? 1 : 0;
+    if (comparison <= 0) fail("RVD-TARGET", "selected target release line must be above every observed stable baseline");
+  }
+  return true;
+}
+
 const CHANNEL_KEYS = ["repositoryFingerprint", "ref", "commit", "tree", "highestStableTag", "highestStableVersion", "peeledCommit", "fetchedAt"];
 function validateChannel(channel, label) {
   exactKeys(channel, CHANNEL_KEYS, `${label} channel`);
@@ -120,6 +147,7 @@ function decisionPayload(decision) {
   return {
     private: decision.private,
     neutralPublic: decision.neutralPublic,
+    selection: decision.selection,
     targetVersion: decision.targetVersion,
     targetTag: decision.targetTag,
     observedAt: decision.observedAt,
@@ -143,18 +171,13 @@ function validateFreshness(decision, nowMs) {
 
 /** Validate the closed durable record and optionally re-check its freshness. */
 export function validateReleaseVersionDecision(decision, { nowMs = null } = {}) {
-  exactKeys(decision, ["schema", "decisionId", "private", "neutralPublic", "targetVersion", "targetTag", "observedAt"], "release version decision");
+  exactKeys(decision, ["schema", "decisionId", "private", "neutralPublic", "selection", "targetVersion", "targetTag", "observedAt"], "release version decision");
   if (decision.schema !== RELEASE_VERSION_DECISION_SCHEMA) fail("RVD-SCHEMA", "release version decision schema is invalid");
   if (typeof decision.decisionId !== "string" || !SHA256.test(decision.decisionId)) fail("RVD-ID", "release version decision ID is invalid");
   validateChannel(decision.private, "private");
   validateChannel(decision.neutralPublic, "neutral-public");
-  parseStableVersion(decision.targetVersion, "target version");
-  if (decision.targetTag !== `v${decision.targetVersion}`) fail("RVD-TAG", "target tag must exactly be v plus target version");
-  const greaterBaseline = compareStableVersions(decision.private.highestStableVersion, decision.neutralPublic.highestStableVersion) >= 0
-    ? decision.private.highestStableVersion
-    : decision.neutralPublic.highestStableVersion;
-  const expectedTarget = nextMinorVersion(greaterBaseline);
-  if (decision.targetVersion !== expectedTarget || compareStableVersions(decision.targetVersion, decision.private.highestStableVersion) <= 0 || compareStableVersions(decision.targetVersion, decision.neutralPublic.highestStableVersion) <= 0) fail("RVD-TARGET", "target version must be the next minor above the greater channel baseline");
+  validateReleaseSelection(decision.selection, decision.private, decision.neutralPublic);
+  if (decision.targetVersion !== decision.selection.targetVersion || decision.targetTag !== decision.selection.targetTag) fail("RVD-TARGET", "decision target fields must equal the explicit promotion selection");
   if (decision.decisionId !== releaseVersionDecisionId(decisionPayload(decision))) fail("RVD-ID", "release version decision ID does not bind the complete observation");
   if (nowMs !== null) {
     if (!Number.isSafeInteger(nowMs) || nowMs < 0) fail("RVD-TIME", "observer clock is invalid");
@@ -169,23 +192,23 @@ export function validateReleaseVersionDecision(decision, { nowMs = null } = {}) 
  * neither proof prose nor a mutable Git response becomes release authority.
  */
 export function createReleaseVersionDecision(input, { nowMs = Date.now() } = {}) {
-  exactKeys(input, ["private", "neutralPublic", "proofs", "observedAt"], "release version decision input");
+  exactKeys(input, ["private", "neutralPublic", "proofs", "selection", "observedAt"], "release version decision input");
   exactKeys(input.proofs, ["private", "neutralPublic"], "channel proofs");
   for (const channel of ["private", "neutralPublic"]) {
     exactKeys(input.proofs[channel], ["annotated", "peeledCommitAncestor"], `${channel} proof`);
     if (input.proofs[channel].annotated !== true || input.proofs[channel].peeledCommitAncestor !== true) fail("RVD-TAG-PROOF", `${channel} requires an annotated tag whose peeled commit is ancestral to the observed ref`);
   }
-  const greaterBaseline = compareStableVersions(input.private.highestStableVersion, input.neutralPublic.highestStableVersion) >= 0
-    ? input.private.highestStableVersion
-    : input.neutralPublic.highestStableVersion;
-  const targetVersion = nextMinorVersion(greaterBaseline);
+  validateChannel(input.private, "private");
+  validateChannel(input.neutralPublic, "neutral-public");
+  validateReleaseSelection(input.selection, input.private, input.neutralPublic);
   const candidate = {
     schema: RELEASE_VERSION_DECISION_SCHEMA,
     decisionId: "0".repeat(64),
     private: structuredClone(input.private),
     neutralPublic: structuredClone(input.neutralPublic),
-    targetVersion,
-    targetTag: `v${targetVersion}`,
+    selection: structuredClone(input.selection),
+    targetVersion: input.selection.targetVersion,
+    targetTag: input.selection.targetTag,
     observedAt: input.observedAt,
   };
   candidate.decisionId = releaseVersionDecisionId(decisionPayload(candidate));
@@ -311,7 +334,6 @@ function validateRecovery(value) {
 function validateVersions(versions, targetVersion) {
   exactKeys(versions, VERSION_SURFACES, "release versions");
   for (const surface of VERSION_SURFACES) {
-    parseStableVersion(versions[surface], `${surface} version`);
     if (versions[surface] !== targetVersion) fail("RVP-VERSION", `${surface} must equal targetVersion`);
   }
 }
@@ -347,6 +369,7 @@ function planPayload(plan) {
     evidenceRevision: plan.evidenceRevision,
     documentEvidenceSha256: plan.documentEvidenceSha256,
     externalPrerequisite: plan.externalPrerequisite,
+    selection: plan.selection,
     targetVersion: plan.targetVersion,
     targetTag: plan.targetTag,
     privateProductCandidate: plan.privateProductCandidate,
@@ -366,8 +389,9 @@ export function releaseVersionPlanId(payload) {
  * digests.  Marketplace inputs are already resolved provider manifests; this
  * helper deliberately does not fetch, read a tree, or invoke a marketplace.
  */
-export function deriveVersionSurfaceConsistency(versionSurfaces, targetVersion) {
-  parseStableVersion(targetVersion, "target version");
+export function deriveVersionSurfaceConsistency(versionSurfaces, targetVersion, promotionChannel = null) {
+  const resolvedChannel = promotionChannel ?? (typeof targetVersion === "string" && BETA_VERSION.test(targetVersion) ? "beta" : "stable");
+  parsePromotionVersion(targetVersion, resolvedChannel, "target version");
   exactKeys(versionSurfaces, ["private", "neutralPublic"], "version surfaces");
   const derived = {};
   for (const channel of ["private", "neutralPublic"]) {
@@ -394,7 +418,6 @@ export function deriveVersionSurfaceConsistency(versionSurfaces, targetVersion) 
         if (!isPlainObject(manifest) || typeof manifest.version !== "string") fail("RVP-VERSION", `${channel} ${surface} has no string version`);
         version = manifest.version;
       }
-      parseStableVersion(version, `${channel} ${surface} version`);
       if (version !== targetVersion) fail("RVP-VERSION", `${channel} ${surface} does not equal targetVersion`);
       records.push({ surface, path: entry.path, sha256: sha256(entry.bytes) });
     }
@@ -409,13 +432,11 @@ export function deriveVersionSurfaceConsistency(versionSurfaces, targetVersion) 
 
 /** Validate the immutable sealed plan without dereferencing external evidence or licensing state. */
 export function validateReleaseVersionPlan(plan, { decision = null, nowMs = null } = {}) {
-  exactKeys(plan, ["schema", "planId", "decisionId", "decisionSha256", "evidenceRevision", "documentEvidenceSha256", "externalPrerequisite", "targetVersion", "targetTag", "privateProductCandidate", "neutralPublicProductCandidate", "versions", "surfaceDigests", "recovery", "status", "createdAt"], "release version plan");
+  exactKeys(plan, ["schema", "planId", "decisionId", "decisionSha256", "evidenceRevision", "documentEvidenceSha256", "externalPrerequisite", "selection", "targetVersion", "targetTag", "privateProductCandidate", "neutralPublicProductCandidate", "versions", "surfaceDigests", "recovery", "status", "createdAt"], "release version plan");
   if (plan.schema !== RELEASE_VERSION_PLAN_SCHEMA || plan.status !== "sealed") fail("RVP-SCHEMA", "release version plan schema/status is invalid");
   if (!SHA256.test(plan.planId ?? "") || !SHA256.test(plan.decisionId ?? "") || !SHA256.test(plan.decisionSha256 ?? "") || !SHA256.test(plan.documentEvidenceSha256 ?? "")) fail("RVP-DIGEST", "release version plan digest is invalid");
   if (!Number.isSafeInteger(plan.evidenceRevision) || plan.evidenceRevision < 1) fail("RVP-EVIDENCE", "release version plan evidence revision is invalid");
   validateExternalPrerequisite(plan.externalPrerequisite);
-  parseStableVersion(plan.targetVersion, "target version");
-  if (plan.targetTag !== `v${plan.targetVersion}`) fail("RVP-VERSION", "target tag does not match target version");
   validateCandidate(plan.privateProductCandidate, "private");
   validateCandidate(plan.neutralPublicProductCandidate, "neutral-public");
   validateVersions(plan.versions, plan.targetVersion);
@@ -425,8 +446,15 @@ export function validateReleaseVersionPlan(plan, { decision = null, nowMs = null
   if (plan.planId !== releaseVersionPlanId(planPayload(plan))) fail("RVP-ID", "plan ID does not bind its complete sealed payload");
   if (decision === null) fail("RVP-DECISION", "a plan validator requires its fixed decision record");
   validateReleaseVersionDecision(decision, nowMs === null ? {} : { nowMs });
-  if (plan.decisionId !== decision.decisionId || plan.decisionSha256 !== sha256(canonicalJson(decision)) || plan.targetVersion !== decision.targetVersion || plan.targetTag !== decision.targetTag) fail("RVP-DECISION", "plan does not bind the supplied current decision");
+  if (plan.decisionId !== decision.decisionId || plan.decisionSha256 !== sha256(canonicalJson(decision))
+    || canonicalJson(plan.selection) !== canonicalJson(decision.selection)
+    || plan.targetVersion !== decision.targetVersion || plan.targetTag !== decision.targetTag) fail("RVP-DECISION", "plan does not bind the supplied current decision and explicit promotion selection");
   if (plan.privateProductCandidate.repositoryFingerprint !== decision.private.repositoryFingerprint || plan.neutralPublicProductCandidate.repositoryFingerprint !== decision.neutralPublic.repositoryFingerprint) fail("RVP-CANDIDATE", "product candidate channel fingerprints do not bind the decision");
+  // beta/stable is the public distribution promotion. The private product
+  // candidate remains a separately bound dual-product identity, while the
+  // selected release candidate must be the exact neutral-public product.
+  if (plan.neutralPublicProductCandidate.commit !== decision.selection.candidateCommit
+    || plan.neutralPublicProductCandidate.tree !== decision.selection.candidateTree) fail("RVP-CANDIDATE", "neutral-public product candidate does not match the explicit promotion selection");
   return true;
 }
 
@@ -439,9 +467,11 @@ export function createReleaseVersionPlan(input, { nowMs = Date.now() } = {}) {
   validateCandidate(input.privateProductCandidate, "private");
   validateCandidate(input.neutralPublicProductCandidate, "neutral-public");
   if (input.privateProductCandidate.repositoryFingerprint !== input.decision.private.repositoryFingerprint || input.neutralPublicProductCandidate.repositoryFingerprint !== input.decision.neutralPublic.repositoryFingerprint) fail("RVP-CANDIDATE", "product candidate fingerprint does not match its decision channel");
+  if (input.neutralPublicProductCandidate.commit !== input.decision.selection.candidateCommit
+    || input.neutralPublicProductCandidate.tree !== input.decision.selection.candidateTree) fail("RVP-CANDIDATE", "neutral-public product candidate does not match the explicit promotion selection");
   validateRecovery(input.recovery);
   timestamp(input.createdAt, "plan createdAt");
-  const consistent = deriveVersionSurfaceConsistency(input.versionSurfaces, input.decision.targetVersion);
+  const consistent = deriveVersionSurfaceConsistency(input.versionSurfaces, input.decision.targetVersion, input.decision.selection.promotionChannel);
   const plan = {
     schema: RELEASE_VERSION_PLAN_SCHEMA,
     planId: "0".repeat(64),
@@ -450,6 +480,7 @@ export function createReleaseVersionPlan(input, { nowMs = Date.now() } = {}) {
     evidenceRevision: input.evidenceRevision,
     documentEvidenceSha256: input.documentEvidenceSha256,
     externalPrerequisite: structuredClone(input.externalPrerequisite),
+    selection: structuredClone(input.decision.selection),
     targetVersion: input.decision.targetVersion,
     targetTag: input.decision.targetTag,
     privateProductCandidate: structuredClone(input.privateProductCandidate),

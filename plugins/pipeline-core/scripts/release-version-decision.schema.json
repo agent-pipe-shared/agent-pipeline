@@ -3,20 +3,40 @@
   "$id": "pipeline.release-version-decision.v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema", "decisionId", "private", "neutralPublic", "targetVersion", "targetTag", "observedAt"],
+  "required": ["schema", "decisionId", "private", "neutralPublic", "selection", "targetVersion", "targetTag", "observedAt"],
   "properties": {
     "schema": { "const": "pipeline.release-version-decision.v1" },
     "decisionId": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "private": { "$ref": "#/$defs/channel" },
     "neutralPublic": { "$ref": "#/$defs/channel" },
-    "targetVersion": { "$ref": "#/$defs/stableVersion" },
-    "targetTag": { "type": "string", "pattern": "^v(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$" },
+    "selection": { "$ref": "#/$defs/selection" },
+    "targetVersion": { "$ref": "#/$defs/promotionVersion" },
+    "targetTag": { "$ref": "#/$defs/promotionTag" },
     "observedAt": { "type": "string", "format": "date-time" }
   },
   "$defs": {
     "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
     "oid": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
     "stableVersion": { "type": "string", "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$" },
+    "betaVersion": { "type": "string", "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)-beta\\.(?:0|[1-9][0-9]*)$" },
+    "promotionVersion": { "type": "string", "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-beta\\.(?:0|[1-9][0-9]*))?$" },
+    "promotionTag": { "type": "string", "pattern": "^v(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)(?:-beta\\.(?:0|[1-9][0-9]*))?$" },
+    "selection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["promotionChannel", "targetVersion", "targetTag", "candidateCommit", "candidateTree"],
+      "properties": {
+        "promotionChannel": { "enum": ["beta", "stable"] },
+        "targetVersion": { "$ref": "#/$defs/promotionVersion" },
+        "targetTag": { "$ref": "#/$defs/promotionTag" },
+        "candidateCommit": { "$ref": "#/$defs/oid" },
+        "candidateTree": { "$ref": "#/$defs/oid" }
+      },
+      "oneOf": [
+        { "properties": { "promotionChannel": { "const": "stable" }, "targetVersion": { "$ref": "#/$defs/stableVersion" }, "targetTag": { "type": "string", "pattern": "^v(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$" } } },
+        { "properties": { "promotionChannel": { "const": "beta" }, "targetVersion": { "$ref": "#/$defs/betaVersion" }, "targetTag": { "type": "string", "pattern": "^v(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)-beta\\.(?:0|[1-9][0-9]*)$" } } }
+      ]
+    },
     "channel": {
       "type": "object",
       "additionalProperties": false,

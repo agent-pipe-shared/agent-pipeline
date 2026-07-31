@@ -28,11 +28,15 @@ import { observeCodexOnboardingCapabilities } from "./codex-onboarding-capabilit
 import {
   applyOnboardingContinuityRepair,
   applyOnboardingKickoff,
+  applyOnboardingKickoffPromotion,
   classifyOnboardingContinuity,
   KICKOFF_GOAL_MAX_BYTES,
   planOnboardingContinuityRepair,
   planOnboardingKickoff,
+  planOnboardingKickoffPromotion,
+  planOnboardingSessionCleanupPrivatization,
   reconstructOnboardingKickoffPlan,
+  reconstructOnboardingKickoffPromotionPlan,
 } from "./onboarding-continuity.mjs";
 import { applyRunnerProfileMigrationV3, inspectRunnerProfileMigrationV3, planRunnerProfileMigrationV3, renderCanonicalV3Manifest } from "./runner-profile-migration-v3.mjs";
 import { loadRunnerProfilesV3Registry, validatePipelineUserV3 } from "./runner-profiles-v3.mjs";
@@ -57,6 +61,7 @@ import {
   NEUTRAL_MANIFEST,
   NEUTRAL_STATE,
   planProjectAuthorityMigration,
+  planProjectAuthoritySessionCleanupRecovery,
   inspectProjectAuthorityProvenance,
   readProjectAuthority,
   resolveProjectAuthorityPaths,
@@ -1837,13 +1842,47 @@ function v4Inspection(rootDir, fs, intent = "onboarding") {
           )],
         });
       }
+      const cleanupRecovery = projectAuthority.code === "PA-STATE-SESSION-CLEANUP-PRIVATE"
+        ? (fs.planProjectAuthoritySessionCleanupRecovery ?? planProjectAuthoritySessionCleanupRecovery)({ rootDir: legacy.root })
+        : null;
+      let cleanupPrivatization = null;
+      if (projectAuthority.code === "PA-STATE-SESSION-CLEANUP-PRIVATE"
+        && cleanupRecovery?.status !== "ready") {
+        try {
+          cleanupPrivatization = (
+            fs.planOnboardingSessionCleanupPrivatization
+            ?? planOnboardingSessionCleanupPrivatization
+          )({
+            rootDir: legacy.root,
+            sessionCleanupScript: SESSION_CLEANUP_SCRIPT,
+          });
+        } catch {
+          cleanupPrivatization = null;
+        }
+      }
       return lifecycleResult({
         status: "invalid",
         root: legacy.root,
         intent,
         repository,
         runtime: emptyRuntime(),
-        nextAction: null,
+        nextAction: cleanupRecovery?.status === "ready"
+          ? commandAction(
+            [PROJECT_AUTHORITY_MIGRATION_WRITER, "recover", "--root", legacy.root],
+            false,
+            false,
+            "pipeline.project-authority-recovery.v1",
+            ["ready", "none", "recovery-unavailable", "recovery-required"],
+          )
+          : cleanupPrivatization?.status === "ready"
+            ? commandAction(
+              [SESSION_CLEANUP_SCRIPT, "plan-privatization", "--repo", legacy.root],
+              false,
+              false,
+              "pipeline.session-cleanup-privatization-plan.v1",
+              ["ready", "noop"],
+            )
+            : null,
         diagnostics: [lifecycleDiagnostic(
           "$.authority",
           "project_authority_invalid",
@@ -2409,6 +2448,35 @@ export function applyProjectOnboardingKickoffV4({
     expectedPlanSha256: planSha256,
     activate,
     deps: { ...overrides, spawn: fs.spawnSync },
+  });
+  return v4Inspection(rootDir, fs, "onboarding");
+}
+
+export function planProjectOnboardingKickoffPromotionV4({
+  rootDir = process.cwd(), profile, featureId, planPath, prdPath, specPath, deps: overrides = {},
+} = {}) {
+  const fs = deps(overrides);
+  const observed = v4Inspection(rootDir, fs, "onboarding");
+  if (observed.status !== "ready" || observed.continuity.status !== "valid") return observed;
+  return planOnboardingKickoffPromotion({
+    rootDir: observed.root, profile, featureId, planPath, prdPath, specPath,
+    repositoryCapability: observed.repository.mode, onboardingScript: ONBOARDING_SCRIPT, spawn: fs.spawnSync,
+  });
+}
+
+export function applyProjectOnboardingKickoffPromotionV4({
+  rootDir = process.cwd(), profile, featureId, planPath, prdPath, specPath,
+  planSha256, activate = false, deps: overrides = {},
+} = {}) {
+  const fs = deps(overrides);
+  const observed = v4Inspection(rootDir, fs, "onboarding");
+  if (observed.status !== "ready" || observed.continuity.status !== "valid") return observed;
+  const plan = reconstructOnboardingKickoffPromotionPlan({
+    rootDir: observed.root, profile, featureId, planPath, prdPath, specPath,
+    repositoryCapability: observed.repository.mode, onboardingScript: ONBOARDING_SCRIPT, spawn: fs.spawnSync,
+  });
+  applyOnboardingKickoffPromotion({
+    plan, expectedPlanSha256: planSha256, activate, deps: { ...overrides, spawn: fs.spawnSync },
   });
   return v4Inspection(rootDir, fs, "onboarding");
 }

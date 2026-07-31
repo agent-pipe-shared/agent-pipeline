@@ -30,6 +30,16 @@ import { hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs"
 
 const NOW = Date.parse("2026-07-19T12:00:00.000Z");
 const h = (char, length = 64) => char.repeat(length);
+function selection(promotionChannel = "stable", targetVersion = "0.4.7", overrides = {}) {
+  return {
+    promotionChannel,
+    targetVersion,
+    targetTag: `v${targetVersion}`,
+    candidateCommit: h("f", 40),
+    candidateTree: h("e", 40),
+    ...overrides,
+  };
+}
 function channel(version, offsetMs = 0, overrides = {}) {
   return {
     repositoryFingerprint: h(version[0] === "0" ? "a" : "b"),
@@ -43,11 +53,12 @@ function channel(version, offsetMs = 0, overrides = {}) {
     ...overrides,
   };
 }
-function input(privateVersion = "0.3.1", publicVersion = "0.3.1", overrides = {}) {
+function input(privateVersion = "0.4.6", publicVersion = "0.4.6", overrides = {}) {
   return {
     private: channel(privateVersion),
     neutralPublic: channel(publicVersion, 60_000),
     proofs: { private: { annotated: true, peeledCommitAncestor: true }, neutralPublic: { annotated: true, peeledCommitAncestor: true } },
+    selection: selection(),
     observedAt: new Date(NOW).toISOString(),
     ...overrides,
   };
@@ -71,7 +82,7 @@ function planInput(overrides = {}) {
     documentEvidenceSha256: h("1"),
     externalPrerequisite: { itemId: "pipeline.source-available-commercial-licensing", closureCommit: h("2", 40), resultSha256: h("3"), transitionSha256: h("4"), privateLicenseGateSha256: h("5"), neutralPublicLicenseGateSha256: h("6") },
     privateProductCandidate: { repositoryFingerprint: decision.private.repositoryFingerprint, commit: h("7", 40), tree: h("8", 40) },
-    neutralPublicProductCandidate: { repositoryFingerprint: decision.neutralPublic.repositoryFingerprint, commit: h("9", 40), tree: h("a", 40) },
+    neutralPublicProductCandidate: { repositoryFingerprint: decision.neutralPublic.repositoryFingerprint, commit: decision.selection.candidateCommit, tree: decision.selection.candidateTree },
     versionSurfaces: versionSurfaces(decision.targetVersion),
     recovery: null,
     createdAt: new Date(NOW).toISOString(),
@@ -80,14 +91,25 @@ function planInput(overrides = {}) {
 }
 
 const cases = [
-  ["greater current baseline derives v0.4.0", () => {
+  ["explicit stable patch selection preserves 0.4.7 without forcing next minor", () => {
     const decision = createReleaseVersionDecision(input(), { nowMs: NOW });
-    assert.equal(decision.targetVersion, "0.4.0");
-    assert.equal(decision.targetTag, "v0.4.0");
+    assert.equal(decision.selection.promotionChannel, "stable");
+    assert.equal(decision.targetVersion, "0.4.7");
+    assert.equal(decision.targetTag, "v0.4.7");
     assert.equal(validateReleaseVersionDecision(decision, { nowMs: NOW }), true);
   }],
-  ["higher neutral-public baseline wins", () => assert.equal(createReleaseVersionDecision(input("0.3.1", "2.7.9"), { nowMs: NOW }).targetVersion, "2.8.0")],
-  ["minor rollover keeps major and resets patch", () => assert.equal(nextMinorVersion("9.999.4"), "9.1000.0")],
+  ["explicit beta selection binds exact prerelease channel, version, tag and candidate", () => {
+    const decision = createReleaseVersionDecision(input("0.4.6", "0.4.6", { selection: selection("beta", "0.4.7-beta.1") }), { nowMs: NOW });
+    assert.equal(decision.selection.promotionChannel, "beta");
+    assert.equal(decision.targetVersion, "0.4.7-beta.1");
+    assert.equal(decision.targetTag, "v0.4.7-beta.1");
+    assert.equal(decision.selection.candidateCommit, h("f", 40));
+  }],
+  ["higher observed baseline constrains but does not choose an explicit target", () => {
+    const decision = createReleaseVersionDecision(input("0.4.6", "2.7.9", { selection: selection("stable", "2.7.10") }), { nowMs: NOW });
+    assert.equal(decision.targetVersion, "2.7.10");
+  }],
+  ["next-minor helper remains recommendation metadata only", () => assert.equal(nextMinorVersion("9.999.4"), "9.1000.0")],
   ["SemVer comparison is numeric, not lexical", () => assert.equal(compareStableVersions("0.10.0", "0.9.99"), 1)],
   ["prerelease, build metadata, and substituted tag fail closed", () => {
     for (const values of [
@@ -95,6 +117,27 @@ const cases = [
       input("1.0.0+build", "1.0.0"),
       input("1.0.0", "1.0.0", { private: channel("1.0.0", 0, { highestStableTag: "v1.0.1" }) }),
     ]) assert.throws(() => createReleaseVersionDecision(values, { nowMs: NOW }), ReleaseVersionDecisionError);
+  }],
+  ["alpha, missing selection, implicit target and malformed beta identifiers fail closed", () => {
+    const missing = input(); delete missing.selection;
+    const implicit = input(); implicit.selection = { promotionChannel: "stable" };
+    for (const value of [
+      input("0.4.6", "0.4.6", { selection: selection("alpha", "0.4.7") }),
+      missing,
+      implicit,
+      input("0.4.6", "0.4.6", { selection: selection("beta", "0.4.7-beta.01") }),
+      input("0.4.6", "0.4.6", { selection: selection("beta", "0.04.7-beta.1") }),
+      input("0.4.6", "0.4.6", { selection: selection("stable", "0.4.7-beta.1") }),
+      input("0.4.6", "0.4.6", { selection: selection("beta", "0.4.7") }),
+    ]) assert.throws(() => createReleaseVersionDecision(value, { nowMs: NOW }), ReleaseVersionDecisionError);
+  }],
+  ["selection tag mismatch and a target not above observed stable fail closed", () => {
+    assert.throws(() => createReleaseVersionDecision(input("0.4.6", "0.4.6", {
+      selection: selection("stable", "0.4.7", { targetTag: "v0.4.8" }),
+    }), { nowMs: NOW }), ReleaseVersionDecisionError);
+    assert.throws(() => createReleaseVersionDecision(input("0.4.7", "0.4.7", {
+      selection: selection("beta", "0.4.7-beta.1"),
+    }), { nowMs: NOW }), ReleaseVersionDecisionError);
   }],
   ["missing annotated or ancestral proof fails before a decision exists", () => {
     for (const proofs of [
@@ -112,6 +155,8 @@ const cases = [
     const decision = createReleaseVersionDecision(input(), { nowMs: NOW });
     const changed = structuredClone(decision); changed.neutralPublic.tree = h("f", 40);
     assert.throws(() => validateReleaseVersionDecision(changed, { nowMs: NOW }), ReleaseVersionDecisionError);
+    const substitutedSelection = structuredClone(decision); substitutedSelection.selection.candidateCommit = h("1", 40);
+    assert.throws(() => validateReleaseVersionDecision(substitutedSelection, { nowMs: NOW }), ReleaseVersionDecisionError);
   }],
   ["private storage uses exactly one no-replace canonical record path", () => {
     const common = mkdtempSync(join(tmpdir(), "release-version-decision-"));
@@ -133,13 +178,14 @@ const cases = [
     const inputValue = planInput();
     const plan = createReleaseVersionPlan(inputValue, { nowMs: NOW });
     assert.equal(plan.status, "sealed");
-    assert.equal(plan.targetVersion, "0.4.0");
+    assert.equal(plan.targetVersion, "0.4.7");
+    assert.deepEqual(plan.selection, inputValue.decision.selection);
     assert.equal(plan.versions.codexMarketplaceResolved, plan.targetVersion);
     assert.equal(plan.surfaceDigests.private.length, 5);
     assert.equal(validateReleaseVersionPlan(plan, { decision: inputValue.decision, nowMs: NOW }), true);
   }],
   ["surface consistency requires exact VERSION bytes and all resolved versions", () => {
-    const target = "0.4.0";
+    const target = "0.4.7";
     const missingNewline = versionSurfaces(target); missingNewline.private[0].bytes = target;
     const marketplaceMismatch = versionSurfaces(target); marketplaceMismatch.neutralPublic[4].bytes = manifest("0.4.1");
     const duplicate = versionSurfaces(target); duplicate.private[4].surface = "claudePlugin";
@@ -148,10 +194,14 @@ const cases = [
   ["plan rejects decision substitution and candidate channel mismatch", () => {
     const source = planInput();
     const plan = createReleaseVersionPlan(source, { nowMs: NOW });
-    const otherDecision = createReleaseVersionDecision(input("1.0.0", "1.0.0"), { nowMs: NOW });
+    const otherDecision = createReleaseVersionDecision(input("1.0.0", "1.0.0", { selection: selection("stable", "1.0.1") }), { nowMs: NOW });
     assert.throws(() => validateReleaseVersionPlan(plan, { decision: otherDecision, nowMs: NOW }), ReleaseVersionDecisionError);
+    const substitutedPlan = structuredClone(plan); substitutedPlan.selection.candidateTree = h("2", 40);
+    assert.throws(() => validateReleaseVersionPlan(substitutedPlan, { decision: source.decision, nowMs: NOW }), ReleaseVersionDecisionError);
     const badCandidate = planInput(); badCandidate.privateProductCandidate.repositoryFingerprint = h("f");
     assert.throws(() => createReleaseVersionPlan(badCandidate, { nowMs: NOW }), ReleaseVersionDecisionError);
+    const substitutedPublicCandidate = planInput(); substitutedPublicCandidate.neutralPublicProductCandidate.commit = h("9", 40);
+    assert.throws(() => createReleaseVersionPlan(substitutedPublicCandidate, { nowMs: NOW }), (error) => error instanceof ReleaseVersionDecisionError && error.code === "RVP-CANDIDATE");
   }],
   ["sealed plan storage is private, immutable, and retains an explicit-ID journal", () => {
     const common = mkdtempSync(join(tmpdir(), "release-version-plan-"));

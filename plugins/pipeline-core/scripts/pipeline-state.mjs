@@ -462,9 +462,14 @@ function writeState(dir, state, expectedState, options = {}) {
     }
     if (nextState.continuity !== undefined) {
       const valid = validateContinuityState(nextState.continuity, nextState.activeFeature?.id);
+      const expectedRevision = expectedState.continuity?.revision;
+      const revisionCurrent = expectedRevision === undefined
+        || nextState.continuity.revision === expectedRevision;
+      const revisionAdvancedOnce = options.allowContinuityAdvance === true
+        && Number.isSafeInteger(expectedRevision)
+        && nextState.continuity.revision === expectedRevision + 1;
       if (!valid.ok
-        || (expectedState.continuity !== undefined
-          && nextState.continuity.revision !== expectedState.continuity.revision)) {
+        || (!revisionCurrent && !revisionAdvancedOnce)) {
         return { ok: false, committed: false, code: "PS-STATE-CONTINUITY" };
       }
     }
@@ -3599,6 +3604,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
             ? { ok: true }
             : { ok: false, code: nextAuthority?.code ?? nextProfile?.code ?? "PLAN-SUBMIT-AUTHORITY-STALE" };
         },
+        allowContinuityAdvance: true,
       });
       if (!stateWriteSucceeded(written)) {
         console.error(`Error: submit-plan failed before commit (${written.code}); no submission was recorded.`);

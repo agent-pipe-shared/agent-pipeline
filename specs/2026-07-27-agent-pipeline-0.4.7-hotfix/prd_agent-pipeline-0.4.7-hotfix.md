@@ -3,15 +3,14 @@
 # PRD — Agent Pipeline 0.4.7 hotfix
 
 > Product Review Document for the PO gate. Status:
-> `design reopened on 2026-07-30; the prior approval is revoked and the
-> stabilized PRD/Spec bytes require a fresh digest-bound PO approval before
-> implementation resumes`.
+> `approved by the PO on 2026-07-31; implementation authority requires the
+> matching digest-bound lifecycle write for these stabilized PRD/Spec bytes`.
 > Task: `agent-pipeline-0.4.7-hotfix` · Feature · Rigor 2 · Risk high.
 > Base: public 0.4.6 release at
 > `9d1b3dc108eb77629ace5b82002120f5539abd8d`. Acceptance criteria:
 > [spec.md](spec.md).
 
-<!-- technical-spec-sha256: 5aa79f0d95a540540246687270ab54c62c21fc771c38d4e864a71fd5719015c3 -->
+<!-- technical-spec-sha256: 4959ada5652b2d94939eaf6633478c3f1b3c4f968af4dbc85a496638c68a6e32 -->
 
 The 2026-07-28 approval remains historical evidence for the already
 implemented slices. The Human/PO explicitly directed implementation of the
@@ -20,7 +19,7 @@ repository-local implementation and verification only; it does not authorize
 push, merge, tag, release, Issue mutation, Pull Request operation, or mutation
 of a downstream Sprint checkout.
 
-## Current code-first release authority — 2026-07-30
+## Current code-first release authority — 2026-07-31
 
 This section supersedes every conflicting scope, implementation-status,
 baseline, branch, and evidence statement below. Current `main` code is the
@@ -32,8 +31,10 @@ The design baseline is `main` at
 `83640cec22d494d227eebc82929370277ce926b9`. The nine open mandatory Issues are
 #63, #70, #71, #73, #77, #81, #82, #83, and #84. The already implemented
 Advisor correction from #80 remains part of the delivered code baseline even
-though it is no longer in the label set. Three additional reproduced defects
-are mandatory for the same release:
+though it is no longer in the label set. The current worktree is the
+implementation truth for delivered slices; this final design remains
+authoritative for missing behavior. The following reproduced defects and
+policy gaps are mandatory for the same release:
 
 1. a sanctioned session start serializes a private
    `continuity.runtime.sessionCleanup` binding into portable neutral
@@ -43,7 +44,16 @@ are mandatory for the same release:
    state machine; and
 3. self-application ruleset freshness compares the checkout branch HEAD with
    marketplace default HEAD and incorrectly turns ordinary update availability
-   into a write blocker.
+   into a write blocker;
+4. upgrade recovery can identify a portable cleanup binding but still expose
+   no guard-admitted writer, leaving consumer sessions deadlocked;
+5. kickoff continuity cannot always be promoted into the selected real
+   Epic/Feature/Mini lifecycle without closing a feature that was never actual
+   work;
+6. long-lived parallel Sprints are treated as continuously rebase-required
+   instead of rebasing only the selected promotion candidate; and
+7. update-channel selection, host-wide source switching, and release promotion
+   are not yet one explicit, non-conflated contract.
 
 ### Code-first disposition
 
@@ -61,17 +71,24 @@ are mandatory for the same release:
 | #84 runner-neutral CI | Repair shallow history, remove productive runner lookup from generic tests, retain offline adapter conformance, and fix the two independent trace-replacement and rollback-identity regressions. |
 | Neutral cleanup portability | Private cleanup identity stays solely in private runtime storage; portable neutral State is null/sanitized at every persist boundary, not only at publication. |
 | Design/approval lifecycle | Draft design remains repeatedly editable; explicit submission enters `awaiting-approval`; any PRD/Spec change invalidates submission/approval back to draft; exact PO approval alone enters implementation. |
-| Freshness separation | Branch/upstream freshness alone controls repository writes. Loaded Pipeline versus marketplace default produces explicit update availability and never retargets, rebases, auto-updates, or ordinarily blocks work. |
+| Freshness separation | Branch/upstream freshness alone controls repository writes. Pipeline update availability is separate and never retargets, rebases, auto-updates, or ordinarily blocks work. |
+| Update channels | Exactly `alpha|beta|stable`: self-application silently defaults to alpha, ordinary consumers silently default to stable, and beta is opt-in through a documented per-repository switch. Initial onboarding asks no channel question. |
+| Host source topology | Official versus local-development Pipeline source is machine-local and shared by all repositories on the Codex App Server. Every source switch says so before mutation, keeps exactly one selector enabled, and is never driven by portable repository config. |
+| Release promotion | A release plan explicitly binds prerelease/beta versus final/stable publication, exact version/tag and candidate. Alpha follows the development head and is not a release tag. |
+| Parallel Sprints | A rebase is a promotion gate for the explicitly selected first merge-ready Sprint, not a steady-state work gate. Protected or overlapping baseline advances require bounded impact review. |
+| Recovery completeness | Every fail-closed lifecycle state has a typed read-only planner and confirmation-bound writer where safe. Completed closure recovery remains first; an active historical descriptor falls back to the identifier-free Privatization plan/apply path. A valid recovery cannot be blocked merely because the session is not ready. |
+| Kickoff promotion | Exact unapproved kickoff seed state can become real Epic/Feature/Mini work atomically without manufacturing approval or requiring feature close. |
 
-The complete release contract is AC-047-01–116 in
+The complete release contract is AC-047-01–135 in
 [spec.md](spec.md). AC-047-01–68 retain the delivered/historical identifiers;
-AC-047-69–116 bind the current mandatory remainder.
+AC-047-69–135 bind the current mandatory remainder.
 
 ### Release boundary
 
 This is a Feature/Rigor-2/high-risk completion package, not a new Epic and not
-a Sprint merge. Implementation resumes only after the PO receives this PRD in
-readable form and replies exactly `approved`. Publication remains a separate
+a Sprint merge. The PO received this PRD in readable form and approved it on
+2026-07-31. Implementation resumes only after the exact current PRD/Spec bytes
+are bound by the sanctioned lifecycle writer. Publication remains a separate
 explicit gate. The final candidate must pass focused tests, runner-neutral Full
 Verify, blocking Security, independent high-risk Critic review, package/install
 readback, clean portable-state readback, and exact remote readback where an
@@ -421,8 +438,8 @@ Full Verify, blocking Security, package, install and lifecycle readback gates.
 
 ## DoD
 
-Product completion requires AC-047-01–116 in [spec.md](spec.md). AC-047-01–68
-are retained regression scope; AC-047-69–116 are the current missing or newly
+Product completion requires AC-047-01–135 in [spec.md](spec.md). AC-047-01–68
+are retained regression scope; AC-047-69–135 are the current missing or newly
 reproduced remainder.
 Completion still requires one immutable candidate commit/tree, all focused
 tests, runner-neutral fresh candidate-bound Full Verify, blocking Security, a
@@ -433,7 +450,7 @@ cleanup binding. Nova/Phoenix or PR #64 evidence is inadmissible.
 
 ## Decision points
 
-1. The code-first AC-047-01–116 implementation scope is proposed and currently
+1. The code-first AC-047-01–135 implementation scope is proposed and currently
    unapproved; the prior approval is historical and revoked.
 2. Implementation begins only after this readable PRD is presented and the PO
    replies exactly `approved`, followed by the matching sanctioned
