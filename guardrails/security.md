@@ -63,3 +63,87 @@ Rule IDs: `SEC-xx`.
 - **MUST** restrict a deploy adapter's `credentials` field (`templates/deploy-adapter.md`) to exactly one of `{oidc, ci-secret, external}` — an inline credential value in that field is itself a finding, never a valid configuration.
 - **Why:** A deploy-target credential grants direct write access to a real destination (a cloud account, a package registry, a hosting platform) — exactly the class of secret SEC-01 already forbids in artifacts, restated here specifically for the deploy surface because the Release/Deploy phase is the first place the pipeline routinely talks to external deploy targets at all, and the ambient-git-push carve-out needs to be explicit so it is not read as a loophole for deploy secrets too.
 - **Verification:** `templates/deploy-adapter.md`'s reference form and every shipped example admit only `{oidc, ci-secret, external}` in the `credentials` field, never an inline value; the Critic checks new adapter/deploy diffs for an inline credential the same way it checks for any other secret-shaped string (SEC-01 pattern).
+
+## SEC-09 — Six-term completeness vocabulary is closed and non-conflating
+
+AC13 (`cyb-2-feature-spec.md`) defines a human-facing completeness vocabulary,
+a coarser doc/report-facing layer sitting on top of the machine-level enums in
+`plugins/pipeline-core/lib/security-evidence-evaluator.mjs` (`RUN_OUTCOMES`,
+`CONTROL_RESULTS`). This is prose vocabulary, not a fourth machine enum — a
+project doc reporting on completeness **MUST** use exactly these six terms
+with exactly these meanings, and **MUST NOT** treat any two of them as
+interchangeable synonyms even where the machine layer beneath them
+legitimately collapses distinctions humans still need to keep apart in prose.
+
+- **clean** — the scan ran and found no blocking-severity finding (the v1,
+  severity-based reading). Says nothing about whether every required
+  capability actually ran: a scan can be `clean` yet `incomplete` (a skipped
+  required capability produces no findings to be unclean about, but the plan
+  is still unsatisfied). This is why v2 (below) was added additively,
+  never replacing v1 (CYB-2F).
+- **complete** — the policy-based reading: `aggregateVerdict().blocking ===
+  false`, i.e. every capability the plan required reached an accepted
+  outcome. A scan can be `complete` yet NOT `clean` (an accepted `findings`
+  outcome means the capability ran and reported, while the underlying
+  finding may still separately block via the severity check). `clean` and
+  `complete` are independent axes — not synonyms, not a strict ordering of
+  one another.
+- **unavailable** — a capability that SHOULD apply (it is in scope for this
+  project/module) but could not be verified right now: the tool wasn't
+  installed, execution errored out, or coverage was cut short. This is a
+  TEMPORARY/environmental gap, never a statement about relevance. When the
+  capability was required, an `unavailable` reading is a hard block at the
+  policy layer even though the human-facing word stays "unavailable," not
+  "not-applicable."
+- **unsupported** — a capability that does not and CANNOT apply to this
+  ecosystem/environment at all (e.g. a JVM-dependency scanner run against a
+  pure-JS repo) — a STRUCTURAL fact about the project, not a transient gap.
+  **This is the term that MUST stay distinct from `not-applicable` in
+  prose**, even though both project onto the same machine-layer
+  control-result: the machine-layer collapse is a deliberate policy
+  simplification ("both mean it doesn't block"), but a reader still needs to
+  know WHICH one is true — an unsupported scanner is a standing
+  environmental fact worth noting once; a not-applicable control is a
+  per-resolution scoping decision. Conflating the two words in prose hides
+  which one actually happened.
+- **waived** — an explicit, authorized, time-bounded exception was granted
+  (the CYB-1d waiver lifecycle): the capability was NOT run or passed on its
+  own merits — a human explicitly accepted the gap. **MUST NOT** be written
+  as silently equivalent to `complete` in prose; always name that a waiver,
+  not a genuine pass, is in effect.
+- **not-applicable** — the capability was never in scope for this resolution
+  to begin with, independent of whether it COULD have run (a SCOPING fact,
+  decided once per policy resolution, not an execution-time observation).
+  **The prose distinction from `unavailable` is the one this rule exists
+  for**: `not-applicable` means "never relevant"; `unavailable` means
+  "relevant but not verifiable right now." These are opposite claims, not
+  degrees of the same thing — an `unavailable` required capability blocks
+  the policy outcome; a `not-applicable` one never did. A doc that uses the
+  two words interchangeably is actively misleading.
+
+Machine-layer mapping (compact; full design rationale and the ratified F-3
+projection logic live in `security-evidence-evaluator.mjs`'s own header
+comment — this table cross-references, it does not restate):
+
+| Prose term       | `RUN_OUTCOMES` member(s)                                                                    | `CONTROL_RESULTS` projection |
+| ----------------- | --------------------------------------------------------------------------------------------- | ----------------------------- |
+| clean             | (v1 concept — not a `RUN_OUTCOMES` member; severity-based read of findings)                   | n/a                            |
+| complete          | (v2 concept — `aggregateVerdict()` over all `RUN_OUTCOMES`, accepted set: `pass`/`findings`/`waived`) | n/a                    |
+| unavailable       | `execution-unavailable`, `partial-coverage`, `stale` (and `required-capability-missing` when required) | `unavailable` / `not-met` when required |
+| unsupported       | `unsupported`                                                                                  | `not-applicable`               |
+| waived            | `waived`                                                                                        | `waived`                       |
+| not-applicable    | `not-applicable`                                                                                | `not-applicable`               |
+
+- **Why:** `unavailable` and `not-applicable` are the two terms most likely
+  to be used as if interchangeable by a careless writer, despite meaning
+  materially different things for policy purposes — one blocks a required
+  capability's outcome, the other never entered the policy calculation at
+  all. A report that blurs the two hides exactly the information a reader
+  needs to judge whether "the pipeline didn't check this" is a temporary gap
+  or a permanent, decided non-issue.
+- **Verification:** `plugins/pipeline-core/scripts/check-completeness-vocabulary-doclint.mjs`
+  scans the declared project-doc set for the specific `unavailable`/
+  `not-applicable` conflation pattern (direct-equivalence phrasing) and fails
+  closed (exit 2) on a match; its own test file
+  (`check-completeness-vocabulary-doclint.test.mjs`) proves both the
+  conflation-detection case and a clean pass against this repo's real docs.
