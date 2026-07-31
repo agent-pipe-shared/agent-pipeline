@@ -2,32 +2,38 @@
 
 ## Entry gate
 
-- PRD and technical Spec approval, including the explicit typed-unavailable
-  Advisor exception, are durably recorded and bind the current digests.
-- The exact 16-Issue snapshot and regenerated bindings are approved.
-- Branch remains `feat/sprint-nova-codex-v046`. Before the stable 0.4.7 rebase,
-  each dispatch carries an exact write-set and may proceed only when every path
-  is disjoint from Bootstrap, installation, runtime-readback and V4/#63
-  recovery.
-- The mandatory rebase and fresh readiness/PO approval remain required before
-  protected-path work, Nova A increment acceptance or immutable final
-  candidate evidence.
+- The prior PRD/Spec approval is revoked; revised 17-Issue authority and a new
+  readiness/PO gate are required before implementation resumes.
+- Branch remains `feat/sprint-nova-codex-v046` and adopts released `v0.4.7`
+  commit `89cb12b99e3fd86ac44878d0c23b278f00538921`, tree
+  `b6537dcaa7bee526d9a393e2603b28648f4b0438`, through the reviewed R0 rebase
+  record before a new Execution approval.
+- Issue `#98` is a P0 blocker and composes `#54`, `#56`, the released
+  publication authority/executor and the one configured Verify command.
 - The package has exact Nova write paths/resources and does not share a
   physical workspace or global runtime resource concurrently with Cyborg.
 - Implementation is dispatched to a fresh Goldfish; the Elephant does not
   implement production code.
 
-## Pre-rebase execution lane
+## Closed pre-rebase execution lane
 
-Run serially, beginning with A1/#57. A3/#8, contract-only A4/#12/#14 and the
-non-protected portions of A6/#54 may follow when their exact manifests pass the
-same protected-surface check. A2/#7, A5/#29/#38 and A7/#56 are not assumed
-safe by Issue number: any bootstrap, install, runtime-readback or V4-adjacent
-path moves that package to the post-rebase lane.
+The former bounded lane is closed by the 2026-08-01 plan revocation. Its local
+commits and focused evidence are inputs to R0 impact analysis only. No new
+implementation dispatch occurs until the revised design is approved and the
+exact `v0.4.7` rebase is recorded.
 
 Pre-rebase focused tests are useful implementation evidence but not final
 increment evidence. The rebase impact review explicitly reruns or invalidates
 them before Nova A acceptance.
+
+## Standing TP authorization
+
+The PO grants a reusable Nova-only authorization through formal Nova close for
+temporary TP-1, TP-3 and TP-5 lifts. Every use remains bound to one exact task
+and write-set and creates its required audit record. No other guard is covered;
+test/gate semantics may not be weakened; and TP-1/TP-3/TP-5 are restored before
+candidate gates, push/publication and Nova close. This removes repeat approval
+prompts but does not leave the protections continuously disabled.
 
 ## Design D0 — Boundary freeze and test inventory
 
@@ -210,9 +216,51 @@ benchmark record. A later external consumer must bind all five fixtures and
 use the closed v1 schema; a format change requires a new version, not a v1
 relaxation. Rollback is the A6/A7 forward-revert path below.
 
+## Slice A6R — Post-v0.4.7 delivery loop
+
+**Issue:** `#98`
+
+**Dependencies:** exact R0 adoption, accepted A5 lineage contract and accepted
+A6 release-preflight contract.
+
+**Outcome:** one supported, observable and convergent path from candidate
+qualification through explicit publication authorization and exact remote
+readback.
+
+**Order:**
+
+1. R0 exact baseline adoption record and evidence-impact disposition;
+2. R1 remote/credential/ref/workflow/policy/executor capability preflight;
+3. R2 fixed productive publication CLI around the existing authority;
+4. R3 bounded Verify progress and candidate-bound resume journal;
+5. R4 release-path Critic delta enforcement;
+6. R5 public release-state projection and contradiction checker; and
+7. R6 integrated disposable-remote, Verify-resume, Critic-lineage and
+   release-state fixtures.
+
+**DoD:**
+
+- all NVA-A98 criteria pass;
+- no raw push or improvised library invocation is needed as the normal path;
+- capability unknown/unavailable/insufficient/rejected states remain distinct;
+- resumed Verify covers the complete registered suite set on one candidate;
+- normal correction reviews never restart from complete release history;
+- publication closes only after fresh matching commit/tree readback; and
+- public release state agrees with the published tag.
+
+**ADR gate:** the machine-local Verify run journal requires an accepted ADR
+covering ownership, permissions, durability, retention, cleanup and stale-run
+recovery before R3 implementation.
+
+The exact contracts, path manifest and negative matrix are in
+`specs/sprint-nova-epic/design/post-v0.4.7-delivery-loop.md`.
+
 ## Slice A7 — Nova A integration and gate
 
 **Outcome:** one candidate-bound Nova A Result.
+
+**Entry:** A1–A6R are complete, the exact v0.4.7 adoption record is valid and
+Issue `#98` has no remaining blocker criterion.
 
 **Shared later-integration resources:** central Verify registration, ADR
 register, state/history and any post-V3 generated projections. Nova may change

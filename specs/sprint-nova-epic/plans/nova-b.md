@@ -10,7 +10,7 @@
   validated `E2` evidence descendant as branch continuation head.
 - No unpublished Cyborg dependency is introduced.
 - The branch is rebased onto the exact Product-Owner-identified stable `main`
-  0.4.7 commit/tree; conflicts are dispositioned against the 16-Issue scope,
+  0.4.7 commit/tree; conflicts are dispositioned against the 17-Issue scope,
   affected bindings are regenerated and upstream #63 regressions pass without
   a Nova delivery claim.
 - External hosts, credentials and mutations remain opt-in and separately
@@ -199,7 +199,7 @@ Issue `#21` remains open. This disposition authorizes neither activation nor
 implementation, credentials, network access, issue closure, push or release.
 
 **Phase exit:** ADR-0048 alone does not activate a live worker. Nova B starts
-only after the stable 0.4.7 rebase, refreshed 16-Issue bindings, exact accepted
+only after the stable 0.4.7 rebase, refreshed 17-Issue bindings, exact accepted
 Nova A receipt and explicit PO activation. Bounded pre-rebase Nova A Execution
 is not a live worker capability claim.
 
@@ -328,7 +328,7 @@ candidate before any native or final gate evidence.
 
 **Checks:**
 
-- complete 16-Issue acceptance mapping;
+- complete 17-Issue acceptance mapping;
 - no reverse dependency on unpublished Cyborg bytes;
 - exact backlog reconciliation previews from the current canonical head;
 - focused tests and candidate inventory; and
@@ -362,7 +362,7 @@ candidate evidence. The close tail may add only append-only evidence that binds
 the frozen candidate; any relevant byte change invalidates and reruns the
 applicable gates.
 
-Every one of the 16 issues receives its own evidence disposition. Any
+Every one of the 17 issues receives its own evidence disposition. Any
 incomplete criterion keeps the issue and Epic open unless the PO explicitly
 changes scope. Canonical backlog transitions use the sanctioned ledger writer
 only after exact closure evidence exists.

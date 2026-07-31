@@ -11,7 +11,7 @@ The Epic has four human-visible gates:
 3. **Nova A gate:** accept an exact Nova A commit/tree, increment receipt,
    Result, Verify, Security and Critic evidence before Nova B implementation.
 4. **Nova B / Epic close gate:** accept the frozen Nova-only candidate,
-   platform/runner/forge evidence and all 16 issue dispositions.
+   platform/runner/forge evidence and all 17 issue dispositions.
 
 No prior gate implies a later gate.
 
@@ -30,8 +30,9 @@ No prior gate implies a later gate.
 | NVA-G09 | WHEN a result is accepted, it SHALL bind the exact package, dispatch, attempt, candidate and result digest; conflicting replay SHALL fail closed. | Replay/duplicate/out-of-order fixtures. |
 | NVA-G10 | Every external mutation SHALL resolve the exact target, require confirmation matching its preview, carry an idempotency binding and require matching readback before success. | Forge/credential adapter tests and opt-in observation. |
 | NVA-G11 | Every portable metric SHALL preserve unknown usage/cost as unknown and SHALL exclude prompts, secrets, private coordinates and unrestricted output. | Privacy/cardinality tests. |
-| NVA-G12 | Epic completion SHALL require all 16 issue acceptance sets and the same frozen Nova-only candidate to pass configured Verify, Security, independent Critic and PO acceptance; unavailable or deferred criteria SHALL remain open unless the PO explicitly changes scope. | Final Result and issue-evidence matrix. |
-| NVA-G13 | Before any protected-surface implementation, Nova A increment acceptance, immutable final candidate evidence or full Nova readiness approval, the branch SHALL rebase onto the exact Product-Owner-identified stable `main` 0.4.7 commit/tree, resolve conflicts against the 16-Issue scope, rerun upstream #63 recovery regressions and regenerate every affected binding without claiming #63 delivery. Pre-rebase focused evidence is provisional and SHALL be invalidated or re-established after the rebase according to path impact. | Exact pre-rebase write-set receipts, base/head OIDs, rebase/conflict disposition, impact invalidation, regression readback and regenerated binding/lifecycle digests. |
+| NVA-G12 | Epic completion SHALL require all 17 issue acceptance sets and the same frozen Nova-only candidate to pass configured Verify, Security, independent Critic and PO acceptance; unavailable or deferred criteria SHALL remain open unless the PO explicitly changes scope. | Final Result and issue-evidence matrix. |
+| NVA-G13 | Before renewed implementation approval, Nova A increment acceptance, immutable final candidate evidence or full Nova readiness approval, the branch SHALL rebase onto commit `89cb12b99e3fd86ac44878d0c23b278f00538921`, tree `b6537dcaa7bee526d9a393e2603b28648f4b0438`, resolve conflicts against the 17-Issue scope, rerun upstream #63 recovery regressions and regenerate every affected binding without claiming #63 delivery. Pre-rebase evidence is provisional and SHALL be invalidated or re-established after the rebase according to path impact. | Exact previous Nova head/tree, released base identity, resulting head/tree, replay/conflict disposition, impact invalidation, regression readback and regenerated binding/lifecycle digests. |
+| NVA-G14 | The standing TP-1/TP-3/TP-5 authorization SHALL apply only to an exact Nova task/write-set, SHALL be audit-recorded, SHALL NOT weaken tests or another guard, and SHALL be fully restored before candidate gates, push/publication and Nova close. | PO authorization record, per-use audit entries, guard readback before each gate and close. |
 
 ## Nova A issue acceptance
 
@@ -157,6 +158,13 @@ No prior gate implies a later gate.
   activated ownership unless a later explicit transfer is recorded.
 - NVA-A54-9: Nova exposes request validity, convergence and delta-review inputs
   without owning #75's cross-runner usage/cost or Critic-assurance aggregation.
+- NVA-A54-10: In the release path, the first admitted review is broad; every
+  normal correction review binds the previous reviewed candidate-to-current
+  candidate range plus deterministic impact closure, and a broad rerun is
+  rejected without a typed invalidation reason.
+- NVA-A54-11: A correction finding identifies a changed line or direct
+  consequence of the correction delta; unchanged historical findings remain
+  dispositions in the existing lineage rather than new findings.
 
 ### `#56` Release preflight
 
@@ -174,12 +182,67 @@ No prior gate implies a later gate.
   destination, archive digest/provenance, public/private classification or
   bounded consent-status readback blocks readiness without exposing raw
   consent, credential or environment material.
+- NVA-A56-7: Before candidate authorization, preflight binds the intended
+  remote fingerprint/ref and exact preimage and reports usable credentials,
+  ref write capability, relevant workflow-update capability, repository/ref
+  policy and fixed executor availability as sanitized typed cells.
+- NVA-A56-8: Missing endpoint access, insufficient permission, policy
+  rejection, stale preimage, ambiguous transport and unavailable executor are
+  distinct non-ready results; successful read access cannot imply write
+  capability.
+
+### `#98` Post-v0.4.7 delivery loop
+
+- NVA-A98-1: One reviewed adoption record binds previous Nova head/tree,
+  released `v0.4.7` commit/tree, rebased candidate, ordered replay/conflict
+  dispositions and every invalidated/rerun evidence item.
+- NVA-A98-2: A fixed productive CLI exposes prepare, explicit authorization,
+  execute and fresh remote readback by consuming the existing publication
+  authority and executor contracts, without direct library invocation.
+- NVA-A98-2a: The released closed-key publication v1 contract remains
+  byte-stable and readable; Critic and release-preflight bindings use a
+  versioned successor in the same authority family/store, and no v1 approval
+  can authorize successor execution.
+- NVA-A98-3: Raw push, arbitrary Git arguments, force, delete, wildcard,
+  multiple refspec and generic guard override remain unavailable.
+- NVA-A98-4: Wrong candidate, tree, repository/remote fingerprint,
+  destination ref, preimage, gate evidence, approval digest, expiry, replay or
+  non-fast-forward state rejects before mutation.
+- NVA-A98-5: An isolated disposable-remote suite covers success, stale
+  preimage, already-published convergence, ambiguous transport, replay and
+  denied operations.
+- NVA-A98-6: Release preflight detects unavailable credentials, insufficient
+  ref permission and missing workflow-update capability before candidate
+  authorization, without exposing identity, endpoint or credential bytes.
+- NVA-A98-7: Full Verify emits bounded machine-readable suite progress while
+  complete logs remain in the private run journal outside the interactive
+  channel.
+- NVA-A98-8: Resume reuses only terminal completed suites bound to the same
+  candidate tree, suite identity/implementation, inputs, environment contract
+  and Verify policy; partial suites rerun.
+- NVA-A98-9: Candidate, suite, input, environment-contract or policy drift
+  invalidates exactly the affected resume receipts and deterministic
+  dependents without reducing registered coverage.
+- NVA-A98-10: A correction-cycle fixture proves that the second Critic reviews
+  the previous reviewed candidate-to-corrected candidate delta plus impact
+  closure rather than complete release history.
+- NVA-A98-11: Every broader correction rerun records a typed invalidation
+  reason and a new lineage-parent binding.
+- NVA-A98-12: Public release-state projection and `docs/state.md` agree with
+  the published version/tag/commit/tree, and deterministic validation rejects
+  an unpublished-candidate claim for an observed published tag.
+- NVA-A98-13: The exact final Nova candidate passes Full Verify, Security,
+  release preflight, delta-correct Critic review, explicit publication and
+  fresh remote readback.
+- NVA-A98-14: Closure evidence names the Nova candidate, integration commit,
+  publication transaction/readback, Verify progress/resume fixtures and
+  Critic lineage.
 
 ## Nova A increment gate
 
 Nova A is accepted only when:
 
-- all nine issue slices have a disposition and no hidden partial completion;
+- all ten Nova A issue slices have a disposition and no hidden partial completion;
 - `#57` has made the default backlog checker green or the Nova A gate remains
   blocked;
 - focused tests and the one configured Verify/Security chain are green on one

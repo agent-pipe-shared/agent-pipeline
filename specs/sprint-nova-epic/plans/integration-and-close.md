@@ -5,17 +5,18 @@
 Shared-file changes are never incidental tail work. Create explicit packages
 for:
 
-1. bounded pre-rebase Nova A packages with exact protected-surface-negative
-   write-sets;
-2. exact stable `main` 0.4.7 baseline identification and Nova rebase;
+1. reviewed Design/project-authority snapshot and exact prior Nova head/tree;
+2. exact released `main` / `v0.4.7` adoption and Nova rebase;
 3. conflict disposition plus regenerated Spec/backlog/lifecycle bindings;
 4. central Verify suite registration;
 5. ADR register and post-V3 migration projection;
 6. issue/backlog reconciliation;
-7. Nova A Result and Nova B activation;
-8. Nova-only candidate assembly and freeze;
-9. final platform/runner/forge evidence; and
-10. append-only Result, state, history and close metadata.
+7. `#98` capability preflight, publication CLI, Verify resume, Critic lineage
+   and release-state consistency integration;
+8. Nova A Result and Nova B activation;
+9. Nova-only candidate assembly and freeze;
+10. final platform/runner/forge evidence; and
+11. append-only Result, state, history and close metadata.
 
 Each package declares exact write paths and resources and is planned through
 the deterministic conflict model.
@@ -23,10 +24,8 @@ the deterministic conflict model.
 ## Required evidence order
 
 ```text
-bounded pre-rebase package
-  -> exact write-set/protected-surface readback
-  -> focused provisional tests
-  -> stable main 0.4.7 identification
+reviewed Design/project-authority snapshot
+  -> exact released v0.4.7 identification
   -> exact Nova rebase and conflict disposition
   -> impact invalidation/rerun
   -> regenerated binding/lifecycle readback
@@ -35,11 +34,14 @@ bounded pre-rebase package
   -> freeze exact Nova-only candidate
   -> Full Verify
   -> Security
-  -> independent Critic
+  -> release capability preflight
+  -> independent broad Critic
+  -> delta/impact-bound correction reviews if needed
   -> synthetic/non-native macOS disposition
   -> finding disposition
-  -> exact remote readback where authorized
-  -> PO acceptance
+  -> explicit publication authorization
+  -> fixed publication execution and exact remote readback
+  -> PO acceptance/close disposition
   -> issue/backlog transitions
   -> close
 ```
@@ -50,7 +52,7 @@ tail or a fresh complete gate when they change authority/security scope.
 
 ## Issue accounting
 
-Before closure, every one of the 16 Nova issue comments must name:
+Before closure, every one of the 17 Nova issue comments must name:
 
 - accepted merged/delivered commit and tree;
 - relevant conformance/benchmark/platform/forge evidence;
@@ -73,9 +75,9 @@ the transferred work. This rule applies to every later Nova scope adjustment.
 
 Issue `#72` independently owns native Apple-Silicon lifecycle and evidence;
 its close is not a Nova gate. Issue `#63` independently owns the 0.4.7 hotfix;
-Nova consumes it only through the exact stable-baseline rebase. Pre-rebase
-Nova packages must prove that their exact write-sets do not overlap its
-Bootstrap, installation, runtime-readback or V4 recovery surfaces.
+Nova consumes it only through the exact released-baseline rebase. Issue `#98`
+owns the resulting Nova delivery-loop integration and must not reopen or
+relabel the completed Hotfix Issues.
 
 ## Backlog accounting
 

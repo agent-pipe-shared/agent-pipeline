@@ -58,7 +58,9 @@ decision and PO exception where one is needed.
 The 0.4.7 owner should, after its own stable delivery evidence, create one
 central PO decision that:
 
-1. identifies the exact stable 0.4.7 `main` commit and tree;
+1. binds released 0.4.7 `main` commit
+   `89cb12b99e3fd86ac44878d0c23b278f00538921` and tree
+   `b6537dcaa7bee526d9a393e2603b28648f4b0438`;
 2. adopts the four baseline dispositions above in the central lifecycle/policy
    source, including UI/status wording that avoids a generic rebase nag;
 3. requires an impact-review receipt rather than an immediate rebase for every

@@ -2,9 +2,11 @@
 
 ## Current snapshot
 
-The authoritative planning snapshot was refreshed read-only from
-`agent-pipe-shared/agent-pipeline` on 2026-07-30. Membership is the current
-GitHub label intersection:
+The original authoritative planning snapshot was refreshed read-only from
+`agent-pipe-shared/agent-pipeline` on 2026-07-30. On 2026-08-01 the PO added
+new open P0 blocker `#98`, carrying `sprint:nova`, after the published
+`v0.4.7` release exposed delivery-loop defects. Membership is the current
+GitHub label intersection plus that explicit PO intake:
 
 - include every open Issue carrying `sprint:nova`;
 - exclude an Issue carrying another `sprint:*` label or any `hotfix:*` label;
@@ -13,23 +15,25 @@ GitHub label intersection:
 - never infer delivery or closure from labels, Issue state, branches or file
   presence.
 
-The resulting Nova portfolio is exactly 16 open Issues:
+The resulting Nova portfolio is exactly 17 open Issues:
 
-`#7,#8,#12,#14,#15,#16,#18,#21,#29,#38,#49,#51,#54,#56,#57,#60`.
+`#7,#8,#12,#14,#15,#16,#18,#21,#29,#38,#49,#51,#54,#56,#57,#60,#98`.
 
-None of those 16 Issues has a competing Sprint or hotfix label. The
+None of those 17 Issues has a competing Sprint or hotfix label. The
 `blocker` label on `#7`, `#15`, `#49` and `#57` is a release-priority signal,
 not a competing ownership label. The `triage:needs-review` label on `#56`
 does not remove its explicit Nova membership.
 
-This snapshot replaces the earlier 17-Issue allocation. Issue `#63` now
-carries `hotfix:0.4.7` and no `sprint:nova` label. It is therefore not a Nova
-deliverable. Its accepted implementation must arrive through the later rebase
-onto the stable `main` 0.4.7 baseline. Existing Nova B4R bytes and evidence are
-historical pre-rescope material: they are neither extended nor deleted before
-that rebase and cannot claim Nova delivery. The PO separately permits
-pre-rebase Nova packages whose exact write-sets are disjoint from Bootstrap,
-installation, runtime-readback and V4/#63 recovery.
+The 2026-07-30 16-Issue snapshot replaced the earlier 17-Issue allocation that
+still contained `#63`. The current 17-Issue set adds only `#98`; it does not
+reintroduce `#63`. Issue `#63` carries `hotfix:0.4.7` and no `sprint:nova`
+label, so it is not a Nova deliverable. Its accepted implementation arrives
+only through the exact released-baseline rebase. Existing Nova B4R bytes and
+evidence are historical pre-rescope material and cannot claim Nova delivery.
+
+That pre-rebase execution permission is now superseded by the 2026-08-01 plan
+revocation. Design reconciliation and exact `v0.4.7` adoption occur before any
+new implementation dispatch.
 
 ## Allocation
 
@@ -44,6 +48,7 @@ installation, runtime-readback and V4/#63 recovery.
 | [#38](https://github.com/agent-pipe-shared/agent-pipeline/issues/38) Invocation reliability | P1 / L | Nova A | Generic preflight, attempt, resolution and repair contracts; telemetry never becomes authority. |
 | [#54](https://github.com/agent-pipe-shared/agent-pipeline/issues/54) Critic convergence | P1 / L | Nova A | Consume `#38` and `#29`; keep fresh review and hard course budgets. Per the 2026-07-28 comment, `#75` owns cross-runner usage/cost and assurance aggregation, not Nova. |
 | [#56](https://github.com/agent-pipe-shared/agent-pipeline/issues/56) Release preflight | shared release gate | Nova A | Provider-neutral core only; later reconciled requirements enter through versioned extensions. |
+| [#98](https://github.com/agent-pipe-shared/agent-pipeline/issues/98) Executable and convergent post-v0.4.7 delivery loop | P0 / L / next-release blocker | Nova A | Compose #56 capability preflight, the released publication authority/executor, observable/resumable Full Verify, #54 correction lineage and public release-state consistency. |
 | [#60](https://github.com/agent-pipe-shared/agent-pipeline/issues/60) Runner-native continuation | P1 / M-L / continuation baseline | Nova B | Bind active executable work to one generation-bound native goal/readback for Codex and Claude Code without a watchdog or automatic unblock claim. |
 | [#21](https://github.com/agent-pipe-shared/agent-pipeline/issues/21) Local Goldfish pool | P1 / XL | Nova B | Start only after accepted `#7/#8/#12/#14`; serial fallback and reserved capacity are product requirements. |
 | [#16](https://github.com/agent-pipe-shared/agent-pipeline/issues/16) Async remote adapter | P2 / L | Nova B | Extend the accepted local-first contract; no provider is required for core tests. |
@@ -67,16 +72,13 @@ installation, runtime-readback and V4/#63 recovery.
 
 ## Rebase and phase gate
 
-No `main` bytes are imported before the stable 0.4.7 baseline. After the
-16-Issue PRD/Spec/Acceptance/plan set is byte-consistent and digest-bound, the
-Pipeline may enter bounded pre-rebase Execution.
-
-Every pre-rebase dispatch must provide an exact write-set. Bootstrap,
-installation, marketplace, runtime-readback and V4/#63 recovery paths are
-protected; an absent or uncertain classification is protected as well. The
-stable 0.4.7 rebase, conflict disposition, regenerated bindings and refreshed
-PO readiness remain mandatory before those paths, Nova A acceptance or final
-candidate evidence.
+No `main` bytes are imported until the 17-Issue
+PRD/Spec/Acceptance/plan set is byte-consistent and receives its renewed PO
+gate. The next repository operation is then the exact rebase onto
+`89cb12b99e3fd86ac44878d0c23b278f00538921` / tree
+`b6537dcaa7bee526d9a393e2603b28648f4b0438`, followed by conflict disposition,
+binding regeneration and refreshed readiness. No bounded pre-rebase
+implementation lane remains open.
 
 ## Issue maintenance
 

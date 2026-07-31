@@ -1,10 +1,9 @@
 # Sprint Nova Epic — Technical Specification
 
-> **Gate status:** PO-approved bounded pre-rebase Execution candidate. Its
-> exact digest must be selected and bound after this decision update. Until
-> the stable `main` 0.4.7 rebase, it authorizes only packages whose exact
-> write-set excludes Bootstrap, installation, runtime-readback and V4/#63
-> recovery surfaces. It is not full increment/final-candidate authority.
+> **Gate status:** Design reconciliation in progress. The prior Execution
+> approval is revoked while this Spec incorporates the exact released
+> `v0.4.7` baseline, Issue `#98` and the standing TP-1/TP-3/TP-5 lift
+> authorization. No implementation package is currently authorized.
 
 ## 1. Bound authority and scope
 
@@ -14,31 +13,33 @@
 | Base commit | `9d1b3dc108eb77629ace5b82002120f5539abd8d` |
 | Base tree | `282a8b5c5b0581e042985bfb373a66be0eb2d08b` |
 | Bounded pre-rebase Execution baseline | current v0.4.6-derived branch; exact protected-surface-negative write-set required per dispatch |
-| Required full Execution baseline | pending exact stable `main` 0.4.7 commit/tree; mandatory rebase before protected-path work, increment acceptance or final evidence |
+| Required full Execution baseline | released `main` / `v0.4.7` commit `89cb12b99e3fd86ac44878d0c23b278f00538921`, tree `b6537dcaa7bee526d9a393e2603b28648f4b0438`; mandatory rebase before renewed Execution approval |
 | Branch | `feat/sprint-nova-codex-v046` |
 | PRD | `specs/sprint-nova-epic/prd_sprint-nova-epic.md`; the approved pre-activation content baseline is SHA-256 `879423cdb24d542b7f9275bc9da4591fcdfd38145fdddee9142ce82eee53402e`, while the live PRD digest is bound by the PO-gate state to avoid a circular PRD↔Spec self-hash |
 | PRD approval | `specs/sprint-nova-epic/evidence/prd-approval.json`, SHA-256 `59b38e54ca64cd94c8ae02bd4844ee082b2202a88beb17965cab13bba361571d` |
-| Acceptance contract | `specs/sprint-nova-epic/acceptance.md`, SHA-256 `69451273769cab9a5f7f9d3911cd3a1a23e2a5e87165f9fdfa4c5886a22fbc96` |
+| Acceptance contract | `specs/sprint-nova-epic/acceptance.md`, SHA-256 `2ebd702edc8c67d04260a811703b8a6297acb479ef2c6c7f6ec37716960f6b5b` |
 | Canonical backlog snapshot commit | `5ca5a4b292a267ffdfcc52577fda0a0593957a65` |
 | Canonical backlog subtree | `832bf98e22e9a147dad88c952c0b794f3ee44fe7` |
 | Canonical transition head | `36dd616d3aa5bc21e49e138f6b8a9a17a9de25321998304306e4fa47289de562` |
-| Current Nova issue set | exactly `#7`, `#8`, `#12`, `#14`, `#15`, `#16`, `#18`, `#21`, `#29`, `#38`, `#49`, `#51`, `#54`, `#56`, `#57`, `#60` |
+| Current Nova issue set | exactly `#7`, `#8`, `#12`, `#14`, `#15`, `#16`, `#18`, `#21`, `#29`, `#38`, `#49`, `#51`, `#54`, `#56`, `#57`, `#60`, `#98` |
 
 The PRD and acceptance matrix own product intent. This specification owns
 technical interfaces, states, failure behavior, file boundaries and slice
 readiness. A contradiction fails closed and returns to the applicable human
 gate; this document cannot silently narrow acceptance.
 
-Nova A contains `#57`, `#7`, `#8`, `#12`, `#14`, `#29`, `#38`, `#54` and
-`#56`. Nova B contains `#60`, `#21`, `#16`, `#18`, `#15`, `#51` and `#49`.
+Nova A contains `#57`, `#7`, `#8`, `#12`, `#14`, `#29`, `#38`, `#54`,
+`#56` and `#98`. Nova B contains `#60`, `#21`, `#16`, `#18`, `#15`, `#51`
+and `#49`.
 Nova B cannot begin from a merely latest branch head: it begins from the exact
 Nova A increment receipt accepted by the PO.
 
-No `main` bytes are imported during bounded pre-rebase Execution. Issue `#63`
-is owned by `hotfix:0.4.7` and excluded from Nova delivery. Its stable accepted
-implementation must enter through the mandatory future rebase. Historical
-Nova B4R material remains retained but is not a current implementation slice,
-acceptance claimant or delivery result.
+No `main` bytes have yet been imported into this feature branch. Issue `#63`
+is owned by `hotfix:0.4.7` and excluded from Nova delivery. Its released
+implementation enters only through the mandatory exact rebase. The former
+bounded pre-rebase lane is closed; historical Nova B4R material remains
+retained but is not a current implementation slice, acceptance claimant or
+delivery result.
 
 ## 2. Normative conventions
 
@@ -600,6 +601,15 @@ broader typed invalidation. The accepted course is at most four review rounds
 and three correction commits. Exceeding either emits `po-course-gate`; no
 automatic extra round occurs.
 
+For the `#98` release loop, the first admitted review is broad and records the
+reviewed candidate as the immutable lineage parent. A normal correction
+request is compiled from exactly that parent-to-corrected-candidate range plus
+the deterministic impact closure. It rejects an unchanged historical path as
+a new finding unless the finding demonstrates a direct consequence of the
+correction delta. A broader correction review requires a closed typed
+invalidation reason and becomes the new lineage parent; coordinator prose or
+an unbound “review latest” request cannot widen the range.
+
 Existing `review-economy.mjs` remains the authority for configured course
 limits and capacity admission. Nova stores its retained stage receipts and
 projects consumption into that authority. Retained evidence can prove that a
@@ -660,12 +670,21 @@ wave-review or remote-mini-train pilot must define its own route, threshold,
 stop and rollback before execution; the framework cannot fill those values
 after seeing results.
 
-`pipeline.release-preflight.v1` is deterministic and local. It checks exact
+`pipeline.release-preflight.v1` is read-only and exact-candidate bound. It checks exact
 candidate/base, version decision, repository cleanliness, documentation links,
 feature lifecycle, PRD/Spec/acceptance/Result destinations, retention classes,
 archive digest/provenance, public/private classification, bounded consent
-status and registered gate inventory. `ready` means only “eligible to begin
-final gates.”
+status and registered gate inventory. Its `remoteCapability` extension invokes
+one fixed target adapter before candidate authorization and binds the intended
+remote name/fingerprint and destination ref, observed remote preimage, usable
+publication credential class, repository/ref write capability, workflow-file
+update capability when the candidate changes `.github/workflows/**`, relevant
+branch/repository policy and the installed publication executor identity.
+Unavailable credentials, insufficient permission, policy rejection, stale
+preimage, ambiguous endpoint and transport unavailability are separate
+sanitized codes. A capability that cannot be authoritatively observed is
+`unavailable`, never inferred from a configured remote or successful read.
+`ready` means only “eligible to begin final gates.”
 
 Consent readback contains decision ID, status, authority digest and expiry; no
 raw consent text, identity, credential or environment bytes. Remote, human,
@@ -674,7 +693,67 @@ missing, mismatched and ambiguous bindings. Cyborg can later register accepted
 requirements through an extension input; Nova never guesses unpublished
 Cyborg bytes.
 
-### 5.7 A7 — Immutable Nova A increment
+### 5.7 A6R — Executable post-`v0.4.7` delivery loop (`#98`)
+
+The productive entrypoint extends the fixed
+`plugins/pipeline-core/scripts/publication-executor.mjs` CLI instead of
+creating a second approval or push authority. It exposes only closed
+subcommands for `preflight`, `prepare`, `authorize-plan`,
+`authorize-apply --activate`, `execute` and `readback`. Every mutating action
+is emitted by the preceding read-only action, binds its digest and requires
+the existing explicit Human confirmation. The CLI accepts no raw endpoint,
+credential, Git argv or refspec. It composes the existing
+`publication-authority.mjs`, `publication-bundle.mjs` and executor contracts;
+raw Git, force, delete, multiple refspecs and generic guard overrides remain
+unavailable.
+
+The released `pipeline.publication-channel.v1` schema is frozen and binds
+identity, Verify and Security evidence but not Critic or release-preflight
+evidence. A6R therefore adds a v2 successor inside the same publication
+bundle, private authority store and transition family. v1 remains byte-stable,
+readable and valid for its original contract; it is never upgraded in place.
+The productive Nova release loop prepares a new v2 transaction whose approval
+tuple includes Critic and release-preflight bindings. No v1 approval or
+authority digest can authorize v2 execution, and no parallel approval format
+is introduced.
+
+The prepared transaction binds candidate commit/tree, repository and remote
+fingerprints, destination ref, observed remote preimage, fast-forward proof,
+identity/Verify/Security/Critic/release-preflight evidence, approval digest,
+executor digest and expiry. Execute consumes the authority before its single
+mutation attempt. `readback` uses a fresh disposable repository with
+alternates disabled and either closes the matching candidate/tree or returns a
+typed non-success. Already-published state converges without another push;
+stale preimage, replay, wrong candidate/tree/evidence/approval/expiry and
+non-fast-forward state reject before mutation.
+
+Full Verify uses a machine-local run journal under the physical Git common
+directory, never a tracked result or second project authority. The journal
+emits bounded `pipeline.verify-progress.v1` JSON events to the interactive
+channel and writes complete per-suite logs plus closed
+`pipeline.verify-suite-receipt.v1` records to its private run directory. A
+suite receipt binds candidate commit/tree, suite ID and implementation digest,
+complete declared inputs, relevant environment-contract digest and Verify
+policy digest. Only terminal completed suites are reusable. Partial suites are
+rerun; candidate, suite, input, environment or policy drift invalidates the
+affected receipt. A resume planner produces a closed
+`pipeline.verify-resume-plan.v1` decision and never derives PASS from console
+text, journal presence or an interrupted process.
+
+Public release state is projected in `docs/release-state.json` and rendered in
+`docs/state.md`. A deterministic checker binds declared version, tag,
+published commit/tree and disposition and fails when the documentation calls a
+published tag an unpublished candidate. The projection is documentation, not
+publication authority.
+
+The exact implementation sequencing and failure matrix live in
+`specs/sprint-nova-epic/design/post-v0.4.7-delivery-loop.md`. The slice ends
+only with disposable-remote success, stale-preimage, already-published,
+ambiguous-transport, replay and denied-operation fixtures; Verify interruption
+and drift fixtures; correction-delta lineage fixtures; release-state
+consistency checks; and one exact candidate-bound publication/readback record.
+
+### 5.8 A7 — Immutable Nova A increment
 
 `pipeline.nova-increment-receipt.v1` has exact keys `schema`, `increment`,
 `base`, `candidate`, `specification`, `acceptance`, `issues`, `backlog`,
@@ -971,18 +1050,22 @@ Issue `#63` is owned by `hotfix:0.4.7`, not `sprint:nova`. Its implementation,
 acceptance evidence and delivery claim are produced on the stable `main`
 0.4.7 lifecycle. Nova neither reimplements nor closes that work.
 
-Before any protected-surface implementation, Nova A increment acceptance,
+Before renewed implementation approval, Nova A increment acceptance,
 immutable final candidate evidence or full Nova readiness approval:
 
-1. the Product Owner identifies the exact stable `main` 0.4.7 commit/tree;
+1. the Product Owner binds released `main` / `v0.4.7` commit
+   `89cb12b99e3fd86ac44878d0c23b278f00538921`, tree
+   `b6537dcaa7bee526d9a393e2603b28648f4b0438`;
 2. this branch rebases onto that exact baseline;
-3. every conflict is resolved against the current 16-Issue Nova scope;
+3. every conflict is resolved against the current 17-Issue Nova scope;
 4. the backlog/spec bindings and lifecycle hashes are regenerated; and
 5. the upstream #63 recovery regression suites are rerun on the rebased Nova
    candidate without turning that result into a Nova delivery claim.
 
-Before that rebase, implementation is permitted only through a dispatch-bound
-pre-rebase lane with all of these properties:
+The former dispatch-bound pre-rebase lane is closed by the 2026-08-01 plan
+revocation. No further implementation uses that lane; its provisional evidence
+is retained only for the rebase impact analysis. Its historical constraints
+were:
 
 1. the dispatch lists every intended write path and shared runtime resource;
 2. no write touches onboarding/bootstrap entrypoints, installation or
@@ -1002,7 +1085,7 @@ implementation authority or acceptance ID.
 ### 6.7 B5 — Candidate freeze and macOS boundary (`#49` → `#72`)
 
 Nova B first assembles one Nova-only candidate and freezes its commit/tree.
-No unpublished Cyborg bytes are an input. The 16-Issue acceptance mapping,
+No unpublished Cyborg bytes are an input. The 17-Issue acceptance mapping,
 focused suites, backlog previews and artifact inventory must be complete
 before a close claim.
 
@@ -1063,6 +1146,11 @@ combined integration remains a later lifecycle.
 | `pipeline.critic-review-lineage.v1` | A5 | Critic integration | course gate/Result |
 | `pipeline.multi-cli-benchmark.v1` | A6 | benchmark runner | report/PO |
 | `pipeline.release-preflight.v1` | A6 | preflight | gate operator |
+| `pipeline.publication-capability-preflight.v1` | A6R | release preflight adapter | publication prepare gate |
+| `pipeline.verify-progress.v1` | A6R | Full Verify orchestrator | interactive progress renderer |
+| `pipeline.verify-suite-receipt.v1` | A6R | Full Verify suite runner | resume planner/final evidence |
+| `pipeline.verify-resume-plan.v1` | A6R | Verify resume planner | Full Verify orchestrator |
+| `pipeline.public-release-state.v1` | A6R | release-state projector | deterministic documentation checker |
 | `pipeline.nova-increment-receipt.v1` | A7/B5 | gate assembler | next increment/close |
 | `pipeline.nova-increment-readback.v1` | A7/B5 | independent gate readback | next increment/close |
 | `pipeline.runner-native-continuation.v1` | B0 | continuation adapter | native-goal evaluator/re-entry |
@@ -1107,6 +1195,11 @@ binary evidence is represented only by a digest/path, never inline.
 | Critic lineage | `schema,reviewId,parentReviewId,candidate,diff,references,packages,coverage,request,lane,verdict,findings,correction,invalidation,course,previousSha256,recordSha256` |
 | benchmark | `schema,benchmarkId,scoringVersion,candidate,fixture,adapterReportSha256,subjects,resourceEnvelope,warmups,repetitions,observations,score,recommendation,recordSha256` |
 | release preflight | `schema,preflightId,candidate,base,version,repository,documentation,lifecycle,retention,consent,gates,extensions,status,reasons,recordSha256` |
+| publication capability preflight | `schema,preflightId,candidate,remote,destinationRef,remotePreimage,credential,permissions,workflowUpdate,policy,executor,status,reasons,recordSha256` |
+| Verify progress | `schema,runId,candidate,suite,index,total,state,startedAt,completedAt,receiptSha256,diagnosticDigest` |
+| Verify suite receipt | `schema,runId,candidate,suite,implementationSha256,inputs,environmentContractSha256,policySha256,status,exitCode,log,startedAt,completedAt,receiptSha256` |
+| Verify resume plan | `schema,runId,candidate,policySha256,reusable,rerun,invalidated,reasons,planSha256` |
+| public release state | `schema,version,tag,commit,tree,publicationStatus,releaseUrlClass,observedAt,recordSha256` |
 | increment receipt | `schema,increment,base,candidate,specification,acceptance,issues,backlog,packages,gates,critic,collisions,evidenceManifest,result,createdAt,receiptSha256` |
 | increment readback | `schema,increment,receiptPath,receiptFileSha256,testedCandidate,evidenceCommit,evidenceTree,evidenceManifestSha256,status,observedAt,recordSha256` |
 | runner-native continuation | `schema,continuationId,subject,objective,acceptance,evidence,terminal,runner,generation,status,progress,readback,reason,recordSha256` |
@@ -1170,6 +1263,8 @@ Schema-specific nested shapes:
 | benchmark `fixture` | `class,path,fileSha256,seed`; observations use `route,repetition,outcome,measures,resourceUse,evidenceSha256` |
 | benchmark `score` | `medianWallMs,p95WallMs,classImprovementPct,classRegressionPct,correctnessEqual,resourceWithinEnvelope` |
 | preflight sections | each of `version,repository,documentation,lifecycle,retention,consent,gates,extensions` is `{status,reasons,evidence}` with sorted reasons and `EvidenceRef[]` |
+| publication capability `remote/credential/permissions/workflowUpdate/policy/executor` | closed sanitized observations; no token, login, private path or unsanitized endpoint; each capability is `available|unavailable|insufficient|not-required` with typed evidence digest |
+| Verify receipt `candidate/inputs/log` | `GitCandidate` / sorted `{path,fileSha256}[]` plus declared non-file input digests / `path,fileSha256,byteLength,truncated`; the complete log remains outside the tool channel |
 | increment `base/candidate` | `GitCandidate`; `evidenceManifest` is `path,fileSha256,treeDigest`; issues are sorted `{issue,acceptanceIds,status,evidenceSha256}[]` |
 | continuation `subject/objective/acceptance/evidence` | closed `featureId,phase,planSha256,specSha256,queueRevision,packageId,actionId` / `conditionSha256,summarySha256` / sorted `{criterionId,status,evidenceSha256}[]` / sorted `EvidenceRef[]`; no raw prompt/message/path |
 | continuation `terminal/runner/generation/status/progress/readback/reason` | `kind,atRevision` / `runnerId,adapterVersion,capability` / non-negative integer and goal digest / lifecycle enum in §6.1 / sorted typed observations with `known|unknown|unavailable` / `goalIdSha256,generation,observedAt,status` / typed code plus optional evidence digest |
@@ -1228,6 +1323,7 @@ gate with collision review. In this table, “schemas `<name>` under
 | A4 | `plugins/pipeline-core/lib/execution-plane-contract.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/scheduling-lifecycle.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/nova-execution-subject.schema.json`; `plugins/pipeline-core/scripts/execution-plane-request.schema.json`; `plugins/pipeline-core/scripts/nova-execution-state.schema.json`; `plugins/pipeline-core/scripts/scheduling-lifecycle.schema.json` | none; frozen planner/exchange/workflow files are test inputs only |
 | A5 | `plugins/pipeline-core/lib/critic-review-lineage.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/critic-review-lineage.schema.json` | `plugins/pipeline-core/scripts/critic-packet-preflight.mjs`, matching `.test.mjs`, only for closed lineage admission; `plugins/pipeline-core/lib/review-economy.mjs`, matching `.test.mjs`, only for projection |
 | A6 | `plugins/pipeline-core/lib/multi-cli-benchmark.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/multi-cli-benchmark.schema.json`; `plugins/pipeline-core/scripts/release-preflight.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/release-preflight.schema.json`; exact fixtures `plugins/pipeline-core/scripts/fixtures/nova-benchmark/mini.json`, `feature.json`, `review.json`, `migration.json`, `failure-recovery.json` | none |
+| A6R / #98 | `plugins/pipeline-core/lib/publication-capability-preflight.mjs`, matching `.test.mjs`; versioned v2 publication-bundle/authority schemas and matching tests within the existing publication family/store; `plugins/pipeline-core/lib/verify-resume.mjs`, matching `.test.mjs`; schemas `publication-capability-preflight`, `verify-progress`, `verify-suite-receipt`, `verify-resume-plan` and `public-release-state` under `plugins/pipeline-core/scripts/`; `harness/scripts/check-release-state-consistency.mjs`, matching `.test.mjs`; `docs/release-state.json`; exact candidate evidence under `specs/sprint-nova-epic/evidence/nova-a/delivery-loop/` | released v1 publication bundle/authority remain byte-stable; released `plugins/pipeline-core/scripts/publication-executor.mjs`, matching `.test.mjs` and schema, only to add the fixed productive operations and v2 selection around the existing authority family; `plugins/pipeline-core/scripts/release-preflight.mjs`, matching `.test.mjs` and schema, only for early capability admission; `harness/scripts/verify.mjs`, only for bounded progress/journal/resume orchestration; `plugins/pipeline-core/lib/critic-review-lineage.mjs`, matching `.test.mjs`, only for release-path delta enforcement; `docs/state.md`; `harness/scripts/verify.mjs` registration; this PRD/Spec/acceptance/plan/lifecycle set |
 | A7 | `plugins/pipeline-core/lib/nova-increment-receipt.mjs`, matching `.test.mjs`; schemas `nova-increment-receipt` and `nova-increment-readback` under `plugins/pipeline-core/scripts/`; exact evidence paths `specs/sprint-nova-epic/evidence/nova-a/evidence-manifest.json`, `increment-receipt.json`, `increment-readback.json`, `verify.json`, `security.json`, `critic.json`, `po-activation.json` | `harness/scripts/verify.mjs`; `specs/sprint-nova-epic/lifecycle.json`; `specs/sprint-nova-epic/plans/nova-a.md`; `specs/sprint-nova-epic/plans/nova-b.md`; append-only `specs/sprint-nova-epic/result.md` |
 | B0 | `plugins/pipeline-core/lib/runner-native-continuation.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/runner-native-continuation.schema.json`; `plugins/pipeline-core/scripts/codex-goal-host.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/claude-goal-host.mjs`, matching `.test.mjs`; cross-runner fixtures under `plugins/pipeline-core/scripts/fixtures/runner-native-continuation/` | `plugins/pipeline-core/lib/continuity-state.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/continuity-status.mjs`, matching `.test.mjs`; `plugins/pipeline-core/lib/interaction-continuity.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/continuity-status.mjs`, matching `.test.mjs`; `plugins/pipeline-core/hooks/stop-suggest.mjs`, matching `.test.mjs`; append-only `specs/sprint-nova-epic/result.md` for sanitized activation/readback evidence |
 | B1-C | `plugins/pipeline-core/lib/local-worker-pool.mjs`, matching `.test.mjs`; `plugins/pipeline-core/scripts/local-worker-pool.schema.json`; `specs/sprint-nova-epic/design/execution-state-authority-proposal.md` | none; pure contract/synthetic reducer only |
@@ -1262,7 +1358,7 @@ evidence only; they are not a Nova implementation or delivery claim. Process
 fixtures requiring real Git execute in the selected process-capable boundary
 rather than accepting sandbox `EPERM`.
 
-A7 and B6 register only completed focused suites in
+A6R, A7 and B6 register only completed focused suites in
 `harness/scripts/verify.mjs` and run the repository-configured Full Verify and
 Security commands. A registration is not evidence that the suite passed.
 
@@ -1289,6 +1385,16 @@ issuance, policy waiver or broad external mutation authority. Logs use
 allowlisted fields and bounded cardinality. Synthetic fixtures contain only
 fake credentials and hosts.
 
+The PO grants one standing Nova-scoped authorization from 2026-08-01 until
+formal Nova close: TP-1, TP-3 and TP-5 may be lifted temporarily when an exact
+Nova task requires their protected paths. This is a reusable authorization,
+not a continuous disablement. Each use records the task/write-set and audit
+entry; no other protected path or guard is covered; tests and gate semantics
+may not be weakened; and all three protections must be restored before
+candidate gates, push/publication and Nova close. The authorization expires
+automatically at Nova close and cannot be transferred to Cyborg, Phoenix,
+Nightwing or later work.
+
 ## 9. Compatibility and migration
 
 - Existing backlog items/events/index remain valid. Transaction v1 is
@@ -1300,12 +1406,13 @@ fake credentials and hosts.
   inputs, not a replacement.
 - Public Core remains forge-neutral and Git remains the only VCS.
 - Nova makes no release version bump.
-- During bounded pre-rebase Execution Nova imports no `main` bytes and
+- During the current Design reconciliation Nova imports no `main` bytes and
   consumes no unpublished Cyborg output.
-- Before protected-path implementation, Nova A increment acceptance,
+- Before renewed implementation approval, Nova A increment acceptance,
   immutable final candidate evidence or full readiness approval, Nova must
-  rebase onto the exact stable `main` 0.4.7 commit/tree, resolve conflicts,
-  regenerate bindings and rerun the required baseline regressions.
+  rebase onto commit `89cb12b99e3fd86ac44878d0c23b278f00538921`, tree
+  `b6537dcaa7bee526d9a393e2603b28648f4b0438`, resolve conflicts, regenerate
+  bindings and rerun the required baseline regressions.
 - Later Nova/Cyborg integration uses exact independently accepted OIDs.
 
 Rollback of code uses a normal forward Git change. Rollback of canonical
@@ -1318,7 +1425,7 @@ fabricated reopen.
 
 The technical Spec is ready for PO approval only when:
 
-1. its digest, the PRD/acceptance digests and the exact 16-Issue snapshot and
+1. its digest, the PRD/acceptance digests and the exact 17-Issue snapshot and
    bindings validate;
 2. every new schema has exact producer, consumer and owner;
 3. every stateful surface has transition, crash, recovery and concurrency
@@ -1332,16 +1439,18 @@ The technical Spec is ready for PO approval only when:
    receipt without claiming an Advisor answer, model identity or sandbox
    success; and
 8. lifecycle and Result record only Spec readiness, not implementation or
-   product completion; and
-9. bounded pre-rebase Execution is restricted by the exact write-set gate in
-   §6.6, while protected-path work, increment acceptance, immutable final
-   evidence and full readiness remain blocked until the exact stable `main`
-   0.4.7 commit/tree is identified, rebased, conflict-resolved,
-   regression-tested and reflected in regenerated bindings.
+   product completion;
+9. the former pre-rebase evidence is classified for reuse/rerun/invalidation,
+   while all implementation, increment acceptance and immutable final evidence
+   remain blocked until the exact released `v0.4.7` commit/tree is rebased,
+   conflict-resolved, regression-tested and reflected in regenerated bindings;
+   and
+10. the `#98` delivery-loop design and standing TP-1/TP-3/TP-5 authorization
+    are represented consistently across PRD, acceptance, plans and lifecycle.
 
-After approval, implementation starts through the Nova A pre-rebase entry gate.
-The rebased 0.4.7 baseline remains mandatory for the protected and acceptance
-boundaries above.
+After approval, the exact v0.4.7 rebase/adoption record is the first repository
+transition. Implementation starts only after its bindings and readiness are
+read back and accepted.
 No acceptance ID is satisfied by this document alone.
 
 ## 11. Rejected alternatives

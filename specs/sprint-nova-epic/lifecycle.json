@@ -4,12 +4,12 @@
     "id": "sprint-nova-epic",
     "rigor": 2
   },
-  "state": "implementing",
+  "state": "approved",
   "artifacts": [
     {
       "class": "prd",
       "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-      "sha256": "aeb073d720ec5f2384221b16a6533d32667f47e5a3ebe6c491642564ccccb661",
+      "sha256": "01e891d225703ed27832fa85dec63653a979daf4abd02c206fb00ef3188c521f",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -17,7 +17,7 @@
     {
       "class": "spec",
       "path": "specs/sprint-nova-epic/spec.md",
-      "sha256": "aa5eba0ce0c251ed90b8a00e94509a73146873f1cfc9f0942203c5dca9fccf17",
+      "sha256": "5ba6e45ec8ac0083ca83375181c7536b4d558d03147c9acd883214fe499b76e5",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -25,7 +25,7 @@
     {
       "class": "acceptance",
       "path": "specs/sprint-nova-epic/acceptance.md",
-      "sha256": "69451273769cab9a5f7f9d3911cd3a1a23e2a5e87165f9fdfa4c5886a22fbc96",
+      "sha256": "2ebd702edc8c67d04260a811703b8a6297acb479ef2c6c7f6ec37716960f6b5b",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -33,7 +33,7 @@
     {
       "class": "result",
       "path": "specs/sprint-nova-epic/result.md",
-      "sha256": "34bed91f15ba530f7dce2c487ffa8425845a0905d5a2cb697ee3d681b4d7f9b9",
+      "sha256": "65cb05b860cedd20d686df7e3b98e63cc25311f2f42e15703d84cf716924c111",
       "authority": true,
       "mutability": "append-only",
       "retention": "retain"
@@ -97,7 +97,7 @@
     {
       "class": "design",
       "path": "specs/sprint-nova-epic/design/rebase-readiness-0.4.7.md",
-      "sha256": "189f3eb603472b3a968bf39a1fed14115d57b1de8908d9903e1c550e4a115050",
+      "sha256": "be85668b105f28f1f7bbdcf3b7edfdca5b554ba8d78cbf43692685034ee68701",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
@@ -105,7 +105,7 @@
     {
       "class": "design",
       "path": "specs/sprint-nova-epic/design/parallel-sprint-integration-handoff.md",
-      "sha256": "11546618806e03f60443662f6f7a7b10de8714817e6f9fb716dc9029d0f2b252",
+      "sha256": "b884801be4a326450694153b8e26a652570b68c3a74575b201cec100872bc0c7",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
@@ -113,7 +113,15 @@
     {
       "class": "design",
       "path": "specs/sprint-nova-epic/design/issue-intake.md",
-      "sha256": "20ee6b60be6682bc74a367147974839a1fee6bc0537b28d4838995a5a6ce4a3d",
+      "sha256": "422a46119cb1fcb3b02b9b4aa8dba28881cd5e13d4dfde58652c36603d9b92a7",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-nova-epic/design/post-v0.4.7-delivery-loop.md",
+      "sha256": "23895a22ace13602026d094171338fe17f4aec76fa4f25d5663de9179a258e2b",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
@@ -121,7 +129,7 @@
     {
       "class": "plan",
       "path": "specs/sprint-nova-epic/plans/integration-and-close.md",
-      "sha256": "f80199c8b5e23ee02c3d51b525cd0c9fa9a327ab2280caf410fa4267521db839",
+      "sha256": "830bf19022fb4dafcd6090865f8750911d3d587621c8469a342aed092c28010c",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
@@ -129,7 +137,7 @@
     {
       "class": "plan",
       "path": "specs/sprint-nova-epic/plans/nova-a.md",
-      "sha256": "d8fa55e50183f9bb92c0cfc4339b30dc3424a2740625dccf1846cc58f5638714",
+      "sha256": "3511ce7416303649c0a8b7a9f6f8aaf1e85b0031aec27fd9a7080feae480e12d",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
@@ -137,7 +145,7 @@
     {
       "class": "plan",
       "path": "specs/sprint-nova-epic/plans/nova-b.md",
-      "sha256": "0a9f264df9eecf655e8a3a0b11a5256e7644ad2df6a6e0e3d1072904d5957975",
+      "sha256": "ab7f8359817ae093b32cd048789a5d948b6ea3e9396b0a96aba940d62621aa80",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
@@ -146,6 +154,14 @@
       "class": "candidate-evidence",
       "path": "specs/sprint-nova-epic/evidence/spec-advisor-disposition.json",
       "sha256": "c3c4bf07fb9838441100f687c6ab3a71677643909ce9cd55b0127cdbe9341711",
+      "authority": false,
+      "mutability": "immutable",
+      "retention": "retain"
+    },
+    {
+      "class": "candidate-evidence",
+      "path": "specs/sprint-nova-epic/evidence/design-advisor-disposition-0.4.7.json",
+      "sha256": "84f4458b65b716cfdd0ffdcaa7429feb242eeb5ddd77f9674a5dba57d5cbe140",
       "authority": false,
       "mutability": "immutable",
       "retention": "retain"

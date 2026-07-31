@@ -5,15 +5,20 @@
 > Normative requirements remain in the approved PRD, Spec and Acceptance
 > matrix. This dossier makes their later execution deterministic.
 
-## Current observation
+## Current observation — 2026-08-01
 
 - Nova branch: `feat/sprint-nova-codex-v046`.
-- Last observed branch/upstream commit: `28e797f7ca6231cffcf702d5ce6ad79d953bc2ad`.
-- Last observed remote main: `83640cec22d494d227eebc82929370277ce926b9`.
-- `main/VERSION` currently reads `0.4.7-partial-auth`; no `v0.4.7` tag was
-  observed. It is therefore **not** the stable baseline required by NVA-G13.
-- The Nova worktree is intentionally dirty. It must not be stashed, reset,
-  committed, discarded or rebased by this dossier.
+- Pre-design-reconciliation Nova head:
+  `7f47613908e4be862865aaa92c8b888d066585c4`, tree
+  `0ab81c85412432d424db0961d6d439a8e5fd6c2f`.
+- Released `main` / `v0.4.7` commit:
+  `89cb12b99e3fd86ac44878d0c23b278f00538921`, tree
+  `b6537dcaa7bee526d9a393e2603b28648f4b0438`.
+- The release identity is accepted as the immutable NVA-G13 baseline; a newer
+  `main` head does not retarget Nova silently.
+- The Nova worktree contains the explicitly activated runner-neutral project
+  authority migration and the open Design reconciliation. The PO authorizes a
+  local design/migration commit before rebase. No push is authorized.
 
 ## Rebase admission record
 
@@ -21,12 +26,12 @@ The PO must supply or confirm all values in this record before any rebase:
 
 | Field | Required value | Admission rule |
 | --- | --- | --- |
-| Stable ref | exact accepted `main` 0.4.7 commit | full 40-hex Git object ID |
-| Stable tree | tree of that commit | full 40-hex Git object ID, read back from the same commit |
-| Version evidence | release/version receipt | proves stable 0.4.7 rather than a partial/auth or development baseline |
+| Stable ref | `89cb12b99e3fd86ac44878d0c23b278f00538921` | released `main` / `v0.4.7` identity |
+| Stable tree | `b6537dcaa7bee526d9a393e2603b28648f4b0438` | read back from the same commit |
+| Version evidence | published `v0.4.7` tag/release and Issue #98 observation basis | exact released baseline, not partial/auth |
 | #63 evidence | accepted upstream recovery candidate and required regression command set | Nova consumes it only as compatibility input; it makes no #63 delivery claim |
-| Worktree disposition | explicit PO-approved snapshot mechanism | no implicit stash, auto-commit, reset or overwrite |
-| Rebase authorization | affirmative PO signal naming the exact commit/tree | branch/remote names alone are insufficient |
+| Worktree disposition | commit the reviewed Nova design and activated project-authority migration locally before rebase | preserve the existing safety stash until post-commit readback; no reset/overwrite |
+| Rebase authorization | already supplied for the exact released baseline after Design correction | execution waits for renewed design gate |
 
 Any missing, ambiguous or mismatched value is a stop condition. A newer `main`
 head or a same-version string alone is not a substitute for this record.
@@ -52,13 +57,14 @@ The exact path list is always regenerated from the worktree immediately before
 the PO-approved snapshot. No hand-maintained list here can supersede that
 readback.
 
-### Deliberately excluded user-owned inputs
+### Activated project-authority migration
 
 `project/pipeline.json`, `project/pipeline.yaml`, `project/pipeline-state.json`
-and `project/guard-config.json` are untracked local inputs. They are not Nova
-candidate bytes, must not be staged or removed by the rebase preparation, and
-are excluded from candidate and conflict accounting unless the PO later gives
-separate authority.
+and `project/guard-config.json` were explicitly activated by the PO through the
+digest-bound 0.4.7 migration. They are now intended local candidate bytes and
+must be included in the pre-rebase design/migration commit with their exact
+post-selection Design state. The older stashed copies are recovery input only
+and cannot overwrite the selected Spec binding or current revocation.
 
 ### Protected and shared surfaces
 
@@ -78,13 +84,14 @@ resolution on any of these paths.
 
 1. Read the supplied stable-ref/tree/version/#63 admission record from the
    exact remote target.
-2. Produce a fresh working-tree and untracked-file inventory. Obtain the
-   explicit snapshot disposition; do not choose one automatically.
-3. Rebase only the approved Nova snapshot onto the exact accepted baseline.
+2. Validate and commit the explicitly approved project-authority migration and
+   reviewed 17-Issue Design reconciliation locally; retain the safety stash
+   until exact commit readback.
+3. Rebase only that approved Nova snapshot onto the exact accepted baseline.
 4. For every conflict, record the upstream path, Nova path, affected acceptance
    IDs, selected resolution, and whether the resolution changes Nova scope.
    An uncertain or protected conflict stops for PO review.
-5. Regenerate the Spec/backlog/lifecycle bindings and compare the 16-Issue
+5. Regenerate the Spec/backlog/lifecycle bindings and compare the 17-Issue
    intake against the current GitHub `sprint:nova` intersection. Do not infer
    a closure or import another Sprint/hotfix issue.
 6. Run the #63 recovery regressions on the rebased Nova candidate as baseline
@@ -105,12 +112,13 @@ resolution on any of these paths.
 | A4/#12/#14 | execution contract, scheduling, planner, control-exchange and workflow-boundary tests | any shared exchange/planner change reruns the complete A4 matrix |
 | A5/#54 | lineage, review economy and host-capable packet preflight | any packet/host/lineage change reruns all; sandbox `EPERM` is not success evidence |
 | A6/#8/#56 | benchmark and release-preflight suites | any candidate/version/doc-governance/gate change reruns the affected suite |
+| A6R/#98 | publication capability/CLI, Verify resume, Critic release-lineage and release-state consistency suites | always built and tested from the released 0.4.7 surfaces; no Hotfix gate evidence substitutes for Nova evidence |
 | A7 | central Verify registration, clean candidate, Full Verify, Security and independent Critic | always fresh after the rebase; pre-rebase evidence cannot satisfy this row |
 
 ## Exit criteria for this dossier
 
-This preparation is complete when the stable baseline has not been assumed,
-the worktree disposition remains a PO decision, the exact snapshot is
-inventoried, all protected conflicts fail closed, and the test/invalidation
-matrix can be applied without redesign. It does not satisfy NVA-G13, accept
-Nova A, activate Nova B or complete any Issue.
+This preparation is complete when the released baseline and pre-rebase Nova
+identity are exact, the design/migration snapshot is locally committed and
+read back, all protected conflicts fail closed, and the test/invalidation
+matrix can be applied without redesign. It does not itself satisfy NVA-G13,
+accept Nova A, activate Nova B or complete any Issue.
