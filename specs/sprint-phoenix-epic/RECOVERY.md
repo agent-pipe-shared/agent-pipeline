@@ -487,6 +487,28 @@ re-enable, bypass, or remote authority. Other than the compensating local
 commit and its fresh evidence, ordinary local development and normal code
 paths remain untouched.
 
+## R-15 — PHX-0A NFKC case-collision validation rollback path
+
+If bounded reproduction diagnoses the NFKC case-collision validation introduced
+by candidate `aa4af674` in
+`plugins/pipeline-core/lib/feature-package-topology.mjs` as a false-positive
+compatibility collision, the production rollback is one new local compensating
+`git revert aa4af674` commit. It reverts that exact candidate/change and its
+matching tests; it does not use reset, history rewriting, force-push, or an
+automatic remote operation.
+
+There is no feature flag, configuration switch, migration, or repair path for
+this validator. It must not be selectively disabled, waived for a legacy
+manifest, or represented as a completed migration.
+
+The compensating candidate may be described only as restoring the predecessor
+planner behavior for the diagnosed false positive after fresh exact Verify,
+Security, and independent Critic evidence. It is not a compatibility approval
+for a real collision and does not weaken the canonical NFKC case-collision
+rejection: any confirmed canonical collision remains rejected, while a corrected
+successor requires its own candidate-bound evidence before it may replace the
+reverted validation.
+
 ## Audit classification
 
 These records illustrate the Phoenix recovery profile:
