@@ -607,11 +607,12 @@ check("approve-plan binds the validated PO authority and revalidates it inside t
     const observed = JSON.parse(readFileSync(join(primary, ".claude", "pipeline-state.json"), "utf8"));
     assert.equal(observed.planApproved, true);
     assert.equal(observed.planSubmission.schema, "pipeline.plan-submission.v1");
-    assert.equal(observed.planApproval.schema, "pipeline.plan-approval.v3");
+    assert.equal(observed.planApproval.schema, "pipeline.plan-approval.v4");
     assert.equal(observed.planApproval.approvedBy, "Product Owner");
     assert.equal(observed.planApproval.approvedAt, NOW);
     assert.match(observed.planApproval.submissionSha256, /^[a-f0-9]{64}$/u);
     assert.equal(observed.planApproval.profileSha256, observed.planSubmission.profileSha256);
+    assert.equal(observed.planApproval.priorInvalidationSha256, null);
     assert.deepEqual(observed.planApproval.poGateAuthority, authority.value);
   });
 });
