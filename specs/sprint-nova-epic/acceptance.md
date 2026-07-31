@@ -204,7 +204,34 @@ No prior gate implies a later gate.
   versioned successor in the same authority family/store, and no v1 approval
   can authorize successor execution.
 - NVA-A98-3: Raw push, arbitrary Git arguments, force, delete, wildcard,
-  multiple refspec and generic guard override remain unavailable.
+  multiple refspec and unbound generic guard override remain unavailable.
+- NVA-A98-3a: Every Human-recoverable project guard denial exposes either a
+  typed executable narrower recovery action or one universal PO emergency
+  plan; it cannot terminate permanently as `HGO-NONOVERRIDABLE` merely
+  because lifecycle readiness is partial.
+- NVA-A98-3b: The emergency plan binds the exact guard/denial, normalized
+  tool and full input digest, eligible path/command class, repository
+  identity, HEAD/tree/status, State/continuity preimage, loaded guard-policy
+  identities, Human reason and short expiry.
+- NVA-A98-3b1: Before the second confirmation, the PO sees the exact action,
+  guard rationale, exhausted safer alternatives, expected repository/external
+  effects, evidence invalidation, rollback/recovery and residual risk. The PO
+  remains final authority for the project-policy decision.
+- NVA-A98-3c: A separate explicit activation arms one single-use capability;
+  changed action, argv, target, preimage, reason, expiry or replay rejects,
+  and immutable audit is durable before the action is admitted.
+- NVA-A98-3d: Override admission is never operation success. The identical
+  original operation must run and pass its normal effect/readback contract;
+  ambiguous effect permits only reconciliation, not blind repetition.
+- NVA-A98-3e: Regression fixtures cover expired unused-plan retry, partial
+  lifecycle cleanup recovery, rebase-abort/readback, commit retry, exact
+  in-root patch admission, drift/replay denial and audit-before-effect order.
+- NVA-A98-3f: Every denial returns an actionable next route. A project-policy
+  guard cannot deadlock as permanently non-overridable; a genuine host/OS
+  limitation instead returns an exact external-operator boundary.
+- NVA-A98-3g: The minimal append-only Nova decision record is durable and
+  forward-compatible with Phoenix's later richer authorization trail; absence
+  of that future trail never blocks today's PO exception.
 - NVA-A98-4: Wrong candidate, tree, repository/remote fingerprint,
   destination ref, preimage, gate evidence, approval digest, expiry, replay or
   non-fast-forward state rejects before mutation.

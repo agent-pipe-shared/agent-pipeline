@@ -9,7 +9,7 @@
     {
       "class": "prd",
       "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-      "sha256": "01e891d225703ed27832fa85dec63653a979daf4abd02c206fb00ef3188c521f",
+      "sha256": "2f4d7e256f1a777a4fa1a07f79031e8c71d9931977038b20bd846e378a3f7c24",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -17,7 +17,7 @@
     {
       "class": "spec",
       "path": "specs/sprint-nova-epic/spec.md",
-      "sha256": "5ba6e45ec8ac0083ca83375181c7536b4d558d03147c9acd883214fe499b76e5",
+      "sha256": "ba27e7a4994a9cd273a00ff4ba7c478f4be8b62e0a60b5d0992286e34d2d55f7",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -25,7 +25,7 @@
     {
       "class": "acceptance",
       "path": "specs/sprint-nova-epic/acceptance.md",
-      "sha256": "2ebd702edc8c67d04260a811703b8a6297acb479ef2c6c7f6ec37716960f6b5b",
+      "sha256": "6e984d776c26c051bed3773395d609b56d2a706babc4f8a8fa1e823a6c6f3803",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -97,7 +97,7 @@
     {
       "class": "design",
       "path": "specs/sprint-nova-epic/design/rebase-readiness-0.4.7.md",
-      "sha256": "be85668b105f28f1f7bbdcf3b7edfdca5b554ba8d78cbf43692685034ee68701",
+      "sha256": "2c9236806e7f43a10dd14eb249fa274675caa314c35b1c917c7377fdc307c274",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
@@ -121,7 +121,7 @@
     {
       "class": "design",
       "path": "specs/sprint-nova-epic/design/post-v0.4.7-delivery-loop.md",
-      "sha256": "23895a22ace13602026d094171338fe17f4aec76fa4f25d5663de9179a258e2b",
+      "sha256": "f20dac9f393954d23c360f12eb8ec44d080b61fd301eb366f31140cfd965c18c",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
@@ -129,7 +129,7 @@
     {
       "class": "plan",
       "path": "specs/sprint-nova-epic/plans/integration-and-close.md",
-      "sha256": "830bf19022fb4dafcd6090865f8750911d3d587621c8469a342aed092c28010c",
+      "sha256": "21b8001de3bad049b16d35b48f9c66603e61d6f3f0ed14f727ea1df506ac8a3c",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"

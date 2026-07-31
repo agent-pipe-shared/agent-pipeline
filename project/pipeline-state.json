@@ -1,8 +1,16 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-07-31T19:42:22.118Z",
+  "updatedAt": "2026-07-31T23:22:26.552Z",
   "closedFeatures": [
+    {
+      "id": "sprint-sentinel-epic",
+      "planPath": "specs/2026-07-19-sprint-sentinel-epic/prd_sentinel-epic.md",
+      "phaseAtClose": "implementation",
+      "closedAt": "2026-07-24T20:49:16.791Z",
+      "closedBy": "Nova Elephant (PO-directed)",
+      "forCommit": null
+    },
     {
       "id": "codex-onboarding-0.4.5",
       "planPath": "specs/2026-07-25-codex-onboarding-0.4.5/prd_codex-onboarding-0.4.5.md",
@@ -54,34 +62,54 @@
     }
   ],
   "activeFeature": {
-    "id": "agent-pipeline-0.4.7-hotfix",
-    "planPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/prd_agent-pipeline-0.4.7-hotfix.md",
+    "id": "sprint-nova-epic",
+    "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
     "phase": "implementation"
+  },
+  "planApproval": {
+    "schema": "pipeline.plan-approval.v4",
+    "approvedBy": "Product Owner (Nova post-v0.4.7 design and guard override amendment, 2026-08-01)",
+    "approvedAt": "2026-07-31T23:22:18.538Z",
+    "submissionSha256": "11a9ff18bf859a9f5091148adb9c852de3630bfed5796881bb5c15a61df9cf00",
+    "profileSha256": "8be50d40c4672fb406256aafbdd146dae9ed1b0931afb31fdfe3f8efa12dee04",
+    "poGateAuthority": {
+      "schema": "pipeline.po-gate-authority.v2",
+      "humanFacing": "en",
+      "sourceSha256": "2a0f69551b46963d6d49ef0faaf9db5c28d27c4f681a9d4dd0be1a81b297da10",
+      "runtimeSha256": "071b0236f6054bbeea2140830320a88d1c6a9e733d7294ad0bb976fd2e28c897",
+      "receiptSha256": "5fe71f9583e7389dee5fd48179d84d0faa6bd76783f43910029105ce051613f9",
+      "repositoryFingerprint": "5172c023ad31e8e1c82402e4d0a657cc6db16c0ba5538a432d48e8d477f2b16d",
+      "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+      "planSha256": "2f4d7e256f1a777a4fa1a07f79031e8c71d9931977038b20bd846e378a3f7c24",
+      "specPath": "specs/sprint-nova-epic/spec.md",
+      "specSha256": "ba27e7a4994a9cd273a00ff4ba7c478f4be8b62e0a60b5d0992286e34d2d55f7"
+    },
+    "priorInvalidationSha256": "15c2ead08947c8a8a54460f9f5d844f67ef8b89f5227474e0b34fa3a5f85b955"
   },
   "continuity": {
     "schema": "pipeline.continuity.v0",
-    "featureId": "agent-pipeline-0.4.7-hotfix",
-    "revision": 4,
+    "featureId": "sprint-nova-epic",
+    "revision": 5,
     "runtime": {
       "humanFacingLanguage": "en",
-      "activeDuty": "Coordinator",
+      "activeDuty": "Elephant",
       "sessionCleanup": null
     },
     "authority": {
       "prd": {
-        "path": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/prd_agent-pipeline-0.4.7-hotfix.md",
-        "sha256": "e48e966b0e4aad3d17bf3c08481b66d98d33e2bd1e89b412f6efcf06ae3fe97d"
+        "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+        "sha256": "2f4d7e256f1a777a4fa1a07f79031e8c71d9931977038b20bd846e378a3f7c24"
       },
       "spec": {
-        "path": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/spec.md",
-        "sha256": "e15fd22c3a85faafb5f08a4b71b66e62e4f76d85a1e2f4dfeddded4963b4cfad"
+        "path": "specs/sprint-nova-epic/spec.md",
+        "sha256": "ba27e7a4994a9cd273a00ff4ba7c478f4be8b62e0a60b5d0992286e34d2d55f7"
       },
       "result": null
     },
     "queueHead": {
-      "packageId": "agent-pipeline-0.4.7-hotfix",
-      "actionId": "review-code-aligned-prd",
-      "nextAction": "review",
+      "packageId": "nova-b0",
+      "actionId": "runner-native-continuation",
+      "nextAction": "dispatch",
       "productRetryCount": 0,
       "environmentRerouteCount": 0,
       "dispatch": null
@@ -90,57 +118,47 @@
     "acknowledgedFinal": null,
     "resume": {
       "mode": "immediate",
-      "sourceRevision": 4,
+      "sourceRevision": 5,
       "reasonCode": "active-turn"
     },
     "recovery": null,
     "decisionTxn": null,
     "capacity": {
-      "concurrencyLimit": 4,
+      "concurrencyLimit": 2,
       "reservedCriticSlots": 1,
       "reservedRecoverySlots": 1,
       "fallbackPolicy": "defer"
-    }
+    },
+    "closeTransition": null
+  },
+  "planRevocation": {
+    "schema": "pipeline.plan-revocation.v2",
+    "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+    "planSha256": "aeb073d720ec5f2384221b16a6533d32667f47e5a3ebe6c491642564ccccb661",
+    "specPath": "specs/sprint-nova-epic/spec.md",
+    "specSha256": "aa5eba0ce0c251ed90b8a00e94509a73146873f1cfc9f0942203c5dca9fccf17",
+    "revokedBy": "Product Owner (Nova design reconciliation including Issue #98, 2026-08-01)",
+    "revokedAt": "2026-07-31T22:06:34.919Z"
   },
   "planSubmission": {
     "schema": "pipeline.plan-submission.v1",
-    "featureId": "agent-pipeline-0.4.7-hotfix",
-    "planPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/prd_agent-pipeline-0.4.7-hotfix.md",
-    "planSha256": "e48e966b0e4aad3d17bf3c08481b66d98d33e2bd1e89b412f6efcf06ae3fe97d",
-    "specPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/spec.md",
-    "specSha256": "e15fd22c3a85faafb5f08a4b71b66e62e4f76d85a1e2f4dfeddded4963b4cfad",
-    "profile": "feature",
-    "profileSha256": "5956cbe39906901a5c195b33b7de90a51b96e6e2db80eac31fe5497258423580",
-    "submittedBy": "PO",
-    "submittedAt": "2026-07-31T19:03:45.697Z"
-  },
-  "planApproval": {
-    "schema": "pipeline.plan-approval.v4",
-    "approvedBy": "PO",
-    "approvedAt": "2026-07-31T19:03:56.472Z",
-    "submissionSha256": "e817afa42101efef46e6ed2e04945e4bee2835786dcbe1ec31ee049408675fb4",
-    "profileSha256": "5956cbe39906901a5c195b33b7de90a51b96e6e2db80eac31fe5497258423580",
-    "poGateAuthority": {
-      "schema": "pipeline.po-gate-authority.v2",
-      "humanFacing": "en",
-      "sourceSha256": "2a0f69551b46963d6d49ef0faaf9db5c28d27c4f681a9d4dd0be1a81b297da10",
-      "runtimeSha256": "071b0236f6054bbeea2140830320a88d1c6a9e733d7294ad0bb976fd2e28c897",
-      "receiptSha256": "d3c4d4b3b952d44e64c2b33164e96ad61652ac25d99425e6ffe9a6fb9c10aebb",
-      "repositoryFingerprint": "3f74c2558c19687097f1285753400a03fde3953ec6a3496820ddbe1f25196f7d",
-      "planPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/prd_agent-pipeline-0.4.7-hotfix.md",
-      "planSha256": "e48e966b0e4aad3d17bf3c08481b66d98d33e2bd1e89b412f6efcf06ae3fe97d",
-      "specPath": "specs/2026-07-27-agent-pipeline-0.4.7-hotfix/spec.md",
-      "specSha256": "e15fd22c3a85faafb5f08a4b71b66e62e4f76d85a1e2f4dfeddded4963b4cfad"
-    },
-    "priorInvalidationSha256": "7d96545189a99ac949fb3136f866e71ec303909b08dec9aecab9928ea3ec5c75"
+    "featureId": "sprint-nova-epic",
+    "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
+    "planSha256": "2f4d7e256f1a777a4fa1a07f79031e8c71d9931977038b20bd846e378a3f7c24",
+    "specPath": "specs/sprint-nova-epic/spec.md",
+    "specSha256": "ba27e7a4994a9cd273a00ff4ba7c478f4be8b62e0a60b5d0992286e34d2d55f7",
+    "profile": "epic",
+    "profileSha256": "8be50d40c4672fb406256aafbdd146dae9ed1b0931afb31fdfe3f8efa12dee04",
+    "submittedBy": "Nova-Elephant-post-rebase-design-2026-08-01",
+    "submittedAt": "2026-07-31T23:22:06.269Z"
   },
   "planInvalidation": {
     "schema": "pipeline.plan-invalidation.v1",
-    "featureId": "agent-pipeline-0.4.7-hotfix",
-    "invalidatedSubmissionSha256": "5892fe6d521fe24b5716a33073fb423c2eaca81528622ae1c531d8c324cf0f9f",
-    "invalidatedApprovalSha256": "ed6d2ae6d3f8bca3997abc7321699320ef44099981fcbf54d2353f02ffd572f5",
-    "invalidatedBy": "PO",
-    "invalidatedAt": "2026-07-31T15:05:51.993Z",
+    "featureId": "sprint-nova-epic",
+    "invalidatedSubmissionSha256": "2dc384d937c9a623458a3d3488c4352f3d6b7b0aed241915ddce1b14b901766c",
+    "invalidatedApprovalSha256": "6c74dd1c91f345691f25db67d821fd9d5339d9a8c84b2a36f7abbfa7f1bd4a14",
+    "invalidatedBy": "Product Owner (Nova #98 Human guard override amendment, 2026-08-01)",
+    "invalidatedAt": "2026-07-31T23:16:43.115Z",
     "reason": "reopen-design"
   }
 }

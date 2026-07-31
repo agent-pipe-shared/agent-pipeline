@@ -704,8 +704,38 @@ is emitted by the preceding read-only action, binds its digest and requires
 the existing explicit Human confirmation. The CLI accepts no raw endpoint,
 credential, Git argv or refspec. It composes the existing
 `publication-authority.mjs`, `publication-bundle.mjs` and executor contracts;
-raw Git, force, delete, multiple refspecs and generic guard overrides remain
-unavailable.
+raw Git, force, delete, multiple refspecs and unbound generic guard overrides
+remain unavailable.
+
+The separate `pipeline.human-guard-override-capability.v2` emergency contract
+is universal across project Pipeline guards. It is admissible only after the
+normal action and any safer typed recovery path have failed or cannot express
+the PO's deliberate decision. Its read-only plan binds the exact guard/rule
+and denial digest, normalized tool plus complete input digest, eligible path or
+command class, physical repository fingerprint, HEAD/tree/status and
+State/continuity preimage, loaded plugin/policy/adapter identities, a Human
+reason digest and a short expiry. `prepare-authorization` selects that exact
+reason; a second explicit `authorize --activate` arms one single-use retry.
+
+The PO is final authority over the project-policy decision. Before the second
+confirmation, the closed preview names the exact action and denial, exhausted
+normal/narrower alternatives, expected repository and external effects,
+invalidated evidence, rollback/recovery action and residual risk. The
+immutable private audit is committed before admission of the original action.
+Only byte-equivalent action/tool input at the same preimage can consume the
+capability. Drift, changed reason, widened target, expiry and replay fail
+closed. The capability does not execute the operation and cannot claim
+success: the caller retries the original action and performs its ordinary
+postcondition/readback. An ambiguous effect routes only to typed readback or
+reconciliation.
+
+Every project-policy denial returns an executable next action instead of a
+permanent `HGO-NONOVERRIDABLE` dead end: normal retry, narrower recovery, PO
+emergency plan or effect reconciliation. A genuine host/system sandbox limit
+returns the exact external-operator boundary because a project authority
+cannot manufacture OS capability. Nova's append-only minimal audit schema is
+forward-compatible with the richer Phoenix authorization trail; Phoenix is
+not a prerequisite for override availability.
 
 The released `pipeline.publication-channel.v1` schema is frozen and binds
 identity, Verify and Security evidence but not Critic or release-preflight

@@ -3,7 +3,7 @@
 **Owner:** Sprint Nova / Issue
 [`#98`](https://github.com/agent-pipe-shared/agent-pipeline/issues/98)
 **Priority / size:** P0 / L
-**Design status:** proposed for the renewed PRD/Spec gate
+**Design status:** accepted by the PO; exact post-rebase State binding required
 **Released input:** `v0.4.7` commit
 `89cb12b99e3fd86ac44878d0c23b278f00538921`, tree
 `b6537dcaa7bee526d9a393e2603b28648f4b0438`
@@ -126,6 +126,52 @@ sets; it never parses console prose or treats journal/file presence as PASS.
 The final Verify evidence still represents the complete registered suite set
 on one exact candidate.
 
+### R2H — Universal PO emergency guard exception
+
+Project Pipeline guards must expose one consistent emergency exception when a
+Human PO deliberately chooses an exact otherwise-denied project action after
+the Elephant has exhausted a safe normal or narrower recovery path. The PO is
+the final authority for every project-policy guard decision; a guard advises,
+constrains automation and gathers evidence but cannot permanently veto that
+informed Human decision. This is not an ambient shell or Git bypass. The
+exception is one action, one preimage, one use and one short expiry.
+
+The closed flow is `plan` -> `prepare-authorization` -> Human
+`authorize --activate` -> retry the identical action -> effect readback. The
+plan binds guard/rule and denial digest, normalized tool name and complete
+input digest, eligible paths or command class, physical repository identity,
+HEAD/tree/status and State/continuity preimage, plugin/policy/adapter digests,
+reason digest and expiry. Before the second confirmation the preview names the
+blocked action, guard rationale, exhausted safer alternatives, expected local
+and external effects, evidence invalidation, rollback/recovery path and
+residual risk. Authorization must be durably audited before the guard admits
+the retry. Drift, expiry, replay, changed reason, widened path, changed argv or
+a different tool fails closed.
+
+The override capability is not success evidence. The original operation must
+actually run and receive its ordinary postcondition/readback. Ambiguous effect
+permits readback/reconciliation only, never automatic repetition. A normal
+recovery command remains available without an override whenever it can be
+made narrower and safer.
+
+No project guard may return a permanent `nonoverridable` dead end for an exact
+Human-recoverable action. Every denial returns one actionable route: a normal
+retry, typed narrower recovery, PO emergency plan, effect reconciliation, or
+an exact external-operator command for a genuinely separate host/system
+boundary. Host/OS constraints cannot masquerade as an unrecoverable
+project-policy denial.
+
+Nova records the minimum immutable decision/audit chain required to eliminate
+the deadlock now. Phoenix may later extend it into the richer authorization
+trail, but that successor does not invalidate Nova records and is not a
+prerequisite for the emergency path.
+
+Required regressions reproduce the observed v0.4.7 failures: retry after an
+expired unused plan, cleanup recovery while lifecycle readiness is partial,
+rebase abort/readback recovery, commit retry after a guard rejection, an exact
+in-root `apply_patch`, changed action/preimage denial, single-use replay denial
+and proof that the audit precedes effect admission.
+
 ### R4 — Critic correction enforcement
 
 The first admitted release Critic is broad and stores its exact candidate as
@@ -181,6 +227,7 @@ Nova PASS without an exact unchanged binding.
 | Baseline adoption | wrong release OID/tree, missing replayed commit, unrecorded semantic conflict, stale binding |
 | Preflight | ambiguous endpoint, unavailable credentials, insufficient ref permission, missing workflow permission, policy rejection, stale preimage, executor unavailable |
 | Publication | wrong candidate/tree/remote/ref/preimage/evidence/approval/expiry, replay, non-fast-forward, force/delete/broad refspec, ambiguous transport |
+| Human guard exception | changed guard/action/tool input/path/command/preimage/reason, expired plan, replay, missing pre-effect audit, false success without effect readback |
 | Verify resume | partial suite, changed candidate, changed suite code, changed input, changed environment contract, changed policy, missing/corrupt log or receipt |
 | Critic | whole-history correction request, changed-line-free finding, missing lineage parent, untyped broad rerun, exhausted course |
 | Documentation | published tag marked candidate/unpublished, wrong commit/tree, missing projection, state/projection mismatch |

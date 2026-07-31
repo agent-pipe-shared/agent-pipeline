@@ -1,9 +1,9 @@
-# Nova 0.4.7 rebase-readiness dossier
+# Nova 0.4.7 adoption and rebase record
 
-> Planning-only artifact. It authorizes no fetch, rebase, stash, commit,
-> force-push, merge, release, Issue mutation or protected-surface edit.
-> Normative requirements remain in the approved PRD, Spec and Acceptance
-> matrix. This dossier makes their later execution deterministic.
+> This artifact began as the planning-only readiness dossier and now retains
+> the exact completed local adoption record. It authorizes no force-push,
+> merge, release, Issue mutation or protected-surface edit. Normative
+> requirements remain in the approved PRD, Spec and Acceptance matrix.
 
 ## Current observation — 2026-08-01
 
@@ -19,6 +19,60 @@
 - The Nova worktree contains the explicitly activated runner-neutral project
   authority migration and the open Design reconciliation. The PO authorizes a
   local design/migration commit before rebase. No push is authorized.
+
+## Completed local adoption — 2026-08-01
+
+- Previous Nova head: `480f2f7091990da06924e33c280b47dcc7921fa8`,
+  tree `c7f0121098b3ceedd7e7e6153398afb1505efb3d`.
+- Adopted release commit: `89cb12b99e3fd86ac44878d0c23b278f00538921`,
+  tree `b6537dcaa7bee526d9a393e2603b28648f4b0438`.
+- Immediate post-rebase head:
+  `94a4904a13518bed4b060ad89a17f3ba2bb36cb3`, tree
+  `ce4d74cf00dc3976734dfff264b884d31916e240`.
+- `git merge-base` readback equals the adopted release commit. The local
+  branch contains 54 replayed Nova commits above that base and has not been
+  pushed.
+- Git executed 56 replay steps with `ort` and the rebase-side `ours`
+  preference, meaning released v0.4.7 bytes won every overlapping hunk while
+  conflict-free Nova additions were retained. No manual conflict resolution
+  was required.
+- Commit `28e797f7ca6231cffcf702d5ce6ad79d953bc2ad` (cleanup recovery)
+  and commit `480f2f7091990da06924e33c280b47dcc7921fa8` (neutral guard
+  audit) were dropped because their patch contents already existed upstream.
+- The automatic strategy selected the v0.4.7 `project/pipeline-state.json`
+  preimage wholesale. That was correct for released code but not sufficient
+  for the active branch authority: it reactivated the already closed Hotfix
+  and orphaned the Nova cleanup binding. The lifecycle then returned
+  `partial` with `cleanup_recovery_observation_unavailable` and exposed no
+  `nextAction`.
+- The PO-confirmed recovery required an exact three-way state postimage. It
+  retained all v0.4.7 closed-feature records, retained the older Sentinel
+  close record, restored the approved Nova PRD/Spec/continuity authority and
+  then used the sanctioned writer for the phase transition. The checked
+  preimages were Nova
+  `1466996e0ec19aa291052e7866126566d7bed9d95fa5554e9e621dcf697b6175`
+  and v0.4.7/current
+  `c3232a33ff3caf6f838753d1498b1a9d18214fe221770721f5def2a1640dc0c2`;
+  the recovered Design-state postimage was
+  `b339d356cd63e9dfb4853376fbd1d46820b373be0c88c40f2d6d1d490739cd48`.
+- The first postimage session inspection returned `ready`, runtime
+  `readback-current`, valid continuity and `CAS-READY`. The safety stash
+  `nova-rebase-pre-0.4.7` remains retained until candidate verification.
+
+### Evidence disposition
+
+- All pre-rebase candidate-bound Verify, Security, Critic, release-preflight
+  and publication evidence is invalidated for the rebased candidate.
+- Historical B4R and v0.4.7 evidence remains historical provenance only and
+  cannot satisfy a Nova gate.
+- Focused results may guide test selection, but every source/schema/shared
+  dependency touched by the 0.4.7 range is rerun. The complete configured
+  Verify, Security and independent Critic gates are always fresh for the final
+  Nova candidate.
+- The guard deadlock, missing recovery action, non-overridable command classes,
+  expired-plan retry behavior and multi-step Human friction observed during
+  this adoption are explicit A6R/#98 regression inputs, not successful guard
+  behavior.
 
 ## Rebase admission record
 

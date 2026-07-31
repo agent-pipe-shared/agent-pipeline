@@ -11,8 +11,9 @@ for:
 4. central Verify suite registration;
 5. ADR register and post-V3 migration projection;
 6. issue/backlog reconciliation;
-7. `#98` capability preflight, publication CLI, Verify resume, Critic lineage
-   and release-state consistency integration;
+7. `#98` capability preflight, publication CLI, universal PO emergency guard
+   exception, Verify resume, Critic lineage and release-state consistency
+   integration;
 8. Nova A Result and Nova B activation;
 9. Nova-only candidate assembly and freeze;
 10. final platform/runner/forge evidence; and
@@ -35,6 +36,7 @@ reviewed Design/project-authority snapshot
   -> Full Verify
   -> Security
   -> release capability preflight
+  -> guard emergency-path conformance and audit-before-effect fixtures
   -> independent broad Critic
   -> delta/impact-bound correction reviews if needed
   -> synthetic/non-native macOS disposition

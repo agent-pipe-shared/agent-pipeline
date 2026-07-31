@@ -1,40 +1,33 @@
 # Sprint Nova Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: 5ba6e45ec8ac0083ca83375181c7536b4d558d03147c9acd883214fe499b76e5 -->
+<!-- technical-spec-sha256: ba27e7a4994a9cd273a00ff4ba7c478f4be8b62e0a60b5d0992286e34d2d55f7 -->
 
 **Feature ID:** `sprint-nova-epic`
 **Profile / rigor / risk:** Epic / 2 / high
-**Gate:** Design reconciliation open; the prior PRD/Spec approval is revoked
-while the released `v0.4.7` baseline and Issue `#98` are incorporated
-**Current working base:** delivered and closed release `v0.4.6`, commit
-`9d1b3dc108eb77629ace5b82002120f5539abd8d`, tree
-`282a8b5c5b0581e042985bfb373a66be0eb2d08b`
-**Pre-rebase execution base:** the current v0.4.6-derived branch, restricted to
-packages whose exact write-set is disjoint from Bootstrap, installation,
-runtime-readback and V4/#63 recovery surfaces
-**Required full execution base:** released `main` / `v0.4.7`, commit
+**Gate:** Revised PRD/Spec accepted by the PO; the exact `v0.4.7` adoption and
+the PO emergency-override amendment are bound before implementation resumes
+**Current execution base:** released `main` / `v0.4.7`, commit
 `89cb12b99e3fd86ac44878d0c23b278f00538921`, tree
-`b6537dcaa7bee526d9a393e2603b28648f4b0438`; this exact baseline must be
-rebased before any renewed Execution approval
-**Working branch:** `feat/sprint-nova-codex-v046`; bounded conflict-independent
-Nova work may continue without importing `main`
+`b6537dcaa7bee526d9a393e2603b28648f4b0438`; its completed adoption record is
+`design/rebase-readiness-0.4.7.md`
+**Working branch:** rebased `feat/sprint-nova-codex-v046`; push remains at the
+later PO gate
 **Sibling workstream:** Sprint Cyborg, independently owned and independently
 closable
 
 ## Gate boundary
 
-The PO returned Nova to Design on 2026-08-01 and revoked the prior plan
-approval so the published `v0.4.7` baseline and Issue `#98` can be incorporated
-before work continues. The 2026-07-30 approval and its typed-unavailable
-Advisor exception remain historical evidence only; they are not current
-Execution authority and make no Advisor-success claim.
+The PO returned Nova to Design on 2026-08-01, accepted the revised PRD/Spec and
+later clarified that every project-policy guard must permit an informed,
+double-confirmed, documented PO exception. The exact `v0.4.7` adoption is now
+complete and its deadlocks are A6R regression inputs. The historical Advisor
+attempt remains typed unavailable and makes no Advisor-success claim.
 
-No implementation dispatch is authorized while this Design reconciliation is
-open. The next PO gate reviews the revised PRD, technical Spec, acceptance
-matrix, exact `v0.4.7` adoption contract and post-release delivery-loop slices
-together. It grants no external access, credentials, provider mutation,
-merge, push, release, issue closure or final increment acceptance.
+Implementation begins only after the sanctioned State submission/approval and
+phase transition bind these exact bytes. That approval grants no external
+access, credentials, provider mutation, merge, push, release, issue closure or
+final increment acceptance.
 
 ## Executive decision
 
@@ -257,6 +250,24 @@ and cannot retroactively redefine either Sprint's acceptance.
   rerun carries a typed invalidation reason.
 - Correct public release-state documentation and add a deterministic check
   that rejects disagreement with the published tag/release identity.
+- Provide one universal, narrowly bound PO emergency path for project guard
+  denials after safe normal/recovery alternatives are exhausted. It requires
+  an exact action/preimage/reason plan, a second explicit activation,
+  short-lived single-use authority and immutable pre-effect audit. The
+  original operation and its readback still determine success; no unbound
+  shell, Git or generic guard bypass is introduced.
+- Treat the PO as final authority over every project-policy guard decision.
+  Before confirmation, disclose the exact action, guard rationale, exhausted
+  safer alternatives, expected local/external effects, evidence invalidation,
+  rollback/recovery and residual risk; record the confirmed decision durably.
+  Phoenix may later enrich this compatible minimum record into a full
+  authorization trail.
+- A project guard may not leave a Human-recoverable action permanently
+  `nonoverridable`: it supplies either the exact emergency plan or a typed
+  executable next action, including an external operator route for a genuine
+  host/OS boundary. Retry, expiry and partial-lifecycle
+  fixtures cover the v0.4.7 rebase/cleanup/commit deadlocks observed during
+  baseline adoption.
 - Close only from one exact Nova candidate with Full Verify, Security, release
   preflight, delta-correct Critic review, publication transaction and fresh
   remote readback evidence.
@@ -555,9 +566,9 @@ historical evidence are never rewritten.
 
 ## PO decisions recorded
 
-The approvals recorded on 2026-07-30 are historical and remain useful
-provenance, but their Execution authority was revoked on 2026-08-01. The
-current Design direction means:
+The approvals recorded on 2026-07-30 are historical provenance. The revised
+2026-08-01 Design and the later PO emergency-override clarification are the
+current accepted direction:
 
 1. the prior 16-Issue set remains in one Nova Epic and P0 blocker `#98` is
    added as the seventeenth Issue;
@@ -571,10 +582,10 @@ current Design direction means:
    and combined integration occurs only after both Sprint Results;
 6. the ADR-0043 Nova membership resubmission and the explicit feature-branch
    disposition are accepted while ADR-0044 remains in force;
-7. no implementation resumes until the revised PRD/Spec and acceptance
-   bindings receive a new explicit PO approval;
-8. released `main` / `v0.4.7` plus an exact Nova rebase, conflict disposition and
-   regenerated bindings remain mandatory before protected-path work,
+7. implementation resumes only after the revised PRD/Spec and acceptance
+   bindings receive an exact State submission/approval and phase transition;
+8. released `main` / `v0.4.7` plus the completed exact Nova rebase, conflict
+   disposition and regenerated bindings remain mandatory before protected-path work,
    increment acceptance and final candidate evidence;
 9. live Antigravity/GitLab/external execution requires the later research,
    Spec, ADR, credential and mutation gates described above; and
@@ -586,8 +597,12 @@ current Design direction means:
 12. TP-1, TP-3 and TP-5 have standing Nova-only authorization for temporary,
     exact-task lifts through formal Nova close; every use remains audited and
     the protections are restored before candidate gates, push/publication and
-    close.
+    close; and
+13. the PO is final authority over project-policy guard decisions after the
+    exact action, impact, alternatives, risks, rollback and evidence effects
+    are disclosed, explicitly reconfirmed and durably recorded. Phoenix may
+    later enrich the authorization trail without reintroducing a deadlock.
 
-This Design direction authorizes document reconciliation only, not
-implementation, merge, push, release, issue closure or a waiver of the exact
-0.4.7 rebase/readiness gate.
+This Design direction authorizes implementation after exact State binding. It
+does not authorize merge, push, release, issue closure or waive candidate
+verification and readback gates.
