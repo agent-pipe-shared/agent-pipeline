@@ -540,14 +540,28 @@ check("a bound plan digest detects a stale post-validation PRD", () => {
   });
 });
 
+function submitFixturePlan(primary, authority, profile) {
+  const status = runPipelineState(["submit-plan", "--by", "coordinator", "--profile", "feature"], {
+    dir: primary,
+    now: () => NOW,
+    poGateAuthority: () => authority,
+    poGateProfile: () => profile,
+  });
+  assert.equal(status, 0);
+}
+
 check("approve-plan binds the validated PO authority and revalidates it inside the writer lock", () => {
-  withFixture({}, ({ primary, validate }) => {
+  withFixture({}, ({ primary, validate, validateProfile }) => {
     const authority = validate();
     assert.equal(authority.ok, true);
+    const profile = validateProfile();
+    assert.equal(profile.ok, true);
+    submitFixturePlan(primary, authority, profile);
     const calls = [];
     const status = runPipelineState(["approve-plan", "--by", "Product Owner"], {
       dir: primary,
       now: () => NOW,
+      poGateProfile: () => profile,
       poGateAuthority(request) {
         calls.push(request);
         return authority;
@@ -560,27 +574,30 @@ check("approve-plan binds the validated PO authority and revalidates it inside t
     ]);
     const observed = JSON.parse(readFileSync(join(primary, ".claude", "pipeline-state.json"), "utf8"));
     assert.equal(observed.planApproved, true);
-    assert.deepEqual(observed.planApproval, {
-      schema: "pipeline.plan-approval.v2",
-      approvedBy: "Product Owner",
-      approvedAt: NOW,
-      specBoundBy: "Product Owner",
-      specBoundAt: NOW,
-      poGateAuthority: authority.value,
-    });
+    assert.equal(observed.planSubmission.schema, "pipeline.plan-submission.v1");
+    assert.equal(observed.planApproval.schema, "pipeline.plan-approval.v3");
+    assert.equal(observed.planApproval.approvedBy, "Product Owner");
+    assert.equal(observed.planApproval.approvedAt, NOW);
+    assert.match(observed.planApproval.submissionSha256, /^[a-f0-9]{64}$/u);
+    assert.equal(observed.planApproval.profileSha256, observed.planSubmission.profileSha256);
+    assert.deepEqual(observed.planApproval.poGateAuthority, authority.value);
   });
 });
 
 check("approve-plan leaves state unchanged when the plan digest becomes stale before commit", () => {
-  withFixture({}, ({ primary, validate }) => {
+  withFixture({}, ({ primary, validate, validateProfile }) => {
     const authority = validate();
     assert.equal(authority.ok, true);
+    const profile = validateProfile();
+    assert.equal(profile.ok, true);
+    submitFixturePlan(primary, authority, profile);
     const statePath = join(primary, ".claude", "pipeline-state.json");
     const before = readFileSync(statePath, "utf8");
     let calls = 0;
     const status = runPipelineState(["approve-plan", "--by", "Product Owner"], {
       dir: primary,
       now: () => NOW,
+      poGateProfile: () => profile,
       poGateAuthority() {
         calls += 1;
         return calls === 1
@@ -595,12 +612,18 @@ check("approve-plan leaves state unchanged when the plan digest becomes stale be
 });
 
 check("approve-plan leaves state unchanged when the initial worktree authority is invalid", () => {
-  withFixture({}, ({ primary }) => {
+  withFixture({}, ({ primary, validate, validateProfile }) => {
+    const authority = validate();
+    assert.equal(authority.ok, true);
+    const profile = validateProfile();
+    assert.equal(profile.ok, true);
+    submitFixturePlan(primary, authority, profile);
     const statePath = join(primary, ".claude", "pipeline-state.json");
     const before = readFileSync(statePath, "utf8");
     const status = runPipelineState(["approve-plan", "--by", "Product Owner"], {
       dir: primary,
       now: () => NOW,
+      poGateProfile: () => profile,
       poGateAuthority: () => ({ ok: false, code: "PO-PROFILE-RECEIPT-STALE" }),
     });
     assert.equal(status, 2);
