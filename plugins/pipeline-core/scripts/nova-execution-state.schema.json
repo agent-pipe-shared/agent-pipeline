@@ -94,6 +94,32 @@
     {
       "if": {
         "properties": {
+          "revision": {
+            "const": 0
+          }
+        },
+        "required": [
+          "revision"
+        ]
+      },
+      "then": {
+        "properties": {
+          "state": { "const": "created" },
+          "observation": { "type": "null" },
+          "result": { "type": "null" },
+          "reason": { "type": "null" },
+          "previousSha256": { "type": "null" }
+        }
+      },
+      "else": {
+        "properties": {
+          "previousSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
           "state": {
             "const": "verified"
           }

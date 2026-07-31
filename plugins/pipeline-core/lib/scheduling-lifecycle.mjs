@@ -115,7 +115,7 @@ function checkAuthority(input) {
       || !eq(subject.authorityDigests, input.authorityDigests)
       || subjectByPackage.has(subject.packageId)
       || dispatches.has(subject.dispatchId)) return "AUTHORITY:subject";
-    const identity = [subject.repository.identitySha256, subject.baseCommit, subject.baseTree];
+    const identity = [subject.repository, subject.baseCommit, subject.baseTree];
     if (base !== null && !eq(identity, base)) return "AUTHORITY:subject-base";
     base = identity;
     subjectByPackage.set(subject.packageId, subject);

@@ -23,7 +23,7 @@
       "const": "pipeline.nova-execution-subject.v1"
     },
     "repository": {
-      "$ref": "#/$defs/repository"
+      "const": "self"
     },
     "baseCommit": {
       "$ref": "#/$defs/oid"
@@ -44,7 +44,8 @@
       "$ref": "#/$defs/id"
     },
     "attempt": {
-      "$ref": "#/$defs/id"
+      "type": "integer",
+      "minimum": 0
     },
     "queueRevision": {
       "type": "integer",
@@ -94,18 +95,6 @@
       "minLength": 1,
       "maxLength": 512,
       "pattern": "^(?!/)(?!.*(?:^|/)\\.\\.?(?:/|$))(?!.*//)(?!.*\\\\)[^\\u0000]+$"
-    },
-    "repository": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": [
-        "identitySha256"
-      ],
-      "properties": {
-        "identitySha256": {
-          "$ref": "#/$defs/sha"
-        }
-      }
     },
     "authorityDigest": {
       "type": "object",

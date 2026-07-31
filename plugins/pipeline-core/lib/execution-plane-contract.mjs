@@ -33,7 +33,7 @@ const capacity = (v) => exact(v, ["unit", "value", "source", "status"])
 function subjectCode(v) {
   if (!exact(v, ["schema", "repository", "baseCommit", "baseTree", "candidateCommit", "candidateTree", "packageId", "dispatchId", "attempt", "queueRevision", "authorityDigests", "writePaths", "resources"])) return "SHAPE:subject";
   if (v.schema !== NOVA_EXECUTION_SUBJECT_SCHEMA) return "SCHEMA:subject";
-  if (!exact(v.repository, ["identitySha256"]) || !SHA.test(v.repository.identitySha256) || ![v.baseCommit, v.baseTree, v.candidateCommit, v.candidateTree].every((x) => OID.test(x)) || ![v.packageId, v.dispatchId, v.attempt].every((x) => ID.test(x)) || !Number.isSafeInteger(v.queueRevision) || v.queueRevision < 0) return "SHAPE:subject-fields";
+  if (v.repository !== "self" || ![v.baseCommit, v.baseTree, v.candidateCommit, v.candidateTree].every((x) => OID.test(x)) || ![v.packageId, v.dispatchId].every((x) => ID.test(x)) || !Number.isSafeInteger(v.attempt) || v.attempt < 0 || !Number.isSafeInteger(v.queueRevision) || v.queueRevision < 0) return "SHAPE:subject-fields";
   if (!sorted(v.authorityDigests, authority) || v.authorityDigests.length === 0 || !sorted(v.writePaths, path) || !sorted(v.resources, (x) => ID.test(x))) return "BOUND:subject-sets";
   return null;
 }
@@ -89,10 +89,39 @@ function validObservation(v) {
 function validResult(v) { return v === null || (exact(v, ["resultSha256", "bytes", "status"]) && SHA.test(v.resultSha256) && Number.isSafeInteger(v.bytes) && v.bytes >= 0 && ["delivered", "verified"].includes(v.status)); }
 function stateCode(v) { if (!exact(v, ["schema", "subject", "subjectSha256", "state", "revision", "observation", "result", "reason", "previousSha256"])) return "SHAPE:state"; if (v.schema !== NOVA_EXECUTION_STATE_SCHEMA) return "SCHEMA:state"; if (subjectCode(v.subject) || executionSubjectDigest(v.subject) !== v.subjectSha256 || !STATES.has(v.state) || !Number.isSafeInteger(v.revision) || v.revision < 0 || !validObservation(v.observation) || !validResult(v.result) || !(v.reason === null || (typeof v.reason === "string" && v.reason.length > 0 && v.reason.length <= 512)) || !(v.previousSha256 === null || SHA.test(v.previousSha256))) return "BOUND:state"; if (v.state === "verified" && v.result?.status !== "verified") return "AUTHORITY:verifier"; return null; }
 export function executionStateDigest(v) { return stateCode(v) ? null : hash(v); }
-export function validateExecutionState(v) { const code = stateCode(v); return code ? { ok: false, code } : { ok: true, code: null }; }
+function genesisStateCode(v) {
+  return v.revision === 0
+    && v.state === "created"
+    && v.observation === null
+    && v.result === null
+    && v.reason === null
+    && v.previousSha256 === null ? null : "AUTHORITY:state-genesis";
+}
+function transitionStateCode(previous, next) {
+  const previousCode = stateCode(previous);
+  if (previousCode) return "STALE:state-predecessor";
+  if (next.revision !== previous.revision + 1
+    || next.previousSha256 !== executionStateDigest(previous)
+    || next.subjectSha256 !== previous.subjectSha256
+    || canonicalExecutionJson(next.subject) !== canonicalExecutionJson(previous.subject)) return "STALE:state-predecessor";
+  return TRANSITIONS[previous.state]?.has(next.state) ? null : "CONFLICT:state-transition";
+}
+/**
+ * Validates a genesis state alone, or a successor only against its exact prior
+ * semantic record.  A non-genesis state without that predecessor is deliberately
+ * unavailable rather than treated as independently authoritative.
+ */
+export function validateExecutionState(v, previous = undefined) {
+  const code = stateCode(v);
+  if (code) return { ok: false, code };
+  const semantic = previous === undefined
+    ? (v.revision === 0 ? genesisStateCode(v) : "UNAVAILABLE:state-predecessor")
+    : previous === null ? genesisStateCode(v) : transitionStateCode(previous, v);
+  return semantic ? { ok: false, code: semantic } : { ok: true, code: null };
+}
 export function createExecutionState(subject) { if (subjectCode(subject)) throw new Error("SHAPE:state-subject"); return freeze({ schema: NOVA_EXECUTION_STATE_SCHEMA, subject: clone(subject), subjectSha256: executionSubjectDigest(subject), state: "created", revision: 0, observation: null, result: null, reason: null, previousSha256: null }); }
 export function normalizeSyntheticExecutionOutcome(expected, outcome) {
-  if (!expected || subjectCode(expected.subject) || !exact(outcome, ["dispatchId", "attempt", "candidateCommit", "kind", "evidenceSha256", "result"]) || ![outcome.dispatchId, outcome.attempt].every((x) => ID.test(x)) || !OID.test(outcome.candidateCommit) || !SHA.test(outcome.evidenceSha256) || !validResult(outcome.result)) return { ok: false, code: "SHAPE:outcome", state: null };
+  if (!expected || subjectCode(expected.subject) || !exact(outcome, ["dispatchId", "attempt", "candidateCommit", "kind", "evidenceSha256", "result"]) || !ID.test(outcome.dispatchId) || !Number.isSafeInteger(outcome.attempt) || outcome.attempt < 0 || !OID.test(outcome.candidateCommit) || !SHA.test(outcome.evidenceSha256) || !validResult(outcome.result)) return { ok: false, code: "SHAPE:outcome", state: null };
   const s = expected.subject; if (outcome.dispatchId !== s.dispatchId || outcome.attempt !== s.attempt || outcome.candidateCommit !== s.candidateCommit) return { ok: false, code: "STALE:outcome", state: null };
   const map = { admitted: "admitted", running: "running", success: "succeeded-unverified", failure: "failed", timeout: "timed-out", lostHeartbeat: "lost", completedUndelivered: "completed-undelivered", verifierPassed: "verified" };
   if (outcome.kind === "duplicate") return { ok: true, code: "REPLAY:duplicate", state: null }; if (outcome.kind === "outOfOrder") return { ok: false, code: "STALE:out-of-order", state: null }; if (outcome.kind !== "cancel" && !Object.hasOwn(map, outcome.kind)) return { ok: false, code: "SHAPE:outcome-kind", state: null };

@@ -82,14 +82,14 @@ function schemaAccepts(value, root) {
 
 function subjectInput(overrides = {}) {
   return {
-    repository: { identitySha256: A },
+    repository: "self",
     baseCommit: O,
     baseTree: O,
     candidateCommit: O,
     candidateTree: O,
     packageId: "pkg",
     dispatchId: "dispatch",
-    attempt: "attempt",
+    attempt: 0,
     queueRevision: 0,
     authorityDigests: [{ kind: "spec", sha256: A }],
     writePaths: ["lib/pkg.mjs"],
@@ -141,7 +141,7 @@ const check = (name, fn) => {
   passed += 1;
   console.log(`PASS EPC${String(passed).padStart(2, "0")} ${name}`);
 };
-const outcome = (kind, result = null, candidateCommit = O) => ({ dispatchId: "dispatch", attempt: "attempt", candidateCommit, kind, evidenceSha256: B, result });
+const outcome = (kind, result = null, candidateCommit = O) => ({ dispatchId: "dispatch", attempt: 0, candidateCommit, kind, evidenceSha256: B, result });
 
 check("publishes exact Draft 2020-12 roots and closes every nested subject/request shape", () => {
   assert.deepEqual(SUBJECT_SCHEMA.required, ["schema", "repository", "baseCommit", "baseTree", "candidateCommit", "candidateTree", "packageId", "dispatchId", "attempt", "queueRevision", "authorityDigests", "writePaths", "resources"]);
@@ -166,7 +166,7 @@ check("keeps execution-subject Schema and runtime admission parallel over the cl
     valid,
     { ...clone(valid), extra: true },
     { ...clone(valid), packageId: "/private/pkg" },
-    { ...clone(valid), repository: { ...clone(valid.repository), rawPath: "/private/repo" } },
+    { ...clone(valid), repository: "foreign" },
     { ...clone(valid), writePaths: ["../escape"] },
     { ...clone(valid), resources: ["cpu", "cpu"] },
     { ...clone(valid), authorityDigests: [{ kind: "spec", sha256: A }, { kind: "spec", sha256: A }] },
@@ -249,7 +249,8 @@ check("keeps the closed full TimedObservation state envelope parallel with runti
   const expected = [true, true, false, false, false, false];
   corpus.forEach((record, index) => {
     const structural = schemaAccepts(record, STATE_SCHEMA);
-    const runtime = validateExecutionState(record).ok;
+    const previous = index === 1 ? admitted : undefined;
+    const runtime = validateExecutionState(record, previous).ok;
     assert.equal(structural && runtime, expected[index], `state public corpus ${index}`);
     assert.equal(runtime, expected[index], `state runtime corpus ${index}`);
   });
@@ -264,6 +265,19 @@ check("normalizes success as unverified and reserves verified for matching verif
   assert.equal(normalizeSyntheticExecutionOutcome(success.state, outcome("verifierPassed", { resultSha256: B, bytes: 1, status: "delivered" })).code, "AUTHORITY:verifier");
   const verified = reduceExecutionState(success.state, outcome("verifierPassed", { resultSha256: A, bytes: 1, status: "delivered" }));
   assert.equal(verified.state.state, "verified");
+});
+
+check("rejects unbound non-genesis states and only admits exact predecessor transitions", () => {
+  const created = createExecutionState(subject);
+  const admitted = reduceExecutionState(created, outcome("admitted")).state;
+  const running = reduceExecutionState(admitted, outcome("running")).state;
+  const forged = { ...clone(running), state: "verified", result: { resultSha256: A, bytes: 1, status: "verified" }, revision: 0, previousSha256: null };
+  assert.equal(validateExecutionState(forged).code, "AUTHORITY:state-genesis");
+  assert.equal(validateExecutionState(running).code, "UNAVAILABLE:state-predecessor");
+  assert.deepEqual(validateExecutionState(running, admitted), { ok: true, code: null });
+  assert.equal(validateExecutionState(running, created).code, "STALE:state-predecessor");
+  const verified = reduceExecutionState(reduceExecutionState(running, outcome("success", { resultSha256: A, bytes: 1, status: "delivered" })).state, outcome("verifierPassed", { resultSha256: A, bytes: 1, status: "delivered" })).state;
+  assert.equal(validateExecutionState(verified, running).code, "STALE:state-predecessor");
 });
 
 check("covers duplicate, out-of-order, stale candidate, failure, timeout, cancellation, lost heartbeat and completed-undelivered without false success", () => {
@@ -281,4 +295,4 @@ check("covers duplicate, out-of-order, stale candidate, failure, timeout, cancel
   assert.equal(reduceExecutionState(running, outcome("completedUndelivered")).state.state, "completed-undelivered");
 });
 
-console.log(`${passed}/9 checks passed.`);
+console.log(`${passed}/10 checks passed.`);

@@ -137,6 +137,9 @@ planner-to-executor handoff without worker launch.
 4. immutable in-process fixture consumer from ADR-0044; and
 5. stale/replay/cancel/failure tests.
 
+**Threat model:** `docs/nova-execution-plane-threat-model.md` is updated with
+every A4 subject, authority, state-chain and verifier trust-boundary change.
+
 **DoD:**
 
 - frozen exchange and planner algorithm stay unchanged;

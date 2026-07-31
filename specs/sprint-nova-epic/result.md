@@ -871,12 +871,23 @@ A6 suites `6/6` and `18/18`. The A5 Draft 2020-12 schema is meta-valid and
 
 This focused evidence is provisional. The stable-main 0.4.7 rebase and
 conflict disposition must invalidate or re-establish it by affected path.
-Shared durable writers and consumers, real adapters/launchers/reporters,
-universal pre-launch Critic-lineage enforcement, the missing release-version
-surfaces, A7 registration, complete Issue acceptance and final
-candidate-bound Verify, Security and independent Critic evidence remain
-outside this checkpoint and require their accepted post-rebase Spec/write-set
-expansion.
+
+### Deferred-risk register — 2026-07-30 checkpoint
+
+The following deliberately unimplemented scope is owned by **Product Owner
+(agent-pipe-shared)** and expires on **2026-08-14**. It must be renewed with a
+new owner/date or resolved in the exact stable-main 0.4.7 rebase/readiness
+review; expiry closes this pre-rebase checkpoint for push/release purposes.
+
+| Deferred risk | Required resolution |
+| --- | --- |
+| Shared durable writers and consumers | Accept a post-rebase package with exclusive write-set and candidate-bound integration evidence. |
+| Real adapters, launchers and reporters | Accept the provider/worker boundary with its own threat model and live capability evidence. |
+| Universal pre-launch Critic-lineage enforcement | Bind it to the accepted shared launch path; no contract-only claim substitutes for that enforcement. |
+| Release-version surfaces and A7 registration | Reconcile the release manifest and register A7 only after stable-main readiness. |
+| Complete Issue acceptance | Regenerate the `sprint:nova` binding and resolve every mapped acceptance row against the rebased candidate. |
+| Final candidate Verify, Security and independent Critic evidence | Run all three against the exact post-rebase candidate commit/tree before a push, merge or release claim. |
+| TP-3 restoration and its exact Verify registration | Treat protected-surface restoration as a separate approved rebase task; do not infer it from this checkpoint. |
 
 No temporary TP lift was exercised here. TP-1 and TP-5 remain configured.
 TP-3 is already absent in the inherited branch HEAD; this checkpoint does not

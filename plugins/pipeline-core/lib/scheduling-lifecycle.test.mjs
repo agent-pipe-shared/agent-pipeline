@@ -66,14 +66,14 @@ function schemaAccepts(value, root) {
 
 function makeSubjects(packageList = packages, authorityDigests = auth) {
   return packageList.map((entry) => createExecutionSubject({
-    repository: { identitySha256: A },
+    repository: "self",
     baseCommit: O,
     baseTree: O,
     candidateCommit: O,
     candidateTree: O,
     packageId: entry.id,
     dispatchId: `dispatch-${entry.id}`,
-    attempt: `attempt-${entry.id}`,
+    attempt: 0,
     queueRevision: 0,
     authorityDigests,
     writePaths: entry.writePaths,
@@ -173,8 +173,8 @@ check("rejects unknown dependency/write/resource sets, overlapping authority and
   assert.throws(() => compose(0, [], null, [], { authorityDigests: overlappingAuthority }), /AUTHORITY:authority-overlap/u);
   const mixed = makeSubjects();
   mixed[0] = createExecutionSubject({
-    repository: { identitySha256: A }, baseCommit: O, baseTree: O, candidateCommit: "2".repeat(40), candidateTree: O,
-    packageId: "a", dispatchId: "dispatch-a", attempt: "attempt-a", queueRevision: 0, authorityDigests: auth,
+    repository: "self", baseCommit: O, baseTree: O, candidateCommit: "2".repeat(40), candidateTree: O,
+    packageId: "a", dispatchId: "dispatch-a", attempt: 0, queueRevision: 0, authorityDigests: auth,
     writePaths: packages[0].writePaths, resources: packages[0].resources,
   });
   assert.throws(() => compose(0, [], null, [], { subjects: mixed }), /AUTHORITY:subject/u);
@@ -183,7 +183,7 @@ check("rejects unknown dependency/write/resource sets, overlapping authority and
 check("scopes attempt identity to each dispatch while retaining global dispatch uniqueness", () => {
   const sharedAttemptSubjects = makeSubjects().map((subject) => {
     const { schema: _schema, ...input } = clone(subject);
-    return createExecutionSubject({ ...input, attempt: "0" });
+    return createExecutionSubject({ ...input, attempt: 0 });
   });
   assert.deepEqual(compose(0, [], null, [], { subjects: sharedAttemptSubjects }).selected.map((entry) => entry.packageId), ["a", "c"]);
   const duplicateDispatchSubjects = [...sharedAttemptSubjects];
