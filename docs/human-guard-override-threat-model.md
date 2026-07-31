@@ -22,6 +22,32 @@ The trusted computing base is:
 The model does not treat an agent instruction, environment variable, free-form
 guard prefix, or possession of a request digest as Human authority.
 
+## Actors and authority boundaries
+
+The relevant adversaries are an untrusted/compromised agent, a local process
+that can race or replace checkout files, a caller replaying a previously
+reviewed action, and an operator or tool attempting to turn a local recovery
+into a publication or Security exception. A same-OS-owner attacker remains a
+residual risk; the controls below are intended to reject accidental,
+partial, stale, and cross-boundary tampering rather than to claim protection
+against full owner compromise.
+
+Three boundaries remain separate and non-substitutable:
+
+- An attended guard override admits at most one otherwise eligible local tool
+  input. It is not State authority, Result-migration authority, publication
+  authority, or Security-ignore authority.
+- The PO-authorized Phoenix `Result.md`/`result.md` collision migration is a
+  separate, digest-bound State-writer transaction. The PO explicitly selects
+  the canonical Result in the read-only plan and confirms its exact apply
+  action; case, mtime, path order, or an agent suggestion never selects it.
+- Publication uses its own candidate-, channel-, destination-, expiry-, and
+  executor-bound authority. Security findings have no generic ignore
+  capability: a scanner exception, where separately supported, is an exact
+  content-bound policy input and remains candidate-bound. Neither a Human
+  guard override, Result migration, nor publication executor can create,
+  widen, or consume a Security ignore.
+
 ## Protected assets
 
 - Pipeline State, Continuity, runtime projection, cleanup descriptors, and
@@ -31,6 +57,16 @@ guard prefix, or possession of a request digest as Human authority.
 - plugin source/installation identity;
 - the denial, authorization, consumption, rejection, and expiry audit trail;
 - the invariant that one authorization permits at most one exact tool input.
+- the two colliding Result candidates, the PO-selected canonical Result, the
+  inactive Result's fixed archive destination, lifecycle artifact binding, and
+  the State/Continuity revision, resume, and authority bindings;
+- the private Result-migration HMAC key and journal, including its preimage,
+  postimage, archive move, lifecycle update, and recovery disposition;
+- the exact publication candidate OID/tree, destination ref/channel,
+  approval expiry, fixed executor identity, one-use execution state, and
+  remote readback receipt;
+- blocking Security findings and the narrow, separately governed,
+  content-bound scanner-exception policy, if one exists.
 
 ## Threats and controls
 
@@ -47,6 +83,11 @@ guard prefix, or possession of a request digest as Human authority.
 | Secret disclosure through audit | Audit events contain digests and bounded identifiers, never raw tool input, Human reason, owner nonce, repository-private path, or secret. |
 | Override reaches a protected operation | State/runtime/private paths, outside-root paths, secret patterns, descriptor deletion, plugin installation, every Git invocation including aliases, push/tag/merge/release, operators, redirects, substitutions, and unparseable commands are non-overridable. Bash recovery is additionally closed to a small read-only diagnostic executable allowlist plus exact single-file `node --check`; interpreter evaluation and arbitrary scripts are never override-eligible. |
 | Adapter persistence or verification fails | The original guard denial remains controlling and the adapter emits only a sanitized failure code. |
+| A case-fold collision silently chooses, overwrites, or deletes a Result | The Phoenix exception is eligible only for one quiescent, physically safe feature package with both distinct regular single-link candidates and an absent fixed archive target. The PO-selected canonical target is bound by path, digest, and identity; the unselected source may only be locally renamed to `archive/<inactive basename>`. No content rewrite, other checkout, Git ref, remote, outcome, decision, or close transition is permitted. |
+| A migration changes State but leaves lifecycle/authority bindings incoherent | The plan binds State, continuity revision, PRD/Spec, both candidates, lifecycle manifest, archive absence, and complete State/lifecycle postimages. Apply holds the normal continuity lock, changes lifecycle retention/authority and State/Continuity together, advances the revision once, and reads back the complete converged postimage. |
+| A crash, forged journal, or replay turns a partial Phoenix migration into success | The private Git-common-dir journal is owner-private, physical-path checked, HMAC authenticated, and bound to the exact plan/pre/postimage. Recovery accepts only the same plan and the expected preimage-or-postimage at every step; conflicting, missing, malformed, or tampered journal/State/lifecycle/archive bytes fail closed. |
+| A caller publishes another candidate, reuses a publication approval, or substitutes an executor | The fixed publication executor must first durably consume the exact `push-authorized` authority under raw-digest CAS. The authority binds candidate OID/tree, channel, destination ref, approval interval, attempt ID, and executor digest; subsequent observation and fetch/readback are bound transitions, not inferred success. |
+| A recovery or publication path suppresses a Security finding | There is no `security-ignore` authority in these paths. A blocking finding remains blocking unless a separate exact content-bound scanner policy applies to that finding; broad/rule-wide suppression, a changed value or position, missing policy, and any attempt to route the exception through a Human override fail closed. |
 
 ## Crash and ambiguity rules
 
@@ -60,6 +101,35 @@ event exist. Consumption happens before allow. Therefore an adapter crash:
   outcome is unknown.
 
 No success is inferred from an absent response.
+
+### Phoenix case-migration recovery
+
+The constrained Phoenix exception is local archival recovery, not a general
+case-normalization feature. After the PO confirms the exact plan, the writer
+first durably publishes the HMAC-authenticated journal. It then moves only the
+inactive local Result to the plan-bound archive path, updates the package
+lifecycle record so that exactly the selected target is active authority and
+the moved file is archive-only, and writes the bound State/Continuity
+postimage. State binds the selected Result authority and matching
+revision/resume/update fields exactly once.
+
+If interrupted before, during, or after any of those steps, a retry may only
+replay that authenticated journal under the same lock and plan bindings. It
+re-observes each archive, lifecycle, and State pre/postimage before continuing;
+only the full postimage may return an applied/replayed disposition, after which
+the journal can be retired. An unresolved journal-retirement failure, partial
+move, or uncertain external state is not success and never permits a second
+revision or an alternative canonical selection.
+
+### Publication and Security recovery
+
+Once publication execution begins, its authority is durably one-use before an
+external mutation is attempted. A timeout, process loss, malformed executor
+result, or missing remote readback leaves the result unknown/consumed or
+blocked; it must be resolved through the separately authorized publication
+state machine, never by rerunning a push or treating local completion as
+remote success. Security evidence is likewise fail-closed: an unavailable,
+changed, or unmatched exception policy does not downgrade a finding.
 
 ## Platform contract
 
