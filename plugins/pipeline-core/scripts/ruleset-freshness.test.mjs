@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -75,13 +76,23 @@ function readyHostControlObservation(version = "0.146.0") {
     code: "CAS-READY",
     phase: "observe",
     daemon: {
+      status: "running",
+      backend: "pid",
       appServerVersion: version,
+      cliVersion: version,
+      managedCodexVersion: version,
       socketPath: "/private/codex-control.sock",
       managedCodexPath: "/private/codex",
     },
   };
 }
+function daemonIdentitySha256(daemon) {
+  const keys = ["status", "backend", "managedCodexPath", "managedCodexVersion", "socketPath", "cliVersion", "appServerVersion"];
+  const canonical = JSON.stringify(Object.fromEntries(keys.map((key) => [key, daemon[key]])));
+  return createHash("sha256").update(canonical).digest("hex");
+}
 function hostExecutionReceipt(action, publicHeadOid) {
+  const control = readyHostControlObservation();
   return {
     schema: FRESHNESS_HOST_RECEIPT_SCHEMA,
     boundaryId: action.boundaryId,
@@ -91,6 +102,7 @@ function hostExecutionReceipt(action, publicHeadOid) {
       schema: FRESHNESS_HOST_CONTROL_SCHEMA,
       code: "CAS-READY",
       appServerVersion: "0.146.0",
+      daemonIdentitySha256: daemonIdentitySha256(control.daemon),
     },
     childStarted: true,
     executable: "/usr/bin/git",
@@ -386,6 +398,7 @@ test("a completed host response without the closed Freshness execution receipt f
     { ...base, hostControl: null },
     { ...base, hostControl: { ...base.hostControl, code: "CAS-DAEMON-UNREACHABLE" } },
     { ...base, hostControl: { ...base.hostControl, appServerVersion: "" } },
+    { ...base, hostControl: { ...base.hostControl, daemonIdentitySha256: "not-a-sha256" } },
     { ...base, childStarted: false },
     { ...base, executable: "git" },
     { ...base, exitCode: 1 },
@@ -448,6 +461,27 @@ test("the host executor does not issue completed when host control is absent or 
     assert.equal(output.receipt, null);
   }
   assert.equal(gitCalls, 0);
+});
+
+test("same-version daemon identities produce distinct private control digests", () => {
+  const action = createFreshnessHostAction("pipeline-start-host-authorized-wsl");
+  const firstControl = readyHostControlObservation();
+  const secondControl = readyHostControlObservation();
+  secondControl.daemon.socketPath = "/private/replaced-control.sock";
+  secondControl.daemon.managedCodexPath = "/private/replaced-codex";
+  const execute = (hostControl) => executeRulesetFreshnessHostAction(action, {
+    spawn() { return { pid: 7890, status: 0, stdout: `${"a".repeat(40)}\tHEAD\n` }; },
+    observeHostControl() { return hostControl; },
+  });
+  const first = execute(firstControl);
+  const second = execute(secondControl);
+  assert.equal(first.status, "completed");
+  assert.equal(second.status, "completed");
+  assert.equal(first.receipt.hostControl.appServerVersion, second.receipt.hostControl.appServerVersion);
+  assert.notEqual(first.receipt.hostControl.daemonIdentitySha256, second.receipt.hostControl.daemonIdentitySha256);
+  assert.match(first.receipt.hostControl.daemonIdentitySha256, /^[0-9a-f]{64}$/u);
+  assert.equal(JSON.stringify(first.receipt).includes("/private/"), false);
+  assert.equal(JSON.stringify(second.receipt).includes("/private/"), false);
 });
 
 test("the host adapter has a real full-result CLI path and rejects arbitrary requests", () => {

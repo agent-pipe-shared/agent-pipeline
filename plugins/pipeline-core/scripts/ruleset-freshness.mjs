@@ -32,6 +32,7 @@ export const FRESHNESS_HOST_RECEIPT_SCHEMA = "pipeline.ruleset-freshness-host-ex
 export const FRESHNESS_HOST_CONTROL_SCHEMA = "pipeline.ruleset-freshness-host-control.v1";
 export const WSL_FRESHNESS_BOUNDARY_ID = "pipeline-start-host-authorized-wsl";
 const SHA = /^[0-9a-f]{40,64}$/iu;
+const SHA256 = /^[0-9a-f]{64}$/iu;
 const BOUNDARY_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,79}$/u;
 const DEFAULT_TIMEOUT_MS = 30_000;
 const CODEX_CLAUDE_FALLBACK_STATUS = "codex-plugin-list-unavailable";
@@ -163,11 +164,13 @@ function observeThroughSelectedHost(action, hostTransport) {
     || receipt.boundaryId !== hostTransport.boundaryId
     || JSON.stringify(receipt.action) !== JSON.stringify(action)
     || receipt.requestSha256 !== action.requestSha256
-    || !exactKeys(receipt.hostControl, ["schema", "code", "appServerVersion"])
+    || !exactKeys(receipt.hostControl, ["schema", "code", "appServerVersion", "daemonIdentitySha256"])
     || receipt.hostControl.schema !== FRESHNESS_HOST_CONTROL_SCHEMA
     || receipt.hostControl.code !== "CAS-READY"
     || typeof receipt.hostControl.appServerVersion !== "string"
     || receipt.hostControl.appServerVersion.length === 0
+    || typeof receipt.hostControl.daemonIdentitySha256 !== "string"
+    || !SHA256.test(receipt.hostControl.daemonIdentitySha256)
     || receipt.childStarted !== true
     || receipt.executable !== "/usr/bin/git"
     || JSON.stringify(receipt.argv) !== JSON.stringify(["ls-remote", PUBLIC_MARKETPLACE_URL, "HEAD"])

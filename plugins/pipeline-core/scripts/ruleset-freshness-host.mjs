@@ -13,6 +13,7 @@
  * invokes this helper by itself.
  */
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 
@@ -31,6 +32,15 @@ import { CODEX_APP_SERVER_HEALTH_SCHEMA, observeCodexAppServer } from "./codex-a
 
 const SHA = /^[0-9a-f]{40,64}$/iu;
 const DEFAULT_TIMEOUT_MS = 30_000;
+const DAEMON_IDENTITY_KEYS = Object.freeze([
+  "status",
+  "backend",
+  "managedCodexPath",
+  "managedCodexVersion",
+  "socketPath",
+  "cliVersion",
+  "appServerVersion",
+]);
 // This helper is intentionally WSL-only.  A literal system path and a sterile
 // Git environment prevent a user PATH entry or ambient Git configuration from
 // retargeting the one reviewed public read.
@@ -59,20 +69,31 @@ function result(action, status, stdout = "", receipt = null) {
   });
 }
 
+function canonicalDaemonIdentity(daemon) {
+  if (daemon === null || typeof daemon !== "object" || Array.isArray(daemon)
+    || JSON.stringify(Object.keys(daemon).sort()) !== JSON.stringify([...DAEMON_IDENTITY_KEYS].sort())
+    || daemon.status !== "running"
+    || daemon.cliVersion !== daemon.appServerVersion
+    || daemon.managedCodexVersion !== daemon.appServerVersion
+    || DAEMON_IDENTITY_KEYS.some((key) => typeof daemon[key] !== "string" || daemon[key].length === 0)) return null;
+  return JSON.stringify(Object.fromEntries(DAEMON_IDENTITY_KEYS.map((key) => [key, daemon[key]])));
+}
+
 function hostControlBinding(observation) {
+  const daemonIdentity = canonicalDaemonIdentity(observation?.daemon);
   if (observation?.schema !== CODEX_APP_SERVER_HEALTH_SCHEMA
     || observation.status !== "ready"
     || observation.code !== "CAS-READY"
     || observation.phase !== "observe"
-    || typeof observation.daemon?.appServerVersion !== "string"
-    || observation.daemon.appServerVersion.length === 0) return null;
+    || daemonIdentity === null) return null;
   // The public receipt intentionally omits the private control socket and
-  // executable paths. The ready code and daemon version are sufficient to
-  // bind this read to a validated host-control observation.
+  // executable paths while carrying a digest of the complete observed-control
+  // identity, bound to this validated host-control observation.
   return Object.freeze({
     schema: FRESHNESS_HOST_CONTROL_SCHEMA,
     code: "CAS-READY",
     appServerVersion: observation.daemon.appServerVersion,
+    daemonIdentitySha256: createHash("sha256").update(daemonIdentity).digest("hex"),
   });
 }
 
