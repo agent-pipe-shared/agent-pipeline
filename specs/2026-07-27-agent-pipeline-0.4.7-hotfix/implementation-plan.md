@@ -1,8 +1,8 @@
 # Implementation plan — Agent Pipeline 0.4.7 completion
 
-Status: code-aligned and approved by the PO on 2026-07-31; implementation
-dispatch remains blocked only until the matching PRD/Spec digests are bound by
-the sanctioned lifecycle writer.
+Status: reopened design on 2026-07-31; AC-047-143–148 and the synchronized
+PRD/Spec bytes require fresh digest-bound PO approval before Result-bootstrap
+implementation or dispatch.
 
 Authority is the code-first section of the neighboring PRD and Spec.
 `main@83640cec22d494d227eebc82929370277ce926b9` is the implementation
@@ -19,7 +19,7 @@ prohibitions, and stop conditions.
 
 ### F0 — Lifecycle authority, kickoff promotion and portable cleanup
 
-Implement AC-047-100–111 and AC-047-131–142 first because these rules decide
+Implement AC-047-100–111 and AC-047-131–148 first because these rules decide
 whether later work can be edited, approved, resumed, recovered, and persisted
 safely.
 
@@ -34,6 +34,9 @@ safely.
 - Add sanctioned submit/invalidate/reapprove transitions and one shared derived
   status used by onboarding, State, continuity, guards, statusline, bootstrap,
   resume, topology, and close.
+- Keep the exact bound PRD and Spec editable while the shared lifecycle is
+  `draft`; keep them immutable in `awaiting-approval` and `approved`, without
+  opening implementation paths or general authority-prefix exemptions.
 - Preserve historical approval/revocation as audit data without treating it as
   current authority.
 - Admit the exact valid pre-submission V2 implementation postimage to the
@@ -69,6 +72,21 @@ safely.
   repair or false success is allowed.
 - Bind an immutable Result to the exact idle review head only through the
   read-only `continuity-result-close-plan` and confirmed CAS apply path.
+- Add a separate generic Elephant-owned Result-authority bootstrap for an
+  exact active, quiescent `authority.result:null` State. Its read-only plan
+  binds physical root, State bytes, feature/revision, PRD/Spec, the canonically
+  feature-package-derived safe Result path and absent preimage, canonical
+  Result bytes/digest, expected postimage and plan digest; its sole typed apply
+  action requires explicit confirmation. Under the normal lock, a private,
+  authenticated durable write-ahead transaction materializes and
+  fsync/readbacks the canonical four-empty-collection `pipeline-result`
+  envelope, then CAS-binds only Result authority plus monotonic
+  revision/resume/update fields. Recover
+  every Result-write/State-write/journal-retirement crash boundary, return
+  `mutated:false` for exact replay, and fail closed on any conflicting journal,
+  file, authority or State evidence. It creates no dispatch, blocker,
+  acknowledgement, decision, outcome, close transition, Git/remote write or
+  other external effect. Do not implement this bullet before fresh PO approval.
 - Preserve closed guard grammar: expose retry actions only when each action is
   independently valid and read-only, keep the bounded cold-repository Git
   observation budget, and restrict Pipeline Author Repair to its exact,
@@ -80,7 +98,10 @@ restart/resume, hostile State, exact reapproval, valid V2 reopen,
 Phoenix/Nova/Rune-shaped portable-binding recovery, identifier-free complete
 privatization actions, missing-activation/stale-plan/replay/drift failures,
 kickoff promotion for all three profiles, Pipeline-start reinspection, and
-negative guard grammar.
+negative guard grammar. For AC-047-143–148 additionally prove read-only
+planning, exact canonical Result creation/binding, postimage field confinement,
+all crash/replay boundaries, and negative root/feature/State/revision/PRD/Spec/
+Result/active-work/journal cases.
 
 Owned production paths: `plugins/pipeline-core/scripts/session-cleanup.mjs`,
 `plugins/pipeline-core/lib/session-cleanup-recovery.mjs`,
@@ -105,6 +126,8 @@ Required focused commands:
 - `node plugins/pipeline-core/lib/feature-package-topology.test.mjs`
 - `node plugins/pipeline-core/hooks/guard-devplan.test.mjs`
 - `node plugins/pipeline-core/hooks/guard-lifecycle-ready.test.mjs`
+- `node plugins/pipeline-core/scripts/pipeline-state-result-bootstrap.test.mjs`
+- `node plugins/pipeline-core/scripts/pipeline-state-result-close.test.mjs`
 
 ### F1 — Freshness channels, parallel Sprint baselines and canonical backlog
 
@@ -270,7 +293,8 @@ old Issue prose. Any regression is fixed within its current architecture.
 After all slices are integrated:
 
 1. synchronize PRD/Spec/plan and exact technical-spec digest, including the
-   code-aligned AC-047-136–142 amendment;
+   code-aligned AC-047-136–142 amendment and approved AC-047-143–148
+   Result-authority bootstrap;
 2. freeze one commit/tree;
 3. run all focused suites, runner-neutral Full Verify, and blocking Security;
 4. obtain independent high-risk Critic review and disposition every finding;

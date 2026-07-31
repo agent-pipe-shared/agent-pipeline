@@ -1,7 +1,7 @@
 # Technical specification — Agent Pipeline 0.4.7 hotfix
 
-Status: `approved by the PO on 2026-07-31; implementation authority requires
-the matching digest-bound lifecycle write for these stabilized PRD/Spec bytes`.
+Status: `reopened design on 2026-07-31; AC-047-143–148 and the synchronized
+PRD/plan require fresh digest-bound PO approval before implementation`.
 
 This specification implements the neighboring
 [PRD](prd_agent-pipeline-0.4.7-hotfix.md) against exact base
@@ -20,7 +20,9 @@ label `hotfix:0.4.7` remain mandatory outcome scope: #63, #70, #71, #73, #77,
 The design baseline is commit
 `83640cec22d494d227eebc82929370277ce926b9`. Existing AC-047-01–68 retain
 their identifiers and implemented behavior. The following AC-047-69–135 bind
-only the current missing or newly reproduced release remainder.
+only the current missing or newly reproduced release remainder;
+AC-047-136–142 retain the code-aligned corrective amendment, and
+AC-047-143–148 define the newly reopened Result-authority bootstrap design.
 
 ### AC-047-69–74 — Fixed exact-candidate main publication (#81)
 
@@ -470,17 +472,70 @@ only the current missing or newly reproduced release remainder.
   generic source mutation, publication, State edits and all existing
   non-overridable classes.
 
+### AC-047-143–148 — Elephant-owned Result-authority bootstrap
+
+- **AC-047-143 — Exact active-null eligibility:** The Elephant SHALL own the
+  generic bootstrap only for one valid active continuity whose feature IDs
+  match, whose `authority.prd` and `authority.spec` are valid and
+  physically unchanged, and whose `authority.result` is exactly `null`.
+  Continuity SHALL be quiescent: no active dispatch, blocker, acknowledged
+  final, recovery, decision transaction or close transition. An existing
+  non-null Result authority, mismatched feature, invalid State or non-quiescent
+  work is ineligible and remains zero-mutation.
+- **AC-047-144 — Closed read-only plan:** Planning SHALL write nothing and
+  SHALL return one typed, identifier-safe envelope binding the physical
+  repository root, portable-State byte digest, feature ID, expected continuity
+  revision, exact PRD and Spec paths/digests, canonically feature-package-derived
+  in-root Result path, Result-path preimage, exact canonical Result
+  bytes/digest, expected State postimage digest, and plan digest. An unjournaled
+  Result-path preimage SHALL be absent. Its sole apply action SHALL use
+  `executable` plus `argv[]`, set `mutation`, `requiresConfirmation`,
+  `executionBoundary` and `expected`, and require explicit digest-bound
+  confirmation.
+- **AC-047-145 — Canonical Result seed:** The planned Result SHALL be a bounded
+  UTF-8/LF regular single-link file with exactly one `pipeline-result` fence.
+  That envelope SHALL contain exactly the four canonical empty collections
+  `decisionBriefs`, `courseDecisionIntents`, `courseDecisionReceipts`, and
+  `finalIntegrations`; it SHALL contain no fabricated dispatch, decision,
+  outcome, evidence or completion claim. The complete planned file bytes, not
+  a caller-supplied shell string, are authoritative.
+- **AC-047-146 — Confirmed durable CAS apply:** Apply SHALL recompute the
+  complete plan under the normal State/continuity lock, verify root, State,
+  revision, feature, PRD, Spec and Result-path preimages, and refuse symlink,
+  hard-link, path-escape or byte drift. Through a repository-private,
+  authenticated, fsynced write-ahead transaction it SHALL atomically
+  materialize/read back the exact Result file,
+  bind only `continuity.authority.result`, increment continuity revision once,
+  set matching `resume.sourceRevision`, update `updatedAt`, durably commit and
+  fully read back the State postimage.
+- **AC-047-147 — Idempotent crash recovery:** The transaction SHALL make a
+  crash before Result publication, after Result publication, after State
+  commit or before journal retirement recoverable only through the same
+  confirmed plan. Exact preimage resumes safely; exact postimage is replayable
+  with `mutated:false`; no retry may duplicate the Result, advance the revision
+  twice or infer success from a partial/lookalike postimage. Conflicting Result,
+  State or journal bytes fail closed with a typed next recovery action.
+- **AC-047-148 — Bootstrap-only boundary and evidence:** The bootstrap SHALL
+  create no dispatch, blocker, acknowledgement, decision artifact, queue
+  outcome, close transition, Git/remote write or external effect, and SHALL
+  preserve every unrelated State field. Focused tests SHALL cover plan
+  read-only behavior, exact apply/readback, every crash boundary and replay,
+  plus wrong root/feature/State/revision/PRD/Spec/Result bindings, non-null
+  Result authority, active dispatch, blocker, decision/recovery/close state,
+  unsafe files and journal drift. The later Result-close transaction remains a
+  separate authority transition.
+
 ### Current ownership and focused-gate map
 
 | Slice | Criteria | Exclusive production ownership | Required focused gate |
 | --- | --- | --- | --- |
-| F0 lifecycle/cleanup | AC-047-100–111, 131–142 | cleanup/recovery, portable State writer, approval/submission model, kickoff promotion, onboarding/continuity/topology/Dev-Plan readers | session-cleanup binding, project-authority/migration, onboarding V3, legacy reopen, kickoff promotion, pipeline-state, feature-package topology, Dev-Plan and lifecycle-guard suites |
+| F0 lifecycle/cleanup | AC-047-100–111, 131–148 | cleanup/recovery, portable State writer, approval/submission model, kickoff promotion, Result-authority bootstrap, onboarding/continuity/topology/Dev-Plan readers | session-cleanup binding, project-authority/migration, onboarding V3, legacy reopen, kickoff promotion, Result bootstrap/close, pipeline-state, feature-package topology, Dev-Plan and lifecycle-guard suites |
 | F1 freshness/baseline/backlog | AC-047-99, 112–130 | ruleset/update channels and repository freshness, per-project channel writer, host-source documentation, parallel-Sprint baseline policy, staleness/bootstrap policy, backlog ledger/projections | ruleset/repository freshness, channel writer, parallel-Sprint policy, backlog state suite and canonical checker |
 | F2 Verify/supervision | AC-047-75–80, 88–98 | Verify workflow/harness, injected runner seams, Critic trace identity, onboarding rollback identity, only shipped supervisor paths | Critic isolation, onboarding V3/E2E, Advisor bootstrap, and runner-free Full Verify |
 | F3 publication | AC-047-69–74 | existing publication bundle/authority, fixed executor, publication-only State/guard/close/release integration | bundle, authority, State-authority, close-journal, and new executor disposable-remote suites |
 | F4 authority adoption | AC-047-81–87 | neutral authority resolver/migration, runtime provenance, classification and adoption receipt | project-authority, migration, and onboarding V3 suites |
 | F5 retained regression | AC-047-01–68 | no redesign; only exact affected current surfaces on regression | existing focused suite matrix |
-| F6 immutable candidate | AC-047-01–135 | integration metadata, package/version/evidence only after all production slices | all focused gates, Full Verify, Security, high-risk Critic, install/readback, portable-state readback |
+| F6 immutable candidate | AC-047-01–148 | integration metadata, package/version/evidence only after all production slices | all focused gates, Full Verify, Security, high-risk Critic, install/readback, portable-state readback |
 
 Exact file paths, command lines, sequencing, shared-file handoff, and stop
 conditions are binding in [implementation-plan.md](implementation-plan.md).

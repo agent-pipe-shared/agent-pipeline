@@ -3,15 +3,15 @@
 # PRD — Agent Pipeline 0.4.7 hotfix
 
 > Product Review Document for the PO gate. Status:
-> `code-aligned and approved by the PO on 2026-07-31; implementation authority
-> requires the matching digest-bound lifecycle write for these stabilized
-> PRD/Spec bytes`.
+> `reopened design on 2026-07-31; the Result-authority bootstrap amendment and
+> synchronized PRD/Spec bytes require fresh digest-bound PO approval before
+> implementation`.
 > Task: `agent-pipeline-0.4.7-hotfix` · Feature · Rigor 2 · Risk high.
 > Base: public 0.4.6 release at
 > `9d1b3dc108eb77629ace5b82002120f5539abd8d`. Acceptance criteria:
 > [spec.md](spec.md).
 
-<!-- technical-spec-sha256: 714238949d1ce36fec3c31e41bafcdc2eaab9bdafa0134d89b5e23da2ed832fe -->
+<!-- technical-spec-sha256: 7d86314adc02541890ad654abe82bd61f98efebda0e5cb666813faacd1ee66c6 -->
 
 The 2026-07-28 approval remains historical evidence for the already
 implemented slices. The Human/PO explicitly directed implementation of the
@@ -52,9 +52,12 @@ policy gaps are mandatory for the same release:
    Epic/Feature/Mini lifecycle without closing a feature that was never actual
    work;
 6. long-lived parallel Sprints are treated as continuously rebase-required
-   instead of rebasing only the selected promotion candidate; and
+   instead of rebasing only the selected promotion candidate;
 7. update-channel selection, host-wide source switching, and release promotion
-   are not yet one explicit, non-conflated contract.
+   are not yet one explicit, non-conflated contract; and
+8. an active, otherwise quiescent continuity with `authority.result:null` has
+   no generic Elephant-owned transaction that can seed canonical Result
+   authority before the separately implemented Result-close transition.
 
 ### Code-first disposition
 
@@ -79,12 +82,14 @@ policy gaps are mandatory for the same release:
 | Parallel Sprints | A rebase is a promotion gate for the explicitly selected first merge-ready Sprint, not a steady-state work gate. Protected or overlapping baseline advances require bounded impact review. |
 | Recovery completeness | Every fail-closed lifecycle state has a typed read-only planner and confirmation-bound writer where safe. Completed closure recovery remains first; an active historical descriptor falls back to the identifier-free Privatization plan/apply path. A valid recovery cannot be blocked merely because the session is not ready. |
 | Kickoff promotion | Exact unapproved kickoff seed state can become real Epic/Feature/Mini work atomically without manufacturing approval or requiring feature close. |
+| Result-authority bootstrap | Design amendment pending fresh PO approval: an Elephant-owned read-only plan and confirmed crash-safe CAS apply seed one canonical Result envelope for an exact active, quiescent `authority.result:null` State without dispatch, decision or remote effects. |
 
-The complete release contract is AC-047-01–142 in
+The complete release contract is AC-047-01–148 in
 [spec.md](spec.md). AC-047-01–68 retain the delivered/historical identifiers;
 AC-047-69–135 bind the current mandatory remainder; AC-047-136–142 record
 the code-aligned recovery and guard corrections retained in the dirty
-candidate.
+candidate; AC-047-143–148 define the reopened, not-yet-implemented
+Result-authority bootstrap.
 
 ### Code-aligned corrective amendment — 2026-07-31
 
@@ -117,16 +122,44 @@ Continuity-State suites. The final candidate still requires fresh Full Verify,
 Security, independent high-risk Critic, install/readback, and publication
 gates.
 
+### Pending Result-authority bootstrap amendment — 2026-07-31
+
+For an active lifecycle with matching valid continuity, exact PRD/Spec
+authority, a quiescent queue and `authority.result:null`, the Elephant needs
+one generic bootstrap before the existing Result-close transaction can apply.
+The read-only plan binds the physical root, portable-State byte digest,
+feature/revision, PRD, Spec, canonically feature-package-derived safe Result
+path and absent preimage, exact canonical Result bytes/digest, State postimage
+and plan digest. Its single typed apply action is explicitly confirmed and
+runs only at the declared host write boundary.
+
+The confirmed writer uses the normal lock and a durable write-ahead
+transaction to materialize and read back a canonical `pipeline-result`
+envelope with the four empty decision/integration collections, then binds only
+Result authority and the corresponding monotonic revision/resume/update
+fields. Exact replay is `mutated:false`; crashes around Result publication,
+State commit and journal retirement converge without a second revision.
+Drift, unsafe paths/files, an existing Result authority, dispatch, blocker,
+decision/recovery/close state, or contradictory transaction evidence fail
+closed. The bootstrap creates no dispatch, decision, outcome, completion
+claim, Git/remote write or other external effect.
+
+This amendment is design only. No Result-bootstrap production implementation
+or dispatch is authorized until the PO approves the synchronized PRD/Spec
+digests again.
+
 ### Release boundary
 
 This is a Feature/Rigor-2/high-risk completion package, not a new Epic and not
-a Sprint merge. The PO received this PRD in readable form and approved it on
-2026-07-31. Implementation resumes only after the exact current PRD/Spec bytes
-are bound by the sanctioned lifecycle writer. Publication remains a separate
-explicit gate. The final candidate must pass focused tests, runner-neutral Full
-Verify, blocking Security, independent high-risk Critic review, package/install
-readback, clean portable-state readback, and exact remote readback where an
-external effect is separately approved.
+a Sprint merge. The PO approval recorded earlier on 2026-07-31 remains
+historical authority for the prior bytes; this reopened amendment requires a
+fresh readable review and digest-bound approval. Implementation resumes only
+after the exact current PRD/Spec bytes are bound by the sanctioned lifecycle
+writer. Publication remains a separate explicit gate. The final candidate must
+pass focused tests, runner-neutral Full Verify, blocking Security, independent
+high-risk Critic review, package/install readback, clean portable-state
+readback, and exact remote readback where an external effect is separately
+approved.
 
 ## Final expanded release authority — 2026-07-29
 
@@ -464,6 +497,7 @@ Full Verify, blocking Security, package, install and lifecycle readback gates.
 | Multi-generation authority drift | AC-047-48–50; required Phoenix-/Nova-shaped synthetic fixtures and confirmed convergence, with Human Override prohibited |
 | Issue #73 retained repairs | AC-047-09–15; retained from the implementation base |
 | Released 0.4.6 continuity | Dedicated one-shot Result/PRD reconciliation followed by the existing close gate |
+| Active continuity with null Result authority | AC-047-143–148; pending PO approval for a generic Elephant-owned canonical Result bootstrap, distinct from Result-close |
 | Backlog, generic source/manifest recovery and WSL IPC profile | Activated by the final expanded release authority as #70, #63 and #71 |
 | Unified close ordering | Activated as the bounded #77 minimum corrective slice |
 | Advisor capability/consultation lifecycle | Activated as #80; AC-047-24 and AC-047-61–68, with zero-model bootstrap and consultation-only 180/90 budgets |
@@ -472,10 +506,11 @@ Full Verify, blocking Security, package, install and lifecycle readback gates.
 
 ## DoD
 
-Product completion requires AC-047-01–142 in [spec.md](spec.md). AC-047-01–68
+Product completion requires AC-047-01–148 in [spec.md](spec.md). AC-047-01–68
 are retained regression scope; AC-047-69–135 are the current missing or newly
 reproduced remainder; AC-047-136–142 bind the retained code-aligned recovery
-and guard corrections.
+and guard corrections; AC-047-143–148 bind the reopened Result-authority
+bootstrap design.
 Completion still requires one immutable candidate commit/tree, all focused
 tests, runner-neutral fresh candidate-bound Full Verify, blocking Security, a
 fresh independent high-risk Critic over the complete expanded candidate,
@@ -485,11 +520,11 @@ cleanup binding. Nova/Phoenix or PR #64 evidence is inadmissible.
 
 ## Decision points
 
-1. The code-first AC-047-01–142 implementation scope is approved by the PO;
-   the matching sanctioned digest-bound approval write remains the operative
-   lifecycle record.
-2. Implementation begins only after that lifecycle record binds these exact
-   readable PRD/Spec bytes.
+1. The prior code-first AC-047-01–142 approval remains historical authority
+   for its exact prior bytes; the synchronized AC-047-01–148 design requires a
+   fresh PO decision and digest-bound lifecycle record.
+2. Result-bootstrap implementation begins only after that lifecycle record
+   binds these exact readable PRD/Spec bytes.
 3. The immutable candidate requires green focused regressions,
    runner-neutral Full Verify, blocking Security, independent high-risk
    Critic, packaging and installed readback before any release claim.

@@ -103,6 +103,14 @@ normative shape is:
 5. **Dispatch.** Give a Goldfish one outcome, exact context paths, DoD checks,
    prohibitions, stop conditions and route metadata. Independent tasks may run
    in parallel when their files and state do not conflict.
+
+   The Elephant SHALL treat an absent early progress message as neutral, not as
+   a worker failure. Before interrupting a dispatched worker, it SHALL allow a
+   reasonable bounded execution window and inspect the worker's status plus the
+   emerging owned-file diff. An interrupt requires a concrete error,
+   scope/prohibition breach, conflicting mutation, or explicit stop request;
+   impatience alone is not evidence. This is orchestration discipline, not a
+   claim that a worker has passed its DoD.
 6. **Verify.** Run the project's single configured verify command. The result
    is machine evidence containing the command and result, not “looks good”.
 7. **Critic.** Review the delta only after the applicable deterministic chain

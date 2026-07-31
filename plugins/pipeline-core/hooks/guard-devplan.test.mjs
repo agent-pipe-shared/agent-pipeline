@@ -10,10 +10,13 @@
  * real .claude/pipeline.yaml / pipeline-state.json can never leak into these cases.
  */
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+
+import { sha256CanonicalJson } from "../lib/plan-spec-state-v2.mjs";
 
 const GUARD = fileURLToPath(new URL("./guard-devplan.mjs", import.meta.url));
 
@@ -30,6 +33,14 @@ function writeManifest(dir, yamlText) {
 function writeState(dir, obj) {
   mkdirSync(join(dir, ".claude"), { recursive: true });
   writeFileSync(join(dir, ".claude", "pipeline-state.json"), typeof obj === "string" ? obj : JSON.stringify(obj));
+}
+function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+function writeAuthorityDocs(dir) {
+  mkdirSync(join(dir, "specs", "feature"), { recursive: true });
+  writeFileSync(join(dir, AUTHORITY_PLAN_PATH), AUTHORITY_PLAN_BYTES);
+  writeFileSync(join(dir, AUTHORITY_SPEC_PATH), AUTHORITY_SPEC_BYTES);
 }
 
 function runGuard(toolName, filePath, projectDir) {
@@ -72,6 +83,40 @@ const MANIFEST_CUSTOM_EXEMPT =
 const MANIFEST_SYNTAX_BROKEN = "schema: pipeline.manifest.v0\ngates:\n  dev-plan: &anchor\n    mode: blocking\n";
 
 const PLAN_PATH = ".claude/plans/2026-07-07-ap1-pipeline-tuning.md";
+const AUTHORITY_PLAN_PATH = "specs/feature/prd.md";
+const AUTHORITY_SPEC_PATH = "specs/feature/spec.md";
+const AUTHORITY_PLAN_BYTES = "# PRD\n";
+const AUTHORITY_SPEC_BYTES = "# Spec\n";
+const PLAN_SUBMISSION = {
+  schema: "pipeline.plan-submission.v1",
+  featureId: "authority-feature",
+  planPath: AUTHORITY_PLAN_PATH,
+  planSha256: sha256(AUTHORITY_PLAN_BYTES),
+  specPath: AUTHORITY_SPEC_PATH,
+  specSha256: sha256(AUTHORITY_SPEC_BYTES),
+  profile: "feature",
+  profileSha256: "3".repeat(64),
+  submittedBy: "Coordinator",
+  submittedAt: "2026-07-31T14:00:00.000Z",
+};
+const AWAITING_AUTHORITY_STATE = {
+  schema: "pipeline.state.v0",
+  activeFeature: { id: "authority-feature", planPath: AUTHORITY_PLAN_PATH, phase: "design" },
+  planApproved: false,
+  planSubmission: PLAN_SUBMISSION,
+};
+const DRAFT_AUTHORITY_STATE = {
+  ...AWAITING_AUTHORITY_STATE,
+  planInvalidation: {
+    schema: "pipeline.plan-invalidation.v1",
+    featureId: "authority-feature",
+    invalidatedSubmissionSha256: sha256CanonicalJson(PLAN_SUBMISSION),
+    invalidatedApprovalSha256: null,
+    invalidatedBy: "PO",
+    invalidatedAt: "2026-07-31T14:05:00.000Z",
+    reason: "reopen-design",
+  },
+};
 // NOTE: no top-level `phase` field here -- `phase` lives
 // EXCLUSIVELY inside `activeFeature.phase` (via pipeline-state.mjs `set-phase`); a
 // top-level `phase` key was a legacy leftover this hook has never read and would have
@@ -367,6 +412,42 @@ const NO_FEATURE_STATE = { schema: "pipeline.state.v0" };
   check("DP24 block  absolute path with a traversal segment resolving outside docs/ is NOT exempt", "Edit", traversalAbs, BLOCK, {
     projectDir: dir,
     stderrIncludes: ["ap1-pipeline-tuning"],
+  });
+}
+
+// ---- DP25 exact PRD/Spec authority is editable only in draft ----------------------------
+{
+  const dir = freshDir("draft-authority");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeAuthorityDocs(dir);
+  writeState(dir, DRAFT_AUTHORITY_STATE);
+  check("DP25 allow  draft exact PRD authority", "Edit", AUTHORITY_PLAN_PATH, ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+  check("DP25b allow  draft exact Spec authority", "Edit", AUTHORITY_SPEC_PATH, ALLOW, {
+    projectDir: dir,
+    stderrEmpty: true,
+  });
+  check("DP25c block  draft implementation path remains gated", "Edit", "src/implementation.mjs", BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["authority-feature", "draft"],
+  });
+}
+
+// ---- DP26 submitted PRD/Spec authority remains immutable while awaiting approval --------
+{
+  const dir = freshDir("awaiting-authority");
+  writeManifest(dir, MANIFEST_BLOCKING);
+  writeAuthorityDocs(dir);
+  writeState(dir, AWAITING_AUTHORITY_STATE);
+  check("DP26 block  awaiting-approval exact PRD authority", "Edit", AUTHORITY_PLAN_PATH, BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["awaiting-approval", "immutable"],
+  });
+  check("DP26b block  awaiting-approval exact Spec authority", "Edit", AUTHORITY_SPEC_PATH, BLOCK, {
+    projectDir: dir,
+    stderrIncludes: ["awaiting-approval", "immutable"],
   });
 }
 

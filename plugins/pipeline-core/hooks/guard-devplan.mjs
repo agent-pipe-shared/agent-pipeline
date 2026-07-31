@@ -41,10 +41,13 @@
  *
  * EXEMPT PATHS (normalized: backslashes → forward slashes, matched case-insensitively,
  * PREFIX match — same normalization style as guard-testpath.mjs):
- *   - Defaults: `docs/`, `specs/`, `.claude/`, `backlog/` (drafting/reviewing the plan
- *     itself, or touching guardrail/state config, is never blocked by this gate).
- *   - The active feature's own `activeFeature.planPath` (so writing the plan draft
- *     that is AWAITING approval is never blocked by the very gate that reads it).
+ *   - Defaults: `docs/`, `specs/`, `.claude/`, `backlog/`. The exact PRD/Spec
+ *     authority is editable only while the lifecycle is `draft`; after submission
+ *     (`awaiting-approval`) and after approval it remains immutable even though it is
+ *     under an otherwise exempt prefix.
+ *   - The active feature's own `activeFeature.planPath` while the lifecycle is
+ *     `draft` (so the gate cannot block the design bytes it requires the author to
+ *     prepare).
  *   - `gates.dev-plan.exemptPaths` (array of path-prefix strings) from the manifest,
  *     if present — project-specific additional exemptions.
  *
@@ -278,8 +281,10 @@ const authoritativePaths = [planPath, specPath]
   .filter((path) => typeof path === "string")
   .map(normalize);
 const touchesAuthority = authoritativePaths.some((path) => normalizedPath === path);
-const isExempt = !touchesAuthority
-  && exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix)));
+const isDraftAuthority = lifecycle.status === "draft" && touchesAuthority;
+const isExempt = isDraftAuthority
+  || (!touchesAuthority
+    && exemptPrefixes.some((prefix) => normalizedPath.startsWith(normalize(prefix))));
 if (isExempt) process.exit(0);
 
 // ---- verdict --------------------------------------------------------------------------
