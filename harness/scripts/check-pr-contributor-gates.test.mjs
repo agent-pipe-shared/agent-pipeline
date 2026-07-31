@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
@@ -28,6 +28,68 @@ function commit(root, subject, signed = true) {
   if (signed) args.push("-m", `Signed-off-by: ${AUTHOR_NAME} <${AUTHOR_EMAIL}>`);
   git(root, ...args);
   return git(root, "rev-parse", "HEAD");
+}
+
+/** Schema-shaped v2 envelope fixture; mirrors security-completeness-gate.test.mjs's `exactV2Envelope`. */
+function exactV2Envelope({ commit, tree, capabilityId = "cap.secrets", status = "PASS", classification = "clean" }) {
+  return {
+    schema: "pipeline.security-evidence.v2",
+    policy: { configurationSha256: "e".repeat(64) },
+    input: { commit, tree, inputSha256: "f".repeat(64) },
+    environment: { platform: process.platform, nodeVersion: process.version },
+    capabilities: [{
+      capabilityId,
+      tool: { name: "gitleaks", version: null },
+      rulePack: { ref: "gitleaks-default", digest: null },
+      status,
+      classification,
+      findings: [],
+      coverage: {
+        subject: "candidate-tree",
+        exclusions: [],
+        ignored: [],
+        unsupportedScope: [],
+        truncation: { truncated: false, scannedFileCount: null, totalEligibleFileCount: null },
+        dataAge: { ageSeconds: 0, snapshotAt: null },
+      },
+      reason: null,
+    }],
+  };
+}
+
+/** Schema-shaped v2 verdict fixture; mirrors security-completeness-gate.test.mjs's `exactV2Verdict`. */
+function exactV2Verdict({ capabilityId = "cap.secrets", outcome, blocking, offendingCapabilities = [] }) {
+  return {
+    schema: "pipeline.security-verdict.v2",
+    producedFrom: "pipeline.security-evidence.v2",
+    exitAuthority: "v1-blocking-logic",
+    note: "fixture",
+    v1ExitCode: 0,
+    plan: { required: [capabilityId], optional: [], planDigest: "g".repeat(64), source: "fixture", resolvedPolicyDigest: "h".repeat(64) },
+    capabilityOutcomes: { [capabilityId]: outcome },
+    verdict: { blocking, offendingCapabilities },
+    controls: [],
+  };
+}
+
+/**
+ * Writes a FRESH, BOUND (to `headSha` + its resolved tree) v2 evidence pair into `root`, mirroring
+ * `security-completeness-gate.test.mjs`'s `writePair` shape (CYB-2I-1: PR call site consumes the
+ * same shared gate against the untrusted PR head tree).
+ */
+function writeSecurityCompletenessEvidence(root, headSha, { blocking = false, status = "PASS", classification = "clean", outcome = "pass", offendingCapabilities = [] } = {}) {
+  const tree = git(root, "rev-parse", `${headSha}^{tree}`);
+  mkdirSync(join(root, "evidence"), { recursive: true });
+  writeFileSync(
+    join(root, "evidence", "security-latest.v2.json"),
+    JSON.stringify(exactV2Envelope({ commit: headSha, tree, status, classification })),
+    "utf8",
+  );
+  writeFileSync(
+    join(root, "evidence", "security-latest.v2.verdict.json"),
+    JSON.stringify(exactV2Verdict({ outcome, blocking, offendingCapabilities })),
+    "utf8",
+  );
 }
 
 function fixture() {
@@ -62,6 +124,7 @@ const hasCode = (receipt, code) => receipt.errors.some((entry) => entry.code ===
 
 test("valid receipt binds PR identity, head, current CLA, and signed commits", () => {
   const { root, claRoot, cla, event } = fixture();
+  writeSecurityCompletenessEvidence(root, event.pull_request.head.sha, {});
   const receipt = validatePrContributorGates({ root, claRoot, event });
   assert.equal(receipt.ok, true, JSON.stringify(receipt.errors));
   assert.equal(receipt.schema, "agent-pipeline.pr-contributor-gate.v2");
@@ -92,6 +155,7 @@ test("a candidate CLA rewrite cannot control trusted-base acceptance", () => {
   writeFileSync(join(root, "CONTRIBUTOR_LICENSE_AGREEMENT.md"), "<!-- CLA-Version: 99.0 -->\n\nAttacker-controlled candidate CLA.\n", "utf8");
   event.pull_request.head.sha = commit(root, "candidate-cla-rewrite");
   event.pull_request.body = expectedAcceptanceLine(cla, LOGIN, true);
+  writeSecurityCompletenessEvidence(root, event.pull_request.head.sha, {});
   const receipt = validatePrContributorGates({ root, claRoot, event });
   assert.equal(receipt.ok, true, JSON.stringify(receipt.errors));
   assert.equal(receipt.cla.version, "1.0");
@@ -148,6 +212,7 @@ test("a maintainer edit cannot accept the CLA for the PR author", () => {
 test("an author push invalidates a proxy checkbox until the author personally re-checks it", () => {
   const { root, claRoot, cla, event } = fixture();
   event.pull_request.head.sha = commit(root, "author-push-after-proxy-checkbox");
+  writeSecurityCompletenessEvidence(root, event.pull_request.head.sha, {});
   event.action = "synchronize";
   const synchronized = validatePrContributorGates({ root, claRoot, event });
   assert.equal(synchronized.ok, false);
@@ -162,6 +227,7 @@ test("an author push invalidates a proxy checkbox until the author personally re
 
 test("CLI emits and writes the same machine-readable receipt without commit email", () => {
   const { root, claRoot, event } = fixture();
+  writeSecurityCompletenessEvidence(root, event.pull_request.head.sha, {});
   const eventPath = join(root, "event.json");
   const receiptPath = join(root, "receipt.json");
   writeFileSync(eventPath, JSON.stringify(event), "utf8");
@@ -182,6 +248,49 @@ test("CLI rejects a missing trusted CLA root and unknown or duplicate arguments"
   assert.equal(runCli(["--root", root, "--event", eventPath], io), 2);
   assert.equal(runCli(["--root", root, "--cla-root", claRoot, "--event", eventPath, "--extra", "value"], io), 2);
   assert.equal(runCli(["--root", root, "--cla-root", claRoot, "--cla-root", claRoot, "--event", eventPath], io), 2);
+});
+
+test("no v2 security evidence present at all is additive: SECURITY_COMPLETENESS_BLOCKING is reported while CLA/DCO are still independently evaluated", () => {
+  const { root, claRoot, event } = fixture();
+  // no evidence/ files written -> the shared gate fails closed with two "missing" reasons.
+  const receipt = validatePrContributorGates({ root, claRoot, event });
+  assert.equal(receipt.ok, false);
+  const completenessErrors = receipt.errors.filter((entry) => entry.code === "SECURITY_COMPLETENESS_BLOCKING");
+  assert.equal(completenessErrors.length, 2);
+  assert.ok(completenessErrors.some((entry) => entry.detail === "evidence/security-latest.v2.json missing"));
+  assert.ok(completenessErrors.some((entry) => entry.detail === "evidence/security-latest.v2.verdict.json missing"));
+  // CLA and DCO are still independently, correctly evaluated (additive, not short-circuiting).
+  assert.equal(receipt.cla.accepted, true);
+  assert.equal(receipt.dco.status, "passed");
+});
+
+test("fresh, bound, non-blocking security evidence yields ok:true with no SECURITY_COMPLETENESS_BLOCKING entries", () => {
+  const { root, claRoot, event } = fixture();
+  writeSecurityCompletenessEvidence(root, event.pull_request.head.sha, {});
+  const receipt = validatePrContributorGates({ root, claRoot, event });
+  assert.equal(receipt.ok, true, JSON.stringify(receipt.errors));
+  assert.equal(receipt.errors.some((entry) => entry.code === "SECURITY_COMPLETENESS_BLOCKING"), false);
+});
+
+test("fresh, bound, BLOCKING security evidence yields ok:false with SECURITY_COMPLETENESS_BLOCKING entries, CLA/DCO unaffected", () => {
+  const { root, claRoot, event } = fixture();
+  writeSecurityCompletenessEvidence(root, event.pull_request.head.sha, {
+    status: "SKIPPED",
+    classification: "binary_missing",
+    outcome: "required-capability-missing",
+    blocking: true,
+    offendingCapabilities: [{ capabilityId: "cap.secrets", outcome: "required-capability-missing" }],
+  });
+  const receipt = validatePrContributorGates({ root, claRoot, event });
+  assert.equal(receipt.ok, false);
+  const completenessErrors = receipt.errors.filter((entry) => entry.code === "SECURITY_COMPLETENESS_BLOCKING");
+  assert.equal(completenessErrors.length, 1);
+  assert.equal(
+    completenessErrors[0].detail,
+    "evidence/security-latest.v2.verdict.json: required capability cap.secrets did not reach an accepted state (outcome=required-capability-missing)",
+  );
+  assert.equal(receipt.cla.accepted, true);
+  assert.equal(receipt.dco.status, "passed");
 });
 
 let failed = 0;

@@ -7,6 +7,8 @@ import { basename, dirname, join, resolve } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+import { checkSecurityCompleteness } from "../../plugins/pipeline-core/lib/security-completeness-gate.mjs";
+
 export const RECEIPT_SCHEMA = "agent-pipeline.pr-contributor-gate.v2";
 export const CLA_PATH = "CONTRIBUTOR_LICENSE_AGREEMENT.md";
 export const ALLOWED_ACTIONS = new Set(["opened", "reopened", "synchronize", "edited"]);
@@ -135,6 +137,13 @@ export function validatePrContributorGates({ root, claRoot, event }) {
   if (acceptance.error) errors.push(acceptance.error);
   const dco = baseSha && headSha ? checkDcoRange(root, baseSha, headSha) : { status: "failed", checkedCommits: 0, failures: [error("DCO_RANGE_IDENTIFIERS_INVALID")] };
   errors.push(...dco.failures);
+
+  if (headSha) {
+    const treeResult = git(root, ["rev-parse", `${headSha}^{tree}`]);
+    const headTree = treeResult.status === 0 ? treeResult.stdout.trim() : null;
+    const completenessFailures = checkSecurityCompleteness({ projectDir: root, commit: headSha, tree: headTree });
+    errors.push(...completenessFailures.map((detail) => error("SECURITY_COMPLETENESS_BLOCKING", detail)));
+  }
 
   return {
     schema: RECEIPT_SCHEMA,
