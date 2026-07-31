@@ -1061,12 +1061,13 @@ function canonicalFixtureJson(value) {
   ok("PS06b schema field correct", state.schema === SCHEMA_ID);
   ok("PS06c planApproved true", state.planApproved === true);
   ok(
-    "PS06d planApproval is exact v3 and binds the submitted Plan, Spec, and profile authority",
+    "PS06d planApproval is exact v4 and binds the submitted Plan, Spec, profile authority, and an empty audit seal",
     state.planSubmission?.schema === "pipeline.plan-submission.v1"
-      && state.planApproval?.schema === "pipeline.plan-approval.v3"
+      && state.planApproval?.schema === "pipeline.plan-approval.v4"
       && state.planApproval?.approvedBy === "po-test"
       && state.planApproval?.approvedAt === FIXED_NOW()
       && state.planApproval?.submissionSha256
+      && state.planApproval?.priorInvalidationSha256 === null
       && state.planApproval?.poGateAuthority?.schema === PO_GATE_AUTHORITY_EVIDENCE_V2_SCHEMA,
   );
   ok("PS06e activeFeature preserved from set-feature", state.activeFeature?.id === "ap1-pipeline-tuning");
@@ -1102,6 +1103,48 @@ function canonicalFixtureJson(value) {
   const replay = run(["reopen-design", "--by", "po-test"], { dir, now: () => "2026-07-07T22:00:00.000Z" });
   ok("PS08d reopen replay accepts the stored timestamp after an ambiguous response", replay === 0, `got ${replay}`);
   ok("PS08e reopen replay leaves state byte-identical", readFileSync(statePath(dir), "utf8") === beforeReplay);
+}
+
+// ---- PS08a: seal v3 approval retained across an invalidation into exact v4 -------------
+{
+  const dir = freshDir("approval-audit-seal");
+  const planPath = "specs/seal/prd_seal.md";
+  run(["set-feature", "--id", "approval-audit-seal", "--plan-path", planPath], { dir, now: FIXED_NOW });
+  submitAndApprove(dir, planPath);
+  const deps = lifecycleDeps(dir, planPath);
+  const reopened = run(["reopen-design", "--by", "po-test"], deps);
+  const successorDeps = lifecycleDeps(dir, planPath, { now: () => "2026-07-08T21:00:00.000Z" });
+  const successorSubmitted = run(["submit-plan", "--by", "coordinator", "--profile", "feature"], successorDeps);
+  const successorApproved = run(["approve-plan", "--by", "po-test"], successorDeps);
+  const legacy = readState(dir).state;
+  const { priorInvalidationSha256: _ignored, ...v3Approval } = legacy.planApproval;
+  const historicalV3 = {
+    ...legacy,
+    planApproved: true,
+    planApproval: { ...v3Approval, schema: "pipeline.plan-approval.v3" },
+  };
+  writeFileSync(statePath(dir), `${JSON.stringify(historicalV3, null, 2)}\n`);
+  const beforeSeal = readState(dir).state;
+  const sealed = captureConsole(() => run(["seal-plan-approval"], successorDeps));
+  const afterSeal = readState(dir).state;
+  ok("PS08a-1 fixture reopens a prior approval before retaining a successor v3 audit record", reopened === 0 && successorSubmitted === 0 && successorApproved === 0 && beforeSeal.planInvalidation?.schema === "pipeline.plan-invalidation.v1");
+  ok("PS08a-2 seal-plan-approval upgrades only a retained v3 approval and emits its audit receipt", sealed.value === 0 && sealed.text.includes("Plan approval audit seal written"));
+  ok(
+    "PS08a-3 seal readback is exact v4 and binds the canonical retained invalidation",
+    afterSeal.planApproved === true
+      && afterSeal.planApproval?.schema === "pipeline.plan-approval.v4"
+      && afterSeal.planApproval?.priorInvalidationSha256 === sha256Canonical(beforeSeal.planInvalidation)
+      && afterSeal.planApproval?.approvedBy === beforeSeal.planApproval?.approvedBy
+      && afterSeal.planApproval?.approvedAt === beforeSeal.planApproval?.approvedAt
+      && afterSeal.planApproval?.submissionSha256 === beforeSeal.planApproval?.submissionSha256
+      && JSON.stringify(afterSeal.planApproval?.poGateAuthority) === JSON.stringify(beforeSeal.planApproval?.poGateAuthority),
+  );
+  ok("PS08a-4 exact v4 readback permits the implementation lifecycle transition", run(["set-phase", "--phase", "implementation"], successorDeps) === 0);
+  const beforeReplay = readFileSync(statePath(dir), "utf8");
+  const replay = captureConsoleError(() => run(["seal-plan-approval"], successorDeps));
+  ok("PS08a-5 seal replay rejects the already-v4 approval without a false success claim or mutation", replay.value === 2 && replay.text.includes("PLAN-APPROVAL-SEAL-V3-REQUIRED") && readFileSync(statePath(dir), "utf8") === beforeReplay);
+  const malformed = captureConsoleError(() => run(["seal-plan-approval", "--by", "po-test"], successorDeps));
+  ok("PS08a-6 seal CLI refuses caller arguments without mutating the exact v4 readback", malformed.value === 2 && readFileSync(statePath(dir), "utf8") === beforeReplay);
 }
 
 // ---- PS08f: bind-plan-spec replay keeps the stored bind time --------------------------
