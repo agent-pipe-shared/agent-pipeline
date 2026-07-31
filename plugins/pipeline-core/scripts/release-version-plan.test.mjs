@@ -363,8 +363,8 @@ const cases = [
       writeReleasePlanSecurityEvidence(dir, { commit: h("1", 40), tree: h("2", 40) }); // bound to a DIFFERENT commit/tree than plan.privateProductCandidate
       const failures = checkReleaseVersionPlanSecurityCompleteness(plan, { projectDir: dir });
       assert.deepStrictEqual(failures, [
-        "evidence/security-latest.v2.json: input commit does not match the pushed source",
-        "evidence/security-latest.v2.json: input tree does not match the pushed source",
+        "evidence/security-latest.v2.json: input commit does not match the sealed plan's private candidate",
+        "evidence/security-latest.v2.json: input tree does not match the sealed plan's private candidate",
       ]);
     } finally { rmSync(dir, { recursive: true, force: true }); }
   }],

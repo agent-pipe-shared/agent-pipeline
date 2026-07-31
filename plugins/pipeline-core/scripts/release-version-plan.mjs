@@ -565,6 +565,7 @@ export function checkReleaseVersionPlanSecurityCompleteness(plan, { projectDir, 
     tree: plan.privateProductCandidate.tree,
     envelopePath,
     verdictPath,
+    subjectLabel: "the sealed plan's private candidate",
   });
 }
 

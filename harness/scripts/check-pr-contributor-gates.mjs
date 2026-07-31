@@ -154,7 +154,7 @@ export function validatePrContributorGates({ root, claRoot, event }) {
   if (headSha && securityGateActive) {
     const treeResult = git(root, ["rev-parse", `${headSha}^{tree}`]);
     const headTree = treeResult.status === 0 ? treeResult.stdout.trim() : null;
-    const completenessFailures = checkSecurityCompleteness({ projectDir: root, commit: headSha, tree: headTree });
+    const completenessFailures = checkSecurityCompleteness({ projectDir: root, commit: headSha, tree: headTree, subjectLabel: "the reviewed PR head" });
     errors.push(...completenessFailures.map((detail) => error("SECURITY_COMPLETENESS_BLOCKING", detail)));
   }
 

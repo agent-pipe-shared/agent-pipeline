@@ -129,10 +129,21 @@ comment — this table cross-references, it does not restate):
 | ----------------- | --------------------------------------------------------------------------------------------- | ----------------------------- |
 | clean             | (v1 concept — not a `RUN_OUTCOMES` member; severity-based read of findings)                   | n/a                            |
 | complete          | (v2 concept — `aggregateVerdict()` over all `RUN_OUTCOMES`, accepted set: `pass`/`findings`/`waived`) | n/a                    |
-| unavailable       | `execution-unavailable`, `partial-coverage`, `stale` (and `required-capability-missing` when required) | `unavailable` / `not-met` when required |
+| unavailable       | `execution-unavailable`, `partial-coverage`, `stale`, `required-capability-missing` (all four, unconditionally — none is conditionally grouped) | `not-met` when the capability was required, `unavailable` when it was not |
 | unsupported       | `unsupported`                                                                                  | `not-applicable`               |
 | waived            | `waived`                                                                                        | `waived`                       |
 | not-applicable    | `not-applicable`                                                                                | `not-applicable`               |
+
+`invalid` (`RUN_OUTCOMES`/`CONTROL_RESULTS` member, schema-invalid/tampered
+evidence) is deliberately **absent** from the table above: it falls OUTSIDE
+the closed six-term vocabulary entirely and MUST NOT be described using any
+of the six terms in prose, least of all `unavailable` — the conflation this
+rule exists to prevent. An `invalid` reading is a data-integrity finding, not
+a completeness reading, and MUST be reported through this repo's existing
+schema/tamper-failure mechanism instead (see
+`security-completeness-gate.mjs`'s own `"envelope schema is invalid"`
+failure-reason string for the precedent language to reuse — never invent a
+new term for this case).
 
 - **Why:** `unavailable` and `not-applicable` are the two terms most likely
   to be used as if interchangeable by a careless writer, despite meaning
@@ -143,7 +154,10 @@ comment — this table cross-references, it does not restate):
   or a permanent, decided non-issue.
 - **Verification:** `plugins/pipeline-core/scripts/check-completeness-vocabulary-doclint.mjs`
   scans the declared project-doc set for the specific `unavailable`/
-  `not-applicable` conflation pattern (direct-equivalence phrasing) and fails
-  closed (exit 2) on a match; its own test file
-  (`check-completeness-vocabulary-doclint.test.mjs`) proves both the
-  conflation-detection case and a clean pass against this repo's real docs.
+  `not-applicable` conflation pattern (direct-equivalence phrasing) and
+  separately verifies this file itself defines a distinct anchor for each of
+  the six terms above; either check fails closed (exit 2) on a match/gap;
+  its own test file (`check-completeness-vocabulary-doclint.test.mjs`) proves
+  the conflation-detection case, the six-term-presence case (including a
+  missing-term failure naming the term), and a clean pass against this
+  repo's real docs.

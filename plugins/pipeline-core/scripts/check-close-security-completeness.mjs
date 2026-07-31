@@ -64,7 +64,7 @@ export function checkCloseSecurityCompleteness(root) {
   const headTree = spawnSync("git", ["-C", root, "rev-parse", "HEAD^{tree}"], { encoding: "utf8", timeout: 5000 });
   const tree = headTree.status === 0 ? headTree.stdout.trim() : null;
 
-  const failures = checkSecurityCompleteness({ projectDir: root, commit, tree });
+  const failures = checkSecurityCompleteness({ projectDir: root, commit, tree, subjectLabel: "the sealed HEAD commit" });
   return { skipped: false, commit, failures };
 }
 

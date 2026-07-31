@@ -146,6 +146,14 @@ function outcomeMatches(recomputedOutcome, persistedOutcome) {
  *   `projectDir`. Defaults to "evidence/security-latest.v2.json".
  * @param {string} [params.verdictPath] - path to the v2 policy-complete verdict document,
  *   relative to `projectDir`. Defaults to "evidence/security-latest.v2.verdict.json".
+ * @param {string} [params.subjectLabel] - human-facing noun phrase naming what `commit`/`tree`
+ *   actually are in the CALLER's own context, substituted into the two candidate-binding failure
+ *   strings below (envelope `input.commit`/`input.tree` mismatch). Defaults to
+ *   "the pushed source" -- `guard-push.mjs`'s own call site (the original, pre-extraction wording)
+ *   relies on this default and passes nothing here, so its failure-string text and existing test
+ *   assertions stay byte-identical. Every OTHER call site (Close, PR, Release) binds against a
+ *   commit/tree that was never pushed, so "the pushed source" is inaccurate there and each passes
+ *   its own accurate label instead (F7, CYB-2I-4R).
  * @returns {string[]} failure reasons; empty = pass.
  */
 export function checkSecurityCompleteness({
@@ -154,6 +162,7 @@ export function checkSecurityCompleteness({
   tree,
   envelopePath = DEFAULT_ENVELOPE_PATH,
   verdictPath = DEFAULT_VERDICT_PATH,
+  subjectLabel = "the pushed source",
 }) {
   const failures = [];
   const envelopeRead = readEvidence(projectDir, envelopePath);
@@ -181,10 +190,10 @@ export function checkSecurityCompleteness({
     );
   }
   if (envelope?.input?.commit !== commit) {
-    failures.push(`${envelopePath}: input commit does not match the pushed source`);
+    failures.push(`${envelopePath}: input commit does not match ${subjectLabel}`);
   }
   if (!tree || envelope?.input?.tree !== tree) {
-    failures.push(`${envelopePath}: input tree does not match the pushed source`);
+    failures.push(`${envelopePath}: input tree does not match ${subjectLabel}`);
   }
   if (verdictDoc?.schema !== "pipeline.security-verdict.v2") {
     failures.push(`${verdictPath}: exact policy-complete verdict v2 schema is required`);

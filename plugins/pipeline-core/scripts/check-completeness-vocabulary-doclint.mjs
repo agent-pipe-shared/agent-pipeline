@@ -72,6 +72,57 @@ const CONFLATION_PATTERNS = [
   new RegExp(`\\b${NOT_APPLICABLE}\\s*/\\s*unavailable\\s+(?:are\\s+)?interchangeable\\b`, "i"),
 ];
 
+/**
+ * SEC-09's closed six-term vocabulary, in the order they're defined in
+ * `guardrails/security.md`. AC13's full evidence requirement is "all six
+ * terms defined distinctly" -- `CONFLATION_PATTERNS` above only enforces the
+ * non-conflation half; this catches the other half (deleting the whole
+ * SEC-09 section would otherwise leave this lint at exit 0).
+ */
+const SIX_TERM_VOCABULARY = Object.freeze(["clean", "complete", "unavailable", "unsupported", "waived", "not-applicable"]);
+
+/** The canonical doc this six-term-presence check applies to (the SEC-09 definition source itself -- the other scanned files only need to avoid conflating the vocabulary, not redefine it). */
+const VOCABULARY_DEFINITION_FILE = "guardrails/security.md";
+
+/**
+ * A term is "defined" when it appears as a bold list-item introduction, e.g.
+ * `- **clean** —`/`- **not-applicable** --`, matching this repo's existing
+ * SEC-09 prose convention. A bare substring search would false-positive on
+ * unrelated prose mentioning e.g. "waived" elsewhere in the doc.
+ */
+function definitionAnchorPattern(term) {
+  const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^\\s*-\\s+\\*\\*${escaped}\\*\\*\\s*[—-]`, "m");
+}
+
+/**
+ * Verifies `guardrails/security.md`'s already-read `text` (or, if the caller
+ * never read it because it was absent from the scanned `files` set, reads it
+ * itself relative to `root`) contains a distinct bold-list-item definition
+ * anchor for each of the six SEC-09 terms. Returns findings naming exactly
+ * which term(s) are missing (empty = all six present). Never reports a
+ * second, redundant "missing or unreadable" finding for a file the main scan
+ * loop already reported missing -- `text` being `undefined` for that reason
+ * is silently skipped here (the missing-file finding already exists).
+ */
+function checkSixTermVocabularyPresence(root, text, alreadyScanned) {
+  const findings = [];
+  if (text === undefined) {
+    if (alreadyScanned) return findings; // main loop already reported this file as missing/unreadable
+    try {
+      text = readFileSync(join(root, VOCABULARY_DEFINITION_FILE), "utf8");
+    } catch (error) {
+      findings.push(`${VOCABULARY_DEFINITION_FILE}: missing or unreadable (${error.code ?? error.message})`);
+      return findings;
+    }
+  }
+  const missing = SIX_TERM_VOCABULARY.filter((term) => !definitionAnchorPattern(term).test(text));
+  if (missing.length > 0) {
+    findings.push(`${VOCABULARY_DEFINITION_FILE}: missing SEC-09 six-term vocabulary definition anchor(s) for: ${missing.join(", ")}`);
+  }
+  return findings;
+}
+
 function safeRelative(file) {
   if (typeof file !== "string" || file.length === 0 || isAbsolute(file) || file.includes("..")) return null;
   return file.replaceAll("\\", "/");
@@ -96,12 +147,15 @@ function scanText(relPath, text, findings) {
  */
 export function checkCompletenessVocabularyDoclint(root = DEFAULT_ROOT, files = DEFAULT_SCANNED_FILES) {
   const findings = [];
+  let vocabularyFileText;
+  let vocabularyFileScanned = false;
   for (const file of files) {
     const relPath = safeRelative(file);
     if (!relPath) {
       findings.push(`${file}: scanned-file entry must be a repository-relative path`);
       continue;
     }
+    if (relPath === VOCABULARY_DEFINITION_FILE) vocabularyFileScanned = true;
     let text;
     try {
       text = readFileSync(join(root, relPath), "utf8");
@@ -109,8 +163,10 @@ export function checkCompletenessVocabularyDoclint(root = DEFAULT_ROOT, files = 
       findings.push(`${relPath}: missing or unreadable (${error.code ?? error.message})`);
       continue;
     }
+    if (relPath === VOCABULARY_DEFINITION_FILE) vocabularyFileText = text;
     scanText(relPath, text, findings);
   }
+  findings.push(...checkSixTermVocabularyPresence(root, vocabularyFileText, vocabularyFileScanned));
   return { ok: findings.length === 0, findings };
 }
 
