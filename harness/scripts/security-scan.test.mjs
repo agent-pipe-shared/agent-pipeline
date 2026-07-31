@@ -1246,6 +1246,88 @@ security:
   assertEqual("runner: all scanners disabled -> exit 0", exitCode, 0);
 }
 
+// ===============================================================================================
+// N3 -- semgrep.rules_dir containment guard (Critic follow-up finding, CYB-2I-1R3)
+// ===============================================================================================
+
+{
+  // A manifest-supplied (candidate-controlled, potentially untrusted) rules_dir that resolves
+  // outside rootDir must be caught and fail closed -- never passed through to the adapter, never
+  // silently dropped. `PIPELINE_SEMGREP_PATH` deliberately points at the CRASH fixture (which
+  // would itself produce a "scanner_error"-classified ERROR with a totally different reason text
+  // if it were ever actually invoked) so a passing assertion on classification/reason here also
+  // proves the adapter was never called at all.
+  const rootDir = makeRootDir("runner-rulesdir-escape-root");
+  writeManifest(
+    rootDir,
+    `schema: pipeline.manifest.v0
+
+gates:
+  security:
+    mode: blocking
+    type: automated
+
+security:
+  scanners:
+    gitleaks:
+      enabled: false
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: true
+      rules_dir: "../../etc"
+    license-check:
+      enabled: false
+`,
+  );
+  const env = { PIPELINE_SEMGREP_PATH: semgrepCrash };
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
+  assertEqual(
+    "runner: semgrep rules_dir escaping rootDir -> ERROR/manifest_config_invalid, adapter never invoked (N3)",
+    { status: evidence.scanners[0].status, classification: evidence.scanners[0].classification, findings: evidence.scanners[0].findingCount },
+    { status: "ERROR", classification: "manifest_config_invalid", findings: 0 },
+  );
+  assertIncludes("runner: rules_dir escape reason names the offending manifest value", evidence.scanners[0].reason, "rules_dir");
+  assertIncludes("runner: rules_dir escape reason states it resolves outside rootDir", evidence.scanners[0].reason, "outside rootDir");
+  assertEqual("runner: rules_dir escape forces blocking-class -> exit 2", exitCode, 2);
+}
+
+{
+  // An ordinary, in-tree rules_dir value is unaffected by the N3 containment guard: the adapter
+  // still runs normally and produces its real result (here, the clean fixture's PASS).
+  const rootDir = makeRootDir("runner-rulesdir-intree-root");
+  writeManifest(
+    rootDir,
+    `schema: pipeline.manifest.v0
+
+gates:
+  security:
+    mode: blocking
+    type: automated
+
+security:
+  scanners:
+    gitleaks:
+      enabled: false
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: true
+      rules_dir: "tooling/semgrep-rules"
+    license-check:
+      enabled: false
+`,
+  );
+  const env = { PIPELINE_SEMGREP_PATH: semgrepClean };
+  const { evidence, exitCode } = await runSecurityScan({ rootDir, env, spawnFn: fixtureSpawnFn, timeoutMs: 5000, assessTrustedExecutablePath: mockAssessFixtureBinary });
+  assertEqual(
+    "runner: ordinary in-tree semgrep rules_dir is unaffected by the N3 containment guard -> PASS",
+    { status: evidence.scanners[0].status, findings: evidence.scanners[0].findingCount },
+    { status: "PASS", findings: 0 },
+  );
+  assertEqual("runner: in-tree rules_dir -> exit 0 (clean)", exitCode, 0);
+}
+
 {
   // Exact-candidate evidence is produced only from a detached materialization,
   // never from the caller's attached worktree.

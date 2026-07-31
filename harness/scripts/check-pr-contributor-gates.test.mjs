@@ -2,11 +2,12 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import assert from "node:assert/strict";
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { expectedAcceptanceLine, readClaContract, runCli, validatePrContributorGates } from "./check-pr-contributor-gates.mjs";
+import { runSecurityScan } from "./security-scan.mjs";
 
 const AUTHOR_NAME = "External Contributor";
 const AUTHOR_EMAIL = "contributor@example.invalid";
@@ -137,6 +138,145 @@ function fixture({ security = "blocking" } = {}) {
     },
   };
   return { root, claRoot, cla, event };
+}
+
+// ---------------------------------------------------------------------------------------------
+// N2 (Critic follow-up finding, CYB-2I-1R3): a real-evidence integration test. Every security-
+// gate case ABOVE uses `writeSecurityCompletenessEvidence` (a synthetic envelope) -- this is
+// exactly why F1's residual (a real, reproducible blocking verdict from this repo's own `cap.sca`
+// capability) went undetected until a Critic ran the real chain by hand. The cases below instead
+// drive the REAL `runSecurityScan()` (imported above from `./security-scan.mjs`, no synthetic
+// helper) into the REAL `validatePrContributorGates()` chain.
+// ---------------------------------------------------------------------------------------------
+
+/**
+ * A FIXTURE-LOCAL governance catalog -- entirely separate from, and never touching, this repo's
+ * own real `governance/security-controls/catalog.json` (DoD 6). Deliberately minimal: one control
+ * naming `cap.sca` (the osv-scanner capability) as REQUIRED (`defaultFailureMode: "block"`,
+ * `module: null` so it activates unconditionally, mirroring this repo's own real
+ * `ctl.base.sca.dependency-lockfile` entry's shape/intent) -- this is the exact CLASS of gap N1's
+ * `cap.sca`/osv-scanner residual belongs to (`docs/state.md`'s F1 entry), reproduced here under
+ * full test control rather than by depending on or modifying this repo's own real catalog.
+ */
+const FIXTURE_SECURITY_CATALOG = JSON.stringify({
+  controls: [
+    {
+      id: "ctl.fixture.sca.required",
+      capabilityRequirements: ["cap.sca"],
+      defaultFailureMode: "block",
+      applicability: { expression: "always", requiredInputs: [] },
+    },
+  ],
+  moduleAttribution: [{ controlId: "ctl.fixture.sca.required", module: null, minAssuranceLevel: "baseline" }],
+});
+
+/**
+ * N2's real-chain test needs exactly ONE fake scanner binary (osv-scanner) -- see
+ * `realScanFixture`'s own doc comment for why gitleaks/semgrep/license-check need no fixture
+ * binary here at all. Reproduces, in miniature, the SAME established fake-binary technique
+ * `security-scan.test.mjs` already uses (`writeFixtureBinary`/`fixtureSpawnFn`/
+ * `mockAssessFixtureBinary`) -- that file's own helpers are private to its module and not
+ * exported, so this is a small, single-binary reproduction, not the "large fraction of fixture
+ * infrastructure" the briefing's stop condition warns against duplicating.
+ */
+const REAL_SCAN_BIN_DIR = mkdtempSync(join(tmpdir(), "pr-gate-real-scan-bin-"));
+
+function writeRealScanFixtureBinary(name, jsBody) {
+  const mjsPath = join(REAL_SCAN_BIN_DIR, `${name}.mjs`);
+  writeFileSync(mjsPath, jsBody);
+  if (process.platform === "win32") {
+    const cmdPath = join(REAL_SCAN_BIN_DIR, `${name}.cmd`);
+    writeFileSync(cmdPath, `@echo off\r\nnode "${mjsPath}" %*\r\n`);
+    return cmdPath;
+  }
+  const shPath = join(REAL_SCAN_BIN_DIR, name);
+  writeFileSync(shPath, `#!/usr/bin/env node\n${jsBody}`);
+  chmodSync(shPath, 0o755);
+  return shPath;
+}
+
+const OSV_CLEAN_BIN = writeRealScanFixtureBinary(
+  "osv-clean",
+  `if (process.argv.includes("--version")) {
+  process.stdout.write("osv-scanner version: 2.0.3\\n");
+  process.exit(0);
+}
+process.stdout.write(JSON.stringify({ results: [] }));
+process.exit(0);
+`,
+);
+
+function realScanSpawnFn(cmd, args, opts) {
+  // Same Windows `.cmd` shell requirement as security-scan.test.mjs's own `fixtureSpawnFn`
+  // (Node's CVE-2024-27980 hardening); production adapters never set `shell: true` themselves.
+  return spawnSync(cmd, args, { ...opts, shell: process.platform === "win32" && cmd !== process.execPath });
+}
+
+/** Test-only trust mock, same seam/rationale as security-scan.test.mjs's own `mockAssessFixtureBinary`. */
+function mockAssessRealScanFixtureBinary(path) {
+  return typeof path === "string" && path.startsWith(REAL_SCAN_BIN_DIR)
+    ? { ok: true, path }
+    : { ok: false, status: "untrusted_path" };
+}
+
+/**
+ * Builds a candidate `root` + trusted `claRoot` pair like `fixture()`, but additionally: (a)
+ * commits `FIXTURE_SECURITY_CATALOG` into `root` at `governance/security-controls/catalog.json`;
+ * (b) runs the REAL, exported `runSecurityScan()` against `root`, writing REAL
+ * `evidence/security-latest.json` + `.v2.json`/`.v2.verdict.json`, bound to `root`'s own real HEAD
+ * commit/tree -- the exact same artifact production CI produces, not a synthetic envelope.
+ * `osvAvailable` selects whether the one fake `osv-scanner` binary is on the scan's env (clean,
+ * PASS) or entirely absent (SKIPPED/binary_missing). gitleaks/semgrep need no fixture binary at
+ * all: neither `cap.secrets` nor `cap.sast` is named by `FIXTURE_SECURITY_CATALOG`, so their own
+ * SKIPPED/binary_missing status is never in `plan.required` and can never block (mirrors how
+ * `sourceCapabilityPlan` in security-scan.mjs activates only the capabilities the fixture's own
+ * catalog actually names). license-check similarly needs no fixture files: its capability contract
+ * has `controlRef: null`, so its control-lane `required` is always `false` regardless of status.
+ */
+async function realScanFixture({ osvAvailable }) {
+  const root = mkdtempSync(join(tmpdir(), "pr-contributor-gates-realscan-"));
+  const claRoot = mkdtempSync(join(tmpdir(), "pr-contributor-gates-realscan-trusted-"));
+  git(root, "init", "-q");
+  git(root, "config", "user.name", AUTHOR_NAME);
+  git(root, "config", "user.email", AUTHOR_EMAIL);
+  writeFileSync(join(root, "CONTRIBUTOR_LICENSE_AGREEMENT.md"), CLA_BYTES, "utf8");
+  writeFileSync(join(claRoot, "CONTRIBUTOR_LICENSE_AGREEMENT.md"), CLA_BYTES, "utf8");
+  mkdirSync(join(claRoot, ".claude"), { recursive: true });
+  writeFileSync(
+    join(claRoot, ".claude", "pipeline.yaml"),
+    "schema: pipeline.manifest.v0\ngates:\n  security:\n    mode: blocking\n    type: automated\n",
+    "utf8",
+  );
+  mkdirSync(join(root, "governance", "security-controls"), { recursive: true });
+  writeFileSync(join(root, "governance", "security-controls", "catalog.json"), FIXTURE_SECURITY_CATALOG, "utf8");
+  writeFileSync(join(root, "change.txt"), "base\n", "utf8");
+  git(root, "add", ".");
+  git(root, "commit", "-q", "-m", "base", "-m", `Signed-off-by: ${AUTHOR_NAME} <${AUTHOR_EMAIL}>`);
+  const baseSha = git(root, "rev-parse", "HEAD");
+  const headSha = commit(root, "candidate");
+
+  const env = osvAvailable ? { PIPELINE_OSV_SCANNER_PATH: OSV_CLEAN_BIN } : {};
+  const { evidence: scanEvidence, exitCode: scanExitCode } = await runSecurityScan({
+    rootDir: root,
+    env,
+    spawnFn: realScanSpawnFn,
+    timeoutMs: 5000,
+    assessTrustedExecutablePath: mockAssessRealScanFixtureBinary,
+  });
+
+  const cla = readClaContract(claRoot);
+  const event = {
+    action: "opened",
+    number: 42,
+    sender: { login: LOGIN },
+    pull_request: {
+      body: expectedAcceptanceLine(cla, LOGIN, true),
+      user: { login: LOGIN },
+      head: { sha: headSha },
+      base: { sha: baseSha, ref: "main" },
+    },
+  };
+  return { root, claRoot, cla, event, scanEvidence, scanExitCode };
 }
 
 const hasCode = (receipt, code) => receipt.errors.some((entry) => entry.code === code);
@@ -362,9 +502,33 @@ test("an untrusted root's own manifest cannot disable the security gate: only th
   assert.equal(receipt.dco.status, "passed");
 });
 
+test("N2: real runSecurityScan() -> real checkSecurityCompleteness chain -- clean fake scanners satisfy a fixture catalog's required cap.sca -> ok:true (no synthetic evidence-writer)", async () => {
+  const { root, claRoot, event, scanEvidence, scanExitCode } = await realScanFixture({ osvAvailable: true });
+  assert.equal(scanExitCode, 0, JSON.stringify(scanEvidence.scanners));
+  const receipt = validatePrContributorGates({ root, claRoot, event });
+  assert.equal(receipt.ok, true, JSON.stringify(receipt.errors));
+  assert.equal(receipt.errors.some((entry) => entry.code === "SECURITY_COMPLETENESS_BLOCKING"), false);
+});
+
+test("N2: real runSecurityScan() -> real checkSecurityCompleteness chain -- osv-scanner absent from PATH makes the fixture catalog's required cap.sca genuinely block (the class of gap N1's cap.sca residual belongs to)", async () => {
+  const { root, claRoot, event } = await realScanFixture({ osvAvailable: false });
+  const receipt = validatePrContributorGates({ root, claRoot, event });
+  assert.equal(receipt.ok, false);
+  const completenessErrors = receipt.errors.filter((entry) => entry.code === "SECURITY_COMPLETENESS_BLOCKING");
+  assert.equal(completenessErrors.length, 1, JSON.stringify(receipt.errors));
+  assert.match(
+    completenessErrors[0].detail,
+    /required capability cap\.sca did not reach an accepted state \(outcome=required-capability-missing\)/,
+  );
+  // CLA/DCO remain independently, correctly evaluated -- the real chain's blocking behavior is
+  // additive, exactly like every synthetic-evidence case above.
+  assert.equal(receipt.cla.accepted, true);
+  assert.equal(receipt.dco.status, "passed");
+});
+
 let failed = 0;
 for (const [name, fn] of tests) {
-  try { fn(); console.log(`ok - ${name}`); }
+  try { await fn(); console.log(`ok - ${name}`); }
   catch (failure) { failed += 1; console.error(`not ok - ${name}\n${failure.stack ?? failure}`); }
 }
 console.log(`1..${tests.length}`);

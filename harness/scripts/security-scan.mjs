@@ -71,7 +71,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmdirSync, writeFileSync } from "node:fs";
 import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
-import { basename, join, resolve } from "node:path";
+import { basename, join, resolve, sep } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
@@ -141,11 +141,54 @@ function resolveGovernancePoliciesPath(manifest) {
   return typeof configured === "string" ? configured : DEFAULT_GOVERNANCE_POLICIES_PATH;
 }
 
-/** Builds the per-adapter `config` object for one scanner key (paths already absolute). */
+/**
+ * Resolves `relPath` against `baseDir` and confirms the result stays within `baseDir` itself or a
+ * descendant of it (N3, Critic follow-up finding, CYB-2I-1R3): a manifest-supplied relative path
+ * (e.g. `security.scanners.semgrep.rules_dir`, sourced from the CANDIDATE's own, potentially
+ * untrusted manifest -- the same untrusted-manifest config surface N1/CYB-2I-1R2 already
+ * established for this codebase) must never be allowed to escape the scan root via a
+ * `../../etc`-style traversal value. Pure string/path resolution only -- no filesystem access, no
+ * `realpath`/symlink following needed: `baseDir` is already a fixed absolute root this process
+ * controls at this point in the call chain, and `relPath` is a pre-execution manifest string, not
+ * something a symlink swap could retarget after the fact. Comparison is case-folded on win32
+ * (NTFS/exFAT path comparison is case-insensitive there; POSIX stays case-sensitive) and anchored
+ * on `path.sep` so a sibling directory sharing a name prefix (e.g. a real `<rootDir>-evil`
+ * directory) is never mistaken for a descendant of `rootDir`. Returns the resolved absolute path
+ * when contained, or `null` on an escape.
+ */
+function resolveContainedPath(baseDir, relPath) {
+  const baseResolved = resolve(baseDir);
+  const candidateResolved = resolve(baseDir, relPath);
+  const baseKey = process.platform === "win32" ? baseResolved.toLowerCase() : baseResolved;
+  const candidateKey = process.platform === "win32" ? candidateResolved.toLowerCase() : candidateResolved;
+  const withinBase = candidateKey === baseKey || candidateKey.startsWith(baseKey + sep);
+  return withinBase ? candidateResolved : null;
+}
+
+/**
+ * Builds the per-adapter `config` object for one scanner key (paths already absolute). A
+ * `configViolation` field (N3) marks a manifest-derived value that failed a containment check --
+ * the caller must treat this as a fail-closed adapter-level ERROR (see the runner loop below)
+ * rather than passing the rejected value through, or silently falling back to the adapter's own
+ * default: an out-of-root path supplied by the (potentially untrusted) candidate manifest is
+ * itself suspicious and this codebase's existing convention is to surface a config/environment
+ * problem loudly (mirrors the `candidate_snapshot`/`execution_environment` pre-adapter ERROR
+ * entries already produced earlier in this same runner loop for other config/environment-shape
+ * problems -- see `runSecurityScan`'s own header/EXIT-CODE POLICY note: "never silently treated
+ * as clean") rather than quietly substituting "auto" and continuing as if nothing happened.
+ */
 function buildAdapterConfig(key, { rootDir, manifest, policiesPathAbs }) {
   if (key === "semgrep") {
     const rulesDirRel = manifest?.security?.scanners?.semgrep?.rules_dir;
-    return { rulesDir: typeof rulesDirRel === "string" ? join(rootDir, rulesDirRel) : undefined };
+    if (typeof rulesDirRel !== "string") return { rulesDir: undefined };
+    const contained = resolveContainedPath(rootDir, rulesDirRel);
+    if (contained === null) {
+      return {
+        rulesDir: undefined,
+        configViolation: `security.scanners.semgrep.rules_dir ("${rulesDirRel}") resolves outside rootDir; refusing to pass an out-of-root path to the semgrep adapter`,
+      };
+    }
+    return { rulesDir: contained };
   }
   if (key === "license-check") {
     // No manifest-driven override for declaredPath -- see header comment for why (schema
@@ -753,13 +796,20 @@ export async function runSecurityScan({
       if (!inst.installed) {
         entry = { tool: adapter.name, status: "SKIPPED", classification: inst.status ?? "binary_missing", findingCount: 0, reason: inst.reason };
       } else {
-        const adapterConfig = { ...buildAdapterConfig(key, { rootDir: scanRoot, manifest, policiesPathAbs }), binaryPath: inst.path };
-        const runArgs = { rootDir: scanRoot, config: adapterConfig, timeoutMs, env };
-        if (spawnFn) runArgs.spawnFn = spawnFn;
-        const result = await adapter.run(runArgs);
-        rawByTool[adapter.name] = result.raw ?? null; // CYB-2E: additive capture (see decl above)
-        entry = scannerEntry(adapter, result, fileSha256(inst.path));
-        findings.push(...result.findings);
+        const builtConfig = buildAdapterConfig(key, { rootDir: scanRoot, manifest, policiesPathAbs });
+        if (builtConfig.configViolation) {
+          // N3: fail closed -- never invoke the adapter with (or silently drop) a manifest-derived
+          // config value that failed containment; see buildAdapterConfig's own doc comment.
+          entry = { tool: adapter.name, status: "ERROR", classification: "manifest_config_invalid", findingCount: 0, reason: builtConfig.configViolation };
+        } else {
+          const adapterConfig = { ...builtConfig, binaryPath: inst.path };
+          const runArgs = { rootDir: scanRoot, config: adapterConfig, timeoutMs, env };
+          if (spawnFn) runArgs.spawnFn = spawnFn;
+          const result = await adapter.run(runArgs);
+          rawByTool[adapter.name] = result.raw ?? null; // CYB-2E: additive capture (see decl above)
+          entry = scannerEntry(adapter, result, fileSha256(inst.path));
+          findings.push(...result.findings);
+        }
       }
       }
       }
