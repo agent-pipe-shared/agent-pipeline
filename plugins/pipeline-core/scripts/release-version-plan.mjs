@@ -22,6 +22,7 @@ import {
 } from "node:fs";
 import { dirname, isAbsolute, join, resolve, sep } from "node:path";
 import { assessWindowsPrivatePath, hardenWindowsPrivateDirectory } from "../lib/windows-private-state.mjs";
+import { checkSecurityCompleteness } from "../lib/security-completeness-gate.mjs";
 
 export const RELEASE_VERSION_DECISION_SCHEMA = "pipeline.release-version-decision.v1";
 export const RELEASE_VERSION_PLAN_SCHEMA = "pipeline.release-version-plan.v1";
@@ -494,6 +495,77 @@ export function createReleaseVersionPlan(input, { nowMs = Date.now() } = {}) {
   plan.planId = releaseVersionPlanId(planPayload(plan));
   validateReleaseVersionPlan(plan, { decision: input.decision, nowMs });
   return plan;
+}
+
+/**
+ * AC8's Release call site (CYB-2I-3, Sprint Cyborg Wave 6) for the shared completeness
+ * evaluator (`checkSecurityCompleteness`, `../lib/security-completeness-gate.mjs`, CYB-2I-0):
+ * runs it against a SEALED release-version plan's own bound PRIVATE-channel product candidate
+ * (`plan.privateProductCandidate.commit`/`.tree`).
+ *
+ * WHY A SEPARATE FUNCTION INSTEAD OF A DIRECT CALL INSIDE `createReleaseVersionPlan()`: this
+ * module's own header comment documents `createReleaseVersionPlan()` as a pure function -- zero
+ * fs/git/network access, every fact supplied by the caller as already-fetched data -- and this
+ * file's own `release-version-plan.test.mjs` in-memory-fixture style depends on that purity
+ * remaining true (no real filesystem, no real git repo, anywhere in that test file). Calling
+ * `checkSecurityCompleteness` (which reads two evidence files off disk) FROM INSIDE
+ * `createReleaseVersionPlan()` would break that invariant. This function is therefore its own
+ * independent, fs-touching seam -- exactly the shape `checkCloseSecurityCompleteness`
+ * (`../scripts/check-close-security-completeness.mjs`, the Close call site) and the inline
+ * `checkSecurityCompleteness` call in the PR call site
+ * (`harness/scripts/check-pr-contributor-gates.mjs`) already use for AC8's other two call sites.
+ * `createReleaseVersionPlan()` itself is UNCHANGED by this addition.
+ *
+ * WHY THE PRIVATE CANDIDATE ONLY, NOT ALSO `neutralPublicProductCandidate`:
+ * `checkSecurityCompleteness` reads its two evidence files (`evidence/security-latest.v2.json`/
+ * `.verdict.json`, by default) from a `projectDir` that only this repository's OWN
+ * `security-scan.mjs` run ever populates -- for the private working tree/CI that actually runs
+ * security scanning. A neutral-public/mirror repository is a publication TARGET whose content is
+ * derived FROM the already-scanned private candidate at publish time; there is no code path in
+ * this repo that runs `security-scan.mjs` against a neutral-public checkout or writes it its own
+ * local `evidence/security-latest.v2*.json` pair, so it has no independent completeness evidence
+ * to bind against. Gating on `neutralPublicProductCandidate` instead (or in addition) would
+ * either always fail closed against a `projectDir` that structurally cannot carry matching
+ * evidence, or require inventing a whole parallel evidence-production path for the mirror --
+ * out of this task's scope (see this module's own header comment on scope, and Field 1 of this
+ * sub-package's briefing, CYB-2I-3).
+ *
+ * USAGE CONTRACT FOR A FUTURE CALLER (none exists in this repo yet -- see this module's own
+ * header comment; do not read this as documentation of an operating CLI): whatever future
+ * release-orchestration caller runs `createReleaseVersionPlan()` + `storeReleaseVersionPlan()`
+ * together MUST invoke this function on the freshly sealed plan, AFTER sealing but BEFORE
+ * `storeReleaseVersionPlan()` durably persists it, and MUST treat a non-empty return value as a
+ * hard block on that store call -- true pre-mutation gating, mirroring how `checkCloseSecurityCompleteness`'s
+ * and the PR call site's own callers already gate their next step on a non-empty failures array.
+ * This function itself performs no gating DECISION and no storage -- it only evaluates and
+ * reports, exactly like `checkSecurityCompleteness` itself.
+ *
+ * PURITY OF **THIS** FUNCTION: unlike `createReleaseVersionPlan()`, this function deliberately
+ * DOES touch the filesystem (via `checkSecurityCompleteness`) -- but stays just as parameterized
+ * as `checkSecurityCompleteness` itself: `projectDir` is supplied entirely by ITS caller, with no
+ * `process.cwd()` default of its own anywhere in this function.
+ *
+ * @param {object} plan - a SEALED release-version plan (typically `createReleaseVersionPlan()`'s
+ *   own return value) -- only `plan.privateProductCandidate.commit`/`.tree` are read.
+ * @param {object} params
+ * @param {string} params.projectDir - directory the evidence files are read relative to
+ *   (forwarded to `checkSecurityCompleteness` unchanged; no default).
+ * @param {string} [params.envelopePath] - forwarded to `checkSecurityCompleteness` unchanged.
+ * @param {string} [params.verdictPath] - forwarded to `checkSecurityCompleteness` unchanged.
+ * @returns {string[]} failure reasons; empty = pass (identical contract to
+ *   `checkSecurityCompleteness` itself).
+ */
+export function checkReleaseVersionPlanSecurityCompleteness(plan, { projectDir, envelopePath, verdictPath } = {}) {
+  if (plan?.schema !== RELEASE_VERSION_PLAN_SCHEMA || plan?.status !== "sealed") fail("RVP-COMPLETENESS", "release version plan completeness check requires an already-sealed release version plan");
+  validateCandidate(plan.privateProductCandidate, "private");
+  if (typeof projectDir !== "string" || projectDir.length === 0) fail("RVP-COMPLETENESS", "release version plan completeness check requires a caller-supplied projectDir");
+  return checkSecurityCompleteness({
+    projectDir,
+    commit: plan.privateProductCandidate.commit,
+    tree: plan.privateProductCandidate.tree,
+    envelopePath,
+    verdictPath,
+  });
 }
 
 function releasePlanDirectory(gitCommonDir, repoFingerprint) {

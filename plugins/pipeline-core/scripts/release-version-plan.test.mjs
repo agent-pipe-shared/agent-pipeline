@@ -11,6 +11,7 @@ import {
   DECISION_MAX_AGE_MS,
   ReleaseVersionDecisionError,
   canonicalJson,
+  checkReleaseVersionPlanSecurityCompleteness,
   createReleaseVersionPlanJournal,
   compareStableVersions,
   createReleaseVersionDecision,
@@ -88,6 +89,64 @@ function planInput(overrides = {}) {
     createdAt: new Date(NOW).toISOString(),
     ...overrides,
   };
+}
+
+/**
+ * Schema-shaped v2 envelope+verdict pair for `checkReleaseVersionPlanSecurityCompleteness`'s own
+ * cases below -- mirrors `security-completeness-gate.test.mjs`'s `exactV2Envelope`/
+ * `exactV2Verdict`/`writePair` fixture shapes exactly (this module's own tests otherwise stay
+ * fully in-memory; the four completeness-gate cases below are the only ones that need a real
+ * temp `projectDir` because `checkSecurityCompleteness`, unlike everything else in this file,
+ * reads real evidence files off disk by design).
+ */
+function writeReleasePlanSecurityEvidence(dir, {
+  commit,
+  tree,
+  status = "PASS",
+  classification = "clean",
+  outcome = "pass",
+  blocking = false,
+  offendingCapabilities = [],
+}) {
+  const envelope = {
+    schema: "pipeline.security-evidence.v2",
+    policy: { configurationSha256: h("e") },
+    input: { commit, tree, inputSha256: h("f") },
+    environment: { platform: process.platform, nodeVersion: process.version },
+    capabilities: [{
+      capabilityId: "cap.secrets",
+      tool: { name: "gitleaks", version: null },
+      rulePack: { ref: "gitleaks-default", digest: null },
+      status,
+      classification,
+      findings: [],
+      coverage: {
+        subject: "candidate-tree",
+        exclusions: [],
+        ignored: [],
+        unsupportedScope: [],
+        truncation: { truncated: false, scannedFileCount: null, totalEligibleFileCount: null },
+        dataAge: { ageSeconds: 0, snapshotAt: null },
+      },
+      reason: null,
+    }],
+  };
+  const verdict = {
+    schema: "pipeline.security-verdict.v2",
+    producedFrom: "pipeline.security-evidence.v2",
+    exitAuthority: "v1-blocking-logic",
+    note: "fixture",
+    v1ExitCode: 0,
+    plan: { required: ["cap.secrets"], optional: [], planDigest: h("g"), source: "fixture", resolvedPolicyDigest: h("h") },
+    capabilityOutcomes: { "cap.secrets": outcome },
+    verdict: { blocking, offendingCapabilities },
+    controls: [],
+  };
+  const envelopePath = join(dir, "evidence/security-latest.v2.json");
+  const verdictPath = join(dir, "evidence/security-latest.v2.verdict.json");
+  mkdirSync(dirname(envelopePath), { recursive: true });
+  writeFileSync(envelopePath, JSON.stringify(envelope));
+  writeFileSync(verdictPath, JSON.stringify(verdict));
 }
 
 const cases = [
@@ -252,6 +311,78 @@ const cases = [
       writeFileSync(recordPath, "third-bytes", "utf8");
       assert.throws(() => recoverReleaseVersionPlan({ gitCommonDir: common, repoFingerprint: h("c"), planId: plan.planId, decision: source.decision }, { nowMs: NOW }), ReleaseVersionDecisionError);
     } finally { rmSync(common, { recursive: true, force: true }); }
+  }],
+  ["release plan completeness gate (CYB-2I-3): fresh bound non-blocking pair is a pass (empty failure array)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "release-plan-completeness-"));
+    try {
+      const source = planInput();
+      const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+      writeReleasePlanSecurityEvidence(dir, { commit: plan.privateProductCandidate.commit, tree: plan.privateProductCandidate.tree });
+      const failures = checkReleaseVersionPlanSecurityCompleteness(plan, { projectDir: dir });
+      assert.deepStrictEqual(failures, []);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }],
+  ["release plan completeness gate (CYB-2I-3): blocking verdict surfaces the shared gate's own failure line", () => {
+    const dir = mkdtempSync(join(tmpdir(), "release-plan-completeness-"));
+    try {
+      const source = planInput();
+      const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+      writeReleasePlanSecurityEvidence(dir, {
+        commit: plan.privateProductCandidate.commit,
+        tree: plan.privateProductCandidate.tree,
+        status: "SKIPPED",
+        classification: "binary_missing",
+        outcome: "required-capability-missing",
+        blocking: true,
+        offendingCapabilities: [{ capabilityId: "cap.secrets", outcome: "required-capability-missing" }],
+      });
+      const failures = checkReleaseVersionPlanSecurityCompleteness(plan, { projectDir: dir });
+      assert.deepStrictEqual(failures, [
+        "evidence/security-latest.v2.verdict.json: required capability cap.secrets did not reach an accepted state (outcome=required-capability-missing)",
+      ]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }],
+  ["release plan completeness gate (CYB-2I-3): missing evidence fails closed with both reasons reported", () => {
+    const dir = mkdtempSync(join(tmpdir(), "release-plan-completeness-"));
+    try {
+      const source = planInput();
+      const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+      const failures = checkReleaseVersionPlanSecurityCompleteness(plan, { projectDir: dir });
+      assert.deepStrictEqual(failures, [
+        "evidence/security-latest.v2.json missing",
+        "evidence/security-latest.v2.verdict.json missing",
+      ]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }],
+  ["release plan completeness gate (CYB-2I-3): evidence bound to a different commit/tree than the plan's own private candidate is caught", () => {
+    const dir = mkdtempSync(join(tmpdir(), "release-plan-completeness-"));
+    try {
+      const source = planInput();
+      const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+      writeReleasePlanSecurityEvidence(dir, { commit: h("1", 40), tree: h("2", 40) }); // bound to a DIFFERENT commit/tree than plan.privateProductCandidate
+      const failures = checkReleaseVersionPlanSecurityCompleteness(plan, { projectDir: dir });
+      assert.deepStrictEqual(failures, [
+        "evidence/security-latest.v2.json: input commit does not match the pushed source",
+        "evidence/security-latest.v2.json: input tree does not match the pushed source",
+      ]);
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  }],
+  ["release plan completeness gate (CYB-2I-3): requires an already-sealed plan", () => {
+    const source = planInput();
+    const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+    const notSealed = { ...plan, status: "draft" };
+    assert.throws(
+      () => checkReleaseVersionPlanSecurityCompleteness(notSealed, { projectDir: "/irrelevant" }),
+      (error) => error instanceof ReleaseVersionDecisionError && error.code === "RVP-COMPLETENESS",
+    );
+  }],
+  ["release plan completeness gate (CYB-2I-3): requires a caller-supplied projectDir (no process.cwd() default)", () => {
+    const source = planInput();
+    const plan = createReleaseVersionPlan(source, { nowMs: NOW });
+    assert.throws(
+      () => checkReleaseVersionPlanSecurityCompleteness(plan, {}),
+      (error) => error instanceof ReleaseVersionDecisionError && error.code === "RVP-COMPLETENESS",
+    );
   }],
 ];
 
