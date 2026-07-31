@@ -273,6 +273,8 @@ function securityPolicyBinding(scanRoot, authority, manifest, blockOn, mode) {
     authoritySource: authority.status === "ready" ? authority.source : null,
     manifestPath,
     manifestSha256: manifestPath === null ? null : fileSha256(join(scanRoot, manifestPath)),
+    gitleaksIgnorePath: ".gitleaksignore",
+    gitleaksIgnoreSha256: fileSha256(join(scanRoot, ".gitleaksignore")),
     declaredLicensesPath: "third-party-licenses.json",
     declaredLicensesSha256: fileSha256(join(scanRoot, "third-party-licenses.json")),
     licenseAllowlistPath,
@@ -381,6 +383,7 @@ function scannerEntry(adapter, result, executableSha256 = null) {
     coverage: { subject: "candidate-tree", exclusions: [] },
   };
   if (result.reason) entry.reason = result.reason;
+  if (result.ignored) entry.ignored = result.ignored;
   return entry;
 }
 

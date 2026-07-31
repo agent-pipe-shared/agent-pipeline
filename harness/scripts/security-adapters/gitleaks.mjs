@@ -35,9 +35,10 @@
  * === null`, `res.signal === "SIGTERM"` -- Node kills the child itself, no manual watchdog
  * needed for a one-shot report-and-exit tool like gitleaks).
  */
-import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, lstatSync, mkdtempSync, readFileSync, realpathSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { delimiter as PATH_DELIM, join as pathJoin } from "node:path";
+import { delimiter as PATH_DELIM, isAbsolute, join as pathJoin, relative, sep } from "node:path";
 import { spawnSync as nodeSpawnSync } from "node:child_process";
 
 export const name = "gitleaks";
@@ -45,6 +46,101 @@ export const name = "gitleaks";
 const ENV_VAR = "PIPELINE_GITLEAKS_PATH";
 const BIN_NAME = "gitleaks";
 const WIN_EXTS = [".exe", ".cmd", ".bat"];
+const IGNORE_FILE = ".gitleaksignore";
+const CONTENT_AUTHORITY_PREFIX = "content-v1:";
+const MAX_IGNORE_BYTES = 256 * 1024;
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function canonicalContentFingerprint(finding) {
+  const path = finding?.File ?? finding?.file;
+  const rule = finding?.RuleID ?? finding?.rule;
+  const line = finding?.StartLine ?? finding?.line;
+  const column = finding?.StartColumn ?? finding?.column;
+  const secret = finding?.Secret ?? finding?.secret;
+  if (
+    typeof path !== "string" || path.length === 0
+    || typeof rule !== "string" || rule.length === 0
+    || !Number.isSafeInteger(line) || line < 1
+    || !Number.isSafeInteger(column) || column < 1
+    || typeof secret !== "string" || secret.length === 0
+  ) return null;
+  return {
+    path,
+    rule,
+    line,
+    column,
+    sha256: sha256(`pipeline.gitleaks-content-fingerprint.v1\0${path}\0${rule}\0${line}\0${column}\0${secret}`),
+  };
+}
+
+export function gitleaksContentAuthorityLine(finding) {
+  const fingerprint = canonicalContentFingerprint(finding);
+  if (fingerprint === null) return null;
+  return `${CONTENT_AUTHORITY_PREFIX}${fingerprint.sha256}:${fingerprint.path}:${fingerprint.rule}:${fingerprint.line}:${fingerprint.column}`;
+}
+
+function safeAuthorityPath(path) {
+  if (isAbsolute(path) || path.includes("\\") || path.includes("\0")) return false;
+  const parts = path.split("/");
+  return parts.length > 0 && parts.every((part) => part.length > 0 && part !== "." && part !== "..");
+}
+
+function parseContentAuthorityLine(line) {
+  if (!line.startsWith(CONTENT_AUTHORITY_PREFIX)) return { kind: "legacy" };
+  const match = /^content-v1:([a-f0-9]{64}):(.+):([a-zA-Z0-9][a-zA-Z0-9._-]*):([1-9][0-9]*):([1-9][0-9]*)$/u.exec(line);
+  if (!match) return { kind: "invalid" };
+  const [, digest, path, rule, lineText, columnText] = match;
+  const lineNumber = Number(lineText);
+  const column = Number(columnText);
+  if (!safeAuthorityPath(path) || !Number.isSafeInteger(lineNumber) || !Number.isSafeInteger(column)) return { kind: "invalid" };
+  return { kind: "content", digest, path, rule, line: lineNumber, column };
+}
+
+function loadContentAuthority(rootDir) {
+  const path = pathJoin(rootDir, IGNORE_FILE);
+  if (!existsSync(path)) return {
+    ok: true,
+    entries: new Set(),
+    sha256: null,
+    path: IGNORE_FILE,
+  };
+  try {
+    const info = lstatSync(path);
+    const physicalRoot = realpathSync(rootDir);
+    const physicalPath = realpathSync(path);
+    const relativePath = relative(physicalRoot, physicalPath);
+    if (
+      !info.isFile() || info.isSymbolicLink()
+      || relativePath === ".." || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)
+    ) return { ok: false, reason: `${IGNORE_FILE} must be one physical regular in-root file` };
+    const raw = readFileSync(physicalPath);
+    if (raw.length > MAX_IGNORE_BYTES) return { ok: false, reason: `${IGNORE_FILE} exceeds ${MAX_IGNORE_BYTES} bytes` };
+    const entries = new Set();
+    for (const rawLine of raw.toString("utf8").split(/\r?\n/u)) {
+      const line = rawLine.trim();
+      if (line === "" || line.startsWith("#")) continue;
+      const parsed = parseContentAuthorityLine(line);
+      if (parsed.kind === "invalid") return { ok: false, reason: `${IGNORE_FILE} contains a malformed content-v1 authority` };
+      if (parsed.kind !== "content") continue;
+      const key = `${parsed.digest}\0${parsed.path}\0${parsed.rule}\0${parsed.line}\0${parsed.column}`;
+      if (entries.has(key)) return { ok: false, reason: `${IGNORE_FILE} contains a duplicate content-v1 authority` };
+      entries.add(key);
+    }
+    return { ok: true, entries, sha256: sha256(raw), path: IGNORE_FILE };
+  } catch (error) {
+    return { ok: false, reason: `${IGNORE_FILE} could not be authenticated: ${error.message}` };
+  }
+}
+
+function authorityKey(finding) {
+  const fingerprint = canonicalContentFingerprint(finding);
+  return fingerprint === null
+    ? null
+    : `${fingerprint.sha256}\0${fingerprint.path}\0${fingerprint.rule}\0${fingerprint.line}\0${fingerprint.column}`;
+}
 
 /** Env override -> plain PATH walk. Returns { installed, path? , reason? }. Never throws. */
 function resolveBinary(env) {
@@ -109,6 +205,16 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
   const resolved = config.binaryPath ? { installed: true, path: config.binaryPath } : resolveBinary(env);
   if (!resolved.installed) {
     return { status: "SKIPPED", classification: "binary_missing", findings: [], raw: null, reason: resolved.reason };
+  }
+  const contentAuthority = loadContentAuthority(rootDir);
+  if (!contentAuthority.ok) {
+    return {
+      status: "ERROR",
+      classification: "ignore_authority",
+      findings: [],
+      raw: null,
+      reason: contentAuthority.reason,
+    };
   }
 
   let tmpDir;
@@ -187,7 +293,15 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
   }
   cleanupTmp(tmpDir);
 
-  const findings = parsed.map((f) => ({
+  const retained = [];
+  let ignoredFindingCount = 0;
+  for (const finding of parsed) {
+    const key = authorityKey(finding);
+    if (key !== null && contentAuthority.entries.has(key)) ignoredFindingCount++;
+    else retained.push(finding);
+  }
+
+  const findings = retained.map((f) => ({
     tool: name,
     severity: "high", // fixed mapping -- see header (gitleaks has no native severity field)
     rule: f?.RuleID ?? f?.rule ?? "unknown-rule",
@@ -196,5 +310,16 @@ export async function run({ rootDir, config = {}, spawnFn = nodeSpawnSync, timeo
     msg: f?.Description ?? f?.description ?? f?.Message ?? "secret detected",
   }));
 
-  return { status: findings.length > 0 ? "FINDINGS" : "PASS", classification: findings.length > 0 ? "findings" : "success", findings, raw };
+  return {
+    status: findings.length > 0 ? "FINDINGS" : "PASS",
+    classification: findings.length > 0 ? "findings" : "success",
+    findings,
+    raw,
+    ignored: {
+      policy: "pipeline.gitleaks-content-fingerprint.v1",
+      authorityPath: contentAuthority.path,
+      authoritySha256: contentAuthority.sha256,
+      findingCount: ignoredFindingCount,
+    },
+  };
 }

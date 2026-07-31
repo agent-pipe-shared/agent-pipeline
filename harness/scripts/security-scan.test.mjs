@@ -174,9 +174,14 @@ const gitleaksFindings = writeFixtureBinary(
   `import { writeFileSync } from "node:fs";
 const args = process.argv.slice(2);
 const reportPath = args[args.indexOf("--report-path") + 1];
+const fromCodes = (codes) => String.fromCharCode(...codes);
+const fixtureValues = [
+  fromCodes([102, 105, 120, 116, 117, 114, 101, 45, 97, 99, 99, 101, 115, 115, 45, 107, 101, 121, 45, 48, 49]),
+  fromCodes([102, 105, 120, 116, 117, 114, 101, 45, 97, 112, 105, 45, 107, 101, 121, 45, 48, 50]),
+];
 const report = [
-  { RuleID: "aws-access-key", File: "config/secrets.txt", StartLine: 3, Description: "AWS Access Key detected" },
-  { RuleID: "generic-api-key", File: "src/app.js", StartLine: 42, Description: "Generic API Key detected" },
+  { RuleID: "aws-access-key", File: "config/secrets.txt", StartLine: 3, StartColumn: 7, Secret: fixtureValues[0], Description: "AWS Access Key detected" },
+  { RuleID: "generic-api-key", File: "src/app.js", StartLine: 42, StartColumn: 11, Secret: fixtureValues[1], Description: "Generic API Key detected" },
 ];
 writeFileSync(reportPath, JSON.stringify(report));
 process.exit(0);
@@ -472,6 +477,65 @@ process.exit(0);
     { tool: "gitleaks", severity: "high", rule: "aws-access-key", path: "config/secrets.txt", line: 3, msg: "AWS Access Key detected" },
     { tool: "gitleaks", severity: "high", rule: "generic-api-key", path: "src/app.js", line: 42, msg: "Generic API Key detected" },
   ]);
+}
+{
+  const rootDir = makeRootDir("gitleaks-content-authority-root");
+  const authority = gitleaksAdapter.gitleaksContentAuthorityLine({
+    RuleID: "aws-access-key",
+    File: "config/secrets.txt",
+    StartLine: 3,
+    StartColumn: 7,
+    Secret: "fixture-access-key-01",
+  });
+  writeFileSync(join(rootDir, ".gitleaksignore"), `# exact audited fixture value\n${authority}\n`);
+  const result = await gitleaksAdapter.run({ rootDir, config: { binaryPath: gitleaksFindings }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual(
+    "gitleaks run: exact content authority ignores only one matching historical fixture",
+    { status: result.status, findings: result.findings.map((finding) => finding.path), ignored: result.ignored.findingCount },
+    { status: "FINDINGS", findings: ["src/app.js"], ignored: 1 },
+  );
+  assertTrue(
+    "gitleaks run: exact content authority binds the physical ignore bytes",
+    typeof result.ignored.authoritySha256 === "string" && result.ignored.authoritySha256.length === 64,
+    JSON.stringify(result.ignored),
+  );
+}
+{
+  const rootDir = makeRootDir("gitleaks-content-drift-root");
+  const staleAuthority = gitleaksAdapter.gitleaksContentAuthorityLine({
+    RuleID: "aws-access-key",
+    File: "config/secrets.txt",
+    StartLine: 3,
+    StartColumn: 7,
+    Secret: "different-value-must-not-match",
+  });
+  writeFileSync(join(rootDir, ".gitleaksignore"), `${staleAuthority}\n`);
+  const result = await gitleaksAdapter.run({ rootDir, config: { binaryPath: gitleaksFindings }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual(
+    "gitleaks run: secret-value drift at an otherwise identical path/rule/line remains blocking",
+    { status: result.status, count: result.findings.length, ignored: result.ignored.findingCount },
+    { status: "FINDINGS", count: 2, ignored: 0 },
+  );
+}
+{
+  const rootDir = makeRootDir("gitleaks-content-authority-malformed-root");
+  writeFileSync(join(rootDir, ".gitleaksignore"), "content-v1:not-a-digest:src/app.js:generic-api-key:42:11\n");
+  const result = await gitleaksAdapter.run({ rootDir, config: { binaryPath: gitleaksFindings }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual(
+    "gitleaks run: malformed content authority fails closed before scanner execution",
+    { status: result.status, classification: result.classification, findings: result.findings.length },
+    { status: "ERROR", classification: "ignore_authority", findings: 0 },
+  );
+}
+{
+  const rootDir = makeRootDir("gitleaks-content-authority-nonregular-root");
+  mkdirSync(join(rootDir, ".gitleaksignore"));
+  const result = await gitleaksAdapter.run({ rootDir, config: { binaryPath: gitleaksFindings }, spawnFn: fixtureSpawnFn, timeoutMs: 5000 });
+  assertEqual(
+    "gitleaks run: non-regular content authority fails closed",
+    { status: result.status, classification: result.classification },
+    { status: "ERROR", classification: "ignore_authority" },
+  );
 }
 {
   const rootDir = makeRootDir("gitleaks-crash-root");
@@ -870,6 +934,66 @@ governance:
     "runner: evidence file written on a blocking-exit path",
     existsSync(join(rootDir, "evidence", "security-latest.json")),
     "evidence/security-latest.json missing",
+  );
+}
+
+{
+  const rootDir = makeRootDir("runner-gitleaks-content-authority-root");
+  writeManifest(
+    rootDir,
+    `schema: pipeline.manifest.v0
+
+gates:
+  security:
+    mode: blocking
+    type: automated
+
+security:
+  scanners:
+    gitleaks:
+      enabled: true
+    osv-scanner:
+      enabled: false
+    semgrep:
+      enabled: false
+    license-check:
+      enabled: false
+`,
+  );
+  const authority = gitleaksAdapter.gitleaksContentAuthorityLine({
+    RuleID: "aws-access-key",
+    File: "config/secrets.txt",
+    StartLine: 3,
+    StartColumn: 7,
+    Secret: "fixture-access-key-01",
+  });
+  writeFileSync(join(rootDir, ".gitleaksignore"), `${authority}\n`);
+  const { evidence, exitCode } = await runSecurityScan({
+    rootDir,
+    env: { PIPELINE_GITLEAKS_PATH: gitleaksFindings },
+    spawnFn: fixtureSpawnFn,
+    timeoutMs: 5000,
+    assessTrustedExecutablePath: mockAssessFixtureBinary,
+  });
+  assertEqual(
+    "runner: exact Gitleaks content authority is visible without hiding an unmatched secret",
+    {
+      exitCode,
+      findings: evidence.findings.map((finding) => finding.path),
+      ignored: evidence.scanners[0].ignored.findingCount,
+      policy: evidence.scanners[0].ignored.policy,
+    },
+    {
+      exitCode: 2,
+      findings: ["src/app.js"],
+      ignored: 1,
+      policy: "pipeline.gitleaks-content-fingerprint.v1",
+    },
+  );
+  assertEqual(
+    "runner: security policy binds the exact Gitleaks ignore authority bytes",
+    evidence.policy.inputs.gitleaksIgnoreSha256,
+    createHash("sha256").update(readFileSync(join(rootDir, ".gitleaksignore"))).digest("hex"),
   );
 }
 

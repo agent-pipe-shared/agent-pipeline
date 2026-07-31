@@ -5,10 +5,29 @@
 
 **Last updated:** 2026-07-30
 **Project status:** ACTIVE
-**Current block:** `0.4.7` code-first hotfix completion; design reopened and
-fresh PO approval required before implementation dispatch
+**Current block:** `0.4.7` final release-candidate qualification; implementation
+is complete and publication remains gated on fresh candidate-bound evidence
 **Repair baseline:** `83640cec22d494d227eebc82929370277ce926b9`
-**Release version:** `0.4.6` released; `0.4.7` expanded corrective candidate
+**Release version:** `0.4.6` released; `0.4.7` final corrective candidate
+
+## 2026-07-31 0.4.7 release qualification — authoritative latest
+
+- The public release surfaces are unified at `0.4.7` (`VERSION`, Codex and
+  Claude plugin manifests). The candidate is not published until its final
+  commit/tree has passed Full Verify, Security, independent Critic review, and
+  the fixed publication/readback transaction.
+- Candidate-tree Gitleaks now recognizes only an exact, content-bound
+  historical-false-positive authority. Each entry binds the path, rule,
+  line, column, and SHA-256 of the recognized value; a changed value or
+  position remains a blocking finding, while malformed, duplicate, or
+  non-regular authority fails closed.
+- The portable neutral State no longer serializes a machine-local cleanup
+  identity. A confirmed privatization and descriptor-bound recovery returned
+  the V4 session lifecycle to `ready` before candidate freeze.
+- The mandatory remote Issue scope is unchanged: #63, #70, #71, #73, #77 and
+  #81–#84. Code and tests, not stale Issue implementation sketches, remain the
+  delivery authority. Issue closure/commentary waits for the exact published
+  commit, release and remote readback.
 
 ## 2026-07-30 code-first 0.4.7 checkpoint — authoritative latest
 
