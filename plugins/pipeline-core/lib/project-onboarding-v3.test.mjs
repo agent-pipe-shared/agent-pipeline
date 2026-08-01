@@ -27,6 +27,8 @@ import {
   planProjectOnboardingManifestRepairV4,
   planProjectOnboardingSourceRecoveryV4,
   planProjectOnboardingV3,
+  planProjectRemoteAdoptionV4,
+  applyProjectRemoteAdoptionV4,
   renderProjectOnboardingAction,
 } from "./project-onboarding-v3.mjs";
 import { planRunnerProfileMigrationV3 } from "./runner-profile-migration-v3.mjs";
@@ -3472,6 +3474,168 @@ test("H3 source recovery distinguishes stale generated projection from unavailab
     assert.equal(plan.status, "unrepairable");
     assert.equal(plan.nextAction, null);
   } finally { dispose(unavailable); }
+});
+
+function remoteAdoptionGitFixture({ includesCodex = false, includesAgents = false, failUpstreamBind = false } = {}) {
+  const oid = "a".repeat(40); const calls = [];
+  const spawn = (command, args, options = {}) => {
+    calls.push({ command, args: [...args], cwd: options.cwd });
+    if (command !== "git") return { status: 1, stderr: "unexpected program" };
+    const cwd = options.cwd;
+    if (args[0] === "ls-remote") return { status: 0, stdout: `${oid}\trefs/heads/remote-adoption\n`, stderr: "" };
+    if (args[0] === "init") {
+      mkdirSync(join(cwd, ".git", "objects"), { recursive: true });
+      mkdirSync(join(cwd, ".git", "refs"), { recursive: true });
+      writeFileSync(join(cwd, ".git", "HEAD"), "ref: refs/heads/main\n");
+      writeFileSync(join(cwd, ".git", "config"), "");
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (args[0] === "remote" && args[1] === "add") {
+      writeFileSync(join(cwd, ".git", "config"), `[remote \"origin\"]\n\turl = ${args[3]}\n`);
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (args[0] === "fetch") {
+      mkdirSync(join(cwd, ".git", "refs", "remotes", "origin"), { recursive: true });
+      writeFileSync(join(cwd, ".git", "refs", "remotes", "origin", "remote-adoption"), `${oid}\n`);
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (args[0] === "rev-parse" && args[1] === "--is-inside-work-tree") return { status: 0, stdout: "true\n", stderr: "" };
+    if (args[0] === "rev-parse") return { status: 0, stdout: `${oid}\n`, stderr: "" };
+    if (args[0] === "ls-tree") return { status: 0, stdout: includesCodex ? ".codex/config.toml\n" : includesAgents ? ".agents/implementor.toml\n" : "pipeline.user.yaml\n", stderr: "" };
+    if (args[0] === "checkout") {
+      mkdirSync(join(cwd, ".git", "refs", "heads"), { recursive: true });
+      writeFileSync(join(cwd, ".git", "refs", "heads", "remote-adoption"), `${oid}\n`);
+      writeFileSync(join(cwd, ".git", "HEAD"), "ref: refs/heads/remote-adoption\n");
+      writeFileSync(join(cwd, "pipeline.user.yaml"), yaml(v0Source()));
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    if (args[0] === "branch" && args[1] === "--set-upstream-to") {
+      if (failUpstreamBind) return { status: 1, stderr: "injected upstream failure" };
+      writeFileSync(join(cwd, ".git", "config"), `${readFileSync(join(cwd, ".git", "config"), "utf8")}[branch \"remote-adoption\"]\n\tremote = origin\n\tmerge = refs/heads/remote-adoption\n`);
+      return { status: 0, stdout: "", stderr: "" };
+    }
+    return { status: 1, stderr: `unexpected git ${args.join(" ")}` };
+  };
+  return { oid, calls, spawn };
+}
+
+test("remote branch adoption plans read-only, preserves .codex, and advances only to the branch authority migration", () => {
+  const target = root(); const fixture = remoteAdoptionGitFixture();
+  try {
+    mkdirSync(join(target, ".codex"));
+    writeFileSync(join(target, ".codex", "control.toml"), "reserved = true\n");
+    mkdirSync(join(target, ".agents"));
+    writeFileSync(join(target, ".agents", "control.toml"), "reserved = true\n");
+    const beforeCodex = lstatSync(join(target, ".codex"));
+    const beforeAgents = lstatSync(join(target, ".agents"));
+    const remoteDeps = { ...fakeDeps, spawnSync: fixture.spawn };
+    const plan = planProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption", deps: remoteDeps,
+    });
+    assert.equal(plan.schema, "pipeline.project-onboarding-remote-adoption-plan.v1");
+    assert.equal(plan.status, "ready");
+    assert.deepEqual(names(target), [".agents", ".codex"], "planning must not seed or initialize the target");
+    assert.equal(plan.authority.status, "deferred-until-exact-branch-checkout");
+    assert.equal(plan.applyAction.mutation, true);
+    assert.equal(plan.applyAction.requiresConfirmation, true);
+    assert.equal(plan.applyAction.requiresHostBoundary, true);
+    const applied = applyProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption",
+      planSha256: plan.planSha256, activate: true, deps: remoteDeps,
+    });
+    assert.equal(applied.status, "migration-required", JSON.stringify(applied));
+    assert.equal(readFileSync(join(target, ".git", "refs", "heads", "remote-adoption"), "utf8"), `${fixture.oid}\n`);
+    assert.match(readFileSync(join(target, ".git", "config"), "utf8"), /remote = origin/u);
+    assert.match(readFileSync(join(target, ".git", "config"), "utf8"), /merge = refs\/heads\/remote-adoption/u);
+    const afterCodex = lstatSync(join(target, ".codex"));
+    assert.equal(String(afterCodex.dev), String(beforeCodex.dev));
+    assert.equal(String(afterCodex.ino), String(beforeCodex.ino));
+    assert.equal(readFileSync(join(target, ".codex", "control.toml"), "utf8"), "reserved = true\n");
+    const afterAgents = lstatSync(join(target, ".agents"));
+    assert.equal(String(afterAgents.dev), String(beforeAgents.dev));
+    assert.equal(String(afterAgents.ino), String(beforeAgents.ino));
+    assert.equal(readFileSync(join(target, ".agents", "control.toml"), "utf8"), "reserved = true\n");
+    assert.equal(existsSync(join(target, "project", "state.json")), false);
+    assert.equal(existsSync(join(target, ".claude", "pipeline.json")), false);
+  } finally { dispose(target); }
+});
+
+test("remote adoption rejects a remote .agents and preserves the target control mount", () => {
+  const target = root(); const fixture = remoteAdoptionGitFixture({ includesAgents: true });
+  try {
+    mkdirSync(join(target, ".agents"));
+    writeFileSync(join(target, ".agents", "control.toml"), "reserved = true\n");
+    const before = lstatSync(join(target, ".agents"));
+    const remoteDeps = { ...fakeDeps, spawnSync: fixture.spawn };
+    const plan = planProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption", deps: remoteDeps,
+    });
+    const applied = applyProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption",
+      planSha256: plan.planSha256, activate: true, deps: remoteDeps,
+    });
+    assert.equal(applied.status, "remote-adoption-rolled-back", JSON.stringify(applied));
+    assert.deepEqual(names(target), [".agents"]);
+    const after = lstatSync(join(target, ".agents"));
+    assert.equal(String(after.dev), String(before.dev));
+    assert.equal(String(after.ino), String(before.ino));
+    assert.equal(readFileSync(join(target, ".agents", "control.toml"), "utf8"), "reserved = true\n");
+  } finally { dispose(target); }
+});
+
+test("remote adoption rejects a remote .codex and rolls back only its owned Git transaction", () => {
+  const target = root(); const fixture = remoteAdoptionGitFixture({ includesCodex: true });
+  try {
+    mkdirSync(join(target, ".codex"));
+    writeFileSync(join(target, ".codex", "control.toml"), "reserved = true\n");
+    const remoteDeps = { ...fakeDeps, spawnSync: fixture.spawn };
+    const plan = planProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption", deps: remoteDeps,
+    });
+    const applied = applyProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption",
+      planSha256: plan.planSha256, activate: true, deps: remoteDeps,
+    });
+    assert.equal(applied.status, "remote-adoption-rolled-back", JSON.stringify(applied));
+    assert.deepEqual(names(target), [".codex"]);
+    assert.equal(readFileSync(join(target, ".codex", "control.toml"), "utf8"), "reserved = true\n");
+  } finally { dispose(target); }
+});
+
+test("remote adoption rolls back the checked-out branch when its owned upstream bind fails", () => {
+  const target = root(); const fixture = remoteAdoptionGitFixture({ failUpstreamBind: true });
+  try {
+    mkdirSync(join(target, ".codex"));
+    writeFileSync(join(target, ".codex", "control.toml"), "reserved = true\n");
+    const remoteDeps = { ...fakeDeps, spawnSync: fixture.spawn };
+    const plan = planProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption", deps: remoteDeps,
+    });
+    const applied = applyProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption",
+      planSha256: plan.planSha256, activate: true, deps: remoteDeps,
+    });
+    assert.equal(applied.status, "remote-adoption-rolled-back", JSON.stringify(applied));
+    assert.deepEqual(names(target), [".codex"]);
+    assert.equal(existsSync(join(target, "pipeline.user.yaml")), false);
+  } finally { dispose(target); }
+});
+
+test("remote adoption refuses a normal initialized Git repository before remote observation", () => {
+  const target = root(); const fixture = remoteAdoptionGitFixture();
+  try {
+    mkdirSync(join(target, ".git", "objects"), { recursive: true });
+    mkdirSync(join(target, ".git", "refs"), { recursive: true });
+    writeFileSync(join(target, ".git", "HEAD"), "ref: refs/heads/main\n");
+    writeFileSync(join(target, ".git", "config"), "");
+    const planned = planProjectRemoteAdoptionV4({
+      rootDir: target, remote: "https://example.test/governed.git", ref: "refs/heads/remote-adoption",
+      deps: { ...fakeDeps, spawnSync: fixture.spawn },
+    });
+    assert.equal(planned.status, "target-not-fresh");
+    assert.equal(planned.diagnostics[0]?.code, "git_control_not_host_reserved");
+    assert.equal(fixture.calls.some(({ args }) => args[0] === "ls-remote"), false);
+  } finally { dispose(target); }
 });
 
 console.log(`\nproject-onboarding-v3: ${passed} passed, ${failures.length} failed`);

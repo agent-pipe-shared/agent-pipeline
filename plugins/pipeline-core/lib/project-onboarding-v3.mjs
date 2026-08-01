@@ -76,6 +76,7 @@ const SOURCE = "pipeline.user.yaml";
 const SCHEMA = "pipeline.project-onboarding.v4";
 const LEGACY_SCHEMA = "pipeline.project-onboarding.v3";
 const PLAN_SCHEMA = "pipeline.project-onboarding-plan.v3";
+const REMOTE_ADOPTION_PLAN_SCHEMA = "pipeline.project-onboarding-remote-adoption-plan.v1";
 const SOURCE_RECOVERY_SCHEMA = "pipeline.project-onboarding-source-recovery.v1";
 const MANIFEST_REPAIR_PLAN_SCHEMA = "pipeline.project-onboarding-manifest-repair-plan.v1";
 const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
@@ -90,6 +91,7 @@ const PO_AUTHORITY_REBIND_WRITER = fileURLToPath(new URL("../scripts/pipeline-st
 const PO_PROFILE_REPAIR_WRITER = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
 const PROJECT_AUTHORITY_MIGRATION_WRITER = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
 const SHA256_RE = /^[a-f0-9]{64}$/u;
+const REMOTE_REF_RE = /^refs\/heads\/[A-Za-z0-9][A-Za-z0-9._/-]*$/u;
 const MANIFEST_REPAIR_SCHEMA = "pipeline.project-onboarding-manifest-repair-plan.v1";
 
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
@@ -2908,6 +2910,228 @@ export function applyProjectOnboardingV3(plan, { rootDir = plan?.root ?? process
     const rollbackFailures = root ? rollback(root, created, createdDirectories, gitIdentity, gitTree, gitWasExpectedAbsent, fs) : [];
     if (rollbackFailures.length) return { schema: PLAN_SCHEMA, status: "rollback-failed", root, diagnostics: [diagnostic("$.transaction", "rollback_failed", `${error.message}; rollback also failed: ${rollbackFailures[0].message}`, "repair generated paths manually before retrying")] };
     return { schema: PLAN_SCHEMA, status: "rolled-back", root, diagnostics: [diagnostic("$.transaction", "apply_failed", error.message, "repair the root and run inspect then plan again")] };
+  }
+}
+
+function remoteAdoptionDiagnostic(code, message, guidance) {
+  return diagnostic("$.remote", code, message, guidance);
+}
+
+function validRemoteAdoptionRequest(remote, ref) {
+  if (typeof remote !== "string" || remote.length === 0 || remote.length > 2048 || remote.startsWith("-") || /[\0\r\n]/u.test(remote)) {
+    return "remote must be one non-empty, NUL-free argv value";
+  }
+  if (!REMOTE_REF_RE.test(ref) || ref.includes("..") || ref.includes("//") || ref.endsWith("/") || ref.endsWith(".lock")) {
+    return "ref must be one safe refs/heads/<branch> value";
+  }
+  return null;
+}
+
+function remoteAdoptionBranch(ref) { return ref.slice("refs/heads/".length); }
+
+function remoteAdoptionTarget(rootDir, fs) {
+  let root;
+  try { root = safeRoot(rootDir, fs); } catch (error) {
+    return { status: "unsafe", root: null, diagnostics: [remoteAdoptionDiagnostic("unsafe_root", error.message, "supply one real target directory")] };
+  }
+  let entries;
+  try { entries = rootEntries(root, fs); } catch (error) {
+    return { status: "unsafe", root, diagnostics: [remoteAdoptionDiagnostic("target_unreadable", error.message, "repair target access before planning adoption")] };
+  }
+  const disallowed = entries.find((entry) => entry.symlink || ![".git", ".codex", ".agents"].includes(entry.name));
+  if (disallowed) {
+    return { status: "target-not-fresh", root, diagnostics: [remoteAdoptionDiagnostic(
+      "target_not_fresh",
+      `remote adoption accepts only an empty target or reserved control mounts; found ${disallowed.name}`,
+      "use a new target directory; remote adoption never merges with user content",
+    )] };
+  }
+  for (const reserved of [".codex", ".agents"]) {
+    const entry = entries.find((candidate) => candidate.name === reserved);
+    if (entry && (!entry.directory || entry.symlink)) {
+      return { status: "unsafe", root, diagnostics: [remoteAdoptionDiagnostic("reserved_control_unsafe", `${reserved} must be a physical directory`, "repair the reserved control mount before planning adoption")] };
+    }
+  }
+  const git = entries.find((entry) => entry.name === ".git");
+  if (git && !isHostControlLayout(root, entries, fs)) {
+    return { status: "target-not-fresh", root, diagnostics: [remoteAdoptionDiagnostic("git_control_not_host_reserved", "remote adoption never mutates a normal initialized Git repository", "use an empty target or the exact empty host-reserved control layout")] };
+  }
+  const controlIdentities = [];
+  for (const entry of entries) {
+    const info = fs.lstatSync(join(root, entry.name));
+    const identity = directoryIdentity(info) ?? fileIdentity(info);
+    if (!identity) return { status: "unsafe", root, diagnostics: [remoteAdoptionDiagnostic("control_identity_unavailable", `the reserved ${entry.name} control path has no stable physical identity`, "repair the control mount before planning adoption")] };
+    controlIdentities.push({ path: entry.name, kind: entry.directory ? "directory" : "file", identity });
+  }
+  return {
+    status: "ready",
+    root,
+    entries: entries.map((entry) => entry.name),
+    initializesGit: !git,
+    protectedPaths: entries.filter((entry) => [".codex", ".agents"].includes(entry.name)).map((entry) => entry.name),
+    controlIdentities,
+    diagnostics: [],
+  };
+}
+
+function runRemoteGit(fs, root, args) {
+  const result = fs.spawnSync("git", args, { cwd: root, encoding: "utf8" });
+  if (result?.error || result?.status !== 0) {
+    const reason = String(result?.stderr ?? result?.error?.message ?? "Git command failed").replace(/[\r\n]+/gu, " ").trim();
+    throw new Error(reason || "Git command failed");
+  }
+  return String(result.stdout ?? "");
+}
+
+function observeRemoteBranch(fs, root, remote, ref) {
+  let stdout;
+  try { stdout = runRemoteGit(fs, root, ["ls-remote", "--refs", remote, ref]); }
+  catch (error) {
+    return { status: "remote-unavailable", diagnostics: [remoteAdoptionDiagnostic("remote_unavailable", error.message, "make the stated remote/ref available through the selected read-only Git transport")] };
+  }
+  const rows = stdout.trim().split(/\r?\n/u).filter(Boolean);
+  if (rows.length !== 1) {
+    return { status: "remote-ref-unavailable", diagnostics: [remoteAdoptionDiagnostic("remote_ref_unavailable", "the stated remote did not return exactly one branch ref", "confirm the exact existing refs/heads branch before adopting it")] };
+  }
+  const match = rows[0].match(/^([0-9a-f]{40}|[0-9a-f]{64})\t([^\t\r\n]+)$/u);
+  if (!match || match[2] !== ref) {
+    return { status: "remote-ref-unavailable", diagnostics: [remoteAdoptionDiagnostic("remote_ref_mismatch", "the remote response was not the exact requested branch ref", "retry only with the intended remote and refs/heads branch")] };
+  }
+  return { status: "ready", oid: match[1], diagnostics: [] };
+}
+
+function remoteAdoptionPlanDigest(plan) {
+  return sha256(JSON.stringify(stable({
+    root: plan.root,
+    remote: plan.remote,
+    ref: plan.ref,
+    branch: plan.branch,
+    revision: plan.revision,
+    target: plan.target,
+  })));
+}
+
+/**
+ * Plan an explicit existing-remote branch adoption.  This is intentionally a
+ * read-only remote observation: it does not seed authority, initialize Git,
+ * create kickoff/cleanup state, or materialize any runtime target.
+ */
+export function planProjectRemoteAdoptionV4({ rootDir = process.cwd(), remote, ref, deps: overrides = {} } = {}) {
+  const fs = deps(overrides);
+  const invalid = validRemoteAdoptionRequest(remote, ref);
+  if (invalid) return { schema: REMOTE_ADOPTION_PLAN_SCHEMA, status: "invalid-request", root: null, diagnostics: [remoteAdoptionDiagnostic("invalid_request", invalid, "provide --remote and one existing --ref refs/heads/<branch>")], requiresExplicitActivation: true };
+  const target = remoteAdoptionTarget(rootDir, fs);
+  if (target.status !== "ready") return { schema: REMOTE_ADOPTION_PLAN_SCHEMA, status: target.status, root: target.root, diagnostics: target.diagnostics, requiresExplicitActivation: true };
+  const observed = observeRemoteBranch(fs, target.root, remote, ref);
+  if (observed.status !== "ready") return { schema: REMOTE_ADOPTION_PLAN_SCHEMA, status: observed.status, root: target.root, diagnostics: observed.diagnostics, requiresExplicitActivation: true };
+  const plan = {
+    schema: REMOTE_ADOPTION_PLAN_SCHEMA,
+    status: "ready",
+    root: target.root,
+    remote,
+    ref,
+    branch: remoteAdoptionBranch(ref),
+    revision: { oid: observed.oid, sha256: sha256(observed.oid) },
+    target: {
+      entries: target.entries,
+      initializesGit: target.initializesGit,
+      protectedPaths: target.protectedPaths,
+      controlIdentities: target.controlIdentities,
+      neverMoves: [".agents", ".codex"],
+    },
+    authority: { status: "deferred-until-exact-branch-checkout" },
+    requiresExplicitActivation: true,
+  };
+  plan.planSha256 = remoteAdoptionPlanDigest(plan);
+  plan.applyAction = {
+    ...commandAction([ONBOARDING_SCRIPT, "adopt-remote", "apply", "--root", plan.root, "--remote", remote, "--ref", ref, "--plan-sha256", plan.planSha256, "--activate"], true, true, SCHEMA, ["ready", "migration-required", "runtime-initialization-required", "runtime-attestation-required", "restart-required", "kickoff-required", "remote-adoption-rolled-back", "remote-adoption-recovery-required"]),
+    requiresHostBoundary: true,
+  };
+  return plan;
+}
+
+function ownedWorktreeSnapshot(root, fs) {
+  const rows = [];
+  for (const name of fs.readdirSync(root).sort()) {
+    if ([".git", ".codex", ".agents"].includes(name)) continue;
+    const path = join(root, name);
+    const info = fs.lstatSync(path);
+    if (info.isSymbolicLink()) throw new Error("remote checkout produced a symbolic link");
+    if (info.isDirectory()) rows.push(...physicalTreeSnapshot(path, fs).map((row) => ({ ...row, path: row.path ? `${name}/${row.path}` : name })));
+    else if (info.isFile() && info.nlink === 1) rows.push({ path: name, kind: "file", dev: String(info.dev), ino: String(info.ino), sha256: sha256(fs.readFileSync(path)) });
+    else throw new Error("remote checkout produced an unsafe worktree entry");
+  }
+  return rows;
+}
+
+function rollbackRemoteAdoption(root, worktree, gitIdentity, gitTree, fs) {
+  try {
+    const current = ownedWorktreeSnapshot(root, fs);
+    if (JSON.stringify(current) !== JSON.stringify(worktree)) throw new Error("remote worktree changed identity before rollback");
+    for (const row of [...worktree].sort((a, b) => b.path.localeCompare(a.path))) {
+      const path = join(root, row.path);
+      if (row.kind === "file") fs.unlinkSync(path);
+      else fs.rmdirSync(path);
+    }
+    const gitPath = join(root, ".git");
+    if (gitIdentity) {
+      if (!sameDirectoryIdentity(gitIdentity, gitPath, fs) || !samePhysicalTree(gitPath, gitTree, fs)) throw new Error("created Git control path changed before rollback");
+      fs.rmSync(gitPath, { recursive: true, force: true });
+    }
+    return null;
+  } catch (error) { return error; }
+}
+
+/** Apply an exact remote plan and then classify the branch's own authority. */
+export function applyProjectRemoteAdoptionV4({ rootDir = process.cwd(), remote, ref, planSha256, activate = false, deps: overrides = {} } = {}) {
+  if (!activate) return { schema: REMOTE_ADOPTION_PLAN_SCHEMA, status: "activation-required", diagnostics: [remoteAdoptionDiagnostic("activation_required", "remote adoption requires explicit activation", "review the digest-bound adoption plan and pass --activate")] };
+  const fs = deps(overrides);
+  const plan = planProjectRemoteAdoptionV4({ rootDir, remote, ref, deps: fs });
+  if (plan.status !== "ready" || plan.planSha256 !== planSha256) return plan;
+  let gitIdentity = null;
+  let gitTree = null;
+  let worktree = [];
+  let checkedOut = false;
+  try {
+    if (plan.target.initializesGit) {
+      runRemoteGit(fs, plan.root, ["init", "--initial-branch=main"]);
+      const gitPath = join(plan.root, ".git");
+      gitIdentity = directoryIdentity(fs.lstatSync(gitPath));
+      if (!gitIdentity) throw new Error("created Git control directory identity is unavailable");
+      gitTree = physicalTreeSnapshot(gitPath, fs);
+    }
+    runRemoteGit(fs, plan.root, ["remote", "add", "origin", plan.remote]);
+    if (gitIdentity) gitTree = physicalTreeSnapshot(join(plan.root, ".git"), fs);
+    runRemoteGit(fs, plan.root, ["fetch", "--no-tags", "origin", `${plan.ref}:refs/remotes/origin/${plan.branch}`]);
+    if (gitIdentity) gitTree = physicalTreeSnapshot(join(plan.root, ".git"), fs);
+    const observed = runRemoteGit(fs, plan.root, ["rev-parse", `refs/remotes/origin/${plan.branch}`]).trim();
+    if (observed !== plan.revision.oid) throw new Error("fetched remote branch no longer matches the digest-bound plan");
+    const names = runRemoteGit(fs, plan.root, ["ls-tree", "-r", "--name-only", plan.revision.oid]).split(/\r?\n/u);
+    if (names.some((name) => [".agents", ".codex"].some((reserved) => name === reserved || name.startsWith(`${reserved}/`)))) {
+      throw new Error("remote branch contains a reserved control path; adoption never moves .agents or .codex");
+    }
+    runRemoteGit(fs, plan.root, ["checkout", "--no-track", "-b", plan.branch, plan.revision.oid]);
+    checkedOut = true;
+    worktree = ownedWorktreeSnapshot(plan.root, fs);
+    if (gitIdentity) gitTree = physicalTreeSnapshot(join(plan.root, ".git"), fs);
+    runRemoteGit(fs, plan.root, ["branch", "--set-upstream-to", `origin/${plan.branch}`, plan.branch]);
+    return v4Inspection(plan.root, fs, "onboarding");
+  } catch (error) {
+    // An owned, newly-created Git control tree can be removed only when both
+    // the checkout tree and Git identity remain exactly the transaction's.
+    // Host-owned control mounts are deliberately left for their owner instead
+    // of pretending a generic local rollback is safe.
+    if (gitIdentity) {
+      const rollbackError = rollbackRemoteAdoption(plan.root, worktree, gitIdentity, gitTree, fs);
+      if (!rollbackError) return { schema: REMOTE_ADOPTION_PLAN_SCHEMA, status: "remote-adoption-rolled-back", root: plan.root, diagnostics: [remoteAdoptionDiagnostic("remote_adoption_rolled_back", error.message, "the exact transaction was rolled back; run the read-only plan again before retrying")] };
+    }
+    return {
+      schema: REMOTE_ADOPTION_PLAN_SCHEMA,
+      status: "remote-adoption-recovery-required",
+      root: plan.root,
+      diagnostics: [remoteAdoptionDiagnostic("remote_adoption_recovery_required", error.message, "the target or host-owned Git control path changed during adoption; preserve it and use the Git owner recovery path")],
+      nextAction: commandAction([ONBOARDING_SCRIPT, "adopt-remote", "plan", "--root", plan.root, "--remote", plan.remote, "--ref", plan.ref], false, false, REMOTE_ADOPTION_PLAN_SCHEMA, ["ready", "target-not-fresh", "remote-unavailable", "remote-ref-unavailable"]),
+    };
   }
 }
 
