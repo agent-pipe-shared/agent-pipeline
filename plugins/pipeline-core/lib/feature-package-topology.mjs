@@ -14,7 +14,7 @@ import { PLAN_LIFECYCLE_STATUSES } from "./plan-spec-state-v2.mjs";
 
 export const FEATURE_PACKAGE_SCHEMA = "pipeline.feature-package.v1";
 export const FEATURE_STATES = Object.freeze([...PLAN_LIFECYCLE_STATUSES, "verifying", "completed", "superseded", "abandoned", "retained"]);
-export const FEATURE_CLASSES = Object.freeze(["prd", "spec", "design", "plan", "acceptance", "result", "candidate-evidence", "supply-chain"]);
+export const FEATURE_CLASSES = Object.freeze(["prd", "spec", "design", "plan", "acceptance", "result", "candidate-evidence", "supply-chain", "threat-model"]);
 const ACTIVE_STATES = new Set(["awaiting-approval", "approved", "implementing", "verifying", "completed"]);
 const SHA256 = /^[a-f0-9]{64}$/u;
 const OID = /^[a-f0-9]{40,64}$/u;
@@ -107,6 +107,7 @@ export function validateFeaturePackage(rootDir = process.cwd(), manifestPath) {
     if (artifact.authority && !["prd", "spec", "acceptance", "result"].includes(artifact.class)) findings.push(`${label}: only authority classes may be authoritative`);
     if (artifact.class === "candidate-evidence" && (artifact.authority || artifact.mutability !== "immutable")) findings.push(`${label}: candidate evidence is immutable non-authority evidence`);
     if (artifact.class === "supply-chain" && (artifact.authority || artifact.mutability !== "immutable")) findings.push(`${label}: supply-chain evidence is immutable non-authority evidence`);
+    if (artifact.class === "threat-model" && (artifact.authority || artifact.mutability !== "immutable")) findings.push(`${label}: threat-model evidence is immutable non-authority evidence`);
     classes.set(artifact.class, [...(classes.get(artifact.class) ?? []), artifact]);
   }
   const required = value?.state === "draft" ? ["prd"] : ACTIVE_STATES.has(value?.state) ? ["prd", "spec", "acceptance", "result", "candidate-evidence"] : [];
