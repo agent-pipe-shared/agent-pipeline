@@ -13,4 +13,5 @@ assert.deepEqual(exportThreatModelView({ classification: "private", entities: [{
 assert.deepEqual(previewThreatModelMigration({ hasCanonicalModel: false }).writes, []);
 assert.equal(validateThreatModel({ schema: "pipeline.threat-model.v1", candidate: { commit: "a", tree: "b" }, policyRevision: "p", classification: "private", entities: [], lifecycle: "proposed" }).valid, true);
 assert.equal(validateSecurityRequirement({ schema: "pipeline.security-requirement.v1", id: "R1", candidate: { commit: "a", tree: "b" }, policyRevision: "p", links: [{ kind: "threat", id: "T1" }], state: "proposed" }).valid, true);
-console.log("11 threat-model checks passed");
+assert.equal(validateSecurityRequirement({ schema: "pipeline.security-requirement.v1", id: "R1", candidate: { commit: "a", tree: "b" }, policyRevision: "p", links: [{ kind: "threat", id: "T1" }], state: "proposed", approved: true }).valid, false);
+console.log("12 threat-model checks passed");
