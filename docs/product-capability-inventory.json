@@ -1157,6 +1157,12 @@
       "member": "stack-fuzz-replay-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:stack-discovery-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "stack-discovery-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:stack-run-outcome-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1953,6 +1959,7 @@
         "verify-phase:harness/scripts/verify.mjs:spec-retention-check",
         "verify-phase:harness/scripts/verify.mjs:spec-retention-tests",
         "verify-phase:harness/scripts/verify.mjs:stack-adapter-contract-tests",
+        "verify-phase:harness/scripts/verify.mjs:stack-discovery-tests",
         "verify-phase:harness/scripts/verify.mjs:stack-dynamic-boundary-tests",
         "verify-phase:harness/scripts/verify.mjs:stack-fuzz-replay-tests",
         "verify-phase:harness/scripts/verify.mjs:stack-run-outcome-tests",

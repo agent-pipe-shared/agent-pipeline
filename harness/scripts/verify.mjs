@@ -260,6 +260,7 @@ const TEST_SUITES = [
   { name: "stack-adapter-contract-tests", file: join(libDir, "stack-adapter-contract.test.mjs") },
   { name: "stack-dynamic-boundary-tests", file: join(libDir, "stack-dynamic-boundary.test.mjs") },
   { name: "stack-fuzz-replay-tests", file: join(libDir, "stack-fuzz-replay.test.mjs") },
+  { name: "stack-discovery-tests", file: join(libDir, "stack-discovery.test.mjs") },
   { name: "stack-run-outcome-tests", file: join(libDir, "stack-run-outcome.test.mjs") },
   { name: "threat-model-discovery-tests", file: join(libDir, "threat-model-discovery.test.mjs") },
   { name: "threat-model-fixture-matrix-tests", file: join(libDir, "threat-model-fixture-matrix.test.mjs") },
