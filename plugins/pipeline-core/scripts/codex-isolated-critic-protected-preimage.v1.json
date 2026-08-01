@@ -1,6 +1,6 @@
 {
   "schema": "pipeline.codex-isolated-critic-protected-preimage.v1",
-  "baselineLabel": "post-storm-v0.4.6-candidate",
+  "baselineLabel": "nova-autonomous-critic-review-policy",
   "files": [
     {
       "path": "harness/review-protocol.md",
@@ -8,7 +8,7 @@
     },
     {
       "path": "plugins/pipeline-core/agents/critic.md",
-      "rawSha256": "473db40b151dea5995fe464e973742b720ab101eeb5d3a83161dfd46ae228dac"
+      "rawSha256": "325b30ea172e47d4973c9de0f977e04749321c4a549dbaed53b3f60cf5a648ed"
     },
     {
       "path": "plugins/pipeline-core/scripts/codex-critic-dispatch.schema.json",
@@ -32,11 +32,11 @@
     },
     {
       "path": "plugins/pipeline-core/skills/critic-review/SKILL.md",
-      "rawSha256": "48ef7129d0528e73ee77513ec386d35f125a35ee4f7d2e83693e570232bc0f13"
+      "rawSha256": "aeddc7d36af9e180947bf119c36e6d0668229da8e18f825370f79687ce1cf8b0"
     },
     {
       "path": "roles/critic.md",
-      "rawSha256": "d6835f6118cc4effafc777300e2427468971eaa26b2b73e00fa43ab34b8cb44d"
+      "rawSha256": "7bdcc71d1c4a0a4663101c193f63db8620928e46e55c1f677f9a7d1cd0286bf3"
     }
   ]
 }

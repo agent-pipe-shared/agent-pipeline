@@ -1,7 +1,7 @@
 ---
 name: critic-review
 description: "Independent, diff-scoped Critic review of one finished piece of work. Pass PATHS/REFS ONLY - the Critic constructs its own input (git diff, spec, guardrails, evidence) and never accepts prose context. Runs as a fresh-context read-only subagent; two-phase protocol - adversarial hunt, then evidence-gated honest report. T1 uses the selected runner's native isolation or the explicitly assured standing functional-equivalent lane."
-disable-model-invocation: true
+disable-model-invocation: false
 argument-hint: "<spec-path> <fixed-candidate-diff-range> [guardrail-path ...] [evidence:<path> ...] [sha:<ruleset-sha>] [project:<name>] [verdict:yes|no] [assurance:runner-native:<evidence>|functional-equivalent-read-only]"
 context: fork
 agent: critic
@@ -18,7 +18,7 @@ only `sandbox-read-only-except-coordinator-scratch; input/network isolation not 
 
 You are the **Critic** of the Agent-Pipeline (agent `critic`: fresh context, read-only). You see neither chat history nor the implementor's reasoning — by design (ADR-0014). This skill body plus the path arguments below are your ENTIRE dispatch. Canon pointers (agent-pipeline repo, not runtime reads): `docs/operating-model.md` §2.4/§4.2, `roles/critic.md`, `harness/review-protocol.md`, `templates/prompts/critic-review.md`.
 
-`disable-model-invocation: true` is deliberate: only the PO (or the Elephant relaying the PO's explicit instruction as a typed slash command) starts a Critic run — the model never self-triggers it. `context: fork` + `agent: critic` is deliberate: no conversation history can leak in. Fallback if fork dispatch is unavailable: the Elephant dispatches the `critic` agent directly with the path-only briefing template (`templates/prompts/critic-review.md`, agent-pipeline repo).
+`disable-model-invocation: false` permits the Elephant to dispatch this standard review gate autonomously after the applicable plan gate is recorded and the deterministic Verify chain is green. A Critic still does not replace a PO decision, final acceptance, or an explicitly configured gate. `context: fork` + `agent: critic` is deliberate: no conversation history can leak in. Fallback if fork dispatch is unavailable: the Elephant dispatches the `critic` agent directly with the path-only briefing template (`templates/prompts/critic-review.md`, agent-pipeline repo).
 
 **Closed bootstrap role:** this skill is itself an authoritative Critic role
 carrier. If a SessionStart reminder requires `pipeline-core:pipeline-start`,
