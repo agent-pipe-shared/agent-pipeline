@@ -200,7 +200,7 @@ function localCommitExists(root, oid) {
   return result.status === 0;
 }
 
-function reachabilityAmendmentFindings(root, event) {
+export function reachabilityAmendmentFindings(root, event) {
   const findings = [];
   const label = `ledger event ${event.sequence}`;
   const reference = event?.evidence?.reference;
@@ -220,9 +220,10 @@ function reachabilityAmendmentFindings(root, event) {
   const historicalSha = historical.status === 0
     ? createHash("sha256").update(historical.stdout).digest("hex")
     : null;
-  const currentSha = createHash("sha256").update(readFileSync(join(root, reference))).digest("hex");
-  if (historicalSha !== event.evidence.referenceSha256
-    || currentSha !== event.evidence.referenceSha256) {
+  // The amendment binds the exact historical projection at evidence.commit.
+  // Current item bytes are deliberately not part of that historical binding:
+  // they may legitimately evolve, including in a later ledger recovery.
+  if (historicalSha !== event.evidence.referenceSha256) {
     findings.push(`${label}: referenceSha256 does not bind the exact retained projection`);
   }
   return findings;

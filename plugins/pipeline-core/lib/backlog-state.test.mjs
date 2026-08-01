@@ -5,6 +5,7 @@ import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, 
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createHash } from "node:crypto";
+import { spawnSync } from "node:child_process";
 
 import {
   EVIDENCE_AMENDMENT_SCHEMA,
@@ -41,6 +42,7 @@ import {
   planSentinelBacklogRecovery,
   planSentinelScopeExtension,
   recoverBacklogTransaction,
+  reachabilityAmendmentFindings,
   writeBacklogProjections,
 } from "../scripts/check-backlog-state.mjs";
 
@@ -287,6 +289,11 @@ function fixtureRoot() {
   write(root, "backlog/schemas/index.schema.json", JSON.stringify({ $id: "pipeline.backlog-index.v1" }));
   return root;
 }
+function git(root, args) {
+  const result = spawnSync("git", args, { cwd: root, encoding: "utf8" });
+  if (result.status !== 0) throw new Error(`git ${args.join(" ")} failed: ${result.stderr}`);
+  return result.stdout.trim();
+}
 function snt1Result() {
   const surfaces = ["LICENSE", "LICENSE-DOCS", "NOTICE", "CONTRIBUTING.md", "README.md", "docs/licensing.md", "third-party-licenses.json"].map((path, index) => ({ path, sha256: String(index + 1).repeat(64) }));
   const surfaceSetSha256 = createHash("sha256").update(canonicalJson(surfaces)).digest("hex");
@@ -464,6 +471,41 @@ function managedRepairInput(root, overrides = {}) {
     written.ok && written.wrote && valid.ok
       && drift.findings.some((finding) => finding.includes("STATUS.md projection drift"))
       && readFileSync(join(root, "backlog/index.json"), "utf8").includes("pipeline.backlog-index.v1"), drift.findings.join("; "));
+}
+
+{
+  const root = fixtureRoot();
+  const reference = "backlog/items/example.md";
+  const historicalBytes = Buffer.from("status: open\n");
+  const currentBytes = Buffer.from("status: in_progress\n");
+  write(root, reference, historicalBytes);
+  git(root, ["init", "-q"]);
+  git(root, ["add", reference]);
+  git(root, ["-c", "user.email=tests@example.invalid", "-c", "user.name=Pipeline Tests", "commit", "-qm", "fixture"]);
+  const commit = git(root, ["rev-parse", "HEAD"]);
+  const blobOid = git(root, ["rev-parse", `HEAD:${reference}`]);
+  write(root, reference, currentBytes);
+  const amendment = {
+    sequence: 2,
+    id: "pipeline.example",
+    from: "open",
+    to: "open",
+    evidence: {
+      kind: "reachability-amendment",
+      commit,
+      reference,
+      referenceBlobOid: blobOid,
+      referenceSha256: createHash("sha256").update(historicalBytes).digest("hex"),
+    },
+  };
+  const validCurrentDrift = reachabilityAmendmentFindings(root, amendment);
+  const tamperedHistorical = structuredClone(amendment);
+  tamperedHistorical.evidence.referenceSha256 = createHash("sha256").update("wrong").digest("hex");
+  const rejectedHistorical = reachabilityAmendmentFindings(root, tamperedHistorical);
+  check("BS19 reachability amendment binds its historical blob without pinning current item bytes",
+    validCurrentDrift.length === 0
+      && rejectedHistorical.some((finding) => finding.includes("referenceSha256")),
+    [...validCurrentDrift, ...rejectedHistorical].join("; "));
 }
 
 {
