@@ -397,6 +397,14 @@ check("kickoff plan is deterministic, closed, valid, and read-only", () => {
   assert.match(first.targets.prd.content, /^<!-- po-language: en -->$/mu);
 });
 
+check("kickoff resolves the PO language from a neutral runtime manifest", () => {
+  const root = fixture("neutral-language", { neutral: true });
+  writeFileSync(join(root, "pipeline.user.yaml"), "language:\n  human_facing: de\n");
+  writeFileSync(join(root, "project", "pipeline.yaml"), "language:\n  human_facing: de\n");
+  const plan = planOnboardingKickoff({ rootDir: root, goal: "Ein neutrales Projekt starten" });
+  assert.match(plan.targets.prd.content, /^<!-- po-language: de -->$/mu);
+});
+
 check("apply requires activation and the exact plan digest", () => {
   const root = fixture("apply-auth");
   const plan = planOnboardingKickoff({ rootDir: root, goal: "Create a product" });

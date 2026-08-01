@@ -76,6 +76,15 @@ or accepted from a project file.
    incompatible workspace sandbox. This avoids false `EPERM`, invalid-layout,
    socket-unavailable, and DNS results without widening mutation authority,
    project access, Critic/Advisor isolation, or assurance.
+10. Native Codex-goal reconciliation is a local host-control boundary. The
+    adapter accepts only the Unix-socket path returned in memory by the
+    sanctioned health observation, never an endpoint from project authority or
+    user content. Before connecting it requires a same-UID, non-symlink Unix
+    socket with no group/world permissions; it then requires a bounded
+    WebSocket upgrade whose accept value matches its fresh client nonce. It
+    accepts bounded unmasked server frames only, resolves exactly one active
+    thread whose `cwd` equals the project root, and keeps the socket path and
+    raw thread ID out of Pipeline State and evidence.
 
 ## Attacker capabilities
 
@@ -83,9 +92,10 @@ The model assumes an attacker or concurrent process may alter project files,
 replace a target between plan and commit, replay or duplicate a ticket, inject
 a foreign private-state file, present a wrong executable/helper identity,
 reuse the writer generation, race barrier publication, forge App-Server
-availability, or invoke a write through Bash instead of a structured edit
-tool. It also assumes project content may contain shell metacharacters and
-paths with spaces.
+availability or its socket endpoint, send malformed or oversized WebSocket
+frames, return multiple/stale foreign thread candidates, or invoke a write
+through Bash instead of a structured edit tool. It also assumes project
+content may contain shell metacharacters and paths with spaces.
 
 The model does not treat a same-user fully compromised host as a secret-safe
 execution environment. OS isolation is supplied by the selected host
@@ -118,6 +128,12 @@ transport, not invented by onboarding.
 - Lifecycle admission is intent-bound. Stronger session and dispatch intents
   repeat their capability probes and cannot reuse onboarding/bootstrap
   readiness.
+- The App-Server goal adapter is client-only: it never starts or restarts a
+  server, discovers no endpoint from repository data, sends only bounded
+  JSON-RPC frames, and treats socket, handshake, frame, response, thread, or
+  readback ambiguity as typed unavailable evidence. A `set` or `clear` action
+  is not a Pipeline success claim until its exact `thread/goal/get` readback
+  verifies the requested state.
 - Host initialization first durably publishes a private pending intent bound
   to the reviewed plan and root. It exclusively reserves `.git`, durably binds
   that directory's device/inode identity before `git init`, and records the

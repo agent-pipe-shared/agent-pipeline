@@ -55,8 +55,10 @@ import { resolveOnboardingPrivateState } from "./codex-onboarding-runtime.mjs";
 import { readState as readSanctionedState } from "../scripts/continuity-status.mjs";
 import {
   LEGACY_CALIBRATION,
+  LEGACY_MANIFEST,
   LEGACY_STATE,
   NEUTRAL_CALIBRATION,
+  NEUTRAL_MANIFEST,
   NEUTRAL_STATE,
   resolveProjectAuthorityPaths,
   validatePortablePipelineState,
@@ -2754,22 +2756,33 @@ function initialAuthorityPaths(featureId) {
 
 function kickoffLanguage(root) {
   const userPath = join(root, "pipeline.user.yaml");
-  const runtimePath = join(root, ".claude", "pipeline.yaml");
+  // `project/` is the canonical runner-neutral authority.  The legacy
+  // `.claude/` projection remains a compatibility input only when a neutral
+  // runtime manifest is absent.  Do not ask resolveProjectAuthorityPaths here:
+  // a pristine kickoff intentionally has no State yet, so that resolver is not
+  // ready even when its manifest is the selected authority.
+  const neutralRuntimePath = join(root, NEUTRAL_MANIFEST);
+  const legacyRuntimePath = join(root, LEGACY_MANIFEST);
   let userBytes = null;
   let runtimeBytes = null;
   try { userBytes = readFileSync(userPath); } catch (error) {
     if (error?.code !== "ENOENT") fail("KICKOFF-PLAN-INVALID", "kickoff PO-language projection is unavailable");
   }
-  try { runtimeBytes = readFileSync(runtimePath); } catch (error) {
+  try { runtimeBytes = readFileSync(neutralRuntimePath); } catch (error) {
     if (error?.code !== "ENOENT") fail("KICKOFF-PLAN-INVALID", "kickoff PO-language projection is unavailable");
   }
-  // The standalone continuity planner is also used for pre-runtime recovery
-  // fixtures.  With neither projection present there is no configured language
-  // to preserve, so retain the historical canonical English seed.  A partial
-  // or malformed projection remains a closed error rather than being masked by
-  // this compatibility default.
-  if (userBytes === null && runtimeBytes === null) return "en";
-  if (userBytes === null || runtimeBytes === null) {
+  if (runtimeBytes === null) {
+    try { runtimeBytes = readFileSync(legacyRuntimePath); } catch (error) {
+      if (error?.code !== "ENOENT") fail("KICKOFF-PLAN-INVALID", "kickoff PO-language projection is unavailable");
+    }
+  }
+  // The standalone continuity planner is also used before a portable source
+  // exists.  Without that source there is no configured PO language to
+  // preserve, even if a neutral pre-runtime fixture already has a manifest, so
+  // retain the historical canonical English seed.  Once the source exists,
+  // however, it must agree with the selected runtime projection.
+  if (userBytes === null) return "en";
+  if (runtimeBytes === null) {
     fail("KICKOFF-PLAN-INVALID", "kickoff PO-language projection is unavailable");
   }
   let projection;
