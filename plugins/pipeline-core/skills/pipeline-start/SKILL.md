@@ -141,6 +141,16 @@ Do not overwrite an existing package; choose an unambiguous suffix after a
 readback. The promotion's `--profile`, feature ID, plan path, PRD path and Spec
 path must bind to that package exactly.
 
+Treat that named package as a pre-authority staging set: write and review its
+PRD, Spec, and `design-input.md` there first, then run `kickoff promote plan`
+and only its digest-bound `kickoff promote apply` to bind their exact paths and
+hashes to State in one sanctioned transition. Never edit the active provisional
+`specs/kickoff-*` PRD/Spec, or any already bound PRD/Spec, merely to add richer
+design documentation. Do not invoke a repair, generic continuity CAS, manifest
+repair, or hash-rebinding cascade solely because a new design package was
+created. After promotion, a material change to a bound PRD/Spec follows the
+ordinary reviewed planning/rebind path; it is not a document cleanup.
+
 `design-input.md` is source evidence, not an unbounded conversation dump. It
 records a faithful, sanitised structured extraction of the material input
 (context, goals/non-goals, requested behaviour, constraints, risks, open
@@ -151,6 +161,11 @@ detailed design into the initial one-line goal. Never persist private
 identifiers, credentials, host paths, URLs, commands, or raw transcripts; when
 such data is material, record only a redacted statement and a digest/reference
 that is safe for the repository.
+
+The source-evidence file is immutable after its PRD/Spec reference is bound.
+If the design input materially changes, create a new safely named evidence
+version and promote/rebind it through the ordinary planning change, rather than
+rewriting an old evidence file and provoking authority-hash drift.
 
 For material input, replace the bootstrap placeholders with a useful PRD and
 Spec before a normal plan gate. The PRD covers problem/users, outcomes and

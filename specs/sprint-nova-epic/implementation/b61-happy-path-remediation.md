@@ -24,6 +24,11 @@ specification layout, and proportionate visual flow documentation.
    decorative diagram.
 5. A restart, session cut, or Compact after material input continues to use the
    existing bounded Resume-Hint capture/readback rule.
+6. The named package is prepared before it becomes active authority and is
+   bound exactly once by the existing digest-bound kickoff-promotion transaction.
+   Creating richer documentation must not invoke repair, generic continuity CAS,
+   manifest repair, or a SHA-rebinding cascade. A later material authority
+   change follows the normal reviewed rebind lifecycle instead.
 
 ## Verification
 
@@ -38,7 +43,9 @@ The evidence artifact is a bounded repository document. It must not contain
 credentials, host paths, private identifiers, raw commands, URLs, or an
 unfiltered conversation transcript. Existing kickoff transaction schemas and
 their immutable `kickoff-*` anchors are retained; promotion is the compatible
-long-term naming transition.
+long-term naming transition. The source-evidence file is immutable after it is
+referenced; changed input becomes a new version through ordinary planning,
+rather than a rewrite that creates hash drift.
 
 ## Rollback
 

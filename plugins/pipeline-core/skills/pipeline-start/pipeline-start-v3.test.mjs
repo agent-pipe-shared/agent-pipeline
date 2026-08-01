@@ -38,4 +38,8 @@ assert.match(core, /`specs\/YYYY-MM-DD_short-topic\/`/u);
 assert.match(core, /`prd_short-topic\.md`, `spec\.md`, and `design-input\.md`/u);
 assert.match(core, /The PRD and Spec both\nlink to it and carry a compact traceability table/u);
 assert.match(core, /include a valid Mermaid flow\/sequence\/state diagram wherever it materially\nclarifies that flow/u);
+assert.match(core, /Treat that named package as a pre-authority staging set/u);
+assert.match(core, /only its digest-bound `kickoff promote apply` to bind their exact paths and\nhashes to State in one sanctioned transition/u);
+assert.match(core, /Do not invoke a repair, generic continuity CAS, manifest\nrepair, or hash-rebinding cascade solely because a new design package was\ncreated/u);
+assert.match(core, /The source-evidence file is immutable after its PRD\/Spec reference is bound/u);
 process.stdout.write("pipeline-start V3: core budget and lazy-reference checks passed\n");
