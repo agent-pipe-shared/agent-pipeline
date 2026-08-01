@@ -85,3 +85,27 @@ Only the future Human Governance Decision Ledger may establish human
 authority.  Agent and lifecycle events are observational.  No projection,
 export, viewer, index, or external integration is accepted by the authority
 resolver.
+
+## Human governance decisions
+
+The `human` stream carries only the closed
+`pipeline.human-governance-decision.v1` payload. A portable decision records a
+non-identifying authority class, assurance, exact repository/candidate/package/
+artifact/action/environment scope, stable reason code, policy and rule digests,
+validity, and linked lifecycle disposition. It never records a person name,
+pseudonym, free-form rationale, command, transcript, private path, or secret.
+
+The canonical lifecycle is `requested`, `granted`, `denied`, `cancelled`,
+`consumed`, `revoked`, `expired`, `corrected`, and `superseded`. A grant links
+one request; a consuming, revoking, correcting, or superseding record links
+the granted decision it disposes. No portable record is rewritten. The resolver
+returns authority only for one exact grant whose physical repository and
+candidate match, whose validity window contains the evaluation time, and which
+has no terminal disposition. Missing, duplicated, stale, cross-repository, or
+ambiguous records deny authority.
+
+For restricted attribution or rationale, store the complete decision only via
+the separate restricted profile. It has no portable counterpart or join
+handle. Erasure and key destruction prove only their documented active-store
+boundaries; a missing restricted record can never be reconstructed into
+portable authority.
