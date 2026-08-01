@@ -1,6 +1,6 @@
 # CYB-7 — provenance + artifact integrity (feature spec)
 
-> **Status: DRAFT, design-phase, pre-gate.** Translates issue #45 (fetched
+> **Status: IMPLEMENTATION, PO-authorized 2026-08-01.** Translates issue #45 (fetched
 > verbatim via `gh issue view 45`, 2026-07-25) into checkable form. Phase III,
 > depends on CYB-1 (catalog) and CYB-3/SBOM subject links. Not dispatched.
 
@@ -85,7 +85,6 @@ soft, one-directional).
 
 ## 8. Gate
 
-Universal package rule. Schema/local-builder/digest-enforcement/attestation-
-fixture work can proceed alongside CYB-4/CYB-6 (issue's own "Parallelism"
-note); final release binding consumes CYB-3's approved SBOM contract. No
-dispatch yet.
+Universal package rule. The Sprint Cyborg PO direction of 2026-08-01
+authorizes schema, local-builder, digest-enforcement and attestation-fixture
+work. Final release binding still consumes CYB-3's approved SBOM contract.
