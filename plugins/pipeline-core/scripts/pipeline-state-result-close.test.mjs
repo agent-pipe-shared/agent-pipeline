@@ -193,7 +193,11 @@ test("confirmed apply changes only the bounded continuity fields and exact repla
   const planned = plan(f);
   const applied = invoke(f.root, planned.applyAction.argv.slice(1));
   assert.equal(applied.status, 0, applied.stderr);
-  assert.equal(JSON.parse(applied.stdout).status, "applied");
+  const appliedReceipt = JSON.parse(applied.stdout);
+  assert.equal(appliedReceipt.status, "applied");
+  assert.deepEqual(appliedReceipt.completion, {
+    scope: "feature-closure", state: "in-progress", nextAction: "close", workflowTerminal: false,
+  });
   const after = JSON.parse(readFileSync(f.statePath, "utf8"));
   const expected = structuredClone(f.state);
   expected.continuity.revision = f.revision + 1;

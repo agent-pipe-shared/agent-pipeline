@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const core = readFileSync(join(here, "SKILL.md"), "utf8");
+const closeBlock = readFileSync(join(here, "..", "close-block", "SKILL.md"), "utf8");
 const refs = ["onboarding-recovery.md", "private-overlay.md", "roles.md", "freshness.md", "failure-cases.md", "continuation.md"]
   .map((name) => readFileSync(join(here, "references", name), "utf8")).join("\n");
 const all = `${core}\n${refs}`;
@@ -42,4 +43,10 @@ assert.match(core, /Treat that named package as a pre-authority staging set/u);
 assert.match(core, /only its digest-bound `kickoff promote apply` to bind the PRD\/Spec in State\nand the source-evidence path\/hash in the same immutable continuity transaction\./u);
 assert.match(core, /Do not invoke a repair, generic continuity CAS, manifest\nrepair, or hash-rebinding cascade solely because a new design package was\ncreated/u);
 assert.match(core, /The source-evidence file is immutable after its PRD\/Spec reference is bound/u);
+assert.match(core, /Normal restart is handover-only/u);
+assert.match(core, /Never invoke `close-block`, `close-feature`, or the close\n   coordinator merely to start a new chat/u);
+assert.match(closeBlock, /Hard entry gate — never close a normal restart/u);
+assert.match(closeBlock, /CLOSE-INTENT-REQUIRED/u);
+assert.match(closeBlock, /`durable-stop` or `runtime-transfer`/u);
+assert.match(closeBlock, /Do \*\*not\*\* invoke `close-block`, `close-feature`, `close-coordinator`, Verify/u);
 process.stdout.write("pipeline-start V3: core budget and lazy-reference checks passed\n");

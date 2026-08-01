@@ -24,6 +24,7 @@ import {
 } from "../lib/project-authority.mjs";
 import {
   advanceCloseCoordinator,
+  coordinatorCompletion,
   coordinatorNextPhases,
   COORDINATOR_PHASES,
   createCloseCoordinator,
@@ -42,6 +43,7 @@ const STATE_WRITER = fileURLToPath(new URL("./pipeline-state.mjs", import.meta.u
 const SHA256 = /^[0-9a-f]{64}$/u;
 const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/u;
 const ID = /^[A-Za-z0-9._-]{1,100}$/u;
+const CLOSE_INTENTS = new Set(["durable-stop", "runtime-transfer"]);
 const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
 
 const canonical = (value) => {
@@ -196,6 +198,7 @@ function action(command, values, planSha256) {
     "--lifecycle", values.lifecycle,
     "--actor", values.actor,
   ];
+  if (values.closeIntent) argv.push("--close-intent", values.closeIntent);
   if (values.phase) argv.push("--phase", values.phase);
   if (values.evidence) argv.push("--evidence", values.evidence);
   if (values.publication) argv.push("--publication", values.publication);
@@ -215,6 +218,9 @@ function action(command, values, planSha256) {
 function startPlan(values) {
   const root = physicalRoot(values.root);
   if (!ID.test(values.lifecycle ?? "") || typeof values.actor !== "string" || values.actor.trim() === "") fail("CLOSE-ARGS", "start identity is invalid");
+  if (!CLOSE_INTENTS.has(values.closeIntent)) {
+    fail("CLOSE-INTENT", "close coordinator requires --close-intent durable-stop or runtime-transfer; normal same-topic restarts are handover-only");
+  }
   const snapshot = stateSnapshot(root);
   const observed = authorityFromState(root, snapshot);
   const coordinator = createCloseCoordinator({
@@ -228,6 +234,7 @@ function startPlan(values) {
     root,
     lifecycleId: values.lifecycle,
     actor: values.actor.trim(),
+    closeIntent: values.closeIntent,
     stateSha256: snapshot.sha256,
     coordinator,
   };
@@ -526,13 +533,35 @@ function applyStart(values, suppliedDigest) {
     const prior = readCloseCoordinator(common, plan.lifecycleId);
     if (lifecycleDigest(prior.coordinator) === lifecycleDigest(plan.coordinator)) {
       const evidenceDirectory = ensurePrivateDirectory(join(publicationClosePaths(common, plan.lifecycleId).directory, "evidence"));
-      return { schema: "pipeline.close-coordinator.apply.v1", status: "replayed", phase: prior.coordinator.phase, stateSha256: lifecycleDigest(prior.coordinator), rawSha256: prior.rawDigest, evidenceDirectory };
+      const completion = coordinatorCompletion(prior.coordinator.phase);
+      return {
+        schema: "pipeline.close-coordinator.apply.v1",
+        status: "replayed",
+        phase: prior.coordinator.phase,
+        completion,
+        identity: { lifecycleId: prior.coordinator.lifecycleId, featureId: prior.coordinator.featureId },
+        integrity: { coordinatorStateSha256: lifecycleDigest(prior.coordinator), persistedRecordSha256: prior.rawDigest },
+        stateSha256: lifecycleDigest(prior.coordinator),
+        rawSha256: prior.rawDigest,
+        evidenceDirectory,
+      };
     }
     fail("CLOSE-EXISTS", "a different coordinator already owns this lifecycle");
   }
   const stored = storeCloseCoordinator({ gitCommonDir: common, coordinator: plan.coordinator, expectedRawSha256: null });
   const evidenceDirectory = ensurePrivateDirectory(join(publicationClosePaths(common, plan.lifecycleId).directory, "evidence"));
-  return { schema: "pipeline.close-coordinator.apply.v1", status: "applied", phase: plan.coordinator.phase, stateSha256: lifecycleDigest(plan.coordinator), rawSha256: stored.rawDigest, evidenceDirectory };
+  const completion = coordinatorCompletion(plan.coordinator.phase);
+  return {
+    schema: "pipeline.close-coordinator.apply.v1",
+    status: "applied",
+    phase: plan.coordinator.phase,
+    completion,
+    identity: { lifecycleId: plan.coordinator.lifecycleId, featureId: plan.coordinator.featureId },
+    integrity: { coordinatorStateSha256: lifecycleDigest(plan.coordinator), persistedRecordSha256: stored.rawDigest },
+    stateSha256: lifecycleDigest(plan.coordinator),
+    rawSha256: stored.rawDigest,
+    evidenceDirectory,
+  };
 }
 function applyTransition(values, suppliedDigest) {
   const root = physicalRoot(values.root);
@@ -541,10 +570,14 @@ function applyTransition(values, suppliedDigest) {
   const priorEffect = prior.coordinator.effects.at(-1);
   if (prior.coordinator.phase === values.phase) {
     if (priorEffect?.operationSha256 === suppliedDigest) {
+      const completion = coordinatorCompletion(prior.coordinator.phase);
       return {
         schema: "pipeline.close-coordinator.apply.v1",
         status: "replayed",
         phase: prior.coordinator.phase,
+        completion,
+        identity: { lifecycleId: prior.coordinator.lifecycleId, featureId: prior.coordinator.featureId },
+        integrity: { coordinatorStateSha256: lifecycleDigest(prior.coordinator), persistedRecordSha256: prior.rawDigest },
         stateSha256: lifecycleDigest(prior.coordinator),
         rawSha256: prior.rawDigest,
       };
@@ -567,6 +600,9 @@ function applyTransition(values, suppliedDigest) {
     schema: "pipeline.close-coordinator.apply.v1",
     status: saved.written ? "applied" : "replayed",
     phase: next.phase,
+    completion: coordinatorCompletion(next.phase),
+    identity: { lifecycleId: next.lifecycleId, featureId: next.featureId },
+    integrity: { coordinatorStateSha256: lifecycleDigest(next), persistedRecordSha256: saved.rawDigest },
     stateSha256: lifecycleDigest(next),
     rawSha256: saved.rawDigest,
   };
@@ -597,7 +633,14 @@ function applyTransition(values, suppliedDigest) {
 const [command, ...argv] = process.argv.slice(2);
 try {
   if (command === "next" && argv.length === 1 && COORDINATOR_PHASES.includes(argv[0])) {
-    emit({ schema: "pipeline.close-coordinator.next.v1", phase: argv[0], next: coordinatorNextPhases(argv[0]), terminal: ["closed-local", "delivered", "promoted"].includes(argv[0]) });
+    const completion = coordinatorCompletion(argv[0]);
+    emit({
+      schema: "pipeline.close-coordinator.next.v1",
+      phase: argv[0],
+      next: completion.next,
+      terminal: completion.workflowTerminal,
+      completion,
+    });
   } else if (command === "inspect") {
     const parsed = exactArgs(argv, new Set(["root", "lifecycle"]));
     if (!parsed || !parsed.values.root || !ID.test(parsed.values.lifecycle ?? "")) fail("CLOSE-ARGS", "inspect arguments invalid");
@@ -607,15 +650,18 @@ try {
     emit({
       schema: "pipeline.close-coordinator.inspect.v1",
       coordinator: stored.coordinator,
+      completion: coordinatorCompletion(stored.coordinator.phase),
+      identity: { lifecycleId: stored.coordinator.lifecycleId, featureId: stored.coordinator.featureId },
+      integrity: { coordinatorStateSha256: lifecycleDigest(stored.coordinator), persistedRecordSha256: stored.rawDigest },
       stateSha256: lifecycleDigest(stored.coordinator),
       rawSha256: stored.rawDigest,
       evidenceDirectory: join(publicationClosePaths(common, parsed.values.lifecycle).directory, "evidence"),
       next: coordinatorNextPhases(stored.coordinator.phase),
     });
   } else if (command === "plan-start" || command === "apply-start") {
-    const parsed = exactArgs(argv, new Set(["root", "lifecycle", "actor", "plan-sha256"]), new Set(["activate"]));
-    if (!parsed || !parsed.values.root || !parsed.values.lifecycle || !parsed.values.actor) fail("CLOSE-ARGS", `${command} arguments invalid`);
-    const values = { root: parsed.values.root, lifecycle: parsed.values.lifecycle, actor: parsed.values.actor };
+    const parsed = exactArgs(argv, new Set(["root", "lifecycle", "actor", "close-intent", "plan-sha256"]), new Set(["activate"]));
+    if (!parsed || !parsed.values.root || !parsed.values.lifecycle || !parsed.values.actor || !CLOSE_INTENTS.has(parsed.values["close-intent"])) fail("CLOSE-INTENT", `${command} requires --close-intent durable-stop or runtime-transfer`);
+    const values = { root: parsed.values.root, lifecycle: parsed.values.lifecycle, actor: parsed.values.actor, closeIntent: parsed.values["close-intent"] };
     if (command === "plan-start") {
       if (parsed.values["plan-sha256"] || parsed.booleans.activate) fail("CLOSE-ARGS", "plan-start is read-only");
       emit(startPlan(values));

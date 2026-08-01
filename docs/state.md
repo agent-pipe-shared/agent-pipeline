@@ -16,6 +16,37 @@ the supplied authoritative release identity; it is not a claimed release time.
 The historical 0.4.7 candidate-qualification section below is retained as
 session history and no longer describes the current publication disposition.
 
+## 2026-08-01 Nova — handover-only session cut (current)
+
+- This is a normal continuation of Sprint Nova, **not** a durable block or
+  feature closure. The next session must run the ordinary pipeline bootstrap
+  and continue from this handover; it must not invoke `close-block`, advance
+  the close coordinator, close the active feature, publish, install a plugin,
+  or perform cleanup merely because the session restarted.
+- The source candidate and loaded local plugin are both
+  `0.4.7+codex.20260801220243`; Bootstrap reports `ready`. No plugin
+  installation, marketplace update, daemon restart, push, release, or
+  publication occurred in this session.
+- Working-tree changes are intentionally uncommitted: they add
+  a canonical `completion` readback to close-coordinator and Result-close
+  receipts. The concrete defect is that `closed-local` previously emitted
+  both `terminal: true` and `next: ["release-eligible"]`. The replacement
+  makes `terminal` mean only “no successor in the Coordinator state machine”
+  and separately reports whether the *feature-closure* scope is complete.
+  Focused coordinator, Result-close, Result-bootstrap, and bootstrap-skill
+  tests are green; the full Verify is still pending the commit of this
+  candidate.
+- A private Coordinator record was mistakenly initialized and moved only to
+  `checkpointed` while preparing this session cut. It left the active feature
+  and all tracked project state untouched. Treat it solely as an audited
+  in-progress checkpoint; do not advance it during the normal continuation.
+- The close boundary is now hardened in both the skill and the executable
+  coordinator: a normal same-topic restart has a handover-only route, while
+  coordinator start requires a digest-bound `durable-stop` or
+  `runtime-transfer` intent before it can write private state. Next: commit
+  this candidate, run full Verify and Critic review, then create a local
+  candidate only. Installation remains a separate PO-authorized action.
+
 ## 2026-07-31 PO session authorization — temporary protected-test lifts
 
 The PO has approved implementation of the current 0.4.7 PRD, Spec, and

@@ -1,12 +1,42 @@
 ---
 name: close-block
-description: "Session/block close ritual, parametrized by the project's .claude/pipeline.json (operating-model §8): run close.pre extensions, verify + machine evidence, drift checks (handover freshness, CLAUDE.md length gate, memory mirror, stale worktrees), handover + HISTORY sync (single source), telemetry line (MP-20), mandatory self-retro, close.post extensions, final commit. Invoke at a block/task boundary or before a planned session cut."
+description: "Durable block-close ritual only: finalizes a stopped topic or a real runtime transfer. Normal same-topic restarts use handover-only and must not invoke this ritual."
 disable-model-invocation: true
-argument-hint: "[block-id or short session label]"
+argument-hint: "<durable-stop|runtime-transfer> [block-id or short session label]"
 allowed-tools: Bash(git add:*), Bash(git commit:*), Bash(git log:*), Bash(git diff:*), Bash(node plugins/pipeline-core/scripts/close-coordinator.mjs:*)
 ---
 
-H5 compatibility rule: close-block delegates checkpoint/finalization planning
+## Hard entry gate — never close a normal restart
+
+`close-block` is not a generic session-cut, restart, Compact, or “save the
+handover” command. Before reading calibration, running an extension, Verify,
+cleanup, or *any* close-coordinator command, the caller must supply exactly
+one explicit intent as the first argument:
+
+- `durable-stop`: the PO has decided not to continue the current topic after
+  this block; or
+- `runtime-transfer`: the PO is deliberately transferring the work to another
+  PC, CLI/runtime, or separately operated environment.
+
+No intent, a mere short restart, a context-window cut, “continue tomorrow”,
+or an ambiguous request to save progress is a refusal: report
+`CLOSE-INTENT-REQUIRED`, perform no close-block step, and use the
+**handover-only route** below. Do not infer either intent from a session name,
+a pending working tree, an active feature, or a request to start a new chat.
+The executable coordinator enforces the same contract: `plan-start` and
+`apply-start` require the matching digest-bound `--close-intent` value.
+
+### Handover-only route for normal continuation
+
+For a same-topic restart, write only the calibrated handover file with the
+current worktree state, explicit unfinished items, and the next re-entry step.
+Capture a sanitised resume hint when material input needs to cross the session
+boundary. Then recommend a new session that begins with `pipeline-start`.
+Do **not** invoke `close-block`, `close-feature`, `close-coordinator`, Verify,
+cleanup, HISTORY/telemetry/retro, a final commit, or a plugin installation as
+part of this route. An ordinary handover is not proof of a completed block.
+
+H5 compatibility rule: after this gate admits a durable intent, close-block delegates checkpoint/finalization planning
 to the unified close coordinator. It must not maintain a parallel completion
 state or require push; inspect → plan-transition → confirmed `--activate`
 apply, with publication and release handled as separate gates.
@@ -44,7 +74,9 @@ independent sequence and must not advance when its coordinator phase is stale.
 
 Normative sources (agent-pipeline repo — canon pointers, not runtime reads): `docs/operating-model.md` §5–§8, `harness/checklists/session-close.md`, `policies/model-policy.md` MP-16/MP-19/MP-20, ADR-0012 (handover), single source of truth. `disable-model-invocation: true` is deliberate: closing writes a commit — the PO times it, the model never self-triggers it. This skill runs IN the main context (no fork): it needs the session's own state (`/usage`, `/context`, what actually happened this block).
 
-Block label: `$ARGUMENTS` (optional; used in the telemetry line and HISTORY entry).
+Intent: first argument, exactly `durable-stop` or `runtime-transfer` (mandatory).
+The remaining arguments form the optional block label used in the telemetry
+line and HISTORY entry.
 
 ## Step 0 — Read the project calibration (parametrization)
 

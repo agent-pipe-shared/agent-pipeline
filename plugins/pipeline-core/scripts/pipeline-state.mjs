@@ -3119,6 +3119,15 @@ function parseResultBootstrapApply(argv) {
   return { featureId: argv[1], expectedRevision: parseExpectedRevision(argv[3]).value, expectedStateSha256: argv[5], expectedPostStateSha256: argv[7], updatedAt: argv[9], planSha256: argv[11] };
 }
 
+function featureClosureProgress(nextAction) {
+  return {
+    scope: "feature-closure",
+    state: "in-progress",
+    nextAction,
+    workflowTerminal: false,
+  };
+}
+
 function runResultBootstrapCommand(sub, rest, deps) {
   if (sub === "continuity-result-bootstrap-plan") {
     if (rest.length !== 0) { console.error("Error: Result bootstrap plan accepts no caller bindings."); return 2; }
@@ -3148,7 +3157,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
         || current.state.activeFeature.id !== apply.featureId || current.state.updatedAt !== apply.updatedAt || current.state.continuity.authority.result?.path !== resultPath
         || resultObserved === null || resultObserved.sha256 !== current.state.continuity.authority.result.sha256) { console.error("Error: Result bootstrap replay postimage is invalid; zero mutation."); return 2; }
       if (journal.journal !== null && (journal.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(journal.paths))) { console.error("Error: Result bootstrap journal recovery is unresolved."); return 2; }
-      console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: current.state.continuity.authority.result, mutated: false })); return 0;
+      console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "replayed", featureId: apply.featureId, revision: current.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: current.state.continuity.authority.result, mutated: false, completion: featureClosureProgress("review") })); return 0;
     }
     // A durable Result may legitimately exist while State is still at the exact
     // preimage.  The authenticated journal is the only authority that may resume
@@ -3188,7 +3197,7 @@ function runResultBootstrapCommand(sub, rest, deps) {
     if (deps.afterResultBootstrapState?.() === false) { console.error("Error: Result bootstrap interrupted after State commit; recovery journal retained."); return 2; }
     const recovered = loadBootstrapJournal(deps.dir, deps);
     if (!recovered.ok || recovered.journal === null || recovered.journal.planSha256 !== apply.planSha256 || !retireBootstrapJournal(recovered.paths)) { console.error("Error: Result bootstrap journal retirement is unresolved."); return 2; }
-    console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: persisted.state.continuity.authority.result, mutated: true })); return 0;
+    console.log(JSON.stringify({ schema: RESULT_BOOTSTRAP_APPLY_SCHEMA, status: "applied", featureId: apply.featureId, revision: persisted.state.continuity.revision, stateSha256: apply.expectedPostStateSha256, result: persisted.state.continuity.authority.result, mutated: true, completion: featureClosureProgress("review") })); return 0;
   } finally { releaseContinuityLock(lock); }
 }
 
@@ -3435,6 +3444,7 @@ function runResultCloseCommand(sub, rest, deps) {
         stateSha256: currentSha256,
         result: request.result,
         nextAction: "close",
+        completion: featureClosureProgress("close"),
       }));
       return 0;
     }
@@ -3477,6 +3487,7 @@ function runResultCloseCommand(sub, rest, deps) {
       stateSha256: apply.expectedPostStateSha256,
       result: request.result,
       nextAction: "close",
+      completion: featureClosureProgress("close"),
     }));
     return 0;
   } finally {

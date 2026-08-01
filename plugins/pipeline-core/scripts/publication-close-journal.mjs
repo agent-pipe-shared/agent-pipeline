@@ -33,6 +33,23 @@ const COORDINATOR_NEXT = Object.freeze({
   "release-eligible": ["promoted"], promoted: [],
 });
 export const coordinatorNextPhases = (phase) => [...(COORDINATOR_NEXT[phase] ?? [])];
+
+// `terminal` must mean terminal for the coordinator state machine, not merely
+// that the local feature-close obligation has been met.  `closed-local` and
+// `delivered` deliberately retain optional release/promotion descendants, so
+// they are closure-complete but not workflow-terminal.
+const CLOSURE_COMPLETE_PHASES = new Set(["closed-local", "delivered", "release-eligible", "promoted"]);
+export function coordinatorCompletion(phase) {
+  if (!COORDINATOR_PHASES.includes(phase)) throw new Error("coordinator phase invalid");
+  const next = coordinatorNextPhases(phase);
+  return {
+    scope: "feature-closure",
+    state: CLOSURE_COMPLETE_PHASES.has(phase) ? "complete" : "in-progress",
+    phase,
+    next,
+    workflowTerminal: next.length === 0,
+  };
+}
 const HEX40_64 = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const HEX64 = /^[0-9a-f]{64}$/;
 const CHANNELS = ["private", "neutral-public"];

@@ -118,6 +118,15 @@ change.
    URLs, credentials, secrets, or private identifiers. The validator rejects
    those forms rather than persisting them.
 
+7. **Normal restart is handover-only:** a same-topic restart, context cut, or
+   request to save progress is not a block close. Update only the calibrated
+   handover and, where needed, the sanitised Resume-Hint, then re-enter with
+   this bootstrap. Never invoke `close-block`, `close-feature`, or the close
+   coordinator merely to start a new chat. `close-block` is available only
+   when the PO explicitly selects `durable-stop` (the topic ends) or
+   `runtime-transfer` (PC/CLI/runtime changes); its coordinator rejects any
+   other start intent before it can write private lifecycle state.
+
 ### Kickoff intake, durable design package, and document quality
 
 Before the first `kickoff plan`, obtain both a single-line project goal and an

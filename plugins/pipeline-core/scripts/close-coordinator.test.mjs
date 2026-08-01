@@ -119,6 +119,19 @@ function publicationAuthorization() {
   };
 }
 test("active checkpoint preserves activeFeature", () => assert.deepEqual(step(fresh(), "checkpointed").activeFeature, { id: "feature", planPath: "specs/feature/plan.md", phase: "implementation" }));
+test("completion separates closure completion from workflow terminality", () => {
+  const local = JSON.parse(spawnSync(process.execPath, [CLI, "next", "closed-local"], { encoding: "utf8" }).stdout);
+  assert.deepEqual(local.next, ["release-eligible"]);
+  assert.equal(local.terminal, false);
+  assert.deepEqual(local.completion, {
+    scope: "feature-closure", state: "complete", phase: "closed-local",
+    next: ["release-eligible"], workflowTerminal: false,
+  });
+  const promoted = JSON.parse(spawnSync(process.execPath, [CLI, "next", "promoted"], { encoding: "utf8" }).stdout);
+  assert.equal(promoted.terminal, true);
+  assert.equal(promoted.completion.state, "complete");
+  assert.equal(promoted.completion.workflowTerminal, true);
+});
 for (const [i, phase] of ["feature-close-prepared", "tracked-close-finalized", "candidate-frozen", "final-verify-green"].entries()) test(`ordered phase ${i}`, () => { let s = fresh(); for (const p of ["checkpointed", "feature-close-prepared", "tracked-close-finalized", "candidate-frozen", "final-verify-green"]) { if (p === "candidate-frozen") s = step(s, p, { candidateOid: h("c", 40), candidateTree: h("d", 40) }); else if (p !== "final-verify-green" || phase === p) s = step(s, p); if (p === phase) break; } assert.equal(s.phase, phase); });
 test("candidate required", () => { let s = fresh(); for (const p of ["checkpointed", "feature-close-prepared", "tracked-close-finalized"]) s = step(s, p); assert.throws(() => step(s, "candidate-frozen"), /candidate/); });
 test("candidate replacement denied", () => { let s = fresh(); for (const p of ["checkpointed", "feature-close-prepared", "tracked-close-finalized"]) s = step(s, p); s = step(s, "candidate-frozen", { candidateOid: h("c", 40), candidateTree: h("d", 40) }); assert.throws(() => step(s, "final-verify-green", { candidateOid: h("e", 40) }), /replacement/); });
@@ -288,7 +301,13 @@ function processFixture(name) {
   git(root, ["-c", "user.name=H5 Test", "-c", "user.email=h5@example.invalid", "commit", "-m", "fixture"]);
 
   const lifecycle = `close-${name}`;
-  const plan = invoke(["plan-start", "--root", root, "--lifecycle", lifecycle, "--actor", "PO"]);
+  const refusedRestart = invoke(["plan-start", "--root", root, "--lifecycle", lifecycle, "--actor", "PO"], 2);
+  assert.equal(refusedRestart.code, "CLOSE-INTENT");
+  assert.equal(existsSync(join(root, ".git", "agent-pipeline")), false, "missing close intent must not create private state");
+  const plan = invoke(["plan-start", "--root", root, "--lifecycle", lifecycle, "--actor", "PO", "--close-intent", "durable-stop"]);
+  assert.equal(plan.closeIntent, "durable-stop");
+  assert.ok(plan.nextAction.argv.includes("--close-intent"));
+  assert.ok(plan.nextAction.argv.includes("durable-stop"));
   assert.equal(existsSync(join(root, ".git", "agent-pipeline")), false, "plan-start mutated private state");
   const started = invokeAction(plan.nextAction);
   assert.equal(started.status, "applied");

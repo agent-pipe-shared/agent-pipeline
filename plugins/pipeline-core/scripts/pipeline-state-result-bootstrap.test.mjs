@@ -71,6 +71,9 @@ test("AC-047-143--146: readonly plan binds existing lowercase canonical Result p
   assert.deepEqual(Buffer.from(p.result.bytesBase64, "base64"), Buffer.concat([f.historical, fence])); assert.equal(existsSync(f.journalPath), false);
   assert.equal(p.applyAction.mutation, true); assert.equal(p.applyAction.requiresConfirmation, true); assert.equal(p.applyAction.argv.at(-1), "--activate");
   const applied = invoke(f.root, p.applyAction.argv.slice(1)); assert.equal(applied.status, 0, applied.err);
+  assert.deepEqual(JSON.parse(applied.out).completion, {
+    scope: "feature-closure", state: "in-progress", nextAction: "review", workflowTerminal: false,
+  });
   const after = JSON.parse(readFileSync(f.statePath)); const expected = structuredClone(f.value);
   expected.continuity.revision = 8; expected.continuity.resume.sourceRevision = 8; expected.continuity.authority.result = { path: "specs/feature/result.md", sha256: p.result.sha256 }; expected.updatedAt = NOW;
   assert.deepEqual(after, expected); assert.deepEqual(readFileSync(f.resultPath), Buffer.from(p.result.bytesBase64, "base64")); assert.deepEqual(readFileSync(f.resultPath).subarray(0, f.historical.length), f.historical);
@@ -88,7 +91,7 @@ test("AC-047-147: journal and Result-before-State interruptions resume once and 
   assert.equal(stopped.status, 2); assert.equal(JSON.parse(readFileSync(f.statePath)).continuity.authority.result, null); assert.equal(existsSync(f.journalPath), true);
   assert.equal(invoke(f.root, p.applyAction.argv.slice(1)).status, 0);
   const bytes = readFileSync(f.statePath); const replay = invoke(f.root, p.applyAction.argv.slice(1));
-  assert.equal(replay.status, 0, replay.err); assert.equal(JSON.parse(replay.out).status, "replayed"); assert.equal(JSON.parse(replay.out).mutated, false); assert.deepEqual(readFileSync(f.statePath), bytes);
+  assert.equal(replay.status, 0, replay.err); assert.equal(JSON.parse(replay.out).status, "replayed"); assert.equal(JSON.parse(replay.out).mutated, false); assert.deepEqual(JSON.parse(replay.out).completion, { scope: "feature-closure", state: "in-progress", nextAction: "review", workflowTerminal: false }); assert.deepEqual(readFileSync(f.statePath), bytes);
   const afterState = fixture("state-before-retire"); const afterStatePlan = plan(afterState);
   const stoppedAfterState = invoke(afterState.root, afterStatePlan.applyAction.argv.slice(1), { afterResultBootstrapState: () => false });
   assert.equal(stoppedAfterState.status, 2); assert.equal(existsSync(afterState.journalPath), true);
