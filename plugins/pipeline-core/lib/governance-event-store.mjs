@@ -223,6 +223,24 @@ async function loadRegistry(root, registryPath = "governance/events/registry.jso
   return { registry: validateRegistry(parsed), path: target };
 }
 
+async function loadCapturePolicy(root) {
+  const target = repositoryPath(root, "governance/events/capture-policy.json");
+  await assertNoSymlinkAncestry(target); await assertNoSymlink(target, { directory: false });
+  let policy;
+  try { policy = parseStrictJson(await readFile(target)); } catch { fail("GES-CAPTURE-POLICY", "Capture policy is not strict JSON."); }
+  if (!exactKeys(policy, ["schema", "policyId", "revision", "defaultAction", "streams", "sanitizedReceipt"])
+    || policy.schema !== "pipeline.governance-capture-policy.v1" || policy.defaultAction !== "deny" || !Array.isArray(policy.streams) || policy.streams.length !== 3) fail("GES-CAPTURE-POLICY", "Capture policy is invalid.");
+  return policy;
+}
+
+function assertPortablePayload(event, policy) {
+  const stream = policy.streams.find((entry) => entry?.origin === event.origin);
+  if (!stream || stream.storageProfile !== "repository-public-safe" || stream.personalIdentifiability !== "prohibited" || stream.contextualIdentifiability !== "prohibited") fail("GES-CAPTURE-DENIED", "Capture policy denies this portable event.");
+  const allowed = event.origin === "lifecycle" ? ["phase"] : event.origin === "agent" ? ["kind", "code"] : ["decisionType", "scope"];
+  if (!exactKeys(event.payload, allowed) || Object.values(event.payload).some((value) => typeof value !== "string" || !/^[A-Za-z0-9._:-]{1,128}$/u.test(value))) fail("GES-PAYLOAD-SCHEMA", "Portable payload is not closed or contains unsafe text.");
+  if (typeof event.policy.capturePolicyDigest !== "string" || event.policy.capturePolicyDigest !== canonicalSha256(policy)) fail("GES-CAPTURE-POLICY-BINDING", "Event does not bind the effective capture policy.");
+}
+
 function streamFor(registry, streamId) {
   const stream = registry.streams.find((entry) => entry.streamId === streamId);
   if (!stream) fail("GES-STREAM", "The stream is not registered.");
@@ -415,6 +433,7 @@ export async function appendPortableGovernanceEvent({ repositoryRoot, registryPa
   const streamId = intent?.streamId;
   const stream = streamFor(registry, streamId);
   const template = assertIntent(intent, stream, repositoryFingerprint);
+  assertPortablePayload(template, await loadCapturePolicy(root));
   const streamRoot = await ensureSafeDirectory(root, `${registry.storageRoot}/${stream.relativeRoot}`);
   return withExclusiveStreamLock(streamRoot, async () => {
     const scanned = await scanStream(root, registry, streamId);

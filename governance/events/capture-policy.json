@@ -1,0 +1,12 @@
+{
+  "schema": "pipeline.governance-capture-policy.v1",
+  "policyId": "phoenix-portable-v1",
+  "revision": "d3f9d265cefc3a7b4e0fd760a4cc363b55d83a9d025e19f27942b05d63667463",
+  "defaultAction": "deny",
+  "streams": [
+    { "origin": "human", "purpose": "authority-history", "materiality": "required", "personalIdentifiability": "prohibited", "contextualIdentifiability": "prohibited", "storageProfile": "repository-public-safe", "retention": "repository-retained", "disclosure": "repository-visible", "encryptionGeneration": null },
+    { "origin": "agent", "purpose": "declared-assumption", "materiality": "policy-selected", "personalIdentifiability": "prohibited", "contextualIdentifiability": "prohibited", "storageProfile": "repository-public-safe", "retention": "repository-retained", "disclosure": "repository-visible", "encryptionGeneration": null },
+    { "origin": "lifecycle", "purpose": "deterministic-lifecycle", "materiality": "required", "personalIdentifiability": "prohibited", "contextualIdentifiability": "prohibited", "storageProfile": "repository-public-safe", "retention": "repository-retained", "disclosure": "repository-visible", "encryptionGeneration": null }
+  ],
+  "sanitizedReceipt": { "allowEventId": true, "allowEventDigest": true, "allowCheckpoint": true, "allowReasonText": false }
+}

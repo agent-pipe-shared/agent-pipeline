@@ -7,7 +7,7 @@ import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
-import { canonicalizeJson, sealGovernanceEvent } from "./governance-event.mjs";
+import { canonicalSha256, canonicalizeJson, sealGovernanceEvent } from "./governance-event.mjs";
 import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import {
@@ -23,6 +23,7 @@ import {
 } from "./governance-event-store.mjs";
 
 let fingerprint = "a".repeat(64);
+let capturePolicyDigest = "b".repeat(64);
 const candidate = { commit: "b".repeat(40), tree: "c".repeat(40) };
 const unavailable = { state: "not-applicable" };
 
@@ -42,13 +43,23 @@ function registryFixture() {
   };
 }
 
+function capturePolicyFixture() {
+  return { schema: "pipeline.governance-capture-policy.v1", policyId: "fixture", revision: "c".repeat(64), defaultAction: "deny", streams: [
+    { origin: "human", purpose: "authority-history", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+    { origin: "agent", purpose: "declared-assumption", materiality: "policy-selected", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+    { origin: "lifecycle", purpose: "deterministic-lifecycle", materiality: "required", personalIdentifiability: "prohibited", contextualIdentifiability: "prohibited", storageProfile: "repository-public-safe", retention: "repository-retained", disclosure: "repository-visible", encryptionGeneration: null },
+  ], sanitizedReceipt: { allowEventId: true, allowEventDigest: true, allowCheckpoint: true, allowReasonText: false } };
+}
+
 async function fixtureRoot() {
   const root = await mkdtemp(path.join(os.tmpdir(), "governance-event-store-"));
   execFileSync("git", ["init", "-q", root]);
   const repository = discoverRepository(root);
   fingerprint = derivePoGateRepositoryFingerprint({ gitCommonDir: repository.commonDir, primaryRoot: repository.primaryRoot });
+  const capturePolicy = capturePolicyFixture(); capturePolicyDigest = canonicalSha256(capturePolicy);
   await mkdir(path.join(root, "governance/events"), { recursive: true });
   await writeFile(path.join(root, "governance/events/registry.json"), `${canonicalizeJson(registryFixture())}\n`);
+  await writeFile(path.join(root, "governance/events/capture-policy.json"), `${canonicalizeJson(capturePolicy)}\n`);
   return root;
 }
 
@@ -72,7 +83,7 @@ function intent(overrides = {}) {
     correlation: { featureId: unavailable, packageId: unavailable, requestId: unavailable, sessionId: unavailable, dispatchId: unavailable, traceId: unavailable },
     candidate,
     artifacts: [unavailable],
-    policy: { policyDigest: unavailable, configurationDigest: unavailable, capturePolicyDigest: unavailable, redactionPolicyDigest: unavailable },
+    policy: { policyDigest: unavailable, configurationDigest: unavailable, capturePolicyDigest, redactionPolicyDigest: unavailable },
     classification: "repository-public-safe",
     storageProfile: "repository-public-safe",
     retentionCompatibility: "repository-retained",
@@ -111,6 +122,12 @@ test("exact idempotency is a zero-write replay while a conflicting key fails clo
   await assert.rejects(() => append(root, conflict), (error) => error instanceof GovernanceEventStoreError && error.code === "GES-IDEMPOTENCY-CONFLICT");
   const result = await verifyPortableGovernanceStream({ repositoryRoot: root, repositoryFingerprint: fingerprint, streamId: "lifecycle" });
   assert.equal(result.eventCount, 1);
+});
+
+test("portable admission requires the exact effective policy and closed safe payload", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  await assert.rejects(() => append(root, intent({ policy: { ...intent().policy, capturePolicyDigest: "d".repeat(64) } })), (error) => error.code === "GES-CAPTURE-POLICY-BINDING");
+  await assert.rejects(() => append(root, intent({ payload: { phase: "started", privateReason: "no" } })), (error) => error.code === "GES-PAYLOAD-SCHEMA");
 });
 
 test("verification is checkpoint-aware and queries return only validated chain records", async (t) => {
