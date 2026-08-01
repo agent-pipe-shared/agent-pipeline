@@ -155,3 +155,6 @@ regression. Together with the final privacy PASS, this closes all independent
 Phoenix design findings. The plan remains unapproved, implementation remains
 unauthorized, and the next authority boundary is the literal Product Owner
 `approved` gate.
+```pipeline-result
+{"courseDecisionIntents":[],"courseDecisionReceipts":[],"decisionBriefs":[],"finalIntegrations":[]}
+```

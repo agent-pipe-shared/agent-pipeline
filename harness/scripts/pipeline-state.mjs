@@ -483,6 +483,12 @@ const CONTINUITY_AUTHORITY_REVISION_SUBCOMMANDS = new Set([
   "continuity-authority-revision-apply",
   "continuity-authority-revision-recover",
 ]);
+const CONTINUITY_RESULT_RECONCILIATION_SUBCOMMANDS = new Set([
+  "continuity-result-reconcile-plan",
+  "continuity-result-reconcile-apply",
+]);
+const RESULT_RECONCILIATION_FENCE = Buffer.from("```pipeline-result\n{\"courseDecisionIntents\":[],\"courseDecisionReceipts\":[],\"decisionBriefs\":[],\"finalIntegrations\":[]}\n```\n", "utf8");
+const RESULT_RECONCILIATION_SCHEMA = "pipeline.continuity-result-reconcile-plan.v1";
 const FEATURE_PACKAGE_REQUEST_SCHEMA = "pipeline.feature-package-transition-request.v1";
 const CONTINUITY_AUTHORITY_REVISION_REQUEST_SCHEMA = "pipeline.continuity-authority-revision-request.v1";
 const FEATURE_PACKAGE_REQUEST_MAX_BYTES = 65_536;
@@ -3349,6 +3355,104 @@ function defaultGitHead(dir) {
   return { ok: true, commit: res.stdout.trim() };
 }
 
+function observeHistoricalResultForReconciliation(dir, relativePath) {
+  const resolved = resolveResultPathWithoutSymlinks(dir, relativePath);
+  if (resolved === null) return null;
+  try {
+    const bytes = readFileSync(resolved.path);
+    const text = bytes.toString("utf8");
+    if (bytes.byteLength < 1 || bytes.byteLength > CONTINUITY_RESULT_MAX_BYTES
+      || !Buffer.from(text, "utf8").equals(bytes) || text.startsWith("\uFEFF") || text.includes("\r")) return null;
+    const postimage = bytes.subarray(Math.max(0, bytes.byteLength - RESULT_RECONCILIATION_FENCE.byteLength)).equals(RESULT_RECONCILIATION_FENCE);
+    const historical = postimage ? bytes.subarray(0, bytes.byteLength - RESULT_RECONCILIATION_FENCE.byteLength) : bytes;
+    const historicalText = historical.toString("utf8");
+    if (historical.byteLength < 1 || /^```pipeline-result(?:\n|$)/mu.test(historicalText)) return null;
+    return { ...resolved, bytes, historical, postimage };
+  } catch { return null; }
+}
+
+function buildResultReconciliationPlan(dir, updatedAt) {
+  const existing = readState(dir);
+  if (existing.status !== "ok" || typeof updatedAt !== "string") return { ok: false, code: "PS-RESULT-RECONCILE-STATE" };
+  const state = existing.state; const continuity = state.continuity;
+  if (state.planApproved !== true || state.activeFeature?.phase !== "implementation"
+    || !validateContinuityState(continuity, state.activeFeature?.id).ok
+    || continuity.queueHead === null || continuity.queueHead.dispatch !== null || continuity.blocker !== null
+    || continuity.acknowledgedFinal !== null || continuity.recovery !== null || continuity.decisionTxn !== null
+    || continuity.revision >= Number.MAX_SAFE_INTEGER || continuity.authority.result === null) {
+    return { ok: false, code: "PS-RESULT-RECONCILE-STATE" };
+  }
+  const prd = continuity.authority.prd; const spec = continuity.authority.spec;
+  if (!hashBoundRepoFile(dir, prd) || !hashBoundRepoFile(dir, spec) || state.activeFeature.planPath !== prd.path) {
+    return { ok: false, code: "PS-RESULT-RECONCILE-AUTHORITY" };
+  }
+  const expectedPath = `${dirname(prd.path).split(sep).join("/")}/result.md`;
+  if (continuity.authority.result.path !== expectedPath || !SHA256_RE.test(continuity.authority.result.sha256)) {
+    return { ok: false, code: "PS-RESULT-RECONCILE-RESULT" };
+  }
+  const result = observeHistoricalResultForReconciliation(dir, expectedPath);
+  if (result === null) return { ok: false, code: "PS-RESULT-RECONCILE-RESULT" };
+  const postBytes = result.postimage ? result.bytes : Buffer.concat([result.historical, RESULT_RECONCILIATION_FENCE]);
+  if (postBytes.byteLength > CONTINUITY_RESULT_MAX_BYTES) return { ok: false, code: "PS-RESULT-RECONCILE-SIZE" };
+  const stateBytes = readFileSync(statePath(dir));
+  const next = clearGateEstimateForMutation({ ...structuredClone(state), continuity: {
+    ...structuredClone(continuity), revision: continuity.revision + 1,
+    authority: { ...structuredClone(continuity.authority), result: { path: expectedPath, sha256: sha256Bytes(postBytes) } },
+    resume: { ...structuredClone(continuity.resume), sourceRevision: continuity.revision + 1 },
+  }, updatedAt });
+  if (!validateContinuityState(next.continuity, state.activeFeature.id).ok) return { ok: false, code: "PS-RESULT-RECONCILE-POSTIMAGE" };
+  const payload = { schema: RESULT_RECONCILIATION_SCHEMA, featureId: state.activeFeature.id,
+    expectedRevision: continuity.revision, preStateSha256: sha256Bytes(stateBytes),
+    preResult: { path: expectedPath, sha256: sha256Bytes(result.historical) },
+    result: { path: expectedPath, sha256: sha256Bytes(postBytes) },
+    postStateSha256: sha256Bytes(Buffer.from(JSON.stringify(next, null, 2) + "\n", "utf8")), updatedAt };
+  return { ok: true, payload, planSha256: sha256Bytes(canonicalPhxJson(payload)), result, postBytes, next };
+}
+
+function atomicWriteReconciledResult(result, bytes, lock) {
+  const tmp = `${result.path}.tmp.${lock.ownerNonce}`; let fd;
+  try {
+    if (!assertContinuityLockOwned(lock)) return false;
+    fd = openSync(tmp, "wx", 0o600); replaceFdContents(fd, bytes); closeSync(fd); fd = undefined;
+    if (!assertContinuityLockOwned(lock)) return false;
+    renameSync(tmp, result.path);
+    return syncDirectory(result.parent).ok && readFileSync(result.path).equals(bytes);
+  } catch { return false; } finally { if (fd !== undefined) closeSync(fd); safeUnlink(tmp); }
+}
+
+function runResultReconciliationCommand(sub, rest, deps) {
+  if (sub === "continuity-result-reconcile-plan") {
+    if (rest.length !== 0) return 2;
+    const planned = buildResultReconciliationPlan(deps.dir, deps.now());
+    if (!planned.ok) { console.error(`Error: Result reconciliation plan refused (${planned.code}); zero mutation.`); return 2; }
+    console.log(JSON.stringify({ ...planned.payload, planSha256: planned.planSha256 })); return 0;
+  }
+  const flags = parseExactFlags(rest, new Set(["expected-revision", "expected-state-sha256", "expected-post-state-sha256", "updated-at", "plan-sha256", "activate"]));
+  if (!flags.ok || flags.value.activate !== "true" || !SHA256_RE.test(flags.value["expected-state-sha256"] ?? "")
+    || !SHA256_RE.test(flags.value["expected-post-state-sha256"] ?? "") || !SHA256_RE.test(flags.value["plan-sha256"] ?? "")) return 2;
+  const lock = acquireContinuityLock(deps.dir, "pipeline-result-reconcile-v1", deps);
+  if (!lock.ok) return 2;
+  try {
+    const replayBytes = readFileSync(statePath(deps.dir));
+    if (sha256Bytes(replayBytes) === flags.value["expected-post-state-sha256"]) {
+      const replay = readState(deps.dir);
+      if (replay.status === "ok" && replay.state.continuity?.revision === Number(flags.value["expected-revision"]) + 1
+        && replay.state.continuity.authority.result?.sha256 !== undefined) {
+        console.log(`PS-RESULT-RECONCILE-REPLAY: continuity revision ${replay.state.continuity.revision}; zero mutation.`); return 0;
+      }
+      return 2;
+    }
+    const planned = buildResultReconciliationPlan(deps.dir, flags.value["updated-at"]);
+    if (!planned.ok || String(planned.payload.expectedRevision) !== flags.value["expected-revision"]
+      || planned.payload.preStateSha256 !== flags.value["expected-state-sha256"]
+      || planned.payload.postStateSha256 !== flags.value["expected-post-state-sha256"] || planned.planSha256 !== flags.value["plan-sha256"]) return 2;
+    if (!planned.result.postimage && !atomicWriteReconciledResult(planned.result, planned.postBytes, lock)) return 2;
+    const written = atomicWriteContinuityState(deps.dir, planned.next, lock, deps);
+    if (!written.ok || sha256Bytes(readFileSync(statePath(deps.dir))) !== planned.payload.postStateSha256) return 2;
+    console.log(`PS-RESULT-RECONCILED: continuity revision ${planned.next.continuity.revision}; Result and State read back.`); return 0;
+  } finally { releaseContinuityLock(lock); }
+}
+
 /**
  * Runs the CLI logic. Never calls process.exit itself (testable); returns the exit
  * code. `deps` allows tests to inject `dir`, `now`, and `gitHead` without touching the
@@ -3366,6 +3470,7 @@ export function run(argv = process.argv.slice(2), deps = {}) {
   if (RECOVERY_BRIDGE_SUBCOMMANDS.has(sub)) return runRecoveryBridgeCommand(sub, rest, { ...deps, dir, now });
   if (FEATURE_PACKAGE_SUBCOMMANDS.has(sub)) return runFeaturePackageCommand(sub, rest, { ...deps, dir, now });
   if (CONTINUITY_AUTHORITY_REVISION_SUBCOMMANDS.has(sub)) return runContinuityAuthorityRevisionCommand(sub, rest, { ...deps, dir, now });
+  if (CONTINUITY_RESULT_RECONCILIATION_SUBCOMMANDS.has(sub)) return runResultReconciliationCommand(sub, rest, { ...deps, dir, now });
   if (CONTINUITY_SUBCOMMANDS.has(sub)) return runContinuityCommand(sub, flags, { ...deps, dir, now });
   if (PUBLICATION_SUBCOMMANDS.has(sub)) return runPublicationCommand(sub, flags, { ...deps, dir, now });
 

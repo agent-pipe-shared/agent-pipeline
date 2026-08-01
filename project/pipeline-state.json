@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-08-01T12:25:42.573Z",
+  "updatedAt": "2026-08-01T16:58:12.623Z",
   "closedFeatures": [
     {
       "id": "codex-onboarding-0.4.5",
@@ -20,7 +20,7 @@
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "sprint-phoenix-epic",
-    "revision": 11,
+    "revision": 12,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Coordinator",
@@ -37,7 +37,7 @@
       },
       "result": {
         "path": "specs/sprint-phoenix-epic/result.md",
-        "sha256": "dd75b473e13918e8b41e10f2005217473e991adbd918b61c461f567cad2e9842"
+        "sha256": "708d9293ad8ec13bb58e39ffd857c0a624d93e17b35cde380f242d26de6d9198"
       }
     },
     "queueHead": {
@@ -52,7 +52,7 @@
     "acknowledgedFinal": null,
     "resume": {
       "mode": "immediate",
-      "sourceRevision": 10,
+      "sourceRevision": 12,
       "reasonCode": "active-turn"
     },
     "recovery": null,

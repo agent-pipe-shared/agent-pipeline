@@ -13,6 +13,48 @@
 
 ## Operational head
 
+### Restart checkpoint — 2026-08-01 (no close ritual)
+
+- This is an in-progress-session checkpoint only: no close-block ritual,
+  commit, push, merge, tag, or other remote action was performed.
+- Immediately before writing this checkpoint, the working tree was clean at local candidate
+  `ff229cd05ac60dac956643d7a89b93ab165164cd`. Its exact-bound aggregate
+  Verify and Security evidence passed; the latest independent Critic reported
+  PASS with no findings under
+  `functional-equivalent-read-only; OS isolation not asserted`.
+- The current canonical Continuity State is revision `11`, with queue head
+  `phoenix-design` / `audit-handoff-design-revision` / `review` and no active
+  dispatch, blocker, decision transaction, or recovery journal. PHX-0 slice A
+  (lifecycle-authority writer) is the selected next implementation package,
+  but has not been dispatched.
+- The attempted, exact generic CAS transition from `review` to the PHX-0A
+  dispatch was rejected as `PS-CONTINUITY-RESULT-FENCE` with zero State and
+  Result mutation. The bound `specs/sprint-phoenix-epic/result.md` contains
+  historical Markdown entries but not the single strict `pipeline-result`
+  authority fence now required by the writer.
+- On restart, run `pipeline-core:pipeline-start`, re-read the canonical State,
+  verify no recovery is pending, and keep this failure fail-closed. Do not
+  hand-edit State or Result and do not manufacture a dispatch: the next repair
+  must use a sanctioned, exact Result-Authority bootstrap route or an
+  explicitly authorized scope decision for that missing writer.
+- TP-5 is restored; no temporary protected-test lift is active. Publication
+  remains fail-closed and no remote push has been attempted.
+
+### Result-Authority reconciliation — 2026-08-01
+
+- The explicitly confirmed, digest-bound Result reconciliation completed through
+  the sanctioned State writer. It preserved the historical Markdown Result
+  bytes, appended the one canonical `pipeline-result` fence, and read back
+  both Result and State.
+- Continuity is now revision `12`; its Result binding is
+  `708d9293ad8ec13bb58e39ffd857c0a624d93e17b35cde380f242d26de6d9198`.
+  The queue remains `phoenix-design` / `audit-handoff-design-revision` /
+  `review`; no implementation dispatch, publication authority, or remote
+  action was created.
+- The narrow writer fix is covered by Pipeline State `244/244`, including
+  historical-byte preservation, one-fence append, State binding, and exact
+  zero-mutation replay. TP-5 was restored immediately after the test run.
+
 ### Push-readiness recovery — 2026-08-01
 
 - The current lifecycle manifest already binds the reviewed `RECOVERY.md`

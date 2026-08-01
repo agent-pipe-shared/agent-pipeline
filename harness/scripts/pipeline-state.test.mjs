@@ -2638,6 +2638,20 @@ function recoveryBridgeExecutableFixture() {
   const symlinkStatus = run(["feature-package-status"], { dir: symlinkFixture.dir, now, gitCommonDir: () => ({ ok: true, path: commonLink }) });
   ok("TP5 Recovery Bridge status accepts consumed legacy journals and fails closed for malformed or symlinked journals", planned.value === 0 && committed.ok && pendingStatus === 2 && recovery === 0 && terminal.decision.status === "consumed" && readyStatus === 0 && legacyJournalStatus === 0 && legacyJournalSymlinkStatus === 2 && malformedStatus === 2 && symlinkStatus === 2);
 }
+{
+  const dir = freshDir("result-reconcile"); const now = () => "2026-08-01T16:58:12.623Z";
+  mkdirSync(join(dir, ".claude")); mkdirSync(join(dir, "specs", "feature"), { recursive: true });
+  const prd = "# PRD\n"; const spec = "# Spec\n"; const historical = "# Historical Result\n\nPreserve this evidence.\n";
+  writeFileSync(join(dir, "specs", "feature", "prd_feature.md"), prd); writeFileSync(join(dir, "specs", "feature", "spec.md"), spec); writeFileSync(join(dir, "specs", "feature", "result.md"), historical);
+  const hash = (value) => createHash("sha256").update(value).digest("hex");
+  const state = { schema: SCHEMA_ID, planApproved: true, updatedAt: now(), activeFeature: { id: "feature", planPath: "specs/feature/prd_feature.md", phase: "implementation" }, continuity: continuityState({ featureId: "feature", revision: 11, runtime: { humanFacingLanguage: "en", activeDuty: "Coordinator", sessionCleanup: null }, authority: { prd: { path: "specs/feature/prd_feature.md", sha256: hash(prd) }, spec: { path: "specs/feature/spec.md", sha256: hash(spec) }, result: { path: "specs/feature/result.md", sha256: D } }, queueHead: continuityQueue({ nextAction: "review", dispatch: null }), resume: { mode: "immediate", sourceRevision: 11, reasonCode: "active-turn" } }) };
+  writeFileSync(join(dir, ".claude", "pipeline-state.json"), JSON.stringify(state, null, 2) + "\n");
+  const planned = captureConsoleLog(() => run(["continuity-result-reconcile-plan"], { dir, now })); const plan = JSON.parse(planned.text);
+  const args = ["continuity-result-reconcile-apply", "--expected-revision", String(plan.expectedRevision), "--expected-state-sha256", plan.preStateSha256, "--expected-post-state-sha256", plan.postStateSha256, "--updated-at", plan.updatedAt, "--plan-sha256", plan.planSha256, "--activate", "true"];
+  const applied = run(args, continuityDeps(dir, { now })); const replay = run(args, continuityDeps(dir, { now }));
+  const result = readFileSync(join(dir, "specs", "feature", "result.md"), "utf8"); const after = JSON.parse(readFileSync(join(dir, ".claude", "pipeline-state.json"), "utf8"));
+  ok("TP5 stale Result authority reconciliation preserves history, appends one canonical fence, binds State, and replays without mutation", planned.value === 0 && applied === 0 && replay === 0 && result === `${historical}\`\`\`pipeline-result\n{\"courseDecisionIntents\":[],\"courseDecisionReceipts\":[],\"decisionBriefs\":[],\"finalIntegrations\":[]}\n\`\`\`\n` && after.continuity.revision === 12 && after.continuity.authority.result.sha256 === plan.result.sha256);
+}
 // ---- Cleanup ------------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {
