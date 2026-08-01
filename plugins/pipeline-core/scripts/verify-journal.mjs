@@ -339,9 +339,9 @@ function appendProgress(run, event, emit) {
   emit(JSON.stringify(event));
 }
 
-function executeSuite({ suite, registration, run, candidate, policySha256, index, total, clock, spawn }) {
+function executeSuite({ suite, registration, run, candidate, policySha256, index, total, clock, spawn, emit }) {
   const startedAt = now(clock);
-  appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "started", startedAt, completedAt: null, receiptSha256: null, diagnosticDigest: null }, console.log);
+  appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "started", startedAt, completedAt: null, receiptSha256: null, diagnosticDigest: null }, emit);
   const result = spawn(process.execPath, [suite.file, ...(suite.args ?? [])], { encoding: "buffer", cwd: suite.cwd, maxBuffer: MAX_LOG_BYTES });
   const stdout = Buffer.isBuffer(result.stdout) ? result.stdout : Buffer.from(result.stdout ?? "");
   const stderr = Buffer.isBuffer(result.stderr) ? result.stderr : Buffer.from(result.stderr ?? "");
@@ -369,11 +369,11 @@ function executeSuite({ suite, registration, run, candidate, policySha256, index
     completedAt,
   });
   atomicJson(join(run.receiptsDir, `${artifact}.json`), receipt);
-  appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "completed", startedAt, completedAt, receiptSha256: receipt.receiptSha256, diagnosticDigest: digestJson({ exitCode, error: result.error?.code ?? null }) }, console.log);
+  appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "completed", startedAt, completedAt, receiptSha256: receipt.receiptSha256, diagnosticDigest: digestJson({ exitCode, error: result.error?.code ?? null }) }, emit);
   return receipt;
 }
 
-function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candidate, policySha256, index, total, clock }) {
+function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candidate, policySha256, index, total, clock, emit }) {
   const startedAt = now(clock);
   const sourceRunDir = dirname(dirname(resolve(run.runsRoot, sourceReceipt.runId, sourceLog.path)));
   const sourcePath = resolve(sourceRunDir, sourceLog.path);
@@ -386,11 +386,12 @@ function reuseSuite({ suite, registration, sourceReceipt, sourceLog, run, candid
   const completedAt = now(clock);
   const receipt = sealVerifySuiteReceipt({ runId: run.manifest.runId, candidate, suite: suite.name, implementationSha256: registration.implementationSha256, inputs: registration.inputs, environmentContractSha256: registration.environmentContractSha256, policySha256, status: "completed", exitCode: 0, log: { path: `logs/${artifact}.log`, fileSha256: sha(bytes), byteLength: bytes.length, truncated: false }, startedAt, completedAt });
   atomicJson(join(run.receiptsDir, `${artifact}.json`), receipt);
-  appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "reused", startedAt, completedAt, receiptSha256: receipt.receiptSha256, diagnosticDigest: digestJson({ sourceRunId: sourceReceipt.runId, sourceReceiptSha256: sourceReceipt.receiptSha256 }) }, console.log);
+  appendProgress(run, { schema: VERIFY_PROGRESS_SCHEMA, runId: run.manifest.runId, candidate, suite: suite.name, index, total, state: "reused", startedAt, completedAt, receiptSha256: receipt.receiptSha256, diagnosticDigest: digestJson({ sourceRunId: sourceReceipt.runId, sourceReceiptSha256: sourceReceipt.receiptSha256 }) }, emit);
   return receipt;
 }
 
-export function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, clock = Date.now, spawn = spawnSync, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}` }) {
+export function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, policyInputs, registerRun, clock = Date.now, spawn = spawnSync, emit = console.log, runId = `verify-${Date.now()}-${randomBytes(8).toString("hex")}` }) {
+  if (typeof emit !== "function") throw new Error("VERIFY-PROGRESS-EMIT-INVALID");
   const registrations = compileVerifySuites({ repoRoot, suites, candidateTree: candidate.tree });
   const policySha256 = digestJson({ schema: "pipeline.verify-policy.v1", maxLogBytes: MAX_LOG_BYTES, suites: registrations, policyInputs });
   const common = assertPhysicalDirectory(realpathSync(gitCommonDir));
@@ -410,8 +411,8 @@ export function runVerifyJournal({ gitCommonDir, repoRoot, candidate, suites, po
     for (const [offset, suite] of suites.entries()) {
       const registration = registrations[offset];
       let receipt;
-      if (plan.reusable.includes(suite.name)) receipt = reuseSuite({ suite, registration, sourceReceipt: prior.receipts[suite.name], sourceLog: prior.logs[suite.name], run, candidate, policySha256, index: offset + 1, total: suites.length, clock });
-      else receipt = executeSuite({ suite: { ...suite, cwd: repoRoot }, registration, run, candidate, policySha256, index: offset + 1, total: suites.length, clock, spawn });
+      if (plan.reusable.includes(suite.name)) receipt = reuseSuite({ suite, registration, sourceReceipt: prior.receipts[suite.name], sourceLog: prior.logs[suite.name], run, candidate, policySha256, index: offset + 1, total: suites.length, clock, emit });
+      else receipt = executeSuite({ suite: { ...suite, cwd: repoRoot }, registration, run, candidate, policySha256, index: offset + 1, total: suites.length, clock, spawn, emit });
       receiptBySuite[suite.name] = receipt;
       steps.push({ name: suite.name, exitCode: receipt.exitCode, receiptSha256: receipt.receiptSha256, reused: plan.reusable.includes(suite.name) });
     }
