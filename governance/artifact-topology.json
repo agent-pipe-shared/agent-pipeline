@@ -4,12 +4,16 @@
   "packageRoot": "specs/<feature-id>",
   "states": ["draft", "awaiting-approval", "approved", "implementing", "verifying", "completed", "superseded", "abandoned", "retained"],
   "classes": [
-    "prd", "spec", "design", "plan", "acceptance", "result", "candidate-evidence", "adr", "release", "backlog", "state", "handover", "retention", "supply-chain", "private-local"
+    "prd", "spec", "design", "plan", "acceptance", "result", "candidate-evidence", "adr", "release", "backlog", "state", "handover", "retention", "supply-chain", "private-local", "governance-event"
   ],
   "lifecycleAuthority": {
     "featurePackageRequests": "repo-relative caller input; never canonical authority; existing-draft reconciliation binds the active PO approval and exact manifest preimage",
     "featurePackageReceiptRoot": "specs/<feature-id>/evidence/lifecycle/",
     "transactionJournal": "private-local; never portable authority",
-    "continuityAuthorityReceipt": "state; public-safe correlated receipt only"
+    "continuityAuthorityReceipt": "state; public-safe correlated receipt only",
+    "governanceEventRegistry": "governance/events/registry.json; repository-bound stream genesis",
+    "governanceEventPortableRoot": "governance/events/<stream>/<sequence>-<event-id>.json; immutable canonical event files",
+    "governanceEventHeads": "governance/events/heads.json; replaceable source-last projection, never authority",
+    "governanceEventRestrictedRoot": "machine-local outside repository; encrypted owner-only storage, never portable authority"
   }
 }

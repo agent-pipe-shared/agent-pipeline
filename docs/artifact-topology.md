@@ -21,6 +21,7 @@ or evidence is invented.
 | Design and plan | `design/`, `plans/` | Mutable working inputs; retain when referenced. |
 | Candidate evidence | `evidence/` | Immutable, non-authoritative, exact-candidate bound. |
 | ADR, backlog, handover, release, retention, supply-chain, private-local | Their established dedicated roots | Governed by their existing schemas; private/local artifacts never join a portable package. |
+| Governance event | `governance/events/<stream>/<sequence>-<event-id>.json` | Immutable canonical stream record; registry is genesis and `heads.json` is a replaceable projection, never authority. |
 
 `planFeaturePackageTransition()` produces a deterministic, non-mutating
 preview of the manifest change and required authority. It intentionally does
@@ -36,6 +37,13 @@ evidence references, an idempotency key, and a typed outcome in State. Generic
 continuity CAS cannot change the PRD or Spec authority pair. Neither route
 accepts a chat preview, handover, guessed path, temporary file, or raw command
 as authority.
+
+PHX-1 adds a separate `governance-event` class.  Its portable registry lives at
+`governance/events/registry.json`; individual canonical records are the only
+portable history.  The corresponding restricted-machine-local root is outside
+the repository, encrypted and owner-only, and is neither a package artifact
+nor portable authority.  Readers must validate stream files against an
+independently retained candidate-bound checkpoint, not a generated head.
 
 The inherited Phoenix draft may additionally use the same transaction only to
 reconcile its PRD, Spec, acceptance, and architecture digest bindings. Its
