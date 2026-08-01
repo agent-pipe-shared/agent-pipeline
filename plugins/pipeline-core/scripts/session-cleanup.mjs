@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 import { existsSync, lstatSync, readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { dirname, join } from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -55,6 +56,7 @@ const USAGE = `Usage:
   session-cleanup.mjs confirm-privatization --repo <checkout> --plan-sha256 <sha256> --accept
   session-cleanup.mjs apply-privatization --repo <checkout> --plan-sha256 <sha256> --activate
   session-cleanup.mjs plan-recovery --repo <checkout>
+  session-cleanup.mjs plan-human-recovery --repo <checkout>
   session-cleanup.mjs apply-recovery --repo <checkout> --plan-sha256 <sha256> --activate
   session-cleanup.mjs register-intent --repo <checkout> (--session <id> | --session-descriptor <id> --expected-descriptor-sha256 <sha256>) --resource-id <id> --type <scratch-file|scratch-directory> --path <absolute> --content-class <scratch|disposable-control|generated-output> --policy <unlink-file|remove-directory>
   session-cleanup.mjs finalize --repo <checkout> (--session <id> | --session-descriptor <id> --expected-descriptor-sha256 <sha256>) --resource-id <id> [--canary <relative-file>]
@@ -70,6 +72,56 @@ a redacted receipt.
 const HERE = dirname(fileURLToPath(import.meta.url));
 const SESSION_POWER_SCRIPT = join(HERE, "session-power.mjs");
 const POWER_RESULT_KEYS = new Set(["schema", "operation", "sessionId", "status", "revision", "failureClass", "observedAt"]);
+
+function sha256(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+/**
+ * A failure to construct automatic cleanup is a PO decision point, never a
+ * deletion permission. This deliberately creates no apply action: the PO can
+ * retain the evidence or choose an attended host recovery after reviewing the
+ * exact observed category.
+ */
+function planHumanRecovery(repo, dependencies = {}) {
+  const planRecovery = dependencies.planSessionCleanupRecoveryFn
+    ?? planSessionCleanupRecovery;
+  let observed;
+  try {
+    const recovery = planRecovery({ rootDir: repo });
+    observed = {
+      status: typeof recovery?.status === "string" ? recovery.status : "observation-unavailable",
+      code: null,
+    };
+  } catch (error) {
+    observed = {
+      status: "observation-unavailable",
+      code: typeof error?.code === "string" && /^[A-Z0-9-]{3,80}$/u.test(error.code)
+        ? error.code
+        : "SESSION-CLEANUP-OBSERVATION-UNAVAILABLE",
+    };
+  }
+  const payload = {
+    schema: "pipeline.session-cleanup-human-recovery-plan.v1",
+    status: "decision-required",
+    root: repo,
+    observed,
+    candidates: [
+      {
+        id: "retain-and-observe",
+        mutation: false,
+        effect: "retain-exact-state",
+      },
+      {
+        id: "attended-host-recovery",
+        mutation: false,
+        effect: "requires-separate-po-confirmed-host-action",
+      },
+    ],
+    automaticMutation: false,
+  };
+  return { ...payload, planSha256: sha256(JSON.stringify(payload)) };
+}
 
 /**
  * The descriptor-bound cleanup command is the one narrow close pathway that
@@ -125,7 +177,7 @@ function parseArgs(argv) {
   const [command, ...rest] = argv;
   if (!new Set([
     "start", "status", "release-binding", "plan-privatization", "confirm-privatization", "apply-privatization",
-    "plan-recovery", "apply-recovery",
+    "plan-recovery", "plan-human-recovery", "apply-recovery",
     "register-intent", "finalize", "seal", "cleanup", "hygiene",
   ]).has(command)) throw new Error(USAGE);
   const flags = {};
@@ -149,7 +201,7 @@ function parseArgs(argv) {
     : new Set(["finalize", "seal"]).has(command) ? ["resource-id", "canary"] : [];
   const allowed = command === "start" ? new Set(["repo", "session"])
     : new Set(["status", "release-binding"]).has(command) ? new Set(["repo"])
-      : new Set(["plan-recovery", "plan-privatization"]).has(command) ? new Set(["repo"])
+      : new Set(["plan-recovery", "plan-human-recovery", "plan-privatization"]).has(command) ? new Set(["repo"])
       : command === "confirm-privatization" ? new Set(["repo", "plan-sha256", "accept"])
       : new Set(["apply-recovery", "apply-privatization"]).has(command) ? new Set(["repo", "plan-sha256", "activate"])
       : new Set([...common, ...extra]);
@@ -231,6 +283,8 @@ export function main(argv = process.argv.slice(2), env = process.env, dependenci
     output = promotionRecovery.status === "not-applicable"
       ? planSessionCleanupRecovery({ rootDir: repo })
       : promotionRecovery;
+  } else if (command === "plan-human-recovery") {
+    output = planHumanRecovery(repo, dependencies);
   } else if (command === "apply-recovery") {
     const planSha256 = required(flags, "plan-sha256");
     const promotionRecovery = planOnboardingKickoffPromotionCleanupRecovery({ rootDir: repo });

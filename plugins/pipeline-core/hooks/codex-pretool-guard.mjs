@@ -302,7 +302,17 @@ if (lifecycleShouldRun) {
     });
   }
 }
+const GRAMMAR_DENIAL = /\bGUARD-(?:PARSE|OPERATOR|REDIRECT)-UNAPPROVED\b/u;
+const grammarOnlyDenial = denials.length > 0
+  && denials.every((entry) => entry.guard === "guard-lifecycle-ready.mjs"
+    && GRAMMAR_DENIAL.test(entry.reason));
 if (denials.length > 0) {
+  // Closed shell-grammar refusals have no side effect to reconcile and are
+  // not authority decisions. Routing them through the one-time Human-override
+  // ledger creates a misleading verify-audit/retry loop.
+  if (grammarOnlyDenial) {
+    deny(denials.map((entry) => entry.reason).join("\n"));
+  }
   const overrideSpawn = (executable, args, options) => boundedSpawn(
     executable,
     args,

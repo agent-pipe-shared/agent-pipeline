@@ -23,7 +23,7 @@ No prior gate implies a later gate.
 | NVA-G02 | WHEN an outcome is unknown, unavailable, stale, invalidated, cancelled, expired, malformed or completed-but-undelivered, THE SYSTEM SHALL NOT project success. | Outcome taxonomy fixtures across local and async adapters. |
 | NVA-G03 | WHEN a worker requests delegation, review, approval, merge, release or undeclared authority, THE SYSTEM SHALL reject it. | Closed-schema and confused-deputy fixtures. |
 | NVA-G04 | WHEN isolation evidence is absent or weaker than requested, THE SYSTEM SHALL report only the observed assurance and SHALL NOT infer OS isolation from branch, worktree, runner or process names. | Assurance downgrade fixtures and reports. |
-| NVA-G05 | WHEN Nova and Cyborg would mutate the same physical workspace or global runtime resource concurrently, implementation SHALL stop until the actual resource is serialized. An identical repository-relative path on independent Sprint branches SHALL be recorded as a later merge collision and SHALL block only the combined integration if the accepted diffs conflict. Before the stable `main` 0.4.7 rebase, a Nova dispatch SHALL carry an exact write-set and SHALL be admitted only when every path is disjoint from Bootstrap, installation, runtime-readback and V4/#63 recovery surfaces; absent or uncertain classification fails closed. | Physical-resource declaration, exact dispatch write-set, protected-surface disposition, collision manifest, exact 0.4.7 rebase receipt and later exact-OID integration receipt. |
+| NVA-G05 | WHEN Nova and Cyborg would mutate the same physical workspace or global runtime resource concurrently, implementation SHALL stop until the actual resource is serialized. An identical repository-relative path on independent Sprint branches SHALL be recorded as a later merge collision and SHALL block only the combined integration if the accepted diffs conflict. The completed stable `main` 0.4.7 adoption remains bound to its exact write-set, protected-surface disposition and conflict/readback evidence; every later Nova dispatch still fails closed on an absent or uncertain path/resource classification. | Physical-resource declaration, exact dispatch write-set, protected-surface disposition, collision manifest, exact 0.4.7 adoption receipt and later exact-OID integration receipt. |
 | NVA-G06 | WHEN Nova and Cyborg both claim direct reconciliation ownership of one canonical backlog ID, integration SHALL fail closed until one claim is withdrawn or an explicit common owner is approved. | Backlog claim manifests bound to the same ledger head. |
 | NVA-G07 | WHEN the backlog ledger head, item body or status differs from the approved intake snapshot, no backlog transition preview SHALL be accepted until the complete intake is regenerated. | Canonical backlog readback and fresh disposition digest. |
 | NVA-G08 | WHEN a frozen V3 or v1 authority would need an in-place edit, the slice SHALL stop and propose a versioned companion or explicit ADR. | Diff review and schema compatibility tests. |
@@ -31,8 +31,8 @@ No prior gate implies a later gate.
 | NVA-G10 | Every external mutation SHALL resolve the exact target, require confirmation matching its preview, carry an idempotency binding and require matching readback before success. | Forge/credential adapter tests and opt-in observation. |
 | NVA-G11 | Every portable metric SHALL preserve unknown usage/cost as unknown and SHALL exclude prompts, secrets, private coordinates and unrestricted output. | Privacy/cardinality tests. |
 | NVA-G12 | Epic completion SHALL require all 17 issue acceptance sets and the same frozen Nova-only candidate to pass configured Verify, Security, independent Critic and PO acceptance; unavailable or deferred criteria SHALL remain open unless the PO explicitly changes scope. | Final Result and issue-evidence matrix. |
-| NVA-G13 | Before renewed implementation approval, Nova A increment acceptance, immutable final candidate evidence or full Nova readiness approval, the branch SHALL rebase onto commit `89cb12b99e3fd86ac44878d0c23b278f00538921`, tree `b6537dcaa7bee526d9a393e2603b28648f4b0438`, resolve conflicts against the 17-Issue scope, rerun upstream #63 recovery regressions and regenerate every affected binding without claiming #63 delivery. Pre-rebase evidence is provisional and SHALL be invalidated or re-established after the rebase according to path impact. | Exact previous Nova head/tree, released base identity, resulting head/tree, replay/conflict disposition, impact invalidation, regression readback and regenerated binding/lifecycle digests. |
-| NVA-G14 | The standing TP-1/TP-3/TP-5 authorization SHALL apply only to an exact Nova task/write-set, SHALL be audit-recorded, SHALL NOT weaken tests or another guard, and SHALL be fully restored before candidate gates, push/publication and Nova close. | PO authorization record, per-use audit entries, guard readback before each gate and close. |
+| NVA-G13 | Before renewed implementation approval, Nova A increment acceptance, immutable final candidate evidence or full Nova readiness approval, the branch SHALL retain the completed adoption of commit `89cb12b99e3fd86ac44878d0c23b278f00538921`, tree `b6537dcaa7bee526d9a393e2603b28648f4b0438`, including its 17-Issue conflict disposition, upstream #63 recovery regressions and regenerated bindings without claiming #63 delivery. Pre-rebase evidence remains provisional and SHALL be invalidated or re-established according to path impact. | Exact previous Nova head/tree, released base identity, resulting head/tree, replay/conflict disposition, impact invalidation, regression readback and regenerated binding/lifecycle digests. |
+| NVA-G14 | The standing TP-1-through-TP-5 authorization SHALL apply only to an exact Nova task/write-set, SHALL be audit-recorded, SHALL NOT weaken tests or another guard, and SHALL be fully restored before candidate gates, push/publication and Nova close. | PO authorization record, per-use audit entries, guard readback before each gate and close. |
 
 ## Nova A issue acceptance
 
@@ -228,10 +228,22 @@ No prior gate implies a later gate.
   in-root patch admission, drift/replay denial and audit-before-effect order.
 - NVA-A98-3f: Every denial returns an actionable next route. A project-policy
   guard cannot deadlock as permanently non-overridable; a genuine host/OS
-  limitation instead returns an exact external-operator boundary.
+  limitation instead returns an exact external-operator boundary. When no
+  automatic recovery is safely constructible, the route SHALL expose a
+  bounded, PO-confirmed Human-recovery decision/plan rather than a null
+  repair state.
 - NVA-A98-3g: The minimal append-only Nova decision record is durable and
   forward-compatible with Phoenix's later richer authorization trail; absence
   of that future trail never blocks today's PO exception.
+- NVA-A98-3h: For `host-authorized-wsl` actions, every Git observation uses
+  the declared host execution profile directly. A sandbox Git EPERM is a
+  typed routing condition, never repository invalidity or a sandbox retry.
+  Host and sandbox Git observations cannot be combined as one authority.
+- NVA-A98-3i: A shell grammar denial is effect-free and SHALL NOT require a
+  Human-override audit reconciliation. Pasted LF or CRLF read-only commands
+  may yield only separately executable normalized retries when every line is
+  independently admitted; quoted/escaped continuations, operators,
+  substitutions, redirects and mutable lines yield no retry action.
 - NVA-A98-4: Wrong candidate, tree, repository/remote fingerprint,
   destination ref, preimage, gate evidence, approval digest, expiry, replay or
   non-fast-forward state rejects before mutation.
@@ -326,6 +338,10 @@ Nova A is accepted only when:
   reproducible payload measurement and stay within a runner-neutral 10–15k
   token budget. Role/state-specific lazy loading must retain every required
   lifecycle, authority, calibration, handover, verify and continuation check;
+- NVA-B60-18: Claude Code's absolute soft Compact nudge SHALL begin no earlier
+  than 400k observed context tokens and escalate only at 500k. The percentage
+  safety brake remains independently governed and this nudge does not itself
+  invoke Compact.
   a cached or skipped check is not a passing optimization.
 
 ### `#21` Local worker pool

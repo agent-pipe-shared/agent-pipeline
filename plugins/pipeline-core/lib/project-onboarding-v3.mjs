@@ -782,6 +782,20 @@ function emptyContinuity() { return { status: "unavailable", stateSha256: null, 
 
 function emptyAppServer() { return { required: false, status: "not-requested", code: null }; }
 
+function cleanupHumanRecoveryAction(root) {
+  return {
+    kind: "command",
+    executable: "node",
+    argv: [SESSION_CLEANUP_SCRIPT, "plan-human-recovery", "--repo", root],
+    mutation: false,
+    requiresConfirmation: false,
+    expected: {
+      schema: "pipeline.session-cleanup-human-recovery-plan.v1",
+      statuses: ["decision-required"],
+    },
+  };
+}
+
 function partialCleanupRecoveryResult({
   root,
   intent,
@@ -829,7 +843,7 @@ function partialCleanupRecoveryResult({
         intent,
         repository,
         runtime,
-        nextAction: null,
+        nextAction: cleanupHumanRecoveryAction(root),
         diagnostics: [lifecycleDiagnostic(
           "$.authority.sessionCleanup",
           "cleanup_recovery_unavailable",
@@ -846,7 +860,7 @@ function partialCleanupRecoveryResult({
         intent,
         repository,
         runtime,
-        nextAction: null,
+        nextAction: cleanupHumanRecoveryAction(root),
         diagnostics: [lifecycleDiagnostic(
           "$.authority.sessionCleanup",
           "cleanup_recovery_observation_unavailable",
@@ -1282,22 +1296,34 @@ function singleQuoted(value, powershell = false) {
     ? `'${value.replaceAll("'", "''")}'`
     : `'${value.replaceAll("'", "'\"'\"'")}'`;
 }
-function boundedAssignmentLines(name, value, powershell = false) {
+function boundedAssignmentLines(name, value, renderer = "posix") {
   if (/[\r\n]/u.test(value)) throw new TypeError("copy command values cannot contain line breaks");
+  const powershell = renderer === "powershell";
+  const cmd = renderer === "cmd";
+  if (!new Set(["posix", "powershell", "cmd"]).has(renderer)) {
+    throw new TypeError("copy command renderer is invalid");
+  }
+  // cmd.exe expands %, ! and several metacharacters before executing SET.
+  // Refuse rather than emit a seemingly copy-safe command for those roots.
+  if (cmd && /[%!"^&|<>()]/u.test(value)) {
+    throw new TypeError("cmd copy command value is unsafe");
+  }
   const lines = [];
   let remaining = value;
   do {
-    const prefix = powershell
-      ? `${name}${lines.length === 0 ? " = " : " += "}`
-      : `${name}=${lines.length === 0 ? "" : `\${${name}}`}`;
+    const prefix = cmd
+      ? `set \"${name}=${lines.length === 0 ? "" : `%${name}%`}`
+      : powershell
+        ? `${name}${lines.length === 0 ? " = " : " += "}`
+        : `${name}=${lines.length === 0 ? "" : `\${${name}}`}`;
     let length = remaining.length;
     while (length > 0
-      && `${prefix}${singleQuoted(remaining.slice(0, length), powershell)}`.length > COPY_COMMAND_MAX_COLUMNS) {
+      && `${prefix}${cmd ? remaining.slice(0, length) : singleQuoted(remaining.slice(0, length), powershell)}${cmd ? "\"" : ""}`.length > COPY_COMMAND_MAX_COLUMNS) {
       length -= 1;
     }
     if (length === 0 && remaining.length > 0) throw new TypeError("copy command value cannot be bounded");
     const chunk = remaining.slice(0, length);
-    lines.push(`${prefix}${singleQuoted(chunk, powershell)}`);
+    lines.push(`${prefix}${cmd ? chunk : singleQuoted(chunk, powershell)}${cmd ? "\"" : ""}`);
     remaining = remaining.slice(length);
   } while (remaining.length > 0);
   return lines;
@@ -1318,18 +1344,25 @@ function restartCopyCommands(executable, argv) {
     'node "$P" --root "$R" --barrier-sha256 "$B" --activate',
   ];
   const powershell = [
-    ...boundedAssignmentLines("$P", launcher, true),
-    ...boundedAssignmentLines("$R", root, true),
-    ...boundedAssignmentLines("$B", barrierSha256, true),
+    ...boundedAssignmentLines("$P", launcher, "powershell"),
+    ...boundedAssignmentLines("$R", root, "powershell"),
+    ...boundedAssignmentLines("$B", barrierSha256, "powershell"),
     "& node $P --root $R --barrier-sha256 $B --activate",
   ];
-  for (const line of [...posix, ...powershell]) {
+  const cmd = [
+    ...boundedAssignmentLines("P", launcher, "cmd"),
+    ...boundedAssignmentLines("R", root, "cmd"),
+    ...boundedAssignmentLines("B", barrierSha256, "cmd"),
+    'node "%P%" --root "%R%" --barrier-sha256 "%B%" --activate',
+  ];
+  for (const line of [...posix, ...powershell, ...cmd]) {
     if (line.length > COPY_COMMAND_MAX_COLUMNS) throw new TypeError("copy command line exceeds its bound");
   }
   return {
     maxColumns: COPY_COMMAND_MAX_COLUMNS,
     posix: posix.join("\n"),
     powershell: powershell.join("\n"),
+    cmd: cmd.join("\r\n"),
   };
 }
 

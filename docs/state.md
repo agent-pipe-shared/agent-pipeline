@@ -27,6 +27,17 @@ authorize edits outside the exact protected target, Human-override bypass,
 `main` integration, publication, or any remote effect. Each use and restoration
 remains subject to the applicable focused tests and candidate evidence.
 
+## 2026-08-01 PO Sprint Nova authorization — standing bounded protected-test lifts
+
+For Sprint Nova pipeline work, TP-1 through TP-5 may each be lifted
+temporarily for the exact protected file of one bounded task. This is a
+standing Sprint authorization, not a global guard disable: every lift remains
+task-scoped, must be restored byte-for-byte before staging, commit, push or
+final verification, and requires its applicable focused evidence. It grants no
+Human-override bypass, `main` integration, publication, remote effect or edit
+outside the exact protected target. Git commits remain single-line invocations
+because of the guard.
+
 ## 2026-07-31 0.4.7 release qualification — authoritative latest
 
 - The public release surfaces are unified at `0.4.7` (`VERSION`, Codex and

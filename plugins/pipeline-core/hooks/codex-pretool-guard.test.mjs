@@ -150,7 +150,7 @@ check("multiple Bash guard denials are aggregated into one Codex decision", () =
   assert.match(output.permissionDecisionReason, /guard-push/);
 });
 
-check("closed shell grammar denial teaches the stable retry shape and exposes an exact PO plan", () => {
+check("closed shell grammar denial teaches the stable retry shape without an override loop", () => {
   const root = fixture();
   const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
   git("init", "-q", "-b", "main");
@@ -170,11 +170,13 @@ check("closed shell grammar denial teaches the stable retry shape and exposes an
   assert.equal(output.permissionDecision, "deny");
   assert.match(output.permissionDecisionReason, /one simple shell command per tool call/u);
   assert.match(output.permissionDecisionReason, /separate parallel tool calls/u);
-  assert.match(output.permissionDecisionReason, /Do not retry by varying &&, ;, newline composition, pipelines, or redirects/u);
+  assert.match(output.permissionDecisionReason, /Do not construct a new composed command/u);
+  assert.match(output.permissionDecisionReason, /If typed retryActions are present/u);
   assert.match(output.permissionDecisionReason, /exact bounded rg-to-head diagnostic pipeline/u);
   assert.match(output.permissionDecisionReason, /"schema":"pipeline.guard-retry-actions.v1"/u);
   assert.match(output.permissionDecisionReason, /"retryActions":\[\]/u);
-  assert.match(output.permissionDecisionReason, /Human override available for this exact action/u);
+  assert.doesNotMatch(output.permissionDecisionReason, /Human override available for this exact action/u);
+  assert.doesNotMatch(output.permissionDecisionReason, /effect-reconciliation-required/u);
   assert.doesNotMatch(output.permissionDecisionReason, /HGO-NONOVERRIDABLE/u);
 });
 
@@ -414,6 +416,7 @@ check("governed bootstrap can read only its loaded pipeline-start skill and curr
   }, root));
   assert.equal(chained.permissionDecision, "deny");
   assert.match(chained.permissionDecisionReason, /guard-lifecycle-ready/);
+  assert.doesNotMatch(chained.permissionDecisionReason, /effect-reconciliation-required/);
   for (const command of [
     `gc -LiteralPath "${skill}" -Raw`,
     `Get-Content -Path "${skill}" -Raw`,

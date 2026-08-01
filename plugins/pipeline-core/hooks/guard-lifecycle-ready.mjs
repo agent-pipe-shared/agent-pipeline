@@ -100,7 +100,8 @@ function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, ret
       "BLOCKED (guard-lifecycle-ready, plugin pipeline-core): "
         + `${code}: ${grammarReason}\n`
         + "Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.\n"
-        + "Do not retry by varying &&, ;, newline composition, pipelines, or redirects.\n"
+        + "Do not construct a new composed command with &&, ;, pipelines, redirects, or line continuation.\n"
+        + "If typed retryActions are present, run only those exact read-only actions as separate tool calls.\n"
         + "Only the exact bounded rg-to-head diagnostic pipeline is admitted as an exception.\n"
         + `${JSON.stringify(retryEnvelope)}\n`,
     );
@@ -273,13 +274,14 @@ export function isReadOnlyDiagnosticCommand(command, root) {
 }
 
 /**
- * Recover only independent semicolon-separated diagnostics.  This is a
- * correction hint, never an execution bypass: each returned argv must pass
- * the same closed single-command read-only policy on its own.
+ * Recover only independent semicolon- or physical-newline-separated
+ * diagnostics. This is a correction hint, never an execution bypass: each
+ * returned argv must pass the same closed single-command read-only policy on
+ * its own. Quoted and escaped newlines are deliberately not normalized.
  */
 export function retryActionsForDeniedCommand(command, root) {
   if (typeof command !== "string" || command.trim() === ""
-    || /[\0\r\n`]/u.test(command) || /\$\s*\(/u.test(command)) return [];
+    || /[\0`]/u.test(command) || /\$\s*\(/u.test(command)) return [];
   const parts = [];
   let quote = null;
   let escaped = false;
@@ -287,6 +289,7 @@ export function retryActionsForDeniedCommand(command, root) {
   for (let index = 0; index < command.length; index += 1) {
     const char = command[index];
     if (escaped) {
+      if (char === "\r" || char === "\n") return [];
       escaped = false;
       continue;
     }
@@ -302,9 +305,11 @@ export function retryActionsForDeniedCommand(command, root) {
       quote = char;
       continue;
     }
-    if (char === ";") {
+    if (char === ";" || char === "\n" || char === "\r") {
+      if (char === "\r" && command[index + 1] !== "\n") return [];
       parts.push(command.slice(start, index).trim());
-      start = index + 1;
+      start = index + (char === "\r" ? 2 : 1);
+      if (char === "\r") index += 1;
       continue;
     }
     if ("|&<>()".includes(char)) return [];
@@ -517,7 +522,7 @@ function sanctionedMigrationArgs(args, root) {
 }
 
 function sanctionedSessionCleanupArgs(args, root) {
-  if (["start", "status", "release-binding", "plan-recovery", "plan-privatization"].includes(args[0])) {
+  if (["start", "status", "release-binding", "plan-recovery", "plan-human-recovery", "plan-privatization"].includes(args[0])) {
     return args[1] === "--repo" && args[2] === root && args.length === 3;
   }
   if (args[0] === "confirm-privatization") {
@@ -589,6 +594,27 @@ function sanctionedPoAuthorityRebindArgs(args) {
     && new Date(args[4]).toISOString() === args[4]
     && args[5] === "--activate"
     && args.length === 6;
+}
+
+function sanctionedPipelineStateArgs(args) {
+  const validBy = (value) => typeof value === "string"
+    && value.trim() !== "" && Buffer.byteLength(value, "utf8") <= 500;
+  if (args[0] === "reopen-design") {
+    return args[1] === "--by" && validBy(args[2]) && args.length === 3;
+  }
+  if (args[0] === "submit-plan") {
+    return args[1] === "--by" && validBy(args[2])
+      && args[3] === "--profile" && new Set(["epic", "feature", "mini"]).has(args[4])
+      && args.length === 5;
+  }
+  if (args[0] === "approve-plan") {
+    return args[1] === "--by" && validBy(args[2]) && args.length === 3;
+  }
+  if (args[0] === "set-phase") {
+    return args[1] === "--phase" && new Set(["design", "implementation"]).has(args[2])
+      && args.length === 3;
+  }
+  return sanctionedPoAuthorityRebindArgs(args);
 }
 
 function sanctionedPoProfileRepairArgs(args, root) {
@@ -663,7 +689,7 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
   if (script === SESSION_CAPABILITY_DIAGNOSE_SCRIPT) return args[0] === "--repo" && args[1] === root && args.length === 2;
   if (script === SESSION_CLEANUP_SCRIPT) return sanctionedSessionCleanupArgs(args, root);
   if (script === PIPELINE_STATE_SCRIPT) {
-    return sanctionedPoAuthorityRebindArgs(args);
+    return sanctionedPipelineStateArgs(args);
   }
   if (script === PO_PROFILE_REPAIR_SCRIPT) return sanctionedPoProfileRepairArgs(args, root);
   if (script === PROJECT_AUTHORITY_MIGRATION_SCRIPT) {

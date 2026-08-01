@@ -236,11 +236,11 @@ function assertSingleLineAction(action, expected) {
 
 function assertBoundedRestartCopyCommand(action) {
   const copy = action?.launch?.copyCommand;
-  assert.deepEqual(Object.keys(copy).sort(), ["maxColumns", "posix", "powershell"]);
+  assert.deepEqual(Object.keys(copy).sort(), ["cmd", "maxColumns", "posix", "powershell"]);
   assert.equal(copy.maxColumns, 72);
-  for (const command of [copy.posix, copy.powershell]) {
+  for (const command of [copy.posix, copy.powershell, copy.cmd]) {
     assert.equal(typeof command, "string");
-    assert.equal(command.split("\n").every((line) => line.length <= copy.maxColumns), true);
+    assert.equal(command.split(/\r?\n/u).every((line) => line.length <= copy.maxColumns), true);
   }
   if (process.platform !== "win32") {
     const lines = copy.posix.split("\n");
@@ -261,6 +261,9 @@ function assertBoundedRestartCopyCommand(action) {
   const powershellLines = copy.powershell.split("\n");
   assert.equal(powershellLines.at(-1), "& node $P --root $R --barrier-sha256 $B --activate");
   assert.equal(powershellLines.some((line) => line.endsWith("`")), false);
+  const cmdLines = copy.cmd.split("\r\n");
+  assert.equal(cmdLines.at(-1), 'node "%P%" --root "%R%" --barrier-sha256 "%B%" --activate');
+  assert.equal(cmdLines.some((line) => line.endsWith("^")), false);
   return copy;
 }
 
@@ -574,6 +577,18 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
     assert.equal(activeSession.nextAction, null);
     assert.equal(activeSessionAppServerCalls, 1);
 
+    const humanRecoveryAction = {
+      kind: "command",
+      executable: "node",
+      argv: [SESSION_CLEANUP_SCRIPT, "plan-human-recovery", "--repo", path],
+      mutation: false,
+      requiresConfirmation: false,
+      expected: {
+        schema: "pipeline.session-cleanup-human-recovery-plan.v1",
+        statuses: ["decision-required"],
+      },
+    };
+
     const unavailable = inspectProjectOnboardingV3({
       rootDir: path,
       intent: "bootstrap",
@@ -592,7 +607,7 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
       },
     });
     assert.equal(unavailable.status, "partial");
-    assert.equal(unavailable.nextAction, null);
+    assert.deepEqual(unavailable.nextAction, humanRecoveryAction);
     assertDiagnostic(unavailable, "cleanup_recovery_unavailable");
 
     const unobserved = inspectProjectOnboardingV3({
@@ -609,7 +624,7 @@ test("runtime-current bootstrap exposes cleanup recovery before App Server or se
       },
     });
     assert.equal(unobserved.status, "partial");
-    assert.equal(unobserved.nextAction, null);
+    assert.deepEqual(unobserved.nextAction, humanRecoveryAction);
     assertDiagnostic(unobserved, "cleanup_recovery_observation_unavailable");
   } finally { dispose(path); }
 });

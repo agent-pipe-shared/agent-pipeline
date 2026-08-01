@@ -609,12 +609,11 @@ export function contextTier(usedPct) {
  */
 export function absoluteContextTier(totalTokens) {
   if (typeof totalTokens !== "number" || !Number.isFinite(totalTokens)) return "none";
-  // 250k is documented (Elephant decision 2026-07-10) as the "strongest soft" floor -- but it
-  // maps to the SAME "overdue" tier as the 200k floor. There is no 4th soft tier between
-  // "overdue" and the percent-gated "block"; the 250k number is an urgency-framing distinction
-  // in the decision record, not a separate machine-checkable state.
-  if (totalTokens >= 200000) return "overdue"; // also covers the 250k "strongest soft" floor
-  if (totalTokens >= 180000) return "warn";
+  // Claude Code's large context windows need a later proactive checkpoint: begin the soft
+  // nudge at 400k and escalate its wording at 500k. There is no 4th soft tier between
+  // "overdue" and the percent-gated "block"; the absolute ladder never blocks a session.
+  if (totalTokens >= 500000) return "overdue";
+  if (totalTokens >= 400000) return "warn";
   return "none";
 }
 

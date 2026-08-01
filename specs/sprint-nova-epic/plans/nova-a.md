@@ -4,10 +4,10 @@
 
 - The prior PRD/Spec approval is revoked; revised 17-Issue authority and a new
   readiness/PO gate are required before implementation resumes.
-- Branch remains `feat/sprint-nova-codex-v046` and adopts released `v0.4.7`
-  commit `89cb12b99e3fd86ac44878d0c23b278f00538921`, tree
+- Branch remains `feat/sprint-nova-codex-v046` and has adopted released
+  `v0.4.7` commit `89cb12b99e3fd86ac44878d0c23b278f00538921`, tree
   `b6537dcaa7bee526d9a393e2603b28648f4b0438`, through the reviewed R0 rebase
-  record before a new Execution approval.
+  record. A new Execution approval still requires the revised authority bytes.
 - Issue `#98` is a P0 blocker and composes `#54`, `#56`, the released
   publication authority/executor and the one configured Verify command.
 - The package has exact Nova write paths/resources and does not share a
@@ -29,11 +29,11 @@ them before Nova A acceptance.
 ## Standing TP authorization
 
 The PO grants a reusable Nova-only authorization through formal Nova close for
-temporary TP-1, TP-3 and TP-5 lifts. Every use remains bound to one exact task
+temporary TP-1 through TP-5 lifts. Every use remains bound to one exact task
 and write-set and creates its required audit record. No other guard is covered;
-test/gate semantics may not be weakened; and TP-1/TP-3/TP-5 are restored before
-candidate gates, push/publication and Nova close. This removes repeat approval
-prompts but does not leave the protections continuously disabled.
+test/gate semantics may not be weakened; and the exact lifted protection is
+restored before candidate gates, push/publication and Nova close. This removes
+repeat approval prompts but does not leave the protections continuously disabled.
 
 ## Design D0 — Boundary freeze and test inventory
 

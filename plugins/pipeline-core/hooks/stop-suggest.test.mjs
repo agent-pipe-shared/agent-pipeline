@@ -407,18 +407,16 @@ ok('contextTier: 100 -> "block"', contextTier(100) === "block");
 // would have hit "block" (>=170k) immediately; percentage-based tiering correctly stays "none".
 ok('contextTier: 1M-window at 34% used -> "none" (NO spurious block; 340k real tokens)', contextTier(34) === "none");
 
-// ---- absoluteContextTier boundaries (pure, Elephant decision 2026-07-10) ----------------
+// ---- absoluteContextTier boundaries (Claude Code context pacing, 2026-08-01) -------------
 // Window-INDEPENDENT soft-nudge ladder, layered beside (NOT replacing) the percent-based
 // contextTier above -- EL-04's own boundary tests above stay untouched/unmodified.
 ok('absoluteContextTier: null -> "none"', absoluteContextTier(null) === "none");
 ok('absoluteContextTier: non-finite (NaN) -> "none"', absoluteContextTier(NaN) === "none");
 ok('absoluteContextTier: 0 -> "none"', absoluteContextTier(0) === "none");
-ok('absoluteContextTier: 179999 -> "none"', absoluteContextTier(179999) === "none");
-ok('absoluteContextTier: 180000 -> "warn" (boundary)', absoluteContextTier(180000) === "warn");
-ok('absoluteContextTier: 199999 -> "warn"', absoluteContextTier(199999) === "warn");
-ok('absoluteContextTier: 200000 -> "overdue" (boundary)', absoluteContextTier(200000) === "overdue");
-ok('absoluteContextTier: 249999 -> "overdue"', absoluteContextTier(249999) === "overdue");
-ok('absoluteContextTier: 250000 -> "overdue" ("strongest soft" floor, same tier)', absoluteContextTier(250000) === "overdue");
+ok('absoluteContextTier: 399999 -> "none"', absoluteContextTier(399999) === "none");
+ok('absoluteContextTier: 400000 -> "warn" (boundary)', absoluteContextTier(400000) === "warn");
+ok('absoluteContextTier: 499999 -> "warn"', absoluteContextTier(499999) === "warn");
+ok('absoluteContextTier: 500000 -> "overdue" (boundary)', absoluteContextTier(500000) === "overdue");
 ok('absoluteContextTier: 10,000,000 -> STILL "overdue", NEVER "block"', absoluteContextTier(10_000_000) === "overdue");
 
 // ---- effectiveContextTier: more-severe combination (pure, Elephant decision 2026-07-10) -
@@ -431,28 +429,28 @@ ok('absoluteContextTier: 10,000,000 -> STILL "overdue", NEVER "block"', absolute
   );
 }
 {
-  // Percent says "none" (usedPct 10, huge window), absolute says "overdue" (totalTokens 340000)
+  // Percent says "none" (usedPct 10, huge window), absolute says "overdue" (totalTokens 500000)
   // -> effective becomes "overdue" (absolute adds urgency percent alone would miss) but NEVER
   // "block" -- this is the EL-04-preserving case the resolved design exists for.
   ok(
-    "effectiveContextTier: percent none (10% of 1M) + absolute overdue (340k) -> overdue, NOT block",
-    effectiveContextTier(10, 340000) === "overdue",
+    "effectiveContextTier: percent none (10% of 1M) + absolute overdue (500k) -> overdue, NOT block",
+    effectiveContextTier(10, 500000) === "overdue",
   );
 }
 {
-  // Percent says "warn" (usedPct 60), absolute says "overdue" (totalTokens 340000) -> more
+  // Percent says "warn" (usedPct 60), absolute says "overdue" (totalTokens 500000) -> more
   // severe of the two ("overdue" outranks "warn") wins.
   ok(
     "effectiveContextTier: percent warn + absolute overdue -> overdue (more severe wins)",
-    effectiveContextTier(60, 340000) === "overdue",
+    effectiveContextTier(60, 500000) === "overdue",
   );
 }
 {
-  // Percent unresolvable (null usedPct, e.g. no usage snapshot) + absolute warn (190000) ->
+  // Percent unresolvable (null usedPct, e.g. no usage snapshot) + absolute warn (400000) ->
   // absolute alone still surfaces a nudge.
   ok(
-    "effectiveContextTier: percent null (contextTier -> none) + absolute warn (190k) -> warn",
-    effectiveContextTier(null, 190000) === "warn",
+    "effectiveContextTier: percent null (contextTier -> none) + absolute warn (400k) -> warn",
+    effectiveContextTier(null, 400000) === "warn",
   );
 }
 {
@@ -907,12 +905,9 @@ function writeGbUsage(rootDir, sessionId, totalTokens, usedPct, updatedAt = new 
   // unmodified below: the OLD absolute-token contextTier (>=170k -> block) would have fired a
   // spurious emergency brake here; percentage-based tiering correctly keeps the HARD "block"
   // tier out of it. What CHANGES (b) is the soft layer: 340k real tokens is >= the new
-  // window-independent 250k absolute-overdue floor (`absoluteContextTier`), so
-  // `effectiveContextTier` now surfaces a SOFT "overdue" nudge (with the copyable /compact
-  // command) even though the percent ladder alone would have said "none" -- this is the
-  // resolved design's whole point (compact-checkpoint-pacing intent: a session carrying 340k
-  // real tokens of live context is worth a proactive nudge, however large its window is), NOT
-  // a regression of EL-04, which only ever governed the HARD brake.
+  // window-independent 400k absolute-warn floor (`absoluteContextTier`), so a 340k session
+  // remains quiet even though the percent ladder alone also says "none". This preserves the
+  // later Claude Code Compact pacing without changing EL-04's hard-brake behavior.
   const rootDir = fixtureDir("gb-cli-1m-window-no-spurious-block");
   writeGbFixture(rootDir);
   writeGbUsage(rootDir, "sess-1m", 340000, 34); // 1M window, 34% used, 340k real tokens
@@ -921,10 +916,8 @@ function writeGbUsage(rootDir, sessionId, totalTokens, usedPct, updatedAt = new 
   ok("G-B CLI: 1M-window at 34% used -> exit 0", r1.status === 0, `stderr=${r1.stderr}`);
   // (a) EL-04's core assertion, UNCHANGED: never a spurious hard emergency brake.
   ok("G-B CLI: 1M-window at 34% used -> NO decision:block (no spurious emergency brake, EL-04 preserved)", !r1.stdout.includes('"decision"'), r1.stdout);
-  // (b) CHANGED (2026-07-10 absolute soft-nudge layer): a soft "overdue" nudge now fires,
-  // carrying the real token count and the copyable /compact command.
-  ok("G-B CLI: 1M-window at 34% used -> soft OVERDUE nudge fires (absolute layer, 340k >= 250k floor)", r1.stdout.includes("OVERDUE") && r1.stdout.includes("340k"), r1.stdout);
-  ok("G-B CLI: 1M-window at 34% used -> nudge carries the copyable /compact command", r1.stdout.includes("/compact "), r1.stdout);
+  // (b) The later 400k floor keeps this session quiet.
+  ok("G-B CLI: 1M-window at 34% used -> no soft nudge before the 400k absolute floor", !r1.stdout.includes("Context "), r1.stdout);
 
   writeGbUsage(rootDir, "sess-1m", 850000, 85); // same 1M window, now 85% used -> tier "block"
   const r2 = runCliWithStdin(rootDir, { session_id: "sess-1m" });
@@ -935,7 +928,7 @@ function writeGbUsage(rootDir, sessionId, totalTokens, usedPct, updatedAt = new 
 
 {
   // NEW regression (this task, 2026-07-10): preserves EL-04's spirit at a token count BELOW
-  // the new absolute soft-nudge floor (180k) -- a session genuinely lightly used on a huge
+  // the new absolute soft-nudge floor (400k) -- a session genuinely lightly used on a huge
   // window (100k real tokens = 10% of a 1M window) must stay completely quiet: no soft nudge,
   // no hard block. Without this guard, an overly aggressive absolute floor could reintroduce
   // exactly the kind of spurious noise EL-04 was written to eliminate, just one layer up (soft
@@ -945,25 +938,25 @@ function writeGbUsage(rootDir, sessionId, totalTokens, usedPct, updatedAt = new 
   writeGbUsage(rootDir, "sess-1m-light", 100000, 10); // 1M window, 10% used, 100k real tokens
 
   const r = runCliWithStdin(rootDir, { session_id: "sess-1m-light" });
-  ok("G-B CLI: 1M-window at 10% used (100k tokens, below the 180k absolute floor) -> exit 0", r.status === 0, `stderr=${r.stderr}`);
+  ok("G-B CLI: 1M-window at 10% used (100k tokens, below the 400k absolute floor) -> exit 0", r.status === 0, `stderr=${r.stderr}`);
   ok("G-B CLI: 1M-window at 10% used -> NO decision:block", !r.stdout.includes('"decision"'), r.stdout);
   ok("G-B CLI: 1M-window at 10% used -> NO context clause at all (tier none, no spurious soft nudge either)", !r.stdout.includes("Context "), r.stdout);
 }
 
 {
   // Interaction regression (this task, 2026-07-10): a 200k-window-sized session that already
-  // hard-blocks via PERCENT (85% used) ALSO happens to sit above the absolute overdue floor
-  // (210000 >= 200000) -- proves the hard block still fires exactly as before (percent wins,
-  // "block" outranks "overdue") and that the absolute layer never downgrades or interferes
+  // hard-blocks via PERCENT (85% used) while remaining below the absolute floor. This proves
+  // the hard block still fires exactly as before (percent wins) and that the absolute layer
+  // never downgrades or interferes
   // with an already-active percent-driven emergency brake.
   const rootDir = fixtureDir("gb-cli-200k-window-hard-block-plus-absolute-overdue");
   writeGbFixture(rootDir);
-  writeGbUsage(rootDir, "sess-200k-block", 210000, 85); // 85% used AND >=200k absolute overdue floor
+  writeGbUsage(rootDir, "sess-200k-block", 210000, 85); // 85% used, below the absolute floor
 
   const r = runCliWithStdin(rootDir, { session_id: "sess-200k-block" });
   const parsed = JSON.parse(r.stdout);
   ok(
-    "G-B CLI: 200k-ish window at 85% used (also >=200k absolute) -> decision:block STILL fires (percent wins over absolute)",
+    "G-B CLI: 200k-ish window at 85% used -> decision:block STILL fires (percent threshold is independent)",
     parsed.decision === "block",
     r.stdout,
   );
@@ -971,12 +964,11 @@ function writeGbUsage(rootDir, sessionId, totalTokens, usedPct, updatedAt = new 
 }
 
 {
-  // Absolute ladder soft-nudge boundaries on a 1M window (this task, 2026-07-10 DoD): 180k ->
-  // warn, 200k -> overdue, 250k -> overdue, all with NO decision:block.
+  // Absolute ladder soft-nudge boundaries on a 1M window: 400k -> warn, 500k -> overdue,
+  // all with NO decision:block.
   const cases = [
-    { totalTokens: 180000, usedPct: 18, label: "180k/1M (warn floor)", expectSubstr: "handover window" },
-    { totalTokens: 200000, usedPct: 20, label: "200k/1M (overdue floor)", expectSubstr: "OVERDUE" },
-    { totalTokens: 250000, usedPct: 25, label: "250k/1M (strongest-soft overdue floor)", expectSubstr: "OVERDUE" },
+    { totalTokens: 400000, usedPct: 40, label: "400k/1M (warn floor)", expectSubstr: "handover window" },
+    { totalTokens: 500000, usedPct: 50, label: "500k/1M (overdue floor)", expectSubstr: "OVERDUE" },
   ];
   for (const [i, c] of cases.entries()) {
     const rootDir = fixtureDir(`gb-cli-1m-window-absolute-ladder-${i}`);
@@ -996,12 +988,12 @@ function writeGbUsage(rootDir, sessionId, totalTokens, usedPct, updatedAt = new 
   // less than 50k growth stays deduped (anti-spam cap still limits repeats within one arming).
   const rootDir = fixtureDir("gb-cli-context-rearm");
   writeGbFixture(rootDir, { phase: "does-not-exist" }); // no phase suggestion -> isolates the context-nudge fingerprint
-  writeGbUsage(rootDir, "sess-rearm", 340000, 34); // 1M window, absolute "overdue" (>=250k)
+  writeGbUsage(rootDir, "sess-rearm", 500000, 50); // 1M window, absolute "overdue" (>=500k)
 
   const r1 = runCliWithStdin(rootDir, { session_id: "sess-rearm" });
-  ok("G-B CLI re-arm: turn 1 (340k) emits the soft nudge", r1.stdout.includes("OVERDUE"), r1.stdout);
+  ok("G-B CLI re-arm: turn 1 (500k) emits the soft nudge", r1.stdout.includes("OVERDUE"), r1.stdout);
 
-  writeGbUsage(rootDir, "sess-rearm", 360000, 36); // +20k, same tier, well under the 50k re-arm step
+  writeGbUsage(rootDir, "sess-rearm", 520000, 52); // +20k, same tier, well under the 50k re-arm step
   const r2 = runCliWithStdin(rootDir, { session_id: "sess-rearm" });
   ok(
     `G-B CLI re-arm: turn 2 (+20k, < ${CONTEXT_REARM_STEP_TOKENS}) -> STILL deduped to silence (anti-spam cap holds within one arming)`,
@@ -1009,11 +1001,11 @@ function writeGbUsage(rootDir, sessionId, totalTokens, usedPct, updatedAt = new 
     `status=${r2.status} stdout=${r2.stdout}`,
   );
 
-  writeGbUsage(rootDir, "sess-rearm", 395000, 39); // +55k since the LAST EMISSION (340k) -> re-arm due
+  writeGbUsage(rootDir, "sess-rearm", 555000, 55); // +55k since the LAST EMISSION (500k) -> re-arm due
   const r3 = runCliWithStdin(rootDir, { session_id: "sess-rearm" });
   ok(
     `G-B CLI re-arm: turn 3 (+55k since last emission, >= ${CONTEXT_REARM_STEP_TOKENS}) -> re-emits despite unchanged fingerprint`,
-    r3.stdout.includes("OVERDUE") && r3.stdout.includes("395k"),
+    r3.stdout.includes("OVERDUE") && r3.stdout.includes("555k"),
     r3.stdout,
   );
 }

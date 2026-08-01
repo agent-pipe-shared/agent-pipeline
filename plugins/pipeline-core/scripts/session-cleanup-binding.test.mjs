@@ -87,6 +87,33 @@ function invoke(argv, dependencies = {}) {
   return { code, output: output === "" ? null : JSON.parse(output) };
 }
 
+test("human recovery plan is read-only when automatic cleanup observation is unavailable", () => {
+  const root = fixture("human-recovery-plan");
+  try {
+    const planned = invoke(["plan-human-recovery", "--repo", root], {
+      planSessionCleanupRecoveryFn() {
+        const error = new Error("private binding conflicts");
+        error.code = "SESSION-CLEANUP-PRIVATE-CAS";
+        throw error;
+      },
+    });
+    assert.equal(planned.code, 0);
+    assert.equal(planned.output.schema, "pipeline.session-cleanup-human-recovery-plan.v1");
+    assert.equal(planned.output.status, "decision-required");
+    assert.equal(planned.output.root, root);
+    assert.deepEqual(planned.output.observed, {
+      status: "observation-unavailable",
+      code: "SESSION-CLEANUP-PRIVATE-CAS",
+    });
+    assert.deepEqual(planned.output.candidates.map((candidate) => candidate.id), [
+      "retain-and-observe",
+      "attended-host-recovery",
+    ]);
+    assert.equal(planned.output.automaticMutation, false);
+    assert.match(planned.output.planSha256, /^[a-f0-9]{64}$/u);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 function legacyPromotionCleanupMismatch(name) {
   const root = neutralFixture(`promotion-mismatch-${name}`);
   const statePath = join(root, "project", "pipeline-state.json");

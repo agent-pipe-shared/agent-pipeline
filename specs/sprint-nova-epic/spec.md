@@ -2,22 +2,22 @@
 
 > **Gate status:** Design reconciliation in progress. The prior Execution
 > approval is revoked while this Spec incorporates the exact released
-> `v0.4.7` baseline, Issue `#98` and the standing TP-1/TP-3/TP-5 lift
+> `v0.4.7` baseline, Issue `#98` and the standing TP-1-through-TP-5 lift
 > authorization. No implementation package is currently authorized.
 
 ## 1. Bound authority and scope
 
 | Authority | Bound value |
 | --- | --- |
-| Current Design working baseline | delivered and closed tag `v0.4.6` |
-| Base commit | `9d1b3dc108eb77629ace5b82002120f5539abd8d` |
-| Base tree | `282a8b5c5b0581e042985bfb373a66be0eb2d08b` |
-| Bounded pre-rebase Execution baseline | current v0.4.6-derived branch; exact protected-surface-negative write-set required per dispatch |
-| Required full Execution baseline | released `main` / `v0.4.7` commit `89cb12b99e3fd86ac44878d0c23b278f00538921`, tree `b6537dcaa7bee526d9a393e2603b28648f4b0438`; mandatory rebase before renewed Execution approval |
+| Current Design working baseline | released `main` / `v0.4.7`, adopted on the Nova branch |
+| Base commit | `89cb12b99e3fd86ac44878d0c23b278f00538921` |
+| Base tree | `b6537dcaa7bee526d9a393e2603b28648f4b0438` |
+| Historical pre-adoption baseline | delivered and closed tag `v0.4.6`; retained only as historical implementation input |
+| Required full Execution baseline | the completed `v0.4.7` adoption above plus its exact conflict, regression and regenerated-binding evidence; no second rebase is implied |
 | Branch | `feat/sprint-nova-codex-v046` |
 | PRD | `specs/sprint-nova-epic/prd_sprint-nova-epic.md`; the approved pre-activation content baseline is SHA-256 `879423cdb24d542b7f9275bc9da4591fcdfd38145fdddee9142ce82eee53402e`, while the live PRD digest is bound by the PO-gate state to avoid a circular PRD↔Spec self-hash |
 | PRD approval | `specs/sprint-nova-epic/evidence/prd-approval.json`, SHA-256 `59b38e54ca64cd94c8ae02bd4844ee082b2202a88beb17965cab13bba361571d` |
-| Acceptance contract | `specs/sprint-nova-epic/acceptance.md`, SHA-256 `2ebd702edc8c67d04260a811703b8a6297acb479ef2c6c7f6ec37716960f6b5b` |
+| Acceptance contract | `specs/sprint-nova-epic/acceptance.md`, SHA-256 `28eeabc27fd0c6caf409a65baac67469a4e5262660eef79aa2b8879c2130c588` |
 | Canonical backlog snapshot commit | `5ca5a4b292a267ffdfcc52577fda0a0593957a65` |
 | Canonical backlog subtree | `832bf98e22e9a147dad88c952c0b794f3ee44fe7` |
 | Canonical transition head | `36dd616d3aa5bc21e49e138f6b8a9a17a9de25321998304306e4fa47289de562` |
@@ -34,12 +34,11 @@ and `#49`.
 Nova B cannot begin from a merely latest branch head: it begins from the exact
 Nova A increment receipt accepted by the PO.
 
-No `main` bytes have yet been imported into this feature branch. Issue `#63`
-is owned by `hotfix:0.4.7` and excluded from Nova delivery. Its released
-implementation enters only through the mandatory exact rebase. The former
-bounded pre-rebase lane is closed; historical Nova B4R material remains
-retained but is not a current implementation slice, acceptance claimant or
-delivery result.
+The completed `v0.4.7` adoption is retained as evidence, not a recurring
+rebase obligation. Issue `#63` is owned by `hotfix:0.4.7` and excluded from
+Nova delivery. The former bounded pre-adoption lane is closed; historical Nova
+B4R material remains retained but is not a current implementation slice,
+acceptance claimant or delivery result.
 
 ## 2. Normative conventions
 
@@ -733,9 +732,32 @@ Every project-policy denial returns an executable next action instead of a
 permanent `HGO-NONOVERRIDABLE` dead end: normal retry, narrower recovery, PO
 emergency plan or effect reconciliation. A genuine host/system sandbox limit
 returns the exact external-operator boundary because a project authority
-cannot manufacture OS capability. Nova's append-only minimal audit schema is
-forward-compatible with the richer Phoenix authorization trail; Phoenix is
-not a prerequisite for override availability.
+cannot manufacture OS capability. Where no automatic repair is safe or a
+planner cannot construct an apply action, the result is instead a closed,
+read-only PO/Human decision plan with exact candidate states, preimage,
+non-effects and a separate digest-bound selection/apply path. It never emits a
+terminal `nextAction: null` for a recoverable authority state, never deletes
+or rewrites descriptors automatically, and never turns a PO decision into a
+generic override. Nova's append-only minimal audit schema is forward-compatible
+with the richer Phoenix authorization trail; Phoenix is not a prerequisite for
+override availability.
+
+On WSL, a returned `executionBoundary: "host-authorized-wsl"` is mandatory
+for every Git-observing onboarding, guard or recovery action. The runner uses
+the declared host profile directly and does not first probe Git in the Codex
+workspace sandbox. A sandbox `spawnSync("git", …)` permission denial is typed
+as a host-boundary routing condition, not an invalid repository or a reason to
+repeat Git diagnostics in that sandbox. Host and sandbox observations are
+never mixed into one authority result.
+
+The closed shell guard treats a command-grammar refusal as effect-free. It
+does not create, consume or reconcile a Human-override capability. For pasted
+physical line breaks or semicolon separators, it may return normalized retry
+actions only when every resulting line is independently an admitted,
+read-only, single command. Quoted, escaped or continued line breaks and every
+operator, redirect, substitution or mutable command remain rejected with no
+normalization. The runner executes returned retries as separate tool calls and
+never joins them into shell text.
 
 The released `pipeline.publication-channel.v1` schema is frozen and binds
 identity, Verify and Security evidence but not Critic or release-preflight
@@ -878,6 +900,11 @@ handover, verify and continuation readbacks first. Recovery, specialist and
 other role/state-inapplicable material may then be selected lazily; it may not
 be omitted when its typed condition applies or replaced with a stale cached
 authority claim.
+
+Claude Code's absolute soft Compact nudge begins at 400k observed context
+tokens and becomes overdue only at 500k. The independent percentage-based
+safety brake remains unchanged, and neither absolute state invokes Compact or
+alters a native goal by itself.
 
 For Codex, an observed native `blocked` goal is a hard automation stop only
 when its exact rendered objective and embedded generation match the current

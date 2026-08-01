@@ -602,7 +602,8 @@ test("redirect-looking quoted data stays argv while hostile composition is typed
       assert.doesNotMatch(result.stderr, /exact V4 ready result/u, command);
       assert.match(result.stderr, /one simple shell command per tool call/u, command);
       assert.match(result.stderr, /separate parallel tool calls/u, command);
-      assert.match(result.stderr, /Do not retry by varying &&, ;, newline composition, pipelines, or redirects/u, command);
+      assert.match(result.stderr, /Do not construct a new composed command/u, command);
+      assert.match(result.stderr, /If typed retryActions are present/u, command);
       assert.match(result.stderr, /Only the exact bounded rg-to-head diagnostic pipeline is admitted as an exception/u, command);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
@@ -631,9 +632,18 @@ test("grammar denials return closed typed retries only for independent read diag
     const envelopeLine = result.stderr.split("\n").find((line) => line.startsWith('{"schema":"pipeline.guard-retry-actions.v1"'));
     assert.ok(envelopeLine);
     assert.deepEqual(JSON.parse(envelopeLine).retryActions, actions);
+    assert.deepEqual(
+      retryActionsForDeniedCommand("sed -n '1,10p' one.txt\nsed -n '1,10p' two.txt", path),
+      actions,
+    );
+    assert.deepEqual(
+      retryActionsForDeniedCommand("sed -n '1,10p' one.txt\r\nsed -n '1,10p' two.txt", path),
+      actions,
+    );
     assert.deepEqual(retryActionsForDeniedCommand("sed -n '1,10p' one.txt ; touch changed.txt", path), []);
     assert.deepEqual(retryActionsForDeniedCommand("rg one . | head -n 10", path), []);
     assert.deepEqual(retryActionsForDeniedCommand("sed -n \"$(id)\" one.txt ; pwd", path), []);
+    assert.deepEqual(retryActionsForDeniedCommand("sed -n '1,10p' one.txt\\\nsed -n '1,10p' two.txt", path), []);
   } finally { rmSync(path, { recursive: true, force: true }); }
 });
 
@@ -653,6 +663,10 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const poDecisionPlan = `node '${PIPELINE_STATE_SCRIPT}' po-authority-decision-plan`;
     const poDecisionSelect = `node '${PIPELINE_STATE_SCRIPT}' po-authority-decision-select --plan-sha256 ${"d".repeat(64)} --planned-at 2026-07-29T09:00:00.000Z --selection spec`;
     const poDecisionApply = `node '${PIPELINE_STATE_SCRIPT}' po-authority-decision-apply --plan-sha256 ${"d".repeat(64)} --selection-digest ${"e".repeat(64)} --planned-at 2026-07-29T09:00:00.000Z --selection spec --activate`;
+    const reopenDesign = `node '${PIPELINE_STATE_SCRIPT}' reopen-design --by 'PO recovery'`;
+    const submitPlan = `node '${PIPELINE_STATE_SCRIPT}' submit-plan --by 'PO recovery' --profile epic`;
+    const approvePlan = `node '${PIPELINE_STATE_SCRIPT}' approve-plan --by 'PO recovery'`;
+    const setPhase = `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase implementation`;
     const profileRepairPlan = `node '${PO_PROFILE_REPAIR_SCRIPT}' plan --root '${path}'`;
     const profileRepairApply = `node '${PO_PROFILE_REPAIR_SCRIPT}' apply --root '${path}' --plan-sha256 ${"d".repeat(64)} --activate`;
     const authorityMigrationPlan = `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' plan --root '${path}'`;
@@ -664,7 +678,7 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
     const overrideAuthorPlan = `${overridePlan} --author-source-root '${authorRoot}'`;
     const overrideAuthorPrepare = `${overridePrepare} --author-source-root '${authorRoot}'`;
     const overrideAuthorAuthorize = `node '${HUMAN_OVERRIDE_SCRIPT}' authorize --repo '${path}' --request-sha256 ${"f".repeat(64)} --plan-sha256 ${"a".repeat(64)} --selection-sha256 ${"c".repeat(64)} --reason 'PO attended exact action' --reason-sha256 ${"b".repeat(64)} --author-source-root '${authorRoot}' --activate`;
-    for (const command of [inspect, apply, preflight, hostPlan, hostApply, kickoffPlan, kickoffApply, overlayRoute, poRebind, poDecisionPlan, poDecisionSelect, poDecisionApply, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
+    for (const command of [inspect, apply, preflight, hostPlan, hostApply, kickoffPlan, kickoffApply, overlayRoute, poRebind, poDecisionPlan, poDecisionSelect, poDecisionApply, reopenDesign, submitPlan, approvePlan, setPhase, profileRepairPlan, profileRepairApply, authorityMigrationPlan, authorityMigrationApply, overridePlan, overridePrepare, overrideAuthorize, overrideAuthorPlan, overrideAuthorPrepare, overrideAuthorAuthorize]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), true, command);
       assert.deepEqual(evaluateLifecycleReadyGuard(bash(command), {
         projectDir: path,
@@ -688,6 +702,12 @@ test("non-ready Bash permits only exact plugin-local lifecycle remediation argv"
       `${poRebind} --bypass`,
       `${poDecisionPlan} --selection spec`,
       `${poDecisionApply} --bypass`,
+      `node '${PIPELINE_STATE_SCRIPT}' reopen-design --by`,
+      `${reopenDesign} --bypass`,
+      `node '${PIPELINE_STATE_SCRIPT}' submit-plan --by 'PO recovery' --profile unsafe`,
+      `${submitPlan} --bypass`,
+      `node '${PIPELINE_STATE_SCRIPT}' approve-plan --by ''`,
+      `node '${PIPELINE_STATE_SCRIPT}' set-phase --phase release`,
       `node '${PO_PROFILE_REPAIR_SCRIPT}' apply --root '${path}' --activate`,
       `node '${PROJECT_AUTHORITY_MIGRATION_SCRIPT}' apply --root '${path}' --activate`,
       `${overrideAuthorize} --bypass`,
@@ -714,6 +734,7 @@ test("non-ready cleanup recovery and privatization admit only exact closed argv"
       `node '${SESSION_CLEANUP_SCRIPT}' start --repo '${path}'`,
       `node '${SESSION_CLEANUP_SCRIPT}' status --repo '${path}'`,
       `node '${SESSION_CLEANUP_SCRIPT}' plan-recovery --repo '${path}'`,
+      `node '${SESSION_CLEANUP_SCRIPT}' plan-human-recovery --repo '${path}'`,
       `node '${SESSION_CLEANUP_SCRIPT}' plan-privatization --repo '${path}'`,
       `node '${SESSION_CLEANUP_SCRIPT}' confirm-privatization --repo '${path}' --plan-sha256 ${digest} --accept`,
       `node '${SESSION_CLEANUP_SCRIPT}' release-binding --repo '${path}'`,
@@ -732,6 +753,7 @@ test("non-ready cleanup recovery and privatization admit only exact closed argv"
       `node '${SESSION_CLEANUP_SCRIPT}' apply-recovery --repo /tmp/other --plan-sha256 ${digest} --activate`,
       `node '${SESSION_CLEANUP_SCRIPT}' apply-recovery --repo '${path}' --plan-sha256 ${digest}`,
       `node '${SESSION_CLEANUP_SCRIPT}' plan-privatization --repo /tmp/other`,
+      `node '${SESSION_CLEANUP_SCRIPT}' plan-human-recovery --repo /tmp/other`,
       `node '${SESSION_CLEANUP_SCRIPT}' plan-privatization --repo '${path}' --session-descriptor session-private`,
       `node '${SESSION_CLEANUP_SCRIPT}' plan-privatization --repo '${path}' --expected-descriptor-sha256 ${digest}`,
       `node '${SESSION_CLEANUP_SCRIPT}' apply-privatization --repo /tmp/other --plan-sha256 ${digest} --activate`,

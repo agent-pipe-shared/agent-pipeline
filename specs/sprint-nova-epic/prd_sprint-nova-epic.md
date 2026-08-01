@@ -1,12 +1,13 @@
 # Sprint Nova Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: 1b5c9240da0d6c9d5092f14a4938fcfda617776059feaba2a208043299e7cce3 -->
+<!-- technical-spec-sha256: ab67354e3da744150729b46c418347ce3e0fd4d4d17100f4b51a83ae465dcf52 -->
 
 **Feature ID:** `sprint-nova-epic`
 **Profile / rigor / risk:** Epic / 2 / high
 **Gate:** Revised PRD/Spec accepted by the PO; the exact `v0.4.7` adoption and
-the PO emergency-override amendment are bound before implementation resumes
+the PO emergency-override, WSL Git-routing and copy/paste-recovery amendments
+are bound before implementation resumes
 **Current execution base:** released `main` / `v0.4.7`, commit
 `89cb12b99e3fd86ac44878d0c23b278f00538921`, tree
 `b6537dcaa7bee526d9a393e2603b28648f4b0438`; its completed adoption record is
@@ -62,14 +63,14 @@ candidate qualification must bind fresh focused evidence, Full Verify,
 Security, Critic and publication/readback evidence before any increment or
 Epic completion claim.
 
-**Current Design basis (PO direction, 2026-08-01):** Nova remains isolated on
-its v0.4.6-derived feature branch and has not imported `main` bytes yet. The
-released `v0.4.7` baseline is now exact and immutable at the commit/tree above.
-Issue `#63` remains closed Hotfix history rather than Nova delivery; Issue
-`#98` owns the defects discovered in the published post-release delivery loop.
-The plan stays revoked until the design binds all 17 Issues and the exact
-rebase/adoption evidence. Existing B4R bytes/evidence remain historical
-pre-rescope material and are neither extended nor claimed as Nova delivery.
+**Current Design basis (PO direction, 2026-08-01):** Nova has adopted the
+released `v0.4.7` baseline at the exact commit/tree above; the current branch
+descends from that baseline. Issue `#63` remains closed Hotfix history rather
+than Nova delivery, and Issue `#98` owns the defects discovered in the
+post-release delivery loop. The plan remains revoked until the revised
+17-Issue authority is submitted and approved for these exact bytes. Existing
+B4R bytes/evidence remain historical pre-rescope material and are neither
+extended nor claimed as Nova delivery.
 
 ## Product problem
 
@@ -487,16 +488,19 @@ concurrency is a separately measured capability.
 
 ## Branch and authority policy
 
-- Nova's current pre-rebase history still descends from delivered `v0.4.6` at
-  the exact commit/tree named above. It is historical implementation input and
-  authorizes no new package while Design reconciliation is open.
-- Nova does not merge, rebase or cherry-pick `main`, Cyborg or another Sprint
-  before the exact 0.4.7 rebase decision.
+- Nova's pre-rebase `v0.4.6` history is retained only as historical
+  implementation input and authorizes no new package while Design
+  reconciliation is open.
+- The exact `v0.4.7` rebase/adoption is complete. No further merge, rebase or
+  cherry-pick from `main`, Cyborg or another Sprint is authorized by that
+  completed adoption record.
 - Released `main` / `v0.4.7` is fixed at
   `89cb12b99e3fd86ac44878d0c23b278f00538921` / tree
   `b6537dcaa7bee526d9a393e2603b28648f4b0438`. An explicit rebase onto this
-  exact identity is mandatory before renewed implementation approval,
-  increment acceptance, final candidate evidence and full readiness approval.
+  exact identity is the completed adoption base. Renewed implementation
+  approval, increment acceptance, final candidate evidence and full readiness
+  approval require its retained adoption/conflict/readback evidence, not a
+  second rebase.
 - Shared behavior comes only from the released base or a separately approved
   common-contract lifecycle.
 - The Nova branch is an explicit feature-branch disposition for this Epic;
@@ -605,8 +609,8 @@ current accepted direction:
 7. implementation resumes only after the revised PRD/Spec and acceptance
    bindings receive an exact State submission/approval and phase transition;
 8. released `main` / `v0.4.7` plus the completed exact Nova rebase, conflict
-   disposition and regenerated bindings remain mandatory before protected-path work,
-   increment acceptance and final candidate evidence;
+   disposition and regenerated bindings remain mandatory evidence before
+   protected-path work, increment acceptance and final candidate evidence;
 9. live Antigravity/GitLab/external execution requires the later research,
    Spec, ADR, credential and mutation gates described above; and
 10. the historical high-risk Advisor attempt remains typed unavailable; a new
@@ -614,10 +618,10 @@ current accepted direction:
     prior answer, model identity or sandbox success is claimed; and
 11. Issue `#98` is a blocker for the next public candidate and must compose
     `#54` and `#56` rather than fork their general authorities; and
-12. TP-1, TP-3 and TP-5 have standing Nova-only authorization for temporary,
+12. TP-1 through TP-5 have standing Nova-only authorization for temporary,
     exact-task lifts through formal Nova close; every use remains audited and
-    the protections are restored before candidate gates, push/publication and
-    close; and
+    the exact protection is restored before candidate gates, push/publication
+    and close; and
 13. the PO is final authority over project-policy guard decisions after the
     exact action, impact, alternatives, risks, rollback and evidence effects
     are disclosed, explicitly reconfirmed and durably recorded. Phoenix may
