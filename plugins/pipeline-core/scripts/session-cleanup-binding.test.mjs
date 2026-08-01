@@ -128,9 +128,11 @@ function legacyPromotionCleanupMismatch(name) {
   mkdirSync(authorityDir, { recursive: true });
   writeFileSync(join(authorityDir, "prd.md"), "# Rune PRD\n");
   writeFileSync(join(authorityDir, "spec.md"), "# Rune spec\n");
+  writeFileSync(join(authorityDir, "design-input.md"), "# Rune design input\n");
   const promotion = planOnboardingKickoffPromotion({
     rootDir: root, profile: "feature", featureId: "rune-game",
     planPath: "specs/rune/spec.md", prdPath: "specs/rune/prd.md", specPath: "specs/rune/spec.md",
+    designInputPath: "specs/rune/design-input.md",
   });
   applyOnboardingKickoffPromotion({ plan: promotion, expectedPlanSha256: promotion.planSha256, activate: true });
   const historyPath = join(root, ".git", "agent-pipeline", "onboarding", "continuity-history.json");
