@@ -15,7 +15,7 @@ import {
   statSync,
   writeFileSync,
 } from "node:fs";
-import { uptime } from "node:os";
+import { homedir, uptime } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -178,38 +178,44 @@ function createRequest(sourceRoot, stateRoot, commit, options = {}) {
 }
 
 function fixture() {
-  // `/tmp` is intentionally untrusted for durable supervisor state. Keep this
-  // integration fixture in a private checkout-local directory instead.
-  const root = mkdtempSync(join(process.cwd(), ".pipeline-b1i-"));
-  const sourceRoot = join(root, "source");
-  const stateBase = join(root, "state");
-  mkdirSync(sourceRoot);
-  mkdirSync(stateBase);
-  git(["init", "-q"], sourceRoot);
-  git(["config", "user.email", "fixture@example.invalid"], sourceRoot);
-  git(["config", "user.name", "B1-I Fixture"], sourceRoot);
-  mkdirSync(join(sourceRoot, "src"));
-  writeFileSync(join(sourceRoot, "src", "a.txt"), "a\n", "utf8");
-  writeFileSync(join(sourceRoot, "src", "b.txt"), "b\n", "utf8");
-  writeFileSync(join(sourceRoot, ".gitignore"), ".pipeline-ignored/\n", "utf8");
-  git(["add", ".gitignore", "src/a.txt", "src/b.txt"], sourceRoot);
-  git(["commit", "-q", "-m", "fixture"], sourceRoot);
-  const commit = git(["rev-parse", "HEAD"], sourceRoot);
-  const resolved = resolveLocalSupervisorRoot({
-    platform: "linux",
-    env: { XDG_STATE_HOME: stateBase },
-    repositoryFingerprint: A,
-  });
-  assert.equal(resolved.ok, true);
-  const stateRoot = resolved.root;
-  const repaired = repairLocalSupervisorState({
-    root: stateRoot,
-    repositoryFingerprint: A,
-    candidate: localWorkerSupervisorSha256(commit),
-    subject: "nova-b1i",
-  });
-  assert.equal(repaired.ok, true);
-  return { root, sourceRoot: realpathSync(sourceRoot), stateBase, stateRoot, commit };
+  // `/tmp` is intentionally untrusted for durable supervisor state. Verify
+  // candidates may themselves be rooted below `/tmp`, so use a short-lived
+  // private directory below the current user's trusted home instead.
+  const root = mkdtempSync(join(homedir(), ".pipeline-b1i-"));
+  try {
+    const sourceRoot = join(root, "source");
+    const stateBase = join(root, "state");
+    mkdirSync(sourceRoot);
+    mkdirSync(stateBase);
+    git(["init", "-q"], sourceRoot);
+    git(["config", "user.email", "fixture@example.invalid"], sourceRoot);
+    git(["config", "user.name", "B1-I Fixture"], sourceRoot);
+    mkdirSync(join(sourceRoot, "src"));
+    writeFileSync(join(sourceRoot, "src", "a.txt"), "a\n", "utf8");
+    writeFileSync(join(sourceRoot, "src", "b.txt"), "b\n", "utf8");
+    writeFileSync(join(sourceRoot, ".gitignore"), ".pipeline-ignored/\n", "utf8");
+    git(["add", ".gitignore", "src/a.txt", "src/b.txt"], sourceRoot);
+    git(["commit", "-q", "-m", "fixture"], sourceRoot);
+    const commit = git(["rev-parse", "HEAD"], sourceRoot);
+    const resolved = resolveLocalSupervisorRoot({
+      platform: "linux",
+      env: { XDG_STATE_HOME: stateBase },
+      repositoryFingerprint: A,
+    });
+    assert.equal(resolved.ok, true);
+    const stateRoot = resolved.root;
+    const repaired = repairLocalSupervisorState({
+      root: stateRoot,
+      repositoryFingerprint: A,
+      candidate: localWorkerSupervisorSha256(commit),
+      subject: "nova-b1i",
+    });
+    assert.equal(repaired.ok, true, JSON.stringify(repaired));
+    return { root, sourceRoot: realpathSync(sourceRoot), stateBase, stateRoot, commit };
+  } catch (error) {
+    rmSync(root, { recursive: true, force: true });
+    throw error;
+  }
 }
 
 function invoke(args, context) {
