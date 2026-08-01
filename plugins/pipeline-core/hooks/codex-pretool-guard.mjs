@@ -306,12 +306,36 @@ const GRAMMAR_DENIAL = /\bGUARD-(?:PARSE|OPERATOR|REDIRECT)-UNAPPROVED\b/u;
 const grammarOnlyDenial = denials.length > 0
   && denials.every((entry) => entry.guard === "guard-lifecycle-ready.mjs"
     && GRAMMAR_DENIAL.test(entry.reason));
+const crossRepositoryOnlyDenial = denials.length > 0
+  && denials.every((entry) => entry.guard === "guard-lifecycle-ready.mjs"
+    && /\bGUARD-CROSS-REPO-MUTATION\b/u.test(entry.reason));
 if (denials.length > 0) {
   // Closed shell-grammar refusals have no side effect to reconcile and are
   // not authority decisions. Routing them through the one-time Human-override
   // ledger creates a misleading verify-audit/retry loop.
   if (grammarOnlyDenial) {
     deny(denials.map((entry) => entry.reason).join("\n"));
+  }
+  // A consumer session cannot attest or mutate the Codex plugin cache.  This
+  // is an external authority boundary, not an effect that an in-repository
+  // Human-override audit can reconcile.  Returning verify-audit here creates
+  // an infinite retry loop without changing the allowed execution boundary.
+  if (crossRepositoryOnlyDenial) {
+    deny([
+      denials.map((entry) => entry.reason).join("\n"),
+      "Guard recovery route:",
+      JSON.stringify({
+        status: "external-operator-required",
+        code: "HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY",
+        nextAction: {
+          kind: "external-operator",
+          executionBoundary: "separate-session-rooted-at-plugin-cache",
+          invocation: "user-copy-only",
+          action: { toolName, toolInputSha256, repositoryRoot: projectRoot },
+          reason: "the Codex plugin cache is outside this repository's physical authority boundary",
+        },
+      }),
+    ].join("\n"));
   }
   const overrideSpawn = (executable, args, options) => boundedSpawn(
     executable,

@@ -272,6 +272,20 @@ check("Pipeline Author Repair selects one exact source root and consumes one pat
   assert.equal(decision(run(input, root)).permissionDecision, "deny");
 });
 
+check("local plugin-cache installation returns one external boundary without an audit retry loop", () => {
+  const output = decision(run({
+    tool_name: "Bash",
+    tool_input: { command: "codex plugin add pipeline-core@agent-pipeline-local" },
+  }, join(pluginRoot, "..", "..")));
+  assert.equal(output.permissionDecision, "deny");
+  assert.match(output.permissionDecisionReason, /GUARD-CROSS-REPO-MUTATION/u);
+  assert.match(output.permissionDecisionReason, /HGO-EXTERNAL-PLUGIN-CACHE-BOUNDARY/u);
+  assert.match(output.permissionDecisionReason, /separate-session-rooted-at-plugin-cache/u);
+  assert.doesNotMatch(output.permissionDecisionReason, /verify-audit/u);
+  assert.doesNotMatch(output.permissionDecisionReason, /effect-reconciliation-required/u);
+  assert.doesNotMatch(output.permissionDecisionReason, /Human override available/u);
+});
+
 check("override persistence failure remains a sanitized fail-closed denial", () => {
   const root = fixture();
   const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
