@@ -141,6 +141,25 @@ optional security tool is reported as `SKIPPED`, never as `PASS`. A typed
 unavailable runner capability stops that capability honestly; it is not an
 invitation to weaken permissions, invent evidence or change runner/model.
 
+### Gate discipline and autonomous happy path
+
+The compiled repository manifest is the sole source for the number and kind of
+human gates. A calibrated two-gate workflow has exactly those two configured
+human decision points; it does not acquire additional chat confirmations while
+work is in progress. Once the applicable plan gate is recorded, ordinary
+implementation is autonomous: bounded edits, focused checks, state readback,
+one-line commits, Verify, Critic preparation and the next approved block are
+agent work.
+
+Do not ask the PO to re-approve routine progress, a guard's first denial, a
+test retry, a bounded recovery already returned by the system, or a normal
+commit. Ask only for a configured decision or acceptance gate, an explicit
+scope/priority trade-off, an irreversible or externally consequential action,
+or a typed hard block for which the supplied safe recovery actions cannot make
+progress. A guard denial is not itself a human gate: execute its exact typed
+read-only or lifecycle recovery first. This discipline preserves human
+judgment without turning the PO into an implementation relay.
+
 ## 6. Evidence, review and recovery
 
 Evidence binds a result to its candidate and records what was actually
@@ -383,6 +402,26 @@ optionales Security-Tool erscheint als `SKIPPED`, nie als `PASS`. Eine typisiert
 nicht verfügbare Runner-Fähigkeit stoppt diese Fähigkeit ehrlich; sie ist keine
 Einladung, Berechtigungen zu lockern, Evidenz zu erfinden oder Runner/Modell zu
 wechseln.
+
+### Gate-Disziplin und autonomer Happy Path
+
+Das kompilierte Repository-Manifest ist die einzige Autorität für Anzahl und
+Art menschlicher Gates. Ein auf zwei Gates kalibrierter Ablauf hat genau diese
+beiden konfigurierten menschlichen Entscheidungspunkte; während der Arbeit
+entstehen keine zusätzlichen Chat-Bestätigungen. Sobald das nötige Plan-Gate
+aufgezeichnet ist, läuft die gewöhnliche Implementierung autonom: begrenzte
+Änderungen, fokussierte Checks, State-Readback, einzeilige Commits, Verify,
+Critic-Vorbereitung und der nächste freigegebene Block sind Agentenarbeit.
+
+Den PO nicht erneut für normalen Fortschritt, die erste Guard-Ablehnung, einen
+Test-Repeat, eine bereits zurückgegebene begrenzte Recovery oder einen normalen
+Commit fragen. Fragen nur bei einem konfigurierten Entscheidungs- oder
+Abnahme-Gate, einem expliziten Scope-/Prioritäts-Trade-off, einer irreversiblen
+oder extern wirksamen Aktion oder einem typisierten harten Block, für den die
+gelieferten sicheren Recovery-Aktionen nicht weiterführen. Eine Guard-Ablehnung
+ist kein menschliches Gate: zuerst ihre exakte typisierte Read-only- oder
+Lifecycle-Recovery ausführen. So bleibt menschliches Urteil sichtbar, ohne den
+PO zum Implementierungs-Relay zu machen.
 
 <a id="7-feedback-loop"></a>
 

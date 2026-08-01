@@ -45,8 +45,9 @@ For local development also print:
    Verify availability. Machine-read full sources and emit digest-bound compact
    facts; never claim a skipped or cached check passed.
 3. **Boundary:** use one simple shell command per tool call. Do not compose
-   `&&`, `;`, redirects or pipelines except the bounded `rg … | head -n 1..500`
-   diagnostic. Treat `executionBoundary: "host-authorized-wsl"` as a mandatory
+   `&&`, `;`, redirects or pipelines except bounded, expansions-free
+   `rg … | rg …` or `rg … | head -n 1..500` diagnostics. Treat
+   `executionBoundary: "host-authorized-wsl"` as a mandatory
    host execution profile: submit the exact returned action directly at that
    boundary, including every Git observation, and never first retry it in the
    Codex workspace sandbox. Keep that routing authoritative and never probe

@@ -254,7 +254,12 @@ function validateRg(argv, root, windows) {
     && (windows ? true : true);
 }
 
-/** Validate only the exact bounded rg-to-head diagnostic pipeline. */
+/**
+ * Validate the small, bounded search-pipeline family.  A second rg consumes
+ * only the first rg's stdout and is still a closed, read-only diagnostic.  It
+ * covers the frequent `rg --files … | rg …` narrowing pattern without
+ * admitting a general shell pipeline.
+ */
 export function isBoundedReadOnlyPipeline(parsed, root) {
   if (!parsed || parsed.parseStatus !== "accepted"
     || parsed.segments.length !== 2
@@ -263,9 +268,15 @@ export function isBoundedReadOnlyPipeline(parsed, root) {
     || parsed.redirects.length > 1) return false;
   const windows = parsed.dialect === "windows-readonly-pipeline";
   const rgName = basename(parsed.segments[0].executable).toLowerCase();
+  const expectedRg = windows ? "rg.exe" : "rg";
   const headName = basename(parsed.segments[1].executable).toLowerCase();
-  if (rgName !== (windows ? "rg.exe" : "rg")
-    || headName !== (windows ? "head.exe" : "head")) return false;
+  if (rgName !== expectedRg) return false;
+  if (headName === expectedRg) {
+    return parsed.redirects.length === 0
+      && validateRg(parsed.segments[0].argv, root, windows)
+      && validateRg(parsed.segments[1].argv, root, windows);
+  }
+  if (headName !== (windows ? "head.exe" : "head")) return false;
   if (parsed.redirects.length === 1) {
     const redirect = parsed.redirects[0];
     if (redirect.segment !== 0 || redirect.fd !== 2 || redirect.direction !== ">"

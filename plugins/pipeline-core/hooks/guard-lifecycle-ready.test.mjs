@@ -548,13 +548,15 @@ test("closed command grammar preserves native Windows paths and direct node.exe 
   ), true);
 });
 
-test("only the bounded rg-to-head pipeline and platform null redirect are read-only", () => {
+test("only bounded rg search pipelines and platform null redirect are read-only", () => {
   const path = root();
   try {
     for (const command of [
       "rg -n -S lifecycle plugins 2>/dev/null | head -n 280",
       "rg --files --hidden --max-depth 3 . | head -n 500",
       "rg -l -S lifecycle plugins -g '*.mjs' -g '*.md' | head -n 180",
+      "rg --files plugins/pipeline-core harness | rg 'verify|journal'",
+      "rg -n -S lifecycle plugins | rg guard",
     ]) {
       const parsed = parseGuardCommand(command, path);
       assert.equal(isBoundedReadOnlyPipeline(parsed, path), true, command);
@@ -564,6 +566,9 @@ test("only the bounded rg-to-head pipeline and platform null redirect are read-o
     const windows = "rg.exe -n lifecycle . 2>NUL | head.exe -n 20";
     const parsedWindows = parseGuardCommand(windows, path, { platform: "win32" });
     assert.equal(isBoundedReadOnlyPipeline(parsedWindows, path), true);
+    const windowsSearch = "rg.exe --files . | rg.exe lifecycle";
+    const parsedWindowsSearch = parseGuardCommand(windowsSearch, path, { platform: "win32" });
+    assert.equal(isBoundedReadOnlyPipeline(parsedWindowsSearch, path), true);
     for (const command of [
       "rg -n lifecycle . | head -n 0",
       "rg -n lifecycle . | head -n 050",
@@ -571,6 +576,9 @@ test("only the bounded rg-to-head pipeline and platform null redirect are read-o
       "rg -n lifecycle . 2>diagnostic.log | head -n 20",
       "rg -n lifecycle . | tee output",
       "rg -n lifecycle . | head -n 20 | wc -l",
+      "rg --pre worker lifecycle . | rg guard",
+      "rg -n lifecycle .. | rg guard",
+      "rg -n lifecycle . 2>diagnostic.log | rg guard",
       "rg --pre worker lifecycle . | head -n 20",
       "rg -n lifecycle .. | head -n 20",
       "rg -n lifecycle . && head -n 20",
@@ -605,7 +613,7 @@ test("redirect-looking quoted data stays argv while hostile composition is typed
       assert.match(result.stderr, /separate parallel tool calls/u, command);
       assert.match(result.stderr, /Do not construct a new composed command/u, command);
       assert.match(result.stderr, /If typed retryActions are present/u, command);
-      assert.match(result.stderr, /Only the exact bounded rg-to-head diagnostic pipeline is admitted as an exception/u, command);
+      assert.match(result.stderr, /Only bounded rg-to-rg and rg-to-head diagnostic pipelines are admitted as exceptions/u, command);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }
 });

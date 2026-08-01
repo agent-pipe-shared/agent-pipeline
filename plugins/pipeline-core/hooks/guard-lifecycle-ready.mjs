@@ -102,7 +102,7 @@ function blocked(code = "GUARD-LIFECYCLE-NOT-READY", lifecycleStatus = null, ret
         + "Use one simple shell command per tool call; issue independent read-only commands as separate parallel tool calls.\n"
         + "Do not construct a new composed command with &&, ;, pipelines, redirects, or line continuation.\n"
         + "If typed retryActions are present, run only those exact read-only actions as separate tool calls.\n"
-        + "Only the exact bounded rg-to-head diagnostic pipeline is admitted as an exception.\n"
+        + "Only bounded rg-to-rg and rg-to-head diagnostic pipelines are admitted as exceptions.\n"
         + `${JSON.stringify(retryEnvelope)}\n`,
     );
   }

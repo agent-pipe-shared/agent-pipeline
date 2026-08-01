@@ -150,7 +150,7 @@ check("multiple Bash guard denials are aggregated into one Codex decision", () =
   assert.match(output.permissionDecisionReason, /guard-push/);
 });
 
-check("closed shell grammar denial teaches the stable retry shape without an override loop", () => {
+check("bounded rg-to-rg search filtering remains read-only without an override loop", () => {
   const root = fixture();
   const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
   git("init", "-q", "-b", "main");
@@ -161,23 +161,14 @@ check("closed shell grammar denial teaches the stable retry shape without an ove
   git("commit", "-q", "-m", "fixture");
   writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
   const startedAt = Date.now();
-  const output = decision(run({
+  const output = run({
     tool_name: "Bash",
     tool_input: { command: "rg --files . | rg lifecycle" },
-  }, root));
+  }, root);
   const elapsedMs = Date.now() - startedAt;
   assert.ok(elapsedMs < 2_000, `grammar denial exceeded strict elapsed bound: ${elapsedMs}ms`);
-  assert.equal(output.permissionDecision, "deny");
-  assert.match(output.permissionDecisionReason, /one simple shell command per tool call/u);
-  assert.match(output.permissionDecisionReason, /separate parallel tool calls/u);
-  assert.match(output.permissionDecisionReason, /Do not construct a new composed command/u);
-  assert.match(output.permissionDecisionReason, /If typed retryActions are present/u);
-  assert.match(output.permissionDecisionReason, /exact bounded rg-to-head diagnostic pipeline/u);
-  assert.match(output.permissionDecisionReason, /"schema":"pipeline.guard-retry-actions.v1"/u);
-  assert.match(output.permissionDecisionReason, /"retryActions":\[\]/u);
-  assert.doesNotMatch(output.permissionDecisionReason, /Human override available for this exact action/u);
-  assert.doesNotMatch(output.permissionDecisionReason, /effect-reconciliation-required/u);
-  assert.doesNotMatch(output.permissionDecisionReason, /HGO-NONOVERRIDABLE/u);
+  assert.equal(output.status, 0, output.stderr);
+  assert.equal(output.stdout, "");
 });
 
 check("attended Human override admits only the exact next tool call and is then consumed", () => {
