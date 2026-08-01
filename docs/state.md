@@ -58,6 +58,31 @@ because of the guard.
   next bounded Nova implementation task autonomously; retain the standing
   TP-1 through TP-5 task-scoped lifts and single-line commit convention.
 
+## 2026-08-01 Nova guard and local-plugin checkpoint
+
+- The current Guard/Operating-Model candidate is `e4b01ba` / tree
+  `7acbf637568ae8c4d9e9d1d3f0b4fb9347a1fd69`. Its isolated Full Verify run
+  `verify-1785589859285-4e7dd7b83999cced` finished `passed`: 199 registered
+  and 199 terminal receipts, clean candidate binding at start and finish, and
+  exit `0`. The preceding `94701cd` candidate is also fully verified; the
+  successor adds only the external plugin-cache recovery route.
+- The candidate admits only bounded, expansions-free `rg | rg` and `rg | head`
+  read diagnostics. It keeps all redirects, substitutions, mutable commands
+  and general shell pipelines closed. The Operating Model now makes the
+  manifest-authoritative two-gate Happy Path explicit: routine implementation,
+  checks, one-line commits and ordinary recovery do not create extra PO chat
+  gates.
+- Local cachebuster metadata currently names
+  `pipeline-core@agent-pipeline-local` version
+  `0.4.7+codex.20260801130757`; it deliberately remains local until installed.
+  A governed consumer session cannot write Codex's plugin cache. Run the exact
+  local install from a separately rooted external terminal, then begin a new
+  Codex thread and re-run `pipeline-core:pipeline-start`:
+  `/home/skar667/.codex/packages/standalone/current/codex plugin add pipeline-core@agent-pipeline-local`.
+  The installed older guard may still return its historical audit loop for
+  that exact action; the verified successor replaces it with one explicit
+  external-operator route. No push, merge or publication is authorized.
+
 ## 2026-07-31 0.4.7 release qualification — authoritative latest
 
 - The public release surfaces are unified at `0.4.7` (`VERSION`, Codex and
