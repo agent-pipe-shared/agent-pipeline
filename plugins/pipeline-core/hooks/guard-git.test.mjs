@@ -32,7 +32,8 @@
  * guard-config on the machine can never leak into union expectations.
  */
 import { spawnSync } from "node:child_process";
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -76,6 +77,24 @@ function check(id, command, expectExit, { projectDir = EMPTY_DIR, stderrIncludes
   } else {
     failures.push(`${id}: ${problems.join("; ")} — cmd: ${command}`);
     console.log(`FAIL  ${id} — ${problems.join("; ")}`);
+  }
+}
+function checkLedger(id, projectDir, predicate) {
+  let entry = null;
+  let problem = null;
+  try {
+    const lines = readFileSync(join(projectDir, ".claude", "guard-override.log.jsonl"), "utf8").trim().split("\n");
+    entry = JSON.parse(lines.at(-1));
+    if (!predicate(entry)) problem = "ledger entry did not satisfy its target-binding contract";
+  } catch {
+    problem = "ledger entry could not be read";
+  }
+  if (problem === null) {
+    pass++;
+    console.log(`PASS  ${id}`);
+  } else {
+    failures.push(`${id}: ${problem}`);
+    console.log(`FAIL  ${id} — ${problem}`);
   }
 }
 const BLOCK = 2, ALLOW = 0, WARN = 1;
@@ -239,6 +258,8 @@ check("CFG block  union active without any config", "git add secrets.yaml", BLOC
 // Ledger-bearing dir: .claude/ pre-created so appendFileSync into guard-override.log.jsonl succeeds.
 const OV_DIR = mkdtempSync(join(tmpdir(), "guard-test-override-"));
 mkdirSync(join(OV_DIR, ".claude"), { recursive: true });
+mkdirSync(join(OV_DIR, "nested-target"), { recursive: true });
+const OV_ABSOLUTE_TARGET = mkdtempSync(join(tmpdir(), "guard-test-override-absolute-target-"));
 // Deliberately WITHOUT .claude/ — simulates an unwritable/missing ledger directory (AC-5).
 const OV_NOLEDGER_DIR = mkdtempSync(join(tmpdir(), "guard-test-override-noledger-"));
 
@@ -482,6 +503,30 @@ check("GO-CFG allow  -C interposed harmless command with the same config loaded"
 check(
   "GO-OV block  override armed for GG-07 rejects a cross-target -C command",
   "PIPELINE_GUARD_OVERRIDE='GG-07|20260704-10|override through -C interposition, the PO approved' git -C sub reset --hard HEAD~1",
+  BLOCK,
+  { projectDir: OV_DIR, stderrIncludes: ["GG-07", "command target and ledger target"] },
+);
+check(
+  "GO-OV warn   override accepts an explicit same-root relative -C target",
+  "PIPELINE_GUARD_OVERRIDE='GG-07|20260704-12|same physical target, the PO approved' git -C . reset --hard HEAD~1",
+  WARN,
+  { projectDir: OV_DIR, stderrIncludes: ["GG-07", "OVERRIDE APPLIED"] },
+);
+checkLedger(
+  "GO-OV ledger target binding stores only an opaque physical-target digest",
+  OV_DIR,
+  (entry) => entry.targetSha256 === createHash("sha256").update(OV_DIR).digest("hex")
+    && !Object.values(entry).some((value) => typeof value === "string" && value.includes(OV_ABSOLUTE_TARGET)),
+);
+check(
+  "GO-OV block  override rejects a relative cross-target -C target",
+  "PIPELINE_GUARD_OVERRIDE='GG-07|20260704-13|relative cross target, the PO approved' git -C nested-target reset --hard HEAD~1",
+  BLOCK,
+  { projectDir: OV_DIR, stderrIncludes: ["GG-07", "command target and ledger target"] },
+);
+check(
+  "GO-OV block  override rejects an absolute cross-target -C target",
+  `PIPELINE_GUARD_OVERRIDE='GG-07|20260704-14|absolute cross target, the PO approved' git -C ${OV_ABSOLUTE_TARGET} reset --hard HEAD~1`,
   BLOCK,
   { projectDir: OV_DIR, stderrIncludes: ["GG-07", "command target and ledger target"] },
 );
