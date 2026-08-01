@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
-  "planApproved": true,
-  "updatedAt": "2026-08-01T18:05:09.535Z",
+  "planApproved": false,
+  "updatedAt": "2026-08-01T19:31:30.336Z",
   "closedFeatures": [
     {
       "id": "codex-onboarding-0.4.5",
@@ -10,79 +10,29 @@
       "closedAt": "2026-07-26T20:27:09.148Z",
       "closedBy": "Phoenix Elephant under explicit PO authority",
       "forCommit": "9d1b3dc108eb77629ace5b82002120f5539abd8d"
+    },
+    {
+      "id": "sprint-phoenix-epic",
+      "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
+      "phaseAtClose": "implementation",
+      "closedAt": "2026-08-01T19:31:30.336Z",
+      "closedBy": "Product Owner Phoenix lifecycle repair authorization 2026-08-01",
+      "forCommit": "15888116c5f44dd1e5dbb21215aedf5a50cca8c6",
+      "continuityClose": {
+        "schema": "pipeline.continuity-close.v0",
+        "featureId": "sprint-phoenix-epic",
+        "expectedRevision": 15,
+        "result": {
+          "path": "specs/sprint-phoenix-epic/result.md",
+          "sha256": "708d9293ad8ec13bb58e39ffd857c0a624d93e17b35cde380f242d26de6d9198"
+        },
+        "closeEvidence": {
+          "path": "specs/sprint-phoenix-epic/evidence/continuity-close-ready-repair.json",
+          "sha256": "6a766b783abc897b95978cfcd1f1ba05f73dac7650ad42e2705ca41b6b4f6719"
+        }
+      }
     }
   ],
-  "activeFeature": {
-    "id": "sprint-phoenix-epic",
-    "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-    "phase": "implementation"
-  },
-  "continuity": {
-    "schema": "pipeline.continuity.v0",
-    "featureId": "sprint-phoenix-epic",
-    "revision": 14,
-    "runtime": {
-      "humanFacingLanguage": "en",
-      "activeDuty": "Coordinator",
-      "sessionCleanup": null
-    },
-    "authority": {
-      "prd": {
-        "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-        "sha256": "92f38d22405392c860eab918a33d5f4d303170561efaa3df1ae5c3884c9b04e9"
-      },
-      "spec": {
-        "path": "specs/sprint-phoenix-epic/spec.md",
-        "sha256": "39912b05660026f5dc82efa5f37aca33b7899d99ff8b29ced1545a9cb389f57f"
-      },
-      "result": {
-        "path": "specs/sprint-phoenix-epic/result.md",
-        "sha256": "708d9293ad8ec13bb58e39ffd857c0a624d93e17b35cde380f242d26de6d9198"
-      }
-    },
-    "queueHead": {
-      "packageId": "phoenix-design",
-      "actionId": "audit-handoff-design-revision",
-      "nextAction": "review",
-      "productRetryCount": 0,
-      "environmentRerouteCount": 0,
-      "dispatch": null
-    },
-    "blocker": null,
-    "acknowledgedFinal": null,
-    "resume": {
-      "mode": "immediate",
-      "sourceRevision": 12,
-      "reasonCode": "active-turn"
-    },
-    "recovery": null,
-    "decisionTxn": null,
-    "capacity": {
-      "concurrencyLimit": 4,
-      "reservedCriticSlots": 1,
-      "reservedRecoverySlots": 1,
-      "fallbackPolicy": "defer"
-    }
-  },
-  "planApproval": {
-    "schema": "pipeline.plan-approval.v2",
-    "approvedBy": "PO reauthorization for Phoenix R-14 digest binding",
-    "approvedAt": "2026-07-27T19:28:45.190Z",
-    "specBoundBy": "PO reauthorization for Phoenix R-14 digest binding",
-    "specBoundAt": "2026-08-01T18:04:38.900Z",
-    "poGateAuthority": {
-      "schema": "pipeline.po-gate-authority.v2",
-      "humanFacing": "en",
-      "sourceSha256": "2a0f69551b46963d6d49ef0faaf9db5c28d27c4f681a9d4dd0be1a81b297da10",
-      "runtimeSha256": "1f469b84b984ea505db77f60a23f0bed3e49cb2dc9929321893e88cbc9408f63",
-      "receiptSha256": "4b85ce328c1dd2056a5d263c6ca2a7afe8d23886771d29cf25ba0d1185c3cd31",
-      "repositoryFingerprint": "92f4f001424af56c17e443aec9969d0ff5ac0e426b8f388fe06d4b1800aa2d35",
-      "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-      "planSha256": "92f38d22405392c860eab918a33d5f4d303170561efaa3df1ae5c3884c9b04e9",
-      "specPath": "specs/sprint-phoenix-epic/spec.md",
-      "specSha256": "39912b05660026f5dc82efa5f37aca33b7899d99ff8b29ced1545a9cb389f57f"
-    }
-  },
   "pushApproval": {
     "lastApproved": {
       "approvedBy": "PO approval for final Phoenix candidate fa3b55e",
