@@ -12,6 +12,7 @@ import { derivePoGateRepositoryFingerprint } from "./po-gate-authority.mjs";
 import { discoverRepository } from "./worktree-lifecycle.mjs";
 import {
   GovernanceEventStoreError,
+  createRestrictedAuthorization,
   appendPortableGovernanceEvent,
   eraseRestrictedGovernanceEvent,
   loadGovernanceEventRegistry,
@@ -182,7 +183,6 @@ test("restricted storage stays outside the repository, is owner-only encrypted, 
   const root = await fixtureRoot(); t.after(() => cleanup(root));
   const restrictedRoot = await mkdtemp(path.join(os.tmpdir(), "governance-restricted-")); t.after(() => cleanup(restrictedRoot));
   const key = Buffer.alloc(32, 7);
-  const authorization = { authorityClass: "restricted-store-operator", repositoryFingerprint: fingerprint };
   const restricted = sealGovernanceEvent({
     ...intent({
       eventId: "restricted-1",
@@ -198,20 +198,24 @@ test("restricted storage stays outside the repository, is owner-only encrypted, 
     payloadDigest: "0".repeat(64),
     eventDigest: "0".repeat(64),
   });
-  const stored = await putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: restricted });
+  const putAuthorization = createRestrictedAuthorization({ key, repositoryFingerprint: fingerprint, operation: "put" });
+  const stored = await putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: putAuthorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: restricted });
   assert.equal(stored.status, "stored");
-  const replay = await putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: restricted });
+  const replay = await putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: putAuthorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: restricted });
   assert.equal(replay.status, "replayed");
   assert.equal(replay.recordId, stored.recordId);
   const conflict = sealGovernanceEvent({ ...restricted, payload: { complete: "different restricted content" }, payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
-  await assert.rejects(() => putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: conflict }), (error) => error.code === "GES-IDEMPOTENCY-CONFLICT");
+  await assert.rejects(() => putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: putAuthorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: conflict }), (error) => error.code === "GES-IDEMPOTENCY-CONFLICT");
   assert.ok(!stored.recordId.includes(restricted.eventId), "the local identifier must not create a portable join handle");
   assert.equal((await stat(restrictedRoot)).mode & 0o077, 0);
-  const queried = await queryRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization, key, recordId: stored.recordId });
+  const queryAuthorization = createRestrictedAuthorization({ key, repositoryFingerprint: fingerprint, operation: "query", recordId: stored.recordId });
+  const queried = await queryRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: queryAuthorization, key, recordId: stored.recordId });
   assert.equal(queried.event.payload.complete, restricted.payload.complete);
   const encrypted = JSON.parse(await readFile(path.join(restrictedRoot, "records", `${stored.recordId}.json`), "utf8"));
-  const erased = await eraseRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization, recordId: stored.recordId, expectedRecordDigest: (await import("./governance-event.mjs")).canonicalSha256(encrypted) });
+  const recordDigest = (await import("./governance-event.mjs")).canonicalSha256(encrypted);
+  const eraseAuthorization = createRestrictedAuthorization({ key, repositoryFingerprint: fingerprint, operation: "erase", recordId: stored.recordId, expectedRecordDigest: recordDigest });
+  const erased = await eraseRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: eraseAuthorization, key, recordId: stored.recordId, expectedRecordDigest: recordDigest });
   assert.deepEqual(erased, { status: "erased-active-store", recordId: stored.recordId, preimageDigest: (await import("./governance-event.mjs")).canonicalSha256(encrypted), backupDisclosure: "unknown" });
-  await assert.rejects(() => queryRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization, key, recordId: stored.recordId }), (error) => error.code === "GES-MISSING");
-  await assert.rejects(() => putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: path.join(root, "restricted"), repositoryFingerprint: fingerprint, authorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: restricted }), (error) => error.code === "GES-RESTRICTED-IN-REPOSITORY");
+  await assert.rejects(() => queryRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization: queryAuthorization, key, recordId: stored.recordId }), (error) => error.code === "GES-MISSING");
+  await assert.rejects(() => putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: path.join(root, "restricted"), repositoryFingerprint: fingerprint, authorization: putAuthorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: restricted }), (error) => error.code === "GES-RESTRICTED-IN-REPOSITORY");
 });

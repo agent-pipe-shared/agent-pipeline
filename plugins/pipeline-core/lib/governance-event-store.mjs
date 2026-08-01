@@ -10,7 +10,7 @@
  */
 import { mkdir, open, readFile, realpath, readdir, rename, unlink, lstat, stat } from "node:fs/promises";
 import path from "node:path";
-import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import {
   canonicalSha256,
   canonicalizeJson,
@@ -113,9 +113,18 @@ function assertEncryptionKey(key) {
   return Buffer.from(key);
 }
 
-function assertRestrictedAuthorization(authorization, repositoryFingerprint) {
-  if (!exactKeys(authorization, ["authorityClass", "repositoryFingerprint"]) || authorization.authorityClass !== RESTRICTED_AUTHORITY
-    || authorization.repositoryFingerprint !== repositoryFingerprint) fail("GES-RESTRICTED-AUTHORIZATION", "A repository-bound restricted-store operator authorization is required.");
+export function createRestrictedAuthorization({ key, repositoryFingerprint, operation, recordId = null, expectedRecordDigest = null } = {}) {
+  const encryptionKey = assertEncryptionKey(key);
+  if (!new Set(["put", "query", "erase"]).has(operation) || (recordId !== null && !/^[a-f0-9]{32}$/u.test(recordId)) || (expectedRecordDigest !== null && !SHA256.test(expectedRecordDigest))) fail("GES-RESTRICTED-AUTHORIZATION", "Restricted authorization binding is invalid.");
+  const binding = { authorityClass: RESTRICTED_AUTHORITY, repositoryFingerprint, operation, recordId, expectedRecordDigest };
+  return Object.freeze({ ...binding, proof: createHmac("sha256", encryptionKey).update(canonicalizeJson(binding), "utf8").digest("hex") });
+}
+
+function assertRestrictedAuthorization(authorization, key, repositoryFingerprint, operation, recordId = null, expectedRecordDigest = null) {
+  if (!exactKeys(authorization, ["authorityClass", "repositoryFingerprint", "operation", "recordId", "expectedRecordDigest", "proof"]) || authorization.authorityClass !== RESTRICTED_AUTHORITY
+    || authorization.repositoryFingerprint !== repositoryFingerprint || authorization.operation !== operation || authorization.recordId !== recordId || authorization.expectedRecordDigest !== expectedRecordDigest || !SHA256.test(authorization.proof)) fail("GES-RESTRICTED-AUTHORIZATION", "Restricted authorization binding is invalid.");
+  const expected = createRestrictedAuthorization({ key, repositoryFingerprint, operation, recordId, expectedRecordDigest }).proof;
+  if (!timingSafeEqual(Buffer.from(expected, "hex"), Buffer.from(authorization.proof, "hex"))) fail("GES-RESTRICTED-AUTHORIZATION", "Restricted authorization proof is invalid.");
 }
 
 function restrictedRecordPath(storeRoot, recordId) {
@@ -517,10 +526,10 @@ export async function recoverPortableGovernanceProjection({ repositoryRoot, regi
  */
 export async function putRestrictedGovernanceEvent({ repositoryRoot, storeRoot, repositoryFingerprint, authorization, key, keyGeneration, expiresAtEpochMs, event } = {}) {
   const { root } = await assertPhysicalRoot(repositoryRoot);
-  assertRestrictedAuthorization(authorization, repositoryFingerprint);
   const restrictedRoot = await assertRestrictedRoot(root, storeRoot, { create: true });
   await restrictedRecordsRoot(restrictedRoot);
   const encryptionKey = assertEncryptionKey(key);
+  assertRestrictedAuthorization(authorization, encryptionKey, repositoryFingerprint, "put");
   const validation = validateGovernanceEventEnvelope(event);
   if (!validation.valid || event.repositoryFingerprint !== repositoryFingerprint || event.storageProfile !== "restricted-machine-local"
     || event.classification !== "restricted" || event.retentionCompatibility !== "machine-local-expiring") fail("GES-RESTRICTED-EVENT", "Only a valid restricted envelope may enter machine-local storage.");
@@ -542,13 +551,14 @@ export async function putRestrictedGovernanceEvent({ repositoryRoot, storeRoot, 
 /** Read one restricted event only with a repository-bound privileged authorization and its external key. */
 export async function queryRestrictedGovernanceEvent({ repositoryRoot, storeRoot, repositoryFingerprint, authorization, key, recordId } = {}) {
   const { root } = await assertPhysicalRoot(repositoryRoot);
-  assertRestrictedAuthorization(authorization, repositoryFingerprint);
+  const encryptionKey = assertEncryptionKey(key);
+  assertRestrictedAuthorization(authorization, encryptionKey, repositoryFingerprint, "query", recordId);
   const restrictedRoot = await assertRestrictedRoot(root, storeRoot);
   const target = restrictedRecordPath(restrictedRoot, recordId);
   await assertNoSymlink(target, { directory: false });
   let record;
   try { record = parseStrictJson(await readFile(target)); } catch { fail("GES-RESTRICTED-RECORD", "The restricted record is not strict JSON."); }
-  const event = decryptRestrictedRecord(record, assertEncryptionKey(key));
+  const event = decryptRestrictedRecord(record, encryptionKey);
   const validation = validateGovernanceEventEnvelope(event);
   if (!validation.valid || event.repositoryFingerprint !== repositoryFingerprint || event.storageProfile !== "restricted-machine-local") fail("GES-RESTRICTED-EVENT", "The decrypted restricted event is invalid.");
   return Object.freeze({ event: Object.freeze({ ...event }), expiresAtEpochMs: record.expiresAtEpochMs, keyGeneration: record.keyGeneration });
@@ -559,14 +569,15 @@ export async function queryRestrictedGovernanceEvent({ repositoryRoot, storeRoot
  * response deliberately proves only active-store absence, never backups or
  * unrelated key copies.
  */
-export async function eraseRestrictedGovernanceEvent({ repositoryRoot, storeRoot, repositoryFingerprint, authorization, recordId, expectedRecordDigest } = {}) {
+export async function eraseRestrictedGovernanceEvent({ repositoryRoot, storeRoot, repositoryFingerprint, authorization, key, recordId, expectedRecordDigest } = {}) {
   const { root } = await assertPhysicalRoot(repositoryRoot);
-  assertRestrictedAuthorization(authorization, repositoryFingerprint);
+  const encryptionKey = assertEncryptionKey(key);
   const restrictedRoot = await assertRestrictedRoot(root, storeRoot);
   const target = restrictedRecordPath(restrictedRoot, recordId);
   await assertNoSymlink(target, { directory: false });
   const record = parseStrictJson(await readFile(target));
   if (!SHA256.test(expectedRecordDigest) || canonicalSha256(record) !== expectedRecordDigest) fail("GES-RESTRICTED-PREIMAGE", "The restricted erase preimage does not match.");
+  assertRestrictedAuthorization(authorization, encryptionKey, repositoryFingerprint, "erase", recordId, expectedRecordDigest);
   await unlink(target);
   if (await lstatOrNull(target)) fail("GES-RESTRICTED-ERASE", "Restricted ciphertext remains in the active store.");
   return Object.freeze({ status: "erased-active-store", recordId, preimageDigest: expectedRecordDigest, backupDisclosure: "unknown" });
