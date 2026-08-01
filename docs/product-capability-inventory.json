@@ -1055,6 +1055,12 @@
       "member": "po-approval-proof-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:threat-model-approval-request-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "threat-model-approval-request-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:po-gate-authority-fixture-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -1977,6 +1983,7 @@
         "verify-phase:harness/scripts/verify.mjs:stop-suggest-tests",
         "verify-phase:harness/scripts/verify.mjs:symlink-capability-tests",
         "verify-phase:harness/scripts/verify.mjs:threat-model-discovery-tests",
+        "verify-phase:harness/scripts/verify.mjs:threat-model-approval-request-tests",
         "verify-phase:harness/scripts/verify.mjs:threat-model-fixture-matrix-tests",
         "verify-phase:harness/scripts/verify.mjs:threat-model-tests",
         "verify-phase:harness/scripts/verify.mjs:v3-bootstrap-authority-tests",

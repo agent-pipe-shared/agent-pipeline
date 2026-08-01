@@ -266,6 +266,7 @@ const TEST_SUITES = [
   { name: "threat-model-fixture-matrix-tests", file: join(libDir, "threat-model-fixture-matrix.test.mjs") },
   { name: "threat-model-tests", file: join(libDir, "threat-model.test.mjs") },
   { name: "po-approval-proof-tests", file: join(libDir, "po-approval-proof.test.mjs") },
+  { name: "threat-model-approval-request-tests", file: join(libDir, "threat-model-approval-request.test.mjs") },
   { name: "sbom-lifecycle-tests", file: join(libDir, "sbom-lifecycle.test.mjs") },
   { name: "sbom-manifest-tests", file: join(libDir, "sbom-manifest.test.mjs") },
   { name: "sbom-node-adapter-tests", file: join(libDir, "sbom-node-adapter.test.mjs") },

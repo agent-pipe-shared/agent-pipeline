@@ -38,6 +38,32 @@ environment variables, stdin, repository files, or local pipeline state. A
 plain CLI may implement steps 1 and 3 everywhere Node runs; it cannot itself
 be the trusted signing boundary when the agent controls that CLI session.
 
+For Cyborg, the portable command is:
+
+```sh
+node plugins/pipeline-core/scripts/po-approval-request.mjs prepare \
+  --feature-id cyb-4 \
+  --plan specs/2026-07-24-sprint-cyborg-epic/prd_cyborg-epic.md \
+  --spec specs/2026-07-24-sprint-cyborg-epic/spec.md \
+  --model specs/cyb-4/threat-model.json
+```
+
+It requires a clean checkout and emits a public request for the exact current
+commit/tree. Save that output outside the repository and have the trusted
+signer inspect and sign `approvalIntent.sha256`. Afterwards, verify the three
+public files from paths outside the checkout:
+
+```sh
+node plugins/pipeline-core/scripts/po-approval-request.mjs verify \
+  --request /secure/path/request.json \
+  --authority /secure/path/trust-policy.json \
+  --proof /secure/path/proof.json
+```
+
+The command does not have a `sign` mode and refuses request/proof/trust-policy
+paths within the repository. It is safe to call from Bash, PowerShell, or a
+desktop terminal because no secret is accepted by either command.
+
 ## Adapter boundary
 
 No IAM, passkey, desktop, or key-store adapter is embedded in the core. Each
