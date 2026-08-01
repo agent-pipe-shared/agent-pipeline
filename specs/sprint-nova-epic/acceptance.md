@@ -322,6 +322,11 @@ Nova A is accepted only when:
   progress, verified completion and degraded capability.
 - NVA-B60-16: Focused tests, configured Verify and public documentation bind
   the exact contract and candidate for both Codex and Claude Code.
+- NVA-B60-17: Normal bootstrap and Compact re-entry record a privacy-safe,
+  reproducible payload measurement and stay within a runner-neutral 10–15k
+  token budget. Role/state-specific lazy loading must retain every required
+  lifecycle, authority, calibration, handover, verify and continuation check;
+  a cached or skipped check is not a passing optimization.
 
 ### `#21` Local worker pool
 

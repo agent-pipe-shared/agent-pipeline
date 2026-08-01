@@ -11,11 +11,11 @@ none widens publication authority or closes another Nova issue.
 2. Released v0.4.7 behavior wins semantic overlaps unless Issue #98 explicitly
    requires a correction. Existing contracts outside the A6R manifest remain
    unchanged.
-3. The local `ahead=120, behind=50` divergence is the expected result of the
-   approved history rewrite. Local work and commits are PO-authorized; the
-   configured upstream remains
-   `upstream/feat/sprint-nova-codex-v046`, and no push occurs before the named
-   Push PO gate.
+3. The approved history rewrite was pushed through the named Push PO gate and
+   read back at `44e25b8ca6f97839bede3d5fe2148790e105092d` on
+   `upstream/feat/sprint-nova-codex-v046`. A later local candidate may become
+   ahead again, but it is never treated as delivered without its own current
+   publication authorization and readback.
 4. Replacing the existing remote feature ref after a clean rebase is a
    separately reviewed Push-PO operation. The #98 publication-v2 product path
    remains non-force and rejects a non-fast-forward candidate; it must not

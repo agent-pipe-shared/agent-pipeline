@@ -871,6 +871,14 @@ resume/compact re-entry, read-only progress, successful completion and
 unsupported capability. Tests prove that activation neither changes effective
 permissions nor creates a duplicate native goal.
 
+Bootstrap and Compact re-entry additionally emit a privacy-safe reproducible
+payload measurement and remain within the runner-neutral 10–15k-token budget.
+The minimal path establishes current lifecycle, authority, calibration,
+handover, verify and continuation readbacks first. Recovery, specialist and
+other role/state-inapplicable material may then be selected lazily; it may not
+be omitted when its typed condition applies or replaced with a stale cached
+authority claim.
+
 For Codex, an observed native `blocked` goal is a hard automation stop only
 when its exact rendered objective and embedded generation match the current
 request. That identity-bound observation returns

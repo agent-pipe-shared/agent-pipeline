@@ -72,13 +72,16 @@ new implementation dispatch.
 
 ## Rebase and phase gate
 
-No `main` bytes are imported until the 17-Issue
-PRD/Spec/Acceptance/plan set is byte-consistent and receives its renewed PO
-gate. The next repository operation is then the exact rebase onto
+The exact rebase onto
 `89cb12b99e3fd86ac44878d0c23b278f00538921` / tree
-`b6537dcaa7bee526d9a393e2603b28648f4b0438`, followed by conflict disposition,
-binding regeneration and refreshed readiness. No bounded pre-rebase
-implementation lane remains open.
+`b6537dcaa7bee526d9a393e2603b28648f4b0438` is complete. The retained replay
+map and semantic conflict dispositions are in
+`evidence/nova-a/delivery-loop/rebase-range-diff.txt`; later #98 and ledger
+commits are not evidence that historical candidate gates remain current.
+
+The next phase gate is renewed authority submission/approval for these exact
+post-rebase PRD, Spec and acceptance bytes, followed by fresh candidate-bound
+readiness. No pre-rebase implementation lane remains open.
 
 ## Issue maintenance
 

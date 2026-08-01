@@ -990,3 +990,23 @@ incompatibility or candidate promotion. The 0.4.7/main owner must accept this
 through the central policy/lifecycle source with its own exact PO authority,
 commit/tree and fixtures. This entry neither changes a current Pipeline gate
 nor claims that Nova, Cyborg or Phoenix is merge-ready.
+
+## 2026-08-01 — Exact v0.4.7 adoption and recovery reconciliation
+
+Status: `rebase-complete; authority-reconciliation-in-design`.
+
+Nova was rebased onto released `v0.4.7` commit
+`89cb12b99e3fd86ac44878d0c23b278f00538921`, tree
+`b6537dcaa7bee526d9a393e2603b28648f4b0438`. The initial post-adoption head,
+replay map and compatibility dispositions are retained in the A6R evidence
+directory. Issue #98 recovery controls were added after that adoption, and
+the canonical backlog ledger was re-integrated append-only at
+`44e25b8ca6f97839bede3d5fe2148790e105092d`; v0.4.7 events were not changed.
+
+The branch replacement was PO-authorized and read back at the same remote OID.
+This is a delivery/readback fact, not a Nova A or Nova B completion claim.
+All pre-reconciliation candidate gates are provenance only for later bytes.
+The current design correction adds the runner-neutral 10–15k Compact/bootstrap
+payload requirement and repairs the stale-revocation approval recovery path.
+Fresh candidate evidence is required before any increment acceptance, Issue
+closure, release or Epic close.

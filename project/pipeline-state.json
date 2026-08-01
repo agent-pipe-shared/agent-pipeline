@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
-  "planApproved": true,
-  "updatedAt": "2026-07-31T23:22:26.552Z",
+  "planApproved": false,
+  "updatedAt": "2026-08-01T07:20:24.022Z",
   "closedFeatures": [
     {
       "id": "sprint-sentinel-epic",
@@ -64,7 +64,7 @@
   "activeFeature": {
     "id": "sprint-nova-epic",
     "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-    "phase": "implementation"
+    "phase": "design"
   },
   "planApproval": {
     "schema": "pipeline.plan-approval.v4",
@@ -89,7 +89,7 @@
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "sprint-nova-epic",
-    "revision": 5,
+    "revision": 6,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Elephant",
@@ -98,11 +98,11 @@
     "authority": {
       "prd": {
         "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-        "sha256": "2f4d7e256f1a777a4fa1a07f79031e8c71d9931977038b20bd846e378a3f7c24"
+        "sha256": "a52c146fb6db526ca17de0fd491bb8d9ef52efd65ae69cca80344993a5005a22"
       },
       "spec": {
         "path": "specs/sprint-nova-epic/spec.md",
-        "sha256": "ba27e7a4994a9cd273a00ff4ba7c478f4be8b62e0a60b5d0992286e34d2d55f7"
+        "sha256": "1b5c9240da0d6c9d5092f14a4938fcfda617776059feaba2a208043299e7cce3"
       },
       "result": null
     },
@@ -118,7 +118,7 @@
     "acknowledgedFinal": null,
     "resume": {
       "mode": "immediate",
-      "sourceRevision": 5,
+      "sourceRevision": 6,
       "reasonCode": "active-turn"
     },
     "recovery": null,
@@ -144,21 +144,21 @@
     "schema": "pipeline.plan-submission.v1",
     "featureId": "sprint-nova-epic",
     "planPath": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-    "planSha256": "2f4d7e256f1a777a4fa1a07f79031e8c71d9931977038b20bd846e378a3f7c24",
+    "planSha256": "a52c146fb6db526ca17de0fd491bb8d9ef52efd65ae69cca80344993a5005a22",
     "specPath": "specs/sprint-nova-epic/spec.md",
-    "specSha256": "ba27e7a4994a9cd273a00ff4ba7c478f4be8b62e0a60b5d0992286e34d2d55f7",
+    "specSha256": "1b5c9240da0d6c9d5092f14a4938fcfda617776059feaba2a208043299e7cce3",
     "profile": "epic",
     "profileSha256": "8be50d40c4672fb406256aafbdd146dae9ed1b0931afb31fdfe3f8efa12dee04",
-    "submittedBy": "Nova-Elephant-post-rebase-design-2026-08-01",
-    "submittedAt": "2026-07-31T23:22:06.269Z"
+    "submittedBy": "Nova-Elephant-post-v0.4.7-reconciliation-2026-08-01",
+    "submittedAt": "2026-08-01T07:20:24.022Z"
   },
   "planInvalidation": {
     "schema": "pipeline.plan-invalidation.v1",
     "featureId": "sprint-nova-epic",
-    "invalidatedSubmissionSha256": "2dc384d937c9a623458a3d3488c4352f3d6b7b0aed241915ddce1b14b901766c",
-    "invalidatedApprovalSha256": "6c74dd1c91f345691f25db67d821fd9d5339d9a8c84b2a36f7abbfa7f1bd4a14",
-    "invalidatedBy": "Product Owner (Nova #98 Human guard override amendment, 2026-08-01)",
-    "invalidatedAt": "2026-07-31T23:16:43.115Z",
+    "invalidatedSubmissionSha256": "11a9ff18bf859a9f5091148adb9c852de3630bfed5796881bb5c15a61df9cf00",
+    "invalidatedApprovalSha256": "eb0421ca5e1f10f321489c46632d2009bcf75ac49a53216b5ddb1c1dbc697f30",
+    "invalidatedBy": "Product Owner (Nova post-v0.4.7 authority reconciliation, 2026-08-01)",
+    "invalidatedAt": "2026-08-01T07:17:23.404Z",
     "reason": "reopen-design"
   }
 }

@@ -1,7 +1,7 @@
 # Sprint Nova Epic — Product Requirements
 
 <!-- po-language: en -->
-<!-- technical-spec-sha256: ba27e7a4994a9cd273a00ff4ba7c478f4be8b62e0a60b5d0992286e34d2d55f7 -->
+<!-- technical-spec-sha256: 1b5c9240da0d6c9d5092f14a4938fcfda617776059feaba2a208043299e7cce3 -->
 
 **Feature ID:** `sprint-nova-epic`
 **Profile / rigor / risk:** Epic / 2 / high
@@ -46,6 +46,21 @@ Nova B may begin only from an exact PO-accepted Nova A commit/tree and immutable
 increment receipt. Nova A and Nova B must remain independently verifiable from
 Cyborg. No Nova gate requires a Cyborg OID, unpublished implementation,
 manifest or Result.
+
+### 2026-08-01 post-`v0.4.7` reconciliation
+
+The exact released baseline has been adopted: `v0.4.7` commit
+`89cb12b99e3fd86ac44878d0c23b278f00538921`, tree
+`b6537dcaa7bee526d9a393e2603b28648f4b0438`. The initial rebased Nova
+adoption head is `94a4904a13518bed4b060ad89a17f3ba2bb36cb3`; Issue #98
+recovery controls and append-only ledger reintegration are later Nova commits.
+The historical pre-rebase statements below remain provenance only.
+
+This reconciliation changes neither the 17-Issue portfolio nor its external
+boundaries. It invalidates prior candidate gates for later Nova bytes: current
+candidate qualification must bind fresh focused evidence, Full Verify,
+Security, Critic and publication/readback evidence before any increment or
+Epic completion claim.
 
 **Current Design basis (PO direction, 2026-08-01):** Nova remains isolated on
 its v0.4.6-derived feature branch and has not imported `main` bytes yet. The
@@ -297,6 +312,11 @@ and cannot retroactively redefine either Sprint's acceptance.
 - Preserve the Stop-hook context budget, deduplication and emergency brake;
   goal activation does not widen sandbox, approval, network, repository or
   host permissions.
+- A normal bootstrap and Compact re-entry must use a privacy-safe measured
+  payload within a runner-neutral 10–15k-token budget. Recovery and
+  specialized lifecycle material is loaded lazily only after mandatory
+  current-role/current-state authority readbacks; no required bootstrap check
+  may be skipped or satisfied from stale authority.
 
 ### B1. Supervised local worker pool — `#21`
 

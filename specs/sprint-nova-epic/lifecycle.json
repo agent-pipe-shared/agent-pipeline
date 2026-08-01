@@ -9,7 +9,7 @@
     {
       "class": "prd",
       "path": "specs/sprint-nova-epic/prd_sprint-nova-epic.md",
-      "sha256": "2f4d7e256f1a777a4fa1a07f79031e8c71d9931977038b20bd846e378a3f7c24",
+      "sha256": "a52c146fb6db526ca17de0fd491bb8d9ef52efd65ae69cca80344993a5005a22",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -17,7 +17,7 @@
     {
       "class": "spec",
       "path": "specs/sprint-nova-epic/spec.md",
-      "sha256": "ba27e7a4994a9cd273a00ff4ba7c478f4be8b62e0a60b5d0992286e34d2d55f7",
+      "sha256": "1b5c9240da0d6c9d5092f14a4938fcfda617776059feaba2a208043299e7cce3",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -25,7 +25,7 @@
     {
       "class": "acceptance",
       "path": "specs/sprint-nova-epic/acceptance.md",
-      "sha256": "6e984d776c26c051bed3773395d609b56d2a706babc4f8a8fa1e823a6c6f3803",
+      "sha256": "553cbce4cbcbc0346b510b3610b56e1ce1278d9b1bc7316f4ab0cee496a9e2c1",
       "authority": true,
       "mutability": "mutable",
       "retention": "active"
@@ -33,7 +33,7 @@
     {
       "class": "result",
       "path": "specs/sprint-nova-epic/result.md",
-      "sha256": "65cb05b860cedd20d686df7e3b98e63cc25311f2f42e15703d84cf716924c111",
+      "sha256": "568ac8c721ff2e611c02e4fa8f5c2d08c2b68149b9a6adc7c5ceffd05b448f6b",
       "authority": true,
       "mutability": "append-only",
       "retention": "retain"
@@ -113,7 +113,7 @@
     {
       "class": "design",
       "path": "specs/sprint-nova-epic/design/issue-intake.md",
-      "sha256": "422a46119cb1fcb3b02b9b4aa8dba28881cd5e13d4dfde58652c36603d9b92a7",
+      "sha256": "f731d8cab5836d3350728e8ef905f7a93ed0d476e389aa7320012d2fa44fd0e2",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
@@ -122,6 +122,14 @@
       "class": "design",
       "path": "specs/sprint-nova-epic/design/post-v0.4.7-delivery-loop.md",
       "sha256": "f20dac9f393954d23c360f12eb8ec44d080b61fd301eb366f31140cfd965c18c",
+      "authority": false,
+      "mutability": "mutable",
+      "retention": "retain"
+    },
+    {
+      "class": "design",
+      "path": "specs/sprint-nova-epic/design/post-v0.4.7-authority-reconciliation.md",
+      "sha256": "bc01cdd3bdc8a4694b94b28c46e9a62df2e23afd065b81eb4e8eb223562da5d9",
       "authority": false,
       "mutability": "mutable",
       "retention": "retain"
