@@ -2547,6 +2547,23 @@ function recoveryBridgeExecutableFixture() {
   const nonBridgeRecover = run(["feature-package-recover", "--request-file", writeRequest(fixture.dir, "critic-non-bridge-request", nonBridge), "--request-sha256", sha256Canonical(nonBridge), "--lock-token", "rb-critic-non-bridge"], deps);
   ok("TP5 Critic Recovery Bridge resume consumes an exact private public-committed transaction without a generic journal", planned.value === 0 && committed.ok && !existsSync(genericJournal) && recovery === 0 && terminal.decision.status === "consumed" && changed.reduce((sum, value) => sum + value, 0) === 1 && changed[3] === 1 && nonBridgeRecover === 2);
 }
+{
+  const fixture = recoveryBridgeExecutableFixture(); const now = () => "2026-08-01T00:00:00.000Z";
+  const planned = captureConsoleLog(() => run(["recovery-bridge-plan", "--decision-file", writeRequest(fixture.dir, "status-decision", fixture.decision)], { dir: fixture.dir, now }));
+  const request = JSON.parse(planned.text).request; const requestFile = writeRequest(fixture.dir, "status-request", request);
+  const deps = { dir: fixture.dir, now, gitCommonDir: () => ({ ok: true, path: fixture.gitCommonDir }) };
+  const committed = transitionRecoveryBridgeDecision(fixture.decision, "public-commit", recoveryBridgeCommitRequest(fixture.decision), { now: now() });
+  const privateDirectory = join(fixture.gitCommonDir, "agent-pipeline", "recovery-bridge", fixture.decision.decisionId); mkdirSync(privateDirectory, { recursive: true });
+  const privateJournal = join(privateDirectory, "journal.json"); writeFileSync(privateJournal, JSON.stringify({ schema: "pipeline.recovery-bridge-transaction.v1", decision: committed.value, requestSha256: sha256Canonical(request) }) + "\n");
+  const pendingStatus = run(["feature-package-status"], deps);
+  const recovery = run(["feature-package-recover", "--request-file", requestFile, "--request-sha256", sha256Canonical(request), "--lock-token", "rb-status-recover"], deps);
+  const terminal = JSON.parse(readFileSync(privateJournal, "utf8")); const readyStatus = run(["feature-package-status"], deps);
+  const malformedFixture = recoveryBridgeExecutableFixture(); const malformedPath = join(malformedFixture.gitCommonDir, "agent-pipeline", "recovery-bridge", malformedFixture.decision.decisionId); mkdirSync(malformedPath, { recursive: true }); writeFileSync(join(malformedPath, "journal.json"), "{ malformed");
+  const malformedStatus = run(["feature-package-status"], { dir: malformedFixture.dir, now, gitCommonDir: () => ({ ok: true, path: malformedFixture.gitCommonDir }) });
+  const symlinkFixture = recoveryBridgeExecutableFixture(); const commonLink = join(symlinkFixture.dir, "common-link"); symlinkSync(symlinkFixture.gitCommonDir, commonLink);
+  const symlinkStatus = run(["feature-package-status"], { dir: symlinkFixture.dir, now, gitCommonDir: () => ({ ok: true, path: commonLink }) });
+  ok("TP5 Recovery Bridge status projects private public-committed recovery and fails closed for malformed stores", planned.value === 0 && committed.ok && pendingStatus === 2 && recovery === 0 && terminal.decision.status === "consumed" && readyStatus === 0 && malformedStatus === 2 && symlinkStatus === 2);
+}
 // ---- Cleanup ------------------------------------------------------------------------------
 for (const dir of ALL_DIRS) {
   try {

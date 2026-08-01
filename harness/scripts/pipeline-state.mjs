@@ -235,6 +235,7 @@ import {
   lstatSync,
   mkdirSync,
   openSync,
+  readdirSync,
   readFileSync,
   realpathSync,
   renameSync,
@@ -313,6 +314,7 @@ const RECOVERY_BRIDGE_MANIFEST = "specs/sprint-phoenix-epic/lifecycle.json";
 const RECOVERY_BRIDGE_ARTIFACT_PATH = "specs/sprint-phoenix-epic/RECOVERY.md";
 const RECOVERY_BRIDGE_ASSURANCE = "operator-local-attested";
 const RECOVERY_BRIDGE_ID_RE = /^rb-[a-f0-9]{16,64}$/u;
+const RECOVERY_BRIDGE_STATUS_MAX_JOURNALS = 64;
 const RECOVERY_BRIDGE_BINDING_KEYS = [
   "decisionId", "featureId", "operation", "manifest", "artifactPath", "assurance",
   "manifestPreimageSha256", "recoveryPostimageSha256", "prdSha256", "specSha256", "approvedBy", "approvedAt", "expiresAt",
@@ -2614,6 +2616,57 @@ function recoveryBridgeTransaction(dir, decisionId, deps = {}) {
       : { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
   } catch { return { ok: false, code: "RB-PRIVATE-STORE-INVALID" }; }
 }
+function recoveryBridgeStatusProjection(dir, deps = {}) {
+  let common;
+  try { common = (deps.gitCommonDir ?? defaultGitCommonDir)(dir); } catch { return { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" }; }
+  if (!common?.ok || typeof common.path !== "string" || !isAbsolute(common.path)) return { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" };
+  let physical;
+  try {
+    const declared = lstatSync(common.path);
+    if (!declared.isDirectory() || declared.isSymbolicLink()) return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+    physical = realpathSync(common.path);
+    const stat = lstatSync(physical);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+  } catch { return { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" }; }
+  const root = resolve(physical, "agent-pipeline", "recovery-bridge");
+  const rel = relative(physical, root);
+  if (rel === "" || rel === ".." || rel.startsWith(`..${sep}`) || isAbsolute(rel)) return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+  try {
+    const parent = lstatSync(join(physical, "agent-pipeline"));
+    if (!parent.isDirectory() || parent.isSymbolicLink()) return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+  } catch (error) {
+    return error?.code === "ENOENT" ? { ok: true, outstanding: false } : { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" };
+  }
+  let entries;
+  try {
+    const stat = lstatSync(root);
+    if (!stat.isDirectory() || stat.isSymbolicLink()) return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+    entries = readdirSync(root, { withFileTypes: true });
+  } catch (error) {
+    return error?.code === "ENOENT" ? { ok: true, outstanding: false } : { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" };
+  }
+  if (entries.length > RECOVERY_BRIDGE_STATUS_MAX_JOURNALS) return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+  let outstanding = false;
+  for (const entry of entries) {
+    if (!RECOVERY_BRIDGE_ID_RE.test(entry.name)) return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+    try {
+      const stat = lstatSync(join(root, entry.name));
+      if (!stat.isDirectory() || stat.isSymbolicLink()) return { ok: false, code: "RB-PRIVATE-STORE-INVALID" };
+    } catch { return { ok: false, code: "RB-PRIVATE-STORE-UNAVAILABLE" }; }
+    const transaction = recoveryBridgeTransaction(dir, entry.name, deps);
+    if (!transaction.ok || transaction.value === null
+      || transaction.value.decision.decisionId !== entry.name) return { ok: false, code: transaction.code ?? "RB-PRIVATE-STORE-INVALID" };
+    if (transaction.value.decision.status === "consumed") continue;
+    const checked = validateRecoveryBridgeDecision(transaction.value.decision, { now: deps.now?.() });
+    if (!checked.ok) return checked;
+    const planned = recoveryBridgeFeatureRequest(dir, { ...transaction.value.decision, status: "issued" }, deps);
+    if (!planned.ok || transaction.value.requestSha256 !== sha256Bytes(canonicalPhxJson(planned.request))) {
+      return { ok: false, code: planned.code ?? "RB-TRANSACTION-CONFLICT" };
+    }
+    outstanding = true;
+  }
+  return { ok: true, outstanding };
+}
 function recoveryBridgePrepareApply(dir, request, lock, deps = {}) {
   const current = recoveryBridgeTransaction(dir, request.authority.decision.decisionId, deps);
   if (!current.ok) return current;
@@ -2748,8 +2801,17 @@ function runFeaturePackageCommand(sub, argv, deps) {
   if (sub === "feature-package-status") {
     const journal = featureJournalPath(dir);
     const recovery = existsSync(journal);
-    console.log(JSON.stringify({ schema: "pipeline.feature-package-status.v1", status: recovery ? "recovery-required" : "ready" }));
-    return recovery ? 2 : 0;
+    if (recovery) {
+      console.log(JSON.stringify({ schema: "pipeline.feature-package-status.v1", status: "recovery-required" }));
+      return 2;
+    }
+    const bridge = recoveryBridgeStatusProjection(dir, deps);
+    if (!bridge.ok) {
+      console.log(JSON.stringify({ schema: "pipeline.feature-package-status.v1", status: "rejected", code: bridge.code }));
+      return 2;
+    }
+    console.log(JSON.stringify({ schema: "pipeline.feature-package-status.v1", status: bridge.outstanding ? "recovery-required" : "ready" }));
+    return bridge.outstanding ? 2 : 0;
   }
   const parsed = parseExactFlags(argv, new Set(["request-file", "request-sha256", "lock-token"]));
   if (!parsed.ok || !SHA256_RE.test(parsed.value["request-sha256"]) || !LOCK_TOKEN_RE.test(parsed.value["lock-token"])) return 2;
