@@ -519,7 +519,7 @@ export function statePath(dir = projectDir()) {
   if (authority.status === "ready") {
     return join(dir, authority.state ?? (authority.source === "neutral" ? NEUTRAL_STATE : LEGACY_STATE));
   }
-  return join(dir, LEGACY_STATE);
+  return join(dir, authority.status === "missing" ? LEGACY_STATE : NEUTRAL_STATE);
 }
 
 /**

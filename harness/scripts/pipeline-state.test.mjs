@@ -487,6 +487,20 @@ function canonicalFixtureJson(value) {
   ok("PS05b file left byte-identical (no silent overwrite)", after === before);
 }
 
+// ---- PS05c: mixed authority never revives a stale legacy State -------------------------
+{
+  const dir = freshDir("mixed-authority");
+  mkdirSync(join(dir, ".claude"), { recursive: true });
+  mkdirSync(join(dir, "project"), { recursive: true });
+  writeFileSync(join(dir, ".claude", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(dir, "project", "pipeline.yaml"), "schema: pipeline.manifest.v0\n");
+  writeFileSync(join(dir, ".claude", "pipeline-state.json"), JSON.stringify({ schema: SCHEMA_ID, activeFeature: { id: "stale-legacy", planPath: "p.md", phase: "implementation" } }) + "\n");
+  ok(
+    "PS05c mixed authority selects neutral State and ignores stale legacy State",
+    statePath(dir) === join(dir, "project", "pipeline-state.json") && readState(dir).status === "absent",
+  );
+}
+
 // ---- PS06: approve-plan shape correct ---------------------------------------------------
 {
   const dir = freshDir("approve-shape");

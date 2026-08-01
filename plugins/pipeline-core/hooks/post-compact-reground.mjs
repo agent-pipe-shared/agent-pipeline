@@ -191,9 +191,10 @@ export function run() {
   if (!shouldActivate(input)) process.exit(0);
 
   const authority = readProjectAuthority({ rootDir });
-  const state = loadStateSafe(join(rootDir, authority.status === "ready" && authority.state
+  const statePath = authority.status === "ready" && authority.state
     ? authority.state
-    : ".claude/pipeline-state.json"));
+    : authority.status === "missing" ? ".claude/pipeline-state.json" : null;
+  const state = statePath ? loadStateSafe(join(rootDir, statePath)) : null;
   const { stdout } = decideOutput(input, state);
   if (stdout) process.stdout.write(stdout);
   process.exit(0);

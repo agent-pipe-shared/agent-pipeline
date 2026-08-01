@@ -852,9 +852,10 @@ export function run() {
 
   const manifest = loadManifestSafe(rootDir);
   const authority = readProjectAuthority({ rootDir });
-  const state = loadStateSafe(join(rootDir, authority.status === "ready" && authority.state
+  const statePath = authority.status === "ready" && authority.state
     ? authority.state
-    : ".claude/pipeline-state.json"));
+    : authority.status === "missing" ? ".claude/pipeline-state.json" : null;
+  const state = statePath ? loadStateSafe(join(rootDir, statePath)) : null;
   const phaseMessage = resolveSuggestion(manifest, state);
 
   // G-B context-budget part: only reachable with a resolvable session_id (no session_id ->
