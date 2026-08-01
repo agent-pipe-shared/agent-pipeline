@@ -554,6 +554,7 @@ test("only the bounded rg-to-head pipeline and platform null redirect are read-o
     for (const command of [
       "rg -n -S lifecycle plugins 2>/dev/null | head -n 280",
       "rg --files --hidden --max-depth 3 . | head -n 500",
+      "rg -l -S lifecycle plugins -g '*.mjs' -g '*.md' | head -n 180",
     ]) {
       const parsed = parseGuardCommand(command, path);
       assert.equal(isBoundedReadOnlyPipeline(parsed, path), true, command);

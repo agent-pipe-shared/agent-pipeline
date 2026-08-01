@@ -84,6 +84,24 @@ No happy-path reference is mandatory. Lazy loading never widens authority and
 must preserve lifecycle, V3 authority, calibration, handover, Verify and
 continuation checks.
 
+## Gate authority and autonomous continuation
+
+The applicable Operating Model, compiled runtime manifest and recorded active
+plan are the only gate authority. Do not create a chat, confirmation or human
+checkpoint merely because a routine implementation step needs to happen.
+
+Once bootstrap is ready and the required plan gate is recorded, continue the
+approved implementation autonomously: scoped edits, focused tests, state
+readback, one-line commits, Verify, Critic preparation and ordinary block
+continuation are agent work. A standing approval is not a fresh human touch.
+
+Ask the human decision role only for a configured decision gate, required final
+acceptance, an irreversible or externally consequential action, or a typed hard
+block for which the returned safe recovery actions cannot progress. A guard
+denial alone is not a human gate: first run its exact typed read-only or
+lifecycle recovery action. Never bypass a real configured gate or turn an
+automated evidence failure into an invented PO approval.
+
 ## Compact
 
 Compact re-enters bootstrap, validates the persisted goal/revision and emits a

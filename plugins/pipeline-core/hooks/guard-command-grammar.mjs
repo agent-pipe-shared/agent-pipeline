@@ -27,6 +27,7 @@ const NUMERIC_VALUE = new Set([
   "-A", "--after-context", "-B", "--before-context", "-C", "--context",
   "--max-count", "--max-depth",
 ]);
+const REPEATABLE_SEARCH_VALUE = new Set(["-g", "--glob", "-t", "--type", "-T", "--type-not"]);
 
 function denied(code = "GUARD-PARSE-UNSUPPORTED") {
   return Object.freeze({
@@ -232,7 +233,8 @@ function validateRg(argv, root, windows) {
       continue;
     }
     if (!afterDashDash && arg.startsWith("-")) {
-      if (arg.includes("=") || (!booleans.has(arg) && !values.has(arg)) || seen.has(arg)) return false;
+      if (arg.includes("=") || (!booleans.has(arg) && !values.has(arg))
+        || (seen.has(arg) && !REPEATABLE_SEARCH_VALUE.has(arg))) return false;
       seen.add(arg);
       if (values.has(arg)) {
         const value = args[index + 1];

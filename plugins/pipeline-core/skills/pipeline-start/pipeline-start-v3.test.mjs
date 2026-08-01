@@ -24,4 +24,7 @@ assert.match(all, /Agent Pipeline source: local-development/u);
 assert.match(all, /pipeline\.start-preflight\.v1/u);
 assert.match(all, /CR?PCR?-BLOCKED|PCR-DECISION-PENDING/u);
 assert.match(all, /four|three|Verify|handover/u);
+assert.match(core, /Operating Model, compiled runtime manifest and recorded active\nplan are the only gate authority/u);
+assert.match(core, /scoped edits, focused tests, state\nreadback, one-line commits, Verify, Critic preparation/u);
+assert.match(core, /A guard\ndenial alone is not a human gate/u);
 process.stdout.write("pipeline-start V3: core budget and lazy-reference checks passed\n");

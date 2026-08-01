@@ -29,8 +29,13 @@ export function sessionStartDecision(projectDir = process.cwd(), exists = exists
     return {
       governed,
       message,
-      context:
-        `${message} This governed-repository bootstrap is mandatory; do not substitute a project-local script or stale cache path.`,
+      context: [
+        message,
+        "This governed-repository bootstrap is mandatory; do not substitute a project-local script or stale cache path.",
+        "After a ready bootstrap, the Operating Model and compiled manifest are the gate authority: continue ordinary implementation, focused tests, commits, Verify, Critic preparation and state readback autonomously.",
+        "Do not invent a human checkpoint for routine work. Request the PO only for a configured decision gate, required final acceptance, an irreversible/external consequence, or a typed hard block with no safe returned recovery action.",
+        "A guard denial is not by itself a human gate: first execute its exact typed read-only or lifecycle recovery action when one is supplied.",
+      ].join(" "),
     };
   }
   const message =

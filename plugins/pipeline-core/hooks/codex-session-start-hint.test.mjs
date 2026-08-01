@@ -28,6 +28,10 @@ try {
   assert.equal(governed.governed, true);
   assert.match(governed.message, /Agent Pipeline is active/u);
   assert.match(governed.message, /report the resolved Pipeline version/u);
+  assert.match(governed.context, /Operating Model and compiled manifest are the gate authority/u);
+  assert.match(governed.context, /ordinary implementation, focused tests, commits, Verify, Critic preparation/u);
+  assert.match(governed.context, /Do not invent a human checkpoint for routine work/u);
+  assert.match(governed.context, /A guard denial is not by itself a human gate/u);
 
   let stdout = "";
   const originalWrite = process.stdout.write;
