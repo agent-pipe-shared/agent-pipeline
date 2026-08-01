@@ -9,6 +9,12 @@ const own = (value, fields) => value !== null && typeof value === "object" && !A
 const text = (value) => typeof value === "string" && value.trim() !== "";
 const stableId = (kind, value) => `${kind}-${createHash("sha256").update(`${kind}\n${value}`).digest("hex").slice(0, 16)}`;
 
+/** Closed machine authority: candidate and effective policy are inseparable. */
+export function validateThreatModel(model) {
+  if (!own(model, ["schema", "candidate", "policyRevision", "classification", "entities", "lifecycle"]) || model.schema !== THREAT_MODEL_SCHEMA || !own(model.candidate, ["commit", "tree"]) || !text(model.candidate.commit) || !text(model.candidate.tree) || !text(model.policyRevision) || !["public", "private"].includes(model.classification) || !Array.isArray(model.entities) || !["draft", "proposed", "approved", "implementing", "verified", "accepted-risk", "superseded", "retired"].includes(model.lifecycle)) return { valid: false, code: "THREAT-MODEL-INVALID" };
+  return { valid: true };
+}
+
 /** Missing observation never becomes a silent exemption. Input stays pure and closed. */
 export function evaluateThreatModelApplicability(input) {
   if (!own(input, ["applicability", "riskInputs"]) || !["required", "not-applicable"].includes(input.applicability) || !own(input.riskInputs, RISK_INPUTS) || !RISK_INPUTS.every((key) => typeof input.riskInputs[key] === "boolean")) return { state: "invalid", code: "THREAT-APPLICABILITY-INVALID" };
