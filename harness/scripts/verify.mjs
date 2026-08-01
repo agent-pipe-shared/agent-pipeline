@@ -258,6 +258,7 @@ const TEST_SUITES = [
   { name: "sbom-node-adapter-tests", file: join(libDir, "sbom-node-adapter.test.mjs") },
   { name: "sbom-discovery-tests", file: join(libDir, "sbom-discovery.test.mjs") },
   { name: "sbom-discovery-cli-tests", file: join(pluginScriptsDir, "sbom-discovery.test.mjs") },
+  { name: "sbom-fixture-matrix-tests", file: join(libDir, "sbom-fixture-matrix.test.mjs") },
   { name: "sbom-release-binding-tests", file: join(libDir, "sbom-release-binding.test.mjs") },
   { name: "po-gate-authority-fixture-tests", file: join(libDir, "po-gate-authority.test.mjs") },
   { name: "public-core-observation-tests", file: join(libDir, "public-core-observation.test.mjs") },
