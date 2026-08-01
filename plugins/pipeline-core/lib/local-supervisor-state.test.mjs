@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: SUL-1.0
 import assert from "node:assert/strict";
 import { chmodSync, existsSync, linkSync, mkdtempSync, mkdirSync, readFileSync, symlinkSync, writeFileSync, rmSync } from "node:fs";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import { admitLocalSupervisorCleanup, localSupervisorStateDigest, planLocalSupervisorFilesystemRepair, repairLocalSupervisorState, resolveLocalSupervisorRoot, validateLocalSupervisorState } from "./local-supervisor-state.mjs";
 const D = "a".repeat(64), C = "b".repeat(64), owner = { nonce: "owner-1", pid: 42, processStartSha256: "c".repeat(64), bootSha256: "d".repeat(64) };
 let passed = 0; const check = (name, fn) => { fn(); passed += 1; console.log(`ok ${passed} - ${name}`); };
-const fixture = (fn) => { const root = mkdtempSync(join(process.cwd(), ".local-supervisor-")); try { fn(root); } finally { rmSync(root, { recursive: true, force: true }); } };
+const fixture = (fn) => { const root = mkdtempSync(join(homedir(), ".local-supervisor-")); try { fn(root); } finally { rmSync(root, { recursive: true, force: true }); } };
 check("no lawful platform root is typed unavailable", () => assert.equal(resolveLocalSupervisorRoot({ platform: "linux", env: {}, repositoryFingerprint: D }).code, "LSS-UNAVAILABLE"));
 check("relative platform state bases are unavailable", () => assert.equal(resolveLocalSupervisorRoot({ platform: "linux", env: { XDG_STATE_HOME: "." }, repositoryFingerprint: D }).code, "LSS-UNAVAILABLE"));
 check("platform-specific absolute roots stay lawful", () => { const root = resolveLocalSupervisorRoot({ platform: "win32", env: { LOCALAPPDATA: "C:\\PipelineState" }, repositoryFingerprint: D }); assert.equal(root.code, "LSS-ROOT"); assert.match(root.root, /\\Agent-Pipeline\\v1\\/u); });
