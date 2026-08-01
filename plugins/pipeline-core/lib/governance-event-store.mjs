@@ -8,9 +8,9 @@
  * owner-authenticated restricted-machine-local profile; callers must never
  * route restricted data through this portable writer.
  */
-import { mkdir, open, readFile, realpath, readdir, rename, unlink, lstat } from "node:fs/promises";
+import { mkdir, open, readFile, realpath, readdir, rename, unlink, lstat, stat } from "node:fs/promises";
 import path from "node:path";
-import { randomBytes } from "node:crypto";
+import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import {
   canonicalSha256,
   canonicalizeJson,
@@ -29,6 +29,8 @@ const STREAMS = new Map([
   ["agent", { origin: "agent", authorityClass: "non-authoritative" }],
   ["lifecycle", { origin: "lifecycle", authorityClass: "non-authoritative" }],
 ]);
+const RESTRICTED_RECORD_SCHEMA = "pipeline.restricted-governance-record.v1";
+const RESTRICTED_AUTHORITY = "restricted-store-operator";
 
 export class GovernanceEventStoreError extends Error {
   constructor(code, message = "Governance event store operation failed.") {
@@ -71,6 +73,108 @@ async function assertPhysicalRoot(repositoryRoot) {
   const root = await realpath(repositoryRoot);
   await assertNoSymlink(root, { directory: true });
   return root;
+}
+
+function assertAbsoluteOutsideRepository(repositoryRoot, storeRoot) {
+  if (typeof storeRoot !== "string" || !path.isAbsolute(storeRoot)) fail("GES-RESTRICTED-ROOT", "Restricted storage must use an absolute machine-local path.");
+  const target = path.resolve(storeRoot);
+  if (target === repositoryRoot || target.startsWith(`${repositoryRoot}${path.sep}`)) fail("GES-RESTRICTED-IN-REPOSITORY", "Restricted storage must be outside the repository and Git history.");
+  return target;
+}
+
+async function assertNoSymlinkAncestry(target) {
+  const parsed = path.parse(target);
+  const pieces = target.slice(parsed.root.length).split(path.sep).filter(Boolean);
+  let current = parsed.root;
+  for (const piece of pieces) {
+    current = path.join(current, piece);
+    const entry = await lstatOrNull(current);
+    if (entry?.isSymbolicLink()) fail("GES-SYMLINK", "Symbolic links are forbidden in governance storage.");
+  }
+}
+
+async function assertRestrictedRoot(repositoryRoot, storeRoot, { create = false } = {}) {
+  const target = assertAbsoluteOutsideRepository(repositoryRoot, storeRoot);
+  if (create) await mkdir(target, { recursive: true, mode: 0o700 });
+  await assertNoSymlinkAncestry(target);
+  await assertNoSymlink(target, { directory: true });
+  const metadata = await stat(target);
+  if ((metadata.mode & 0o077) !== 0) fail("GES-RESTRICTED-PERMISSIONS", "Restricted storage must not grant group or other access.");
+  if (typeof process.getuid === "function" && metadata.uid !== process.getuid()) fail("GES-RESTRICTED-OWNER", "Restricted storage is not owned by this operator.");
+  return target;
+}
+
+function assertEncryptionKey(key) {
+  if (!(key instanceof Uint8Array) || key.byteLength !== 32) fail("GES-RESTRICTED-KEY", "Restricted storage requires a 32-byte externally protected encryption key.");
+  return Buffer.from(key);
+}
+
+function assertRestrictedAuthorization(authorization, repositoryFingerprint) {
+  if (!exactKeys(authorization, ["authorityClass", "repositoryFingerprint"]) || authorization.authorityClass !== RESTRICTED_AUTHORITY
+    || authorization.repositoryFingerprint !== repositoryFingerprint) fail("GES-RESTRICTED-AUTHORIZATION", "A repository-bound restricted-store operator authorization is required.");
+}
+
+function restrictedRecordPath(storeRoot, recordId) {
+  if (typeof recordId !== "string" || !/^[a-f0-9]{32}$/u.test(recordId)) fail("GES-RESTRICTED-ID", "A restricted record identifier is invalid.");
+  return path.join(storeRoot, "records", `${recordId}.json`);
+}
+
+async function restrictedRecordsRoot(storeRoot) {
+  const recordsRoot = path.join(storeRoot, "records");
+  await mkdir(recordsRoot, { recursive: true, mode: 0o700 });
+  await assertNoSymlink(recordsRoot, { directory: true });
+  const metadata = await stat(recordsRoot);
+  if ((metadata.mode & 0o077) !== 0) fail("GES-RESTRICTED-PERMISSIONS", "Restricted records must not grant group or other access.");
+  return recordsRoot;
+}
+
+async function findRestrictedIdempotency(restrictedRoot, key, idempotencyKey) {
+  const recordsRoot = await restrictedRecordsRoot(restrictedRoot);
+  const entries = await readdir(recordsRoot, { withFileTypes: true });
+  for (const entry of entries) {
+    if (entry.isSymbolicLink()) fail("GES-SYMLINK", "Symbolic links are forbidden in governance storage.");
+    if (!entry.isFile() || !/^[a-f0-9]{32}\.json$/u.test(entry.name)) fail("GES-RESTRICTED-PATH", "Restricted storage contains an unsafe path.");
+    const recordId = entry.name.slice(0, -5);
+    const record = parseStrictJson(await readFile(restrictedRecordPath(restrictedRoot, recordId)));
+    let event;
+    try { event = decryptRestrictedRecord(record, key); } catch (error) {
+      if (error?.code === "GES-RESTRICTED-EXPIRED") continue;
+      throw error;
+    }
+    if (event.idempotencyKey === idempotencyKey) return { recordId, record, event };
+  }
+  return null;
+}
+
+function encryptRestrictedRecord(event, key, keyGeneration, expiresAtEpochMs) {
+  if (typeof keyGeneration !== "string" || !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/u.test(keyGeneration)) fail("GES-RESTRICTED-KEY-GENERATION", "A non-secret key generation identifier is required.");
+  if (!Number.isSafeInteger(expiresAtEpochMs) || expiresAtEpochMs <= Date.now()) fail("GES-RESTRICTED-EXPIRY", "Restricted records require a future integer expiry.");
+  const nonce = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", key, nonce);
+  const ciphertext = Buffer.concat([cipher.update(canonicalizeJson(event), "utf8"), cipher.final()]);
+  return {
+    schema: RESTRICTED_RECORD_SCHEMA,
+    algorithm: "aes-256-gcm",
+    keyGeneration,
+    expiresAtEpochMs,
+    nonce: nonce.toString("base64url"),
+    ciphertext: ciphertext.toString("base64url"),
+    tag: cipher.getAuthTag().toString("base64url"),
+  };
+}
+
+function decryptRestrictedRecord(record, key) {
+  if (!exactKeys(record, ["schema", "algorithm", "keyGeneration", "expiresAtEpochMs", "nonce", "ciphertext", "tag"])
+    || record.schema !== RESTRICTED_RECORD_SCHEMA || record.algorithm !== "aes-256-gcm" || !Number.isSafeInteger(record.expiresAtEpochMs)) fail("GES-RESTRICTED-RECORD", "The restricted record shape is invalid.");
+  if (record.expiresAtEpochMs <= Date.now()) fail("GES-RESTRICTED-EXPIRED", "The restricted record has expired.");
+  try {
+    const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(record.nonce, "base64url"));
+    decipher.setAuthTag(Buffer.from(record.tag, "base64url"));
+    return parseStrictJson(Buffer.concat([decipher.update(Buffer.from(record.ciphertext, "base64url")), decipher.final()]));
+  } catch (error) {
+    if (error instanceof GovernanceEventStoreError) throw error;
+    fail("GES-RESTRICTED-DECRYPT", "Restricted record decryption or authentication failed.");
+  }
 }
 
 async function ensureSafeDirectory(root, relative) {
@@ -360,4 +464,66 @@ export async function recoverPortableGovernanceProjection({ repositoryRoot, regi
     await writeHeads(root, registry, streamId, rechecked.events);
     return Object.freeze({ status: "projection-rebuilt", streamId, eventCount: rechecked.events.length, checkpoint: verification.checkpoint });
   });
+}
+
+/**
+ * Store one complete restricted event outside the repository.  The caller owns
+ * key protection; no key, event ID, digest, or correlator is copied to the
+ * portable tree or returned in the operational receipt.
+ */
+export async function putRestrictedGovernanceEvent({ repositoryRoot, storeRoot, repositoryFingerprint, authorization, key, keyGeneration, expiresAtEpochMs, event } = {}) {
+  const root = await assertPhysicalRoot(repositoryRoot);
+  assertRestrictedAuthorization(authorization, repositoryFingerprint);
+  const restrictedRoot = await assertRestrictedRoot(root, storeRoot, { create: true });
+  await restrictedRecordsRoot(restrictedRoot);
+  const encryptionKey = assertEncryptionKey(key);
+  const validation = validateGovernanceEventEnvelope(event);
+  if (!validation.valid || event.repositoryFingerprint !== repositoryFingerprint || event.storageProfile !== "restricted-machine-local"
+    || event.classification !== "restricted" || event.retentionCompatibility !== "machine-local-expiring") fail("GES-RESTRICTED-EVENT", "Only a valid restricted envelope may enter machine-local storage.");
+  const existing = await findRestrictedIdempotency(restrictedRoot, encryptionKey, event.idempotencyKey);
+  if (existing) {
+    if (existing.event.eventDigest !== event.eventDigest) fail("GES-IDEMPOTENCY-CONFLICT", "Idempotency replay conflicts with the existing restricted event.");
+    return Object.freeze({ status: "replayed", recordId: existing.recordId, expiresAtEpochMs: existing.record.expiresAtEpochMs, keyGeneration: existing.record.keyGeneration });
+  }
+  const recordId = randomBytes(16).toString("hex");
+  const record = encryptRestrictedRecord(event, encryptionKey, keyGeneration, expiresAtEpochMs);
+  const target = restrictedRecordPath(restrictedRoot, recordId);
+  await writeAtomic(target, `${canonicalizeJson(record)}\n`);
+  await assertNoSymlink(target, { directory: false });
+  const persisted = parseStrictJson(await readFile(target));
+  if (canonicalSha256(persisted) !== canonicalSha256(record)) fail("GES-RESTRICTED-READBACK", "Restricted record readback differs from the encrypted postimage.");
+  return Object.freeze({ status: "stored", recordId, expiresAtEpochMs, keyGeneration });
+}
+
+/** Read one restricted event only with a repository-bound privileged authorization and its external key. */
+export async function queryRestrictedGovernanceEvent({ repositoryRoot, storeRoot, repositoryFingerprint, authorization, key, recordId } = {}) {
+  const root = await assertPhysicalRoot(repositoryRoot);
+  assertRestrictedAuthorization(authorization, repositoryFingerprint);
+  const restrictedRoot = await assertRestrictedRoot(root, storeRoot);
+  const target = restrictedRecordPath(restrictedRoot, recordId);
+  await assertNoSymlink(target, { directory: false });
+  let record;
+  try { record = parseStrictJson(await readFile(target)); } catch { fail("GES-RESTRICTED-RECORD", "The restricted record is not strict JSON."); }
+  const event = decryptRestrictedRecord(record, assertEncryptionKey(key));
+  const validation = validateGovernanceEventEnvelope(event);
+  if (!validation.valid || event.repositoryFingerprint !== repositoryFingerprint || event.storageProfile !== "restricted-machine-local") fail("GES-RESTRICTED-EVENT", "The decrypted restricted event is invalid.");
+  return Object.freeze({ event: Object.freeze({ ...event }), expiresAtEpochMs: record.expiresAtEpochMs, keyGeneration: record.keyGeneration });
+}
+
+/**
+ * Erase one restricted ciphertext after exact encrypted-preimage binding. The
+ * response deliberately proves only active-store absence, never backups or
+ * unrelated key copies.
+ */
+export async function eraseRestrictedGovernanceEvent({ repositoryRoot, storeRoot, repositoryFingerprint, authorization, recordId, expectedRecordDigest } = {}) {
+  const root = await assertPhysicalRoot(repositoryRoot);
+  assertRestrictedAuthorization(authorization, repositoryFingerprint);
+  const restrictedRoot = await assertRestrictedRoot(root, storeRoot);
+  const target = restrictedRecordPath(restrictedRoot, recordId);
+  await assertNoSymlink(target, { directory: false });
+  const record = parseStrictJson(await readFile(target));
+  if (!SHA256.test(expectedRecordDigest) || canonicalSha256(record) !== expectedRecordDigest) fail("GES-RESTRICTED-PREIMAGE", "The restricted erase preimage does not match.");
+  await unlink(target);
+  if (await lstatOrNull(target)) fail("GES-RESTRICTED-ERASE", "Restricted ciphertext remains in the active store.");
+  return Object.freeze({ status: "erased-active-store", recordId, preimageDigest: expectedRecordDigest, backupDisclosure: "unknown" });
 }

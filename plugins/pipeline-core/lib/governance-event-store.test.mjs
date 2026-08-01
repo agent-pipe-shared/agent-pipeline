@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 /** Stateful PHX-1 tests for portable governance event storage. */
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -10,7 +10,10 @@ import { canonicalizeJson, sealGovernanceEvent } from "./governance-event.mjs";
 import {
   GovernanceEventStoreError,
   appendPortableGovernanceEvent,
+  eraseRestrictedGovernanceEvent,
   loadGovernanceEventRegistry,
+  putRestrictedGovernanceEvent,
+  queryRestrictedGovernanceEvent,
   queryPortableGovernanceStream,
   recoverPortableGovernanceProjection,
   verifyPortableGovernanceStream,
@@ -148,4 +151,42 @@ test("projection recovery requires a retained checkpoint and rebuilds a stale he
   assert.equal(recovered.status, "projection-rebuilt");
   const head = JSON.parse(await readFile(path.join(root, "governance/events/heads.json"), "utf8"));
   assert.deepEqual(head.streams.lifecycle, { sequence: 1, eventDigest: first.eventDigest });
+});
+
+test("restricted storage stays outside the repository, is owner-only encrypted, and supports exact active-store erasure", async (t) => {
+  const root = await fixtureRoot(); t.after(() => cleanup(root));
+  const restrictedRoot = await mkdtemp(path.join(os.tmpdir(), "governance-restricted-")); t.after(() => cleanup(restrictedRoot));
+  const key = Buffer.alloc(32, 7);
+  const authorization = { authorityClass: "restricted-store-operator", repositoryFingerprint: fingerprint };
+  const restricted = sealGovernanceEvent({
+    ...intent({
+      eventId: "restricted-1",
+      idempotencyKey: "restricted-idem-1",
+      classification: "restricted",
+      storageProfile: "restricted-machine-local",
+      retentionCompatibility: "machine-local-expiring",
+      disclosureClass: "machine-local-only",
+      payload: { complete: "restricted only" },
+    }),
+    sequence: 1,
+    previousEventDigest: null,
+    payloadDigest: "0".repeat(64),
+    eventDigest: "0".repeat(64),
+  });
+  const stored = await putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: restricted });
+  assert.equal(stored.status, "stored");
+  const replay = await putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: restricted });
+  assert.equal(replay.status, "replayed");
+  assert.equal(replay.recordId, stored.recordId);
+  const conflict = sealGovernanceEvent({ ...restricted, payload: { complete: "different restricted content" }, payloadDigest: "0".repeat(64), eventDigest: "0".repeat(64) });
+  await assert.rejects(() => putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: conflict }), (error) => error.code === "GES-IDEMPOTENCY-CONFLICT");
+  assert.ok(!stored.recordId.includes(restricted.eventId), "the local identifier must not create a portable join handle");
+  assert.equal((await stat(restrictedRoot)).mode & 0o077, 0);
+  const queried = await queryRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization, key, recordId: stored.recordId });
+  assert.equal(queried.event.payload.complete, restricted.payload.complete);
+  const encrypted = JSON.parse(await readFile(path.join(restrictedRoot, "records", `${stored.recordId}.json`), "utf8"));
+  const erased = await eraseRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization, recordId: stored.recordId, expectedRecordDigest: (await import("./governance-event.mjs")).canonicalSha256(encrypted) });
+  assert.deepEqual(erased, { status: "erased-active-store", recordId: stored.recordId, preimageDigest: (await import("./governance-event.mjs")).canonicalSha256(encrypted), backupDisclosure: "unknown" });
+  await assert.rejects(() => queryRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: restrictedRoot, repositoryFingerprint: fingerprint, authorization, key, recordId: stored.recordId }), (error) => error.code === "GES-MISSING");
+  await assert.rejects(() => putRestrictedGovernanceEvent({ repositoryRoot: root, storeRoot: path.join(root, "restricted"), repositoryFingerprint: fingerprint, authorization, key, keyGeneration: "key-1", expiresAtEpochMs: Date.now() + 60_000, event: restricted }), (error) => error.code === "GES-RESTRICTED-IN-REPOSITORY");
 });
