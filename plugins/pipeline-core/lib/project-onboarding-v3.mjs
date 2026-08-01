@@ -80,6 +80,7 @@ const SOURCE_RECOVERY_SCHEMA = "pipeline.project-onboarding-source-recovery.v1";
 const MANIFEST_REPAIR_PLAN_SCHEMA = "pipeline.project-onboarding-manifest-repair-plan.v1";
 const SAFE_RELATIVE = /^(?!\/)(?!.*(?:^|\/)\.\.?($|\/))[A-Za-z0-9._-]+(?:\/[A-Za-z0-9._-]+)*$/u;
 const AUTHENTICATED = new WeakMap();
+const AUTHENTICATED_MANIFEST_REPAIRS = new WeakMap();
 const USER_RESERVED_PATHS = new Set([".agents", ".claude", ".codex", "project"]);
 const ONBOARDING_SCRIPT = fileURLToPath(new URL("../scripts/project-onboarding-v3.mjs", import.meta.url));
 const MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/runner-profile-migration-v3.mjs", import.meta.url));
@@ -89,7 +90,6 @@ const PO_AUTHORITY_REBIND_WRITER = fileURLToPath(new URL("../scripts/pipeline-st
 const PO_PROFILE_REPAIR_WRITER = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
 const PROJECT_AUTHORITY_MIGRATION_WRITER = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
 const SHA256_RE = /^[a-f0-9]{64}$/u;
-const SOURCE_RECOVERY_SCHEMA = "pipeline.project-onboarding-source-recovery.v1";
 const MANIFEST_REPAIR_SCHEMA = "pipeline.project-onboarding-manifest-repair-plan.v1";
 
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
@@ -1716,6 +1716,15 @@ function sourceEnablesCodex(root, fs) {
   } catch { return false; }
 }
 
+function selectedRunnerIsCodex(root, fs) {
+  try {
+    const parsed = parseYaml(fs.readFileSync(safePath(root, SOURCE, fs), "utf8"));
+    return parsed?.runners?.default === "codex"
+      && Array.isArray(parsed.runners.enabled)
+      && parsed.runners.enabled.includes("codex");
+  } catch { return false; }
+}
+
 function sourceRecoveryResult({
   status,
   root,
@@ -3017,6 +3026,7 @@ function applyLifecycle(rootDir, fs, operation, planSha256, activate) {
       rootDir: plan.root,
       sourceSha256: plan.sourceSha256,
       runtimeTargets,
+      codexExecutable: fs.codexExecutable,
     });
   } catch (error) {
     return runtimeFailureResult(beforeApply, error, {

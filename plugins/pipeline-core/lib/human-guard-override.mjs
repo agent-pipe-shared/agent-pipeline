@@ -229,6 +229,35 @@ function pluginIdentity(pluginRoot) {
   };
 }
 
+function policyIdentity(root, pluginRoot, denials) {
+  const hooksRoot = join(pluginRoot, "hooks");
+  const guards = [...new Set(denials.map(({ guard }) => String(guard)))].sort().map((guard) => {
+    const path = SAFE_ID.test(guard) ? join(hooksRoot, guard) : null;
+    if (path === null || !existsSync(path)) return { guard, implementationSha256: null };
+    const info = lstatSync(path);
+    if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || realpathSync(path) !== path) {
+      fail("HGO-PLUGIN", "guard implementation identity is unsafe");
+    }
+    return { guard, implementationSha256: sha(readFileSync(path)) };
+  });
+  const project = [
+    ".claude/settings.json",
+    ".claude/guard-config.json",
+    ".claude/pipeline.json",
+    "project/guard-config.json",
+    "project/pipeline.json",
+  ].map((path) => {
+    const absolute = join(root, path);
+    if (!existsSync(absolute)) return { path, status: "absent", sha256: null };
+    const info = lstatSync(absolute);
+    if (!info.isFile() || info.isSymbolicLink() || info.nlink !== 1 || realpathSync(absolute) !== absolute) {
+      fail("HGO-POLICY", "project guard policy identity is unsafe");
+    }
+    return { path, status: "present", sha256: sha(readFileSync(absolute)) };
+  });
+  return { guards, project };
+}
+
 function stateObservation(root) {
   let authority = null;
   try { authority = resolveProjectAuthorityPaths({ rootDir: root }); } catch {}
@@ -256,7 +285,10 @@ function stateObservation(root) {
 }
 
 function repositoryObservation(root, spawn = spawnSync) {
+  const common = git(root, ["rev-parse", "--path-format=absolute", "--git-common-dir"], spawn);
+  const physicalCommon = realpathSync(isAbsolute(common) ? common : resolve(root, common));
   return {
+    fingerprintSha256: sha({ physicalRoot: realpathSync(root), physicalCommon }),
     head: git(root, ["rev-parse", "HEAD"], spawn),
     tree: git(root, ["rev-parse", "HEAD^{tree}"], spawn),
     statusSha256: sha(git(root, ["status", "--porcelain=v1", "--untracked-files=all"], spawn)),
@@ -308,6 +340,14 @@ function protectedPath(path) {
     || /(^|\/)(?:secrets?|credentials?|tokens?|id_rsa|id_ed25519)(?:[./_-]|$)/u.test(normalized);
 }
 
+function hardBoundaryPath(path) {
+  const normalized = path.toLowerCase();
+  return normalized === ".git" || normalized.startsWith(".git/")
+    || normalized === ".codex" || normalized.startsWith(".codex/")
+    || normalized === ".agent-pipeline" || normalized.startsWith(".agent-pipeline/")
+    || /(^|\/)(?:secrets?|credentials?|tokens?|id_rsa|id_ed25519)(?:[./_-]|$)/u.test(normalized);
+}
+
 function pipelineSourcePath(path) {
   const normalized = path.toLowerCase();
   return normalized === "plugins/pipeline-core" || normalized.startsWith("plugins/pipeline-core/");
@@ -336,67 +376,390 @@ function authorEligiblePaths(root, paths, selectedSourceRoot) {
 }
 
 function patchPaths(command) {
-  if (typeof command !== "string" || !command.startsWith("*** Begin Patch\n") || !command.endsWith("*** End Patch")) return null;
+  if (typeof command !== "string") return null;
+  const normalized = command.replace(/\r\n/gu, "\n").replace(/\n+$/u, "");
+  if (!normalized.startsWith("*** Begin Patch\n") || !normalized.endsWith("*** End Patch")) return null;
   const paths = [];
-  for (const line of command.split("\n")) {
+  for (const line of normalized.split("\n")) {
     const match = line.match(/^\*\*\* (?:(?:Add|Update|Delete) File|Move to): (.+)$/u);
     if (match) paths.push(match[1]);
   }
   return paths.length > 0 ? paths : null;
 }
 
+function exactGitSubcommand(parsed) {
+  if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1) return null;
+  const segment = parsed.segments[0];
+  if (segment.executable.toLowerCase().replace(/\.exe$/u, "") !== "git") return null;
+  let index = 0;
+  while (index < segment.argv.length) {
+    const value = segment.argv[index];
+    if (value === "-C" || value === "-c" || value === "--git-dir" || value === "--work-tree") {
+      index += 2;
+      continue;
+    }
+    if (value.startsWith("--git-dir=") || value.startsWith("--work-tree=") || value.startsWith("--config-env=")) {
+      index += 1;
+      continue;
+    }
+    break;
+  }
+  return segment.argv[index] ?? null;
+}
+
+function actionPreview(toolName, toolInput, paths, commandClass) {
+  if (toolName === "Bash") {
+    return {
+      toolName,
+      command: String(toolInput?.command ?? ""),
+      commandClass,
+      eligiblePaths: paths,
+    };
+  }
+  return {
+    toolName,
+    command: null,
+    commandClass,
+    eligiblePaths: paths,
+  };
+}
+
+function denialRationale(denials) {
+  return denials.map((denial) => ({
+    guard: String(denial.guard),
+    denialSha256: sha(String(denial.reason)),
+    rationale: String(denial.reason).slice(0, 2_000),
+  })).sort((left, right) => `${left.guard}:${left.denialSha256}`.localeCompare(`${right.guard}:${right.denialSha256}`));
+}
+
+function denialRetryActions(denials) {
+  const actions = [];
+  for (const { reason } of denials) {
+    for (const line of String(reason).split("\n")) {
+      let value;
+      try { value = JSON.parse(line); } catch { continue; }
+      if (value?.schema !== "pipeline.guard-retry-actions.v1" || !Array.isArray(value.retryActions)) continue;
+      for (const action of value.retryActions) {
+        if (!object(action) || typeof action.executable !== "string" || !Array.isArray(action.argv)
+          || action.mutation !== false || action.requiresConfirmation !== false) continue;
+        actions.push(structuredClone(action));
+      }
+    }
+  }
+  return actions;
+}
+
+function decisionPreview({ toolName, toolInput, paths, commandClass, denials }) {
+  const effect = commandClass === "git-commit"
+    ? {
+      repository: "creates one local commit from the already staged index if Git and hooks succeed",
+      external: "no external effect is expected from git commit",
+      rollbackRecovery: "read back HEAD/tree/status; correct by a new commit or an explicitly reviewed revert, never infer commit success",
+      residualRisk: "the commit may capture unintended staged bytes or invalidate candidate-bound evidence",
+    }
+    : new Set(["exact-in-root-patch", "exact-in-root-write", "pipeline-author-repair"]).has(commandClass)
+      ? {
+        repository: "changes only the listed in-root working-tree paths if the original tool succeeds",
+        external: "no external effect is expected from the classified in-root file action",
+        rollbackRecovery: "read back every listed path and repository status; repair with a reviewed inverse patch when needed",
+        residualRisk: "the exact edit may violate project invariants or invalidate evidence that covered the prior bytes",
+      }
+      : {
+        repository: "the exact command may change the bound repository preimage",
+        external: "external effects are unknown for this exact command and must be treated as possible",
+        rollbackRecovery: "use command-specific readback or reconciliation; never repeat an ambiguous effect",
+        residualRisk: "the exact command may have effects not inferable by the guard adapter",
+      };
+  return {
+    action: actionPreview(toolName, toolInput, paths, commandClass),
+    guardRationale: denialRationale(denials),
+    alternatives: [
+      {
+        route: "normal-retry",
+        status: "denied",
+        evidenceSha256: sha(denialRationale(denials).map(({ guard, denialSha256 }) => ({ guard, denialSha256 }))),
+      },
+      {
+        route: "narrower-typed-recovery",
+        status: "not-returned-by-denying-guard",
+        evidenceSha256: null,
+      },
+    ],
+    expectedEffects: {
+      repository: effect.repository,
+      external: effect.external,
+    },
+    evidenceInvalidation: "all candidate-bound Verify, Security, Critic, preflight, or release evidence affected by the changed preimage must be rerun",
+    rollbackRecovery: effect.rollbackRecovery,
+    residualRisk: effect.residualRisk,
+    postcondition: "retry the byte-identical original tool action, then run its ordinary effect readback; override admission is not operation success",
+    poAuthority: "final-for-this-exact-project-policy-decision",
+  };
+}
+
+function localAction(executable, argv, expected) {
+  return {
+    executable,
+    argv,
+    mutation: false,
+    requiresConfirmation: false,
+    executionBoundary: "local-process",
+    expected,
+  };
+}
+
+function recoveryRoute(code, toolName, toolInput, paths = [], context = {}) {
+  const { root = null, pluginRoot = null, repository = null } = context;
+  const command = String(toolInput?.command ?? "");
+  if (code === "HGO-NONOVERRIDABLE-SECRET") {
+    return {
+      status: "external-operator-required",
+      code: "HGO-EXTERNAL-SENSITIVE-INPUT",
+      nextAction: {
+        kind: "external-operator",
+        executionBoundary: "attended-external-terminal",
+        invocation: "user-copy-only",
+        action: {
+          toolName,
+          toolInputSha256: sha(toolInput),
+          repositoryRoot: root,
+        },
+        reason: "the guarded input may contain sensitive bytes that cannot enter the override preview or durable request",
+      },
+    };
+  }
+  if (code === "HGO-NONOVERRIDABLE-PATH" || code === "HGO-NONOVERRIDABLE-CROSS-BOUNDARY") {
+    const protectedTarget = paths.some(protectedPath)
+      || /(?:pipeline-state\.json|pipeline\.ya?ml|guard-config\.json|settings(?:\.local)?\.json)/iu.test(command);
+    return protectedTarget
+      ? {
+        status: "narrower-recovery-required",
+        code: "HGO-NARROWER-WRITER-REQUIRED",
+        nextAction: {
+          kind: "typed-recovery",
+          action: localAction(
+            process.execPath,
+            [join(pluginRoot, "scripts", "guard-human-override.mjs"), "verify-audit", "--repo", root],
+            { schema: "pipeline.human-guard-override-audit-verification.v1", status: "valid" },
+          ),
+          after: "retry the exact original denial to obtain a fresh emergency plan or use its sanctioned writer",
+        },
+      }
+      : {
+        status: "external-operator-required",
+        code: "HGO-EXTERNAL-PROJECT-BOUNDARY",
+        nextAction: {
+          kind: "external-operator",
+          executionBoundary: "separate-session-rooted-at-exact-target",
+          invocation: "user-copy-only",
+          action: {
+            toolName,
+            toolInputSha256: sha(toolInput),
+            sourceRepositoryRoot: root,
+            targetPaths: paths,
+          },
+          reason: "the target is outside this project's physical authority boundary",
+        },
+      };
+  }
+  if (code === "HGO-PUBLICATION-REQUIRED" || /\bgit(?:\.exe)?\b[^\n]*\bpush\b/iu.test(command)) {
+    const preflightId = `guard-${sha(toolInput).slice(0, 24)}`;
+    return {
+      status: "narrower-recovery-required",
+      code: "HGO-NARROWER-PUBLICATION-REQUIRED",
+      nextAction: {
+        kind: "typed-recovery",
+        action: localAction(
+          process.execPath,
+          [
+            join(pluginRoot, "scripts", "publication-executor.mjs"),
+            "preflight",
+            "--root", root,
+            "--preflight-id", preflightId,
+            "--candidate", repository?.head ?? "unavailable",
+            "--remote-name", "origin",
+            "--destination-ref", "refs/heads/main",
+          ],
+          { schema: "pipeline.publication-capability-preflight.v1", statuses: ["ready", "blocked"] },
+        ),
+        limitation: "the fixed productive publication route revalidates candidate, remote, destination, credentials, policy, and preimage; it never inherits raw push argv",
+      },
+    };
+  }
+  if (code === "HGO-NONOVERRIDABLE-WILDCARD") {
+    return {
+      status: "narrower-recovery-required",
+      code: "HGO-NARROWER-EXACT-TARGET-REQUIRED",
+      nextAction: {
+        kind: "typed-recovery",
+        action: {
+          toolName,
+          toolInputSha256: sha(toolInput),
+          requiredChange: "replace every wildcard with one exact target",
+          repositoryRoot: root,
+        },
+      },
+    };
+  }
+  return {
+    status: "external-operator-required",
+    code: "HGO-EXTERNAL-ADAPTER-BOUNDARY",
+    nextAction: {
+      kind: "external-operator",
+      executionBoundary: "attended-external-tool",
+      invocation: "user-copy-only",
+      action: {
+        toolName,
+        toolInputSha256: sha(toolInput),
+        repositoryRoot: root,
+      },
+      reason: "the exact action class or target cannot be safely attested inside this guard adapter",
+    },
+  };
+}
+
 function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = null } = {}) {
   const paths = [];
   const serialized = canonical(toolInput);
   if (/(?:gh[pousr]_[A-Za-z0-9]{16,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----|(?:token|password|secret)\s*[:=]\s*["']?[A-Za-z0-9+/_=-]{12,})/u.test(serialized)) {
-    return { eligible: false, code: "HGO-NONOVERRIDABLE-SECRET" };
+    return { eligible: false, code: "HGO-NONOVERRIDABLE-SECRET", paths };
   }
   if (new Set(["Edit", "Write"]).has(toolName)) {
     const path = safePath(root, toolInput?.file_path);
-    if (!path || protectedPath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH" };
+    if (!path) return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths };
+    if (hardBoundaryPath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH", paths: [path.relative] };
     paths.push(path.relative);
+    if (protectedPath(path.relative)) return {
+      eligible: true,
+      mode: "standard",
+      sourceRoot: null,
+      paths,
+      commandClass: "writer-owned-project-policy-emergency",
+    };
   } else if (toolName === "apply_patch") {
     const parsed = patchPaths(toolInput?.command);
-    if (!parsed) return { eligible: false, code: "HGO-NONOVERRIDABLE-GRAMMAR" };
+    if (!parsed) {
+      return { eligible: false, code: "HGO-NONOVERRIDABLE-GRAMMAR", paths };
+    }
     for (const candidate of parsed) {
       const path = safePath(root, candidate);
-      if (!path || protectedPath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH" };
+      if (!path) return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [...paths, candidate] };
+      if (hardBoundaryPath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH", paths: [...paths, path.relative] };
       paths.push(path.relative);
     }
+    if (paths.some(protectedPath)) return {
+      eligible: true,
+      mode: "standard",
+      sourceRoot: null,
+      paths: [...new Set(paths)].sort(),
+      commandClass: "writer-owned-project-policy-emergency",
+    };
   } else if (toolName === "Bash") {
     const command = String(toolInput?.command ?? "");
     const parsed = parseGuardCommand(command, root);
-    if (parsed.parseStatus !== "accepted" || parsed.segments.length !== 1
-      || parsed.operators.length !== 0 || parsed.redirects.length !== 0) {
-      return { eligible: false, code: "HGO-NONOVERRIDABLE-GRAMMAR" };
+    let writerOwnedProjectPolicy = false;
+    if (/\bgit(?:\.exe)?\b[^\n]*\bpush\b/iu.test(command)) {
+      return { eligible: false, code: "HGO-NONOVERRIDABLE-COMMAND", paths, commandClass: "raw-git-push" };
     }
-    const { executable, argv } = parsed.segments[0];
-    const normalizedExecutable = executable.toLowerCase().replace(/\.exe$/u, "");
-    const readOnlyDiagnostics = new Set([
-      "cat", "grep", "head", "ls", "pwd", "sha256sum", "stat", "tail", "test", "true", "false", "wc",
-    ]);
-    const exactNodeCheck = normalizedExecutable === "node"
-      && argv.length === 2
-      && argv[0] === "--check"
-      && typeof argv[1] === "string"
-      && !argv[1].startsWith("-");
-    if (!readOnlyDiagnostics.has(normalizedExecutable) && !exactNodeCheck) {
-      return { eligible: false, code: "HGO-NONOVERRIDABLE-COMMAND" };
+    if (/(^|[\s=])(?:\*|\?)(?=$|\s)/u.test(command)) {
+      return { eligible: false, code: "HGO-NONOVERRIDABLE-WILDCARD", paths, commandClass: "wildcard-command" };
     }
-    const candidateTokens = exactNodeCheck ? [argv[1]] : argv.filter((token) => !token.startsWith("-"));
-    for (const token of candidateTokens) {
-      const path = safePath(root, token);
-      if (!path || protectedPath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH" };
+    if (parsed.parseStatus !== "accepted") {
+      if (/(?:^|\s)\.\.(?:\s|$)|[\\/$`<>]/u.test(command)) {
+        return { eligible: false, code: "HGO-NONOVERRIDABLE-GRAMMAR", paths };
+      }
+      return {
+        eligible: true,
+        mode: "standard",
+        sourceRoot: null,
+        paths,
+        commandClass: "closed-shell-exact",
+      };
+    }
+    for (const redirect of parsed.redirects) {
+      if (redirect.target === "/dev/null" || redirect.target?.toLowerCase() === "nul") continue;
+      const path = safePath(root, redirect.target);
+      if (!path) return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [redirect.target] };
+      if (hardBoundaryPath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH", paths: [path.relative] };
       paths.push(path.relative);
+      if (protectedPath(path.relative)) writerOwnedProjectPolicy = true;
     }
+    for (const segment of parsed.segments) {
+      for (let index = 0; index < segment.argv.length; index += 1) {
+        const token = segment.argv[index];
+        if (token === "-C" || token === "--git-dir" || token === "--work-tree") {
+          const candidate = segment.argv[index + 1];
+          if (typeof candidate === "string") {
+            const path = safePath(root, candidate);
+            if (!path) return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [candidate] };
+            paths.push(path.relative);
+          }
+          index += 1;
+          continue;
+        }
+        const assignedPath = token.match(/^--(?:git-dir|work-tree)=(.+)$/u)?.[1];
+        if (assignedPath !== undefined) {
+          const path = safePath(root, assignedPath);
+          if (!path) return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [assignedPath] };
+          paths.push(path.relative);
+          continue;
+        }
+        const normalizedToken = token.replace(/\\/gu, "/");
+        if (!token.startsWith("-") && hardBoundaryPath(normalizedToken)) {
+          return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH", paths: [normalizedToken] };
+        }
+        if (!token.startsWith("-") && protectedPath(normalizedToken)) {
+          writerOwnedProjectPolicy = true;
+          paths.push(normalizedToken);
+          continue;
+        }
+        if (isAbsolute(token) || token === ".." || token.startsWith("../") || token.includes("/../")) {
+          const path = safePath(root, token);
+          if (!path) return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [token] };
+          if (hardBoundaryPath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH", paths: [path.relative] };
+          paths.push(path.relative);
+          if (protectedPath(path.relative)) writerOwnedProjectPolicy = true;
+        }
+      }
+    }
+    if (parsed.segments.length !== 1 || parsed.operators.length !== 0 || parsed.redirects.length !== 0) {
+      return {
+        eligible: true,
+        mode: "standard",
+        sourceRoot: null,
+        paths: [...new Set(paths)].sort(),
+        commandClass: writerOwnedProjectPolicy
+          ? "writer-owned-project-policy-emergency"
+          : "closed-shell-exact",
+      };
+    }
+    const segment = parsed.segments[0];
+    const normalizedExecutable = segment.executable.toLowerCase().replace(/\.exe$/u, "");
+    if (normalizedExecutable === "node" && segment.argv.length === 2 && segment.argv[0] === "--check") {
+      const path = safePath(root, segment.argv[1]);
+      if (!path) return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: [segment.argv[1]] };
+      if (hardBoundaryPath(path.relative)) return { eligible: false, code: "HGO-NONOVERRIDABLE-PATH", paths: [path.relative] };
+      paths.push(path.relative);
+      if (protectedPath(path.relative)) writerOwnedProjectPolicy = true;
+    }
+    const subcommand = exactGitSubcommand(parsed);
+    return {
+      eligible: true,
+      mode: "standard",
+      sourceRoot: null,
+      paths: [...new Set(paths)].sort(),
+      commandClass: writerOwnedProjectPolicy
+        ? "writer-owned-project-policy-emergency"
+        : subcommand === null ? "exact-command" : `git-${subcommand}`,
+    };
   } else {
-    return { eligible: false, code: "HGO-NONOVERRIDABLE-TOOL" };
+    return { eligible: false, code: "HGO-NONOVERRIDABLE-TOOL", paths };
   }
   const uniquePaths = [...new Set(paths)].sort();
   const pipelinePaths = uniquePaths.filter(pipelineSourcePath);
   if (pipelinePaths.length > 0) {
     if (pipelinePaths.length !== uniquePaths.length) {
-      return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY" };
+      return { eligible: false, code: "HGO-NONOVERRIDABLE-CROSS-BOUNDARY", paths: uniquePaths };
     }
     if (selectedAuthorSourceRoot === null) {
       return {
@@ -412,7 +775,13 @@ function eligibility(root, toolName, toolInput, { selectedAuthorSourceRoot = nul
     return { eligible: true, mode: "pipeline-author-repair", sourceRoot, paths: uniquePaths };
   }
   if (selectedAuthorSourceRoot !== null) return { eligible: false, code: "HGO-AUTHOR-SCOPE-MISMATCH" };
-  return { eligible: true, mode: "standard", sourceRoot: null, paths: uniquePaths };
+  return {
+    eligible: true,
+    mode: "standard",
+    sourceRoot: null,
+    paths: uniquePaths,
+    commandClass: toolName === "apply_patch" ? "exact-in-root-patch" : "exact-in-root-write",
+  };
 }
 
 function requestPath(paths, digest) {
@@ -539,7 +908,10 @@ const CAPABILITY_KEYS = [
   "repository",
   "toolName",
   "toolInputSha256",
+  "commandClass",
   "denials",
+  "policy",
+  "preview",
   "eligiblePaths",
   "mode",
   "authorSourceRoot",
@@ -566,6 +938,8 @@ function validatedCapability(paths, path) {
     || !SHA256.test(value.selectionSha256 ?? "")
     || !SHA256.test(value.reasonSha256 ?? "")
     || !SHA256.test(value.toolInputSha256 ?? "")
+    || typeof value.commandClass !== "string" || value.commandClass.trim() === ""
+    || !object(value.policy) || !object(value.preview)
     || !new Set(["standard", "pipeline-author-repair"]).has(value.mode)
     || !(value.authorSourceRoot === null || typeof value.authorSourceRoot === "string")
     || !SHA256.test(value.mac ?? "")
@@ -592,7 +966,7 @@ function validatedRequest(paths, requestSha256) {
   const request = readJson(requestPath(paths, requestSha256));
   if (!exactKeys(request, [
     "schema", "root", "plugin", "repository", "toolName", "toolInputSha256", "denials",
-    "eligiblePaths", "mode", "authorSourceRoot", "createdAt", "expiresAt",
+    "policy", "preview", "eligiblePaths", "commandClass", "mode", "authorSourceRoot", "createdAt", "expiresAt",
   ])
     || request.schema !== REQUEST_SCHEMA || request.root === undefined
     || !new Set(["standard", "pipeline-author-repair-candidate"]).has(request.mode)
@@ -613,23 +987,59 @@ export function recordHumanGuardDenial({
   spawn = spawnSync,
 } = {}) {
   const repo = topology(rootDir, spawn);
+  if (!Array.isArray(denials) || denials.length === 0) fail("HGO-DENIAL", "denial set is empty");
+  const repository = repositoryObservation(repo.root, spawn);
+  if (denials.some(({ guard }) => String(guard) === "guard-push.mjs")) {
+    return recoveryRoute("HGO-PUBLICATION-REQUIRED", toolName, toolInput, [], {
+      root: repo.root,
+      pluginRoot,
+      repository,
+    });
+  }
+  const retryActions = denialRetryActions(denials);
+  if (retryActions.length > 0) {
+    return {
+      status: "narrower-recovery-required",
+      code: "HGO-NORMAL-RETRY-ACTIONS",
+      nextAction: {
+        kind: "typed-recovery",
+        actions: retryActions,
+      },
+    };
+  }
   const eligible = eligibility(repo.root, toolName, toolInput);
   if (!eligible.eligible && !eligible.authorCandidate) {
-    return { status: "non-overridable", code: eligible.code };
+    return recoveryRoute(eligible.code, toolName, toolInput, eligible.paths, {
+      root: repo.root,
+      pluginRoot,
+      repository,
+    });
   }
-  if (!Array.isArray(denials) || denials.length === 0) fail("HGO-DENIAL", "denial set is empty");
   const paths = storage(repo.common);
+  const policy = policyIdentity(repo.root, pluginRoot, denials);
+  const commandClass = eligible.commandClass
+    ?? (eligible.authorCandidate ? "pipeline-author-repair" : "exact-project-action");
+  const preview = decisionPreview({
+    toolName,
+    toolInput,
+    paths: eligible.paths,
+    commandClass,
+    denials,
+  });
   const request = {
     schema: REQUEST_SCHEMA,
     root: repo.root,
     plugin: pluginIdentity(pluginRoot),
-    repository: repositoryObservation(repo.root, spawn),
+    repository,
     toolName,
     toolInputSha256: sha(toolInput),
+    commandClass,
     denials: denials.map((denial) => ({
       guard: String(denial.guard),
       sha256: sha(String(denial.reason)),
     })).sort((left, right) => `${left.guard}:${left.sha256}`.localeCompare(`${right.guard}:${right.sha256}`)),
+    policy,
+    preview,
     eligiblePaths: eligible.paths,
     mode: eligible.authorCandidate ? "pipeline-author-repair-candidate" : eligible.mode,
     authorSourceRoot: null,
@@ -645,7 +1055,10 @@ export function recordHumanGuardDenial({
     at: new Date(nowMs).toISOString(),
     requestSha256,
     toolName,
+    commandClass,
     denialDigests: request.denials,
+    policySha256: sha(policy),
+    previewSha256: sha(preview),
   });
   return eligible.authorCandidate
     ? {
@@ -671,7 +1084,10 @@ export function planHumanGuardOverride({
   if (request.root !== repo.root || new Date(request.expiresAt).getTime() <= nowMs) fail("HGO-EXPIRED", "override request expired");
   const plugin = pluginIdentity(pluginRoot);
   const repository = repositoryObservation(repo.root, spawn);
-  if (canonical(plugin) !== canonical(request.plugin) || canonical(repository) !== canonical(request.repository)) {
+  const policy = policyIdentity(repo.root, pluginRoot, request.denials);
+  if (canonical(plugin) !== canonical(request.plugin)
+    || canonical(policy) !== canonical(request.policy)
+    || canonical(repository) !== canonical(request.repository)) {
     fail("HGO-DRIFT", "override request preimage drifted");
   }
   let mode = "standard";
@@ -694,7 +1110,10 @@ export function planHumanGuardOverride({
     repository,
     toolName: request.toolName,
     toolInputSha256: request.toolInputSha256,
+    commandClass: request.commandClass,
     denials: request.denials,
+    policy: request.policy,
+    preview: request.preview,
     eligiblePaths: request.eligiblePaths,
     mode,
     authorSourceRoot: authorSourceRootValue,
@@ -769,6 +1188,8 @@ export function prepareHumanGuardOverrideAuthorization({
     ...selection,
     status: "prepared",
     selectionSha256,
+    expiresAt: planned.expiresAt,
+    decisionPreview: planned.preview,
     authorizeAction: {
       executable: process.execPath,
       argv: [
@@ -856,7 +1277,10 @@ export function authorizeHumanGuardOverride({
     repository: planned.repository,
     toolName: planned.toolName,
     toolInputSha256: planned.toolInputSha256,
+    commandClass: planned.commandClass,
     denials: planned.denials,
+    policy: planned.policy,
+    preview: planned.preview,
     eligiblePaths: planned.eligiblePaths,
     mode: planned.mode,
     authorSourceRoot: planned.authorSourceRoot,
@@ -929,6 +1353,7 @@ export function consumeHumanGuardOverride({
     sha256: sha(String(denial.reason)),
   })).sort((left, right) => `${left.guard}:${left.sha256}`.localeCompare(`${right.guard}:${right.sha256}`));
   const files = [];
+  let replanRequired = false;
   try {
     files.push(...readdirSync(paths.capabilities).filter((name) => name.endsWith(".json")).sort());
   } catch { return { status: "absent" }; }
@@ -955,12 +1380,14 @@ export function consumeHumanGuardOverride({
         return { status: "invalid", code: "HGO-AUDIT" };
       }
       const plugin = pluginIdentity(pluginRoot);
+      const policy = policyIdentity(repo.root, pluginRoot, denials);
       const repository = repositoryObservation(repo.root, spawn);
       const expired = new Date(capability.expiresAt).getTime() <= nowMs;
       const drifted = capability.status !== "armed" || capability.root !== repo.root
         || capability.toolName !== toolName || capability.toolInputSha256 !== toolInputSha256
         || canonical(capability.denials) !== canonical(denialDigests)
         || canonical(capability.plugin) !== canonical(plugin)
+        || canonical(capability.policy) !== canonical(policy)
         || canonical(capability.repository) !== canonical(repository)
         || (capability.mode === "pipeline-author-repair"
           && authorEligiblePaths(repo.root, capability.eligiblePaths, capability.authorSourceRoot) === null);
@@ -973,7 +1400,11 @@ export function consumeHumanGuardOverride({
           reasonSha256: capability.reasonSha256,
           code: expired ? "HGO-EXPIRED" : "HGO-DRIFT",
         });
-        return { status: "invalid", code: expired ? "HGO-EXPIRED" : "HGO-DRIFT" };
+        if (expired) {
+          replanRequired = true;
+          continue;
+        }
+        return { status: "replan", code: "HGO-DRIFT" };
       }
       const consumedCore = {
         ...capability,
@@ -1001,7 +1432,9 @@ export function consumeHumanGuardOverride({
       try { unlinkSync(lock); } catch {}
     }
   }
-  return { status: "absent" };
+  return replanRequired
+    ? { status: "replan", code: "HGO-EXPIRED" }
+    : { status: "absent" };
 }
 
 export function verifyHumanGuardOverrideAudit({ rootDir, spawn = spawnSync } = {}) {

@@ -39,6 +39,74 @@
 - Commit `28e797f7ca6231cffcf702d5ce6ad79d953bc2ad` (cleanup recovery)
   and commit `480f2f7091990da06924e33c280b47dcc7921fa8` (neutral guard
   audit) were dropped because their patch contents already existed upstream.
+- The exact full-OID `git range-diff --no-patch --abbrev=40` replay readback is
+  retained at
+  `specs/sprint-nova-epic/evidence/nova-a/delivery-loop/rebase-range-diff.txt`;
+  the compact rendering below is its human-readable index.
+  `=` is byte-equivalent patch identity, `!` is an expected context/upstream
+  adjustment, `<` is a dropped pre-rebase patch and `>` is its independently
+  replayed counterpart. The order is the Git replay order, not a reconstructed
+  chronology:
+
+```text
+ 1  5aae0b5 ! 120dbcb  fix(nova): deliver v0.4.6 recovery candidate
+ 2  8701961 ! 9b9779c  fix(nova): bind runtime fixture executable
+ 3  ddd0d6a = 2491ff4  test(nova): make host control fixture hermetic
+ 4  5d5b68d = 1c606de  docs(nova): record B4R candidate evidence
+ 5  ece3ae9 ! b8d6630  docs(nova): clarify epic close readiness
+ 6  63d3508 ! f7dc5f5  docs(nova): retain B4R gate receipts
+ 7  16cb9c1 = a9bd168  feat(nova): add Antigravity alpha runner boundary
+ 8  2fa66cc = 78e8d72  fix(codex): surface blocked goal resume requirement
+ 9  8d1ff80 = c89eaf4  fix(continuity): retain blocked goal readbacks
+10  340ccd9 = 6b0b280  docs(codex): distinguish goal resume from replacement
+11  f9018db = a4cb57b  docs(nova): bind Codex blocked goal acceptance
+12  5d04be7 ! e899101  fix(nova): retain long-lived native goals safely
+13  033575c ! a6e8001  fix(nova): close recritic authority gaps
+14  bb6c20c = 9860958  test(nova): use trusted supervisor state fixtures
+15  a4a456b = 135f42e  docs(nova): correct supervisor trust boundary record
+16  fe3fddf = 1d10746  docs(nova): rebind corrected result artifact
+17  6dfba1e = 07df8c1  docs(nova): amend supervisor trust boundary record
+18  ea78887 = 5d61b94  feat(nova): add macOS acceptance contract
+19  7f8f7c2 ! 748a3ab  fix(nova): canonicalize B5 evidence bindings
+20  9b62f75 = 2346e5f  docs(nova): record runner and macOS boundaries
+21  76da17e = 4f8a7eb  docs(nova): reconcile the 17-issue intake
+22  da2efb6 = 4554c51  docs(nova): correct the independent branch base
+23:-  8f765ee < -------  fix(backlog): repair managed onboarding ledger admission
+-:23  ------- > 1401e46  fix(backlog): repair managed onboarding ledger admission
+24  f9caeb5 = 3071217  docs(nova): freeze B5 candidate evidence
+25  dc30367 = a4814c4  feat(nova): validate B5 candidate freeze evidence
+26  f365a09 = 9f1960d  docs(nova): register B5 freeze verification
+27  d604c60 = 3896d5e  docs(nova): rebind B5 freeze evidence
+28  a1ae8e5 = 30ac95c  docs(nova): define dual-provider and B2 pilot boundaries
+29  2475c57 ! e3b0e9d  feat(nova): add dual-forge transport contracts
+30  cf051d5 = dcc7345  chore(nova): bind forge candidate artifacts
+31  812abfb = b4da2d5  docs(nova): authorize contract evidence bindings
+32  f846d2a = 9a86848  feat(nova): add bounded gitlab ci broker contract
+33  d70ffc3 = c8ffded  fix(nova): harden gitlab broker reconciliation
+34  f55783a = 52a0cb9  fix(nova): order gitlab broker observations
+35  2ea86fd = 350f507  fix(nova): validate persisted broker ordering
+36  3b51ecc = 8ea32ad  feat(nova): bind broker cancellation intents
+37  85bbcb2 = 165861f  fix(nova): admit broker candidates through git
+38  2f06b1c = 512f702  fix(nova): retain broker cancellation intent
+39  02075aa = 8ec138a  fix(nova): bind broker base and lineage
+40  2508ec0 = 73139ae  fix(nova): seal broker expiry and retries
+41  e221419 = 54194f9  fix(nova): close broker cancellation and schema gaps
+42  c18ffd3 = 59f3f05  fix(nova): seal broker cancellation lineage
+43  08257d6 = b0ab0cf  fix(nova): bind reconciliation timing
+44  5dd062e = fec7ea3  fix(nova): seal fixed broker admission
+45  6966845 = 09d8c4b  fix(nova): bind broker timing clock
+46  01ae0e9 = 9420622  fix(nova): seal broker retry and clock lineage
+47  b1b2df3 = 26cd4b4  fix(nova): preserve retry clock lineage
+48  c499509 = d395e10  fix(nova): reject stale broker records
+49  d54f707 = 66c9af6  fix(nova): require confirmation before branch apply
+50:-  28e797f < -------  fix(cleanup): recover retained Nova session binding
+51:50  08ba06d = 4580d69  feat(nova): add pre-rebase execution contracts
+52:51  cacb755 = 9f800b3  fix(nova): close execution contract review gaps
+53:52  59ef38b = 64ef60b  fix(nova): require complete execution state chains
+54:53  7f47613 ! b89dd8c  fix(governance): classify Nova threat model
+55:54  e31dc16 ! 94a4904  docs(nova): adopt v0.4.7 delivery-loop design
+56:-  480f2f7 < -------  fix(governance): retain neutral guard audit
+```
 - The automatic strategy selected the v0.4.7 `project/pipeline-state.json`
   preimage wholesale. That was correct for released code but not sufficient
   for the active branch authority: it reactivated the already closed Hotfix
@@ -73,6 +141,44 @@
   expired-plan retry behavior and multi-step Human friction observed during
   this adoption are explicit A6R/#98 regression inputs, not successful guard
   behavior.
+
+### PO-authorized local divergence exception — 2026-08-01
+
+- Exact decision preimage: local branch
+  `feat/sprint-nova-codex-v046` at
+  `6e4661fd91d616271b75e6a766ec76b70e5ac363`; configured upstream
+  `upstream/feat/sprint-nova-codex-v046` at
+  `28e797f7ca6231cffcf702d5ce6ad79d953bc2ad`; the authoritative disposable
+  remote observation reports `ahead=120`, `behind=50`, `status=diverged`.
+- Guard rationale: the released 0.4.7 repository-freshness policy normally
+  rejects local writes on a diverged remote-tracked branch. Here the
+  divergence is the intended, already approved consequence of rebasing Nova
+  onto the exact released baseline while retaining the old remote preimage
+  until the later Push PO gate.
+- Exhausted safer alternatives: an early push violates the named Push PO gate;
+  merging the old remote history destroys the approved clean rebase; changing
+  the configured upstream violates the PO's branch/upstream constraint.
+- Confirmed authority: after receiving the exact action, alternatives,
+  repository/external effects, evidence consequences, rollback and residual
+  risk, the PO explicitly confirmed: "Nova may continue and commit local work
+  despite the expected rebase divergence until the Push PO gate; no push before
+  that gate."
+- Exact scope/effects: local Nova implementation, tests, documentation and
+  commits only on this branch. The exception authorizes no push, fetch-merge,
+  upstream change, force operation, release, publication success or freshness
+  claim. The remote preimage must remain unchanged until a later separately
+  approved publication action.
+- Evidence impact: repository freshness remains `diverged`, never PASS. All
+  candidate-bound Verify, Security, Critic, release-preflight and publication
+  evidence must be generated from the final local candidate; remote delivery
+  remains unproved until a fresh post-publication readback.
+- Rollback/recovery: retain `nova-rebase-pre-0.4.7` and the repository backups;
+  local commits remain recoverable while the untouched remote stays the
+  external preimage. An ambiguous local operation is reconciled from Git
+  commit/tree/status before retry.
+- Residual risk: the final local history will require a separately reviewed
+  existing-ref replacement rather than a fast-forward. That operation is
+  deliberately outside this exception and stops at the Push PO gate.
 
 ## Rebase admission record
 

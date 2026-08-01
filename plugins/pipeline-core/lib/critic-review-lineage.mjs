@@ -16,6 +16,7 @@ import {
 } from "./review-economy.mjs";
 
 export const CRITIC_REVIEW_LINEAGE_SCHEMA = "pipeline.critic-review-lineage.v1";
+export const RELEASE_CRITIC_REVIEW_SCOPE_SCHEMA = "pipeline.release-critic-review-scope.v1";
 export const CRITIC_REVIEW_FAILURES = Object.freeze([
   "no-result",
   "empty",
@@ -478,6 +479,195 @@ function expectedInvalidation(parent, attempt, admission) {
     return { kind: "full-review-required", reason: "unknown-changed-path" };
   }
   return { kind: "full-review-required", reason: "delta-bindings-invalid" };
+}
+
+function releaseFindingCode(findings, changedPaths, directConsequencePaths, integrationEdges) {
+  if (!orderedRows(
+    findings,
+    (finding) => exact(finding, ["id", "path", "basis", "evidenceSha256"])
+      && identifier(finding.id)
+      && safePath(finding.path)
+      && ["changed-line", "direct-consequence"].includes(finding.basis)
+      && digest(finding.evidenceSha256),
+    (finding) => finding.id,
+    { allowEmpty: true },
+  )) return "CRL-RELEASE-FINDINGS-SHAPE";
+  for (const finding of findings) {
+    if (finding.basis === "changed-line" && !changedPaths.includes(finding.path)) {
+      return "CRL-RELEASE-FINDING-OUTSIDE-DELTA";
+    }
+    if (finding.basis === "direct-consequence"
+      && (!directConsequencePaths.includes(finding.path) || integrationEdges.length === 0)) {
+      return "CRL-RELEASE-FINDING-NOT-DIRECT-CONSEQUENCE";
+    }
+  }
+  return null;
+}
+
+const RELEASE_SCOPE_KEYS = [
+  "schema", "mode", "parentReviewId", "previousReviewedCandidate", "previousFindingIds",
+  "reviewedRange", "deltaSha256", "changedPaths", "impactClosure", "impactClosureSha256",
+  "findings", "invalidation", "nextLineageParent", "scopeSha256",
+];
+
+function releaseScopeCode(scope) {
+  if (!exact(scope, RELEASE_SCOPE_KEYS)
+    || scope.schema !== RELEASE_CRITIC_REVIEW_SCOPE_SCHEMA
+    || !["broad-first", "correction", "broad-correction"].includes(scope.mode)
+    || !(scope.parentReviewId === null || identifier(scope.parentReviewId))
+    || !(scope.previousReviewedCandidate === null || candidateCode(scope.previousReviewedCandidate) === null)
+    || !sortedUnique(scope.previousFindingIds, identifier, { allowEmpty: true })
+    || !exact(scope.reviewedRange, ["base", "head", "tree"])
+    || ![scope.reviewedRange.base, scope.reviewedRange.head, scope.reviewedRange.tree].every((value) => OID.test(value))
+    || !digest(scope.deltaSha256)
+    || !sortedUnique(scope.changedPaths, safePath)
+    || !exact(scope.impactClosure, ["changedPaths", "directConsequencePaths", "integrationEdges"])
+    || !sortedUnique(scope.impactClosure.changedPaths, safePath)
+    || !sortedUnique(scope.impactClosure.directConsequencePaths, safePath, { allowEmpty: true })
+    || !sortedUnique(scope.impactClosure.integrationEdges, identifier, { allowEmpty: true })
+    || !same(scope.changedPaths, scope.impactClosure.changedPaths)
+    || scope.impactClosureSha256 !== sha256Canonical(scope.impactClosure.integrationEdges)
+    || releaseFindingCode(scope.findings, scope.changedPaths,
+      scope.impactClosure.directConsequencePaths, scope.impactClosure.integrationEdges)
+    || invalidationCode(scope.invalidation)
+    || candidateCode(scope.nextLineageParent)
+    || !same(scope.nextLineageParent, {
+      commit: scope.reviewedRange.head,
+      tree: scope.reviewedRange.tree,
+    })
+    || !digest(scope.scopeSha256)
+    || scope.scopeSha256 !== sha256Canonical(Object.fromEntries(
+      Object.entries(scope).filter(([key]) => key !== "scopeSha256"),
+    ))) return "CRL-RELEASE-SCOPE-SHAPE";
+  const first = scope.mode === "broad-first";
+  if (first
+    ? !(scope.parentReviewId === null
+      && scope.previousReviewedCandidate === null
+      && scope.previousFindingIds.length === 0)
+    : scope.parentReviewId === null || scope.previousReviewedCandidate === null) {
+    return "CRL-RELEASE-SCOPE-PARENT";
+  }
+  if (first && scope.invalidation.kind !== "none") return "CRL-RELEASE-FIRST-BROAD";
+  if (scope.mode === "correction" && (scope.invalidation.kind !== "none"
+    || scope.reviewedRange.base !== scope.previousReviewedCandidate.commit)) {
+    return "CRL-RELEASE-CORRECTION-RANGE";
+  }
+  if (scope.mode === "broad-correction" && scope.invalidation.kind !== "full-review-required") {
+    return "CRL-RELEASE-BROAD-INVALIDATION";
+  }
+  return null;
+}
+
+/**
+ * Compile the release-only review scope that sits beside the generic lineage.
+ * The first review is broad. A normal correction is exactly the immutable
+ * reviewed candidate..corrected candidate range plus deterministic impact
+ * closure. Broader corrections require typed invalidation and establish the
+ * corrected candidate as the next immutable parent.
+ */
+export function compileReleaseCriticReviewScope(input) {
+  if (!exact(input, ["parent", "packet", "mode", "impactClosure", "findings", "invalidation"])
+    || packetCode(input.packet)
+    || !["broad-first", "correction", "broad-correction"].includes(input.mode)
+    || !exact(input.impactClosure, ["changedPaths", "directConsequencePaths", "integrationEdges"])
+    || !sortedUnique(input.impactClosure.changedPaths, safePath)
+    || !sortedUnique(input.impactClosure.directConsequencePaths, safePath, { allowEmpty: true })
+    || !sortedUnique(input.impactClosure.integrationEdges, identifier, { allowEmpty: true })
+    || !same(input.impactClosure.changedPaths, input.packet.diffPaths)
+    || invalidationCode(input.invalidation)) {
+    throw new TypeError("CRL-RELEASE-SCOPE-SHAPE");
+  }
+  const parent = input.parent;
+  if (input.mode === "broad-first") {
+    if (parent !== null || input.invalidation.kind !== "none") {
+      throw new TypeError("CRL-RELEASE-FIRST-BROAD");
+    }
+  } else {
+    if (parent === null || !validateCriticReviewLineage(parent).ok) {
+      throw new TypeError("CRL-RELEASE-PARENT");
+    }
+    if (input.mode === "correction") {
+      if (input.packet.candidate.base !== parent.candidate.commit
+        || input.invalidation.kind !== "none") {
+        throw new TypeError("CRL-RELEASE-CORRECTION-RANGE");
+      }
+    } else if (input.invalidation.kind !== "full-review-required"
+      || !INVALIDATION_REASONS.has(input.invalidation.reason)
+      || !digest(input.invalidation.evidenceSha256)) {
+      throw new TypeError("CRL-RELEASE-BROAD-INVALIDATION");
+    }
+  }
+  const findingInvalid = releaseFindingCode(
+    input.findings,
+    input.impactClosure.changedPaths,
+    input.impactClosure.directConsequencePaths,
+    input.impactClosure.integrationEdges,
+  );
+  if (findingInvalid) throw new TypeError(findingInvalid);
+  const core = {
+    schema: RELEASE_CRITIC_REVIEW_SCOPE_SCHEMA,
+    mode: input.mode,
+    parentReviewId: parent?.reviewId ?? null,
+    previousReviewedCandidate: parent?.candidate ?? null,
+    previousFindingIds: parent?.findings.map(({ id }) => id).sort() ?? [],
+    reviewedRange: {
+      base: input.mode === "correction" ? parent.candidate.commit : input.packet.candidate.base,
+      head: input.packet.candidate.commit,
+      tree: input.packet.candidate.tree,
+    },
+    deltaSha256: input.packet.diff.sha256,
+    changedPaths: [...input.packet.diffPaths],
+    impactClosure: structuredClone(input.impactClosure),
+    impactClosureSha256: sha256Canonical(input.impactClosure.integrationEdges),
+    findings: structuredClone(input.findings),
+    invalidation: structuredClone(input.invalidation),
+    nextLineageParent: {
+      commit: input.packet.candidate.commit,
+      tree: input.packet.candidate.tree,
+    },
+  };
+  const scope = {
+    ...core,
+    scopeSha256: sha256Canonical(core),
+  };
+  const invalid = releaseScopeCode(scope);
+  if (invalid) throw new TypeError(invalid);
+  return Object.freeze(scope);
+}
+
+/** Bind one compiled generic lineage record to its release-only scope. */
+export function validateReleaseCriticScopeAdmission(lineage, packet, scope) {
+  const lineageValid = validateCriticReviewLineage(lineage);
+  if (!lineageValid.ok) return lineageValid;
+  const scopeInvalid = releaseScopeCode(scope);
+  if (scopeInvalid) return { ok: false, code: scopeInvalid };
+  if (packetCode(packet)
+    || !same(lineage.candidate, { commit: packet.candidate.commit, tree: packet.candidate.tree })
+    || lineage.parentReviewId !== scope.parentReviewId
+    || lineage.diff.base !== scope.reviewedRange.base
+    || lineage.diff.sha256 !== scope.deltaSha256
+    || !same(lineage.diff.changedPaths, scope.changedPaths)
+    || !same(scope.nextLineageParent, lineage.candidate)
+    || !same(lineage.invalidation, scope.invalidation)) {
+    return { ok: false, code: "CRL-RELEASE-SCOPE-BINDING" };
+  }
+  const expectedMode = scope.mode === "correction" ? "delta" : "full";
+  if (lineage.request.mode !== expectedMode) return { ok: false, code: "CRL-RELEASE-MODE" };
+  if (lineage.correction !== null
+    && lineage.correction.impactSha256 !== scope.impactClosureSha256) {
+    return { ok: false, code: "CRL-RELEASE-IMPACT-CLOSURE" };
+  }
+  const parentIds = new Set(scope.previousFindingIds);
+  const scopedIds = new Set(scope.findings.map(({ id }) => id));
+  const introducedIds = lineage.findings
+    .filter(({ priorFindingId }) => priorFindingId === null)
+    .map(({ id }) => id)
+    .filter((id) => !parentIds.has(id));
+  if (introducedIds.some((id) => !scopedIds.has(id))
+    || [...scopedIds].some((id) => !introducedIds.includes(id))) {
+    return { ok: false, code: "CRL-RELEASE-FINDING-SCOPE" };
+  }
+  return { ok: true, code: null, scopeSha256: scope.scopeSha256 };
 }
 
 export function criticReviewLineageDigest(record) {

@@ -53,8 +53,8 @@ const SAFE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{2,79}$/;
 const SAFE_PURPOSE = /^[a-z0-9][a-z0-9-]{1,39}$/;
 const OID = /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/;
 const SHA256 = /^[0-9a-f]{64}$/;
-const TEMP_TYPES = new Set(["scratch-file", "scratch-directory", "disposable-worktree"]);
-const TEMP_CLASSES = new Set(["scratch", "disposable-control", "generated-output"]);
+const TEMP_TYPES = new Set(["scratch-file", "scratch-directory", "disposable-worktree", "verify-run-directory"]);
+const TEMP_CLASSES = new Set(["scratch", "disposable-control", "generated-output", "verify-recovery"]);
 const CLEANUP_POLICIES = new Set(["unlink-file", "remove-directory", "remove-worktree"]);
 const PROTECTED_CONTENT_CLASSES = new Set(["spec", "prd", "state", "implementation", "unknown"]);
 const FIXED_GIT_CONFIG = [
@@ -861,6 +861,36 @@ function processIdentityAlive(pid, startId) {
   return processStartIdentity(pid) === startId;
 }
 
+function validateVerifyRunLock(resource, { requireClosed = false } = {}) {
+  const run = lstatSync(resource.physicalPath);
+  const posixModeViolation = process.platform !== "win32" && ((run.mode & 0o077) !== 0
+    || (typeof process.getuid === "function" && run.uid !== process.getuid()));
+  const windowsInsecure = process.platform === "win32" && assessWindowsPrivatePath(resource.physicalPath).status !== "secure";
+  if (!run.isDirectory() || run.isSymbolicLink() || realpathSync(resource.physicalPath) !== resolve(resource.physicalPath)
+    || posixModeViolation || windowsInsecure) fail("WT-VERIFY-RUN-PRIVATE", "Verify run directory is not physical and owner-private");
+  const lockPath = join(resource.physicalPath, "run.lock");
+  if (!existsSync(lockPath)) fail("WT-VERIFY-RUN-LOCK", "Verify run lock is absent");
+  assertPrivateRegularFile(lockPath, "WT-VERIFY-RUN-LOCK", "Verify run lock");
+  let lock;
+  try { lock = JSON.parse(readFileSync(lockPath, "utf8")); } catch { fail("WT-VERIFY-RUN-LOCK", "Verify run lock is malformed"); }
+  const keys = ["schema", "runId", "pid", "processStartId", "owner", "status", "closedAt"];
+  if (!lock || typeof lock !== "object" || Array.isArray(lock)
+    || JSON.stringify(Object.keys(lock).sort()) !== JSON.stringify([...keys].sort())
+    || lock.schema !== "pipeline.verify-run-lock.v1" || lock.runId !== basename(resource.physicalPath)
+    || !Number.isSafeInteger(lock.pid) || lock.pid < 1 || typeof lock.processStartId !== "string"
+    || !/^(?:\d+|pid-\d+)$/u.test(lock.processStartId) || lock.owner !== "current-os-user"
+    || !new Set(["active", "closed"]).has(lock.status)
+    || (lock.status === "active" ? lock.closedAt !== null
+      : typeof lock.closedAt !== "string" || Number.isNaN(Date.parse(lock.closedAt)))) {
+    fail("WT-VERIFY-RUN-LOCK", "Verify run lock binding is invalid");
+  }
+  if (lock.status === "active" && processIdentityAlive(lock.pid, lock.processStartId)) {
+    fail("WT-VERIFY-RUN-ACTIVE", "Verify run still has a live exact writer");
+  }
+  if (requireClosed && lock.status !== "closed") fail("WT-VERIFY-RUN-INCOMPLETE", "Verify run is not terminally closed");
+  return lock;
+}
+
 function acquireManifestLock(repo, sessionId, nonce) {
   const manifestPath = cleanupManifestPath(repo, sessionId);
   const lockPath = `${manifestPath}.lock`;
@@ -955,10 +985,39 @@ function writeManifest(path, manifest, now) {
   return next;
 }
 
+function ensureVerifyRunsRoot(repo) {
+  const root = resolve(localRoot(repo.commonDir), "verify", "runs");
+  let cursor = repo.commonDir;
+  for (const segment of relative(repo.commonDir, root).split(sep).filter(Boolean)) {
+    cursor = join(cursor, segment);
+    if (!existsSync(cursor)) mkdirSync(cursor, { mode: 0o700 });
+    const info = lstatSync(cursor);
+    if (!info.isDirectory() || info.isSymbolicLink() || realpathSync(cursor) !== resolve(cursor)) {
+      fail("WT-VERIFY-ROOT", "Verify run root contains a non-physical directory");
+    }
+    if (process.platform === "win32") {
+      if (assessWindowsPrivatePath(cursor).status !== "secure") {
+        const hardened = hardenWindowsPrivateDirectory(cursor);
+        if (hardened.status !== "secure") fail("WT-VERIFY-ROOT", "Verify run root is not owner-private");
+      }
+    } else if ((info.mode & 0o077) !== 0 || (typeof process.getuid === "function" && info.uid !== process.getuid())) {
+      fail("WT-VERIFY-ROOT", "Verify run root is not owner-private");
+    }
+  }
+  return root;
+}
+
 function allowedRootFor(repo, type, path) {
   const physicalTmp = realpathSync(tmpdir());
   const detached = resolve(repo.primaryRoot, "branch", "detached");
   const absolute = resolve(path);
+  if (type === "verify-run-directory") {
+    const verifyRuns = ensureVerifyRunsRoot(repo);
+    if (!isInside(verifyRuns, absolute) || absolute === verifyRuns) {
+      fail("WT-VERIFY-ROOT", "Verify run is outside the private Git-common-dir run root");
+    }
+    return verifyRuns;
+  }
   if (type === "disposable-worktree") {
     if (!isInside(detached, absolute) || absolute === detached) fail("WT-TEMP-ROOT", "disposable worktree is outside branch/detached");
     return detached;
@@ -975,7 +1034,7 @@ function assertTemporaryClassification(resource) {
   if (resource.soleCopy !== false) fail("WT-TEMP-SOLE-COPY", "temporary resources must explicitly declare soleCopy:false");
   if (!CLEANUP_POLICIES.has(resource.cleanupPolicy)) fail("WT-TEMP-POLICY", "cleanup policy is unsupported");
   const expectedPolicy = resource.type === "scratch-file" ? "unlink-file"
-    : resource.type === "scratch-directory" ? "remove-directory" : "remove-worktree";
+    : new Set(["scratch-directory", "verify-run-directory"]).has(resource.type) ? "remove-directory" : "remove-worktree";
   if (resource.cleanupPolicy !== expectedPolicy) fail("WT-TEMP-POLICY", "cleanup policy does not match resource type");
 }
 
@@ -1216,6 +1275,7 @@ function validateResourcePhysical(repo, resource, { requireCleanWorktree = true,
   if (resource.type === "scratch-file" && resourceFingerprint(resource) !== resource.sealedTreeSha256) {
     fail("WT-RESOURCE-DRIFT", "registered scratch file changed after sealing");
   }
+  if (resource.type === "verify-run-directory") validateVerifyRunLock(resource, { requireClosed: true });
   if (resource.type === "disposable-worktree") {
     const common = realpathSync(gitText(resource.physicalPath, ["rev-parse", "--path-format=absolute", "--git-common-dir"]));
     if (common !== repo.commonDir) fail("WT-COMMON-DIR-MISMATCH", "registered worktree changed repositories");
@@ -1300,6 +1360,7 @@ export function cleanupSession(startPath, fields, options = {}) {
         if (physical !== resource.physicalPath || !isInside(realpathSync(resource.allowedRoot), physical)) {
           fail("WT-RESOURCE-ALIAS", "creating resource path no longer resolves exactly inside its allowed root");
         }
+        if (resource.type === "verify-run-directory") validateVerifyRunLock(resource);
       } catch (error) {
         preflight.push({ resourceId: resource.resourceId, code: classifyCleanupFailure(error) });
       }

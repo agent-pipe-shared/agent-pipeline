@@ -150,10 +150,15 @@ check("multiple Bash guard denials are aggregated into one Codex decision", () =
   assert.match(output.permissionDecisionReason, /guard-push/);
 });
 
-check("closed shell grammar denial teaches the stable retry shape and remains non-overridable", () => {
+check("closed shell grammar denial teaches the stable retry shape and exposes an exact PO plan", () => {
   const root = fixture();
   const git = (...args) => spawnSync("git", args, { cwd: root, encoding: "utf8", shell: false });
   git("init", "-q", "-b", "main");
+  git("config", "user.name", "Fixture");
+  git("config", "user.email", "fixture@example.invalid");
+  writeFileSync(join(root, "README.md"), "fixture\n");
+  git("add", "README.md");
+  git("commit", "-q", "-m", "fixture");
   writeFileSync(join(root, "pipeline.user.yaml"), "schema: pipeline.user.v3\n");
   const startedAt = Date.now();
   const output = decision(run({
@@ -169,8 +174,8 @@ check("closed shell grammar denial teaches the stable retry shape and remains no
   assert.match(output.permissionDecisionReason, /exact bounded rg-to-head diagnostic pipeline/u);
   assert.match(output.permissionDecisionReason, /"schema":"pipeline.guard-retry-actions.v1"/u);
   assert.match(output.permissionDecisionReason, /"retryActions":\[\]/u);
-  assert.match(output.permissionDecisionReason, /Human override unavailable: HGO-NONOVERRIDABLE-GRAMMAR/u);
-  assert.doesNotMatch(output.permissionDecisionReason, /Human override available for this exact action/u);
+  assert.match(output.permissionDecisionReason, /Human override available for this exact action/u);
+  assert.doesNotMatch(output.permissionDecisionReason, /HGO-NONOVERRIDABLE/u);
 });
 
 check("attended Human override admits only the exact next tool call and is then consumed", () => {

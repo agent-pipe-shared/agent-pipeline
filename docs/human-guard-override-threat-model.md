@@ -1,6 +1,6 @@
 # Attended Human guard override threat model
 
-Status: normative security input for the 0.4.7 hotfix candidate.
+Status: normative security input for the 0.4.7 baseline and accepted Nova R2H successor.
 
 ## Purpose and security boundary
 
@@ -34,9 +34,13 @@ against full owner compromise.
 
 Three boundaries remain separate and non-substitutable:
 
-- An attended guard override admits at most one otherwise eligible local tool
-  input. It is not State authority, Result-migration authority, publication
-  authority, or Security-ignore authority.
+- An attended guard override admits at most one exact project-policy tool
+  input after the PO reviews its effects, evidence invalidation, recovery and
+  residual risk. This is final PO authority for that one decision, including a
+  writer-owned in-root project-policy path when no returned narrower action
+  resolves the denial. It is not ambient State authority, Result-migration
+  authority, publication authority, Security-ignore authority, or host/OS
+  capability.
 - The PO-authorized Phoenix `Result.md`/`result.md` collision migration is a
   separate, digest-bound State-writer transaction. The PO explicitly selects
   the canonical Result in the read-only plan and confirms its exact apply
@@ -81,8 +85,8 @@ Three boundaries remain separate and non-substitutable:
 | Audit deletion, replacement, reordering, or editing | Strict sequence plus previous-MAC linkage, HMAC verification, and a separately authenticated ledger-head anchor; deleting either or both ledger/head files while retaining the key fails closed. An armed capability is unusable unless its exact authorization event is present. Missing material is never silently regenerated. |
 | Symlink, hardlink, weak POSIX mode, or weak native-Windows DACL | Every existing target ancestor is physically inspected; symlink traversal, single-link, mode, and DACL assurance failures fail closed. |
 | Secret disclosure through audit | Audit events contain digests and bounded identifiers, never raw tool input, Human reason, owner nonce, repository-private path, or secret. |
-| Override reaches a protected operation | State/runtime/private paths, outside-root paths, secret patterns, descriptor deletion, plugin installation, every Git invocation including aliases, push/tag/merge/release, operators, redirects, substitutions, and unparseable commands are non-overridable. Bash recovery is additionally closed to a small read-only diagnostic executable allowlist plus exact single-file `node --check`; interpreter evaluation and arbitrary scripts are never override-eligible. |
-| Adapter persistence or verification fails | The original guard denial remains controlling and the adapter emits only a sanitized failure code. |
+| Override reaches a protected operation | Nova R2H distinguishes project policy from external capability. Exact in-root project actions, including Git commit and closed operator input, may receive one digest/preimage/reason-bound PO capability. Writer-owned policy files keep their sanctioned writer as the preferred narrower route, but an informed PO can authorize the exact in-root emergency action when the denying guard returned no usable narrower action. `.git`, `.codex`, private authority/secret material, outside-root targets, wildcard targets, raw publication/push (including aliases), and Security exceptions never inherit that capability; they return an exact narrower publication/recovery action or external-operator action. |
+| Adapter persistence or verification fails | The original guard denial remains controlling and the adapter returns an exact audit-verification/replan action, or an exact external-operator action when the repository/host boundary cannot be attested. It never reports override admission or recovery routing as effect success. |
 | A case-fold collision silently chooses, overwrites, or deletes a Result | The Phoenix exception is eligible only for one quiescent, physically safe feature package with both distinct regular single-link candidates and an absent fixed archive target. The PO-selected canonical target is bound by path, digest, and identity; the unselected source may only be locally renamed to `archive/<inactive basename>`. No content rewrite, other checkout, Git ref, remote, outcome, decision, or close transition is permitted. |
 | A migration changes State but leaves lifecycle/authority bindings incoherent | The plan binds State, continuity revision, PRD/Spec, both candidates, lifecycle manifest, archive absence, and complete State/lifecycle postimages. Apply holds the normal continuity lock, changes lifecycle retention/authority and State/Continuity together, advances the revision once, and reads back the complete converged postimage. |
 | A crash, forged journal, or replay turns a partial Phoenix migration into success | The private Git-common-dir journal is owner-private, physical-path checked, HMAC authenticated, and bound to the exact plan/pre/postimage. Recovery accepts only the same plan and the expected preimage-or-postimage at every step; conflicting, missing, malformed, or tampered journal/State/lifecycle/archive bytes fail closed. |
@@ -150,12 +154,16 @@ beyond attended local recovery, and no later than the 0.4.8 design gate.
   full owner compromise.
 - The guard-to-tool boundary cannot hold a filesystem lock across execution.
   A concurrent actor could change an otherwise eligible target after
-  consumption. The exact input remains fixed, replay is impossible, and
-  high-impact paths/actions remain non-overridable, but callers must still
-  avoid concurrent repository mutation during an attended recovery.
+  consumption. The exact input remains fixed and replay is impossible;
+  external/publication/Security/private-state boundaries remain separate,
+  while an exact in-root project-policy action depends on the PO's reviewed
+  effects and recovery. Callers must still avoid concurrent repository
+  mutation during an attended recovery.
 - Opaque in-repository scripts can have behavior not derivable from their
   argv. Human review remains mandatory; the override is not a sandbox.
 
 These residual risks are accepted only for attended local recovery. They do
-not weaken push, release, deployment, credential, State, or private-descriptor
-controls.
+not weaken push, release, deployment, credential, host/OS, Security,
+`.git`/`.codex`, or private-descriptor controls. A writer-owned project-policy
+file can be admitted only as the exact R2H emergency action and does not grant
+general State-writer authority.

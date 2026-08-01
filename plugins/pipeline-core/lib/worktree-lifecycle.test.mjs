@@ -108,6 +108,23 @@ function nodeCli(script, args, env = {}) {
   return result;
 }
 
+function currentProcessStartId() {
+  if (process.platform !== "linux") return `pid-${process.pid}`;
+  return readFileSync(`/proc/${process.pid}/stat`, "utf8").trim().split(" ")[21];
+}
+
+function verifyLock(runId, { status = "closed", pid = process.pid, processStartId = currentProcessStartId() } = {}) {
+  return {
+    schema: "pipeline.verify-run-lock.v1",
+    runId,
+    pid,
+    processStartId,
+    owner: "current-os-user",
+    status,
+    closedAt: status === "closed" ? "2026-08-01T00:00:00.000Z" : null,
+  };
+}
+
 check("D0-01 branch mapping is canonical and traversal is rejected", () => {
   const { primary } = repoFixture();
   assert.equal(canonicalBranchTarget(primary, "feat/x").target, join(resolve(primary), "branch", "feat", "x"));
@@ -355,6 +372,122 @@ check("D0-10 stale same-session writer lock recovers while a foreign lock blocks
   writeFileSync(foreignLock, `${JSON.stringify({ ...stale, sessionId: second.sessionId, ownerNonceSha256: "f".repeat(64) }, null, 2)}\n`, { flag: "wx", mode: 0o600 });
   assertLifecycleError(() => cleanupSession(primary, second), "WT-MANIFEST-LOCK");
   assert.equal(existsSync(secondPath), true);
+});
+
+check("D0 Verify cleanup registration accepts only the private Git-common run root", () => {
+  const { primary } = repoFixture();
+  const session = startSessionDescriptor(primary, {
+    sessionId: "session-verify-root",
+    ownerNonce: "owner-nonce-verify-root-000001",
+  });
+  const outside = join(tmpdir(), "verify-outside-run");
+  assertLifecycleError(() => registerTemporaryIntent(primary, {
+    sessionId: session.sessionId,
+    ownerNonce: session.ownerNonce,
+    resourceId: "verify-outside",
+    type: "verify-run-directory",
+    path: outside,
+    contentClass: "verify-recovery",
+    soleCopy: false,
+    cleanupPolicy: "remove-directory",
+  }), "WT-VERIFY-ROOT");
+});
+
+check("D0 Verify cleanup removes one exact closed run and preserves an unregistered sibling", () => {
+  const { primary } = repoFixture();
+  const session = startSessionDescriptor(primary, {
+    sessionId: "session-verify-closed",
+    ownerNonce: "owner-nonce-verify-closed-0001",
+  });
+  const repo = discoverRepository(primary);
+  const runs = join(repo.commonDir, "agent-pipeline", "verify", "runs");
+  const runId = "verify-closed-run";
+  const runPath = join(runs, runId);
+  registerTemporaryIntent(primary, {
+    sessionId: session.sessionId,
+    ownerNonce: session.ownerNonce,
+    resourceId: "verify-closed-resource",
+    type: "verify-run-directory",
+    path: runPath,
+    contentClass: "verify-recovery",
+    soleCopy: false,
+    cleanupPolicy: "remove-directory",
+  });
+  mkdirSync(runPath, { mode: 0o700 });
+  writeFileSync(join(runPath, "run.lock"), `${JSON.stringify(verifyLock(runId))}\n`, { mode: 0o600 });
+  writeFileSync(join(runPath, "terminal.json"), "{}\n", { mode: 0o600 });
+  finalizeTemporaryResource(primary, {
+    sessionId: session.sessionId,
+    ownerNonce: session.ownerNonce,
+    resourceId: "verify-closed-resource",
+    canaryRelative: "terminal.json",
+  });
+  const decoy = join(runs, "verify-unregistered-sibling");
+  mkdirSync(decoy, { mode: 0o700 });
+  const cleaned = cleanupSession(primary, session);
+  assert.equal(cleaned.ok, true);
+  assert.equal(existsSync(runPath), false);
+  assert.equal(existsSync(decoy), true);
+});
+
+check("D0 Verify cleanup blocks a live writer but retires its exact stale creating run", () => {
+  const { primary } = repoFixture();
+  const session = startSessionDescriptor(primary, {
+    sessionId: "session-verify-active",
+    ownerNonce: "owner-nonce-verify-active-0001",
+  });
+  const repo = discoverRepository(primary);
+  const runId = "verify-active-run";
+  const runPath = join(repo.commonDir, "agent-pipeline", "verify", "runs", runId);
+  registerTemporaryIntent(primary, {
+    sessionId: session.sessionId,
+    ownerNonce: session.ownerNonce,
+    resourceId: "verify-active-resource",
+    type: "verify-run-directory",
+    path: runPath,
+    contentClass: "verify-recovery",
+    soleCopy: false,
+    cleanupPolicy: "remove-directory",
+  });
+  mkdirSync(runPath, { mode: 0o700 });
+  const lockPath = join(runPath, "run.lock");
+  writeFileSync(lockPath, `${JSON.stringify(verifyLock(runId, { status: "active" }))}\n`, { mode: 0o600 });
+  const live = cleanupSession(primary, session);
+  assert.equal(live.ok, false);
+  assert.equal(live.receipt.outcomes[0].code, "WT-VERIFY-RUN-ACTIVE");
+  writeFileSync(lockPath, `${JSON.stringify(verifyLock(runId, { status: "active", pid: 2_147_483_647, processStartId: "2147483647" }))}\n`, { mode: 0o600 });
+  const stale = cleanupSession(primary, session);
+  assert.equal(stale.ok, true);
+  assert.equal(existsSync(runPath), false);
+});
+
+check("D0 Verify cleanup fails closed for missing or malformed run ownership locks", () => {
+  const { primary } = repoFixture();
+  const session = startSessionDescriptor(primary, {
+    sessionId: "session-verify-invalid",
+    ownerNonce: "owner-nonce-verify-invalid-0001",
+  });
+  const repo = discoverRepository(primary);
+  const runPath = join(repo.commonDir, "agent-pipeline", "verify", "runs", "verify-invalid-run");
+  registerTemporaryIntent(primary, {
+    sessionId: session.sessionId,
+    ownerNonce: session.ownerNonce,
+    resourceId: "verify-invalid-resource",
+    type: "verify-run-directory",
+    path: runPath,
+    contentClass: "verify-recovery",
+    soleCopy: false,
+    cleanupPolicy: "remove-directory",
+  });
+  mkdirSync(runPath, { mode: 0o700 });
+  const missing = cleanupSession(primary, session);
+  assert.equal(missing.ok, false);
+  assert.equal(missing.receipt.outcomes[0].code, "WT-VERIFY-RUN-LOCK");
+  writeFileSync(join(runPath, "run.lock"), "{}\n", { mode: 0o600 });
+  const malformed = cleanupSession(primary, session);
+  assert.equal(malformed.ok, false);
+  assert.equal(malformed.receipt.outcomes[0].code, "WT-VERIFY-RUN-LOCK");
+  assert.equal(existsSync(runPath), true);
 });
 
 check("D0-07 hygiene reports only redacted classifications and rejects noncanonical registration", () => {

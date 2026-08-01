@@ -184,6 +184,10 @@ function scopedRegistrationFailureFixture() {
     copyFileSync(join(repoRoot, "harness", "scripts", "verify.mjs"), writer);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "scoped-verify-registration.mjs"), registration);
     copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-assurance-verify-registration.mjs"), windowsRegistration);
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "verify-resume.mjs"));
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "lib", "windows-private-state.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "lib", "windows-private-state.mjs"));
+    mkdirSync(join(fixtureRoot, "plugins", "pipeline-core", "scripts"), { recursive: true });
+    copyFileSync(join(repoRoot, "plugins", "pipeline-core", "scripts", "verify-journal.mjs"), join(fixtureRoot, "plugins", "pipeline-core", "scripts", "verify-journal.mjs"));
     copyFileSync(join(repoRoot, PRD_PATH), prd);
     copyFileSync(join(repoRoot, WINDOWS_ASSURANCE_MATRIX_PATH), windowsAssuranceMatrix);
     for (const suite of WINDOWS_ASSURANCE_SUITES) {

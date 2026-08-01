@@ -21,6 +21,7 @@ import {
 import {
   evaluateLifecycleReadyGuard,
   isForbiddenCrossRepositoryMutation,
+  isNarrowRepositoryRecoveryCommand,
   isProjectWritePath,
   isReadOnlyDiagnosticCommand,
   isSanctionedLifecycleCommand,
@@ -709,6 +710,7 @@ test("non-ready cleanup recovery and privatization admit only exact closed argv"
     writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
     const digest = "a".repeat(64);
     const commands = [
+      `node '${SESSION_CLEANUP_SCRIPT}' start --repo '${path}'`,
       `node '${SESSION_CLEANUP_SCRIPT}' status --repo '${path}'`,
       `node '${SESSION_CLEANUP_SCRIPT}' plan-recovery --repo '${path}'`,
       `node '${SESSION_CLEANUP_SCRIPT}' plan-privatization --repo '${path}'`,
@@ -739,12 +741,46 @@ test("non-ready cleanup recovery and privatization admit only exact closed argv"
       `node '/tmp/other/scripts/session-cleanup.mjs' plan-privatization --repo '${path}'`,
       `node '${SESSION_CLEANUP_SCRIPT}' plan-privatization --repo '${path}' && touch bypass`,
       `node '${SESSION_CLEANUP_SCRIPT}' cleanup --repo '${path}' --session-descriptor ../foreign --expected-descriptor-sha256 ${digest}`,
-      `node '${SESSION_CLEANUP_SCRIPT}' start --repo '${path}'`,
+      `node '${SESSION_CLEANUP_SCRIPT}' start --repo /tmp/other`,
+      `node '${SESSION_CLEANUP_SCRIPT}' start --repo '${path}' --force`,
     ]) {
       assert.equal(isSanctionedLifecycleCommand(command, path), false, command);
       assert.equal(evaluateLifecycleReadyGuard(bash(command), {
         projectDir: path,
         requireProjectOnboardingReadyFn() { deny("continuity-damaged"); },
+      }).exitCode, 2, command);
+    }
+  } finally { rmSync(path, { recursive: true, force: true }); }
+});
+
+test("partial lifecycle admits only exact rebase abort plus ordinary readback", () => {
+  const path = root();
+  try {
+    writeFileSync(join(path, "pipeline.user.yaml"), "marker\n");
+    for (const command of ["git rebase --abort", `git -C '${path}' rebase --abort`]) {
+      assert.equal(isNarrowRepositoryRecoveryCommand(command, path), true, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("partial"); },
+      }).exitCode, 0, command);
+    }
+    for (const command of ["git status --short", "git diff --stat"]) {
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("partial"); },
+      }).exitCode, 0, command);
+    }
+    for (const command of [
+      "git rebase --continue",
+      "git rebase --skip",
+      "git rebase --abort --quiet",
+      "git -C .. rebase --abort",
+      "git rebase --abort && touch bypass",
+    ]) {
+      assert.equal(isNarrowRepositoryRecoveryCommand(command, path), false, command);
+      assert.equal(evaluateLifecycleReadyGuard(bash(command), {
+        projectDir: path,
+        requireProjectOnboardingReadyFn() { deny("partial"); },
       }).exitCode, 2, command);
     }
   } finally { rmSync(path, { recursive: true, force: true }); }

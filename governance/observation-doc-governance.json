@@ -109,7 +109,9 @@
           "docs/contributor-gate-security.md",
           "docs/critic-isolation-threat-model.md",
           "docs/github-actions-token-permissions.md",
+          "docs/gitlab-ci-pilot-threat-model.md",
           "docs/human-guard-override-threat-model.md",
+          "docs/local-supervisor-state-threat-model.md",
           "docs/marketplace-supply-chain-threat-model.md",
           "docs/next-session-setup-prompt.md",
           "docs/po-approval-proof-contract.md",
@@ -179,7 +181,11 @@
           "docs/adr/0044-control-execution-boundary.md",
           "docs/adr/0045-canonical-artifact-topology.md",
           "docs/adr/0046-project-authority-layering.md",
+          "docs/adr/0047-local-supervisor-state-authority.md",
           "docs/adr/0047-model-free-advisor-preflight-v2.md",
+          "docs/adr/0048-local-goldfish-supervisor.md",
+          "docs/adr/0049-gitlab-ci-constrained-remote-executor-pilot.md",
+          "docs/adr/0050-candidate-bound-verify-run-journal.md",
           "docs/adr/README.md"
         ]
       },
@@ -211,6 +217,7 @@
         "lifecycle": "maintained",
         "paths": [
           "docs/product-capability-inventory.json",
+          "docs/release-state.json",
           "docs/spec-archive/2026-07-20-sentinel-recovery/manifest.json"
         ]
       }

@@ -516,7 +516,7 @@ function sanctionedMigrationArgs(args, root) {
 }
 
 function sanctionedSessionCleanupArgs(args, root) {
-  if (["status", "release-binding", "plan-recovery", "plan-privatization"].includes(args[0])) {
+  if (["start", "status", "release-binding", "plan-recovery", "plan-privatization"].includes(args[0])) {
     return args[1] === "--repo" && args[2] === root && args.length === 3;
   }
   if (["apply-recovery", "apply-privatization"].includes(args[0])) {
@@ -531,6 +531,27 @@ function sanctionedSessionCleanupArgs(args, root) {
     && args[5] === "--expected-descriptor-sha256"
     && HEX.test(args[6] ?? "")
     && args.length === 7;
+}
+
+/**
+ * A partially initialized lifecycle must not strand Git's own reversible
+ * operation state. This admits only the exact local abort; ordinary status,
+ * diff and rev-parse readback already use the read-only diagnostic path.
+ */
+export function isNarrowRepositoryRecoveryCommand(command, root) {
+  const words = simpleWords(command, root);
+  if (!words) return false;
+  let index = 0;
+  if (basename(words[index]).toLowerCase() !== "git") return false;
+  index += 1;
+  if (words[index] === "-C") {
+    const target = words[index + 1];
+    if (typeof target !== "string" || resolve(root, target) !== root) return false;
+    index += 2;
+  }
+  return words[index] === "rebase"
+    && words[index + 1] === "--abort"
+    && index + 2 === words.length;
 }
 
 function sanctionedPoAuthorityRebindArgs(args) {
@@ -704,6 +725,9 @@ export function evaluateLifecycleReadyGuard(input, dependencies = {}) {
     return crossRepositoryMutationBlocked();
   }
   if (toolName === "Bash" && isReadOnlyDiagnosticCommand(input.tool_input.command, root)) {
+    return verdict(0);
+  }
+  if (toolName === "Bash" && isNarrowRepositoryRecoveryCommand(input.tool_input.command, root)) {
     return verdict(0);
   }
   if (toolName === "Bash") {

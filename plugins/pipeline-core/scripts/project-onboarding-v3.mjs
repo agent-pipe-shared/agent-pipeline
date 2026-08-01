@@ -7,13 +7,11 @@ import {
   applyProjectOnboardingKickoffV4,
   applyProjectOnboardingKickoffPromotionV4,
   applyProjectOnboardingLifecycleV4,
-  applyProjectOnboardingManifestRepair,
   inspectProjectOnboardingV3,
-  planProjectOnboardingManifestRepair,
-  planProjectOnboardingSourceRecovery,
   planProjectOnboardingKickoffV4,
   planProjectOnboardingKickoffPromotionV4,
   planProjectOnboardingLifecycleV4,
+  planProjectOnboardingManifestRepairV4,
   planProjectOnboardingSourceRecoveryV4,
 } from "../lib/project-onboarding-v3.mjs";
 
@@ -80,9 +78,6 @@ export function main(args = process.argv.slice(2), {
   let output;
   try {
     if (options.command === "inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: options.intent });
-    else if (options.command === "plan-source-recovery") output = planProjectOnboardingSourceRecovery({ rootDir: options.root, deps });
-    else if (options.command === "plan-manifest-repair") output = planProjectOnboardingManifestRepair({ rootDir: options.root, deps });
-    else if (options.command === "apply-manifest-repair") output = applyProjectOnboardingManifestRepair({ rootDir: options.root, planSha256: options.planSha256, activate: options.activate, deps });
     else if (options.command === "continuity-inspect") output = inspectProjectOnboardingV3({ rootDir: options.root, deps, intent: "onboarding" });
     else if (options.command === "plan") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "portable" });
     else if (options.command === "plan-runtime") output = planProjectOnboardingLifecycleV4({ rootDir: options.root, deps, operation: "runtime" });

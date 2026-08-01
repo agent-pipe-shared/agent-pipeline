@@ -18,6 +18,11 @@ import {
   preparePublication, publicationDigest, rearmPublication, startReadback,
   validatePublication,
 } from "./publication-bundle.mjs";
+import {
+  PUBLICATION_SCHEMA_V2, approvePublicationV2, authorizePublicationV2,
+  closePublicationV2, observePublicationV2, preparePublicationV2,
+  startReadbackV2, validatePublicationV2,
+} from "./publication-bundle-v2.mjs";
 
 export const PUBLICATION_AUTHORITY_SCHEMA = "pipeline.publication-authority.v1";
 export const PUBLICATION_AUTHORITY_REFERENCE_SCHEMA = "pipeline.publication-authority-reference.v1";
@@ -83,7 +88,7 @@ export function validatePublicationAuthority(record) {
   assertKeys(record, RECORD_KEYS, "publication authority");
   if (record.schema !== PUBLICATION_AUTHORITY_SCHEMA || !["active", "executing", "consumed", "blocked"].includes(record.status)) throw new Error("publication authority invalid");
   assertTransaction(record.transactionId);
-  validatePublication(record.publication);
+  validatePublicationAny(record.publication);
   if (record.channel !== record.publication.channel || record.transactionId !== record.publication.transactionId) throw new Error("publication authority binding invalid");
   if (record.status === "active") {
     if (record.execution !== null || record.block !== null) throw new Error("active authority contamination");
@@ -103,6 +108,12 @@ export function validatePublicationAuthority(record) {
     }
   }
   return true;
+}
+
+function validatePublicationAny(publication) {
+  return publication?.schema === PUBLICATION_SCHEMA_V2
+    ? validatePublicationV2(publication)
+    : validatePublication(publication);
 }
 
 export function publicationAuthorityReference(record, rawSha256) {
@@ -198,11 +209,59 @@ export function preparePublicationAuthority({ gitCommonDir, input, expectedRawSh
   });
 }
 
+export function preparePublicationAuthorityV2({ gitCommonDir, input, expectedRawSha256 = null, heldLocks = [] }) {
+  const publication = preparePublicationV2(input);
+  const paths = publicationAuthorityPaths(gitCommonDir, publication.transactionId);
+  return withLock(paths, heldLocks, () => {
+    if (existsSync(paths.state)) {
+      const current = readStored(paths);
+      if (expectedRawSha256 !== current.rawDigest) throw new Error("stale publication authority raw CAS");
+      if (canonical(current.record.publication) === canonical(publication) && current.record.status === "active") return result(paths, current.record, current.rawDigest, false);
+      throw new Error("publication authority transaction replay");
+    }
+    if (expectedRawSha256 !== null) throw new Error("publication authority missing for CAS");
+    const record = { schema: PUBLICATION_AUTHORITY_SCHEMA, transactionId: publication.transactionId, channel: publication.channel, publication, status: "active", execution: null, block: null };
+    validatePublicationAuthority(record);
+    return result(paths, record, durableReplace(paths, record), true);
+  });
+}
+
 export function approvePublicationAuthority(input) {
   return transition(input, (state) => approvePublication(state, pick(input, ["expectedRevision", "expectedStateSha256", "approvalId", "attribution", "approvedAt", "expiresAt"])));
 }
 export function authorizePublicationAuthority(input) {
   return transition(input, (state) => authorizePublication(state, pick(input, ["expectedRevision", "expectedStateSha256", "now", "command"])));
+}
+export function approvePublicationAuthorityV2(input) {
+  return transition(input, (state) => approvePublicationV2(state, pick(input, ["expectedRevision", "expectedStateSha256", "approvalId", "attribution", "approvedAt", "expiresAt"])));
+}
+export function authorizePublicationAuthorityV2(input) {
+  return transition(input, (state) => authorizePublicationV2(state, pick(input, ["expectedRevision", "expectedStateSha256", "now", "command"])));
+}
+
+/** Approve and authorize v2 under one writer lock and one durable replacement. */
+export function activatePublicationAuthorityV2({
+  gitCommonDir, transactionId, channel, expectedRawSha256, expectedRevision,
+  expectedStateSha256, approvalId, attribution, approvedAt, expiresAt, now,
+  command, heldLocks = [], faultInjector = () => {},
+}) {
+  const paths = publicationAuthorityPaths(gitCommonDir, transactionId);
+  return withLock(paths, heldLocks, () => {
+    const current = requireCurrent(paths, expectedRawSha256, channel);
+    const approved = approvePublicationV2(current.record.publication, {
+      expectedRevision, expectedStateSha256, approvalId, attribution, approvedAt, expiresAt,
+    });
+    const publication = authorizePublicationV2(approved, {
+      expectedRevision: approved.revision,
+      expectedStateSha256: publicationDigest(approved),
+      now,
+      command,
+    });
+    const record = { ...current.record, publication };
+    validatePublicationAuthority(record);
+    faultInjector("before-authorization-durable-replace");
+    return result(paths, record, durableReplace(paths, record), true);
+  });
 }
 
 /**
@@ -256,15 +315,21 @@ function executionTransition(input, acceptedStatuses, action) {
 }
 
 export function observePublicationExecutionAuthority(input) {
-  return executionTransition(input, ["executing"], (state) => observePublication(state, pick(input, ["expectedRevision", "expectedStateSha256", "observedOid", "observedAt", "status"])));
+  return executionTransition(input, ["executing"], (state) => state.schema === PUBLICATION_SCHEMA_V2
+    ? observePublicationV2(state, pick(input, ["expectedRevision", "expectedStateSha256", "observedOid", "observedAt", "status"]))
+    : observePublication(state, pick(input, ["expectedRevision", "expectedStateSha256", "observedOid", "observedAt", "status"])));
 }
 
 export function startPublicationExecutionReadback(input) {
-  return executionTransition(input, ["consumed"], (state) => startReadback(state, pick(input, ["expectedRevision", "expectedStateSha256", "repositoryKind", "alternatesDisabled", "destinationRef"])));
+  return executionTransition(input, ["consumed"], (state) => state.schema === PUBLICATION_SCHEMA_V2
+    ? startReadbackV2(state, pick(input, ["expectedRevision", "expectedStateSha256", "repositoryKind", "alternatesDisabled", "destinationRef"]))
+    : startReadback(state, pick(input, ["expectedRevision", "expectedStateSha256", "repositoryKind", "alternatesDisabled", "destinationRef"])));
 }
 
 export function closePublicationExecutionAuthority(input) {
-  return executionTransition(input, ["consumed"], (state) => closePublication(state, pick(input, ["expectedRevision", "expectedStateSha256", "fetchedRef", "fetchedOid", "fetchedTree", "completedAt"])));
+  return executionTransition(input, ["consumed"], (state) => state.schema === PUBLICATION_SCHEMA_V2
+    ? closePublicationV2(state, pick(input, ["expectedRevision", "expectedStateSha256", "fetchedRef", "fetchedOid", "fetchedTree", "completedAt"]))
+    : closePublication(state, pick(input, ["expectedRevision", "expectedStateSha256", "fetchedRef", "fetchedOid", "fetchedTree", "completedAt"])));
 }
 export function observePublicationAuthority(input) {
   return transition(input, (state) => observePublication(state, pick(input, ["expectedRevision", "expectedStateSha256", "observedOid", "observedAt", "status"])));

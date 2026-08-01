@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "pipeline.publication-authorization-plan.v2",
+  "type": "object", "additionalProperties": false,
+  "required": ["schema", "status", "transactionId", "channel", "remoteName", "candidateOid", "candidateTree", "destinationRef", "remoteFingerprint", "remotePreimageOid", "authorityRawSha256", "publicationStateSha256", "approvalId", "attribution", "approvedAt", "expiresAt", "rootDir", "planSha256", "applyAction"],
+  "properties": {
+    "schema": {"const": "pipeline.publication-authorization-plan.v2"}, "status": {"const": "ready"}, "transactionId": {"type": "string"}, "channel": {"enum": ["private", "neutral-public"]},
+    "remoteName": {"type": "string"}, "candidateOid": {"$ref": "#/$defs/oid"}, "candidateTree": {"$ref": "#/$defs/oid"}, "destinationRef": {"type": "string"}, "remoteFingerprint": {"$ref": "#/$defs/digest"}, "remotePreimageOid": {"oneOf": [{"$ref": "#/$defs/oid"}, {"type": "null"}]},
+    "authorityRawSha256": {"$ref": "#/$defs/digest"}, "publicationStateSha256": {"$ref": "#/$defs/digest"}, "approvalId": {"type": "string"}, "attribution": {"type": "string"}, "approvedAt": {"type": "integer"}, "expiresAt": {"type": "integer"}, "rootDir": {"type": "string"}, "planSha256": {"$ref": "#/$defs/digest"},
+    "applyAction": {"type": "object", "additionalProperties": false, "required": ["executable", "argv", "mutation", "requiresConfirmation"], "properties": {"executable": {"const": "node"}, "argv": {"type": "array", "items": {"type": "string"}}, "mutation": {"const": true}, "requiresConfirmation": {"const": true}}}
+  },
+  "$defs": {"digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "oid": {"type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$"}}
+}

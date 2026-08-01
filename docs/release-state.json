@@ -1,0 +1,11 @@
+{
+  "schema": "pipeline.public-release-state.v1",
+  "version": "0.4.7",
+  "tag": "v0.4.7",
+  "commit": "89cb12b99e3fd86ac44878d0c23b278f00538921",
+  "tree": "b6537dcaa7bee526d9a393e2603b28648f4b0438",
+  "publicationStatus": "published",
+  "releaseUrlClass": "public-release",
+  "observedAt": "2026-08-01T00:03:21.000Z",
+  "recordSha256": "aa94e2087e66a4df6399c0ab3bf37a135fe4b072aee1c690c743120cf08c2d05"
+}

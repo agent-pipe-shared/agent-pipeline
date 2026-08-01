@@ -3,11 +3,13 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import {
   CRITIC_REVIEW_FAILURES,
+  compileReleaseCriticReviewScope,
   compileCriticReviewLineage,
   criticReviewLineageDigest,
   validateCriticLineagePacketAdmission,
   validateCriticReviewHistory,
   validateCriticReviewLineage,
+  validateReleaseCriticScopeAdmission,
 } from "./critic-review-lineage.mjs";
 import { sha256Canonical } from "./review-economy.mjs";
 
@@ -148,6 +150,13 @@ check("ships a complete Draft-2020-12 schema parallel to the runtime root and ne
     "reviewRound", "correctionCommitCount", "maxReviewRounds", "maxCorrectionCommits", "status",
   ]);
   assert.deepEqual(schema.$defs.verdict.properties.failure.enum.filter(Boolean), CRITIC_REVIEW_FAILURES);
+  const releaseScopeSchema = JSON.parse(readFileSync(
+    new URL("../scripts/release-critic-review-scope.schema.json", import.meta.url),
+    "utf8",
+  ));
+  assert.equal(releaseScopeSchema.$schema, "https://json-schema.org/draft/2020-12/schema");
+  assert.equal(releaseScopeSchema.$id, "pipeline.release-critic-review-scope.v1");
+  assert.equal(releaseScopeSchema.additionalProperties, false);
 });
 
 check("retains pending incomplete/null coverage verbatim and admits only its exact compiled packet", () => {
@@ -524,4 +533,114 @@ check("requires a parent for a course gate and accepts simultaneous exact 4/3 to
   assert.equal(validateCriticReviewHistory([...records, gate]).ok, true);
 });
 
-console.log(`${passed}/12 checks passed.`);
+check("release corrections bind the previous reviewed candidate, impact closure and finding scope", () => {
+  const first = compile({
+    coverage: completeCoverage(),
+    verdict: findingsVerdict,
+    findings: [findingOpen],
+  });
+  const firstScope = compileReleaseCriticReviewScope({
+    parent: null,
+    packet: packet1,
+    mode: "broad-first",
+    impactClosure: {
+      changedPaths: [PATH],
+      directConsequencePaths: [],
+      integrationEdges: [EDGE],
+    },
+    findings: [{
+      id: findingOpen.id,
+      path: PATH,
+      basis: "changed-line",
+      evidenceSha256: findingOpen.evidenceSha256,
+    }],
+    invalidation: none,
+  });
+  assert.equal(validateReleaseCriticScopeAdmission(first, packet1, firstScope).ok, true);
+
+  const newFinding = {
+    id: "finding-2",
+    priorFindingId: null,
+    severity: "medium",
+    status: "open",
+    evidenceSha256: H("e"),
+  };
+  const fixed = { ...findingOpen, priorFindingId: findingOpen.id, status: "fixed", evidenceSha256: H("d") };
+  const second = compile({
+    packet: packet2,
+    reviewId: "review-2-release",
+    parent: first,
+    coverage: completeCoverage(packet2),
+    verdict: findingsVerdict,
+    findings: [fixed, newFinding],
+    correction: correction(),
+    invalidation: none,
+    reviewAttempt: deltaAttempt(2, 1),
+  });
+  const consequencePath = "plugins/pipeline-core/lib/dependent.mjs";
+  const correctionScope = compileReleaseCriticReviewScope({
+    parent: first,
+    packet: packet2,
+    mode: "correction",
+    impactClosure: {
+      changedPaths: [PATH],
+      directConsequencePaths: [consequencePath],
+      integrationEdges: [EDGE],
+    },
+    findings: [{
+      id: newFinding.id,
+      path: consequencePath,
+      basis: "direct-consequence",
+      evidenceSha256: newFinding.evidenceSha256,
+    }],
+    invalidation: none,
+  });
+  assert.equal(correctionScope.reviewedRange.base, first.candidate.commit);
+  assert.deepEqual(correctionScope.nextLineageParent, second.candidate);
+  assert.equal(validateReleaseCriticScopeAdmission(second, packet2, correctionScope).ok, true);
+  assert.throws(() => compileReleaseCriticReviewScope({
+    parent: first,
+    packet: packet2,
+    mode: "correction",
+    impactClosure: {
+      changedPaths: [PATH],
+      directConsequencePaths: [],
+      integrationEdges: [EDGE],
+    },
+    findings: [{
+      id: "historical-finding",
+      path: consequencePath,
+      basis: "changed-line",
+      evidenceSha256: H("f"),
+    }],
+    invalidation: none,
+  }), /CRL-RELEASE-FINDING-OUTSIDE-DELTA/u);
+
+  const broad = compile({
+    packet: packet2,
+    reviewId: "review-2-broad-release",
+    parent: first,
+    coverage: completeCoverage(packet2),
+    verdict: noFindings,
+    findings: [fixed],
+    correction: correction(),
+    invalidation: explicitFull,
+    reviewAttempt: { round: 2, correctionCommits: 1, requestedMode: "full" },
+  });
+  const broadScope = compileReleaseCriticReviewScope({
+    parent: first,
+    packet: packet2,
+    mode: "broad-correction",
+    impactClosure: {
+      changedPaths: [PATH],
+      directConsequencePaths: [],
+      integrationEdges: [EDGE],
+    },
+    findings: [],
+    invalidation: explicitFull,
+  });
+  assert.equal(broadScope.invalidation.reason, "explicit-broad-review");
+  assert.equal(validateReleaseCriticScopeAdmission(broad, packet2, broadScope).ok, true);
+});
+
+console.log(`${passed}/13 checks passed.`);

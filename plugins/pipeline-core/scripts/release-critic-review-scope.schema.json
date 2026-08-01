@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "pipeline.release-critic-review-scope.v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "mode", "parentReviewId", "previousReviewedCandidate",
+    "previousFindingIds", "reviewedRange", "deltaSha256", "changedPaths",
+    "impactClosure", "impactClosureSha256", "findings", "invalidation",
+    "nextLineageParent", "scopeSha256"
+  ],
+  "properties": {
+    "schema": {"const": "pipeline.release-critic-review-scope.v1"},
+    "mode": {"enum": ["broad-first", "correction", "broad-correction"]},
+    "parentReviewId": {"anyOf": [{"$ref": "#/$defs/id"}, {"type": "null"}]},
+    "previousReviewedCandidate": {"anyOf": [{"$ref": "#/$defs/candidate"}, {"type": "null"}]},
+    "previousFindingIds": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}},
+    "reviewedRange": {
+      "type": "object", "additionalProperties": false,
+      "required": ["base", "head", "tree"],
+      "properties": {"base": {"$ref": "#/$defs/oid"}, "head": {"$ref": "#/$defs/oid"}, "tree": {"$ref": "#/$defs/oid"}}
+    },
+    "deltaSha256": {"$ref": "#/$defs/digest"},
+    "changedPaths": {"$ref": "#/$defs/paths"},
+    "impactClosure": {
+      "type": "object", "additionalProperties": false,
+      "required": ["changedPaths", "directConsequencePaths", "integrationEdges"],
+      "properties": {
+        "changedPaths": {"$ref": "#/$defs/paths"},
+        "directConsequencePaths": {"$ref": "#/$defs/paths"},
+        "integrationEdges": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/id"}}
+      }
+    },
+    "impactClosureSha256": {"$ref": "#/$defs/digest"},
+    "findings": {
+      "type": "array", "uniqueItems": true,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["id", "path", "basis", "evidenceSha256"],
+        "properties": {
+          "id": {"$ref": "#/$defs/id"}, "path": {"$ref": "#/$defs/path"},
+          "basis": {"enum": ["changed-line", "direct-consequence"]},
+          "evidenceSha256": {"$ref": "#/$defs/digest"}
+        }
+      }
+    },
+    "invalidation": {"$ref": "critic-review-lineage.schema.json#/$defs/invalidation"},
+    "nextLineageParent": {"$ref": "#/$defs/candidate"},
+    "scopeSha256": {"$ref": "#/$defs/digest"}
+  },
+  "$defs": {
+    "digest": {"type": "string", "pattern": "^[a-f0-9]{64}$"},
+    "oid": {"type": "string", "pattern": "^(?:[a-f0-9]{40}|[a-f0-9]{64})$"},
+    "id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$"},
+    "path": {"type": "string", "pattern": "^(?!/)(?!.*\\\\)[A-Za-z0-9._/-]{1,512}$"},
+    "paths": {"type": "array", "uniqueItems": true, "items": {"$ref": "#/$defs/path"}},
+    "candidate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["commit", "tree"],
+      "properties": {"commit": {"$ref": "#/$defs/oid"}, "tree": {"$ref": "#/$defs/oid"}}
+    }
+  }
+}

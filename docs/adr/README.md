@@ -137,6 +137,10 @@ Architecture Decision Records der Agent-Pipeline. Die ADRs formalisieren das kan
 | [0045](0045-canonical-artifact-topology.md) | Kanonische Artefakt-Topologie | akzeptiert | 2026-07-24 |
 | [0046](0046-project-authority-layering.md) | Projekt-Authority-Layering | akzeptiert | 2026-07-24 |
 | [0047](0047-model-free-advisor-preflight-v2.md) | Modellfreier Advisor-Preflight und On-demand-Consultation v2 | akzeptiert | 2026-07-29 |
+| [0047-N](0047-local-supervisor-state-authority.md) | Lokale Supervisor-State-Authority (repo-lokale Nummernkollision beibehalten) | akzeptiert | 2026-07-26 |
+| [0048](0048-local-goldfish-supervisor.md) | Lokaler Goldfish-Supervisor | akzeptiert | 2026-07-26 |
+| [0049](0049-gitlab-ci-constrained-remote-executor-pilot.md) | GitLab-CI-Pilot für eingeschränkte Remote-Ausführung | akzeptiert | 2026-07-27 |
+| [0050](0050-candidate-bound-verify-run-journal.md) | Kandidatengebundenes privates Verify-Run-Journal | akzeptiert | 2026-08-01 |
 
 ## Wiedervorlagen
 

@@ -24,6 +24,7 @@ import {
   planProjectOnboardingKickoffV4,
   planProjectOnboardingKickoffPromotionV4,
   planProjectOnboardingLifecycleV4,
+  planProjectOnboardingManifestRepairV4,
   planProjectOnboardingSourceRecoveryV4,
   planProjectOnboardingV3,
   renderProjectOnboardingAction,
@@ -185,6 +186,7 @@ function clearRuntimeBarrier(path, barrier) {
     token: issued.token,
     now: 40_001,
     spawn: fakeGit,
+    codexExecutable: process.execPath,
     receipt: {
       schema: "pipeline.codex-project-runtime-readback.v1",
       barrierSha256: barrier.rawSha256,
@@ -2569,6 +2571,7 @@ test("portable seed is manifest-valid, then onboarding owns the runtime initiali
       token: issued.token,
       now: 40_001,
       spawn: fakeGit,
+      codexExecutable: process.execPath,
       receipt: {
         schema: "pipeline.codex-project-runtime-readback.v1",
         barrierSha256: barrier.rawSha256,
@@ -2905,7 +2908,7 @@ test("an invalid generated manifest is never accepted as a current fresh authori
     ]);
     const disposition = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
     assert.equal(disposition.status, "unrepairable");
-    assertDiagnostic(disposition, "manifest_unowned_bytes_unpreservable");
+    assertDiagnostic(disposition, "manifest_existing_target_requires_owner_repair");
   } finally { dispose(path); }
 });
 
@@ -2917,8 +2920,7 @@ test("manifest-only repair is source/preimage/plan bound, confirmed, and read ba
     const manifestPath = join(path, ".claude", "pipeline.yaml");
     unlinkSync(manifestPath);
     const invalid = inspectProjectOnboardingV3({ rootDir: path, deps: fakeDeps });
-    assert.equal(invalid.status, "partial");
-    assertDiagnostic(invalid, "manifest_invalid");
+    assert.equal(invalid.status, "runtime-initialization-required");
 
     const plan = planProjectOnboardingManifestRepairV4({ rootDir: path, deps: fakeDeps });
     assert.equal(plan.status, "ready", JSON.stringify(plan));
@@ -2943,7 +2945,7 @@ test("manifest-only repair is source/preimage/plan bound, confirmed, and read ba
       activate: true,
       deps: fakeDeps,
     });
-    assert.equal(wrong.status, "partial");
+    assert.equal(wrong.status, "runtime-initialization-required");
     assert.equal(existsSync(manifestPath), false);
 
     writeFileSync(manifestPath, "foreign: manifest bytes\n");
@@ -3036,8 +3038,7 @@ test("manifest repair rejects source drift before publication and leaves the man
         },
       },
     });
-    assert.equal(result.status, "partial");
-    assertDiagnostic(result, "manifest_invalid");
+    assert.equal(result.status, "runtime-initialization-required");
     assert.equal(existsSync(manifestPath), false);
     assert.equal(injected, true);
   } finally { dispose(path); }
@@ -3230,7 +3231,7 @@ test("source recovery planner distinguishes invalid authority and unsupported ru
     const sourcePath = join(unsupported, "pipeline.user.yaml");
     writeFileSync(sourcePath, readFileSync(sourcePath, "utf8").replace(/default: "?codex"?/u, "default: \"claude\""));
     const observedUnsupported = inspectProjectOnboardingV3({ rootDir: unsupported, deps: fakeDeps });
-    assert.equal(observedUnsupported.status, "invalid");
+    assert.equal(observedUnsupported.status, "runtime-initialization-required");
     const unsupportedPlan = planProjectOnboardingSourceRecoveryV4({ rootDir: unsupported, deps: fakeDeps });
     assert.equal(unsupportedPlan.status, "unrepairable");
     assert.equal(unsupportedPlan.category, "unsupported-source-transition");

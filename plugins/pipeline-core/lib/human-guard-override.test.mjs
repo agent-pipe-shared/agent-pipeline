@@ -80,6 +80,9 @@ test("one exact attended capability is audited, consumed once and cannot be repl
     assert.equal(plan.status, "planned");
     assert.equal(plan.toolInputSha256.length, 64);
     assert.deepEqual(plan.eligiblePaths, ["notes.md"]);
+    assert.equal(plan.preview.poAuthority, "final-for-this-exact-project-policy-decision");
+    assert.match(plan.preview.postcondition, /byte-identical original tool action/u);
+    assert.equal(plan.policy.guards[0].guard, "guard-lifecycle-ready.mjs");
     const reason = "PO attended recovery for the exact notes write";
     const prepared = prepareHumanGuardOverrideAuthorization({
       rootDir: root,
@@ -94,6 +97,7 @@ test("one exact attended capability is audited, consumed once and cannot be repl
     assert.equal(prepared.authorizeAction.mutation, true);
     assert.equal(prepared.authorizeAction.requiresConfirmation, true);
     assert.equal(prepared.authorizeAction.argv.includes("<human-reason>"), false);
+    assert.deepEqual(prepared.decisionPreview, plan.preview);
     const armed = authorizeHumanGuardOverride({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
@@ -116,6 +120,10 @@ test("one exact attended capability is audited, consumed once and cannot be repl
       nowMs: 4000,
     });
     assert.equal(consumed.status, "consumed");
+    const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+    const audit = join(common, "agent-pipeline", "human-guard-overrides", "audit.jsonl");
+    const auditEvents = readFileSync(audit, "utf8").trim().split("\n").map((line) => JSON.parse(line).event);
+    assert.deepEqual(auditEvents.map(({ type }) => type), ["denied", "authorized", "consumed"]);
     assert.equal(consumeHumanGuardOverride({
       rootDir: root,
       pluginRoot: PLUGIN_ROOT,
@@ -132,6 +140,79 @@ test("one exact attended capability is audited, consumed once and cannot be repl
     });
   } finally {
     rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("commit and exact in-root patch admission never execute the effect or claim success", () => {
+  for (const [toolName, toolInput, expectedClass] of [
+    ["Bash", { command: "git commit -m exact-retry" }, "git-commit"],
+    ["apply_patch", {
+      command: "*** Begin Patch\n*** Add File: notes.md\n+exact patch retry\n*** End Patch",
+    }, "exact-in-root-patch"],
+  ]) {
+    const root = fixture();
+    try {
+      const originalHead = git(root, "rev-parse", "HEAD");
+      const request = recordHumanGuardDenial({
+        rootDir: root,
+        pluginRoot: PLUGIN_ROOT,
+        toolName,
+        toolInput,
+        denials: denial,
+        nowMs: 1000,
+      });
+      assert.equal(request.status, "planned");
+      const scriptPath = join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs");
+      const plan = planHumanGuardOverride({
+        rootDir: root,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: request.requestSha256,
+        nowMs: 2000,
+        scriptPath,
+      });
+      assert.equal(plan.commandClass, expectedClass);
+      const reason = `PO approved ${expectedClass}`;
+      const prepared = prepareHumanGuardOverrideAuthorization({
+        rootDir: root,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: request.requestSha256,
+        planSha256: plan.planSha256,
+        reason,
+        nowMs: 2500,
+        scriptPath,
+      });
+      authorizeHumanGuardOverride({
+        rootDir: root,
+        pluginRoot: PLUGIN_ROOT,
+        requestSha256: request.requestSha256,
+        planSha256: plan.planSha256,
+        selectionSha256: prepared.selectionSha256,
+        reason,
+        reasonSha256: prepared.reasonSha256,
+        activate: true,
+        nowMs: 3000,
+        scriptPath,
+      });
+      assert.equal(consumeHumanGuardOverride({
+        rootDir: root,
+        pluginRoot: PLUGIN_ROOT,
+        toolName,
+        toolInput,
+        denials: denial,
+        nowMs: 4000,
+      }).status, "consumed");
+      const common = git(root, "rev-parse", "--path-format=absolute", "--git-common-dir");
+      const events = readFileSync(
+        join(common, "agent-pipeline", "human-guard-overrides", "audit.jsonl"),
+        "utf8",
+      ).trim().split("\n").map((line) => JSON.parse(line).event.type);
+      assert.equal(events.at(-1), "consumed", "audit must be durable before admission returns");
+      assert.equal(git(root, "rev-parse", "HEAD"), originalHead, "override admission must not execute git commit");
+      assert.equal(existsSync(join(root, "notes.md")), false, "override admission must not apply the patch");
+      assert.match(plan.preview.postcondition, /ordinary effect readback/u);
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
   }
 });
 
@@ -205,40 +286,51 @@ test("drift, expiry and concurrent consumption fail closed", () => {
       toolInput,
       denials: denial,
       nowMs: 12000,
-    }), { status: "invalid", code: "HGO-EXPIRED" });
+    }), { status: "replan", code: "HGO-EXPIRED" });
+    const fresh = recordHumanGuardDenial({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Write",
+      toolInput,
+      denials: denial,
+      nowMs: 12001,
+      ttlMs: 10000,
+    });
+    assert.equal(fresh.status, "planned");
+    assert.notEqual(fresh.requestSha256, request.requestSha256);
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
 });
 
-test("security boundaries, path escape, push and ambiguous shell actions remain non-overridable", () => {
+test("security and authority boundaries return typed recovery without an ambient bypass", () => {
   const root = fixture();
   try {
     mkdirSync(join(root, "physical"), { recursive: true });
     symlinkSync(join(root, "physical"), join(root, "linked"), "dir");
     writeFileSync(join(root, "physical", "linked-source.txt"), "shared\n");
     linkSync(join(root, "physical", "linked-source.txt"), join(root, "hardlinked.txt"));
-    for (const [toolName, toolInput] of [
-      ["Write", { file_path: ".claude/pipeline-state.json", content: "{}" }],
-      ["Write", { file_path: ".claude/pipeline.yaml", content: "runtime: drift\n" }],
-      ["Write", { file_path: "plugins/pipeline-core/lib/human-guard-override.mjs", content: "tamper\n" }],
-      ["Write", { file_path: "../outside.txt", content: "x" }],
-      ["Write", { file_path: "linked/escape.txt", content: "x" }],
-      ["Write", { file_path: "hardlinked.txt", content: "x" }],
-      ["Bash", { command: "git push origin HEAD:refs/heads/main" }],
-      ["Bash", { command: "/usr/bin/git push origin HEAD:refs/heads/main" }],
-      ["Bash", { command: "/bin/sh -c 'git push origin HEAD:refs/heads/main'" }],
-      ["Bash", { command: "git harmless-alias notes.md" }],
-      ["Bash", { command: "python3 -c 'open(\"owned\", \"w\").write(\"x\")'" }],
-      ["Bash", { command: "perl -e 'open my $fh, \">\", \"owned\"'" }],
-      ["Bash", { command: "node safe.mjs" }],
-      ["Bash", { command: "node --check ../../outside.mjs" }],
-      ["Bash", { command: "node --check .claude/pipeline-state.json" }],
-      ["Bash", { command: "node safe.mjs --tok" + "en=fixture-not-a-secret" }],
-      ["Bash", { command: "touch safe && touch second" }],
-      ["apply_patch", { command: "*** Begin Patch\n*** Update File: .claude/pipeline-state.json\n@@\n-{}\n+{\"x\":1}\n*** End Patch" }],
-      ["apply_patch", { command: "*** Begin Patch\n*** Update File: plugins/pipeline-core/hooks/codex-pretool-guard.mjs\n@@\n-old\n+tampered\n*** End Patch" }],
-      ["apply_patch", { command: "*** Begin Patch\n*** Update File: notes.md\n*** Move to: ../outside.md\n@@\n-old\n+new\n*** End Patch" }],
+    for (const [expected, toolName, toolInput] of [
+      ["planned", "Write", { file_path: ".claude/pipeline-state.json", content: "{}" }],
+      ["planned", "Write", { file_path: ".claude/pipeline.yaml", content: "runtime: drift\n" }],
+      ["author-repair-required", "Write", { file_path: "plugins/pipeline-core/lib/human-guard-override.mjs", content: "tamper\n" }],
+      ["external-operator-required", "Write", { file_path: "../outside.txt", content: "x" }],
+      ["external-operator-required", "Write", { file_path: "linked/escape.txt", content: "x" }],
+      ["external-operator-required", "Write", { file_path: "hardlinked.txt", content: "x" }],
+      ["narrower-recovery-required", "Bash", { command: "git push origin HEAD:refs/heads/main" }],
+      ["narrower-recovery-required", "Bash", { command: "/usr/bin/git push origin HEAD:refs/heads/main" }],
+      ["narrower-recovery-required", "Bash", { command: "/bin/sh -c 'git push origin HEAD:refs/heads/main'" }],
+      ["planned", "Bash", { command: "git harmless-alias notes.md" }],
+      ["planned", "Bash", { command: "python3 -c 'open(\"owned\", \"w\").write(\"x\")'" }],
+      ["planned", "Bash", { command: "perl -e 'open my $fh, \">\", \"owned\"'" }],
+      ["planned", "Bash", { command: "node safe.mjs" }],
+      ["external-operator-required", "Bash", { command: "node --check ../../outside.mjs" }],
+      ["planned", "Bash", { command: "node --check .claude/pipeline-state.json" }],
+      ["external-operator-required", "Bash", { command: "node safe.mjs --tok" + "en=fixture-not-a-secret" }],
+      ["planned", "Bash", { command: "touch safe && touch second" }],
+      ["planned", "apply_patch", { command: "*** Begin Patch\n*** Update File: .claude/pipeline-state.json\n@@\n-{}\n+{\"x\":1}\n*** End Patch" }],
+      ["author-repair-required", "apply_patch", { command: "*** Begin Patch\n*** Update File: plugins/pipeline-core/hooks/codex-pretool-guard.mjs\n@@\n-old\n+tampered\n*** End Patch" }],
+      ["external-operator-required", "apply_patch", { command: "*** Begin Patch\n*** Update File: notes.md\n*** Move to: ../outside.md\n@@\n-old\n+new\n*** End Patch" }],
     ]) {
       const observed = recordHumanGuardDenial({
         rootDir: root,
@@ -247,12 +339,15 @@ test("security boundaries, path escape, push and ambiguous shell actions remain 
         toolInput,
         denials: denial,
       });
-      const pipelineSource = JSON.stringify(toolInput).includes("plugins/pipeline-core/");
       assert.equal(
         observed.status,
-        pipelineSource ? "author-repair-required" : "non-overridable",
+        expected,
         `${toolName} ${JSON.stringify(toolInput)}`,
       );
+      if (new Set(["narrower-recovery-required", "external-operator-required"]).has(observed.status)) {
+        assert.equal(typeof observed.nextAction, "object");
+        assert.equal(typeof observed.nextAction.action, "object");
+      }
     }
     writeFileSync(join(root, "safe.mjs"), "export {};\n");
     const syntaxCheck = recordHumanGuardDenial({
@@ -275,6 +370,28 @@ test("security boundaries, path escape, push and ambiguous shell actions remain 
   }
 });
 
+test("every push-guard denial routes to an exact publication preflight even through an alias", () => {
+  const root = fixture();
+  try {
+    const observed = recordHumanGuardDenial({
+      rootDir: root,
+      pluginRoot: PLUGIN_ROOT,
+      toolName: "Bash",
+      toolInput: { command: "release-alias current" },
+      denials: [{ guard: "guard-push.mjs", reason: "PG-CAPABILITY: publication authority required" }],
+    });
+    assert.equal(observed.status, "narrower-recovery-required");
+    assert.equal(observed.code, "HGO-NARROWER-PUBLICATION-REQUIRED");
+    assert.equal(observed.nextAction.kind, "typed-recovery");
+    assert.equal(observed.nextAction.action.executable, process.execPath);
+    assert.match(observed.nextAction.action.argv[0], /publication-executor\.mjs$/u);
+    assert.equal(observed.nextAction.action.argv.includes("release-alias"), false);
+    assert.equal(observed.nextAction.action.argv.includes(git(root, "rev-parse", "HEAD")), true);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
 test("pipeline author repair binds one exact source root and action without State readiness", () => {
   const root = fixture();
   try {
@@ -290,7 +407,7 @@ test("pipeline author repair binds one exact source root and action without Stat
       "Write",
       { file_path: "plugins/pipeline-core/linked-outside/escape.mjs", content: "escape\n" },
       { selectedAuthorSourceRoot: sourceRoot },
-    ).code, "HGO-NONOVERRIDABLE-PATH");
+    ).code, "HGO-NONOVERRIDABLE-CROSS-BOUNDARY");
     mkdirSync(join(root, "project"), { recursive: true });
     writeFileSync(join(root, "project", "pipeline-state.json"), "{damaged portable state\n");
     const toolInput = {

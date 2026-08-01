@@ -3,12 +3,18 @@
 > Canonical operational handover for this repository. It contains public
 > repository state only; durable decisions remain in the ADR register.
 
-**Last updated:** 2026-07-31
+**Last updated:** 2026-08-01
 **Project status:** ACTIVE
-**Current block:** `0.4.7` final release-candidate qualification; implementation
-is complete and publication remains gated on fresh candidate-bound evidence
+**Current block:** Sprint Nova execution on the released `v0.4.7` baseline
 **Repair baseline:** `83640cec22d494d227eebc82929370277ce926b9`
-**Release version:** `0.4.6` released; `0.4.7` final corrective candidate
+**Release version:** `0.4.7` released
+**Release state:** version `0.4.7` · tag `v0.4.7` · commit `89cb12b99e3fd86ac44878d0c23b278f00538921` · tree `b6537dcaa7bee526d9a393e2603b28648f4b0438` · status `published`
+
+The machine-readable public projection is [`release-state.json`](release-state.json).
+Its `observedAt` is the UTC time when this public projection was produced from
+the supplied authoritative release identity; it is not a claimed release time.
+The historical 0.4.7 candidate-qualification section below is retained as
+session history and no longer describes the current publication disposition.
 
 ## 2026-07-31 PO session authorization — temporary protected-test lifts
 

@@ -755,6 +755,18 @@
       "member": "nova-scheduling-lifecycle-tests"
     },
     {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-verify-journal-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-verify-journal-tests"
+    },
+    {
+      "surfaceId": "verify-phase:harness/scripts/verify.mjs:nova-verify-resume-tests",
+      "kind": "verify-phase",
+      "path": "harness/scripts/verify.mjs",
+      "member": "nova-verify-resume-tests"
+    },
+    {
       "surfaceId": "verify-phase:harness/scripts/verify.mjs:runner-native-continuation-tests",
       "kind": "verify-phase",
       "path": "harness/scripts/verify.mjs",
@@ -2009,6 +2021,7 @@
         "verify-phase:harness/scripts/verify.mjs:capture-observation-intake-tests",
         "verify-phase:harness/scripts/verify.mjs:check-ownership-tests",
         "verify-phase:harness/scripts/verify.mjs:claude-critic-host-tests",
+        "verify-phase:harness/scripts/verify.mjs:claude-goal-host-tests",
         "verify-phase:harness/scripts/verify.mjs:close-coordinator-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-advisory-app-server-tests",
         "verify-phase:harness/scripts/verify.mjs:codex-advisory-bootstrap-tests",
@@ -2107,6 +2120,8 @@
         "verify-phase:harness/scripts/verify.mjs:nova-runner-capability-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-sandbox-disposition-tests",
         "verify-phase:harness/scripts/verify.mjs:nova-scheduling-lifecycle-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-verify-journal-tests",
+        "verify-phase:harness/scripts/verify.mjs:nova-verify-resume-tests",
         "verify-phase:harness/scripts/verify.mjs:observation-governance-tests",
         "verify-phase:harness/scripts/verify.mjs:onboarding-continuity-tests",
         "verify-phase:harness/scripts/verify.mjs:p3b-runner-conformance-tests",

@@ -36,15 +36,19 @@
  * noise on every run). ONE canonical path, overwritten each run — no registry (#2 CUT).
  *
  * Exit code: 0 iff every step exited 0; the first non-zero step's code otherwise
- * (mirrors `npm run`-style aggregation). stdout of both suites is passed through
- * unchanged so a human sees the same PASS/FAIL lines the suites themselves print.
+ * (mirrors `npm run`-style aggregation). Complete suite stdout/stderr stays in
+ * owner-private bounded logs; the interactive channel receives only bounded
+ * machine-readable start/terminal progress records.
  */
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { validateScopedVerifyRegistration } from "../../plugins/pipeline-core/lib/scoped-verify-registration.mjs";
 import { validateWindowsAssuranceVerifyRegistration } from "../../plugins/pipeline-core/lib/windows-assurance-verify-registration.mjs";
+import { createPublicVerifyRunEvidence } from "../../plugins/pipeline-core/lib/verify-resume.mjs";
+import { runVerifyJournal } from "../../plugins/pipeline-core/scripts/verify-journal.mjs";
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(scriptDir, "..", "..");
@@ -60,7 +64,7 @@ function candidateIdentity() {
   try {
     const commit = spawnSync("git", ["rev-parse", "HEAD"], { encoding: "utf8", cwd: repoRoot });
     const tree = spawnSync("git", ["rev-parse", "HEAD^{tree}"], { encoding: "utf8", cwd: repoRoot });
-    const worktree = spawnSync("git", ["status", "--porcelain=v1", "--untracked-files=no"], { encoding: "utf8", cwd: repoRoot });
+    const worktree = spawnSync("git", ["status", "--porcelain=v1"], { encoding: "utf8", cwd: repoRoot });
     if (commit.status !== 0 || tree.status !== 0 || worktree.status !== 0) return { status: "unavailable", commit: null, tree: null };
     return {
       status: worktree.stdout === "" ? "clean" : "dirty",
@@ -69,10 +73,16 @@ function candidateIdentity() {
     };
   } catch { return { status: "unavailable", commit: null, tree: null }; }
 }
+function gitCommonDirectory() {
+  const result = spawnSync("git", ["rev-parse", "--path-format=absolute", "--git-common-dir"], { encoding: "utf8", cwd: repoRoot });
+  if (result.status !== 0 || result.stdout.trim() === "") throw new Error("VERIFY-GIT-COMMON-DIR-UNAVAILABLE");
+  return result.stdout.trim();
+}
 const startedCandidate = candidateIdentity();
 const command = "node harness/scripts/verify.mjs";
 const evidenceDir = join(repoRoot, "evidence");
 const evidencePath = join(evidenceDir, "verify-latest.json");
+const verifyStartedAt = new Date().toISOString();
 function writeEvidence(evidence) {
   mkdirSync(evidenceDir, { recursive: true });
   writeFileSync(evidencePath, JSON.stringify(evidence, null, 2) + "\n");
@@ -87,9 +97,10 @@ writeEvidence({
   commit: startedCandidate.commit ?? "unknown",
   tree: startedCandidate.tree ?? "unknown",
   candidate: { start: startedCandidate, finish: null, binding: "running" },
-  startedAt: new Date().toISOString(),
+  startedAt: verifyStartedAt,
   finishedAt: null,
   steps: [{ name: "verify-running", exitCode: 1 }],
+  verifyRun: null,
   exitCode: 1,
 });
 const SCOPED_VERIFY_SUITES = Object.freeze([
@@ -366,6 +377,8 @@ const TEST_SUITES = [
   { name: "nova-b4-github-forge-adapter-tests", file: join(pluginScriptsDir, "github-forge-adapter.test.mjs") },
   { name: "nova-b4-gitlab-forge-adapter-tests", file: join(pluginScriptsDir, "gitlab-forge-adapter.test.mjs") },
   { name: "nova-candidate-freeze-tests", file: join(libDir, "nova-candidate-freeze.test.mjs") },
+  { name: "nova-verify-resume-tests", file: join(libDir, "verify-resume.test.mjs") },
+  { name: "nova-verify-journal-tests", file: join(pluginScriptsDir, "verify-journal.test.mjs") },
 ];
 
 // Manifest-gated phase steps: see header — only projects with `.claude/pipeline.yaml`
@@ -389,6 +402,8 @@ const PHASE_STEPS =
       ];
 
 const steps = [];
+let verifyRun = null;
+let verifyRunEvidence = null;
 // A known dirty candidate cannot produce delivery evidence.  Fail before any
 // expensive or externally-dependent suite so this is an actionable preflight,
 // not a misleading red full run.  Non-Git fixtures retain the historic
@@ -409,13 +424,38 @@ if (startedCandidate.status === "dirty") {
     } else {
       const scopedTests = SCOPED_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
       const windowsAssuranceTests = WINDOWS_ASSURANCE_VERIFY_SUITES.map((suite) => ({ name: suite.name, file: join(repoRoot, suite.file) }));
-      for (const suite of [...TEST_SUITES, ...scopedTests, ...windowsAssuranceTests, ...PHASE_STEPS]) {
-        console.log(`\n=== ${suite.name} (${suite.file}) ===`);
-        const res = spawnSync(process.execPath, [suite.file, ...(suite.args ?? [])], { encoding: "utf8", cwd: repoRoot });
-        if (res.stdout) process.stdout.write(res.stdout);
-        if (res.stderr) process.stderr.write(res.stderr);
-        const exitCode = res.status ?? 1;
-        steps.push({ name: suite.name, exitCode });
+      const phaseSteps = PHASE_STEPS.map((suite, index) => ({ ...suite, dependsOn: index === 0 ? [] : [PHASE_STEPS[index - 1].name] }));
+      const registeredSuites = [...TEST_SUITES, ...scopedTests, ...windowsAssuranceTests, ...phaseSteps];
+      try {
+        verifyRun = runVerifyJournal({
+          gitCommonDir: gitCommonDirectory(),
+          repoRoot,
+          candidate: { commit: startedCandidate.commit, tree: startedCandidate.tree },
+          suites: registeredSuites,
+          policyInputs: {
+            command,
+            harnessSha256: createHash("sha256").update(readFileSync(fileURLToPath(import.meta.url))).digest("hex"),
+            phase26Result,
+            phase3Result,
+          },
+        });
+        steps.push(...verifyRun.steps.map(({ name, exitCode }) => ({ name, exitCode })));
+        verifyRunEvidence = createPublicVerifyRunEvidence({
+          runId: verifyRun.runId,
+          policySha256: verifyRun.policySha256,
+          resumePlanSha256: verifyRun.plan.planSha256,
+          terminalSha256: verifyRun.terminal.terminalSha256,
+          registeredSuiteCount: registeredSuites.length,
+          terminalReceiptCount: verifyRun.terminal.receipts.length,
+          terminalStatus: verifyRun.terminal.status,
+        });
+        if (verifyRunEvidence.status !== "passed" && steps.every((step) => step.exitCode === 0)) {
+          steps.push({ name: "verify-terminal-coverage", exitCode: 1 });
+        }
+      } catch (error) {
+        const diagnostic = error instanceof Error ? error.message.slice(0, 256) : "VERIFY-JOURNAL-UNAVAILABLE";
+        console.error(`VERIFY-JOURNAL-FAILED: ${diagnostic}`);
+        steps.push({ name: "verify-journal", exitCode: 1 });
       }
     }
   }
@@ -445,8 +485,10 @@ const evidence = {
     finish: finishedCandidate,
     binding: startedCandidate.status === "unavailable" ? "unavailable" : startedCandidate.status === "dirty" ? "preflight-rejected" : steps.some((step) => step.name === "candidate-binding") ? "drift" : "exact",
   },
+  startedAt: verifyStartedAt,
   finishedAt: new Date().toISOString(),
   steps,
+  verifyRun: verifyRunEvidence,
   exitCode: overallExitCode,
 };
 

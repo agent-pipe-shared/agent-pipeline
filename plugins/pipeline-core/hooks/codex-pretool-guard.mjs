@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: SUL-1.0
 
 /** Translate provider-neutral guard exits into Codex PreToolUse denials. */
+import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { existsSync, read, realpathSync } from "node:fs";
 import { join, resolve } from "node:path";
@@ -156,6 +157,9 @@ catch { deny("Codex PreToolUse input is not valid JSON; pipeline guards fail clo
 const toolName = String(input?.tool_name ?? "");
 const filePath = input?.tool_input?.file_path;
 const command = String(input?.tool_input?.command ?? "");
+const toolInputSha256 = createHash("sha256")
+  .update(JSON.stringify(input?.tool_input ?? {}))
+  .digest("hex");
 // Codex supplies the session working directory in the native hook envelope and
 // also launches the hook from that directory. CLAUDE_PROJECT_DIR belongs to
 // the Claude compatibility surface and may be inherited from another process;
@@ -299,14 +303,6 @@ if (lifecycleShouldRun) {
   }
 }
 if (denials.length > 0) {
-  const grammarCode = [
-    "GUARD-PARSE-UNSUPPORTED",
-    "GUARD-OPERATOR-UNAPPROVED",
-    "GUARD-REDIRECT-UNAPPROVED",
-  ].find((code) => denials.some((entry) => entry.reason.includes(`${code}:`)));
-  if (grammarCode) {
-    deny(`${denials.map((entry) => entry.reason).join("\n")}\nHuman override unavailable: HGO-NONOVERRIDABLE-GRAMMAR.`);
-  }
   const overrideSpawn = (executable, args, options) => boundedSpawn(
     executable,
     args,
@@ -339,7 +335,7 @@ if (denials.length > 0) {
     process.exit(0);
   }
   let overrideGuidance = "";
-  if (consumed.status === "absent") {
+  if (consumed.status === "absent" || consumed.status === "replan") {
     try {
       const planned = recordHumanGuardDenial({
         rootDir: projectRoot,
@@ -363,15 +359,93 @@ if (denials.length > 0) {
           "Pipeline Author Repair is available for this exact source action (one use; audited; explicit confirmation required):",
           `${process.execPath} ${JSON.stringify(script)} plan --repo ${JSON.stringify(projectRoot)} --request-sha256 ${planned.requestSha256} --author-source-root ${JSON.stringify(planned.candidateSourceRoot)}`,
         ].join("\n");
+      } else if (new Set(["narrower-recovery-required", "external-operator-required"]).has(planned.status)) {
+        overrideGuidance = [
+          "",
+          "Guard recovery route:",
+          JSON.stringify(planned),
+        ].join("\n");
       } else {
-        overrideGuidance = `\nHuman override unavailable: ${planned.code}.`;
+        overrideGuidance = [
+          "",
+          "Guard recovery route:",
+          JSON.stringify({
+            status: "effect-reconciliation-required",
+            code: planned.code ?? "HGO-UNCLASSIFIED",
+            nextAction: {
+              kind: "typed-recovery",
+              action: {
+                executable: process.execPath,
+                argv: [join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"), "verify-audit", "--repo", projectRoot],
+                mutation: false,
+                requiresConfirmation: false,
+                executionBoundary: "local-process",
+                expected: { schema: "pipeline.human-guard-override-audit-verification.v1", status: "valid" },
+              },
+              after: "retry the identical original action to obtain a fresh bound plan",
+            },
+          }),
+        ].join("\n");
       }
     } catch (error) {
       diagnostic("human-override-plan-failed", humanOverrideFailureFields(error));
-      overrideGuidance = "\nHuman override unavailable; the guarded action remains denied.";
+      const hostBoundary = error?.code === "HGO-GIT" || error?.code === "HGO-ROOT"
+        || error?.code === "HGO-COMMON-DIR";
+      overrideGuidance = [
+        "",
+        "Guard recovery route:",
+        JSON.stringify(hostBoundary
+          ? {
+            status: "external-operator-required",
+            code: "HGO-EXTERNAL-REPOSITORY-OBSERVATION",
+            nextAction: {
+              kind: "external-operator",
+              executionBoundary: "attended-host-terminal",
+              invocation: "user-copy-only",
+              action: { toolName, toolInputSha256, repositoryRoot: projectRoot },
+              reason: "the host repository preimage cannot be attested inside this guard process",
+            },
+          }
+          : {
+            status: "effect-reconciliation-required",
+            code: "HGO-DECISION-RECORD-UNAVAILABLE",
+            nextAction: {
+              kind: "typed-recovery",
+              action: {
+                executable: process.execPath,
+                argv: [join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"), "verify-audit", "--repo", projectRoot],
+                mutation: false,
+                requiresConfirmation: false,
+                executionBoundary: "local-process",
+                expected: { schema: "pipeline.human-guard-override-audit-verification.v1", status: "valid" },
+              },
+              after: "retry the identical original action to obtain a fresh bound plan",
+            },
+          }),
+      ].join("\n");
     }
   } else {
-    overrideGuidance = `\nHuman override rejected: ${consumed.code ?? "capability-invalid"}.`;
+    overrideGuidance = [
+      "",
+      "Human override rejected; override admission is not operation success.",
+      "Guard recovery route:",
+      JSON.stringify({
+        status: "effect-reconciliation-required",
+        code: consumed.code ?? "HGO-CAPABILITY-INVALID",
+        nextAction: {
+          kind: "typed-recovery",
+          action: {
+            executable: process.execPath,
+            argv: [join(PLUGIN_ROOT, "scripts", "guard-human-override.mjs"), "verify-audit", "--repo", projectRoot],
+            mutation: false,
+            requiresConfirmation: false,
+            executionBoundary: "local-process",
+            expected: { schema: "pipeline.human-guard-override-audit-verification.v1", status: "valid" },
+          },
+          after: "retry the identical original action to obtain a fresh bound plan",
+        },
+      }),
+    ].join("\n");
   }
   deny(`${denials.map((entry) => entry.reason).join("\n")}${overrideGuidance}`);
 }
