@@ -48,6 +48,7 @@ const APP_SERVER_SCRIPT = fileURLToPath(new URL("../scripts/codex-app-server-hea
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
+const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../scripts/session-capability-diagnose.mjs", import.meta.url));
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 const PO_PROFILE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
 const PROJECT_AUTHORITY_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
@@ -486,7 +487,7 @@ function sanctionedOnboardingArgs(args, root) {
         && ["onboarding", "bootstrap", "session", "dispatch"].includes(args[4])))) return true;
   if (args[0] === "continuity" && args[1] === "inspect"
     && exactRoot(args, root, 2) && args.length === 4) return true;
-  if (["plan", "plan-runtime", "plan-repair", "plan-readback", "plan-source-recovery", "plan-manifest-repair"].includes(args[0])
+  if (["plan", "plan-runtime", "plan-reinstall", "plan-repair", "plan-readback", "plan-source-recovery", "plan-manifest-repair"].includes(args[0])
     && exactRoot(args, root, 1) && args.length === 3) return true;
   if (["plan-source-recovery", "plan-manifest-repair"].includes(args[0])
     && exactRoot(args, root, 1) && args.length === 3) return true;
@@ -494,7 +495,7 @@ function sanctionedOnboardingArgs(args, root) {
     && exactRoot(args, root, 1)
     && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
     && args[5] === "--activate" && args.length === 6) return true;
-  if (["apply-portable-seed", "initialize-runtime", "apply-repair", "apply-readback"].includes(args[0])
+  if (["apply-portable-seed", "apply-reinstall", "initialize-runtime", "apply-repair", "apply-readback"].includes(args[0])
     && exactRoot(args, root, 1)
     && args[3] === "--plan-sha256" && HEX.test(args[4] ?? "")
     && args[5] === "--activate" && args.length === 6) return true;
@@ -659,6 +660,7 @@ export function isSanctionedLifecycleCommand(command, root, options = {}) {
   }
   if (script === READBACK_SCRIPT) return exactRoot(args, root, 0) && args.length === 2;
   if (script === START_PREFLIGHT_SCRIPT) return args.length === 0;
+  if (script === SESSION_CAPABILITY_DIAGNOSE_SCRIPT) return args[0] === "--repo" && args[1] === root && args.length === 2;
   if (script === SESSION_CLEANUP_SCRIPT) return sanctionedSessionCleanupArgs(args, root);
   if (script === PIPELINE_STATE_SCRIPT) {
     return sanctionedPoAuthorityRebindArgs(args);

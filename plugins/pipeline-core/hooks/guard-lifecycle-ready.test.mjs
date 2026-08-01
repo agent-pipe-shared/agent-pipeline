@@ -38,6 +38,7 @@ const V3_BOOTSTRAP_AUTHORITY_SCRIPT = fileURLToPath(new URL("../scripts/v3-boots
 const START_PREFLIGHT_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-start-preflight.mjs", import.meta.url));
 const HOST_REPOSITORY_INIT_SCRIPT = fileURLToPath(new URL("../scripts/codex-host-repository-init.mjs", import.meta.url));
 const SESSION_CLEANUP_SCRIPT = fileURLToPath(new URL("../scripts/session-cleanup.mjs", import.meta.url));
+const SESSION_CAPABILITY_DIAGNOSE_SCRIPT = fileURLToPath(new URL("../scripts/session-capability-diagnose.mjs", import.meta.url));
 const PIPELINE_STATE_SCRIPT = fileURLToPath(new URL("../scripts/pipeline-state.mjs", import.meta.url));
 const PO_PROFILE_REPAIR_SCRIPT = fileURLToPath(new URL("../scripts/po-gate-profile-repair.mjs", import.meta.url));
 const PROJECT_AUTHORITY_MIGRATION_SCRIPT = fileURLToPath(new URL("../scripts/project-authority-migration.mjs", import.meta.url));
@@ -892,10 +893,15 @@ test("H3 recovery commands admit only exact plugin-local argv and reject lookali
     assert.equal(isSanctionedLifecycleCommand(`${base} plan-source-recovery --root ${path}`, path), true);
     assert.equal(isSanctionedLifecycleCommand(`${base} plan-manifest-repair --root ${path}`, path), true);
     assert.equal(isSanctionedLifecycleCommand(`${base} apply-manifest-repair --root ${path} --plan-sha256 ${digest} --activate`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`${base} plan-reinstall --root ${path}`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`${base} apply-reinstall --root ${path} --plan-sha256 ${digest} --activate`, path), true);
+    assert.equal(isSanctionedLifecycleCommand(`node ${SESSION_CAPABILITY_DIAGNOSE_SCRIPT} --repo ${path}`, path), true);
     for (const hostile of [
       `${base} plan-manifest-repair --root ${path} --activate`,
       `${base} apply-manifest-repair --root ${path} --plan-sha256 ${digest}`,
       `${base} apply-manifest-repair --root ${path}/.. --plan-sha256 ${digest} --activate`,
+      `${base} apply-reinstall --root ${path} --plan-sha256 ${digest}`,
+      `node ${SESSION_CAPABILITY_DIAGNOSE_SCRIPT} --repo /tmp/other`,
       `${base} plan-manifest-repair --root ${path}; touch ${path}/x`,
       `node ${join(path, "plugins/pipeline-core/scripts/project-onboarding-v3.mjs")} plan-manifest-repair --root ${path}`,
     ]) assert.equal(isSanctionedLifecycleCommand(hostile, path), false, hostile);
