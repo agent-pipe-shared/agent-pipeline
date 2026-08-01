@@ -247,7 +247,9 @@ inventory.
    canonical Handover, Phoenix Recovery audit, self-retro item, Error Register,
    Continuity transition, and all verification evidence remain written. Do not
    bypass or approve the plan merely to fill those two records; reconcile them
-   through a sanctioned close-artifact path.
+   through a sanctioned close-artifact path. **Owner:** Phoenix close owner
+   (Elephant). **Expiry:** 2026-08-08; resolve it or obtain an explicit PO waiver
+   before any Phoenix push or final acceptance.
 
 No remote action is implied by this handover. The renewed approval remains
 limited to the exact bound Phoenix PRD and Spec; every later material revision

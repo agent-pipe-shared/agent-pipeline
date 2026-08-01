@@ -415,7 +415,9 @@ implementation. Those two optional-to-product but mandatory-to-ritual writes
 were not bypassed. Their intended sanitized content is represented by this
 Recovery entry, the canonical handover, Error Register, and self-retro item;
 the root records remain an explicitly open close-routine residual requiring a
-sanctioned close-artifact path, not premature plan approval.
+sanctioned close-artifact path, not premature plan approval. **Owner:** Phoenix
+close owner (Elephant). **Expiry:** 2026-08-08; resolve it or obtain an explicit
+PO waiver before any Phoenix push or final acceptance.
 
 ## R-12 — Authorized Phoenix design-review reopening and external-handoff scope
 
