@@ -1,7 +1,7 @@
 {
   "schema": "pipeline.state.v0",
   "planApproved": true,
-  "updatedAt": "2026-08-01T16:58:12.623Z",
+  "updatedAt": "2026-08-01T17:43:04.871Z",
   "closedFeatures": [
     {
       "id": "codex-onboarding-0.4.5",
@@ -20,7 +20,7 @@
   "continuity": {
     "schema": "pipeline.continuity.v0",
     "featureId": "sprint-phoenix-epic",
-    "revision": 12,
+    "revision": 13,
     "runtime": {
       "humanFacingLanguage": "en",
       "activeDuty": "Coordinator",
@@ -29,11 +29,11 @@
     "authority": {
       "prd": {
         "path": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-        "sha256": "27ff8b211136bb132566e9f0dbafa04bad6a2355aade83b241d194a782db9362"
+        "sha256": "357f1f62975eb95bae927d55be41b265e1a0111e0fdde79930fe11829beb76c5"
       },
       "spec": {
         "path": "specs/sprint-phoenix-epic/spec.md",
-        "sha256": "238d05dd36936f428e05d732ffedc925fe8f3702d9fcdcb33a4a68d9711bf356"
+        "sha256": "39912b05660026f5dc82efa5f37aca33b7899d99ff8b29ced1545a9cb389f57f"
       },
       "result": {
         "path": "specs/sprint-phoenix-epic/result.md",
@@ -69,7 +69,7 @@
     "approvedBy": "PO reauthorization for Phoenix R-14 digest binding",
     "approvedAt": "2026-07-27T19:28:45.190Z",
     "specBoundBy": "PO reauthorization for Phoenix R-14 digest binding",
-    "specBoundAt": "2026-08-01T12:07:31.481Z",
+    "specBoundAt": "2026-08-01T17:41:34.394Z",
     "poGateAuthority": {
       "schema": "pipeline.po-gate-authority.v2",
       "humanFacing": "en",
@@ -78,9 +78,9 @@
       "receiptSha256": "4b85ce328c1dd2056a5d263c6ca2a7afe8d23886771d29cf25ba0d1185c3cd31",
       "repositoryFingerprint": "92f4f001424af56c17e443aec9969d0ff5ac0e426b8f388fe06d4b1800aa2d35",
       "planPath": "specs/sprint-phoenix-epic/prd_phoenix-epic.md",
-      "planSha256": "27ff8b211136bb132566e9f0dbafa04bad6a2355aade83b241d194a782db9362",
+      "planSha256": "357f1f62975eb95bae927d55be41b265e1a0111e0fdde79930fe11829beb76c5",
       "specPath": "specs/sprint-phoenix-epic/spec.md",
-      "specSha256": "238d05dd36936f428e05d732ffedc925fe8f3702d9fcdcb33a4a68d9711bf356"
+      "specSha256": "39912b05660026f5dc82efa5f37aca33b7899d99ff8b29ced1545a9cb389f57f"
     }
   },
   "pushApproval": {

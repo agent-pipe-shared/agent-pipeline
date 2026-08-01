@@ -337,9 +337,13 @@ architecture prose or an implementation briefing.
   `draft` bootstrap preview required to bind initial creation; it SHALL NOT
   introduce a separate planner or bypass the resulting receipt. This writer
   SHALL also reconcile the inherited Phoenix `draft` manifest's stale PRD,
-  Spec, acceptance, and architecture digests only through an
+  Spec, acceptance, architecture, and Result digests only through an
   existing-manifest preview, exact PO-bound apply, and readback, with no
   lifecycle-state, artifact-set, candidate, or other authority-byte change.
+  A Result reconciliation SHALL be admitted only when the current Result is
+  bound by Continuity State and proves the exact stale manifest digest as its
+  preserved historical prefix followed by the canonical Result-reconciliation
+  fence; a metadata-only Result digest refresh SHALL be refused.
   It SHALL NOT permit manual digest replacement to stand in for that
   transaction. This writer
   closure SHALL be the

@@ -954,7 +954,7 @@ slice A owns this exact closed inventory:
 | `governance/artifact-topology.json` | register the lifecycle request, transaction journal, sanitized receipt and candidate-evidence classes at their sole canonical roots without making temporary journals portable authority |
 | `docs/artifact-topology.md` | document discovery, state/authority mapping, bootstrap limitation, transaction/recovery sequence, retention and the prohibition on legacy/path-guess authority |
 | `harness/scripts/verify.mjs` | register the focused writer/recovery suite and the topology validator in the single repository Verify gate |
-| `specs/sprint-phoenix-epic/lifecycle.json` | reconcile its existing `draft` postimage only through `feature-package-plan` → exact PO-bound `feature-package-apply` → readback; the request binds its current digest and proposes only the current PRD, Spec, acceptance, and architecture digest values | Repair stale authority bindings without a manual manifest edit, artifact-set expansion, or lifecycle-state transition |
+| `specs/sprint-phoenix-epic/lifecycle.json` | reconcile its existing `draft` postimage only through `feature-package-plan` → exact PO-bound `feature-package-apply` → readback; the request binds its current digest and proposes only the current PRD, Spec, acceptance, architecture, and proven append-only Result digest values | Repair stale authority bindings without a manual manifest edit, artifact-set expansion, lifecycle-state transition, or Result-history rewrite |
 
 `feature-package-plan` is read-only and emits a closed
 `pipeline.feature-package-transition-request.v1` plus its SHA-256. The request
@@ -969,15 +969,19 @@ that repo-relative request plus its exact digest and expected current preimage;
 it never accepts free-form manifest bytes.
 
 For the inherited Phoenix `draft` manifest, PHX-0A additionally performs one
-closed reconciliation of the four stale authority digest bindings (PRD, Spec,
-acceptance, and architecture). It uses the same existing-manifest planner and
+closed reconciliation of the five stale authority digest bindings (PRD, Spec,
+acceptance, architecture, and Result). It uses the same existing-manifest planner and
 transactional writer, with the exact current manifest as preimage and an
 unchanged feature ID, artifact inventory, mutability, retention, candidate,
 supersedes value, and lifecycle state. The plan may propose no other byte
 change; only an exact Product Owner decision bound to that preview permits the
-apply, and the writer's readback is the sole completion evidence. This is not
-a manual authority-manifest edit, an implicit approval, or a lifecycle
-transition.
+apply, and the writer's readback is the sole completion evidence. The Result
+path is narrower still: its artifact metadata must be authoritative,
+`append-only`, and `active`; its current bytes must be the exact stale
+manifest-bound historical prefix followed by the canonical
+Result-reconciliation fence; and Continuity State must bind those exact current
+Result bytes. This is not a manual authority-manifest edit, an implicit
+approval, a lifecycle transition, or a mechanism for rewriting Result history.
 
 Apply obtains one package-local exclusive lock, writes a closed recovery
 journal before the first replace, writes and syncs a same-directory temporary

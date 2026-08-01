@@ -2537,6 +2537,13 @@ function reconcileDraftPreview(dir, manifestPath) {
     if (artifactClass === "result" && (matches[0].authority !== true || matches[0].mutability !== "append-only" || matches[0].retention !== "active")) return { ok: false, code: "PS-FEATURE-RECONCILE-SHAPE" };
     const current = currentRepoArtifact(dir, path);
     if (!current) return { ok: false, code: "PS-FEATURE-RECONCILE-SOURCE" };
+    if (artifactClass === "result" && current.sha256 !== matches[0].sha256) {
+      const historical = observeHistoricalResultForReconciliation(dir, path);
+      const state = readState(dir); const continuity = state.status === "ok" ? state.state.continuity : null;
+      const bound = continuity ? continuityResultMatchesState(dir, continuity) : { ok: false };
+      if (!historical?.postimage || sha256Bytes(historical.historical) !== matches[0].sha256
+        || !bound.ok || continuity.authority.result?.path !== path || continuity.authority.result.sha256 !== current.sha256) return { ok: false, code: "PS-FEATURE-RECONCILE-RESULT-PROOF" };
+    }
     if (current.sha256 !== matches[0].sha256) replacements.push({ index: value.artifacts.indexOf(matches[0]), old: matches[0].sha256, next: current.sha256 });
   }
   if (replacements.length === 0) return { ok: false, code: "PS-FEATURE-RECONCILE-NOOP" };

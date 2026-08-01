@@ -364,7 +364,7 @@ files are excepted only when their path is already declared here.
 | `plugins/pipeline-core/lib/project-authority.test.mjs` | cover preview, explicit activation, readback, and no-op replay of the neutral Result-path correction | Prove the correction cannot become a general State writer. |
 | `plugins/pipeline-core/scripts/project-authority-migration.mjs` | expose the closed `reconcile-state` operator operation with pre-write preview | Keep the correction behind the sanctioned project-authority boundary. |
 | `plugins/pipeline-core/scripts/project-authority-migration.test.mjs` | cover the operator command and readback | Prove the human-facing write route is explicit and bounded. |
-| `specs/sprint-phoenix-epic/lifecycle.json` | reconcile only the existing draft manifest's stale PRD, Spec, acceptance, and architecture digest bindings through the PHX-0A feature-package writer | Keep the reviewed artifact set and `draft` state intact while replacing no authority bytes except the four writer-planned current digest values; forbid manual editing, direct hash replacement, or a state transition. |
+| `specs/sprint-phoenix-epic/lifecycle.json` | reconcile only the existing draft manifest's stale PRD, Spec, acceptance, architecture, and proven append-only Result digest bindings through the PHX-0A feature-package writer | Keep the reviewed artifact set and `draft` state intact while replacing no authority bytes except the five writer-planned current digest values; admit Result only when its manifest-bound historical prefix, canonical reconciliation fence, and Continuity-State binding all read back exactly; forbid manual editing, direct hash replacement, history rewrite, or a state transition. |
 
 ### 7.2 Ruleset-source trust root
 

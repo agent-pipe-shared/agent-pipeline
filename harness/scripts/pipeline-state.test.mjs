@@ -2161,6 +2161,8 @@ if (symlinkCapable) {
 {
   const dir = freshDir("phx-feature-reconcile");
   const id = "sprint-phoenix-epic"; const base = `specs/${id}`; const planPath = `${base}/prd_phoenix-epic.md`;
+  const resultHistorical = "# Phoenix Result\n";
+  const resultPostimage = `${resultHistorical}\`\`\`pipeline-result\n{"courseDecisionIntents":[],"courseDecisionReceipts":[],"decisionBriefs":[],"finalIntegrations":[]}\n\`\`\`\n`;
   const artifact = (artifactClass, path, bytes, authority = false) => {
     mkdirSync(dirname(join(dir, path)), { recursive: true }); writeFileSync(join(dir, path), bytes);
     return { class: artifactClass, path, sha256: createHash("sha256").update(`stale:${path}`).digest("hex"), authority, mutability: "mutable", retention: artifactClass === "design" ? "retain" : "active" };
@@ -2170,9 +2172,9 @@ if (symlinkCapable) {
     artifact("spec", `${base}/spec.md`, "# Phoenix Spec\n", true),
     artifact("acceptance", `${base}/acceptance.md`, "# Phoenix Acceptance\n", true),
     artifact("design", `${base}/design/architecture.md`, "# Phoenix Architecture\n"),
-    artifact("result", `${base}/result.md`, "# Phoenix Result\n", true),
+    artifact("result", `${base}/result.md`, resultPostimage, true),
   ];
-  artifacts[4].mutability = "append-only";
+  artifacts[4].mutability = "append-only"; artifacts[4].sha256 = createHash("sha256").update(resultHistorical).digest("hex");
   const manifestPath = `${base}/lifecycle.json`;
   const manifest = { schema: "pipeline.feature-package.v1", feature: { id, rigor: 2 }, state: "draft", artifacts, candidate: null, supersedes: null };
   const before = `${JSON.stringify(manifest, null, 2)}\n`;
@@ -2181,6 +2183,16 @@ if (symlinkCapable) {
   mkdirSync(join(dir, ".claude"), { recursive: true });
   const approval = { schema: "pipeline.plan-approval.v2", approvedBy: "PO", approvedAt: "2026-07-27T00:00:00.000Z", specBoundBy: "PO", specBoundAt: "2026-07-27T00:00:00.000Z", poGateAuthority: authority };
   writeFileSync(statePath(dir), `${JSON.stringify({ schema: SCHEMA_ID, activeFeature: { id, planPath, phase: "implementation" }, planApproved: true, planApproval: approval }, null, 2)}\n`);
+  const continuity = continuityState({
+    featureId: id,
+    authority: {
+      prd: { path: planPath, sha256: createHash("sha256").update("# Phoenix PRD\n").digest("hex") },
+      spec: { path: `${base}/spec.md`, sha256: createHash("sha256").update("# Phoenix Spec\n").digest("hex") },
+      result: { path: `${base}/result.md`, sha256: createHash("sha256").update(resultPostimage).digest("hex") },
+    },
+    queueHead: continuityQueue({ dispatch: null }),
+  });
+  run(continuityArgs("continuity-init", "absent", writeRequest(dir, "reconcile-continuity-init", continuity)), continuityDeps(dir));
   const proposed = writeRequest(dir, "reconcile-proposal", { operation: "reconcile-draft", targetState: "draft" });
   const planned = captureConsoleLog(() => run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", proposed, "--idempotency-key", "phx-reconcile-01", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir, poGateAuthority }));
   const plan = JSON.parse(planned.text); const request = plan.request;
@@ -2195,7 +2207,7 @@ if (symlinkCapable) {
   ok("PHX0A4 existing draft plan binds exactly the active PO approval", planned.value === 0 && request.operation === "reconcile-draft" && request.manifestPreimage === createHash("sha256").update(before).digest("hex") && request.authority.decision.approvalSha256 === sha256CanonicalJson(approval));
   ok("PHX0A5 existing draft reconciliation rejects a mismatched PO decision without mutation", deniedCode === 2 && deniedPreserved);
   const receipt = JSON.parse(readFileSync(join(dir, `${base}/evidence/lifecycle/feature-package-phx-reconcile-01.json`), "utf8"));
-  ok("PHX0A6 existing draft reconciliation updates only the five planned digest bindings, including the append-only Result, and replays zero-write", applied === 0 && changedDigests === 5 && afterValue.artifacts[4].sha256 === createHash("sha256").update("# Phoenix Result\n").digest("hex") && afterValue.state === "draft" && JSON.stringify(afterValue.feature) === JSON.stringify(manifest.feature) && JSON.stringify(afterValue.candidate) === "null" && JSON.stringify(afterValue.supersedes) === "null" && replay === 0 && readFileSync(join(dir, manifestPath), "utf8") === after && /^fp-[a-f0-9]{16}$/.test(receipt.correlation) && !/[a-f0-9]{32}/.test(JSON.stringify(receipt)));
+  ok("PHX0A6 existing draft reconciliation updates only the five planned digest bindings, including the proven append-only Result, and replays zero-write", applied === 0 && changedDigests === 5 && afterValue.artifacts[4].sha256 === createHash("sha256").update(resultPostimage).digest("hex") && afterValue.state === "draft" && JSON.stringify(afterValue.feature) === JSON.stringify(manifest.feature) && JSON.stringify(afterValue.candidate) === "null" && JSON.stringify(afterValue.supersedes) === "null" && replay === 0 && readFileSync(join(dir, manifestPath), "utf8") === after && /^fp-[a-f0-9]{16}$/.test(receipt.correlation) && !/[a-f0-9]{32}/.test(JSON.stringify(receipt)));
   writeFileSync(join(dir, manifestPath), after.replace("  \"schema\":", "\t\"schema\" :").replaceAll("\n", "\r\n"));
   writeFileSync(join(dir, planPath), "# Phoenix PRD revised\n");
   writeFileSync(join(dir, `${base}/acceptance.md`), "# Phoenix Acceptance revised\n");
@@ -2207,6 +2219,10 @@ if (symlinkCapable) {
   const partialChanges = partialBefore.artifacts.filter((entry, index) => entry.sha256 !== partialAfter.artifacts[index].sha256).length;
   const expectedPartialBytes = partialBeforeBytes.replace(partialBefore.artifacts[0].sha256, partialAfter.artifacts[0].sha256).replace(partialBefore.artifacts[2].sha256, partialAfter.artifacts[2].sha256);
   ok("PHX0A7 draft reconciliation binds and updates only the two artifacts that drifted without reformatting other bytes", partialApplied === 0 && partialChanges === 2 && partialBefore.artifacts[1].sha256 === partialAfter.artifacts[1].sha256 && partialBefore.artifacts[3].sha256 === partialAfter.artifacts[3].sha256 && partialAfterBytes === expectedPartialBytes && partialAfterBytes.includes("\r\n\t\"schema\" :"));
+  writeFileSync(join(dir, `${base}/result.md`), `# Rewritten Result\n\`\`\`pipeline-result\n{"courseDecisionIntents":[],"courseDecisionReceipts":[],"decisionBriefs":[],"finalIntegrations":[]}\n\`\`\`\n`);
+  const resultAttackBefore = readFileSync(join(dir, manifestPath), "utf8");
+  const resultAttack = captureConsoleLog(() => run(["feature-package-plan", "--manifest", manifestPath, "--proposal-file", writeRequest(dir, "reconcile-result-attack", { operation: "reconcile-draft", targetState: "draft" }), "--idempotency-key", "result-rewrite-attack", "--expires-at", "2030-01-01T00:00:00.000Z"], { dir, poGateAuthority }));
+  ok("PHX0A7a Result reconciliation refuses a rewritten historical prefix before any manifest mutation", resultAttack.value === 2 && readFileSync(join(dir, manifestPath), "utf8") === resultAttackBefore);
 }
 
 // ---- PHX0A: one explicit mutable non-authority design-artifact reconciliation ----
